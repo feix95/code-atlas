@@ -8,6 +8,8 @@
   --accent-soft: rgba(79, 110, 247, 0.12);
   --border: #e5e7eb;
   --danger: #d64545;
+  --git-add: #1a7f37;
+  --git-rename: #9a6700;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +22,8 @@
     --accent-soft: rgba(123, 150, 255, 0.15);
     --border: #2d3340;
     --danger: #ef6b6b;
+    --git-add: #3fb950;
+    --git-rename: #d29922;
   }
 }
 
@@ -526,6 +530,122 @@ body {
   border-radius: 8px;
   padding: 12px 14px;
   white-space: pre-wrap;
+}
+
+/* ── git 修改卡(第七锤) ───────────── */
+
+.git {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.git-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.git-branch {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.git-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.git-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.git-row:hover {
+  background: var(--accent-soft);
+}
+
+.git-row.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.git-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  color: var(--text-muted);
+}
+
+.git-badge--added {
+  color: var(--git-add);
+  border-color: var(--git-add);
+}
+
+.git-badge--modified {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.git-badge--deleted {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.git-badge--renamed {
+  color: var(--git-rename);
+  border-color: var(--git-rename);
+}
+
+.git-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Consolas, Menlo, monospace;
+}
+
+.git-staged {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--git-add);
+  background: color-mix(in srgb, var(--git-add) 12%, transparent);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.git-numstat {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.git-numstat.is-binary {
+  color: var(--text-muted);
+}
+
+.git-add {
+  color: var(--git-add);
+  font-weight: 600;
+}
+
+.git-del {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 /* ── 目录树 ───────────────────────── */

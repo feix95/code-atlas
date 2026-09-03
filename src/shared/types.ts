@@ -112,6 +112,41 @@ export interface DepGraphResult {
   durationMs: number
 }
 
+/** git 改动清单里的一个文件 */
+export interface GitChange {
+  relPath: string
+  /** 重命名前的旧路径(仅 kind = renamed 时有) */
+  oldPath?: string
+  kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+  /** 这次改动是否已进暂存区(untracked 恒为 false) */
+  staged: boolean
+  /** 新增行数;二进制文件为 -1 */
+  additions: number
+  /** 删除行数;二进制文件为 -1 */
+  deletions: number
+  /** 二进制文件:git 没法逐行对比 */
+  binary: boolean
+}
+
+/** 项目当前的 git 改动总览:谁动了、动了多少行 */
+export interface GitChangesResult {
+  rootPath: string
+  /** false = 这个文件夹不在 git 仓库里,changes 为空,靠界面提示 */
+  isGitRepo: boolean
+  /** 当前分支名;仓库还没有任何提交时为"(还没有提交)" */
+  branch: string
+  changes: GitChange[]
+  stats: {
+    /** 有改动的文件数 */
+    changed: number
+    /** 全部新增行合计(二进制不计) */
+    additions: number
+    /** 全部删除行合计(二进制不计) */
+    deletions: number
+  }
+  durationMs: number
+}
+
 /** AI 解释的模型配置(指向 LM Studio 这类本地服务的 OpenAI 兼容接口) */
 export interface AiConfig {
   /** 服务根地址,常以 /v1 结尾,如 http://127.0.0.1:1234/v1 */

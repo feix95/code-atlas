@@ -19,7 +19,8 @@
     "test:paths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-paths.mts",
     "test:depgraph": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-depgraph.mts",
     "test:ai": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-ai.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai"
+    "test:git": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-git.mts",
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:git"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -4,7 +4,8 @@ import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
-import { explainWithModel, isExplainable, buildExplainPrompt } from '../ai/index.ts'
+import { collectGitChanges, getChangeDiff } from '../git/index.ts'
+import { explainWithModel, isExplainable, buildExplainPrompt, buildDiffPrompt, DIFF_SYSTEM_PROMPT } from '../ai/index.ts'
 import { loadAiConfig, saveAiConfig } from '../ai/config.ts'
 import { joinRoot } from '../shared/paths.ts'
 import type { AiConfig, FileStructure } from '../shared/types.ts'
@@ -106,6 +107,43 @@ function registerIpc(): void {
     }
     const data = (await res.json()) as { data?: Array<{ id: string }> }
     return (data.data ?? []).map((m) => m.id)
+  })
+
+  // git 改动总览:谁动了、动了多少行。不是 git 仓库时返回 isGitRepo=false,不炸
+  ipcMain.handle('atlas:git-changes', (_event, rootPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath.trim() === '') {
+      throw new Error('路径不能为空')
+    }
+    return collectGitChanges(rootPath)
+  })
+
+  // 人话讲解一个改动:diff 由主进程现场重取(不信任渲染进程传内容),再喂本地模型
+  // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
+  ipcMain.handle('atlas:git-explain-change', async (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+      throw new Error('参数不合法')
+    }
+    const changes = await collectGitChanges(rootPath)
+    if (!changes.isGitRepo) {
+      return { status: 'error', text: '这个文件夹不在 git 仓库里,没有改动可讲', model: '', durationMs: 0 }
+    }
+    const change = changes.changes.find((c) => c.relPath === relPath)
+    if (!change) {
+      return { status: 'error', text: '这个文件当前没有改动', model: '', durationMs: 0 }
+    }
+    const changeDiff = await getChangeDiff(rootPath, change)
+    if (!changeDiff) {
+      return { status: 'error', text: change.binary ? '二进制文件没法逐行对比,讲不了' : '这个文件太大,讲不了(先拆小再试)', model: '', durationMs: 0 }
+    }
+    if (!changeDiff.diff.trim()) {
+      return { status: 'error', text: '这个文件没有可逐行对比的内容(可能只改了权限/编码)', model: '', durationMs: 0 }
+    }
+    const config = await loadAiConfig(app.getPath('userData'))
+    if (!config.model) {
+      return { status: 'error', text: '还没配置模型,先去「AI 设置」里连一下 LM Studio', model: '', durationMs: 0 }
+    }
+    const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
+    return explainWithModel(config, prompt, DIFF_SYSTEM_PROMPT)
   })
 
   // 人话解释:读文件(joinRoot) → AST → 拼提示词 → 调本地模型。路径契约同 analyze-file

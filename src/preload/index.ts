@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AiConfig, AiExplainResult, DepGraphResult, FileStructure, ScanResult } from '../shared/types.ts'
+import type { AiConfig, AiExplainResult, DepGraphResult, FileStructure, GitChangesResult, ScanResult } from '../shared/types.ts'
 
 // 挂在 window.atlas 命名空间下:版本信息、选文件夹、扫描、AST 分析,都从这儿走
 contextBridge.exposeInMainWorld('atlas', {
@@ -17,5 +17,8 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
   aiExplainFile: (rootPath: string, relPath: string, languageId: string): Promise<AiExplainResult> =>
-    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId)
+    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId),
+  gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
+  gitExplainChange: (rootPath: string, relPath: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath)
 })

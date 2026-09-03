@@ -4,6 +4,7 @@ import { AiSettings } from './components/AiSettings'
 import { ExplainCard } from './components/ExplainCard'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
+import { GitChanges } from './components/GitChanges'
 import { StructureGrid } from './components/StructureGrid'
 
 interface Versions {
@@ -81,6 +82,7 @@ function App(): React.JSX.Element {
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
   const [showAiSettings, setShowAiSettings] = useState(false)
+  const [showGit, setShowGit] = useState(false)
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -94,6 +96,7 @@ function App(): React.JSX.Element {
     setAnalyzeNote(null)
     setGraph(null)
     setGraphNote(null)
+    setShowGit(false)
     try {
       setResult(await window.atlas.scanFolder(dir))
     } catch (err) {
@@ -160,6 +163,11 @@ function App(): React.JSX.Element {
         <button type="button" className="btn btn-ghost" onClick={() => setShowAiSettings((v) => !v)}>
           ⚙️ AI 设置
         </button>
+        {folder && (
+          <button type="button" className="btn btn-ghost" onClick={() => setShowGit((v) => !v)}>
+            🌿 Git 修改
+          </button>
+        )}
         {folder && <span className="current-path">{folder}</span>}
       </header>
 
@@ -168,6 +176,13 @@ function App(): React.JSX.Element {
           <section className="summary">
             <div className="bars-title">⚙️ AI 人话解释设置</div>
             <AiSettings />
+          </section>
+        )}
+
+        {showGit && folder && !scanning && (
+          <section className="summary">
+            <div className="bars-title">🌿 git 修改翻译 —— 谁动了代码,讲给你听</div>
+            <GitChanges rootPath={folder} onJump={jumpTo} />
           </section>
         )}
 

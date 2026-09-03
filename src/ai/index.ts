@@ -13,6 +13,15 @@ const SYSTEM_PROMPT = `你是 CodeAtlas 的"代码人话翻译官"。
 3. 用中文,短句,最多 3-5 句。像跟朋友讲解一样自然。
 4. 如果结构信息太少看不出用途,就诚实说"看不出这个文件具体做什么",并说说你唯一能确定的点。`
 
+/** git 改动翻译的专属人设:只讲 diff 里真实发生的改动 */
+export const DIFF_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码改动翻译官"。
+你的任务:把 Given 的一次代码改动(git diff),用普通没学过编程的人也能看懂的大白话,讲清楚"这次改了什么、大概为什么改、会影响哪里"。
+铁律:
+1. 只依据 Given 里的 diff 内容说话,绝不猜测、绝不编造 diff 里没有的改动。
+2. 不输出废话、不寒暄。
+3. 用中文,短句,最多 3-5 句。
+4. 如果改动太碎看不出意图,就老实说"这是一批小调整",再挑你最有把握的一两点讲。`
+
 function formatStructureLines(structure: FileStructure): string[] {
   const lines: string[] = []
   if (structure.functions.length > 0) lines.push(`函数:${structure.functions.join(', ')}`)
@@ -65,6 +74,33 @@ export function isExplainable(languageId: string): boolean {
   return /^(typescript|typescript-react|javascript|javascript-react|python)$/.test(languageId)
 }
 
+/** 改动种类 → 人话(提示词和界面共用一份口径) */
+export function gitKindName(kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'): string {
+  const names: Record<typeof kind, string> = {
+    added: '新增',
+    modified: '修改',
+    deleted: '删除',
+    renamed: '重命名',
+    untracked: '新文件'
+  }
+  return names[kind]
+}
+
+/** 固定格式提示词:把一次改动的 diff 摆给模型,让它只翻译不编造 */
+export function buildDiffPrompt(change: { relPath: string; kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'; diff: string }): string {
+  const evidence = change.diff.trim()
+    ? `改动内容(git diff):\n${change.diff}`
+    : '改动内容:(空的,没有可逐行对比的内容。如果没有任何改动信息,直接说看不出这次改了什么,不要编造。)'
+  return [
+    `文件:${change.relPath}`,
+    `改动类型:${gitKindName(change.kind)}`,
+    '',
+    evidence,
+    '',
+    '请根据上面的改动内容,用大白话告诉我:这次改动做了什么,大概会影响哪里。'
+  ].join('\n')
+}
+
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>
 }
@@ -72,8 +108,9 @@ interface ChatCompletionResponse {
 /**
  * 调 LM Studio 的 OpenAI 兼容接口,拿到人话解释。
  * 能力边界:结构太稀疏或服务不通时,返回对应的 status,不影响界面。
+ * system 参数留给不同的"翻译官"人设(文件解释 / 改动翻译),默认是文件解释。
  */
-export async function explainWithModel(config: AiConfig, prompt: string): Promise<AiExplainResult> {
+export async function explainWithModel(config: AiConfig, prompt: string, system: string = SYSTEM_PROMPT): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
   try {
@@ -88,7 +125,7 @@ export async function explainWithModel(config: AiConfig, prompt: string): Promis
       body: JSON.stringify({
         model: config.model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: system },
           { role: 'user', content: prompt }
         ],
         temperature: 0.2,
