@@ -48,7 +48,7 @@ export function FolderCard({ rootPath, relPath, name }: { rootPath: string; relP
         {busy && (streamText ? (
           <div className="explain-text">✨ {streamText}<span className="stream-caret">▌</span></div>
         ) : (
-          <div className="explain-note">正在看这个文件夹里装了什么,组织人话……</div>
+          <div className="explain-note">正在等本地模型看完这个文件夹、组织人话(第一次要热身,可能得等一会儿)……</div>
         ))}
         {!busy && result?.status === 'supported' && <div className="explain-text">✨ {result.text}</div>}
         {!busy && result?.status === 'unsupported' && <div className="explain-note">{result.text}</div>}

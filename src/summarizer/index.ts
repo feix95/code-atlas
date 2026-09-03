@@ -338,6 +338,11 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
     return { emoji: '📁', text: '还没探:点开它,马上帮你探这一层' }
   }
 
+  // 这层打开被拒(多半是 Windows 锁住的系统文件夹):老实说"不让看",别谎报成空文件夹
+  if (node.truncated && fileCount === 0 && directDirs === 0) {
+    return { emoji: '🔒', text: '系统不让看:被 Windows 锁住的内部文件夹,不是空的,也不用看' }
+  }
+
   if (fileCount === 0 && directDirs === 0) {
     return { emoji: '📂', text: '空文件夹:暂时啥也没装' }
   }

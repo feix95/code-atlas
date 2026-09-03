@@ -24,7 +24,10 @@ const IGNORED_NAMES = new Set([
   '.gradle',
   'Pods',
   '.DS_Store',
-  'Thumbs.db'
+  'Thumbs.db',
+  // Windows 的系统保险柜(还原点/索引账本),普通用户永远打不开,也绝不是代码:
+  // 放进来只会收获一个吓人的"不完整"徽标和一嘴谎话,直接绕开
+  'System Volume Information'
 ])
 
 /** 目录深度上限:防止超深目录把机器拖死 */

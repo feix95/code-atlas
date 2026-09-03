@@ -28,6 +28,17 @@ function extOf(name: string): string {
   return dot <= 0 ? '' : name.slice(dot).toLowerCase()
 }
 
+/**
+ * 文件夹/文件打不开时说人话:被 Windows 上锁的(EPERM/EACCES,常见于系统保护区)
+ * 和真不存在的,必须分成两种说法 —— 谎报"不存在"会让用户以为自己删了什么东西
+ */
+function accessDeniedMessage(err: NodeJS.ErrnoException, kind: '文件夹' | '文件', relPath: string): string {
+  if (err?.code === 'EPERM' || err?.code === 'EACCES') {
+    return `「${relPath}」被 Windows 上了锁,软件没钥匙看不了 —— 这类多半是系统自管的内部文件夹,不是你的项目内容,不看也不影响`
+  }
+  return `${kind}不存在:${relPath}`
+}
+
 /** 读文件开头 64KB 当「内容片段」;含 空字节 = 二进制,返回 null */
 async function readTextPreview(absPath: string): Promise<string | null> {
   const handle = await fs.open(absPath, 'r')
@@ -150,8 +161,11 @@ function registerIpc(): void {
     }
     if (!isAnalysisSupported(languageId)) return null
     const absPath = joinRoot(rootPath, relPath) // relPath 想越界(.. 上跳、盘符注入)会在这里被拦
-    const stat = await fs.stat(absPath).catch(() => null)
-    if (!stat || !stat.isFile()) {
+    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+    if (stat instanceof Error) {
+      throw new Error(accessDeniedMessage(stat, '文件', relPath))
+    }
+    if (!stat.isFile()) {
       throw new Error(`文件不存在:${relPath}`)
     }
     if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
@@ -317,11 +331,20 @@ function registerIpc(): void {
       return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
     }
     const absPath = joinRoot(rootPath, relPath)
-    const stat = await fs.stat(absPath).catch(() => null)
-    if (!stat || !stat.isDirectory()) {
-      throw new Error(`文件夹不存在:${relPath || '(根目录)'}`)
+    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+    if (stat instanceof Error) {
+      throw new Error(accessDeniedMessage(stat, '文件夹', relPath || '(根目录)'))
     }
-    const dirents = await fs.readdir(absPath, { withFileTypes: true })
+    if (!stat.isDirectory()) {
+      throw new Error(`这不是一个文件夹:${relPath || '(根目录)'}`)
+    }
+    let dirents
+    try {
+      dirents = await fs.readdir(absPath, { withFileTypes: true })
+    } catch (err) {
+      // stat 能过但 readdir 被拒:也是"锁着",不是空文件夹
+      throw new Error(accessDeniedMessage(err as NodeJS.ErrnoException, '文件夹', relPath || '(根目录)'), { cause: err })
+    }
     if (dirents.length === 0) {
       return { status: 'unsupported', text: '这是个空文件夹,啥也没装,就不用劳烦模型了', model: '', durationMs: 0 }
     }

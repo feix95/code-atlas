@@ -132,8 +132,13 @@ async function main(): Promise<void> {
   assert.ok(textOf(lazyPlain).includes('还没探'), '没名字线索的未探目录要老实说还没探,不是空')
   assert.ok(textOf(lazyVideos).startsWith('🖼️'), '名字认得出的未探目录保留字典标签(素材库)')
 
+  // ── 8.5 打开被拒的空目录(系统保护区):老实说"不让看",不许谎报成空文件夹 ──
+  const locked = dir('locked-vault', [], { truncated: true })
+  annotateSummaries(dir('proj', [locked]))
+  assert.ok(textOf(locked).startsWith('🔒'), `被锁的空目录要说系统不让看,实际:${textOf(locked)}`)
+
   console.log('✅ 全树速览自测全部通过')
-  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖 · 未探占位')
+  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖 · 未探占位 · 被锁目录')
 }
 
 main().catch((err) => {

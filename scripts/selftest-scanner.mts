@@ -12,6 +12,7 @@ async function main(): Promise<void> {
   await fs.mkdir(join(root, 'docs'), { recursive: true })
   await fs.mkdir(join(root, 'node_modules', 'leftpad'), { recursive: true })
   await fs.mkdir(join(root, '.git'), { recursive: true })
+  await fs.mkdir(join(root, 'System Volume Information'), { recursive: true })
   await fs.writeFile(join(root, 'src', 'index.ts'), 'export {}')
   await fs.writeFile(join(root, 'src', 'components', 'Button.tsx'), 'export {}')
   await fs.writeFile(join(root, 'docs', 'readme.md'), '# hi')
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   await fs.writeFile(join(root, 'photo.PNG'), 'fake') // 大写后缀,考验归一化
   await fs.writeFile(join(root, 'node_modules', 'leftpad', 'index.js'), 'fake')
   await fs.writeFile(join(root, '.git', 'HEAD'), 'fake')
+  await fs.writeFile(join(root, 'System Volume Information', 'tracking.log'), 'fake')
 
   try {
     const result = await scanDirectory(root)
@@ -28,10 +30,11 @@ async function main(): Promise<void> {
     assert.equal(result.stats.dirCount, 3, `文件夹数应为3,实际${result.stats.dirCount}`)
 
     // 2. node_modules 和 .git 被忽略
-    assert.equal(result.stats.ignoredCount, 2, '应忽略 node_modules 和 .git 两项')
+    assert.equal(result.stats.ignoredCount, 3, '应忽略 node_modules / .git / System Volume Information 三项')
     const childNames = result.tree.children.map((c) => c.name)
     assert.ok(!childNames.includes('node_modules'), 'node_modules 不该出现在树里')
     assert.ok(!childNames.includes('.git'), '.git 不该出现在树里')
+    assert.ok(!childNames.includes('System Volume Information'), 'Windows 系统保险柜不该出现在树里')
 
     // 3. 扩展名归一化:.PNG 计入 .png
     assert.equal(result.stats.byExt['.png'], 1, '大写 .PNG 应归一化为 .png')
