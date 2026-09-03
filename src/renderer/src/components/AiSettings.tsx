@@ -99,7 +99,7 @@ export function AiSettings(): React.JSX.Element {
               className="ai-input"
               value={config.builtin.modelPath}
               onChange={(e) => setConfig({ ...config, builtin: { ...config.builtin, modelPath: e.target.value } })}
-              placeholder="例如 F:\\LLM_Models\\Qwen\\...\\模型名.gguf"
+              placeholder="例如 D:\\models\\my-model.gguf"
             />
             <button type="button" className="btn" onClick={() => void handlePick()} disabled={busy}>
               📂 选择模型
