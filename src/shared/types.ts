@@ -1,5 +1,12 @@
 // 主进程与渲染进程共用的数据契约,两边都从这里导入,防止口径不一
 
+/** 全树速览给节点配的一句大白话标签(规则引擎现场算,不劳烦 AI) */
+export interface NodeSummary {
+  emoji: string
+  /** 一句话说清这是干嘛的;界面原样展示 */
+  text: string
+}
+
 export interface ScanFileNode {
   type: 'file'
   name: string
@@ -13,6 +20,8 @@ export interface ScanFileNode {
   ext: string
   /** 语言识别结果;认不出语言时不填 */
   language?: LanguageTag
+  /** 全树速览标签;规则引擎实在认不出时不填(界面不硬凑) */
+  summary?: NodeSummary
 }
 
 /** 一个文件的语言标签 */
@@ -46,6 +55,8 @@ export interface ScanDirNode {
   children: ScanTreeNode[]
   /** true 表示该目录读不了(无权限)或被深度上限截断,内容不完整 */
   truncated?: boolean
+  /** 全树速览标签;空文件夹等内容太薄时也会给(说它空着) */
+  summary?: NodeSummary
 }
 
 export type ScanTreeNode = ScanFileNode | ScanDirNode

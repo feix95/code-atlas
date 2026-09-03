@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, shell, BrowserWindow, type IpcMainInvokeEvent, ty
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
+import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
 import { collectGitChanges, getChangeDiff } from '../git/index.ts'
@@ -116,12 +117,16 @@ function registerIpc(): void {
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
 
-  // 扫描指定文件夹,返回目录树 + 统计
+  // 扫描指定文件夹,返回目录树 + 统计;顺手给每个节点打大白话速览标签
   ipcMain.handle('atlas:scan-folder', (_event, folderPath: unknown) => {
     if (typeof folderPath !== 'string' || folderPath.trim() === '') {
       throw new Error('路径不能为空')
     }
-    return scanDirectory(folderPath)
+    const result = scanDirectory(folderPath)
+    return result.then((r) => {
+      annotateSummaries(r.tree)
+      return r
+    })
   })
 
   // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)

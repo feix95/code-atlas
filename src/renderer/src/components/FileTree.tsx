@@ -24,6 +24,11 @@ function TreeRow({ node, depth, selectedPath, onSelectFile, onSelectFolder }: Tr
       >
         <span className="tree-icon">📄</span>
         <span className="tree-name">{node.name}</span>
+        {node.summary && (
+          <span className="tree-summary" title={node.summary.text}>
+            {node.summary.emoji} {node.summary.text}
+          </span>
+        )}
         {node.language?.source === 'content' && <span className="tree-lang">{node.language.name}</span>}
         {node.ext && <span className="tree-ext">{node.ext}</span>}
       </button>
@@ -43,6 +48,11 @@ function TreeRow({ node, depth, selectedPath, onSelectFile, onSelectFolder }: Tr
       >
         <span className="tree-icon">{open ? '📂' : '📁'}</span>
         <span className="tree-name">{node.name}</span>
+        {node.summary && (
+          <span className="tree-summary" title={node.summary.text}>
+            {node.summary.emoji} {node.summary.text}
+          </span>
+        )}
         {node.truncated && <span className="tree-badge">不完整</span>}
         <span className="tree-arrow">{open ? '▾' : '▸'}</span>
       </button>
