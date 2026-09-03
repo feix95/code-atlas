@@ -132,9 +132,43 @@ async function main(): Promise<void> {
     )
     assert.ok(tier.stats.lazyCount >= 1, `没探的目录要记账,实际 ${tier.stats.lazyCount}`)
 
+    // 分级扫描的路径契约:探子目录必须传全项目前缀,子树 relPath 才是全局坐标,拼回大树不断链
+    const sub = await scanDirectory(join(tierRoot, 'big'), 'big')
+    assert.equal(sub.tree.relPath, 'big', '子树根的 relPath 应带全项目前缀')
+    const subChild = sub.tree.children.find((c) => c.type === 'file')
+    assert.ok(subChild && subChild.relPath.startsWith('big/'), `子树节点的 relPath 必须以 'big/' 开头,实际 ${subChild?.relPath}`)
+    // 预算中途用尽:子树根照实挂 truncated(前端透传成"不完整"徽标)和 lazy(记账,拼树时清掉)
+    assert.equal(sub.tree.truncated, true, '子目录预算用尽要挂 truncated,不许装完整')
+    assert.equal(sub.tree.lazy, true, '被截断的子目录自己也要记一笔 lazy')
+
     console.log(`✅ 分级扫描自测通过:预算内探了 ${tier.stats.fileCount} 个文件 · ${tier.stats.lazyCount} 个目录挂"还没探"`)
   } finally {
     await fs.rm(tierRoot, { recursive: true, force: true })
+  }
+
+  // ── 9. 分级扫描的路径契约:多层子目录也要带全前缀;整项目扫描不传前缀,行为照旧 ──
+  const subRoot = join(tmpdir(), `code-atlas-subdir-selftest-${Date.now()}`)
+  await fs.mkdir(join(subRoot, 'src', 'lib'), { recursive: true })
+  await fs.writeFile(join(subRoot, 'src', 'lib', 'util.ts'), 'export {}')
+
+  try {
+    const sub = await scanDirectory(join(subRoot, 'src', 'lib'), 'src/lib')
+    assert.equal(sub.tree.relPath, 'src/lib', '子树根的 relPath 应是完整前缀')
+    assert.deepEqual(
+      sub.tree.children.map((c) => c.relPath),
+      ['src/lib/util.ts'],
+      '探子目录时子节点的 relPath 必须带全项目前缀,不许从子目录重新起算'
+    )
+
+    const whole = await scanDirectory(subRoot)
+    assert.equal(whole.tree.relPath, '', '整项目扫描的根 relPath 仍是空串')
+    const srcNode = whole.tree.children.find((c) => c.name === 'src')
+    const lib = srcNode?.type === 'directory' ? srcNode.children.find((c) => c.name === 'lib') : undefined
+    assert.ok(lib && lib.relPath === 'src/lib', '整项目扫描行为不变:子节点 relPath 照旧从根起算')
+
+    console.log('✅ 分级扫描路径契约自测通过:子树 relPath 是全局坐标,拼回大树不断链')
+  } finally {
+    await fs.rm(subRoot, { recursive: true, force: true })
   }
 }
 

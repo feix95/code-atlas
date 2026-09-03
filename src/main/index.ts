@@ -134,8 +134,8 @@ function registerIpc(): void {
     if (typeof rootPath !== 'string' || rootPath.trim() === '' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
-    // 路径契约:全项目唯一的绝对路径拼接点就是 joinRoot
-    const result = scanDirectory(joinRoot(rootPath, relPath))
+    // 路径契约:绝对路径拼接只走 joinRoot;子树 relPath 必须带全项目前缀,拼回大树才不断链
+    const result = scanDirectory(joinRoot(rootPath, relPath), relPath)
     return result.then((r) => {
       annotateSummaries(r.tree)
       return r

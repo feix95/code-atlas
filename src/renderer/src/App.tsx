@@ -74,12 +74,12 @@ function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
 function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): ScanDirNode {
   const parts = relPath === '' ? [] : relPath.split('/')
   if (parts.length === 0) {
-    // 重探根:换内容,身份(rootPath 相关的字段)照旧
-    return { ...root, children: sub.children, summary: sub.summary, lazy: undefined, truncated: undefined }
+    // 重探根:换内容,身份(rootPath 相关的字段)照旧;truncated 照实透传,子目录没探完不许装完整
+    return { ...root, children: sub.children, summary: sub.summary, lazy: undefined, truncated: sub.truncated }
   }
   const walk = (node: ScanDirNode, i: number): ScanDirNode => {
     if (i === parts.length) {
-      return { ...node, children: sub.children, summary: sub.summary, lazy: undefined, truncated: undefined }
+      return { ...node, children: sub.children, summary: sub.summary, lazy: undefined, truncated: sub.truncated }
     }
     return {
       ...node,

@@ -167,8 +167,11 @@ async function scanDir(
 /**
  * 扫描一个目录,返回完整目录树 + 统计。
  * 只做结构化,不做任何"解释"——解释是后面 AI 模块的事。
+ *
+ * baseRelPath:分级扫描探子目录时必须传入它在全项目里的前缀(如 'src/lib'),
+ * 子树节点的 relPath 才是全局坐标,拼回大树不断链;整项目扫描不传,从 '' 起算
  */
-export async function scanDirectory(rootPath: string): Promise<ScanResult> {
+export async function scanDirectory(rootPath: string, baseRelPath = ''): Promise<ScanResult> {
   const stat = await fs.stat(rootPath).catch(() => null)
   if (!stat) {
     throw new Error(`路径不存在或无法访问:${rootPath}`)
@@ -191,8 +194,8 @@ export async function scanDirectory(rootPath: string): Promise<ScanResult> {
   }
   const start = performance.now()
   const rootName = basename(rootPath)
-  // 根节点 relPath 为空:根名只活在 rootName/rootPath 里,绝不进相对路径
-  const tree = await scanDir(rootPath, rootName, '', 0, ctx)
+  // 根节点 relPath = baseRelPath:整项目扫描为空串,探子目录时带全项目前缀
+  const tree = await scanDir(rootPath, rootName, baseRelPath, 0, ctx)
 
   return {
     rootPath,
