@@ -6,6 +6,7 @@ import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { GitChanges } from './components/GitChanges'
 import { StructureGrid } from './components/StructureGrid'
+import { cleanErrMsg } from './errText'
 
 interface Versions {
   node: string
@@ -19,12 +20,7 @@ function readVersions(): Versions | null {
   return v ? { node: v.node(), chrome: v.chrome(), electron: v.electron() } : null
 }
 
-// 主进程抛的错经过 IPC 会带上前缀,剥掉只留人话
-function cleanErrMsg(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err)
-  return msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
-}
-
+// 主进程抛的错经过 IPC 会带上前缀,剥掉只留人话 —— 统一走 errText 的共享口径
 function topEntries(
   record: Record<string, { name: string; count: number } | number>,
   n: number

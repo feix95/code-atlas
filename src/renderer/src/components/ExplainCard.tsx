@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AiExplainResult } from '@shared/types'
+import { friendlyErr } from '../errText'
 
 // 人话解释卡:点「用大白话解释」→ 调本地模型 → 贴结果。路径契约由主进程保证,这里只递 relPath。
 export function ExplainCard({
@@ -21,7 +22,7 @@ export function ExplainCard({
       const res = await window.atlas.aiExplainFile(rootPath, relPath, languageId)
       setResult(res)
     } catch (err) {
-      setResult({ status: 'error', text: String(err), model: '', durationMs: 0 })
+      setResult({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
     } finally {
       setBusy(false)
     }

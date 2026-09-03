@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types'
-
-// 主进程抛的错经过 IPC 会带上前缀,剥掉只留人话(与 App.tsx 同一份口径)
-function cleanErrMsg(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err)
-  return msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
-}
+import { friendlyErr } from '../errText'
 
 const KIND_LABEL: Record<GitChange['kind'], string> = {
   added: '新增',
@@ -47,7 +42,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
         setExplain(null)
         setNote(null)
       } catch (err) {
-        if (!cancelled) setNote(cleanErrMsg(err))
+        if (!cancelled) setNote(friendlyErr(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -66,7 +61,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
       setSelected(null)
       setExplain(null)
     } catch (err) {
-      setNote(cleanErrMsg(err))
+      setNote(friendlyErr(err))
     } finally {
       setLoading(false)
     }
@@ -81,20 +76,22 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
       const res = await window.atlas.gitExplainChange(rootPath, selected.relPath)
       setExplain(res)
     } catch (err) {
-      setExplain({ status: 'error', text: cleanErrMsg(err), model: '', durationMs: 0 })
+      setExplain({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
     } finally {
       setExplaining(false)
     }
   }
 
-  if (loading) return <div className="structure-note">⏳ 正在问 git 谁动了代码……</div>
+  if (loading) return <div className="structure-note">⏳ 正在翻 git 的账本,看看谁动了代码……</div>
   if (note) return <div className="structure-note is-error">⚠️ {note}</div>
-  if (!result) return <div className="structure-note">还没收到 git 的答复</div>
+  if (!result) return <div className="structure-note">git 的账本还没递过来,点一下「🔄 刷新」再试一次?</div>
 
   if (!result.isGitRepo) {
     return (
       <div className="structure-note">
-        这个文件夹不在 git 仓库里,没有「改动」可讲。要么选仓库根目录,要么先在项目里 <code>git init</code>。
+        这个文件夹还不是 git 仓库,git 还没开始给它记账。
+        <br />
+        两个办法:① 选项目根目录(里面有 .git 隐藏文件夹的那层);② 或者在项目里跑一次 <code>git init</code>(先跟项目主人打个招呼哦)。
       </div>
     )
   }
@@ -112,7 +109,13 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
         </button>
       </div>
 
-      {result.changes.length === 0 && <div className="structure-note">✅ 干干净净,没有待处理的改动</div>}
+      {result.changes.length === 0 && (
+        <div className="structure-note">
+          🌿 这儿干净着呢 —— 所有改动都已经提交存档了,没有新账要翻。
+          <br />
+          想看看它怎么干活?随手改一个文件保存(加行注释就行),再点上面的「🔄 刷新」,马上给你讲它改了啥。
+        </div>
+      )}
 
       <div className="git-list">
         {result.changes.map((change) => (
