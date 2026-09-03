@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import type { ScanResult } from '../../../shared/types.ts'
+
 declare global {
   interface Window {
     atlas: {
@@ -8,6 +10,8 @@ declare global {
         chrome: () => string
         electron: () => string
       }
+      pickFolder: () => Promise<string | null>
+      scanFolder: (folderPath: string) => Promise<ScanResult>
     }
   }
 }

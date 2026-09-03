@@ -12,7 +12,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:scanner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-scanner.mts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

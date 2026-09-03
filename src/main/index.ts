@@ -1,5 +1,6 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, shell, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { join } from 'node:path'
+import { scanDirectory } from '../scanner/index.ts'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -35,8 +36,27 @@ function createWindow(): void {
   }
 }
 
+function registerIpc(): void {
+  // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
+  ipcMain.handle('atlas:pick-folder', async () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    const options: OpenDialogOptions = { properties: ['openDirectory'] }
+    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+
+  // 扫描指定文件夹,返回目录树 + 统计
+  ipcMain.handle('atlas:scan-folder', (_event, folderPath: unknown) => {
+    if (typeof folderPath !== 'string' || folderPath.trim() === '') {
+      throw new Error('路径不能为空')
+    }
+    return scanDirectory(folderPath)
+  })
+}
+
 app.whenReady().then(() => {
   createWindow()
+  registerIpc()
 
   // macOS:点 Dock 图标时,没有窗口就重新建一个
   app.on('activate', () => {

@@ -11,8 +11,12 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    },
     "types": ["node"]
   },
   "include": ["src", "electron.vite.config.ts"]
