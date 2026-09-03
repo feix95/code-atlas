@@ -1,6 +1,8 @@
 // AI 人话解释器:把文件的结构 + 关系,交给本地大模型翻译成普通人都懂的话。
 // 路径契约:只认 relPath,读文件是主进程的事;这里只负责"拼提示词 + 调接口"。
-import type { AiConfig, AiExplainResult, FileStructure, DepGraphResult } from '../shared/types.ts'
+// 底层不绑定任何推理服务 —— LM Studio、llama-server 都说 OpenAI 兼容的方言,
+// 这里只认 ChatTarget(baseURL + 模型名),换后端不改一行业务代码。
+import type { AiExplainResult, ChatTarget, FileStructure, DepGraphResult } from '../shared/types.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -192,12 +194,53 @@ interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>
 }
 
+interface ChatStreamChunk {
+  choices?: Array<{ delta?: { content?: string } }>
+}
+
 /**
- * 调 LM Studio 的 OpenAI 兼容接口,拿到人话解释。
- * 能力边界:结构太稀疏或服务不通时,返回对应的 status,不影响界面。
- * system 参数留给不同的"翻译官"人设(文件解释 / 改动翻译),默认是文件解释。
+ * 解析 OpenAI 流式(SSE)响应体,逐段吐出新增文本。
+ * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
  */
-export async function explainWithModel(config: AiConfig, prompt: string, system: string = SYSTEM_PROMPT): Promise<AiExplainResult> {
+async function* sseContentDeltas(res: Response): AsyncGenerator<string> {
+  const reader = res.body?.getReader()
+  if (!reader) return
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? '' // 最后一段可能是残行,留给下一块
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const payload = trimmed.slice(5).trim()
+      if (payload === '[DONE]') return
+      try {
+        const chunk = JSON.parse(payload) as ChatStreamChunk
+        const piece = chunk.choices?.[0]?.delta?.content
+        if (piece) yield piece
+      } catch {
+        // 残帧或心跳,跳过
+      }
+    }
+  }
+}
+
+/**
+ * 调 OpenAI 兼容接口(ChatTarget),拿到人话解释。
+ * 传 onDelta = 流式:边生成边推送增量(内置大模型生成慢,流式不用干瞪眼);
+ * 不传 = 老行为,等全量。两条路 LM Studio 和内置模型都支持。
+ * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
+ */
+export async function explainWithModel(
+  config: ChatTarget,
+  prompt: string,
+  system: string = SYSTEM_PROMPT,
+  onDelta?: (text: string) => void
+): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
   try {
@@ -216,7 +259,8 @@ export async function explainWithModel(config: AiConfig, prompt: string, system:
           { role: 'user', content: prompt }
         ],
         temperature: 0.2,
-        max_tokens: 500
+        max_tokens: 500,
+        stream: Boolean(onDelta)
       }),
       signal: controller.signal
     })
@@ -232,17 +276,30 @@ export async function explainWithModel(config: AiConfig, prompt: string, system:
       }
     }
 
-    const data = (await res.json()) as ChatCompletionResponse
-    const content = data.choices?.[0]?.message?.content?.trim()
-    if (!content) {
+    if (!onDelta) {
+      const data = (await res.json()) as ChatCompletionResponse
+      const content = data.choices?.[0]?.message?.content?.trim()
+      if (!content) {
+        return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt }
+      }
+      return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt }
+    }
+
+    // 流式:逐段喂给 onDelta,全文攒到最后一起返回
+    let full = ''
+    for await (const piece of sseContentDeltas(res)) {
+      full += piece
+      onDelta(piece)
+    }
+    if (!full.trim()) {
       return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt }
     }
-    return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt }
+    return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt }
   } catch (err) {
     const isAbort = err instanceof Error && err.name === 'AbortError'
     const msg = isAbort
       ? '模型响应超时,可能模型还在加载,或太大跑不动'
-      : `连不上模型服务,检查 LM Studio 是否已启动(默认 ${baseUrl})`
+      : `连不上模型服务,检查模型服务是否已启动(${baseUrl})`
     return { status: 'error', text: msg, model: config.model, durationMs: Date.now() - startedAt }
   }
 }

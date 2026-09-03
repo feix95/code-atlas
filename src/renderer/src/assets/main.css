@@ -476,6 +476,39 @@ body {
   flex-wrap: wrap;
 }
 
+/* 双 Provider 切换按钮排 */
+.ai-providers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 路径输入 + 选择按钮 一行摆下 */
+.ai-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-row .ai-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 流式输出时的光标:一闪一闪,表示"正在打字" */
+.stream-caret {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--accent);
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 .chip-link.is-on {
   background: var(--accent);
   color: #fff;

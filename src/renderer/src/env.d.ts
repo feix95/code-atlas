@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 
-import type { AiConfig, AiExplainResult, DepGraphResult, FileStructure, GitChangesResult, ScanResult } from '../../../shared/types.ts'
+import type {
+  AiConfig,
+  AiDeltaPayload,
+  AiExplainResult,
+  DepGraphResult,
+  FileStructure,
+  GitChangesResult,
+  ScanResult
+} from '../../../shared/types.ts'
 
 declare global {
   interface Window {
@@ -17,10 +25,12 @@ declare global {
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>
-      aiExplainFile: (rootPath: string, relPath: string, languageId: string) => Promise<AiExplainResult>
-      aiExplainFolder: (rootPath: string, relPath: string) => Promise<AiExplainResult>
+      aiPickFile: (kind: 'server' | 'model') => Promise<string | null>
+      aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string) => Promise<AiExplainResult>
+      aiExplainFolder: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
-      gitExplainChange: (rootPath: string, relPath: string) => Promise<AiExplainResult>
+      gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
+      onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void
     }
   }
 }

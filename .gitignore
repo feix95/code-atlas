@@ -3,3 +3,6 @@ out/
 dist/
 *.log
 .DS_Store
+
+# 本地下载的 llama-server 与测试模型:体积大,不进 Git(模型绝不塞进仓库)
+vendor/

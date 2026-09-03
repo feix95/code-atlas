@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types'
 import { friendlyErr } from '../errText'
 
@@ -28,6 +28,15 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
   const [selected, setSelected] = useState<GitChange | null>(null)
   const [explain, setExplain] = useState<AiExplainResult | null>(null)
   const [explaining, setExplaining] = useState(false)
+  const [streamText, setStreamText] = useState('')
+  const idRef = useRef('')
+
+  // 订阅 AI 流式增量:只认自己这次请求的 id;组件卸载时退订,防止泄漏监听
+  useEffect(() => {
+    return window.atlas.onAiDelta((payload) => {
+      if (payload.id === idRef.current) setStreamText((prev) => prev + payload.text)
+    })
+  }, [])
 
   // 挂载/换文件夹时自动收一遍;setState 都发生在 await 之后,不在 effect 里同步触发。
   // cancelled 守卫:慢响应回来时文件夹已经换了,不许旧账盖新账
@@ -71,9 +80,11 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
     if (!selected) return
     setExplaining(true)
     setExplain(null)
+    setStreamText('')
+    idRef.current = crypto.randomUUID()
     try {
       // 路径契约:只递 relPath,diff 由主进程现场重取,前端传不了假货
-      const res = await window.atlas.gitExplainChange(rootPath, selected.relPath)
+      const res = await window.atlas.gitExplainChange(rootPath, selected.relPath, idRef.current)
       setExplain(res)
     } catch (err) {
       setExplain({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
@@ -150,7 +161,11 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
           <button type="button" className="structure-note chip-link" onClick={() => onJump(selected.relPath)}>
             ↗ 在地图里打开这个文件
           </button>
-          {explaining && <div className="explain-note">正在把改动翻译成人话……(diff 长的话会慢一点)</div>}
+          {explaining && (streamText ? (
+            <div className="explain-text">✨ {streamText}<span className="stream-caret">▌</span></div>
+          ) : (
+            <div className="explain-note">正在把改动翻译成人话……(diff 长的话会慢一点)</div>
+          ))}
           {!explaining && explain?.status === 'supported' && <div className="explain-text">✨ {explain.text}</div>}
           {!explaining && explain?.status === 'error' && <div className="explain-note is-error">⚠️ {explain.text}</div>}
         </div>

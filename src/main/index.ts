@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, BrowserWindow, type OpenDialogOptions } from 'electron'
+import { app, dialog, ipcMain, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
@@ -16,19 +16,18 @@ import {
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT
 } from '../ai/index.ts'
-import { loadAiConfig, saveAiConfig } from '../ai/config.ts'
+import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
+import { ensureBuiltinServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiConfig } from '../shared/types.ts'
-
-const NO_MODEL_MSG = '还没配置模型,先去「AI 设置」里连一下 LM Studio'
+import type { AiConfig, AiDeltaPayload, ChatTarget } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot <= 0 ? '' : name.slice(dot).toLowerCase()
 }
 
-/** 读文件开头 64KB 当「内容片段」;含 \0 字节 = 二进制,返回 null */
+/** 读文件开头 64KB 当「内容片段」;含 空字节 = 二进制,返回 null */
 async function readTextPreview(absPath: string): Promise<string | null> {
   const handle = await fs.open(absPath, 'r')
   try {
@@ -39,6 +38,38 @@ async function readTextPreview(absPath: string): Promise<string | null> {
     return chunk.toString('utf8')
   } finally {
     await handle.close()
+  }
+}
+
+/**
+ * 三个讲解通道共用的前置:把当前 AI 配置收敛成 ChatTarget。
+ * 选了内置模型就顺手把 llama-server 子进程拉起来(首次用 AI 才启动,不拖慢打开速度);
+ * 没配好不抛异常,返回人话错误让界面原样展示。
+ */
+async function resolveChatTargetOrError(): Promise<{ target: ChatTarget } | { error: string }> {
+  const config = await loadAiConfig(app.getPath('userData'))
+  let runtime: BuiltinRuntime | undefined
+  if (config.provider === 'builtin') {
+    try {
+      runtime = await ensureBuiltinServer(config.builtin)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+  const resolved = resolveAiTarget(config, runtime)
+  return resolved.ok ? { target: resolved.target } : { error: resolved.message }
+}
+
+/**
+ * 流式增量推送:渲染进程带 requestId 过来,就按 id 对号入座往回推
+ * 'atlas:ai-delta',边生成边显示;没带 id(老调用方)就走一次性返回。
+ */
+function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string) => void) | undefined {
+  if (typeof requestId !== 'string' || requestId === '') return undefined
+  return (text) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('atlas:ai-delta', { id: requestId, text } satisfies AiDeltaPayload)
+    }
   }
 }
 
@@ -118,15 +149,42 @@ function registerIpc(): void {
     return buildDependencyGraph(rootPath)
   })
 
-  // AI 配置:读 / 存
+  // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
   ipcMain.handle('atlas:ai-config-get', () => loadAiConfig(app.getPath('userData')))
   ipcMain.handle('atlas:ai-config-save', (_event, config: unknown) => {
     if (typeof config !== 'object' || config === null) throw new Error('配置不合法')
     const c = config as Partial<AiConfig>
-    if (typeof c.baseUrl !== 'string' || typeof c.model !== 'string') {
-      throw new Error('配置不合法:缺 baseUrl 或 model')
+    const lm = c.lmstudio
+    const bi = c.builtin
+    if (
+      !lm || typeof lm.baseUrl !== 'string' || typeof lm.model !== 'string' ||
+      !bi || typeof bi.serverPath !== 'string' || typeof bi.modelPath !== 'string'
+    ) {
+      throw new Error('配置不合法:缺 lmstudio / builtin 设置')
     }
-    return saveAiConfig(app.getPath('userData'), { baseUrl: c.baseUrl, model: c.model, apiKey: c.apiKey ?? '' })
+    return saveAiConfig(app.getPath('userData'), {
+      provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
+      lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
+      builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath }
+    })
+  })
+
+  // 「AI 设置」里选文件:kind=server 选 llama-server 可执行文件,kind=model 选 GGUF 模型
+  ipcMain.handle('atlas:ai-pick-file', async (_event, kind: unknown) => {
+    if (kind !== 'server' && kind !== 'model') throw new Error('参数不合法')
+    const win = BrowserWindow.getAllWindows()[0]
+    const options: OpenDialogOptions =
+      kind === 'server'
+        ? {
+            properties: ['openFile'],
+            filters: [
+              { name: 'llama-server 程序', extensions: ['exe'] },
+              { name: '所有文件', extensions: ['*'] }
+            ]
+          }
+        : { properties: ['openFile'], filters: [{ name: 'GGUF 模型', extensions: ['gguf'] }, { name: '所有文件', extensions: ['*'] }] }
+    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
   })
 
   // 连接测试 + 列出本地模型:叫 LM Studio 报告它加载了哪些模型
@@ -151,7 +209,7 @@ function registerIpc(): void {
 
   // 人话讲解一个改动:diff 由主进程现场重取(不信任渲染进程传内容),再喂本地模型
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
-  ipcMain.handle('atlas:git-explain-change', async (_event, rootPath: unknown, relPath: unknown) => {
+  ipcMain.handle('atlas:git-explain-change', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -170,12 +228,12 @@ function registerIpc(): void {
     if (!changeDiff.diff.trim()) {
       return { status: 'error', text: '这个文件没有可逐行对比的内容(可能只改了权限/编码)', model: '', durationMs: 0 }
     }
-    const config = await loadAiConfig(app.getPath('userData'))
-    if (!config.model) {
-      return { status: 'error', text: '还没配置模型,先去「AI 设置」里连一下 LM Studio', model: '', durationMs: 0 }
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
     }
     const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
-    return explainWithModel(config, prompt, DIFF_SYSTEM_PROMPT)
+    return explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId))
   })
 
   // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);
@@ -183,13 +241,13 @@ function registerIpc(): void {
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
-    async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
+    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
-      const config = await loadAiConfig(app.getPath('userData'))
-      if (!config.model) {
-        return { status: 'error', text: NO_MODEL_MSG, model: '', durationMs: 0 }
+      const resolved = await resolveChatTargetOrError()
+      if ('error' in resolved) {
+        return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
       }
       const absPath = joinRoot(rootPath, relPath) // relPath 想越界会在这里被拦
       const stat = await fs.stat(absPath).catch(() => null)
@@ -197,6 +255,7 @@ function registerIpc(): void {
         throw new Error(`文件不存在:${relPath}`)
       }
       const name = relPath.split('/').pop() ?? relPath
+      const onDelta = makeDeltaSender(event, requestId)
 
       // 结构流:证据最硬 —— 函数/类/导入导出都摆给模型
       if (isAnalysisSupported(languageId) && stat.size <= 1_000_000) {
@@ -204,7 +263,7 @@ function registerIpc(): void {
         const structure = await analyzeSource(code, languageId)
         if (structure) {
           const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
-          return explainWithModel(config, prompt)
+          return explainWithModel(resolved.target, prompt, undefined, onDelta)
         }
       }
 
@@ -218,19 +277,19 @@ function registerIpc(): void {
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
       const prompt = buildGuessPrompt({ relPath, name, languageName, preview })
-      return explainWithModel(config, prompt, GUESS_SYSTEM_PROMPT)
+      return explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta)
     }
   )
 
   // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
   // relPath 传 '' 表示解释项目根目录本身
-  ipcMain.handle('atlas:ai-explain-folder', async (_event, rootPath: unknown, relPath: unknown) => {
+  ipcMain.handle('atlas:ai-explain-folder', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
-    const config = await loadAiConfig(app.getPath('userData'))
-    if (!config.model) {
-      return { status: 'error', text: NO_MODEL_MSG, model: '', durationMs: 0 }
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
     }
     const absPath = joinRoot(rootPath, relPath)
     const stat = await fs.stat(absPath).catch(() => null)
@@ -262,7 +321,7 @@ function registerIpc(): void {
       files,
       languages: Object.fromEntries(languages)
     })
-    return explainWithModel(config, prompt, FOLDER_SYSTEM_PROMPT)
+    return explainWithModel(resolved.target, prompt, FOLDER_SYSTEM_PROMPT, makeDeltaSender(event, requestId))
   })
 }
 
@@ -274,6 +333,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  stopBuiltinServer() // 内置模型是子进程,退出时带走,不留孤儿进程占着显存
 })
 
 app.on('window-all-closed', () => {

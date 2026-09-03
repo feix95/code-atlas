@@ -147,14 +147,48 @@ export interface GitChangesResult {
   durationMs: number
 }
 
-/** AI 解释的模型配置(指向 LM Studio 这类本地服务的 OpenAI 兼容接口) */
-export interface AiConfig {
+/**
+ * AI 服务的两种来源:LM Studio(外部)与内置模型(llama-server 子进程)。
+ * 对上层业务它们是同一种服务 —— 都收敛成 ChatTarget(baseURL + 模型名)。
+ */
+export type AiProviderKind = 'lmstudio' | 'builtin'
+
+/** LM Studio 这类外部 OpenAI 兼容服务的设置 */
+export interface AiLmstudioSettings {
   /** 服务根地址,常以 /v1 结尾,如 http://127.0.0.1:1234/v1 */
   baseUrl: string
-  /** LM Studio 里加载的模型名,如 Qwen3.8-27B-Uncensored-IQ4_XS */
+  /** 服务里已加载的模型名 */
   model: string
-  /** OpenAI 兼容接口的鉴权 key;本地 LM Studio 通常可留空 */
+  /** 鉴权 key;本地 LM Studio 通常留空 */
+  apiKey: string
+}
+
+/** 内置模型的设置:MVP 阶段手动指定 llama-server 程序与 GGUF 模型文件 */
+export interface AiBuiltinSettings {
+  /** llama-server 可执行文件的绝对路径 */
+  serverPath: string
+  /** GGUF 模型文件的绝对路径 */
+  modelPath: string
+}
+
+/** AI 配置(存 userData,含两个 Provider 的全部设置 + 当前选用谁) */
+export interface AiConfig {
+  provider: AiProviderKind
+  lmstudio: AiLmstudioSettings
+  builtin: AiBuiltinSettings
+}
+
+/** 一次对话调用的运行时目标:上层业务只认它,不感知底层是 LM Studio 还是内置模型 */
+export interface ChatTarget {
+  baseUrl: string
+  model: string
   apiKey?: string
+}
+
+/** 流式输出的增量推送(主进程 → 渲染进程),按 requestId 对号入座 */
+export interface AiDeltaPayload {
+  id: string
+  text: string
 }
 
 /** AI 人话解释的结果 */
