@@ -1,6 +1,7 @@
 import { promises as fs, type Dirent } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { ScanDirNode, ScanResult, ScanStats, ScanTreeNode } from '../shared/types.ts'
+import { identifyFileLanguage } from '../parser/index.ts'
 
 /** 扫描时直接绕开的目录/文件:依赖包、版本库、构建产物等"仓库杂物" */
 const IGNORED_NAMES = new Set([
@@ -71,7 +72,16 @@ async function scanDir(absPath: string, name: string, depth: number, ctx: ScanCo
         ctx.stats.fileCount++
         const ext = extname(entry.name).toLowerCase()
         ctx.stats.byExt[ext] = (ctx.stats.byExt[ext] ?? 0) + 1
-        children.push({ type: 'file', name: entry.name, ext })
+        // 后缀认得出的不读文件;认不出的现场嗅探内容
+        const language = await identifyFileLanguage(fullPath, entry.name)
+        if (language) {
+          const agg = ctx.stats.byLanguage[language.id] ?? { name: language.name, count: 0 }
+          agg.count++
+          ctx.stats.byLanguage[language.id] = agg
+          children.push({ type: 'file', name: entry.name, ext, language })
+        } else {
+          children.push({ type: 'file', name: entry.name, ext })
+        }
       }
       // 其他类型(管道、socket 等)不进树
     })
@@ -100,7 +110,14 @@ export async function scanDirectory(rootPath: string): Promise<ScanResult> {
   }
 
   const ctx: ScanContext = {
-    stats: { fileCount: 0, dirCount: 0, byExt: {}, ignoredCount: 0, skippedCount: 0 }
+    stats: {
+      fileCount: 0,
+      dirCount: 0,
+      byExt: {},
+      byLanguage: {},
+      ignoredCount: 0,
+      skippedCount: 0
+    }
   }
   const start = performance.now()
   const rootName = basename(rootPath)

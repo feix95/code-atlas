@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:scanner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-scanner.mts"
+    "test:scanner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-scanner.mts",
+    "test:parser": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-parser.mts",
+    "test": "npm run test:scanner && npm run test:parser"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

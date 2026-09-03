@@ -10,6 +10,9 @@ function TreeRow({ node, depth }: { node: ScanTreeNode; depth: number }): React.
       <div className="tree-row is-file" style={{ paddingLeft: depth * 20 + 12 }}>
         <span className="tree-icon">📄</span>
         <span className="tree-name">{node.name}</span>
+        {node.language?.source === 'content' && (
+          <span className="tree-lang">{node.language.name}</span>
+        )}
         {node.ext && <span className="tree-ext">{node.ext}</span>}
       </div>
     )

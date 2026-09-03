@@ -16,6 +16,8 @@ npm run lint # 代码检查
 npm run typecheck # 类型检查
 npm run format # 格式化
 npm run test:scanner # 目录扫描器自测
+npm run test:parser # 语言识别器自测
+npm run test # 全部自测
 npm run build # 构建产物
 ```
 
@@ -23,7 +25,7 @@ npm run build # 构建产物
 
 - [x] 第一锤:项目骨架(Electron + React + TypeScript)
 - [x] 第二锤:目录扫描器(选择文件夹 → 目录树 + 文件统计)
-- [ ] 语言识别
+- [x] 第三锤:语言识别器(后缀速查 + 内容嗅探,界面语言分布)
 - [ ] AST 结构分析
 - [ ] AI 人话解释
 - [ ] Git 修改翻译

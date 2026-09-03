@@ -20,11 +20,30 @@ function cleanErrMsg(err: unknown): string {
   return msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
 }
 
-function topExts(byExt: Record<string, number>, n: number): Array<{ ext: string; count: number }> {
-  return Object.entries(byExt)
-    .map(([ext, count]) => ({ ext, count }))
+function topEntries(
+  record: Record<string, { name: string; count: number } | number>,
+  n: number
+): Array<{ key: string; label: string; count: number }> {
+  return Object.entries(record)
+    .map(([key, value]) => ({
+      key,
+      label: typeof value === 'number' ? key : value.name,
+      count: typeof value === 'number' ? value : value.count
+    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, n)
+}
+
+function BarRow({ label, count, total }: { label: string; count: number; total: number }): React.JSX.Element {
+  return (
+    <div className="extbar">
+      <span className="extbar-label">{label}</span>
+      <div className="extbar-track">
+        <div className="extbar-fill" style={{ width: `${(count / total) * 100}%` }} />
+      </div>
+      <span className="extbar-count">{count}</span>
+    </div>
+  )
 }
 
 function App(): React.JSX.Element {
@@ -100,18 +119,14 @@ function App(): React.JSX.Element {
                 )}
               </div>
               <div className="extbars">
-                {topExts(result.stats.byExt, 5).map(({ ext, count }) => {
-                  const total = result.stats.fileCount || 1
-                  return (
-                    <div className="extbar" key={ext || '无后缀'}>
-                      <span className="extbar-label">{ext || '无后缀'}</span>
-                      <div className="extbar-track">
-                        <div className="extbar-fill" style={{ width: `${(count / total) * 100}%` }} />
-                      </div>
-                      <span className="extbar-count">{count}</span>
-                    </div>
-                  )
-                })}
+                <div className="bars-title">🗣️ 语言分布</div>
+                {topEntries(result.stats.byLanguage, 6).map(({ key, label, count }) => (
+                  <BarRow key={key} label={label} count={count} total={result.stats.fileCount || 1} />
+                ))}
+                <div className="bars-title">🧩 后缀分布</div>
+                {topEntries(result.stats.byExt, 5).map(({ label, count }) => (
+                  <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={result.stats.fileCount || 1} />
+                ))}
               </div>
             </section>
             <FileTree root={result.tree} />

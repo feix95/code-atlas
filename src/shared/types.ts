@@ -5,6 +5,16 @@ export interface ScanFileNode {
   name: string
   /** 小写扩展名(含点),如 '.ts';无扩展名则为空字符串 */
   ext: string
+  /** 语言识别结果;认不出语言时不填 */
+  language?: LanguageTag
+}
+
+/** 一个文件的语言标签 */
+export interface LanguageTag {
+  id: string
+  name: string
+  /** extension = 靠后缀认的;content = 后缀认不出、靠内容嗅探认的 */
+  source: 'extension' | 'content'
 }
 
 export interface ScanDirNode {
@@ -22,6 +32,8 @@ export interface ScanStats {
   dirCount: number
   /** 按扩展名(小写,含点)统计的文件数;无扩展名归到 '' */
   byExt: Record<string, number>
+  /** 按语言统计:id → 语言名 + 文件数;认不出语言的文件不计入 */
+  byLanguage: Record<string, { name: string; count: number }>
   /** 因在忽略名单(node_modules、.git 等)而被跳过的条目数 */
   ignoredCount: number
   /** 因无权限、符号链接等原因跳过的条目数 */

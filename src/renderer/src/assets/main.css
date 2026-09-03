@@ -216,6 +216,17 @@ body {
   gap: 6px;
 }
 
+.bars-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.bars-title:not(:first-child) {
+  margin-top: 14px;
+}
+
 .extbar {
   display: grid;
   grid-template-columns: 90px 1fr 44px;
@@ -306,6 +317,15 @@ body {
   border: 1px solid var(--danger);
   border-radius: 4px;
   padding: 0 5px;
+}
+
+.tree-lang {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 5px;
+  flex-shrink: 0;
 }
 
 .tree-arrow {
