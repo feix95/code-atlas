@@ -3,6 +3,12 @@
 export interface ScanFileNode {
   type: 'file'
   name: string
+  /**
+   * 相对扫描根的路径,如 'src/main/index.ts'。分隔符统一为 '/',
+   * 不含根目录名 —— 这是全项目的文件标识契约,要读文件必须经
+   * shared/paths 的 joinRoot(rootPath, relPath) 解析,不许手拼
+   */
+  relPath: string
   /** 小写扩展名(含点),如 '.ts';无扩展名则为空字符串 */
   ext: string
   /** 语言识别结果;认不出语言时不填 */
@@ -35,6 +41,8 @@ export interface FileStructure {
 export interface ScanDirNode {
   type: 'directory'
   name: string
+  /** 相对扫描根的路径,分隔符统一为 '/';根节点为 ''(根名不进路径,防止与 rootPath 重复拼接) */
+  relPath: string
   children: ScanTreeNode[]
   /** true 表示该目录读不了(无权限)或被深度上限截断,内容不完整 */
   truncated?: boolean

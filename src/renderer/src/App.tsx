@@ -95,8 +95,9 @@ function App(): React.JSX.Element {
     setAnalyzing(true)
     setAnalyzeNote(null)
     try {
-      const absPath = folder ? `${folder}/${relPath}` : relPath
-      const fs = await window.atlas.analyzeFile(absPath, file.language.id)
+      // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
+      if (!result) return
+      const fs = await window.atlas.analyzeFile(result.rootPath, relPath, file.language.id)
       if (fs) {
         setStructure(fs)
       } else {

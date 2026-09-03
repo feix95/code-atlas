@@ -12,7 +12,7 @@ declare global {
       }
       pickFolder: () => Promise<string | null>
       scanFolder: (folderPath: string) => Promise<ScanResult>
-      analyzeFile: (filePath: string, languageId: string) => Promise<FileStructure | null>
+      analyzeFile: (rootPath: string, relPath: string, languageId: string) => Promise<FileStructure | null>
     }
   }
 }

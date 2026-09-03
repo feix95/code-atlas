@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
+import { joinRoot } from '../shared/paths.ts'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -56,17 +57,19 @@ function registerIpc(): void {
   })
 
   // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)
-  ipcMain.handle('atlas:analyze-file', async (_event, filePath: unknown, languageId: unknown) => {
-    if (typeof filePath !== 'string' || typeof languageId !== 'string') {
+  // 路径契约:收 (rootPath, relPath),绝对路径只能由 joinRoot 在这儿解析
+  ipcMain.handle('atlas:analyze-file', async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
+    if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
       throw new Error('参数不合法')
     }
     if (!isAnalysisSupported(languageId)) return null
-    const stat = await fs.stat(filePath).catch(() => null)
+    const absPath = joinRoot(rootPath, relPath) // relPath 想越界(.. 上跳、盘符注入)会在这里被拦
+    const stat = await fs.stat(absPath).catch(() => null)
     if (!stat || !stat.isFile()) {
-      throw new Error(`文件不存在:${filePath}`)
+      throw new Error(`文件不存在:${relPath}`)
     }
     if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
-    const code = await fs.readFile(filePath, 'utf8')
+    const code = await fs.readFile(absPath, 'utf8')
     return analyzeSource(code, languageId)
   })
 }

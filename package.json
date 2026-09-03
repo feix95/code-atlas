@@ -16,7 +16,8 @@
     "test:scanner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-scanner.mts",
     "test:parser": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-parser.mts",
     "test:analyzer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-analyzer.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer"
+    "test:paths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-paths.mts",
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

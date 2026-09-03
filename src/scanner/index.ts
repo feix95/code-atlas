@@ -34,14 +34,20 @@ interface ScanContext {
   stats: ScanStats
 }
 
-async function scanDir(absPath: string, name: string, depth: number, ctx: ScanContext): Promise<ScanDirNode> {
+async function scanDir(
+  absPath: string,
+  name: string,
+  relPath: string,
+  depth: number,
+  ctx: ScanContext
+): Promise<ScanDirNode> {
   let entries: Dirent[]
   try {
     entries = await fs.readdir(absPath, { withFileTypes: true })
   } catch {
     // 读不了(常见是无权限):不炸,标记截断继续走
     ctx.stats.skippedCount++
-    return { type: 'directory', name, children: [], truncated: true }
+    return { type: 'directory', name, relPath, children: [], truncated: true }
   }
 
   const children: ScanTreeNode[] = []
@@ -58,14 +64,16 @@ async function scanDir(absPath: string, name: string, depth: number, ctx: ScanCo
         return
       }
 
+      // relPath 是全项目的文件标识契约:分隔符统一 '/',根名不进路径
+      const childRelPath = relPath ? `${relPath}/${entry.name}` : entry.name
       const fullPath = join(absPath, entry.name)
       if (entry.isDirectory()) {
         ctx.stats.dirCount++
         let child: ScanDirNode
         if (depth >= MAX_DEPTH) {
-          child = { type: 'directory', name: entry.name, children: [], truncated: true }
+          child = { type: 'directory', name: entry.name, relPath: childRelPath, children: [], truncated: true }
         } else {
-          child = await scanDir(fullPath, entry.name, depth + 1, ctx)
+          child = await scanDir(fullPath, entry.name, childRelPath, depth + 1, ctx)
         }
         children.push(child)
       } else if (entry.isFile()) {
@@ -78,9 +86,9 @@ async function scanDir(absPath: string, name: string, depth: number, ctx: ScanCo
           const agg = ctx.stats.byLanguage[language.id] ?? { name: language.name, count: 0 }
           agg.count++
           ctx.stats.byLanguage[language.id] = agg
-          children.push({ type: 'file', name: entry.name, ext, language })
+          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext, language })
         } else {
-          children.push({ type: 'file', name: entry.name, ext })
+          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext })
         }
       }
       // 其他类型(管道、socket 等)不进树
@@ -93,7 +101,7 @@ async function scanDir(absPath: string, name: string, depth: number, ctx: ScanCo
     return a.name.localeCompare(b.name, 'zh')
   })
 
-  return { type: 'directory', name, children }
+  return { type: 'directory', name, relPath, children }
 }
 
 /**
@@ -121,7 +129,8 @@ export async function scanDirectory(rootPath: string): Promise<ScanResult> {
   }
   const start = performance.now()
   const rootName = basename(rootPath)
-  const tree = await scanDir(rootPath, rootName, 0, ctx)
+  // 根节点 relPath 为空:根名只活在 rootName/rootPath 里,绝不进相对路径
+  const tree = await scanDir(rootPath, rootName, '', 0, ctx)
 
   return {
     rootPath,
