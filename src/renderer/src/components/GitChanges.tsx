@@ -64,6 +64,10 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
   async function handleRefresh(): Promise<void> {
     setLoading(true)
     setNote(null)
+    // 讲解若在路上,先作废:刷新后选中的文件可能不在了,旧讲解不许挂回来
+    idRef.current = ''
+    setExplaining(false)
+    setStreamText('')
     try {
       const r = await window.atlas.gitChanges(rootPath)
       setResult(r)
@@ -78,18 +82,21 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
 
   async function handleExplain(): Promise<void> {
     if (!selected) return
+    const requestId = crypto.randomUUID()
     setExplaining(true)
     setExplain(null)
     setStreamText('')
-    idRef.current = crypto.randomUUID()
+    idRef.current = requestId
     try {
       // 路径契约:只递 relPath,diff 由主进程现场重取,前端传不了假货
-      const res = await window.atlas.gitExplainChange(rootPath, selected.relPath, idRef.current)
+      const res = await window.atlas.gitExplainChange(rootPath, selected.relPath, requestId)
+      if (idRef.current !== requestId) return // 中途换了文件/刷新,这份旧账作废
       setExplain(res)
     } catch (err) {
+      if (idRef.current !== requestId) return
       setExplain({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
     } finally {
-      setExplaining(false)
+      if (idRef.current === requestId) setExplaining(false)
     }
   }
 
@@ -137,6 +144,12 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
             onClick={() => {
               setSelected(change)
               setExplain(null)
+              // 上一份讲解还在路上就点了别的文件:作废它,别让 A 的答案挂到 B 头上
+              if (explaining) {
+                idRef.current = ''
+                setExplaining(false)
+                setStreamText('')
+              }
             }}
             title={change.relPath}
           >

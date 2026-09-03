@@ -229,10 +229,19 @@ async function* sseContentDeltas(res: Response): AsyncGenerator<string> {
   }
 }
 
+/** 等响应头的耐心(模型加载/排队可能很久,首次可达一分钟以上) */
+const HEADERS_TIMEOUT_MS = 120_000
+/** 非流式:读完整回复的耐心 */
+const BODY_TIMEOUT_MS = 120_000
+/** 流式:两次增量之间超过这么久没动静,判定模型卡住,掐断别让界面干等 */
+const STREAM_IDLE_MS = 30_000
+
 /**
  * 调 OpenAI 兼容接口(ChatTarget),拿到人话解释。
  * 传 onDelta = 流式:边生成边推送增量(内置大模型生成慢,流式不用干瞪眼);
  * 不传 = 老行为,等全量。两条路 LM Studio 和内置模型都支持。
+ * 超时是分段看门狗:等响应头/整段回复给足耐心;流式只要还有增量就一直续命,
+ * 一旦没动静立刻掐断 —— 绝不无限挂死,也不把慢模型的正常输出拦腰砍断。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
  */
 export async function explainWithModel(
@@ -243,9 +252,15 @@ export async function explainWithModel(
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
+  const controller = new AbortController()
+  let watchdog: ReturnType<typeof setTimeout> | undefined
+  const armWatchdog = (ms: number): void => {
+    clearTimeout(watchdog)
+    watchdog = setTimeout(() => controller.abort(), ms)
+  }
+  let full = ''
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000) // 本地大模型慢,给足 2 分钟
+    armWatchdog(HEADERS_TIMEOUT_MS)
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -264,7 +279,6 @@ export async function explainWithModel(
       }),
       signal: controller.signal
     })
-    clearTimeout(timeout)
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
@@ -277,6 +291,7 @@ export async function explainWithModel(
     }
 
     if (!onDelta) {
+      armWatchdog(BODY_TIMEOUT_MS)
       const data = (await res.json()) as ChatCompletionResponse
       const content = data.choices?.[0]?.message?.content?.trim()
       if (!content) {
@@ -286,9 +301,10 @@ export async function explainWithModel(
     }
 
     // 流式:逐段喂给 onDelta,全文攒到最后一起返回
-    let full = ''
+    armWatchdog(STREAM_IDLE_MS)
     for await (const piece of sseContentDeltas(res)) {
       full += piece
+      armWatchdog(STREAM_IDLE_MS) // 还有增量,继续续命
       onDelta(piece)
     }
     if (!full.trim()) {
@@ -297,9 +313,20 @@ export async function explainWithModel(
     return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt }
   } catch (err) {
     const isAbort = err instanceof Error && err.name === 'AbortError'
+    // 卡住前已经吐了一部分:把到手的先给用户,别一把全扔
+    if (isAbort && full.trim()) {
+      return {
+        status: 'supported',
+        text: `${full}\n\n(回答到这儿断了:模型可能卡住了,再点一次可以重讲)`,
+        model: config.model,
+        durationMs: Date.now() - startedAt
+      }
+    }
     const msg = isAbort
       ? '模型响应超时,可能模型还在加载,或太大跑不动'
       : `连不上模型服务,检查模型服务是否已启动(${baseUrl})`
     return { status: 'error', text: msg, model: config.model, durationMs: Date.now() - startedAt }
+  } finally {
+    clearTimeout(watchdog)
   }
 }

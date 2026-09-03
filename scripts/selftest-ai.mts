@@ -13,7 +13,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { resolveServerProgram } from '../src/ai/builtin.ts'
+import { parseListenerPids, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
 import type { AiConfig, FileStructure } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
@@ -190,6 +190,24 @@ async function main(): Promise<void> {
   } finally {
     await rm(exeDir, { recursive: true, force: true })
   }
+
+  // ── 6.6 孤儿收尸的纯函数:netstat / tasklist 输出解析(端口认领要精确,击杀要验明正身) ──
+  const netstatSample = [
+    '  Proto  Local Address          Foreign Address        State           PID',
+    '  TCP    127.0.0.1:8766         0.0.0.0:0              LISTENING       1234',
+    '  TCP    [::]:8766              [::]:0                 LISTENING       5678',
+    '  TCP    127.0.0.1:18766        0.0.0.0:0              LISTENING       99',
+    '  TCP    127.0.0.1:8765         1.2.3.4:5555           ESTABLISHED     42'
+  ].join('\n')
+  assert.deepEqual(parseListenerPids(netstatSample, 8766), [1234, 5678], '应找出监听 8766 的 PID(18766/8765/非监听都不算)')
+  assert.deepEqual(parseListenerPids('  TCP    0.0.0.0:8766    0.0.0.0:0    LISTENING    not-a-pid', 8766), [], 'PID 不是数字就不收')
+  assert.deepEqual(parseListenerPids('', 8766), [], '空输出给空清单')
+  assert.equal(
+    parseTasklistImage('"llama-server.exe","1234","Console","1","123,456 K"'),
+    'llama-server.exe',
+    'tasklist CSV 应抠出映像名'
+  )
+  assert.equal(parseTasklistImage('INFO: 没有运行的任务匹配指定的标准。'), '', '查无此进程应得空串,绝不凭空杀人')
 
   // ── 7. 用本地假模型服务验证整条 fetch → 解析链路(非流式 + SSE 流式) ──
   const receivedBodies: string[] = []

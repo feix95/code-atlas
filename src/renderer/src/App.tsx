@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { DepGraphResult, FileStructure, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { AiSettings } from './components/AiSettings'
 import { ExplainCard } from './components/ExplainCard'
@@ -86,6 +86,8 @@ function App(): React.JSX.Element {
   const [graphNote, setGraphNote] = useState<string | null>(null)
   const [showAiSettings, setShowAiSettings] = useState(false)
   const [showGit, setShowGit] = useState(false)
+  // 结构分析的头票号:连点两个文件时,慢的旧响应回来不许盖新的账
+  const analyzeSeqRef = useRef(0)
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -111,6 +113,7 @@ function App(): React.JSX.Element {
   }
 
   async function handleSelectFile(relPath: string, file: ScanFileNode): Promise<void> {
+    const seq = ++analyzeSeqRef.current
     setSelectedFile({ relPath, name: file.name, languageId: file.language?.id ?? '', languageName: file.language?.name ?? '' })
     setSelectedFolder(null)
     setStructure(null)
@@ -125,15 +128,17 @@ function App(): React.JSX.Element {
       // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
       if (!result) return
       const fs = await window.atlas.analyzeFile(result.rootPath, relPath, file.language.id)
+      if (seq !== analyzeSeqRef.current) return // 用户已经点了别的文件,这份旧账作废
       if (fs) {
         setStructure(fs)
       } else {
-        setAnalyzeNote('该语言暂不支持结构分析(目前支持 TS/TSX/JS/JSX/Python)')
+        setAnalyzeNote('该语言暂不支持结构分析(支持 TS/TSX/JS/JSX/Python/Java/Go/C/C++/C#/Rust)')
       }
     } catch (err) {
+      if (seq !== analyzeSeqRef.current) return
       setAnalyzeNote(cleanErrMsg(err))
     } finally {
-      setAnalyzing(false)
+      if (seq === analyzeSeqRef.current) setAnalyzing(false)
     }
   }
 

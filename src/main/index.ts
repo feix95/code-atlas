@@ -17,7 +17,7 @@ import {
   GUESS_SYSTEM_PROMPT
 } from '../ai/index.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { ensureBuiltinServer, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import type { AiConfig, AiDeltaPayload, ChatTarget } from '../shared/types.ts'
@@ -151,7 +151,7 @@ function registerIpc(): void {
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
   ipcMain.handle('atlas:ai-config-get', () => loadAiConfig(app.getPath('userData')))
-  ipcMain.handle('atlas:ai-config-save', (_event, config: unknown) => {
+  ipcMain.handle('atlas:ai-config-save', async (_event, config: unknown) => {
     if (typeof config !== 'object' || config === null) throw new Error('配置不合法')
     const c = config as Partial<AiConfig>
     const lm = c.lmstudio
@@ -162,11 +162,21 @@ function registerIpc(): void {
     ) {
       throw new Error('配置不合法:缺 lmstudio / builtin 设置')
     }
-    return saveAiConfig(app.getPath('userData'), {
+    const previous = await loadAiConfig(app.getPath('userData'))
+    const saved = await saveAiConfig(app.getPath('userData'), {
       provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath }
     })
+    // 垃圾不白占:切走了内置模式,或换了模型/引擎设置,旧子进程就地解散,
+    // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账
+    if (previous.provider === 'builtin' && saved.provider !== 'builtin' && isBuiltinRunning()) {
+      stopBuiltinServer()
+    }
+    if (saved.provider === 'builtin' && builtinNeedsRestart(saved.builtin)) {
+      stopBuiltinServer()
+    }
+    return saved
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
@@ -187,7 +197,8 @@ function registerIpc(): void {
   ipcMain.handle('atlas:ai-list-models', async (_event, baseUrl: unknown) => {
     if (typeof baseUrl !== 'string' || baseUrl.trim() === '') throw new Error('地址不能为空')
     const url = `${baseUrl.replace(/\/+$/, '')}/models`
-    const res = await fetch(url).catch(() => null)
+    // 5 秒没应答就当没通:LM Studio 卡死时别让界面跟着无限转圈
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) }).catch(() => null)
     if (!res || !res.ok) {
       throw new Error(`连不上模型服务,检查 LM Studio 是否已启动(${baseUrl})`)
     }
@@ -321,9 +332,36 @@ function registerIpc(): void {
   })
 }
 
+/** 清掉 7 天前的崩溃转储(.dmp):单份好几 MB,崩几次就攒一坨,应用不该自己攒垃圾 */
+async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const dirs = [join(userDataDir, 'Crashpad', 'reports'), join(userDataDir, 'Crashpad', 'pending')]
+  for (const dir of dirs) {
+    let entries
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      continue // 目录不存在 = 没崩过,好事
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.dmp')) continue
+      const fullPath = join(dir, entry.name)
+      const stat = await fs.stat(fullPath).catch(() => null)
+      if (stat && stat.mtimeMs < cutoff) {
+        await fs.rm(fullPath, { force: true }).catch(() => {})
+      }
+    }
+  }
+}
+
 app.whenReady().then(() => {
   createWindow()
   registerIpc()
+
+  // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
+  // 旧的崩溃转储过期的清掉。都是后台安静干,失败也不打扰启动
+  void reapOrphanServer().catch(() => {})
+  void cleanupOldCrashDumps(app.getPath('userData')).catch(() => {})
 
   // macOS:点 Dock 图标时,没有窗口就重新建一个
   app.on('activate', () => {
