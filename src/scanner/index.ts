@@ -30,8 +30,36 @@ const IGNORED_NAMES = new Set([
 /** 目录深度上限:防止超深目录把机器拖死 */
 const MAX_DEPTH = 20
 
+/** 全项目同时嗅探文件的并发上限:大目录不再所有文件同时开抢,内存/磁盘句柄都有界 */
+const MAX_CONCURRENT_SNIFFS = 32
+
+/** 极简信号量:最多 max 个任务同时在跑,余下的排队等叫号 */
+class SniffGate {
+  private active = 0
+  private readonly waiters: Array<() => void> = []
+  private readonly max: number
+
+  constructor(max: number) {
+    this.max = max
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.active >= this.max) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve))
+    }
+    this.active++
+    try {
+      return await fn()
+    } finally {
+      this.active--
+      this.waiters.shift()?.()
+    }
+  }
+}
+
 interface ScanContext {
   stats: ScanStats
+  gate: SniffGate
 }
 
 async function scanDir(
@@ -80,8 +108,8 @@ async function scanDir(
         ctx.stats.fileCount++
         const ext = extname(entry.name).toLowerCase()
         ctx.stats.byExt[ext] = (ctx.stats.byExt[ext] ?? 0) + 1
-        // 后缀认得出的不读文件;认不出的现场嗅探内容
-        const language = await identifyFileLanguage(fullPath, entry.name)
+        // 后缀认得出的不读文件;认不出的现场嗅探内容(全局限流,不一窝蜂)
+        const language = await ctx.gate.run(() => identifyFileLanguage(fullPath, entry.name))
         if (language) {
           const agg = ctx.stats.byLanguage[language.id] ?? { name: language.name, count: 0 }
           agg.count++
@@ -118,6 +146,7 @@ export async function scanDirectory(rootPath: string): Promise<ScanResult> {
   }
 
   const ctx: ScanContext = {
+    gate: new SniffGate(MAX_CONCURRENT_SNIFFS),
     stats: {
       fileCount: 0,
       dirCount: 0,

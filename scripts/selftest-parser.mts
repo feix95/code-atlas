@@ -114,13 +114,40 @@ async function main(): Promise<void> {
     )
     assert.equal(await identifyFileLanguage(join(dir, 'blob.bin'), 'blob.bin'), null, '二进制无语言')
 
+    // ── 三·五、大文件防线:只读文件头,绝不整只读进内存 ──
+    // 稀疏文件:先写满一段文本(头 4KB 不能有零字节),再 truncate 撑大,瞬间造出"巨型文件"
+    const smallHead = 'interface User {\n  id: number;\n}\nconst name: string = "a";\n'.padEnd(4096, ' ')
+    await fs.writeFile(join(dir, 'huge.xyz'), smallHead)
+    await fs.truncate(join(dir, 'huge.xyz'), 6 * 1024 * 1024) // 6MB,超过 5MB 嗅探红线
+    assert.equal(
+      await identifyFileLanguage(join(dir, 'huge.xyz'), 'huge.xyz'),
+      null,
+      '超大文件不嗅探,诚实认不出'
+    )
+
+    await fs.writeFile(join(dir, 'medium.xyz'), smallHead)
+    await fs.truncate(join(dir, 'medium.xyz'), 3 * 1024 * 1024) // 3MB,红线以内照常嗅探
+    assertTag(
+      await identifyFileLanguage(join(dir, 'medium.xyz'), 'medium.xyz'),
+      'typescript',
+      'content',
+      '红线以内的大文件只读开头照样认出'
+    )
+
+    await fs.writeFile(join(dir, 'movie.mp4'), '看起来像文本的视频壳')
+    assert.equal(
+      await identifyFileLanguage(join(dir, 'movie.mp4'), 'movie.mp4'),
+      null,
+      '视频壳走二进制黑名单,零 I/O 直接放过'
+    )
+
     // ── 四、扫描器联动:byLanguage 统计与树节点标签 ──
     await fs.writeFile(join(dir, 'lib.rs'), 'fn main() { println!("x"); }\n')
     await fs.writeFile(join(dir, 'data.json'), '{}')
     await fs.writeFile(join(dir, 'notes.md'), '# Notes\n')
     const scan = await scanDirectory(dir)
 
-    assert.equal(scan.stats.byLanguage['typescript']?.count, 1, 'TypeScript 应 1 个')
+    assert.equal(scan.stats.byLanguage['typescript']?.count, 2, 'TypeScript 应 2 个(app.ts + medium.xyz 嗅探认出)')
     assert.equal(scan.stats.byLanguage['rust']?.count, 1, 'Rust 应 1 个')
     assert.equal(scan.stats.byLanguage['python']?.count, 1, 'Python 应 1 个(嗅探认出)')
     assert.equal(scan.stats.byLanguage['text']?.count, 1, '纯文本兜底只算 unknown.xyz 一个,二进制不计入')

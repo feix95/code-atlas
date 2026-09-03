@@ -57,6 +57,53 @@ async function main(): Promise<void> {
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
+
+  // ── 7. 大文件夹防线:视频壳、超大文件、海量小文件,扫描都要秒过且内存有界 ──
+  const bigRoot = join(tmpdir(), `code-atlas-big-selftest-${Date.now()}`)
+  await fs.mkdir(join(bigRoot, 'videos'), { recursive: true })
+  await fs.mkdir(join(bigRoot, 'pile'), { recursive: true })
+
+  // 一把视频壳:内容就算是文本,也走二进制黑名单零 I/O 放过,绝不读文件
+  for (const name of ['a.mp4', 'b.mkv', 'c.avi', 'd.mov', 'e.webm']) {
+    await fs.writeFile(join(bigRoot, 'videos', name), 'fake video shell, just text')
+  }
+  // 海量无后缀小文件:每个都得现场嗅探,考验并发限流不炸
+  const MANY = 2000
+  for (let i = 0; i < MANY; i++) {
+    await fs.writeFile(join(bigRoot, 'pile', `f${i}`), `console.log(${i})\n`)
+  }
+  // 稀疏文件撑出 64MB 大文件:老实现会整只读进内存,新实现只准碰开头 4KB
+  await fs.writeFile(join(bigRoot, 'mystery-big'), 'const answer: number = 42\n')
+  await fs.truncate(join(bigRoot, 'mystery-big'), 64 * 1024 * 1024)
+
+  try {
+    const before = process.memoryUsage().external
+    const big = await scanDirectory(bigRoot)
+    const externalGrew = process.memoryUsage().external - before
+
+    assert.equal(big.stats.fileCount, MANY + 6, `文件数应为 ${MANY + 6}(2000 小文件 + 5 视频壳 + 1 大文件)`)
+    assert.equal(big.stats.byExt['.mp4'], 1, '视频壳照常按后缀计数')
+
+    const videos = big.tree.children.find((c) => c.name === 'videos')
+    assert.ok(
+      videos?.type === 'directory' && videos.children.every((c) => c.type === 'file' && c.language === undefined),
+      '视频壳一律无语言标签(黑名单零 I/O 放过)'
+    )
+    const mystery = big.tree.children.find((c) => c.name === 'mystery-big')
+    assert.ok(
+      mystery?.type === 'file' && mystery.language === undefined,
+      '超大文件不嗅探,诚实认不出(哪怕开头是代码)'
+    )
+
+    assert.ok(big.durationMs < 30_000, `海量小文件应秒级扫完,实际 ${big.durationMs}ms`)
+    assert.ok(
+      externalGrew < 16 * 1024 * 1024,
+      `嗅探内存必须与大文件体积无关:外部内存涨了 ${(externalGrew / 1024 / 1024).toFixed(1)}MB(红线 16MB)`
+    )
+    console.log(`✅ 大文件夹防线自测通过:${big.stats.fileCount} 个文件 · ${big.durationMs}ms · 外部内存增量 ${(externalGrew / 1024 / 1024).toFixed(2)}MB`)
+  } finally {
+    await fs.rm(bigRoot, { recursive: true, force: true })
+  }
 }
 
 main().catch((err) => {
