@@ -194,62 +194,67 @@ export async function analyzeSource(code: string, languageId: string): Promise<F
   const tree = parser.parse(code)
   if (!tree) return null
 
-  const result: FileStructure = {
-    languageId,
-    imports: [],
-    exports: [],
-    functions: [],
-    classes: [],
-    interfaces: [],
-    reactComponents: []
-  }
+  // 解析树占的是 WASM 内存,用完必须 delete:try/finally 保证异常路径也不漏
+  try {
+    const result: FileStructure = {
+      languageId,
+      imports: [],
+      exports: [],
+      functions: [],
+      classes: [],
+      interfaces: [],
+      reactComponents: []
+    }
 
-  for (const match of query.matches(tree.rootNode)) {
-    for (const capture of match.captures) {
-      const text = capture.node.text
-      switch (capture.name) {
-        case 'fn':
-          result.functions.push(text)
-          break
-        case 'cls':
-          result.classes.push(text)
-          break
-        case 'iface':
-          result.interfaces.push(text)
-          break
-        case 'imp':
-          result.imports.push(stripQuotes(text))
-          break
-        case 'reqmod':
-          // CommonJS 的 require('x'):确认调用的是 require 本尊才算导入
-          if (match.captures.some((c) => c.name === 'reqfn' && c.node.text === 'require')) {
+    for (const match of query.matches(tree.rootNode)) {
+      for (const capture of match.captures) {
+        const text = capture.node.text
+        switch (capture.name) {
+          case 'fn':
+            result.functions.push(text)
+            break
+          case 'cls':
+            result.classes.push(text)
+            break
+          case 'iface':
+            result.interfaces.push(text)
+            break
+          case 'imp':
             result.imports.push(stripQuotes(text))
-          }
-          break
-        case 'exp':
-        case 'expspec':
-          result.exports.push(text)
-          break
-        case 'expdef':
-          result.exports.push(text)
-          break
-        case 'expdefanon':
-          result.exports.push('default')
-          break
+            break
+          case 'reqmod':
+            // CommonJS 的 require('x'):确认调用的是 require 本尊才算导入
+            if (match.captures.some((c) => c.name === 'reqfn' && c.node.text === 'require')) {
+              result.imports.push(stripQuotes(text))
+            }
+            break
+          case 'exp':
+          case 'expspec':
+            result.exports.push(text)
+            break
+          case 'expdef':
+            result.exports.push(text)
+            break
+          case 'expdefanon':
+            result.exports.push('default')
+            break
+        }
       }
     }
-  }
 
-  // React 组件判定:文件确实用了 JSX,且函数/类名大写开头(行业约定)
-  if (languageId.endsWith('-react') && tree.rootNode.descendantsOfType('jsx_element').length > 0) {
-    result.reactComponents = [...result.functions, ...result.classes].filter((name) => /^[A-Z]/.test(name))
-  }
+    // React 组件判定:文件确实用了 JSX,且函数/类名大写开头(行业约定)
+    if (languageId.endsWith('-react') && tree.rootNode.descendantsOfType('jsx_element').length > 0) {
+      result.reactComponents = [...result.functions, ...result.classes].filter((name) => /^[A-Z]/.test(name))
+    }
 
-  result.imports = dedupeSorted(result.imports)
-  result.exports = dedupeSorted(result.exports)
-  result.functions = dedupeSorted(result.functions)
-  result.classes = dedupeSorted(result.classes)
-  result.interfaces = dedupeSorted(result.interfaces)
-  result.reactComponents = dedupeSorted(result.reactComponents)
-  return result
+    result.imports = dedupeSorted(result.imports)
+    result.exports = dedupeSorted(result.exports)
+    result.functions = dedupeSorted(result.functions)
+    result.classes = dedupeSorted(result.classes)
+    result.interfaces = dedupeSorted(result.interfaces)
+    result.reactComponents = dedupeSorted(result.reactComponents)
+    return result
+  } finally {
+    tree.delete()
+  }
 }
