@@ -4,6 +4,8 @@
 // 生命周期:首次用到 AI 才启动(不拖慢 app 打包体积和启动速度);app 退出时杀掉。
 // 端口固定 8766,避开 LM Studio 默认的 1234。
 import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { AiBuiltinSettings } from '../shared/types.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
@@ -21,17 +23,43 @@ export function isBuiltinRunning(): boolean {
 }
 
 /**
+ * 引擎自动定位:用户不该知道 llama-server 是啥。
+ * 设置里填了程序路径就用填的(高级用法);没填就找 app 自带的引擎
+ * (dev 模式在项目根 vendor/llama-cpp/,打包后在 resources/llama-cpp/)。
+ * 都找不到 → 人话错误,只有一个动作指引,不暴露任何术语。
+ */
+export function resolveServerProgram(configuredPath: string): string {
+  const configured = configuredPath.trim()
+  if (configured) {
+    if (!existsSync(configured)) {
+      throw new Error('找不到 llama-server 程序:去「AI 设置」重新选一下程序路径')
+    }
+    return configured
+  }
+  const candidates: string[] = [join(process.cwd(), 'vendor', 'llama-cpp', 'llama-server.exe')]
+  const resourcesPath = (process as { resourcesPath?: string }).resourcesPath
+  if (typeof resourcesPath === 'string') {
+    candidates.push(join(resourcesPath, 'llama-cpp', 'llama-server.exe'))
+  }
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  throw new Error('内置引擎还没就位:把 llama-server.exe 放进应用的 vendor\\llama-cpp\\ 文件夹里就好了')
+}
+
+/**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
  * 已在跑就直接复用;没跑就拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
+ * 引擎优先用 app 自带的,用户只管选模型文件。
  * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面。
  */
 export async function ensureBuiltinServer(settings: AiBuiltinSettings): Promise<{ baseUrl: string; model: string }> {
   if (isBuiltinRunning() && readyPromise) return readyPromise
 
-  const serverPath = settings.serverPath.trim()
+  const serverPath = resolveServerProgram(settings.serverPath)
   const modelPath = settings.modelPath.trim()
-  if (!serverPath || !modelPath) {
-    throw new Error('内置模型还没配置:去「AI 设置」填 llama-server 程序和模型文件的路径')
+  if (!modelPath) {
+    throw new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
   }
 
   const baseUrl = `http://127.0.0.1:${BUILTIN_PORT}/v1`

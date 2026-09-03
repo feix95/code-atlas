@@ -89,9 +89,9 @@ export function resolveAiTarget(
     if (!builtinRuntime) {
       return {
         ok: false,
-        message: config.builtin.serverPath && config.builtin.modelPath
+        message: config.builtin.modelPath.trim()
           ? '内置模型正在启动,稍等几秒再试'
-          : '内置模型还没配置:去「AI 设置」填 llama-server 程序和模型文件的路径'
+          : '还没选模型:去「AI 设置」点「选择模型」,选一个 GGUF 模型文件'
       }
     }
     return { ok: true, target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model } }

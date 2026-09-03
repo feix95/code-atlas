@@ -25,7 +25,7 @@ declare global {
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>
-      aiPickFile: (kind: 'server' | 'model') => Promise<string | null>
+      aiPickFile: () => Promise<string | null>
       aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string) => Promise<AiExplainResult>
       aiExplainFolder: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       gitChanges: (rootPath: string) => Promise<GitChangesResult>

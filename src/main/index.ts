@@ -169,20 +169,16 @@ function registerIpc(): void {
     })
   })
 
-  // 「AI 设置」里选文件:kind=server 选 llama-server 可执行文件,kind=model 选 GGUF 模型
-  ipcMain.handle('atlas:ai-pick-file', async (_event, kind: unknown) => {
-    if (kind !== 'server' && kind !== 'model') throw new Error('参数不合法')
+  // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
+  ipcMain.handle('atlas:ai-pick-file', async () => {
     const win = BrowserWindow.getAllWindows()[0]
-    const options: OpenDialogOptions =
-      kind === 'server'
-        ? {
-            properties: ['openFile'],
-            filters: [
-              { name: 'llama-server 程序', extensions: ['exe'] },
-              { name: '所有文件', extensions: ['*'] }
-            ]
-          }
-        : { properties: ['openFile'], filters: [{ name: 'GGUF 模型', extensions: ['gguf'] }, { name: '所有文件', extensions: ['*'] }] }
+    const options: OpenDialogOptions = {
+      properties: ['openFile'],
+      filters: [
+        { name: 'GGUF 模型', extensions: ['gguf'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+    }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })

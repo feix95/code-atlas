@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
-  aiPickFile: (kind: 'server' | 'model'): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file', kind),
+  aiPickFile: (): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file'),
   aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId),
   aiExplainFolder: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>

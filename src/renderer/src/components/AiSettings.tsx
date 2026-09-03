@@ -30,17 +30,13 @@ export function AiSettings(): React.JSX.Element {
     }
   }
 
-  async function handlePick(kind: 'server' | 'model'): Promise<void> {
+  async function handlePick(): Promise<void> {
     if (!config) return
     setNote(null)
     try {
-      const picked = await window.atlas.aiPickFile(kind)
+      const picked = await window.atlas.aiPickFile()
       if (!picked) return // 用户点了取消,不算事儿
-      setConfig(
-        kind === 'server'
-          ? { ...config, builtin: { ...config.builtin, serverPath: picked } }
-          : { ...config, builtin: { ...config.builtin, modelPath: picked } }
-      )
+      setConfig({ ...config, builtin: { ...config.builtin, modelPath: picked } })
     } catch (err) {
       setNote(friendlyErr(err))
     }
@@ -89,47 +85,28 @@ export function AiSettings(): React.JSX.Element {
         </div>
         <p className="ai-hint">
           {isBuiltin
-            ? '内置模式:选好程序和模型文件就行。第一次用 AI 时自动在后台启动,退出应用自动关闭,不占开机资源。'
+            ? '内置模式:选一个模型文件就能用。第一次点 AI 会自动启动(大模型加载要等一会儿),退出应用自动关闭。'
             : 'LM Studio 模式:先打开 LM Studio 并加载好模型,CodeAtlas 跟它对话。'}
         </p>
       </div>
 
       {isBuiltin ? (
-        <>
-          <div className="ai-field">
-            <label className="ai-label" htmlFor="ai-server-path">llama-server 程序路径</label>
-            <div className="ai-row">
-              <input
-                id="ai-server-path"
-                className="ai-input"
-                value={config.builtin.serverPath}
-                onChange={(e) => setConfig({ ...config, builtin: { ...config.builtin, serverPath: e.target.value } })}
-                placeholder="例如 D:\\tools\\llama-server.exe"
-              />
-              <button type="button" className="btn" onClick={() => void handlePick('server')} disabled={busy}>
-                📂 选择程序
-              </button>
-            </div>
-            <p className="ai-hint">llama.cpp 自带的 llama-server 可执行文件(下载解压后里面那个 exe)。</p>
+        <div className="ai-field">
+          <label className="ai-label" htmlFor="ai-model-path">模型文件</label>
+          <div className="ai-row">
+            <input
+              id="ai-model-path"
+              className="ai-input"
+              value={config.builtin.modelPath}
+              onChange={(e) => setConfig({ ...config, builtin: { ...config.builtin, modelPath: e.target.value } })}
+              placeholder="例如 F:\\LLM_Models\\Qwen\\...\\模型名.gguf"
+            />
+            <button type="button" className="btn" onClick={() => void handlePick()} disabled={busy}>
+              📂 选择模型
+            </button>
           </div>
-
-          <div className="ai-field">
-            <label className="ai-label" htmlFor="ai-model-path">GGUF 模型文件路径</label>
-            <div className="ai-row">
-              <input
-                id="ai-model-path"
-                className="ai-input"
-                value={config.builtin.modelPath}
-                onChange={(e) => setConfig({ ...config, builtin: { ...config.builtin, modelPath: e.target.value } })}
-                placeholder="例如 F:\\LLM_Models\\Qwen\\...\\模型名.gguf"
-              />
-              <button type="button" className="btn" onClick={() => void handlePick('model')} disabled={busy}>
-                📂 选择模型
-              </button>
-            </div>
-            <p className="ai-hint">模型以独立文件存在,不塞进应用里;再大的模型也只是硬盘上的一个文件。</p>
-          </div>
-        </>
+          <p className="ai-hint">模型就是 AI 的大脑,一个独立文件。推理引擎已经内置在应用里,不用你操心;以后想换更强的 AI,换个模型文件就行。</p>
+        </div>
       ) : (
         <>
           <div className="ai-field">

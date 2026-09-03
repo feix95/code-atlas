@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,6 +13,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
+import { resolveServerProgram } from '../src/ai/builtin.ts'
 import type { AiConfig, FileStructure } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
@@ -157,13 +159,37 @@ async function main(): Promise<void> {
   assert.ok(!lmNoModel.ok && lmNoModel.message.includes('AI 设置'), '失败要给人话指引')
 
   const biMissing = resolveAiTarget({ ...lmConfig(''), provider: 'builtin' })
-  assert.ok(!biMissing.ok, '内置 Provider 没配置路径应解析失败')
-  assert.ok(!biMissing.ok && biMissing.message.includes('内置模型'), '失败要指向内置模型配置')
+  assert.ok(!biMissing.ok, '内置 Provider 没选模型应解析失败')
+  assert.ok(!biMissing.ok && biMissing.message.includes('还没选模型'), '失败要指向选模型这个动作')
 
   const biOk = resolveAiTarget({ ...lmConfig(''), provider: 'builtin' }, { baseUrl: 'http://127.0.0.1:8766/v1', model: 'qwen-7b' })
   assert.ok(biOk.ok, '内置 Provider 有运行时应解析成功')
   assert.equal(biOk.ok && biOk.target.baseUrl, 'http://127.0.0.1:8766/v1', '目标地址来自子进程运行时')
   assert.equal(biOk.ok && biOk.target.model, 'qwen-7b', '目标模型名来自子进程报告')
+
+  // ── 6.5 引擎自动定位:填了就用填的;没填找 app 自带的;都没有给人话错误 ──
+  const exeDir = await mkdtemp(join(tmpdir(), 'codeatlas-builtin-'))
+  try {
+    const exePath = join(exeDir, 'llama-server.exe')
+    await writeFile(exePath, 'fake engine')
+    assert.equal(resolveServerProgram(`  ${exePath}  `), exePath.trim(), '手动填的路径应去掉空格原样使用')
+
+    let threw = ''
+    try {
+      resolveServerProgram('D:\\不存在\\llama-server.exe')
+    } catch (err) {
+      threw = err instanceof Error ? err.message : String(err)
+    }
+    assert.ok(threw.includes('找不到'), '不存在的程序路径要给人话错误')
+
+    // 没填路径时回退到 app 自带引擎;引擎没下载就跳过这条(dev 机器上通常已就位)
+    const bundled = join(process.cwd(), 'vendor', 'llama-cpp', 'llama-server.exe')
+    if (existsSync(bundled)) {
+      assert.equal(resolveServerProgram(''), bundled, '没填路径应自动用内置引擎')
+    }
+  } finally {
+    await rm(exeDir, { recursive: true, force: true })
+  }
 
   // ── 7. 用本地假模型服务验证整条 fetch → 解析链路(非流式 + SSE 流式) ──
   const receivedBodies: string[] = []
