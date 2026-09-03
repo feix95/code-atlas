@@ -242,17 +242,23 @@ const STREAM_IDLE_MS = 30_000
  * 不传 = 老行为,等全量。两条路 LM Studio 和内置模型都支持。
  * 超时是分段看门狗:等响应头/整段回复给足耐心;流式只要还有增量就一直续命,
  * 一旦没动静立刻掐断 —— 绝不无限挂死,也不把慢模型的正常输出拦腰砍断。
+ * signal = 外部取消(用户换了讲解目标):立刻掐,不让过气的生成占着模型排队。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
  */
 export async function explainWithModel(
   config: ChatTarget,
   prompt: string,
   system: string = SYSTEM_PROMPT,
-  onDelta?: (text: string) => void
+  onDelta?: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
   const controller = new AbortController()
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
   let watchdog: ReturnType<typeof setTimeout> | undefined
   const armWatchdog = (ms: number): void => {
     clearTimeout(watchdog)

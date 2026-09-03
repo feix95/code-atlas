@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('atlas', {
   gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
   gitExplainChange: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath, requestId),
+  /** 掐掉还在生成的讲解:换了讲解目标/关掉卡片时喊一声,模型立刻空出来 */
+  aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke('atlas:ai-cancel', requestId),
   /** 订阅 AI 流式增量;返回退订函数,组件卸载时调用,防止泄漏监听 */
   onAiDelta: (callback: (payload: AiDeltaPayload) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void => callback(payload)

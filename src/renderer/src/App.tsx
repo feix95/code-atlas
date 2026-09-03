@@ -217,11 +217,11 @@ function App(): React.JSX.Element {
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
   async function handleExpandLazy(relPath: string): Promise<void> {
-    if (!result || expanding) return
+    if (!result) return
     setExpanding(relPath)
     setTreeNote(null)
     try {
-      // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
+      // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径只能由主进程 joinRoot 解析
       const sub = await window.atlas.scanSubdir(result.rootPath, relPath)
       setResult((prev) =>
         prev
@@ -234,6 +234,119 @@ function App(): React.JSX.Element {
       setExpanding(null)
     }
   }
+
+  // 全局小账条:无论选中什么都挂在一屏里,随时知道这张图有多大、还欠多少没探
+  const statsStrip = result && (
+    <div className="summary chips-strip">
+      <div className="chips">
+        <span className="chip">📄 {result.stats.fileCount} 个文件</span>
+        <span className="chip">📁 {result.stats.dirCount} 个文件夹</span>
+        <span className="chip">⏱ {result.durationMs} ms</span>
+        {result.stats.ignoredCount > 0 && <span className="chip is-muted">已绕开 {result.stats.ignoredCount} 项杂物</span>}
+        {result.stats.skippedCount > 0 && <span className="chip is-muted">跳过 {result.stats.skippedCount} 项(无权限/链接)</span>}
+        {result.stats.lazyCount > 0 && <span className="chip is-muted">还有 {result.stats.lazyCount} 个文件夹没探,点开就扫</span>}
+      </div>
+    </div>
+  )
+
+  const aiSettingsCard = showAiSettings && (
+    <section className="summary">
+      <div className="bars-title">⚙️ AI 人话解释设置</div>
+      <AiSettings />
+    </section>
+  )
+
+  const gitCard = showGit && folder && !scanning && (
+    <section className="summary">
+      <div className="bars-title">🌿 git 修改翻译 —— 谁动了代码,讲给你听</div>
+      <GitChanges rootPath={folder} onJump={jumpTo} />
+    </section>
+  )
+
+  // 还没选中任何东西:右侧是全项目概览(语言分布 + 关系图入口)
+  const overview = (
+    <>
+      <section className="summary">
+        <div className="extbars">
+          <div className="bars-title">🗣️ 语言分布</div>
+          {result && topEntries(result.stats.byLanguage, 6).map(({ key, label, count }) => (
+            <BarRow key={key} label={label} count={count} total={result.stats.fileCount || 1} />
+          ))}
+          <div className="bars-title">🧩 后缀分布</div>
+          {result && topEntries(result.stats.byExt, 5).map(({ label, count }) => (
+            <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={result.stats.fileCount || 1} />
+          ))}
+        </div>
+        <div className="summary-actions">
+          <button type="button" className="btn" onClick={() => void handleLoadGraph()} disabled={graphLoading}>
+            {graphLoading ? '⏳ 正在连线……' : graph ? '🔄 重新分析关系' : '🕸️ 分析文件关系'}
+          </button>
+          {graph && (
+            <span className="chip is-muted">
+              {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 · 外部包引用{' '}
+              {graph.stats.externalCount} 次 · 没连上 {graph.stats.unresolved.length} 条 · ⏱ {graph.durationMs} ms
+            </span>
+          )}
+        </div>
+        {graphNote && <div className="structure-note">⚠️ {graphNote}</div>}
+      </section>
+      {graph && graph.hubs.length > 0 && (
+        <section className="summary">
+          <div className="bars-title">⭐ 最忙的文件(被引用最多,改它要小心 · 点名字跳过去看)</div>
+          <div className="extbars bars-hub">
+            {graph.hubs.slice(0, 8).map((hub) => (
+              <button
+                key={hub.relPath}
+                type="button"
+                className="extbar extbar-link"
+                onClick={() => jumpTo(hub.relPath)}
+                title={hub.relPath}
+              >
+                <span className="extbar-label">{hub.relPath}</span>
+                <div className="extbar-track">
+                  <div className="extbar-fill" style={{ width: `${(hub.inCount / graph.hubs[0].inCount) * 100}%` }} />
+                </div>
+                <span className="extbar-count">{hub.inCount}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  )
+
+  // 选中了文件:结构骨架 + 它在关系图里的位置 + AI 自动开讲,全在右侧一屏
+  const fileDetail = selectedFile && result && (
+    <section className="structure">
+      <div className="structure-head">
+        <span className="structure-title">🧬 {selectedFile.name}</span>
+        {selectedFile.languageName && <span className="structure-lang">{selectedFile.languageName}</span>}
+        <button
+          type="button"
+          className="structure-close"
+          onClick={() => {
+            setSelectedFile(null)
+            setStructure(null)
+            setAnalyzeNote(null)
+          }}
+        >
+          ✕
+        </button>
+      </div>
+      {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
+      {!analyzing && analyzeNote && <div className="structure-note">{analyzeNote}</div>}
+      {!analyzing && structure && <StructureGrid structure={structure} />}
+      {!analyzing && graph && <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />}
+      {!analyzing && (
+        <ExplainCard
+          key={selectedFile.relPath}
+          rootPath={result.rootPath}
+          relPath={selectedFile.relPath}
+          languageId={selectedFile.languageId}
+        />
+      )}
+    </section>
+  )
 
   return (
     <div className="app">
@@ -253,151 +366,10 @@ function App(): React.JSX.Element {
         {folder && <span className="current-path">{folder}</span>}
       </header>
 
-      <main className="content">
-        {showAiSettings && (
-          <section className="summary">
-            <div className="bars-title">⚙️ AI 人话解释设置</div>
-            <AiSettings />
-          </section>
-        )}
-
-        {showGit && folder && !scanning && (
-          <section className="summary">
-            <div className="bars-title">🌿 git 修改翻译 —— 谁动了代码,讲给你听</div>
-            <GitChanges rootPath={folder} onJump={jumpTo} />
-          </section>
-        )}
-
-        {scanning && <div className="state">⏳ 正在绘制地图,稍等……</div>}
-
-        {!scanning && error && <div className="state is-error">⚠️ {error}</div>}
-
-        {!folder && !scanning && !error && (
-          <div className="welcome-card">
-            <div className="logo">🗺️</div>
-            <h1>CodeAtlas</h1>
-            <p className="slogan">你的 AI 代码地图 —— 不读代码,也能看懂整个项目</p>
-            <p className="empty-hint">点上方「选择文件夹」,哥把它的地图画给你看</p>
-            <div className="engine">
-              {versions ? (
-                <>
-                  <span>Electron {versions.electron}</span>
-                  <span>Node {versions.node}</span>
-                  <span>Chromium {versions.chrome}</span>
-                </>
-              ) : (
-                <span>引擎启动中……</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {result && !scanning && (
-          <>
-            <section className="summary">
-              <div className="chips">
-                <span className="chip">📄 {result.stats.fileCount} 个文件</span>
-                <span className="chip">📁 {result.stats.dirCount} 个文件夹</span>
-                <span className="chip">⏱ {result.durationMs} ms</span>
-                {result.stats.ignoredCount > 0 && (
-                  <span className="chip is-muted">已绕开 {result.stats.ignoredCount} 项杂物</span>
-                )}
-                {result.stats.skippedCount > 0 && (
-                  <span className="chip is-muted">跳过 {result.stats.skippedCount} 项(无权限/链接)</span>
-                )}
-                {result.stats.lazyCount > 0 && (
-                  <span className="chip is-muted">还有 {result.stats.lazyCount} 个文件夹没探,点开就扫</span>
-                )}
-              </div>
-              <div className="extbars">
-                <div className="bars-title">🗣️ 语言分布</div>
-                {topEntries(result.stats.byLanguage, 6).map(({ key, label, count }) => (
-                  <BarRow key={key} label={label} count={count} total={result.stats.fileCount || 1} />
-                ))}
-                <div className="bars-title">🧩 后缀分布</div>
-                {topEntries(result.stats.byExt, 5).map(({ label, count }) => (
-                  <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={result.stats.fileCount || 1} />
-                ))}
-              </div>
-              <div className="summary-actions">
-                <button type="button" className="btn" onClick={handleLoadGraph} disabled={graphLoading}>
-                  {graphLoading ? '⏳ 正在连线……' : graph ? '🔄 重新分析关系' : '🕸️ 分析文件关系'}
-                </button>
-                {graph && (
-                  <span className="chip is-muted">
-                    {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 · 外部包引用{' '}
-                    {graph.stats.externalCount} 次 · 没连上 {graph.stats.unresolved.length} 条 · ⏱ {graph.durationMs} ms
-                  </span>
-                )}
-              </div>
-              {graphNote && <div className="structure-note">⚠️ {graphNote}</div>}
-            </section>
-            {graph && graph.hubs.length > 0 && (
-              <section className="summary">
-                <div className="bars-title">⭐ 最忙的文件(被引用最多,改它要小心)</div>
-                <div className="extbars bars-hub">
-                  {graph.hubs.slice(0, 8).map((hub) => (
-                    <button
-                      key={hub.relPath}
-                      type="button"
-                      className="extbar extbar-link"
-                      onClick={() => jumpTo(hub.relPath)}
-                      title={hub.relPath}
-                    >
-                      <span className="extbar-label">{hub.relPath}</span>
-                      <div className="extbar-track">
-                        <div className="extbar-fill" style={{ width: `${(hub.inCount / graph.hubs[0].inCount) * 100}%` }} />
-                      </div>
-                      <span className="extbar-count">{hub.inCount}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-            {selectedFolder && result && (
-              <FolderCard
-                key={selectedFolder.relPath || '(root)'}
-                rootPath={result.rootPath}
-                relPath={selectedFolder.relPath}
-                name={selectedFolder.name}
-              />
-            )}
-            {selectedFile && (
-              <section className="structure">
-                <div className="structure-head">
-                  <span className="structure-title">🧬 {selectedFile.name}</span>
-                  {selectedFile.languageName && (
-                    <span className="structure-lang">{selectedFile.languageName}</span>
-                  )}
-                  <button
-                    type="button"
-                    className="structure-close"
-                    onClick={() => {
-                      setSelectedFile(null)
-                      setStructure(null)
-                      setAnalyzeNote(null)
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-                {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
-                {!analyzing && analyzeNote && <div className="structure-note">{analyzeNote}</div>}
-                {!analyzing && structure && <StructureGrid structure={structure} />}
-                {!analyzing && graph && selectedFile && (
-                  <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />
-                )}
-                {!analyzing && selectedFile && (
-                  <ExplainCard
-                    key={selectedFile.relPath}
-                    rootPath={result.rootPath}
-                    relPath={selectedFile.relPath}
-                    languageId={selectedFile.languageId}
-                  />
-                )}
-              </section>
-            )}
-            {treeNote && <div className="structure-note">⚠️ {treeNote}</div>}
+      {result && !scanning ? (
+        // 资源管理器式双栏:左边目录树,右边选中项的全部分析信息
+        <main className="workspace">
+          <aside className="sidebar">
             <FileTree
               root={result.tree}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
@@ -406,9 +378,52 @@ function App(): React.JSX.Element {
               onSelectFolder={handleSelectFolder}
               onExpandLazy={handleExpandLazy}
             />
-          </>
-        )}
-      </main>
+            {treeNote && <div className="tree-toast">⚠️ {treeNote}</div>}
+          </aside>
+          <section className="detail">
+            {statsStrip}
+            {aiSettingsCard}
+            {gitCard}
+            {selectedFile ? fileDetail : selectedFolder ? (
+              <FolderCard
+                key={selectedFolder.relPath || '(root)'}
+                rootPath={result.rootPath}
+                relPath={selectedFolder.relPath}
+                name={selectedFolder.name}
+                onClose={() => setSelectedFolder(null)}
+              />
+            ) : (
+              overview
+            )}
+          </section>
+        </main>
+      ) : (
+        <main className="content">
+          {aiSettingsCard}
+          {gitCard}
+          {scanning && <div className="state">⏳ 正在绘制地图,稍等……</div>}
+          {!scanning && error && <div className="state is-error">⚠️ {error}</div>}
+          {!folder && !scanning && !error && (
+            <div className="welcome-card">
+              <div className="logo">🗺️</div>
+              <h1>CodeAtlas</h1>
+              <p className="slogan">你的 AI 代码地图 —— 不读代码,也能看懂整个项目</p>
+              <p className="empty-hint">点上方「选择文件夹」,哥把它的地图画给你看</p>
+              <div className="engine">
+                {versions ? (
+                  <>
+                    <span>Electron {versions.electron}</span>
+                    <span>Node {versions.node}</span>
+                    <span>Chromium {versions.chrome}</span>
+                  </>
+                ) : (
+                  <span>引擎启动中……</span>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      )}
     </div>
   )
 }

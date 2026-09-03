@@ -31,6 +31,7 @@ declare global {
       aiExplainFolder: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
+      aiCancel: (requestId: string) => Promise<void>
       onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void
     }
   }

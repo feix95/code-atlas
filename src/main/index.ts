@@ -21,11 +21,34 @@ import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from
 import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiConfig, AiDeltaPayload, ChatTarget } from '../shared/types.ts'
+import type { AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot <= 0 ? '' : name.slice(dot).toLowerCase()
+}
+
+/** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
+const explainAborters = new Map<string, AbortController>()
+
+/**
+ * 带取消的讲解执行:requestId 对号入座。
+ * 自动讲解时代用户会连点文件,旧生成必须能被掐断,模型才能马上讲下一个。
+ */
+async function explainWithCancel(
+  requestId: unknown,
+  run: (signal: AbortSignal) => Promise<AiExplainResult>
+): Promise<AiExplainResult> {
+  if (typeof requestId !== 'string' || requestId === '') {
+    return run(new AbortController().signal)
+  }
+  const aborter = new AbortController()
+  explainAborters.set(requestId, aborter)
+  try {
+    return await run(aborter.signal)
+  } finally {
+    explainAborters.delete(requestId)
+  }
 }
 
 /**
@@ -272,7 +295,9 @@ function registerIpc(): void {
       return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
     }
     const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
-    return explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId))
+    return explainWithCancel(requestId, (signal) =>
+      explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
+    )
   })
 
   // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);
@@ -302,7 +327,7 @@ function registerIpc(): void {
         const structure = await analyzeSource(code, languageId)
         if (structure) {
           const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
-          return explainWithModel(resolved.target, prompt, undefined, onDelta)
+          return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, undefined, onDelta, signal))
         }
       }
 
@@ -316,7 +341,7 @@ function registerIpc(): void {
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
       const prompt = buildGuessPrompt({ relPath, name, languageName, preview })
-      return explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta)
+      return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
     }
   )
 
@@ -369,7 +394,16 @@ function registerIpc(): void {
       files,
       languages: Object.fromEntries(languages)
     })
-    return explainWithModel(resolved.target, prompt, FOLDER_SYSTEM_PROMPT, makeDeltaSender(event, requestId))
+    return explainWithCancel(requestId, (signal) =>
+      explainWithModel(resolved.target, prompt, FOLDER_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
+    )
+  })
+
+  // 掐掉还在生成的讲解:渲染进程换了讲解目标/关掉卡片时喊一声,模型立刻空出来讲下一个
+  ipcMain.handle('atlas:ai-cancel', (_event, requestId: unknown) => {
+    if (typeof requestId !== 'string' || requestId === '') return
+    explainAborters.get(requestId)?.abort()
+    explainAborters.delete(requestId)
   })
 }
 

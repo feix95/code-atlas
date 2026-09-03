@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types'
 import { friendlyErr } from '../errText'
 
+/** 掐掉还在路上的生成:换了文件/刷新/关面板时喊一声,模型立刻空出来 */
+function cancelExplain(id: string): void {
+  if (id) void window.atlas.aiCancel(id)
+}
+
 const KIND_LABEL: Record<GitChange['kind'], string> = {
   added: '新增',
   modified: '修改',
@@ -38,6 +43,13 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
     })
   }, [])
 
+  // 组件卸载(关掉 git 面板/换布局)时,把还在生成的讲解掐掉,别占着模型
+  useEffect(() => {
+    return () => {
+      if (idRef.current) void window.atlas.aiCancel(idRef.current)
+    }
+  }, [])
+
   // 挂载/换文件夹时自动收一遍;setState 都发生在 await 之后,不在 effect 里同步触发。
   // cancelled 守卫:慢响应回来时文件夹已经换了,不许旧账盖新账
   useEffect(() => {
@@ -64,7 +76,8 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
   async function handleRefresh(): Promise<void> {
     setLoading(true)
     setNote(null)
-    // 讲解若在路上,先作废:刷新后选中的文件可能不在了,旧讲解不许挂回来
+    // 讲解若在路上,先掐掉:刷新后选中的文件可能不在了,旧讲解不许挂回来
+    cancelExplain(idRef.current)
     idRef.current = ''
     setExplaining(false)
     setStreamText('')
@@ -144,8 +157,9 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
             onClick={() => {
               setSelected(change)
               setExplain(null)
-              // 上一份讲解还在路上就点了别的文件:作废它,别让 A 的答案挂到 B 头上
+              // 上一份讲解还在路上就点了别的文件:掐掉它,别让 A 的答案挂到 B 头上,也别占着模型
               if (explaining) {
+                cancelExplain(idRef.current)
                 idRef.current = ''
                 setExplaining(false)
                 setStreamText('')
