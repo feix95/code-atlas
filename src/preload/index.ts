@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DepGraphResult, FileStructure, ScanResult } from '../shared/types.ts'
+import type { AiConfig, AiExplainResult, DepGraphResult, FileStructure, ScanResult } from '../shared/types.ts'
 
 // 挂在 window.atlas 命名空间下:版本信息、选文件夹、扫描、AST 分析,都从这儿走
 contextBridge.exposeInMainWorld('atlas', {
@@ -12,5 +12,10 @@ contextBridge.exposeInMainWorld('atlas', {
   scanFolder: (folderPath: string): Promise<ScanResult> => ipcRenderer.invoke('atlas:scan-folder', folderPath),
   analyzeFile: (rootPath: string, relPath: string, languageId: string): Promise<FileStructure | null> =>
     ipcRenderer.invoke('atlas:analyze-file', rootPath, relPath, languageId),
-  depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke('atlas:dep-graph', rootPath)
+  depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke('atlas:dep-graph', rootPath),
+  aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
+  aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
+  aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
+  aiExplainFile: (rootPath: string, relPath: string, languageId: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId)
 })

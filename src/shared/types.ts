@@ -111,3 +111,25 @@ export interface DepGraphResult {
   }
   durationMs: number
 }
+
+/** AI 解释的模型配置(指向 LM Studio 这类本地服务的 OpenAI 兼容接口) */
+export interface AiConfig {
+  /** 服务根地址,常以 /v1 结尾,如 http://127.0.0.1:1234/v1 */
+  baseUrl: string
+  /** LM Studio 里加载的模型名,如 Qwen3.8-27B-Uncensored-IQ4_XS */
+  model: string
+  /** OpenAI 兼容接口的鉴权 key;本地 LM Studio 通常可留空 */
+  apiKey?: string
+}
+
+/** AI 人话解释的结果 */
+export interface AiExplainResult {
+  /** 能力边界:该语言是否被支持、服务是否通、模型是否返回了内容 */
+  status: 'supported' | 'unsupported' | 'error'
+  /** 解释文本;出错时是给用户看的人话说明 */
+  text: string
+  /** 本次用了哪个模型(方便界面回显) */
+  model: string
+  /** 耗时(ms) */
+  durationMs: number
+}

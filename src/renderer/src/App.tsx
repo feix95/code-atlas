@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { DepGraphResult, FileStructure, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import { AiSettings } from './components/AiSettings'
+import { ExplainCard } from './components/ExplainCard'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { StructureGrid } from './components/StructureGrid'
@@ -78,6 +80,7 @@ function App(): React.JSX.Element {
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
+  const [showAiSettings, setShowAiSettings] = useState(false)
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -154,10 +157,20 @@ function App(): React.JSX.Element {
         <button type="button" className="btn" onClick={handlePick} disabled={scanning}>
           📁 选择文件夹
         </button>
+        <button type="button" className="btn btn-ghost" onClick={() => setShowAiSettings((v) => !v)}>
+          ⚙️ AI 设置
+        </button>
         {folder && <span className="current-path">{folder}</span>}
       </header>
 
       <main className="content">
+        {showAiSettings && (
+          <section className="summary">
+            <div className="bars-title">⚙️ AI 人话解释设置</div>
+            <AiSettings />
+          </section>
+        )}
+
         {scanning && <div className="state">⏳ 正在绘制地图,稍等……</div>}
 
         {!scanning && error && <div className="state is-error">⚠️ {error}</div>}
@@ -265,6 +278,14 @@ function App(): React.JSX.Element {
                 {!analyzing && structure && <StructureGrid structure={structure} />}
                 {!analyzing && graph && selectedFile && (
                   <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />
+                )}
+                {!analyzing && structure && selectedFile && result && (
+                  <ExplainCard
+                    key={selectedFile.relPath}
+                    rootPath={result.rootPath}
+                    relPath={selectedFile.relPath}
+                    languageId={structure.languageId}
+                  />
                 )}
               </section>
             )}

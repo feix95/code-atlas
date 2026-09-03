@@ -417,6 +417,117 @@ body {
   gap: 14px;
 }
 
+/* ── AI 设置(第六锤) ─────────────── */
+
+.btn-ghost {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ai-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.ai-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.ai-input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: Consolas, Menlo, monospace;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ai-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ai-models {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-link.is-on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ai-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-note {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── 人话解释卡(第六锤) ──────────── */
+
+.explain {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.explain-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.explain-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.explain-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.explain-note.is-error {
+  color: var(--danger);
+}
+
+.explain-text {
+  font-size: 14px;
+  line-height: 1.75;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+}
+
 /* ── 目录树 ───────────────────────── */
 
 .tree {
