@@ -14,3 +14,6 @@ vendor/
 ai-config.json
 *.pem
 *.key
+
+# 含他人用户名路径的参考截图:本地留用作参考,不进公开仓库(CLAUDE.md 红线)
+inspiration/ui-ref-02.jpg
