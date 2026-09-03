@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('atlas', {
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
   aiExplainFile: (rootPath: string, relPath: string, languageId: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId),
+  aiExplainFolder: (rootPath: string, relPath: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath),
   gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
   gitExplainChange: (rootPath: string, relPath: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath)

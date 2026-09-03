@@ -3,7 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
-import { buildExplainPrompt, explainWithModel, isExplainable } from '../src/ai/index.ts'
+import {
+  buildExplainPrompt,
+  buildFolderPrompt,
+  buildGuessPrompt,
+  explainWithModel,
+  GUESS_SYSTEM_PROMPT,
+  isBinaryFile
+} from '../src/ai/index.ts'
 import { defaultAiConfig, loadAiConfig, saveAiConfig } from '../src/ai/config.ts'
 import type { FileStructure, AiConfig } from '../src/shared/types.ts'
 
@@ -51,9 +58,50 @@ async function main(): Promise<void> {
   )
   assert.ok(emptyPrompt.includes('不要编造'), '空结构要提醒模型别编造')
 
-  // ── 2. isExplainable:支持/不支持边界 ──
-  assert.ok(isExplainable('python'), 'python 应可解释')
-  assert.ok(!isExplainable('json'), 'json 应不可解释(没结构)')
+  // ── 2. 文件夹提示词:清单全进证据、根目录与截断都有人话 ──
+  const fp = buildFolderPrompt({
+    relPath: 'src/main',
+    name: 'main',
+    subdirs: ['utils'],
+    files: ['index.ts', 'server.ts'],
+    languages: { TypeScript: 12, Python: 3 }
+  })
+  assert.ok(fp.includes('src/main'), '文件夹提示词应含路径')
+  assert.ok(fp.includes('utils'), '应含子文件夹名')
+  assert.ok(fp.includes('index.ts'), '应含文件名')
+  assert.ok(fp.includes('TypeScript×12'), '应含语言分布')
+
+  const fpRoot = buildFolderPrompt({ relPath: '', name: 'code-atlas', subdirs: [], files: [], languages: {} })
+  assert.ok(fpRoot.includes('项目根目录'), '根目录要有说明')
+  assert.ok(fpRoot.includes('没有可识别的代码文件'), '空清单要老实说')
+
+  const manyFiles = Array.from({ length: 150 }, (_, i) => `f${i}.ts`)
+  const fpBig = buildFolderPrompt({ relPath: 'big', name: 'big', subdirs: [], files: manyFiles, languages: {} })
+  assert.ok(fpBig.includes('还有 50 个没列出'), '超量文件要注明截断')
+  assert.ok(!fpBig.includes('f149.ts'), '没列出的文件不许混进提示词')
+
+  // ── 3. 猜猜官提示词:名字 + 片段进证据、读不了/空文件有人话 ──
+  const gp = buildGuessPrompt({
+    relPath: 'tools/deploy.sh',
+    name: 'deploy.sh',
+    languageName: 'Shell',
+    preview: 'echo start\ncp -r dist /var/www'
+  })
+  assert.ok(gp.includes('deploy.sh'), '应含文件名')
+  assert.ok(gp.includes('cp -r dist'), '应含内容片段')
+  assert.ok(gp.includes('Shell'), '应含语言名')
+
+  const gpNull = buildGuessPrompt({ relPath: 'x', name: 'x', languageName: '', preview: null })
+  assert.ok(gpNull.includes('读不出文本内容'), '读不了内容要明说')
+  const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', languageName: '', preview: '' })
+  assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
+
+  // ── 4. 二进制判断:媒体/二进制不算代码,svg 与无后缀不算二进制 ──
+  assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
+  assert.ok(isBinaryFile('app.exe'), '可执行文件是二进制')
+  assert.ok(!isBinaryFile('logo.svg'), 'svg 是文本')
+  assert.ok(!isBinaryFile('.gitignore'), '隐藏文件不算二进制')
+  assert.ok(!isBinaryFile('Makefile'), '无后缀不算二进制')
 
   // ── 3. 配置读写往返 ──
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
@@ -102,6 +150,13 @@ async function main(): Promise<void> {
     assert.equal(sent.messages.length, 2, '应有两段消息(system + user)')
     assert.equal(sent.messages[0]?.role, 'system', '第一段是系统人设')
     assert.equal(sent.messages[1]?.role, 'user', '第二段是用户提示词')
+
+    // 猜猜官人设:同一管道,换系统提示词后发出去的人设要跟着换
+    const guessRes = await explainWithModel(config, gp, GUESS_SYSTEM_PROMPT)
+    assert.equal(guessRes.status, 'supported', '猜猜官链路应通')
+    const bodies = Buffer.concat(received).toString('utf8')
+    assert.ok(bodies.includes('猜猜官'), '猜猜官人设应发到服务')
+    assert.ok(bodies.includes('tools/deploy.sh'), '猜猜官提示词应带上文件证据')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
@@ -112,7 +167,7 @@ async function main(): Promise<void> {
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查 LM Studio')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 配置往返正常 · 本地假模型链路通 · 服务不可达有兜底')
+  console.log('   提示词固定不编造 · 文件夹/猜猜官提示词就位 · 二进制边界清楚 · 配置往返正常 · 本地假模型链路通 · 人设随场景切换')
 }
 
 main().catch((err) => {

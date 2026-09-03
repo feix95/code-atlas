@@ -1,14 +1,46 @@
 import { app, dialog, ipcMain, shell, BrowserWindow, type OpenDialogOptions } from 'electron'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
 import { collectGitChanges, getChangeDiff } from '../git/index.ts'
-import { explainWithModel, isExplainable, buildExplainPrompt, buildDiffPrompt, DIFF_SYSTEM_PROMPT } from '../ai/index.ts'
+import {
+  explainWithModel,
+  buildExplainPrompt,
+  buildDiffPrompt,
+  buildFolderPrompt,
+  buildGuessPrompt,
+  isBinaryFile,
+  DIFF_SYSTEM_PROMPT,
+  FOLDER_SYSTEM_PROMPT,
+  GUESS_SYSTEM_PROMPT
+} from '../ai/index.ts'
 import { loadAiConfig, saveAiConfig } from '../ai/config.ts'
+import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiConfig, FileStructure } from '../shared/types.ts'
+import type { AiConfig } from '../shared/types.ts'
+
+const NO_MODEL_MSG = '还没配置模型,先去「AI 设置」里连一下 LM Studio'
+
+function extOf(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot <= 0 ? '' : name.slice(dot).toLowerCase()
+}
+
+/** 读文件开头 64KB 当「内容片段」;含 \0 字节 = 二进制,返回 null */
+async function readTextPreview(absPath: string): Promise<string | null> {
+  const handle = await fs.open(absPath, 'r')
+  try {
+    const buf = Buffer.alloc(64 * 1024)
+    const { bytesRead } = await handle.read(buf, 0, buf.length, 0)
+    const chunk = buf.subarray(0, bytesRead)
+    if (chunk.includes(0)) return null
+    return chunk.toString('utf8')
+  } finally {
+    await handle.close()
+  }
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -146,31 +178,92 @@ function registerIpc(): void {
     return explainWithModel(config, prompt, DIFF_SYSTEM_PROMPT)
   })
 
-  // 人话解释:读文件(joinRoot) → AST → 拼提示词 → 调本地模型。路径契约同 analyze-file
+  // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);
+  // 不认识的用名字 + 内容片段让模型猜(声明不确定);二进制直接本地人话,不劳烦模型
+  // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
     async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
-      if (!isExplainable(languageId)) {
-        return { status: 'unsupported', text: '这个语言暂不支持人话解释', model: '', durationMs: 0 }
-      }
-      const absPath = joinRoot(rootPath, relPath) // relPath 想越界会在这里被拦
-      const code = await fs.readFile(absPath, 'utf8')
-      const structure = (await analyzeSource(code, languageId)) as FileStructure | null
-      if (!structure) {
-        return { status: 'error', text: '解析不出这个文件的结构', model: '', durationMs: 0 }
-      }
       const config = await loadAiConfig(app.getPath('userData'))
       if (!config.model) {
-        return { status: 'error', text: '还没配置模型,先去「AI 设置」里连一下 LM Studio', model: '', durationMs: 0 }
+        return { status: 'error', text: NO_MODEL_MSG, model: '', durationMs: 0 }
+      }
+      const absPath = joinRoot(rootPath, relPath) // relPath 想越界会在这里被拦
+      const stat = await fs.stat(absPath).catch(() => null)
+      if (!stat || !stat.isFile()) {
+        throw new Error(`文件不存在:${relPath}`)
       }
       const name = relPath.split('/').pop() ?? relPath
-      const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
-      return explainWithModel(config, prompt)
+
+      // 结构流:证据最硬 —— 函数/类/导入导出都摆给模型
+      if (isAnalysisSupported(languageId) && stat.size <= 1_000_000) {
+        const code = await fs.readFile(absPath, 'utf8')
+        const structure = await analyzeSource(code, languageId)
+        if (structure) {
+          const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
+          return explainWithModel(config, prompt)
+        }
+      }
+
+      // 兜底流:猜猜官 —— 名字 + 内容片段,推测并声明不确定
+      if (isBinaryFile(name)) {
+        return { status: 'unsupported', text: `「${name}」是图片/音视频/二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
+      }
+      const preview = stat.size === 0 ? '' : await readTextPreview(absPath)
+      if (preview === null) {
+        return { status: 'unsupported', text: `「${name}」看起来是二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
+      }
+      const languageName = BY_EXT.get(extOf(name))?.name ?? ''
+      const prompt = buildGuessPrompt({ relPath, name, languageName, preview })
+      return explainWithModel(config, prompt, GUESS_SYSTEM_PROMPT)
     }
   )
+
+  // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
+  // relPath 传 '' 表示解释项目根目录本身
+  ipcMain.handle('atlas:ai-explain-folder', async (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+      throw new Error('参数不合法')
+    }
+    const config = await loadAiConfig(app.getPath('userData'))
+    if (!config.model) {
+      return { status: 'error', text: NO_MODEL_MSG, model: '', durationMs: 0 }
+    }
+    const absPath = joinRoot(rootPath, relPath)
+    const stat = await fs.stat(absPath).catch(() => null)
+    if (!stat || !stat.isDirectory()) {
+      throw new Error(`文件夹不存在:${relPath || '(根目录)'}`)
+    }
+    const dirents = await fs.readdir(absPath, { withFileTypes: true })
+    if (dirents.length === 0) {
+      return { status: 'unsupported', text: '这是个空文件夹,啥也没装,就不用劳烦模型了', model: '', durationMs: 0 }
+    }
+    dirents.sort((a, b) => a.name.localeCompare(b.name))
+    const subdirs: string[] = []
+    const files: string[] = []
+    const languages = new Map<string, number>()
+    for (const item of dirents) {
+      if (item.isDirectory()) {
+        subdirs.push(item.name)
+        continue
+      }
+      if (!item.isFile()) continue // 符号链接等不靠谱的,跳过
+      files.push(item.name)
+      const langName = BY_EXT.get(extOf(item.name))?.name ?? '没认出的文件'
+      languages.set(langName, (languages.get(langName) ?? 0) + 1)
+    }
+    const prompt = buildFolderPrompt({
+      relPath,
+      name: basename(absPath) || basename(rootPath),
+      subdirs,
+      files,
+      languages: Object.fromEntries(languages)
+    })
+    return explainWithModel(config, prompt, FOLDER_SYSTEM_PROMPT)
+  })
 }
 
 app.whenReady().then(() => {

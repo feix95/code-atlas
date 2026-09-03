@@ -6,10 +6,11 @@ interface TreeRowProps {
   depth: number
   selectedPath: string | null
   onSelectFile: (relPath: string, file: ScanFileNode) => void
+  onSelectFolder: (relPath: string, name: string) => void
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, selectedPath, onSelectFile }: TreeRowProps): React.JSX.Element {
+function TreeRow({ node, depth, selectedPath, onSelectFile, onSelectFolder }: TreeRowProps): React.JSX.Element {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
 
@@ -33,9 +34,12 @@ function TreeRow({ node, depth, selectedPath, onSelectFile }: TreeRowProps): Rea
     <div>
       <button
         type="button"
-        className="tree-row is-dir"
+        className={`tree-row is-dir${selectedPath === node.relPath ? ' is-selected' : ''}`}
         style={{ paddingLeft: depth * 20 + 12 }}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setOpen(!open) // 展开/收起照旧;同时选中它,右侧出文件夹讲解卡
+          onSelectFolder(node.relPath, node.name)
+        }}
       >
         <span className="tree-icon">{open ? '📂' : '📁'}</span>
         <span className="tree-name">{node.name}</span>
@@ -50,6 +54,7 @@ function TreeRow({ node, depth, selectedPath, onSelectFile }: TreeRowProps): Rea
             depth={depth + 1}
             selectedPath={selectedPath}
             onSelectFile={onSelectFile}
+            onSelectFolder={onSelectFolder}
           />
         ))}
     </div>
@@ -60,12 +65,13 @@ interface FileTreeProps {
   root: ScanDirNode
   selectedPath: string | null
   onSelectFile: (relPath: string, file: ScanFileNode) => void
+  onSelectFolder: (relPath: string, name: string) => void
 }
 
-export function FileTree({ root, selectedPath, onSelectFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, selectedPath, onSelectFile, onSelectFolder }: FileTreeProps): React.JSX.Element {
   return (
     <div className="tree">
-      <TreeRow node={root} depth={0} selectedPath={selectedPath} onSelectFile={onSelectFile} />
+      <TreeRow node={root} depth={0} selectedPath={selectedPath} onSelectFile={onSelectFile} onSelectFolder={onSelectFolder} />
     </div>
   )
 }

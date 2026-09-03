@@ -4,6 +4,7 @@ import { AiSettings } from './components/AiSettings'
 import { ExplainCard } from './components/ExplainCard'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
+import { FolderCard } from './components/FolderCard'
 import { GitChanges } from './components/GitChanges'
 import { StructureGrid } from './components/StructureGrid'
 import { cleanErrMsg } from './errText'
@@ -54,6 +55,11 @@ interface SelectedFile {
   languageName: string
 }
 
+interface SelectedFolder {
+  relPath: string
+  name: string
+}
+
 // 按路径契约在扫描树里找文件节点:关系卡跳转只认 relPath,不手拼任何路径
 function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
   if (node.type === 'file') return node.relPath === relPath ? node : null
@@ -71,6 +77,7 @@ function App(): React.JSX.Element {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<SelectedFolder | null>(null)
   const [structure, setStructure] = useState<FileStructure | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeNote, setAnalyzeNote] = useState<string | null>(null)
@@ -88,6 +95,7 @@ function App(): React.JSX.Element {
     setResult(null)
     setError(null)
     setSelectedFile(null)
+    setSelectedFolder(null)
     setStructure(null)
     setAnalyzeNote(null)
     setGraph(null)
@@ -104,10 +112,11 @@ function App(): React.JSX.Element {
 
   async function handleSelectFile(relPath: string, file: ScanFileNode): Promise<void> {
     setSelectedFile({ relPath, name: file.name, languageId: file.language?.id ?? '', languageName: file.language?.name ?? '' })
+    setSelectedFolder(null)
     setStructure(null)
 
     if (!file.language) {
-      setAnalyzeNote('没有认出语言,暂不支持结构分析')
+      setAnalyzeNote('这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,点下面的按钮,AI 会看名字和内容片段猜给你')
       return
     }
     setAnalyzing(true)
@@ -147,6 +156,14 @@ function App(): React.JSX.Element {
     if (!result) return
     const found = findFile(result.tree, relPath)
     if (found) void handleSelectFile(found.relPath, found)
+  }
+
+  // 点了文件夹:展开/收起由 FileTree 自己管,这儿负责出文件夹讲解卡(与文件卡互斥)
+  function handleSelectFolder(relPath: string, name: string): void {
+    setSelectedFolder({ relPath, name })
+    setSelectedFile(null)
+    setStructure(null)
+    setAnalyzeNote(null)
   }
 
   return (
@@ -265,6 +282,14 @@ function App(): React.JSX.Element {
                 </div>
               </section>
             )}
+            {selectedFolder && result && (
+              <FolderCard
+                key={selectedFolder.relPath || '(root)'}
+                rootPath={result.rootPath}
+                relPath={selectedFolder.relPath}
+                name={selectedFolder.name}
+              />
+            )}
             {selectedFile && (
               <section className="structure">
                 <div className="structure-head">
@@ -290,17 +315,22 @@ function App(): React.JSX.Element {
                 {!analyzing && graph && selectedFile && (
                   <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />
                 )}
-                {!analyzing && structure && selectedFile && result && (
+                {!analyzing && selectedFile && (
                   <ExplainCard
                     key={selectedFile.relPath}
                     rootPath={result.rootPath}
                     relPath={selectedFile.relPath}
-                    languageId={structure.languageId}
+                    languageId={selectedFile.languageId}
                   />
                 )}
               </section>
             )}
-            <FileTree root={result.tree} selectedPath={selectedFile?.relPath ?? null} onSelectFile={handleSelectFile} />
+            <FileTree
+              root={result.tree}
+              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+              onSelectFile={handleSelectFile}
+              onSelectFolder={handleSelectFolder}
+            />
           </>
         )}
       </main>

@@ -29,7 +29,13 @@ const GRAMMAR_FILES: Record<string, string> = {
   'typescript-react': 'tree-sitter-tsx.wasm',
   javascript: 'tree-sitter-tsx.wasm',
   'javascript-react': 'tree-sitter-tsx.wasm',
-  python: 'tree-sitter-python.wasm'
+  python: 'tree-sitter-python.wasm',
+  java: 'tree-sitter-java.wasm',
+  go: 'tree-sitter-go.wasm',
+  c: 'tree-sitter-c.wasm',
+  cpp: 'tree-sitter-cpp.wasm',
+  csharp: 'tree-sitter-c_sharp.wasm',
+  rust: 'tree-sitter-rust.wasm'
 }
 
 export function isAnalysisSupported(languageId: string): boolean {
@@ -51,7 +57,7 @@ async function prepare(languageId: string): Promise<Parser> {
   }
 
   if (!queryCache.has(languageId)) {
-    queryCache.set(languageId, lang.query(languageId === 'python' ? PY_QUERY : JS_QUERY))
+    queryCache.set(languageId, lang.query(QUERIES[languageId]!))
   }
   sharedParser.setLanguage(lang)
   return sharedParser
@@ -88,9 +94,88 @@ const PY_QUERY = `
   (import_from_statement module_name: (dotted_name) @imp)
 `
 
+/** Java:方法/构造器、类/枚举、接口、导入 */
+const JAVA_QUERY = `
+  (method_declaration name: (identifier) @fn)
+  (constructor_declaration name: (identifier) @fn)
+  (class_declaration name: (identifier) @cls)
+  (enum_declaration name: (identifier) @cls)
+  (interface_declaration name: (identifier) @iface)
+  (import_declaration (scoped_identifier) @imp)
+  (import_declaration (identifier) @imp)
+`
+
+/** Go:函数/方法、struct 与 interface、导入(路径是字符串字面量) */
+const GO_QUERY = `
+  (function_declaration name: (identifier) @fn)
+  (method_declaration name: (field_identifier) @fn)
+  (type_spec name: (type_identifier) @cls type: (struct_type))
+  (type_spec name: (type_identifier) @iface type: (interface_type))
+  (import_spec path: (interpreted_string_literal) @imp)
+  (import_spec path: (raw_string_literal) @imp)
+`
+
+/** C:函数定义(含指针返回)、struct、#include(系统头 <> 是 system_lib_string 节点) */
+const C_QUERY = `
+  (function_definition declarator: (function_declarator declarator: (identifier) @fn))
+  (function_definition declarator: (pointer_declarator (function_declarator declarator: (identifier) @fn)))
+  (struct_specifier name: (type_identifier) @cls)
+  (preproc_include path: (string_literal) @imp)
+  (preproc_include path: (system_lib_string) @imp)
+`
+
+/** C++:类内/类外方法(含 Foo::bar 限定名)、class 与 struct、#include */
+const CPP_QUERY = `
+  (function_definition declarator: (function_declarator declarator: (identifier) @fn))
+  (function_definition declarator: (function_declarator declarator: (field_identifier) @fn))
+  (function_definition declarator: (function_declarator declarator: (qualified_identifier name: (identifier) @fn)))
+  (function_definition declarator: (pointer_declarator (function_declarator declarator: [(identifier) (field_identifier)] @fn)))
+  (class_specifier name: (type_identifier) @cls)
+  (struct_specifier name: (type_identifier) @cls)
+  (preproc_include path: (string_literal) @imp)
+  (preproc_include path: (system_lib_string) @imp)
+`
+
+/** C#:方法/构造器、类、接口、using 导入 */
+const CS_QUERY = `
+  (method_declaration name: (identifier) @fn)
+  (constructor_declaration name: (identifier) @fn)
+  (class_declaration name: (identifier) @cls)
+  (interface_declaration name: (identifier) @iface)
+  (using_directive (qualified_name) @imp)
+  (using_directive (identifier) @imp)
+`
+
+/** Rust:函数(trait 里的签名也算)、struct/enum、trait、use 导入 */
+const RUST_QUERY = `
+  (function_item name: (identifier) @fn)
+  (function_signature_item name: (identifier) @fn)
+  (struct_item name: (type_identifier) @cls)
+  (enum_item name: (type_identifier) @cls)
+  (trait_item name: (type_identifier) @iface)
+  (use_declaration (scoped_identifier) @imp)
+  (use_declaration (identifier) @imp)
+`
+
+/** 每种语言自己的提取规则 */
+const QUERIES: Record<string, string> = {
+  typescript: JS_QUERY,
+  'typescript-react': JS_QUERY,
+  javascript: JS_QUERY,
+  'javascript-react': JS_QUERY,
+  python: PY_QUERY,
+  java: JAVA_QUERY,
+  go: GO_QUERY,
+  c: C_QUERY,
+  cpp: CPP_QUERY,
+  csharp: CS_QUERY,
+  rust: RUST_QUERY
+}
+
+/** 剥掉字符串/系统头的包装:C 的 #include <x> 和各种引号,只留里面的名字 */
 function stripQuotes(text: string): string {
   const trimmed = text.trim()
-  return trimmed.replace(/^['"`]/, '').replace(/['"`]$/, '')
+  return trimmed.replace(/^['"`<]/, '').replace(/['"`>]$/, '')
 }
 
 function dedupeSorted(items: Iterable<string>): string[] {

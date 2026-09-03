@@ -22,6 +22,22 @@ export const DIFF_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码改动翻译官"�
 3. 用中文,短句,最多 3-5 句。
 4. 如果改动太碎看不出意图,就老实说"这是一批小调整",再挑你最有把握的一两点讲。`
 
+/** 文件夹讲解的专属人设:只按真实清单讲,不编造不存在的文件 */
+export const FOLDER_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码地图导游"。
+你的任务:根据 Given 一个文件夹里装了什么(子文件夹、文件、语言分布),用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件夹是负责什么的、在整个项目里扮演什么角色"。
+铁律:
+1. 只依据 Given 的清单说话,绝不编造清单里没有的文件或功能。
+2. 你的判断是推测:如果清单看不出用途,就老实说"从清单上看不出来"。
+3. 不输出废话、不寒暄。用中文,短句,最多 3-5 句。`
+
+/** 名字兜底的人设:证据不全,判断是推测,没把握要明说 */
+export const GUESS_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码猜猜官"。
+你的任务:根据 Given 一个文件的路径、名字和内容片段,推测"这个文件大概是干什么的"。
+铁律:
+1. 片段只是文件的一小部分,你的判断是推测 —— 要让听的人知道哪些是有把握的、哪些是猜的。
+2. 绝不编造片段里没有的函数、类或功能。
+3. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。`
+
 function formatStructureLines(structure: FileStructure): string[] {
   const lines: string[] = []
   if (structure.functions.length > 0) lines.push(`函数:${structure.functions.join(', ')}`)
@@ -69,11 +85,6 @@ export function buildExplainPrompt(file: {
     .replace(/\n{3,}/g, '\n\n')
 }
 
-/** 判断该语言能否解释:目前只有 AST 分析支持的语言才能给模型喂结构 */
-export function isExplainable(languageId: string): boolean {
-  return /^(typescript|typescript-react|javascript|javascript-react|python)$/.test(languageId)
-}
-
 /** 改动种类 → 人话(提示词和界面共用一份口径) */
 export function gitKindName(kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'): string {
   const names: Record<typeof kind, string> = {
@@ -84,6 +95,82 @@ export function gitKindName(kind: 'added' | 'modified' | 'deleted' | 'renamed' |
     untracked: '新文件'
   }
   return names[kind]
+}
+
+/** 常见二进制/媒体后缀(小写含点):这些不是代码,不劳烦模型 */
+const BINARY_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tif', '.tiff',
+  '.pdf', '.zip', '.tar', '.gz', '.rar', '.7z', '.bz2', '.xz',
+  '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a', '.lib', '.class', '.jar', '.pyc', '.wasm',
+  '.woff', '.woff2', '.ttf', '.otf', '.eot',
+  '.mp3', '.wav', '.flac', '.ogg', '.mp4', '.avi', '.mov', '.mkv', '.webm',
+  '.psd', '.ai', '.sketch', '.db', '.sqlite', '.sqlite3', '.dat'
+])
+
+/** 按文件名判断是不是二进制/媒体文件(svg 是文本,不算) */
+export function isBinaryFile(name: string): boolean {
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return false // 无后缀或隐藏文件(如 .gitignore)不当二进制
+  return BINARY_EXTS.has(name.slice(dot).toLowerCase())
+}
+
+/** 固定格式提示词:把一个文件夹的真实清单摆给模型,让它只翻译不编造 */
+export function buildFolderPrompt(folder: {
+  relPath: string
+  name: string
+  subdirs: string[]
+  files: string[]
+  /** 语言分布:语言名 → 文件数 */
+  languages: Record<string, number>
+}): string {
+  const isRoot = folder.relPath === ''
+  const langLines = Object.entries(folder.languages)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([lang, count]) => `${lang}×${count}`)
+  const MAX_FILES = 100
+  const MAX_SUBDIRS = 40
+  const shownFiles = folder.files.slice(0, MAX_FILES)
+  const shownSubdirs = folder.subdirs.slice(0, MAX_SUBDIRS)
+  const lines = [
+    `文件夹:${isRoot ? '(项目根目录)' : folder.relPath}`,
+    `名称:${folder.name}`,
+    '',
+    '里面有什么:',
+    `- 子文件夹(${folder.subdirs.length} 个):${shownSubdirs.join(', ')}${folder.subdirs.length > shownSubdirs.length ? ` ……(还有 ${folder.subdirs.length - shownSubdirs.length} 个没列出)` : ''}`,
+    `- 文件(${folder.files.length} 个):${shownFiles.join(', ')}${folder.files.length > shownFiles.length ? ` ……(还有 ${folder.files.length - shownFiles.length} 个没列出)` : ''}`,
+    `- 语言分布:${langLines.length > 0 ? langLines.join(', ') : '(没有可识别的代码文件)'}`
+  ]
+  return [
+    ...lines,
+    '',
+    '请根据上面的清单,用大白话告诉我:这个文件夹是负责什么的,在整个项目里扮演什么角色。'
+  ].join('\n')
+}
+
+/** 固定格式提示词:名字 + 内容片段给模型,让它推测并声明不确定的部分 */
+export function buildGuessPrompt(file: { relPath: string; name: string; languageName: string; preview: string | null }): string {
+  const previewText = file.preview === null
+    ? '(读不出文本内容,只能凭名字和位置判断)'
+    : file.preview.trim() === ''
+      ? '(这是个空文件)'
+      : clipPreview(file.preview)
+  return [
+    `文件:${file.relPath}`,
+    `文件名:${file.name}`,
+    `语言/类型:${file.languageName || '(没认出来)'}`,
+    '',
+    `内容片段(只是开头一段,不一定完整):${previewText}`,
+    '',
+    '请推测:这个文件大概是干什么的。片段不完整,只讲你有把握的;没把握的部分要明说"从片段看不出来",绝不许编造文件里没有的东西。'
+  ].join('\n')
+}
+
+/** 片段上限:40 行 / 3000 字符,超出注明截断 */
+function clipPreview(preview: string): string {
+  const lines = preview.split('\n').slice(0, 40).join('\n')
+  const clipped = lines.length > 3000 ? `${lines.slice(0, 3000)}\n……` : lines
+  const wasCut = preview.split('\n').length > 40 || preview.length > 3000
+  return wasCut ? `${clipped}\n(后面还有内容,只取了开头)` : clipped
 }
 
 /** 固定格式提示词:把一次改动的 diff 摆给模型,让它只翻译不编造 */
