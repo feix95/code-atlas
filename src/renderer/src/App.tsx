@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { FileStructure, ScanFileNode, ScanResult } from '@shared/types'
+import type { DepGraphResult, FileStructure, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { StructureGrid } from './components/StructureGrid'
 
@@ -54,6 +55,16 @@ interface SelectedFile {
   languageName: string
 }
 
+// 按路径契约在扫描树里找文件节点:关系卡跳转只认 relPath,不手拼任何路径
+function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
+  if (node.type === 'file') return node.relPath === relPath ? node : null
+  for (const child of node.children) {
+    const hit = findFile(child, relPath)
+    if (hit) return hit
+  }
+  return null
+}
+
 function App(): React.JSX.Element {
   const [versions] = useState<Versions | null>(readVersions)
   const [folder, setFolder] = useState<string | null>(null)
@@ -64,6 +75,9 @@ function App(): React.JSX.Element {
   const [structure, setStructure] = useState<FileStructure | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeNote, setAnalyzeNote] = useState<string | null>(null)
+  const [graph, setGraph] = useState<DepGraphResult | null>(null)
+  const [graphLoading, setGraphLoading] = useState(false)
+  const [graphNote, setGraphNote] = useState<string | null>(null)
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -75,6 +89,8 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
+    setGraph(null)
+    setGraphNote(null)
     try {
       setResult(await window.atlas.scanFolder(dir))
     } catch (err) {
@@ -108,6 +124,27 @@ function App(): React.JSX.Element {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  async function handleLoadGraph(): Promise<void> {
+    if (!result) return
+    setGraphLoading(true)
+    setGraphNote(null)
+    try {
+      // 路径契约:renderer 只递 rootPath,图里的节点全是主进程算好的 relPath
+      setGraph(await window.atlas.depGraph(result.rootPath))
+    } catch (err) {
+      setGraphNote(cleanErrMsg(err))
+    } finally {
+      setGraphLoading(false)
+    }
+  }
+
+  // 关系卡点路径跳转:在扫描树里按 relPath 找到文件节点,再走同一条选中链路
+  function jumpTo(relPath: string): void {
+    if (!result) return
+    const found = findFile(result.tree, relPath)
+    if (found) void handleSelectFile(found.relPath, found)
   }
 
   return (
@@ -169,7 +206,41 @@ function App(): React.JSX.Element {
                   <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={result.stats.fileCount || 1} />
                 ))}
               </div>
+              <div className="summary-actions">
+                <button type="button" className="btn" onClick={handleLoadGraph} disabled={graphLoading}>
+                  {graphLoading ? '⏳ 正在连线……' : graph ? '🔄 重新分析关系' : '🕸️ 分析文件关系'}
+                </button>
+                {graph && (
+                  <span className="chip is-muted">
+                    {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 · 外部包引用{' '}
+                    {graph.stats.externalCount} 次 · 没连上 {graph.stats.unresolved.length} 条 · ⏱ {graph.durationMs} ms
+                  </span>
+                )}
+              </div>
+              {graphNote && <div className="structure-note">⚠️ {graphNote}</div>}
             </section>
+            {graph && graph.hubs.length > 0 && (
+              <section className="summary">
+                <div className="bars-title">⭐ 最忙的文件(被引用最多,改它要小心)</div>
+                <div className="extbars bars-hub">
+                  {graph.hubs.slice(0, 8).map((hub) => (
+                    <button
+                      key={hub.relPath}
+                      type="button"
+                      className="extbar extbar-link"
+                      onClick={() => jumpTo(hub.relPath)}
+                      title={hub.relPath}
+                    >
+                      <span className="extbar-label">{hub.relPath}</span>
+                      <div className="extbar-track">
+                        <div className="extbar-fill" style={{ width: `${(hub.inCount / graph.hubs[0].inCount) * 100}%` }} />
+                      </div>
+                      <span className="extbar-count">{hub.inCount}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
             {selectedFile && (
               <section className="structure">
                 <div className="structure-head">
@@ -192,6 +263,9 @@ function App(): React.JSX.Element {
                 {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
                 {!analyzing && analyzeNote && <div className="structure-note">{analyzeNote}</div>}
                 {!analyzing && structure && <StructureGrid structure={structure} />}
+                {!analyzing && graph && selectedFile && (
+                  <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />
+                )}
               </section>
             )}
             <FileTree root={result.tree} selectedPath={selectedFile?.relPath ?? null} onSelectFile={handleSelectFile} />

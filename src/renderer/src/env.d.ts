@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { FileStructure, ScanResult } from '../../../shared/types.ts'
+import type { DepGraphResult, FileStructure, ScanResult } from '../../../shared/types.ts'
 
 declare global {
   interface Window {
@@ -13,6 +13,7 @@ declare global {
       pickFolder: () => Promise<string | null>
       scanFolder: (folderPath: string) => Promise<ScanResult>
       analyzeFile: (rootPath: string, relPath: string, languageId: string) => Promise<FileStructure | null>
+      depGraph: (rootPath: string) => Promise<DepGraphResult>
     }
   }
 }

@@ -363,6 +363,60 @@ body {
   font-family: Consolas, Menlo, monospace;
 }
 
+/* ── 项目关系(第五锤) ─────────────── */
+
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bars-hub .extbar {
+  grid-template-columns: minmax(0, 320px) 1fr 44px;
+}
+
+.bars-hub .extbar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extbar-link {
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.extbar-link:hover .extbar-label {
+  color: var(--accent);
+}
+
+.chip-link {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chip-link:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.relations {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 /* ── 目录树 ───────────────────────── */
 
 .tree {

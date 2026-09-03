@@ -70,3 +70,44 @@ export interface ScanResult {
   stats: ScanStats
   durationMs: number
 }
+
+/** 项目关系图的一条引用边:from 文件引用了 to 文件(两边都是 relPath,路径契约) */
+export interface DepEdge {
+  from: string
+  to: string
+}
+
+/** 解析不出来的导入:老实记账,不假装连上了 */
+export interface UnresolvedImport {
+  from: string
+  spec: string
+}
+
+/** 关系图里的一个文件节点 */
+export interface DepGraphNode {
+  relPath: string
+  languageId: string
+  /** 被几个文件引用(入度 = 影响范围:改它要小心) */
+  inCount: number
+  /** 引用了几个项目内文件(出度) */
+  outCount: number
+}
+
+/** 项目关系分析结果:谁引用谁,全部用 relPath 说话 */
+export interface DepGraphResult {
+  rootPath: string
+  nodes: DepGraphNode[]
+  edges: DepEdge[]
+  /** 被引用最多的文件排行(已按入度降序,前端直接展示) */
+  hubs: DepGraphNode[]
+  stats: {
+    /** 实际做了 AST 分析的文件数 */
+    analyzed: number
+    /** 引用外部包(react、node:path 这类)的次数 */
+    externalCount: number
+    /** 读不了或超过大小上限而跳过的文件数 */
+    skipped: number
+    unresolved: UnresolvedImport[]
+  }
+  durationMs: number
+}

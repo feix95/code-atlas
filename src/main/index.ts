@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
+import { buildDependencyGraph } from '../depgraph/index.ts'
 import { joinRoot } from '../shared/paths.ts'
 
 function createWindow(): void {
@@ -71,6 +72,14 @@ function registerIpc(): void {
     if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
     const code = await fs.readFile(absPath, 'utf8')
     return analyzeSource(code, languageId)
+  })
+
+  // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot
+  ipcMain.handle('atlas:dep-graph', (_event, rootPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath.trim() === '') {
+      throw new Error('路径不能为空')
+    }
+    return buildDependencyGraph(rootPath)
   })
 }
 
