@@ -104,6 +104,38 @@ async function main(): Promise<void> {
   } finally {
     await fs.rm(bigRoot, { recursive: true, force: true })
   }
+
+  // ── 8. 分级扫描:节点预算用尽就收,没探到的目录挂"点开再扫"占位 ──
+  const tierRoot = join(tmpdir(), `code-atlas-tier-selftest-${Date.now()}`)
+  await fs.mkdir(join(tierRoot, 'big'), { recursive: true })
+  await fs.mkdir(join(tierRoot, 'small'))
+  for (let i = 0; i < 4200; i++) {
+    await fs.writeFile(join(tierRoot, 'big', `f${i}.txt`), 'x')
+  }
+
+  try {
+    const tier = await scanDirectory(tierRoot)
+    assert.ok(tier.stats.fileCount <= 4000, `预算内必须收工,实际探了 ${tier.stats.fileCount} 个文件`)
+    assert.ok(tier.tree.lazy !== true, '根节点自己就是这张图,不挂"还没探"')
+
+    const bigNode = tier.tree.children.find((c) => c.name === 'big')
+    assert.ok(
+      bigNode?.type === 'directory' && bigNode.lazy === true && bigNode.truncated === true,
+      '装不下的目录要挂"点开再探"标记'
+    )
+    assert.ok(bigNode && bigNode.children.length < 4200, '大目录只探到一部分')
+
+    const smallNode = tier.tree.children.find((c) => c.name === 'small')
+    assert.ok(
+      smallNode?.type === 'directory',
+      '顶层目录必须都看得见(真扫完或挂"还没探"占位,不许凭空消失)'
+    )
+    assert.ok(tier.stats.lazyCount >= 1, `没探的目录要记账,实际 ${tier.stats.lazyCount}`)
+
+    console.log(`✅ 分级扫描自测通过:预算内探了 ${tier.stats.fileCount} 个文件 · ${tier.stats.lazyCount} 个目录挂"还没探"`)
+  } finally {
+    await fs.rm(tierRoot, { recursive: true, force: true })
+  }
 }
 
 main().catch((err) => {

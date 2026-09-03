@@ -248,6 +248,8 @@ const DIR_SUMMARIES: Record<string, NodeSummary> = {
   icons: { emoji: '🖼️', text: '素材库:图片字体这些装点门面的东西' },
   fonts: { emoji: '🖼️', text: '素材库:图片字体这些装点门面的东西' },
   media: { emoji: '🖼️', text: '素材库:图片字体这些装点门面的东西' },
+  videos: { emoji: '🖼️', text: '素材库:图片字体这些装点门面的东西' },
+  video: { emoji: '🖼️', text: '素材库:图片字体这些装点门面的东西' },
   components: { emoji: '🧩', text: '零件库:界面一块块的小零件,拼出整个页面' },
   component: { emoji: '🧩', text: '零件库:界面一块块的小零件,拼出整个页面' },
   ui: { emoji: '🧩', text: '零件库:界面一块块的小零件,拼出整个页面' },
@@ -329,6 +331,11 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
       }
     }
     return byName
+  }
+
+  // 分级扫描还没探进这层:老实说"还没探",别让人以为是个空文件夹
+  if (node.lazy) {
+    return { emoji: '📁', text: '还没探:点开它,马上帮你探这一层' }
   }
 
   if (fileCount === 0 && directDirs === 0) {

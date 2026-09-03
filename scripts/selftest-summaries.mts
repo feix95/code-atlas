@@ -16,8 +16,8 @@ function file(name: string, language?: LanguageTag): ScanFileNode {
   }
 }
 
-function dir(name: string, children: ScanFileNode[] | ScanDirNode[] = []): ScanDirNode {
-  return { type: 'directory', name, relPath: name, children }
+function dir(name: string, children: ScanFileNode[] | ScanDirNode[] = [], extra: Partial<ScanDirNode> = {}): ScanDirNode {
+  return { type: 'directory', name, relPath: name, children, ...extra }
 }
 
 const TS: LanguageTag = { id: 'typescript', name: 'TypeScript', source: 'extension' }
@@ -125,8 +125,15 @@ async function main(): Promise<void> {
     n.summary !== undefined && n.children.every((c) => (c.type === 'directory' ? allTagged(c) : c.summary !== undefined))
   assert.ok(allTagged(root), '整棵树每个节点都有速览标签')
 
+  // ── 8. 分级扫描占位:没探过的目录要老实说"还没探",不许装成空文件夹 ──
+  const lazyPlain = dir('mystery-plain', [], { lazy: true })
+  const lazyVideos = dir('videos', [], { lazy: true })
+  annotateSummaries(dir('proj', [lazyPlain, lazyVideos]))
+  assert.ok(textOf(lazyPlain).includes('还没探'), '没名字线索的未探目录要老实说还没探,不是空')
+  assert.ok(textOf(lazyVideos).startsWith('🖼️'), '名字认得出的未探目录保留字典标签(素材库)')
+
   console.log('✅ 全树速览自测全部通过')
-  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖')
+  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖 · 未探占位')
 }
 
 main().catch((err) => {

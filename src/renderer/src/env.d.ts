@@ -20,6 +20,7 @@ declare global {
       }
       pickFolder: () => Promise<string | null>
       scanFolder: (folderPath: string) => Promise<ScanResult>
+      scanSubdir: (rootPath: string, relPath: string) => Promise<ScanResult>
       analyzeFile: (rootPath: string, relPath: string, languageId: string) => Promise<FileStructure | null>
       depGraph: (rootPath: string) => Promise<DepGraphResult>
       aiConfigGet: () => Promise<AiConfig>

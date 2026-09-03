@@ -55,6 +55,11 @@ export interface ScanDirNode {
   children: ScanTreeNode[]
   /** true 表示该目录读不了(无权限)或被深度上限截断,内容不完整 */
   truncated?: boolean
+  /**
+   * true = 分级扫描还没探进这一层(目录名已知,内容待点开再扫)。
+   * 巨型目录(整个 C 盘)扫到节点预算就用不完全展开,靠这个标记让用户点哪探哪
+   */
+  lazy?: boolean
   /** 全树速览标签;空文件夹等内容太薄时也会给(说它空着) */
   summary?: NodeSummary
 }
@@ -72,6 +77,8 @@ export interface ScanStats {
   ignoredCount: number
   /** 因无权限、符号链接等原因跳过的条目数 */
   skippedCount: number
+  /** 分级扫描:因节点预算用尽而暂时没探开的目录数(点开就扫) */
+  lazyCount: number
 }
 
 export interface ScanResult {

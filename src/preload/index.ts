@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('atlas', {
   },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('atlas:pick-folder'),
   scanFolder: (folderPath: string): Promise<ScanResult> => ipcRenderer.invoke('atlas:scan-folder', folderPath),
+  scanSubdir: (rootPath: string, relPath: string): Promise<ScanResult> =>
+    ipcRenderer.invoke('atlas:scan-subdir', rootPath, relPath),
   analyzeFile: (rootPath: string, relPath: string, languageId: string): Promise<FileStructure | null> =>
     ipcRenderer.invoke('atlas:analyze-file', rootPath, relPath, languageId),
   depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke('atlas:dep-graph', rootPath),

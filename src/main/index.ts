@@ -129,6 +129,19 @@ function registerIpc(): void {
     })
   })
 
+  // 分级扫描:点开某个还没探的子文件夹,只探这一层(预算内收工),返回子树 + 这一份统计
+  ipcMain.handle('atlas:scan-subdir', (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath.trim() === '' || typeof relPath !== 'string') {
+      throw new Error('参数不合法')
+    }
+    // 路径契约:全项目唯一的绝对路径拼接点就是 joinRoot
+    const result = scanDirectory(joinRoot(rootPath, relPath))
+    return result.then((r) => {
+      annotateSummaries(r.tree)
+      return r
+    })
+  })
+
   // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)
   // 路径契约:收 (rootPath, relPath),绝对路径只能由 joinRoot 在这儿解析
   ipcMain.handle('atlas:analyze-file', async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {

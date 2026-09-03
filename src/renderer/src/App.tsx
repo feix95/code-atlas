@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { DepGraphResult, FileStructure, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { DepGraphResult, FileStructure, ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } from '@shared/types'
 import { AiSettings } from './components/AiSettings'
 import { ExplainCard } from './components/ExplainCard'
 import { FileRelations } from './components/FileRelations'
@@ -70,6 +70,45 @@ function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
   return null
 }
 
+// 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
+function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): ScanDirNode {
+  const parts = relPath === '' ? [] : relPath.split('/')
+  if (parts.length === 0) {
+    // 重探根:换内容,身份(rootPath 相关的字段)照旧
+    return { ...root, children: sub.children, summary: sub.summary, lazy: undefined, truncated: undefined }
+  }
+  const walk = (node: ScanDirNode, i: number): ScanDirNode => {
+    if (i === parts.length) {
+      return { ...node, children: sub.children, summary: sub.summary, lazy: undefined, truncated: undefined }
+    }
+    return {
+      ...node,
+      children: node.children.map((c) => (c.type === 'directory' && c.name === parts[i] ? walk(c, i + 1) : c))
+    }
+  }
+  return walk(root, 0)
+}
+
+// 分级扫描:把子树探出来的一份统计累加进总账(各项都是纯增量,直接加)
+function mergeStats(base: ScanStats, add: ScanStats): ScanStats {
+  const byExt = { ...base.byExt }
+  for (const [k, v] of Object.entries(add.byExt)) byExt[k] = (byExt[k] ?? 0) + v
+  const byLanguage = { ...base.byLanguage }
+  for (const [k, v] of Object.entries(add.byLanguage)) {
+    byLanguage[k] = { name: v.name, count: (byLanguage[k]?.count ?? 0) + v.count }
+  }
+  return {
+    fileCount: base.fileCount + add.fileCount,
+    dirCount: base.dirCount + add.dirCount,
+    byExt,
+    byLanguage,
+    ignoredCount: base.ignoredCount + add.ignoredCount,
+    skippedCount: base.skippedCount + add.skippedCount,
+    // 目标目录自己从"没探"变成"探了",减回它那一份
+    lazyCount: base.lazyCount + add.lazyCount - 1
+  }
+}
+
 function App(): React.JSX.Element {
   const [versions] = useState<Versions | null>(readVersions)
   const [folder, setFolder] = useState<string | null>(null)
@@ -86,6 +125,9 @@ function App(): React.JSX.Element {
   const [graphNote, setGraphNote] = useState<string | null>(null)
   const [showAiSettings, setShowAiSettings] = useState(false)
   const [showGit, setShowGit] = useState(false)
+  // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
+  const [expanding, setExpanding] = useState<string | null>(null)
+  const [treeNote, setTreeNote] = useState<string | null>(null)
   // 结构分析的头票号:连点两个文件时,慢的旧响应回来不许盖新的账
   const analyzeSeqRef = useRef(0)
 
@@ -103,6 +145,8 @@ function App(): React.JSX.Element {
     setGraph(null)
     setGraphNote(null)
     setShowGit(false)
+    setExpanding(null)
+    setTreeNote(null)
     try {
       setResult(await window.atlas.scanFolder(dir))
     } catch (err) {
@@ -169,6 +213,26 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
+  }
+
+  // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
+  async function handleExpandLazy(relPath: string): Promise<void> {
+    if (!result || expanding) return
+    setExpanding(relPath)
+    setTreeNote(null)
+    try {
+      // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
+      const sub = await window.atlas.scanSubdir(result.rootPath, relPath)
+      setResult((prev) =>
+        prev
+          ? { ...prev, tree: spliceSubtree(prev.tree, relPath, sub.tree), stats: mergeStats(prev.stats, sub.stats) }
+          : prev
+      )
+    } catch (err) {
+      setTreeNote(cleanErrMsg(err))
+    } finally {
+      setExpanding(null)
+    }
   }
 
   return (
@@ -240,6 +304,9 @@ function App(): React.JSX.Element {
                 )}
                 {result.stats.skippedCount > 0 && (
                   <span className="chip is-muted">跳过 {result.stats.skippedCount} 项(无权限/链接)</span>
+                )}
+                {result.stats.lazyCount > 0 && (
+                  <span className="chip is-muted">还有 {result.stats.lazyCount} 个文件夹没探,点开就扫</span>
                 )}
               </div>
               <div className="extbars">
@@ -330,11 +397,14 @@ function App(): React.JSX.Element {
                 )}
               </section>
             )}
+            {treeNote && <div className="structure-note">⚠️ {treeNote}</div>}
             <FileTree
               root={result.tree}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+              expandingPath={expanding}
               onSelectFile={handleSelectFile}
               onSelectFolder={handleSelectFolder}
+              onExpandLazy={handleExpandLazy}
             />
           </>
         )}
