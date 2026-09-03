@@ -17,6 +17,21 @@ export interface LanguageTag {
   source: 'extension' | 'content'
 }
 
+/** AST 分析提取出的文件结构(只结构化,不解释) */
+export interface FileStructure {
+  languageId: string
+  /** 导入的模块/包名 */
+  imports: string[]
+  /** 导出的名字(默认导出记为 default) */
+  exports: string[]
+  functions: string[]
+  classes: string[]
+  /** TS 的 interface 与 type 别名 */
+  interfaces: string[]
+  /** React 组件(文件含 JSX 且函数/类名大写开头) */
+  reactComponents: string[]
+}
+
 export interface ScanDirNode {
   type: 'directory'
   name: string

@@ -1,6 +1,8 @@
 import { app, dialog, ipcMain, shell, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { join } from 'node:path'
+import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
+import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -51,6 +53,21 @@ function registerIpc(): void {
       throw new Error('路径不能为空')
     }
     return scanDirectory(folderPath)
+  })
+
+  // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)
+  ipcMain.handle('atlas:analyze-file', async (_event, filePath: unknown, languageId: unknown) => {
+    if (typeof filePath !== 'string' || typeof languageId !== 'string') {
+      throw new Error('参数不合法')
+    }
+    if (!isAnalysisSupported(languageId)) return null
+    const stat = await fs.stat(filePath).catch(() => null)
+    if (!stat || !stat.isFile()) {
+      throw new Error(`文件不存在:${filePath}`)
+    }
+    if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
+    const code = await fs.readFile(filePath, 'utf8')
+    return analyzeSource(code, languageId)
   })
 }
 

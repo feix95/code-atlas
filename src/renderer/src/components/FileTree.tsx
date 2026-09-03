@@ -1,23 +1,37 @@
 import { useState } from 'react'
-import type { ScanDirNode, ScanTreeNode } from '@shared/types'
+import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
 
-function TreeRow({ node, depth }: { node: ScanTreeNode; depth: number }): React.JSX.Element {
+interface TreeRowProps {
+  node: ScanTreeNode
+  depth: number
+  /** 相对项目根的路径前缀,如 'src/components' */
+  prefix: string
+  selectedPath: string | null
+  onSelectFile: (relPath: string, file: ScanFileNode) => void
+}
+
+function TreeRow({ node, depth, prefix, selectedPath, onSelectFile }: TreeRowProps): React.JSX.Element {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
 
   if (node.type === 'file') {
+    const relPath = prefix ? `${prefix}/${node.name}` : node.name
     return (
-      <div className="tree-row is-file" style={{ paddingLeft: depth * 20 + 12 }}>
+      <button
+        type="button"
+        className={`tree-row is-file${selectedPath === relPath ? ' is-selected' : ''}`}
+        style={{ paddingLeft: depth * 20 + 12 }}
+        onClick={() => onSelectFile(relPath, node)}
+      >
         <span className="tree-icon">📄</span>
         <span className="tree-name">{node.name}</span>
-        {node.language?.source === 'content' && (
-          <span className="tree-lang">{node.language.name}</span>
-        )}
+        {node.language?.source === 'content' && <span className="tree-lang">{node.language.name}</span>}
         {node.ext && <span className="tree-ext">{node.ext}</span>}
-      </div>
+      </button>
     )
   }
 
+  const childPrefix = prefix ? `${prefix}/${node.name}` : node.name
   return (
     <div>
       <button
@@ -31,15 +45,31 @@ function TreeRow({ node, depth }: { node: ScanTreeNode; depth: number }): React.
         {node.truncated && <span className="tree-badge">不完整</span>}
         <span className="tree-arrow">{open ? '▾' : '▸'}</span>
       </button>
-      {open && node.children.map((child) => <TreeRow key={child.name} node={child} depth={depth + 1} />)}
+      {open &&
+        node.children.map((child) => (
+          <TreeRow
+            key={child.name}
+            node={child}
+            depth={depth + 1}
+            prefix={childPrefix}
+            selectedPath={selectedPath}
+            onSelectFile={onSelectFile}
+          />
+        ))}
     </div>
   )
 }
 
-export function FileTree({ root }: { root: ScanDirNode }): React.JSX.Element {
+interface FileTreeProps {
+  root: ScanDirNode
+  selectedPath: string | null
+  onSelectFile: (relPath: string, file: ScanFileNode) => void
+}
+
+export function FileTree({ root, selectedPath, onSelectFile }: FileTreeProps): React.JSX.Element {
   return (
     <div className="tree">
-      <TreeRow node={root} depth={0} />
+      <TreeRow node={root} depth={0} prefix="" selectedPath={selectedPath} onSelectFile={onSelectFile} />
     </div>
   )
 }

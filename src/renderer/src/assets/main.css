@@ -261,6 +261,108 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 结构卡(选中文件后展示) ──────── */
+
+.structure {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.structure-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.structure-title {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: Consolas, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structure-lang {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+.structure-close {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.structure-close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.structure-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.structure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.structure-section {
+  min-width: 0;
+}
+
+.structure-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.structure-section-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.structure-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-sm {
+  font-size: 12px;
+  padding: 3px 9px;
+  font-weight: 500;
+  font-family: Consolas, Menlo, monospace;
+}
+
 /* ── 目录树 ───────────────────────── */
 
 .tree {
@@ -293,6 +395,15 @@ body {
 .tree-row.is-dir:hover,
 .tree-row.is-file:hover {
   background: var(--accent-soft);
+}
+
+.tree-row.is-file {
+  cursor: pointer;
+}
+
+.tree-row.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .tree-icon {

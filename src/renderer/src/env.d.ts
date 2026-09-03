@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { ScanResult } from '../../../shared/types.ts'
+import type { FileStructure, ScanResult } from '../../../shared/types.ts'
 
 declare global {
   interface Window {
@@ -12,6 +12,7 @@ declare global {
       }
       pickFolder: () => Promise<string | null>
       scanFolder: (folderPath: string) => Promise<ScanResult>
+      analyzeFile: (filePath: string, languageId: string) => Promise<FileStructure | null>
     }
   }
 }

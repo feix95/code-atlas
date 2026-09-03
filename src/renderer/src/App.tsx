@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { ScanResult } from '@shared/types'
+import type { FileStructure, ScanFileNode, ScanResult } from '@shared/types'
 import { FileTree } from './components/FileTree'
+import { StructureGrid } from './components/StructureGrid'
 
 interface Versions {
   node: string
@@ -46,12 +47,23 @@ function BarRow({ label, count, total }: { label: string; count: number; total: 
   )
 }
 
+interface SelectedFile {
+  relPath: string
+  name: string
+  languageId: string
+  languageName: string
+}
+
 function App(): React.JSX.Element {
   const [versions] = useState<Versions | null>(readVersions)
   const [folder, setFolder] = useState<string | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
+  const [structure, setStructure] = useState<FileStructure | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeNote, setAnalyzeNote] = useState<string | null>(null)
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -60,12 +72,40 @@ function App(): React.JSX.Element {
     setScanning(true)
     setResult(null)
     setError(null)
+    setSelectedFile(null)
+    setStructure(null)
+    setAnalyzeNote(null)
     try {
       setResult(await window.atlas.scanFolder(dir))
     } catch (err) {
       setError(cleanErrMsg(err))
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function handleSelectFile(relPath: string, file: ScanFileNode): Promise<void> {
+    setSelectedFile({ relPath, name: file.name, languageId: file.language?.id ?? '', languageName: file.language?.name ?? '' })
+    setStructure(null)
+
+    if (!file.language) {
+      setAnalyzeNote('没有认出语言,暂不支持结构分析')
+      return
+    }
+    setAnalyzing(true)
+    setAnalyzeNote(null)
+    try {
+      const absPath = folder ? `${folder}/${relPath}` : relPath
+      const fs = await window.atlas.analyzeFile(absPath, file.language.id)
+      if (fs) {
+        setStructure(fs)
+      } else {
+        setAnalyzeNote('该语言暂不支持结构分析(目前支持 TS/TSX/JS/JSX/Python)')
+      }
+    } catch (err) {
+      setAnalyzeNote(cleanErrMsg(err))
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -129,7 +169,31 @@ function App(): React.JSX.Element {
                 ))}
               </div>
             </section>
-            <FileTree root={result.tree} />
+            {selectedFile && (
+              <section className="structure">
+                <div className="structure-head">
+                  <span className="structure-title">🧬 {selectedFile.name}</span>
+                  {selectedFile.languageName && (
+                    <span className="structure-lang">{selectedFile.languageName}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="structure-close"
+                    onClick={() => {
+                      setSelectedFile(null)
+                      setStructure(null)
+                      setAnalyzeNote(null)
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
+                {!analyzing && analyzeNote && <div className="structure-note">{analyzeNote}</div>}
+                {!analyzing && structure && <StructureGrid structure={structure} />}
+              </section>
+            )}
+            <FileTree root={result.tree} selectedPath={selectedFile?.relPath ?? null} onSelectFile={handleSelectFile} />
           </>
         )}
       </main>
