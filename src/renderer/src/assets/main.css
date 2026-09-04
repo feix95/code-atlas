@@ -93,8 +93,8 @@ body {
 }
 
 .btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed; /* 沙漏像卡死;禁止光标才是"这按钮暂时点不了" */
+  opacity: 0.55;
+  cursor: default; /* 忙碌时按钮文字自己就是进度(⏳ ……) —— 沙漏和禁止符在小白眼里都像坏了 */
 }
 
 .topbar .brand,
@@ -104,6 +104,7 @@ body {
 
 /* 地址栏:路径可以直接输入回车开图,不必每次弹系统对话框 */
 .path-box {
+  position: relative; /* 内联提示气泡挂在输入框正下方 */
   flex: 1;
   min-width: 160px;
   display: flex;
@@ -114,6 +115,43 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   transition: border-color 0.15s ease;
+}
+
+/* 空路径点了「前往」:不禁用按钮,点了他才被告知缺什么 —— 禁用灰在小白眼里像坏了 */
+.path-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 10px;
+  z-index: 30;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .path-box.is-shaking {
+    animation: path-shake 0.35s ease;
+  }
+}
+
+@keyframes path-shake {
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 .path-box:focus-within {

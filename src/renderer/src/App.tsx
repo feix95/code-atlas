@@ -125,6 +125,11 @@ function App(): React.JSX.Element {
   const [folder, setFolder] = useState<string | null>(null)
   // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
   const [pathDraft, setPathDraft] = useState('')
+  // 空路径点了「前往」:不禁用按钮,点了才提示缺什么(禁用灰在小白眼里像坏了)
+  const [pathHint, setPathHint] = useState<string | null>(null)
+  const [pathShaking, setPathShaking] = useState(false)
+  const pathInputRef = useRef<HTMLInputElement>(null)
+  const pathHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -202,6 +207,8 @@ function App(): React.JSX.Element {
   async function scanPath(dir: string): Promise<void> {
     setFolder(dir)
     setPathDraft(dir)
+    setPathHint(null)
+    if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
     setScanning(true)
     setResult(null)
     setError(null)
@@ -228,11 +235,23 @@ function App(): React.JSX.Element {
     if (dir) await scanPath(dir)
   }
 
+  // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
+  function setShakeAndHint(): void {
+    setPathShaking(true)
+    setPathHint('先填个文件夹路径,再点「前往」;也可以点左边「选择文件夹」')
+    if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
+    pathHintTimerRef.current = setTimeout(() => setPathHint(null), 5000)
+    pathInputRef.current?.focus()
+  }
+
   // 地址栏回车/点「前往」:直接开输进来的路径;粘来的路径常带首尾引号,顺手剥掉
   async function goPath(): Promise<void> {
     if (scanning) return
     const dir = pathDraft.trim().replace(/^"+|"+$/g, '').trim()
-    if (dir === '') return
+    if (dir === '') {
+      setShakeAndHint()
+      return
+    }
     await scanPath(dir)
   }
 
@@ -433,7 +452,7 @@ function App(): React.JSX.Element {
       <header className="topbar">
         <span className="brand">🗺️ CodeAtlas</span>
         <button type="button" className="btn" onClick={handlePick} disabled={scanning}>
-          📁 选择文件夹
+          {scanning ? '⏳ 正在画地图……' : '📁 选择文件夹'}
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => setShowAiSettings((v) => !v)}>
           ⚙️ AI 设置
@@ -443,28 +462,31 @@ function App(): React.JSX.Element {
             🌿 Git 修改
           </button>
         )}
-        <div className="path-box">
+        <div
+          className={`path-box${pathShaking ? ' is-shaking' : ''}`}
+          onAnimationEnd={() => setPathShaking(false)}
+        >
           <input
+            ref={pathInputRef}
             className="path-input"
             type="text"
             value={pathDraft}
             placeholder="输入或粘贴文件夹路径,回车直接打开"
             spellCheck={false}
             aria-label="文件夹路径"
-            onChange={(e) => setPathDraft(e.target.value)}
+            onChange={(e) => {
+              setPathDraft(e.target.value)
+              setPathHint(null)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void goPath()
               if (e.key === 'Escape') setPathDraft(folder ?? '')
             }}
           />
-          <button
-            type="button"
-            className="btn btn-ghost path-go"
-            onClick={() => void goPath()}
-            disabled={scanning || pathDraft.trim() === ''}
-          >
-            前往
+          <button type="button" className="btn btn-ghost path-go" onClick={() => void goPath()} disabled={scanning}>
+            {scanning ? '⏳ 扫描中……' : '前往'}
           </button>
+          {pathHint && <div className="path-hint">{pathHint}</div>}
         </div>
       </header>
 
