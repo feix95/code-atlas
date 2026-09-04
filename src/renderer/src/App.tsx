@@ -9,6 +9,7 @@ import { GitChanges } from './components/GitChanges'
 import { StructureGrid } from './components/StructureGrid'
 import { cleanErrMsg } from './errText'
 import { Notice } from './components/Notice'
+import { ProgressDots } from './components/ProgressDots'
 
 interface Versions {
   node: string
@@ -131,6 +132,9 @@ function App(): React.JSX.Element {
   const [pathShaking, setPathShaking] = useState(false)
   const pathInputRef = useRef<HTMLInputElement>(null)
   const pathHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 扫描完成的轻提示:报个数就自己退场,不挡路
+  const [scanToast, setScanToast] = useState<string | null>(null)
+  const scanToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -224,7 +228,11 @@ function App(): React.JSX.Element {
     setExpanding(null)
     setTreeNote(null)
     try {
-      setResult(await window.atlas.scanFolder(dir))
+      const scanned = await window.atlas.scanFolder(dir)
+      setResult(scanned)
+      setScanToast(`🗺️ 地图画好了:${scanned.stats.fileCount} 个文件`)
+      if (scanToastTimerRef.current) clearTimeout(scanToastTimerRef.current)
+      scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
     } catch (err) {
       setError(cleanErrMsg(err))
     } finally {
@@ -434,7 +442,7 @@ function App(): React.JSX.Element {
           ✕
         </button>
       </div>
-      {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
+      {analyzing && <div className="structure-note"><ProgressDots />解析结构中……</div>}
       {!analyzing && analyzeNote && (
         analyzeNote.kind === 'error' ? <Notice kind="error">⚠️ {analyzeNote.text}</Notice> : <div className="structure-note">{analyzeNote.text}</div>
       )}
@@ -524,6 +532,7 @@ function App(): React.JSX.Element {
             onKeyDown={onSashKeyDown}
           />
           <section className="detail">
+            {scanToast && <div className="notice">{scanToast}</div>}
             {statsStrip}
             {aiSettingsCard}
             {gitCard}
@@ -544,14 +553,19 @@ function App(): React.JSX.Element {
         <main className="content">
           {aiSettingsCard}
           {gitCard}
-          {scanning && <div className="state">⏳ 正在绘制地图,稍等……</div>}
+          {scanning && <div className="state"><ProgressDots />正在绘制地图,稍等……</div>}
           {!scanning && error && <div className="state is-error">⚠️ {error}</div>}
           {!folder && !scanning && !error && (
             <div className="welcome-card">
               <div className="logo">🗺️</div>
               <h1>CodeAtlas</h1>
               <p className="slogan">你的 AI 代码地图 —— 不读代码,也能看懂整个项目</p>
-              <p className="empty-hint">点上方「选择文件夹」,哥把它的地图画给你看</p>
+              <p className="empty-hint">点上方「选择文件夹」,或在右上角地址栏粘贴路径</p>
+              <ol className="welcome-steps">
+                <li><i>1</i>选一个文件夹打开,地图马上画出来</li>
+                <li><i>2</i>在左边树上点开想看的东西</li>
+                <li><i>3</i>右边 AI 用大白话讲给你听</li>
+              </ol>
               <div className="engine">
                 {versions ? (
                   <>

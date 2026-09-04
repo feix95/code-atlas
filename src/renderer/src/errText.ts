@@ -14,7 +14,7 @@ export function cleanErrMsg(err: unknown): string {
 export function friendlyErr(err: unknown): string {
   const msg = cleanErrMsg(err)
   if (/is not a function|is not available/i.test(msg)) {
-    return '应用的底层零件还是上一版,还不会这个新动作 —— 把应用整个关掉,重新跑一次 npm run dev 就好。要是重启了还这样,回来喊哥看看。'
+    return '应用的底层零件还是上一版,还不会这个新动作 —— 把应用整个关掉,重新跑一次 npm run dev 就好。要是重启了还这样,把这段话截图留存,发给能帮你修的人。'
   }
   return msg
 }

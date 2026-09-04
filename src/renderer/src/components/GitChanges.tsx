@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types'
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
+import { ProgressDots } from './ProgressDots'
 
 /** 掐掉还在路上的生成:换了文件/刷新/关面板时喊一声,模型立刻空出来 */
 function cancelExplain(id: string): void {
@@ -114,7 +115,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
     }
   }
 
-  if (loading) return <div className="structure-note">⏳ 正在翻 git 的账本,看看谁动了代码……</div>
+  if (loading) return <div className="structure-note"><ProgressDots />正在翻 git 的账本,看看谁动了代码……</div>
   if (note) return <Notice kind="error">⚠️ {note}</Notice>
   if (!result) return <div className="structure-note">git 的账本还没递过来,点一下「🔄 刷新」再试一次?</div>
 
@@ -192,7 +193,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
           {explaining && (streamText ? (
             <div className="explain-text">✨ {streamText}<span className="stream-caret">▌</span></div>
           ) : (
-            <div className="explain-note">正在把改动翻译成人话……(diff 长的话会慢一点)</div>
+            <div className="explain-note"><ProgressDots />正在把改动翻译成人话……(diff 长的话会慢一点)</div>
           ))}
           {!explaining && explain?.status === 'supported' && <div className="explain-text">✨ {explain.text}</div>}
           {!explaining && explain?.status === 'error' && <Notice kind="error">⚠️ {explain.text}</Notice>}

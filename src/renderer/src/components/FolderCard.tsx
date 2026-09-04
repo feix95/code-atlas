@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult } from '@shared/types'
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
+import { ProgressDots } from './ProgressDots'
 
 /** 掐掉还在路上的生成:换了目标/关了卡片时喊一声,模型立刻空出来讲下一个 */
 function cancelExplain(id: string): void {
@@ -77,7 +78,7 @@ export function FolderCard({
         {busy && (streamText ? (
           <div className="explain-text">✨ {streamText}<span className="stream-caret">▌</span></div>
         ) : (
-          <div className="explain-note">正在等本地模型看完这个文件夹、组织人话(第一次要热身,可能得等一会儿)……</div>
+          <div className="explain-note"><ProgressDots />正在等本地模型看完这个文件夹、组织人话(第一次要热身,可能得等一会儿)……</div>
         ))}
         {!busy && result?.status === 'supported' && <div className="explain-text">✨ {result.text}</div>}
         {!busy && result?.status === 'unsupported' && <Notice kind="info">{result.text}</Notice>}
