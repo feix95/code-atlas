@@ -109,6 +109,17 @@ function mergeStats(base: ScanStats, add: ScanStats): ScanStats {
   }
 }
 
+// 左栏宽度:分割条拖多宽记进 localStorage,下次打开还是自己调好的样子
+const DEFAULT_SIDEBAR_WIDTH = 420
+const MIN_SIDEBAR_WIDTH = 260
+const SIDEBAR_WIDTH_KEY = 'atlas.sidebar-width'
+
+// 树再宽也不能把右栏挤没:右栏保底 360px 看分析内容
+function clampSidebar(width: number): number {
+  const max = Math.max(MIN_SIDEBAR_WIDTH + 40, window.innerWidth - 360)
+  return Math.min(Math.max(width, MIN_SIDEBAR_WIDTH), max)
+}
+
 function App(): React.JSX.Element {
   const [versions] = useState<Versions | null>(readVersions)
   const [folder, setFolder] = useState<string | null>(null)
@@ -130,6 +141,60 @@ function App(): React.JSX.Element {
   const [treeNote, setTreeNote] = useState<string | null>(null)
   // 结构分析的头票号:连点两个文件时,慢的旧响应回来不许盖新的账
   const analyzeSeqRef = useRef(0)
+
+  // VSCode 式分割条:左栏宽度跟着鼠标走;拖动布尔放 ref,不为它每帧重渲染
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
+    return saved > 0 ? clampSidebar(saved) : DEFAULT_SIDEBAR_WIDTH
+  })
+  const sidebarWidthRef = useRef(sidebarWidth)
+  const sashDraggingRef = useRef(false)
+
+  function applySidebarWidth(next: number): void {
+    const clamped = clampSidebar(next)
+    sidebarWidthRef.current = clamped
+    setSidebarWidth(clamped)
+  }
+
+  function persistSidebarWidth(): void {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current))
+  }
+
+  // pointer capture:鼠标拖出分割条、甚至拖出窗口,move 事件照样送到条上,不跟丢
+  function onSashPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    e.preventDefault()
+    sashDraggingRef.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+    document.body.classList.add('is-sash-dragging')
+  }
+
+  function onSashPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!sashDraggingRef.current) return
+    // 树栏贴着窗口左缘,分割条的横向位置就是左栏该有的宽度
+    applySidebarWidth(e.clientX)
+  }
+
+  function endSashDrag(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!sashDraggingRef.current) return
+    sashDraggingRef.current = false
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    document.body.classList.remove('is-sash-dragging')
+    persistSidebarWidth()
+  }
+
+  function onSashDoubleClick(): void {
+    applySidebarWidth(DEFAULT_SIDEBAR_WIDTH)
+    persistSidebarWidth()
+  }
+
+  // 键盘也能调(VSCode 同款):左右方向键微调,24px 一步
+  function onSashKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    applySidebarWidth(sidebarWidthRef.current + (e.key === 'ArrowRight' ? 24 : -24))
+    persistSidebarWidth()
+  }
 
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
@@ -369,7 +434,7 @@ function App(): React.JSX.Element {
       {result && !scanning ? (
         // 资源管理器式双栏:左边目录树,右边选中项的全部分析信息
         <main className="workspace">
-          <aside className="sidebar">
+          <aside className="sidebar" style={{ width: sidebarWidth }}>
             <FileTree
               root={result.tree}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
@@ -380,6 +445,21 @@ function App(): React.JSX.Element {
             />
             {treeNote && <div className="tree-toast">⚠️ {treeNote}</div>}
           </aside>
+          <div
+            className="sash"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="左右栏分割条:拖动调整左栏宽度,双击恢复默认"
+            aria-valuemin={MIN_SIDEBAR_WIDTH}
+            aria-valuenow={Math.round(sidebarWidth)}
+            tabIndex={0}
+            onPointerDown={onSashPointerDown}
+            onPointerMove={onSashPointerMove}
+            onPointerUp={endSashDrag}
+            onPointerCancel={endSashDrag}
+            onDoubleClick={onSashDoubleClick}
+            onKeyDown={onSashKeyDown}
+          />
           <section className="detail">
             {statsStrip}
             {aiSettingsCard}

@@ -125,17 +125,56 @@ body {
   display: flex;
 }
 
+/* 左栏宽度由 App 的内联样式管(分割条可拖),这里只管长相 */
 .sidebar {
-  width: 420px;
-  min-width: 320px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
   background: var(--panel);
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px;
   display: flex;
   flex-direction: column;
+}
+
+/* VSCode 式分割条:整条 5px 是好按的隐形把手,中线 1px 平时就是边界线,
+   悬停/聚焦/拖动时变亮变粗,告诉用户"抓住我就能拖" */
+.sash {
+  flex: 0 0 5px;
+  position: relative;
+  z-index: 5;
+  cursor: col-resize;
+  background: transparent;
+  border: none;
+  padding: 0;
+  outline: none;
+  touch-action: none; /* 别让浏览器把按住当滚动手势抢走 */
+}
+
+.sash::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border);
+  transition:
+    background 0.15s ease,
+    width 0.15s ease;
+}
+
+.sash:hover::after,
+.sash:focus-visible::after,
+body.is-sash-dragging .sash::after {
+  width: 2px;
+  background: var(--accent);
+}
+
+/* 拖动全程:文字别被划选,光标保持左右箭头 */
+body.is-sash-dragging {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .sidebar .tree {
