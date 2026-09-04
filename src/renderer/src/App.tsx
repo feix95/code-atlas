@@ -8,6 +8,7 @@ import { FolderCard } from './components/FolderCard'
 import { GitChanges } from './components/GitChanges'
 import { StructureGrid } from './components/StructureGrid'
 import { cleanErrMsg } from './errText'
+import { Notice } from './components/Notice'
 
 interface Versions {
   node: string
@@ -137,7 +138,6 @@ function App(): React.JSX.Element {
   const [selectedFolder, setSelectedFolder] = useState<SelectedFolder | null>(null)
   const [structure, setStructure] = useState<FileStructure | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeNote, setAnalyzeNote] = useState<string | null>(null)
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
@@ -148,6 +148,8 @@ function App(): React.JSX.Element {
   const [treeNote, setTreeNote] = useState<string | null>(null)
   // 结构分析的头票号:连点两个文件时,慢的旧响应回来不许盖新的账
   const analyzeSeqRef = useRef(0)
+  // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
+  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
 
   // VSCode 式分割条:左栏宽度跟着鼠标走;拖动布尔放 ref,不为它每帧重渲染
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -262,7 +264,7 @@ function App(): React.JSX.Element {
     setStructure(null)
 
     if (!file.language) {
-      setAnalyzeNote('这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,点下面的按钮,AI 会看名字和内容片段猜给你')
+      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,AI 会看名字和内容片段猜给你', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -275,11 +277,11 @@ function App(): React.JSX.Element {
       if (fs) {
         setStructure(fs)
       } else {
-        setAnalyzeNote('该语言暂不支持结构分析(支持 TS/TSX/JS/JSX/Python/Java/Go/C/C++/C#/Rust)')
+        setAnalyzeNote({ text: '该语言暂不支持结构分析(支持 TS/TSX/JS/JSX/Python/Java/Go/C/C++/C#/Rust)', kind: 'info' })
       }
     } catch (err) {
       if (seq !== analyzeSeqRef.current) return
-      setAnalyzeNote(cleanErrMsg(err))
+      setAnalyzeNote({ text: cleanErrMsg(err), kind: 'error' })
     } finally {
       if (seq === analyzeSeqRef.current) setAnalyzing(false)
     }
@@ -387,7 +389,7 @@ function App(): React.JSX.Element {
             </span>
           )}
         </div>
-        {graphNote && <div className="structure-note">⚠️ {graphNote}</div>}
+        {graphNote && <Notice kind="error">⚠️ {graphNote}</Notice>}
       </section>
       {graph && graph.hubs.length > 0 && (
         <section className="summary">
@@ -433,7 +435,9 @@ function App(): React.JSX.Element {
         </button>
       </div>
       {analyzing && <div className="structure-note">🔍 解析结构中……</div>}
-      {!analyzing && analyzeNote && <div className="structure-note">{analyzeNote}</div>}
+      {!analyzing && analyzeNote && (
+        analyzeNote.kind === 'error' ? <Notice kind="error">⚠️ {analyzeNote.text}</Notice> : <div className="structure-note">{analyzeNote.text}</div>
+      )}
       {!analyzing && structure && <StructureGrid structure={structure} />}
       {!analyzing && graph && <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />}
       {!analyzing && (

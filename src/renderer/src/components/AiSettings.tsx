@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import type { AiConfig } from '@shared/types'
 import { friendlyErr } from '../errText'
+import { Notice } from './Notice'
+
+// 信号灯口径:提示语分两色 —— 真出错的(friendlyErr)挂红,随口一说挂灰
+type Note = { text: string; kind: 'info' | 'error' }
 
 // AI 设置:选 AI 从哪儿来 —— LM Studio(外部服务)或 内置模型(本机 llama-server)。
 // 两个 Provider 的设置互不干扰,切换不丢;改了就存,下次不用再配。
 export function AiSettings(): React.JSX.Element {
   const [config, setConfig] = useState<AiConfig | null>(null)
   const [models, setModels] = useState<string[]>([])
-  const [note, setNote] = useState<string | null>(null)
+  const [note, setNote] = useState<Note | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    void window.atlas.aiConfigGet().then(setConfig).catch((err) => setNote(friendlyErr(err)))
+    void window.atlas.aiConfigGet().then(setConfig).catch((err) => setNote({ text: friendlyErr(err), kind: 'error' }))
   }, [])
 
   async function handleListModels(): Promise<void> {
@@ -22,9 +26,9 @@ export function AiSettings(): React.JSX.Element {
     try {
       const ids = await window.atlas.aiListModels(config.lmstudio.baseUrl)
       setModels(ids)
-      if (ids.length === 0) setNote('LM Studio 通了,但没列出模型。加载一个模型再试。')
+      if (ids.length === 0) setNote({ text: 'LM Studio 通了,但没列出模型。加载一个模型再试。', kind: 'info' })
     } catch (err) {
-      setNote(friendlyErr(err))
+      setNote({ text: friendlyErr(err), kind: 'error' })
     } finally {
       setBusy(false)
     }
@@ -38,7 +42,7 @@ export function AiSettings(): React.JSX.Element {
       if (!picked) return // 用户点了取消,不算事儿
       setConfig({ ...config, builtin: { ...config.builtin, modelPath: picked } })
     } catch (err) {
-      setNote(friendlyErr(err))
+      setNote({ text: friendlyErr(err), kind: 'error' })
     }
   }
 
@@ -49,9 +53,9 @@ export function AiSettings(): React.JSX.Element {
     try {
       const saved = await window.atlas.aiConfigSave(config)
       setConfig(saved)
-      setNote('✅ 已保存')
+      setNote({ text: '✅ 已保存', kind: 'info' })
     } catch (err) {
-      setNote(friendlyErr(err))
+      setNote({ text: friendlyErr(err), kind: 'error' })
     } finally {
       setBusy(false)
     }
@@ -155,7 +159,9 @@ export function AiSettings(): React.JSX.Element {
         <button type="button" className="btn" onClick={handleSave} disabled={busy}>
           {busy ? '保存中……' : '💾 保存'}
         </button>
-        {note && <span className="ai-note">{note}</span>}
+        {note && (
+          <Notice kind={note.kind}>{note.kind === 'error' ? `⚠️ ${note.text}` : note.text}</Notice>
+        )}
       </div>
     </div>
   )

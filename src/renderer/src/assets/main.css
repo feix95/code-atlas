@@ -8,6 +8,9 @@
   --accent-soft: rgba(79, 110, 247, 0.12);
   --border: #e5e7eb;
   --danger: #d64545;
+  --danger-soft: rgba(214, 69, 69, 0.1);
+  --warn: #b7791f;
+  --warn-soft: rgba(183, 121, 31, 0.12);
   --git-add: #1a7f37;
   --git-rename: #9a6700;
 }
@@ -22,6 +25,9 @@
     --accent-soft: rgba(123, 150, 255, 0.15);
     --border: #2d3340;
     --danger: #ef6b6b;
+    --danger-soft: rgba(239, 107, 107, 0.12);
+    --warn: #d29922;
+    --warn-soft: rgba(210, 153, 34, 0.15);
     --git-add: #3fb950;
     --git-rename: #d29922;
   }
@@ -341,6 +347,35 @@ body.is-sash-dragging {
   border: 1px solid var(--border);
   padding: 3px 10px;
   border-radius: 999px;
+}
+
+/* ── 信号灯三级信息条 ─────────────── */
+/* info 灰=随口一说 · warn 琥珀=留个心眼 · error 红=真出事了;红色只有 error 一处出口 */
+.notice {
+  font-size: 13px;
+  line-height: 1.65;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.notice code {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+}
+
+.notice-warn {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.notice-error {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
 }
 
 /* ── 统计摘要 ─────────────────────── */
@@ -683,11 +718,6 @@ body.is-sash-dragging {
   gap: 12px;
 }
 
-.ai-note {
-  font-size: 13px;
-  color: var(--text);
-}
-
 /* ── 人话解释卡(第六锤) ──────────── */
 
 .explain {
@@ -713,10 +743,6 @@ body.is-sash-dragging {
 .explain-note {
   font-size: 13px;
   color: var(--text-muted);
-}
-
-.explain-note.is-error {
-  color: var(--danger);
 }
 
 .explain-text {
@@ -914,12 +940,19 @@ body.is-sash-dragging {
   font-family: Consolas, Menlo, monospace;
 }
 
+/* 树上的小徽章:胶囊形;「点开探一探」是邀请用主色,「不完整」是留个心眼用琥珀,都不许用红 */
 .tree-badge {
+  flex-shrink: 0;
   font-size: 11px;
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 4px;
-  padding: 0 5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.tree-badge.is-warn {
+  color: var(--warn);
+  background: var(--warn-soft);
 }
 
 .tree-lang {

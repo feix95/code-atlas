@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult } from '@shared/types'
 import { friendlyErr } from '../errText'
+import { Notice } from './Notice'
 
 /** 掐掉还在路上的生成:换了目标/关了卡片时喊一声,模型立刻空出来讲下一个 */
 function cancelExplain(id: string): void {
@@ -70,11 +71,9 @@ export function ExplainCard({
       {!busy && result?.status === 'supported' && (
         <div className="explain-text">✨ {result.text}</div>
       )}
-      {!busy && result?.status === 'unsupported' && (
-        <div className="explain-note">{result.text}</div>
-      )}
+      {!busy && result?.status === 'unsupported' && <Notice kind="info">{result.text}</Notice>}
       {!busy && result?.status === 'error' && (
-        <div className="explain-note is-error">⚠️ {result.text}</div>
+        <Notice kind="error">⚠️ {result.text}</Notice>
       )}
     </div>
   )

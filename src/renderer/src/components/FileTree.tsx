@@ -66,7 +66,8 @@ function TreeRow({ node, depth, selectedPath, expandingPath, onSelectFile, onSel
             {expandingPath === node.relPath ? '⏳ 正在探……' : '点开探一探'}
           </span>
         )}
-        {node.truncated && !node.lazy && <span className="tree-badge">不完整</span>}
+        {/* 「不完整」是正常行为不是出错:琥珀色留个心眼,红色只留给真失败 */}
+        {node.truncated && !node.lazy && <span className="tree-badge is-warn">不完整</span>}
         {!node.lazy && <span className="tree-arrow">{open ? '▾' : '▸'}</span>}
       </button>
       {open &&

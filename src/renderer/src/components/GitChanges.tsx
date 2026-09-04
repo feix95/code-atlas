@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types'
 import { friendlyErr } from '../errText'
+import { Notice } from './Notice'
 
 /** 掐掉还在路上的生成:换了文件/刷新/关面板时喊一声,模型立刻空出来 */
 function cancelExplain(id: string): void {
@@ -114,16 +115,16 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
   }
 
   if (loading) return <div className="structure-note">⏳ 正在翻 git 的账本,看看谁动了代码……</div>
-  if (note) return <div className="structure-note is-error">⚠️ {note}</div>
+  if (note) return <Notice kind="error">⚠️ {note}</Notice>
   if (!result) return <div className="structure-note">git 的账本还没递过来,点一下「🔄 刷新」再试一次?</div>
 
   if (!result.isGitRepo) {
     return (
-      <div className="structure-note">
+      <Notice kind="info">
         这个文件夹还不是 git 仓库,git 还没开始给它记账。
         <br />
         两个办法:① 选项目根目录(里面有 .git 隐藏文件夹的那层);② 或者在项目里跑一次 <code>git init</code>(先跟项目主人打个招呼哦)。
-      </div>
+      </Notice>
     )
   }
 
@@ -194,7 +195,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
             <div className="explain-note">正在把改动翻译成人话……(diff 长的话会慢一点)</div>
           ))}
           {!explaining && explain?.status === 'supported' && <div className="explain-text">✨ {explain.text}</div>}
-          {!explaining && explain?.status === 'error' && <div className="explain-note is-error">⚠️ {explain.text}</div>}
+          {!explaining && explain?.status === 'error' && <Notice kind="error">⚠️ {explain.text}</Notice>}
         </div>
       )}
     </div>
