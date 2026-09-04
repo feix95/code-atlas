@@ -97,14 +97,47 @@ body {
   cursor: wait;
 }
 
-.current-path {
+.topbar .brand,
+.topbar .btn {
+  flex-shrink: 0;
+}
+
+/* 地址栏:路径可以直接输入回车开图,不必每次弹系统对话框 */
+.path-box {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 2px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.path-box:focus-within {
+  border-color: var(--accent);
+}
+
+.path-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
   font-size: 13px;
+  padding: 5px 0;
+  outline: none;
+}
+
+.path-input::placeholder {
   color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl; /* 长路径从左截断,保住右端(真正要看的部分) */
-  text-align: left;
+}
+
+.path-go {
+  padding: 4px 12px;
+  font-size: 13px;
 }
 
 /* ── 主区域 ───────────────────────── */

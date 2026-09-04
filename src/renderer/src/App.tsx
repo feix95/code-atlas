@@ -123,6 +123,8 @@ function clampSidebar(width: number): number {
 function App(): React.JSX.Element {
   const [versions] = useState<Versions | null>(readVersions)
   const [folder, setFolder] = useState<string | null>(null)
+  // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
+  const [pathDraft, setPathDraft] = useState('')
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -196,10 +198,10 @@ function App(): React.JSX.Element {
     persistSidebarWidth()
   }
 
-  async function handlePick(): Promise<void> {
-    const dir = await window.atlas.pickFolder().catch(() => null)
-    if (!dir) return
+  // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条
+  async function scanPath(dir: string): Promise<void> {
     setFolder(dir)
+    setPathDraft(dir)
     setScanning(true)
     setResult(null)
     setError(null)
@@ -219,6 +221,19 @@ function App(): React.JSX.Element {
     } finally {
       setScanning(false)
     }
+  }
+
+  async function handlePick(): Promise<void> {
+    const dir = await window.atlas.pickFolder().catch(() => null)
+    if (dir) await scanPath(dir)
+  }
+
+  // 地址栏回车/点「前往」:直接开输进来的路径;粘来的路径常带首尾引号,顺手剥掉
+  async function goPath(): Promise<void> {
+    if (scanning) return
+    const dir = pathDraft.trim().replace(/^"+|"+$/g, '').trim()
+    if (dir === '') return
+    await scanPath(dir)
   }
 
   async function handleSelectFile(relPath: string, file: ScanFileNode): Promise<void> {
@@ -428,7 +443,29 @@ function App(): React.JSX.Element {
             🌿 Git 修改
           </button>
         )}
-        {folder && <span className="current-path">{folder}</span>}
+        <div className="path-box">
+          <input
+            className="path-input"
+            type="text"
+            value={pathDraft}
+            placeholder="输入或粘贴文件夹路径,回车直接打开"
+            spellCheck={false}
+            aria-label="文件夹路径"
+            onChange={(e) => setPathDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void goPath()
+              if (e.key === 'Escape') setPathDraft(folder ?? '')
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost path-go"
+            onClick={() => void goPath()}
+            disabled={scanning || pathDraft.trim() === ''}
+          >
+            前往
+          </button>
+        </div>
       </header>
 
       {result && !scanning ? (

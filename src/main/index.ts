@@ -152,11 +152,25 @@ function registerIpc(): void {
   })
 
   // 扫描指定文件夹,返回目录树 + 统计;顺手给每个节点打大白话速览标签
-  ipcMain.handle('atlas:scan-folder', (_event, folderPath: unknown) => {
+  ipcMain.handle('atlas:scan-folder', async (_event, folderPath: unknown) => {
     if (typeof folderPath !== 'string' || folderPath.trim() === '') {
       throw new Error('路径不能为空')
     }
-    const result = scanDirectory(folderPath)
+    const root = folderPath.trim()
+    // 地址栏手输的路径先验明正身:不存在 / 填的是文件,都得说人话,别吐 ENOENT 生面孔
+    const stat = await fs.stat(root).catch((err: NodeJS.ErrnoException) => err)
+    if (stat instanceof Error) {
+      if (stat.code === 'ENOENT') {
+        throw new Error(`找不到这个文件夹:${root} —— 检查一下盘符、拼写和斜杠方向;不确定的话,用「选择文件夹」点一个最稳`)
+      }
+      throw new Error(accessDeniedMessage(stat, '文件夹', root))
+    }
+    if (!stat.isDirectory()) {
+      // 手滑填了文件路径:顺手把上一层文件夹指给他看
+      const parent = root.replace(/[\\/]+[^\\/]+$/, '') || root
+      throw new Error(`这个路径是一个文件,不是文件夹 —— 要填装它的那层文件夹,比如:${parent}`)
+    }
+    const result = scanDirectory(root)
     return result.then((r) => {
       annotateSummaries(r.tree)
       return r
