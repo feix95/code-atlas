@@ -1,13 +1,19 @@
 import { useRef, useState } from 'react'
-import type { DepGraphResult, FileStructure, ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } from '@shared/types'
+import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import { AiChatPanel } from './components/AiAssist'
 import { AiSettings } from './components/AiSettings'
-import { ExplainCard } from './components/ExplainCard'
+import { DetailHeader, type Crumb } from './components/DetailHeader'
+import { Drawer } from './components/Drawer'
+import { FileOverview } from './components/FileOverview'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
-import { FolderCard } from './components/FolderCard'
+import { FolderOverview } from './components/FolderOverview'
 import { GitChanges } from './components/GitChanges'
+import { GitFileStatus } from './components/GitFileStatus'
+import { ProjectOverview } from './components/ProjectOverview'
 import { StructureGrid } from './components/StructureGrid'
 import { cleanErrMsg } from './errText'
+import { FILE_PRESETS, useAiAsk } from './useAiAsk'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 
@@ -23,54 +29,21 @@ function readVersions(): Versions | null {
   return v ? { node: v.node(), chrome: v.chrome(), electron: v.electron() } : null
 }
 
-// 主进程抛的错经过 IPC 会带上前缀,剥掉只留人话 —— 统一走 errText 的共享口径
-function topEntries(
-  record: Record<string, { name: string; count: number } | number>,
-  n: number
-): Array<{ key: string; label: string; count: number }> {
-  return Object.entries(record)
-    .map(([key, value]) => ({
-      key,
-      label: typeof value === 'number' ? key : value.name,
-      count: typeof value === 'number' ? value : value.count
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, n)
-}
+// 文件详情的五个 Tab;文件夹详情另有自己的两页
+type DetailTab = 'overview' | 'structure' | 'relations' | 'changes' | 'chat'
 
-function BarRow({ label, count, total }: { label: string; count: number; total: number }): React.JSX.Element {
-  return (
-    <div className="extbar">
-      <span className="extbar-label">{label}</span>
-      <div className="extbar-track">
-        <div className="extbar-fill" style={{ width: `${(count / total) * 100}%` }} />
-      </div>
-      <span className="extbar-count">{count}</span>
-    </div>
-  )
-}
+const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
+  { key: 'overview', label: '概览' },
+  { key: 'structure', label: '结构' },
+  { key: 'relations', label: '关系' },
+  { key: 'changes', label: '修改建议' },
+  { key: 'chat', label: 'AI 对话' }
+]
 
-interface SelectedFile {
-  relPath: string
-  name: string
-  languageId: string
-  languageName: string
-}
-
-interface SelectedFolder {
-  relPath: string
-  name: string
-}
-
-// 按路径契约在扫描树里找文件节点:关系卡跳转只认 relPath,不手拼任何路径
-function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
-  if (node.type === 'file') return node.relPath === relPath ? node : null
-  for (const child of node.children) {
-    const hit = findFile(child, relPath)
-    if (hit) return hit
-  }
-  return null
-}
+const FOLDER_TABS = [
+  { key: 'overview', label: '概览' },
+  { key: 'ai', label: 'AI 讲解' }
+]
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
 function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): ScanDirNode {
@@ -92,7 +65,7 @@ function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): Sc
 }
 
 // 分级扫描:把子树探出来的一份统计累加进总账(各项都是纯增量,直接加)
-function mergeStats(base: ScanStats, add: ScanStats): ScanStats {
+function mergeStats(base: ScanResult['stats'], add: ScanResult['stats']): ScanResult['stats'] {
   const byExt = { ...base.byExt }
   for (const [k, v] of Object.entries(add.byExt)) byExt[k] = (byExt[k] ?? 0) + v
   const byLanguage = { ...base.byLanguage }
@@ -111,9 +84,27 @@ function mergeStats(base: ScanStats, add: ScanStats): ScanStats {
   }
 }
 
+// 按路径契约在扫描树里找文件节点:关系卡跳转只认 relPath,不手拼任何路径
+function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
+  if (node.type === 'file') return node.relPath === relPath ? node : null
+  for (const child of node.children) {
+    const hit = findFile(child, relPath)
+    if (hit) return hit
+  }
+  return null
+}
+
+/** 面包屑分段:rootName + relPath 的每一层;最后一段由调用方自己标成当前 */
+function buildCrumbs(rootName: string, rootPath: string, relPath: string): Crumb[] {
+  const crumbs: Crumb[] = [{ label: rootName, title: rootPath }]
+  const parts = relPath === '' ? [] : relPath.split('/')
+  for (const part of parts) crumbs.push({ label: part, title: relPath })
+  return crumbs
+}
+
 // 左栏宽度:分割条拖多宽记进 localStorage,下次打开还是自己调好的样子
-const DEFAULT_SIDEBAR_WIDTH = 420
-const MIN_SIDEBAR_WIDTH = 260
+const DEFAULT_SIDEBAR_WIDTH = 340
+const MIN_SIDEBAR_WIDTH = 240
 const SIDEBAR_WIDTH_KEY = 'atlas.sidebar-width'
 
 // 树再宽也不能把右栏挤没:右栏保底 360px 看分析内容
@@ -138,22 +129,28 @@ function App(): React.JSX.Element {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
-  const [selectedFolder, setSelectedFolder] = useState<SelectedFolder | null>(null)
+  // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
+  const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [structure, setStructure] = useState<FileStructure | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  // 结构分析的票号:连点两个文件时,慢的旧响应回来不许盖新的账
+  const analyzeSeq = useRef(0)
+  // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
+  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
-  const [showAiSettings, setShowAiSettings] = useState(false)
+  // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和 Git 抽屉共用
+  const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
+  const [gitLoading, setGitLoading] = useState(false)
+  // 设置和 Git 都是抽屉:盖在主内容上面,不把详情往下推;关掉后详情原地不动
+  const [showSettings, setShowSettings] = useState(false)
   const [showGit, setShowGit] = useState(false)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const [treeNote, setTreeNote] = useState<string | null>(null)
-  // 结构分析的头票号:连点两个文件时,慢的旧响应回来不许盖新的账
-  const analyzeSeqRef = useRef(0)
-  // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
-  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
 
   // VSCode 式分割条:左栏宽度跟着鼠标走;拖动布尔放 ref,不为它每帧重渲染
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -209,6 +206,13 @@ function App(): React.JSX.Element {
     persistSidebarWidth()
   }
 
+  // 扫描完成的轻提示:报个数就自己退场
+  function flashToast(text: string): void {
+    setScanToast(text)
+    if (scanToastTimerRef.current) clearTimeout(scanToastTimerRef.current)
+    scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
+  }
+
   // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条
   async function scanPath(dir: string): Promise<void> {
     setFolder(dir)
@@ -220,6 +224,7 @@ function App(): React.JSX.Element {
     setError(null)
     setSelectedFile(null)
     setSelectedFolder(null)
+    setActiveTab('overview')
     setStructure(null)
     setAnalyzeNote(null)
     setGraph(null)
@@ -227,12 +232,20 @@ function App(): React.JSX.Element {
     setShowGit(false)
     setExpanding(null)
     setTreeNote(null)
+    setGitInfo(null)
     try {
       const scanned = await window.atlas.scanFolder(dir)
       setResult(scanned)
-      setScanToast(`🗺️ 地图画好了:${scanned.stats.fileCount} 个文件`)
-      if (scanToastTimerRef.current) clearTimeout(scanToastTimerRef.current)
-      scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
+      flashToast(`地图画好了:${scanned.stats.fileCount} 个文件`)
+      // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
+      setGitLoading(true)
+      try {
+        setGitInfo(await window.atlas.gitChanges(dir))
+      } catch {
+        setGitInfo(null)
+      } finally {
+        setGitLoading(false)
+      }
     } catch (err) {
       setError(cleanErrMsg(err))
     } finally {
@@ -245,10 +258,19 @@ function App(): React.JSX.Element {
     if (dir) await scanPath(dir)
   }
 
+  // 刷新 = 把当前项目重扫一遍;没开项目就点了,告诉他缺什么,按钮不装哑巴
+  async function handleRefresh(): Promise<void> {
+    if (!folder) {
+      flashToast('先打开一个文件夹,才有得刷新 —— 点「打开项目」或在上面填路径')
+      return
+    }
+    if (!scanning) await scanPath(folder)
+  }
+
   // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
   function setShakeAndHint(): void {
     setPathShaking(true)
-    setPathHint('先填个文件夹路径,再点「前往」;也可以点左边「选择文件夹」')
+    setPathHint('先填个文件夹路径,再点「前往」;也可以点「打开项目」选一个')
     if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
     pathHintTimerRef.current = setTimeout(() => setPathHint(null), 5000)
     pathInputRef.current?.focus()
@@ -265,14 +287,19 @@ function App(): React.JSX.Element {
     await scanPath(dir)
   }
 
-  async function handleSelectFile(relPath: string, file: ScanFileNode): Promise<void> {
-    const seq = ++analyzeSeqRef.current
-    setSelectedFile({ relPath, name: file.name, languageId: file.language?.id ?? '', languageName: file.language?.name ?? '' })
+  /**
+   * 选中文件:只更新选中,立即出静态详情;本地结构分析自动跑(不耗模型),
+   * AI 绝不自动启动。keepTab = 从关系卡跳过来时保持当前 Tab,详情区不换页。
+   */
+  async function handleSelectFile(relPath: string, file: ScanFileNode, opts?: { keepTab?: boolean }): Promise<void> {
+    const seq = ++analyzeSeq.current
+    setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
+    if (!opts?.keepTab) setActiveTab('overview')
 
     if (!file.language) {
-      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,AI 会看名字和内容片段猜给你', kind: 'info' })
+      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,去「AI 对话」里问', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -281,17 +308,17 @@ function App(): React.JSX.Element {
       // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
       if (!result) return
       const fs = await window.atlas.analyzeFile(result.rootPath, relPath, file.language.id)
-      if (seq !== analyzeSeqRef.current) return // 用户已经点了别的文件,这份旧账作废
+      if (seq !== analyzeSeq.current) return // 用户已经点了别的文件,这份旧账作废
       if (fs) {
         setStructure(fs)
       } else {
         setAnalyzeNote({ text: '该语言暂不支持结构分析(支持 TS/TSX/JS/JSX/Python/Java/Go/C/C++/C#/Rust)', kind: 'info' })
       }
     } catch (err) {
-      if (seq !== analyzeSeqRef.current) return
+      if (seq !== analyzeSeq.current) return
       setAnalyzeNote({ text: cleanErrMsg(err), kind: 'error' })
     } finally {
-      if (seq === analyzeSeqRef.current) setAnalyzing(false)
+      if (seq === analyzeSeq.current) setAnalyzing(false)
     }
   }
 
@@ -309,19 +336,29 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 关系卡点路径跳转:在扫描树里按 relPath 找到文件节点,再走同一条选中链路
-  function jumpTo(relPath: string): void {
+  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,再走同一条选中链路
+  // keepTab:从关系卡跳的保持「关系」Tab,顺着依赖链一路看;从概览跳的回到概览
+  function jumpTo(relPath: string, keepTab = false): void {
     if (!result) return
     const found = findFile(result.tree, relPath)
-    if (found) void handleSelectFile(found.relPath, found)
+    if (found) void handleSelectFile(found.relPath, found, { keepTab })
   }
 
-  // 点了文件夹:展开/收起由 FileTree 自己管,这儿负责出文件夹讲解卡(与文件卡互斥)
-  function handleSelectFolder(relPath: string, name: string): void {
-    setSelectedFolder({ relPath, name })
+  // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发
+  function handleSelectFolder(node: ScanDirNode): void {
+    setSelectedFolder(node)
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
+    setActiveTab('overview')
+  }
+
+  function clearSelection(): void {
+    setSelectedFile(null)
+    setSelectedFolder(null)
+    setStructure(null)
+    setAnalyzeNote(null)
+    setActiveTab('overview')
   }
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
@@ -344,143 +381,25 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 全局小账条:无论选中什么都挂在一屏里,随时知道这张图有多大、还欠多少没探
-  const statsStrip = result && (
-    <div className="summary chips-strip">
-      <div className="chips">
-        <span className="chip">📄 {result.stats.fileCount} 个文件</span>
-        <span className="chip">📁 {result.stats.dirCount} 个文件夹</span>
-        <span className="chip">⏱ {result.durationMs} ms</span>
-        {result.stats.ignoredCount > 0 && <span className="chip is-muted">已绕开 {result.stats.ignoredCount} 项杂物</span>}
-        {result.stats.skippedCount > 0 && <span className="chip is-muted">跳过 {result.stats.skippedCount} 项(无权限/链接)</span>}
-        {result.stats.lazyCount > 0 && <span className="chip is-muted">还有 {result.stats.lazyCount} 个文件夹没探,点开就扫</span>}
-      </div>
-    </div>
-  )
-
-  const aiSettingsCard = showAiSettings && (
-    <section className="summary">
-      <div className="bars-title">⚙️ AI 人话解释设置</div>
-      <AiSettings />
-    </section>
-  )
-
-  const gitCard = showGit && folder && !scanning && (
-    <section className="summary">
-      <div className="bars-title">🌿 git 修改翻译 —— 谁动了代码,讲给你听</div>
-      <GitChanges rootPath={folder} onJump={jumpTo} />
-    </section>
-  )
-
-  // 还没选中任何东西:右侧是全项目概览(语言分布 + 关系图入口)
-  const overview = (
-    <>
-      <section className="summary">
-        <div className="extbars">
-          <div className="bars-title">🗣️ 语言分布</div>
-          {result && topEntries(result.stats.byLanguage, 6).map(({ key, label, count }) => (
-            <BarRow key={key} label={label} count={count} total={result.stats.fileCount || 1} />
-          ))}
-          <div className="bars-title">🧩 后缀分布</div>
-          {result && topEntries(result.stats.byExt, 5).map(({ label, count }) => (
-            <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={result.stats.fileCount || 1} />
-          ))}
-        </div>
-        <div className="summary-actions">
-          <button type="button" className="btn" onClick={() => void handleLoadGraph()} disabled={graphLoading}>
-            {graphLoading ? '⏳ 正在连线……' : graph ? '🔄 重新分析关系' : '🕸️ 分析文件关系'}
-          </button>
-          {graph && (
-            <span className="chip is-muted">
-              {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 · 外部包引用{' '}
-              {graph.stats.externalCount} 次 · 没连上 {graph.stats.unresolved.length} 条 · ⏱ {graph.durationMs} ms
-            </span>
-          )}
-        </div>
-        {graphNote && <Notice kind="error">⚠️ {graphNote}</Notice>}
-      </section>
-      {graph && graph.hubs.length > 0 && (
-        <section className="summary">
-          <div className="bars-title">⭐ 最忙的文件(被引用最多,改它要小心 · 点名字跳过去看)</div>
-          <div className="extbars bars-hub">
-            {graph.hubs.slice(0, 8).map((hub) => (
-              <button
-                key={hub.relPath}
-                type="button"
-                className="extbar extbar-link"
-                onClick={() => jumpTo(hub.relPath)}
-                title={hub.relPath}
-              >
-                <span className="extbar-label">{hub.relPath}</span>
-                <div className="extbar-track">
-                  <div className="extbar-fill" style={{ width: `${(hub.inCount / graph.hubs[0].inCount) * 100}%` }} />
-                </div>
-                <span className="extbar-count">{hub.inCount}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-    </>
-  )
-
-  // 选中了文件:结构骨架 + 它在关系图里的位置 + AI 自动开讲,全在右侧一屏
-  const fileDetail = selectedFile && result && (
-    <section className="structure">
-      <div className="structure-head">
-        <span className="structure-title">🧬 {selectedFile.name}</span>
-        {selectedFile.languageName && <span className="structure-lang">{selectedFile.languageName}</span>}
-        <button
-          type="button"
-          className="structure-close"
-          onClick={() => {
-            setSelectedFile(null)
-            setStructure(null)
-            setAnalyzeNote(null)
-          }}
-        >
-          ✕
-        </button>
-      </div>
-      {analyzing && <div className="structure-note"><ProgressDots />解析结构中……</div>}
-      {!analyzing && analyzeNote && (
-        analyzeNote.kind === 'error' ? <Notice kind="error">⚠️ {analyzeNote.text}</Notice> : <div className="structure-note">{analyzeNote.text}</div>
-      )}
-      {!analyzing && structure && <StructureGrid structure={structure} />}
-      {!analyzing && graph && <FileRelations relPath={selectedFile.relPath} graph={graph} onJump={jumpTo} />}
-      {!analyzing && (
-        <ExplainCard
-          key={selectedFile.relPath}
-          rootPath={result.rootPath}
-          relPath={selectedFile.relPath}
-          languageId={selectedFile.languageId}
-        />
-      )}
-    </section>
-  )
-
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">🗺️ CodeAtlas</span>
-        <button type="button" className="btn" onClick={handlePick} disabled={scanning}>
-          {scanning ? '⏳ 正在画地图……' : '📁 选择文件夹'}
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            ⌁
+          </span>
+          CodeAtlas
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
+          {scanning ? '正在画地图……' : '打开项目'}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => setShowAiSettings((v) => !v)}>
-          ⚙️ AI 设置
+        <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} disabled={scanning}>
+          {scanning ? '扫描中……' : '刷新'}
         </button>
-        {folder && (
-          <button type="button" className="btn btn-ghost" onClick={() => setShowGit((v) => !v)}>
-            🌿 Git 修改
-          </button>
-        )}
-        <div
-          className={`path-box${pathShaking ? ' is-shaking' : ''}`}
-          onAnimationEnd={() => setPathShaking(false)}
-        >
+        <div className={`path-box${pathShaking ? ' is-shaking' : ''}`} onAnimationEnd={() => setPathShaking(false)}>
           <input
             ref={pathInputRef}
-            className="path-input"
+            className="path-input mono"
             type="text"
             value={pathDraft}
             placeholder="输入或粘贴文件夹路径,回车直接打开"
@@ -495,25 +414,37 @@ function App(): React.JSX.Element {
               if (e.key === 'Escape') setPathDraft(folder ?? '')
             }}
           />
-          <button type="button" className="btn btn-ghost path-go" onClick={() => void goPath()} disabled={scanning}>
-            {scanning ? '⏳ 扫描中……' : '前往'}
+          <button type="button" className="btn path-go" onClick={() => void goPath()} disabled={scanning}>
+            {scanning ? '……' : '前往'}
           </button>
           {pathHint && <div className="path-hint">{pathHint}</div>}
         </div>
+        <button type="button" className="icon-btn" onClick={() => setShowSettings(true)} aria-label="打开 AI 设置">
+          ⚙
+        </button>
       </header>
 
       {result && !scanning ? (
-        // 资源管理器式双栏:左边目录树,右边选中项的全部分析信息
+        // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
         <main className="workspace">
           <aside className="sidebar" style={{ width: sidebarWidth }}>
             <FileTree
               root={result.tree}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
               expandingPath={expanding}
-              onSelectFile={handleSelectFile}
+              onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
               onSelectFolder={handleSelectFolder}
-              onExpandLazy={handleExpandLazy}
+              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
             />
+            <footer className="sidebar-footer">
+              <span>
+                <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
+                {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
+              </span>
+              <span className="mono">
+                {result.stats.fileCount} files · {result.stats.dirCount} folders
+              </span>
+            </footer>
             {treeNote && <div className="tree-toast">⚠️ {treeNote}</div>}
           </aside>
           <div
@@ -532,39 +463,77 @@ function App(): React.JSX.Element {
             onKeyDown={onSashKeyDown}
           />
           <section className="detail">
-            {scanToast && <div className="notice">{scanToast}</div>}
-            {statsStrip}
-            {aiSettingsCard}
-            {gitCard}
-            {selectedFile ? fileDetail : selectedFolder ? (
-              <FolderCard
-                key={selectedFolder.relPath || '(root)'}
-                rootPath={result.rootPath}
-                relPath={selectedFolder.relPath}
-                name={selectedFolder.name}
-                onClose={() => setSelectedFolder(null)}
+            {scanToast && <div className="scan-toast">{scanToast}</div>}
+            {selectedFile && result ? (
+              <FileDetailView
+                key={selectedFile.relPath}
+                file={selectedFile}
+                result={result}
+                structure={structure}
+                analyzing={analyzing}
+                analyzeNote={analyzeNote}
+                graph={graph}
+                graphLoading={graphLoading}
+                graphNote={graphNote}
+                onLoadGraph={() => void handleLoadGraph()}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onClose={clearSelection}
+                onJump={(p) => jumpTo(p, true)}
+                gitInfo={gitInfo}
+                gitLoading={gitLoading}
+                onOpenGit={() => setShowGit(true)}
               />
+            ) : selectedFolder && result ? (
+              <FolderDetailView key={selectedFolder.relPath || '(root)'} dir={selectedFolder} result={result} onClose={clearSelection} />
             ) : (
-              overview
+              <ProjectOverview
+                result={result}
+                graph={graph}
+                graphLoading={graphLoading}
+                graphNote={graphNote}
+                onLoadGraph={() => void handleLoadGraph()}
+                onJump={(p) => jumpTo(p)}
+                gitInfo={gitInfo}
+                onOpenGit={() => setShowGit(true)}
+              />
             )}
           </section>
         </main>
       ) : (
         <main className="content">
-          {aiSettingsCard}
-          {gitCard}
-          {scanning && <div className="state"><ProgressDots />正在绘制地图,稍等……</div>}
-          {!scanning && error && <div className="state is-error">⚠️ {error}</div>}
+          {scanning && (
+            <div className="state">
+              <ProgressDots />
+              正在绘制地图,稍等……
+            </div>
+          )}
+          {!scanning && error && (
+            <div className="state">
+              <Notice kind="error">{error}</Notice>
+              <p className="empty-hint">检查一下路径,或点上方「打开项目」重新选一个文件夹</p>
+            </div>
+          )}
           {!folder && !scanning && !error && (
             <div className="welcome-card">
-              <div className="logo">🗺️</div>
+              <div className="logo">
+                <span className="brand-mark brand-mark-big" aria-hidden="true">
+                  ⌁
+                </span>
+              </div>
               <h1>CodeAtlas</h1>
               <p className="slogan">你的 AI 代码地图 —— 不读代码,也能看懂整个项目</p>
-              <p className="empty-hint">点上方「选择文件夹」,或在右上角地址栏粘贴路径</p>
+              <p className="empty-hint">点上方「打开项目」,或在地址栏粘贴路径</p>
               <ol className="welcome-steps">
-                <li><i>1</i>选一个文件夹打开,地图马上画出来</li>
-                <li><i>2</i>在左边树上点开想看的东西</li>
-                <li><i>3</i>右边 AI 用大白话讲给你听</li>
+                <li>
+                  <i>1</i>选一个文件夹打开,地图马上画出来
+                </li>
+                <li>
+                  <i>2</i>在左边树上点开想看的东西(点箭头展开,点名字选中)
+                </li>
+                <li>
+                  <i>3</i>右边先看静态结构;想让 AI 讲,点一下它才开跑
+                </li>
               </ol>
               <div className="engine">
                 {versions ? (
@@ -581,6 +550,181 @@ function App(): React.JSX.Element {
           )}
         </main>
       )}
+
+      {showSettings && (
+        <Drawer title="AI 设置" onClose={() => setShowSettings(false)}>
+          <AiSettings />
+        </Drawer>
+      )}
+      {showGit && folder && (
+        <Drawer title="Git 修改" onClose={() => setShowGit(false)}>
+          <GitChanges rootPath={folder} initial={gitInfo ?? undefined} onRefreshed={setGitInfo} onJump={(p) => jumpTo(p)} />
+        </Drawer>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 文件详情:固定头部(面包屑/文件名/徽章/关闭)+ 五个 Tab。
+ * key = relPath:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消,
+ * 旧响应回来也盖不到新文件头上。
+ */
+function FileDetailView({
+  file,
+  result,
+  structure,
+  analyzing,
+  analyzeNote,
+  graph,
+  graphLoading,
+  graphNote,
+  onLoadGraph,
+  activeTab,
+  onTabChange,
+  onClose,
+  onJump,
+  gitInfo,
+  gitLoading,
+  onOpenGit
+}: {
+  file: ScanFileNode
+  result: ScanResult
+  structure: FileStructure | null
+  analyzing: boolean
+  analyzeNote: { text: string; kind: 'info' | 'error' } | null
+  graph: DepGraphResult | null
+  graphLoading: boolean
+  graphNote: string | null
+  onLoadGraph: () => void
+  activeTab: DetailTab
+  onTabChange: (tab: DetailTab) => void
+  onClose: () => void
+  /** 关系卡跳转:保持当前 Tab */
+  onJump: (relPath: string) => void
+  gitInfo: GitChangesResult | null
+  gitLoading: boolean
+  onOpenGit: () => void
+}): React.JSX.Element {
+  // AI 助手:所有提问走这一个线程(概览卡、修改建议、对话页共用),绝不自动开跑
+  const ai = useAiAsk((requestId, question) =>
+    window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined)
+  )
+
+  const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
+  const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
+  const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
+  if (file.language) badges.push({ label: file.language.name, tone: 'blue' })
+  if (gitChange) {
+    const tone = gitChange.kind === 'deleted' ? 'red' : gitChange.kind === 'added' ? 'green' : 'blue'
+    const label: Record<string, string> = {
+      added: 'git 新增',
+      modified: 'git 修改',
+      deleted: 'git 删除',
+      renamed: 'git 重命名',
+      untracked: 'git 新文件'
+    }
+    badges.push({ label: label[gitChange.kind], tone })
+  } else if (gitInfo && !gitLoading) {
+    badges.push({ label: '无未提交改动', tone: 'muted' })
+  }
+
+  return (
+    <div className="detail-page">
+      <DetailHeader
+        crumbs={crumbs}
+        icon="▤"
+        title={file.name}
+        subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
+        badges={badges}
+        tabs={FILE_TABS}
+        activeTab={activeTab}
+        onTabChange={(key) => onTabChange(key as DetailTab)}
+        onClose={onClose}
+      />
+      <div className="detail-body">
+        {activeTab === 'overview' && (
+          <FileOverview file={file} structure={structure} analyzing={analyzing} analyzeNote={analyzeNote} graph={graph} ai={ai} />
+        )}
+        {activeTab === 'structure' && (
+          <>
+            {analyzing && (
+              <div className="card-waiting">
+                <ProgressDots />
+                正在解析结构骨架……
+              </div>
+            )}
+            {!analyzing && analyzeNote?.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
+            {!analyzing && analyzeNote?.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
+            {!analyzing && structure && <StructureGrid structure={structure} />}
+          </>
+        )}
+        {activeTab === 'relations' && (
+          <>
+            {graph ? (
+              <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
+            ) : graphLoading ? (
+              <div className="card-waiting">
+                <ProgressDots />
+                正在连线……
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p className="empty-title">还没分析过文件关系</p>
+                <p className="empty-hint">连上线才知道:谁引用了它、它引用谁、改它会牵连谁</p>
+                <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
+                  分析文件关系
+                </button>
+                {graphNote && <Notice kind="error">{graphNote}</Notice>}
+              </div>
+            )}
+          </>
+        )}
+        {activeTab === 'changes' && (
+          <GitFileStatus
+            gitInfo={gitInfo}
+            gitLoading={gitLoading}
+            rootPath={result.rootPath}
+            relPath={file.relPath}
+            onOpenGit={onOpenGit}
+            ai={ai}
+            onGoChat={() => onTabChange('chat')}
+          />
+        )}
+        {activeTab === 'chat' && <AiChatPanel ai={ai} presets={FILE_PRESETS} contextLabel={file.name} mainLabel="解释这个文件" />}
+      </div>
+    </div>
+  )
+}
+
+/** 文件夹详情:静态目录概览为主,AI 讲解收在独立的 Tab 里等用户点 */
+function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: ScanResult; onClose: () => void }): React.JSX.Element {
+  const [tab, setTab] = useState('overview')
+  const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
+
+  const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
+  if (dir.relPath === '') badges.push({ label: '项目根', tone: 'blue' })
+  if (dir.lazy) badges.push({ label: '未扫描', tone: 'amber' })
+  else if (dir.truncated) badges.push({ label: '不完整', tone: 'amber' })
+  else badges.push({ label: '已扫描', tone: 'green' })
+
+  return (
+    <div className="detail-page">
+      <DetailHeader
+        crumbs={buildCrumbs(result.rootName, result.rootPath, dir.relPath)}
+        icon="▣"
+        title={dir.name || result.rootName}
+        subtitle={dir.summary?.text ?? '文件夹'}
+        badges={badges}
+        tabs={FOLDER_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        onClose={onClose}
+      />
+      <div className="detail-body">
+        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} />}
+        {tab === 'ai' && <AiChatPanel ai={ai} presets={[]} contextLabel={dir.name || result.rootName} mainLabel="用大白话讲讲这个文件夹" folderMode />}
+      </div>
     </div>
   )
 }

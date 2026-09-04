@@ -27,10 +27,10 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file'),
-  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string): Promise<AiExplainResult> =>
-    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId),
-  aiExplainFolder: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
-    ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId),
+  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question),
+  aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question),
   gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
   gitExplainChange: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath, requestId),

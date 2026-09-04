@@ -26,17 +26,32 @@ function StatLine({ add, del }: { add: number; del: number }): React.JSX.Element
   )
 }
 
-// git 修改卡:点开自动收一遍改动清单,点文件行选中,再让本地模型用人话讲这个改动。
+// git 修改卡(现在住在右侧抽屉里):挂载时收一遍改动清单(外部已有总账就直用,不重复跑 git),
+// 点文件行选中,再让本地模型用人话讲这个改动。
 // 路径契约由主进程保证,这里只递 (rootPath, relPath)。
-export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (relPath: string) => void }): React.JSX.Element {
-  const [loading, setLoading] = useState(true)
-  const [result, setResult] = useState<GitChangesResult | null>(null)
+export function GitChanges({
+  rootPath,
+  onJump,
+  initial,
+  onRefreshed
+}: {
+  rootPath: string
+  onJump: (relPath: string) => void
+  /** App 开图时顺手查过的总账;有就直用,不重复跑 git 命令 */
+  initial?: GitChangesResult
+  /** 刷新拿到新账后回传 App,让详情头部的 git 徽章跟着新 */
+  onRefreshed?: (result: GitChangesResult) => void
+}): React.JSX.Element {
+  const [loading, setLoading] = useState(!initial)
+  const [result, setResult] = useState<GitChangesResult | null>(initial ?? null)
   const [note, setNote] = useState<string | null>(null)
   const [selected, setSelected] = useState<GitChange | null>(null)
   const [explain, setExplain] = useState<AiExplainResult | null>(null)
   const [explaining, setExplaining] = useState(false)
   const [streamText, setStreamText] = useState('')
   const idRef = useRef('')
+  // 初值只在挂载时认一次:之后 App 那份变了也不回退用户看到的账
+  const initialRef = useRef(initial)
 
   // 订阅 AI 流式增量:只认自己这次请求的 id;组件卸载时退订,防止泄漏监听
   useEffect(() => {
@@ -52,9 +67,10 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
     }
   }, [])
 
-  // 挂载/换文件夹时自动收一遍;setState 都发生在 await 之后,不在 effect 里同步触发。
+  // 挂载时收一遍(App 已经查过总账就跳过);setState 都发生在 await 之后,不在 effect 里同步触发。
   // cancelled 守卫:慢响应回来时文件夹已经换了,不许旧账盖新账
   useEffect(() => {
+    if (initialRef.current) return
     let cancelled = false
     void (async (): Promise<void> => {
       try {
@@ -88,6 +104,7 @@ export function GitChanges({ rootPath, onJump }: { rootPath: string; onJump: (re
       setResult(r)
       setSelected(null)
       setExplain(null)
+      onRefreshed?.(r) // 回传 App:头部徽章和修改建议 Tab 跟着新账走
     } catch (err) {
       setNote(friendlyErr(err))
     } finally {

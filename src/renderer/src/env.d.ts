@@ -27,8 +27,8 @@ declare global {
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>
       aiPickFile: () => Promise<string | null>
-      aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string) => Promise<AiExplainResult>
-      aiExplainFolder: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
+      aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string) => Promise<AiExplainResult>
+      aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string) => Promise<AiExplainResult>
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       aiCancel: (requestId: string) => Promise<void>

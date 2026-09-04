@@ -29,6 +29,17 @@ function extOf(name: string): string {
   return dot <= 0 ? '' : name.slice(dot).toLowerCase()
 }
 
+/**
+ * 用户点名的问题(来自 AI 面板的预设问题/输入框):追加到证据后面,
+ * 让模型围绕问题作答,而不是每次都做全面介绍。不传则保持原行为。
+ */
+function withQuestion(prompt: string, question: unknown): string {
+  if (typeof question !== 'string') return prompt
+  const q = question.trim()
+  if (!q) return prompt
+  return `${prompt}\n\n用户的问题:${q}\n请直接围绕这个问题回答(结合上面给出的文件信息),不要泛泛做全面介绍。`
+}
+
 /** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
 const explainAborters = new Map<string, AbortController>()
 
@@ -346,7 +357,7 @@ function registerIpc(): void {
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
-    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown) => {
+    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
@@ -374,7 +385,10 @@ function registerIpc(): void {
         })
         const structure = await analyzeSource(code, languageId)
         if (structure) {
-          const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
+          const prompt = withQuestion(
+            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null }),
+            question
+          )
           return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, undefined, onDelta, signal))
         }
       }
@@ -395,18 +409,18 @@ function registerIpc(): void {
             ? `${kind.type},尺寸 ${kind.dims}`
             : kind.type
           : '认不出具体格式(文件头不像任何已知类型)'
-        const prompt = buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) })
+        const prompt = withQuestion(buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }), question)
         return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
-      const prompt = buildGuessPrompt({ relPath, name, languageName, preview })
+      const prompt = withQuestion(buildGuessPrompt({ relPath, name, languageName, preview }), question)
       return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
     }
   )
 
   // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
   // relPath 传 '' 表示解释项目根目录本身
-  ipcMain.handle('atlas:ai-explain-folder', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
+  ipcMain.handle('atlas:ai-explain-folder', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -446,13 +460,16 @@ function registerIpc(): void {
       const langName = BY_EXT.get(extOf(item.name))?.name ?? '没认出的文件'
       languages.set(langName, (languages.get(langName) ?? 0) + 1)
     }
-    const prompt = buildFolderPrompt({
-      relPath,
-      name: basename(absPath) || basename(rootPath),
-      subdirs,
-      files,
-      languages: Object.fromEntries(languages)
-    })
+    const prompt = withQuestion(
+      buildFolderPrompt({
+        relPath,
+        name: basename(absPath) || basename(rootPath),
+        subdirs,
+        files,
+        languages: Object.fromEntries(languages)
+      }),
+      question
+    )
     return explainWithCancel(requestId, (signal) =>
       explainWithModel(resolved.target, prompt, FOLDER_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
     )
