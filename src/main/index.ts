@@ -59,6 +59,10 @@ function accessDeniedMessage(err: NodeJS.ErrnoException, kind: '文件夹' | '�
   if (err?.code === 'EPERM' || err?.code === 'EACCES') {
     return `「${relPath}」被 Windows 上了锁,软件没钥匙看不了 —— 这类多半是系统自管的内部文件夹,不是你的项目内容,不看也不影响`
   }
+  // Windows 核心文件(如 swapfile.sys)连 stat 都不给(EINVAL),独占占用是 EBUSY —— 不是"不存在",别谎报
+  if (err?.code === 'EINVAL' || err?.code === 'EBUSY') {
+    return `「${relPath}」被 Windows 独占占用(多半是系统自己管的核心文件),软件读不了 —— 不是你删了什么,不看也不影响`
+  }
   return `${kind}不存在:${relPath}`
 }
 
@@ -203,10 +207,12 @@ function registerIpc(): void {
       throw new Error(accessDeniedMessage(stat, '文件', relPath))
     }
     if (!stat.isFile()) {
-      throw new Error(`文件不存在:${relPath}`)
+      throw new Error(`这个路径不是一个文件:${relPath}`)
     }
     if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
-    const code = await fs.readFile(absPath, 'utf8')
+    const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
+      throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+    })
     return analyzeSource(code, languageId)
   })
 
@@ -328,16 +334,23 @@ function registerIpc(): void {
         return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
       }
       const absPath = joinRoot(rootPath, relPath) // relPath 想越界会在这里被拦
-      const stat = await fs.stat(absPath).catch(() => null)
-      if (!stat || !stat.isFile()) {
-        throw new Error(`文件不存在:${relPath}`)
+      // stat 失败别吞成"不存在":系统核心文件(swapfile.sys 等)会给 EINVAL/EBUSY,得说真话
+      const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+      if (stat instanceof Error) {
+        throw new Error(accessDeniedMessage(stat, '文件', relPath), { cause: stat })
+      }
+      if (!stat.isFile()) {
+        throw new Error(`这个路径不是一个文件:${relPath}`)
       }
       const name = relPath.split('/').pop() ?? relPath
       const onDelta = makeDeltaSender(event, requestId)
 
       // 结构流:证据最硬 —— 函数/类/导入导出都摆给模型
       if (isAnalysisSupported(languageId) && stat.size <= 1_000_000) {
-        const code = await fs.readFile(absPath, 'utf8')
+        // 读内容也可能撞上独占/上锁(EBUSY/EPERM),同样走人话口径,不吐生面孔
+        const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
+          throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+        })
         const structure = await analyzeSource(code, languageId)
         if (structure) {
           const prompt = buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null })
@@ -349,7 +362,12 @@ function registerIpc(): void {
       if (isBinaryFile(name)) {
         return { status: 'unsupported', text: `「${name}」是图片/音视频/二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
       }
-      const preview = stat.size === 0 ? '' : await readTextPreview(absPath)
+      const preview =
+        stat.size === 0
+          ? ''
+          : await readTextPreview(absPath).catch((err: NodeJS.ErrnoException) => {
+              throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+            })
       if (preview === null) {
         return { status: 'unsupported', text: `「${name}」看起来是二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
       }
