@@ -8,7 +8,9 @@ import {
   buildExplainPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
+  buildBinaryPrompt,
   explainWithModel,
+  sniffBinaryKind,
   GUESS_SYSTEM_PROMPT,
   isBinaryFile
 } from '../src/ai/index.ts'
@@ -106,12 +108,72 @@ async function main(): Promise<void> {
   const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', languageName: '', preview: '' })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
 
-  // ── 4. 二进制判断:媒体/二进制不算代码,svg 与无后缀不算二进制 ──
+  // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
   assert.ok(isBinaryFile('app.exe'), '可执行文件是二进制')
   assert.ok(!isBinaryFile('logo.svg'), 'svg 是文本')
   assert.ok(!isBinaryFile('.gitignore'), '隐藏文件不算二进制')
   assert.ok(!isBinaryFile('Makefile'), '无后缀不算二进制')
+
+  // ── 4.5 魔数识别:文件头认类型(真证据),认不出要老实说 ──
+  const png = Buffer.alloc(24)
+  png.set([0x89, 0x50, 0x4e, 0x47], 0)
+  png.writeUInt32BE(1920, 16)
+  png.writeUInt32BE(1080, 20)
+  const pngKind = sniffBinaryKind(png, 'hero.png')
+  assert.ok(pngKind, 'PNG 头应认出')
+  assert.equal(pngKind?.type, 'PNG 图片', 'PNG 类型名')
+  assert.equal(pngKind?.dims, '1920×1080', 'PNG 尺寸(宽×高)')
+
+  const gif = Buffer.alloc(16)
+  gif.write('GIF89a', 0, 'latin1')
+  gif.writeUInt16LE(64, 6)
+  gif.writeUInt16LE(64, 8)
+  const gifKind = sniffBinaryKind(gif, 'logo.gif')
+  assert.equal(gifKind?.type, 'GIF 图片', 'GIF 头应认出')
+  assert.equal(gifKind?.dims, '64×64', 'GIF 尺寸(小端读宽高)')
+
+  const zip = Buffer.alloc(4)
+  zip.set([0x50, 0x4b, 0x03, 0x04], 0)
+  assert.equal(sniffBinaryKind(zip, 'report.docx')?.type, 'Word 文档(Office 打包格式)', 'ZIP 容器按后缀细分出 docx')
+  assert.equal(sniffBinaryKind(zip, 'bundle.jar')?.type, 'Java 归档包(JAR)', 'ZIP 容器按后缀细分出 jar')
+  assert.equal(sniffBinaryKind(zip, 'pack.zip')?.type, 'ZIP 压缩包', '细分不出的就叫压缩包')
+
+  const mp4 = Buffer.alloc(12)
+  mp4.set([0x66, 0x74, 0x79, 0x70], 4)
+  mp4.set(Buffer.from('isom', 'latin1'), 8)
+  assert.ok(sniffBinaryKind(mp4, 'clip.mp4')?.type.includes('MP4'), 'ftyp 盒应认出 MP4')
+
+  const sqlite = Buffer.from('SQLite format 3\0', 'latin1')
+  assert.equal(sniffBinaryKind(sqlite, 'app.db')?.type, 'SQLite 数据库', 'SQLite 头应认出')
+
+  const mz = Buffer.alloc(2)
+  mz.set([0x4d, 0x5a], 0)
+  assert.equal(sniffBinaryKind(mz, 'tool.exe')?.type, 'Windows 可执行文件或库(EXE/DLL)', 'MZ 头应认出')
+
+  assert.equal(sniffBinaryKind(Buffer.from([1, 2, 3, 4]), 'x.dat'), null, '认不出就返回 null,不许瞎认')
+  assert.equal(sniffBinaryKind(Buffer.alloc(2), 'short.bin'), null, '头太短认不了')
+
+  // 二进制提示词:类型/尺寸/大小进证据,开头要声明"没看到内容"
+  const bp = buildBinaryPrompt({ relPath: 'assets/hero.png', name: 'hero.png', typeInfo: 'PNG 图片,尺寸 1920×1080', sizeText: '2.3 MB' })
+  assert.ok(bp.includes('PNG 图片,尺寸 1920×1080'), '类型和尺寸要进证据')
+  assert.ok(bp.includes('2.3 MB'), '大小要进证据')
+  assert.ok(bp.includes('assets/hero.png'), '路径要进证据')
+  assert.ok(bp.includes('推测'), '要声明是推测')
+  assert.ok(bp.includes('没有看到文件内容'), '要明说没看到内容')
+  assert.ok(bp.includes('绝不许编造'), '要禁止编造')
+
+  // JPEG 尺寸解析:SOF0 段之前垫一个带长度的 APP0(模拟 JFIF 头)
+  const jpg = Buffer.alloc(64)
+  jpg.set([0xff, 0xd8, 0xff], 0)
+  jpg[3] = 0xe0 // APP0
+  jpg.writeUInt16BE(16, 4) // 段长 16
+  jpg[20] = 0xff
+  jpg[21] = 0xc0 // SOF0
+  jpg.writeUInt16BE(17, 22) // 段长
+  jpg.writeUInt16BE(1080, 25) // 高(SOF0 段:FF C0 @20-21、段长 @22-23、精度 @24、高 @25-26、宽 @27-28)
+  jpg.writeUInt16BE(1920, 27) // 宽
+  assert.equal(sniffBinaryKind(jpg, 'photo.jpg')?.dims, '1920×1080', 'JPEG 顺着标记链走到 SOF0 读出尺寸(宽×高,与 PNG/GIF 同一约定)')
 
   // ── 5. 配置读写往返(新双 Provider 格式)+ 老格式自动搬家 ──
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
@@ -278,7 +340,7 @@ async function main(): Promise<void> {
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 文件夹/猜猜官提示词就位 · 二进制边界清楚 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
+  console.log('   提示词固定不编造 · 文件夹/猜猜官提示词就位 · 二进制照样讲(魔数认类型当证据) · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
 }
 
 main().catch((err) => {

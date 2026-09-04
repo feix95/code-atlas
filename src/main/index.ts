@@ -12,7 +12,8 @@ import {
   buildDiffPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
-  isBinaryFile,
+  buildBinaryPrompt,
+  sniffBinaryKind,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT
@@ -78,6 +79,26 @@ async function readTextPreview(absPath: string): Promise<string | null> {
   } finally {
     await handle.close()
   }
+}
+
+/** 读文件头 64 字节给魔数识别用;只在 readTextPreview 已经成功打开过文件后调用,不另外兜错误 */
+async function readHeader(absPath: string, bytes = 64): Promise<Buffer> {
+  const handle = await fs.open(absPath, 'r')
+  try {
+    const buf = Buffer.alloc(bytes)
+    const { bytesRead } = await handle.read(buf, 0, bytes, 0)
+    return buf.subarray(0, bytesRead)
+  } finally {
+    await handle.close()
+  }
+}
+
+/** 字节数 → 人话大小(提示词里给模型的证据) */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} 字节`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
 /**
@@ -359,9 +380,6 @@ function registerIpc(): void {
       }
 
       // 兜底流:猜猜官 —— 名字 + 内容片段,推测并声明不确定
-      if (isBinaryFile(name)) {
-        return { status: 'unsupported', text: `「${name}」是图片/音视频/二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
-      }
       const preview =
         stat.size === 0
           ? ''
@@ -369,7 +387,16 @@ function registerIpc(): void {
               throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
             })
       if (preview === null) {
-        return { status: 'unsupported', text: `「${name}」看起来是二进制文件,不是代码,就不用劳烦模型了`, model: '', durationMs: 0 }
+        // 二进制读不出文字:读文件头认类型当真证据,照样让模型讲,只是明说"按类型推测"
+        const header = stat.size === 0 ? Buffer.alloc(0) : await readHeader(absPath)
+        const kind = sniffBinaryKind(header, name)
+        const typeInfo = kind
+          ? kind.dims
+            ? `${kind.type},尺寸 ${kind.dims}`
+            : kind.type
+          : '认不出具体格式(文件头不像任何已知类型)'
+        const prompt = buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) })
+        return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
       const prompt = buildGuessPrompt({ relPath, name, languageName, preview })
