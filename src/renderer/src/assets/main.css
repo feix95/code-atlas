@@ -94,7 +94,7 @@ body {
 
 .btn:disabled {
   opacity: 0.5;
-  cursor: wait;
+  cursor: not-allowed; /* 沙漏像卡死;禁止光标才是"这按钮暂时点不了" */
 }
 
 .topbar .brand,
