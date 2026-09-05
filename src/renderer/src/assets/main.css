@@ -52,7 +52,6 @@
   --git-rename: #9a6700;
   --hover: #e9edf0;
   --selected-bg: #dcecf8;
-  --shadow-win: 0 24px 70px rgba(12, 44, 67, 0.28), 0 3px 12px rgba(17, 38, 49, 0.2);
   --shadow-pop: 0 8px 24px rgba(12, 44, 67, 0.16);
 }
 
@@ -84,7 +83,6 @@
     --git-rename: #d29922;
     --hover: #293238;
     --selected-bg: #213e52;
-    --shadow-win: 0 24px 70px rgba(0, 0, 0, 0.55), 0 3px 12px rgba(0, 0, 0, 0.4);
     --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
   }
 }
@@ -95,20 +93,16 @@
   box-sizing: border-box;
 }
 
-/* 蓝色渐变桌面:应用窗口悬浮在它上面 */
+/* 应用窗口就是真实边界,不需要在窗里再画一层「假桌面」:边贴边铺满 */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.32), transparent 23%),
-    radial-gradient(circle at 88% 83%, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(135deg, #1597d2, #1aa1da 42%, #62d3d3);
+  background: var(--window);
 }
 
 #root {
   height: 100vh;
-  padding: 16px;
 }
 
 .mono {
@@ -121,9 +115,6 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--window);
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 14px;
-  box-shadow: var(--shadow-win);
 }
 
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
@@ -1915,10 +1906,6 @@ body.is-sash-dragging {
 /* ── 窄窗口:路径框让位,树保底宽度,详情内部滚动 ── */
 
 @media (max-width: 760px) {
-  #root {
-    padding: 8px;
-  }
-
   .topbar {
     flex-wrap: wrap;
   }
