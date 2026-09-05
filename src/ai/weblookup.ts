@@ -11,8 +11,24 @@ export const WEB_LOOKUP_TIMEOUT_MS = 5_000
 /** 取网页正文用的传输层:主进程默认给 Chromium 的 net.fetch(自动跟随系统代理) */
 export type LookupTransport = (url: string) => Promise<string>
 
+/** 查一次联网的完整战果:资料正文 + 命中了哪个来源(给界面的状态标签记账用) */
+export interface WebLookupOutcome {
+  material: string
+  sources: string[]
+}
+
+/**
+ * 查询链,按序兜底:中文维基 → 英文维基 → DuckDuckGo 免注册 HTML。
+ * 每个源带名字,查到哪个就记哪个,界面上"已联网查询:×××"说的就是它。
+ */
+const LOOKUP_SOURCES: Array<{ name: string; run: (query: string, fetchText: LookupTransport) => Promise<string> }> = [
+  { name: '维基百科(中文)', run: (q, f) => lookupWikipediaLang('zh', q, f) },
+  { name: '维基百科(英文)', run: (q, f) => lookupWikipediaLang('en', q, f) },
+  { name: 'DuckDuckGo', run: lookupDuckDuckGoHtml }
+]
+
 /** 查询结果在内存里按名字缓存:同一个名字这场会话只查一次,不反复耗流量 */
-const lookupCache = new Map<string, string>()
+const lookupCache = new Map<string, WebLookupOutcome>()
 
 /** 剥掉摘要里的 HTML 标记和常见实体(维基摘要自带 <span> 这类,DDG 摘要自带 <b>) */
 export function stripHtmlTags(text: string): string {
@@ -50,13 +66,6 @@ async function lookupWikipediaLang(lang: string, query: string, fetchText: Looku
   return lines.length > 0 ? `来自维基百科(${lang})的条目摘要:\n${lines.map((l) => `- ${l}`).join('\n')}` : ''
 }
 
-/** 维基百科:先查中文,查不到再查英文 —— 软件品牌的英文条目往往更全 */
-async function lookupWikipedia(query: string, fetchText: LookupTransport): Promise<string> {
-  const zh = await lookupWikipediaLang('zh', query, fetchText)
-  if (zh) return zh
-  return lookupWikipediaLang('en', query, fetchText)
-}
-
 /**
  * DuckDuckGo 免注册 HTML 搜索入口:抓自然结果的标题 + 摘要(广告位的链接带
  * ad_domain 标记,认出来直接跳过,不给模型喂广告)。
@@ -79,24 +88,33 @@ async function lookupDuckDuckGoHtml(query: string, fetchText: LookupTransport): 
 }
 
 /**
- * 按名字查公开资料:维基(中→英)→ DuckDuckGo HTML,都失败返回空串(绝不抛错)。
+ * 按名字查公开资料,并把战果记账:资料正文 + 命中的来源名。
+ * 维基(中→英)→ DuckDuckGo HTML,全都失败/为空时 material 为空串、来源为空(绝不抛错)。
  * 成功结果按名字缓存;失败不缓存,下次还会再试。
  * fetchText 可注入:主进程传跟随系统代理的 net.fetch 版本,测试可传别的。
  */
-export async function webLookup(query: string, fetchText: LookupTransport = nodeFetchText): Promise<string> {
+export async function webLookupDetailed(query: string, fetchText: LookupTransport = nodeFetchText): Promise<WebLookupOutcome> {
   const key = query.trim()
-  if (!key) return ''
+  if (!key) return { material: '', sources: [] }
   const cached = lookupCache.get(key)
-  if (cached !== undefined) return cached
-  let material = ''
-  for (const source of [lookupWikipedia, lookupDuckDuckGoHtml]) {
+  if (cached) return cached
+  let outcome: WebLookupOutcome = { material: '', sources: [] }
+  for (const source of LOOKUP_SOURCES) {
     try {
-      material = await source(key, fetchText)
+      const material = await source.run(key, fetchText)
+      if (material) {
+        outcome = { material, sources: [source.name] }
+        break
+      }
     } catch {
-      material = '' // 断网/超时/限流/页面改版:这个源认输,换下一个
+      // 断网/超时/限流/页面改版:这个源认输,换下一个
     }
-    if (material) break
   }
-  if (material) lookupCache.set(key, material)
-  return material
+  if (outcome.material) lookupCache.set(key, outcome)
+  return outcome
+}
+
+/** 只要资料正文的老入口(讲解信号修正流用):要来源记账时用 webLookupDetailed */
+export async function webLookup(query: string, fetchText: LookupTransport = nodeFetchText): Promise<string> {
+  return (await webLookupDetailed(query, fetchText)).material
 }

@@ -216,14 +216,73 @@ export interface AiDeltaPayload {
 
 /** AI 人话解释的结果 */
 export interface AiExplainResult {
-  /** 能力边界:该语言是否被支持、服务是否通、模型是否返回了内容 */
-  status: 'supported' | 'unsupported' | 'error'
+  /** 能力边界:该语言是否被支持、服务是否通、模型是否返回了内容;cancelled = 用户主动掐掉 */
+  status: 'supported' | 'unsupported' | 'error' | 'cancelled'
   /** 解释文本;出错时是给用户看的人话说明 */
   text: string
   /** 本次用了哪个模型(方便界面回显) */
   model: string
   /** 耗时(ms) */
   durationMs: number
+}
+
+/**
+ * 自由对话挂到消息旁的「当前参考资料」:机器扫描出来的资料,仅供参考。
+ * 它是本轮请求的附件,绝不混进对话历史 —— 切换文件时旧资料不会污染新对话。
+ */
+export interface ChatContextAttachment {
+  /** 资料属于哪类对象;none = 没选中任何东西 */
+  targetType: 'file' | 'folder' | 'project' | 'none'
+  name: string
+  relPath: string
+  /** 一句话摘要(附件卡收起时展示这句) */
+  summary: string
+  /** 资料正文(清单/结构),随消息发给模型;有长度上限,别把上下文撑爆 */
+  details: string
+}
+
+/** 本轮联网查询的程序真实状态:程序做了什么就是什么,模型自己说了不算 */
+export type WebLookupState =
+  | 'not_requested' // 用户没点名要联网
+  | 'disabled' // 点名了,但「联网查证」开关没开,本轮没有查询
+  | 'searching' // 正在联网查询
+  | 'completed' // 查到了可用资料
+  | 'failed' // 查询失败/超时
+  | 'empty' // 查完了,但没有找到可用资料
+
+/** 联网查询的状态账本(主进程如实记账 → 界面照实展示) */
+export interface WebLookupMeta {
+  /** 用户这轮有没有点名要联网/搜索 */
+  requested: boolean
+  /** 联网查证开关当时开没开 */
+  enabled: boolean
+  /** 程序有没有真的发起查询 */
+  attempted: boolean
+  state: WebLookupState
+  /** 查到资料时,命中的来源(如「维基百科(中文)」「DuckDuckGo」) */
+  sources: string[]
+}
+
+/** 自由对话一次请求的载荷(渲染进程 → 主进程) */
+export interface AiChatRequest {
+  requestId: string
+  question: string
+  /** 之前的问答(只含用户和探针的消息,资料附件不进来) */
+  history: AiHistoryMessage[]
+  /** 当前选中对象的资料;没选中就是 null */
+  context: ChatContextAttachment | null
+}
+
+/** 自由对话一次请求的结果:AI 文本 + 程序真实执行过的联网账本 */
+export interface AiChatResult extends AiExplainResult {
+  webLookup: WebLookupMeta
+}
+
+/** 联网查询进行中/结束时的实时播报(主进程 → 渲染进程),按 requestId 对号入座 */
+export interface AiChatLookupPayload {
+  id: string
+  state: Extract<WebLookupState, 'searching' | 'completed' | 'failed' | 'empty'>
+  sources: string[]
 }
 
 /**

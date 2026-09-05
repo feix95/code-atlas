@@ -16,7 +16,7 @@ const KIND_LABEL: Record<GitChangesResult['changes'][number]['kind'], string> = 
 /**
  * 「修改建议」Tab:这个文件在 git 里有没有未提交的改动,一眼看到;
  * 有改动可以让 AI 对着 diff 讲「这次改了啥」,没改动可以问 AI「改它会影响什么」
- * (问题发到 AI 对话 Tab 的同一线程里,不重复消耗)。
+ * (问题走「解释」通道,答案在概览页的 AI 助手卡里流式出来)。
  */
 export function GitFileStatus({
   gitInfo,
@@ -25,16 +25,16 @@ export function GitFileStatus({
   relPath,
   onOpenGit,
   ai,
-  onGoChat
+  onGoOverview
 }: {
   gitInfo: GitChangesResult | null
   gitLoading: boolean
   rootPath: string
   relPath: string
   onOpenGit: () => void
-  /** 文件 AI 助手(问题进同一线程) */
+  /** 文件 AI 助手(问题进解释通道) */
   ai: AiAssistApi
-  onGoChat: () => void
+  onGoOverview: () => void
 }): React.JSX.Element {
   if (gitLoading && !gitInfo) {
     return (
@@ -91,9 +91,9 @@ export function GitFileStatus({
             className="btn btn-primary"
             disabled={ai.busy}
             onClick={() => {
-              // 问题发进 AI 对话的同一线程,答案在那边流式出来
+              // 问题发进解释通道,概览页的助手卡里看答案
               ai.ask('修改它会影响什么？')
-              onGoChat()
+              onGoOverview()
             }}
           >
             {ai.busy ? 'AI 正在回答……' : '问 AI:改它会影响什么？'}

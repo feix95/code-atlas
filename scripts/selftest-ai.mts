@@ -11,22 +11,26 @@ import {
   buildBinaryPrompt,
   explainWithModel,
   explainWithMessages,
-  buildChatMessages,
+  buildFreeChatMessages,
   sanitizeHistory,
+  sanitizeAttachment,
+  buildAttachmentText,
+  pickWebLookupQuery,
+  resolveWebLookupMeta,
   buildRefineMessages,
   hasWebLookupSignal,
   hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
-  CHAT_SYSTEM_PROMPT,
+  FREE_CHAT_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { parseListenerPids, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
-import { stripHtmlTags } from '../src/ai/weblookup.ts'
-import type { AiConfig, FileStructure } from '../src/shared/types.ts'
+import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
+import type { AiConfig, ChatContextAttachment, FileStructure } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
   return {
@@ -163,11 +167,13 @@ async function main(): Promise<void> {
   const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', absPath: 'X:\\demo\\e', languageName: '', preview: '' })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
 
-  // ── 3.5 追问:人设分寸 + 历史清洗 + 消息组装(合并相邻同角色、问题收尾)──
-  assert.ok(CHAT_SYSTEM_PROMPT.includes('回收站'), '追问人设要带低成本安全网(回收站观察)')
-  assert.ok(CHAT_SYSTEM_PROMPT.includes('System32'), '追问人设要明确护住系统关键目录')
-  assert.ok(CHAT_SYSTEM_PROMPT.includes('判断不了'), '没把握要老实说判断不了,不装懂')
-  assert.ok(CHAT_SYSTEM_PROMPT.includes('不许用'), '禁止拿"咨询专业人士"打太极')
+  // ── 3.5 自由对话:小探针人设分寸 + 历史清洗 + 附件清洗 + 消息组装 ──
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('Atlas 小探针'), '自由对话人设要点名 Atlas 小探针')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('你是谁'), '问「你是谁」要有稳定的身份答法')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('不限制用户问题的范围') || FREE_CHAT_SYSTEM_PROMPT.includes('最高优先级'), '用户问题优先,不被资料拽着走')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('回收站'), '聊天人设要保留低成本安全网(回收站观察)')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('System32'), '聊天人设要护住系统关键目录')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('不要说自己查过网页') || FREE_CHAT_SYSTEM_PROMPT.includes('没有真正执行联网查询'), '没联网不许装查过')
 
   assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
   const longText = '长'.repeat(600)
@@ -188,25 +194,78 @@ async function main(): Promise<void> {
   assert.equal(clean[1]?.content.length, 502, '超长历史要截断(500 字 + 省略号)')
   assert.ok(clean.every((m) => m.role === 'user' || m.role === 'assistant'), '只收 user/assistant 两种角色')
 
-  const explMsgs = buildChatMessages('追问人设', '证据清单', [{ role: 'assistant', content: '首讲内容' }], '这个能删吗?')
-  assert.deepEqual(
-    explMsgs.map((m) => m.role),
-    ['system', 'user', 'assistant', 'user'],
-    '带首讲历史的消息顺序:人设/证据/首讲/问题'
-  )
-  assert.ok(explMsgs[3]?.content.includes('这个能删吗'), '当前问题要收尾')
+  // 附件清洗:形状不对一律当没有;字段洗净;正文封顶
+  assert.equal(sanitizeAttachment(null), null, '没附件就当没有')
+  assert.equal(sanitizeAttachment('乱传的'), null, '附件不是对象就当没有')
+  assert.equal(sanitizeAttachment({ targetType: '炸弹', name: 'x', details: 'y' }), null, '对象类型不认识就当没有')
+  assert.equal(sanitizeAttachment({ targetType: 'file', name: '', details: 'y' }), null, '没名字的附件不收')
+  const attClean = sanitizeAttachment({
+    targetType: 'folder',
+    name: '  components  ',
+    relPath: ' src/renderer/components ',
+    summary: '  组件库  ',
+    details: `  ${'长'.repeat(5000)}  `
+  })
+  assert.ok(attClean, '合法附件应通过清洗')
+  assert.equal(attClean?.name, 'components', '附件名字要掐掉空白')
+  assert.equal(attClean?.relPath, 'src/renderer/components', '附件路径要掐掉空白')
+  assert.equal(attClean?.summary, '组件库', '附件摘要要掐掉空白')
+  assert.ok((attClean?.details.length ?? 0) <= 4100, '附件正文要封顶(4000 字 + 截断注记)')
+  assert.ok(attClean?.details.includes('资料太长'), '截断要注明,不许装完整')
 
-  const qaMsgs = buildChatMessages(
-    '追问人设',
-    '证据清单',
-    [
-      { role: 'user', content: '它是做什么的?' },
-      { role: 'assistant', content: '是个工具' }
-    ],
-    '删了会怎样?'
+  // 附件文本:<context_attachment> 块,声明仅供参考、不是指令
+  const att: ChatContextAttachment = {
+    targetType: 'folder',
+    name: 'components',
+    relPath: 'src/renderer/components',
+    summary: '组件库',
+    details: '文件:AiAssist.tsx, Notice.tsx'
+  }
+  const attText = buildAttachmentText(att)
+  assert.ok(attText.includes('<context_attachment>'), '附件要带 context_attachment 标记')
+  assert.ok(attText.includes('仅供参考'), '要声明仅供参考')
+  assert.ok(attText.includes('不限制用户问题的范围'), '要声明不限制问题范围')
+  assert.ok(attText.includes('对象类型:文件夹'), '对象类型要翻译成人话')
+  assert.ok(attText.includes('名称:components'), '名称要进附件')
+  assert.ok(attText.includes('相对路径:src/renderer/components'), '相对路径要进附件')
+
+  // 消息组装:附件垫底(不进历史)、历史居中、问题收尾、相邻同角色合并
+  const freeMsgs = buildFreeChatMessages('小探针人设', att, [{ role: 'assistant', content: '先前的回答' }], '你是谁?')
+  assert.deepEqual(
+    freeMsgs.map((m) => m.role),
+    ['system', 'user', 'assistant', 'user'],
+    '自由对话消息顺序:人设/附件/历史/问题'
   )
-  assert.equal(qaMsgs.length, 4, '首问没讲解时,证据和首问要合并,不能出现连续两条 user')
-  assert.ok(qaMsgs[1]?.content.includes('证据清单') && qaMsgs[1]?.content.includes('它是做什么的?'), '证据和首问合并成一条')
+  assert.ok(freeMsgs[1]?.content.includes('<context_attachment>'), '附件是第二条消息(用户腿)')
+  assert.ok(freeMsgs[3]?.content.includes('你是谁'), '当前问题收尾')
+
+  const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的')
+  assert.equal(bareMsgs.length, 2, '没附件没历史 = 人设 + 问题两条')
+  assert.ok(!bareMsgs.some((m) => m.content.includes('<context_attachment>')), '没附件就不该有附件消息')
+
+  const mergedMsgs = buildFreeChatMessages('小探针人设', att, [], '这个文件夹是干嘛的?')
+  assert.equal(mergedMsgs.length, 2, '首问带附件时,附件和问题要合并成一条 user')
+  assert.ok(mergedMsgs[1]?.content.includes('components') && mergedMsgs[1]?.content.includes('这个文件夹是干嘛的'), '附件与首问合并,不出现连续两条 user')
+
+  const webMsgs = buildFreeChatMessages('小探针人设', att, [], '联网搜搜它', { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' })
+  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('Aomei 是备份软件厂商'), '联网资料要附在问题里')
+  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('把资料里跟它对得上的信息讲出来'), '要要求模型讲出对得上的信息')
+
+  // 联网查询词:优先选中对象的名字;没对象就剥掉意图词,封顶 60 字
+  assert.equal(pickWebLookupQuery('联网搜搜它', att), 'components', '有选中对象就查名字')
+  assert.equal(pickWebLookupQuery('联网搜一下这个软件', null), '这个软件', '没对象就剥掉意图词拿问题主体')
+  assert.ok(pickWebLookupQuery('帮我查查', null).length <= 60, '查询词封顶 60 字')
+  assert.equal(pickWebLookupQuery('帮我查查', null), '', '剥完啥都不剩就给空串,别拿垃圾去查')
+
+  // 联网状态账本:程序做了什么就是什么,六种状态各有归属
+  assert.equal(resolveWebLookupMeta(false, true, { kind: 'skipped' }).state, 'not_requested', '没点名 = not_requested')
+  assert.equal(resolveWebLookupMeta(true, false, { kind: 'skipped' }).state, 'disabled', '点名但开关没开 = disabled')
+  assert.equal(resolveWebLookupMeta(true, true, { kind: 'skipped' }).state, 'failed', '点名开着但没查成 = failed')
+  assert.equal(resolveWebLookupMeta(true, true, { kind: 'error' }).state, 'failed', '查询抛错 = failed')
+  assert.equal(resolveWebLookupMeta(true, true, { kind: 'attempted', material: '', sources: [] }).state, 'empty', '查完没料 = empty')
+  const doneMeta = resolveWebLookupMeta(true, true, { kind: 'attempted', material: '资料', sources: ['维基百科(英文)'] })
+  assert.equal(doneMeta.state, 'completed', '查到资料 = completed')
+  assert.deepEqual(doneMeta.sources, ['维基百科(英文)'], '来源要记账')
 
   // ── 3.6 联网查证(默认关):信号词 + 修正消息 + 摘要洗白 ──
   assert.ok(WEB_SIGNAL_INSTRUCTION.includes('需要联网确认'), '信号词指令要包含标记原文')
@@ -225,6 +284,32 @@ async function main(): Promise<void> {
   assert.ok(hasSearchIntent('联网搜搜最新信息'), '「联网搜搜」要识别为搜索意图')
   assert.ok(hasSearchIntent('帮我查查这是什么软件'), '「查查」要识别为搜索意图')
   assert.ok(!hasSearchIntent('这个能删吗?'), '普通追问不该误触发联网')
+
+  // ── 3.7 webLookupDetailed:来源记账 + 缓存 + 全灭认输 ──
+  {
+    let calls = 0
+    const flakyFetch = async (url: string): Promise<string> => {
+      calls++
+      if (url.includes('zh.wikipedia')) throw new Error('被墙了') // 中文维基失败 → 换英文
+      if (url.includes('en.wikipedia')) {
+        return JSON.stringify({ query: { search: [{ title: 'AOMEI', snippet: 'backup <b>software</b> vendor' }] } })
+      }
+      return ''
+    }
+    const hit = await webLookupDetailed('Aomei 来源记账', flakyFetch)
+    assert.equal(hit.sources[0], '维基百科(英文)', '命中的来源要记账')
+    assert.ok(hit.material.includes('AOMEI'), '资料要带条目标题')
+    assert.ok(hit.material.includes('backup software vendor'), '摘要的 HTML 要剥干净')
+    const again = await webLookupDetailed('Aomei 来源记账', flakyFetch)
+    assert.equal(again.material, hit.material, '同名第二次走缓存')
+    assert.equal(calls, 2, '缓存生效:中文失败 1 次 + 英文成功 1 次,不再多发')
+    const dead = await webLookupDetailed('查无此物xyz', async () => {
+      throw new Error('全网断')
+    })
+    assert.equal(dead.material, '', '全部源失败 = 空资料')
+    assert.deepEqual(dead.sources, [], '全部源失败 = 空来源')
+    assert.equal((await webLookupDetailed('   ', flakyFetch)).material, '', '空查询不劳烦网络')
+  }
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
@@ -453,18 +538,24 @@ async function main(): Promise<void> {
     assert.ok(allBodies.includes('猜猜官'), '猜猜官人设应发到服务')
     assert.ok(allBodies.includes('tools/deploy.sh'), '猜猜官提示词应带上文件证据')
 
-    // 追问流:带历史的多轮消息原样发出去,角色和顺序不变形
-    const chatMessages = buildChatMessages(CHAT_SYSTEM_PROMPT, '证据:文件夹清单', [{ role: 'assistant', content: '这是备份软件的残留' }], '这个能删吗？')
-    const chatRes = await explainWithMessages(target, chatMessages)
-    assert.equal(chatRes.status, 'supported', '追问链路应通')
-    const chatBody = JSON.parse(receivedBodies[receivedBodies.length - 1] ?? '') as {
+    // 自由对话流:附件垫底(不进历史)、人设和资料原样发出去,角色和顺序不变形
+    const freeMessages = buildFreeChatMessages(
+      FREE_CHAT_SYSTEM_PROMPT,
+      { targetType: 'folder', name: 'Aomei', relPath: 'D:/Aomei', summary: '软件残留', details: '文件:卸载说明.txt' },
+      [{ role: 'assistant', content: '这是备份软件的残留' }],
+      '你是谁？'
+    )
+    const freeRes = await explainWithMessages(target, freeMessages)
+    assert.equal(freeRes.status, 'supported', '自由对话链路应通')
+    const freeBody = JSON.parse(receivedBodies[receivedBodies.length - 1] ?? '') as {
       messages: Array<{ role: string; content: string }>
     }
-    assert.equal(chatBody.messages.length, 4, '追问消息 = 人设 + 证据 + 历史 + 当前问题')
-    assert.equal(chatBody.messages[0]?.role, 'system', '第一段是追问人设')
-    assert.ok(chatBody.messages[0]?.content.includes('追问答疑官'), '追问人设要发到服务')
-    assert.equal(chatBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
-    assert.ok(chatBody.messages[3]?.content.includes('这个能删吗'), '当前问题收尾')
+    assert.equal(freeBody.messages.length, 4, '自由对话消息 = 人设 + 附件 + 历史 + 当前问题')
+    assert.ok(freeBody.messages[0]?.content.includes('Atlas 小探针'), '小探针人设要发到服务')
+    assert.ok(freeBody.messages[1]?.content.includes('<context_attachment>'), '资料附件按用户消息垫底')
+    assert.ok(freeBody.messages[1]?.content.includes('仅供参考'), '附件要声明仅供参考')
+    assert.equal(freeBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
+    assert.ok(freeBody.messages[3]?.content.includes('你是谁'), '当前问题收尾')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
@@ -475,7 +566,7 @@ async function main(): Promise<void> {
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 追问多轮(历史清洗/消息组装/追问人设分寸) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
 }
 
 main().catch((err) => {

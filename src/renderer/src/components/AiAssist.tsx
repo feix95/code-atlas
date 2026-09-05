@@ -1,9 +1,9 @@
-import { useRef, useState, type FormEvent } from 'react'
 import type { AiAssistApi, AiTurn } from '../useAiAsk'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
-// 本文件只放 AI 助手的展示组件;状态机钩子在 ../useAiAsk.ts(纯函数文件,HMR 才不打架)
+// 本文件只放 AI 解释的展示组件;状态机钩子在 ../useAiAsk.ts(纯函数文件,HMR 才不打架)
+// 自由聊天不在这里 —— 它有自己的 FreeChatPanel 和 useAiChat,两条通道互不掺和
 
 /** 当前最新一轮的状态;一轮都没有 = 未请求 */
 function latestTurn(turns: AiTurn[]): AiTurn | null {
@@ -82,7 +82,7 @@ function PresetRow({ presets, disabled, onPick }: PresetRowProps): React.JSX.Ele
 
 /**
  * 概览页的 AI 紧凑卡:主按钮随状态换脸(解释/取消/重试/再来一次),
- * 结果正文直接展示;想追问去「AI 对话」Tab(共用同一份 turns)。
+ * 结果正文直接展示。想开放式聊天去「自由对话」Tab —— 那边是独立通道,两边互不打架。
  */
 export function AiAssistCard({
   ai,
@@ -151,102 +151,5 @@ export function AiAssistCard({
         )}
       </div>
     </section>
-  )
-}
-
-/**
- * AI 对话 Tab:所有问答摆成一条线(问的靠右蓝泡,答的靠左白泡)。
- * 推荐追问按钮点一下只是填进输入框,方便改两个字再发;回车照常发送。
- * 文件和文件夹都有输入框 —— "这个能删吗"这种追问就是给文件夹准备的。
- */
-export function AiChatPanel({
-  ai,
-  presets,
-  contextLabel,
-  mainLabel,
-  folderMode = false
-}: {
-  ai: AiAssistApi
-  presets: string[]
-  contextLabel: string
-  mainLabel: string
-  folderMode?: boolean
-}): React.JSX.Element {
-  const [draft, setDraft] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  function fill(q: string): void {
-    setDraft(q)
-    inputRef.current?.focus()
-  }
-
-  function submit(e: FormEvent): void {
-    e.preventDefault()
-    const q = draft.trim()
-    if (!q || ai.busy) return
-    ai.ask(q)
-    setDraft('')
-  }
-
-  return (
-    <div className="chat-shell">
-      {ai.turns.length === 0 && (
-        <div className="chat-intro">
-          <p>
-            围绕 <strong>{contextLabel}</strong> 追问:挑一个推荐问题填进去(可以改两个字再发),或自己输入。
-            AI 会带着前面讲解的内容一起回答,不会每次都从头来。
-          </p>
-          {folderMode && (
-            <div className="ai-card-actions">
-              <button type="button" className="btn btn-primary" onClick={() => ai.ask(null)}>
-                {mainLabel}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-      {ai.turns.length > 0 && (
-        <div className="chat-messages">
-          {ai.turns.map((turn) => (
-            <div key={turn.key} className="chat-turn">
-              <div className={`message${turn.question ? ' user' : ''}`}>{turn.question ?? `(${mainLabel})`}</div>
-              <div className="message answer">
-                {turn.state === 'busy' || turn.state === 'error' || turn.state === 'unsupported' ? (
-                  <TurnText turn={turn} />
-                ) : turn.state === 'cancelled' ? (
-                  <>
-                    分析已取消。
-                    {turn.text && <div className="explain-text">{turn.text}</div>}
-                  </>
-                ) : (
-                  turn.text || '(没有内容)'
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="chat-bottom">
-        <PresetRow presets={presets} disabled={false} onPick={fill} />
-        <form className="chat-input" onSubmit={submit}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={draft}
-            placeholder={ai.busy ? 'AI 正在回答上一个问题……' : `追问 ${contextLabel}……`}
-            aria-label="输入追问"
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button type="submit" className="btn btn-primary" disabled={ai.busy}>
-            {ai.busy ? '回答中……' : '发送'}
-          </button>
-          {ai.busy && (
-            <button type="button" className="btn btn-ghost" onClick={ai.cancel}>
-              取消分析
-            </button>
-          )}
-        </form>
-      </div>
-    </div>
   )
 }

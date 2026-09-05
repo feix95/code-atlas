@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
-import { AiChatPanel } from './components/AiAssist'
 import { AiSettings } from './components/AiSettings'
 import { AppearanceSettings } from './components/AppearanceSettings'
+import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { Drawer } from './components/Drawer'
 import { FileOverview } from './components/FileOverview'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { FolderOverview } from './components/FolderOverview'
+import { FreeChatPanel } from './components/FreeChatPanel'
 import { GitChanges } from './components/GitChanges'
 import { GitFileStatus } from './components/GitFileStatus'
 import { ProjectOverview } from './components/ProjectOverview'
 import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
-import { CHAT_PRESETS, FILE_PRESETS, useAiAsk } from './useAiAsk'
+import { useAiAsk } from './useAiAsk'
+import { useAiChat } from './useAiChat'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
@@ -32,7 +34,7 @@ function readVersions(): Versions | null {
   return v ? { node: v.node(), chrome: v.chrome(), electron: v.electron() } : null
 }
 
-// 文件详情的五个 Tab;文件夹详情另有自己的两页
+// 文件详情的五个 Tab;文件夹详情有自己的两页
 type DetailTab = 'overview' | 'structure' | 'relations' | 'changes' | 'chat'
 
 const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
@@ -40,12 +42,12 @@ const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'structure', label: '结构' },
   { key: 'relations', label: '关系' },
   { key: 'changes', label: '修改建议' },
-  { key: 'chat', label: 'AI 对话' }
+  { key: 'chat', label: '自由对话' }
 ]
 
 const FOLDER_TABS = [
   { key: 'overview', label: '概览' },
-  { key: 'ai', label: 'AI 讲解' }
+  { key: 'chat', label: '自由对话' }
 ]
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
@@ -309,7 +311,7 @@ function App(): React.JSX.Element {
     if (!opts?.keepTab) setActiveTab('overview')
 
     if (!file.language) {
-      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,去「AI 对话」里问', kind: 'info' })
+      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,去「自由对话」里问', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -618,10 +620,13 @@ function FileDetailView({
   gitLoading: boolean
   onOpenGit: () => void
 }): React.JSX.Element {
-  // AI 助手:所有提问走这一个线程(概览卡、修改建议、对话页共用),绝不自动开跑
+  // AI 解释:概览卡、修改建议共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined)
   )
+  // 自由聊天:独立通道、独立 session。钩子挂在详情层,概览↔自由对话来回切不掉聊天记录;
+  // 换文件时整个详情重挂(key=relPath),旧 session 连同在途请求一起就地清掉
+  const chat = useAiChat(buildFileAttachment(file, structure))
 
   const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
   const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
@@ -700,21 +705,20 @@ function FileDetailView({
             relPath={file.relPath}
             onOpenGit={onOpenGit}
             ai={ai}
-            onGoChat={() => onTabChange('chat')}
+            onGoOverview={() => onTabChange('overview')}
           />
         )}
-        {activeTab === 'chat' && (
-          <AiChatPanel ai={ai} presets={[...CHAT_PRESETS, ...FILE_PRESETS]} contextLabel={file.name} mainLabel="解释这个文件" />
-        )}
+        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={buildFileAttachment(file, structure)} />}
       </div>
     </div>
   )
 }
 
-/** 文件夹详情:静态目录概览为主,AI 讲解收在独立的 Tab 里等用户点 */
+/** 文件夹详情:静态目录概览为主;讲解卡在概览页,自由对话是独立 Tab/独立通道 */
 function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: ScanResult; onClose: () => void }): React.JSX.Element {
   const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
+  const chat = useAiChat(buildFolderAttachment(dir, dir.name || result.rootName))
 
   const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
   if (dir.relPath === '') badges.push({ label: '项目根', tone: 'blue' })
@@ -737,7 +741,7 @@ function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: 
       />
       <div className="detail-body">
         {tab === 'overview' && <FolderOverview dir={dir} ai={ai} />}
-        {tab === 'ai' && <AiChatPanel ai={ai} presets={CHAT_PRESETS} contextLabel={dir.name || result.rootName} mainLabel="用大白话讲讲这个文件夹" folderMode />}
+        {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
       </div>
     </div>
   )

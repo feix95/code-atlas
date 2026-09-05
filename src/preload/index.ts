@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
 import type {
+  AiChatLookupPayload,
+  AiChatRequest,
+  AiChatResult,
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
-  AiHistoryMessage,
   DepGraphResult,
   FileStructure,
   GitChangesResult,
@@ -57,22 +59,18 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file'),
-  aiExplainFile: (
-    rootPath: string,
-    relPath: string,
-    languageId: string,
-    requestId?: string,
-    question?: string,
-    history?: AiHistoryMessage[]
-  ): Promise<AiExplainResult> =>
-    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question, history),
-  aiExplainFolder: (
-    rootPath: string,
-    relPath: string,
-    requestId?: string,
-    question?: string,
-    history?: AiHistoryMessage[]
-  ): Promise<AiExplainResult> => ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question, history),
+  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question),
+  aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question),
+  /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
+  aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke('atlas:ai-chat', req),
+  /** 订阅自由对话的联网状态播报(查询中/查到/没查到);返回退订函数 */
+  onChatLookup: (callback: (payload: AiChatLookupPayload) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: AiChatLookupPayload): void => callback(payload)
+    ipcRenderer.on('atlas:ai-chat-lookup', listener)
+    return () => ipcRenderer.removeListener('atlas:ai-chat-lookup', listener)
+  },
   gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
   gitExplainChange: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath, requestId),

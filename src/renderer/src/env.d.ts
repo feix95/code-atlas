@@ -1,10 +1,12 @@
 /// <reference types="vite/client" />
 
 import type {
+  AiChatLookupPayload,
+  AiChatRequest,
+  AiChatResult,
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
-  AiHistoryMessage,
   DepGraphResult,
   FileStructure,
   GitChangesResult,
@@ -40,10 +42,11 @@ declare global {
         relPath: string,
         languageId: string,
         requestId?: string,
-        question?: string,
-        history?: AiHistoryMessage[]
+        question?: string
       ) => Promise<AiExplainResult>
-      aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string, history?: AiHistoryMessage[]) => Promise<AiExplainResult>
+      aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string) => Promise<AiExplainResult>
+      aiChat: (req: AiChatRequest) => Promise<AiChatResult>
+      onChatLookup: (callback: (payload: AiChatLookupPayload) => void) => () => void
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       aiCancel: (requestId: string) => Promise<void>

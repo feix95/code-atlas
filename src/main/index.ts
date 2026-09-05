@@ -16,22 +16,25 @@ import {
   buildBinaryPrompt,
   sniffBinaryKind,
   sanitizeHistory,
-  buildChatMessages,
+  sanitizeAttachment,
+  buildFreeChatMessages,
+  pickWebLookupQuery,
+  resolveWebLookupMeta,
   buildRefineMessages,
   hasWebLookupSignal,
   hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
-  CHAT_SYSTEM_PROMPT,
+  FREE_CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT
 } from '../ai/index.ts'
-import { webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
+import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -53,47 +56,27 @@ function withQuestion(prompt: string, question: unknown): string {
 const explainAborters = new Map<string, AbortController>()
 
 /**
- * 讲解/追问的共用出口。没有对话历史 = 首次讲解,走原路(各自人设 + 问题追加);
- * 带了对话历史 = 追问,换追问人设,证据每轮重新摆一遍当第一条消息,历史问答垫在后面 ——
- * 模型不失忆的根就是这份永远新鲜的证据,历史只是帮它接上话茬。
- * lookupName(只传名字,绝不传路径)给着且开关开着时,首次讲解走联网增强:
- * 先正常讲,答案带「需要联网确认」信号才查公开资料并修正;查不到/没网就原样回退。
+ * 讲解通道的共用出口:证据优先,单问单答。question 是用户点名的问题(预设/输入框),
+ * 追加到证据后面让模型围绕问题作答;lookupName(只传名字,绝不传路径)给着且开关开着时,
+ * 首次讲解走联网增强:先正常讲,答案带「需要联网确认」信号才查公开资料并修正。
+ * (自由聊天不在这里 —— 它有自己的 atlas:ai-chat 通道和人设,不往这条路上堆条件。)
  */
 async function respondWithEvidence(
   event: IpcMainInvokeEvent,
   requestId: unknown,
   question: unknown,
-  history: unknown,
   evidence: string,
   system: string | undefined,
   resolved: { target: ChatTarget; webLookup: boolean },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
-  const hist = sanitizeHistory(history)
-  if (hist.length === 0) {
-    const hasQuestion = typeof question === 'string' && question.trim() !== ''
-    if (resolved.webLookup && lookupName && !hasQuestion) {
-      return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta)
-    }
-    return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, withQuestion(evidence, question), system, onDelta, signal)
-    )
-  }
-  const q = typeof question === 'string' && question.trim() !== '' ? question.trim() : '请结合上面的资料再讲讲。'
-  // 追问里点名叫联网(开关开着):按名字现查一份公开资料,塞进这一轮的问题里给模型
-  if (resolved.webLookup && lookupName && hasSearchIntent(q)) {
-    const material = await webLookup(lookupName, electronFetchText).catch(() => '')
-    if (material) {
-      const enriched = `${q}\n\n(已按你的要求联网查询「${lookupName}」,公开资料如下:\n${material}\n请把资料里跟它对得上的信息讲出来:它是什么、是谁家的、有哪些部分;资料没帮助才照常回答,别硬编。)`
-      return explainWithCancel(requestId, (signal) =>
-        explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, enriched), onDelta, signal)
-      )
-    }
-    // 没查到就照常答:人设第 6 条会让模型老实交代这次没查到资料,不装搜过
+  const hasQuestion = typeof question === 'string' && question.trim() !== ''
+  if (resolved.webLookup && lookupName && !hasQuestion) {
+    return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta)
   }
   return explainWithCancel(requestId, (signal) =>
-    explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, q), onDelta, signal)
+    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), system, onDelta, signal)
   )
 }
 
@@ -238,6 +221,14 @@ function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text:
     if (!event.sender.isDestroyed()) {
       event.sender.send('atlas:ai-delta', { id: requestId, text } satisfies AiDeltaPayload)
     }
+  }
+}
+
+/** 自由对话的联网状态播报:查着没查着都是程序说了算,按 requestId 对号推给界面挂标签 */
+function sendChatLookup(event: IpcMainInvokeEvent, requestId: unknown, state: AiChatLookupPayload['state'], sources: string[]): void {
+  if (typeof requestId !== 'string' || requestId === '') return
+  if (!event.sender.isDestroyed()) {
+    event.sender.send('atlas:ai-chat-lookup', { id: requestId, state, sources } satisfies AiChatLookupPayload)
   }
 }
 
@@ -485,15 +476,7 @@ function registerIpc(): void {
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
-    async (
-      event,
-      rootPath: unknown,
-      relPath: unknown,
-      languageId: unknown,
-      requestId?: unknown,
-      question?: unknown,
-      history?: unknown
-    ) => {
+    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
@@ -524,7 +507,6 @@ function registerIpc(): void {
             event,
             requestId,
             question,
-            history,
             buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null }),
             undefined,
             resolved
@@ -553,7 +535,6 @@ function registerIpc(): void {
           event,
           requestId,
           question,
-          history,
           buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }),
           GUESS_SYSTEM_PROMPT,
           resolved,
@@ -565,7 +546,6 @@ function registerIpc(): void {
         event,
         requestId,
         question,
-        history,
         buildGuessPrompt({ relPath, name, absPath, languageName, preview }),
         GUESS_SYSTEM_PROMPT,
         resolved,
@@ -575,10 +555,10 @@ function registerIpc(): void {
   )
 
   // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
-  // relPath 传 '' 表示解释项目根目录本身;带 history = 讲解之后的追问,换追问人设接着聊
+  // relPath 传 '' 表示解释项目根目录本身;自由聊天有专门的 atlas:ai-chat 通道
   ipcMain.handle(
     'atlas:ai-explain-folder',
-    async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown, history?: unknown) => {
+    async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -628,7 +608,6 @@ function registerIpc(): void {
       event,
       requestId,
       question,
-      history,
       buildFolderPrompt({
         relPath,
         name: folderName,
@@ -642,6 +621,64 @@ function registerIpc(): void {
       resolved,
       folderName
     )
+  })
+
+  // 自由对话:独立通道、独立人设(Atlas 小探针)。当前选中对象的资料以「附件」身份
+  // 垫在最前面,仅供参考,不进历史 —— 换对象不带旧资料,旧对话也不污染新对象。
+  // 用户点名要联网(联网/搜搜/查查…)且开关开着,程序先按名字真查一份资料再开答;
+  // 查询的每一步状态(查着了/没查到/没开开关)都以程序账本为准回传,模型说了不算。
+  ipcMain.handle('atlas:ai-chat', async (event, req: unknown): Promise<AiChatResult> => {
+    const startedAt = Date.now()
+    const notRequested: WebLookupMeta = { requested: false, enabled: false, attempted: false, state: 'not_requested', sources: [] }
+    const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
+    const question = typeof body.question === 'string' ? body.question.trim() : ''
+    if (!question) {
+      return { status: 'error', text: '先输入一句话再发送', model: '', durationMs: 0, webLookup: notRequested }
+    }
+    const requestId = typeof body.requestId === 'string' ? body.requestId : ''
+    const history = sanitizeHistory(body.history)
+    const attachment = sanitizeAttachment(body.context)
+    const requested = hasSearchIntent(question)
+
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      // 模型服务都没通,查询自然也没发生:如实记成 failed,不让账本装无事发生
+      const meta: WebLookupMeta = requested
+        ? { requested: true, enabled: false, attempted: false, state: 'failed', sources: [] }
+        : notRequested
+      return { status: 'error', text: resolved.error, model: '', durationMs: Date.now() - startedAt, webLookup: meta }
+    }
+
+    // 联网查询先行:状态边查边播报(searching → completed/failed/empty),不等模型开金口
+    const enabled = resolved.webLookup
+    let outcome: { kind: 'skipped' } | { kind: 'attempted'; material: string; sources: string[] } | { kind: 'error' } = { kind: 'skipped' }
+    let webMaterial: { query: string; material: string } | null = null
+    if (requested && enabled) {
+      const query = pickWebLookupQuery(question, attachment)
+      sendChatLookup(event, requestId, 'searching', [])
+      try {
+        const found = await webLookupDetailed(query, electronFetchText)
+        outcome = { kind: 'attempted', material: found.material, sources: found.sources }
+        if (found.material) webMaterial = { query, material: found.material }
+      } catch {
+        outcome = { kind: 'error' }
+      }
+      const finalState = outcome.kind === 'attempted' ? (outcome.material === '' ? 'empty' : 'completed') : 'failed'
+      sendChatLookup(event, requestId, finalState, outcome.kind === 'attempted' ? outcome.sources : [])
+    }
+
+    const meta = resolveWebLookupMeta(requested, enabled, outcome)
+    const messages = buildFreeChatMessages(FREE_CHAT_SYSTEM_PROMPT, attachment, history, question, webMaterial)
+    const aborter = new AbortController()
+    if (requestId !== '') explainAborters.set(requestId, aborter)
+    try {
+      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal)
+      // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
+      const status = aborter.signal.aborted ? 'cancelled' : res.status
+      return { ...res, status, webLookup: meta }
+    } finally {
+      if (requestId !== '') explainAborters.delete(requestId)
+    }
   })
 
   // 掐掉还在生成的讲解:渲染进程换了讲解目标/关掉卡片时喊一声,模型立刻空出来讲下一个

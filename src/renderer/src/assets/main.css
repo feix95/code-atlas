@@ -1421,6 +1421,200 @@ body.is-sash-dragging {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
+/* ── 自由对话(Atlas 小探针):附件卡 / 探针头像 / 联网状态标签 ── */
+
+/* 资料附件卡:默认收起一行,展开看机器扫到的原始资料 */
+.chat-attach {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.chat-attach summary {
+  cursor: pointer;
+  padding: 7px 12px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  user-select: none;
+}
+
+.chat-attach summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-attach strong {
+  color: var(--text);
+}
+
+.chat-attach-summary::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+.chat-attach-details {
+  margin: 0;
+  padding: 2px 12px 10px;
+  border-top: 1px dashed var(--line);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* 探针头像与回答正文并排;联网标签缩进到跟正文对齐 */
+.chat-avatar {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.chat-answer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat-answer-row .message.answer {
+  flex: 1;
+}
+
+.chat-webstatus {
+  margin-left: 34px;
+  margin-top: 2px;
+}
+
+.chat-typing {
+  color: var(--muted);
+}
+
+.chat-muted {
+  font-size: var(--font-sm);
+  margin-top: 4px;
+}
+
+/* 空状态:探针立正打招呼 */
+.chat-probe {
+  width: 56px;
+  height: 56px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.chat-intro-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 小探针本体:待命 = 呼吸 + 钟摆慢摇;思考 = 摆大摆快 + 轻浮动 + 眼睛左右看;
+   出错 = 天线铃铛和壳线变琥珀色。动画只在 CSS,系统要求减少动态就全静止 */
+.atlas-probe .probe-shell {
+  fill: var(--surface);
+  stroke: var(--accent-line);
+  stroke-width: 1.5;
+}
+
+.atlas-probe .probe-eye {
+  fill: var(--accent);
+  transform-origin: center;
+}
+
+.atlas-probe .probe-antenna line {
+  stroke: var(--accent-line);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.atlas-probe .probe-bell {
+  fill: var(--secondary);
+}
+
+.atlas-probe .probe-antenna {
+  transform-origin: 24px 15px;
+  animation: probe-sway 3.2s ease-in-out infinite;
+}
+
+.atlas-probe .probe-head {
+  transform-origin: 24px 27px;
+  animation: probe-breathe 3.2s ease-in-out infinite;
+}
+
+.atlas-probe.is-thinking .probe-antenna {
+  animation-duration: 0.9s;
+}
+
+.atlas-probe.is-thinking .probe-head {
+  animation-name: probe-bob;
+  animation-duration: 0.9s;
+}
+
+.atlas-probe.is-thinking .probe-eye {
+  animation: probe-look 1.8s ease-in-out infinite;
+}
+
+.atlas-probe.is-error .probe-shell {
+  stroke: var(--amber);
+}
+
+.atlas-probe.is-error .probe-bell {
+  fill: var(--amber);
+}
+
+@keyframes probe-sway {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes probe-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes probe-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.6px);
+  }
+}
+
+@keyframes probe-look {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(2.2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-probe .probe-antenna,
+  .atlas-probe .probe-head,
+  .atlas-probe .probe-eye {
+    animation: none;
+  }
+}
+
 /* ── 关系 Tab ── */
 
 .relation-list {
