@@ -24,6 +24,13 @@ function readUiScale(): number {
 }
 webFrame.setZoomFactor(readUiScale())
 
+// 首帧信号:连跑两个动画帧 = 合成器真的画出了画面,主进程收到才敢露窗。
+// 这是露窗链的主保险 —— 无边框模式下 ready-to-show 在部分高缩放屏上永不触发
+// (第三十六锤补实测),不能指望它;主进程另备 3 秒看门狗兜底,窗口绝不永久隐身
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => ipcRenderer.send('atlas:first-frame'))
+})
+
 // 挂在 window.atlas 命名空间下:版本信息、选文件夹、扫描、AST 分析,都从这儿走
 contextBridge.exposeInMainWorld('atlas', {
   versions: {

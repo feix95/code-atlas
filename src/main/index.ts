@@ -239,25 +239,49 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     title: 'CodeAtlas',
-    // 窗口壳自绘:frame:false 摘掉系统标题栏,标题栏和左上角三颗灰点都自己画。
-    // 真透明试过一轮:150% 显示缩放的 Windows 上透明窗永远画不出头一帧,窗口整个隐身
-    // (进程活着、日志零报错、就是没窗户)—— 退回实底保打开,圆角悬浮等找到稳路子再上
+    // 圆角悬浮壳回归(模块四):frame:false 摘系统框,transparent 让四角露出真实桌面,
+    // 14px 圆角 + 悬浮阴影全由 CSS 画。系统级圆角(DWM roundedCorners)只有 Windows 11
+    // (build 22000+)认,本机 Win10 19045 不认 —— 所以抗锯齿圆角只有透明合成这一条路。
+    // 上次「窗隐身」的病根已查明:不是透明本身,而是 show:false 时 ready-to-show 在
+    // 4K + 150% 缩放屏上永不触发(实底窗同样隐身,第三十六锤补实测)。这次 show:false
+    // 只是为了等首帧防白闪,但绝不指望 ready-to-show —— 露窗走下面的三保险链。
     frame: false,
-    backgroundColor: '#f6f7f8',
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false, // 系统影子跟着方框走,会描出一圈直角细线;悬浮阴影改由 CSS 画圆角的
     autoHideMenuBar: true,
-    // 不做「等首帧画好再露窗」:无边框模式下 ready-to-show 在 4K + 150% 缩放的 Windows
-    // 上永远不触发,配 show:false 的窗就永远藏着(进程活着、日志干净、就是没窗)。
-    // 随创建直接露面最稳;底色和应用同色,看不出闪
-    show: true,
+    show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // 首帧探测靠渲染层 rAF 发信号;窗口还藏着时后台节流会把 rAF 憋死,必须关掉
+      backgroundThrottling: false
     }
   })
 
-  mainWindow.on('ready-to-show', () => mainWindow.show())
+  // ── 三保险露窗链:健康机走快路,任何一环罢工都有兜底,窗口绝不永久隐身 ──
+  let shown = false
+  let shownVia = 'never'
+  const showOnce = (why: string): void => {
+    if (shown || mainWindow.isDestroyed()) return
+    shown = true
+    shownVia = why
+    mainWindow.show()
+    console.log(`[window] 露窗方式:${why}`)
+  }
+  // 1) 健康机的快路:页面就绪即露(多数机器到这就走了)
+  mainWindow.once('ready-to-show', () => showOnce('ready-to-show'))
+  // 2) 主保险:渲染层连跑两帧动画帧 = 合成器真画出了画面(preload 发 atlas:first-frame)
+  ipcMain.removeAllListeners('atlas:first-frame')
+  ipcMain.on('atlas:first-frame', () => showOnce('first-frame'))
+  // 3) 加载完主动催一帧:藏在幕后的合成器可能还没开工,invalidate 踢它一脚
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.invalidate()
+  })
+  // 4) 看门狗:以上信号全哑火,3 秒后硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫
+  setTimeout(() => showOnce('watchdog-3s'), 3000)
 
   // 最大化是两副面孔:贴满屏幕时圆角描边必须收掉,四角才不漏出怪缝 —— 状态一变就喊渲染进程换装
   const syncMaximized = (maximized: boolean): void => {
@@ -277,6 +301,30 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  // 验收探针(只在设置了 ATLAS_PROBE_DIR 时启用):露窗后截整窗图 + 记账再退出,
+  // 专门伺候「100%/125%/150% 三档缩放实测」当证据;正常跑应用完全不碰这段
+  const probeDir = process.env['ATLAS_PROBE_DIR']
+  if (probeDir) {
+    void (async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2500)) // 露窗后再稳两秒半,让画面完全落定
+      const scale = await mainWindow.webContents.executeJavaScript('String(window.devicePixelRatio)').catch(() => 'unknown')
+      const image = await mainWindow.webContents.capturePage().catch(() => null)
+      const png = image ? image.toPNG() : Buffer.alloc(0)
+      const report = {
+        devicePixelRatio: scale,
+        shownVia,
+        visible: mainWindow.isVisible(),
+        maximized: mainWindow.isMaximized(),
+        bounds: mainWindow.getBounds(),
+        pngBytes: png.length
+      }
+      await fs.mkdir(probeDir, { recursive: true })
+      await fs.writeFile(join(probeDir, `probe-dpr${scale}.json`), JSON.stringify(report, null, 2))
+      if (png.length > 0) await fs.writeFile(join(probeDir, `probe-dpr${scale}.png`), png)
+      app.quit()
+    })()
   }
 }
 
