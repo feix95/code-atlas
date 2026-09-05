@@ -24,21 +24,23 @@ export const DIFF_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码改动翻译官"�
 3. 用中文,短句,最多 3-5 句。
 4. 如果改动太碎看不出意图,就老实说"这是一批小调整",再挑你最有把握的一两点讲。`
 
-/** 文件夹讲解的专属人设:只按真实清单讲,不编造不存在的文件 */
+/** 文件夹讲解的专属人设:只按真实清单讲,不编造不存在的文件;认得系统目录就用常识 */
 export const FOLDER_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码地图导游"。
-你的任务:根据 Given 一个文件夹里装了什么(子文件夹、文件、语言分布),用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件夹是负责什么的、在整个项目里扮演什么角色"。
+你的任务:根据 Given 一个文件夹的信息(完整路径、里面装了什么、文件类型分布),用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件夹是干什么的"。
 铁律:
-1. 只依据 Given 的清单说话,绝不编造清单里没有的文件或功能。
-2. 你的判断是推测:如果清单看不出用途,就老实说"从清单上看不出来"。
-3. 不输出废话、不寒暄。用中文,短句,最多 3-5 句。`
+1. 只依据 Given 的信息说话,绝不编造清单里没有的文件或功能。
+2. 用户可能在浏览自己电脑的任意磁盘,不一定是开发项目:如果完整路径是知名系统目录或知名软件的安装目录(比如 Program Files、Windows、AppData、Users),直接用你已知的常识介绍它是干什么的,不用假装只能从文件清单瞎猜。
+3. 你的判断是推测:如果路径和清单都看不出用途,就老实说"看不出来"。
+4. 不输出废话、不寒暄。用中文,短句,最多 3-5 句。`
 
-/** 名字兜底的人设:证据不全,判断是推测,没把握要明说 */
+/** 名字兜底的人设:证据不全,判断是推测,没把握要明说;认得系统目录就用常识 */
 export const GUESS_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码猜猜官"。
-你的任务:根据 Given 一个文件的路径、名字和内容片段,推测"这个文件大概是干什么的"。
+你的任务:根据 Given 一个文件的完整路径、名字和内容片段,推测"这个文件大概是干什么的"。
 铁律:
 1. 片段只是文件的一小部分,你的判断是推测 —— 要让听的人知道哪些是有把握的、哪些是猜的。
 2. 绝不编造片段里没有的函数、类或功能。
-3. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。`
+3. 如果完整路径一看就是系统目录或知名软件的地盘(比如 Windows、Program Files、AppData),直接用你已知的常识介绍这类文件是干什么的,不用假装只能凭片段瞎猜。
+4. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。`
 
 function formatStructureLines(structure: FileStructure): string[] {
   const lines: string[] = []
@@ -116,41 +118,60 @@ export function isBinaryFile(name: string): boolean {
   return BINARY_EXTS.has(name.slice(dot).toLowerCase())
 }
 
-/** 固定格式提示词:把一个文件夹的真实清单摆给模型,让它只翻译不编造 */
+/** 固定格式提示词:把一个文件夹的真实清单摆给模型,让它只翻译不编造;完整路径帮它认出系统目录 */
 export function buildFolderPrompt(folder: {
   relPath: string
   name: string
+  /** 完整路径(项目根 + relPath):模型靠它认出系统目录、知名软件目录 */
+  absPath: string
   subdirs: string[]
   files: string[]
-  /** 语言分布:语言名 → 文件数 */
+  /** 语言分布:语言名 → 文件数(只统计认得出的编程语言) */
   languages: Record<string, number>
+  /** 通用后缀分布:后缀 → 文件数(什么文件都数,.exe/.dll/.log 这些是认系统文件夹的关键证据) */
+  extCounts: Record<string, number>
 }): string {
   const isRoot = folder.relPath === ''
   const langLines = Object.entries(folder.languages)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([lang, count]) => `${lang}×${count}`)
+  const MAX_EXTS = 15
+  const extEntries = Object.entries(folder.extCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const extLines = extEntries.slice(0, MAX_EXTS).map(([ext, count]) => `${ext}×${count}`)
+  const hiddenExts = extEntries.length - extLines.length
+  const extText =
+    extLines.length > 0 ? `${extLines.join(', ')}${hiddenExts > 0 ? ` ……(还有 ${hiddenExts} 种)` : ''}` : '(这个文件夹没有文件)'
   const MAX_FILES = 100
   const MAX_SUBDIRS = 40
   const shownFiles = folder.files.slice(0, MAX_FILES)
   const shownSubdirs = folder.subdirs.slice(0, MAX_SUBDIRS)
   const lines = [
     `文件夹:${isRoot ? '(项目根目录)' : folder.relPath}`,
+    `完整路径:${folder.absPath}`,
     `名称:${folder.name}`,
     '',
     '里面有什么:',
     `- 子文件夹(${folder.subdirs.length} 个):${shownSubdirs.join(', ')}${folder.subdirs.length > shownSubdirs.length ? ` ……(还有 ${folder.subdirs.length - shownSubdirs.length} 个没列出)` : ''}`,
     `- 文件(${folder.files.length} 个):${shownFiles.join(', ')}${folder.files.length > shownFiles.length ? ` ……(还有 ${folder.files.length - shownFiles.length} 个没列出)` : ''}`,
-    `- 语言分布:${langLines.length > 0 ? langLines.join(', ') : '(没有可识别的代码文件)'}`
+    `- 语言分布:${langLines.length > 0 ? langLines.join(', ') : '(没有可识别的代码文件)'}`,
+    `- 文件类型分布(按后缀统计,什么文件都算):${extText}`
   ]
   return [
     ...lines,
     '',
-    '请根据上面的清单,用大白话告诉我:这个文件夹是负责什么的,在整个项目里扮演什么角色。'
+    '请用大白话告诉我:这个文件夹是干什么的。完整路径如果一看就是系统目录或知名软件的地盘(比如 Windows、Program Files、AppData),直接用你已知的常识介绍它;不是的话,再按清单推测它在项目里扮演什么角色。'
   ].join('\n')
 }
 
-/** 固定格式提示词:名字 + 内容片段给模型,让它推测并声明不确定的部分 */
-export function buildGuessPrompt(file: { relPath: string; name: string; languageName: string; preview: string | null }): string {
+/** 固定格式提示词:完整路径 + 名字 + 内容片段给模型,让它推测并声明不确定的部分 */
+export function buildGuessPrompt(file: {
+  relPath: string
+  name: string
+  /** 完整路径:模型靠它认出系统目录、知名软件目录 */
+  absPath: string
+  languageName: string
+  preview: string | null
+}): string {
   const previewText = file.preview === null
     ? '(读不出文本内容,只能凭名字和位置判断)'
     : file.preview.trim() === ''
@@ -158,12 +179,13 @@ export function buildGuessPrompt(file: { relPath: string; name: string; language
       : clipPreview(file.preview)
   return [
     `文件:${file.relPath}`,
+    `完整路径:${file.absPath}`,
     `文件名:${file.name}`,
     `语言/类型:${file.languageName || '(没认出来)'}`,
     '',
     `内容片段(只是开头一段,不一定完整):${previewText}`,
     '',
-    '请推测:这个文件大概是干什么的。片段不完整,只讲你有把握的;没把握的部分要明说"从片段看不出来",绝不许编造文件里没有的东西。'
+    '请推测:这个文件大概是干什么的。完整路径如果一看就是系统目录或知名软件的地盘,直接用你已知的常识介绍;否则按名字和片段推测。只讲你有把握的;没把握的部分要明说"从片段看不出来",绝不许编造文件里没有的东西。'
   ].join('\n')
 }
 

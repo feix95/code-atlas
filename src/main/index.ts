@@ -443,7 +443,7 @@ function registerIpc(): void {
         return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
-      const prompt = withQuestion(buildGuessPrompt({ relPath, name, languageName, preview }), question)
+      const prompt = withQuestion(buildGuessPrompt({ relPath, name, absPath, languageName, preview }), question)
       return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
     }
   )
@@ -480,6 +480,8 @@ function registerIpc(): void {
     const subdirs: string[] = []
     const files: string[] = []
     const languages = new Map<string, number>()
+    // 通用后缀分布:什么文件都数(.exe/.dll/.log 是认出系统文件夹的关键证据,编程语言认不出的也算)
+    const extCounts = new Map<string, number>()
     for (const item of dirents) {
       if (item.isDirectory()) {
         subdirs.push(item.name)
@@ -489,14 +491,19 @@ function registerIpc(): void {
       files.push(item.name)
       const langName = BY_EXT.get(extOf(item.name))?.name ?? '没认出的文件'
       languages.set(langName, (languages.get(langName) ?? 0) + 1)
+      const dot = item.name.lastIndexOf('.')
+      const ext = dot > 0 ? item.name.slice(dot).toLowerCase() : '(无后缀)'
+      extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1)
     }
     const prompt = withQuestion(
       buildFolderPrompt({
         relPath,
         name: basename(absPath) || basename(rootPath),
+        absPath,
         subdirs,
         files,
-        languages: Object.fromEntries(languages)
+        languages: Object.fromEntries(languages),
+        extCounts: Object.fromEntries(extCounts)
       }),
       question
     )

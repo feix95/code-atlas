@@ -70,42 +70,84 @@ async function main(): Promise<void> {
   )
   assert.ok(emptyPrompt.includes('不要编造'), '空结构要提醒模型别编造')
 
-  // ── 2. 文件夹提示词:清单全进证据、根目录与截断都有人话 ──
+  // ── 2. 文件夹提示词:清单全进证据、完整路径认系统目录、根目录与截断都有人话 ──
   const fp = buildFolderPrompt({
     relPath: 'src/main',
     name: 'main',
+    absPath: 'X:\\demo\\proj\\src\\main',
     subdirs: ['utils'],
-    files: ['index.ts', 'server.ts'],
-    languages: { TypeScript: 12, Python: 3 }
+    files: ['index.ts', 'server.ts', 'run.log'],
+    languages: { TypeScript: 12, Python: 3 },
+    extCounts: { '.ts': 12, '.py': 3, '.log': 1 }
   })
   assert.ok(fp.includes('src/main'), '文件夹提示词应含路径')
+  assert.ok(fp.includes('X:\\demo\\proj\\src\\main'), '应含完整路径(模型靠它认系统目录)')
   assert.ok(fp.includes('utils'), '应含子文件夹名')
   assert.ok(fp.includes('index.ts'), '应含文件名')
   assert.ok(fp.includes('TypeScript×12'), '应含语言分布')
+  assert.ok(fp.includes('.ts×12'), '应含通用后缀分布(编程语言)')
+  assert.ok(fp.includes('.log×1'), '通用后缀分布要算上语言认不出的文件')
+  assert.ok(fp.includes('文件类型分布'), '后缀分布要有标题行')
+  assert.ok(fp.includes('系统目录'), '要有"认得系统目录就用常识"的引导')
 
-  const fpRoot = buildFolderPrompt({ relPath: '', name: 'code-atlas', subdirs: [], files: [], languages: {} })
+  const fpRoot = buildFolderPrompt({
+    relPath: '',
+    name: 'code-atlas',
+    absPath: 'X:\\demo\\code-atlas',
+    subdirs: [],
+    files: [],
+    languages: {},
+    extCounts: {}
+  })
   assert.ok(fpRoot.includes('项目根目录'), '根目录要有说明')
   assert.ok(fpRoot.includes('没有可识别的代码文件'), '空清单要老实说')
+  assert.ok(fpRoot.includes('(这个文件夹没有文件)'), '一个文件都没有时后缀分布要老实说')
 
   const manyFiles = Array.from({ length: 150 }, (_, i) => `f${i}.ts`)
-  const fpBig = buildFolderPrompt({ relPath: 'big', name: 'big', subdirs: [], files: manyFiles, languages: {} })
+  const fpBig = buildFolderPrompt({
+    relPath: 'big',
+    name: 'big',
+    absPath: 'X:\\demo\\big',
+    subdirs: [],
+    files: manyFiles,
+    languages: {},
+    extCounts: { '.ts': 150, '.dll': 4, '.exe': 2 }
+  })
   assert.ok(fpBig.includes('还有 50 个没列出'), '超量文件要注明截断')
   assert.ok(!fpBig.includes('f149.ts'), '没列出的文件不许混进提示词')
+  assert.ok(fpBig.includes('.exe×2'), '后缀分布要带上系统文件夹的关键证据(exe/dll)')
 
-  // ── 3. 猜猜官提示词:名字 + 片段进证据、读不了/空文件有人话 ──
+  // 后缀种类超上限:只摆前 15 种,注明还剩多少种
+  const manyExts = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`.x${i}`, 20 - i]))
+  const fpExts = buildFolderPrompt({
+    relPath: 'mixed',
+    name: 'mixed',
+    absPath: 'X:\\demo\\mixed',
+    subdirs: [],
+    files: [],
+    languages: {},
+    extCounts: manyExts
+  })
+  assert.ok(fpExts.includes('还有 5 种'), '超量后缀要注明截断')
+  assert.ok(!fpExts.includes('.x15×'), '没列出的后缀不许混进提示词')
+
+  // ── 3. 猜猜官提示词:完整路径 + 名字 + 片段进证据、读不了/空文件有人话 ──
   const gp = buildGuessPrompt({
     relPath: 'tools/deploy.sh',
     name: 'deploy.sh',
+    absPath: 'X:\\demo\\proj\\tools\\deploy.sh',
     languageName: 'Shell',
     preview: 'echo start\ncp -r dist /var/www'
   })
   assert.ok(gp.includes('deploy.sh'), '应含文件名')
+  assert.ok(gp.includes('X:\\demo\\proj\\tools\\deploy.sh'), '应含完整路径')
   assert.ok(gp.includes('cp -r dist'), '应含内容片段')
   assert.ok(gp.includes('Shell'), '应含语言名')
+  assert.ok(gp.includes('系统目录'), '要有"认得系统目录就用常识"的引导')
 
-  const gpNull = buildGuessPrompt({ relPath: 'x', name: 'x', languageName: '', preview: null })
+  const gpNull = buildGuessPrompt({ relPath: 'x', name: 'x', absPath: 'X:\\demo\\x', languageName: '', preview: null })
   assert.ok(gpNull.includes('读不出文本内容'), '读不了内容要明说')
-  const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', languageName: '', preview: '' })
+  const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', absPath: 'X:\\demo\\e', languageName: '', preview: '' })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
@@ -340,7 +382,7 @@ async function main(): Promise<void> {
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 文件夹/猜猜官提示词就位 · 二进制照样讲(魔数认类型当证据) · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
+  console.log('   提示词固定不编造 · 文件夹/猜猜官带完整路径与通用后缀分布(认得出系统目录) · 二进制照样讲(魔数认类型当证据) · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
 }
 
 main().catch((err) => {
