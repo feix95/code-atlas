@@ -157,7 +157,10 @@ function createWindow(): void {
     frame: false,
     backgroundColor: '#f6f7f8',
     autoHideMenuBar: true,
-    show: false,
+    // 不做「等首帧画好再露窗」:无边框模式下 ready-to-show 在 4K + 150% 缩放的 Windows
+    // 上永远不触发,配 show:false 的窗就永远藏着(进程活着、日志干净、就是没窗)。
+    // 随创建直接露面最稳;底色和应用同色,看不出闪
+    show: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
