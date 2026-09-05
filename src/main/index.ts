@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, dialog, ipcMain, net, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
@@ -17,11 +17,15 @@ import {
   sniffBinaryKind,
   sanitizeHistory,
   buildChatMessages,
+  buildRefineMessages,
+  hasWebLookupSignal,
+  WEB_SIGNAL_INSTRUCTION,
   CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT
 } from '../ai/index.ts'
+import { webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
@@ -51,6 +55,8 @@ const explainAborters = new Map<string, AbortController>()
  * 讲解/追问的共用出口。没有对话历史 = 首次讲解,走原路(各自人设 + 问题追加);
  * 带了对话历史 = 追问,换追问人设,证据每轮重新摆一遍当第一条消息,历史问答垫在后面 ——
  * 模型不失忆的根就是这份永远新鲜的证据,历史只是帮它接上话茬。
+ * lookupName(只传名字,绝不传路径)给着且开关开着时,首次讲解走联网增强:
+ * 先正常讲,答案带「需要联网确认」信号才查公开资料并修正;查不到/没网就原样回退。
  */
 async function respondWithEvidence(
   event: IpcMainInvokeEvent,
@@ -59,11 +65,16 @@ async function respondWithEvidence(
   history: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget }
+  resolved: { target: ChatTarget; webLookup: boolean },
+  lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
   const hist = sanitizeHistory(history)
   if (hist.length === 0) {
+    const hasQuestion = typeof question === 'string' && question.trim() !== ''
+    if (resolved.webLookup && lookupName && !hasQuestion) {
+      return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta)
+    }
     return explainWithCancel(requestId, (signal) =>
       explainWithModel(resolved.target, withQuestion(evidence, question), system, onDelta, signal)
     )
@@ -72,6 +83,34 @@ async function respondWithEvidence(
   return explainWithCancel(requestId, (signal) =>
     explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, q), onDelta, signal)
   )
+}
+
+/**
+ * 联网增强的讲解:先安静地讲一遍(答案里可能带信号词),带信号就查公开资料、
+ * 流式输出修正版;没信号/查不到/修正失败,都老老实实回落到本地推测的版本。
+ */
+async function explainWithWebLookup(
+  requestId: unknown,
+  evidence: string,
+  system: string,
+  lookupName: string,
+  target: ChatTarget,
+  onDelta: ((text: string) => void) | undefined
+): Promise<AiExplainResult> {
+  const first = await explainWithCancel(requestId, (signal) =>
+    explainWithModel(target, evidence + WEB_SIGNAL_INSTRUCTION, system, undefined, signal)
+  )
+  if (first.status !== 'supported' || !hasWebLookupSignal(first.text)) return first
+  const material = await webLookup(lookupName, electronFetchText).catch(() => '')
+  if (!material) {
+    // 查不到(没网/超时/太冷门):剥掉信号词,加上一句人话交代,回退本地推测
+    const fallback = first.text.replace(/「?需要联网确认」?/g, '').trimEnd()
+    return { ...first, text: `${fallback}\n\n(联网没查到这个,上面是本地推测。)` }
+  }
+  const refined = await explainWithCancel(requestId, (signal) =>
+    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal)
+  )
+  return refined.status === 'supported' ? refined : first
 }
 
 /**
@@ -128,11 +167,25 @@ async function readHeader(absPath: string, bytes = 64): Promise<Buffer> {
   const handle = await fs.open(absPath, 'r')
   try {
     const buf = Buffer.alloc(bytes)
-    const { bytesRead } = await handle.read(buf, 0, bytes, 0)
+    const { bytesRead } = await handle.read(buf, 0, buf.length, 0)
     return buf.subarray(0, bytesRead)
   } finally {
     await handle.close()
   }
+}
+
+/**
+ * 联网查证的传输层:走 Chromium 的网络栈(net.fetch),跟用户浏览器一个路数 ——
+ * 自动跟随系统代理设置,直连到不了的站点也能按用户自己的网络环境正常查。
+ * 渲染进程依旧不碰网络,查询只发生在主进程。
+ */
+const electronFetchText: LookupTransport = async (url) => {
+  const res = await net.fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.text()
 }
 
 /** 字节数 → 人话大小(提示词里给模型的证据) */
@@ -147,8 +200,9 @@ function formatSize(bytes: number): string {
  * 三个讲解通道共用的前置:把当前 AI 配置收敛成 ChatTarget。
  * 选了内置模型就顺手把 llama-server 子进程拉起来(首次用 AI 才启动,不拖慢打开速度);
  * 没配好不抛异常,返回人话错误让界面原样展示。
+ * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
-async function resolveChatTargetOrError(): Promise<{ target: ChatTarget } | { error: string }> {
+async function resolveChatTargetOrError(): Promise<{ target: ChatTarget; webLookup: boolean } | { error: string }> {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
   if (config.provider === 'builtin') {
@@ -159,7 +213,7 @@ async function resolveChatTargetOrError(): Promise<{ target: ChatTarget } | { er
     }
   }
   const resolved = resolveAiTarget(config, runtime)
-  return resolved.ok ? { target: resolved.target } : { error: resolved.message }
+  return resolved.ok ? { target: resolved.target, webLookup: config.webLookup === true } : { error: resolved.message }
 }
 
 /**
@@ -461,6 +515,7 @@ function registerIpc(): void {
             buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null }),
             undefined,
             resolved
+            // 结构流证据够硬(真代码结构),不掺联网查证
           )
         }
       }
@@ -488,7 +543,8 @@ function registerIpc(): void {
           history,
           buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }),
           GUESS_SYSTEM_PROMPT,
-          resolved
+          resolved,
+          name
         )
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
@@ -499,7 +555,8 @@ function registerIpc(): void {
         history,
         buildGuessPrompt({ relPath, name, absPath, languageName, preview }),
         GUESS_SYSTEM_PROMPT,
-        resolved
+        resolved,
+        name
       )
     }
   )
@@ -553,6 +610,7 @@ function registerIpc(): void {
       const ext = dot > 0 ? item.name.slice(dot).toLowerCase() : '(无后缀)'
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1)
     }
+    const folderName = basename(absPath) || basename(rootPath)
     return respondWithEvidence(
       event,
       requestId,
@@ -560,7 +618,7 @@ function registerIpc(): void {
       history,
       buildFolderPrompt({
         relPath,
-        name: basename(absPath) || basename(rootPath),
+        name: folderName,
         absPath,
         subdirs,
         files,
@@ -568,7 +626,8 @@ function registerIpc(): void {
         extCounts: Object.fromEntries(extCounts)
       }),
       FOLDER_SYSTEM_PROMPT,
-      resolved
+      resolved,
+      folderName
     )
   })
 
@@ -577,6 +636,13 @@ function registerIpc(): void {
     if (typeof requestId !== 'string' || requestId === '') return
     explainAborters.get(requestId)?.abort()
     explainAborters.delete(requestId)
+  })
+
+  // 联网查证(可选举手):讲解认不出软件/品牌时,拿「名字」去维基百科/DuckDuckGo 查免费公开资料。
+  // 只许传名字,不许传本地路径 —— 隐私边界写在调用方;5 秒超时,查不到返回空串,上层自己回退
+  ipcMain.handle('atlas:web-lookup', (_event, query: unknown) => {
+    if (typeof query !== 'string' || query.trim() === '') return ''
+    return webLookup(query, electronFetchText)
   })
 }
 

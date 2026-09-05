@@ -194,6 +194,11 @@ export interface AiConfig {
   provider: AiProviderKind
   lmstudio: AiLmstudioSettings
   builtin: AiBuiltinSettings
+  /**
+   * 联网查证开关,默认关(本地优先、默认离线):开着的唯一作用是——讲解认不出
+   * 某个软件/品牌时,拿「名字」去免费公开源查一下再修正答案;不发路径、不发别的
+   */
+  webLookup?: boolean
 }
 
 /** 一次对话调用的运行时目标:上层业务只认它,不感知底层是 LM Studio 还是内置模型 */

@@ -5,12 +5,13 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { AiConfig, ChatTarget } from '../shared/types.ts'
 
-/** 默认指向 LM Studio 本地服务;模型名留空 = 还没配置,由界面引导填 */
+/** 默认指向 LM Studio 本地服务;模型名留空 = 还没配置,由界面引导填。联网查证默认关 */
 export function defaultAiConfig(): AiConfig {
   return {
     provider: 'lmstudio',
     lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: '', apiKey: '' },
-    builtin: { serverPath: '', modelPath: '' }
+    builtin: { serverPath: '', modelPath: '' },
+    webLookup: false
   }
 }
 
@@ -47,7 +48,9 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       builtin: {
         serverPath: typeof bi.serverPath === 'string' ? bi.serverPath : '',
         modelPath: typeof bi.modelPath === 'string' ? bi.modelPath : ''
-      }
+      },
+      // 老配置没这个字段 = 默认关,行为与从前完全一致
+      webLookup: parsed.webLookup === true
     }
   } catch {
     return fallback
@@ -65,7 +68,8 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
     builtin: {
       serverPath: config.builtin.serverPath.trim(),
       modelPath: config.builtin.modelPath.trim()
-    }
+    },
+    webLookup: config.webLookup === true
   }
   await fs.writeFile(aiConfigPath(userDataDir), JSON.stringify(normalized, null, 2), 'utf8')
   return normalized

@@ -47,6 +47,7 @@ declare global {
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       aiCancel: (requestId: string) => Promise<void>
+      webLookup: (query: string) => Promise<string>
       onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void
     }
   }

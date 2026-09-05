@@ -13,6 +13,9 @@ import {
   explainWithMessages,
   buildChatMessages,
   sanitizeHistory,
+  buildRefineMessages,
+  hasWebLookupSignal,
+  WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
   CHAT_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
@@ -21,6 +24,7 @@ import {
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { parseListenerPids, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
+import { stripHtmlTags } from '../src/ai/weblookup.ts'
 import type { AiConfig, FileStructure } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
@@ -203,6 +207,20 @@ async function main(): Promise<void> {
   assert.equal(qaMsgs.length, 4, '首问没讲解时,证据和首问要合并,不能出现连续两条 user')
   assert.ok(qaMsgs[1]?.content.includes('证据清单') && qaMsgs[1]?.content.includes('它是做什么的?'), '证据和首问合并成一条')
 
+  // ── 3.6 联网查证(默认关):信号词 + 修正消息 + 摘要洗白 ──
+  assert.ok(WEB_SIGNAL_INSTRUCTION.includes('需要联网确认'), '信号词指令要包含标记原文')
+  assert.ok(hasWebLookupSignal('回答正文。\n「需要联网确认」'), '带信号的回答要认出来')
+  assert.ok(!hasWebLookupSignal('普通回答,没有信号'), '普通回答不误报')
+  const refine = buildRefineMessages('导游人设', '证据清单', '首答:可能是某个软件。', '维基资料:傲梅是备份软件厂商')
+  assert.deepEqual(
+    refine.map((m) => m.role),
+    ['system', 'user', 'assistant', 'user'],
+    '修正消息顺序:人设/证据/首答/联网资料'
+  )
+  assert.ok(refine[3]?.content.includes('傲梅是备份软件厂商'), '联网资料要进修正消息')
+  assert.ok(refine[3]?.content.includes('别硬编'), '资料对不上时要提醒维持原话')
+  assert.equal(stripHtmlTags('<span class="x">傲梅</span> &amp; 备份  软件'), '傲梅 & 备份 软件', '维基摘要的 HTML 标记要剥干净')
+
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
   assert.ok(isBinaryFile('app.exe'), '可执行文件是二进制')
@@ -281,15 +299,19 @@ async function main(): Promise<void> {
     const saved = await saveAiConfig(dir, {
       provider: 'builtin',
       lmstudio: { baseUrl: '  http://127.0.0.1:1234/v1  ', model: 'Qwen3.8-27B', apiKey: '' },
-      builtin: { serverPath: ' D:\\tools\\llama-server.exe ', modelPath: 'F:\\models\\qwen.gguf' }
+      builtin: { serverPath: ' D:\\tools\\llama-server.exe ', modelPath: 'F:\\models\\qwen.gguf' },
+      webLookup: true
     })
     assert.equal(saved.provider, 'builtin', 'Provider 应保存')
     assert.equal(saved.lmstudio.baseUrl, 'http://127.0.0.1:1234/v1', 'baseUrl 应去掉首尾空格')
     assert.equal(saved.builtin.serverPath, 'D:\\tools\\llama-server.exe', 'serverPath 应去掉首尾空格')
+    assert.equal(saved.webLookup, true, '联网查证开关应保存')
     const loaded = await loadAiConfig(dir)
     assert.equal(loaded.provider, 'builtin', '重新读回 Provider')
     assert.equal(loaded.lmstudio.model, 'Qwen3.8-27B', '重新读回模型名')
     assert.equal(loaded.builtin.modelPath, 'F:\\models\\qwen.gguf', '重新读回模型文件路径')
+    assert.equal(loaded.webLookup, true, '重新读回联网查证开关')
+    assert.equal(defaultAiConfig().webLookup, false, '联网查证默认必须是关')
 
     // 老版本配置是扁平的 {baseUrl, model, apiKey}:load 时要自动搬进 lmstudio 分支
     await writeFile(

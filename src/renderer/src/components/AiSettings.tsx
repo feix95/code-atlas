@@ -94,6 +94,25 @@ export function AiSettings(): React.JSX.Element {
         </p>
       </div>
 
+      {/* 联网查证:默认关,本地优先是产品的根;开了也只发名字,不发路径 */}
+      <div className="ai-field">
+        <span className="ai-label">联网查证(默认关)</span>
+        <div className="ai-providers">
+          <button
+            type="button"
+            className={`chip chip-link ${config.webLookup ? 'is-on' : ''}`}
+            onClick={() => setConfig({ ...config, webLookup: !config.webLookup })}
+          >
+            {config.webLookup ? '✅ 认不出来时允许联网查一下' : '⛔ 保持完全离线(默认)'}
+          </button>
+        </div>
+        <p className="ai-hint">
+          开了之后,讲解认不出某个文件夹/文件是谁家软件时,允许联网查一下再回答(需要联网)。
+          只会把认不出的「名字」发出去查,不会传你的文件夹路径和别的文件;查不到就还用本地推测。
+          改完记得点下面的「保存」。
+        </p>
+      </div>
+
       {isBuiltin ? (
         <div className="ai-field">
           <label className="ai-label" htmlFor="ai-model-path">模型文件</label>
