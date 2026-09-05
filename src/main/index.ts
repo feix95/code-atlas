@@ -19,6 +19,7 @@ import {
   buildChatMessages,
   buildRefineMessages,
   hasWebLookupSignal,
+  hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
   CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
@@ -80,6 +81,17 @@ async function respondWithEvidence(
     )
   }
   const q = typeof question === 'string' && question.trim() !== '' ? question.trim() : '请结合上面的资料再讲讲。'
+  // 追问里点名叫联网(开关开着):按名字现查一份公开资料,塞进这一轮的问题里给模型
+  if (resolved.webLookup && lookupName && hasSearchIntent(q)) {
+    const material = await webLookup(lookupName, electronFetchText).catch(() => '')
+    if (material) {
+      const enriched = `${q}\n\n(已按你的要求联网查询「${lookupName}」,公开资料如下:\n${material}\n请把资料里跟它对得上的信息讲出来:它是什么、是谁家的、有哪些部分;资料没帮助才照常回答,别硬编。)`
+      return explainWithCancel(requestId, (signal) =>
+        explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, enriched), onDelta, signal)
+      )
+    }
+    // 没查到就照常答:人设第 6 条会让模型老实交代这次没查到资料,不装搜过
+  }
   return explainWithCancel(requestId, (signal) =>
     explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, q), onDelta, signal)
   )
@@ -388,7 +400,8 @@ function registerIpc(): void {
     const saved = await saveAiConfig(app.getPath('userData'), {
       provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
-      builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath }
+      builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
+      webLookup: c.webLookup === true
     })
     // 垃圾不白占:切走了内置模式,或换了模型/引擎设置,旧子进程就地解散,
     // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账

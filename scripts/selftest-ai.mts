@@ -15,6 +15,7 @@ import {
   sanitizeHistory,
   buildRefineMessages,
   hasWebLookupSignal,
+  hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
   CHAT_SYSTEM_PROMPT,
@@ -220,6 +221,10 @@ async function main(): Promise<void> {
   assert.ok(refine[3]?.content.includes('傲梅是备份软件厂商'), '联网资料要进修正消息')
   assert.ok(refine[3]?.content.includes('别硬编'), '资料对不上时要提醒维持原话')
   assert.equal(stripHtmlTags('<span class="x">傲梅</span> &amp; 备份  软件'), '傲梅 & 备份 软件', '维基摘要的 HTML 标记要剥干净')
+  // 追问点名联网:意图词命中,开关关着/没命中就当普通问题
+  assert.ok(hasSearchIntent('联网搜搜最新信息'), '「联网搜搜」要识别为搜索意图')
+  assert.ok(hasSearchIntent('帮我查查这是什么软件'), '「查查」要识别为搜索意图')
+  assert.ok(!hasSearchIntent('这个能删吗?'), '普通追问不该误触发联网')
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
