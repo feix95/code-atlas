@@ -261,7 +261,11 @@ function createWindow(): void {
     }
   })
 
-  // ── 三保险露窗链:健康机走快路,任何一环罢工都有兜底,窗口绝不永久隐身 ──
+  // ── 露窗链:多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身 ──
+  // 本机实测(模块四验收):ready-to-show 只在 GPU 缓存健康时才来 —— 缓存被另一个
+  // 实例锁住(Gpu Cache Creation failed)或被污染时就永远装死;当年「窗隐身」就是
+  // 两实例缓存大战 + show 眼巴巴等 ready-to-show 叠出来的。所以下面每一路都只当快路,
+  // 谁都不许当唯一依靠,3 秒看门狗才是保底。
   let shown = false
   let shownVia = 'never'
   const showOnce = (why: string): void => {
@@ -271,16 +275,17 @@ function createWindow(): void {
     mainWindow.show()
     console.log(`[window] 露窗方式:${why}`)
   }
-  // 1) 健康机的快路:页面就绪即露(多数机器到这就走了)
+  // 1) 常见快路:GPU 栈干净时它先到
   mainWindow.once('ready-to-show', () => showOnce('ready-to-show'))
-  // 2) 主保险:渲染层连跑两帧动画帧 = 合成器真画出了画面(preload 发 atlas:first-frame)
+  // 2) 渲染层双 rAF 信号(合成器肯给隐藏窗出帧的机器上生效,多数机器到不了这)
   ipcMain.removeAllListeners('atlas:first-frame')
   ipcMain.on('atlas:first-frame', () => showOnce('first-frame'))
-  // 3) 加载完主动催一帧:藏在幕后的合成器可能还没开工,invalidate 踢它一脚
+  // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.invalidate()
   })
-  // 4) 看门狗:以上信号全哑火,3 秒后硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫
+  // 4) 看门狗(唯一无条件的兜底):3 秒硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫。
+  //    隐藏的透明窗此刻多半还没内容,用户看到「窗口浮现」的实际时刻仍是首帧画好之时
   setTimeout(() => showOnce('watchdog-3s'), 3000)
 
   // 最大化是两副面孔:贴满屏幕时圆角描边必须收掉,四角才不漏出怪缝 —— 状态一变就喊渲染进程换装
