@@ -151,9 +151,14 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     title: 'CodeAtlas',
+    // 窗口壳自绘:frame:false 摘掉系统标题栏,transparent 让圆角以外真透明 ——
+    // 露出来的是用户的真实桌面,不是自己画一层假桌面。拖边缩放交给 Chromium 的
+    // 命中测试(Electron 39 曾回归、当季修复,透明窗口现在原生可缩放)
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000', // 透明窗口不能写实色底,不然四个圆角外会发白发黑
     autoHideMenuBar: true,
     show: false,
-    backgroundColor: '#f6f7f9',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -163,6 +168,13 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
+
+  // 最大化是两副面孔:贴满屏幕时圆角描边必须收掉,四角才不漏出怪缝 —— 状态一变就喊渲染进程换装
+  const syncMaximized = (maximized: boolean): void => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('atlas:window-maximized', maximized)
+  }
+  mainWindow.on('maximize', () => syncMaximized(true))
+  mainWindow.on('unmaximize', () => syncMaximized(false))
 
   // 外部链接交给系统浏览器打开,不在应用里开新窗口
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -179,6 +191,22 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
+  // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
+  ipcMain.handle('atlas:window-close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close()
+  })
+  ipcMain.handle('atlas:window-minimize', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize()
+  })
+  ipcMain.handle('atlas:window-maximize-toggle', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return false
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+    return win.isMaximized()
+  })
+  ipcMain.handle('atlas:window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
   ipcMain.handle('atlas:pick-folder', async () => {
     const win = BrowserWindow.getAllWindows()[0]

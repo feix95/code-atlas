@@ -19,6 +19,11 @@ declare global {
         electron: () => string
       }
       pickFolder: () => Promise<string | null>
+      windowClose: () => Promise<void>
+      windowMinimize: () => Promise<void>
+      windowMaximizeToggle: () => Promise<boolean>
+      windowIsMaximized: () => Promise<boolean>
+      onWindowMaximized: (callback: (maximized: boolean) => void) => () => void
       scanFolder: (folderPath: string) => Promise<ScanResult>
       scanSubdir: (rootPath: string, relPath: string) => Promise<ScanResult>
       analyzeFile: (rootPath: string, relPath: string, languageId: string) => Promise<FileStructure | null>

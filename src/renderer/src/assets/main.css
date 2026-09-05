@@ -93,12 +93,13 @@
   box-sizing: border-box;
 }
 
-/* 应用窗口就是真实边界,不需要在窗里再画一层「假桌面」:边贴边铺满 */
+/* 窗口壳是圆角悬浮卡:html/body 必须透明,圆角以外露出的是用户的真实桌面,不能自己垫色 */
+html,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  background: var(--window);
+  background: transparent;
 }
 
 #root {
@@ -115,6 +116,98 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--window);
+  /* 悬浮窗壳:圆角 + 一圈浅描边,数值照参考图;贴满屏幕时由 body.is-maximized 收掉 */
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 14px;
+  box-shadow:
+    0 24px 70px rgba(12, 44, 67, 0.28),
+    0 3px 12px rgba(17, 38, 49, 0.2);
+}
+
+/* 最大化贴满屏幕:圆角和描边必须收掉,四角才不漏出怪缝 */
+body.is-maximized .app {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ── 自绘标题栏:整条能拖动窗口;底下可点的东西必须 no-drag,不然只会拖窗点不到 ── */
+
+.titlebar {
+  position: relative;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: drag;
+  background: linear-gradient(#fafbfb, #f1f2f3);
+  border-bottom: 1px solid var(--line);
+  color: #858b90;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .titlebar {
+    background: linear-gradient(#242a2e, #1d2226);
+  }
+}
+
+.traffic-lights {
+  position: absolute;
+  left: 8.5px;
+  display: flex;
+}
+
+/* 灰点本体 11px,按钮底座放大到 18px:看着照参考图,点着不费劲 */
+.traffic-lights .light {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.traffic-lights .light::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #d1d3d4;
+  transition:
+    filter 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.traffic-lights .light:nth-child(1)::before {
+  background: #d9d9d8;
+}
+
+.traffic-lights .light:nth-child(2)::before {
+  background: #d0d2d0;
+}
+
+.traffic-lights .light:nth-child(3)::before {
+  background: #c9cccd;
+}
+
+/* 悬停必须有动静:点变深 + 外圈浅环;鼠标按下去再深一档 */
+.traffic-lights .light:hover::before {
+  filter: brightness(0.9);
+  box-shadow: 0 0 0 3px rgba(127, 127, 127, 0.22);
+}
+
+.traffic-lights .light:active::before {
+  filter: brightness(0.82);
 }
 
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
@@ -1665,6 +1758,13 @@ body.is-sash-dragging {
   z-index: 50;
   display: flex;
   justify-content: flex-end;
+  /* 抽屉盖在圆角窗上:一起削出圆角,不然抽屉把四个圆角戳成方角 */
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+body.is-maximized .drawer-layer {
+  border-radius: 0;
 }
 
 .drawer-overlay {

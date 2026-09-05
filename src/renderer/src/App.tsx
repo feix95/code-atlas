@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { AiChatPanel } from './components/AiAssist'
 import { AiSettings } from './components/AiSettings'
@@ -12,8 +12,10 @@ import { GitChanges } from './components/GitChanges'
 import { GitFileStatus } from './components/GitFileStatus'
 import { ProjectOverview } from './components/ProjectOverview'
 import { StructureGrid } from './components/StructureGrid'
+import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
 import { FILE_PRESETS, useAiAsk } from './useAiAsk'
+import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 
@@ -151,6 +153,13 @@ function App(): React.JSX.Element {
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const [treeNote, setTreeNote] = useState<string | null>(null)
+
+  // 窗口壳:最大化时圆角描边要收掉;状态挂 body 上,抽屉(传送门挂在 body)跟着一起换装
+  const maximized = useWindowMaximized()
+  useEffect(() => {
+    document.body.classList.toggle('is-maximized', maximized)
+    return () => document.body.classList.remove('is-maximized')
+  }, [maximized])
 
   // VSCode 式分割条:左栏宽度跟着鼠标走;拖动布尔放 ref,不为它每帧重渲染
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -383,6 +392,7 @@ function App(): React.JSX.Element {
 
   return (
     <div className="app">
+      <TitleBar />
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">

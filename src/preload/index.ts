@@ -17,6 +17,17 @@ contextBridge.exposeInMainWorld('atlas', {
     electron: (): string => process.versions.electron
   },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('atlas:pick-folder'),
+  // 自绘窗口壳:三颗灰点背后的真动作 + 最大化状态同步,渲染进程不许直接碰 BrowserWindow
+  windowClose: (): Promise<void> => ipcRenderer.invoke('atlas:window-close'),
+  windowMinimize: (): Promise<void> => ipcRenderer.invoke('atlas:window-minimize'),
+  windowMaximizeToggle: (): Promise<boolean> => ipcRenderer.invoke('atlas:window-maximize-toggle'),
+  windowIsMaximized: (): Promise<boolean> => ipcRenderer.invoke('atlas:window-is-maximized'),
+  /** 订阅最大化/还原状态变化;返回退订函数,组件卸载时调用 */
+  onWindowMaximized: (callback: (maximized: boolean) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, maximized: boolean): void => callback(maximized)
+    ipcRenderer.on('atlas:window-maximized', listener)
+    return () => ipcRenderer.removeListener('atlas:window-maximized', listener)
+  },
   scanFolder: (folderPath: string): Promise<ScanResult> => ipcRenderer.invoke('atlas:scan-folder', folderPath),
   scanSubdir: (rootPath: string, relPath: string): Promise<ScanResult> =>
     ipcRenderer.invoke('atlas:scan-subdir', rootPath, relPath),
