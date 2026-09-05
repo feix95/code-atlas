@@ -151,12 +151,11 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     title: 'CodeAtlas',
-    // 窗口壳自绘:frame:false 摘掉系统标题栏,transparent 让圆角以外真透明 ——
-    // 露出来的是用户的真实桌面,不是自己画一层假桌面。拖边缩放交给 Chromium 的
-    // 命中测试(Electron 39 曾回归、当季修复,透明窗口现在原生可缩放)
+    // 窗口壳自绘:frame:false 摘掉系统标题栏,标题栏和左上角三颗灰点都自己画。
+    // 真透明试过一轮:150% 显示缩放的 Windows 上透明窗永远画不出头一帧,窗口整个隐身
+    // (进程活着、日志零报错、就是没窗户)—— 退回实底保打开,圆角悬浮等找到稳路子再上
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000', // 透明窗口不能写实色底,不然四个圆角外会发白发黑
+    backgroundColor: '#f6f7f8',
     autoHideMenuBar: true,
     show: false,
     webPreferences: {

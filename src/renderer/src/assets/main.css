@@ -96,13 +96,13 @@
   box-sizing: border-box;
 }
 
-/* 窗口壳是圆角悬浮卡:html/body 必须透明,圆角以外露出的是用户的真实桌面,不能自己垫色 */
+/* 窗口就是真实边界,边贴边铺满;真透明圆角壳在 150% 缩放屏上整个隐身,退回实底 */
 html,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  background: transparent;
+  background: var(--window);
 }
 
 #root {
@@ -119,19 +119,6 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--window);
-  /* 悬浮窗壳:圆角 + 一圈浅描边,数值照参考图;贴满屏幕时由 body.is-maximized 收掉 */
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 14px;
-  box-shadow:
-    0 24px 70px rgba(12, 44, 67, 0.28),
-    0 3px 12px rgba(17, 38, 49, 0.2);
-}
-
-/* 最大化贴满屏幕:圆角和描边必须收掉,四角才不漏出怪缝 */
-body.is-maximized .app {
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
 }
 
 /* ── 自绘标题栏:整条能拖动窗口;底下可点的东西必须 no-drag,不然只会拖窗点不到 ── */
@@ -1805,13 +1792,6 @@ body.is-sash-dragging {
   z-index: 50;
   display: flex;
   justify-content: flex-end;
-  /* 抽屉盖在圆角窗上:一起削出圆角,不然抽屉把四个圆角戳成方角 */
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-body.is-maximized .drawer-layer {
-  border-radius: 0;
 }
 
 .drawer-overlay {
