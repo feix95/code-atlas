@@ -165,13 +165,15 @@ body.is-maximized .app {
   background: linear-gradient(#242a2e, #1d2226);
 }
 
+/* 三颗窗控按钮住右上角,顺序照 Windows 习惯(最小化 → 最大化 → 关闭) */
 .traffic-lights {
   position: absolute;
-  left: 8.5px;
+  right: 10px;
   display: flex;
+  gap: 2px;
 }
 
-/* 灰点本体 11px,按钮底座放大到 18px:看着照参考图,点着不费劲 */
+/* 圆点本体 11px,按钮底座放大到 18px:点着不费劲 */
 .traffic-lights .light {
   position: relative;
   width: 18px;
@@ -199,22 +201,28 @@ body.is-maximized .app {
     box-shadow 0.12s ease;
 }
 
-.traffic-lights .light:nth-child(1)::before {
-  background: #d9d9d8;
+/* 最小化/最大化:中性灰,两颗之间留一丝深浅差;关闭:偏红的警示色,不用 hover 就能认出危险 */
+.traffic-lights .is-min::before {
+  background: #cfd2d1;
 }
 
-.traffic-lights .light:nth-child(2)::before {
-  background: #d0d2d0;
+.traffic-lights .is-max::before {
+  background: #c5c9c8;
 }
 
-.traffic-lights .light:nth-child(3)::before {
-  background: #c9cccd;
+.traffic-lights .is-close::before {
+  background: #d3736d;
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* 悬停必须有动静:点变深 + 外圈浅环;鼠标按下去再深一档 */
+/* 悬停必须有动静:点变深 + 外圈浅环;关闭的环也跟着带红,鼠标按下去再深一档 */
 .traffic-lights .light:hover::before {
   filter: brightness(0.9);
   box-shadow: 0 0 0 3px rgba(127, 127, 127, 0.22);
+}
+
+.traffic-lights .is-close:hover::before {
+  box-shadow: 0 0 0 3px rgba(211, 115, 109, 0.28);
 }
 
 .traffic-lights .light:active::before {
