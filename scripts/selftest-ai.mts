@@ -11,6 +11,7 @@ import {
   buildBinaryPrompt,
   explainWithModel,
   sniffBinaryKind,
+  FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
   isBinaryFile
 } from '../src/ai/index.ts'
@@ -89,6 +90,9 @@ async function main(): Promise<void> {
   assert.ok(fp.includes('.log×1'), '通用后缀分布要算上语言认不出的文件')
   assert.ok(fp.includes('文件类型分布'), '后缀分布要有标题行')
   assert.ok(fp.includes('系统目录'), '要有"认得系统目录就用常识"的引导')
+  // 防摆烂条款:人设必须禁止"看不出来"一句甩烂,极端情况也要复述文件名(第三十七锤补丁)
+  assert.ok(FOLDER_SYSTEM_PROMPT.includes('不许只回一句'), '文件夹人设要明确禁止一句摆烂')
+  assert.ok(FOLDER_SYSTEM_PROMPT.includes('念出来'), '毫无辨识度时也要把观察到的文件名念出来')
 
   const fpRoot = buildFolderPrompt({
     relPath: '',
