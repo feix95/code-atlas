@@ -4,7 +4,8 @@
    ============================================================ */
 
 :root {
-  color-scheme: light dark;
+  /* 亮暗由外观系统往 <html> 挂 data-theme 控制(自动模式跟着系统,也能手动钉死) */
+  color-scheme: light;
   /* ── 布局 token ── */
   --space-1: 4px;
   --space-2: 8px;
@@ -27,6 +28,7 @@
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
   /* ── 色板(浅色)── */
   --window: #f6f7f8;
+  --secondary: #5ac5db; /* 辅助色:图标/分布条的渐变配角 */
   --surface: #ffffff;
   --surface-soft: #fbfbfc;
   --line: #d9dcdf;
@@ -55,36 +57,37 @@
   --shadow-pop: 0 8px 24px rgba(12, 44, 67, 0.16);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --window: #1d2226;
-    --surface: #252b2f;
-    --surface-soft: #20262a;
-    --line: #374047;
-    --line-soft: #2c343a;
-    --text: #e5eaed;
-    --text-strong: #f0f4f6;
-    --muted: #9da8ae;
-    --muted-2: #778289;
-    --accent: #5fb0e6;
-    --accent-hover: #82c4ef;
-    --accent-soft: #203e54;
-    --accent-line: #2e607d;
-    --green: #55c07e;
-    --green-soft: #1e3527;
-    --green-line: #2e5a3d;
-    --amber: #d29922;
-    --amber-soft: #33290f;
-    --amber-line: #57431a;
-    --danger: #ef6b6b;
-    --danger-soft: #3a2226;
-    --danger-line: #63393e;
-    --git-add: #3fb950;
-    --git-rename: #d29922;
-    --hover: #293238;
-    --selected-bg: #213e52;
-    --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
-  }
+/* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --window: #1d2226;
+  --secondary: #7ecbe8;
+  --surface: #252b2f;
+  --surface-soft: #20262a;
+  --line: #374047;
+  --line-soft: #2c343a;
+  --text: #e5eaed;
+  --text-strong: #f0f4f6;
+  --muted: #9da8ae;
+  --muted-2: #778289;
+  --accent: #5fb0e6;
+  --accent-hover: #82c4ef;
+  --accent-soft: #203e54;
+  --accent-line: #2e607d;
+  --green: #55c07e;
+  --green-soft: #1e3527;
+  --green-line: #2e5a3d;
+  --amber: #d29922;
+  --amber-soft: #33290f;
+  --amber-line: #57431a;
+  --danger: #ef6b6b;
+  --danger-soft: #3a2226;
+  --danger-line: #63393e;
+  --git-add: #3fb950;
+  --git-rename: #d29922;
+  --hover: #293238;
+  --selected-bg: #213e52;
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -148,10 +151,8 @@ body.is-maximized .app {
   user-select: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  .titlebar {
-    background: linear-gradient(#242a2e, #1d2226);
-  }
+:root[data-theme='dark'] .titlebar {
+  background: linear-gradient(#242a2e, #1d2226);
 }
 
 .traffic-lights {
@@ -247,8 +248,8 @@ body.is-maximized .app {
   color: #fff;
   font-size: 14px;
   border-radius: 7px;
-  background: linear-gradient(135deg, #1876c8, #5ac5db);
-  box-shadow: 0 4px 9px rgba(21, 126, 204, 0.22);
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  box-shadow: 0 4px 9px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .brand-mark-big {
@@ -298,7 +299,7 @@ body.is-maximized .app {
   color: #fff;
   border-color: var(--accent);
   background: var(--accent);
-  box-shadow: 0 2px 5px rgba(20, 125, 204, 0.22);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .btn-primary:hover {
@@ -306,10 +307,8 @@ body.is-maximized .app {
   border-color: var(--accent-hover);
 }
 
-@media (prefers-color-scheme: dark) {
-  .btn-primary {
-    color: #10222e;
-  }
+:root[data-theme='dark'] .btn-primary {
+  color: #10222e;
 }
 
 .btn-ghost {
@@ -364,7 +363,7 @@ body.is-maximized .app {
 
 .path-box:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(20, 125, 204, 0.09);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .path-input {
@@ -442,10 +441,8 @@ body.is-maximized .app {
   overflow: hidden;
 }
 
-@media (prefers-color-scheme: dark) {
-  .sidebar {
-    background: #1a2024;
-  }
+:root[data-theme='dark'] .sidebar {
+  background: #1a2024;
 }
 
 .sidebar-top {
@@ -1055,7 +1052,7 @@ body.is-sash-dragging {
   height: 100%;
   display: block;
   border-radius: inherit;
-  background: linear-gradient(90deg, #3b9dd8, #74cbdc);
+  background: linear-gradient(90deg, var(--secondary), var(--accent));
   min-width: 2px;
 }
 
@@ -1282,10 +1279,8 @@ body.is-sash-dragging {
   background: var(--accent);
 }
 
-@media (prefers-color-scheme: dark) {
-  .prompt:hover {
-    color: #10222e;
-  }
+:root[data-theme='dark'] .prompt:hover {
+  color: #10222e;
 }
 
 .prompt:disabled {
@@ -1429,7 +1424,7 @@ body.is-sash-dragging {
 
 .chat-input input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(20, 125, 204, 0.09);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 /* ── 关系 Tab ── */
@@ -1718,6 +1713,60 @@ body.is-sash-dragging {
   min-width: 0;
 }
 
+/* 设置抽屉里的两个面板(外观 / AI)之间留一道缝 */
+.ai-settings + .ai-settings {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-soft);
+}
+
+/* 配色预设小圆点:两颗一排,一眼看出这套配色长什么样 */
+.preset-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: -1px;
+}
+
+/* 取色器:原生控件收一收边就够用 */
+.color-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.color-input {
+  width: 36px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.scale-value {
+  min-width: 48px;
+  text-align: center;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
 .ai-actions {
   display: flex;
   align-items: center;
@@ -1744,10 +1793,8 @@ body.is-sash-dragging {
   color: #fff;
 }
 
-@media (prefers-color-scheme: dark) {
-  .chip-link.is-on {
-    color: #10222e;
-  }
+:root[data-theme='dark'] .chip-link.is-on {
+  color: #10222e;
 }
 
 /* ── 抽屉 ── */

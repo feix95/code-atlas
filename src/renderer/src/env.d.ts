@@ -19,6 +19,8 @@ declare global {
         electron: () => string
       }
       pickFolder: () => Promise<string | null>
+      getUiScale: () => number
+      setUiScale: (factor: number) => void
       windowClose: () => Promise<void>
       windowMinimize: () => Promise<void>
       windowMaximizeToggle: () => Promise<boolean>

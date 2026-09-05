@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { AiChatPanel } from './components/AiAssist'
 import { AiSettings } from './components/AiSettings'
+import { AppearanceSettings } from './components/AppearanceSettings'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { Drawer } from './components/Drawer'
 import { FileOverview } from './components/FileOverview'
@@ -429,7 +430,7 @@ function App(): React.JSX.Element {
           </button>
           {pathHint && <div className="path-hint">{pathHint}</div>}
         </div>
-        <button type="button" className="icon-btn" onClick={() => setShowSettings(true)} aria-label="打开 AI 设置">
+        <button type="button" className="icon-btn" onClick={() => setShowSettings(true)} aria-label="打开设置">
           ⚙
         </button>
       </header>
@@ -562,7 +563,8 @@ function App(): React.JSX.Element {
       )}
 
       {showSettings && (
-        <Drawer title="AI 设置" onClose={() => setShowSettings(false)}>
+        <Drawer title="设置" onClose={() => setShowSettings(false)}>
+          <AppearanceSettings />
           <AiSettings />
         </Drawer>
       )}
