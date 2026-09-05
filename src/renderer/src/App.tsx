@@ -107,10 +107,15 @@ function buildCrumbs(rootName: string, rootPath: string, relPath: string): Crumb
   return crumbs
 }
 
-// 左栏宽度:分割条拖多宽记进 localStorage,下次打开还是自己调好的样子
+// 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值),下次打开还是自己调好的样子
 const DEFAULT_SIDEBAR_WIDTH = 340
 const MIN_SIDEBAR_WIDTH = 240
 const SIDEBAR_WIDTH_KEY = 'atlas.sidebar-width'
+
+function readSidebarBase(): number {
+  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
+  return saved > 0 ? saved : DEFAULT_SIDEBAR_WIDTH
+}
 
 // 树再宽也不能把右栏挤没:右栏保底 360px 看分析内容
 function clampSidebar(width: number): number {
@@ -164,23 +169,39 @@ function App(): React.JSX.Element {
     return () => document.body.classList.remove('is-maximized')
   }, [maximized])
 
-  // VSCode 式分割条:左栏宽度跟着鼠标走;拖动布尔放 ref,不为它每帧重渲染
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
-    return saved > 0 ? clampSidebar(saved) : DEFAULT_SIDEBAR_WIDTH
-  })
+  // 界面缩放系数:设置页滑条实时改;左栏宽度要按比例跟着走(固定像素不跟缩放,
+  // 高倍率下文字变大、面板不变,挤在一起 —— 第四十四锤修的根因就在这)
+  const [uiScale, setUiScale] = useState(window.atlas.getUiScale)
+  // VSCode 式分割条:左栏宽度跟着鼠标走。存的是「100% 缩放下的基准值」,
+  // 渲染宽度 = 基准值 × 缩放系数,面板和文字等比例一起变
+  const sidebarBaseRef = useRef(readSidebarBase())
+  const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebar(readSidebarBase() * window.atlas.getUiScale()))
   const sidebarWidthRef = useRef(sidebarWidth)
   const sashDraggingRef = useRef(false)
 
   function applySidebarWidth(next: number): void {
     const clamped = clampSidebar(next)
     sidebarWidthRef.current = clamped
+    sidebarBaseRef.current = clamped / uiScale
     setSidebarWidth(clamped)
   }
 
   function persistSidebarWidth(): void {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current))
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarBaseRef.current))
   }
+
+  // 设置页拖了缩放滑条:按基准值 × 新系数重算左栏宽度,重夹一遍边界
+  useEffect(() => {
+    function onUiScale(e: Event): void {
+      const factor = (e as CustomEvent<number>).detail
+      setUiScale(factor)
+      const clamped = clampSidebar(sidebarBaseRef.current * factor)
+      sidebarWidthRef.current = clamped
+      setSidebarWidth(clamped)
+    }
+    window.addEventListener('atlas:ui-scale', onUiScale)
+    return () => window.removeEventListener('atlas:ui-scale', onUiScale)
+  }, [])
 
   // pointer capture:鼠标拖出分割条、甚至拖出窗口,move 事件照样送到条上,不跟丢
   function onSashPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
@@ -206,7 +227,7 @@ function App(): React.JSX.Element {
   }
 
   function onSashDoubleClick(): void {
-    applySidebarWidth(DEFAULT_SIDEBAR_WIDTH)
+    applySidebarWidth(DEFAULT_SIDEBAR_WIDTH * uiScale)
     persistSidebarWidth()
   }
 

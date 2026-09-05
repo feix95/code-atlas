@@ -8,8 +8,9 @@ import {
   type AppearanceMode
 } from '../appearance'
 
-// 界面缩放的档位(跟 VS Code 的界面缩放一个意思):小屏幕调小,大显示器调大
-const SCALE_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.4]
+// 界面缩放范围(跟 VS Code 的界面缩放一个意思):连续滑条随意调,小屏幕调小,大显示器调大
+const SCALE_MIN = 0.8
+const SCALE_MAX = 1.8
 
 const MODES: Array<{ key: AppearanceMode; name: string }> = [
   { key: 'auto', name: '跟随系统' },
@@ -31,12 +32,14 @@ export function AppearanceSettings(): React.JSX.Element {
     applyAppearance(next)
   }
 
-  function stepScale(dir: 1 | -1): void {
-    const i = SCALE_STEPS.findIndex((v) => v >= scale - 0.001)
-    const current = i === -1 ? SCALE_STEPS.length - 1 : i
-    const next = SCALE_STEPS[Math.min(Math.max(current + dir, 0), SCALE_STEPS.length - 1)]
-    setScale(next)
-    window.atlas.setUiScale(next)
+  function applyScale(next: number): void {
+    const v = Math.min(Math.max(next, SCALE_MIN), SCALE_MAX)
+    setScale(v)
+    window.atlas.setUiScale(v)
+  }
+
+  function stepScale(dir: number): void {
+    applyScale(Math.round((scale + dir) * 100) / 100)
   }
 
   const preset = COLOR_PRESETS.find((p) => p.key === appearance.preset) ?? COLOR_PRESETS[0]
@@ -113,15 +116,26 @@ export function AppearanceSettings(): React.JSX.Element {
       <div className="ai-field">
         <span className="ai-label">界面大小</span>
         <div className="ai-row">
-          <button type="button" className="btn" onClick={() => stepScale(-1)} disabled={scale <= SCALE_STEPS[0]}>
-            − 调小
+          <button type="button" className="btn" aria-label="调小界面" onClick={() => stepScale(-0.05)} disabled={scale <= SCALE_MIN + 0.001}>
+            −
           </button>
+          <input
+            type="range"
+            className="scale-slider"
+            min={SCALE_MIN}
+            max={SCALE_MAX}
+            step={0.05}
+            value={scale}
+            aria-label="界面缩放(80% 到 180%)"
+            aria-valuetext={`${Math.round(scale * 100)}%`}
+            onChange={(e) => applyScale(Number(e.target.value))}
+          />
           <span className="scale-value mono">{Math.round(scale * 100)}%</span>
-          <button type="button" className="btn" onClick={() => stepScale(1)} disabled={scale >= SCALE_STEPS[SCALE_STEPS.length - 1]}>
-            + 调大
+          <button type="button" className="btn" aria-label="调大界面" onClick={() => stepScale(0.05)} disabled={scale >= SCALE_MAX - 0.001}>
+            +
           </button>
         </div>
-        <p className="ai-hint">小屏幕觉得挤就调小,大显示器觉得字小就调大,点了马上变,下次打开还是这个大小。</p>
+        <p className="ai-hint">拖滑条或点两边加减微调,80% 到 180% 随意;左边文件树会跟着一起变大变小,点了马上生效。</p>
       </div>
     </div>
   )

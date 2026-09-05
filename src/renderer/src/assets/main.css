@@ -1979,6 +1979,13 @@ body.is-sash-dragging {
   border-radius: 4px;
 }
 
+/* 连续缩放滑条:主题色渲染,左右加减按钮夹着 % 读数 */
+.scale-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
 .scale-value {
   min-width: 48px;
   text-align: center;
