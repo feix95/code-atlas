@@ -24,8 +24,8 @@ export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent:
   { key: 'violet', name: '丁香紫', accent: '#7c5cd6', secondary: '#b79ef0' }
 ]
 
-/** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配 */
-const TOKEN_KEYS = ['--accent', '--accent-hover', '--accent-soft', '--accent-line', '--selected-bg', '--secondary'] as const
+/** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配(--secondary-deep 是辅助色的文字安全档) */
+const TOKEN_KEYS = ['--accent', '--accent-hover', '--accent-soft', '--accent-line', '--selected-bg', '--secondary', '--secondary-deep'] as const
 
 export function loadAppearance(): Appearance {
   try {
@@ -115,6 +115,7 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--accent-line', hslCss(h, 30, 40))
     root.setProperty('--selected-bg', hslCss(h, 40, 24))
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 50, 78)))
+    root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
   } else {
     root.setProperty('--accent', hslCss(h, sat, clamp(l, 28, 58)))
     root.setProperty('--accent-hover', hslCss(h, sat, clamp(l, 28, 58) - 8))
@@ -122,6 +123,7 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--accent-line', hslCss(h, sat, 80))
     root.setProperty('--selected-bg', hslCss(h, sat, 91))
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
+    root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
   }
 }
 
