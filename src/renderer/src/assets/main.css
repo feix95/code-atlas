@@ -343,9 +343,11 @@ body.is-maximized .app {
   background: color-mix(in srgb, var(--secondary) 10%, transparent);
 }
 
+/* 图标按钮:热区放大到 36px 兜住「双重缩放(系统 150% × 应用 zoom)下的小幅命中偏移」,
+   字形 16px 视觉不变;line-height 锁 1 防字形基线漂移 */
 .icon-btn {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -354,6 +356,7 @@ body.is-maximized .app {
   color: var(--muted);
   background: transparent;
   font-size: 16px;
+  line-height: 1;
   font-family: inherit;
   cursor: pointer;
   flex-shrink: 0;
