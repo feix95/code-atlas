@@ -15,7 +15,7 @@ import { ProjectOverview } from './components/ProjectOverview'
 import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
-import { FILE_PRESETS, useAiAsk } from './useAiAsk'
+import { CHAT_PRESETS, FILE_PRESETS, useAiAsk } from './useAiAsk'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
@@ -703,7 +703,9 @@ function FileDetailView({
             onGoChat={() => onTabChange('chat')}
           />
         )}
-        {activeTab === 'chat' && <AiChatPanel ai={ai} presets={FILE_PRESETS} contextLabel={file.name} mainLabel="解释这个文件" />}
+        {activeTab === 'chat' && (
+          <AiChatPanel ai={ai} presets={[...CHAT_PRESETS, ...FILE_PRESETS]} contextLabel={file.name} mainLabel="解释这个文件" />
+        )}
       </div>
     </div>
   )
@@ -735,7 +737,7 @@ function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: 
       />
       <div className="detail-body">
         {tab === 'overview' && <FolderOverview dir={dir} ai={ai} />}
-        {tab === 'ai' && <AiChatPanel ai={ai} presets={[]} contextLabel={dir.name || result.rootName} mainLabel="用大白话讲讲这个文件夹" folderMode />}
+        {tab === 'ai' && <AiChatPanel ai={ai} presets={CHAT_PRESETS} contextLabel={dir.name || result.rootName} mainLabel="用大白话讲讲这个文件夹" folderMode />}
       </div>
     </div>
   )

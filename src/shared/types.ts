@@ -220,3 +220,12 @@ export interface AiExplainResult {
   /** 耗时(ms) */
   durationMs: number
 }
+
+/**
+ * 追问的对话历史(渲染进程 → 主进程):之前的问答对,让追问不失忆。
+ * 渲染进程只回传问题和模型自己的回答,证据(路径/清单/结构)由主进程每次现场重摆。
+ */
+export interface AiHistoryMessage {
+  role: 'user' | 'assistant'
+  content: string
+}

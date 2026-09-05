@@ -8,12 +8,16 @@ import { buildDependencyGraph } from '../depgraph/index.ts'
 import { collectGitChanges, getChangeDiff } from '../git/index.ts'
 import {
   explainWithModel,
+  explainWithMessages,
   buildExplainPrompt,
   buildDiffPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
   buildBinaryPrompt,
   sniffBinaryKind,
+  sanitizeHistory,
+  buildChatMessages,
+  CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT
@@ -42,6 +46,33 @@ function withQuestion(prompt: string, question: unknown): string {
 
 /** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
 const explainAborters = new Map<string, AbortController>()
+
+/**
+ * 讲解/追问的共用出口。没有对话历史 = 首次讲解,走原路(各自人设 + 问题追加);
+ * 带了对话历史 = 追问,换追问人设,证据每轮重新摆一遍当第一条消息,历史问答垫在后面 ——
+ * 模型不失忆的根就是这份永远新鲜的证据,历史只是帮它接上话茬。
+ */
+async function respondWithEvidence(
+  event: IpcMainInvokeEvent,
+  requestId: unknown,
+  question: unknown,
+  history: unknown,
+  evidence: string,
+  system: string | undefined,
+  resolved: { target: ChatTarget }
+): Promise<AiExplainResult> {
+  const onDelta = makeDeltaSender(event, requestId)
+  const hist = sanitizeHistory(history)
+  if (hist.length === 0) {
+    return explainWithCancel(requestId, (signal) =>
+      explainWithModel(resolved.target, withQuestion(evidence, question), system, onDelta, signal)
+    )
+  }
+  const q = typeof question === 'string' && question.trim() !== '' ? question.trim() : '请结合上面的资料再讲讲。'
+  return explainWithCancel(requestId, (signal) =>
+    explainWithMessages(resolved.target, buildChatMessages(CHAT_SYSTEM_PROMPT, evidence, hist, q), onDelta, signal)
+  )
+}
 
 /**
  * 带取消的讲解执行:requestId 对号入座。
@@ -387,7 +418,15 @@ function registerIpc(): void {
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
-    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown) => {
+    async (
+      event,
+      rootPath: unknown,
+      relPath: unknown,
+      languageId: unknown,
+      requestId?: unknown,
+      question?: unknown,
+      history?: unknown
+    ) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
@@ -405,7 +444,6 @@ function registerIpc(): void {
         throw new Error(`这个路径不是一个文件:${relPath}`)
       }
       const name = relPath.split('/').pop() ?? relPath
-      const onDelta = makeDeltaSender(event, requestId)
 
       // 结构流:证据最硬 —— 函数/类/导入导出都摆给模型
       if (isAnalysisSupported(languageId) && stat.size <= 1_000_000) {
@@ -415,11 +453,15 @@ function registerIpc(): void {
         })
         const structure = await analyzeSource(code, languageId)
         if (structure) {
-          const prompt = withQuestion(
+          return respondWithEvidence(
+            event,
+            requestId,
+            question,
+            history,
             buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null }),
-            question
+            undefined,
+            resolved
           )
-          return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, undefined, onDelta, signal))
         }
       }
 
@@ -439,18 +481,34 @@ function registerIpc(): void {
             ? `${kind.type},尺寸 ${kind.dims}`
             : kind.type
           : '认不出具体格式(文件头不像任何已知类型)'
-        const prompt = withQuestion(buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }), question)
-        return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
+        return respondWithEvidence(
+          event,
+          requestId,
+          question,
+          history,
+          buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }),
+          GUESS_SYSTEM_PROMPT,
+          resolved
+        )
       }
       const languageName = BY_EXT.get(extOf(name))?.name ?? ''
-      const prompt = withQuestion(buildGuessPrompt({ relPath, name, absPath, languageName, preview }), question)
-      return explainWithCancel(requestId, (signal) => explainWithModel(resolved.target, prompt, GUESS_SYSTEM_PROMPT, onDelta, signal))
+      return respondWithEvidence(
+        event,
+        requestId,
+        question,
+        history,
+        buildGuessPrompt({ relPath, name, absPath, languageName, preview }),
+        GUESS_SYSTEM_PROMPT,
+        resolved
+      )
     }
   )
 
   // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
-  // relPath 传 '' 表示解释项目根目录本身
-  ipcMain.handle('atlas:ai-explain-folder', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown) => {
+  // relPath 传 '' 表示解释项目根目录本身;带 history = 讲解之后的追问,换追问人设接着聊
+  ipcMain.handle(
+    'atlas:ai-explain-folder',
+    async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown, history?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -495,7 +553,11 @@ function registerIpc(): void {
       const ext = dot > 0 ? item.name.slice(dot).toLowerCase() : '(无后缀)'
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1)
     }
-    const prompt = withQuestion(
+    return respondWithEvidence(
+      event,
+      requestId,
+      question,
+      history,
       buildFolderPrompt({
         relPath,
         name: basename(absPath) || basename(rootPath),
@@ -505,10 +567,8 @@ function registerIpc(): void {
         languages: Object.fromEntries(languages),
         extCounts: Object.fromEntries(extCounts)
       }),
-      question
-    )
-    return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, prompt, FOLDER_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
+      FOLDER_SYSTEM_PROMPT,
+      resolved
     )
   })
 

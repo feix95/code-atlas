@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import type { AiAssistApi, AiTurn } from '../useAiAsk'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
@@ -155,9 +155,9 @@ export function AiAssistCard({
 }
 
 /**
- * AI 对话 Tab:所有问答摆成一条线(问的靠右蓝泡,答的靠左白泡),
- * 输入框发新问题(问题自动绑定当前文件,不用重复描述)。
- * folderMode = 文件夹讲解:没有输入框和预设,只有主按钮和线程。
+ * AI 对话 Tab:所有问答摆成一条线(问的靠右蓝泡,答的靠左白泡)。
+ * 推荐追问按钮点一下只是填进输入框,方便改两个字再发;回车照常发送。
+ * 文件和文件夹都有输入框 —— "这个能删吗"这种追问就是给文件夹准备的。
  */
 export function AiChatPanel({
   ai,
@@ -173,6 +173,12 @@ export function AiChatPanel({
   folderMode?: boolean
 }): React.JSX.Element {
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function fill(q: string): void {
+    setDraft(q)
+    inputRef.current?.focus()
+  }
 
   function submit(e: FormEvent): void {
     e.preventDefault()
@@ -187,9 +193,9 @@ export function AiChatPanel({
       {ai.turns.length === 0 && (
         <div className="chat-intro">
           <p>
-            围绕 <strong>{contextLabel}</strong> 提问。挑一个预设问题,或自己在下面输入;AI 不会在你浏览时自动开跑。
+            围绕 <strong>{contextLabel}</strong> 追问:挑一个推荐问题填进去(可以改两个字再发),或自己输入。
+            AI 会带着前面讲解的内容一起回答,不会每次都从头来。
           </p>
-          <PresetRow presets={presets} disabled={false} onPick={(q) => ai.ask(q)} />
           {folderMode && (
             <div className="ai-card-actions">
               <button type="button" className="btn btn-primary" onClick={() => ai.ask(null)}>
@@ -220,13 +226,15 @@ export function AiChatPanel({
           ))}
         </div>
       )}
-      {!folderMode && (
+      <div className="chat-bottom">
+        <PresetRow presets={presets} disabled={false} onPick={fill} />
         <form className="chat-input" onSubmit={submit}>
           <input
+            ref={inputRef}
             type="text"
             value={draft}
-            placeholder={ai.busy ? 'AI 正在回答上一个问题……' : `询问 ${contextLabel}……`}
-            aria-label="输入问题"
+            placeholder={ai.busy ? 'AI 正在回答上一个问题……' : `追问 ${contextLabel}……`}
+            aria-label="输入追问"
             onChange={(e) => setDraft(e.target.value)}
           />
           <button type="submit" className="btn btn-primary" disabled={ai.busy}>
@@ -238,7 +246,7 @@ export function AiChatPanel({
             </button>
           )}
         </form>
-      )}
+      </div>
     </div>
   )
 }

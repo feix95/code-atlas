@@ -2,7 +2,7 @@
 // 路径契约:只认 relPath,读文件是主进程的事;这里只负责"拼提示词 + 调接口"。
 // 底层不绑定任何推理服务 —— LM Studio、llama-server 都说 OpenAI 兼容的方言,
 // 这里只认 ChatTarget(baseURL + 模型名),换后端不改一行业务代码。
-import type { AiExplainResult, ChatTarget, FileStructure, DepGraphResult } from '../shared/types.ts'
+import type { AiExplainResult, AiHistoryMessage, ChatTarget, FileStructure, DepGraphResult } from '../shared/types.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -44,6 +44,67 @@ export const GUESS_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码猜猜官"。
 2. 绝不编造片段里没有的函数、类或功能。
 3. 如果完整路径一看就是系统目录或知名软件的地盘(比如 Windows、Program Files、AppData),直接用你已知的常识介绍这类文件是干什么的,不用假装只能凭片段瞎猜。
 4. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。`
+
+/**
+ * 追问的专属人设:讲解之后的"能不能删、删了会怎样"这类行动问题归它答。
+ * 分寸:敢给明确倾向,不拿"咨询专业人士"打太极;但系统关键地盘必须劝阻;
+ * 建议"能删"时顺手带低成本安全网;真没把握就老实承认,不装懂。
+ */
+export const CHAT_SYSTEM_PROMPT = `你是 CodeAtlas 的"追问答疑官"。用户看过一段讲解后继续追问,常问"这个能删吗、删了会有什么影响、这是什么软件留下的"。
+你的任务:结合 Given 的资料(完整路径、清单/结构、之前的对话)和常识,正面回答,给普通人能落地的建议。
+铁律:
+1. 只依据 Given 的资料和常识说话,绝不编造资料里没有的东西。
+2. 敢给明确倾向:能判断就直说(比如"这类残留文件夹通常删了不影响系统运行"),不许用"建议咨询专业人士"这种没有信息量的车轱辘话敷衍。
+3. 涉及系统关键地盘(Windows、Program Files、System32 这类系统目录内部)要明确劝阻:这些是系统和软件的家,删了可能开不了机或坏掉软件,别怂恿用户删。
+4. 建议"可以删"时,顺手带一句低成本保险做法:"先移到回收站,观察几天没问题再清空",不许空喊"建议谨慎"。
+5. 真没把握判断安全性,就老实说"这个我也判断不了,建议你自己搜一下确认",不许装懂。
+6. 不输出废话、不寒暄。用中文,短句,最多 5 句。`
+
+/** 追问历史的上限:本地模型上下文只有 4096,证据每轮都要全量重摆,历史只留最近几条垫底 */
+const CHAT_HISTORY_MAX = 5
+const CHAT_HISTORY_CONTENT_MAX = 500
+
+/** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆 */
+export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
+  if (!Array.isArray(history)) return []
+  const cleaned: AiHistoryMessage[] = []
+  for (const item of history) {
+    if (typeof item !== 'object' || item === null) continue
+    const { role, content } = item as { role?: unknown; content?: unknown }
+    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') continue
+    const text = content.trim()
+    if (!text) continue
+    cleaned.push({ role, content: text.length > CHAT_HISTORY_CONTENT_MAX ? `${text.slice(0, CHAT_HISTORY_CONTENT_MAX)}……` : text })
+    if (cleaned.length >= CHAT_HISTORY_MAX) break
+  }
+  return cleaned
+}
+
+/**
+ * 组追问的消息序列:证据永远当第一条用户消息重摆(模型不失忆的根),
+ * 历史问答跟在后面,当前问题收尾。相邻同角色合并成一条 —— 首问不带讲解直问时,
+ * 证据和首个问题会连成两条 user,拼回一条才跟当时的真实对话形态一致,也不挑聊天模板。
+ */
+export function buildChatMessages(
+  system: string,
+  evidence: string,
+  history: AiHistoryMessage[],
+  question: string
+): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: system },
+    { role: 'user', content: evidence },
+    ...history,
+    { role: 'user', content: `用户的问题:${question}` }
+  ]
+  const merged: typeof messages = []
+  for (const msg of messages) {
+    const last = merged[merged.length - 1]
+    if (last && last.role === msg.role) last.content = `${last.content}\n\n${msg.content}`
+    else merged.push({ ...msg })
+  }
+  return merged
+}
 
 function formatStructureLines(structure: FileStructure): string[] {
   const lines: string[] = []
@@ -372,10 +433,9 @@ const STREAM_IDLE_MS = 30_000
  * signal = 外部取消(用户换了讲解目标):立刻掐,不让过气的生成占着模型排队。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
  */
-export async function explainWithModel(
+export async function explainWithMessages(
   config: ChatTarget,
-  prompt: string,
-  system: string = SYSTEM_PROMPT,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   onDelta?: (text: string) => void,
   signal?: AbortSignal
 ): Promise<AiExplainResult> {
@@ -402,10 +462,7 @@ export async function explainWithModel(
       },
       body: JSON.stringify({
         model: config.model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: prompt }
-        ],
+        messages,
         temperature: 0.2,
         max_tokens: 500,
         stream: Boolean(onDelta)
@@ -462,4 +519,23 @@ export async function explainWithModel(
   } finally {
     clearTimeout(watchdog)
   }
+}
+
+/** 单轮讲解的老入口:人设 + 一条证据消息。追问等多轮场景直接用 explainWithMessages */
+export async function explainWithModel(
+  config: ChatTarget,
+  prompt: string,
+  system: string = SYSTEM_PROMPT,
+  onDelta?: (text: string) => void,
+  signal?: AbortSignal
+): Promise<AiExplainResult> {
+  return explainWithMessages(
+    config,
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt }
+    ],
+    onDelta,
+    signal
+  )
 }

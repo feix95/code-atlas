@@ -1385,14 +1385,21 @@ body.is-sash-dragging {
   margin: 0;
 }
 
+/* 对话底部:推荐追问 + 输入框吸底,聊得再长也不够不着输入框 */
+.chat-bottom {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  background: var(--surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .chat-input {
   display: flex;
   gap: var(--space-2);
-  margin-top: auto;
-  padding-top: var(--space-3);
-  position: sticky;
-  bottom: 0;
-  background: var(--surface-soft);
 }
 
 .chat-input input {

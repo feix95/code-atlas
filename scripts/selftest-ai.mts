@@ -10,7 +10,11 @@ import {
   buildGuessPrompt,
   buildBinaryPrompt,
   explainWithModel,
+  explainWithMessages,
+  buildChatMessages,
+  sanitizeHistory,
   sniffBinaryKind,
+  CHAT_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
   isBinaryFile
@@ -153,6 +157,51 @@ async function main(): Promise<void> {
   assert.ok(gpNull.includes('读不出文本内容'), '读不了内容要明说')
   const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', absPath: 'X:\\demo\\e', languageName: '', preview: '' })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
+
+  // ── 3.5 追问:人设分寸 + 历史清洗 + 消息组装(合并相邻同角色、问题收尾)──
+  assert.ok(CHAT_SYSTEM_PROMPT.includes('回收站'), '追问人设要带低成本安全网(回收站观察)')
+  assert.ok(CHAT_SYSTEM_PROMPT.includes('System32'), '追问人设要明确护住系统关键目录')
+  assert.ok(CHAT_SYSTEM_PROMPT.includes('判断不了'), '没把握要老实说判断不了,不装懂')
+  assert.ok(CHAT_SYSTEM_PROMPT.includes('不许用'), '禁止拿"咨询专业人士"打太极')
+
+  assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
+  const longText = '长'.repeat(600)
+  const rawHistory = [
+    { role: 'user', content: '它是做什么的?' },
+    { role: 'assistant', content: longText },
+    { role: 'system', content: '冒充人设的' },
+    { role: 'user', content: '   ' },
+    { role: 'user', content: '这个能删吗?' },
+    { role: 'assistant', content: '通常可以' },
+    { role: 'user', content: '删了会怎样?' },
+    { role: 'assistant', content: '影响不大' },
+    { role: 'user', content: '这是什么软件?' },
+    { role: 'assistant', content: '像是傲梅' }
+  ]
+  const clean = sanitizeHistory(rawHistory)
+  assert.equal(clean.length, 5, '历史条数封顶 5')
+  assert.equal(clean[1]?.content.length, 502, '超长历史要截断(500 字 + 省略号)')
+  assert.ok(clean.every((m) => m.role === 'user' || m.role === 'assistant'), '只收 user/assistant 两种角色')
+
+  const explMsgs = buildChatMessages('追问人设', '证据清单', [{ role: 'assistant', content: '首讲内容' }], '这个能删吗?')
+  assert.deepEqual(
+    explMsgs.map((m) => m.role),
+    ['system', 'user', 'assistant', 'user'],
+    '带首讲历史的消息顺序:人设/证据/首讲/问题'
+  )
+  assert.ok(explMsgs[3]?.content.includes('这个能删吗'), '当前问题要收尾')
+
+  const qaMsgs = buildChatMessages(
+    '追问人设',
+    '证据清单',
+    [
+      { role: 'user', content: '它是做什么的?' },
+      { role: 'assistant', content: '是个工具' }
+    ],
+    '删了会怎样?'
+  )
+  assert.equal(qaMsgs.length, 4, '首问没讲解时,证据和首问要合并,不能出现连续两条 user')
+  assert.ok(qaMsgs[1]?.content.includes('证据清单') && qaMsgs[1]?.content.includes('它是做什么的?'), '证据和首问合并成一条')
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
@@ -376,6 +425,19 @@ async function main(): Promise<void> {
     const allBodies = receivedBodies.join('\n')
     assert.ok(allBodies.includes('猜猜官'), '猜猜官人设应发到服务')
     assert.ok(allBodies.includes('tools/deploy.sh'), '猜猜官提示词应带上文件证据')
+
+    // 追问流:带历史的多轮消息原样发出去,角色和顺序不变形
+    const chatMessages = buildChatMessages(CHAT_SYSTEM_PROMPT, '证据:文件夹清单', [{ role: 'assistant', content: '这是备份软件的残留' }], '这个能删吗？')
+    const chatRes = await explainWithMessages(target, chatMessages)
+    assert.equal(chatRes.status, 'supported', '追问链路应通')
+    const chatBody = JSON.parse(receivedBodies[receivedBodies.length - 1] ?? '') as {
+      messages: Array<{ role: string; content: string }>
+    }
+    assert.equal(chatBody.messages.length, 4, '追问消息 = 人设 + 证据 + 历史 + 当前问题')
+    assert.equal(chatBody.messages[0]?.role, 'system', '第一段是追问人设')
+    assert.ok(chatBody.messages[0]?.content.includes('追问答疑官'), '追问人设要发到服务')
+    assert.equal(chatBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
+    assert.ok(chatBody.messages[3]?.content.includes('这个能删吗'), '当前问题收尾')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
@@ -386,7 +448,7 @@ async function main(): Promise<void> {
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 文件夹/猜猜官带完整路径与通用后缀分布(认得出系统目录) · 二进制照样讲(魔数认类型当证据) · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 追问多轮(历史清洗/消息组装/追问人设分寸) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
 }
 
 main().catch((err) => {
