@@ -999,6 +999,20 @@ body.is-sash-dragging {
   margin-top: var(--space-3);
 }
 
+/* 统计方块只管自己的上边距;紧跟它的文字说明/双栏要自己留呼吸缝,不然贴成一坨 */
+.metric-grid + .card-text {
+  margin-top: var(--space-3);
+}
+
+.metric-grid + .two-col {
+  margin-top: var(--space-3);
+}
+
+/* 相邻两行文字说明同理:「主要语言」和速览一句话不能贴在一起 */
+.card-text + .card-text {
+  margin-top: var(--space-2);
+}
+
 .metric {
   padding: 10px;
   border: 1px solid var(--line);
