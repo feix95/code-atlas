@@ -103,8 +103,7 @@
 
 /* 界面缩放约定(第四十七锤起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
    布局/字号/图标全挂 rem 跟着变,点击坐标和视觉永远 1:1 —— 不再借用浏览器缩放坐标系。
-   两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;
-   ②窗壳本体(透明裙边/圆角/阴影)是「窗」的装饰,不该跟着内容一起胖 */
+   两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;②窗壳的圆角和描边是「窗」的装饰 */
 html,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -114,12 +113,10 @@ body {
   background: transparent;
 }
 
+/* 圆角贴满窗(第五十六锤,小葵拍板):界面卡片直接铺满整扇窗 —— 不留透明裙边、
+   不要外阴影,只有四个角用圆角裁掉透出真实桌面。Win10 没有系统圆角接口,
+   透明合成仍是唯一能出抗锯齿圆角的路,玻璃窗保留 */
 body {
-  padding: 10px;
-}
-
-/* 最大化贴满屏幕:裙边、圆角、描边、阴影全收掉,四角不漏缝 */
-body.is-maximized {
   padding: 0;
 }
 
@@ -139,16 +136,12 @@ body.is-maximized {
   background: var(--canvas-tint);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow:
-    0 16px 44px rgba(15, 30, 40, 0.16),
-    0 3px 12px rgba(15, 30, 40, 0.08);
 }
 
-/* 最大化:窗口贴满屏幕,圆角悬浮卡的一切外壳装饰退场 */
+/* 最大化:贴满屏幕时圆角和描边收掉,四角不漏缝 */
 body.is-maximized .app {
   border: none;
   border-radius: 0;
-  box-shadow: none;
 }
 
 /* ── 自绘标题栏:整条能拖动窗口;底下可点的东西必须 no-drag,不然只会拖窗点不到 ── */
@@ -2105,20 +2098,16 @@ body.is-sash-dragging {
 
 .drawer-layer {
   position: fixed;
-  /* 只铺满圆角卡,不铺满整扇玻璃窗:窗口四周有 10px 透明裙边给阴影呼吸,
-     抽屉要是按 inset:0 铺到玻璃边,白板就会从卡片顶上/底下/右侧冒出 10px,
-     悬浮卡的壳就被戳穿了(小葵截图抓的正犯人)。10px = body 裙边宽度 */
-  inset: 10px;
+  /* 和界面卡片一致贴满整扇窗(第五十六锤起没有裙边了),圆角裁角跟 .app 对齐 */
+  inset: 0;
   z-index: 50;
   display: flex;
   justify-content: flex-end;
-  /* 跟着圆角卡裁角:遮罩和抽屉都收在卡片里,圆角外的裙边保持全透明 */
   border-radius: 14px;
   overflow: hidden;
 }
 
 body.is-maximized .drawer-layer {
-  inset: 0; /* 最大化时裙边收掉,卡片贴满窗,抽屉跟着铺满 */
   border-radius: 0;
 }
 
