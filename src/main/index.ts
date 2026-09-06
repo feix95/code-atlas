@@ -19,6 +19,9 @@ import {
   buildTreeDigest,
   parseLocateReply,
   filterLocateHits,
+  LOCATE_SYSTEM_PROMPT,
+  LOCATE_NODE_BUDGET,
+  LOCATE_TOKEN_BUDGET,
   sniffBinaryKind,
   sanitizeHistory,
   sanitizeAttachment,
@@ -33,8 +36,7 @@ import {
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
-  REPORT_SYSTEM_PROMPT,
-  LOCATE_SYSTEM_PROMPT
+  REPORT_SYSTEM_PROMPT
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
@@ -627,24 +629,32 @@ function registerIpc(): void {
     if ('error' in resolved) {
       return { status: 'error', hits: [], text: resolved.error, model: '', durationMs: 0 } satisfies FeatureLocateResult
     }
-    const prompt = buildLocatePrompt({ digest: buildTreeDigest(root), question: question.trim() })
-    const reply = await explainWithCancel(requestId, (signal) =>
-      explainWithMessages(
-        resolved.target,
-        [
-          { role: 'system', content: LOCATE_SYSTEM_PROMPT },
-          { role: 'user', content: prompt }
-        ],
-        undefined,
-        signal,
-        700
+    const askTheGuide = (tokenBudget: number): Promise<AiExplainResult> =>
+      explainWithCancel(requestId, (signal) =>
+        explainWithMessages(
+          resolved.target,
+          [
+            { role: 'system', content: LOCATE_SYSTEM_PROMPT },
+            { role: 'user', content: buildLocatePrompt({ digest: buildTreeDigest(root, LOCATE_NODE_BUDGET, tokenBudget), question: question.trim() }) }
+          ],
+          undefined,
+          signal,
+          700
+        )
       )
-    )
+    // 先按标准预算问;碰到 4k 这类小上下文装不下,把地图砍到三分之一再试最后一次
+    let reply = await askTheGuide(LOCATE_TOKEN_BUDGET)
+    if (reply.status === 'error' && /exceeds the available context|context size|context length|too many tokens/i.test(reply.text)) {
+      reply = await askTheGuide(Math.floor(LOCATE_TOKEN_BUDGET / 3))
+    }
     if (reply.status !== 'supported') {
+      const contextBlown = /exceeds the available context|context size|context length|too many tokens/i.test(reply.text)
       return {
         status: 'error',
         hits: [],
-        text: reply.text,
+        text: contextBlown
+          ? '模型的上下文装不下这张地图(已经自动精简重试过还是不行)—— 把模型服务的上下文调大些,再回来问一次。'
+          : reply.text,
         model: reply.model,
         durationMs: reply.durationMs
       } satisfies FeatureLocateResult

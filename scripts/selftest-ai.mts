@@ -22,10 +22,12 @@ import {
   buildRefineMessages,
   filterLocateHits,
   findTreeNode,
+  estimateTokens,
   hasWebLookupSignal,
   hasSearchIntent,
   parseLocateReply,
   LOCATE_NODE_BUDGET,
+  LOCATE_TOKEN_BUDGET,
   WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
   FREE_CHAT_SYSTEM_PROMPT,
@@ -619,6 +621,33 @@ async function main(): Promise<void> {
   assert.equal(capped.split('\n').filter((l) => !l.startsWith('(地图没画全')).length, 3, '超预算要截断到预算行数')
   assert.ok(capped.includes('地图没画全'), '截断要注明')
   assert.ok(LOCATE_NODE_BUDGET >= 100, '预算要有基本容量,别小气到地图没法用')
+
+  // 小葵场景(第六十八锤):118 个文件的真项目把 4096 上下文撑爆 —— 地图必须卡在 token 预算内
+  const bigTree: ScanDirNode = {
+    type: 'directory',
+    name: 'big',
+    relPath: '',
+    children: [
+      {
+        type: 'directory',
+        name: 'src',
+        relPath: 'src',
+        children: Array.from({ length: 150 }, (_, i) => ({
+          type: 'file' as const,
+          name: `file${i}.ts`,
+          relPath: `src/file${i}.ts`,
+          ext: '.ts',
+          language: { id: 'typescript', name: 'TypeScript', source: 'extension' as const },
+          summary: { emoji: '📄', text: `第 ${i} 号源代码文件,负责一块功能` }
+        }))
+      },
+      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+    ]
+  }
+  const bigDigest = buildTreeDigest(bigTree)
+  assert.ok(estimateTokens(bigDigest) <= LOCATE_TOKEN_BUDGET + 80, '地图加备注不许超 token 预算(小模型 4k 也装得下)')
+  assert.ok(bigDigest.includes('地图没画全'), '被掐掉的部分要如实注明')
+  assert.equal(estimateTokens('配置写在哪个文件'), 8, 'CJK 一字记 1 token')
 
   // 提示词拼装:地图 + 问题 + 「逐字照抄路径」的硬要求
   const locatePrompt = buildLocatePrompt({ digest, question: '程序从哪启动' })

@@ -392,28 +392,47 @@ confidence 是你的把握 0~100。看着地图实在指不出来的,就输出 {
 export const LOCATE_NODE_BUDGET = 400
 
 /**
+ * 项目地图的 token 预算(估算):本地模型的上下文普遍只有 4k(小葵实测 4096 被地图撑爆,
+ * 第六十八锤),地图必须留足人设/问题/回复的地盘。宁可低估预算,也不许把上下文挤爆。
+ */
+export const LOCATE_TOKEN_BUDGET = 2200
+
+/**
+ * 估算一段文本的 token 数(纯函数):只用来掐预算,所以刻意保守 ——
+ * CJK 一字记 1 token(常见分词器约 1~1.5 字/token),其余按 4 字符记 1 token。
+ */
+export function estimateTokens(text: string): number {
+  let tokens = 0
+  for (const ch of text) {
+    tokens += ch.charCodeAt(0) > 0x2e7f ? 1 : 0.25
+  }
+  return Math.ceil(tokens)
+}
+
+/**
  * 把扫描树摊成「项目地图」文本(纯函数,自测直接打):每行一个节点,
  * 带完整 relPath(模型照抄就行,不用自己拼路径);广度优先,浅层先画 —— 导航价值最高;
- * 超预算截断并注明地图不全,提示模型指不了就老实说。
+ * 节点数和估算 token 双预算掐着,超了就截断并注明地图不全,提示模型指不了就老实说。
  */
-export function buildTreeDigest(root: ScanDirNode, nodeBudget: number = LOCATE_NODE_BUDGET): string {
+export function buildTreeDigest(root: ScanDirNode, nodeBudget: number = LOCATE_NODE_BUDGET, tokenBudget: number = LOCATE_TOKEN_BUDGET): string {
   const lines: string[] = []
+  let usedTokens = 0
   let skipped = 0
   const queue: Array<{ node: ScanTreeNode; depth: number }> = [{ node: root, depth: 0 }]
   while (queue.length > 0) {
     const { node, depth } = queue.shift() as { node: ScanTreeNode; depth: number }
-    if (lines.length >= nodeBudget) {
+    if (node.type === 'directory') queue.push(...node.children.map((c) => ({ node: c, depth: depth + 1 })))
+    if (lines.length >= nodeBudget || usedTokens >= tokenBudget) {
       skipped += 1
-      if (node.type === 'directory') queue.push(...node.children.map((c) => ({ node: c, depth: depth + 1 })))
       continue
     }
     const indent = '  '.repeat(depth)
     const tag = node.type === 'directory' ? '目录' : node.language ? `文件·${node.language.name}` : '文件'
     const note = node.summary ? ` —— ${node.summary.text}` : ''
-    lines.push(`${indent}${node.relPath || '(项目根)'} [${tag}]${note}`)
-    if (node.type === 'directory') queue.push(...node.children.map((c) => ({ node: c, depth: depth + 1 })))
+    const line = `${indent}${node.relPath || '(项目根)'} [${tag}]${note}`
+    lines.push(line)
+    usedTokens += estimateTokens(line) + 1
   }
-  // 队列里剩的(含被预算挡在门外的子树内容)都算没画出来的
   skipped += queue.length
   if (skipped > 0) lines.push(`(地图没画全:还有 ${skipped} 个没列出来 —— 对不上的地方就老实说指不了)`)
   return lines.join('\n')
