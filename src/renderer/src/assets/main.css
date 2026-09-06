@@ -225,16 +225,26 @@ body.is-maximized .app {
   border-radius: 2px;
 }
 
-/* 贴满屏幕时方框变双框,示意「点这里还原」 */
+/* 贴满屏幕时方框变双框,示意「点这里还原」:i 当后面那块原位不动,
+   ::after 是底左的前块 —— 实心垫底把后块穿过来的线挡掉,双框才不会糊成同心框 */
 body.is-maximized .traffic-lights .is-max i::after {
   content: '';
   position: absolute;
-  top: -0.1875rem;
-  right: -0.1875rem;
-  width: 0.3125rem;
-  height: 0.3125rem;
+  top: 0.03125rem;
+  left: -0.09375rem;
+  width: 0.125rem;
+  height: 0.125rem;
   border: 1.5px solid #5c6165;
   border-radius: 1px;
+  background: #c5c9c8;
+}
+
+.traffic-lights .is-max:hover i::after {
+  filter: brightness(0.9);
+}
+
+.traffic-lights .is-max:active i::after {
+  filter: brightness(0.82);
 }
 
 .traffic-lights .is-close i {
