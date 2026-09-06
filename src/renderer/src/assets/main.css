@@ -2078,9 +2078,68 @@ body.is-maximized .drawer-layer {
   box-shadow: var(--shadow-pop);
 }
 
+/* 左缘收起把手:主关闭入口。竖直居中贴边,平时低调,靠近向外探头;点一下面板缩回去 */
+.drawer-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.125rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: var(--font-base);
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.drawer-handle:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-50%) translateX(-3px);
+}
+
+/* 收起动画进行中:整层不再接收点击,遮罩先淡出去 */
+.drawer-layer.is-closing {
+  pointer-events: none;
+}
+
+.drawer-layer.is-closing .drawer-overlay {
+  opacity: 0;
+  transition: opacity 0.26s ease;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .drawer {
     animation: drawer-in 0.18s ease;
+  }
+
+  /* 橡皮筋收起:先向外弹一小下,再猛地缩出视野,比干巴巴的线性滑出有点手感 */
+  .drawer.is-closing {
+    animation: drawer-out 0.32s ease-in forwards;
+  }
+}
+
+@keyframes drawer-out {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(1rem);
+  }
+  100% {
+    transform: translateX(-110%);
   }
 }
 
