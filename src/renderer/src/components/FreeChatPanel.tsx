@@ -130,19 +130,20 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
           <pre className="chat-attach-details">{context.details}</pre>
         </details>
       )}
-      {chat.messages.length === 0 ? (
-        <div className="chat-intro">
-          <AtlasProbe state="idle" className="chat-probe" />
-          <p className="chat-intro-title">我是 Atlas 小探针。</p>
-          <p>
-            你可以问我当前项目,也可以聊点完全无关的事情。
-            {context ? '当前选中的资料会作为可选参考附在消息旁。' : '现在没有选中任何文件,咱们就纯聊天。'}
-          </p>
-        </div>
-      ) : (
-        <div className="chat-messages-wrap">
-          <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
-            {chat.messages.map((m) =>
+      {/* 开场白和聊起来的气泡共用同一个消息区骨架:开场白也撑满中段,输入栏两种状态钉在同一个底 */}
+      <div className="chat-messages-wrap">
+        <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
+          {chat.messages.length === 0 ? (
+            <div className="chat-intro">
+              <AtlasProbe state="idle" className="chat-probe" />
+              <p className="chat-intro-title">我是 Atlas 小探针。</p>
+              <p>
+                你可以问我当前项目,也可以聊点完全无关的事情。
+                {context ? '当前选中的资料会作为可选参考附在消息旁。' : '现在没有选中任何文件,咱们就纯聊天。'}
+              </p>
+            </div>
+          ) : (
+            chat.messages.map((m) =>
               m.role === 'user' ? (
                 <div key={m.key} className="message user">
                   {m.text}
@@ -150,15 +151,15 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
               ) : (
                 <AssistantBubble key={m.key} msg={m} />
               )
-            )}
-          </div>
-          {showJump && (
-            <button key={newBeat} type="button" className="chat-jump" onClick={jumpToLatest} aria-label="跳到最新消息" title="跳到最新消息">
-              <i aria-hidden="true" />
-            </button>
+            )
           )}
         </div>
-      )}
+        {showJump && (
+          <button key={newBeat} type="button" className="chat-jump" onClick={jumpToLatest} aria-label="跳到最新消息" title="跳到最新消息">
+            <i aria-hidden="true" />
+          </button>
+        )}
+      </div>
       <div className="chat-bottom">
         {chat.messages.length === 0 && (
           <div className="prompt-row">
