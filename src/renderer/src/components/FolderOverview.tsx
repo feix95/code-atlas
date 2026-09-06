@@ -1,6 +1,7 @@
 import type { GitChangesResult, ScanDirNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
 import { type AiAssistApi } from '../useAiAsk'
+import { GitDoor } from './GitDoor'
 import { Notice } from './Notice'
 
 interface FolderCensus {
@@ -46,7 +47,9 @@ export function FolderOverview({
   ai,
   onGoChat,
   gitInfo,
-  onOpenGit
+  rootPath,
+  onJump,
+  onRefreshed
 }: {
   dir: ScanDirNode
   ai: AiAssistApi
@@ -54,8 +57,10 @@ export function FolderOverview({
   onGoChat?: () => void
   /** 项目 git 总账:有未提交改动就亮出 git 门 */
   gitInfo?: GitChangesResult | null
-  /** 点 git 门打开「Git 修改」抽屉 */
-  onOpenGit?: () => void
+  /** git 门的展开内容(账本 + AI 干活报告)要用的三个参数 */
+  rootPath?: string
+  onJump?: (relPath: string) => void
+  onRefreshed?: (result: GitChangesResult) => void
 }): React.JSX.Element {
   const info = census(dir)
 
@@ -105,16 +110,8 @@ export function FolderOverview({
         )}
       </section>
 
-      {gitInfo?.isGitRepo && gitInfo.stats.changed > 0 && onOpenGit && (
-        <button type="button" className="git-door" onClick={onOpenGit} title="打开 Git 修改面板,看 AI 干活报告">
-          <span className="git-door-branch">🌿 {gitInfo.branch}</span>
-          <span className="git-door-text">
-            项目里有 <strong>{gitInfo.stats.changed}</strong> 个文件还没提交 —— 想知道改了什么,点这儿看报告
-          </span>
-          <span className="git-door-arrow" aria-hidden="true">
-            →
-          </span>
-        </button>
+      {gitInfo?.isGitRepo && rootPath && onJump && (
+        <GitDoor gitInfo={gitInfo} rootPath={rootPath} onJump={onJump} onRefreshed={onRefreshed} />
       )}
 
       <AiAssistCard

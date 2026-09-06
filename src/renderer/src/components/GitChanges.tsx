@@ -26,7 +26,7 @@ function StatLine({ add, del }: { add: number; del: number }): React.JSX.Element
   )
 }
 
-// git 修改卡(现在住在右侧抽屉里):挂载时收一遍改动清单(外部已有总账就直用,不重复跑 git),
+// git 修改卡(第六十五锤起住在右栏 git 门的展开层里):挂载时收一遍改动清单(外部已有总账就直用,不重复跑 git),
 // 点文件行选中,再让本地模型用人话讲这个改动。
 // 路径契约由主进程保证,这里只递 (rootPath, relPath)。
 export function GitChanges({

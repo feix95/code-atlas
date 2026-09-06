@@ -1957,7 +1957,8 @@ body.is-sash-dragging {
   color: var(--muted);
 }
 
-/* git 门(第六十四锤):文件夹概览里的一扇门 —— 有未提交改动才亮,点了进 Git 修改抽屉 */
+/* git 门(第六十五锤):侧边栏退役,git 住进右栏 —— 门行收着(分支图标+数量徽章+文案),
+   点一下原地展开账本和 AI 干活报告;有未提交改动才亮,账结清自动退场 */
 .git-door {
   display: flex;
   align-items: center;
@@ -1978,6 +1979,41 @@ body.is-sash-dragging {
   background: var(--accent-soft);
 }
 
+/* 分支图标 + 数量徽章:VS Code 源代码管理同款 —— 灰描边图标,右下角蓝底白字圆标 */
+.git-door-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--muted);
+}
+
+.git-door-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.git-door-badge {
+  position: absolute;
+  right: -0.4375rem;
+  bottom: -0.3125rem;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  padding: 0 0.1875rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 0.875rem;
+  text-align: center;
+}
+
+.git-door:hover .git-door-icon {
+  color: var(--accent);
+}
+
 .git-door-branch {
   flex-shrink: 0;
   font-weight: 700;
@@ -1989,13 +2025,19 @@ body.is-sash-dragging {
   color: var(--muted);
 }
 
-.git-door-text strong {
-  color: var(--text);
+.git-door-caret {
+  flex-shrink: 0;
+  color: var(--muted);
 }
 
-.git-door-arrow {
-  flex-shrink: 0;
-  color: var(--accent);
+@media (prefers-reduced-motion: no-preference) {
+  .git-door-caret {
+    transition: transform 0.15s ease;
+  }
+}
+
+.git-door-caret.is-open {
+  transform: rotate(180deg);
 }
 
 .git-list {
@@ -2128,133 +2170,6 @@ body.is-sash-dragging {
 
 :root[data-theme='dark'] .chip-link.is-on {
   color: #10222e;
-}
-
-/* ── 抽屉 ── */
-
-.drawer-layer {
-  position: fixed;
-  /* 和界面卡片一致贴满整扇窗(第五十六锤起没有裙边了),圆角裁角跟 .app 对齐 */
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: flex-end;
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-body.is-maximized .drawer-layer {
-  border-radius: 0;
-}
-
-.drawer-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 30, 40, 0.35);
-}
-
-.drawer {
-  position: relative;
-  width: min(28.75rem, 92vw);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--window);
-  border-left: 1px solid var(--line);
-  box-shadow: var(--shadow-pop);
-}
-
-/* 左缘收起把手:主关闭入口。竖直居中贴边,平时低调,靠近向外探头;点一下面板缩回去 */
-.drawer-handle {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1.125rem;
-  height: 3.5rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-left: none;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--surface-soft);
-  color: var(--muted);
-  font-size: var(--font-base);
-  line-height: 1;
-  cursor: pointer;
-  z-index: 1;
-  transition:
-    transform 0.15s ease,
-    color 0.15s ease,
-    background 0.15s ease;
-}
-
-.drawer-handle:hover {
-  color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-50%) translateX(-3px);
-}
-
-/* 收起动画进行中:整层不再接收点击,遮罩先淡出去 */
-.drawer-layer.is-closing {
-  pointer-events: none;
-}
-
-.drawer-layer.is-closing .drawer-overlay {
-  opacity: 0;
-  transition: opacity 0.26s ease;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .drawer {
-    animation: drawer-in 0.18s ease;
-  }
-
-  /* 橡皮筋收起:先向外弹一小下,再猛地缩出视野,比干巴巴的线性滑出有点手感 */
-  .drawer.is-closing {
-    animation: drawer-out 0.32s ease-in forwards;
-  }
-}
-
-@keyframes drawer-out {
-  0% {
-    transform: translateX(0);
-  }
-  30% {
-    transform: translateX(1rem);
-  }
-  100% {
-    transform: translateX(-110%);
-  }
-}
-
-@keyframes drawer-in {
-  from {
-    transform: translateX(1.5rem);
-    opacity: 0;
-  }
-}
-
-.drawer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-
-.drawer-head h2 {
-  font-size: var(--font-base);
-  font-weight: 700;
-}
-
-.drawer-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-4);
 }
 
 /* ── 欢迎页 / 扫描中 ── */

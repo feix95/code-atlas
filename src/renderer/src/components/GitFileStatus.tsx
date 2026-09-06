@@ -49,7 +49,7 @@ export function GitFileStatus({
       <Notice kind="info">
         Git 状态还没查到。{' '}
         <button type="button" className="btn btn-ghost" onClick={onOpenGit}>
-          打开 Git 面板看详情
+          回项目总览再查一遍
         </button>
       </Notice>
     )
@@ -99,7 +99,7 @@ export function GitFileStatus({
             {ai.busy ? 'AI 正在回答……' : '问 AI:改它会影响什么？'}
           </button>
           <button type="button" className="btn btn-ghost" onClick={onOpenGit}>
-            查看全部 Git 改动
+            回项目总览看全部改动
           </button>
         </div>
       </section>

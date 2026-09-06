@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
-import { Drawer } from './components/Drawer'
 import { FileOverview } from './components/FileOverview'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { FolderOverview } from './components/FolderOverview'
 import { FreeChatPanel } from './components/FreeChatPanel'
-import { GitChanges } from './components/GitChanges'
 import { GitFileStatus } from './components/GitFileStatus'
 import { ProjectOverview } from './components/ProjectOverview'
 import { SettingsDialog } from './components/SettingsDialog'
@@ -148,12 +146,10 @@ function App(): React.JSX.Element {
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
-  // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和 Git 抽屉共用
+  // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和右栏 git 门共用
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
-  // 设置和 Git 都是抽屉:盖在主内容上面,不把详情往下推;关掉后详情原地不动
   const [showSettings, setShowSettings] = useState(false)
-  const [showGit, setShowGit] = useState(false)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const [treeNote, setTreeNote] = useState<string | null>(null)
@@ -274,7 +270,6 @@ function App(): React.JSX.Element {
     setAnalyzeNote(null)
     setGraph(null)
     setGraphNote(null)
-    setShowGit(false)
     setExpanding(null)
     setTreeNote(null)
     setGitInfo(null)
@@ -542,7 +537,7 @@ function App(): React.JSX.Element {
                 onJump={(p) => jumpTo(p, true)}
                 gitInfo={gitInfo}
                 gitLoading={gitLoading}
-                onOpenGit={() => setShowGit(true)}
+                onOpenGit={clearSelection}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -551,7 +546,8 @@ function App(): React.JSX.Element {
                 result={result}
                 onClose={clearSelection}
                 gitInfo={gitInfo}
-                onOpenGit={() => setShowGit(true)}
+                onJump={(p) => jumpTo(p)}
+                onRefreshed={setGitInfo}
               />
             ) : (
               <ProjectOverview
@@ -562,7 +558,7 @@ function App(): React.JSX.Element {
                 onLoadGraph={() => void handleLoadGraph()}
                 onJump={(p) => jumpTo(p)}
                 gitInfo={gitInfo}
-                onOpenGit={() => setShowGit(true)}
+                onRefreshed={setGitInfo}
               />
             )}
           </section>
@@ -615,11 +611,6 @@ function App(): React.JSX.Element {
           workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
           onClose={() => setShowSettings(false)}
         />
-      )}
-      {showGit && folder && (
-        <Drawer title="Git 修改" onClose={() => setShowGit(false)}>
-          <GitChanges rootPath={folder} initial={gitInfo ?? undefined} onRefreshed={setGitInfo} onJump={(p) => jumpTo(p)} />
-        </Drawer>
       )}
     </div>
   )
@@ -774,13 +765,15 @@ function FolderDetailView({
   result,
   onClose,
   gitInfo,
-  onOpenGit
+  onJump,
+  onRefreshed
 }: {
   dir: ScanDirNode
   result: ScanResult
   onClose: () => void
   gitInfo: GitChangesResult | null
-  onOpenGit: () => void
+  onJump: (relPath: string) => void
+  onRefreshed: (result: GitChangesResult) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
@@ -806,7 +799,17 @@ function FolderDetailView({
         onClose={onClose}
       />
       <div className={`detail-body${tab === 'chat' ? ' is-chat' : ''}`}>
-        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} onGoChat={() => setTab('chat')} gitInfo={gitInfo} onOpenGit={onOpenGit} />}
+        {tab === 'overview' && (
+          <FolderOverview
+            dir={dir}
+            ai={ai}
+            onGoChat={() => setTab('chat')}
+            gitInfo={gitInfo}
+            rootPath={result.rootPath}
+            onJump={onJump}
+            onRefreshed={onRefreshed}
+          />
+        )}
         {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
       </div>
     </div>

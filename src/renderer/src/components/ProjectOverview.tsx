@@ -1,4 +1,5 @@
 import type { DepGraphResult, GitChangesResult, ScanResult, ScanTreeNode } from '@shared/types'
+import { GitDoor } from './GitDoor'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
@@ -50,7 +51,7 @@ export function ProjectOverview({
   onLoadGraph,
   onJump,
   gitInfo,
-  onOpenGit
+  onRefreshed
 }: {
   result: ScanResult
   graph: DepGraphResult | null
@@ -59,7 +60,7 @@ export function ProjectOverview({
   onLoadGraph: () => void
   onJump: (relPath: string) => void
   gitInfo: GitChangesResult | null
-  onOpenGit: () => void
+  onRefreshed: (result: GitChangesResult) => void
 }): React.JSX.Element {
   const { stats } = result
   const languageEntries = topEntries(stats.byLanguage, 6)
@@ -68,14 +69,6 @@ export function ProjectOverview({
 
   const recs: Array<{ key: string; path: string; reason: string; onClick?: () => void; mono?: boolean }> = []
 
-  if (gitInfo && gitInfo.isGitRepo && gitInfo.stats.changed > 0) {
-    recs.push({
-      key: 'git',
-      path: `${gitInfo.stats.changed} 个文件有改动`,
-      reason: `分支「${gitInfo.branch}」上还没提交的账 —— 先看谁动了代码`,
-      onClick: onOpenGit
-    })
-  }
   if (graph && graph.hubs.length > 0) {
     for (const hub of graph.hubs.slice(0, 5)) {
       recs.push({
@@ -149,6 +142,7 @@ export function ProjectOverview({
           </div>
         </div>
 
+        {gitInfo && <GitDoor gitInfo={gitInfo} rootPath={result.rootPath} onJump={onJump} onRefreshed={onRefreshed} />}
         <div className="two-col">
           <section className="sub-card">
             <h3>语言分布</h3>
