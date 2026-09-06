@@ -2047,16 +2047,20 @@ body.is-sash-dragging {
 
 .drawer-layer {
   position: fixed;
-  inset: 0;
+  /* 只铺满圆角卡,不铺满整扇玻璃窗:窗口四周有 10px 透明裙边给阴影呼吸,
+     抽屉要是按 inset:0 铺到玻璃边,白板就会从卡片顶上/底下/右侧冒出 10px,
+     悬浮卡的壳就被戳穿了(小葵截图抓的正犯人)。10px = body 裙边宽度 */
+  inset: 10px;
   z-index: 50;
   display: flex;
   justify-content: flex-end;
-  /* 跟着圆角壳裁角:遮罩是全窗的,不裁的话直角会盖到圆角外的透明裙边上 */
+  /* 跟着圆角卡裁角:遮罩和抽屉都收在卡片里,圆角外的裙边保持全透明 */
   border-radius: 14px;
   overflow: hidden;
 }
 
 body.is-maximized .drawer-layer {
+  inset: 0; /* 最大化时裙边收掉,卡片贴满窗,抽屉跟着铺满 */
   border-radius: 0;
 }
 
