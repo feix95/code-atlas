@@ -9,7 +9,7 @@ import type { AiChatApi, ChatMessage } from '../useAiChat'
  * 自由对话面板:和 Atlas 小探针开放式聊天,问题不限于当前文件。
  * 资料附件卡常驻顶部(默认收起,展开能看机器扫到的原始资料);
  * 助手消息带小探针头像,本轮动过联网就在消息下方挂程序记账的状态标签。
- * 示例问题只是示例(点了填进输入框),不是仅有的问法。
+ * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
  */
 
 const CHAT_EXAMPLES = ['你是谁？', '联网搜一下它是什么', '今天不想聊代码,讲点轻松的']
@@ -74,9 +74,10 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
     setDraft('')
   }
 
-  function fill(q: string): void {
-    setDraft(q)
-    inputRef.current?.focus()
+  /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
+  function sendExample(q: string): void {
+    if (chat.busy) return
+    chat.send(q)
   }
 
   return (
@@ -117,7 +118,7 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
         {chat.messages.length === 0 && (
           <div className="prompt-row">
             {CHAT_EXAMPLES.map((q) => (
-              <button key={q} type="button" className="prompt" onClick={() => fill(q)}>
+              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
                 {q}
               </button>
             ))}
