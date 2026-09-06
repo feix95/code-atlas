@@ -2755,7 +2755,8 @@ body.is-maximized .cfg-layer {
   display: flex;
   align-items: center;
   gap: 0.4375rem;
-  padding: 0.4375rem 0.5rem;
+  padding: 0.4375rem 1.5rem 0.4375rem 0.5rem; /* 右侧统一预留对勾角标位,文字不顶到卡缘 */
+  
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -2803,8 +2804,8 @@ body.is-maximized .cfg-layer {
 
 .cfg-theme-check {
   position: absolute;
-  top: 0.3125rem;
-  right: 0.3125rem;
+  top: 0.375rem;
+  right: 0.375rem;
   color: var(--accent);
 }
 
