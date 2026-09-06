@@ -1134,6 +1134,12 @@ body.is-sash-dragging {
   gap: var(--space-3);
 }
 
+/* 网格子项默认 min-width:auto,右栏被侧栏挤窄时卡片撑着最小内容宽不肯缩,
+   把详情区撑出横向滚动条(第六十六锤) —— 放行让它跟着缩 */
+.two-col > * {
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .two-col {
     grid-template-columns: 1fr;
@@ -2345,6 +2351,11 @@ body.is-sash-dragging {
 }
 
 ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 两条滚动条交汇的角块:不点名上色就露系统默认的白,暗色主题下是个白疙瘩(小葵截图报) */
+::-webkit-scrollbar-corner {
   background: transparent;
 }
 
