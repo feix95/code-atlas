@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
-import { AiSettings } from './components/AiSettings'
-import { AppearanceSettings } from './components/AppearanceSettings'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { Drawer } from './components/Drawer'
@@ -13,6 +11,7 @@ import { FreeChatPanel } from './components/FreeChatPanel'
 import { GitChanges } from './components/GitChanges'
 import { GitFileStatus } from './components/GitFileStatus'
 import { ProjectOverview } from './components/ProjectOverview'
+import { SettingsDialog } from './components/SettingsDialog'
 import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
@@ -588,10 +587,10 @@ function App(): React.JSX.Element {
       )}
 
       {showSettings && (
-        <Drawer title="设置" onClose={() => setShowSettings(false)}>
-          <AppearanceSettings />
-          <AiSettings />
-        </Drawer>
+        <SettingsDialog
+          workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+          onClose={() => setShowSettings(false)}
+        />
       )}
       {showGit && folder && (
         <Drawer title="Git 修改" onClose={() => setShowGit(false)}>

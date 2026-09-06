@@ -18,9 +18,9 @@ export interface Appearance {
 
 export const APPEARANCE_KEY = 'atlas.appearance'
 
-/** 配色预设:晴空蓝 = 现在的默认皮肤(不写任何内联,和从前一模一样);另两套是现成的成套配色 */
+/** 配色预设:雾空蓝 = 现在的默认皮肤(不写任何内联,和从前一模一样);另两套是现成的成套配色 */
 export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent: string; secondary: string }> = [
-  { key: 'default', name: '晴空蓝', accent: '#147dcc', secondary: '#5ac5db' },
+  { key: 'default', name: '雾空蓝', accent: '#147dcc', secondary: '#5ac5db' },
   { key: 'teal', name: '青碧', accent: '#0e9488', secondary: '#56c3ad' },
   { key: 'violet', name: '丁香紫', accent: '#7c5cd6', secondary: '#b79ef0' }
 ]

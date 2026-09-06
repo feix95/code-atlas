@@ -1945,132 +1945,6 @@ body.is-sash-dragging {
   margin-left: 0;
 }
 
-/* ── AI 设置(抽屉内)── */
-
-.ai-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.ai-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.ai-label {
-  font-size: var(--font-sm);
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.ai-input {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-md);
-  font-family: var(--mono);
-  background: var(--surface);
-  color: var(--text);
-}
-
-.ai-input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.ai-hint {
-  font-size: var(--font-xs);
-  color: var(--muted);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.ai-models {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.ai-providers {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.ai-row {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.ai-row .ai-input {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 设置抽屉里的两个面板(外观 / AI)之间留一道缝 */
-.ai-settings + .ai-settings {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line-soft);
-}
-
-/* 配色预设小圆点:两颗一排,一眼看出这套配色长什么样 */
-.preset-dot {
-  display: inline-block;
-  width: 0.625rem;
-  height: 0.625rem;
-  margin-right: 0.25rem;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  vertical-align: -1px;
-}
-
-/* 取色器:原生控件收一收边就够用 */
-.color-pick {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--muted);
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.color-input {
-  width: 2.25rem;
-  height: 1.625rem;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.color-input::-webkit-color-swatch-wrapper {
-  padding: 2px;
-}
-
-.color-input::-webkit-color-swatch {
-  border: none;
-  border-radius: 0.25rem;
-}
-
-/* 连续缩放滑条:主题色渲染,左右加减按钮夹着 % 读数 */
-.scale-slider {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--accent);
-}
-
-.scale-value {
-  min-width: 3rem;
-  text-align: center;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
 .chip-link {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -2417,4 +2291,1199 @@ body.is-maximized .drawer-layer {
     order: 10;
     flex-basis: 100%;
   }
+}
+
+/* ── 设置弹窗(第五十七锤,按小葵的效果图重构)──
+   暂存 + 预览 + 应用:改动先进草稿即时预览,点「应用更改」才落盘;
+   恢复默认/关弹窗退回上次保存的样子。颜色全走语义 token,亮暗自动换装 */
+
+.cfg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.75rem;
+  /* 跟界面卡片同框圆角裁切:遮罩不许糊到圆角外的透明角上 */
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+body.is-maximized .cfg-layer {
+  border-radius: 0;
+}
+
+.cfg-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 30, 40, 0.42);
+}
+
+.cfg-window {
+  position: relative;
+  width: min(65rem, 100%);
+  height: min(47.25rem, 100%);
+  min-height: 36rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.8125rem;
+  background: var(--window);
+  box-shadow:
+    0 1.75rem 4.375rem rgba(11, 36, 51, 0.34),
+    0 0.375rem 1.0625rem rgba(17, 36, 48, 0.18);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cfg-window {
+    animation: cfg-in 0.2s ease;
+  }
+}
+
+@keyframes cfg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+.cfg-head {
+  min-height: 4.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.cfg-head-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6875rem;
+}
+
+.cfg-head-icon {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 0.5rem;
+  background: var(--accent-soft);
+}
+
+.cfg-head-title h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cfg-head-title p {
+  margin: 0.1875rem 0 0;
+  color: var(--muted);
+  font-size: 0.625rem;
+}
+
+.cfg-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.cfg-dirty-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--amber);
+  font-size: 0.625rem;
+}
+
+.cfg-dirty-pill i {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.cfg-close {
+  width: 1.875rem;
+  height: 1.875rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cfg-close:hover {
+  color: var(--text-strong);
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
+.cfg-body {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 12.125rem minmax(0, 1fr);
+  /* 行高锁死在可用空间:内容再高也只在 .cfg-scroll 里滚,
+     不然分区会把弹窗体撑高、整块压在页脚按钮上(探针抓过现行) */
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.cfg-content {
+  min-height: 0;
+}
+
+.cfg-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 1.3125rem 0.6875rem 0.875rem;
+  border-right: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.cfg-nav-caption {
+  padding: 0 0.625rem 0.5625rem;
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.cfg-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.cfg-nav-item:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.cfg-nav-item.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cfg-nav-icon {
+  width: 1.6875rem;
+  height: 1.6875rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.cfg-nav-item strong,
+.cfg-nav-item small {
+  display: block;
+}
+
+.cfg-nav-item strong {
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
+.cfg-nav-item small {
+  margin-top: 0.1875rem;
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-nav-item.is-active small {
+  color: var(--accent);
+  opacity: 0.75;
+}
+
+.cfg-nav-marker {
+  position: absolute;
+  top: 0.8125rem;
+  right: 0;
+  width: 0.1875rem;
+  height: 1.6875rem;
+  border-radius: 0.25rem 0 0 0.25rem;
+  background: var(--accent);
+}
+
+.cfg-nav-rule {
+  height: 1px;
+  margin: 1.0625rem 0.625rem;
+  background: var(--line-soft);
+}
+
+.cfg-nav-context {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0.4375rem;
+  padding: 0.625rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+
+.cfg-context-icon {
+  width: 1.4375rem;
+  height: 1.4375rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border-radius: 0.3125rem;
+  background: var(--accent-soft);
+}
+
+.cfg-nav-context strong,
+.cfg-nav-context span {
+  display: block;
+}
+
+.cfg-nav-context strong {
+  color: var(--text);
+  font-size: 0.625rem;
+}
+
+.cfg-nav-context span {
+  margin-top: 0.1875rem;
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.5625rem;
+}
+
+.cfg-nav-footnote {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: auto 0.5rem 0;
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-content {
+  min-width: 0;
+  background: var(--window);
+}
+
+.cfg-scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.5625rem 2rem 1.875rem;
+}
+
+.cfg-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.4375rem;
+}
+
+.cfg-eyebrow {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.1em;
+}
+
+.cfg-intro h2 {
+  margin: 0.4375rem 0 0.3125rem;
+  color: var(--text-strong);
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cfg-intro p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.6;
+}
+
+.cfg-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  color: var(--green);
+  border: 1px solid var(--green-line);
+  border-radius: var(--radius-sm);
+  background: var(--green-soft);
+  font-size: 0.5625rem;
+}
+
+.cfg-live-status i {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--green) 15%, transparent);
+}
+
+.cfg-live-status.is-dirty {
+  color: var(--amber);
+  border-color: var(--amber-line);
+  background: var(--amber-soft);
+}
+
+.cfg-live-status.is-dirty i {
+  background: var(--amber);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--amber) 15%, transparent);
+}
+
+.cfg-section {
+  scroll-margin-top: 1.25rem;
+  margin-bottom: 1.375rem;
+}
+
+.cfg-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5625rem;
+}
+
+.cfg-section-head > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-section-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cfg-section-head > span {
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-step {
+  min-width: 1.4375rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.625rem;
+}
+
+.cfg-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.cfg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 1.375rem;
+  padding: 1rem 1.0625rem;
+}
+
+.cfg-copy {
+  min-width: 10rem;
+}
+
+.cfg-copy label {
+  display: block;
+  color: var(--text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.cfg-copy p {
+  max-width: 17.5rem;
+  margin: 0.3125rem 0 0;
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 1.55;
+}
+
+.cfg-divider {
+  height: 1px;
+  margin: 0 1.0625rem;
+  background: var(--line-soft);
+}
+
+.cfg-themes {
+  display: flex;
+  align-items: stretch;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.cfg-theme {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.4375rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.cfg-theme:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-theme.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cfg-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  border-radius: 0.3125rem;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.cfg-theme strong,
+.cfg-theme small {
+  display: block;
+}
+
+.cfg-theme strong {
+  color: var(--text);
+  font-size: 0.625rem;
+  font-weight: 650;
+}
+
+.cfg-theme small {
+  margin-top: 0.125rem;
+  color: var(--muted-2);
+  font-size: 0.5rem;
+}
+
+.cfg-theme-check {
+  position: absolute;
+  top: 0.3125rem;
+  right: 0.3125rem;
+  color: var(--accent);
+}
+
+.cfg-colors {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cfg-color {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+  cursor: pointer;
+}
+
+.cfg-color input {
+  width: 2.25rem;
+  height: 1.625rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.cfg-scale {
+  min-width: 22.1875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+}
+
+.cfg-stepper {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.cfg-stepper:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-stepper:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cfg-slider-wrap {
+  width: 11.875rem;
+}
+
+.cfg-slider-wrap input {
+  width: 100%;
+  display: block;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.cfg-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.375rem;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.5rem;
+}
+
+.cfg-scale-value {
+  min-width: 2.8125rem;
+  color: var(--text-strong);
+  font-family: var(--mono);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cfg-preview-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1.0625rem;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface-soft);
+}
+
+.cfg-preview-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  color: var(--muted);
+  font-size: 0.5625rem;
+}
+
+.cfg-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 8.125rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.cfg-mini-dot {
+  display: block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 0.125rem;
+  background: var(--preview-accent);
+}
+
+.cfg-mini-line-long {
+  display: block;
+  width: 2.3125rem;
+  height: 0.25rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--preview-accent), var(--surface) 57%);
+}
+
+.cfg-mini-line {
+  display: block;
+  width: 1.4375rem;
+  height: 0.25rem;
+  border-radius: 0.3125rem;
+  background: var(--line-soft);
+}
+
+.cfg-mini em {
+  margin-left: auto;
+  padding: 0.125rem 0.25rem;
+  color: var(--muted);
+  border-radius: 0.1875rem;
+  background: var(--surface-soft);
+  font-family: var(--mono);
+  font-size: 0.4375rem;
+  font-style: normal;
+}
+
+.cfg-preview-note {
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-segmented {
+  display: flex;
+  padding: 0.1875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.cfg-segmented button {
+  min-width: 9.0625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: 0.3125rem;
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cfg-segmented button:hover {
+  color: var(--text);
+}
+
+.cfg-segmented button.is-selected {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0.0625rem 0.25rem rgba(24, 90, 111, 0.12);
+}
+
+.cfg-segmented strong,
+.cfg-segmented small {
+  display: block;
+}
+
+.cfg-segmented strong {
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.cfg-segmented small {
+  margin-top: 0.125rem;
+  font-size: 0.5rem;
+  color: var(--muted-2);
+}
+
+.cfg-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5625rem;
+  margin: 0 1.0625rem 0.875rem;
+  padding: 0.625rem 0.6875rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.cfg-callout-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-callout strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.625rem;
+}
+
+.cfg-callout p {
+  max-width: 27.5rem;
+  margin: 0.1875rem 0 0;
+  color: var(--muted);
+  font-size: 0.5625rem;
+  line-height: 1.5;
+}
+
+.cfg-callout-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding-top: 0.1875rem;
+  color: var(--green);
+  white-space: nowrap;
+  font-size: 0.5625rem;
+}
+
+.cfg-callout-state.is-warn {
+  color: var(--amber);
+}
+
+.cfg-flag {
+  margin-left: 0.25rem;
+  padding: 0.1875rem 0.3125rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  background: var(--surface-soft);
+  font-size: 0.5rem;
+  font-weight: 600;
+  vertical-align: 0.0625rem;
+}
+
+.cfg-flag.is-on {
+  color: var(--green);
+  border-color: var(--green-line);
+  background: var(--green-soft);
+}
+
+.cfg-switch {
+  width: 2.4375rem;
+  height: 1.375rem;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0.9375rem;
+  background: var(--muted-2);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.cfg-switch span {
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform 0.18s ease;
+}
+
+.cfg-switch.is-on {
+  background: var(--green);
+}
+
+.cfg-switch.is-on span {
+  transform: translateX(1.0625rem);
+}
+
+.cfg-privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5625rem 1.0625rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--green) 4%, var(--surface));
+  font-size: 0.5625rem;
+}
+
+.cfg-privacy > span {
+  flex: 1;
+}
+
+.cfg-privacy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+
+.cfg-privacy button:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.cfg-privacy-more {
+  padding: 0.5625rem 1.0625rem 0.6875rem;
+  color: var(--muted);
+  border-top: 1px dashed var(--line-soft);
+  background: var(--surface-soft);
+  font-size: 0.5625rem;
+  line-height: 1.6;
+}
+
+.cfg-advanced {
+  transition: border-color 0.16s ease;
+}
+
+.cfg-advanced.is-open {
+  border-color: var(--accent-line);
+}
+
+.cfg-advanced-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  padding: 0.8125rem 1rem;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cfg-advanced-trigger:hover {
+  background: var(--surface-soft);
+}
+
+.cfg-advanced-icon {
+  width: 1.5625rem;
+  height: 1.5625rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-advanced-trigger strong,
+.cfg-advanced-trigger small {
+  display: block;
+}
+
+.cfg-advanced-trigger strong {
+  font-size: 0.625rem;
+}
+
+.cfg-advanced-trigger small {
+  margin-top: 0.1875rem;
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-chevron {
+  margin-left: auto;
+  color: var(--muted-2);
+  transition: transform 0.18s ease;
+}
+
+.cfg-advanced.is-open .cfg-chevron {
+  transform: rotate(180deg);
+}
+
+.cfg-advanced-body {
+  padding: 0 1rem 0.9375rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cfg-advanced-body {
+    animation: cfg-reveal 0.18s ease;
+  }
+}
+
+@keyframes cfg-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+.cfg-field-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.8125rem 0 0.375rem;
+}
+
+.cfg-field-head label {
+  color: var(--text);
+  font-size: 0.625rem;
+  font-weight: 650;
+}
+
+.cfg-field-head span {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.5625rem;
+}
+
+.cfg-path-input {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.125rem;
+  padding-left: 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.cfg-path-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.cfg-path-input input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+}
+
+.cfg-path-input button {
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.3125rem;
+  padding: 0 0.5rem;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 0.3125rem;
+  background: var(--accent-soft);
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+
+.cfg-path-input button:hover {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.cfg-field-help {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin: 0.5rem 0 0;
+  color: var(--muted-2);
+  font-size: 0.5625rem;
+}
+
+.cfg-field-help.is-warn {
+  color: var(--amber);
+}
+
+.cfg-chip-row {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.cfg-chip-row button {
+  padding: 0.125rem 0.5rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+
+.cfg-chip-row button.is-selected {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cfg-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  margin-top: 0.6875rem;
+  padding: 0.6875rem 0.8125rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+
+.cfg-summary-icon {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-summary strong {
+  color: var(--text);
+  font-size: 0.625rem;
+}
+
+.cfg-summary p {
+  margin: 0.1875rem 0 0;
+  color: var(--muted);
+  font-size: 0.5625rem;
+}
+
+.cfg-summary-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  color: var(--green);
+  white-space: nowrap;
+  font-size: 0.5625rem;
+}
+
+.cfg-summary-state.is-dirty {
+  color: var(--amber);
+}
+
+.cfg-foot {
+  min-height: 3.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.875rem;
+  padding: 0 1.25rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.cfg-foot-state {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+}
+
+.cfg-foot-state.is-green {
+  color: var(--green);
+}
+
+.cfg-foot-state.is-amber {
+  color: var(--amber);
+}
+
+.cfg-foot-state.is-red {
+  color: var(--danger);
+}
+
+.cfg-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-btn-reset,
+.cfg-btn-apply {
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.6875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.625rem;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.cfg-btn-reset {
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cfg-btn-reset:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted-2);
+  background: var(--surface-soft);
+}
+
+.cfg-btn-apply {
+  color: #fff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.cfg-btn-apply:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.cfg-btn-reset:disabled,
+.cfg-btn-apply:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+/* 暗色下主色变浅,实心按钮和悬停填充的字跟着换深色保对比 */
+:root[data-theme='dark'] .cfg-btn-apply {
+  color: #10222e;
+}
+
+:root[data-theme='dark'] .cfg-path-input button:hover {
+  color: #10222e;
+}
+
+:root[data-theme='dark'] .cfg-switch span {
+  background: #e5eaed;
 }

@@ -61,6 +61,12 @@ contextBridge.exposeInMainWorld('atlas', {
     // 喊一声界面:侧栏宽度这类「按比例跟缩放」的布局要实时跟着重算
     window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
   },
+  // 设置弹窗的暂存预览:根字号跟着草稿走,但不写 localStorage —— 点「应用更改」才真正 setUiScale 落盘
+  previewUiScale: (factor: number): void => {
+    const f = Math.min(Math.max(Number(factor) || 1, SCALE_MIN), SCALE_MAX)
+    applyRootFont(f)
+    window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
+  },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('atlas:pick-folder'),
   // 自绘窗口壳:三颗灰点背后的真动作 + 最大化状态同步,渲染进程不许直接碰 BrowserWindow
   windowClose: (): Promise<void> => ipcRenderer.invoke('atlas:window-close'),

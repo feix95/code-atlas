@@ -24,6 +24,8 @@ declare global {
       pickFolder: () => Promise<string | null>
       getUiScale: () => number
       setUiScale: (factor: number) => void
+      /** 只预览不落盘:改根字号并广播,但不写 localStorage(设置弹窗的暂存预览用) */
+      previewUiScale: (factor: number) => void
       windowClose: () => Promise<void>
       windowMinimize: () => Promise<void>
       windowMaximizeToggle: () => Promise<boolean>
