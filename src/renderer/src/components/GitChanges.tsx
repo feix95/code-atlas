@@ -49,21 +49,28 @@ export function GitChanges({
   const [explain, setExplain] = useState<AiExplainResult | null>(null)
   const [explaining, setExplaining] = useState(false)
   const [streamText, setStreamText] = useState('')
+  // AI 干活报告(第六十三锤):整轮改动的大白话审计,和单文件讲解各自一条线,流式互不串线
+  const [report, setReport] = useState<AiExplainResult | null>(null)
+  const [reporting, setReporting] = useState(false)
+  const [reportStream, setReportStream] = useState('')
   const idRef = useRef('')
+  const reportIdRef = useRef('')
   // 初值只在挂载时认一次:之后 App 那份变了也不回退用户看到的账
   const initialRef = useRef(initial)
 
-  // 订阅 AI 流式增量:只认自己这次请求的 id;组件卸载时退订,防止泄漏监听
+  // 订阅 AI 流式增量:按 id 分账,讲解和报告各进各的;组件卸载时退订,防止泄漏监听
   useEffect(() => {
     return window.atlas.onAiDelta((payload) => {
       if (payload.id === idRef.current) setStreamText((prev) => prev + payload.text)
+      if (payload.id === reportIdRef.current) setReportStream((prev) => prev + payload.text)
     })
   }, [])
 
-  // 组件卸载(关掉 git 面板/换布局)时,把还在生成的讲解掐掉,别占着模型
+  // 组件卸载(关掉 git 面板/换布局)时,把还在生成的讲解/报告都掐掉,别占着模型
   useEffect(() => {
     return () => {
       if (idRef.current) void window.atlas.aiCancel(idRef.current)
+      if (reportIdRef.current) void window.atlas.aiCancel(reportIdRef.current)
     }
   }, [])
 
@@ -94,11 +101,16 @@ export function GitChanges({
   async function handleRefresh(): Promise<void> {
     setLoading(true)
     setNote(null)
-    // 讲解若在路上,先掐掉:刷新后选中的文件可能不在了,旧讲解不许挂回来
+    // 讲解/报告若在路上,先掐掉:刷新后旧账作废,旧讲解旧报告不许挂回来
     cancelExplain(idRef.current)
     idRef.current = ''
     setExplaining(false)
     setStreamText('')
+    cancelExplain(reportIdRef.current)
+    reportIdRef.current = ''
+    setReporting(false)
+    setReportStream('')
+    setReport(null)
     try {
       const r = await window.atlas.gitChanges(rootPath)
       setResult(r)
@@ -129,6 +141,28 @@ export function GitChanges({
       setExplain({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
     } finally {
       if (idRef.current === requestId) setExplaining(false)
+    }
+  }
+
+  /** 生成本轮报告:账本由主进程现场重取,签名没变直接回缓存,不重复烧模型 */
+  async function handleReport(): Promise<void> {
+    const requestId = crypto.randomUUID()
+    setReporting(true)
+    setReport(null)
+    setReportStream('')
+    reportIdRef.current = requestId
+    try {
+      const res = await window.atlas.gitReport(rootPath, requestId)
+      if (reportIdRef.current !== requestId) return // 中途刷新了,这份旧账作废
+      setReport(res)
+    } catch (err) {
+      if (reportIdRef.current !== requestId) return
+      setReport({ status: 'error', text: friendlyErr(err), model: '', durationMs: 0 })
+    } finally {
+      if (reportIdRef.current === requestId) {
+        setReporting(false)
+        reportIdRef.current = ''
+      }
     }
   }
 
@@ -164,6 +198,31 @@ export function GitChanges({
           🌿 这儿干净着呢 —— 所有改动都已经提交存档了,没有新账要翻。
           <br />
           想看看它怎么干活?随手改一个文件保存(加行注释就行),再点上面的「🔄 刷新」,马上给你讲它改了啥。
+        </div>
+      )}
+
+      {result.changes.length > 0 && (
+        <div className="git-report">
+          <div className="explain-head">
+            <span className="explain-title">🧾 AI 干活报告</span>
+            <button type="button" className="btn" onClick={() => void handleReport()} disabled={reporting}>
+              {reporting ? '⏳ 审计官翻账中……' : report?.status === 'supported' ? '🔄 再审一遍' : '🤖 生成本轮报告'}
+            </button>
+          </div>
+          <p className="git-report-hint">不用读一行代码:审计官把这轮改动翻成大白话 —— 干了什么、账对不对、要不要细看。</p>
+          {reporting &&
+            (reportStream ? (
+              <div className="explain-text">
+                ✨ {reportStream}
+                <span className="stream-caret">▌</span>
+              </div>
+            ) : (
+              <div className="explain-note">
+                <ProgressDots />正在翻账本、对线索……(改动多时会慢一点)
+              </div>
+            ))}
+          {!reporting && report?.status === 'supported' && <div className="explain-text">✨ {report.text}</div>}
+          {!reporting && report?.status === 'error' && <Notice kind="error">⚠️ {report.text}</Notice>}
         </div>
       )}
 

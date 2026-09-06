@@ -6,8 +6,26 @@ import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
-import { DIFF_SYSTEM_PROMPT, buildDiffPrompt, explainWithModel, gitKindName } from '../src/ai/index.ts'
-import { DIFF_CHAR_LIMIT, collectGitChanges, getChangeDiff, normalizeNumstatPath, parsePorcelainZ, pickKind } from '../src/git/index.ts'
+import {
+  DIFF_SYSTEM_PROMPT,
+  REPORT_SYSTEM_PROMPT,
+  REPORT_ROW_LIMIT,
+  buildDiffPrompt,
+  buildReportPrompt,
+  explainWithMessages,
+  explainWithModel,
+  gitKindName
+} from '../src/ai/index.ts'
+import {
+  DIFF_CHAR_LIMIT,
+  collectGitChanges,
+  collectRecentSubjects,
+  getChangeDiff,
+  gitChangesSignature,
+  normalizeNumstatPath,
+  parsePorcelainZ,
+  pickKind
+} from '../src/git/index.ts'
 import type { AiConfig, GitChange } from '../src/shared/types.ts'
 
 function git(cwd: string, ...args: string[]): Promise<string> {
@@ -169,6 +187,69 @@ async function main(): Promise<void> {
     if (notRepoDir) await rm(notRepoDir, { recursive: true, force: true })
   }
 
+  // ── 6.5 干活报告的家底:提交主题 / 缓存签名 / 报告提示词 ──
+  const reportRoot = await makeRepo()
+  let emptyRepo = ''
+  try {
+    await writeFile(join(reportRoot, 'a.ts'), 'line1-改\nline2\nline3\n', 'utf8')
+    await git(reportRoot, 'commit', '-am', '修复窗口圆角的渲染逻辑')
+    const subjects = await collectRecentSubjects(reportRoot)
+    assert.equal(subjects.length, 2, '仓库应有 2 条提交主题(init + 测试提交)')
+    assert.ok(subjects[0]?.includes('窗口圆角'), '提交主题按新到旧排,第一条应是测试提交')
+    assert.equal(subjects[1], 'init', '第二条应是造仓库时的 init')
+
+    // 还没有任何提交的仓库:安静回空数组,不炸
+    emptyRepo = await mkdtemp(join(tmpdir(), 'codeatlas-emptyrepo-'))
+    await git(emptyRepo, 'init')
+    assert.deepEqual(await collectRecentSubjects(emptyRepo), [], '没有提交应回空数组')
+
+    const changesNow = await collectGitChanges(reportRoot)
+    assert.equal(changesNow.changes.length, 0, '刚提交完,账本应是干净的')
+    const sig = gitChangesSignature(changesNow, subjects)
+    assert.equal(gitChangesSignature(changesNow, [...subjects]), sig, '同一份账本签名要稳定')
+    assert.notEqual(gitChangesSignature(changesNow, ['换个主题']), sig, '提交主题变了签名要变')
+    await writeFile(join(reportRoot, 'a.ts'), '又改了一行\nline2\nline3\n', 'utf8')
+    const changesNew = await collectGitChanges(reportRoot)
+    assert.equal(changesNew.changes.length, 1, '改一行后应有 1 笔改动')
+    assert.notEqual(gitChangesSignature(changesNew, subjects), sig, '账本变了签名要变')
+
+    const rp = buildReportPrompt({
+      branch: 'main',
+      changes: changesNew.changes,
+      stats: changesNew.stats,
+      recentSubjects: subjects
+    })
+    assert.ok(rp.includes('分支:main'), '提示词应含分支')
+    assert.ok(rp.includes('a.ts'), '提示词应含改动文件')
+    assert.ok(rp.includes('+1 −1') || rp.includes('+0 −1') || rp.includes('+2') || rp.includes('+1'), '提示词应含行数账')
+    assert.ok(rp.includes('窗口圆角'), '提示词应含提交主题线索')
+    assert.ok(!rp.includes(reportRoot), '提示词不许带绝对路径(路径契约)')
+
+    // 行数封顶:100 个文件的改动只摆 80 行,剩下的按零碎改动一笔带过
+    const many: GitChange[] = Array.from({ length: 100 }, (_, i) => ({
+      relPath: `f${i}.ts`,
+      kind: 'modified' as const,
+      staged: false,
+      additions: 1,
+      deletions: 0,
+      binary: false
+    }))
+    const capped = buildReportPrompt({ branch: 'main', changes: many, stats: { additions: 100, deletions: 0 }, recentSubjects: [] })
+    assert.equal(capped.split('\n').filter((l) => l.startsWith('- 修改')).length, REPORT_ROW_LIMIT, '清单行数要封顶')
+    assert.ok(capped.includes('还有 20 个小改动'), '封顶后要注明还有多少零碎改动')
+    const binaryRow = buildReportPrompt({
+      branch: 'main',
+      changes: [{ relPath: 'pic.png', kind: 'modified', staged: true, additions: -1, deletions: -1, binary: true }],
+      stats: { additions: 0, deletions: 0 },
+      recentSubjects: []
+    })
+    assert.ok(binaryRow.includes('二进制'), '二进制改动不许报假行数')
+    assert.ok(binaryRow.includes('(已暂存)'), '已暂存要标出来')
+  } finally {
+    await rm(reportRoot, { recursive: true, force: true })
+    if (emptyRepo) await rm(emptyRepo, { recursive: true, force: true })
+  }
+
   // ── 7. 提示词:证据进去了、类型是人话、空 diff 提醒别编造 ──
   const dp = buildDiffPrompt({ relPath: 'src/app.ts', kind: 'modified', diff: '+加了一行配置' })
   assert.ok(dp.includes('src/app.ts'), '提示词应含文件路径')
@@ -199,15 +280,31 @@ async function main(): Promise<void> {
     const config: AiConfig = { baseUrl: `http://127.0.0.1:${address.port}/v1`, model: 'fake-model', apiKey: '' }
     const res2 = await explainWithModel(config, dp, DIFF_SYSTEM_PROMPT)
     assert.equal(res2.status, 'supported', '假服务应返回成功')
-    const sent = JSON.parse(received[0] ?? '{}') as { messages: Array<{ role: string; content: string }> }
+    const sent = JSON.parse(received[0] ?? '{}') as { messages: Array<{ role: string; content: string }>; max_tokens?: number }
     assert.ok(sent.messages[0]?.content.includes('改动翻译官'), '系统人设应是「改动翻译官」')
     assert.ok(sent.messages[1]?.content.includes('src/app.ts'), '用户提示词应是改动内容')
+
+    // 干活报告:审计官人设真的挂上去,生成上限真的放宽(报告三段式,500 不够用)
+    const reportRes = await explainWithMessages(
+      config,
+      [
+        { role: 'system', content: REPORT_SYSTEM_PROMPT },
+        { role: 'user', content: 'Given:一轮代码改动的完整账本。' }
+      ],
+      undefined,
+      undefined,
+      900
+    )
+    assert.equal(reportRes.status, 'supported', '报告假服务应返回成功')
+    const reportSent = JSON.parse(received[1] ?? '{}') as { messages: Array<{ role: string; content: string }>; max_tokens?: number }
+    assert.ok(reportSent.messages[0]?.content.includes('干活审计官'), '系统人设应是「干活审计官」')
+    assert.equal(reportSent.max_tokens, 900, '报告的生成上限应是 900')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 
   console.log('✅ git 修改翻译自测全部通过')
-  console.log('   真仓库改动收集 · 子目录场景 · 五种 diff · 大文件边界 · 非仓库兜底 · 提示词固定 · 改动翻译官人设')
+  console.log('   真仓库改动收集 · 子目录场景 · 五种 diff · 大文件边界 · 非仓库兜底 · 提示词固定 · 改动翻译官人设 · 干活报告(主题/签名/封顶/审计官人设)')
 }
 
 main().catch((err) => {

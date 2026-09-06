@@ -108,6 +108,9 @@ contextBridge.exposeInMainWorld('atlas', {
   gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke('atlas:git-changes', rootPath),
   gitExplainChange: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-explain-change', rootPath, relPath, requestId),
+  /** AI 干活报告:整轮改动翻成大白话审计,流式增量走 atlas:ai-delta,按 requestId 对号 */
+  gitReport: (rootPath: string, requestId?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:git-report', rootPath, requestId),
   /** 掐掉还在生成的讲解:换了讲解目标/关掉卡片时喊一声,模型立刻空出来 */
   aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke('atlas:ai-cancel', requestId),
   /** 联网查证(默认关):只把「名字」交给主进程去查公开资料,渲染进程不碰网络 */

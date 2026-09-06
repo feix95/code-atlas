@@ -1940,6 +1940,23 @@ body.is-sash-dragging {
   font-weight: 700;
 }
 
+/* AI 干活报告卡(第六十三锤):改动页顶层的整轮审计,报告和单文件讲解共用 explain-* 排版 */
+.git-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.git-report-hint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
 .git-list {
   display: flex;
   flex-direction: column;

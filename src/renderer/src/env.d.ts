@@ -56,6 +56,8 @@ declare global {
       onChatLookup: (callback: (payload: AiChatLookupPayload) => void) => () => void
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
+      /** AI 干活报告:整轮改动的大白话审计,流式增量走 atlas:ai-delta */
+      gitReport: (rootPath: string, requestId?: string) => Promise<AiExplainResult>
       aiCancel: (requestId: string) => Promise<void>
       webLookup: (query: string) => Promise<string>
       onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void

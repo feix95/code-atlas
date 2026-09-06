@@ -9,6 +9,8 @@ import type { GitChange, GitChangesResult } from '../shared/types.ts'
 
 /** 单文件 diff 喂给模型的上限(字符数),超出截断并注明 */
 export const DIFF_CHAR_LIMIT = 30_000
+/** 干活报告的背景线索:最多取最近几条提交主题 */
+export const REPORT_SUBJECT_LIMIT = 8
 /** 未跟踪的全新文件当作「全部新增」读给模型的上限(字节数),超过就算太大 */
 const NEW_FILE_BYTE_LIMIT = 200_000
 
@@ -206,4 +208,33 @@ export async function getChangeDiff(rootPath: string, change: GitChange): Promis
 function clip(result: ChangeDiff): ChangeDiff | null {
   if (result.diff.length <= DIFF_CHAR_LIMIT) return result
   return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……(改动太大,只取了前面一部分)`, note: '改动太大,已截断' }
+}
+
+/**
+ * 最近几次提交的主题(默认 8 条):给干活报告当「这轮在干嘛」的背景线索。
+ * 还没有提交、git 命令翻车 —— 一律安静回空数组,报告照样能写(少个背景而已)。
+ */
+export async function collectRecentSubjects(rootPath: string, limit: number = REPORT_SUBJECT_LIMIT): Promise<string[]> {
+  try {
+    const out = await runGit(rootPath, ['log', `-${limit}`, '--format=%s'])
+    return out
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => (line.length > 80 ? `${line.slice(0, 80)}…` : line))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 干活报告的缓存签名:账本(种类/暂存/路径/行数)+ 最近提交主题,任何一样变了签名就变。
+ * 内部先排序再拼,同一份账本不管怎么数出来都是同一个签名,缓存才不会错发旧报告。
+ */
+export function gitChangesSignature(changes: GitChangesResult, recentSubjects: string[]): string {
+  const rows = changes.changes
+    .map((c) => `${c.kind}:${c.staged ? 1 : 0}:${c.relPath}:${c.additions}:${c.deletions}`)
+    .sort()
+    .join('|')
+  return `${changes.branch}#${rows}#${changes.stats.additions}/${changes.stats.deletions}#${recentSubjects.join('¶')}`
 }

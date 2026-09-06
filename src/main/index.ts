@@ -5,7 +5,7 @@ import { scanDirectory } from '../scanner/index.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
-import { collectGitChanges, getChangeDiff } from '../git/index.ts'
+import { collectGitChanges, collectRecentSubjects, getChangeDiff, gitChangesSignature } from '../git/index.ts'
 import {
   explainWithModel,
   explainWithMessages,
@@ -14,6 +14,7 @@ import {
   buildFolderPrompt,
   buildGuessPrompt,
   buildBinaryPrompt,
+  buildReportPrompt,
   sniffBinaryKind,
   sanitizeHistory,
   sanitizeAttachment,
@@ -27,7 +28,8 @@ import {
   FREE_CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
-  GUESS_SYSTEM_PROMPT
+  GUESS_SYSTEM_PROMPT,
+  REPORT_SYSTEM_PROMPT
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
@@ -54,6 +56,9 @@ function withQuestion(prompt: string, question: unknown): string {
 
 /** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
 const explainAborters = new Map<string, AbortController>()
+
+/** 干活报告的签名缓存:同一份改动集(账本+最近提交主题一样)不重复烧模型,最多留 20 份 */
+const reportCache = new Map<string, AiExplainResult>()
 
 /**
  * 讲解通道的共用出口:证据优先,单问单答。question 是用户点名的问题(预设/输入框),
@@ -546,6 +551,57 @@ function registerIpc(): void {
     return explainWithCancel(requestId, (signal) =>
       explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
     )
+  })
+
+  // AI 干活报告(第六十三锤):整轮改动翻成大白话审计 —— 干了什么/账对不对/要不要细看。
+  // 账本由主进程现场重取(渲染进程递不进假货);改动集没变就走签名缓存,不重复烧模型。
+  // 报告比单句讲解长(三段式),生成上限放宽到 900 tokens。
+  ipcMain.handle('atlas:git-report', async (event, rootPath: unknown, requestId?: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath.trim() === '') {
+      throw new Error('路径不能为空')
+    }
+    const changes = await collectGitChanges(rootPath)
+    if (!changes.isGitRepo) {
+      return { status: 'error', text: '这个文件夹不在 git 仓库里,没有账本可审', model: '', durationMs: 0 }
+    }
+    if (changes.changes.length === 0) {
+      return { status: 'error', text: '当前没有任何改动 —— 账本干干净净,不用审。', model: '', durationMs: 0 }
+    }
+    const subjects = await collectRecentSubjects(rootPath)
+    const signature = gitChangesSignature(changes, subjects)
+    const cached = reportCache.get(signature)
+    if (cached) return cached
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+    }
+    const prompt = buildReportPrompt({
+      branch: changes.branch,
+      changes: changes.changes,
+      stats: { additions: changes.stats.additions, deletions: changes.stats.deletions },
+      recentSubjects: subjects
+    })
+    const result = await explainWithCancel(requestId, (signal) =>
+      explainWithMessages(
+        resolved.target,
+        [
+          { role: 'system', content: REPORT_SYSTEM_PROMPT },
+          { role: 'user', content: prompt }
+        ],
+        makeDeltaSender(event, requestId),
+        signal,
+        900
+      )
+    )
+    if (result.status === 'supported') {
+      reportCache.set(signature, result)
+      // 缓存封顶:只留最近 20 份,最旧的先出,别让 Map 悄悄长胖
+      if (reportCache.size > 20) {
+        const oldest = reportCache.keys().next().value
+        if (oldest !== undefined) reportCache.delete(oldest)
+      }
+    }
+    return result
   })
 
   // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);
