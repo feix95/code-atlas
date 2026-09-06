@@ -1,4 +1,4 @@
-import type { ScanDirNode } from '@shared/types'
+import type { GitChangesResult, ScanDirNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
 import { type AiAssistApi } from '../useAiAsk'
 import { Notice } from './Notice'
@@ -39,16 +39,23 @@ function census(dir: ScanDirNode): FolderCensus {
 /**
  * 文件夹「概览」Tab:不调 AI 也有干货 —— 目录路径、扫描状态、
  * 子文件夹/文件数量、主要语言;没探开的目录老实说还没扫,只提示点箭头展开。
+ * 项目有未提交改动时挂一扇「git 门」:住在文件夹详情里也能一眼看到 AI 改了什么没看。
  */
 export function FolderOverview({
   dir,
   ai,
-  onGoChat
+  onGoChat,
+  gitInfo,
+  onOpenGit
 }: {
   dir: ScanDirNode
   ai: AiAssistApi
   /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
   onGoChat?: () => void
+  /** 项目 git 总账:有未提交改动就亮出 git 门 */
+  gitInfo?: GitChangesResult | null
+  /** 点 git 门打开「Git 修改」抽屉 */
+  onOpenGit?: () => void
 }): React.JSX.Element {
   const info = census(dir)
 
@@ -97,6 +104,18 @@ export function FolderOverview({
           </>
         )}
       </section>
+
+      {gitInfo?.isGitRepo && gitInfo.stats.changed > 0 && onOpenGit && (
+        <button type="button" className="git-door" onClick={onOpenGit} title="打开 Git 修改面板,看 AI 干活报告">
+          <span className="git-door-branch">🌿 {gitInfo.branch}</span>
+          <span className="git-door-text">
+            项目里有 <strong>{gitInfo.stats.changed}</strong> 个文件还没提交 —— 想知道改了什么,点这儿看报告
+          </span>
+          <span className="git-door-arrow" aria-hidden="true">
+            →
+          </span>
+        </button>
+      )}
 
       <AiAssistCard
         ai={ai}

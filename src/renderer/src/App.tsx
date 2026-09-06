@@ -545,7 +545,14 @@ function App(): React.JSX.Element {
                 onOpenGit={() => setShowGit(true)}
               />
             ) : selectedFolder && result ? (
-              <FolderDetailView key={selectedFolder.relPath || '(root)'} dir={selectedFolder} result={result} onClose={clearSelection} />
+              <FolderDetailView
+                key={selectedFolder.relPath || '(root)'}
+                dir={selectedFolder}
+                result={result}
+                onClose={clearSelection}
+                gitInfo={gitInfo}
+                onOpenGit={() => setShowGit(true)}
+              />
             ) : (
               <ProjectOverview
                 result={result}
@@ -762,7 +769,19 @@ function FileDetailView({
 }
 
 /** 文件夹详情:静态目录概览为主;讲解卡在概览页,自由对话是独立 Tab/独立通道 */
-function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: ScanResult; onClose: () => void }): React.JSX.Element {
+function FolderDetailView({
+  dir,
+  result,
+  onClose,
+  gitInfo,
+  onOpenGit
+}: {
+  dir: ScanDirNode
+  result: ScanResult
+  onClose: () => void
+  gitInfo: GitChangesResult | null
+  onOpenGit: () => void
+}): React.JSX.Element {
   const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
   const chat = useAiChat(buildFolderAttachment(dir, dir.name || result.rootName))
@@ -787,7 +806,7 @@ function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: 
         onClose={onClose}
       />
       <div className={`detail-body${tab === 'chat' ? ' is-chat' : ''}`}>
-        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} onGoChat={() => setTab('chat')} />}
+        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} onGoChat={() => setTab('chat')} gitInfo={gitInfo} onOpenGit={onOpenGit} />}
         {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
       </div>
     </div>
