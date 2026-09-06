@@ -9,8 +9,10 @@ import type {
   AiExplainResult,
   DepGraphResult,
   DriveInfo,
+  FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ScanDirNode,
   ScanResult
 } from '../../../shared/types.ts'
 
@@ -58,6 +60,8 @@ declare global {
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>
       /** AI 干活报告:整轮改动的大白话审计,流式增量走 atlas:ai-delta */
       gitReport: (rootPath: string, requestId?: string) => Promise<AiExplainResult>
+      /** 功能定位:扫描树当地图递给主进程,带路人指路(地址已过防编造校验) */
+      locateFeature: (tree: ScanDirNode, question: string, requestId?: string) => Promise<FeatureLocateResult>
       aiCancel: (requestId: string) => Promise<void>
       webLookup: (query: string) => Promise<string>
       onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void

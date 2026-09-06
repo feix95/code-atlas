@@ -8,8 +8,10 @@ import type {
   AiExplainResult,
   DepGraphResult,
   DriveInfo,
+  FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ScanDirNode,
   ScanResult
 } from '../shared/types.ts'
 
@@ -111,6 +113,9 @@ contextBridge.exposeInMainWorld('atlas', {
   /** AI 干活报告:整轮改动翻成大白话审计,流式增量走 atlas:ai-delta,按 requestId 对号 */
   gitReport: (rootPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:git-report', rootPath, requestId),
+  /** 功能定位:「这个功能在哪」—— 扫描树递给主进程当地图,带路人指路,防编造校验在主进程 */
+  locateFeature: (tree: ScanDirNode, question: string, requestId?: string): Promise<FeatureLocateResult> =>
+    ipcRenderer.invoke('atlas:locate-feature', tree, question, requestId),
   /** 掐掉还在生成的讲解:换了讲解目标/关掉卡片时喊一声,模型立刻空出来 */
   aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke('atlas:ai-cancel', requestId),
   /** 联网查证(默认关):只把「名字」交给主进程去查公开资料,渲染进程不碰网络 */

@@ -91,6 +91,18 @@ function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
   return null
 }
 
+/** 按 relPath 找目录节点:功能定位指中文件夹时,跳转走这里 */
+function findDir(node: ScanTreeNode, relPath: string): ScanDirNode | null {
+  if (node.type === 'directory') {
+    if (node.relPath === relPath) return node
+    for (const child of node.children) {
+      const hit = findDir(child, relPath)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
 /** 面包屑分段:rootName + relPath 的每一层;最后一段由调用方自己标成当前 */
 function buildCrumbs(rootName: string, rootPath: string, relPath: string): Crumb[] {
   const crumbs: Crumb[] = [{ label: rootName, title: rootPath }]
@@ -378,10 +390,16 @@ function App(): React.JSX.Element {
 
   // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,再走同一条选中链路
   // keepTab:从关系卡跳的保持「关系」Tab,顺着依赖链一路看;从概览跳的回到概览
+  // 文件找不到再找目录:功能定位指中「整个功能住在这个文件夹」时也能跳
   function jumpTo(relPath: string, keepTab = false): void {
     if (!result) return
     const found = findFile(result.tree, relPath)
-    if (found) void handleSelectFile(found.relPath, found, { keepTab })
+    if (found) {
+      void handleSelectFile(found.relPath, found, { keepTab })
+      return
+    }
+    const dir = findDir(result.tree, relPath)
+    if (dir) handleSelectFolder(dir)
   }
 
   // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发
@@ -551,6 +569,7 @@ function App(): React.JSX.Element {
               />
             ) : (
               <ProjectOverview
+                key={result.rootPath}
                 result={result}
                 graph={graph}
                 graphLoading={graphLoading}

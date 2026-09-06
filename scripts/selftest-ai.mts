@@ -9,6 +9,8 @@ import {
   buildFolderPrompt,
   buildGuessPrompt,
   buildBinaryPrompt,
+  buildLocatePrompt,
+  buildTreeDigest,
   explainWithModel,
   explainWithMessages,
   buildFreeChatMessages,
@@ -18,19 +20,24 @@ import {
   pickWebLookupQuery,
   resolveWebLookupMeta,
   buildRefineMessages,
+  filterLocateHits,
+  findTreeNode,
   hasWebLookupSignal,
   hasSearchIntent,
+  parseLocateReply,
+  LOCATE_NODE_BUDGET,
   WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
   FREE_CHAT_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
+  LOCATE_SYSTEM_PROMPT,
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { parseListenerPids, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
-import type { AiConfig, ChatContextAttachment, FileStructure } from '../src/shared/types.ts'
+import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
   return {
@@ -565,8 +572,95 @@ async function main(): Promise<void> {
   assert.equal(down.status, 'error', '连不上服务时状态应为 error')
   assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
+  // ── 9. 功能定位(第六十七锤):地图摊开 / 回复解析 / 防编造过滤 ──
+  assert.ok(LOCATE_SYSTEM_PROMPT.includes('不许编造'), '带路人人设要有防编造铁律')
+  assert.ok(LOCATE_SYSTEM_PROMPT.includes('{"hits":'), '带路人人设要带 JSON 格式样例')
+  const locateTree: ScanDirNode = {
+    type: 'directory',
+    name: 'demo',
+    relPath: '',
+    summary: { emoji: '🏠', text: 'demo 项目' },
+    children: [
+      {
+        type: 'directory',
+        name: 'src',
+        relPath: 'src',
+        summary: { emoji: '📦', text: '源代码都在这' },
+        children: [
+          {
+            type: 'file',
+            name: 'main.tsx',
+            relPath: 'src/main.tsx',
+            ext: '.tsx',
+            language: { id: 'typescript-react', name: 'TypeScript React', source: 'extension' },
+            summary: { emoji: '🚪', text: '程序的大门' }
+          },
+          {
+            type: 'file',
+            name: 'config.ts',
+            relPath: 'src/config.ts',
+            ext: '.ts',
+            language: { id: 'typescript', name: 'TypeScript', source: 'extension' },
+            summary: { emoji: '⚙️', text: '配置都在这' }
+          }
+        ]
+      },
+      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+    ]
+  }
+
+  // 地图摊开:每行带完整 relPath + 类型标注 + 一句话;广度优先(浅层先画)
+  const digest = buildTreeDigest(locateTree)
+  assert.ok(digest.includes('(项目根) [目录]'), '根节点要标成项目根')
+  assert.ok(digest.includes('src/main.tsx [文件·TypeScript React] —— 程序的大门'), '文件行要带路径/语言/一句话')
+  assert.ok(digest.indexOf('README.md') < digest.indexOf('src/main.tsx'), '广度优先:浅层要排在深层前面')
+  // 预算截断:预算用尽要如实注明地图不全,不许装作画全了
+  const capped = buildTreeDigest(locateTree, 3)
+  assert.equal(capped.split('\n').filter((l) => !l.startsWith('(地图没画全')).length, 3, '超预算要截断到预算行数')
+  assert.ok(capped.includes('地图没画全'), '截断要注明')
+  assert.ok(LOCATE_NODE_BUDGET >= 100, '预算要有基本容量,别小气到地图没法用')
+
+  // 提示词拼装:地图 + 问题 + 「逐字照抄路径」的硬要求
+  const locatePrompt = buildLocatePrompt({ digest, question: '程序从哪启动' })
+  assert.ok(locatePrompt.includes('用户想知道:程序从哪启动'), '问题要进提示词')
+  assert.ok(locatePrompt.includes('逐字照抄'), '要硬要求模型照抄路径')
+
+  // 回复解析:裸 JSON / 围栏包裹 / 前后夹话都能读;反斜杠统一成正斜杠;垃圾回空
+  const parsed = parseLocateReply('{"hits":[{"relPath":"src\\\\main.tsx","reason":"大门在这","confidence":88}]}')
+  assert.equal(parsed.length, 1, '裸 JSON 要能解析')
+  assert.equal(parsed[0]?.relPath, 'src/main.tsx', '反斜杠要统一成正斜杠')
+  assert.equal(parsed[0]?.reason, '大门在这')
+  assert.equal(parsed[0]?.confidence, 88)
+  const fenced = parseLocateReply('好的,指路如下:\n```json\n{"hits":[{"relPath":"src/config.ts","reason":"配置","confidence":150}]}\n```\n请查收')
+  assert.equal(fenced[0]?.relPath, 'src/config.ts', '围栏包裹要能剥掉')
+  assert.equal(fenced[0]?.confidence, 100, 'confidence 要夹在 0~100')
+  const noReason = parseLocateReply('{"hits":[{"relPath":"README.md"}]}')
+  assert.ok(noReason[0]?.reason.length, '没给理由要兜底一句,不许空着')
+  assert.equal(parseLocateReply('我觉得是 main.tsx,不解释').length, 0, '没 JSON 要回空')
+  assert.equal(parseLocateReply('{"hits":"不是数组"}').length, 0, 'hits 不是数组要回空')
+  assert.equal(parseLocateReply('{"hits":[{"reason":"没路径"}]}').length, 0, '没 relPath 的命中要扔')
+  const seven = parseLocateReply(
+    JSON.stringify({ hits: Array.from({ length: 7 }, (_, i) => ({ relPath: `f${i}.ts`, reason: 'x' })) })
+  )
+  assert.equal(seven.length, 5, '命中最多 5 个,防话痨')
+
+  // 防编造:指的每个地址对照真树点名,编造的当场扔;目录也是合法命中;按把握排序
+  assert.equal(findTreeNode(locateTree, 'src')?.type, 'directory', '目录命中要认得出')
+  assert.equal(findTreeNode(locateTree, 'src/main.tsx')?.type, 'file', '文件命中要认得出')
+  assert.equal(findTreeNode(locateTree, 'src/ghost.ts'), null, '编造的路径要点名点不出来')
+  const filtered = filterLocateHits(locateTree, [
+    { relPath: 'src/ghost.ts', reason: '编的', confidence: 99 },
+    { relPath: 'README.md', reason: '说明书', confidence: 30 },
+    { relPath: 'src/config.ts', reason: '配置', confidence: 70 }
+  ])
+  assert.deepEqual(
+    filtered.map((h) => h.relPath),
+    ['src/config.ts', 'README.md'],
+    '编造的要扔掉,剩下的按把握从大到小排'
+  )
+
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造)')
 }
 
 main().catch((err) => {

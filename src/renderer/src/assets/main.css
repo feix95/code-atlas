@@ -2046,6 +2046,78 @@ body.is-sash-dragging {
   transform: rotate(180deg);
 }
 
+/* 功能定位(第六十七锤):「功能在哪」卡 —— 输入一句想知道的事,带路人指路,文件卡一点直达 */
+.locator-form {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.locator-form input {
+  min-width: 0;
+  flex: 1;
+  height: 2rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-md);
+  font-family: inherit;
+}
+
+.locator-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.locator-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.locator-hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.locator-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.locator-hit:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.locator-hit-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.locator-hit-path {
+  color: var(--accent);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.locator-hit-reason {
+  color: var(--muted);
+}
+
 .git-list {
   display: flex;
   flex-direction: column;

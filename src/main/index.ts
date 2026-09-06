@@ -15,6 +15,10 @@ import {
   buildGuessPrompt,
   buildBinaryPrompt,
   buildReportPrompt,
+  buildLocatePrompt,
+  buildTreeDigest,
+  parseLocateReply,
+  filterLocateHits,
   sniffBinaryKind,
   sanitizeHistory,
   sanitizeAttachment,
@@ -29,14 +33,15 @@ import {
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
-  REPORT_SYSTEM_PROMPT
+  REPORT_SYSTEM_PROMPT,
+  LOCATE_SYSTEM_PROMPT
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -602,6 +607,59 @@ function registerIpc(): void {
       }
     }
     return result
+  })
+
+  // 功能定位(第六十七锤):「这个功能在哪」—— 渲染进程把扫描树递过来(不重扫不读文件),
+  // 带路人照着地图指路;指回来的每个地址都对照真树点名,编造的一律拦下,全被拦就老实说指不了。
+  ipcMain.handle('atlas:locate-feature', async (_event, tree: unknown, question: unknown, requestId?: unknown) => {
+    if (
+      !tree ||
+      typeof tree !== 'object' ||
+      (tree as ScanDirNode).type !== 'directory' ||
+      !Array.isArray((tree as ScanDirNode).children) ||
+      typeof question !== 'string' ||
+      question.trim() === ''
+    ) {
+      throw new Error('参数不合法')
+    }
+    const root = tree as ScanDirNode
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', hits: [], text: resolved.error, model: '', durationMs: 0 } satisfies FeatureLocateResult
+    }
+    const prompt = buildLocatePrompt({ digest: buildTreeDigest(root), question: question.trim() })
+    const reply = await explainWithCancel(requestId, (signal) =>
+      explainWithMessages(
+        resolved.target,
+        [
+          { role: 'system', content: LOCATE_SYSTEM_PROMPT },
+          { role: 'user', content: prompt }
+        ],
+        undefined,
+        signal,
+        700
+      )
+    )
+    if (reply.status !== 'supported') {
+      return {
+        status: 'error',
+        hits: [],
+        text: reply.text,
+        model: reply.model,
+        durationMs: reply.durationMs
+      } satisfies FeatureLocateResult
+    }
+    const hits = filterLocateHits(root, parseLocateReply(reply.text))
+    if (hits.length === 0) {
+      return {
+        status: 'unsupported',
+        hits: [],
+        text: '带路人盯着地图,实在认不出这个功能住哪儿 —— 换个问法试试,或者先确认它真的在这个项目里。',
+        model: reply.model,
+        durationMs: reply.durationMs
+      } satisfies FeatureLocateResult
+    }
+    return { status: 'supported', hits, text: '', model: reply.model, durationMs: reply.durationMs } satisfies FeatureLocateResult
   })
 
   // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);

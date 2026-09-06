@@ -301,3 +301,21 @@ export interface AiHistoryMessage {
   role: 'user' | 'assistant'
   content: string
 }
+
+/** 功能定位的一个命中:带路人指的文件/文件夹 + 一句大白话理由 */
+export interface FeatureHit {
+  relPath: string
+  reason: string
+  /** 带路人自报的把握 0~100;只是排序参考,不是保证 */
+  confidence?: number
+}
+
+/** 功能定位结果:hits 为空 = 带路人老实说指不了,text 是给人看的说明 */
+export interface FeatureLocateResult {
+  status: 'supported' | 'unsupported' | 'error' | 'cancelled'
+  hits: FeatureHit[]
+  /** supported 时是补充说明(可为空);unsupported/error/cancelled 时是给人看的人话 */
+  text: string
+  model: string
+  durationMs: number
+}

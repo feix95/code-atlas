@@ -1,4 +1,5 @@
 import type { DepGraphResult, GitChangesResult, ScanResult, ScanTreeNode } from '@shared/types'
+import { FeatureLocator } from './FeatureLocator'
 import { GitDoor } from './GitDoor'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
@@ -143,6 +144,7 @@ export function ProjectOverview({
         </div>
 
         {gitInfo && <GitDoor gitInfo={gitInfo} rootPath={result.rootPath} onJump={onJump} onRefreshed={onRefreshed} />}
+        <FeatureLocator tree={result.tree} onJump={onJump} />
         <div className="two-col">
           <section className="sub-card">
             <h3>语言分布</h3>
