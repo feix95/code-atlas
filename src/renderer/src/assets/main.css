@@ -208,6 +208,67 @@ body.is-maximized .app {
     box-shadow 0.12s ease;
 }
 
+/* 圆点里的功能图标:横线=最小化,方框=最大化(最大化时变双框=还原),白叉=关闭;
+   图标跟圆点一样挂 rem 随缩放走,发丝粗细留物理像素。关闭的白叉压红底,不用 hover 也认得出 */
+.traffic-lights .light i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.traffic-lights .is-min i {
+  width: 0.4375rem;
+  height: 1.5px;
+  border-radius: 1px;
+  background: #5c6165;
+}
+
+.traffic-lights .is-max i {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border: 1.5px solid #5c6165;
+  border-radius: 2px;
+}
+
+/* 贴满屏幕时方框变双框,示意「点这里还原」 */
+body.is-maximized .traffic-lights .is-max i::after {
+  content: '';
+  position: absolute;
+  top: -0.1875rem;
+  right: -0.1875rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border: 1.5px solid #5c6165;
+  border-radius: 1px;
+}
+
+.traffic-lights .is-close i {
+  width: 0.4375rem;
+  height: 0.4375rem;
+}
+
+.traffic-lights .is-close i::before,
+.traffic-lights .is-close i::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.4375rem;
+  height: 1.5px;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.traffic-lights .is-close i::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.traffic-lights .is-close i::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
 /* 最小化/最大化:中性灰,两颗之间留一丝深浅差;关闭:偏红的警示色,不用 hover 就能认出危险 */
 .traffic-lights .is-min::before {
   background: #cfd2d1;
