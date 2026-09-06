@@ -8,6 +8,7 @@ import type {
   AiDeltaPayload,
   AiExplainResult,
   DepGraphResult,
+  DriveInfo,
   FileStructure,
   GitChangesResult,
   ScanResult
@@ -22,6 +23,10 @@ declare global {
         electron: () => string
       }
       pickFolder: () => Promise<string | null>
+      /** 列盘符:只问 Windows 有哪些盘,不翻文件内容;首页盘符列表用 */
+      listDrives: () => Promise<DriveInfo[]>
+      /** CodeAtlas 自身版本号(设置里的版本信息行用) */
+      appVersion: () => Promise<string>
       getUiScale: () => number
       setUiScale: (factor: number) => void
       /** 只预览不落盘:改根字号并广播,但不写 localStorage(设置弹窗的暂存预览用) */

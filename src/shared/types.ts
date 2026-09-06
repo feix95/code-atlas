@@ -81,6 +81,14 @@ export interface ScanStats {
   lazyCount: number
 }
 
+/** 一个盘符:根路径 + 可选容量。列盘符只问 Windows「有哪些盘」,不翻任何文件内容 */
+export interface DriveInfo {
+  letter: string
+  root: string
+  free?: number
+  total?: number
+}
+
 export interface ScanResult {
   rootPath: string
   rootName: string

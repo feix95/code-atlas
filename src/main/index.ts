@@ -34,7 +34,7 @@ import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from
 import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -357,6 +357,30 @@ function registerIpc(): void {
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
+
+  // 列盘符(第六十锤):只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
+  // 跳过 A/B(软驱遗物,探测可能卡好几秒);容量用 statfs 一次系统调用,拿不到就只给盘符
+  ipcMain.handle('atlas:list-drives', async (): Promise<DriveInfo[]> => {
+    const out: DriveInfo[] = []
+    for (const ch of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+      const root = `${ch}:\\`
+      if (!(await fs.stat(root).then(() => true, () => false))) continue
+      const info: DriveInfo = { letter: ch, root }
+      const usage = await fs.statfs(root).then(
+        (s) => ({ free: s.bsize * s.bfree, total: s.bsize * s.blocks }),
+        () => null
+      )
+      if (usage) {
+        info.free = usage.free
+        info.total = usage.total
+      }
+      out.push(info)
+    }
+    return out
+  })
+
+  // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)
+  ipcMain.handle('atlas:app-version', () => app.getVersion())
 
   // 扫描指定文件夹,返回目录树 + 统计;顺手给每个节点打大白话速览标签
   ipcMain.handle('atlas:scan-folder', async (_event, folderPath: unknown) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DepGraphResult, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { Drawer } from './components/Drawer'
@@ -21,16 +21,11 @@ import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 
-interface Versions {
-  node: string
-  chrome: string
-  electron: string
-}
-
-// 引擎版本在页面渲染前就能从 preload 拿到,渲染时读一次即可,无需 effect
-function readVersions(): Versions | null {
-  const v = window.atlas?.versions
-  return v ? { node: v.node(), chrome: v.chrome(), electron: v.electron() } : null
+/** 容量读数:字节换 GB,过百就不带小数,别啰嗦 */
+function driveCapacity(d: DriveInfo): string {
+  if (!d.total) return '就绪'
+  const gb = (n: number): string => `${(n / 1024 ** 3).toFixed(n / 1024 ** 3 >= 100 ? 0 : 1)} GB`
+  return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
 // 文件详情的五个 Tab;文件夹详情有自己的两页
@@ -123,7 +118,9 @@ function clampSidebar(width: number): number {
 }
 
 function App(): React.JSX.Element {
-  const [versions] = useState<Versions | null>(readVersions)
+  // 首页盘符列表(第六十锤):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
+  const [drives, setDrives] = useState<DriveInfo[] | null>(null)
+  const [drivesNote, setDrivesNote] = useState<string | null>(null)
   const [folder, setFolder] = useState<string | null>(null)
   // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
   const [pathDraft, setPathDraft] = useState('')
@@ -167,6 +164,22 @@ function App(): React.JSX.Element {
     document.body.classList.toggle('is-maximized', maximized)
     return () => document.body.classList.remove('is-maximized')
   }, [maximized])
+
+  // 开屏就列盘符;列失败不堵路 —— 提示一声,「打开项目」照样能用
+  useEffect(() => {
+    let alive = true
+    window.atlas
+      .listDrives()
+      .then((list) => {
+        if (alive) setDrives(list)
+      })
+      .catch(() => {
+        if (alive) setDrivesNote('盘符列不出来 —— 用上方「打开项目」选文件夹也一样使')
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // 界面缩放系数:设置页滑条实时改;左栏宽度要按比例跟着走(固定像素不跟缩放,
   // 高倍率下文字变大、面板不变,挤在一起 —— 第四十四锤修的根因就在这)
@@ -393,6 +406,11 @@ function App(): React.JSX.Element {
     setActiveTab('overview')
   }
 
+  // logo = 回项目总览主页:钻到多深的子目录,一键回总览;没开项目时按钮自己变灰
+  function goHome(): void {
+    if (folder) clearSelection()
+  }
+
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
   async function handleExpandLazy(relPath: string): Promise<void> {
     if (!result) return
@@ -417,12 +435,19 @@ function App(): React.JSX.Element {
     <div className="app">
       <TitleBar />
       <header className="topbar">
-        <div className="brand">
+        <button
+          type="button"
+          className="brand"
+          onClick={goHome}
+          disabled={!folder}
+          title={folder ? '回到项目总览' : '先打开一个项目,logo 就能带你回去'}
+          aria-label="回到项目总览"
+        >
           <span className="brand-mark" aria-hidden="true">
             ⌁
           </span>
           CodeAtlas
-        </div>
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
           {scanning ? '正在画地图……' : '打开项目'}
         </button>
@@ -550,37 +575,29 @@ function App(): React.JSX.Element {
             </div>
           )}
           {!folder && !scanning && !error && (
-            <div className="welcome-card">
-              <div className="logo">
-                <span className="brand-mark brand-mark-big" aria-hidden="true">
-                  ⌁
-                </span>
-              </div>
-              <h1>CodeAtlas</h1>
-              <p className="slogan">你的 AI 代码地图 —— 不读代码,也能看懂整个项目</p>
-              <p className="empty-hint">点上方「打开项目」,或在地址栏粘贴路径</p>
-              <ol className="welcome-steps">
-                <li>
-                  <i>1</i>选一个文件夹打开,地图马上画出来
-                </li>
-                <li>
-                  <i>2</i>在左边树上点开想看的东西(点箭头展开,点名字选中)
-                </li>
-                <li>
-                  <i>3</i>右边先看静态结构;想让 AI 讲,点一下它才开跑
-                </li>
-              </ol>
-              <div className="engine">
-                {versions ? (
-                  <>
-                    <span>Electron {versions.electron}</span>
-                    <span>Node {versions.node}</span>
-                    <span>Chromium {versions.chrome}</span>
-                  </>
-                ) : (
-                  <span>引擎启动中……</span>
-                )}
-              </div>
+            <div className="drives-view">
+              <h1>这台电脑</h1>
+              <p className="empty-hint">点一个盘就开门画图;想直奔某个项目,用上方「打开项目」或粘贴路径</p>
+              {drives === null && !drivesNote ? (
+                <div className="state">
+                  <ProgressDots />
+                  正在列盘符……
+                </div>
+              ) : drivesNote ? (
+                <Notice kind="error">{drivesNote}</Notice>
+              ) : (
+                <div className="drives-grid">
+                  {(drives ?? []).map((d) => (
+                    <button key={d.letter} type="button" className="drive-card" onClick={() => void scanPath(d.root)}>
+                      <strong className="drive-letter">{d.letter}:</strong>
+                      <span className="drive-info">
+                        <strong>本地磁盘</strong>
+                        <small>{driveCapacity(d)}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </main>

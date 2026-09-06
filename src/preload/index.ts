@@ -7,6 +7,7 @@ import type {
   AiDeltaPayload,
   AiExplainResult,
   DepGraphResult,
+  DriveInfo,
   FileStructure,
   GitChangesResult,
   ScanResult
@@ -68,6 +69,9 @@ contextBridge.exposeInMainWorld('atlas', {
     window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
   },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('atlas:pick-folder'),
+  // 列盘符(只问有哪些盘,不翻文件内容);app 版本号(设置里的版本信息行用)
+  listDrives: (): Promise<DriveInfo[]> => ipcRenderer.invoke('atlas:list-drives'),
+  appVersion: (): Promise<string> => ipcRenderer.invoke('atlas:app-version'),
   // 自绘窗口壳:三颗灰点背后的真动作 + 最大化状态同步,渲染进程不许直接碰 BrowserWindow
   windowClose: (): Promise<void> => ipcRenderer.invoke('atlas:window-close'),
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('atlas:window-minimize'),

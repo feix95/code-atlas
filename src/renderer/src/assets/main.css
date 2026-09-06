@@ -318,6 +318,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   flex-shrink: 0;
 }
 
+/* logo(第六十锤起可点):开着项目时点了回项目总览,没开项目时变灰不可点 */
 .brand {
   display: flex;
   align-items: center;
@@ -327,6 +328,32 @@ body.is-maximized .traffic-lights .is-max i::after {
   letter-spacing: -0.01em;
   margin-right: var(--space-2);
   flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s ease;
+}
+
+.brand:hover:not(:disabled) .brand-mark {
+  filter: brightness(1.12);
+}
+
+.brand:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.brand:disabled {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .brand-mark {
@@ -339,14 +366,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   border-radius: 0.4375rem;
   background: linear-gradient(135deg, var(--accent), var(--secondary));
   box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.brand-mark-big {
-  width: 2.875rem;
-  height: 2.875rem;
-  font-size: 1.625rem;
-  border-radius: 0.75rem;
-  margin: 0 auto;
+  transition: filter 0.15s ease;
 }
 
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
@@ -2131,87 +2151,78 @@ body.is-maximized .drawer-layer {
   text-align: left;
 }
 
-.welcome-card {
+/* ── 首页盘符列表(第六十锤):一开就是「这台电脑」,欢迎卡退役,版本号搬进设置 ── */
+
+.drives-view {
   margin: auto;
   text-align: center;
+  max-width: 34rem;
+  width: 100%;
+}
+
+.drives-view h1 {
+  margin: 0 0 var(--space-2);
+}
+
+.drives-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.drive-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  padding: var(--space-7) var(--space-8);
-  box-shadow: var(--shadow-pop);
-  max-width: 32.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
-.logo {
-  margin-bottom: var(--space-3);
+.drive-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--accent) 14%, transparent);
+  transform: translateY(-1px);
 }
 
-.welcome-card h1 {
-  font-size: var(--font-display);
-  margin: var(--space-2) 0;
+.drive-card:active {
+  transform: translateY(0);
 }
 
-.slogan {
-  color: var(--muted);
-  font-size: var(--font-base);
-  line-height: 1.6;
-}
-
-.welcome-card .empty-hint {
-  margin-top: var(--space-4);
-  color: var(--accent);
-}
-
-.welcome-steps {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  text-align: left;
+.drive-letter {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
   font-size: var(--font-md);
-}
-
-.welcome-steps li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.welcome-steps i {
-  font-style: normal;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
   color: var(--accent);
-  font-size: var(--font-xs);
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 
-.engine {
+.drive-info {
   display: flex;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line-soft);
-  font-size: var(--font-xs);
-  color: var(--muted-2);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
 }
 
-.engine span {
-  background: var(--surface-soft);
-  border: 1px solid var(--line-soft);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  font-family: var(--mono);
+.drive-info strong {
+  font-size: var(--font-sm);
+}
+
+.drive-info small {
+  color: var(--muted);
+  font-size: var(--font-xs);
 }
 
 /* ── 统一等待语言:脉冲点 + 动词 ── */
@@ -3529,6 +3540,30 @@ body.is-maximized .cfg-layer {
 .cfg-btn-apply:disabled {
   opacity: 0.48;
   cursor: default;
+}
+
+/* 版本信息行(第六十锤):欢迎卡退役后,CodeAtlas/引擎版本搬进高级选项 */
+.cfg-versions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0 0.125rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+}
+
+.cfg-versions-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  color: var(--muted-2);
+}
+
+.cfg-versions .mono {
+  color: var(--muted);
+  letter-spacing: 0;
 }
 
 /* 暗色下主色变浅,实心按钮和悬停填充的字跟着换深色保对比 */

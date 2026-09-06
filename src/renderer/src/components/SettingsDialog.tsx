@@ -125,6 +125,13 @@ const ICON_PATHS: Record<string, ReactNode> = {
   sparkles: (
     <path d="M9.9 15.5a2 2 0 0 0-1.4-1.4l-6.1-1.6a.5.5 0 0 1 0-1L8.5 9.9A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </>
+  ),
   folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
 }
 
@@ -176,6 +183,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [models, setModels] = useState<string[]>([])
   const [modelsNote, setModelsNote] = useState<string | null>(null)
   const [modelsBusy, setModelsBusy] = useState(false)
+  const [appVersion, setAppVersion] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLElement | null>(null)
   const aiRef = useRef<HTMLElement | null>(null)
@@ -189,6 +197,11 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
         setDraftConfig(c)
       })
       .catch(() => {})
+  }, [])
+
+  // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
+  useEffect(() => {
+    window.atlas.appVersion().then(setAppVersion).catch(() => {})
   }, [])
 
   // 视觉预览:草稿一变,界面当场变(还没落盘,撤销/关弹窗就退回)
@@ -798,6 +811,17 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                       )}
                     </div>
                   )}
+                </div>
+
+                <div className="cfg-versions">
+                  <span className="cfg-versions-label">
+                    <Icon name="info" size={12} />
+                    版本
+                  </span>
+                  <span className="mono">
+                    CodeAtlas {appVersion ?? '…'} · Electron {window.atlas.versions.electron()} · Node {window.atlas.versions.node()} · Chromium{' '}
+                    {window.atlas.versions.chrome()}
+                  </span>
                 </div>
 
                 <div className="cfg-summary">
