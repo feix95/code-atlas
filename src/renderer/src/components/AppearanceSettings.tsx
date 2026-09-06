@@ -146,6 +146,7 @@ export function AppearanceSettings(): React.JSX.Element {
             onChange={(e) => setDragValue(Number(e.target.value))}
             onPointerUp={commitDrag}
             onPointerCancel={commitDrag}
+            onTouchEnd={commitDrag}
             onKeyUp={commitDrag}
             onBlur={commitDrag}
           />
