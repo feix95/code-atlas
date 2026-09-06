@@ -4,7 +4,8 @@
 // 自定义色在启动时算出一族同色系的 token 写到 :root 内联样式上,压过样式表默认值。
 
 export type AppearanceMode = 'auto' | 'light' | 'dark'
-export type AppearancePreset = 'default' | 'teal' | 'violet'
+/** preset 和自定义色互斥:选了预设就清空自定义色,点「自定义」才进 custom 档 */
+export type AppearancePreset = 'default' | 'teal' | 'violet' | 'custom'
 
 export interface Appearance {
   mode: AppearanceMode
@@ -24,8 +25,19 @@ export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent:
   { key: 'violet', name: '丁香紫', accent: '#7c5cd6', secondary: '#b79ef0' }
 ]
 
-/** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配(--secondary-deep 是辅助色的文字安全档) */
-const TOKEN_KEYS = ['--accent', '--accent-hover', '--accent-soft', '--accent-line', '--selected-bg', '--secondary', '--secondary-deep'] as const
+/** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配
+ *  (--secondary-deep 是辅助色的文字安全档;--line 边框线归辅助色管,--canvas-tint 画布底色归主题色管) */
+const TOKEN_KEYS = [
+  '--accent',
+  '--accent-hover',
+  '--accent-soft',
+  '--accent-line',
+  '--selected-bg',
+  '--secondary',
+  '--secondary-deep',
+  '--line',
+  '--canvas-tint'
+] as const
 
 export function loadAppearance(): Appearance {
   try {
@@ -34,7 +46,7 @@ export function loadAppearance(): Appearance {
       const p = JSON.parse(raw) as Partial<Appearance>
       return {
         mode: p.mode === 'light' || p.mode === 'dark' ? p.mode : 'auto',
-        preset: p.preset === 'teal' || p.preset === 'violet' ? p.preset : 'default',
+        preset: p.preset === 'teal' || p.preset === 'violet' || p.preset === 'custom' ? p.preset : 'default',
         accent: isHexColor(p.accent) ? p.accent : null,
         secondary: isHexColor(p.secondary) ? p.secondary : null
       }
@@ -100,9 +112,22 @@ export function applyAppearance(a: Appearance): void {
     for (const key of TOKEN_KEYS) root.removeProperty(key)
     return
   }
-  const preset = COLOR_PRESETS.find((p) => p.key === a.preset) ?? COLOR_PRESETS[0]
-  const [h, s, l] = hexToHsl(a.accent ?? preset.accent)
-  const [h2, s2, l2] = hexToHsl(a.secondary ?? preset.secondary)
+
+  // 预设与自定义分家:custom 档直接用用户选的色,绝不跟某个预设攀亲戚;
+  // 万一 custom 状态下颜色缺了(老存档坏了,理论上不该发生),整套回退晴空蓝固定色,不炸界面
+  let accentHex: string
+  let secondaryHex: string
+  if (a.preset === 'custom') {
+    const fallback = COLOR_PRESETS[0]
+    accentHex = a.accent ?? fallback.accent
+    secondaryHex = a.secondary ?? fallback.secondary
+  } else {
+    const preset = COLOR_PRESETS.find((p) => p.key === a.preset) ?? COLOR_PRESETS[0]
+    accentHex = a.accent ?? preset.accent
+    secondaryHex = a.secondary ?? preset.secondary
+  }
+  const [h, s, l] = hexToHsl(accentHex)
+  const [h2, s2, l2] = hexToHsl(secondaryHex)
   const sat = clamp(s, 30, 85)
   const sat2 = clamp(s2, 25, 80)
 
@@ -116,6 +141,10 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--selected-bg', hslCss(h, 40, 24))
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 50, 78)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
+    // 边框分隔线跟辅助色:饱和度压到灰蒙蒙的量级、亮度限位,压成带一丝色相的灰
+    root.setProperty('--line', hslCss(h2, clamp(s2, 10, 22), 27))
+    // 画布底色跟主题色:很淡的一层色调垫在最外层/卡片缝隙底下,内容卡片保持干净中性色
+    root.setProperty('--canvas-tint', hslCss(h, clamp(s, 8, 16), 12))
   } else {
     root.setProperty('--accent', hslCss(h, sat, clamp(l, 28, 58)))
     root.setProperty('--accent-hover', hslCss(h, sat, clamp(l, 28, 58) - 8))
@@ -124,6 +153,8 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--selected-bg', hslCss(h, sat, 91))
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
+    root.setProperty('--line', hslCss(h2, clamp(s2, 8, 20), 85))
+    root.setProperty('--canvas-tint', hslCss(h, clamp(s, 3, 6), 97))
   }
 }
 

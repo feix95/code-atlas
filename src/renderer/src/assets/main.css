@@ -28,6 +28,8 @@
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
   /* ── 色板(浅色)── */
   --window: #f6f7f8;
+  /* 画布底色:主题色染的极淡一层,垫在最外层和卡片缝隙底下;内容卡片本身保持中性白 */
+  --canvas-tint: hsl(207 5% 97%);
   --secondary: #5ac5db; /* 辅助色:图标/分布条/预设问题 chips 等的渐变与点缀主角 */
   --secondary-deep: #1f7e8e; /* 辅助色的文字安全档:同一色相压深,浅底上看得清 */
   --surface: #ffffff;
@@ -62,6 +64,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --window: #1d2226;
+  --canvas-tint: hsl(206 13% 13%);
   --secondary: #7ecbe8;
   --secondary-deep: #93d3e6;
   --surface: #252b2f;
@@ -133,7 +136,7 @@ body.is-maximized {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--window);
+  background: var(--canvas-tint);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow:
@@ -754,7 +757,8 @@ body.is-sash-dragging {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  /* 卡片下方的画布:染主题色的极淡调,内容卡片仍是无染的白底,文字对比度不让步 */
+  background: var(--canvas-tint);
   position: relative;
 }
 
@@ -786,7 +790,7 @@ body.is-sash-dragging {
   flex-shrink: 0;
   padding: var(--space-3) var(--space-4) 0;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--canvas-tint);
 }
 
 .crumbs {

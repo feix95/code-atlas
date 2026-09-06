@@ -52,7 +52,16 @@ export function AppearanceSettings(): React.JSX.Element {
   }
 
   const preset = COLOR_PRESETS.find((p) => p.key === appearance.preset) ?? COLOR_PRESETS[0]
-  const hasCustomColors = appearance.accent !== null || appearance.secondary !== null
+
+  // 进自定义档:拿当前生效的颜色当起点(没自定义过就抄当前预设的),取色器不空着手出现
+  function enterCustom(): void {
+    update({
+      ...appearance,
+      preset: 'custom',
+      accent: appearance.accent ?? preset.accent,
+      secondary: appearance.secondary ?? preset.secondary
+    })
+  }
 
   return (
     <div className="ai-settings">
@@ -81,45 +90,42 @@ export function AppearanceSettings(): React.JSX.Element {
               key={p.key}
               type="button"
               className={`chip chip-link ${appearance.preset === p.key ? 'is-on' : ''}`}
-              onClick={() => update({ ...appearance, preset: p.key })}
+              onClick={() => update({ ...appearance, preset: p.key, accent: null, secondary: null })}
             >
               <i className="preset-dot" style={{ background: p.accent }} aria-hidden="true" />
               <i className="preset-dot" style={{ background: p.secondary }} aria-hidden="true" />
               {p.name}
             </button>
           ))}
+          <button type="button" className={`chip chip-link ${appearance.preset === 'custom' ? 'is-on' : ''}`} onClick={enterCustom}>
+            自定义
+          </button>
         </div>
-        <p className="ai-hint">三套现成配色,点一下整体换装,亮暗两副面孔都给你配好了。</p>
-      </div>
-
-      <div className="ai-field">
-        <span className="ai-label">自己挑颜色</span>
-        <div className="ai-row">
-          <label className="color-pick">
-            主题色
-            <input
-              type="color"
-              className="color-input"
-              value={appearance.accent ?? preset.accent}
-              onChange={(e) => update({ ...appearance, accent: e.target.value })}
-            />
-          </label>
-          <label className="color-pick">
-            辅助色
-            <input
-              type="color"
-              className="color-input"
-              value={appearance.secondary ?? preset.secondary}
-              onChange={(e) => update({ ...appearance, secondary: e.target.value })}
-            />
-          </label>
-          {hasCustomColors && (
-            <button type="button" className="btn" onClick={() => update({ ...appearance, accent: null, secondary: null })}>
-              用回预设的颜色
-            </button>
-          )}
-        </div>
-        <p className="ai-hint">主题色管按钮、选中这些主角色;辅助色管图标、分布条这些配角色。挑了马上生效,随时可以反悔。</p>
+        {appearance.preset === 'custom' && (
+          <div className="ai-row">
+            <label className="color-pick">
+              主题色
+              <input
+                type="color"
+                className="color-input"
+                value={appearance.accent ?? preset.accent}
+                onChange={(e) => update({ ...appearance, preset: 'custom', accent: e.target.value })}
+              />
+            </label>
+            <label className="color-pick">
+              辅助色
+              <input
+                type="color"
+                className="color-input"
+                value={appearance.secondary ?? preset.secondary}
+                onChange={(e) => update({ ...appearance, preset: 'custom', secondary: e.target.value })}
+              />
+            </label>
+          </div>
+        )}
+        <p className="ai-hint">
+          点现成配色一键换装;点「自定义」自己调主题色和辅助色,连边框线、卡片底下的画布色都跟着变。换回任何预设会扔掉自定义色,两边不打架。
+        </p>
       </div>
 
       <div className="ai-field">
