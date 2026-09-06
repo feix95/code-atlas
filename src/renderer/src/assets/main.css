@@ -2348,6 +2348,51 @@ body.is-maximized .cfg-layer {
   }
 }
 
+/* 关弹窗确认(第五十八锤):有未应用的更改时,遮罩/×/Esc 先弹确认再丢弃 */
+.cfg-confirm-dim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 30, 40, 0.32);
+}
+
+.cfg-confirm {
+  width: min(21.25rem, calc(100% - 3.5rem));
+  padding: 1.125rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  background: var(--window);
+  box-shadow: 0 1.25rem 2.5rem rgba(11, 36, 51, 0.3);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cfg-confirm {
+    animation: cfg-in 0.18s ease;
+  }
+}
+
+.cfg-confirm h2 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cfg-confirm p {
+  margin: 0.375rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.cfg-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
 .cfg-head {
   min-height: 4.125rem;
   display: flex;

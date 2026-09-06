@@ -158,7 +158,7 @@ const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: strin
 /**
  * 设置弹窗(按小葵的效果图重构):居中卡片 + 左侧导航 + 分区内容。
  * 逻辑是「暂存 + 预览 + 应用」:所有改动先进草稿、界面即时预览,
- * 点「应用更改」才落盘;恢复默认/关弹窗(×、Esc、点遮罩)都会退回上次保存的样子。
+ * 点「应用更改」才落盘;恢复默认直接退回;关弹窗(×、Esc、点遮罩)在有未应用的更改时先弹确认,确认丢弃才退回。
  */
 export function SettingsDialog({ workspaceName, onClose }: { workspaceName: string | null; onClose: () => void }): React.JSX.Element {
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
@@ -171,6 +171,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [modelsNote, setModelsNote] = useState<string | null>(null)
@@ -240,8 +241,18 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     setApplyState({ kind: 'idle' })
   }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale])
 
-  /** 关弹窗:没应用的改动当没改过,预览先退回已保存的样子 */
+  /** 关弹窗入口(遮罩/×/Esc 同路):保存中不响应;有草稿先弹确认,确认丢弃才真关 */
   const requestClose = useCallback((): void => {
+    if (applyState.kind === 'saving') return
+    if (dirty) {
+      setConfirmDiscard(true)
+      return
+    }
+    onClose()
+  }, [applyState.kind, dirty, onClose])
+
+  /** 确认丢弃:预览退回上次保存的样子,没应用的草稿当没改过 */
+  const discardAndClose = useCallback((): void => {
     applyAppearance(savedAppearance)
     window.atlas.setUiScale(savedScale)
     onClose()
@@ -249,11 +260,17 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') requestClose()
+      if (e.key !== 'Escape') return
+      // 确认框开着时 Esc 等于「继续编辑」,别连着把设置也关了
+      if (confirmDiscard) {
+        setConfirmDiscard(false)
+        return
+      }
+      requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [requestClose])
+  }, [requestClose, confirmDiscard])
 
   function sectionEl(key: SectionKey): HTMLElement | null {
     if (key === 'appearance') return appearanceRef.current
@@ -339,7 +356,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const footerState = (() => {
     if (applyState.kind === 'saving') return { tone: 'amber' as const, text: '正在保存……' }
     if (applyState.kind === 'error') return { tone: 'red' as const, text: applyState.text }
-    if (dirty) return { tone: 'amber' as const, text: '有未应用的更改 —— 关掉弹窗会退回上次保存的样子' }
+    if (dirty) return { tone: 'amber' as const, text: '有未应用的更改 —— 应用后生效,关闭前会先确认' }
     return { tone: 'green' as const, text: '所有设置已同步' }
   })()
 
@@ -821,6 +838,30 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
           </div>
         </footer>
       </main>
+
+      {confirmDiscard && (
+        <div className="cfg-confirm-dim" onClick={() => setConfirmDiscard(false)}>
+          <div
+            className="cfg-confirm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cfg-confirm-title"
+            aria-describedby="cfg-confirm-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="cfg-confirm-title">未应用的更改</h2>
+            <p id="cfg-confirm-desc">关闭设置将丢弃这些更改,并恢复为上次保存的状态。</p>
+            <div className="cfg-confirm-actions">
+              <button type="button" className="cfg-btn-reset" onClick={discardAndClose}>
+                丢弃并关闭
+              </button>
+              <button type="button" className="cfg-btn-apply" autoFocus onClick={() => setConfirmDiscard(false)}>
+                继续编辑
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   )
