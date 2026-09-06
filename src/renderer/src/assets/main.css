@@ -7,24 +7,24 @@
   /* 亮暗由外观系统往 <html> 挂 data-theme 控制(自动模式跟着系统,也能手动钉死) */
   color-scheme: light;
   /* ── 布局 token ── */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 32px;
-  --space-8: 48px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 3rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
   --radius-pill: 999px;
-  --font-xs: 11px;
-  --font-sm: 12px;
-  --font-md: 13px;
-  --font-base: 14px;
-  --font-lg: 16px;
-  --font-display: 26px;
+  --font-xs: 0.6875rem;
+  --font-sm: 0.75rem;
+  --font-md: 0.8125rem;
+  --font-base: 0.875rem;
+  --font-lg: 1rem;
+  --font-display: 1.625rem;
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
   /* ── 色板(浅色)── */
   --window: #f6f7f8;
@@ -55,7 +55,7 @@
   --git-rename: #9a6700;
   --hover: #e9edf0;
   --selected-bg: #dcecf8;
-  --shadow-pop: 0 8px 24px rgba(12, 44, 67, 0.16);
+  --shadow-pop: 0 0.5rem 1.5rem rgba(12, 44, 67, 0.16);
 }
 
 /* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场 */
@@ -89,7 +89,7 @@
   --git-rename: #d29922;
   --hover: #293238;
   --selected-bg: #213e52;
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -98,8 +98,10 @@
   box-sizing: border-box;
 }
 
-/* 窗口壳:真透明,窗口本体就是一张 14px 圆角悬浮卡,四角和裙边露出真实桌面。
-   阴影用 CSS 画(系统影子只认方框),所以 body 留 10px 透明裙边给阴影呼吸 */
+/* 界面缩放约定(第四十七锤起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
+   布局/字号/图标全挂 rem 跟着变,点击坐标和视觉永远 1:1 —— 不再借用浏览器缩放坐标系。
+   两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;
+   ②窗壳本体(透明裙边/圆角/阴影)是「窗」的装饰,不该跟着内容一起胖 */
 html,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -150,7 +152,7 @@ body.is-maximized .app {
 
 .titlebar {
   position: relative;
-  flex: 0 0 38px;
+  flex: 0 0 2.375rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,7 +160,7 @@ body.is-maximized .app {
   background: linear-gradient(#fafbfb, #f1f2f3);
   border-bottom: 1px solid var(--line);
   color: #858b90;
-  font-size: 11px;
+  font-size: 0.6875rem;
   letter-spacing: 0.03em;
   user-select: none;
 }
@@ -170,16 +172,16 @@ body.is-maximized .app {
 /* 三颗窗控按钮住右上角,顺序照 Windows 习惯(最小化 → 最大化 → 关闭) */
 .traffic-lights {
   position: absolute;
-  right: 10px;
+  right: 0.625rem;
   display: flex;
   gap: 2px;
 }
 
-/* 圆点本体 11px,按钮底座放大到 18px:点着不费劲 */
+/* 圆点本体 0.6875rem,按钮底座放大到 1.125rem:点着不费劲 */
 .traffic-lights .light {
   position: relative;
-  width: 18px;
-  height: 18px;
+  width: 1.125rem;
+  height: 1.125rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -192,8 +194,8 @@ body.is-maximized .app {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 11px;
-  height: 11px;
+  width: 0.6875rem;
+  height: 0.6875rem;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -220,11 +222,11 @@ body.is-maximized .app {
 /* 悬停必须有动静:点变深 + 外圈浅环;关闭的环也跟着带红,鼠标按下去再深一档 */
 .traffic-lights .light:hover::before {
   filter: brightness(0.9);
-  box-shadow: 0 0 0 3px rgba(127, 127, 127, 0.22);
+  box-shadow: 0 0 0 0.1875rem rgba(127, 127, 127, 0.22);
 }
 
 .traffic-lights .is-close:hover::before {
-  box-shadow: 0 0 0 3px rgba(211, 115, 109, 0.28);
+  box-shadow: 0 0 0 0.1875rem rgba(211, 115, 109, 0.28);
 }
 
 .traffic-lights .light:active::before {
@@ -261,29 +263,29 @@ body.is-maximized .app {
 }
 
 .brand-mark {
-  width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 14px;
-  border-radius: 7px;
+  font-size: 0.875rem;
+  border-radius: 0.4375rem;
   background: linear-gradient(135deg, var(--accent), var(--secondary));
-  box-shadow: 0 4px 9px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .brand-mark-big {
-  width: 46px;
-  height: 46px;
-  font-size: 26px;
-  border-radius: 12px;
+  width: 2.875rem;
+  height: 2.875rem;
+  font-size: 1.625rem;
+  border-radius: 0.75rem;
   margin: 0 auto;
 }
 
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
 
 .btn {
-  height: 30px;
+  height: 1.875rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
@@ -319,7 +321,7 @@ body.is-maximized .app {
   color: #fff;
   border-color: var(--accent);
   background: var(--accent);
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 2px 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .btn-primary:hover {
@@ -343,11 +345,11 @@ body.is-maximized .app {
   background: color-mix(in srgb, var(--secondary) 10%, transparent);
 }
 
-/* 图标按钮:热区放大到 36px 兜住「双重缩放(系统 150% × 应用 zoom)下的小幅命中偏移」,
-   字形 16px 视觉不变;line-height 锁 1 防字形基线漂移 */
+/* 图标按钮:热区放大到 2.25rem 兜住「双重缩放(系统 150% × 应用 zoom)下的小幅命中偏移」,
+   字形 1rem 视觉不变;line-height 锁 1 防字形基线漂移 */
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
   display: grid;
   place-items: center;
@@ -355,7 +357,7 @@ body.is-maximized .app {
   border-radius: var(--radius-sm);
   color: var(--muted);
   background: transparent;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
   font-family: inherit;
   cursor: pointer;
@@ -372,11 +374,11 @@ body.is-maximized .app {
 .path-box {
   position: relative;
   flex: 1;
-  min-width: 180px;
+  min-width: 11.25rem;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: 30px;
+  height: 1.875rem;
   padding: 0 2px 0 var(--space-2);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -386,7 +388,7 @@ body.is-maximized .app {
 
 .path-box:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .path-input {
@@ -405,15 +407,15 @@ body.is-maximized .app {
 }
 
 .path-go {
-  height: 24px;
+  height: 1.5rem;
   padding: 0 var(--space-2);
 }
 
 /* 空路径点了「前往」:气泡提示挂输入框正下方 */
 .path-hint {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 10px;
+  top: calc(100% + 0.375rem);
+  left: 0.625rem;
   z-index: 30;
   white-space: nowrap;
   font-size: var(--font-sm);
@@ -433,13 +435,13 @@ body.is-maximized .app {
 
 @keyframes path-shake {
   20% {
-    transform: translateX(-4px);
+    transform: translateX(-0.25rem);
   }
   40% {
-    transform: translateX(4px);
+    transform: translateX(0.25rem);
   }
   60% {
-    transform: translateX(-3px);
+    transform: translateX(-0.1875rem);
   }
   80% {
     transform: translateX(2px);
@@ -475,11 +477,11 @@ body.is-maximized .app {
 }
 
 .search {
-  height: 30px;
+  height: 1.875rem;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 10px;
+  padding: 0 0.625rem;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -527,14 +529,14 @@ body.is-maximized .app {
 }
 
 .sidebar-footer .mono {
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .status-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 5px;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-right: 0.3125rem;
   border-radius: 50%;
   background: var(--green);
 }
@@ -560,7 +562,7 @@ body.is-maximized .app {
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 27px;
+  height: 1.6875rem;
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background 0.13s ease;
@@ -577,16 +579,16 @@ body.is-maximized .app {
 }
 
 .tree-caret {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 22px;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.375rem;
   display: grid;
   place-items: center;
   border: none;
   padding: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -602,8 +604,8 @@ body.is-maximized .app {
 
 /* 懒加载探测中的小圈圈 */
 .tree-spin {
-  width: 9px;
-  height: 9px;
+  width: 0.5625rem;
+  height: 0.5625rem;
   border: 2px solid var(--accent-line);
   border-top-color: var(--accent);
   border-radius: 50%;
@@ -626,9 +628,9 @@ body.is-maximized .app {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   height: 100%;
-  padding: 0 7px 0 2px;
+  padding: 0 0.4375rem 0 2px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -645,7 +647,7 @@ body.is-maximized .app {
 .tree-icon {
   flex-shrink: 0;
   color: var(--muted-2);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .tree-row.is-selected .tree-icon {
@@ -676,19 +678,19 @@ body.is-maximized .app {
   flex: 0 0 auto;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 0.03em;
 }
 
 /* 文件夹直接子项数:灰色小胶囊 */
 .tree-count {
   flex: 0 0 auto;
-  min-width: 18px;
-  padding: 1px 5px;
+  min-width: 1.125rem;
+  padding: 1px 0.3125rem;
   color: var(--muted);
   border-radius: var(--radius-pill);
   background: var(--hover);
-  font-size: 9px;
+  font-size: 0.5625rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -696,18 +698,18 @@ body.is-maximized .app {
 /* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
 .tree-badge {
   flex: 0 0 auto;
-  font-size: 9px;
+  font-size: 0.5625rem;
   color: var(--amber);
   background: var(--amber-soft);
   border: 1px solid var(--amber-line);
   border-radius: var(--radius-pill);
-  padding: 0 6px;
+  padding: 0 0.375rem;
 }
 
 /* ── 分割条(VSCode 式)── */
 
 .sash {
-  flex: 0 0 5px;
+  flex: 0 0 0.3125rem;
   position: relative;
   z-index: 5;
   cursor: col-resize;
@@ -759,8 +761,8 @@ body.is-sash-dragging {
 /* 扫描完成的轻提示:浮在详情右上角,报个数就走 */
 .scan-toast {
   position: absolute;
-  top: 10px;
-  right: 14px;
+  top: 0.625rem;
+  right: 0.875rem;
   z-index: 10;
   padding: var(--space-1) var(--space-3);
   color: var(--text);
@@ -790,11 +792,11 @@ body.is-sash-dragging {
 .crumbs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   overflow: hidden;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.625rem;
   white-space: nowrap;
 }
 
@@ -820,14 +822,14 @@ body.is-sash-dragging {
 }
 
 .entity-icon {
-  width: 30px;
-  height: 30px;
+  width: 1.875rem;
+  height: 1.875rem;
   display: grid;
   place-items: center;
   border-radius: var(--radius-md);
   color: var(--accent);
   background: var(--accent-soft);
-  font-size: 15px;
+  font-size: 0.9375rem;
   flex-shrink: 0;
 }
 
@@ -840,7 +842,7 @@ body.is-sash-dragging {
   margin: 0;
   overflow: hidden;
   color: var(--text-strong);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
@@ -858,12 +860,12 @@ body.is-sash-dragging {
 
 /* 徽章:状态用色各就各位 */
 .badge {
-  padding: 3px 7px;
+  padding: 0.1875rem 0.4375rem;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
-  font-size: 10px;
+  font-size: 0.625rem;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -897,7 +899,7 @@ body.is-sash-dragging {
 .tabs {
   display: flex;
   gap: var(--space-4);
-  height: 32px;
+  height: 2rem;
 }
 
 .tab {
@@ -949,7 +951,7 @@ body.is-sash-dragging {
   gap: var(--space-2);
   margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -957,7 +959,7 @@ body.is-sash-dragging {
 
 .section-label span {
   color: var(--muted-2);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -997,7 +999,7 @@ body.is-sash-dragging {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
@@ -1017,7 +1019,7 @@ body.is-sash-dragging {
 }
 
 .metric {
-  padding: 10px;
+  padding: 0.625rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1033,7 +1035,7 @@ body.is-sash-dragging {
 
 .metric span {
   display: block;
-  margin-top: 3px;
+  margin-top: 0.1875rem;
   color: var(--muted);
   font-size: var(--font-xs);
 }
@@ -1064,13 +1066,13 @@ body.is-sash-dragging {
 /* 分布条:语言/后缀占比 */
 .bar-row {
   display: grid;
-  grid-template-columns: 82px 1fr 36px;
+  grid-template-columns: 5.125rem 1fr 2.25rem;
   align-items: center;
   gap: var(--space-2);
   margin: var(--space-2) 0;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .bar-label {
@@ -1080,7 +1082,7 @@ body.is-sash-dragging {
 }
 
 .bar {
-  height: 6px;
+  height: 0.375rem;
   overflow: hidden;
   border-radius: var(--radius-pill);
   background: var(--hover);
@@ -1126,14 +1128,14 @@ body.is-sash-dragging {
 }
 
 .rec-number {
-  width: 18px;
-  height: 18px;
+  width: 1.125rem;
+  height: 1.125rem;
   display: grid;
   place-items: center;
   color: var(--accent);
   border-radius: 50%;
   background: var(--accent-soft);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -1255,14 +1257,14 @@ body.is-sash-dragging {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 10px var(--space-3);
+  padding: 0.625rem var(--space-3);
   border-bottom: 1px solid var(--line-soft);
 }
 
 .ai-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   color: var(--accent);
   font-size: var(--font-md);
   font-weight: 650;
@@ -1278,7 +1280,7 @@ body.is-sash-dragging {
 }
 
 .ai-card-body p {
-  margin: 0 0 10px;
+  margin: 0 0 0.625rem;
   color: var(--muted);
   font-size: var(--font-md);
   line-height: 1.65;
@@ -1295,13 +1297,13 @@ body.is-sash-dragging {
 .prompt-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0.375rem;
   margin-top: var(--space-2);
 }
 
 /* 预设问题 chips 归辅助色管:跟主操作按钮(主题色)拉开层级,换辅助色一眼可见 */
 .prompt {
-  padding: 5px 8px;
+  padding: 0.3125rem 0.5rem;
   color: var(--secondary-deep);
   border: 1px solid color-mix(in srgb, var(--secondary) 45%, transparent);
   border-radius: var(--radius-sm);
@@ -1401,12 +1403,12 @@ body.is-sash-dragging {
 .chat-turn {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .message {
   max-width: 88%;
-  padding: 8px 12px;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--radius-md);
   color: var(--text);
   background: var(--surface);
@@ -1453,8 +1455,8 @@ body.is-sash-dragging {
 .chat-input input {
   min-width: 0;
   flex: 1;
-  height: 32px;
-  padding: 0 11px;
+  height: 2rem;
+  padding: 0 0.6875rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   outline: none;
@@ -1466,7 +1468,7 @@ body.is-sash-dragging {
 
 .chat-input input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 /* ── 自由对话(Atlas 小探针):附件卡 / 探针头像 / 联网状态标签 ── */
@@ -1482,11 +1484,11 @@ body.is-sash-dragging {
 
 .chat-attach summary {
   cursor: pointer;
-  padding: 7px 12px;
+  padding: 0.4375rem 0.75rem;
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   flex-wrap: wrap;
   user-select: none;
 }
@@ -1501,33 +1503,33 @@ body.is-sash-dragging {
 
 .chat-attach-summary::before {
   content: '·';
-  margin-right: 6px;
+  margin-right: 0.375rem;
 }
 
 .chat-attach-details {
   margin: 0;
-  padding: 2px 12px 10px;
+  padding: 2px 0.75rem 0.625rem;
   border-top: 1px dashed var(--line);
   font-family: inherit;
   font-size: var(--font-sm);
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  max-height: 220px;
+  max-height: 13.75rem;
   overflow-y: auto;
 }
 
 /* 探针头像与回答正文并排;联网标签缩进到跟正文对齐 */
 .chat-avatar {
-  width: 26px;
-  height: 26px;
+  width: 1.625rem;
+  height: 1.625rem;
   flex: none;
 }
 
 .chat-answer-row {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .chat-answer-row .message.answer {
@@ -1535,7 +1537,7 @@ body.is-sash-dragging {
 }
 
 .chat-webstatus {
-  margin-left: 34px;
+  margin-left: 2.125rem;
   margin-top: 2px;
 }
 
@@ -1545,15 +1547,15 @@ body.is-sash-dragging {
 
 .chat-muted {
   font-size: var(--font-sm);
-  margin-top: 4px;
+  margin-top: 0.25rem;
 }
 
 /* 空状态:探针立正打招呼 */
 .chat-probe {
-  width: 56px;
-  height: 56px;
+  width: 3.5rem;
+  height: 3.5rem;
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 0.375rem;
 }
 
 .chat-intro-title {
@@ -1585,6 +1587,7 @@ body.is-sash-dragging {
 }
 
 .atlas-probe .probe-antenna {
+  /* SVG 内部是用户单位坐标系,轴心必须留在 px;外层尺寸才用 rem 缩放 */
   transform-origin: 24px 15px;
   animation: probe-sway 3.2s ease-in-out infinite;
 }
@@ -1691,7 +1694,7 @@ body.is-sash-dragging {
   display: block;
   width: 100%;
   overflow: hidden;
-  padding: 6px 0;
+  padding: 0.375rem 0;
   color: var(--accent);
   border: 0;
   border-bottom: 1px solid var(--line-soft);
@@ -1715,7 +1718,7 @@ body.is-sash-dragging {
 
 .structure-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-4);
 }
 
@@ -1959,9 +1962,9 @@ body.is-sash-dragging {
 /* 配色预设小圆点:两颗一排,一眼看出这套配色长什么样 */
 .preset-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 4px;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-right: 0.25rem;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.08);
   vertical-align: -1px;
@@ -1978,8 +1981,8 @@ body.is-sash-dragging {
 }
 
 .color-input {
-  width: 36px;
-  height: 26px;
+  width: 2.25rem;
+  height: 1.625rem;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1993,7 +1996,7 @@ body.is-sash-dragging {
 
 .color-input::-webkit-color-swatch {
   border: none;
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 
 /* 连续缩放滑条:主题色渲染,左右加减按钮夹着 % 读数 */
@@ -2004,7 +2007,7 @@ body.is-sash-dragging {
 }
 
 .scale-value {
-  min-width: 48px;
+  min-width: 3rem;
   text-align: center;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -2065,7 +2068,7 @@ body.is-maximized .drawer-layer {
 
 .drawer {
   position: relative;
-  width: min(460px, 92vw);
+  width: min(28.75rem, 92vw);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -2082,7 +2085,7 @@ body.is-maximized .drawer-layer {
 
 @keyframes drawer-in {
   from {
-    transform: translateX(24px);
+    transform: translateX(1.5rem);
     opacity: 0;
   }
 }
@@ -2142,7 +2145,7 @@ body.is-maximized .drawer-layer {
   border-radius: var(--radius-lg);
   padding: var(--space-7) var(--space-8);
   box-shadow: var(--shadow-pop);
-  max-width: 520px;
+  max-width: 32.5rem;
 }
 
 .logo {
@@ -2184,8 +2187,8 @@ body.is-maximized .drawer-layer {
 
 .welcome-steps i {
   font-style: normal;
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent);
@@ -2228,8 +2231,8 @@ body.is-maximized .drawer-layer {
 }
 
 .progress-dots i {
-  width: 5px;
-  height: 5px;
+  width: 0.3125rem;
+  height: 0.3125rem;
   border-radius: var(--radius-pill);
   background: var(--accent);
   opacity: 0.3;
@@ -2267,20 +2270,20 @@ body.is-maximized .drawer-layer {
 @keyframes card-in {
   from {
     opacity: 0;
-    transform: translateY(5px);
+    transform: translateY(0.3125rem);
   }
 }
 
 /* ── 滚动条:细一圈,不抢内容 ── */
 
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 0.5625rem;
+  height: 0.5625rem;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--line);
-  border-radius: 10px;
+  border-radius: 0.625rem;
   border: 2px solid transparent;
   background-clip: content-box;
 }

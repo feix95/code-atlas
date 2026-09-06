@@ -30,8 +30,9 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
   const expanded = filter !== '' || open
 
   if (node.type === 'file') {
+    // 缩进挂 rem(每层 18px 基准 = 1.125rem),跟着根字号一起缩放
     return (
-      <div className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`} style={{ paddingLeft: depth * 18 }}>
+      <div className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`} style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}>
         <span className="tree-caret" aria-hidden="true" />
         <button
           type="button"
@@ -76,7 +77,7 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
     <div className="tree-branch">
       <div
         className={`tree-row is-dir${selectedPath === dir.relPath ? ' is-selected' : ''}`}
-        style={{ paddingLeft: depth * 18 }}
+        style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}
         onKeyDown={onRowKeyDown}
       >
         <button

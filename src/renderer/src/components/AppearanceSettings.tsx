@@ -25,6 +25,9 @@ const MODES: Array<{ key: AppearanceMode; name: string }> = [
 export function AppearanceSettings(): React.JSX.Element {
   const [appearance, setAppearance] = useState<Appearance>(loadAppearance)
   const [scale, setScale] = useState<number>(() => window.atlas.getUiScale())
+  // 拖动途中只记预览值不动界面;松手(或键盘松键/失焦收尾)才真换根字号 —— 整个界面
+  // 重排一次就够,不会一路拖着一路抖
+  const [dragValue, setDragValue] = useState<number | null>(null)
 
   function update(next: Appearance): void {
     setAppearance(next)
@@ -40,6 +43,12 @@ export function AppearanceSettings(): React.JSX.Element {
 
   function stepScale(dir: number): void {
     applyScale(Math.round((scale + dir) * 100) / 100)
+  }
+
+  function commitDrag(): void {
+    if (dragValue === null) return
+    if (dragValue !== scale) applyScale(dragValue)
+    setDragValue(null)
   }
 
   const preset = COLOR_PRESETS.find((p) => p.key === appearance.preset) ?? COLOR_PRESETS[0]
@@ -125,17 +134,21 @@ export function AppearanceSettings(): React.JSX.Element {
             min={SCALE_MIN}
             max={SCALE_MAX}
             step={0.05}
-            value={scale}
+            value={dragValue ?? scale}
             aria-label="界面缩放(80% 到 180%)"
-            aria-valuetext={`${Math.round(scale * 100)}%`}
-            onChange={(e) => applyScale(Number(e.target.value))}
+            aria-valuetext={`${Math.round((dragValue ?? scale) * 100)}%`}
+            onChange={(e) => setDragValue(Number(e.target.value))}
+            onPointerUp={commitDrag}
+            onPointerCancel={commitDrag}
+            onKeyUp={commitDrag}
+            onBlur={commitDrag}
           />
-          <span className="scale-value mono">{Math.round(scale * 100)}%</span>
+          <span className="scale-value mono">{Math.round((dragValue ?? scale) * 100)}%</span>
           <button type="button" className="btn" aria-label="调大界面" onClick={() => stepScale(0.05)} disabled={scale >= SCALE_MAX - 0.001}>
             +
           </button>
         </div>
-        <p className="ai-hint">拖滑条或点两边加减微调,80% 到 180% 随意;左边文件树会跟着一起变大变小,点了马上生效。</p>
+        <p className="ai-hint">拖滑条,松手才换装;点两边加减立刻生效。80% 到 180% 随意,左边文件树跟着一起变大变小。</p>
       </div>
     </div>
   )

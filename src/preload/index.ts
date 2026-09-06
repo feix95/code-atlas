@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webFrame } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -12,19 +12,32 @@ import type {
   ScanResult
 } from '../shared/types.ts'
 
-// 界面缩放(跟 VS Code 的界面缩放一个思路):用 Chromium 原生缩放,文字排版整体等比变,
-// 多种显示器分辨率各自调舒服。存 localStorage,页面脚本跑之前就定好,不会先小后大闪一下。
+// 界面缩放(第四十七锤起换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
+// 会把整个渲染坐标系缩一顿,无边框自绘窗的「鼠标判定」和「视觉框」就对不上:
+// 设置面板 × 视觉上正对着却点不中、拖边热区跑出窗框、设置页比窗还大,三个连环 bug 同这个根。
+// 现在改成改根字号:html 的 font-size = 16px × 系数,布局/字号/图标全挂 rem 跟着变,
+// 没有第二套坐标系,鼠标坐标和视觉永远 1:1。存 localStorage,页面脚本跑之前就定好,不会先小后大闪一下。
 // 超出范围的旧存档贴边处理(不再静默跳回 100%,用户调过 180% 就给他 180%)
 const UI_SCALE_KEY = 'atlas.ui-scale'
+const ROOT_FONT_BASE_PX = 16
 export const SCALE_MIN = 0.8
 export const SCALE_MAX = 1.8
+
+function applyRootFont(factor: number): void {
+  const set = (): void => {
+    document.documentElement.style.fontSize = `${(ROOT_FONT_BASE_PX * factor).toFixed(2)}px`
+  }
+  // preload 跑在页面脚本之前,documentElement 一般已经在;万一没好就等 DOM 一就绪立刻补上
+  if (document.documentElement) set()
+  else document.addEventListener('DOMContentLoaded', set, { once: true })
+}
 
 function readUiScale(): number {
   const v = Number(localStorage.getItem(UI_SCALE_KEY))
   if (!Number.isFinite(v) || v <= 0) return 1
   return Math.min(Math.max(v, SCALE_MIN), SCALE_MAX)
 }
-webFrame.setZoomFactor(readUiScale())
+applyRootFont(readUiScale())
 
 // 首帧信号:连跑两个动画帧 = 合成器真的画出了画面,主进程收到才敢露窗。
 // 这是露窗链的主保险 —— 无边框模式下 ready-to-show 在部分高缩放屏上永不触发
@@ -44,7 +57,7 @@ contextBridge.exposeInMainWorld('atlas', {
   setUiScale: (factor: number): void => {
     const f = Math.min(Math.max(Number(factor) || 1, SCALE_MIN), SCALE_MAX)
     localStorage.setItem(UI_SCALE_KEY, String(f))
-    webFrame.setZoomFactor(f)
+    applyRootFont(f)
     // 喊一声界面:侧栏宽度这类「按比例跟缩放」的布局要实时跟着重算
     window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
   },

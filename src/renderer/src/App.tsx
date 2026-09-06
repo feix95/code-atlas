@@ -461,7 +461,9 @@ function App(): React.JSX.Element {
       {result && !scanning ? (
         // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
         <main className="workspace">
-          <aside className="sidebar" style={{ width: sidebarWidth }}>
+          {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
+              不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
+          <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
             <FileTree
               root={result.tree}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
