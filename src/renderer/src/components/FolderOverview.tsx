@@ -40,7 +40,16 @@ function census(dir: ScanDirNode): FolderCensus {
  * 文件夹「概览」Tab:不调 AI 也有干货 —— 目录路径、扫描状态、
  * 子文件夹/文件数量、主要语言;没探开的目录老实说还没扫,只提示点箭头展开。
  */
-export function FolderOverview({ dir, ai }: { dir: ScanDirNode; ai: AiAssistApi }): React.JSX.Element {
+export function FolderOverview({
+  dir,
+  ai,
+  onGoChat
+}: {
+  dir: ScanDirNode
+  ai: AiAssistApi
+  /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
+  onGoChat?: () => void
+}): React.JSX.Element {
   const info = census(dir)
 
   return (
@@ -94,6 +103,7 @@ export function FolderOverview({ dir, ai }: { dir: ScanDirNode; ai: AiAssistApi 
         presets={[]}
         idleText="想知道这个文件夹整体是干嘛的?点按钮,AI 看完目录清单后用大白话讲。"
         mainLabel="用大白话讲讲这个文件夹"
+        onGoChat={onGoChat}
       />
     </>
   )

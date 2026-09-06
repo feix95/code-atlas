@@ -684,7 +684,15 @@ function FileDetailView({
       />
       <div className="detail-body">
         {activeTab === 'overview' && (
-          <FileOverview file={file} structure={structure} analyzing={analyzing} analyzeNote={analyzeNote} graph={graph} ai={ai} />
+          <FileOverview
+            file={file}
+            structure={structure}
+            analyzing={analyzing}
+            analyzeNote={analyzeNote}
+            graph={graph}
+            ai={ai}
+            onGoChat={() => onTabChange('chat')}
+          />
         )}
         {activeTab === 'structure' && (
           <>
@@ -763,7 +771,7 @@ function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: 
         onClose={onClose}
       />
       <div className="detail-body">
-        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} />}
+        {tab === 'overview' && <FolderOverview dir={dir} ai={ai} onGoChat={() => setTab('chat')} />}
         {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
       </div>
     </div>

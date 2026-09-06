@@ -88,7 +88,8 @@ export function AiAssistCard({
   ai,
   presets,
   idleText,
-  mainLabel
+  mainLabel,
+  onGoChat
 }: {
   ai: AiAssistApi
   presets: string[]
@@ -96,9 +97,16 @@ export function AiAssistCard({
   idleText: string
   /** 主按钮文案(未请求态) */
   mainLabel: string
+  /** 给了就显示「去追问」:直接跳到自由对话 Tab,当前文件的上下文那边本来就带着 */
+  onGoChat?: () => void
 }): React.JSX.Element {
   const turn = latestTurn(ai.turns)
   const badge = stateBadge(turn)
+  const goChat = onGoChat ? (
+    <button type="button" className="btn" onClick={onGoChat}>
+      去追问
+    </button>
+  ) : null
   return (
     <section className="ai-card">
       <div className="ai-card-head">
@@ -118,6 +126,7 @@ export function AiAssistCard({
               <button type="button" className="btn btn-primary" onClick={() => ai.ask(null)}>
                 {mainLabel}
               </button>
+              {goChat}
             </div>
             <PresetRow presets={presets} disabled={false} onPick={(q) => ai.ask(q)} />
           </>
@@ -129,6 +138,7 @@ export function AiAssistCard({
               <button type="button" className="btn" onClick={ai.cancel}>
                 取消分析
               </button>
+              {goChat}
             </div>
           </>
         )}
@@ -145,6 +155,7 @@ export function AiAssistCard({
                   {turn.question ? '再问一次' : '再解释一次'}
                 </button>
               )}
+              {goChat}
             </div>
             <PresetRow presets={presets} disabled={false} onPick={(q) => ai.ask(q)} />
           </>

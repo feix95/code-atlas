@@ -14,7 +14,8 @@ export function FileOverview({
   analyzing,
   analyzeNote,
   graph,
-  ai
+  ai,
+  onGoChat
 }: {
   file: ScanFileNode
   structure: FileStructure | null
@@ -22,6 +23,8 @@ export function FileOverview({
   analyzeNote: { text: string; kind: 'info' | 'error' } | null
   graph: DepGraphResult | null
   ai: AiAssistApi
+  /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
+  onGoChat?: () => void
 }): React.JSX.Element {
   const relNode = graph?.nodes.find((n) => n.relPath === file.relPath)
   const count = (arr: string[] | undefined): number => arr?.length ?? 0
@@ -90,6 +93,7 @@ export function FileOverview({
         presets={FILE_PRESETS}
         idleText="不自动打断你的浏览。点按钮或挑一个问题,AI 才开始分析当前文件。"
         mainLabel="解释这个文件"
+        onGoChat={onGoChat}
       />
     </>
   )
