@@ -1465,10 +1465,20 @@ body.is-sash-dragging {
 
 /* ── AI 对话 Tab ── */
 
+/* 自由对话三段式(第六十一锤):详情页 body 在 chat 态不再自己滚,
+   交给中间消息区;输入框一行钉死在底部,聊再长也不动地方 */
+.detail-body.is-chat {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
 .chat-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
   gap: var(--space-3);
 }
 
@@ -1482,10 +1492,22 @@ body.is-sash-dragging {
   margin-top: var(--space-3);
 }
 
+.chat-messages-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-messages {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .chat-turn {
@@ -1523,16 +1545,67 @@ body.is-sash-dragging {
   margin: 0;
 }
 
-/* 对话底部:推荐追问 + 输入框吸底,聊得再长也不够不着输入框 */
+/* 对话底部:推荐追问 + 输入框,在三段式骨架里正常吸底,不再是贴纸 */
 .chat-bottom {
-  position: sticky;
-  bottom: 0;
-  margin-top: auto;
-  padding-top: var(--space-3);
+  flex-shrink: 0;
+  padding: var(--space-3) 0;
   background: var(--surface-soft);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* 跳到最新(第六十一锤):不在底部时浮出;新内容到了按钮重挂一次,蹦一下报信 */
+.chat-jump {
+  position: absolute;
+  bottom: 0.625rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: var(--shadow-pop);
+  z-index: 2;
+}
+
+.chat-jump:hover {
+  background: var(--accent-soft);
+}
+
+.chat-jump i {
+  width: 0;
+  height: 0;
+  border-left: 0.3125rem solid transparent;
+  border-right: 0.3125rem solid transparent;
+  border-top: 0.4375rem solid currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chat-jump {
+    animation: chat-jump-pop 0.45s ease;
+  }
+}
+
+@keyframes chat-jump-pop {
+  0% {
+    transform: translateX(-50%) translateY(0.25rem);
+    opacity: 0.35;
+  }
+  60% {
+    transform: translateX(-50%) translateY(-0.125rem);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
 }
 
 .chat-input {
@@ -1563,6 +1636,7 @@ body.is-sash-dragging {
 
 /* 资料附件卡:默认收起一行,展开看机器扫到的原始资料 */
 .chat-attach {
+  flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);

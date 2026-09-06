@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
@@ -65,11 +65,48 @@ function AssistantBubble({ msg }: { msg: ChatMessage }): React.JSX.Element {
 export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: ChatContextAttachment | null }): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const atBottomRef = useRef(true)
+  const [showJump, setShowJump] = useState(false)
+  const [newBeat, setNewBeat] = useState(0)
+
+  function onMessagesScroll(): void {
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32
+    atBottomRef.current = nearBottom
+    setShowJump(!nearBottom)
+  }
+
+  function jumpToLatest(): void {
+    const el = scrollRef.current
+    if (!el) return
+    atBottomRef.current = true
+    setShowJump(false)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' })
+  }
+
+  /** 自己发消息 = 强制回底部:自己的话自己得看见,发出去这一眼不被上翻状态挡住 */
+  function forceBottom(): void {
+    atBottomRef.current = true
+    setShowJump(false)
+  }
+
+  // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就让箭头 key 变一变、蹦一下
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    if (atBottomRef.current) el.scrollTop = el.scrollHeight
+    else setNewBeat((c) => c + 1)
+  }, [chat.messages])
 
   function submit(e: FormEvent): void {
     e.preventDefault()
     const q = draft.trim()
     if (!q || chat.busy) return
+    forceBottom()
     chat.send(q)
     setDraft('')
   }
@@ -77,6 +114,7 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
   /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
   function sendExample(q: string): void {
     if (chat.busy) return
+    forceBottom()
     chat.send(q)
   }
 
@@ -102,15 +140,22 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
           </p>
         </div>
       ) : (
-        <div className="chat-messages">
-          {chat.messages.map((m) =>
-            m.role === 'user' ? (
-              <div key={m.key} className="message user">
-                {m.text}
-              </div>
-            ) : (
-              <AssistantBubble key={m.key} msg={m} />
-            )
+        <div className="chat-messages-wrap">
+          <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
+            {chat.messages.map((m) =>
+              m.role === 'user' ? (
+                <div key={m.key} className="message user">
+                  {m.text}
+                </div>
+              ) : (
+                <AssistantBubble key={m.key} msg={m} />
+              )
+            )}
+          </div>
+          {showJump && (
+            <button key={newBeat} type="button" className="chat-jump" onClick={jumpToLatest} aria-label="跳到最新消息" title="跳到最新消息">
+              <i aria-hidden="true" />
+            </button>
           )}
         </div>
       )}

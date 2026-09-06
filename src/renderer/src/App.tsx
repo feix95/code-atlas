@@ -698,7 +698,7 @@ function FileDetailView({
         onTabChange={(key) => onTabChange(key as DetailTab)}
         onClose={onClose}
       />
-      <div className="detail-body">
+      <div className={`detail-body${activeTab === 'chat' ? ' is-chat' : ''}`}>
         {activeTab === 'overview' && (
           <FileOverview
             file={file}
@@ -786,7 +786,7 @@ function FolderDetailView({ dir, result, onClose }: { dir: ScanDirNode; result: 
         onTabChange={setTab}
         onClose={onClose}
       />
-      <div className="detail-body">
+      <div className={`detail-body${tab === 'chat' ? ' is-chat' : ''}`}>
         {tab === 'overview' && <FolderOverview dir={dir} ai={ai} onGoChat={() => setTab('chat')} />}
         {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
       </div>
