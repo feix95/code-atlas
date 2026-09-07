@@ -26,7 +26,8 @@ export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent:
 ]
 
 /** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配
- *  (--secondary-deep 是辅助色的文字安全档;--line 边框线归辅助色管,--canvas-tint 画布底色归主题色管) */
+ *  (--secondary-deep 是辅助色的文字安全档;--line 边框线归辅助色管;
+ *   --canvas-tint 不在列 —— 第七十七锤起画布回归固定中性底,不再跟主题色染) */
 const TOKEN_KEYS = [
   '--accent',
   '--accent-hover',
@@ -35,8 +36,7 @@ const TOKEN_KEYS = [
   '--selected-bg',
   '--secondary',
   '--secondary-deep',
-  '--line',
-  '--canvas-tint'
+  '--line'
 ] as const
 
 export function loadAppearance(): Appearance {
@@ -135,7 +135,8 @@ export function applyAppearance(a: Appearance): void {
   // 主题色不再整面染色,只上动作件和细边/细条(树选中行本就有左侧主题色条撑着);
   // ②明度还给用户 —— 像饱和度一样限安全带,带内听你的,出带才夹
   // (带子就是按钮上固定字色的可读边界:暗色按钮压深字、亮色按钮压白字);
-  // ③画布底的雾保留,照旧跟主题色染 —— 底色氛围不掐。
+  // ③第七十七锤补刀:画布雾也转中性 —— 雾在小面积是氛围,铺在聊天区/底栏这种
+  // 大片空白上就是罩子;画布回归固定中性底,主题色只活在动作件上。
 
   // 明度做安全限位:再深的主题色也不至于在暗背景上看不见,再亮的也不至于糊成一片
   if (dark) {
@@ -149,8 +150,6 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
     // 边框分隔线跟辅助色:饱和度压到灰蒙蒙的量级、亮度限位,压成带一丝色相的灰
     root.setProperty('--line', hslCss(h2, clamp(s2, 10, 22), 27))
-    // 画布底色跟主题色:很淡的一层色调垫在最外层/卡片缝隙底下,内容卡片保持干净中性色
-    root.setProperty('--canvas-tint', hslCss(h, clamp(s, 8, 16), 12))
   } else {
     const dl = clamp(l, 25, 62)
     root.setProperty('--accent', hslCss(h, sat, dl))
@@ -161,7 +160,6 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
     root.setProperty('--line', hslCss(h2, clamp(s2, 8, 20), 85))
-    root.setProperty('--canvas-tint', hslCss(h, clamp(s, 3, 6), 97))
   }
 }
 

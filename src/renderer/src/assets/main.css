@@ -28,7 +28,8 @@
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
   /* ── 色板(浅色)── */
   --window: #f6f7f8;
-  /* 画布底色:主题色染的极淡一层,垫在最外层和卡片缝隙底下;内容卡片本身保持中性白 */
+  /* 画布底色:固定中性底(第七十七锤起不再跟主题色染 —— 雾铺在大片空白上就是罩子),
+     垫在最外层和卡片缝隙底下;内容卡片本身保持中性白 */
   --canvas-tint: hsl(207 5% 97%);
   --secondary: #5ac5db; /* 辅助色:图标/分布条/预设问题 chips 等的渐变与点缀主角 */
   --secondary-deep: #1f7e8e; /* 辅助色的文字安全档:同一色相压深,浅底上看得清 */
@@ -841,7 +842,7 @@ body.is-sash-dragging {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* 卡片下方的画布:染主题色的极淡调,内容卡片仍是无染的白底,文字对比度不让步 */
+  /* 卡片下方的画布:固定中性调(第七十七锤起不再跟主题色),内容卡片仍是无染的白底,文字对比度不让步 */
   background: var(--canvas-tint);
   position: relative;
 }
@@ -3224,7 +3225,8 @@ body.is-maximized .cfg-layer {
   padding: 0.625rem 0.6875rem;
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  /* 第七十七锤:底回中性面板,不再掺主题色(遮罩手法全面退场);识别靠这条色边 */
+  background: var(--surface-soft);
 }
 
 .cfg-callout-icon {
@@ -3549,7 +3551,8 @@ body.is-maximized .cfg-layer {
   padding: 0.6875rem 0.8125rem;
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  /* 第七十七锤:底回中性面板,不再掺主题色 */
+  background: var(--surface-soft);
 }
 
 .cfg-summary-icon {
