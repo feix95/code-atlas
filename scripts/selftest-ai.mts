@@ -23,6 +23,11 @@ import {
   filterLocateHits,
   findTreeNode,
   estimateTokens,
+  parseLmStudioContext,
+  parseLlamaProps,
+  isContextOverflow,
+  budgetsForContext,
+  DEFAULT_CONTEXT_SIZE,
   hasWebLookupSignal,
   hasSearchIntent,
   parseLocateReply,
@@ -687,6 +692,37 @@ async function main(): Promise<void> {
     ['src/config.ts', 'README.md'],
     '编造的要扔掉,剩下的按把握从大到小排'
   )
+
+  // ── 10. 模型上下文自适应(第六十九锤):探测解析 / 预算公式 / 撞墙特征 ──
+  const lmPayload = JSON.stringify({
+    data: [
+      { id: 'other-model', max_context_length: 8192 },
+      { id: 'qwen-4b', max_context_length: 32768, loaded_context_length: 4096 }
+    ]
+  })
+  assert.equal(parseLmStudioContext(lmPayload, 'qwen-4b'), 4096, 'LM Studio:已加载的上下文优先')
+  assert.equal(parseLmStudioContext(lmPayload, 'other-model'), 8192, 'LM Studio:没加载的报标称上下文')
+  assert.equal(parseLmStudioContext(lmPayload, '不存在'), null, '模型对不上回 null')
+  assert.equal(parseLmStudioContext('不是 JSON', 'qwen-4b'), null, '垃圾回复回 null')
+  assert.equal(parseLmStudioContext(JSON.stringify({ data: [{ id: 'm', max_context_length: 128 }] }), 'm'), null, '过小的上下文不可信')
+
+  const llamaPayload = JSON.stringify({ default_generation_settings: { n_ctx: 4096 }, total_slots: 1 })
+  assert.equal(parseLlamaProps(llamaPayload), 4096, 'llama-server:读 default_generation_settings.n_ctx')
+  assert.equal(parseLlamaProps(JSON.stringify({ n_ctx: 8192 })), 8192, 'llama-server:顶层 n_ctx 也认')
+  assert.equal(parseLlamaProps('html 页面'), null, 'llama-server:垃圾回复回 null')
+
+  assert.ok(isContextOverflow('模型服务返回错误(400):{"error":{"message":"request (4297 tokens) exceeds the available context size (4096 tokens)"}}'), '小葵的 400 要认得出')
+  assert.ok(isContextOverflow('the request exceeds the available context size'), 'llama 措辞要认得出')
+  assert.ok(!isContextOverflow('连不上模型服务,检查 LM Studio 是否已启动'), '普通错误不许误伤')
+
+  const budgets4k = budgetsForContext(4096)
+  assert.equal(budgets4k.mapTokens, 2252, '4k 上下文:地图 ≈ 55%')
+  assert.equal(budgets4k.replyTokens, 819, '4k 上下文:回复 ≈ 20%')
+  const budgetsSmall = budgetsForContext(2048)
+  assert.equal(budgetsSmall.replyTokens, 409, '2k 上下文:回复按比例缩')
+  assert.ok(budgetsSmall.mapTokens >= 600, '地图有安全下限,再小的上下文也不许把地图掐死')
+  const budgetsJunk = budgetsForContext(100)
+  assert.equal(budgetsJunk.mapTokens, Math.floor(DEFAULT_CONTEXT_SIZE * 0.55), '离谱输入退回保守默认')
 
   console.log('✅ AI 人话解释自测全部通过')
   console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造)')

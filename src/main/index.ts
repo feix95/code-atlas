@@ -19,9 +19,11 @@ import {
   buildTreeDigest,
   parseLocateReply,
   filterLocateHits,
-  LOCATE_SYSTEM_PROMPT,
-  LOCATE_NODE_BUDGET,
-  LOCATE_TOKEN_BUDGET,
+  budgetsForContext,
+  isContextOverflow,
+  probeContextSize,
+  DEFAULT_CONTEXT_SIZE,
+  REPORT_ROW_LIMIT,
   sniffBinaryKind,
   sanitizeHistory,
   sanitizeAttachment,
@@ -36,7 +38,9 @@ import {
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
-  REPORT_SYSTEM_PROMPT
+  REPORT_SYSTEM_PROMPT,
+  LOCATE_SYSTEM_PROMPT,
+  LOCATE_NODE_BUDGET
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
@@ -79,16 +83,16 @@ async function respondWithEvidence(
   question: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget; webLookup: boolean },
+  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number } },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
   const hasQuestion = typeof question === 'string' && question.trim() !== ''
   if (resolved.webLookup && lookupName && !hasQuestion) {
-    return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta)
+    return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta, resolved.budgets.replyTokens)
   }
   return explainWithCancel(requestId, (signal) =>
-    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), system, onDelta, signal)
+    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), system, onDelta, signal, resolved.budgets.replyTokens)
   )
 }
 
@@ -102,10 +106,11 @@ async function explainWithWebLookup(
   system: string,
   lookupName: string,
   target: ChatTarget,
-  onDelta: ((text: string) => void) | undefined
+  onDelta: ((text: string) => void) | undefined,
+  replyTokens: number
 ): Promise<AiExplainResult> {
   const first = await explainWithCancel(requestId, (signal) =>
-    explainWithModel(target, evidence + WEB_SIGNAL_INSTRUCTION, system, undefined, signal)
+    explainWithModel(target, evidence + WEB_SIGNAL_INSTRUCTION, system, undefined, signal, replyTokens)
   )
   if (first.status !== 'supported' || !hasWebLookupSignal(first.text)) return first
   const material = await webLookup(lookupName, electronFetchText).catch(() => '')
@@ -115,7 +120,7 @@ async function explainWithWebLookup(
     return { ...first, text: `${fallback}\n\n(联网没查到这个,上面是本地推测。)` }
   }
   const refined = await explainWithCancel(requestId, (signal) =>
-    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal)
+    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal, replyTokens)
   )
   return refined.status === 'supported' ? refined : first
 }
@@ -204,12 +209,15 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * 三个讲解通道共用的前置:把当前 AI 配置收敛成 ChatTarget。
+ * 三个讲解通道共用的前置:把当前 AI 配置收敛成 ChatTarget,顺手把模型上下文摸清
+ * (手动档优先,没填就向模型服务探测,再不行退回保守默认)—— 各路预算按它按比例算。
  * 选了内置模型就顺手把 llama-server 子进程拉起来(首次用 AI 才启动,不拖慢打开速度);
  * 没配好不抛异常,返回人话错误让界面原样展示。
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
-async function resolveChatTargetOrError(): Promise<{ target: ChatTarget; webLookup: boolean } | { error: string }> {
+async function resolveChatTargetOrError(): Promise<
+  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number } } | { error: string }
+> {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
   if (config.provider === 'builtin') {
@@ -220,7 +228,9 @@ async function resolveChatTargetOrError(): Promise<{ target: ChatTarget; webLook
     }
   }
   const resolved = resolveAiTarget(config, runtime)
-  return resolved.ok ? { target: resolved.target, webLookup: config.webLookup === true } : { error: resolved.message }
+  if (!resolved.ok) return { error: resolved.message }
+  const ctx = config.contextSize ?? (await probeContextSize(resolved.target, config.provider)) ?? DEFAULT_CONTEXT_SIZE
+  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx) }
 }
 
 /**
@@ -556,7 +566,7 @@ function registerIpc(): void {
     }
     const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
     return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal)
+      explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
     )
   })
 
@@ -582,24 +592,35 @@ function registerIpc(): void {
     if ('error' in resolved) {
       return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
     }
-    const prompt = buildReportPrompt({
-      branch: changes.branch,
-      changes: changes.changes,
-      stats: { additions: changes.stats.additions, deletions: changes.stats.deletions },
-      recentSubjects: subjects
-    })
-    const result = await explainWithCancel(requestId, (signal) =>
-      explainWithMessages(
-        resolved.target,
-        [
-          { role: 'system', content: REPORT_SYSTEM_PROMPT },
-          { role: 'user', content: prompt }
-        ],
-        makeDeltaSender(event, requestId),
-        signal,
-        900
+    const makeReport = (rowLimit: number): Promise<AiExplainResult> =>
+      explainWithCancel(requestId, (signal) =>
+        explainWithMessages(
+          resolved.target,
+          [
+            { role: 'system', content: REPORT_SYSTEM_PROMPT },
+            {
+              role: 'user',
+              content: buildReportPrompt(
+                {
+                  branch: changes.branch,
+                  changes: changes.changes,
+                  stats: { additions: changes.stats.additions, deletions: changes.stats.deletions },
+                  recentSubjects: subjects
+                },
+                rowLimit
+              )
+            }
+          ],
+          makeDeltaSender(event, requestId),
+          signal,
+          resolved.budgets.replyTokens
+        )
       )
-    )
+    // 先按标准清单问;小上下文装不下就把账本砍到 30 行再试最后一次(400 时模型一个字都没吐,流式不会重影)
+    let result = await makeReport(REPORT_ROW_LIMIT)
+    if (result.status === 'error' && isContextOverflow(result.text)) {
+      result = await makeReport(30)
+    }
     if (result.status === 'supported') {
       reportCache.set(signature, result)
       // 缓存封顶:只留最近 20 份,最旧的先出,别让 Map 悄悄长胖
@@ -639,16 +660,16 @@ function registerIpc(): void {
           ],
           undefined,
           signal,
-          700
+          resolved.budgets.replyTokens
         )
       )
-    // 先按标准预算问;碰到 4k 这类小上下文装不下,把地图砍到三分之一再试最后一次
-    let reply = await askTheGuide(LOCATE_TOKEN_BUDGET)
-    if (reply.status === 'error' && /exceeds the available context|context size|context length|too many tokens/i.test(reply.text)) {
-      reply = await askTheGuide(Math.floor(LOCATE_TOKEN_BUDGET / 3))
+    // 先按标准预算问;碰到小上下文装不下,把地图砍到三分之一再试最后一次
+    let reply = await askTheGuide(resolved.budgets.mapTokens)
+    if (reply.status === 'error' && isContextOverflow(reply.text)) {
+      reply = await askTheGuide(Math.floor(resolved.budgets.mapTokens / 3))
     }
     if (reply.status !== 'supported') {
-      const contextBlown = /exceeds the available context|context size|context length|too many tokens/i.test(reply.text)
+      const contextBlown = isContextOverflow(reply.text)
       return {
         status: 'error',
         hits: [],
@@ -873,7 +894,7 @@ function registerIpc(): void {
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal)
+      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, resolved.budgets.replyTokens)
       // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
       const status = aborter.signal.aborted ? 'cancelled' : res.status
       return { ...res, status, webLookup: meta }

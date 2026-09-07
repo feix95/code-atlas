@@ -40,6 +40,12 @@ const ICON_PATHS: Record<string, ReactNode> = {
       <path d="M9 13v2" />
     </>
   ),
+  gauge: (
+    <>
+      <path d="M12 15l3.5-3.5" />
+      <path d="M20.2 15.5a8.5 8.5 0 1 0-16.4 0" />
+    </>
+  ),
   sliders: (
     <>
       <line x1="21" x2="14" y1="4" y2="4" />
@@ -809,6 +815,28 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           <p className="cfg-field-help">LM Studio 里开「开发者」本地服务,地址一般是 http://127.0.0.1:1234/v1。</p>
                         </>
                       )}
+
+                      <div className="cfg-field-head">
+                        <label htmlFor="cfg-context-size">模型上下文</label>
+                        <span>tokens · 留空自动探测</span>
+                      </div>
+                      <div className="cfg-path-input">
+                        <Icon name="gauge" size={13} />
+                        <input
+                          id="cfg-context-size"
+                          inputMode="numeric"
+                          value={draftConfig.contextSize ?? ''}
+                          placeholder="自动向模型服务探测(探测不到按 4096 算)"
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, '')
+                            setDraftConfig({
+                              ...draftConfig,
+                              contextSize: raw === '' ? undefined : Math.max(512, Math.min(1_048_576, Number(raw)))
+                            })
+                          }}
+                        />
+                      </div>
+                      <p className="cfg-field-help">模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。</p>
                     </div>
                   )}
                 </div>

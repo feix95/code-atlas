@@ -349,13 +349,16 @@ export const REPORT_ROW_LIMIT = 80
  * 干活报告的证据拼装(纯函数,自测直接打):账本逐行进 Given,行数封顶,
  * 最近提交主题当背景线索。模型只准照着这份账本说话。
  */
-export function buildReportPrompt(input: {
-  branch: string
-  changes: GitChange[]
-  stats: { additions: number; deletions: number }
-  recentSubjects: string[]
-}): string {
-  const shown = input.changes.slice(0, REPORT_ROW_LIMIT)
+export function buildReportPrompt(
+  input: {
+    branch: string
+    changes: GitChange[]
+    stats: { additions: number; deletions: number }
+    recentSubjects: string[]
+  },
+  rowLimit: number = REPORT_ROW_LIMIT
+): string {
+  const shown = input.changes.slice(0, rowLimit)
   const hidden = input.changes.length - shown.length
   const rows = shown.map((c) => {
     const numstat = c.binary ? '二进制' : `+${Math.max(0, c.additions)} −${Math.max(0, c.deletions)}`
@@ -500,6 +503,77 @@ export function filterLocateHits(root: ScanDirNode, hits: FeatureHit[]): Feature
   return hits
     .filter((h) => findTreeNode(root, h.relPath) !== null)
     .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+}
+
+/* ── 模型上下文自适应(第六十九锤):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
+
+/** 拿不到真实上下文时的保守默认:按最差的 4k 小模型配,宁可浪费大模型的力,不许挤爆 */
+export const DEFAULT_CONTEXT_SIZE = 4096
+
+/** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
+export function isContextOverflow(text: string): boolean {
+  return /exceeds the available context|context size|context length|too many tokens|n_ctx/i.test(text)
+}
+
+/** LM Studio 扩展接口的模型列表 → 目标模型的上下文长度(纯函数;认不出回 null) */
+export function parseLmStudioContext(raw: string, model: string): number | null {
+  try {
+    const data = JSON.parse(raw) as { data?: Array<{ id?: string; loaded_context_length?: number; max_context_length?: number }> }
+    const hit = (data.data ?? []).find((m) => m.id === model)
+    const ctx = hit?.loaded_context_length ?? hit?.max_context_length
+    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= 512 ? Math.round(ctx) : null
+  } catch {
+    return null
+  }
+}
+
+/** llama-server /props 的回复 → 实际加载的 n_ctx(纯函数;认不出回 null) */
+export function parseLlamaProps(raw: string): number | null {
+  try {
+    const data = JSON.parse(raw) as { default_generation_settings?: { n_ctx?: number }; n_ctx?: number }
+    const ctx = data.default_generation_settings?.n_ctx ?? data.n_ctx
+    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= 512 ? Math.round(ctx) : null
+  } catch {
+    return null
+  }
+}
+
+/** 探测结果的小缓存:同地址同模型 5 分钟内不重复问,本地请求虽快也没必要每次都发 */
+const ctxProbeCache = new Map<string, { value: number | null; at: number }>()
+const CTX_PROBE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * 向模型服务探测上下文大小(LM Studio 走 /api/v0/models,llama-server 走 /props)。
+ * 探测失败(接口没开/版本太老/认不出)安静回 null,由调用层退回手动档或保守默认。
+ */
+export async function probeContextSize(target: ChatTarget, kind: 'lmstudio' | 'builtin'): Promise<number | null> {
+  const key = `${target.baseUrl}|${target.model}`
+  const cached = ctxProbeCache.get(key)
+  if (cached && Date.now() - cached.at < CTX_PROBE_TTL_MS) return cached.value
+  const root = target.baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+  let value: number | null = null
+  try {
+    if (kind === 'lmstudio') {
+      const res = await fetch(`${root}/api/v0/models`, { signal: AbortSignal.timeout(3000) })
+      if (res.ok) value = parseLmStudioContext(await res.text(), target.model)
+    } else {
+      const res = await fetch(`${root}/props`, { signal: AbortSignal.timeout(3000) })
+      if (res.ok) value = parseLlamaProps(await res.text())
+    }
+  } catch {
+    value = null
+  }
+  ctxProbeCache.set(key, { value, at: Date.now() })
+  return value
+}
+
+/** 按真实上下文算各路预算(纯函数):地图 ≈ 55%,回复 ≈ 20%;两端各留安全下限 */
+export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens: number } {
+  const safe = ctx >= 512 ? ctx : DEFAULT_CONTEXT_SIZE
+  return {
+    mapTokens: Math.max(600, Math.floor(safe * 0.55)),
+    replyTokens: Math.max(256, Math.min(1024, Math.floor(safe * 0.2)))
+  }
 }
 
 /** 常见二进制/媒体后缀(小写含点):这些读不出文本,走「文件头认类型」那一支 */
@@ -865,15 +939,8 @@ export async function explainWithModel(
   prompt: string,
   system: string = SYSTEM_PROMPT,
   onDelta?: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens = 500
 ): Promise<AiExplainResult> {
-  return explainWithMessages(
-    config,
-    [
-      { role: 'system', content: system },
-      { role: 'user', content: prompt }
-    ],
-    onDelta,
-    signal
-  )
+  return explainWithMessages(config, [{ role: 'system', content: system }, { role: 'user', content: prompt }], onDelta, signal, maxTokens)
 }

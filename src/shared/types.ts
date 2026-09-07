@@ -203,6 +203,12 @@ export interface AiConfig {
   lmstudio: AiLmstudioSettings
   builtin: AiBuiltinSettings
   /**
+   * 模型上下文大小(tokens),整个 AI 层按它按比例算预算(地图/回复长度等)。
+   * 留空 = 自动向模型服务探测(LM Studio /api/v0/models、llama-server /props);
+   * 探测不到再退回保守默认 4096。撞墙自动减半重试当最后保险丝。
+   */
+  contextSize?: number
+  /**
    * 联网查证开关,默认关(本地优先、默认离线):开着的唯一作用是——讲解认不出
    * 某个软件/品牌时,拿「名字」去免费公开源查一下再修正答案;不发路径、不发别的
    */
