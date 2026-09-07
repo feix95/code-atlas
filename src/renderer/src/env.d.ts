@@ -12,6 +12,7 @@ import type {
   FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ModelFitVerdict,
   ModelStatus,
   ScanDirNode,
   ScanResult
@@ -71,6 +72,8 @@ declare global {
       modelEject: () => Promise<{ ok: boolean; message?: string }>
       /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数 */
       onModelStatus: (callback: (status: ModelStatus) => void) => () => void
+      /** 量尺:模型块头 vs 机器尺寸,选模型那一刻就给结论(绿装得下/黄有点挤/红装不下) */
+      modelFitCheck: (modelPath: string) => Promise<ModelFitVerdict>
     }
   }
 }

@@ -3885,3 +3885,18 @@ body.is-maximized .cfg-layer {
     animation: none;
   }
 }
+
+/* ── 第七十三锤:模型量尺灯 —— 选模型那一刻就告诉用户带不带得动 ── */
+
+.cfg-fit-note.is-ok {
+  color: var(--green);
+}
+
+.cfg-fit-note.is-tight {
+  color: var(--amber);
+}
+
+.cfg-fit-note.is-too-big,
+.cfg-fit-note.is-missing {
+  color: var(--danger);
+}

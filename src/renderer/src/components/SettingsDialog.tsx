@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { AiConfig } from '@shared/types'
+import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 
@@ -190,6 +190,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [modelsNote, setModelsNote] = useState<string | null>(null)
   const [modelsBusy, setModelsBusy] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
+  // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
+  const [fitNote, setFitNote] = useState<ModelFitVerdict | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLElement | null>(null)
   const aiRef = useRef<HTMLElement | null>(null)
@@ -209,6 +211,22 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   useEffect(() => {
     window.atlas.appVersion().then(setAppVersion).catch(() => {})
   }, [])
+
+  // 量尺(第七十三锤):模型路径一变就问「带得动吗」;路径清空就不显示(旧结论作废)
+  const modelPathDraft = draftConfig?.builtin.modelPath ?? ''
+  useEffect(() => {
+    if (!modelPathDraft.trim()) return
+    let alive = true
+    void window.atlas
+      .modelFitCheck(modelPathDraft)
+      .then((v) => {
+        if (alive) setFitNote(v)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [modelPathDraft])
 
   // 视觉预览:草稿一变,界面当场变(还没落盘,撤销/关弹窗就退回)
   useEffect(() => {
@@ -765,6 +783,11 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                             </button>
                           </div>
                           <p className="cfg-field-help">模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。</p>
+                          {modelPathDraft.trim() && fitNote && fitNote.level !== 'empty' && (
+                            <p className={`cfg-field-help cfg-fit-note is-${fitNote.level}`}>
+                              {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '⚠'} {fitNote.title}:{fitNote.detail}
+                            </p>
+                          )}
                         </>
                       ) : (
                         <>

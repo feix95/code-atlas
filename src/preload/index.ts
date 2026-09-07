@@ -11,6 +11,7 @@ import type {
   FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ModelFitVerdict,
   ModelStatus,
   ScanDirNode,
   ScanResult
@@ -135,5 +136,7 @@ contextBridge.exposeInMainWorld('atlas', {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void => callback(status)
     ipcRenderer.on('atlas:model-status', listener)
     return () => ipcRenderer.removeListener('atlas:model-status', listener)
-  }
+  },
+  /** 量尺(第七十三锤):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
+  modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> => ipcRenderer.invoke('atlas:model-fit-check', modelPath)
 })

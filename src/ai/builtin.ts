@@ -6,6 +6,7 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import os from 'node:os'
 import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
@@ -133,6 +134,111 @@ function recordWarmupMs(modelPath: string, ms: number): void {
     writeFileSync(file, JSON.stringify(nextWarmupStore(raw, modelPath, ms), null, 2), 'utf8')
   } catch {
     // 账本写不进去就算了:估价是锦上添花,不该惊动任何人
+  }
+}
+
+// ── 提前量尺(第七十三锤)──
+// 选模型那一刻就拿「模型块头」比「机器尺寸」,带不动当场说,不让用户白等一场。
+
+const GB = 1024 ** 3
+
+/** 机器的家底:内存多大、显存多大(NVIDIA 卡能问到,问不到就 null,只按内存量尺) */
+export interface MachineSpec {
+  ramBytes: number
+  vramBytes: number | null
+  gpuName: string | null
+}
+
+/** nvidia-smi 的一行输出 → 显卡名 + 显存字节(纯函数,自测覆盖);认不出回 null */
+export function parseNvidiaSmi(line: string): { name: string; vramBytes: number } | null {
+  // 形如 "NVIDIA GeForce RTX 5060 Ti, 16311 MiB"
+  const hit = line.match(/^(.+?),\s*(\d+)\s*MiB\s*$/)
+  if (!hit) return null
+  const mib = Number(hit[2])
+  if (!Number.isFinite(mib) || mib <= 0) return null
+  return { name: hit[1].trim(), vramBytes: Math.round(mib * 1024 * 1024) }
+}
+
+let machineSpecCache: MachineSpec | undefined // undefined = 还没问过
+
+/** 问一次机器家底(显存走 nvidia-smi,N/A 显卡老实回 null);同一进程只问一遍 */
+export async function queryMachineSpec(): Promise<MachineSpec> {
+  if (machineSpecCache !== undefined) return machineSpecCache
+  const ramBytes = os.totalmem()
+  let vramBytes: number | null = null
+  let gpuName: string | null = null
+  try {
+    const out = await runCommand('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader'])
+    const hit = parseNvidiaSmi(out.split('\n')[0] ?? '')
+    if (hit) {
+      vramBytes = hit.vramBytes
+      gpuName = hit.name
+    }
+  } catch {
+    // 没装 N 卡或没这命令:不硬编显存,量尺退回只看内存
+  }
+  const spec: MachineSpec = { ramBytes, vramBytes, gpuName }
+  machineSpecCache = spec
+  return spec
+}
+
+function formatGB(bytes: number): string {
+  return `${(bytes / GB).toFixed(1).replace(/\.0$/, '')} GB`
+}
+
+export interface ModelFitVerdictPure {
+  level: 'ok' | 'tight' | 'too-big'
+  title: string
+  detail: string
+}
+
+/**
+ * 量尺公式(纯函数,自测覆盖):模型块头 vs 显存+内存。
+ * 有显存:≤90% 显存 = 全进卡(最快);再往上挤到「显存+一半内存」= 能跑但落内存会慢;
+ * 超过 = 必然靠硬盘硬扛,直接劝退。没问到显存:只看内存,权重超过内存七成就算挤。
+ */
+export function judgeModelFit(modelBytes: number, ramBytes: number, vramBytes: number | null): ModelFitVerdictPure {
+  if (vramBytes !== null && vramBytes > 0) {
+    if (modelBytes <= vramBytes * 0.9) {
+      return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},显存 ${formatGB(vramBytes)} —— 整个进显卡,跑得动` }
+    }
+    if (modelBytes <= vramBytes + ramBytes * 0.5) {
+      return { level: 'tight', title: '有点挤', detail: `模型 ${formatGB(modelBytes)} 比显存 ${formatGB(vramBytes)} 大,多出来的要落内存 —— 能跑,但会慢一些` }
+    }
+    const suggest = Math.floor((vramBytes * 0.9) / GB)
+    return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},显存只有 ${formatGB(vramBytes)},连内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条` }
+  }
+  if (modelBytes <= ramBytes * 0.5) {
+    return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下` }
+  }
+  if (modelBytes <= ramBytes * 0.7) {
+    return { level: 'tight', title: '有点挤', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 塞得下但系统会挤,跑起来偏慢` }
+  }
+  const suggest = Math.floor((ramBytes * 0.5) / GB)
+  return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},内存只有 ${formatGB(ramBytes)} —— 建议换 ${suggest} GB 以下的模型` }
+}
+
+/**
+ * 引擎「启动就死」的验尸报告(纯函数,自测覆盖):分清撑死、上下文填爆、还是文件坏了,
+ * 不再一句「可能太大」糊弄所有人。撑死要拿量尺的数字说话;上下文嫌疑只在手动填大了时点。
+ */
+export function autopsyExitMessage(exitCode: number | null, fit: ModelFitVerdictPure, manualContext: number | null): string {
+  if (fit.level === 'too-big') {
+    return `模型在这台机器上装不下,引擎一启动就撑死了(退出码 ${exitCode ?? '未知'})。${fit.detail}`
+  }
+  if (manualContext !== null && manualContext >= 32768) {
+    return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'})。最常见的两个原因:①设置里「模型上下文」填得太大(当前 ${manualContext})—— 清空它,回到自动探测;②模型文件损坏 —— 重新下一个`
+  }
+  return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'}):常见原因是模型文件损坏或被别的程序占用,重新选一个模型文件试试`
+}
+
+/** 引擎「启动就死」的专用错误:带着退出码,验尸时好认 */
+export class EngineExitError extends Error {
+  exitCode: number | null
+  constructor(exitCode: number | null, message: string) {
+    super(message)
+    this.name = 'EngineExitError'
+    this.exitCode = exitCode
   }
 }
 
@@ -334,7 +440,8 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
  */
 export async function ensureBuiltinServer(
   settings: AiBuiltinSettings,
-  contextSize = 4096
+  contextSize = 4096,
+  manualContext: number | null = null
 ): Promise<{ baseUrl: string; model: string }> {
   if (isBuiltinRunning() && readyPromise) return readyPromise
 
@@ -368,8 +475,16 @@ export async function ensureBuiltinServer(
   } catch (err) {
     // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
     const facts = builtinIdleFacts(modelPath)
-    if (stopping) announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
-    else announceBuiltinError(modelPath, err)
+    if (stopping) {
+      announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
+    } else {
+      // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
+      if (err instanceof EngineExitError) {
+        const spec = await queryMachineSpec()
+        err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes), manualContext)
+      }
+      announceBuiltinError(modelPath, err)
+    }
     stopBuiltinServer()
     throw err
   }
@@ -427,11 +542,12 @@ async function startAndWaitReady(
   announceLoading(null)
 
   // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误;
-  // 是用户自己按的取消/卸下就说「取消了」,别吓人
+  // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,验尸时好认
   const exitError = new Promise<never>((_, reject) => {
     child?.once('exit', (code) => {
       reject(
-        new Error(
+        new EngineExitError(
+          code ?? null,
           stopping
             ? CANCEL_MESSAGE
             : `内置模型程序启动失败就退出了(退出码 ${code ?? '未知'}):常见原因是程序路径没指对、模型文件损坏,或端口被占用`
@@ -472,7 +588,7 @@ async function startAndWaitReady(
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     }
-    if (!isBuiltinRunning()) throw new Error('内置模型进程提前退出了,检查路径和模型文件')
+    if (!isBuiltinRunning()) throw new EngineExitError(null, '内置模型进程提前退出了,检查路径和模型文件')
 
     // 热身真耗时入账:下次同一模型的估价就有据可依
     recordWarmupMs(modelPath, Date.now() - startedAt)

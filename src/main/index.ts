@@ -45,10 +45,10 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, lastBuiltinStatus, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -223,8 +223,9 @@ async function resolveChatTargetOrError(): Promise<
   let runtime: BuiltinRuntime | undefined
   if (config.provider === 'builtin') {
     try {
-      // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话
-      runtime = await ensureBuiltinServer(config.builtin, config.contextSize)
+      // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话;
+      // 是否手动填的也带过去 —— 引擎启动就死时,验尸话能点名「上下文填太大」
+      runtime = await ensureBuiltinServer(config.builtin, config.contextSize, config.contextSize ?? null)
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
@@ -573,6 +574,22 @@ function registerIpc(): void {
     stopBuiltinServer()
     broadcastModelStatus(builtinIdleStatus(config.builtin.modelPath))
     return { ok: true, message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑' }
+  })
+
+  // 量尺(第七十三锤):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
+  ipcMain.handle('atlas:model-fit-check', async (_event, modelPath: unknown): Promise<ModelFitVerdict> => {
+    if (typeof modelPath !== 'string' || !modelPath.trim()) {
+      return { level: 'empty', title: '', detail: '', sizeBytes: null }
+    }
+    const sizeBytes = await fs
+      .stat(modelPath.trim())
+      .then((s) => s.size)
+      .catch(() => null)
+    if (sizeBytes === null) {
+      return { level: 'missing', title: '文件不存在', detail: '这个路径找不到文件:检查一下盘符和文件名', sizeBytes: null }
+    }
+    const spec = await queryMachineSpec()
+    return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes), sizeBytes }
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
@@ -1019,6 +1036,8 @@ app.whenReady().then(() => {
   setBuiltinStatusAnnouncer(broadcastModelStatus)
   // 热身耗时小账本安家 userData:模型上次热身多久,下次估价进度就有据可依
   setBuiltinWarmupDir(app.getPath('userData'))
+  // 机器家底提前问一遍(显存走 nvidia-smi):引擎万一启动就死,验尸话张口就来,不现场等
+  void queryMachineSpec().catch(() => {})
 
   // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
   // 旧的崩溃转储过期的清掉。都是后台安静干,失败也不打扰启动

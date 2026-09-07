@@ -43,7 +43,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { estimateLoadProgress, nextWarmupStore, parseListenerPids, parseLoadProgress, parseTasklistImage, parseWarmupStore, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupStore, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -784,8 +784,37 @@ async function main(): Promise<void> {
   assert.ok(warmupNudgeMessage(5 * 60_000)?.includes('取消'), '到点开口:提醒里得告诉人「取消」在哪')
   assert.ok(warmupNudgeMessage(30 * 60_000)?.includes('慢是正常的'), '等半小时也还是同一句善意提醒,不升级不恐吓')
 
+  // ── 14. 提前量尺(第七十三锤):选模型那一刻就分「装得下/有点挤/装不下」──
+  const G = 1024 ** 3
+  assert.equal(parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.vramBytes, Math.round(16311 * 1024 * 1024), 'nvidia-smi 一行能抠出显存')
+  assert.equal(parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.name, 'NVIDIA GeForce RTX 5060 Ti', '显卡名也带回来')
+  assert.equal(parseNvidiaSmi(' garbage '), null, '垃圾输出回 null')
+  assert.equal(parseNvidiaSmi('AMD Radeon, N/A MiB'), null, 'N/A 显存不可信')
+
+  // 小葵的实机(32GB 内存 + 16GB 4060Ti 级显存,14.26GB 模型):全进卡,绿灯
+  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level, 'ok', '14.26GB 模型 vs 16GB 显存:绿灯')
+  // 显存小一号:能跑但落内存,黄灯;大到显存+一半内存都兜不住,红灯
+  assert.equal(judgeModelFit(10 * G, 16 * G, 8 * G).level, 'tight', '10GB 模型 vs 8GB 显存:黄灯(部分落内存)')
+  assert.equal(judgeModelFit(20 * G, 16 * G, 8 * G).level, 'too-big', '20GB 模型 vs 8GB 显存+16GB 内存:红灯')
+  // 问不到显存(N/A 卡):只看内存,五成宽裕七成挤
+  assert.equal(judgeModelFit(14 * G, 32 * G, null).level, 'ok', '无显存数据:14GB vs 32GB 内存,绿灯')
+  assert.equal(judgeModelFit(16 * G, 24 * G, null).level, 'tight', '无显存数据:16GB vs 24GB 内存,黄灯(过七成线前)')
+  assert.equal(judgeModelFit(20 * G, 24 * G, null).level, 'too-big', '无显存数据:20GB vs 24GB 内存,红灯')
+  assert.ok(judgeModelFit(20 * G, 16 * G, 8 * G).detail.includes('换'), '红灯细节要给出换多大模型的建议')
+
+  // 验尸:撑死拿量尺数字说话;上下文填大了点它名;都不是才说文件坏
+  const fitBig = judgeModelFit(20 * G, 16 * G, 8 * G)
+  assert.ok(autopsyExitMessage(3, fitBig, null).includes('装不下'), '撑死:验尸话点明装不下')
+  assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '验尸话保留退出码')
+  assert.ok(autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'), '撑死优先于上下文嫌疑')
+  const ctxMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, 131072)
+  assert.ok(ctxMsg.includes('模型上下文') && ctxMsg.includes('131072') && ctxMsg.includes('清空'), '装得下却死了+手动上下文填大:点名上下文')
+  const brokenMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, null)
+  assert.ok(brokenMsg.includes('损坏') || brokenMsg.includes('占用'), '都不是:才归到文件损坏/被占用')
+  assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
+
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/热身不掐表只提醒)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/热身不掐表只提醒/量尺与验尸)')
 }
 
 main().catch((err) => {

@@ -242,6 +242,20 @@ export interface ModelStatus {
   message?: string
 }
 
+/**
+ * 模型块头 vs 机器尺寸的量尺结果(第七十三锤):选模型那一刻就给,不等引擎白跑一趟。
+ * level:ok=装得下 tight=有点挤(能跑但慢) too-big=装不下 missing=文件不存在 empty=还没选
+ */
+export interface ModelFitVerdict {
+  level: 'ok' | 'tight' | 'too-big' | 'missing' | 'empty'
+  /** 一句话结论(给人看的,如「装得下」「这台机器装不下」) */
+  title: string
+  /** 数字说话的细节(模型多大、显存内存多大、建议换多大的) */
+  detail: string
+  /** 模型文件大小(字节);拿不到就是 null */
+  sizeBytes: number | null
+}
+
 /** 流式输出的增量推送(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiDeltaPayload {
   id: string
