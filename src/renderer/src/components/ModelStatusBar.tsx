@@ -55,29 +55,36 @@ export function ModelStatusBar(): React.JSX.Element {
   return (
     <footer className="model-dock">
       <div className={`model-status is-${status.state}`} role="status" aria-live="polite">
-        <span className="model-dot" aria-hidden="true" />
-        <span className="model-provider">{providerName}</span>
-        <span className="model-state" title={status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined}>
-          {stateText}
-        </span>
-        {status.modelName && (
-          <span className="model-name mono" title={status.modelName}>
-            {status.modelName}
+        {/* 左:状态本体 + 动作按钮(小葵定的版式:状态和取消/卸下都住左边) */}
+        <span className="model-left">
+          <span className="model-dot" aria-hidden="true" />
+          <span className="model-provider">{providerName}</span>
+          <span className="model-state" title={status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined}>
+            {stateText}
           </span>
-        )}
-        {size && <span className="model-size mono">{size}</span>}
+          {/* 取消/卸下只对内置模型生效:热身中按=取消,就绪后按=卸下腾内存;外接的装卸归 LM Studio */}
+          {status.provider === 'builtin' && (status.state === 'loading' || status.state === 'ready') && (
+            <button type="button" className="model-act" onClick={() => void window.atlas.modelEject()}>
+              {status.state === 'loading' ? '取消' : '卸下'}
+            </button>
+          )}
+        </span>
+        {/* 中:提醒/出岔子的话,空间不够自动截断,悬停看全文 */}
         {status.message && (
           <span className="model-message" title={status.message}>
             {status.message}
           </span>
         )}
-        {/* 取消/卸下只对内置模型生效:热身中按=取消,就绪后按=卸下腾内存;外接的装卸归 LM Studio */}
-        {status.provider === 'builtin' && (status.state === 'loading' || status.state === 'ready') && (
-          <button type="button" className="model-act" onClick={() => void window.atlas.modelEject()}>
-            {status.state === 'loading' ? '取消' : '卸下'}
-          </button>
-        )}
-        {/* 进度线只在热身中出现;就绪时满宽绿线退场;其他状态(还没叫醒/出岔子)一根毛都不画 */}
+        {/* 右:模型数据 */}
+        <span className="model-right">
+          {status.modelName && (
+            <span className="model-name mono" title={status.modelName}>
+              {status.modelName}
+            </span>
+          )}
+          {size && <span className="model-size mono">{size}</span>}
+        </span>
+        {/* 进度线:贴着整条底栏底下走,按底栏全长当最大;就绪时满宽绿线退场;其他状态一根毛都不画 */}
         {(status.state === 'loading' || status.state === 'ready') && (
           <i
             className={`model-bar${status.progress === null ? ' is-unknown' : ''}`}
