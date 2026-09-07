@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, net, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, dialog, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
@@ -48,6 +48,7 @@ import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from
 import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
+import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
@@ -293,9 +294,22 @@ async function refreshModelStatus(): Promise<void> {
 }
 
 function createWindow(): void {
+  // ── 第七十八锤:窗口尺寸记事本 ──
+  // 上回把窗拉到多大、搁在哪儿,这回开窗就照旧;最大化单独记一票,还原时先落回上次的
+  // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
+  // 存档先过安检再落窗:垃圾存档走默认,旧存档对着现在的屏幕贴边夹紧(换屏/改分辨率
+  // 也不把窗送出屏外)。记不住(读写失败)就当没这回事,走默认 —— 锦上添花不添乱。
+  const savedWindowState = readWindowState(app.getPath('userData'))
+  const placedBox = savedWindowState
+    ? placeWindowBox(savedWindowState.box, screen.getAllDisplays().map((d) => d.workArea))
+    : null
+  let normalBox: WindowBox | null = savedWindowState ? savedWindowState.box : null
+  let stateSaveTimer: NodeJS.Timeout | null = null
+
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: placedBox?.width ?? 1200,
+    height: placedBox?.height ?? 800,
+    ...(placedBox && placedBox.x !== undefined && placedBox.y !== undefined ? { x: placedBox.x, y: placedBox.y } : {}),
     minWidth: 960,
     minHeight: 640,
     title: 'CodeAtlas',
@@ -320,6 +334,42 @@ function createWindow(): void {
       backgroundThrottling: false
     }
   })
+
+  // 记事本落盘:平常拖大拖小/挪地方都是 debounce 攒 0.5 秒写一回,关窗那一刻清表补写;
+  // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
+  const persistWindowState = (): void => {
+    if (mainWindow.isDestroyed()) return
+    writeWindowState(app.getPath('userData'), {
+      box: normalBox ?? mainWindow.getBounds(),
+      maximized: mainWindow.isMaximized()
+    })
+  }
+  const scheduleWindowStateSave = (): void => {
+    if (stateSaveTimer) clearTimeout(stateSaveTimer)
+    stateSaveTimer = setTimeout(persistWindowState, 500)
+  }
+  const noteNormalBounds = (): void => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isMaximized()) normalBox = mainWindow.getBounds()
+  }
+  mainWindow.on('resize', () => {
+    noteNormalBounds()
+    scheduleWindowStateSave()
+  })
+  mainWindow.on('move', () => {
+    noteNormalBounds()
+    scheduleWindowStateSave()
+  })
+  mainWindow.on('maximize', scheduleWindowStateSave)
+  mainWindow.on('unmaximize', () => {
+    noteNormalBounds()
+    scheduleWindowStateSave()
+  })
+  mainWindow.on('close', () => {
+    if (stateSaveTimer) clearTimeout(stateSaveTimer)
+    persistWindowState()
+  })
+  // 上回关窗时是最大化:先把存档的正常大小落好,再进最大化,圆角描边那条链照常接手
+  if (savedWindowState?.maximized) mainWindow.maximize()
 
   // ── 露窗链:多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身 ──
   // 本机实测(模块四验收):ready-to-show 只在 GPU 缓存健康时才来 —— 缓存被另一个

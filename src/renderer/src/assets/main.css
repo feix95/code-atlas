@@ -2474,8 +2474,10 @@ body.is-maximized .cfg-layer {
 .cfg-window {
   position: relative;
   width: min(65rem, 100%);
+  /* 高度帽子必须永远赢:界面缩放是改根字号(第四十七锤),rem 写的 min-height 会随缩放
+     一同长大、反过头盖过这顶帽子 —— 缩放≈130% + 默认窗 1200×800 时页脚按钮就被截半截
+     (探针 B 场景抓过现行)。所以不许有任何 min-height;矮窗下内容交给 .cfg-scroll 内滚 */
   height: min(47.25rem, 100%);
-  min-height: 36rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
