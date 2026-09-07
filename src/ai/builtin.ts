@@ -10,8 +10,9 @@ import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 const BUILTIN_PORT = 8766
-/** 就绪等待上限:大模型首次加载要往显存/内存里灌几个 GB,给足耐心 */
-const READY_TIMEOUT_MS = 120_000
+/** 热身多久没好开始温柔提醒(第七十二锤,小葵拍板):绝不掐进程 —— 大模型从机械盘
+ * 搬进显存两三分钟是常事,掐表只会杀死健康的加载;等不等由用户手里的「取消」说了算 */
+const WARMUP_NUDGE_MS = 5 * 60_000
 const POLL_INTERVAL_MS = 1000
 /** 引擎进程名(收尸时先验明正身,绝不误杀别的程序) */
 const ENGINE_IMAGE = 'llama-server.exe'
@@ -92,7 +93,16 @@ export function nextWarmupStore(raw: unknown, modelPath: string, ms: number): Re
 }
 
 /**
- * 估价公式:已用时 ÷ 上次耗时 → 百分比,1~95 封顶(纯函数,自测覆盖)。
+ * 热身太久的温柔提醒(纯函数,自测覆盖):5 分钟还没好才开口,一句话管理预期,
+ * 绝不吓唬也绝不催命 —— 去留是用户手里「取消」的事,不是闹钟的事。
+ */
+export function warmupNudgeMessage(elapsedMs: number): string | undefined {
+  return elapsedMs >= WARMUP_NUDGE_MS
+    ? '这次热身有点久:大模型第一次要从硬盘整个搬一遍,慢是正常的;不想等就点「取消」,搬完它自己会说'
+    : undefined
+}
+
+/** 热身估价公式:已用时 ÷ 上次耗时 → 百分比,1~95 封顶(纯函数,自测覆盖)。
  * 没账可查回 null(界面转圈);宁慢勿快 —— 封顶 95,没真就绪绝不谎报到手。
  */
 export function estimateLoadProgress(elapsedMs: number, lastMs: number | null): number | null {
@@ -408,8 +418,11 @@ async function startAndWaitReady(
     }
   )
   const announceLoading = (realProgress: number | null): void => {
-    const est = realProgress ?? estimateLoadProgress(Date.now() - startedAt, lastWarmupMs)
-    announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, est, undefined, est !== null && realProgress === null))
+    const elapsed = Date.now() - startedAt
+    const est = realProgress ?? estimateLoadProgress(elapsed, lastWarmupMs)
+    announceBuiltin(
+      builtinStatus('loading', facts.modelName, facts.sizeBytes, est, warmupNudgeMessage(elapsed), est !== null && realProgress === null)
+    )
   }
   announceLoading(null)
 
@@ -436,16 +449,12 @@ async function startAndWaitReady(
 
   const healthUrl = baseUrl.replace(/\/v1$/, '') + '/health'
   const ready = (async () => {
-    const deadline = Date.now() + READY_TIMEOUT_MS
-    let healthy = false
-    while (Date.now() < deadline) {
-      if (!isBuiltinRunning()) break // 进程已退出,交给 exitError 报错
+    // 不设闹钟(第七十二锤):进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
+    // 2 分钟的硬超时只会掐死健康的加载;真死锁交给用户手里的「取消」
+    while (isBuiltinRunning()) {
       try {
         const res = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) })
-        if (res.ok) {
-          healthy = true
-          break // 200 = 模型加载完毕
-        }
+        if (res.ok) break // 200 = 模型加载完毕
         if (res.status === 503) {
           // 还在加载:服务报了进度就用真数,没报就按上次耗时估一条,每秒往前走
           const body = await res.text().catch(() => '')
@@ -464,9 +473,6 @@ async function startAndWaitReady(
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     }
     if (!isBuiltinRunning()) throw new Error('内置模型进程提前退出了,检查路径和模型文件')
-    if (!healthy) {
-      throw new Error('模型加载超时(等了两分钟还没就绪):模型可能太大,换个小点的模型,或关掉其他吃内存的程序再试')
-    }
 
     // 热身真耗时入账:下次同一模型的估价就有据可依
     recordWarmupMs(modelPath, Date.now() - startedAt)

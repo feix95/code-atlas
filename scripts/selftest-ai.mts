@@ -43,7 +43,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { estimateLoadProgress, nextWarmupStore, parseListenerPids, parseLoadProgress, parseTasklistImage, parseWarmupStore, resolveServerProgram } from '../src/ai/builtin.ts'
+import { estimateLoadProgress, nextWarmupStore, parseListenerPids, parseLoadProgress, parseTasklistImage, parseWarmupStore, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -778,8 +778,14 @@ async function main(): Promise<void> {
   assert.equal(nextWarmupStore('垃圾', 'n.gguf', 2000)['n.gguf'], 2000, '垃圾旧账就地开新账')
   assert.equal(nextWarmupStore({}, 'n.gguf', 5)['n.gguf'], 1000, '耗时有 1 秒下限,防小模型记出 0')
 
+  // ── 13. 热身不掐表(第七十二锤):5 分钟后温柔提醒,绝不催命 ──
+  assert.equal(warmupNudgeMessage(0), undefined, '刚开锅不提醒')
+  assert.equal(warmupNudgeMessage(4 * 60_000 + 59_000), undefined, '差一秒到五分钟也不提醒')
+  assert.ok(warmupNudgeMessage(5 * 60_000)?.includes('取消'), '到点开口:提醒里得告诉人「取消」在哪')
+  assert.ok(warmupNudgeMessage(30 * 60_000)?.includes('慢是正常的'), '等半小时也还是同一句善意提醒,不升级不恐吓')
+
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/热身不掐表只提醒)')
 }
 
 main().catch((err) => {
