@@ -43,7 +43,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { parseListenerPids, parseLoadProgress, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
+import { estimateLoadProgress, nextWarmupStore, parseListenerPids, parseLoadProgress, parseTasklistImage, parseWarmupStore, resolveServerProgram } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -757,8 +757,29 @@ async function main(): Promise<void> {
   assert.equal(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, '别的模型').state, 'idle', '查无此模型 = 还没叫醒')
   assert.equal(parseLmStudioModelState(null, 'q').state, 'idle', '垃圾回复别炸')
 
+  // ── 12. 热身估价进度(第七十一锤):数是估的,但估得有据、封顶诚实 ──
+  assert.equal(estimateLoadProgress(5000, 10_000), 50, '已用时÷上次耗时,一半就是 50%')
+  assert.equal(estimateLoadProgress(0, 10_000), 1, '刚开锅给 1%,别顶着 0 吓人')
+  assert.equal(estimateLoadProgress(99_999, 10_000), 95, '封顶 95:没真就绪绝不谎报 100')
+  assert.equal(estimateLoadProgress(5000, null), null, '头一回没账 = 转圈,不硬估')
+  assert.equal(estimateLoadProgress(5000, 0), null, '账本里的 0 秒不可信')
+  assert.equal(estimateLoadProgress(5000, -3), null, '负数账不可信')
+  assert.equal(estimateLoadProgress(4996, 10_000), 49, '向下取整,宁可少报不虚报')
+
+  const warmupRaw = { 'F:\\models\\qwen.gguf': 42_000, 'D:\\x.gguf': 8000 }
+  assert.equal(parseWarmupStore(warmupRaw, 'F:\\models\\qwen.gguf'), 42_000, '账本按模型路径记账')
+  assert.equal(parseWarmupStore(warmupRaw, '没记过的.gguf'), null, '没记过就是没记过')
+  assert.equal(parseWarmupStore('垃圾', 'x'), null, '垃圾账本回 null')
+  assert.equal(parseWarmupStore({ x: 5 }, 'x'), null, '小于 1 秒的账不可信')
+  assert.equal(parseWarmupStore({ x: 1234.6 }, 'x'), 1235, '耗时取整到毫秒')
+  const warmupNext = nextWarmupStore(warmupRaw, 'F:\\models\\qwen.gguf', 39_500)
+  assert.equal(warmupNext['F:\\models\\qwen.gguf'], 39_500, '同模型重热身,旧账被新账盖掉')
+  assert.equal(warmupNext['D:\\x.gguf'], 8000, '别家的账不许动')
+  assert.equal(nextWarmupStore('垃圾', 'n.gguf', 2000)['n.gguf'], 2000, '垃圾旧账就地开新账')
+  assert.equal(nextWarmupStore({}, 'n.gguf', 5)['n.gguf'], 1000, '耗时有 1 秒下限,防小模型记出 0')
+
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶)')
 }
 
 main().catch((err) => {

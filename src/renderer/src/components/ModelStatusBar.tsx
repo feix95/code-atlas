@@ -43,7 +43,7 @@ export function ModelStatusBar(): React.JSX.Element {
     status.state === 'loading'
       ? status.progress === null
         ? '热身中……'
-        : `热身中 ${Math.round(status.progress)}%`
+        : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`
       : status.state === 'idle'
         ? '还没叫醒'
         : status.state === 'ready'
@@ -57,7 +57,9 @@ export function ModelStatusBar(): React.JSX.Element {
       <div className={`model-status is-${status.state}`} role="status" aria-live="polite">
         <span className="model-dot" aria-hidden="true" />
         <span className="model-provider">{providerName}</span>
-        <span className="model-state">{stateText}</span>
+        <span className="model-state" title={status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined}>
+          {stateText}
+        </span>
         {status.modelName && (
           <span className="model-name mono" title={status.modelName}>
             {status.modelName}

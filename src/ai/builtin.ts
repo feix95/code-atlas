@@ -4,7 +4,7 @@
 // 生命周期:首次用到 AI 才启动(不拖慢 app 打包体积和启动速度);app 退出时杀掉。
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
 
@@ -50,9 +50,80 @@ function builtinStatus(
   modelName: string,
   sizeBytes: number | null,
   progress: number | null = null,
-  message?: string
+  message?: string,
+  estimated = false
 ): ModelStatus {
-  return { provider: 'builtin', state, modelName, sizeBytes, progress, ...(message ? { message } : {}) }
+  return {
+    provider: 'builtin',
+    state,
+    modelName,
+    sizeBytes,
+    progress,
+    ...(estimated ? { estimated: true } : {}),
+    ...(message ? { message } : {})
+  }
+}
+
+// ── 热身估价小账本(第七十一锤)──
+// 这版引擎(build 10786)加载期间 /health 不带进度、日志不打印,真百分比三头都拿不到。
+// 但同一台电脑同一个模型,热身耗时相当稳 —— 记下上次真实耗时,下次按「已用时÷上次耗时」
+// 画一条有据的估,封顶 95%(没真就绪绝不报 100),标「约」字;头一回没账就转圈。
+// 账本存 userData/model-warmup.json,这是应用自己的小账本,不碰项目文件。
+
+/** 热身耗时账本目录(userData),main 进程启动时注入 */
+let warmupDir: string | null = null
+
+export function setBuiltinWarmupDir(dir: string): void {
+  warmupDir = dir
+}
+
+/** 账本原始内容 → 某个模型上次的热身耗时(ms);没记过/垃圾内容回 null(纯函数,自测覆盖) */
+export function parseWarmupStore(raw: unknown, modelPath: string): number | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const ms = (raw as Record<string, unknown>)[modelPath]
+  return typeof ms === 'number' && Number.isFinite(ms) && ms >= 1000 ? Math.round(ms) : null
+}
+
+/** 账本更新:某模型刚热身完,记下这次耗时(纯函数,自测覆盖;垃圾输入就地开新账) */
+export function nextWarmupStore(raw: unknown, modelPath: string, ms: number): Record<string, number> {
+  const base = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {}
+  base[modelPath] = Math.max(1000, Math.round(ms))
+  return base as Record<string, number>
+}
+
+/**
+ * 估价公式:已用时 ÷ 上次耗时 → 百分比,1~95 封顶(纯函数,自测覆盖)。
+ * 没账可查回 null(界面转圈);宁慢勿快 —— 封顶 95,没真就绪绝不谎报到手。
+ */
+export function estimateLoadProgress(elapsedMs: number, lastMs: number | null): number | null {
+  if (lastMs === null || !Number.isFinite(lastMs) || lastMs <= 0) return null
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 1
+  return Math.max(1, Math.min(95, Math.floor((elapsedMs / lastMs) * 100)))
+}
+
+function warmupFilePath(): string | null {
+  return warmupDir ? join(warmupDir, 'model-warmup.json') : null
+}
+
+function readWarmupMs(modelPath: string): number | null {
+  const file = warmupFilePath()
+  if (!file || !existsSync(file)) return null
+  try {
+    return parseWarmupStore(JSON.parse(readFileSync(file, 'utf8')), modelPath)
+  } catch {
+    return null
+  }
+}
+
+function recordWarmupMs(modelPath: string, ms: number): void {
+  const file = warmupFilePath()
+  if (!file) return
+  try {
+    const raw = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
+    writeFileSync(file, JSON.stringify(nextWarmupStore(raw, modelPath, ms), null, 2), 'utf8')
+  } catch {
+    // 账本写不进去就算了:估价是锦上添花,不该惊动任何人
+  }
 }
 
 function announceBuiltin(status: ModelStatus): void {
@@ -315,6 +386,8 @@ async function startAndWaitReady(
   startedKey = settingsKey({ serverPath, modelPath })
   stopping = false // 新的一轮启动:上次「主动叫停」的标记就地清账
   const facts = builtinIdleFacts(modelPath)
+  const startedAt = Date.now()
+  const lastWarmupMs = readWarmupMs(modelPath)
   child = spawn(
     serverPath,
     [
@@ -334,7 +407,11 @@ async function startAndWaitReady(
       stdio: 'ignore'
     }
   )
-  announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, null, '正在热身……'))
+  const announceLoading = (realProgress: number | null): void => {
+    const est = realProgress ?? estimateLoadProgress(Date.now() - startedAt, lastWarmupMs)
+    announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, est, undefined, est !== null && realProgress === null))
+  }
+  announceLoading(null)
 
   // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误;
   // 是用户自己按的取消/卸下就说「取消了」,别吓人
@@ -370,7 +447,7 @@ async function startAndWaitReady(
           break // 200 = 模型加载完毕
         }
         if (res.status === 503) {
-          // 还在加载:服务报了进度就给状态栏一个准数,没报就让界面转圈
+          // 还在加载:服务报了进度就用真数,没报就按上次耗时估一条,每秒往前走
           const body = await res.text().catch(() => '')
           let parsed: unknown
           try {
@@ -378,10 +455,11 @@ async function startAndWaitReady(
           } catch {
             parsed = null
           }
-          announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, parseLoadProgress(parsed)))
+          announceLoading(parseLoadProgress(parsed))
         }
       } catch {
-        // 还没开始监听端口,继续等
+        // 还没开始监听端口,继续等;估价也照走,别让百分比卡在原地
+        announceLoading(null)
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     }
@@ -389,6 +467,9 @@ async function startAndWaitReady(
     if (!healthy) {
       throw new Error('模型加载超时(等了两分钟还没就绪):模型可能太大,换个小点的模型,或关掉其他吃内存的程序再试')
     }
+
+    // 热身真耗时入账:下次同一模型的估价就有据可依
+    recordWarmupMs(modelPath, Date.now() - startedAt)
 
     // 就绪后问它加载了哪个模型;刚就绪就断线的话给人话兜底
     let model: string

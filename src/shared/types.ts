@@ -236,6 +236,8 @@ export interface ModelStatus {
   sizeBytes: number | null
   /** 加载进度 0-100;服务没报就是 null(界面转圈不给数) */
   progress: number | null
+  /** progress 是按「上次热身耗时」估出来的(引擎不报真进度时);真数或无进度时没有这个标记 */
+  estimated?: boolean
   /** 出岔子或需要引导时的一句话(给人看的) */
   message?: string
 }

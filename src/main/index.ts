@@ -45,7 +45,7 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, lastBuiltinStatus, reapOrphanServer, setBuiltinStatusAnnouncer, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, lastBuiltinStatus, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
@@ -1017,6 +1017,8 @@ app.whenReady().then(() => {
 
   // 内置引擎的状态播报员上岗:引擎一动(热身/进度/就绪/出岔子/被卸下)就广播给状态栏
   setBuiltinStatusAnnouncer(broadcastModelStatus)
+  // 热身耗时小账本安家 userData:模型上次热身多久,下次估价进度就有据可依
+  setBuiltinWarmupDir(app.getPath('userData'))
 
   // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
   // 旧的崩溃转储过期的清掉。都是后台安静干,失败也不打扰启动
