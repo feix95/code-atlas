@@ -43,7 +43,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupStore, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -766,17 +766,27 @@ async function main(): Promise<void> {
   assert.equal(estimateLoadProgress(5000, -3), null, '负数账不可信')
   assert.equal(estimateLoadProgress(4996, 10_000), 49, '向下取整,宁可少报不虚报')
 
-  const warmupRaw = { 'F:\\models\\qwen.gguf': 42_000, 'D:\\x.gguf': 8000 }
-  assert.equal(parseWarmupStore(warmupRaw, 'F:\\models\\qwen.gguf'), 42_000, '账本按模型路径记账')
-  assert.equal(parseWarmupStore(warmupRaw, '没记过的.gguf'), null, '没记过就是没记过')
-  assert.equal(parseWarmupStore('垃圾', 'x'), null, '垃圾账本回 null')
-  assert.equal(parseWarmupStore({ x: 5 }, 'x'), null, '小于 1 秒的账不可信')
-  assert.equal(parseWarmupStore({ x: 1234.6 }, 'x'), 1235, '耗时取整到毫秒')
+  const warmupRaw = { 'F:\\models\\qwen.gguf': [42_000, 8_000], 'D:\\x.gguf': 8_000 }
+  assert.deepEqual(parseWarmupSamples(warmupRaw, 'F:\\models\\qwen.gguf'), [42_000, 8_000], '数组账原样读回')
+  assert.deepEqual(parseWarmupSamples(warmupRaw, 'D:\\x.gguf'), [8_000], '老格式单个数自动当一次历史,不用删档')
+  assert.equal(parseWarmupSamples(warmupRaw, '没记过的.gguf'), null, '没记过就是没记过')
+  assert.equal(parseWarmupSamples('垃圾', 'x'), null, '垃圾账本回 null')
+  assert.deepEqual(parseWarmupSamples({ x: [5, 20_000, 30_000] }, 'x'), [20_000, 30_000], '小于 1 秒的脏账剔除')
+  assert.deepEqual(parseWarmupSamples({ x: [1, 2, 3, 40_000, 50_000, 60_000] }, 'x'), [40_000, 50_000, 60_000], '超长账只认最近三次')
+  assert.equal(parseWarmupSamples({ x: [5] }, 'x'), null, '全是脏账等于没账')
+
   const warmupNext = nextWarmupStore(warmupRaw, 'F:\\models\\qwen.gguf', 39_500)
-  assert.equal(warmupNext['F:\\models\\qwen.gguf'], 39_500, '同模型重热身,旧账被新账盖掉')
-  assert.equal(warmupNext['D:\\x.gguf'], 8000, '别家的账不许动')
-  assert.equal(nextWarmupStore('垃圾', 'n.gguf', 2000)['n.gguf'], 2000, '垃圾旧账就地开新账')
-  assert.equal(nextWarmupStore({}, 'n.gguf', 5)['n.gguf'], 1000, '耗时有 1 秒下限,防小模型记出 0')
+  assert.deepEqual(warmupNext['F:\\models\\qwen.gguf'], [42_000, 8_000, 39_500], '新账入列,旧账都还在')
+  assert.equal(warmupNext['D:\\x.gguf'], 8_000, '别家的账不许动')
+  assert.deepEqual(nextWarmupStore('垃圾', 'n.gguf', 2000)['n.gguf'], [2000], '垃圾旧账就地开新账')
+  assert.deepEqual(nextWarmupStore({ m: [10_000, 20_000, 30_000] }, 'm', 40_000)['m'], [20_000, 30_000, 40_000], '满三条再入账,最老的滚出去')
+  assert.deepEqual(nextWarmupStore({}, 'n.gguf', 5)['n.gguf'], [1000], '耗时有 1 秒下限,防小模型记出 0')
+
+  // 均值:一冷两热混算,估价落在中间,运气只占三分之一
+  assert.equal(averageWarmup([]), null, '没样本不硬估')
+  assert.equal(averageWarmup([150_000]), 150_000, '单样本就是它自己')
+  assert.equal(averageWarmup([150_000, 30_000, 30_000]), 70_000, '一冷两热,均值落在中间')
+  assert.equal(averageWarmup([1000, 1500]), 1250, '均值四舍五入到毫秒')
 
   // ── 13. 热身不掐表(第七十二锤):5 分钟后温柔提醒,绝不催命 ──
   assert.equal(warmupNudgeMessage(0), undefined, '刚开锅不提醒')
@@ -814,7 +824,7 @@ async function main(): Promise<void> {
   assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
 
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/热身不掐表只提醒/量尺与验尸)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
 }
 
 main().catch((err) => {
