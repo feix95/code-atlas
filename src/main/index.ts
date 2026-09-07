@@ -34,6 +34,7 @@ import {
   hasWebLookupSignal,
   hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
+  parseLmStudioModelState,
   FREE_CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
   FOLDER_SYSTEM_PROMPT,
@@ -44,10 +45,10 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { builtinNeedsRestart, ensureBuiltinServer, isBuiltinRunning, reapOrphanServer, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, lastBuiltinStatus, reapOrphanServer, setBuiltinStatusAnnouncer, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -222,7 +223,8 @@ async function resolveChatTargetOrError(): Promise<
   let runtime: BuiltinRuntime | undefined
   if (config.provider === 'builtin') {
     try {
-      runtime = await ensureBuiltinServer(config.builtin)
+      // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话
+      runtime = await ensureBuiltinServer(config.builtin, config.contextSize)
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
@@ -252,6 +254,41 @@ function sendChatLookup(event: IpcMainInvokeEvent, requestId: unknown, state: Ai
   if (!event.sender.isDestroyed()) {
     event.sender.send('atlas:ai-chat-lookup', { id: requestId, state, sources } satisfies AiChatLookupPayload)
   }
+}
+
+// ── 第七十锤:模型状态栏的后厨 ──
+// 内置引擎的状态由 builtin.ts 播报员推过来;外接 LM Studio 没法订阅,只能低频去问。
+// 两路都汇到 broadcastModelStatus,渲染层的常驻底栏只认这一条频道。
+
+function broadcastModelStatus(status: ModelStatus): void {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (win && !win.isDestroyed()) win.webContents.send('atlas:model-status', status)
+}
+
+/** 问一轮 LM Studio:模型加载了没/热身到多少;服务没开就老实说没连上,不装没事 */
+async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
+  const model = config.lmstudio.model.trim()
+  const root = config.lmstudio.baseUrl.trim().replace(/\/v1\/?$/, '') || 'http://127.0.0.1:1234'
+  const base = { provider: 'lmstudio' as const, modelName: model, sizeBytes: null, progress: null }
+  if (!model) return { ...base, state: 'idle', message: '还没填模型名:去「AI 设置」连一下 LM Studio' }
+  try {
+    const res = await fetch(`${root}/api/v0/models`, { signal: AbortSignal.timeout(3000) })
+    if (res.ok) {
+      const parsed = parseLmStudioModelState(await res.json().catch(() => null), model)
+      return { ...base, state: parsed.state, progress: parsed.progress }
+    }
+    // 老版本 LM Studio 没有 v0 接口:OpenAI 兼容口能列出模型就当就绪
+    const legacy = await fetch(`${root}/v1/models`, { signal: AbortSignal.timeout(3000) })
+    return { ...base, state: legacy.ok ? 'ready' : 'unreachable' }
+  } catch {
+    return { ...base, state: 'unreachable', message: 'LM Studio 没连上:那边开了「开发者」本地服务,这边才看得到' }
+  }
+}
+
+/** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权 */
+async function refreshModelStatus(): Promise<void> {
+  const config = await loadAiConfig(app.getPath('userData'))
+  if (config.provider === 'lmstudio') broadcastModelStatus(await probeLmStudioStatus(config))
 }
 
 function createWindow(): void {
@@ -305,7 +342,15 @@ function createWindow(): void {
   // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.invalidate()
+    // 顺手把模型状态问一轮:状态栏一开屏就有真话可说,不用干等轮询
+    void refreshModelStatus().catch(() => {})
   })
+  // 外接 LM Studio 没法订阅它的内部状态:低频去问(10 秒一轮,本地请求很轻);
+  // 内置引擎靠播报员事件推,不占这个轮询
+  const modelStatusTimer = setInterval(() => {
+    void refreshModelStatus().catch(() => {})
+  }, 10_000)
+  mainWindow.on('closed', () => clearInterval(modelStatusTimer))
   // 4) 看门狗(唯一无条件的兜底):3 秒硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫。
   //    隐藏的透明窗此刻多半还没内容,用户看到「窗口浮现」的实际时刻仍是首帧画好之时
   setTimeout(() => showOnce('watchdog-3s'), 3000)
@@ -491,17 +536,43 @@ function registerIpc(): void {
       provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
-      webLookup: c.webLookup === true
+      webLookup: c.webLookup === true,
+      // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
+      contextSize: typeof c.contextSize === 'number' && c.contextSize >= 512 ? c.contextSize : undefined
     })
     // 垃圾不白占:切走了内置模式,或换了模型/引擎设置,旧子进程就地解散,
     // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账
     if (previous.provider === 'builtin' && saved.provider !== 'builtin' && isBuiltinRunning()) {
       stopBuiltinServer()
+      broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
     if (saved.provider === 'builtin' && builtinNeedsRestart(saved.builtin)) {
       stopBuiltinServer()
+      broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
+    // 换了 provider 或模型,状态栏立刻照新配置报话,不等下一轮轮询
+    void refreshModelStatus().catch(() => {})
     return saved
+  })
+
+  // ── 模型状态栏(第七十锤):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
+  ipcMain.handle('atlas:model-status-get', async (): Promise<ModelStatus> => {
+    const config = await loadAiConfig(app.getPath('userData'))
+    if (config.provider === 'builtin') {
+      // 引擎播报员有最新账就照账说;还没开播报过就拿配置兜底(上次用的模型 + 文件大小)
+      return lastBuiltinStatus() ?? builtinIdleStatus(config.builtin.modelPath)
+    }
+    return probeLmStudioStatus(config)
+  })
+  ipcMain.handle('atlas:model-eject', async (): Promise<{ ok: boolean; message?: string }> => {
+    const config = await loadAiConfig(app.getPath('userData'))
+    if (config.provider !== 'builtin') {
+      return { ok: false, message: '外接模型的装卸归 LM Studio 管,这边只看状态' }
+    }
+    const wasRunning = isBuiltinRunning()
+    stopBuiltinServer()
+    broadcastModelStatus(builtinIdleStatus(config.builtin.modelPath))
+    return { ok: true, message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑' }
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
@@ -943,6 +1014,9 @@ async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
 app.whenReady().then(() => {
   createWindow()
   registerIpc()
+
+  // 内置引擎的状态播报员上岗:引擎一动(热身/进度/就绪/出岔子/被卸下)就广播给状态栏
+  setBuiltinStatusAnnouncer(broadcastModelStatus)
 
   // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
   // 旧的崩溃转储过期的清掉。都是后台安静干,失败也不打扰启动

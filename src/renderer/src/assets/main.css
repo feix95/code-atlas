@@ -3708,3 +3708,180 @@ body.is-maximized .cfg-layer {
 :root[data-theme='dark'] .cfg-switch span {
   background: #e5eaed;
 }
+
+/* ── 第七十锤:模型状态栏 —— 钉在窗口最底下,随时看模型热身到哪了 ── */
+
+.model-dock {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  min-height: 1.875rem;
+  border-top: 1px solid var(--line-soft);
+  background: var(--canvas-tint);
+  padding: 0 var(--space-2);
+}
+
+.model-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.125rem var(--space-2) 0.1875rem;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 状态点:灰=还没叫醒,琥珀=热身中,绿=就绪,红=出岔子/没连上 */
+.model-dot {
+  flex: none;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+
+.model-status.is-loading .model-dot {
+  background: var(--amber);
+  animation: model-breathe 1.2s ease-in-out infinite;
+}
+
+.model-status.is-ready .model-dot {
+  background: var(--green);
+}
+
+.model-status.is-error .model-dot,
+.model-status.is-unreachable .model-dot {
+  background: var(--danger);
+}
+
+@keyframes model-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.model-provider {
+  flex: none;
+  padding: 0 0.375rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.model-state {
+  flex: none;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.model-status.is-error .model-state,
+.model-status.is-unreachable .model-state {
+  color: var(--danger);
+}
+
+/* 模型名:长名字掐头留尾,悬停看全名 */
+.model-name {
+  min-width: 0;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.model-size {
+  flex: none;
+  color: var(--muted-2);
+}
+
+/* 引导/出岔子的一句话:能省则省,悬停看全文 */
+.model-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.model-status.is-error .model-message {
+  color: var(--danger);
+}
+
+/* 取消/卸下:小号描边按钮,像底栏的一部分,不抢戏 */
+.model-act {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-xs);
+  padding: 0.0625rem 0.5rem;
+  cursor: pointer;
+}
+
+.model-act:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 热身进度条:贴着状态行底下走,像 LM Studio 那样一条细线;
+   服务没报进度时(is-unknown)就一小段来回扫,不给假数字 */
+.model-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 0.125rem;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+.model-bar.is-unknown {
+  width: 32%;
+  animation: model-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes model-sweep {
+  0% {
+    transform: translateX(-40%);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(280%);
+    opacity: 0.4;
+  }
+}
+
+/* 就绪后进度条退场:满宽一条绿,1.5 秒后隐掉,别一直压着底栏 */
+.model-status.is-ready .model-bar {
+  background: var(--green);
+  animation: model-bar-fade 1.5s ease forwards;
+}
+
+@keyframes model-bar-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-dot,
+  .model-bar.is-unknown {
+    animation: none;
+  }
+}

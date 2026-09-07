@@ -4,9 +4,9 @@
 // 生命周期:首次用到 AI 才启动(不拖慢 app 打包体积和启动速度);app 退出时杀掉。
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import type { AiBuiltinSettings } from '../shared/types.ts'
+import { existsSync, statSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 const BUILTIN_PORT = 8766
@@ -21,6 +21,88 @@ let child: ChildProcess | null = null
 let readyPromise: Promise<{ baseUrl: string; model: string }> | null = null
 /** 当前子进程是用哪组设置拉起的(serverPath|modelPath),换模型时判断要不要重启 */
 let startedKey = ''
+
+// ── 第七十锤:模型状态播报 ──
+// 引擎在干嘛(没叫醒/热身到百分之几/就绪/出岔子)由这里记账并喊给状态栏。
+// progress 只在 /health 真报了数时给值,拿不到就 null,绝不编百分比。
+
+/** 状态栏播报员:main 进程注册,状态一动就往窗口广播 */
+let statusAnnouncer: ((status: ModelStatus) => void) | null = null
+/** 最近一次播报(状态栏查询时的兜底) */
+let lastStatus: ModelStatus | null = null
+/** 主动叫停标记:取消/卸下触发的进程退出不当故障报,下次 startAndWaitReady 时复位 */
+let stopping = false
+
+/** 用户按了取消/卸下时,挂起的启动等待收到的一句话(不是故障,是「先不用了」) */
+const CANCEL_MESSAGE = '加载取消了:想用的时候再问一句,它会重新热身'
+
+export function setBuiltinStatusAnnouncer(announce: ((status: ModelStatus) => void) | null): void {
+  statusAnnouncer = announce
+}
+
+/** 最近一次内置模型状态(没播报过就是 null,由调用方拿配置兜底) */
+export function lastBuiltinStatus(): ModelStatus | null {
+  return lastStatus
+}
+
+function builtinStatus(
+  state: ModelStatus['state'],
+  modelName: string,
+  sizeBytes: number | null,
+  progress: number | null = null,
+  message?: string
+): ModelStatus {
+  return { provider: 'builtin', state, modelName, sizeBytes, progress, ...(message ? { message } : {}) }
+}
+
+function announceBuiltin(status: ModelStatus): void {
+  lastStatus = status
+  try {
+    statusAnnouncer?.(status)
+  } catch {
+    // 播报员打喷嚏不影响引擎干活
+  }
+}
+
+function announceBuiltinError(modelPath: string, err: unknown): void {
+  const facts = builtinIdleFacts(modelPath)
+  announceBuiltin(builtinStatus('error', facts.modelName, facts.sizeBytes, null, err instanceof Error ? err.message : String(err)))
+}
+
+/** 没开引擎时的展示信息:上次用的模型名 + 文件多大;文件失踪就老实说,不报假数 */
+export function builtinIdleFacts(modelPath: string): { modelName: string; sizeBytes: number | null; message?: string } {
+  const p = modelPath.trim()
+  if (!p) return { modelName: '', sizeBytes: null, message: '还没选模型:去「AI 设置」挑一个 GGUF 模型文件' }
+  try {
+    return { modelName: basename(p), sizeBytes: statSync(p).size }
+  } catch {
+    return { modelName: basename(p), sizeBytes: null, message: '模型文件找不到了(可能被挪走或删了):去「AI 设置」重新选一下' }
+  }
+}
+
+/** 内置模型的「还没叫醒」状态(状态栏查询与配置保存后复位用) */
+export function builtinIdleStatus(modelPath: string): ModelStatus {
+  const facts = builtinIdleFacts(modelPath)
+  return builtinStatus('idle', facts.modelName, facts.sizeBytes, null, facts.message)
+}
+
+/**
+ * 从 /health 的 503 响应体里抠加载进度。llama.cpp 新版给
+ * {"error":{"message":"Loading model","progress":0.42}},老版啥都不给。
+ * 0~1 当比例 ×100,1~100 当百分数,出了范围或不是数 = 拿不到(纯函数,自测覆盖)。
+ */
+export function parseLoadProgress(body: unknown): number | null {
+  const raw =
+    typeof body === 'number'
+      ? body
+      : body !== null && typeof body === 'object'
+        ? ((body as { progress?: unknown }).progress ?? (body as { error?: { progress?: unknown } }).error?.progress)
+        : undefined
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null
+  if (raw <= 1) return raw * 100
+  if (raw <= 100) return raw
+  return null
+}
 
 export function isBuiltinRunning(): boolean {
   return child !== null && child.exitCode === null
@@ -165,31 +247,48 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
 /**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
  * 已在跑就直接复用;没跑就收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
+ * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填保守 4096。
  * 引擎优先用 app 自带的,用户只管选模型文件。
- * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面。
+ * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面;状态栏同步收到播报。
  */
-export async function ensureBuiltinServer(settings: AiBuiltinSettings): Promise<{ baseUrl: string; model: string }> {
+export async function ensureBuiltinServer(
+  settings: AiBuiltinSettings,
+  contextSize = 4096
+): Promise<{ baseUrl: string; model: string }> {
   if (isBuiltinRunning() && readyPromise) return readyPromise
 
-  const serverPath = resolveServerProgram(settings.serverPath)
+  let serverPath: string
+  try {
+    serverPath = resolveServerProgram(settings.serverPath)
+  } catch (err) {
+    announceBuiltinError(settings.modelPath, err)
+    throw err
+  }
   const modelPath = settings.modelPath.trim()
   if (!modelPath) {
-    throw new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
+    const err = new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
+    announceBuiltinError(modelPath, err)
+    throw err
   }
 
   // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
   const reap = await reapOrphanServer()
   if (reap.blockedBy) {
-    throw new Error(`内置模型的端口 ${BUILTIN_PORT} 被别的程序占着(${reap.blockedBy}),先关掉那个程序再试`)
+    const err = new Error(`内置模型的端口 ${BUILTIN_PORT} 被别的程序占着(${reap.blockedBy}),先关掉那个程序再试`)
+    announceBuiltinError(modelPath, err)
+    throw err
   }
 
   const baseUrl = `http://127.0.0.1:${BUILTIN_PORT}/v1`
-  readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl)
+  readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize)
   try {
     const target = await readyPromise
     return target
   } catch (err) {
-    // 启动失败:清干净现场,下次再试能重新拉起
+    // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
+    const facts = builtinIdleFacts(modelPath)
+    if (stopping) announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
+    else announceBuiltinError(modelPath, err)
     stopBuiltinServer()
     throw err
   }
@@ -207,19 +306,45 @@ async function fetchModelId(baseUrl: string): Promise<string> {
   return model
 }
 
-async function startAndWaitReady(serverPath: string, modelPath: string, baseUrl: string): Promise<{ baseUrl: string; model: string }> {
+async function startAndWaitReady(
+  serverPath: string,
+  modelPath: string,
+  baseUrl: string,
+  contextSize = 4096
+): Promise<{ baseUrl: string; model: string }> {
   startedKey = settingsKey({ serverPath, modelPath })
-  child = spawn(serverPath, ['-m', modelPath, '--port', String(BUILTIN_PORT), '--host', '127.0.0.1', '-c', '4096', '-ngl', '999'], {
-    windowsHide: true,
-    stdio: 'ignore'
-  })
+  stopping = false // 新的一轮启动:上次「主动叫停」的标记就地清账
+  const facts = builtinIdleFacts(modelPath)
+  child = spawn(
+    serverPath,
+    [
+      '-m',
+      modelPath,
+      '--port',
+      String(BUILTIN_PORT),
+      '--host',
+      '127.0.0.1',
+      '-c',
+      String(Math.max(512, Math.floor(contextSize))),
+      '-ngl',
+      '999'
+    ],
+    {
+      windowsHide: true,
+      stdio: 'ignore'
+    }
+  )
+  announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, null, '正在热身……'))
 
-  // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误
+  // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误;
+  // 是用户自己按的取消/卸下就说「取消了」,别吓人
   const exitError = new Promise<never>((_, reject) => {
     child?.once('exit', (code) => {
       reject(
         new Error(
-          `内置模型程序启动失败就退出了(退出码 ${code ?? '未知'}):常见原因是程序路径没指对、模型文件损坏,或端口被占用`
+          stopping
+            ? CANCEL_MESSAGE
+            : `内置模型程序启动失败就退出了(退出码 ${code ?? '未知'}):常见原因是程序路径没指对、模型文件损坏,或端口被占用`
         )
       )
     })
@@ -244,7 +369,17 @@ async function startAndWaitReady(serverPath: string, modelPath: string, baseUrl:
           healthy = true
           break // 200 = 模型加载完毕
         }
-        // 503 = 还在加载,继续等
+        if (res.status === 503) {
+          // 还在加载:服务报了进度就给状态栏一个准数,没报就让界面转圈
+          const body = await res.text().catch(() => '')
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(body)
+          } catch {
+            parsed = null
+          }
+          announceBuiltin(builtinStatus('loading', facts.modelName, facts.sizeBytes, parseLoadProgress(parsed)))
+        }
       } catch {
         // 还没开始监听端口,继续等
       }
@@ -264,6 +399,17 @@ async function startAndWaitReady(serverPath: string, modelPath: string, baseUrl:
         ? err
         : new Error('内置模型刚就绪就没了响应,再点一次试试')
     }
+    announceBuiltin(builtinStatus('ready', model, facts.sizeBytes, 100))
+
+    // 就绪之后再夭折(跑着跑着崩了):状态栏如实报故障,下次提问会自动重新拉起;
+    // 用户主动卸下的不算,走 stopping 标记闭嘴
+    child?.once('exit', (code) => {
+      if (!stopping) {
+        announceBuiltin(
+          builtinStatus('error', model, facts.sizeBytes, null, `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`)
+        )
+      }
+    })
     return { baseUrl, model }
   })()
 
@@ -271,9 +417,10 @@ async function startAndWaitReady(serverPath: string, modelPath: string, baseUrl:
   return Promise.race([ready, exitError])
 }
 
-/** 杀掉内置模型子进程。幂等:没在跑就直接返回。app 退出时调用。 */
+/** 杀掉内置模型子进程。幂等:没在跑就直接返回。取消/卸下/app 退出都走这里。 */
 export function stopBuiltinServer(): void {
   if (child && child.exitCode === null) {
+    stopping = true // 主动叫停:exit 监听别把「先不用了」报成故障
     child.kill()
   }
   child = null

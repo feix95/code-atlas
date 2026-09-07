@@ -25,6 +25,7 @@ import {
   estimateTokens,
   parseLmStudioContext,
   parseLlamaProps,
+  parseLmStudioModelState,
   isContextOverflow,
   budgetsForContext,
   DEFAULT_CONTEXT_SIZE,
@@ -42,7 +43,7 @@ import {
   isBinaryFile
 } from '../src/ai/index.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { parseListenerPids, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
+import { parseListenerPids, parseLoadProgress, parseTasklistImage, resolveServerProgram } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -417,6 +418,20 @@ async function main(): Promise<void> {
     assert.equal(loaded.webLookup, true, '重新读回联网查证开关')
     assert.equal(defaultAiConfig().webLookup, false, '联网查证默认必须是关')
 
+    // 手动上下文(第七十锤补的存取):填了要能存能读,清空 = 回自动探测
+    const withCtx = await saveAiConfig(dir, {
+      provider: 'lmstudio',
+      lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: 'm', apiKey: '' },
+      builtin: { serverPath: '', modelPath: '' },
+      webLookup: false,
+      contextSize: 8192
+    })
+    assert.equal(withCtx.contextSize, 8192, '手动上下文应保存')
+    assert.equal((await loadAiConfig(dir)).contextSize, 8192, '手动上下文应读回')
+    const noCtx = await saveAiConfig(dir, { ...withCtx, contextSize: undefined })
+    assert.equal(noCtx.contextSize, undefined, '清空上下文 = 回到自动探测')
+    assert.equal((await loadAiConfig(dir)).contextSize, undefined, '没填就别留旧账')
+
     // 老版本配置是扁平的 {baseUrl, model, apiKey}:load 时要自动搬进 lmstudio 分支
     await writeFile(
       aiConfigPath(dir),
@@ -724,8 +739,26 @@ async function main(): Promise<void> {
   const budgetsJunk = budgetsForContext(100)
   assert.equal(budgetsJunk.mapTokens, Math.floor(DEFAULT_CONTEXT_SIZE * 0.55), '离谱输入退回保守默认')
 
+  // ── 11. 模型状态栏(第七十锤):进度解析不打诳语 + LM Studio 状态映射 ──
+  assert.equal(parseLoadProgress({ progress: 0.3525 }), 35.25, 'llama.cpp 新版:0~1 按比例 ×100')
+  assert.equal(parseLoadProgress({ error: { message: 'Loading model', progress: 0.42 } }), 42, '进度藏在 error 里也认')
+  assert.equal(parseLoadProgress({ progress: 87 }), 87, '1~100 直接当百分数')
+  assert.equal(parseLoadProgress({ progress: 1 }), 100, '1 当 100% 收尾')
+  assert.equal(parseLoadProgress({ progress: 0 }), 0, '0 就是刚开锅')
+  assert.equal(parseLoadProgress({ progress: 150 }), null, '出了范围宁可不给数')
+  assert.equal(parseLoadProgress({ progress: 'x' }), null, '不是数不给数')
+  assert.equal(parseLoadProgress({}), null, '老版引擎啥都不报 = null,界面转圈')
+  assert.equal(parseLoadProgress('loading'), null, '字符串垃圾回 null')
+
+  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, 'q'), { state: 'ready', progress: 100 }, 'loaded = 就绪')
+  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loading', progress: 0.25 }] }, 'q'), { state: 'loading', progress: 25 }, 'loading 带进度就给准数')
+  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loading' }] }, 'q'), { state: 'loading', progress: null }, 'LM Studio 没报进度就 null')
+  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'not-loaded' }] }, 'q'), { state: 'idle', progress: null }, 'not-loaded = 还没叫醒')
+  assert.equal(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, '别的模型').state, 'idle', '查无此模型 = 还没叫醒')
+  assert.equal(parseLmStudioModelState(null, 'q').state, 'idle', '垃圾回复别炸')
+
   console.log('✅ AI 人话解释自测全部通过')
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射)')
 }
 
 main().catch((err) => {

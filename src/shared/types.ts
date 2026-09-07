@@ -222,6 +222,24 @@ export interface ChatTarget {
   apiKey?: string
 }
 
+/**
+ * 模型状态栏的心跳(第七十锤):主进程随状态变化广播 'atlas:model-status',
+ * 渲染层常驻底栏展示。progress 只在服务真报了数时给值,拿不到就是 null —— 绝不编进度。
+ */
+export interface ModelStatus {
+  provider: 'builtin' | 'lmstudio'
+  /** idle=还没叫醒(懒加载,没提问不启动) loading=热身中 ready=就绪 error=出岔子 unreachable=外接服务没连上 */
+  state: 'idle' | 'loading' | 'ready' | 'error' | 'unreachable'
+  /** 模型名:内置 = 文件名/引擎报的 id;外接 = 配置里填的模型名 */
+  modelName: string
+  /** 模型文件多大(字节);外接的文件归 LM Studio 管,拿不到就是 null */
+  sizeBytes: number | null
+  /** 加载进度 0-100;服务没报就是 null(界面转圈不给数) */
+  progress: number | null
+  /** 出岔子或需要引导时的一句话(给人看的) */
+  message?: string
+}
+
 /** 流式输出的增量推送(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiDeltaPayload {
   id: string

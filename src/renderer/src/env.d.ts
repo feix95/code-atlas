@@ -12,6 +12,7 @@ import type {
   FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ModelStatus,
   ScanDirNode,
   ScanResult
 } from '../../../shared/types.ts'
@@ -65,6 +66,11 @@ declare global {
       aiCancel: (requestId: string) => Promise<void>
       webLookup: (query: string) => Promise<string>
       onAiDelta: (callback: (payload: AiDeltaPayload) => void) => () => void
+      /** 模型状态栏(第七十锤):查一次现状;取消热身/卸下模型(仅内置模型有效) */
+      modelStatusGet: () => Promise<ModelStatus>
+      modelEject: () => Promise<{ ok: boolean; message?: string }>
+      /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数 */
+      onModelStatus: (callback: (status: ModelStatus) => void) => () => void
     }
   }
 }

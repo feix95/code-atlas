@@ -11,6 +11,7 @@ import type {
   FeatureLocateResult,
   FileStructure,
   GitChangesResult,
+  ModelStatus,
   ScanDirNode,
   ScanResult
 } from '../shared/types.ts'
@@ -125,5 +126,14 @@ contextBridge.exposeInMainWorld('atlas', {
     const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void => callback(payload)
     ipcRenderer.on('atlas:ai-delta', listener)
     return () => ipcRenderer.removeListener('atlas:ai-delta', listener)
+  },
+  // ── 模型状态栏(第七十锤):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
+  modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke('atlas:model-status-get'),
+  modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('atlas:model-eject'),
+  /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
+  onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void => callback(status)
+    ipcRenderer.on('atlas:model-status', listener)
+    return () => ipcRenderer.removeListener('atlas:model-status', listener)
   }
 })

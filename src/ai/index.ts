@@ -16,6 +16,7 @@ import type {
   ScanTreeNode,
   WebLookupMeta
 } from '../shared/types.ts'
+import { parseLoadProgress } from './builtin.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -536,6 +537,31 @@ export function parseLlamaProps(raw: string): number | null {
   } catch {
     return null
   }
+}
+
+/**
+ * LM Studio /api/v0/models 的模型条目 → 状态栏要的加载状态(纯函数,自测覆盖)。
+ * state:loaded→就绪、loading→热身、not-loaded/查无此模型→还没叫醒;
+ * 进度复用 parseLoadProgress 的换算规矩,它没报就 null,绝不编数。
+ */
+export function parseLmStudioModelState(
+  raw: unknown,
+  model: string
+): { state: 'idle' | 'loading' | 'ready'; progress: number | null } {
+  type LmModelEntry = { id?: unknown; state?: unknown; progress?: unknown }
+  const list: unknown[] =
+    raw !== null && typeof raw === 'object' && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : Array.isArray(raw)
+        ? raw
+        : []
+  const hit = list.find(
+    (m): m is LmModelEntry => m !== null && typeof m === 'object' && (m as LmModelEntry).id === model
+  )
+  const state = hit?.state
+  if (state === 'loaded') return { state: 'ready', progress: 100 }
+  if (state === 'loading') return { state: 'loading', progress: parseLoadProgress(hit) }
+  return { state: 'idle', progress: null }
 }
 
 /** 探测结果的小缓存:同地址同模型 5 分钟内不重复问,本地请求虽快也没必要每次都发 */

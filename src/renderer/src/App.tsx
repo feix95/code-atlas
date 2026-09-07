@@ -8,6 +8,7 @@ import { FileTree } from './components/FileTree'
 import { FolderOverview } from './components/FolderOverview'
 import { FreeChatPanel } from './components/FreeChatPanel'
 import { GitFileStatus } from './components/GitFileStatus'
+import { ModelStatusBar } from './components/ModelStatusBar'
 import { ProjectOverview } from './components/ProjectOverview'
 import { SettingsDialog } from './components/SettingsDialog'
 import { StructureGrid } from './components/StructureGrid'
@@ -624,6 +625,9 @@ function App(): React.JSX.Element {
           )}
         </main>
       )}
+
+      {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见 */}
+      <ModelStatusBar />
 
       {showSettings && (
         <SettingsDialog

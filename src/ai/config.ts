@@ -50,7 +50,9 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
         modelPath: typeof bi.modelPath === 'string' ? bi.modelPath : ''
       },
       // 老配置没这个字段 = 默认关,行为与从前完全一致
-      webLookup: parsed.webLookup === true
+      webLookup: parsed.webLookup === true,
+      // 手动上下文(留空 = 自动探测);上一版存取两边都把它弄丢了,这里补上回读
+      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= 512 ? parsed.contextSize : undefined
     }
   } catch {
     return fallback
@@ -69,7 +71,9 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
       serverPath: config.builtin.serverPath.trim(),
       modelPath: config.builtin.modelPath.trim()
     },
-    webLookup: config.webLookup === true
+    webLookup: config.webLookup === true,
+    // JSON.stringify 会直接丢掉 undefined:没填上下文时落盘就是没有这个字段,读取走自动探测
+    contextSize: typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : undefined
   }
   await fs.writeFile(aiConfigPath(userDataDir), JSON.stringify(normalized, null, 2), 'utf8')
   return normalized
