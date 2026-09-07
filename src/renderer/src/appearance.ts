@@ -131,14 +131,20 @@ export function applyAppearance(a: Appearance): void {
   const sat = clamp(s, 30, 85)
   const sat2 = clamp(s2, 25, 80)
 
+  // 第七十六锤(小葵拍板):①遮罩摘除 —— --accent-soft / --selected-bg 回归中性面板,
+  // 主题色不再整面染色,只上动作件和细边/细条(树选中行本就有左侧主题色条撑着);
+  // ②明度还给用户 —— 像饱和度一样限安全带,带内听你的,出带才夹
+  // (带子就是按钮上固定字色的可读边界:暗色按钮压深字、亮色按钮压白字);
+  // ③画布底的雾保留,照旧跟主题色染 —— 底色氛围不掐。
+
   // 明度做安全限位:再深的主题色也不至于在暗背景上看不见,再亮的也不至于糊成一片
   if (dark) {
-    const dl = clamp(l, 62, 80)
+    const dl = clamp(l, 55, 85)
     root.setProperty('--accent', hslCss(h, sat, dl))
-    root.setProperty('--accent-hover', hslCss(h, sat, Math.min(dl + 12, 88)))
-    root.setProperty('--accent-soft', hslCss(h, 35, 24))
+    root.setProperty('--accent-hover', hslCss(h, sat, Math.min(dl + 8, 88)))
+    root.setProperty('--accent-soft', '#2b333a')
     root.setProperty('--accent-line', hslCss(h, 30, 40))
-    root.setProperty('--selected-bg', hslCss(h, 40, 24))
+    root.setProperty('--selected-bg', '#2e3841')
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 50, 78)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
     // 边框分隔线跟辅助色:饱和度压到灰蒙蒙的量级、亮度限位,压成带一丝色相的灰
@@ -146,11 +152,12 @@ export function applyAppearance(a: Appearance): void {
     // 画布底色跟主题色:很淡的一层色调垫在最外层/卡片缝隙底下,内容卡片保持干净中性色
     root.setProperty('--canvas-tint', hslCss(h, clamp(s, 8, 16), 12))
   } else {
-    root.setProperty('--accent', hslCss(h, sat, clamp(l, 28, 58)))
-    root.setProperty('--accent-hover', hslCss(h, sat, clamp(l, 28, 58) - 8))
-    root.setProperty('--accent-soft', hslCss(h, sat, 94))
+    const dl = clamp(l, 25, 62)
+    root.setProperty('--accent', hslCss(h, sat, dl))
+    root.setProperty('--accent-hover', hslCss(h, sat, dl - 8))
+    root.setProperty('--accent-soft', '#eef0f2')
     root.setProperty('--accent-line', hslCss(h, sat, 80))
-    root.setProperty('--selected-bg', hslCss(h, sat, 91))
+    root.setProperty('--selected-bg', '#dfe4e8')
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
     root.setProperty('--line', hslCss(h2, clamp(s2, 8, 20), 85))

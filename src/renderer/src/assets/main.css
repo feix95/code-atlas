@@ -42,7 +42,7 @@
   --muted-2: #a1a6aa;
   --accent: #147dcc;
   --accent-hover: #0f6db3;
-  --accent-soft: #e3f1fc;
+  --accent-soft: #eef0f2;
   --accent-line: #bfdef1;
   --green: #38a169;
   --green-soft: #effaf3;
@@ -56,7 +56,7 @@
   --git-add: #1a7f37;
   --git-rename: #9a6700;
   --hover: #e9edf0;
-  --selected-bg: #dcecf8;
+  --selected-bg: #dfe4e8;
   --shadow-pop: 0 0.5rem 1.5rem rgba(12, 44, 67, 0.16);
 }
 
@@ -77,7 +77,7 @@
   --muted-2: #778289;
   --accent: #5fb0e6;
   --accent-hover: #82c4ef;
-  --accent-soft: #203e54;
+  --accent-soft: #2b333a;
   --accent-line: #2e607d;
   --green: #55c07e;
   --green-soft: #1e3527;
@@ -91,7 +91,7 @@
   --git-add: #3fb950;
   --git-rename: #d29922;
   --hover: #293238;
-  --selected-bg: #213e52;
+  --selected-bg: #2e3841;
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
 }
 
@@ -659,7 +659,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:蓝底 + 左侧强调线 */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧主题色细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
 .tree-row.is-selected {
   background: var(--selected-bg);
   box-shadow: inset 2px 0 0 var(--accent);
