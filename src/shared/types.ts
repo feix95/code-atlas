@@ -5,6 +5,8 @@ export interface NodeSummary {
   emoji: string
   /** 一句话说清这是干嘛的;界面原样展示 */
   text: string
+  /** 风险提示句(如「不要手动改」):同话重播时不参与降噪,全文常亮 —— 重复是故意的,要形成"别动它"的条件反射 */
+  sticky?: boolean
 }
 
 export interface ScanFileNode {
