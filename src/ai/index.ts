@@ -2,7 +2,7 @@
 // 路径契约:只认 relPath,读文件是主进程的事;这里只负责"拼提示词 + 调接口"。
 // 底层不绑定任何推理服务 —— LM Studio、llama-server 都说 OpenAI 兼容的方言,
 // 这里只认 ChatTarget(baseURL + 模型名),换后端不改一行业务代码。
-import type {
+import type { AiStreamStats,
   AiExplainResult,
   AiHistoryMessage,
   ChatContextAttachment,
@@ -817,21 +817,56 @@ export function buildDiffPrompt(change: { relPath: string; kind: 'added' | 'modi
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>
+  usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
 interface ChatStreamChunk {
   choices?: Array<{ delta?: { content?: string } }>
+  /** llama-server timings_per_token(第八十四锤):已读提示词/已吐 token/吐字速度 */
+  timings?: { prompt_n?: number; predicted_n?: number; predicted_per_second?: number }
+  /** OpenAI 习惯的收尾账(llama-server / LM Studio 都可能给) */
+  usage?: { prompt_tokens?: number; completion_tokens?: number }
+}
+
+/** 从一帧流里抠出 token 账(纯函数,自测覆盖);啥都没有回 null,绝不编数 */
+export function extractStreamStats(chunk: ChatStreamChunk, phase: 'reading' | 'writing'): AiStreamStats | null {
+  const t = typeof chunk.timings === 'object' && chunk.timings !== null ? chunk.timings : null
+  const u = typeof chunk.usage === 'object' && chunk.usage !== null ? chunk.usage : null
+  const promptTokens = typeof t?.prompt_n === 'number' && Number.isFinite(t.prompt_n) ? t.prompt_n : undefined
+  const tps =
+    typeof t?.predicted_per_second === 'number' && Number.isFinite(t.predicted_per_second)
+      ? t.predicted_per_second
+      : undefined
+  const outputFromTimings = typeof t?.predicted_n === 'number' && Number.isFinite(t.predicted_n) ? t.predicted_n : undefined
+  const outputFromUsage = typeof u?.completion_tokens === 'number' && Number.isFinite(u.completion_tokens) ? u.completion_tokens : undefined
+  const promptFromUsage = typeof u?.prompt_tokens === 'number' && Number.isFinite(u.prompt_tokens) ? u.prompt_tokens : undefined
+  const stats: AiStreamStats = {
+    phase,
+    promptTokens: promptTokens ?? promptFromUsage,
+    outputTokens: outputFromTimings ?? outputFromUsage,
+    tokensPerSecond: tps
+  }
+  const hasAnything = stats.promptTokens !== undefined || stats.outputTokens !== undefined || stats.tokensPerSecond !== undefined
+  return hasAnything ? stats : null
+}
+
+/** SSE 流里的一次事件:一段正文和/或一份 token 账 */
+interface SseEvent {
+  text?: string
+  stats?: AiStreamStats
 }
 
 /**
- * 解析 OpenAI 流式(SSE)响应体,逐段吐出新增文本。
+ * 解析 OpenAI 流式(SSE)响应体,逐帧吐出「新增文本 + token 账」。
  * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
+ * timings/usage 帧照常转发(llama-server 吐字帧里捎 timings,收尾捎 usage)。
  */
-async function* sseContentDeltas(res: Response): AsyncGenerator<string> {
+async function* sseEvents(res: Response): AsyncGenerator<SseEvent> {
   const reader = res.body?.getReader()
   if (!reader) return
   const decoder = new TextDecoder()
   let buffer = ''
+  let writing = false
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -846,7 +881,9 @@ async function* sseContentDeltas(res: Response): AsyncGenerator<string> {
       try {
         const chunk = JSON.parse(payload) as ChatStreamChunk
         const piece = chunk.choices?.[0]?.delta?.content
-        if (piece) yield piece
+        if (piece) writing = true
+        const stats = extractStreamStats(chunk, writing ? 'writing' : 'reading')
+        if (piece || stats) yield piece ? { text: piece, stats: stats ?? undefined } : { stats: stats! }
       } catch {
         // 残帧或心跳,跳过
       }
@@ -873,7 +910,7 @@ const STREAM_IDLE_MS = 30_000
 export async function explainWithMessages(
   config: ChatTarget,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  onDelta?: (text: string) => void,
+  onDelta?: (text: string, stats?: AiStreamStats) => void,
   signal?: AbortSignal,
   maxTokens = 500
 ): Promise<AiExplainResult> {
@@ -903,7 +940,10 @@ export async function explainWithMessages(
         messages,
         temperature: 0.2,
         max_tokens: maxTokens,
-        stream: Boolean(onDelta)
+        stream: Boolean(onDelta),
+        // 内置引擎(llama-server)才塞的旗子(第八十四锤):流里报 token 账,预处理进度看得见。
+        // 外接服务不认识这些字段,不塞,行为一分不变
+        ...(config.timings ? { timings_per_token: true, stream_options: { include_usage: true } } : {})
       }),
       signal: controller.signal
     })
@@ -922,23 +962,57 @@ export async function explainWithMessages(
       armWatchdog(BODY_TIMEOUT_MS)
       const data = (await res.json()) as ChatCompletionResponse
       const content = data.choices?.[0]?.message?.content?.trim()
+      const usage =
+        typeof data.usage === 'object' && data.usage !== null
+          ? {
+              promptTokens: data.usage.prompt_tokens,
+              outputTokens: data.usage.completion_tokens
+            }
+          : undefined
       if (!content) {
-        return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt }
+        return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt, usage }
       }
-      return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt }
+      return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt, usage }
     }
 
-    // 流式:逐段喂给 onDelta,全文攒到最后一起返回
+    // 流式:逐帧喂给 onDelta(文本 + token 账),全文攒到最后一起返回
+    let lastStats: AiStreamStats | undefined
     armWatchdog(STREAM_IDLE_MS)
-    for await (const piece of sseContentDeltas(res)) {
-      full += piece
-      armWatchdog(STREAM_IDLE_MS) // 还有增量,继续续命
-      onDelta(piece)
+    for await (const ev of sseEvents(res)) {
+      if (ev.text) {
+        full += ev.text
+        armWatchdog(STREAM_IDLE_MS) // 还有增量,继续续命
+      }
+      // 收尾帧(usage)只带 token 数不带速度:按字段合并,别把上一帧的吐字速度冲掉
+      if (ev.stats) {
+        lastStats = lastStats
+          ? {
+              phase: ev.stats.phase,
+              promptTokens: ev.stats.promptTokens ?? lastStats.promptTokens,
+              outputTokens: ev.stats.outputTokens ?? lastStats.outputTokens,
+              tokensPerSecond: ev.stats.tokensPerSecond ?? lastStats.tokensPerSecond
+            }
+          : ev.stats
+      }
+      onDelta(ev.text ?? '', lastStats)
     }
+    const usage = lastStats
+      ? {
+          promptTokens: lastStats.promptTokens,
+          outputTokens: lastStats.outputTokens,
+          tokensPerSecond: lastStats.tokensPerSecond
+        }
+      : undefined
     if (!full.trim()) {
-      return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt }
+      return {
+        status: 'error',
+        text: '模型没有返回内容,可能没加载成功',
+        model: config.model,
+        durationMs: Date.now() - startedAt,
+        usage
+      }
     }
-    return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt }
+    return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt, usage }
   } catch (err) {
     const isAbort = err instanceof Error && err.name === 'AbortError'
     // 卡住前已经吐了一部分:把到手的先给用户,别一把全扔
@@ -964,7 +1038,7 @@ export async function explainWithModel(
   config: ChatTarget,
   prompt: string,
   system: string = SYSTEM_PROMPT,
-  onDelta?: (text: string) => void,
+  onDelta?: (text: string, stats?: AiStreamStats) => void,
   signal?: AbortSignal,
   maxTokens = 500
 ): Promise<AiExplainResult> {

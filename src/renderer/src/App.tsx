@@ -14,6 +14,7 @@ import { SettingsDialog } from './components/SettingsDialog'
 import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
+import { pushNavLocation, stepNavIndex, type NavLocation } from './navHistory'
 import {
   formatRecentTime,
   forgetRecentProject,
@@ -175,6 +176,17 @@ function App(): React.JSX.Element {
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const [treeNote, setTreeNote] = useState<string | null>(null)
+  // 后退/前进(第八十三锤):浏览过的位置(首页/项目/选中的文件文件夹)串成一条线,按钮挪游标
+  const [nav, setNav] = useState<{ stack: NavLocation[]; index: number }>(() => ({
+    stack: [{ folder: null, file: null, dir: null }],
+    index: 0
+  }))
+  // 后退/前进跳转途中记录器闭嘴:恢复旧位置引发的一串选中不许再记新账
+  const navTravelingRef = useRef(false)
+  const folderRef = useRef(folder)
+  useEffect(() => {
+    folderRef.current = folder
+  }, [folder])
 
   // 窗口壳:最大化时圆角描边要收掉;状态挂 body 上,抽屉(传送门挂在 body)跟着一起换装
   const maximized = useWindowMaximized()
@@ -281,8 +293,9 @@ function App(): React.JSX.Element {
     scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
   }
 
-  // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条
-  async function scanPath(dir: string): Promise<void> {
+  // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条。
+  // 扫成的图递还给调用方(后退/前进恢复选中要在新树上找人);扫砸了回 null
+  async function scanPath(dir: string): Promise<ScanResult | null> {
     setFolder(dir)
     setPathDraft(dir)
     setPathHint(null)
@@ -305,6 +318,8 @@ function App(): React.JSX.Element {
       setResult(scanned)
       // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
       setRecents(rememberRecentProject(dir))
+      // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
+      if (dir !== folder) pushNav({ folder: dir, file: null, dir: null })
       flashToast(`地图画好了:${scanned.stats.fileCount} 个文件`)
       // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
       setGitLoading(true)
@@ -315,8 +330,10 @@ function App(): React.JSX.Element {
       } finally {
         setGitLoading(false)
       }
+      return scanned
     } catch (err) {
       setError(cleanErrMsg(err))
+      return null
     } finally {
       setScanning(false)
     }
@@ -362,6 +379,7 @@ function App(): React.JSX.Element {
    */
   async function handleSelectFile(relPath: string, file: ScanFileNode, opts?: { keepTab?: boolean }): Promise<void> {
     const seq = ++analyzeSeq.current
+    pushNav({ folder, file: relPath, dir: null })
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
@@ -421,6 +439,7 @@ function App(): React.JSX.Element {
 
   // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发
   function handleSelectFolder(node: ScanDirNode): void {
+    pushNav({ folder, file: null, dir: node.relPath })
     setSelectedFolder(node)
     setSelectedFile(null)
     setStructure(null)
@@ -440,6 +459,7 @@ function App(): React.JSX.Element {
   // 上次开的路径留在输入框里,想回这个项目点「前往」就行。没开项目时按钮自己变灰
   function goHome(): void {
     if (!folder) return
+    pushNav({ folder: null, file: null, dir: null })
     clearSelection()
     setFolder(null)
     setResult(null)
@@ -450,6 +470,53 @@ function App(): React.JSX.Element {
     setTreeNote(null)
     setGitInfo(null)
     setPathHint(null)
+  }
+
+  // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
+  function pushNav(loc: NavLocation): void {
+    if (navTravelingRef.current) return
+    setNav((prev) => pushNavLocation(prev.stack, prev.index, loc))
+  }
+
+  // 后退/前进本体:游标挪一步,再按那站的样子把界面摆回去 —— 换项目就重扫,还在本项目就恢复选中
+  async function goNav(delta: number): Promise<void> {
+    if (navTravelingRef.current || scanning) return
+    const target = stepNavIndex(nav.index, delta, nav.stack.length)
+    if (target === nav.index) return
+    navTravelingRef.current = true
+    try {
+      const loc = nav.stack[target]
+      if (!loc.folder) {
+        goHome()
+      } else if (loc.folder !== folder) {
+        applyNavSelection(await scanPath(loc.folder), loc)
+      } else {
+        applyNavSelection(result, loc)
+      }
+      setNav((prev) => ({ ...prev, index: target }))
+    } finally {
+      navTravelingRef.current = false
+    }
+  }
+
+  // 把某一站的样子摆回界面:文件还在树上就选中,节点没了(重扫过)就老实清空选中
+  function applyNavSelection(scanned: ScanResult | null, loc: NavLocation): void {
+    if (!scanned) return
+    if (loc.file) {
+      const f = findFile(scanned.tree, loc.file)
+      if (f) {
+        void handleSelectFile(f.relPath, f)
+        return
+      }
+    }
+    if (loc.dir) {
+      const d = findDir(scanned.tree, loc.dir)
+      if (d) {
+        handleSelectFolder(d)
+        return
+      }
+    }
+    clearSelection()
   }
 
   // 最近列表点 ✕:只删记录,不碰文件夹本身(第八十一锤)
@@ -512,6 +579,27 @@ function App(): React.JSX.Element {
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
           {scanning ? '正在画地图……' : '打开项目'}
+        </button>
+        {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰 */}
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => void goNav(-1)}
+          disabled={scanning || nav.index <= 0}
+          title="后退"
+          aria-label="后退"
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => void goNav(1)}
+          disabled={scanning || nav.index >= nav.stack.length - 1}
+          title="前进"
+          aria-label="前进"
+        >
+          →
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} disabled={scanning}>
           {scanning ? '扫描中……' : '刷新'}
@@ -688,11 +776,8 @@ function App(): React.JSX.Element {
                       <button key={d.letter} type="button" className="drive-card" onClick={() => void scanPath(d.root)}>
                         <strong className="drive-letter">{d.letter}:</strong>
                         <span className="drive-info">
-                          <strong>{d.label || driveKindName(d)}</strong>
-                          <small>
-                            {d.label ? `${driveKindName(d)} · ` : ''}
-                            {driveCapacity(d)}
-                          </small>
+                          <strong>{driveKindName(d)}</strong>
+                          <small>{driveCapacity(d)}</small>
                           {used !== null && (
                             <i className={`drive-bar${d.free !== undefined && d.free / d.total! < 0.1 ? ' is-low' : ''}`}>
                               <i style={{ width: `${used}%` }} />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiChatRequest, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { AiStreamStats, AiUsage, AiChatRequest, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { friendlyErr } from './errText'
 
 /**
@@ -17,6 +17,10 @@ export interface ChatMessage {
   text: string
   state: ChatMsgState
   /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
+  /** 本次问答收尾的 token 账(第八十四锤):引擎肯报才有 */
+  /** 流式过程中的实时账(第八十四锤) */
+  stats?: AiStreamStats
+  usage?: AiUsage
   web: WebLookupMeta | null
 }
 
@@ -55,7 +59,11 @@ export function useAiChat(context: ChatContextAttachment | null): {
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
         setMessages((prev) =>
-          prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: m.text + payload.text } : m))
+          prev.map((m) =>
+            m.role === 'assistant' && m.state === 'busy'
+              ? { ...m, text: m.text + payload.text, stats: payload.stats ?? m.stats }
+              : m
+          )
         )
       }),
     []
@@ -125,7 +133,9 @@ export function useAiChat(context: ChatContextAttachment | null): {
                   ...m,
                   state: res.status === 'supported' || res.status === 'unsupported' ? 'done' : res.status === 'cancelled' ? 'cancelled' : 'error',
                   text: res.text || m.text,
-                  web: res.webLookup
+                  web: res.webLookup,
+                  usage: res.usage,
+                  stats: undefined
                 }
               : m
           )

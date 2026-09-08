@@ -48,9 +48,10 @@ import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from
 import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
+import { formatStreamStats } from '../shared/aiText.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
-import { queryDriveMeta } from './drive-meta.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import { queryDriveKinds } from './drive-meta.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -141,10 +142,13 @@ async function explainWithCancel(
   }
   const aborter = new AbortController()
   explainAborters.set(requestId, aborter)
+  announceActivityBusy(lastActivityProvider) // 嵌套讲解中途接续时,把「忙」续上
   try {
     return await run(aborter.signal)
   } finally {
     explainAborters.delete(requestId)
+    // 只有最后一桩活收工才回「就绪」;嵌套讲解(web 查证两段式)中途不许闪
+    if (explainAborters.size === 0) announceActivityIdle()
   }
 }
 
@@ -234,6 +238,9 @@ async function resolveChatTargetOrError(): Promise<
   }
   const resolved = resolveAiTarget(config, runtime)
   if (!resolved.ok) return { error: resolved.message }
+  // 过了这关就是真要使唤模型了:状态栏进「忙」(第八十四锤)
+  lastActivityProvider = config.provider
+  announceActivityBusy(config.provider)
   const ctx = config.contextSize ?? (await probeContextSize(resolved.target, config.provider)) ?? DEFAULT_CONTEXT_SIZE
   return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx) }
 }
@@ -242,12 +249,13 @@ async function resolveChatTargetOrError(): Promise<
  * 流式增量推送:渲染进程带 requestId 过来,就按 id 对号入座往回推
  * 'atlas:ai-delta',边生成边显示;没带 id(老调用方)就走一次性返回。
  */
-function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string) => void) | undefined {
+function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string, stats?: AiStreamStats) => void) | undefined {
   if (typeof requestId !== 'string' || requestId === '') return undefined
-  return (text) => {
-    if (!event.sender.isDestroyed()) {
-      event.sender.send('atlas:ai-delta', { id: requestId, text } satisfies AiDeltaPayload)
-    }
+  return (text, stats) => {
+    if (event.sender.isDestroyed()) return
+    event.sender.send('atlas:ai-delta', stats ? { id: requestId, text, stats } : { id: requestId, text } satisfies AiDeltaPayload)
+    // 引擎肯报账,状态栏的「忙」就跟着报数(第八十四锤)
+    if (stats) announceActivityBusy(lastActivityProvider, stats)
   }
 }
 
@@ -291,7 +299,38 @@ async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
 /** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权 */
 async function refreshModelStatus(): Promise<void> {
   const config = await loadAiConfig(app.getPath('userData'))
-  if (config.provider === 'lmstudio') broadcastModelStatus(await probeLmStudioStatus(config))
+  if (config.provider === 'lmstudio') {
+    const status = await probeLmStudioStatus(config)
+    lastLmStudioStatus = status
+    broadcastModelStatus(status)
+  }
+}
+
+// ── 「忙」播报(第八十四锤):就绪 ≠ 闲着 —— 模型请求从发出到收工,状态栏全程在场 ──
+// 起点在 resolveChatTargetOrError(每个模型请求的必经口),终点在 explainWithCancel /
+// 自由对话的 finally(explainAborters 清空才收工,嵌套的讲解不会中途闪「就绪」)。
+let lastLmStudioStatus: ModelStatus | null = null
+let lastActivityProvider: AiProviderKind = 'builtin'
+
+/** 当前该拿谁的身份说「忙」:内置用播报员手里的真身,外接用最近一轮探测 */
+function announceActivityBusy(provider: AiProviderKind, stats?: AiStreamStats): void {
+  lastActivityProvider = provider
+  const base = provider === 'builtin' ? lastBuiltinStatus() : lastLmStudioStatus
+  if (!base) return
+  // 引擎还在热身时,加载播报员 owns 这个频道,「忙」不许抢话
+  if (base.state === 'loading' || base.state === 'idle') return
+  const message = stats ? formatStreamStats(stats) : '在干活……'
+  broadcastModelStatus({ ...base, state: 'busy', progress: null, estimated: undefined, message })
+}
+
+/** 一轮活干完(或干砸了):回到「就绪」,别让「忙」挂在那里变成谎话 */
+function announceActivityIdle(): void {
+  const provider = lastActivityProvider
+  const base = provider === 'builtin' ? lastBuiltinStatus() : lastLmStudioStatus
+  if (!base) return
+  if (base.state !== 'loading' && base.state !== 'idle') {
+    broadcastModelStatus({ ...base, state: 'ready', progress: null, estimated: undefined, message: undefined })
+  }
 }
 
 function createWindow(): void {
@@ -479,10 +518,10 @@ function registerIpc(): void {
 
   // 列盘符(第六十锤):只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
   // 跳过 A/B(软驱遗物,探测可能卡好几秒);容量用 statfs 一次系统调用,拿不到就只给盘符
-  // 列盘符(第八十一锤加固):①所有盘一起问、单盘 2.5 秒不答就当缺席 —— 掉线的网络映射盘
-  // 以前能拖住整列;②卷标和盘的来路(固定/移动/网络/光驱)一次 PowerShell 问齐,失败/超时就
-  // 当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(元数据带 5 秒小缓存,回首页
-  // 重列盘符时不用次次都起 PowerShell)
+  // 列盘符(第八十一锤加固,第八十二锤瘦身):①所有盘一起问、单盘 2.5 秒不答就当缺席 ——
+  // 掉线的网络映射盘以前能拖住整列;②盘的来路(固定/移动/网络/光驱)一次 PowerShell 问齐,
+  // 失败/超时就当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(带 5 秒小缓存,
+  // 回首页重列盘符时不用次次都起 PowerShell)。卷标不再问 —— 小葵拍板:盘就认大写字母,直白
   ipcMain.handle('atlas:list-drives', async (): Promise<DriveInfo[]> => {
     /** 单个询问加超时:到点回 null,慢半拍的输家就地安静,不许变未处理的拒绝 */
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> => {
@@ -514,13 +553,11 @@ function registerIpc(): void {
 
     const letters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
     const drives = (await Promise.all(letters.map(probeLetter))).filter((d): d is DriveInfo => d !== null)
-    const meta = await queryDriveMeta()
-    if (meta) {
+    const kinds = await queryDriveKinds()
+    if (kinds) {
       for (const d of drives) {
-        const m = meta.get(d.letter)
-        if (!m) continue
-        if (m.label) d.label = m.label
-        if (m.kind) d.kind = m.kind
+        const kind = kinds.get(d.letter)
+        if (kind) d.kind = kind
       }
     }
     return drives
@@ -1067,6 +1104,7 @@ function registerIpc(): void {
       return { ...res, status, webLookup: meta }
     } finally {
       if (requestId !== '') explainAborters.delete(requestId)
+      if (explainAborters.size === 0) announceActivityIdle()
     }
   })
 

@@ -46,7 +46,9 @@ export function ModelStatusBar(): React.JSX.Element {
         : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`
       : status.state === 'idle'
         ? '还没叫醒'
-        : status.state === 'ready'
+        : status.state === 'busy'
+          ? '忙'
+          : status.state === 'ready'
           ? '就绪'
           : status.state === 'unreachable'
             ? '没连上'

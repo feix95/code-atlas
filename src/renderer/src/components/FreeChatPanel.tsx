@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
 import { AtlasProbe, type ProbeState } from './AtlasProbe'
@@ -51,6 +52,13 @@ function AssistantBubble({ msg }: { msg: ChatMessage }): React.JSX.Element {
           {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
           {msg.state === 'cancelled' && msg.text && <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>}
           {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
+          {/* 实时 token 账(第八十四锤):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
+          {msg.state === 'busy' && (msg.stats || msg.text) && (
+            <div className="chat-stats">{msg.stats ? formatStreamStats(msg.stats) : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}</div>
+          )}
+          {msg.state !== 'busy' && msg.usage && (
+            <div className="chat-stats chat-usage">本次 · {formatUsage(msg.usage)}</div>
+          )}
         </div>
       </div>
       {label && (

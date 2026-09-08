@@ -102,7 +102,11 @@ export function resolveAiTarget(
           : '还没选模型:去「AI 设置」点「选择模型」,选一个 GGUF 模型文件'
       }
     }
-    return { ok: true, target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model } }
+    return {
+      ok: true,
+      // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四锤)
+      target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model, timings: true }
+    }
   }
   if (!config.lmstudio.model.trim()) {
     return { ok: false, message: '还没选模型:去「AI 设置」连一下 LM Studio' }

@@ -87,9 +87,8 @@ export interface DriveInfo {
   root: string
   free?: number
   total?: number
-  /** 卷标(用户给盘起的名,如「新加卷」);问不到不填(界面回退按类型叫) */
-  label?: string
-  /** 盘的来路:固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到不填 */
+  /** 盘的来路:固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到不填(界面照旧叫本地磁盘)。
+   *  卷标(ssd/software 这些)第八十二锤起不再上卡片 —— 小葵拍板:盘就认大写字母,直白 */
   kind?: 'fixed' | 'removable' | 'network' | 'optical'
 }
 
@@ -224,6 +223,11 @@ export interface ChatTarget {
   baseUrl: string
   model: string
   apiKey?: string
+  /**
+   * 内置引擎专旗(第八十四锤):请求里带 timings_per_token + stream_options,
+   * 引擎才肯在流里报「读了多少 token / 吐了多少 token / 多快」。外接服务不认识这些旗子,不塞
+   */
+  timings?: boolean
 }
 
 /**
@@ -233,7 +237,7 @@ export interface ChatTarget {
 export interface ModelStatus {
   provider: 'builtin' | 'lmstudio'
   /** idle=还没叫醒(懒加载,没提问不启动) loading=热身中 ready=就绪 error=出岔子 unreachable=外接服务没连上 */
-  state: 'idle' | 'loading' | 'ready' | 'error' | 'unreachable'
+  state: 'idle' | 'loading' | 'ready' | 'busy' | 'error' | 'unreachable'
   /** 模型名:内置 = 文件名/引擎报的 id;外接 = 配置里填的模型名 */
   modelName: string
   /** 模型文件多大(字节);外接的文件归 LM Studio 管,拿不到就是 null */
@@ -264,6 +268,8 @@ export interface ModelFitVerdict {
 export interface AiDeltaPayload {
   id: string
   text: string
+  /** 实时 token 账(第八十四锤):引擎报了就捎来,没报没有 —— 界面绝不编数 */
+  stats?: AiStreamStats
 }
 
 /** AI 人话解释的结果 */
@@ -276,6 +282,24 @@ export interface AiExplainResult {
   model: string
   /** 耗时(ms) */
   durationMs: number
+  /** 本次问答的 token 账(第八十四锤):引擎肯报才有,绝不编数 */
+  usage?: AiUsage
+}
+
+/** 一次问答的 token 账(第八十四锤):读了多少提示词、吐了多少字、多快 */
+export interface AiUsage {
+  promptTokens?: number
+  outputTokens?: number
+  /** 吐字速度(tokens/秒) */
+  tokensPerSecond?: number
+}
+
+/** 流式过程中的实时账(第八十四锤):随增量帧捎给界面,读材料/吐字两阶段 */
+export interface AiStreamStats {
+  phase: 'reading' | 'writing'
+  promptTokens?: number
+  outputTokens?: number
+  tokensPerSecond?: number
 }
 
 /**

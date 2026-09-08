@@ -1710,6 +1710,19 @@ body.is-sash-dragging {
   margin-top: 2px;
 }
 
+/* 实时 token 账(第八十四锤):流式时贴在气泡左下的小灰字;收尾换一行「本次 · 读 x 吐 y」 */
+.chat-stats {
+  margin-top: 0.375rem;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  font-family: var(--mono);
+  user-select: text;
+}
+
+.chat-usage {
+  color: var(--muted-2);
+}
+
 .chat-typing {
   color: var(--muted);
 }
@@ -3866,13 +3879,18 @@ body.is-maximized .cfg-layer {
   margin-left: auto;
 }
 
-/* 状态点:灰=还没叫醒,琥珀=热身中,绿=就绪,红=出岔子/没连上 */
+/* 状态点:灰=还没叫醒,琥珀=热身中,主色呼吸=忙,绿=就绪,红=出岔子/没连上 */
 .model-dot {
   flex: none;
   width: 0.4375rem;
   height: 0.4375rem;
   border-radius: 50%;
   background: var(--muted-2);
+}
+
+.model-status.is-busy .model-dot {
+  background: var(--accent);
+  animation: model-breathe 1.2s ease-in-out infinite;
 }
 
 .model-status.is-loading .model-dot {
