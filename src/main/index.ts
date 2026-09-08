@@ -273,8 +273,11 @@ function sendChatLookup(event: IpcMainInvokeEvent, requestId: unknown, state: Ai
 // 两路都汇到 broadcastModelStatus,渲染层的常驻底栏只认这一条频道。
 
 function broadcastModelStatus(status: ModelStatus): void {
-  const win = BrowserWindow.getAllWindows()[0]
-  if (win && !win.isDestroyed()) win.webContents.send('atlas:model-status', status)
+  // 第八十八锤:必须挨个窗都发 —— Developer 日志窗进了队,「[0]」不一定是主窗;
+  // 广播喂给没人听的日志窗,主窗底栏就冻死在「还没叫醒」
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('atlas:model-status', status)
+  }
 }
 
 /** 问一轮 LM Studio:模型加载了没/热身到多少;服务没开就老实说没连上,不装没事 */
@@ -575,8 +578,9 @@ function registerIpc(): void {
   ipcMain.handle('atlas:window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
 
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
-  ipcMain.handle('atlas:pick-folder', async () => {
-    const win = BrowserWindow.getAllWindows()[0]
+  // 第八十八锤:对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
+  ipcMain.handle('atlas:pick-folder', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = { properties: ['openDirectory'] }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
@@ -786,9 +790,9 @@ function registerIpc(): void {
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
 
-  // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
-  ipcMain.handle('atlas:ai-pick-file', async () => {
-    const win = BrowserWindow.getAllWindows()[0]
+  // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型(弹窗认准来叫它的窗,同上)
+  ipcMain.handle('atlas:ai-pick-file', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = {
       properties: ['openFile'],
       filters: [
