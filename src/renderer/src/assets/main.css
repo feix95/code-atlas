@@ -654,6 +654,10 @@ body.is-maximized .traffic-lights .is-max i::after {
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background 0.13s ease;
+  /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
+     几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.6875rem;
 }
 
 .tree-row:hover {
