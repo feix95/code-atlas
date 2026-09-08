@@ -8,6 +8,18 @@ import { friendlyErr } from '../errText'
 const SCALE_MIN = 0.8
 const SCALE_MAX = 1.8
 
+// 第八十九锤:模型上下文的合法范围。夹紧只发生在失焦/保存那一刻 —— 以前每敲一个键就夹,
+// 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
+const CONTEXT_MIN = 512
+const CONTEXT_MAX = 1_048_576
+
+/** 上下文输入框的落账规则:空串 = 交回自动探测(undefined);数字夹进合法范围 */
+function clampContextSize(raw: string): number | undefined {
+  const digits = raw.replace(/[^0-9]/g, '')
+  if (digits === '') return undefined
+  return Math.max(CONTEXT_MIN, Math.min(CONTEXT_MAX, Number(digits)))
+}
+
 type SectionKey = 'appearance' | 'ai' | 'advanced'
 type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
 
@@ -192,6 +204,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitNote, setFitNote] = useState<ModelFitVerdict | null>(null)
+  // 第八十九锤:上下文框的打字草稿(纯字符串,和存档里的数字分开管)
+  const [contextRaw, setContextRaw] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLElement | null>(null)
   const aiRef = useRef<HTMLElement | null>(null)
@@ -203,6 +217,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
       .then((c) => {
         setSavedConfig(c)
         setDraftConfig(c)
+        // 第八十九锤:读档落定上下文框的初始字(打字草稿和存档数字分开管)
+        setContextRaw(c.contextSize === undefined ? '' : String(c.contextSize))
       })
       .catch(() => {})
   }, [])
@@ -239,7 +255,9 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const appearanceDirty = JSON.stringify(draftAppearance) !== JSON.stringify(savedAppearance)
   const scaleDirty = draftScale !== savedScale
   const configDirty = savedConfig !== null && draftConfig !== null && JSON.stringify(draftConfig) !== JSON.stringify(savedConfig)
-  const dirty = appearanceDirty || scaleDirty || configDirty
+  // 第八十九锤:上下文框里没失焦的字也算草稿 —— 打了数还没点别处就关窗,照样弹「确认丢弃」
+  const contextDirty = savedConfig !== null && clampContextSize(contextRaw) !== savedConfig.contextSize
+  const dirty = appearanceDirty || scaleDirty || configDirty || contextDirty
 
   const updateAppearance = useCallback((patch: Partial<Appearance>): void => {
     setDraftAppearance((prev) => ({ ...prev, ...patch }))
@@ -250,6 +268,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     setDraftAppearance(savedAppearance)
     setDraftConfig(savedConfig)
     setDraftScale(savedScale)
+    // 上下文框里没失焦的字也一并退回(存档没换人时上面那个回填不触发,这里手动退)
+    setContextRaw(savedConfig?.contextSize === undefined ? '' : String(savedConfig.contextSize))
     setDragValue(null)
     setApplyState({ kind: 'idle' })
   }, [savedAppearance, savedConfig, savedScale])
@@ -262,9 +282,14 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     let errText: string | null = null
     if (draftConfig) {
       try {
-        const saved = await window.atlas.aiConfigSave(draftConfig)
+        // 第八十九锤:兜键盘流的底 —— 点「应用更改」前如果框里还有没失焦的字,保存这一刻也夹进合法范围
+        const committed = clampContextSize(contextRaw)
+        const toSave = committed === draftConfig.contextSize ? draftConfig : { ...draftConfig, contextSize: committed }
+        const saved = await window.atlas.aiConfigSave(toSave)
         setSavedConfig(saved)
         setDraftConfig(saved)
+        // 保存回写后框里照存档摆字(第八十九锤:存档换人的四个时刻之一)
+        setContextRaw(saved.contextSize === undefined ? '' : String(saved.contextSize))
       } catch (err) {
         errText = friendlyErr(err)
       }
@@ -276,7 +301,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     window.atlas.setUiScale(draftScale)
     setSavedScale(draftScale)
     setApplyState({ kind: 'idle' })
-  }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale])
+  }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale, contextRaw])
 
   /** 关弹窗入口(遮罩/×/Esc 同路):保存中不响应;有草稿先弹确认,确认丢弃才真关 */
   const requestClose = useCallback((): void => {
@@ -848,18 +873,26 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                         <input
                           id="cfg-context-size"
                           inputMode="numeric"
-                          value={draftConfig.contextSize ?? ''}
+                          value={contextRaw}
                           placeholder="自动向模型服务探测(探测不到按 4096 算)"
                           onChange={(e) => {
-                            const raw = e.target.value.replace(/[^0-9]/g, '')
-                            setDraftConfig({
-                              ...draftConfig,
-                              contextSize: raw === '' ? undefined : Math.max(512, Math.min(1_048_576, Number(raw)))
-                            })
+                            // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
+                            setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
+                          }}
+                          onBlur={() => {
+                            // 失焦落账:数字归到合法范围,空串交回自动探测;框里当场改字,眼见为实
+                            const committed = clampContextSize(contextRaw)
+                            setContextRaw(committed === undefined ? '' : String(committed))
+                            if (draftConfig.contextSize !== committed) {
+                              setDraftConfig({ ...draftConfig, contextSize: committed })
+                            }
                           }}
                         />
                       </div>
-                      <p className="cfg-field-help">模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。</p>
+                      <p className="cfg-field-help">
+                        模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。
+                        范围 512 ~ 1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
+                      </p>
                     </div>
                   )}
                 </div>
