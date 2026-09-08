@@ -27,6 +27,9 @@ import {
   parseLlamaProps,
   parseLmStudioModelState,
   isContextOverflow,
+  halfNote,
+  timeoutText,
+  friendlyHttpError,
   budgetsForContext,
   DEFAULT_CONTEXT_SIZE,
   hasWebLookupSignal,
@@ -40,8 +43,10 @@ import {
   FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
-  isBinaryFile
+  isBinaryFile,
+  extractStreamStats
 } from '../src/ai/index.ts'
+import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
@@ -592,7 +597,7 @@ async function main(): Promise<void> {
   // ── 8. 服务连不上:应返回 error 状态而不是抛异常 ──
   const down = await explainWithModel({ baseUrl: 'http://127.0.0.1:1/v1', model: 'x' }, prompt)
   assert.equal(down.status, 'error', '连不上服务时状态应为 error')
-  assert.ok(down.text.includes('连不上'), '错误信息要提示检查模型服务')
+  assert.ok(down.text.includes('连接断了') || down.text.includes('连不上'), '错误信息要提示检查模型服务')
 
   // ── 9. 功能定位(第六十七锤):地图摊开 / 回复解析 / 防编造过滤 ──
   assert.ok(LOCATE_SYSTEM_PROMPT.includes('不许编造'), '带路人人设要有防编造铁律')
@@ -823,7 +828,55 @@ async function main(): Promise<void> {
   assert.ok(brokenMsg.includes('损坏') || brokenMsg.includes('占用'), '都不是:才归到文件损坏/被占用')
   assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
 
+  // ── 第八十五锤:超时话术按现场分流 + 半截必留(纯函数) ──
+  assert.ok(halfNote('disconnect').includes('连接断了'), '断线注脚说断线')
+  assert.ok(halfNote('watchdog').includes('等太久'), '掐断注脚说等太久')
+  assert.ok(halfNote('stall').includes('卡住'), '卡住注脚说卡住')
+  assert.ok(timeoutText().includes('第一个字'), '空手超时话术点名没等到字')
+  assert.ok(!timeoutText().includes('还在加载'), '不再冤枉「还在加载」')
+  assert.ok(friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes('脑容量'), '小葵的 400 翻译成人话')
+  assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
+  assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
+
   console.log('✅ AI 人话解释自测全部通过')
+
+// ── 第八十四锤:流式 token 账(纯函数) ──
+// extractStreamStats:timings 帧(读材料段)
+  void (() => {
+  const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 0 } }, 'reading')
+  assert.deepEqual(s, { phase: 'reading', promptTokens: 2048, outputTokens: 0, tokensPerSecond: undefined })
+})()
+// extractStreamStats:timings 帧(吐字段,带速度)
+  void (() => {
+  const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 128, predicted_per_second: 12.5 } }, 'writing')
+  assert.deepEqual(s, { phase: 'writing', promptTokens: 2048, outputTokens: 128, tokensPerSecond: 12.5 })
+})()
+// extractStreamStats:usage 收尾帧补 prompt
+  void (() => {
+  const s = extractStreamStats({ usage: { prompt_tokens: 3000, completion_tokens: 200 } }, 'writing')
+  assert.deepEqual(s, { phase: 'writing', promptTokens: 3000, outputTokens: 200, tokensPerSecond: undefined })
+})()
+// extractStreamStats:垃圾/缺数回 null,绝不编
+  void (() => {
+  assert.equal(extractStreamStats({}, 'reading'), null)
+  assert.equal(extractStreamStats({ timings: { prompt_n: 'x' } }, 'reading'), null)
+  assert.equal(extractStreamStats({ timings: { prompt_n: NaN, predicted_n: Infinity } }, 'writing'), null)
+})()
+// formatStreamStats:读材料/吐字两段话术
+  void (() => {
+  assert.equal(formatStreamStats({ phase: 'reading', promptTokens: 2048 }), '读材料中 · 已读 2,048 tokens')
+  assert.equal(formatStreamStats({ phase: 'reading' }), '读材料中……')
+  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 128, tokensPerSecond: 12.5 }), '已吐 128 tokens · 13 tokens/s')
+  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 9, tokensPerSecond: 4.6 }), '已吐 9 tokens · 4.6 tokens/s')
+  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 5000, tokensPerSecond: 33.4 }), '已吐 5,000 tokens · 33 tokens/s')
+  assert.equal(formatStreamStats({ phase: 'writing' }), '吐字中')
+})()
+// formatUsage:收尾尾注,缺哪段省哪段
+  void (() => {
+  assert.equal(formatUsage({ promptTokens: 2048, outputTokens: 128, tokensPerSecond: 12.5 }), '读 2,048 · 吐 128 tokens · 13 tokens/s')
+  assert.equal(formatUsage({ outputTokens: 64 }), '吐 64 tokens')
+  assert.equal(formatUsage({}), '')
+})()
   console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
 }
 

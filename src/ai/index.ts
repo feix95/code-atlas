@@ -2,7 +2,7 @@
 // 路径契约:只认 relPath,读文件是主进程的事;这里只负责"拼提示词 + 调接口"。
 // 底层不绑定任何推理服务 —— LM Studio、llama-server 都说 OpenAI 兼容的方言,
 // 这里只认 ChatTarget(baseURL + 模型名),换后端不改一行业务代码。
-import type { AiStreamStats,
+import type { AiUsage, AiStreamStats,
   AiExplainResult,
   AiHistoryMessage,
   ChatContextAttachment,
@@ -861,14 +861,37 @@ interface SseEvent {
  * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
  * timings/usage 帧照常转发(llama-server 吐字帧里捎 timings,收尾捎 usage)。
  */
-async function* sseEvents(res: Response): AsyncGenerator<SseEvent> {
+async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<SseEvent> {
   const reader = res.body?.getReader()
   if (!reader) return
   const decoder = new TextDecoder()
   let buffer = ''
   let writing = false
+  // 用户取消的铃:abort 掐不掐得进读队列看引擎心情,铃是保底(第八十五锤)
+  const abortBell = new Promise<'abort'>((resolve) => {
+    if (!signal) return
+    if (signal.aborted) resolve('abort')
+    else signal.addEventListener('abort', () => resolve('abort'), { once: true })
+  })
   while (true) {
-    const { done, value } = await reader.read()
+    let idleTimer: ReturnType<typeof setTimeout> | undefined
+    const idleBell = new Promise<'idle'>((resolve) => {
+      // 首帧前的静默是大提示词的预处理,给足两分钟;吐字中途 30 秒没动静才算真卡住
+      idleTimer = setTimeout(() => resolve('idle'), writing ? STREAM_IDLE_MS : FIRST_FRAME_MS)
+    })
+    const raced = await Promise.race([reader.read(), idleBell, abortBell])
+    clearTimeout(idleTimer)
+    if (raced === 'idle') {
+      void reader.cancel().catch(() => {})
+      throw new StreamIdleError(writing)
+    }
+    if (raced === 'abort') {
+      void reader.cancel().catch(() => {})
+      const e = new Error('aborted by user')
+      e.name = 'AbortError'
+      throw e
+    }
+    const { done, value } = raced
     if (done) break
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
@@ -895,8 +918,41 @@ async function* sseEvents(res: Response): AsyncGenerator<SseEvent> {
 const HEADERS_TIMEOUT_MS = 120_000
 /** 非流式:读完整回复的耐心 */
 const BODY_TIMEOUT_MS = 120_000
-/** 流式:两次增量之间超过这么久没动静,判定模型卡住,掐断别让界面干等 */
+/** 流式:吐第一个字之前的耐心 —— 大提示词的预处理在这段里,引擎可能整段静默,必须给足
+ * (第八十五锤:30 秒静默掐读是小葵冤案的帮凶,首帧前的耐心对齐响应头 = 两分钟) */
+const FIRST_FRAME_MS = 120_000
+/** 流式:开始吐字之后,两帧之间超过这么久没动静才算真卡住 */
 const STREAM_IDLE_MS = 30_000
+
+/** 读流时「没动静」超时:reader 的 abort 掐不进读队列(实测),自己赛跑自己掐 */
+class StreamIdleError extends Error {
+  /** true = 已经在吐字后卡的;false = 连第一个字都没等到 */
+  readonly writing: boolean
+  constructor(writing: boolean) {
+    super(writing ? 'stream stalled mid-answer' : 'no first frame in time')
+    this.writing = writing
+  }
+}
+
+/** 到手的半截话配的注脚(纯函数,自测覆盖):断线/掐断/卡住各有各的说法 */
+export function halfNote(kind: 'stall' | 'disconnect' | 'watchdog'): string {
+  if (kind === 'disconnect') return '(连接断了,上面是已经生成的部分;再点一次可以重讲)'
+  if (kind === 'watchdog') return '(等太久被掐断了,上面是已经生成的部分)'
+  return '(回答到这儿断了:模型可能卡住了,再点一次可以重讲)'
+}
+
+/** 等不到任何输出的超时话术(纯函数,自测覆盖) */
+export function timeoutText(): string {
+  return '等了很久没等到第一个字:材料大预处理就慢,引擎也可能卡住了 —— 不想等就「取消」,清点一下参考材料再问'
+}
+
+/** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文) */
+export function friendlyHttpError(status: number, detail: string): string | null {
+  if (isContextOverflow(`${status} ${detail}`)) {
+    return '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
+  }
+  return null
+}
 
 /**
  * 调 OpenAI 兼容接口(ChatTarget),拿到人话解释。
@@ -927,6 +983,7 @@ export async function explainWithMessages(
     watchdog = setTimeout(() => controller.abort(), ms)
   }
   let full = ''
+  let usage: AiUsage | undefined
   try {
     armWatchdog(HEADERS_TIMEOUT_MS)
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -950,6 +1007,10 @@ export async function explainWithMessages(
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
+      const friendly = friendlyHttpError(res.status, detail)
+      if (friendly) {
+        return { status: 'error', text: friendly, model: config.model, durationMs: Date.now() - startedAt }
+      }
       return {
         status: 'error',
         text: `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`,
@@ -962,7 +1023,7 @@ export async function explainWithMessages(
       armWatchdog(BODY_TIMEOUT_MS)
       const data = (await res.json()) as ChatCompletionResponse
       const content = data.choices?.[0]?.message?.content?.trim()
-      const usage =
+      usage =
         typeof data.usage === 'object' && data.usage !== null
           ? {
               promptTokens: data.usage.prompt_tokens,
@@ -970,18 +1031,24 @@ export async function explainWithMessages(
             }
           : undefined
       if (!content) {
-        return { status: 'error', text: '模型没有返回内容,可能没加载成功', model: config.model, durationMs: Date.now() - startedAt, usage }
+        return {
+          status: 'error',
+          text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
+          model: config.model,
+          durationMs: Date.now() - startedAt,
+          usage
+        }
       }
       return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt, usage }
     }
 
-    // 流式:逐帧喂给 onDelta(文本 + token 账),全文攒到最后一起返回
+    // 流式:逐帧喂给 onDelta(文本 + token 账),全文攒到最后一起返回。
+    // 「没动静」的看守交棒给 sseEvents 自己(首帧/帧间两档);用户取消也由它插铃保底
     let lastStats: AiStreamStats | undefined
-    armWatchdog(STREAM_IDLE_MS)
-    for await (const ev of sseEvents(res)) {
+    clearTimeout(watchdog)
+    for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
         full += ev.text
-        armWatchdog(STREAM_IDLE_MS) // 还有增量,继续续命
       }
       // 收尾帧(usage)只带 token 数不带速度:按字段合并,别把上一帧的吐字速度冲掉
       if (ev.stats) {
@@ -996,7 +1063,7 @@ export async function explainWithMessages(
       }
       onDelta(ev.text ?? '', lastStats)
     }
-    const usage = lastStats
+    usage = lastStats
       ? {
           promptTokens: lastStats.promptTokens,
           outputTokens: lastStats.outputTokens,
@@ -1006,7 +1073,7 @@ export async function explainWithMessages(
     if (!full.trim()) {
       return {
         status: 'error',
-        text: '模型没有返回内容,可能没加载成功',
+        text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
         model: config.model,
         durationMs: Date.now() - startedAt,
         usage
@@ -1014,20 +1081,36 @@ export async function explainWithMessages(
     }
     return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt, usage }
   } catch (err) {
+    // 第八十五锤:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
     const isAbort = err instanceof Error && err.name === 'AbortError'
-    // 卡住前已经吐了一部分:把到手的先给用户,别一把全扔
-    if (isAbort && full.trim()) {
+    const idle = err instanceof StreamIdleError ? err : null
+    const userCancelled = signal?.aborted === true
+    const half = full.trim()
+    if (half) {
+      // 用户自己停的:界面有「已停下」的专门话术,不重复注脚
+      const note = userCancelled
+        ? ''
+        : idle && !idle.writing
+          ? halfNote('watchdog')
+          : idle
+            ? halfNote('stall')
+            : isAbort
+              ? halfNote('watchdog')
+              : halfNote('disconnect')
       return {
         status: 'supported',
-        text: `${full}\n\n(回答到这儿断了:模型可能卡住了,再点一次可以重讲)`,
+        text: note ? `${full}\n\n${note}` : full,
         model: config.model,
-        durationMs: Date.now() - startedAt
+        durationMs: Date.now() - startedAt,
+        usage
       }
     }
-    const msg = isAbort
-      ? '模型响应超时,可能模型还在加载,或太大跑不动'
-      : `连不上模型服务,检查模型服务是否已启动(${baseUrl})`
-    return { status: 'error', text: msg, model: config.model, durationMs: Date.now() - startedAt }
+    const msg = userCancelled
+      ? '取消了 —— 这次没等到任何输出'
+      : isAbort || idle
+        ? timeoutText()
+        : `连接断了,模型服务可能停了(${baseUrl})`
+    return { status: 'error', text: msg, model: config.model, durationMs: Date.now() - startedAt, usage }
   } finally {
     clearTimeout(watchdog)
   }
