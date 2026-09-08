@@ -766,7 +766,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   flex: 0 0 auto;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   letter-spacing: 0.03em;
 }
 
@@ -778,7 +778,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   color: var(--muted);
   border-radius: var(--radius-pill);
   background: var(--hover);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -786,7 +786,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 /* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
 .tree-badge {
   flex: 0 0 auto;
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   color: var(--amber);
   background: var(--amber-soft);
   border: 1px solid var(--amber-line);
@@ -1406,7 +1406,10 @@ body.is-sash-dragging {
   font-size: var(--font-sm);
   font-family: inherit;
   cursor: pointer;
-  transition: 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .prompt:hover {
@@ -2711,7 +2714,7 @@ body.is-maximized .cfg-layer {
   color: var(--text-strong);
   font-size: 1rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .cfg-head-title p {
@@ -2785,7 +2788,7 @@ body.is-maximized .cfg-layer {
 .cfg-nav-caption {
   padding: 0 0.625rem 0.5625rem;
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -2843,7 +2846,7 @@ body.is-maximized .cfg-layer {
 .cfg-nav-item small {
   margin-top: 0.1875rem;
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-nav-item.is-active small {
@@ -2907,7 +2910,7 @@ body.is-maximized .cfg-layer {
   white-space: nowrap;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-nav-footnote {
@@ -2916,7 +2919,7 @@ body.is-maximized .cfg-layer {
   gap: 0.375rem;
   margin: auto 0.5rem 0;
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-content {
@@ -2942,7 +2945,7 @@ body.is-maximized .cfg-layer {
 .cfg-eyebrow {
   color: var(--accent);
   font-family: var(--mono);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   letter-spacing: 0.1em;
 }
 
@@ -2951,7 +2954,7 @@ body.is-maximized .cfg-layer {
   color: var(--text-strong);
   font-size: 1.1875rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .cfg-intro p {
@@ -2972,7 +2975,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--green-line);
   border-radius: var(--radius-sm);
   background: var(--green-soft);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-live-status i {
@@ -3022,7 +3025,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-section-head > span {
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-step {
@@ -3129,7 +3132,7 @@ body.is-maximized .cfg-layer {
 .cfg-theme small {
   margin-top: 0.125rem;
   color: var(--muted-2);
-  font-size: 0.5rem;
+  font-size: 0.625rem;
 }
 
 .cfg-theme-check {
@@ -3215,7 +3218,7 @@ body.is-maximized .cfg-layer {
   margin-top: 0.375rem;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.5rem;
+  font-size: 0.625rem;
 }
 
 .cfg-scale-value {
@@ -3224,7 +3227,7 @@ body.is-maximized .cfg-layer {
   font-family: var(--mono);
   font-size: 1.0625rem;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -3243,7 +3246,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: 0.3125rem;
   color: var(--muted);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-mini {
@@ -3289,13 +3292,13 @@ body.is-maximized .cfg-layer {
   border-radius: 0.1875rem;
   background: var(--surface-soft);
   font-family: var(--mono);
-  font-size: 0.4375rem;
+  font-size: 0.625rem;
   font-style: normal;
 }
 
 .cfg-preview-note {
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-segmented {
@@ -3346,7 +3349,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-segmented small {
   margin-top: 0.125rem;
-  font-size: 0.5rem;
+  font-size: 0.625rem;
   color: var(--muted-2);
 }
 
@@ -3383,7 +3386,7 @@ body.is-maximized .cfg-layer {
   max-width: 27.5rem;
   margin: 0.1875rem 0 0;
   color: var(--muted);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   line-height: 1.5;
 }
 
@@ -3395,7 +3398,7 @@ body.is-maximized .cfg-layer {
   padding-top: 0.1875rem;
   color: var(--green);
   white-space: nowrap;
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-callout-state.is-warn {
@@ -3409,7 +3412,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--line);
   border-radius: 0.25rem;
   background: var(--surface-soft);
-  font-size: 0.5rem;
+  font-size: 0.625rem;
   font-weight: 600;
   vertical-align: 0.0625rem;
 }
@@ -3461,7 +3464,7 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border-top: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--green) 4%, var(--surface));
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-privacy > span {
@@ -3476,7 +3479,7 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border: 0;
   background: transparent;
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 
@@ -3490,7 +3493,7 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border-top: 1px dashed var(--line-soft);
   background: var(--surface-soft);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   line-height: 1.6;
 }
 
@@ -3542,7 +3545,7 @@ body.is-maximized .cfg-layer {
 .cfg-advanced-trigger small {
   margin-top: 0.1875rem;
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-chevron {
@@ -3588,7 +3591,7 @@ body.is-maximized .cfg-layer {
 .cfg-field-head span {
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-path-input {
@@ -3630,7 +3633,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--accent-line);
   border-radius: 0.3125rem;
   background: var(--accent-soft);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 
@@ -3646,7 +3649,7 @@ body.is-maximized .cfg-layer {
   gap: 0.3125rem;
   margin: 0.5rem 0 0;
   color: var(--muted-2);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-field-help.is-warn {
@@ -3666,7 +3669,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 
@@ -3707,7 +3710,7 @@ body.is-maximized .cfg-layer {
 .cfg-summary p {
   margin: 0.1875rem 0 0;
   color: var(--muted);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-summary-state {
@@ -3717,7 +3720,7 @@ body.is-maximized .cfg-layer {
   margin-left: auto;
   color: var(--green);
   white-space: nowrap;
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
 }
 
 .cfg-summary-state.is-dirty {
@@ -4301,3 +4304,14 @@ body.is-maximized .cfg-layer {
 }
 
 /* 状态栏右端的「日志」小口子:沿用取消/卸下那颗字的皮,不加新花样 */
+
+/* 最近列表删除的撤销条(第九十四锤):破坏性动作给 6 秒反悔窗 */
+.recent-undo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-md);
+}

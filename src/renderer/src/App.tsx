@@ -20,6 +20,7 @@ import {
   forgetRecentProject,
   readRecentProjects,
   rememberRecentProject,
+  writeRecentProjects,
   type RecentProject
 } from './recents'
 import { useAiAsk } from './useAiAsk'
@@ -519,9 +520,25 @@ function App(): React.JSX.Element {
     clearSelection()
   }
 
-  // 最近列表点 ✕:只删记录,不碰文件夹本身(第八十一锤)
+  // 最近列表点 ✕:只删记录,不碰文件夹本身(第八十一锤);给 6 秒撤销窗(第九十四锤,破坏性动作不裸奔)
+  const [recentUndo, setRecentUndo] = useState<{ snapshot: RecentProject[]; removed: RecentProject } | null>(null)
+  const recentUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   function removeRecent(path: string): void {
+    const removed = recents.find((r) => r.p === path)
+    if (!removed) return
     setRecents(forgetRecentProject(path))
+    setRecentUndo({ snapshot: recents, removed })
+    if (recentUndoTimerRef.current) clearTimeout(recentUndoTimerRef.current)
+    recentUndoTimerRef.current = setTimeout(() => setRecentUndo(null), 6000)
+  }
+
+  function undoRecentRemove(): void {
+    if (!recentUndo) return
+    if (recentUndoTimerRef.current) clearTimeout(recentUndoTimerRef.current)
+    writeRecentProjects(recentUndo.snapshot)
+    setRecents(recentUndo.snapshot)
+    setRecentUndo(null)
   }
 
   /** 盘的来路人话(第八十一锤):固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到照旧叫本地磁盘 */
@@ -625,7 +642,7 @@ function App(): React.JSX.Element {
           <button type="button" className="btn path-go" onClick={() => void goPath()} disabled={scanning}>
             {scanning ? '……' : '前往'}
           </button>
-          {pathHint && <div className="path-hint">{pathHint}</div>}
+          {pathHint && <div className="path-hint" role="status">{pathHint}</div>}
         </div>
         <button type="button" className="icon-btn" onClick={() => setShowSettings(true)} aria-label="打开设置">
           ⚙
@@ -655,7 +672,7 @@ function App(): React.JSX.Element {
                 {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
               </span>
             </footer>
-            {treeNote && <div className="tree-toast">⚠️ {treeNote}</div>}
+            {treeNote && <div className="tree-toast" role="alert">⚠️ {treeNote}</div>}
           </aside>
           <div
             className="sash"
@@ -673,7 +690,7 @@ function App(): React.JSX.Element {
             onKeyDown={onSashKeyDown}
           />
           <section className="detail">
-            {scanToast && <div className="scan-toast">{scanToast}</div>}
+            {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
             {selectedFile && result ? (
               <FileDetailView
                 key={selectedFile.relPath}
@@ -759,6 +776,14 @@ function App(): React.JSX.Element {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+              {recentUndo && (
+                <div className="recent-undo" role="status">
+                  已删除「{recentUndo.removed.n}」
+                  <button type="button" className="btn btn-ghost" onClick={undoRecentRemove}>
+                    撤销
+                  </button>
                 </div>
               )}
               {drives === null && !drivesNote ? (
