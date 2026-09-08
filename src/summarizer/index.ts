@@ -28,6 +28,7 @@ const FILE_SUMMARIES: Record<string, NodeSummary> = {
   '.eslintrc.yml': { emoji: '🩺', text: '代码体检医生:揪出坏写法和潜在 bug' },
   '.eslintrc.yaml': { emoji: '🩺', text: '代码体检医生:揪出坏写法和潜在 bug' },
   'jsconfig.json': { emoji: '📐', text: 'JavaScript 的尺子:编辑器怎么理解这套代码' },
+  'tsconfig.json': { emoji: '📐', text: 'TypeScript 的尺子:类型查多严、编译成啥标准' },
   'claude.md': { emoji: '🤖', text: 'AI 说明书:AI 助手上岗前必读,交代项目背景和注意事项' },
   'license': { emoji: '⚖️', text: '使用许可证:别人能拿这代码干什么、不能干什么' },
   'license.md': { emoji: '⚖️', text: '使用许可证:别人能拿这代码干什么、不能干什么' },
@@ -132,7 +133,7 @@ const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
   // 测试文件:名字里带 test/spec/selftest 的都是考卷
   { re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/, summary: { emoji: '🧪', text: '测试:验证代码对不对的考卷' } },
   { re: /^tsconfig\..*\.json$/, summary: { emoji: '📐', text: 'TypeScript 的尺子:类型查多严、编译成啥标准' } },
-  { re: /^\.?prettier\.config\./, summary: { emoji: '📏', text: '排版规矩:缩进、引号、换行统一标准,全项目一个审美' } },
+  { re: /^(\.?prettier\.config\.|\.prettierrc)/, summary: { emoji: '📏', text: '排版规矩:缩进、引号、换行统一标准,全项目一个审美' } },
   {
     re: /^(\.eslintrc\.(?!json|js|yml|yaml)|eslint\.config\.)/,
     summary: { emoji: '🩺', text: '代码体检医生:揪出坏写法和潜在 bug' }
@@ -317,9 +318,22 @@ function isTestFileName(name: string): boolean {
   return /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/.test(lower)
 }
 
-/** 目录速览:名字字典 → 全文档特判 → 内容统计兜底(没名字线索时看里面装了啥) */
+/** 目录速览:事实先上(锁死/空)→ 名字字典 → 全文档特判 → 内容统计兜底(没名字线索时看里面装了啥) */
 function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, byLang: Map<string, number>, extCounts: Map<string, number>): NodeSummary {
   const lower = node.name.toLowerCase()
+  // 残账要说"至少":分级扫描截断后数出来的数是下限,不许把残账报成总数
+  const n = (count: number): string => (node.truncated ? `至少 ${count}` : `${count}`)
+
+  // 这层打开被拒(多半是 Windows 锁住的系统文件夹):老实说"不让看",别谎报成空文件夹
+  if (node.truncated && fileCount === 0 && directDirs === 0) {
+    return { emoji: '🔒', text: '系统不让看:被 Windows 锁住的内部文件夹,不是空的,也不用看' }
+  }
+
+  // 真探过且空就是空:哪怕名字叫 config,也不许对着空抽屉喊"开关都集中在这"
+  if (!node.lazy && fileCount === 0 && directDirs === 0) {
+    return { emoji: '📂', text: '空文件夹:暂时啥也没装' }
+  }
+
   const byName = DIR_SUMMARIES[lower]
   if (byName) {
     // 脚本类目录里若大半是测试文件,改口成自测工具箱(带数量更实在)
@@ -327,7 +341,7 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
       const directFiles = node.children.filter((c) => c.type === 'file')
       const testFiles = directFiles.filter((c) => isTestFileName(c.name))
       if (directFiles.length > 0 && testFiles.length * 2 >= directFiles.length) {
-        return { emoji: '🧪', text: `自测工具箱:${testFiles.length} 个测试脚本,改完代码跑一遍验身` }
+        return { emoji: '🧪', text: `自测工具箱:${n(testFiles.length)} 个测试脚本,改完代码跑一遍验身` }
       }
     }
     return byName
@@ -338,22 +352,12 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
     return { emoji: '📁', text: '还没探:点开它,马上帮你探这一层' }
   }
 
-  // 这层打开被拒(多半是 Windows 锁住的系统文件夹):老实说"不让看",别谎报成空文件夹
-  if (node.truncated && fileCount === 0 && directDirs === 0) {
-    return { emoji: '🔒', text: '系统不让看:被 Windows 锁住的内部文件夹,不是空的,也不用看' }
-  }
-
-  if (fileCount === 0 && directDirs === 0) {
-    return { emoji: '📂', text: '空文件夹:暂时啥也没装' }
-  }
-
-  // 全是文字资料、一份代码没有:老实说它是资料间
   if (fileCount > 0 && extCounts.size > 0 && [...extCounts.keys()].every((ext) => DOC_EXTS.has(ext))) {
-    return { emoji: '📚', text: `资料间:${fileCount} 份文字资料,一份代码没有` }
+    return { emoji: '📚', text: `资料间:${n(fileCount)} 份文字资料,一份代码没有` }
   }
 
   if (fileCount === 0 && directDirs > 0) {
-    return { emoji: '📁', text: `分类抽屉:里头划了 ${directDirs} 个子文件夹,没散文件` }
+    return { emoji: '📁', text: `分类抽屉:里头划了 ${n(directDirs)} 个子文件夹,没散文件` }
   }
 
   // 没有名字线索,靠内容说话:哪种语言最多
@@ -366,9 +370,9 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
     }
   }
   if (topLang) {
-    return { emoji: '🧱', text: `装着 ${fileCount} 个文件,大头是${topLang}代码` }
+    return { emoji: '🧱', text: `装着 ${n(fileCount)} 个文件,大头是${topLang}代码` }
   }
-  return { emoji: '📦', text: `装着 ${fileCount} 个文件,没认出是什么代码` }
+  return { emoji: '📦', text: `装着 ${n(fileCount)} 个文件,没认出是什么代码` }
 }
 
 interface DirTally {

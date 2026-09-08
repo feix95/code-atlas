@@ -41,6 +41,9 @@ async function main(): Promise<void> {
   // ── 2. 名字模式规则:tsconfig 变体 / eslint / env / 打包流水线 ──
   const cases: Array<[ScanFileNode, string]> = [
     [file('tsconfig.node.json'), 'TypeScript 的尺子'],
+    [file('tsconfig.json'), 'TypeScript 的尺子'],
+    [file('.prettierrc.json'), '排版规矩'],
+    [file('.prettierrc'), '排版规矩'],
     [file('eslint.config.mjs'), '体检医生'],
     [file('.env.local'), '环境变量'],
     [file('electron.vite.config.ts'), '打包流水线'],
@@ -137,8 +140,21 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [locked]))
   assert.ok(textOf(locked).startsWith('🔒'), `被锁的空目录要说系统不让看,实际:${textOf(locked)}`)
 
+  // ── 9. 事实压过绰号 + 残账说"至少":空抽屉不喊绰号,截断的家底不报成总数 ──
+  const emptyConfig = dir('config')
+  annotateSummaries(dir('proj', [emptyConfig]))
+  assert.ok(textOf(emptyConfig).includes('空文件夹'), `探空的 config 要老实说空,不许喊「配置间」绰号,实际:${textOf(emptyConfig)}`)
+
+  const cutRoot = dir('huge', Array.from({ length: 3 }, (_, i) => file(`f${i}.ts`, TS)), { truncated: true })
+  annotateSummaries(dir('proj', [cutRoot]))
+  assert.ok(textOf(cutRoot).includes('至少 3 个文件'), `截断的家底要说「至少」,不许把残账报成总数,实际:${textOf(cutRoot)}`)
+
+  const cutNotes = dir('notes', [file('a.md'), file('b.md'), file('c.md')], { truncated: true })
+  annotateSummaries(dir('proj', [cutNotes]))
+  assert.ok(textOf(cutNotes).includes('至少 3 份'), `截断的资料间也要说「至少」,实际:${textOf(cutNotes)}`)
+
   console.log('✅ 全树速览自测全部通过')
-  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖 · 未探占位 · 被锁目录')
+  console.log('   文件名字典 · 模式规则 · 角色与内容兜底 · 目录名字典 · scripts 看内容改口 · 家底聚合 · 整树全覆盖 · 未探占位 · 被锁目录 · 事实压绰号')
 }
 
 main().catch((err) => {
