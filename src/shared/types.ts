@@ -87,6 +87,10 @@ export interface DriveInfo {
   root: string
   free?: number
   total?: number
+  /** 卷标(用户给盘起的名,如「新加卷」);问不到不填(界面回退按类型叫) */
+  label?: string
+  /** 盘的来路:固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到不填 */
+  kind?: 'fixed' | 'removable' | 'network' | 'optical'
 }
 
 export interface ScanResult {

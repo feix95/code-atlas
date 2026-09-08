@@ -43,6 +43,9 @@
   --muted-2: #a1a6aa;
   --accent: #147dcc;
   --accent-hover: #0f6db3;
+  /* 实心主题色件上的字色:第七十九锤起由 appearance 按派生主题色的对比度自动翻深浅,
+     亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
+  --accent-ink: #ffffff;
   --accent-soft: #eef0f2;
   --accent-line: #bfdef1;
   --green: #38a169;
@@ -78,6 +81,7 @@
   --muted-2: #778289;
   --accent: #5fb0e6;
   --accent-hover: #82c4ef;
+  --accent-ink: #10222e; /* 第七十九锤:实心主题色件字色改自适应,暗色默认压深字 */
   --accent-soft: #2b333a;
   --accent-line: #2e607d;
   --green: #55c07e;
@@ -362,7 +366,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   height: 1.5rem;
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 0.875rem;
   border-radius: 0.4375rem;
   background: linear-gradient(135deg, var(--accent), var(--secondary));
@@ -406,7 +410,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .btn-primary {
-  color: #fff;
+  color: var(--accent-ink);
   border-color: var(--accent);
   background: var(--accent);
   box-shadow: 0 2px 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
@@ -415,10 +419,6 @@ body.is-maximized .traffic-lights .is-max i::after {
 .btn-primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-}
-
-:root[data-theme='dark'] .btn-primary {
-  color: #10222e;
 }
 
 .btn-ghost {
@@ -2010,7 +2010,7 @@ body.is-sash-dragging {
   padding: 0 0.1875rem;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 0.625rem;
   font-weight: 700;
   line-height: 0.875rem;
@@ -2244,11 +2244,7 @@ body.is-sash-dragging {
 .chip-link.is-on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
-}
-
-:root[data-theme='dark'] .chip-link.is-on {
-  color: #10222e;
+  color: var(--accent-ink);
 }
 
 /* ── 欢迎页 / 扫描中 ── */
@@ -2297,6 +2293,107 @@ body.is-sash-dragging {
   margin-top: var(--space-5);
 }
 
+/* ── 最近打开(第八十一锤):首页一排小卡,点一下回上次的项目;✕ 只删记录不动文件夹 ── */
+
+.recents {
+  margin-top: var(--space-6);
+  max-width: 46rem;
+}
+
+.recents-title {
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.recents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.recent-card {
+  position: relative;
+  min-width: 0;
+}
+
+.recent-open {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.recent-open:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+/* 长路径掐头留尾:卡片里只露项目名和上次时间,全路径悬停看 */
+.recent-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+}
+
+.recent-time {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.recent-remove {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  font-size: 0.625rem;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.recent-card:hover .recent-remove,
+.recent-remove:focus-visible {
+  opacity: 1;
+}
+
+.recent-remove:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* 键盘用户和触屏没有 hover:聚焦时 ✕ 也要在;系统声明无悬停设备时常显 */
+@media (hover: none) {
+  .recent-remove {
+    opacity: 1;
+  }
+}
+
 .drive-card {
   display: flex;
   align-items: center;
@@ -2340,6 +2437,27 @@ body.is-sash-dragging {
   flex-direction: column;
   gap: 0.125rem;
   min-width: 0;
+}
+
+/* 容量条(第八十一锤):像手机存储那样一眼看胖瘦;剩不到一成转琥珀提醒 */
+.drive-bar {
+  display: block;
+  height: 0.25rem;
+  margin-top: 0.1875rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+}
+
+.drive-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--secondary);
+}
+
+.drive-bar.is-low > i {
+  background: var(--amber);
 }
 
 .drive-info strong {
@@ -3504,7 +3622,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-path-input button:hover {
-  color: #fff;
+  color: var(--accent-ink);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -3660,7 +3778,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-btn-apply {
-  color: #fff;
+  color: var(--accent-ink);
   border: 1px solid var(--accent);
   background: var(--accent);
   box-shadow: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
@@ -3701,14 +3819,7 @@ body.is-maximized .cfg-layer {
   letter-spacing: 0;
 }
 
-/* 暗色下主色变浅,实心按钮和悬停填充的字跟着换深色保对比 */
-:root[data-theme='dark'] .cfg-btn-apply {
-  color: #10222e;
-}
-
-:root[data-theme='dark'] .cfg-path-input button:hover {
-  color: #10222e;
-}
+/* 第七十九锤:实心主题色件的字色统一走 --accent-ink 自适应,暗色硬编码 override 退场 */
 
 :root[data-theme='dark'] .cfg-switch span {
   background: #e5eaed;

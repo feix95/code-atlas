@@ -49,6 +49,7 @@ import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinR
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
+import { queryDriveMeta } from './drive-meta.ts'
 import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
@@ -478,23 +479,51 @@ function registerIpc(): void {
 
   // 列盘符(第六十锤):只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
   // 跳过 A/B(软驱遗物,探测可能卡好几秒);容量用 statfs 一次系统调用,拿不到就只给盘符
+  // 列盘符(第八十一锤加固):①所有盘一起问、单盘 2.5 秒不答就当缺席 —— 掉线的网络映射盘
+  // 以前能拖住整列;②卷标和盘的来路(固定/移动/网络/光驱)一次 PowerShell 问齐,失败/超时就
+  // 当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(元数据带 5 秒小缓存,回首页
+  // 重列盘符时不用次次都起 PowerShell)
   ipcMain.handle('atlas:list-drives', async (): Promise<DriveInfo[]> => {
-    const out: DriveInfo[] = []
-    for (const ch of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+    /** 单个询问加超时:到点回 null,慢半拍的输家就地安静,不许变未处理的拒绝 */
+    const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> => {
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const bell = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms)
+      })
+      p.catch(() => null)
+      return Promise.race([p.catch(() => null), bell]).finally(() => {
+        if (timer) clearTimeout(timer)
+      })
+    }
+
+    const probeLetter = async (ch: string): Promise<DriveInfo | null> => {
       const root = `${ch}:\\`
-      if (!(await fs.stat(root).then(() => true, () => false))) continue
+      const exists = await withTimeout(fs.stat(root).then(() => true, () => false), 2500)
+      if (!exists) return null
       const info: DriveInfo = { letter: ch, root }
-      const usage = await fs.statfs(root).then(
-        (s) => ({ free: s.bsize * s.bfree, total: s.bsize * s.blocks }),
-        () => null
+      const usage = await withTimeout(
+        fs.statfs(root).then((s) => ({ free: s.bsize * s.bfree, total: s.bsize * s.blocks })),
+        2500
       )
       if (usage) {
         info.free = usage.free
         info.total = usage.total
       }
-      out.push(info)
+      return info
     }
-    return out
+
+    const letters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+    const drives = (await Promise.all(letters.map(probeLetter))).filter((d): d is DriveInfo => d !== null)
+    const meta = await queryDriveMeta()
+    if (meta) {
+      for (const d of drives) {
+        const m = meta.get(d.letter)
+        if (!m) continue
+        if (m.label) d.label = m.label
+        if (m.kind) d.kind = m.kind
+      }
+    }
+    return drives
   })
 
   // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)

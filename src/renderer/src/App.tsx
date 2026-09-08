@@ -14,6 +14,13 @@ import { SettingsDialog } from './components/SettingsDialog'
 import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
+import {
+  formatRecentTime,
+  forgetRecentProject,
+  readRecentProjects,
+  rememberRecentProject,
+  type RecentProject
+} from './recents'
 import { useAiAsk } from './useAiAsk'
 import { useAiChat } from './useAiChat'
 import { useWindowMaximized } from './useWindowMaximized'
@@ -132,6 +139,8 @@ function App(): React.JSX.Element {
   // 首页盘符列表(第六十锤):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
   const [drives, setDrives] = useState<DriveInfo[] | null>(null)
   const [drivesNote, setDrivesNote] = useState<string | null>(null)
+  // 最近打开的项目(第八十一锤):存 localStorage,开过谁就记谁,首页一排卡片点回去
+  const [recents, setRecents] = useState<RecentProject[]>(() => readRecentProjects())
   const [folder, setFolder] = useState<string | null>(null)
   // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
   const [pathDraft, setPathDraft] = useState('')
@@ -174,13 +183,18 @@ function App(): React.JSX.Element {
     return () => document.body.classList.remove('is-maximized')
   }, [maximized])
 
-  // 开屏就列盘符;列失败不堵路 —— 提示一声,「打开项目」照样能用
+  // 开屏列盘符,之后每回退回首页(含 logo 回家)都重列一遍(第八十一锤):
+  // app 开着的时候插的 U 盘、拔的移动盘,回家永远见得到;重列期间老列表照常摆着,不闪空
   useEffect(() => {
+    if (folder) return
     let alive = true
     window.atlas
       .listDrives()
       .then((list) => {
-        if (alive) setDrives(list)
+        if (alive) {
+          setDrives(list)
+          setDrivesNote(null)
+        }
       })
       .catch(() => {
         if (alive) setDrivesNote('盘符列不出来 —— 用上方「打开项目」选文件夹也一样使')
@@ -188,7 +202,7 @@ function App(): React.JSX.Element {
     return () => {
       alive = false
     }
-  }, [])
+  }, [folder])
 
   // 界面缩放系数:设置页滑条实时改;左栏宽度要按比例跟着走(固定像素不跟缩放,
   // 高倍率下文字变大、面板不变,挤在一起 —— 第四十四锤修的根因就在这)
@@ -289,6 +303,8 @@ function App(): React.JSX.Element {
     try {
       const scanned = await window.atlas.scanFolder(dir)
       setResult(scanned)
+      // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
+      setRecents(rememberRecentProject(dir))
       flashToast(`地图画好了:${scanned.stats.fileCount} 个文件`)
       // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
       setGitLoading(true)
@@ -420,9 +436,41 @@ function App(): React.JSX.Element {
     setActiveTab('overview')
   }
 
-  // logo = 回项目总览主页:钻到多深的子目录,一键回总览;没开项目时按钮自己变灰
+  // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
+  // 上次开的路径留在输入框里,想回这个项目点「前往」就行。没开项目时按钮自己变灰
   function goHome(): void {
-    if (folder) clearSelection()
+    if (!folder) return
+    clearSelection()
+    setFolder(null)
+    setResult(null)
+    setError(null)
+    setGraph(null)
+    setGraphNote(null)
+    setExpanding(null)
+    setTreeNote(null)
+    setGitInfo(null)
+    setPathHint(null)
+  }
+
+  // 最近列表点 ✕:只删记录,不碰文件夹本身(第八十一锤)
+  function removeRecent(path: string): void {
+    setRecents(forgetRecentProject(path))
+  }
+
+  /** 盘的来路人话(第八十一锤):固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到照旧叫本地磁盘 */
+  function driveKindName(d: DriveInfo): string {
+    if (d.kind === 'removable') return 'U 盘或移动硬盘'
+    if (d.kind === 'network') return '网络盘'
+    if (d.kind === 'optical') return '光驱'
+    if (d.kind === 'fixed') return '固定硬盘'
+    return '本地磁盘'
+  }
+
+  /** 容量条走掉的百分比(0~100);拿不到容量回 null(不画条) */
+  function driveUsedPercent(d: DriveInfo): number | null {
+    if (!d.total) return null
+    const used = (d.total - (d.free ?? 0)) / d.total
+    return Math.round(Math.min(100, Math.max(0, used * 100)))
   }
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
@@ -453,9 +501,9 @@ function App(): React.JSX.Element {
           type="button"
           className="brand"
           onClick={goHome}
-          disabled={!folder}
-          title={folder ? '回到项目总览' : '先打开一个项目,logo 就能带你回去'}
-          aria-label="回到项目总览"
+          disabled={!folder || scanning}
+          title={folder ? '回到这台电脑' : '已经在这台电脑了'}
+          aria-label="回到这台电脑"
         >
           <span className="brand-mark" aria-hidden="true">
             ⌁
@@ -601,6 +649,30 @@ function App(): React.JSX.Element {
             <div className="drives-view">
               <h1>这台电脑</h1>
               <p className="empty-hint">点一个盘就开门画图;想直奔某个项目,用上方「打开项目」或粘贴路径</p>
+              {recents.length > 0 && (
+                <div className="recents">
+                  <p className="recents-title">最近打开</p>
+                  <div className="recents-grid">
+                    {recents.map((r) => (
+                      <div key={r.p} className="recent-card">
+                        <button type="button" className="recent-open" onClick={() => void scanPath(r.p)} title={r.p}>
+                          <strong className="recent-name">{r.n}</strong>
+                          <small className="recent-time">{formatRecentTime(r.t)}</small>
+                        </button>
+                        <button
+                          type="button"
+                          className="recent-remove"
+                          onClick={() => removeRecent(r.p)}
+                          aria-label={`从最近列表删掉 ${r.n}`}
+                          title="只删这条记录,不动文件夹本身"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {drives === null && !drivesNote ? (
                 <div className="state">
                   <ProgressDots />
@@ -610,15 +682,26 @@ function App(): React.JSX.Element {
                 <Notice kind="error">{drivesNote}</Notice>
               ) : (
                 <div className="drives-grid">
-                  {(drives ?? []).map((d) => (
-                    <button key={d.letter} type="button" className="drive-card" onClick={() => void scanPath(d.root)}>
-                      <strong className="drive-letter">{d.letter}:</strong>
-                      <span className="drive-info">
-                        <strong>本地磁盘</strong>
-                        <small>{driveCapacity(d)}</small>
-                      </span>
-                    </button>
-                  ))}
+                  {(drives ?? []).map((d) => {
+                    const used = driveUsedPercent(d)
+                    return (
+                      <button key={d.letter} type="button" className="drive-card" onClick={() => void scanPath(d.root)}>
+                        <strong className="drive-letter">{d.letter}:</strong>
+                        <span className="drive-info">
+                          <strong>{d.label || driveKindName(d)}</strong>
+                          <small>
+                            {d.label ? `${driveKindName(d)} · ` : ''}
+                            {driveCapacity(d)}
+                          </small>
+                          {used !== null && (
+                            <i className={`drive-bar${d.free !== undefined && d.free / d.total! < 0.1 ? ' is-low' : ''}`}>
+                              <i style={{ width: `${used}%` }} />
+                            </i>
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
