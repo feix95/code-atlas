@@ -14,7 +14,8 @@ import type {
   ModelFitVerdict,
   ModelStatus,
   ScanDirNode,
-  ScanResult
+  ScanResult,
+  DevLogEntry
 } from '../shared/types.ts'
 
 // 界面缩放(第四十七锤起换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
@@ -138,5 +139,15 @@ contextBridge.exposeInMainWorld('atlas', {
     return () => ipcRenderer.removeListener('atlas:model-status', listener)
   },
   /** 量尺(第七十三锤):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
-  modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> => ipcRenderer.invoke('atlas:model-fit-check', modelPath)
+  modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> => ipcRenderer.invoke('atlas:model-fit-check', modelPath),
+  // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
+  devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
+  devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),
+  devLogsOpen: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-open'),
+  /** 订阅新日志条目;返回退订函数,组件卸载时调用 */
+  onDevLog: (callback: (entry: DevLogEntry) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: DevLogEntry): void => callback(entry)
+    ipcRenderer.on('atlas:dev-log', listener)
+    return () => ipcRenderer.removeListener('atlas:dev-log', listener)
+  }
 })

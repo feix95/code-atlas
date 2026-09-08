@@ -77,7 +77,7 @@ export function ModelStatusBar(): React.JSX.Element {
             {status.message}
           </span>
         )}
-        {/* 右:模型数据 */}
+        {/* 右:模型数据 + 后台日志入口(第八十七锤) */}
         <span className="model-right">
           {status.modelName && (
             <span className="model-name mono" title={status.modelName}>
@@ -85,6 +85,14 @@ export function ModelStatusBar(): React.JSX.Element {
             </span>
           )}
           {size && <span className="model-size mono">{size}</span>}
+          <button
+            type="button"
+            className="model-act"
+            title="Developer 日志:看模型后台原话、请求报账"
+            onClick={() => void window.atlas.devLogsOpen()}
+          >
+            日志
+          </button>
         </span>
         {/* 进度线:贴着整条底栏底下走,按底栏全长当最大;就绪时满宽绿线退场;其他状态一根毛都不画 */}
         {(status.state === 'loading' || status.state === 'ready') && (

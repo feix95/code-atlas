@@ -864,6 +864,15 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                   )}
                 </div>
 
+                {/* Developer 日志(第八十七锤):模型后台原话的常设入口,不用展开高级面板就够得着 */}
+                <div className="cfg-devlog-row">
+                  <button type="button" className="cfg-devlog-btn" onClick={() => void window.atlas.devLogsOpen()}>
+                    <Icon name="monitor" size={13} />
+                    打开后台日志
+                  </button>
+                  <p className="cfg-field-help">Developer 日志:引擎原话、每笔请求的报账、应用的记账,全在一本账里 —— 模型在干嘛、卡在哪,开窗就知道。</p>
+                </div>
+
                 <div className="cfg-versions">
                   <span className="cfg-versions-label">
                     <Icon name="info" size={12} />

@@ -8,6 +8,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import os from 'node:os'
 import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
+import { addDevLog } from '../shared/devlog.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 const BUILTIN_PORT = 8766
@@ -462,10 +463,12 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
     const image = await tasklistImage(pid)
     if (!image) continue
     if (image.toLowerCase() !== ENGINE_IMAGE) {
+      addDevLog('system', `端口 ${BUILTIN_PORT} 被别的程序占着(${image}),不动它`)
       blockedBy = image
       continue
     }
     await runCommand('taskkill', ['/PID', String(pid), '/F']).catch(() => {})
+    addDevLog('system', `收尸:请走了占着端口 ${BUILTIN_PORT} 的孤儿引擎进程(PID ${pid})`)
     killedAny = true
   }
   // 强杀后端口释放要一两秒,等它真放开再交差
@@ -562,6 +565,11 @@ async function startAndWaitReady(
   const facts = builtinIdleFacts(modelPath)
   const startedAt = Date.now()
   const lastWarmupMs = readWarmupMs(modelPath)
+  // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
+  addDevLog(
+    'system',
+    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${Math.max(512, Math.floor(contextSize))} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT}`
+  )
   child = spawn(
     serverPath,
     [
@@ -578,9 +586,29 @@ async function startAndWaitReady(
     ],
     {
       windowsHide: true,
-      stdio: 'ignore'
+      // 第八十七锤:stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
+      stdio: ['ignore', 'pipe', 'pipe']
     }
   )
+  // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
+  // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
+  const feedEngineStream = (stream: NodeJS.ReadableStream | null): void => {
+    if (!stream) return
+    let leftover = ''
+    stream.on('data', (chunk: Buffer) => {
+      leftover += chunk.toString('utf8')
+      const lines = leftover.split(/\r\n|\r|\n/)
+      leftover = lines.pop() ?? ''
+      for (const line of lines) {
+        if (line.trim()) addDevLog('engine', line)
+      }
+    })
+    stream.on('end', () => {
+      if (leftover.trim()) addDevLog('engine', leftover)
+    })
+  }
+  feedEngineStream(child.stdout)
+  feedEngineStream(child.stderr)
   const announceLoading = (realProgress: number | null): void => {
     const elapsed = Date.now() - startedAt
     const est = realProgress ?? estimateLoadProgress(elapsed, lastWarmupMs)
@@ -594,6 +622,7 @@ async function startAndWaitReady(
   // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,验尸时好认
   const exitError = new Promise<never>((_, reject) => {
     child?.once('exit', (code) => {
+      addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎启动就退出了(退出码 ${code ?? '未知'})`)
       reject(
         new EngineExitError(
           code ?? null,
@@ -604,6 +633,7 @@ async function startAndWaitReady(
       )
     })
     child?.once('error', (err) => {
+      addDevLog('system', `引擎没法启动:${err.message}`)
       const msg =
         (err as NodeJS.ErrnoException).code === 'ENOENT'
           ? '找不到 llama-server 程序:去「AI 设置」重新选一下程序路径'
@@ -641,6 +671,7 @@ async function startAndWaitReady(
 
     // 热身真耗时入账:下次同一模型的估价就有据可依
     recordWarmupMs(modelPath, Date.now() - startedAt)
+    addDevLog('system', `引擎就绪:模型加载完成,耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`)
 
     // 就绪后问它加载了哪个模型;刚就绪就断线的话给人话兜底
     let model: string
@@ -656,6 +687,7 @@ async function startAndWaitReady(
     // 就绪之后再夭折(跑着跑着崩了):状态栏如实报故障,下次提问会自动重新拉起;
     // 用户主动卸下的不算,走 stopping 标记闭嘴
     child?.once('exit', (code) => {
+      addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎中途退出了(退出码 ${code ?? '未知'})`)
       if (!stopping) {
         announceBuiltin(
           builtinStatus('error', model, facts.sizeBytes, null, `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`)

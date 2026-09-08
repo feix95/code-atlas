@@ -49,6 +49,7 @@ import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinR
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
+import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
@@ -333,6 +334,67 @@ function announceActivityIdle(): void {
   }
 }
 
+// ── Developer 日志窗口(第八十七锤):模型后台原话亮出来看 ──
+// 独立小窗(frameless,和主窗一个壳),渲染层用 ?view=devlogs 分支画日志页。
+// 引擎的每一行原话、每笔请求报账,广播员推给所有窗口,这窗常驻收听。
+
+let devLogWindow: BrowserWindow | null = null
+
+function openDevLogWindow(): void {
+  if (devLogWindow && !devLogWindow.isDestroyed()) {
+    devLogWindow.focus()
+    return
+  }
+  const win = new BrowserWindow({
+    width: 780,
+    height: 560,
+    minWidth: 560,
+    minHeight: 380,
+    title: 'Developer 日志 · CodeAtlas',
+    autoHideMenuBar: true,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    }
+  })
+  devLogWindow = win
+  win.on('closed', () => {
+    if (devLogWindow === win) devLogWindow = null
+  })
+  // 露窗三保险,和主窗同一条链:ready-to-show 快路 + 渲染层双 rAF 首帧信号
+  // (按 sender 认窗,不抢主窗的信号)+ 3 秒看门狗,绝不永久隐身
+  let shown = false
+  const showOnce = (): void => {
+    if (shown || win.isDestroyed()) return
+    shown = true
+    win.show()
+  }
+  win.once('ready-to-show', showOnce)
+  const onFirstFrame = (_event: Electron.IpcMainEvent): void => {
+    if (_event.sender === win.webContents) {
+      showOnce()
+      ipcMain.removeListener('atlas:first-frame', onFirstFrame)
+    }
+  }
+  ipcMain.on('atlas:first-frame', onFirstFrame)
+  setTimeout(showOnce, 3000)
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
+    const url = new URL(process.env['ELECTRON_RENDERER_URL'])
+    url.searchParams.set('view', 'devlogs')
+    void win.loadURL(url.toString())
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'devlogs' } })
+  }
+}
+
 function createWindow(): void {
   // ── 第七十八锤:窗口尺寸记事本 ──
   // 上回把窗拉到多大、搁在哪儿,这回开窗就照旧;最大化单独记一票,还原时先落回上次的
@@ -441,7 +503,11 @@ function createWindow(): void {
   const modelStatusTimer = setInterval(() => {
     void refreshModelStatus().catch(() => {})
   }, 10_000)
-  mainWindow.on('closed', () => clearInterval(modelStatusTimer))
+  mainWindow.on('closed', () => {
+    clearInterval(modelStatusTimer)
+    // 主窗走了,Developer 日志窗没有独活的意义:一起带走,应用照常退出
+    if (devLogWindow && !devLogWindow.isDestroyed()) devLogWindow.close()
+  })
   // 4) 看门狗(唯一无条件的兜底):3 秒硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫。
   //    隐藏的透明窗此刻多半还没内容,用户看到「窗口浮现」的实际时刻仍是首帧画好之时
   setTimeout(() => showOnce('watchdog-3s'), 3000)
@@ -565,6 +631,15 @@ function registerIpc(): void {
 
   // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)
   ipcMain.handle('atlas:app-version', () => app.getVersion())
+
+  // ── Developer 日志(第八十七锤):拉全量 / 清账 / 开窗 ──
+  ipcMain.handle('atlas:dev-log-pull', () => devLogSnapshot())
+  ipcMain.handle('atlas:dev-log-clear', () => {
+    clearDevLogs()
+  })
+  ipcMain.handle('atlas:dev-log-open', () => {
+    openDevLogWindow()
+  })
 
   // 扫描指定文件夹,返回目录树 + 统计;顺手给每个节点打大白话速览标签
   ipcMain.handle('atlas:scan-folder', async (_event, folderPath: unknown) => {
@@ -1151,6 +1226,14 @@ async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
 app.whenReady().then(() => {
   createWindow()
   registerIpc()
+
+  // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
+  setDevLogListener((entry) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('atlas:dev-log', entry)
+    }
+  })
+  addDevLog('system', 'CodeAtlas 启动')
 
   // 内置引擎的状态播报员上岗:引擎一动(热身/进度/就绪/出岔子/被卸下)就广播给状态栏
   setBuiltinStatusAnnouncer(broadcastModelStatus)

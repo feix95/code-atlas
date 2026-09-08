@@ -302,6 +302,19 @@ export interface AiStreamStats {
   tokensPerSecond?: number
 }
 
+/** 后台日志的来源(第八十七锤,Developer 日志窗口):引擎原话 / 请求报账 / 应用记账 */
+export type DevLogSource = 'engine' | 'request' | 'system'
+
+/** 后台日志的一条记录:只记元数据和引擎输出,绝不记用户的问题内容 */
+export interface DevLogEntry {
+  /** 单调递增序号,窗口端按它判断新行 */
+  id: number
+  /** 记账时刻(毫秒时间戳) */
+  ts: number
+  source: DevLogSource
+  text: string
+}
+
 /**
  * 自由对话挂到消息旁的「当前参考资料」:机器扫描出来的资料,仅供参考。
  * 它是本轮请求的附件,绝不混进对话历史 —— 切换文件时旧资料不会污染新对话。

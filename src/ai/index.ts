@@ -17,6 +17,8 @@ import type { AiUsage, AiStreamStats,
   WebLookupMeta
 } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
+import { addDevLog } from '../shared/devlog.ts'
+import { formatUsage } from '../shared/aiText.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -962,8 +964,34 @@ export function friendlyHttpError(status: number, detail: string): string | null
  * 一旦没动静立刻掐断 —— 绝不无限挂死,也不把慢模型的正常输出拦腰砍断。
  * signal = 外部取消(用户换了讲解目标):立刻掐,不让过气的生成占着模型排队。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
+ * 第八十七锤:所有模型请求都过这一道 —— 起止都在后台日志里报账(只记元数据:
+ * 消息条数、提示词字数、token 账、耗时,问题内容一个字不落账)。
  */
 export async function explainWithMessages(
+  config: ChatTarget,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  onDelta?: (text: string, stats?: AiStreamStats) => void,
+  signal?: AbortSignal,
+  maxTokens = 500
+): Promise<AiExplainResult> {
+  const startedAt = Date.now()
+  const promptChars = messages.reduce((sum, m) => sum + m.content.length, 0)
+  addDevLog(
+    'request',
+    `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}`
+  )
+  const result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens)
+  const took = ((Date.now() - startedAt) / 1000).toFixed(1)
+  if (result.status === 'supported') {
+    const account = result.usage ? ` · ${formatUsage(result.usage)}` : ''
+    addDevLog('request', `回答完成 · 输出约 ${result.text.length} 字${account} · 耗时 ${took} 秒`)
+  } else {
+    addDevLog('request', `这轮没成(${result.status}) · ${result.text.slice(0, 80)} · 耗时 ${took} 秒`)
+  }
+  return result
+}
+
+async function explainWithMessagesCore(
   config: ChatTarget,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   onDelta?: (text: string, stats?: AiStreamStats) => void,
