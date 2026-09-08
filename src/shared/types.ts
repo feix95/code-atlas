@@ -18,8 +18,6 @@ export interface ScanFileNode {
   relPath: string
   /** 小写扩展名(含点),如 '.ts';无扩展名则为空字符串 */
   ext: string
-  /** 文件多大(字节,第九十锤):扫描时顺手 stat 一把;拿不到记 0,不编数 */
-  sizeBytes: number
   /** 语言识别结果;认不出语言时不填 */
   language?: LanguageTag
   /** 全树速览标签;规则引擎实在认不出时不填(界面不硬凑) */

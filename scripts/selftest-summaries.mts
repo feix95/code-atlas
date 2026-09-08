@@ -12,7 +12,6 @@ function file(name: string, language?: LanguageTag): ScanFileNode {
     name,
     relPath: `f${fileSeq}/${name}`,
     ext: dot > 0 ? name.slice(dot).toLowerCase() : '',
-    sizeBytes: 0,
     ...(language ? { language } : {})
   }
 }

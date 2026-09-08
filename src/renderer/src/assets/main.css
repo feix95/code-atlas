@@ -783,15 +783,6 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-variant-numeric: tabular-nums;
 }
 
-/* 右缘数字栏:文件/文件夹多大(第九十锤);等宽 + 表格数字,竖着扫一列能对齐 */
-.tree-size {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.5625rem;
-  font-variant-numeric: tabular-nums;
-}
-
 /* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
 .tree-badge {
   flex: 0 0 auto;

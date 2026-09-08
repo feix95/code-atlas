@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
-import { formatSize } from '@shared/format'
-import { computeTreeSizes, type DirSize } from '@shared/treeSize'
 
 interface TreeRowProps {
   node: ScanTreeNode
@@ -11,15 +9,13 @@ interface TreeRowProps {
   expandingPath: string | null
   /** 搜索过滤词;空串 = 不过滤(过滤时全树按名字匹配,目录自动全展开) */
   filter: string
-  /** 文件夹大小账本(relPath → 总和 + 是否算得准),第九十锤;文件不看这本账 */
-  dirSizes: Map<string, DirSize>
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, selectedPath, expandingPath, filter, dirSizes, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -50,8 +46,6 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, dirSizes, o
           <span className="tree-name">{node.name}</span>
           {node.summary && <span className="tree-summary">{node.summary.text}</span>}
           {node.ext && <span className="tree-tag">{node.ext.slice(1).toUpperCase()}</span>}
-          {/* 右缘数字栏:文件报自己多大(第九十锤) */}
-          <span className="tree-size">{formatSize(node.sizeBytes)}</span>
         </button>
       </div>
     )
@@ -105,12 +99,6 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, dirSizes, o
           {dir.lazy && <span className="tree-badge is-warn">未扫描</span>}
           {dir.truncated && !dir.lazy && <span className="tree-badge is-warn">不完整</span>}
           {!dir.lazy && dir.children.length > 0 && <span className="tree-count">{dir.children.length}</span>}
-          {/* 右缘数字栏:文件夹只有子孙探全了总和才算得准,残账宁可不亮(第九十锤);
-              空文件夹不亮 0 B,摘要已经说了它空着 */}
-          {(() => {
-            const size = dirSizes.get(dir.relPath)
-            return size?.complete && size.bytes > 0 ? <span className="tree-size">{formatSize(size.bytes)}</span> : null
-          })()}
         </button>
       </div>
       {expanded &&
@@ -122,7 +110,6 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, dirSizes, o
             selectedPath={selectedPath}
             expandingPath={expandingPath}
             filter={filter}
-            dirSizes={dirSizes}
             onSelectFile={onSelectFile}
             onSelectFolder={onSelectFolder}
             onExpandLazy={onExpandLazy}
@@ -167,9 +154,6 @@ export function FileTree({ root, selectedPath, expandingPath, onSelectFile, onSe
     return filterTree(root, q)
   }, [root, q])
 
-  // 大小账本跟着树走:懒展开探开一层,树换新账本重算,文件夹总和自动跟上(第九十锤)
-  const dirSizes = useMemo(() => computeTreeSizes(root), [root])
-
   return (
     <>
       <div className="sidebar-top">
@@ -193,7 +177,6 @@ export function FileTree({ root, selectedPath, expandingPath, onSelectFile, onSe
               selectedPath={selectedPath}
               expandingPath={expandingPath}
               filter={q}
-              dirSizes={dirSizes}
               onSelectFile={onSelectFile}
               onSelectFolder={onSelectFolder}
               onExpandLazy={onExpandLazy}
