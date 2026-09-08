@@ -48,7 +48,7 @@ import {
 } from '../src/ai/index.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -807,7 +807,13 @@ async function main(): Promise<void> {
   assert.equal(parseNvidiaSmi('AMD Radeon, N/A MiB'), null, 'N/A 显存不可信')
 
   // 小葵的实机(32GB 内存 + 16GB 4060Ti 级显存,14.26GB 模型):全进卡,绿灯
-  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level, 'ok', '14.26GB 模型 vs 16GB 显存:绿灯')
+  // 第八十六锤:量尺把上下文缓存算进去 —— 小葵的 14.26GB vs 16GB 从绿翻黄(权重+缓存超出九成线)
+  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level, 'tight', '14.26GB+缓存 vs 16GB 显存:黄灯(读大材料会慢)')
+  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('上下文'), '黄灯细节要点名上下文缓存')
+  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('慢'), '黄灯细节要说清读大材料会慢')
+  // 上下文旋钮:调小缓存,同一块头翻回绿灯
+  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).level, 'ok', '同模型把上下文调到 512:缓存缩小,翻回绿灯')
+  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).detail.includes('512'), '绿灯细节写明按多少 tokens 估的')
   // 显存小一号:能跑但落内存,黄灯;大到显存+一半内存都兜不住,红灯
   assert.equal(judgeModelFit(10 * G, 16 * G, 8 * G).level, 'tight', '10GB 模型 vs 8GB 显存:黄灯(部分落内存)')
   assert.equal(judgeModelFit(20 * G, 16 * G, 8 * G).level, 'too-big', '20GB 模型 vs 8GB 显存+16GB 内存:红灯')
@@ -837,6 +843,13 @@ async function main(): Promise<void> {
   assert.ok(friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes('脑容量'), '小葵的 400 翻译成人话')
   assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
   assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
+
+  // ── 第八十六锤:KV 缓存估算(纯函数) ──
+  assert.equal(estimateKvBytes(4096, 14.26 * G), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
+  assert.equal(estimateKvBytes(4096, 6 * G), 4096 * 128 * 1024, '4~8GB 减半')
+  assert.equal(estimateKvBytes(4096, 2 * G), 4096 * 64 * 1024, '<4GB 再减半')
+  assert.equal(estimateKvBytes(0, 14.26 * G), 0, '上下文 0 不估')
+  assert.equal(estimateKvBytes(Number.NaN, 14.26 * G), 0, 'NaN 不估')
 
   console.log('✅ AI 人话解释自测全部通过')
 

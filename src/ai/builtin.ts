@@ -217,17 +217,46 @@ export interface ModelFitVerdictPure {
  * 有显存:≤90% 显存 = 全进卡(最快);再往上挤到「显存+一半内存」= 能跑但落内存会慢;
  * 超过 = 必然靠硬盘硬扛,直接劝退。没问到显存:只看内存,权重超过内存七成就算挤。
  */
-export function judgeModelFit(modelBytes: number, ramBytes: number, vramBytes: number | null): ModelFitVerdictPure {
+/** 上下文缓存(KV)的估算(纯函数,自测覆盖):光看权重块头会说「装得下」,
+ * 实际跑起来上下文一占就溢出显存、预处理慢吞吞(小葵 C 盘大项目的病根)。
+ * 架构细节拿不到,按模型块头分档粗估每 token 的缓存开销:≥8GB 按 64 层大模型算,
+ * 4~8GB 减半,更小的再减半 —— 宁可粗,不可无;量尺的话里标明是估的。
+ */
+export function estimateKvBytes(contextTokens: number, modelBytes: number): number {
+  if (!Number.isFinite(contextTokens) || contextTokens <= 0) return 0
+  const perToken = modelBytes >= 8 * GB ? 256 * 1024 : modelBytes >= 4 * GB ? 128 * 1024 : 64 * 1024
+  return Math.round(contextTokens * perToken)
+}
+
+export function judgeModelFit(
+  modelBytes: number,
+  ramBytes: number,
+  vramBytes: number | null,
+  contextTokens = 4096
+): ModelFitVerdictPure {
   if (vramBytes !== null && vramBytes > 0) {
-    if (modelBytes <= vramBytes * 0.9) {
-      return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},显存 ${formatGB(vramBytes)} —— 整个进显卡,跑得动` }
+    // 第八十六锤:显存是权重 + 上下文缓存一起抢的,量尺把缓存估进去再说话
+    const kv = estimateKvBytes(contextTokens, modelBytes)
+    const need = modelBytes + kv
+    if (need <= vramBytes * 0.9) {
+      return {
+        level: 'ok',
+        title: '装得下',
+        detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)≈ ${formatGB(need)},显存 ${formatGB(vramBytes)} —— 整个进显卡,跑得动`
+      }
     }
-    if (modelBytes <= vramBytes + ramBytes * 0.5) {
-      return { level: 'tight', title: '有点挤', detail: `模型 ${formatGB(modelBytes)} 比显存 ${formatGB(vramBytes)} 大,多出来的要落内存 —— 能跑,但会慢一些` }
+    if (need <= vramBytes + ramBytes * 0.5) {
+      return {
+        level: 'tight',
+        title: '有点挤',
+        detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)超出了显存 ${formatGB(vramBytes)},多出来的要落内存 —— 能跑,但读大材料时会明显变慢;把「模型上下文」调小能快回来`
+      }
     }
-    const suggest = Math.floor((vramBytes * 0.9) / GB)
-    return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},显存只有 ${formatGB(vramBytes)},连内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条` }
+    const suggest = Math.floor(Math.max(1, vramBytes * 0.9 - kv) / GB)
+    return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条` }
   }
+  // 纯内存跑(问不到显存,A/老卡):量尺只答装不装得下,缓存不另估 —— 内存机型本身就慢,
+  // 缓存那点开销改变不了结论,别拿估出来的数字吓人
   if (modelBytes <= ramBytes * 0.5) {
     return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下` }
   }
@@ -501,7 +530,7 @@ export async function ensureBuiltinServer(
       // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
       if (err instanceof EngineExitError) {
         const spec = await queryMachineSpec()
-        err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes), manualContext)
+        err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, Math.max(512, Math.floor(contextSize))), manualContext)
       }
       announceBuiltinError(modelPath, err)
     }

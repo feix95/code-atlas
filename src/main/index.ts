@@ -705,7 +705,10 @@ function registerIpc(): void {
       return { level: 'missing', title: '文件不存在', detail: '这个路径找不到文件:检查一下盘符和文件名', sizeBytes: null }
     }
     const spec = await queryMachineSpec()
-    return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes), sizeBytes }
+    // 上下文缓存跟着配置走(第八十六锤):手动填了按手动的,没填按引擎实际跑的 4096
+    const config = await loadAiConfig(app.getPath('userData'))
+    const ctx = typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : 4096
+    return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型
