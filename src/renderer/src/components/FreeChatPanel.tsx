@@ -147,7 +147,7 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
               <p className="chat-intro-title">我是 Atlas 小探针。</p>
               <p>
                 你可以问我当前项目,也可以聊点完全无关的事情。
-                {context ? '当前选中的资料会作为可选参考附在消息旁。' : '现在没有选中任何文件,咱们就纯聊天。'}
+                {context ? '当前选中的资料会作为可选参考附在消息旁。' : '没有选中任何文件,就纯聊天。'}
               </p>
             </div>
           ) : (

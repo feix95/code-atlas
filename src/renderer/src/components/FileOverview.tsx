@@ -32,7 +32,7 @@ export function FileOverview({
   return (
     <>
       <div className="section-label">
-        文件概览 <span>静态分析 · 选中即得,不劳烦模型</span>
+        文件概览 <span>静态分析 · 选中即得</span>
       </div>
       <section className="card">
         <p className="card-text">

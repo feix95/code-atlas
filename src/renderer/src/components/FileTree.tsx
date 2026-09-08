@@ -205,7 +205,7 @@ export function FileTree({ root, selectedPath, expandingPath, onSelectFile, onSe
           ) : (
             <div className="empty-state">
               <p className="empty-title">没找到叫「{filter.trim()}」的文件</p>
-              <p className="empty-hint">只搜已经扫进地图的部分;没探开的文件夹,先去树上点箭头展开</p>
+              <p className="empty-hint">只搜已扫描的部分;没展开的文件夹,先点箭头展开</p>
             </div>
           )}
         </div>

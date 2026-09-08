@@ -56,7 +56,7 @@ export function GitFileStatus({
   }
   if (!gitInfo.isGitRepo) {
     return (
-      <Notice kind="info">这个文件夹还不是 git 仓库,没有改动记录可看。选项目根目录(有 .git 的那层)再试。</Notice>
+      <Notice kind="info">这里不是 git 仓库,看不到改动记录;到有 .git 的项目根目录再试。</Notice>
     )
   }
   const change = gitInfo.changes.find((c) => c.relPath === relPath)
@@ -115,10 +115,10 @@ function ExplainChangeBlock({ rootPath, relPath }: { rootPath: string; relPath: 
   return (
     <div className="explain">
       <div className="explain-head">
-        <span className="explain-title">这次改了啥</span>
+        <span className="explain-title">这次改了什么</span>
         {(!turn || turn.state !== 'busy') && (
           <button type="button" className="btn" onClick={() => ai.ask(null)}>
-            {turn ? '再讲一次' : '让 AI 讲讲这次改了啥'}
+            {turn ? '再讲一次' : '让 AI 讲讲这次改了什么'}
           </button>
         )}
         {turn?.state === 'busy' && (

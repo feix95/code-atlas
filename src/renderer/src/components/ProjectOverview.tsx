@@ -139,7 +139,7 @@ export function ProjectOverview({
           </div>
           <div className="metric">
             <strong>{stats.lazyCount > 0 ? `${stats.lazyCount} 处` : '全扫完'}</strong>
-            <span>{stats.lazyCount > 0 ? '还没探(点开就扫)' : '扫描完整'}</span>
+            <span>{stats.lazyCount > 0 ? '还没扫完,点开就扫' : '扫描完整'}</span>
           </div>
         </div>
 

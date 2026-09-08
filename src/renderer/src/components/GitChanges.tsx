@@ -166,16 +166,16 @@ export function GitChanges({
     }
   }
 
-  if (loading) return <div className="structure-note"><ProgressDots />正在翻 git 的账本,看看谁动了代码……</div>
+  if (loading) return <div className="structure-note"><ProgressDots />正在读取 git 记录……</div>
   if (note) return <Notice kind="error">⚠️ {note}</Notice>
-  if (!result) return <div className="structure-note">git 的账本还没递过来,点一下「🔄 刷新」再试一次?</div>
+  if (!result) return <div className="structure-note">git 记录还没拿到,点「刷新」再试。</div>
 
   if (!result.isGitRepo) {
     return (
       <Notice kind="info">
-        这个文件夹还不是 git 仓库,git 还没开始给它记账。
+        这个文件夹还不是 git 仓库,没有改动记录。
         <br />
-        两个办法:① 选项目根目录(里面有 .git 隐藏文件夹的那层);② 或者在项目里跑一次 <code>git init</code>(先跟项目主人打个招呼哦)。
+        两个办法:① 打开项目根目录(里面有 .git 的那层);② 或在项目里运行 <code>git init</code>。
       </Notice>
     )
   }
@@ -195,21 +195,21 @@ export function GitChanges({
 
       {result.changes.length === 0 && (
         <div className="structure-note">
-          🌿 这儿干净着呢 —— 所有改动都已经提交存档了,没有新账要翻。
+          🌿 工作区是干净的 —— 所有改动都已提交。
           <br />
-          想看看它怎么干活?随手改一个文件保存(加行注释就行),再点上面的「🔄 刷新」,马上给你讲它改了啥。
+          想看效果?随手改一个文件并保存,再点「刷新」,就能让 AI 讲清这次改动。
         </div>
       )}
 
       {result.changes.length > 0 && (
         <div className="git-report">
           <div className="explain-head">
-            <span className="explain-title">🧾 AI 干活报告</span>
+            <span className="explain-title">🧾 AI 改动报告</span>
             <button type="button" className="btn" onClick={() => void handleReport()} disabled={reporting}>
-              {reporting ? '⏳ 审计官翻账中……' : report?.status === 'supported' ? '🔄 再审一遍' : '🤖 生成本轮报告'}
+              {reporting ? '⏳ 正在分析……' : report?.status === 'supported' ? '🔄 再分析一遍' : '🤖 生成本轮报告'}
             </button>
           </div>
-          <p className="git-report-hint">不用读一行代码:审计官把这轮改动翻成大白话 —— 干了什么、账对不对、要不要细看。</p>
+          <p className="git-report-hint">不用读代码:AI 把这轮改动讲成大白话 —— 改了什么、有没有问题、要不要细看。</p>
           {reporting &&
             (reportStream ? (
               <div className="explain-text">
@@ -218,7 +218,7 @@ export function GitChanges({
               </div>
             ) : (
               <div className="explain-note">
-                <ProgressDots />正在翻账本、对线索……(改动多时会慢一点)
+                <ProgressDots />正在分析改动……(改动多时会慢一点)
               </div>
             ))}
           {!reporting && report?.status === 'supported' && <div className="explain-text">✨ {report.text}</div>}
@@ -257,7 +257,7 @@ export function GitChanges({
         <div className="explain">
           <div className="explain-head">
             <span className="explain-title">
-              💬 「{selected.relPath}」这次改了啥
+              💬 「{selected.relPath}」这次改了什么
             </span>
             <button type="button" className="btn" onClick={handleExplain} disabled={explaining}>
               {explaining ? '⏳ 模型思考中……' : '🤖 用人话讲讲这个改动'}

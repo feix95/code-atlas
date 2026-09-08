@@ -71,10 +71,7 @@ export function FolderOverview({
       </div>
       <section className="card">
         {dir.lazy ? (
-          <>
-            <Notice kind="warn">这个文件夹还没扫描过 —— 到左边目录树点它旁边的展开箭头,才会探进来。</Notice>
-            <p className="card-waiting">选中它不会自动扫描,扫描只由你点开箭头触发。</p>
-          </>
+          <Notice kind="warn">这个文件夹还没扫描 —— 到左边目录树点它的展开箭头,才会扫进来。</Notice>
         ) : (
           <>
             <div className="metric-grid">
@@ -88,11 +85,11 @@ export function FolderOverview({
               </div>
               <div className="metric">
                 <strong>{info.totalFiles}</strong>
-                <span>共 {info.totalFiles} 个文件(含子层)</span>
+                <span>含子层的全部文件</span>
               </div>
               <div className="metric">
                 <strong>{dir.truncated ? '不完整' : '完整'}</strong>
-                <span>{dir.truncated ? '有的子层没探到(琥珀色是提醒,不是出错)' : '已扫描'}</span>
+                <span>{dir.truncated ? '有的子层还没扫描' : '已扫描'}</span>
               </div>
             </div>
             {info.topLanguages.length > 0 && (

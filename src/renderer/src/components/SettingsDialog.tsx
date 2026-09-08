@@ -517,7 +517,6 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                   <div className="cfg-row">
                     <div className="cfg-copy">
                       <label>亮还是暗</label>
-                      <p>选「跟随系统」就跟 Windows 的深浅色一起换;想固定住就点「白天」或「黑夜」。</p>
                     </div>
                     <div className="cfg-segmented">
                       {MODES.map((m) => (

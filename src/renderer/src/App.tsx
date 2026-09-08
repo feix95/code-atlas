@@ -209,7 +209,7 @@ function App(): React.JSX.Element {
         }
       })
       .catch(() => {
-        if (alive) setDrivesNote('盘符列不出来 —— 用上方「打开项目」选文件夹也一样使')
+        if (alive) setDrivesNote('盘符列不出来,用上方「打开项目」选文件夹一样能用')
       })
     return () => {
       alive = false
@@ -320,7 +320,7 @@ function App(): React.JSX.Element {
       setRecents(rememberRecentProject(dir))
       // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
       if (dir !== folder) pushNav({ folder: dir, file: null, dir: null })
-      flashToast(`地图画好了:${scanned.stats.fileCount} 个文件`)
+      flashToast(`扫描完成:${scanned.stats.fileCount} 个文件`)
       // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
       setGitLoading(true)
       try {
@@ -347,7 +347,7 @@ function App(): React.JSX.Element {
   // 刷新 = 把当前项目重扫一遍;没开项目就点了,告诉他缺什么,按钮不装哑巴
   async function handleRefresh(): Promise<void> {
     if (!folder) {
-      flashToast('先打开一个文件夹,才有得刷新 —— 点「打开项目」或在上面填路径')
+      flashToast('先打开一个项目,再刷新')
       return
     }
     if (!scanning) await scanPath(folder)
@@ -356,7 +356,7 @@ function App(): React.JSX.Element {
   // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
   function setShakeAndHint(): void {
     setPathShaking(true)
-    setPathHint('先填个文件夹路径,再点「前往」;也可以点「打开项目」选一个')
+    setPathHint('先填个路径,或点「打开项目」选一个')
     if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
     pathHintTimerRef.current = setTimeout(() => setPathHint(null), 5000)
     pathInputRef.current?.focus()
@@ -386,7 +386,7 @@ function App(): React.JSX.Element {
     if (!opts?.keepTab) setActiveTab('overview')
 
     if (!file.language) {
-      setAnalyzeNote({ text: '这个文件的类型没认出来,给不出结构骨架 —— 想知道它是干嘛的,去「自由对话」里问', kind: 'info' })
+      setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「自由对话」问', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -578,7 +578,7 @@ function App(): React.JSX.Element {
           CodeAtlas
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
-          {scanning ? '正在画地图……' : '打开项目'}
+          {scanning ? '扫描中……' : '打开项目'}
         </button>
         {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰 */}
         <button
@@ -610,7 +610,7 @@ function App(): React.JSX.Element {
             className="path-input mono"
             type="text"
             value={pathDraft}
-            placeholder="输入或粘贴文件夹路径,回车直接打开"
+            placeholder="文件夹路径,回车直接打开"
             spellCheck={false}
             aria-label="文件夹路径"
             onChange={(e) => {
@@ -652,7 +652,7 @@ function App(): React.JSX.Element {
                 {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
               </span>
               <span className="mono">
-                {result.stats.fileCount} files · {result.stats.dirCount} folders
+                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
               </span>
             </footer>
             {treeNote && <div className="tree-toast">⚠️ {treeNote}</div>}
@@ -736,7 +736,7 @@ function App(): React.JSX.Element {
           {!folder && !scanning && !error && (
             <div className="drives-view">
               <h1>这台电脑</h1>
-              <p className="empty-hint">点一个盘就开门画图;想直奔某个项目,用上方「打开项目」或粘贴路径</p>
+              <p className="empty-hint">点一个盘开始扫描;想直奔某个项目,用上方「打开项目」或粘贴路径</p>
               {recents.length > 0 && (
                 <div className="recents">
                   <p className="recents-title">最近打开</p>
@@ -904,7 +904,7 @@ function FileDetailView({
             {analyzing && (
               <div className="card-waiting">
                 <ProgressDots />
-                正在解析结构骨架……
+                正在解析结构……
               </div>
             )}
             {!analyzing && analyzeNote?.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
