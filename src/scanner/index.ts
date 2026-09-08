@@ -135,15 +135,18 @@ async function scanDir(
         ctx.stats.fileCount++
         const ext = extname(entry.name).toLowerCase()
         ctx.stats.byExt[ext] = (ctx.stats.byExt[ext] ?? 0) + 1
+        // 第九十锤:顺手 stat 一把带出文件大小(只问元数据,不翻内容);拿不到记 0,不编数
+        const stat = await ctx.gate.run(() => fs.stat(fullPath).catch(() => null))
+        const sizeBytes = stat?.size ?? 0
         // 后缀认得出的不读文件;认不出的现场嗅探内容(全局限流,不一窝蜂)
         const language = await ctx.gate.run(() => identifyFileLanguage(fullPath, entry.name))
         if (language) {
           const agg = ctx.stats.byLanguage[language.id] ?? { name: language.name, count: 0 }
           agg.count++
           ctx.stats.byLanguage[language.id] = agg
-          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext, language })
+          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext, language, sizeBytes })
         } else {
-          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext })
+          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext, sizeBytes })
         }
       }
       // 其他类型(管道、socket 等)不进树

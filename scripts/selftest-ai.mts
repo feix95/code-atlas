@@ -619,6 +619,7 @@ async function main(): Promise<void> {
             name: 'main.tsx',
             relPath: 'src/main.tsx',
             ext: '.tsx',
+            sizeBytes: 0,
             language: { id: 'typescript-react', name: 'TypeScript React', source: 'extension' },
             summary: { emoji: '🚪', text: '程序的大门' }
           },
@@ -627,12 +628,13 @@ async function main(): Promise<void> {
             name: 'config.ts',
             relPath: 'src/config.ts',
             ext: '.ts',
+            sizeBytes: 0,
             language: { id: 'typescript', name: 'TypeScript', source: 'extension' },
             summary: { emoji: '⚙️', text: '配置都在这' }
           }
         ]
       },
-      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', sizeBytes: 0, summary: { emoji: '📖', text: '说明书' } }
     ]
   }
 
@@ -662,11 +664,12 @@ async function main(): Promise<void> {
           name: `file${i}.ts`,
           relPath: `src/file${i}.ts`,
           ext: '.ts',
+          sizeBytes: 0,
           language: { id: 'typescript', name: 'TypeScript', source: 'extension' as const },
           summary: { emoji: '📄', text: `第 ${i} 号源代码文件,负责一块功能` }
         }))
       },
-      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', sizeBytes: 0, summary: { emoji: '📖', text: '说明书' } }
     ]
   }
   const bigDigest = buildTreeDigest(bigTree)

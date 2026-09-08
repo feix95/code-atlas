@@ -3,6 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import { scanDirectory } from '../src/scanner/index.ts'
+import { formatSize } from '../src/shared/format.ts'
+import { computeTreeSizes } from '../src/shared/treeSize.ts'
+import type { ScanDirNode, ScanTreeNode } from '../src/shared/types.ts'
 
 async function main(): Promise<void> {
   const root = join(tmpdir(), `code-atlas-selftest-${Date.now()}`)
@@ -97,6 +100,10 @@ async function main(): Promise<void> {
       mystery?.type === 'file' && mystery.language === undefined,
       '超大文件不嗅探,诚实认不出(哪怕开头是代码)'
     )
+    assert.ok(
+      mystery?.type === 'file' && mystery.sizeBytes === 64 * 1024 * 1024,
+      '大小走 stat 元数据:64MB 大文件的账不靠读内容也拿得准'
+    )
 
     assert.ok(big.durationMs < 30_000, `海量小文件应秒级扫完,实际 ${big.durationMs}ms`)
     assert.ok(
@@ -172,6 +179,80 @@ async function main(): Promise<void> {
     console.log('✅ 分级扫描路径契约自测通过:子树 relPath 是全局坐标,拼回大树不断链')
   } finally {
     await fs.rm(subRoot, { recursive: true, force: true })
+  }
+
+  // ── 10. 文件大小账(第九十锤):文件自带大小,文件夹总和渲染层现算,残账宁缺 ──
+  const sizeRoot = join(tmpdir(), `code-atlas-size-selftest-${Date.now()}`)
+  await fs.mkdir(join(sizeRoot, 'a', 'b'), { recursive: true })
+  await fs.writeFile(join(sizeRoot, 'a', 'one.txt'), '12345') // 5 字节
+  await fs.writeFile(join(sizeRoot, 'a', 'b', 'two.txt'), '12345678') // 8 字节
+  await fs.writeFile(join(sizeRoot, 'empty.txt'), '') // 0 字节
+
+  try {
+    const sized = await scanDirectory(sizeRoot)
+    const one = sized.tree.children.find((c) => c.name === 'a')
+    assert.ok(one?.type === 'directory')
+    const two = one.children.find((c) => c.name === 'b')
+    assert.ok(two?.type === 'directory')
+
+    // 文件节点自带真实大小;空文件诚实报 0
+    const oneFile = one.children.find((c) => c.name === 'one.txt')
+    const twoFile = two.children.find((c) => c.name === 'two.txt')
+    const emptyFile = sized.tree.children.find((c) => c.name === 'empty.txt')
+    assert.ok(oneFile?.type === 'file' && oneFile.sizeBytes === 5, `one.txt 应记 5 字节,实际 ${oneFile && oneFile.type === 'file' ? oneFile.sizeBytes : '非文件'}`)
+    assert.ok(twoFile?.type === 'file' && twoFile.sizeBytes === 8, `two.txt 应记 8 字节,实际 ${twoFile && twoFile.type === 'file' ? twoFile.sizeBytes : '非文件'}`)
+    assert.ok(emptyFile?.type === 'file' && emptyFile.sizeBytes === 0, '空文件应诚实记 0 字节')
+
+    // 渲染层总账:全探完的树,每层总和都对,根目录 complete
+    const book = computeTreeSizes(sized.tree)
+    assert.deepEqual(book.get(''), { bytes: 13, complete: true }, '根目录总账应为 13 字节且算得准')
+    assert.deepEqual(book.get('a'), { bytes: 13, complete: true }, 'a/ 总账应为 13 字节')
+    assert.deepEqual(book.get('a/b'), { bytes: 8, complete: true }, 'a/b/ 总账应为 8 字节')
+
+    // 残账规矩:名下有没探全的目录,总和只算已扫进的,且 complete = false(界面宁可不亮)
+    const leaf = (name: string, bytes: number, relPath: string): ScanTreeNode => ({
+      type: 'file',
+      name,
+      relPath,
+      ext: '.txt',
+      sizeBytes: bytes
+    })
+    const halfExplored: ScanDirNode = {
+      type: 'directory',
+      name: 'proj',
+      relPath: '',
+      children: [
+        { type: 'directory', name: 'done', relPath: 'done', children: [leaf('a.txt', 10, 'done/a.txt')] },
+        {
+          type: 'directory',
+          name: 'half',
+          relPath: 'half',
+          children: [leaf('b.txt', 100, 'half/b.txt')],
+          lazy: true,
+          truncated: true
+        }
+      ]
+    }
+    const halfBook = computeTreeSizes(halfExplored)
+    assert.deepEqual(halfBook.get('done'), { bytes: 10, complete: true }, '探全的子目录要标 complete')
+    assert.deepEqual(halfBook.get('half'), { bytes: 100, complete: false }, '没探全的目录是残账,不算准')
+    assert.deepEqual(halfBook.get(''), { bytes: 110, complete: false }, '残账向上传染:根目录也算不准')
+
+    // 人话格式:字节直报,满 10 丢小数,1024 进位
+    assert.equal(formatSize(0), '0 B')
+    assert.equal(formatSize(876), '876 B')
+    assert.equal(formatSize(1024), '1.0 KB')
+    assert.equal(formatSize(3.2 * 1024), '3.2 KB')
+    assert.equal(formatSize(12 * 1024), '12 KB')
+    assert.equal(formatSize(1.8 * 1024 ** 2), '1.8 MB')
+    assert.equal(formatSize(45 * 1024 ** 2), '45 MB')
+    assert.equal(formatSize(1.2 * 1024 ** 3), '1.2 GB')
+    assert.equal(formatSize(120 * 1024 ** 3), '120 GB')
+    assert.equal(formatSize(-5), '', '负数不是合法大小,给空串不编数')
+
+    console.log('✅ 文件大小账自测通过:文件自带大小 · 文件夹总和算得准才亮 · 人话格式 10 断言')
+  } finally {
+    await fs.rm(sizeRoot, { recursive: true, force: true })
   }
 }
 
