@@ -1,6 +1,6 @@
 import { promises as fs, type Dirent } from 'node:fs'
 import { basename, extname, join } from 'node:path'
-import type { ScanDirNode, ScanResult, ScanStats, ScanTreeNode } from '../shared/types.ts'
+import type { ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } from '../shared/types.ts'
 import { identifyFileLanguage } from '../parser/index.ts'
 
 /** 扫描时直接绕开的目录/文件:依赖包、版本库、构建产物等"仓库杂物" */
@@ -179,7 +179,7 @@ async function scanDir(
         }
         // 文档类读个开头标题(第一百锤):一句话说明能亮真名而不是笼统一句「文档」
         const docTitle = DOC_EXTS.has(ext) ? await ctx.gate.run(() => sniffDocTitle(fullPath)) : undefined
-        const node = { type: 'file', name: entry.name, relPath: childRelPath, ext, ...(language ? { language } : {}), ...(docTitle ? { docTitle } : {}) }
+        const node: ScanFileNode = { type: 'file', name: entry.name, relPath: childRelPath, ext, ...(language ? { language } : {}), ...(docTitle ? { docTitle } : {}) }
         children.push(node)
       }
       // 其他类型(管道、socket 等)不进树
