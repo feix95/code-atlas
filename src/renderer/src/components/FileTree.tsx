@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
-import { flagDuplicateSummaries } from '@shared/summaryDedup'
 
 interface TreeRowProps {
   node: ScanTreeNode
   depth: number
-  /** 同话降噪:同一目录里重复的话,本行只亮 emoji(悬停看全文;风险句不降噪) */
-  emojiOnly?: boolean
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
   expandingPath: string | null
@@ -18,7 +15,7 @@ interface TreeRowProps {
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, emojiOnly, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -47,14 +44,7 @@ function TreeRow({ node, depth, emojiOnly, selectedPath, expandingPath, filter, 
             ▤
           </span>
           <span className="tree-name">{node.name}</span>
-          {node.summary &&
-            (emojiOnly ? (
-              <span className="tree-summary" title={node.summary.text}>
-                {node.summary.emoji}
-              </span>
-            ) : (
-              <span className="tree-summary">{node.summary.text}</span>
-            ))}
+          {node.summary && <span className="tree-summary">{node.summary.text}</span>}
           {node.ext && <span className="tree-tag">{node.ext.slice(1).toUpperCase()}</span>}
         </button>
       </div>
@@ -83,9 +73,6 @@ function TreeRow({ node, depth, emojiOnly, selectedPath, expandingPath, filter, 
     }
   }
 
-  // 同话降噪:本目录的孩子里一模一样的话,第二条起只亮 emoji(风险句豁免,悬停看全文)
-  const dupFlags = flagDuplicateSummaries(dir.children)
-
   return (
     <div className="tree-branch">
       <div
@@ -107,14 +94,7 @@ function TreeRow({ node, depth, emojiOnly, selectedPath, expandingPath, filter, 
             ▣
           </span>
           <span className="tree-name">{dir.name}</span>
-          {dir.summary &&
-            (emojiOnly ? (
-              <span className="tree-summary" title={dir.summary.text}>
-                {dir.summary.emoji}
-              </span>
-            ) : (
-              <span className="tree-summary">{dir.summary.text}</span>
-            ))}
+          {dir.summary && <span className="tree-summary">{dir.summary.text}</span>}
           {/* 未扫描/不完整都是琥珀色:是「留个心眼」不是「出事了」,红色只留给真失败 */}
           {dir.lazy && <span className="tree-badge is-warn">未扫描</span>}
           {dir.truncated && !dir.lazy && <span className="tree-badge is-warn">不完整</span>}
@@ -122,12 +102,11 @@ function TreeRow({ node, depth, emojiOnly, selectedPath, expandingPath, filter, 
         </button>
       </div>
       {expanded &&
-        dir.children.map((child, i) => (
+        dir.children.map((child) => (
           <TreeRow
             key={child.name}
             node={child}
             depth={depth + 1}
-            emojiOnly={dupFlags[i]}
             selectedPath={selectedPath}
             expandingPath={expandingPath}
             filter={filter}

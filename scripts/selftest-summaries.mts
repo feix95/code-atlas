@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { annotateSummaries } from '../src/summarizer/index.ts'
-import { flagDuplicateSummaries } from '../src/shared/summaryDedup.ts'
 import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 let fileSeq = 0
@@ -169,28 +168,13 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [cutNotes]))
   assert.ok(textOf(cutNotes).includes('至少 3 份'), `截断的文档目录也要说「至少」,实际:${textOf(cutNotes)}`)
 
-  // ── 10. 同话降噪:同目录重复的话第二条起只亮 emoji;风险句豁免 ──
-  const dedupDir = dir('mix', [
-    file('x1.test.ts'),
-    file('x2.test.ts'),
-    file('x3.test.ts'),
-    file('package-lock.json'),
-    file('y1.md')
-  ])
-  annotateSummaries(dedupDir)
-  const flags = flagDuplicateSummaries(dedupDir.children)
-  assert.deepEqual(
-    flags,
-    [false, true, true, false, false],
-    `同话第2/3行 true;风险句(sticky)与首行、不同话 false,实际:${JSON.stringify(flags)}`
-  )
-  const stickyRepeat = dir('locks', [file('pnpm-lock.yaml'), file('yarn.lock')])
-  annotateSummaries(stickyRepeat)
-  const stickyFlags = flagDuplicateSummaries(stickyRepeat.children)
-  assert.deepEqual(stickyFlags, [false, false], '风险句重复也不降噪(条件反射要常亮)')
+  // ── 10. 风险句标记:sticky 是数据标记(风险提示句),渲染层一律文字标注,不做 emoji 降噪 ──
+  const stickyLock = file('yarn.lock')
+  annotateSummaries(dir('proj', [stickyLock]))
+  assert.ok(stickyLock.summary?.sticky === true && textOf(stickyLock).includes('不要手动改'), '风险句保留 sticky 标记')
 
   console.log('✅ 全树速览自测全部通过')
-  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 同话降噪豁免风险句')
+  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记')
 }
 
 main().catch((err) => {
