@@ -100,5 +100,3 @@ export function useAiAsk(send: AiSendFn): {
   return { turns, busy, ask, cancel }
 }
 
-/** 文件详情的预设问题:点了就问,不用自己组织话 */
-export const FILE_PRESETS = ['它是做什么的？', '从哪里开始读？', '修改它会影响什么？', '怎么给它加新功能？']

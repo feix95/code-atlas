@@ -25,6 +25,7 @@ import {
 } from './recents'
 import { useAiAsk } from './useAiAsk'
 import { useAiChat } from './useAiChat'
+import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
@@ -926,6 +927,8 @@ function FileDetailView({
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
+  // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动
+  const presets = usePresetQuestions({ rootPath: result.rootPath, file, note: note?.text })
   // 自由聊天:独立通道、独立 session。钩子挂在详情层,概览↔自由对话来回切不掉聊天记录;
   // 换文件时整个详情重挂(key=relPath),旧 session 连同在途请求一起就地清掉
   const chat = useAiChat(buildFileAttachment(file, structure))
@@ -969,6 +972,7 @@ function FileDetailView({
           <FileOverview
             file={file}
             noteText={note?.text}
+            presets={presets.questions}
             structure={structure}
             analyzing={analyzing}
             analyzeNote={analyzeNote}

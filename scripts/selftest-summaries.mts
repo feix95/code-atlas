@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { annotateSummaries } from '../src/summarizer/index.ts'
 import { findCategory, LOCATE_CATEGORIES } from '../src/shared/locateCategories.ts'
+import { DEFAULT_PRESET_QUESTIONS, rulePresetQuestions } from '../src/shared/presetQuestions.ts'
 import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 let fileSeq = 0
@@ -235,6 +236,17 @@ async function main(): Promise<void> {
   const emptyHit = findCategory(catTree, '打包产物')
   assert.equal(emptyHit.total, 0, '没有对应东西就老实报 0,不硬凑')
   for (const c of LOCATE_CATEGORIES) findCategory(catTree, c.label) // 十个词条全跑一遍,不许抛
+
+  // ── 14. 预设问题三层预测·规则层(第一百零九锤):按类别出题,认不出回万金油 ──
+  assert.deepEqual(
+    rulePresetQuestions({ name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }).slice(0, 1),
+    ['它测的是哪个模块？'],
+    '测试文件出测试专属题'
+  )
+  assert.ok(rulePresetQuestions({ name: 'tsconfig.json', icon: 'config', text: '编译配置' }).includes('动哪一项会影响什么？'), '配置文件出配置专属题')
+  assert.ok(rulePresetQuestions({ name: '.env.local', icon: 'key', text: '配置开关' }).includes('该提交它还是忽略它？'), '密钥文件出安全专属题')
+  assert.ok(rulePresetQuestions({ name: 'README.md', icon: 'doc', text: '文档' }).includes('信息过时了吗？'), '文档出文档专属题')
+  assert.deepEqual(rulePresetQuestions({ name: 'zzz.xyz' }), DEFAULT_PRESET_QUESTIONS, '认不出的文件回万金油四问,永不空场')
 
   console.log('✅ 全树速览自测全部通过')
   console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典')

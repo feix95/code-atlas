@@ -1,6 +1,6 @@
 import type { DepGraphResult, FileStructure, ScanFileNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
-import { FILE_PRESETS, type AiAssistApi } from '../useAiAsk'
+import type { AiAssistApi } from '../useAiAsk'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
@@ -11,6 +11,7 @@ import { ProgressDots } from './ProgressDots'
 export function FileOverview({
   file,
   noteText,
+  presets,
   structure,
   analyzing,
   analyzeNote,
@@ -21,6 +22,8 @@ export function FileOverview({
   file: ScanFileNode
   /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
   noteText?: string
+  /** 预设问题(第一百零九锤:规则打底 + AI 定制预测) */
+  presets: string[]
   structure: FileStructure | null
   analyzing: boolean
   analyzeNote: { text: string; kind: 'info' | 'error' } | null
@@ -95,7 +98,7 @@ export function FileOverview({
 
       <AiAssistCard
         ai={ai}
-        presets={FILE_PRESETS}
+        presets={presets}
         idleText="不自动打断你的浏览。点按钮或挑一个问题,AI 才开始分析当前文件。"
         mainLabel="解释这个文件"
         onGoChat={onGoChat}
