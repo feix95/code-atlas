@@ -23,7 +23,7 @@ import { formatUsage } from '../shared/aiText.ts'
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
 /** 一份固定的系统人设,禁止模型自由发挥 */
-const SYSTEM_PROMPT = `你是 CodeAtlas 的"代码人话翻译官"。
+export const SYSTEM_PROMPT = `你是 CodeAtlas 的"代码人话翻译官"。
 你的任务:把 Given 一个代码文件的结构信息,用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件是干什么的、负责什么"。
 铁律:
 1. 只依据 Given 里给出的结构信息说话,绝不猜测、绝不编造结构里没有的东西。
