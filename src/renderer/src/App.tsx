@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { FileOverview } from './components/FileOverview'
@@ -157,6 +158,8 @@ function App(): React.JSX.Element {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 手动备注(第九十八锤):本项目 relPath → 小葵的一句话;存本机,存上限有孤儿清收
+  const [notes, setNotes] = useState<NoteMap>({})
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -314,9 +317,12 @@ function App(): React.JSX.Element {
     setExpanding(null)
     setTreeNote(null)
     setGitInfo(null)
+    setNotes({})
     try {
       const scanned = await window.atlas.scanFolder(dir)
       setResult(scanned)
+      // 备注跟上新树:顺带清孤儿(垃圾不越攒越多),再写回本机
+      setNotes(refreshNotesForScan(dir, scanned.tree))
       // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
       setRecents(rememberRecentProject(dir))
       // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
@@ -471,6 +477,17 @@ function App(): React.JSX.Element {
     setTreeNote(null)
     setGitInfo(null)
     setPathHint(null)
+    setNotes({})
+  }
+
+  // 存一条手动备注(第九十八锤):空串 = 删除;上限和淘汰在 shared/notes 里管
+  function saveNote(relPath: string, text: string): void {
+    if (!folder) return
+    setNotes((prev) => {
+      const next = upsertNote(prev, relPath, text, Date.now())
+      saveNotes(folder, next)
+      return next
+    })
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -657,6 +674,7 @@ function App(): React.JSX.Element {
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
             <FileTree
               root={result.tree}
+              notes={notes}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
               expandingPath={expanding}
               onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
@@ -710,6 +728,8 @@ function App(): React.JSX.Element {
                 gitInfo={gitInfo}
                 gitLoading={gitLoading}
                 onOpenGit={clearSelection}
+                note={notes[selectedFile.relPath] ?? null}
+                onNoteSave={saveNote}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -720,6 +740,8 @@ function App(): React.JSX.Element {
                 gitInfo={gitInfo}
                 onJump={(p) => jumpTo(p)}
                 onRefreshed={setGitInfo}
+                note={notes[selectedFolder.relPath] ?? null}
+                onNoteSave={saveNote}
               />
             ) : (
               <ProjectOverview
@@ -853,7 +875,9 @@ function FileDetailView({
   onJump,
   gitInfo,
   gitLoading,
-  onOpenGit
+  onOpenGit,
+  note,
+  onNoteSave
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -872,6 +896,9 @@ function FileDetailView({
   gitInfo: GitChangesResult | null
   gitLoading: boolean
   onOpenGit: () => void
+  /** 小葵的手动备注(第九十八锤) */
+  note: NoteEntry | null
+  onNoteSave: (relPath: string, text: string) => void
 }): React.JSX.Element {
   // AI 解释:概览卡、修改建议共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
@@ -906,6 +933,8 @@ function FileDetailView({
         icon="▤"
         title={file.name}
         subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
+        note={note}
+        onNoteSave={(text) => onNoteSave(file.relPath, text)}
         badges={badges}
         tabs={FILE_TABS}
         activeTab={activeTab}
@@ -916,6 +945,7 @@ function FileDetailView({
         {activeTab === 'overview' && (
           <FileOverview
             file={file}
+            noteText={note?.text}
             structure={structure}
             analyzing={analyzing}
             analyzeNote={analyzeNote}
@@ -982,7 +1012,9 @@ function FolderDetailView({
   onClose,
   gitInfo,
   onJump,
-  onRefreshed
+  onRefreshed,
+  note,
+  onNoteSave
 }: {
   dir: ScanDirNode
   result: ScanResult
@@ -990,6 +1022,9 @@ function FolderDetailView({
   gitInfo: GitChangesResult | null
   onJump: (relPath: string) => void
   onRefreshed: (result: GitChangesResult) => void
+  /** 小葵的手动备注(第九十八锤) */
+  note: NoteEntry | null
+  onNoteSave: (relPath: string, text: string) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
@@ -1008,6 +1043,8 @@ function FolderDetailView({
         icon="▣"
         title={dir.name || result.rootName}
         subtitle={dir.summary?.text ?? '文件夹'}
+        note={note}
+        onNoteSave={(text) => onNoteSave(dir.relPath, text)}
         badges={badges}
         tabs={FOLDER_TABS}
         activeTab={tab}
@@ -1018,6 +1055,7 @@ function FolderDetailView({
         {tab === 'overview' && (
           <FolderOverview
             dir={dir}
+            noteText={note?.text}
             ai={ai}
             onGoChat={() => setTab('chat')}
             gitInfo={gitInfo}

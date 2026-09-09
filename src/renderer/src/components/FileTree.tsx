@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
+import type { NoteMap } from '@shared/notes'
+import { NotePen } from './NotePen'
 
 interface TreeRowProps {
   node: ScanTreeNode
   depth: number
+  /** 本项目的手动备注表:备注过的行亮小葵自己的话,压过引擎一句话 */
+  notes?: NoteMap
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
   expandingPath: string | null
@@ -15,7 +19,7 @@ interface TreeRowProps {
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, notes, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -30,6 +34,7 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
   const expanded = filter !== '' || open
 
   if (node.type === 'file') {
+    const note = notes?.[node.relPath]
     // 缩进挂 rem(每层 18px 基准 = 1.125rem),跟着根字号一起缩放
     return (
       <div className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`} style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}>
@@ -44,7 +49,14 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
             ▤
           </span>
           <span className="tree-name">{node.name}</span>
-          {node.summary && <span className="tree-summary">{node.summary.text}</span>}
+          {note ? (
+            <span className="tree-summary is-note" title={`我的备注:${note.text}`}>
+              <NotePen />
+              {note.text}
+            </span>
+          ) : (
+            node.summary && <span className="tree-summary">{node.summary.text}</span>
+          )}
           {node.ext && <span className="tree-tag">{node.ext.slice(1).toUpperCase()}</span>}
         </button>
       </div>
@@ -52,6 +64,7 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
   }
 
   const dir = node
+  const dirNote = notes?.[dir.relPath]
 
   // 箭头只管展开/收起;没探过的目录,箭头才是触发扫描的唯一入口(点名字不扫)
   function toggleExpand(): void {
@@ -94,7 +107,14 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
             ▣
           </span>
           <span className="tree-name">{dir.name}</span>
-          {dir.summary && <span className="tree-summary">{dir.summary.text}</span>}
+          {dirNote ? (
+            <span className="tree-summary is-note" title={`我的备注:${dirNote.text}`}>
+              <NotePen />
+              {dirNote.text}
+            </span>
+          ) : (
+            dir.summary && <span className="tree-summary">{dir.summary.text}</span>
+          )}
           {/* 未扫描/不完整都是琥珀色:是「留个心眼」不是「出事了」,红色只留给真失败 */}
           {dir.lazy && <span className="tree-badge is-warn">未扫描</span>}
           {dir.truncated && !dir.lazy && <span className="tree-badge is-warn">不完整</span>}
@@ -107,6 +127,7 @@ function TreeRow({ node, depth, selectedPath, expandingPath, filter, onSelectFil
             key={child.name}
             node={child}
             depth={depth + 1}
+            notes={notes}
             selectedPath={selectedPath}
             expandingPath={expandingPath}
             filter={filter}
@@ -138,6 +159,8 @@ function filterTree(node: ScanDirNode, q: string): ScanDirNode | null {
 
 interface FileTreeProps {
   root: ScanDirNode
+  /** 本项目手动备注表(第九十八锤);不传就只亮引擎一句话 */
+  notes?: NoteMap
   selectedPath: string | null
   expandingPath: string | null
   onSelectFile: (relPath: string, file: ScanFileNode) => void
@@ -145,7 +168,7 @@ interface FileTreeProps {
   onExpandLazy: (relPath: string) => void
 }
 
-export function FileTree({ root, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
 
@@ -174,6 +197,7 @@ export function FileTree({ root, selectedPath, expandingPath, onSelectFile, onSe
             <TreeRow
               node={shown}
               depth={0}
+              notes={notes}
               selectedPath={selectedPath}
               expandingPath={expandingPath}
               filter={q}

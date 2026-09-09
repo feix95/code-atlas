@@ -44,6 +44,7 @@ function census(dir: ScanDirNode): FolderCensus {
  */
 export function FolderOverview({
   dir,
+  noteText,
   ai,
   onGoChat,
   gitInfo,
@@ -52,6 +53,8 @@ export function FolderOverview({
   onRefreshed
 }: {
   dir: ScanDirNode
+  /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
+  noteText?: string
   ai: AiAssistApi
   /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
   onGoChat?: () => void
@@ -102,7 +105,7 @@ export function FolderOverview({
                 ))}
               </p>
             )}
-            {dir.summary && <p className="card-text">{dir.summary.text}</p>}
+            {noteText ? <p className="card-text">{noteText}</p> : dir.summary && <p className="card-text">{dir.summary.text}</p>}
           </>
         )}
       </section>

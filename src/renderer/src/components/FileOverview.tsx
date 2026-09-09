@@ -10,6 +10,7 @@ import { ProgressDots } from './ProgressDots'
  */
 export function FileOverview({
   file,
+  noteText,
   structure,
   analyzing,
   analyzeNote,
@@ -18,6 +19,8 @@ export function FileOverview({
   onGoChat
 }: {
   file: ScanFileNode
+  /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
+  noteText?: string
   structure: FileStructure | null
   analyzing: boolean
   analyzeNote: { text: string; kind: 'info' | 'error' } | null
@@ -37,7 +40,9 @@ export function FileOverview({
       <section className="card">
         <p className="card-text">
           <strong>{file.name}</strong>
-          {file.summary ? (
+          {noteText ? (
+            <> —— {noteText}</>
+          ) : file.summary ? (
             <> —— {file.summary.text}</>
           ) : (
             <>

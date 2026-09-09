@@ -765,6 +765,56 @@ body.is-maximized .traffic-lights .is-max i::after {
   color: var(--muted-2);
 }
 
+/* 我的备注(第九十八锤):小葵自己的话压过引擎一句话,小笔帽章 + 字色亮一档 */
+.tree-summary.is-note {
+  color: var(--muted);
+}
+
+.tree-summary.is-note .note-pen {
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+  vertical-align: -0.125rem;
+}
+
+/* 详情页副标题位置的备注:亮一档,跟引擎话区分 */
+.entity-title p.is-note {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  color: var(--text);
+}
+
+.entity-title p.is-note .note-pen {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* 详情页的备注编辑行:挂在实体行下,Enter 存 / Esc 走 */
+.note-editor {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+}
+
+.note-editor input {
+  min-width: 0;
+  flex: 1;
+  height: 2rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-md);
+  font-family: inherit;
+}
+
+.note-editor input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
 /* 后缀小标:等宽、灰色,压到最低视觉权重 */
 .tree-tag {
   flex: 0 0 auto;

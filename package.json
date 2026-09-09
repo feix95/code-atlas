@@ -25,8 +25,9 @@
     "test:nav": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-nav.mts",
     "test:git": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-git.mts",
     "test:summaries": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-summaries.mts",
+    "test:notes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-notes.mts",
     "test:devlog": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-devlog.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:devlog"
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
