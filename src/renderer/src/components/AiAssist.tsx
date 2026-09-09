@@ -114,7 +114,7 @@ export function AiAssistCard({
           <span className="spark" aria-hidden="true">
             ✦
           </span>
-          AI 助手
+          Atlas 小探针
         </span>
         <span className={`badge badge-${badge.tone}`}>{badge.label}</span>
       </div>

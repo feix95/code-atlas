@@ -45,12 +45,12 @@ const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'structure', label: '结构' },
   { key: 'relations', label: '关系' },
   { key: 'changes', label: '修改建议' },
-  { key: 'chat', label: '自由对话' }
+  { key: 'chat', label: 'Atlas 小探针' }
 ]
 
 const FOLDER_TABS = [
   { key: 'overview', label: '概览' },
-  { key: 'chat', label: '自由对话' }
+  { key: 'chat', label: 'Atlas 小探针' }
 ]
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
@@ -160,6 +160,8 @@ function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   // 手动备注(第九十八锤):本项目 relPath → 小葵的一句话;存本机,存上限有孤儿清收
   const [notes, setNotes] = useState<NoteMap>({})
+  // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
+  const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -393,7 +395,7 @@ function App(): React.JSX.Element {
     if (!opts?.keepTab) setActiveTab('overview')
 
     if (!file.language) {
-      setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「自由对话」问', kind: 'info' })
+      setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「Atlas 小探针」问', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -488,6 +490,22 @@ function App(): React.JSX.Element {
       saveNotes(folder, next)
       return next
     })
+  }
+
+  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点让详情页出来,再弹编辑框
+  function editNoteFromTree(relPath: string): void {
+    if (!result) return
+    const f = findFile(result.tree, relPath)
+    if (f) {
+      void handleSelectFile(f.relPath, f)
+      setNoteEditRequest(relPath)
+      return
+    }
+    const d = findDir(result.tree, relPath)
+    if (d) {
+      handleSelectFolder(d)
+      setNoteEditRequest(relPath)
+    }
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -680,6 +698,8 @@ function App(): React.JSX.Element {
               onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
               onSelectFolder={handleSelectFolder}
               onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+              onNoteEdit={editNoteFromTree}
+              onNoteRemove={(relPath) => saveNote(relPath, '')}
             />
             <footer className="sidebar-footer">
               <span>
@@ -730,6 +750,7 @@ function App(): React.JSX.Element {
                 onOpenGit={clearSelection}
                 note={notes[selectedFile.relPath] ?? null}
                 onNoteSave={saveNote}
+                autoOpenNote={noteEditRequest === selectedFile.relPath}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -742,6 +763,7 @@ function App(): React.JSX.Element {
                 onRefreshed={setGitInfo}
                 note={notes[selectedFolder.relPath] ?? null}
                 onNoteSave={saveNote}
+                autoOpenNote={noteEditRequest === selectedFolder.relPath}
               />
             ) : (
               <ProjectOverview
@@ -877,7 +899,8 @@ function FileDetailView({
   gitLoading,
   onOpenGit,
   note,
-  onNoteSave
+  onNoteSave,
+  autoOpenNote
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -899,6 +922,8 @@ function FileDetailView({
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
+  /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
+  autoOpenNote?: boolean
 }): React.JSX.Element {
   // AI 解释:概览卡、修改建议共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
@@ -935,6 +960,7 @@ function FileDetailView({
         subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
         note={note}
         onNoteSave={(text) => onNoteSave(file.relPath, text)}
+        autoOpenNote={autoOpenNote}
         badges={badges}
         tabs={FILE_TABS}
         activeTab={activeTab}
@@ -1014,7 +1040,8 @@ function FolderDetailView({
   onJump,
   onRefreshed,
   note,
-  onNoteSave
+  onNoteSave,
+  autoOpenNote
 }: {
   dir: ScanDirNode
   result: ScanResult
@@ -1025,6 +1052,8 @@ function FolderDetailView({
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
+  /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
+  autoOpenNote?: boolean
 }): React.JSX.Element {
   const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
@@ -1045,6 +1074,7 @@ function FolderDetailView({
         subtitle={dir.summary?.text ?? '文件夹'}
         note={note}
         onNoteSave={(text) => onNoteSave(dir.relPath, text)}
+        autoOpenNote={autoOpenNote}
         badges={badges}
         tabs={FOLDER_TABS}
         activeTab={tab}

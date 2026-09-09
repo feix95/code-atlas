@@ -8,6 +8,8 @@ interface TreeRowProps {
   depth: number
   /** 本项目的手动备注表:备注过的行亮小葵自己的话,压过引擎一句话 */
   notes?: NoteMap
+  /** 右键菜单(第一百零二锤):编辑备注的直接入口 */
+  onRowContextMenu?: (e: React.MouseEvent, node: ScanTreeNode) => void
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
   expandingPath: string | null
@@ -19,7 +21,7 @@ interface TreeRowProps {
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, notes, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -43,6 +45,7 @@ function TreeRow({ node, depth, notes, selectedPath, expandingPath, filter, onSe
           type="button"
           className="tree-main"
           onClick={() => onSelectFile(node.relPath, node)}
+          onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
           title={node.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
@@ -102,7 +105,13 @@ function TreeRow({ node, depth, notes, selectedPath, expandingPath, filter, onSe
         >
           {expandingPath === dir.relPath ? <span className="tree-spin" aria-hidden="true" /> : <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>}
         </button>
-        <button type="button" className="tree-main" onClick={() => onSelectFolder(dir)} title={dir.summary?.text}>
+        <button
+          type="button"
+          className="tree-main"
+          onClick={() => onSelectFolder(dir)}
+          onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, dir) : undefined}
+          title={dir.summary?.text}
+        >
           <span className="tree-icon" aria-hidden="true">
             ▣
           </span>
@@ -128,6 +137,7 @@ function TreeRow({ node, depth, notes, selectedPath, expandingPath, filter, onSe
             node={child}
             depth={depth + 1}
             notes={notes}
+            onRowContextMenu={onRowContextMenu}
             selectedPath={selectedPath}
             expandingPath={expandingPath}
             filter={filter}
@@ -166,11 +176,28 @@ interface FileTreeProps {
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
+  /** 右键「写/编辑备注」:App 负责选中节点并弹详情页的编辑框 */
+  onNoteEdit?: (relPath: string) => void
+  /** 右键「清除备注」 */
+  onNoteRemove?: (relPath: string) => void
 }
 
-export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
+  // 右键菜单:记住在谁身上、屏幕哪个位置;点别处/再右键即收
+  const [menu, setMenu] = useState<{ x: number; y: number; relPath: string; hasNote: boolean } | null>(null)
+
+  function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
+    if (!onNoteEdit) return
+    e.preventDefault()
+    setMenu({
+      x: Math.min(e.clientX, window.innerWidth - 170),
+      y: Math.min(e.clientY, window.innerHeight - 110),
+      relPath: node.relPath,
+      hasNote: notes?.[node.relPath] !== undefined
+    })
+  }
 
   const shown = useMemo(() => {
     if (q === '') return root
@@ -198,6 +225,7 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
               node={shown}
               depth={0}
               notes={notes}
+              onRowContextMenu={handleRowContextMenu}
               selectedPath={selectedPath}
               expandingPath={expandingPath}
               filter={q}
@@ -213,6 +241,42 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
           )}
         </div>
       </div>
+      {menu && (
+        <>
+          <div
+            className="menu-backdrop"
+            onClick={() => setMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu(null)
+            }}
+          />
+          <div className="tree-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onNoteEdit?.(menu.relPath)
+                setMenu(null)
+              }}
+            >
+              {menu.hasNote ? '编辑备注' : '写备注'}
+            </button>
+            {menu.hasNote && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onNoteRemove?.(menu.relPath)
+                  setMenu(null)
+                }}
+              >
+                清除备注
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </>
   )
 }

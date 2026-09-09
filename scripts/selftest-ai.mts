@@ -852,6 +852,12 @@ async function main(): Promise<void> {
   assert.equal(estimateKvBytes(0, 14.26 * G), 0, '上下文 0 不估')
   assert.equal(estimateKvBytes(Number.NaN, 14.26 * G), 0, 'NaN 不估')
 
+  // ── 第一百零二锤:名词小课堂 + 路径层级规矩进人设 ──
+  assert.ok(SYSTEM_PROMPT.includes('名词小课堂'), '文件讲解人设要有名词小课堂')
+  assert.ok(FOLDER_SYSTEM_PROMPT.includes('名词小课堂') && FOLDER_SYSTEM_PROMPT.includes('src、renderer、dist'), '文件夹讲解要主动解释名字术语')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('名词小课堂'), '小探针人设要有名词小课堂')
+  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('两个 src 有什么区别'), '小探针要会答目录层级对比题')
+
   console.log('✅ AI 人话解释自测全部通过')
 
 // ── 第八十四锤:流式 token 账(纯函数) ──

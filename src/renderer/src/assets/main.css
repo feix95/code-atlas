@@ -4369,3 +4369,39 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   font-size: var(--font-md);
 }
+
+/* ── 树上右键菜单(第一百零二锤):写/编辑/清除备注,点别处即收 ── */
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.tree-menu {
+  position: fixed;
+  z-index: 41;
+  min-width: 8.75rem;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-menu button {
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-menu button:hover {
+  background: var(--hover);
+}
