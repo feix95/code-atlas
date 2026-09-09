@@ -98,8 +98,8 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file'),
-  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
-    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question),
+  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string, note?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question, note),
   aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */

@@ -902,7 +902,7 @@ function FileDetailView({
 }): React.JSX.Element {
   // AI 解释:概览卡、修改建议共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
-    window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined)
+    window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
   // 自由聊天:独立通道、独立 session。钩子挂在详情层,概览↔自由对话来回切不掉聊天记录;
   // 换文件时整个详情重挂(key=relPath),旧 session 连同在途请求一起就地清掉

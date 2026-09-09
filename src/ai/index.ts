@@ -28,8 +28,9 @@ const SYSTEM_PROMPT = `你是 CodeAtlas 的"代码人话翻译官"。
 铁律:
 1. 只依据 Given 里给出的结构信息说话,绝不猜测、绝不编造结构里没有的东西。
 2. 不输出废话、不寒暄、不重复要点。
-3. 用中文,短句,最多 3-5 句。像跟朋友讲解一样自然。
-4. 如果结构信息太少看不出用途,就诚实说"看不出这个文件具体做什么",并说说你唯一能确定的点。`
+3. 讲解必须点名结构里真实存在的函数/类名,说清它具体干什么;「这个文件主要负责相关功能」这种放在哪个文件都成立的空话,一句都不许有。
+4. 用中文,短句,最多 3-5 句。像跟朋友讲解一样自然。
+5. 如果结构信息太少看不出用途,就诚实说"看不出这个文件具体做什么",并说说你唯一能确定的点。`
 
 /** git 改动翻译的专属人设:只讲 diff 里真实发生的改动 */
 export const DIFF_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码改动翻译官"。
@@ -308,6 +309,51 @@ function formatRelationLine(relPath: string, graph: DepGraphResult | null): stri
   return `关系:${parts.join(';')}`
 }
 
+/**
+ * 文件开头注释提取(纯函数,自测覆盖):扫前 40 行,收 //、块注释、# 注释,
+ * 拼成一段话;文件头注释常写着「本模块负责什么」,是喂给模型的免费证据。
+ * 没有注释、或全是空记号,返回 null —— 宁缺不硬凑。
+ */
+export function extractHeaderComment(code: string, maxChars = 240): string | null {
+  const lines = code.split('\n').slice(0, 40)
+  const collected: string[] = []
+  let inBlock = false
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (inBlock) {
+      const end = line.indexOf('*/')
+      const piece = (end >= 0 ? line.slice(0, end) : line).replace(/^\*+\s?/, '').trim()
+      if (piece) collected.push(piece)
+      if (end >= 0) inBlock = false
+      if (collected.join('').length >= maxChars) break
+      continue
+    }
+    if (line === '') continue
+    if (line.startsWith('//')) {
+      collected.push(line.slice(2).replace(/^[/!\s]+/, '').trim())
+      continue
+    }
+    if (line.startsWith('/*')) {
+      const end = line.indexOf('*/', 2)
+      const piece = (end >= 0 ? line.slice(2, end) : line.slice(2)).replace(/^\*+\s?/, '').trim()
+      if (piece) collected.push(piece)
+      if (end < 0) inBlock = true
+      continue
+    }
+    if (line.startsWith('*')) {
+      collected.push(line.replace(/^\*+\s?/, '').trim())
+      continue
+    }
+    if (line.startsWith('#') && !line.startsWith('#!')) {
+      collected.push(line.replace(/^#+\s*/, '').trim())
+      continue
+    }
+    break
+  }
+  const text = collected.filter(Boolean).join(' ').slice(0, maxChars).trim()
+  return text === '' ? null : text
+}
+
 /** 固定格式提示词:把证据摆给模型,让它只翻译不编造 */
 export function buildExplainPrompt(file: {
   relPath: string
@@ -315,6 +361,10 @@ export function buildExplainPrompt(file: {
   languageName: string
   structure: FileStructure
   graph: DepGraphResult | null
+  /** 小葵的手动备注(第一百零一锤):主人的原话当高权重证据 */
+  note?: string
+  /** 文件开头注释(第一百零一锤):常写着本模块负责什么 */
+  headerComment?: string | null
 }): string {
   const structureLines = [...formatStructureLines(file.structure), TOO_SPARSE_TIP]
   const relationLine = formatRelationLine(file.relPath, file.graph)
@@ -322,12 +372,15 @@ export function buildExplainPrompt(file: {
     `文件:${file.relPath}`,
     `语言:${file.languageName}`,
     '',
+    file.headerComment ? `文件开头注释:${file.headerComment}` : '',
+    file.note ? `项目主人备注:${file.note}(主人手写的背景,若和代码证据对不上要直说)` : '',
+    '',
     '结构信息:',
     ...structureLines.map((line) => `- ${line}`),
     '',
     relationLine,
     '',
-    '请根据上面的结构信息,用大白话告诉我:这个文件是干什么的,负责什么。'
+    '请根据上面的结构信息,用大白话告诉我:这个文件是干什么的,负责什么。点名结构里真实的函数/类名来讲。'
   ]
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -674,6 +727,8 @@ export function buildGuessPrompt(file: {
   absPath: string
   languageName: string
   preview: string | null
+  /** 小葵的手动备注(第一百零一锤) */
+  note?: string
 }): string {
   const previewText = file.preview === null
     ? '(读不出文本内容,只能凭名字和位置判断)'
@@ -685,6 +740,7 @@ export function buildGuessPrompt(file: {
     `完整路径:${file.absPath}`,
     `文件名:${file.name}`,
     `语言/类型:${file.languageName || '(没认出来)'}`,
+    file.note ? `项目主人备注:${file.note}(主人手写,供参考)` : '',
     '',
     `内容片段(只是开头一段,不一定完整):${previewText}`,
     '',

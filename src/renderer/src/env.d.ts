@@ -54,7 +54,8 @@ declare global {
         relPath: string,
         languageId: string,
         requestId?: string,
-        question?: string
+        question?: string,
+        note?: string
       ) => Promise<AiExplainResult>
       aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string) => Promise<AiExplainResult>
       aiChat: (req: AiChatRequest) => Promise<AiChatResult>

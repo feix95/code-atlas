@@ -8,6 +8,7 @@ import {
   buildExplainPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
+  extractHeaderComment,
   buildBinaryPrompt,
   buildLocatePrompt,
   buildTreeDigest,
@@ -891,6 +892,43 @@ async function main(): Promise<void> {
   assert.equal(formatUsage({}), '')
 })()
   console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
+  // ── 第一百零一锤:讲解喂骨架+备注+头注释,输出立硬规矩 ──
+  const header = extractHeaderComment([
+    '// 全树速览:给每个文件配一句大白话。',
+    '// 纯规则引擎,不劳烦 AI。',
+    '',
+    'export const something = 1'
+  ].join('\n'))
+  assert.equal(header, '全树速览:给每个文件配一句大白话。 纯规则引擎,不劳烦 AI。', `块注释提取,实际:${String(header)}`)
+  const blockHeader = extractHeaderComment('/*\n * 计算两个数的最大公约数。\n */\nexport function gcd() {}')
+  assert.equal(blockHeader, '计算两个数的最大公约数。', `块注释提取,实际:${String(blockHeader)}`)
+  assert.equal(extractHeaderComment('const x = 1'), null, '没注释老老实实回 null')
+
+  const explainPrompt = buildExplainPrompt({
+    relPath: 'src/scanner/index.ts',
+    name: 'index.ts',
+    languageName: 'typescript',
+    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    graph: null,
+    note: '这是扫描器',
+    headerComment: '把文件夹读成树'
+  })
+  assert.ok(explainPrompt.includes('项目主人备注:这是扫描器'), '备注要进证据包')
+  assert.ok(explainPrompt.includes('文件开头注释:把文件夹读成树'), '头注释要进证据包')
+  assert.ok(explainPrompt.includes('点名结构里真实的函数/类名'), '输出硬规矩要进提示词')
+  const plainPrompt = buildExplainPrompt({
+    relPath: 'a.ts',
+    name: 'a.ts',
+    languageName: 'typescript',
+    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    graph: null
+  })
+  assert.ok(!plainPrompt.includes('项目主人备注') && !plainPrompt.includes('文件开头注释'), '没备注没注释不留空行占位假证据')
+
+  const guessPrompt = buildGuessPrompt({ relPath: 'x.xyz', name: 'x.xyz', absPath: 'C:/x.xyz', languageName: '', preview: 'hello', note: '临时文件' })
+  assert.ok(guessPrompt.includes('项目主人备注:临时文件'), '猜猜官也吃备注')
+
+  console.log('✅ AI 人话解释自测全部通过')
 }
 
 main().catch((err) => {

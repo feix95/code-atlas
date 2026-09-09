@@ -10,6 +10,7 @@ import {
   explainWithModel,
   explainWithMessages,
   buildExplainPrompt,
+  extractHeaderComment,
   buildDiffPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
@@ -984,10 +985,11 @@ function registerIpc(): void {
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     'atlas:ai-explain-file',
-    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown) => {
+    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown, note?: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
       }
+      const ownerNote = typeof note === 'string' && note.trim() !== '' ? note.trim().slice(0, 100) : undefined
       const resolved = await resolveChatTargetOrError()
       if ('error' in resolved) {
         return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
@@ -1015,7 +1017,7 @@ function registerIpc(): void {
             event,
             requestId,
             question,
-            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null }),
+            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null, note: ownerNote, headerComment: extractHeaderComment(code) }),
             undefined,
             resolved
             // 结构流证据够硬(真代码结构),不掺联网查证
@@ -1054,7 +1056,7 @@ function registerIpc(): void {
         event,
         requestId,
         question,
-        buildGuessPrompt({ relPath, name, absPath, languageName, preview }),
+        buildGuessPrompt({ relPath, name, absPath, languageName, preview, note: ownerNote }),
         GUESS_SYSTEM_PROMPT,
         resolved,
         name
