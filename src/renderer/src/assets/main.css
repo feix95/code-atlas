@@ -377,6 +377,10 @@ body.is-maximized .traffic-lights .is-max i::after {
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3125rem;
   height: 1.875rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--accent-line);
@@ -4404,4 +4408,10 @@ body.is-maximized .cfg-layer {
 
 .tree-menu button:hover {
   background: var(--hover);
+}
+
+/* 顶栏线稿图标(第一百零三锤):跟备注小笔一家,不随文字换行挤变形 */
+.top-icon {
+  flex-shrink: 0;
+  display: block;
 }

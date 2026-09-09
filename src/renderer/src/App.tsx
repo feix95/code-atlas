@@ -29,6 +29,7 @@ import { useAiChat } from './useAiChat'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
+import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh } from './components/Icons'
 
 /** 容量读数:字节换 GB,过百就不带小数,别啰嗦 */
 function driveCapacity(d: DriveInfo): string {
@@ -630,6 +631,7 @@ function App(): React.JSX.Element {
           CodeAtlas
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
+          <IconFolder />
           {scanning ? '扫描中……' : '打开项目'}
         </button>
         {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰 */}
@@ -641,7 +643,7 @@ function App(): React.JSX.Element {
           title="后退"
           aria-label="后退"
         >
-          ←
+          <IconArrowLeft />
         </button>
         <button
           type="button"
@@ -651,9 +653,10 @@ function App(): React.JSX.Element {
           title="前进"
           aria-label="前进"
         >
-          →
+          <IconArrowRight />
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} disabled={scanning}>
+          <IconRefresh />
           {scanning ? '扫描中……' : '刷新'}
         </button>
         <div className={`path-box${pathShaking ? ' is-shaking' : ''}`} onAnimationEnd={() => setPathShaking(false)}>
