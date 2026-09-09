@@ -189,9 +189,8 @@ export function GitChanges({
           {result.stats.changed} 个文件改动 · <span className="git-add">+{result.stats.additions}</span>{' '}
           <span className="git-del">−{result.stats.deletions}</span> · {result.durationMs} ms
         </span>
-        <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()}>
+        <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} aria-label="刷新" title="刷新">
           <IconRefresh />
-          刷新
         </button>
       </div>
 

@@ -53,6 +53,8 @@ export function DetailHeader({
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  // 小笔写字动画(第一百零九锤补):保存/清删的瞬间磕一下
+  const [tapping, setTapping] = useState(false)
   // 右键菜单的「写/编辑备注」落到这里:置真就自动展开编辑框,每次挂载只应一次
   const autoOpenedRef = useRef(false)
   useEffect(() => {
@@ -71,6 +73,8 @@ export function DetailHeader({
   function save(): void {
     onNoteSave?.(draft)
     setEditing(false)
+    setTapping(true)
+    window.setTimeout(() => setTapping(false), 350)
   }
 
   return (
@@ -112,7 +116,7 @@ export function DetailHeader({
             aria-label={note ? '编辑备注' : '写备注'}
             title={note ? '编辑备注' : '写一句话备注'}
           >
-            <NotePen size={15} />
+            <NotePen size={15} tapping={tapping} />
           </button>
         )}
         <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭详情,回到项目概览">

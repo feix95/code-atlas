@@ -2019,6 +2019,8 @@ body.is-sash-dragging {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  /* 门行底下留呼吸缝(小葵红线):统计行不贴着门 */
+  margin-top: var(--space-2);
 }
 
 .git-branch {
@@ -2156,6 +2158,7 @@ body.is-sash-dragging {
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-2);
   margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .locator-examples .chip {
@@ -4521,6 +4524,7 @@ body.is-maximized .cfg-layer {
 
 /* 对话底部的小动作排(第一百零七锤):复制/重试,小而左对齐 */
 .msg-actions {
+  position: relative;
   display: flex;
   gap: 2px;
   margin-top: 0.25rem;
@@ -4546,4 +4550,50 @@ body.is-maximized .cfg-layer {
 
 .msg-action svg {
   display: block;
+}
+
+/* 复制成功的小提示(第一百零七锤补):浮在按钮排上方,1 秒内自己走,不挤按钮 */
+.msg-copied {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 小笔写字动画(第一百零九锤补):保存瞬间以笔尖为轴轻磕一下,笔迹从笔尖划出淡出 */
+@media (prefers-reduced-motion: no-preference) {
+  .note-pen.is-tapping {
+    transform-origin: 2.2px 14.6px;
+    animation: pen-tap 0.35s ease;
+  }
+
+  .note-pen .note-pen-trail {
+    opacity: 0;
+  }
+
+  .note-pen.is-tapping .note-pen-trail {
+    stroke-dasharray: 8;
+    stroke-dashoffset: 8;
+    animation: pen-trail 0.35s ease-out;
+  }
+}
+
+@keyframes pen-tap {
+  30% {
+    transform: rotate(12deg) translateY(1px);
+  }
+}
+
+@keyframes pen-trail {
+  40% {
+    opacity: 1;
+    stroke-dashoffset: 8;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
 }

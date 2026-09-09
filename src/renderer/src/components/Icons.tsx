@@ -1,11 +1,9 @@
-/** 备注小笔(第九十八锤):细线单色,跟本册一家 —— 不用彩色 emoji(小葵裁定) */
-
-
-/** 备注小笔(第九十八锤):细线单色,跟设置齿轮、git 分支一家 —— 不用彩色 emoji(小葵裁定) */
-export function NotePen({ size = 12 }: { size?: number }): React.JSX.Element {
+/** 备注小笔(第九十八锤):细线单色,跟设置齿轮、git 分支一家 —— 不用彩色 emoji(小葵裁定)。
+ *  第一百零九锤补:写字动画 —— 「is-tapping」时以笔尖为轴轻磕一下并从笔尖划出一道笔迹淡出 */
+export function NotePen({ size = 12, tapping = false }: { size?: number; tapping?: boolean }): React.JSX.Element {
   return (
     <svg
-      className="note-pen"
+      className={`note-pen${tapping ? ' is-tapping' : ''}`}
       width={size}
       height={size}
       viewBox="0 0 16 16"
@@ -18,6 +16,7 @@ export function NotePen({ size = 12 }: { size?: number }): React.JSX.Element {
     >
       <path d="M11.3 2.5a1.9 1.9 0 0 1 2.7 2.7L5.6 13.6l-3.4.9.9-3.4Z" />
       <path d="m9.9 3.9 2.7 2.7" />
+      <path className="note-pen-trail" d="M2 15.5h5" />
     </svg>
   )
 }

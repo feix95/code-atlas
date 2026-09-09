@@ -39,11 +39,12 @@ function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'g
 function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetry?: boolean; onRetry?: () => void }): React.JSX.Element {
   const label = webLabel(msg.web)
   const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
+  // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
   const [copied, setCopied] = useState(false)
   function copyAnswer(): void {
     void navigator.clipboard.writeText(msg.text).then(() => {
       setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
+      window.setTimeout(() => setCopied(false), 800)
     })
   }
   return (
@@ -67,6 +68,11 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
       </div>
       {(msg.state === 'done' || msg.state === 'cancelled') && msg.text && (
         <div className="msg-actions">
+          {copied && (
+            <span className="msg-copied" role="status">
+              已复制
+            </span>
+          )}
           <button
             type="button"
             className="msg-action"
