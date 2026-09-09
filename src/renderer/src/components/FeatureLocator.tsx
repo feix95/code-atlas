@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { FeatureLocateResult, ScanDirNode, ScanTreeNode } from '@shared/types'
+import { findCategory, LOCATE_CATEGORIES, type CategoryResult } from '@shared/locateCategories'
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
-
-/** 示例问法点了直接发;挑的是各类项目都通用的三问 */
-const LOCATE_EXAMPLES = ['程序从哪个文件启动', '配置写在哪个文件', '界面代码在哪']
 
 /** 在树里找节点(文件/目录都算):给命中的文件卡挂语言徽章用,找不到不硬挂 */
 function findNode(node: ScanTreeNode, relPath: string): ScanTreeNode | null {
@@ -33,6 +31,8 @@ export function FeatureLocator({
   const [question, setQuestion] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<FeatureLocateResult | null>(null)
+  // 类目直找(第一百零八锤):点了词条在树里现找,确定性结果
+  const [local, setLocal] = useState<CategoryResult | null>(null)
   const idRef = useRef('')
 
   // 卸载(换选中/关详情)时把还在路上的请求掐掉,别占着模型
@@ -49,6 +49,7 @@ export function FeatureLocator({
     idRef.current = requestId
     setBusy(true)
     setResult(null)
+    setLocal(null)
     try {
       // 树由主进程现摊成地图喂模型;指回来的地址已过防编造校验,这里只管画卡片
       const res = await window.atlas.locateFeature(tree, questionText, requestId)
@@ -67,20 +68,25 @@ export function FeatureLocator({
 
   function submit(e: FormEvent): void {
     e.preventDefault()
+    setLocal(null)
     void ask(question)
+  }
+
+  /** 点类目词条:树里现找,确定性结果,不劳烦模型 */
+  function findByCategory(label: string): void {
+    setResult(null)
+    setQuestion('')
+    setLocal(findCategory(tree, label))
   }
 
   return (
     <>
-      <div className="section-label">
-        功能在哪 <span>带路人照着地图指路 · 指的地址都验过真伪</span>
-      </div>
       <section className="card">
         <form className="locator-form" onSubmit={submit}>
           <input
             type="text"
             value={question}
-            placeholder="想知道什么功能在哪?比如:程序从哪个文件启动"
+            placeholder="想知道什么功能在哪?点下面的类目直接找"
             aria-label="描述你要找的功能"
             onChange={(e) => setQuestion(e.target.value)}
           />
@@ -88,14 +94,44 @@ export function FeatureLocator({
             {busy ? '带路中……' : '带我去'}
           </button>
         </form>
-        {!busy && !result && (
+        {!busy && (
           <div className="locator-examples">
-            {LOCATE_EXAMPLES.map((q) => (
-              <button key={q} type="button" className="chip chip-muted" onClick={() => void ask(q)}>
-                {q}
+            {LOCATE_CATEGORIES.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                className={`chip chip-muted${local?.label === c.label ? ' chip-link is-on' : ''}`}
+                onClick={() => findByCategory(c.label)}
+              >
+                {c.label}
               </button>
             ))}
           </div>
+        )}
+        {local && !busy && (
+          <>
+            {local.hits.length > 0 ? (
+              <div className="locator-hits">
+                {local.hits.map((hit) => {
+                  const node = findNode(tree, hit.relPath)
+                  return (
+                    <button key={hit.relPath} type="button" className="locator-hit" onClick={() => onJump(hit.relPath)} title="在地图里打开">
+                      <span className="locator-hit-top">
+                        <span className="locator-hit-path mono">{hit.relPath}</span>
+                        {node?.type === 'file' && node.language && <span className="chip chip-muted">{node.language.name}</span>}
+                      </span>
+                      <span className="locator-hit-reason">{hit.reason}</span>
+                    </button>
+                  )
+                })}
+                {local.total > local.hits.length && (
+                  <p className="rec-footnote">同类一共 {local.total} 处,先列最靠前的 {local.hits.length} 个。</p>
+                )}
+              </div>
+            ) : (
+              <p className="card-waiting">这棵树里没找到「{local.label}」相关的东西 —— 换个类目,或用上面输入框问带路人。</p>
+            )}
+          </>
         )}
         {busy && (
           <div className="card-waiting">
