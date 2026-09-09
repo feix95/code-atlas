@@ -6,6 +6,7 @@
 // 状态类(空/锁定/未展开/截断)单走第五节规矩:像日志播报,比喻全免。
 // 纯规则引擎,不劳烦 AI:毫秒级、零成本、断网也能用;认不出就给诚实话,绝不硬凑。
 import type { NodeSummary, ScanDirNode, ScanFileNode } from '../shared/types.ts'
+import { translateName } from './words.ts'
 
 // 风险句构造器:档位3专用,同话重播时不参与降噪(见 shared/summaryDedup)
 const TIER3 = (emoji: string, text: string): NodeSummary => ({ emoji, text, sticky: true })
@@ -184,6 +185,11 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { emoji: '🚪', text: '入口：程序多半从这儿开始跑' }
   }
 
+  // 词根词典(第九十九锤):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
+  // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
+  const byWords = translateName(file.name)
+  if (byWords) return { emoji: '🧱', text: byWords }
+
   const byExt = FILE_EXT_SUMMARIES[file.ext]
   if (byExt) return byExt
 
@@ -350,6 +356,10 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
     }
     return byName
   }
+
+  // 词根词典(第九十九锤):业务起的名(scanner/summarizer)按词根给个身份词
+  const dirWords = translateName(node.name)
+  if (dirWords) return { emoji: '📦', text: dirWords }
 
   // 状态播报:分级扫描还没展开这层,老实说"还没展开",别让人以为是个空文件夹
   if (node.lazy) {

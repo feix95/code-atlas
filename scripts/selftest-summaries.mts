@@ -77,8 +77,8 @@ async function main(): Promise<void> {
   annotateSummaries(dir('p', [entry, cssFile, kt, plainTs, docMd, photo, silentTxt, zipFile, unknownExt, noExt]))
   assert.ok(textOf(entry).includes('入口'), '代码语言的 index.ts 是入口(档位2,真信息)')
   assert.ok(textOf(cssFile).includes('样式'), 'index.css → 范畴词「样式」')
-  assert.equal(kt.summary, undefined, '任意 .kt:语言标签已说清,不写字')
-  assert.equal(plainTs.summary, undefined, '任意 .ts:不写字(老版「一块积木」已裁)')
+  assert.equal(kt.summary, undefined, '任意 .kt:名字查不出词,老实闭嘴')
+  assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」(第九十九锤)')
   assert.equal(textOf(docMd), '📖 文档', '.md → 范畴词「文档」')
   assert.equal(photo.summary, undefined, '.png 家喻户晓,沉默名单不写字')
   assert.equal(silentTxt.summary, undefined, '.txt 沉默名单不写字')
@@ -173,8 +173,28 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [stickyLock]))
   assert.ok(stickyLock.summary?.sticky === true && textOf(stickyLock).includes('不要手动改'), '风险句保留 sticky 标记')
 
+  // ── 11. 词根词典(第九十九锤):名字拆词查表,业务起的名也有身份 ──
+  const scannerFile = file('scanner.ts', TS)
+  const gitFile = file('GitFileStatus.tsx')
+  const askHook = file('useAiAsk.ts', TS)
+  const dataUtil = file('dataUtils.ts', TS)
+  const cssIndex = file('index.css', CSS)
+  const sumDir = dir('summarizer', [file('index.ts', TS)])
+  const graphDir = dir('dep_graph', [file('a.ts', TS)])
+  annotateSummaries(dir('proj', [scannerFile, gitFile, askHook, dataUtil, cssIndex, sumDir, graphDir]))
+  assert.ok(textOf(scannerFile).includes('扫描器'), `scanner → 扫描器,实际:${textOf(scannerFile)}`)
+  assert.ok(textOf(gitFile).includes('git') && textOf(gitFile).includes('状态'), `GitFileStatus → git状态,实际:${textOf(gitFile)}`)
+  assert.ok(textOf(askHook).includes('AI'), `useAiAsk → AI 询问,实际:${textOf(askHook)}`)
+  assert.ok(textOf(dataUtil).includes('数据'), `dataUtils → 数据工具,实际:${textOf(dataUtil)}`)
+  assert.ok(textOf(cssIndex).includes('样式') && !textOf(cssIndex).includes('索引'), 'index.css 不给「索引」空话')
+  assert.ok(textOf(sumDir).includes('摘要器'), 'summarizer 目录 → 摘要器')
+  assert.ok(textOf(graphDir).includes('依赖'), 'dep_graph 目录 → 依赖图')
+  const genericApp = file('App.tsx', TS)
+  annotateSummaries(dir('proj', [genericApp]))
+  assert.equal(genericApp.summary, undefined, 'App.tsx 只剩「应用」空话,老实闭嘴')
+
   console.log('✅ 全树速览自测全部通过')
-  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记')
+  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典')
 }
 
 main().catch((err) => {
