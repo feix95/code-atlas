@@ -86,7 +86,8 @@ export function FeatureLocator({
           <input
             type="text"
             value={question}
-            placeholder="想知道什么功能在哪?点下面的类目直接找"
+            placeholder="用大白话描述想找的功能,AI 带路帮你指路;也可点下方类目直达"
+            title="用法:用大白话写出你想找的功能(如「程序从哪个文件启动」「配置写在哪」),带路人会照着项目地图指路;常见的类目点下方词条直接找,必中。"
             aria-label="描述你要找的功能"
             onChange={(e) => setQuestion(e.target.value)}
           />
