@@ -185,6 +185,12 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { emoji: '🚪', text: '入口：程序多半从这儿开始跑' }
   }
 
+  // 文档读开头(第一百锤):有真标题就亮真名,别再笼统一句「文档」
+  if (file.docTitle) {
+    const t = file.docTitle.length > 16 ? `${file.docTitle.slice(0, 16)}…` : file.docTitle
+    return { emoji: '📖', text: `文档：${t}` }
+  }
+
   // 词根词典(第九十九锤):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
   // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
   const byWords = translateName(file.name)

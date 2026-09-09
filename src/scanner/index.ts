@@ -43,6 +43,41 @@ const MAX_NODES = 4000
 /** 全项目同时嗅探文件的并发上限:大目录不再所有文件同时开抢,内存/磁盘句柄都有界 */
 const MAX_CONCURRENT_SNIFFS = 32
 
+/** 文档类后缀:读个开头标题,一句话说明就能亮真名(第一百锤) */
+const DOC_EXTS = new Set(['.md', '.markdown', '.txt'])
+
+/**
+ * 读文档开头,取第一行当标题(纯嗅探,最多 256 字节,过限流门调用):
+ * md 剥掉 # 号和加粗记号;太长(>30 字)或空文件不硬凑,返回 undefined
+ */
+async function sniffDocTitle(fullPath: string): Promise<string | undefined> {
+  let fh
+  try {
+    fh = await fs.open(fullPath, 'r')
+    const buf = Buffer.alloc(256)
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0)
+    if (bytesRead <= 0) return undefined
+    const firstLine = buf
+      .subarray(0, bytesRead)
+      .toString('utf8')
+      .replace(/\uFFFD+$/, '') // 掐掉的尾巴可能切断多字节字符,残缺符去净
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line !== '')
+    if (!firstLine) return undefined
+    const title = firstLine
+      .replace(/^#+\s*/, '') // md 标题的 # 号
+      .replace(/[*_`>]/g, '') // 加粗/斜体/引用记号
+      .trim()
+    if (title.length < 2 || title.length > 30) return undefined
+    return title
+  } catch {
+    return undefined
+  } finally {
+    await fh?.close()
+  }
+}
+
 /** 极简信号量:最多 max 个任务同时在跑,余下的排队等叫号 */
 class SniffGate {
   private active = 0
@@ -141,10 +176,11 @@ async function scanDir(
           const agg = ctx.stats.byLanguage[language.id] ?? { name: language.name, count: 0 }
           agg.count++
           ctx.stats.byLanguage[language.id] = agg
-          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext, language })
-        } else {
-          children.push({ type: 'file', name: entry.name, relPath: childRelPath, ext })
         }
+        // 文档类读个开头标题(第一百锤):一句话说明能亮真名而不是笼统一句「文档」
+        const docTitle = DOC_EXTS.has(ext) ? await ctx.gate.run(() => sniffDocTitle(fullPath)) : undefined
+        const node = { type: 'file', name: entry.name, relPath: childRelPath, ext, ...(language ? { language } : {}), ...(docTitle ? { docTitle } : {}) }
+        children.push(node)
       }
       // 其他类型(管道、socket 等)不进树
     })

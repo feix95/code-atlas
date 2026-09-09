@@ -4,7 +4,7 @@ import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types
 
 let fileSeq = 0
 
-function file(name: string, language?: LanguageTag): ScanFileNode {
+function file(name: string, language?: LanguageTag, docTitle?: string): ScanFileNode {
   fileSeq++
   const dot = name.lastIndexOf('.')
   return {
@@ -12,7 +12,8 @@ function file(name: string, language?: LanguageTag): ScanFileNode {
     name,
     relPath: `f${fileSeq}/${name}`,
     ext: dot > 0 ? name.slice(dot).toLowerCase() : '',
-    ...(language ? { language } : {})
+    ...(language ? { language } : {}),
+    ...(docTitle ? { docTitle } : {})
   }
 }
 
@@ -192,6 +193,17 @@ async function main(): Promise<void> {
   const genericApp = file('App.tsx', TS)
   annotateSummaries(dir('proj', [genericApp]))
   assert.equal(genericApp.summary, undefined, 'App.tsx 只剩「应用」空话,老实闭嘴')
+
+  // ── 12. 文档读开头(第一百锤):有真标题亮真名,标题过长掐头留省略号 ──
+  const titledDoc = file('a.md', undefined, '安装指南')
+  const longDoc = file('b.md', undefined, '这是一个特别特别特别长的文档标题超出了预算')
+  const titledTxt = file('c.txt', undefined, '随手记')
+  const plainMd = file('d.md')
+  annotateSummaries(dir('proj', [titledDoc, longDoc, titledTxt, plainMd]))
+  assert.equal(textOf(titledDoc), '📖 文档：安装指南', `md 真标题亮真名,实际:${textOf(titledDoc)}`)
+  assert.ok(textOf(longDoc).includes('…') && textOf(longDoc).length <= 24, `超长标题掐头留省略号,实际:${textOf(longDoc)}`)
+  assert.equal(textOf(titledTxt), '📖 文档：随手记', 'txt 有标题也算文档')
+  assert.equal(textOf(plainMd), '📖 文档', '没标题的 md 照旧范畴词')
 
   console.log('✅ 全树速览自测全部通过')
   console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典')
