@@ -8,7 +8,6 @@ import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
 import { FolderOverview } from './components/FolderOverview'
 import { FreeChatPanel } from './components/FreeChatPanel'
-import { GitFileStatus } from './components/GitFileStatus'
 import { ModelStatusBar } from './components/ModelStatusBar'
 import { ProjectOverview } from './components/ProjectOverview'
 import { SettingsDialog } from './components/SettingsDialog'
@@ -38,15 +37,13 @@ function driveCapacity(d: DriveInfo): string {
   return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
-// 文件详情的五个 Tab;文件夹详情有自己的两页
-type DetailTab = 'overview' | 'structure' | 'relations' | 'changes' | 'chat'
+// 文件详情的三个 Tab(第一百零五锤:修改建议退役,结构与关系并成一栏垫底)
+type DetailTab = 'overview' | 'structure' | 'chat'
 
 const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '概览' },
-  { key: 'structure', label: '结构' },
-  { key: 'relations', label: '关系' },
-  { key: 'changes', label: '修改建议' },
-  { key: 'chat', label: 'Atlas 小探针' }
+  { key: 'chat', label: 'Atlas 小探针' },
+  { key: 'structure', label: '结构与关系' }
 ]
 
 const FOLDER_TABS = [
@@ -750,7 +747,6 @@ function App(): React.JSX.Element {
                 onJump={(p) => jumpTo(p, true)}
                 gitInfo={gitInfo}
                 gitLoading={gitLoading}
-                onOpenGit={clearSelection}
                 note={notes[selectedFile.relPath] ?? null}
                 onNoteSave={saveNote}
                 autoOpenNote={noteEditRequest === selectedFile.relPath}
@@ -900,7 +896,6 @@ function FileDetailView({
   onJump,
   gitInfo,
   gitLoading,
-  onOpenGit,
   note,
   onNoteSave,
   autoOpenNote
@@ -921,14 +916,13 @@ function FileDetailView({
   onJump: (relPath: string) => void
   gitInfo: GitChangesResult | null
   gitLoading: boolean
-  onOpenGit: () => void
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
   autoOpenNote?: boolean
 }): React.JSX.Element {
-  // AI 解释:概览卡、修改建议共用,证据优先的单问单答,绝不自动开跑
+  // AI 解释:概览卡、小探针共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
@@ -994,10 +988,9 @@ function FileDetailView({
             {!analyzing && analyzeNote?.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
             {!analyzing && analyzeNote?.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
             {!analyzing && structure && <StructureGrid structure={structure} />}
-          </>
-        )}
-        {activeTab === 'relations' && (
-          <>
+            <div className="section-label">
+              关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
+            </div>
             {graph ? (
               <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
             ) : graphLoading ? (
@@ -1006,9 +999,8 @@ function FileDetailView({
                 正在连线……
               </div>
             ) : (
-              <div className="empty-state">
-                <p className="empty-title">还没分析过文件关系</p>
-                <p className="empty-hint">连上线才知道:谁引用了它、它引用谁、改它会牵连谁</p>
+              <div className="card-waiting">
+                还没分析过文件关系。
                 <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
                   分析文件关系
                 </button>
@@ -1016,17 +1008,6 @@ function FileDetailView({
               </div>
             )}
           </>
-        )}
-        {activeTab === 'changes' && (
-          <GitFileStatus
-            gitInfo={gitInfo}
-            gitLoading={gitLoading}
-            rootPath={result.rootPath}
-            relPath={file.relPath}
-            onOpenGit={onOpenGit}
-            ai={ai}
-            onGoOverview={() => onTabChange('overview')}
-          />
         )}
         {activeTab === 'chat' && <FreeChatPanel chat={chat} context={buildFileAttachment(file, structure)} />}
       </div>
