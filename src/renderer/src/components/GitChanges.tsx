@@ -4,6 +4,7 @@ import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { IconRefresh } from './Icons'
+import { MiniMD } from './MiniMD'
 
 /** 掐掉还在路上的生成:换了文件/刷新/关面板时喊一声,模型立刻空出来 */
 function cancelExplain(id: string): void {
@@ -214,15 +215,14 @@ export function GitChanges({
           {reporting &&
             (reportStream ? (
               <div className="explain-text">
-                {reportStream}
-                <span className="stream-caret">▌</span>
+                <MiniMD text={reportStream} caret />
               </div>
             ) : (
               <div className="explain-note">
                 <ProgressDots />正在分析改动……(改动多时会慢一点)
               </div>
             ))}
-          {!reporting && report?.status === 'supported' && <div className="explain-text">{report.text}</div>}
+          {!reporting && report?.status === 'supported' && <div className="explain-text"><MiniMD text={report.text} /></div>}
           {!reporting && report?.status === 'error' && <Notice kind="error">{report.text}</Notice>}
         </div>
       )}
@@ -266,11 +266,11 @@ export function GitChanges({
             ↗ 在地图里打开这个文件
           </button>
           {explaining && (streamText ? (
-            <div className="explain-text">{streamText}<span className="stream-caret">▌</span></div>
+            <div className="explain-text"><MiniMD text={streamText} caret /></div>
           ) : (
             <div className="explain-note"><ProgressDots />正在把改动翻译成人话……(diff 长的话会慢一点)</div>
           ))}
-          {!explaining && explain?.status === 'supported' && <div className="explain-text">{explain.text}</div>}
+          {!explaining && explain?.status === 'supported' && <div className="explain-text"><MiniMD text={explain.text} /></div>}
           {!explaining && explain?.status === 'error' && <Notice kind="error">{explain.text}</Notice>}
         </div>
       )}

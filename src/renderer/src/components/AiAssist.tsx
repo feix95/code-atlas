@@ -1,5 +1,6 @@
 import type { AiAssistApi, AiTurn } from '../useAiAsk'
 import { Notice } from './Notice'
+import { MiniMD } from './MiniMD'
 import { ProgressDots } from './ProgressDots'
 
 // 本文件只放 AI 解释的展示组件;状态机钩子在 ../useAiAsk.ts(纯函数文件,HMR 才不打架)
@@ -31,8 +32,7 @@ export function TurnText({ turn }: { turn: AiTurn }): React.JSX.Element {
   if (turn.state === 'busy') {
     return turn.text ? (
       <div className="explain-text">
-        {turn.text}
-        <span className="stream-caret">▌</span>
+        <MiniMD text={turn.text} caret />
       </div>
     ) : (
       <div className="explain-note">
@@ -49,7 +49,7 @@ export function TurnText({ turn }: { turn: AiTurn }): React.JSX.Element {
         {turn.text ? (
           <>
             分析已取消,已经生成的这部分先留给你:
-            <div className="explain-text">{turn.text}</div>
+            <div className="explain-text"><MiniMD text={turn.text} /></div>
           </>
         ) : (
           '分析已取消。'
@@ -57,7 +57,7 @@ export function TurnText({ turn }: { turn: AiTurn }): React.JSX.Element {
       </div>
     )
   }
-  return <div className="explain-text">{turn.text}</div>
+  return <div className="explain-text"><MiniMD text={turn.text} /></div>
 }
 
 interface PresetRowProps {

@@ -4,7 +4,8 @@ import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
 import { AtlasProbe, type ProbeState } from './AtlasProbe'
-import { TreeIcon } from './Icons'
+import { IconRefresh, TreeIcon } from './Icons'
+import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
 
 /**
@@ -35,21 +36,23 @@ function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'g
   }
 }
 
-function AssistantBubble({ msg }: { msg: ChatMessage }): React.JSX.Element {
+function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetry?: boolean; onRetry?: () => void }): React.JSX.Element {
   const label = webLabel(msg.web)
   const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
+  const [copied, setCopied] = useState(false)
+  function copyAnswer(): void {
+    void navigator.clipboard.writeText(msg.text).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    })
+  }
   return (
     <div className="chat-turn">
       <div className="chat-answer-row">
         <AtlasProbe state={probe} className="chat-avatar" />
         <div className="message answer">
           {msg.state === 'busy' && !msg.text && <span className="chat-typing">小探针正在思考……</span>}
-          {msg.text && (
-            <>
-              {msg.text}
-              {msg.state === 'busy' && <span className="stream-caret">▌</span>}
-            </>
-          )}
+          {msg.text && <MiniMD text={msg.text} caret={msg.state === 'busy'} />}
           {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
           {msg.state === 'cancelled' && msg.text && <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>}
           {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
@@ -62,6 +65,24 @@ function AssistantBubble({ msg }: { msg: ChatMessage }): React.JSX.Element {
           )}
         </div>
       </div>
+      {(msg.state === 'done' || msg.state === 'cancelled') && msg.text && (
+        <div className="msg-actions">
+          <button
+            type="button"
+            className="msg-action"
+            onClick={copyAnswer}
+            aria-label={copied ? '已复制' : '复制这条回答'}
+            title={copied ? '已复制' : '复制'}
+          >
+            <TreeIcon name="copy" size={13} />
+          </button>
+          {canRetry && onRetry && (
+            <button type="button" className="msg-action" onClick={onRetry} aria-label="重试生成" title="重试">
+              <IconRefresh size={13} />
+            </button>
+          )}
+        </div>
+      )}
       {label && (
         <div className="chat-webstatus">
           <Badge label={label.text} tone={label.tone} />
@@ -152,15 +173,31 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
               </p>
             </div>
           ) : (
-            chat.messages.map((m) =>
-              m.role === 'user' ? (
-                <div key={m.key} className="message user">
-                  {m.text}
-                </div>
-              ) : (
-                <AssistantBubble key={m.key} msg={m} />
+            chat.messages.map((m, idx) => {
+              if (m.role === 'user') {
+                return (
+                  <div key={m.key} className="message user">
+                    {m.text}
+                  </div>
+                )
+              }
+              // 重试只挂在最后一条回答上:重答的应该是最新这个问题,历史回答不翻烧饼
+              const lastAssistantKey = [...chat.messages].reverse().find((x) => x.role === 'assistant')?.key
+              return (
+                <AssistantBubble
+                  key={m.key}
+                  msg={m}
+                  canRetry={m.key === lastAssistantKey && !chat.busy}
+                  onRetry={() => {
+                    const q = [...chat.messages].slice(0, idx).reverse().find((x) => x.role === 'user')?.text
+                    if (q) {
+                      forceBottom()
+                      chat.send(q)
+                    }
+                  }}
+                />
               )
-            )
+            })
           )}
         </div>
         {showJump && (
