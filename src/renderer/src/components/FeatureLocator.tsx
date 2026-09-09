@@ -120,7 +120,7 @@ export function FeatureLocator({
             <p className="rec-footnote">指路是带路人的推测 —— 点卡片直接去那个文件;想接着细问,去「自由对话」。</p>
           </div>
         )}
-        {!busy && result?.status === 'error' && <Notice kind="error">⚠️ {result.text}</Notice>}
+        {!busy && result?.status === 'error' && <Notice kind="error">{result.text}</Notice>}
         {!busy && result && (result.status === 'unsupported' || result.status === 'cancelled') && (
           <p className="card-text">{result.text}</p>
         )}

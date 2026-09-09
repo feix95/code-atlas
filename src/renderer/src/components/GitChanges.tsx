@@ -3,6 +3,7 @@ import type { AiExplainResult, GitChange, GitChangesResult } from '@shared/types
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
+import { IconRefresh } from './Icons'
 
 /** 掐掉还在路上的生成:换了文件/刷新/关面板时喊一声,模型立刻空出来 */
 function cancelExplain(id: string): void {
@@ -167,7 +168,7 @@ export function GitChanges({
   }
 
   if (loading) return <div className="structure-note"><ProgressDots />正在读取 git 记录……</div>
-  if (note) return <Notice kind="error">⚠️ {note}</Notice>
+  if (note) return <Notice kind="error">{note}</Notice>
   if (!result) return <div className="structure-note">git 记录还没拿到,点「刷新」再试。</div>
 
   if (!result.isGitRepo) {
@@ -183,19 +184,19 @@ export function GitChanges({
   return (
     <div className="git">
       <div className="git-head">
-        <span className="git-branch">🌿 {result.branch}</span>
         <span className="chip is-muted">
           {result.stats.changed} 个文件改动 · <span className="git-add">+{result.stats.additions}</span>{' '}
-          <span className="git-del">−{result.stats.deletions}</span> · ⏱ {result.durationMs} ms
+          <span className="git-del">−{result.stats.deletions}</span> · {result.durationMs} ms
         </span>
         <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()}>
-          🔄 刷新
+          <IconRefresh />
+          刷新
         </button>
       </div>
 
       {result.changes.length === 0 && (
         <div className="structure-note">
-          🌿 工作区是干净的 —— 所有改动都已提交。
+          工作区是干净的 —— 所有改动都已提交。
           <br />
           想看效果?随手改一个文件并保存,再点「刷新」,就能让 AI 讲清这次改动。
         </div>
@@ -204,16 +205,16 @@ export function GitChanges({
       {result.changes.length > 0 && (
         <div className="git-report">
           <div className="explain-head">
-            <span className="explain-title">🧾 AI 改动报告</span>
+            <span className="explain-title">AI 改动报告</span>
             <button type="button" className="btn" onClick={() => void handleReport()} disabled={reporting}>
-              {reporting ? '⏳ 正在分析……' : report?.status === 'supported' ? '🔄 再分析一遍' : '🤖 生成本轮报告'}
+              {reporting ? '正在分析……' : report?.status === 'supported' ? '再分析一遍' : '生成本轮报告'}
             </button>
           </div>
           <p className="git-report-hint">不用读代码:AI 把这轮改动讲成大白话 —— 改了什么、有没有问题、要不要细看。</p>
           {reporting &&
             (reportStream ? (
               <div className="explain-text">
-                ✨ {reportStream}
+                {reportStream}
                 <span className="stream-caret">▌</span>
               </div>
             ) : (
@@ -221,8 +222,8 @@ export function GitChanges({
                 <ProgressDots />正在分析改动……(改动多时会慢一点)
               </div>
             ))}
-          {!reporting && report?.status === 'supported' && <div className="explain-text">✨ {report.text}</div>}
-          {!reporting && report?.status === 'error' && <Notice kind="error">⚠️ {report.text}</Notice>}
+          {!reporting && report?.status === 'supported' && <div className="explain-text">{report.text}</div>}
+          {!reporting && report?.status === 'error' && <Notice kind="error">{report.text}</Notice>}
         </div>
       )}
 
@@ -256,23 +257,21 @@ export function GitChanges({
       {selected && (
         <div className="explain">
           <div className="explain-head">
-            <span className="explain-title">
-              💬 「{selected.relPath}」这次改了什么
-            </span>
+            <span className="explain-title">「{selected.relPath}」这次改了什么</span>
             <button type="button" className="btn" onClick={handleExplain} disabled={explaining}>
-              {explaining ? '⏳ 模型思考中……' : '🤖 用人话讲讲这个改动'}
+              {explaining ? '模型思考中……' : '用人话讲讲这个改动'}
             </button>
           </div>
           <button type="button" className="structure-note chip-link" onClick={() => onJump(selected.relPath)}>
             ↗ 在地图里打开这个文件
           </button>
           {explaining && (streamText ? (
-            <div className="explain-text">✨ {streamText}<span className="stream-caret">▌</span></div>
+            <div className="explain-text">{streamText}<span className="stream-caret">▌</span></div>
           ) : (
             <div className="explain-note"><ProgressDots />正在把改动翻译成人话……(diff 长的话会慢一点)</div>
           ))}
-          {!explaining && explain?.status === 'supported' && <div className="explain-text">✨ {explain.text}</div>}
-          {!explaining && explain?.status === 'error' && <Notice kind="error">⚠️ {explain.text}</Notice>}
+          {!explaining && explain?.status === 'supported' && <div className="explain-text">{explain.text}</div>}
+          {!explaining && explain?.status === 'error' && <Notice kind="error">{explain.text}</Notice>}
         </div>
       )}
     </div>

@@ -713,7 +713,7 @@ function App(): React.JSX.Element {
                 {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
               </span>
             </footer>
-            {treeNote && <div className="tree-toast" role="alert">⚠️ {treeNote}</div>}
+            {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
           </aside>
           <div
             className="sash"

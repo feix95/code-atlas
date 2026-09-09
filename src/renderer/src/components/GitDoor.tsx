@@ -44,7 +44,7 @@ export function GitDoor({
           <span className="git-door-badge">{gitInfo.stats.changed}</span>
         </span>
         <span className="git-door-branch">{gitInfo.branch}</span>
-        <span className="git-door-text">个项目还没提交 —— 点开就能看 AI 干活报告</span>
+        <span className="git-door-text">有改动还没提交,点开看 AI 改动报告</span>
         <span className={`git-door-caret${open ? ' is-open' : ''}`} aria-hidden="true">
           ▾
         </span>
