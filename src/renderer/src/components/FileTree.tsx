@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
-import { NotePen } from './NotePen'
+import { NotePen, TreeIcon } from './Icons'
 
 interface TreeRowProps {
   node: ScanTreeNode
@@ -49,7 +49,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={node.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            ▤
+            {<TreeIcon name={node.summary?.icon ?? 'file'} />}
           </span>
           <span className="tree-name">{node.name}</span>
           {note ? (
@@ -113,7 +113,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={dir.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            ▣
+            {<TreeIcon name={dir.summary?.icon ?? 'folder'} />}
           </span>
           <span className="tree-name">{dir.name}</span>
           {dirNote ? (

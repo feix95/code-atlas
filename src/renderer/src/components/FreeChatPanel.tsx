@@ -4,6 +4,7 @@ import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
 import { AtlasProbe, type ProbeState } from './AtlasProbe'
+import { TreeIcon } from './Icons'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
 
 /**
@@ -131,7 +132,7 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
       {context && (
         <details className="chat-attach">
           <summary>
-            <span aria-hidden="true">📎</span>
+            <TreeIcon name="clip" size={12} />
             当前参考资料:<strong>{context.name}</strong>
             <span className="chat-attach-summary">{context.summary}</span>
           </summary>

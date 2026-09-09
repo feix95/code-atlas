@@ -9,80 +9,80 @@ import type { NodeSummary, ScanDirNode, ScanFileNode } from '../shared/types.ts'
 import { translateName } from './words.ts'
 
 // 风险句构造器:档位3专用,同话重播时不参与降噪(见 shared/summaryDedup)
-const TIER3 = (emoji: string, text: string): NodeSummary => ({ emoji, text, sticky: true })
+const TIER3 = (icon: string, text: string): NodeSummary => ({ icon, text, sticky: true })
 
 // ── 文件:精确文件名字典(小写比对,最铁的证据) ──
 const FILE_SUMMARIES: Record<string, NodeSummary> = {
-  'package.json': { emoji: '🪪', text: '项目配置：名称、依赖和命令' },
-  'package-lock.json': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'npm-shrinkwrap.json': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'pnpm-lock.yaml': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'yarn.lock': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'cargo.lock': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'poetry.lock': TIER3('🔒', '锁定依赖版本，自动生成，不要手动改'),
-  'readme': { emoji: '🏠', text: '项目说明：是什么、怎么运行' },
-  'readme.md': { emoji: '🏠', text: '项目说明：是什么、怎么运行' },
-  'readme.txt': { emoji: '🏠', text: '项目说明：是什么、怎么运行' },
-  '.gitignore': TIER3('🚫', '告诉 Git 忽略哪些文件，不会被提交'),
-  '.gitattributes': { emoji: '🏷️', text: 'Git 的文件处理规则' },
-  '.gitkeep': { emoji: '🧯', text: '空文件夹占位文件' },
-  '.gitmodules': { emoji: '🔗', text: 'Git 子项目清单' },
-  '.prettierignore': { emoji: '🙈', text: '格式化忽略名单' },
-  '.editorconfig': { emoji: '✒️', text: '编辑器配置：统一缩进和换行' },
-  '.eslintrc': { emoji: '🩺', text: '代码检查：查出写法问题和 bug' },
-  '.eslintrc.js': { emoji: '🩺', text: '代码检查：查出写法问题和 bug' },
-  '.eslintrc.json': { emoji: '🩺', text: '代码检查：查出写法问题和 bug' },
-  '.eslintrc.yml': { emoji: '🩺', text: '代码检查：查出写法问题和 bug' },
-  '.eslintrc.yaml': { emoji: '🩺', text: '代码检查：查出写法问题和 bug' },
-  'jsconfig.json': { emoji: '📐', text: 'JS 配置：帮编辑器理解代码' },
-  'tsconfig.json': { emoji: '📐', text: '编译配置：类型检查和编译标准' },
-  'claude.md': { emoji: '🤖', text: 'AI 说明：AI 干活前必读的背景' },
-  'license': { emoji: '⚖️', text: '许可证：规定代码能怎么用' },
-  'license.md': { emoji: '⚖️', text: '许可证：规定代码能怎么用' },
-  'license.txt': { emoji: '⚖️', text: '许可证：规定代码能怎么用' },
-  'licence': { emoji: '⚖️', text: '许可证：规定代码能怎么用' },
-  'licence.md': { emoji: '⚖️', text: '许可证：规定代码能怎么用' },
-  'changelog.md': { emoji: '📜', text: '更新日志：每个版本改了什么' },
-  'contributing.md': { emoji: '🤝', text: '参与指南：如何贡献代码' },
-  'code_of_conduct.md': { emoji: '🤝', text: '社区公约：行为准则' },
-  'dockerfile': { emoji: '🐳', text: 'Docker 说明：项目怎么打包运行' },
-  'docker-compose.yml': { emoji: '🐳', text: 'Docker 编排：多个容器一起运行' },
-  'docker-compose.yaml': { emoji: '🐳', text: 'Docker 编排：多个容器一起运行' },
-  'compose.yml': { emoji: '🐳', text: 'Docker 编排：多个容器一起运行' },
-  'compose.yaml': { emoji: '🐳', text: 'Docker 编排：多个容器一起运行' },
-  'makefile': { emoji: '🔨', text: '自动化指令：一条命令跑一串任务' },
-  'requirements.txt': { emoji: '📋', text: 'Python 依赖清单' },
-  'pyproject.toml': { emoji: '🐍', text: 'Python 项目配置' },
-  'setup.py': { emoji: '🐍', text: 'Python 项目配置' },
-  'setup.cfg': { emoji: '🐍', text: 'Python 项目配置' },
-  'go.mod': { emoji: '📋', text: 'Go 依赖清单' },
-  'cargo.toml': { emoji: '📋', text: 'Rust 项目配置' },
-  'pom.xml': { emoji: '📋', text: 'Java 依赖和构建配置' },
-  'build.gradle': { emoji: '📋', text: 'Java 依赖和构建配置' },
-  'build.gradle.kts': { emoji: '📋', text: 'Java 依赖和构建配置' },
-  'settings.gradle': { emoji: '📋', text: 'Java 依赖和构建配置' },
-  'settings.gradle.kts': { emoji: '📋', text: 'Java 依赖和构建配置' },
-  '.npmrc': { emoji: '⚙️', text: 'npm 配置：从哪装、怎么装' },
-  '.nvmrc': { emoji: '🔢', text: '指定 Node 版本' }
+  'package.json': { icon: 'config', text: '项目配置：名称、依赖和命令' },
+  'package-lock.json': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'npm-shrinkwrap.json': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'pnpm-lock.yaml': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'yarn.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'cargo.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'poetry.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
+  'readme': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
+  'readme.md': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
+  'readme.txt': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
+  '.gitignore': TIER3('lock', '告诉 Git 忽略哪些文件，不会被提交'),
+  '.gitattributes': { icon: 'config', text: 'Git 的文件处理规则' },
+  '.gitkeep': { icon: 'file', text: '空文件夹占位文件' },
+  '.gitmodules': { icon: 'package', text: 'Git 子项目清单' },
+  '.prettierignore': { icon: 'style', text: '格式化忽略名单' },
+  '.editorconfig': { icon: 'config', text: '编辑器配置：统一缩进和换行' },
+  '.eslintrc': { icon: 'check', text: '代码检查：查出写法问题和 bug' },
+  '.eslintrc.js': { icon: 'check', text: '代码检查：查出写法问题和 bug' },
+  '.eslintrc.json': { icon: 'check', text: '代码检查：查出写法问题和 bug' },
+  '.eslintrc.yml': { icon: 'check', text: '代码检查：查出写法问题和 bug' },
+  '.eslintrc.yaml': { icon: 'check', text: '代码检查：查出写法问题和 bug' },
+  'jsconfig.json': { icon: 'config', text: 'JS 配置：帮编辑器理解代码' },
+  'tsconfig.json': { icon: 'config', text: '编译配置：类型检查和编译标准' },
+  'claude.md': { icon: 'bot', text: 'AI 说明：AI 干活前必读的背景' },
+  'license': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  'license.md': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  'license.txt': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  'licence': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  'licence.md': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  'changelog.md': { icon: 'doc', text: '更新日志：每个版本改了什么' },
+  'contributing.md': { icon: 'doc', text: '参与指南：如何贡献代码' },
+  'code_of_conduct.md': { icon: 'doc', text: '社区公约：行为准则' },
+  'dockerfile': { icon: 'package', text: 'Docker 说明：项目怎么打包运行' },
+  'docker-compose.yml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
+  'docker-compose.yaml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
+  'compose.yml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
+  'compose.yaml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
+  'makefile': { icon: 'terminal', text: '自动化指令：一条命令跑一串任务' },
+  'requirements.txt': { icon: 'package', text: 'Python 依赖清单' },
+  'pyproject.toml': { icon: 'package', text: 'Python 项目配置' },
+  'setup.py': { icon: 'package', text: 'Python 项目配置' },
+  'setup.cfg': { icon: 'package', text: 'Python 项目配置' },
+  'go.mod': { icon: 'package', text: 'Go 依赖清单' },
+  'cargo.toml': { icon: 'package', text: 'Rust 项目配置' },
+  'pom.xml': { icon: 'package', text: 'Java 依赖和构建配置' },
+  'build.gradle': { icon: 'package', text: 'Java 依赖和构建配置' },
+  'build.gradle.kts': { icon: 'package', text: 'Java 依赖和构建配置' },
+  'settings.gradle': { icon: 'package', text: 'Java 依赖和构建配置' },
+  'settings.gradle.kts': { icon: 'package', text: 'Java 依赖和构建配置' },
+  '.npmrc': { icon: 'config', text: 'npm 配置：从哪装、怎么装' },
+  '.nvmrc': { icon: 'config', text: '指定 Node 版本' }
 }
 
 // ── 文件:名字模式规则(字典没精确命中时看名字形状) ──
 const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
-  { re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/, summary: { emoji: '🧪', text: '测试：验证代码对不对' } },
-  { re: /^tsconfig\..*\.json$/, summary: { emoji: '📐', text: '编译配置：类型检查和编译标准' } },
-  { re: /^(\.?prettier\.config\.|\.prettierrc)/, summary: { emoji: '📏', text: '格式配置：统一缩进、引号、换行' } },
+  { re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/, summary: { icon: 'test', text: '测试：验证代码对不对' } },
+  { re: /^tsconfig\..*\.json$/, summary: { icon: 'config', text: '编译配置：类型检查和编译标准' } },
+  { re: /^(\.?prettier\.config\.|\.prettierrc)/, summary: { icon: 'style', text: '格式配置：统一缩进、引号、换行' } },
   {
     re: /^(\.eslintrc\.(?!json|js|yml|yaml)|eslint\.config\.)/,
-    summary: { emoji: '🩺', text: '代码检查：查出写法问题和 bug' }
+    summary: { icon: 'check', text: '代码检查：查出写法问题和 bug' }
   },
   {
     re: /^(electron\.)?vite\.config\.|webpack\.config\.|rollup\.config\.|rspack\.config\./,
-    summary: { emoji: '⚙️', text: '打包配置：源代码变成能跑的程序' }
+    summary: { icon: 'config', text: '打包配置：源代码变成能跑的程序' }
   },
-  { re: /^\.env(\.|$)/, summary: TIER3('🔑', '配置开关，常包含密钥，不要外传') },
-  { re: /^dockerfile\./, summary: { emoji: '🐳', text: 'Docker 说明：项目怎么打包运行' } },
-  { re: /\.d\.ts$/, summary: { emoji: '📜', text: '类型说明：库的类型清单' } },
-  { re: /\.config\./, summary: { emoji: '⚙️', text: '配置文件' } }
+  { re: /^\.env(\.|$)/, summary: TIER3('key', '配置开关，常包含密钥，不要外传') },
+  { re: /^dockerfile\./, summary: { icon: 'package', text: 'Docker 说明：项目怎么打包运行' } },
+  { re: /\.d\.ts$/, summary: { icon: 'doc', text: '类型说明：库的类型清单' } },
+  { re: /\.config\./, summary: { icon: '⚙️', text: '配置文件' } }
 ]
 
 // 认得出是代码的语言 id:给"入口角色"提示用(样式/标记类语言不掺和)
@@ -106,63 +106,63 @@ const CODE_LANG_IDS = new Set([
 
 // ── 文件:后缀范畴词(档位1:只给黑话后缀配 2~4 字范畴词,不写句子) ──
 const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
-  '.md': { emoji: '📖', text: '文档' },
-  '.markdown': { emoji: '📖', text: '文档' },
-  '.json': { emoji: '🗂️', text: '配置/数据' },
-  '.yaml': { emoji: '🗂️', text: '配置' },
-  '.yml': { emoji: '🗂️', text: '配置' },
-  '.toml': { emoji: '🗂️', text: '配置' },
-  '.ini': { emoji: '⚙️', text: '配置' },
-  '.cfg': { emoji: '⚙️', text: '配置' },
-  '.conf': { emoji: '⚙️', text: '配置' },
-  '.lock': { emoji: '🔒', text: '锁文件' },
-  '.svg': { emoji: '🖼️', text: '矢量图' },
-  '.ico': { emoji: '🖼️', text: '图标' },
-  '.mp3': { emoji: '🎵', text: '音频' },
-  '.wav': { emoji: '🎵', text: '音频' },
-  '.ogg': { emoji: '🎵', text: '音频' },
-  '.flac': { emoji: '🎵', text: '音频' },
-  '.m4a': { emoji: '🎵', text: '音频' },
-  '.mp4': { emoji: '🎬', text: '视频' },
-  '.mov': { emoji: '🎬', text: '视频' },
-  '.avi': { emoji: '🎬', text: '视频' },
-  '.mkv': { emoji: '🎬', text: '视频' },
-  '.webm': { emoji: '🎬', text: '视频' },
-  '.ttf': { emoji: '🔤', text: '字体' },
-  '.otf': { emoji: '🔤', text: '字体' },
-  '.woff': { emoji: '🔤', text: '字体' },
-  '.woff2': { emoji: '🔤', text: '字体' },
-  '.eot': { emoji: '🔤', text: '字体' },
-  '.csv': { emoji: '📊', text: '表格数据' },
-  '.html': { emoji: '🌐', text: '网页' },
-  '.htm': { emoji: '🌐', text: '网页' },
-  '.css': { emoji: '🎨', text: '样式' },
-  '.scss': { emoji: '🎨', text: '样式' },
-  '.sass': { emoji: '🎨', text: '样式' },
-  '.less': { emoji: '🎨', text: '样式' },
-  '.sql': { emoji: '🗃️', text: '数据库脚本' },
-  '.sh': { emoji: '🖥️', text: '脚本' },
-  '.bash': { emoji: '🖥️', text: '脚本' },
-  '.zsh': { emoji: '🖥️', text: '脚本' },
-  '.ps1': { emoji: '🖥️', text: '脚本' },
-  '.bat': { emoji: '🖥️', text: '脚本' },
-  '.cmd': { emoji: '🖥️', text: '脚本' },
-  '.zip': { emoji: '📦', text: '压缩包' },
-  '.tar': { emoji: '📦', text: '压缩包' },
-  '.gz': { emoji: '📦', text: '压缩包' },
-  '.7z': { emoji: '📦', text: '压缩包' },
-  '.rar': { emoji: '📦', text: '压缩包' },
-  '.exe': { emoji: '⚙️', text: '程序文件' },
-  '.dll': { emoji: '⚙️', text: '程序文件' },
-  '.so': { emoji: '⚙️', text: '程序文件' },
-  '.dylib': { emoji: '⚙️', text: '程序文件' },
-  '.bin': { emoji: '⚙️', text: '程序文件' },
-  '.wasm': { emoji: '⚙️', text: '网页程序' },
-  '.proto': { emoji: '📡', text: '接口定义' },
-  '.graphql': { emoji: '📡', text: '接口定义' },
-  '.gql': { emoji: '📡', text: '接口定义' },
-  '.vue': { emoji: '🧩', text: '界面组件' },
-  '.svelte': { emoji: '🧩', text: '界面组件' }
+  '.md': { icon: 'doc', text: '文档' },
+  '.markdown': { icon: 'doc', text: '文档' },
+  '.json': { icon: 'data', text: '配置/数据' },
+  '.yaml': { icon: 'config', text: '配置' },
+  '.yml': { icon: 'config', text: '配置' },
+  '.toml': { icon: 'config', text: '配置' },
+  '.ini': { icon: 'config', text: '配置' },
+  '.cfg': { icon: 'config', text: '配置' },
+  '.conf': { icon: 'config', text: '配置' },
+  '.lock': { icon: 'lock', text: '锁文件' },
+  '.svg': { icon: 'image', text: '矢量图' },
+  '.ico': { icon: 'image', text: '图标' },
+  '.mp3': { icon: 'audio', text: '音频' },
+  '.wav': { icon: 'audio', text: '音频' },
+  '.ogg': { icon: 'audio', text: '音频' },
+  '.flac': { icon: 'audio', text: '音频' },
+  '.m4a': { icon: 'audio', text: '音频' },
+  '.mp4': { icon: 'video', text: '视频' },
+  '.mov': { icon: 'video', text: '视频' },
+  '.avi': { icon: 'video', text: '视频' },
+  '.mkv': { icon: 'video', text: '视频' },
+  '.webm': { icon: 'video', text: '视频' },
+  '.ttf': { icon: 'font', text: '字体' },
+  '.otf': { icon: 'font', text: '字体' },
+  '.woff': { icon: 'font', text: '字体' },
+  '.woff2': { icon: 'font', text: '字体' },
+  '.eot': { icon: 'font', text: '字体' },
+  '.csv': { icon: 'table', text: '表格数据' },
+  '.html': { icon: 'globe', text: '网页' },
+  '.htm': { icon: 'globe', text: '网页' },
+  '.css': { icon: 'style', text: '样式' },
+  '.scss': { icon: 'style', text: '样式' },
+  '.sass': { icon: 'style', text: '样式' },
+  '.less': { icon: 'style', text: '样式' },
+  '.sql': { icon: 'database', text: '数据库脚本' },
+  '.sh': { icon: 'terminal', text: '脚本' },
+  '.bash': { icon: 'terminal', text: '脚本' },
+  '.zsh': { icon: 'terminal', text: '脚本' },
+  '.ps1': { icon: 'terminal', text: '脚本' },
+  '.bat': { icon: 'terminal', text: '脚本' },
+  '.cmd': { icon: 'terminal', text: '脚本' },
+  '.zip': { icon: 'archive', text: '压缩包' },
+  '.tar': { icon: 'archive', text: '压缩包' },
+  '.gz': { icon: 'archive', text: '压缩包' },
+  '.7z': { icon: 'archive', text: '压缩包' },
+  '.rar': { icon: 'archive', text: '压缩包' },
+  '.exe': { icon: 'cpu', text: '程序文件' },
+  '.dll': { icon: 'cpu', text: '程序文件' },
+  '.so': { icon: 'cpu', text: '程序文件' },
+  '.dylib': { icon: 'cpu', text: '程序文件' },
+  '.bin': { icon: 'cpu', text: '程序文件' },
+  '.wasm': { icon: 'cpu', text: '网页程序' },
+  '.proto': { icon: 'globe', text: '接口定义' },
+  '.graphql': { icon: 'globe', text: '接口定义' },
+  '.gql': { icon: 'globe', text: '接口定义' },
+  '.vue': { icon: 'component', text: '界面组件' },
+  '.svelte': { icon: 'component', text: '界面组件' }
 }
 
 // 档位1的"沉默名单":图片/纯文本这类家喻户晓的后缀,类型标签已经说清 —— 不写字,但也不许报"没认出"
@@ -182,19 +182,19 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   // 入口角色(档位2:文件名看不出来的真信息):常见代码语言的 index/main,多半是程序开始跑的地方
   const base = lower.replace(/\.[^.]+$/, '')
   if (file.language && CODE_LANG_IDS.has(file.language.id) && (base === 'index' || base === 'main')) {
-    return { emoji: '🚪', text: '入口：程序多半从这儿开始跑' }
+    return { icon: 'entry', text: '入口：程序多半从这儿开始跑' }
   }
 
   // 文档读开头(第一百锤):有真标题就亮真名,别再笼统一句「文档」
   if (file.docTitle) {
     const t = file.docTitle.length > 16 ? `${file.docTitle.slice(0, 16)}…` : file.docTitle
-    return { emoji: '📖', text: `文档：${t}` }
+    return { icon: 'doc', text: `文档：${t}` }
   }
 
   // 词根词典(第九十九锤):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
   // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
   const byWords = translateName(file.name)
-  if (byWords) return { emoji: '🧱', text: byWords }
+  if (byWords) return { icon: 'code', text: byWords }
 
   const byExt = FILE_EXT_SUMMARIES[file.ext]
   if (byExt) return byExt
@@ -203,125 +203,125 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   if (KNOWN_SILENT_EXTS.has(file.ext)) return undefined
   if (file.language) return undefined
 
-  if (file.ext) return { emoji: '🤔', text: `未知类型「${file.ext}」，点击可问 AI` }
-  return { emoji: '📄', text: '没有后缀，无法判断类型' }
+  if (file.ext) return { icon: 'help', text: `未知类型「${file.ext}」，点击可问 AI` }
+  return { icon: 'file', text: '没有后缀，无法判断类型' }
 }
 
 // ── 目录:名字习惯字典(档位2正脸直说,≤14 字,无人物拟人) ──
 const DIR_SUMMARIES: Record<string, NodeSummary> = {
-  src: { emoji: '🏠', text: '项目全部源代码' },
-  source: { emoji: '🏠', text: '项目全部源代码' },
-  sources: { emoji: '🏠', text: '项目全部源代码' },
-  lib: { emoji: '🧰', text: '通用工具代码' },
-  libs: { emoji: '🧰', text: '通用工具代码' },
-  utils: { emoji: '🧰', text: '通用工具代码' },
-  util: { emoji: '🧰', text: '通用工具代码' },
-  helpers: { emoji: '🧰', text: '通用工具代码' },
-  helper: { emoji: '🧰', text: '通用工具代码' },
-  common: { emoji: '🧰', text: '通用工具代码' },
-  shared: { emoji: '🧰', text: '通用工具代码' },
-  scripts: { emoji: '⚙️', text: '自动化脚本' },
-  script: { emoji: '⚙️', text: '自动化脚本' },
-  bin: { emoji: '⚙️', text: '自动化脚本' },
-  tools: { emoji: '⚙️', text: '自动化脚本' },
-  tooling: { emoji: '⚙️', text: '自动化脚本' },
-  test: { emoji: '🧪', text: '测试代码' },
-  tests: { emoji: '🧪', text: '测试代码' },
-  __tests__: { emoji: '🧪', text: '测试代码' },
-  spec: { emoji: '🧪', text: '测试代码' },
-  specs: { emoji: '🧪', text: '测试代码' },
-  e2e: { emoji: '🧪', text: '测试代码' },
-  docs: { emoji: '📚', text: '项目文档' },
-  doc: { emoji: '📚', text: '项目文档' },
-  documents: { emoji: '📚', text: '项目文档' },
-  documentation: { emoji: '📚', text: '项目文档' },
-  manual: { emoji: '📚', text: '项目文档' },
-  manuals: { emoji: '📚', text: '项目文档' },
-  inspiration: { emoji: '💡', text: '参考资料和示例' },
-  examples: { emoji: '💡', text: '参考资料和示例' },
-  example: { emoji: '💡', text: '参考资料和示例' },
-  demo: { emoji: '💡', text: '参考资料和示例' },
-  demos: { emoji: '💡', text: '参考资料和示例' },
-  samples: { emoji: '💡', text: '参考资料和示例' },
-  sample: { emoji: '💡', text: '参考资料和示例' },
-  reference: { emoji: '💡', text: '参考资料和示例' },
-  references: { emoji: '💡', text: '参考资料和示例' },
-  vendor: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  vendors: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  third_party: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  thirdparty: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  external: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  deps: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  dependencies: { emoji: '📦', text: '第三方代码，只使用不修改' },
-  assets: { emoji: '🖼️', text: '静态资源' },
-  asset: { emoji: '🖼️', text: '静态资源' },
-  static: { emoji: '🖼️', text: '静态资源' },
-  public: { emoji: '🖼️', text: '静态资源' },
-  images: { emoji: '🖼️', text: '图片资源' },
-  img: { emoji: '🖼️', text: '图片资源' },
-  icons: { emoji: '🖼️', text: '图片资源' },
-  fonts: { emoji: '🔤', text: '字体文件' },
-  media: { emoji: '🎬', text: '媒体文件' },
-  videos: { emoji: '🎬', text: '媒体文件' },
-  video: { emoji: '🎬', text: '媒体文件' },
-  components: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  component: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  ui: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  widgets: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  views: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  pages: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  screens: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  layouts: { emoji: '🧩', text: '界面按钮、卡片等可复用组件' },
-  config: { emoji: '⚙️', text: '配置文件' },
-  configs: { emoji: '⚙️', text: '配置文件' },
-  configuration: { emoji: '⚙️', text: '配置文件' },
-  settings: { emoji: '⚙️', text: '配置文件' },
-  styles: { emoji: '🎨', text: '界面的颜色、字体、间距样式' },
-  style: { emoji: '🎨', text: '界面的颜色、字体、间距样式' },
-  css: { emoji: '🎨', text: '界面的颜色、字体、间距样式' },
-  scss: { emoji: '🎨', text: '界面的颜色、字体、间距样式' },
-  sass: { emoji: '🎨', text: '界面的颜色、字体、间距样式' },
-  types: { emoji: '📐', text: '类型定义' },
-  typings: { emoji: '📐', text: '类型定义' },
-  interfaces: { emoji: '📐', text: '类型定义' },
-  api: { emoji: '📡', text: '供其他程序调用的接口' },
-  apis: { emoji: '📡', text: '供其他程序调用的接口' },
-  routes: { emoji: '📡', text: '供其他程序调用的接口' },
-  controllers: { emoji: '📡', text: '供其他程序调用的接口' },
-  endpoints: { emoji: '📡', text: '供其他程序调用的接口' },
-  hooks: { emoji: '🪝', text: '可复用的界面逻辑' },
-  store: { emoji: '🗄️', text: '数据和数据库代码' },
-  stores: { emoji: '🗄️', text: '数据和数据库代码' },
-  state: { emoji: '🗄️', text: '数据和数据库代码' },
-  models: { emoji: '🗄️', text: '数据和数据库代码' },
-  model: { emoji: '🗄️', text: '数据和数据库代码' },
-  entities: { emoji: '🗄️', text: '数据和数据库代码' },
-  schemas: { emoji: '🗄️', text: '数据和数据库代码' },
-  schema: { emoji: '🗄️', text: '数据和数据库代码' },
-  db: { emoji: '🗄️', text: '数据和数据库代码' },
-  database: { emoji: '🗄️', text: '数据和数据库代码' },
-  migrations: { emoji: '🗄️', text: '数据和数据库代码' },
-  services: { emoji: '🏭', text: '业务功能代码，如下单、登录' },
-  service: { emoji: '🏭', text: '业务功能代码，如下单、登录' },
-  business: { emoji: '🏭', text: '业务功能代码，如下单、登录' },
-  domain: { emoji: '🏭', text: '业务功能代码，如下单、登录' },
-  core: { emoji: '🏭', text: '业务功能代码，如下单、登录' },
-  i18n: { emoji: '🌍', text: '多语言翻译' },
-  locales: { emoji: '🌍', text: '多语言翻译' },
-  locale: { emoji: '🌍', text: '多语言翻译' },
-  lang: { emoji: '🌍', text: '多语言翻译' },
-  languages: { emoji: '🌍', text: '多语言翻译' },
-  translations: { emoji: '🌍', text: '多语言翻译' },
-  l10n: { emoji: '🌍', text: '多语言翻译' },
-  middleware: { emoji: '🚦', text: '中间站：外部请求先经它检查一遍' },
-  plugins: { emoji: '🔌', text: '可选功能插件' },
-  extensions: { emoji: '🔌', text: '可选功能插件' },
-  addons: { emoji: '🔌', text: '可选功能插件' },
-  modules: { emoji: '🔌', text: '可选功能插件' },
-  ci: { emoji: '🤖', text: '自动化流程：提交后自动检查' },
-  workflows: { emoji: '🤖', text: '自动化流程：提交后自动检查' },
-  node_modules: TIER3('📦', '第三方库，删了能重装，不要手动改'),
-  dist: TIER3('🏗️', '打包产物，不要手动改，改源代码后重新打包'),
+  src: { icon: 'code', text: '项目全部源代码' },
+  source: { icon: 'code', text: '项目全部源代码' },
+  sources: { icon: 'code', text: '项目全部源代码' },
+  lib: { icon: 'wrench', text: '通用工具代码' },
+  libs: { icon: 'wrench', text: '通用工具代码' },
+  utils: { icon: 'wrench', text: '通用工具代码' },
+  util: { icon: 'wrench', text: '通用工具代码' },
+  helpers: { icon: 'wrench', text: '通用工具代码' },
+  helper: { icon: 'wrench', text: '通用工具代码' },
+  common: { icon: 'wrench', text: '通用工具代码' },
+  shared: { icon: 'wrench', text: '通用工具代码' },
+  scripts: { icon: 'terminal', text: '自动化脚本' },
+  script: { icon: 'terminal', text: '自动化脚本' },
+  bin: { icon: 'terminal', text: '自动化脚本' },
+  tools: { icon: 'terminal', text: '自动化脚本' },
+  tooling: { icon: 'terminal', text: '自动化脚本' },
+  test: { icon: 'test', text: '测试代码' },
+  tests: { icon: 'test', text: '测试代码' },
+  __tests__: { icon: 'test', text: '测试代码' },
+  spec: { icon: 'test', text: '测试代码' },
+  specs: { icon: 'test', text: '测试代码' },
+  e2e: { icon: 'test', text: '测试代码' },
+  docs: { icon: 'doc', text: '项目文档' },
+  doc: { icon: 'doc', text: '项目文档' },
+  documents: { icon: 'doc', text: '项目文档' },
+  documentation: { icon: 'doc', text: '项目文档' },
+  manual: { icon: 'doc', text: '项目文档' },
+  manuals: { icon: 'doc', text: '项目文档' },
+  inspiration: { icon: 'bulb', text: '参考资料和示例' },
+  examples: { icon: 'bulb', text: '参考资料和示例' },
+  example: { icon: 'bulb', text: '参考资料和示例' },
+  demo: { icon: 'bulb', text: '参考资料和示例' },
+  demos: { icon: 'bulb', text: '参考资料和示例' },
+  samples: { icon: 'bulb', text: '参考资料和示例' },
+  sample: { icon: 'bulb', text: '参考资料和示例' },
+  reference: { icon: 'bulb', text: '参考资料和示例' },
+  references: { icon: 'bulb', text: '参考资料和示例' },
+  vendor: { icon: 'package', text: '第三方代码，只使用不修改' },
+  vendors: { icon: 'package', text: '第三方代码，只使用不修改' },
+  third_party: { icon: 'package', text: '第三方代码，只使用不修改' },
+  thirdparty: { icon: 'package', text: '第三方代码，只使用不修改' },
+  external: { icon: 'package', text: '第三方代码，只使用不修改' },
+  deps: { icon: 'package', text: '第三方代码，只使用不修改' },
+  dependencies: { icon: 'package', text: '第三方代码，只使用不修改' },
+  assets: { icon: 'image', text: '静态资源' },
+  asset: { icon: 'image', text: '静态资源' },
+  static: { icon: 'image', text: '静态资源' },
+  public: { icon: 'image', text: '静态资源' },
+  images: { icon: 'image', text: '图片资源' },
+  img: { icon: 'image', text: '图片资源' },
+  icons: { icon: 'image', text: '图片资源' },
+  fonts: { icon: 'font', text: '字体文件' },
+  media: { icon: 'video', text: '媒体文件' },
+  videos: { icon: 'video', text: '媒体文件' },
+  video: { icon: 'video', text: '媒体文件' },
+  components: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  component: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  ui: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  widgets: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  views: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  pages: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  screens: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  layouts: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
+  config: { icon: '⚙️', text: '配置文件' },
+  configs: { icon: '⚙️', text: '配置文件' },
+  configuration: { icon: '⚙️', text: '配置文件' },
+  settings: { icon: '⚙️', text: '配置文件' },
+  styles: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
+  style: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
+  css: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
+  scss: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
+  sass: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
+  types: { icon: '📐', text: '类型定义' },
+  typings: { icon: '📐', text: '类型定义' },
+  interfaces: { icon: '📐', text: '类型定义' },
+  api: { icon: '📡', text: '供其他程序调用的接口' },
+  apis: { icon: '📡', text: '供其他程序调用的接口' },
+  routes: { icon: '📡', text: '供其他程序调用的接口' },
+  controllers: { icon: '📡', text: '供其他程序调用的接口' },
+  endpoints: { icon: '📡', text: '供其他程序调用的接口' },
+  hooks: { icon: '🪝', text: '可复用的界面逻辑' },
+  store: { icon: 'database', text: '数据和数据库代码' },
+  stores: { icon: 'database', text: '数据和数据库代码' },
+  state: { icon: 'database', text: '数据和数据库代码' },
+  models: { icon: 'database', text: '数据和数据库代码' },
+  model: { icon: 'database', text: '数据和数据库代码' },
+  entities: { icon: 'database', text: '数据和数据库代码' },
+  schemas: { icon: 'database', text: '数据和数据库代码' },
+  schema: { icon: 'database', text: '数据和数据库代码' },
+  db: { icon: 'database', text: '数据和数据库代码' },
+  database: { icon: 'database', text: '数据和数据库代码' },
+  migrations: { icon: 'database', text: '数据和数据库代码' },
+  services: { icon: 'wrench', text: '业务功能代码，如下单、登录' },
+  service: { icon: 'wrench', text: '业务功能代码，如下单、登录' },
+  business: { icon: 'wrench', text: '业务功能代码，如下单、登录' },
+  domain: { icon: 'wrench', text: '业务功能代码，如下单、登录' },
+  core: { icon: 'wrench', text: '业务功能代码，如下单、登录' },
+  i18n: { icon: 'globe', text: '多语言翻译' },
+  locales: { icon: 'globe', text: '多语言翻译' },
+  locale: { icon: 'globe', text: '多语言翻译' },
+  lang: { icon: 'globe', text: '多语言翻译' },
+  languages: { icon: 'globe', text: '多语言翻译' },
+  translations: { icon: 'globe', text: '多语言翻译' },
+  l10n: { icon: 'globe', text: '多语言翻译' },
+  middleware: { icon: 'arrows', text: '中间站：外部请求先经它检查一遍' },
+  plugins: { icon: 'component', text: '可选功能插件' },
+  extensions: { icon: 'component', text: '可选功能插件' },
+  addons: { icon: 'component', text: '可选功能插件' },
+  modules: { icon: 'component', text: '可选功能插件' },
+  ci: { icon: 'bot', text: '自动化流程：提交后自动检查' },
+  workflows: { icon: 'bot', text: '自动化流程：提交后自动检查' },
+  node_modules: TIER3('package', '第三方库，删了能重装，不要手动改'),
+  dist: TIER3('archive', '打包产物，不要手动改，改源代码后重新打包'),
   build: TIER3('🏗️', '打包产物，不要手动改，改源代码后重新打包')
 }
 
@@ -342,12 +342,12 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
 
   // 状态播报:这层打开被拒(多半是 Windows 锁住的系统文件夹),不是空的,也不用看
   if (node.truncated && fileCount === 0 && directDirs === 0) {
-    return { emoji: '🔒', text: '系统保护目录，无法查看，不影响使用' }
+    return { icon: 'lock', text: '系统保护目录，无法查看，不影响使用' }
   }
 
   // 状态播报:真探过且空就是空,哪怕名字叫 config 也不许喊"配置间"绰号
   if (!node.lazy && fileCount === 0 && directDirs === 0) {
-    return { emoji: '📂', text: '空的，还没有内容' }
+    return { icon: 'folder', text: '空的，还没有内容' }
   }
 
   const byName = DIR_SUMMARIES[lower]
@@ -357,7 +357,7 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
       const directFiles = node.children.filter((c) => c.type === 'file')
       const testFiles = directFiles.filter((c) => isTestFileName(c.name))
       if (directFiles.length > 0 && testFiles.length * 2 >= directFiles.length) {
-        return { emoji: '🧪', text: `${n(testFiles.length)} 个测试脚本，改完代码跑一遍` }
+        return { icon: 'test', text: `${n(testFiles.length)} 个测试脚本，改完代码跑一遍` }
       }
     }
     return byName
@@ -365,20 +365,20 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
 
   // 词根词典(第九十九锤):业务起的名(scanner/summarizer)按词根给个身份词
   const dirWords = translateName(node.name)
-  if (dirWords) return { emoji: '📦', text: dirWords }
+  if (dirWords) return { icon: '📦', text: dirWords }
 
   // 状态播报:分级扫描还没展开这层,老实说"还没展开",别让人以为是个空文件夹
   if (node.lazy) {
-    return { emoji: '📁', text: '还没展开，点击查看' }
+    return { icon: 'folder', text: '还没展开，点击查看' }
   }
 
   // 全是文字资料、一份代码没有
   if (fileCount > 0 && extCounts.size > 0 && [...extCounts.keys()].every((ext) => DOC_EXTS.has(ext))) {
-    return { emoji: '📚', text: `全是文档，${n(fileCount)} 份，没有代码` }
+    return { icon: 'doc', text: `全是文档，${n(fileCount)} 份，没有代码` }
   }
 
   if (fileCount === 0 && directDirs > 0) {
-    return { emoji: '📁', text: `只含子文件夹，${n(directDirs)} 个` }
+    return { icon: 'folder', text: `只含子文件夹，${n(directDirs)} 个` }
   }
 
   // 没有名字线索,靠内容说话:哪种语言最多
@@ -391,9 +391,9 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
     }
   }
   if (topLang) {
-    return { emoji: '🧱', text: `${n(fileCount)} 个文件，以${topLang}代码为主` }
+    return { icon: 'code', text: `${n(fileCount)} 个文件，以${topLang}代码为主` }
   }
-  return { emoji: '📦', text: `${n(fileCount)} 个文件，代码类型未知` }
+  return { icon: 'package', text: `${n(fileCount)} 个文件，代码类型未知` }
 }
 
 interface DirTally {

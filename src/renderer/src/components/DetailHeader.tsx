@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NoteEntry } from '@shared/notes'
-import { NotePen } from './NotePen'
+import { NotePen, TreeIcon } from './Icons'
 
 export interface DetailTabDef {
   key: string
@@ -22,7 +22,7 @@ export type BadgeTone = 'blue' | 'green' | 'amber' | 'red' | 'muted'
  */
 export function DetailHeader({
   crumbs,
-  icon,
+  iconName,
   title,
   subtitle,
   note,
@@ -35,7 +35,8 @@ export function DetailHeader({
   onClose
 }: {
   crumbs: Crumb[]
-  icon: string
+  /** 图标册里的名字(第一百零六锤):按册画线稿 */
+  iconName: string
   title: string
   subtitle?: string
   /** 小葵的手动备注;有它副标题就是她自己的话 */
@@ -86,7 +87,7 @@ export function DetailHeader({
       </nav>
       <div className="entity-line">
         <span className="entity-icon" aria-hidden="true">
-          {icon}
+          <TreeIcon name={iconName} size={18} />
         </span>
         <div className="entity-title">
           <h1 title={title}>{title}</h1>

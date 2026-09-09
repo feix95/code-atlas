@@ -809,7 +809,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           <p className="cfg-field-help">模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。</p>
                           {modelPathDraft.trim() && fitNote && fitNote.level !== 'empty' && (
                             <p className={`cfg-field-help cfg-fit-note is-${fitNote.level}`}>
-                              {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '⚠'} {fitNote.title}:{fitNote.detail}
+                              {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '!'} {fitNote.title}:{fitNote.detail}
                             </p>
                           )}
                         </>

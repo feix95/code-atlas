@@ -952,7 +952,7 @@ function FileDetailView({
     <div className="detail-page">
       <DetailHeader
         crumbs={crumbs}
-        icon="▤"
+        iconName={file.summary?.icon ?? 'file'}
         title={file.name}
         subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
         note={note}
@@ -1053,7 +1053,7 @@ function FolderDetailView({
     <div className="detail-page">
       <DetailHeader
         crumbs={buildCrumbs(result.rootName, result.rootPath, dir.relPath)}
-        icon="▣"
+        iconName={dir.summary?.icon ?? 'folder'}
         title={dir.name || result.rootName}
         subtitle={dir.summary?.text ?? '文件夹'}
         note={note}

@@ -26,7 +26,7 @@ const CSS: LanguageTag = { id: 'css', name: 'CSS', source: 'extension' }
 const KOTLIN: LanguageTag = { id: 'kotlin', name: 'Kotlin', source: 'extension' }
 
 function textOf(node: ScanFileNode | ScanDirNode): string {
-  return node.summary ? `${node.summary.emoji} ${node.summary.text}` : '(无)'
+  return node.summary ? `${node.summary.icon} ${node.summary.text}` : '(无)'
 }
 
 async function main(): Promise<void> {
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(cssFile).includes('样式'), 'index.css → 范畴词「样式」')
   assert.equal(kt.summary, undefined, '任意 .kt:名字查不出词,老实闭嘴')
   assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」(第九十九锤)')
-  assert.equal(textOf(docMd), '📖 文档', '.md → 范畴词「文档」')
+  assert.equal(textOf(docMd), 'doc 文档', '.md → 范畴词「文档」')
   assert.equal(photo.summary, undefined, '.png 家喻户晓,沉默名单不写字')
   assert.equal(silentTxt.summary, undefined, '.txt 沉默名单不写字')
   assert.ok(textOf(zipFile).includes('压缩包'), '.zip → 范畴词「压缩包」')
@@ -149,7 +149,7 @@ async function main(): Promise<void> {
   const lazyVideos = dir('videos', [], { lazy: true })
   annotateSummaries(dir('proj', [lazyPlain, lazyVideos]))
   assert.ok(textOf(lazyPlain).includes('还没展开，点击查看'), '没名字线索的未展开目录要老实说')
-  assert.ok(textOf(lazyVideos).startsWith('🎬'), '名字认得出的未展开目录保留身份标签(媒体文件)')
+  assert.ok(textOf(lazyVideos).startsWith('video'), '名字认得出的未展开目录保留身份标签(媒体文件)')
 
   // ── 8.5 打开被拒的空目录(系统保护区):像日志一样播报 ──
   const locked = dir('locked-vault', [], { truncated: true })
@@ -200,10 +200,10 @@ async function main(): Promise<void> {
   const titledTxt = file('c.txt', undefined, '随手记')
   const plainMd = file('d.md')
   annotateSummaries(dir('proj', [titledDoc, longDoc, titledTxt, plainMd]))
-  assert.equal(textOf(titledDoc), '📖 文档：安装指南', `md 真标题亮真名,实际:${textOf(titledDoc)}`)
+  assert.equal(textOf(titledDoc), 'doc 文档：安装指南', `md 真标题亮真名,实际:${textOf(titledDoc)}`)
   assert.ok(textOf(longDoc).includes('…') && textOf(longDoc).length <= 24, `超长标题掐头留省略号,实际:${textOf(longDoc)}`)
-  assert.equal(textOf(titledTxt), '📖 文档：随手记', 'txt 有标题也算文档')
-  assert.equal(textOf(plainMd), '📖 文档', '没标题的 md 照旧范畴词')
+  assert.equal(textOf(titledTxt), 'doc 文档：随手记', 'txt 有标题也算文档')
+  assert.equal(textOf(plainMd), 'doc 文档', '没标题的 md 照旧范畴词')
 
   console.log('✅ 全树速览自测全部通过')
   console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典')
