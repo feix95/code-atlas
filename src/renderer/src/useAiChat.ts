@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiStreamStats, AiUsage, AiChatRequest, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { AiStreamStats, AiUsage, AiChatRequest, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { friendlyErr } from './errText'
 
 /**
@@ -22,6 +22,8 @@ export interface ChatMessage {
   stats?: AiStreamStats
   usage?: AiUsage
   web: WebLookupMeta | null
+  /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
+  refs?: ChatCodeRef[]
 }
 
 /** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底 */
@@ -40,7 +42,7 @@ function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
 export function useAiChat(context: ChatContextAttachment | null): {
   messages: ChatMessage[]
   busy: boolean
-  send: (question: string) => void
+  send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -102,9 +104,11 @@ export function useAiChat(context: ChatContextAttachment | null): {
     }
   }, [])
 
-  function send(question: string): void {
+  function send(question: string, refs?: ChatCodeRef[]): void {
     const q = question.trim()
-    if (!q || busyRef.current) return
+    // 带引用的允许「只发代码不发问题」:主进程会给一句兜底问法(光甩代码过去没题目,说不清要讲哪面)
+    const useRefs = refs && refs.length > 0 ? refs : undefined
+    if ((!q && !useRefs) || busyRef.current) return
     const requestId = crypto.randomUUID()
     idRef.current = requestId
     busyRef.current = true
@@ -112,7 +116,7 @@ export function useAiChat(context: ChatContextAttachment | null): {
     const botKey = requestId
     setMessages((prev) => [
       ...prev,
-      { key: `${requestId}-u`, role: 'user', text: q, state: 'done', web: null },
+      { key: `${requestId}-u`, role: 'user', text: q, state: 'done', web: null, refs: useRefs },
       { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }
     ])
     void (async () => {
@@ -122,7 +126,8 @@ export function useAiChat(context: ChatContextAttachment | null): {
           requestId,
           question: q,
           history: buildHistory(messagesRef.current),
-          context: contextRef.current
+          context: contextRef.current,
+          codeRefs: useRefs
         }
         const res = await window.atlas.aiChat(req)
         if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废

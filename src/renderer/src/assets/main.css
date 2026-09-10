@@ -717,6 +717,97 @@ body.is-maximized .traffic-lights .is-max i::after {
   color: var(--text);
 }
 
+/* 选区浮钮(第一百一十一锤):以选区上沿中点为锚浮在代码上,选了就能引 */
+.code-select-btn {
+  position: fixed;
+  z-index: 30;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 0.3125rem 0.625rem;
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  box-shadow: var(--shadow-pop);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.code-select-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.code-select-btn:disabled {
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: not-allowed;
+}
+
+/* 引用卡排(第一百一十一锤):挂在输入框上方,一条一段代码,点 ✕ 摘掉 */
+.chat-refs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.chat-refs-label {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.chat-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  padding: 0.1875rem 0.375rem 0.1875rem 0.5rem;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--font-xs);
+}
+
+.chat-ref-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-ref-remove {
+  flex-shrink: 0;
+  padding: 0 0.125rem;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  font-size: 0.625rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chat-ref-remove:hover {
+  color: var(--danger);
+}
+
+/* 用户气泡里留下的引用痕迹:他说过什么、引的是哪一段,回看时对得上 */
+.msg-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.msg-ref {
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 18%);
+  font-size: 0.625rem;
+}
+
 .status-dot {
   display: inline-block;
   width: 0.4375rem;

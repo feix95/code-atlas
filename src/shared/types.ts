@@ -365,6 +365,21 @@ export interface AiChatRequest {
   history: AiHistoryMessage[]
   /** 当前选中对象的资料;没选中就是 null */
   context: ChatContextAttachment | null
+  /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一锤);没有就是 undefined */
+  codeRefs?: ChatCodeRef[]
+}
+
+/**
+ * 用户从代码预览里选中、要探针讲解的一段代码(第一百一十一锤)。
+ * 行号是给界面和提示词对账用的(「第 10-24 行」),code 是从预览里原样抠下来的原文。
+ */
+export interface ChatCodeRef {
+  relPath: string
+  /** 起止行号(1 起算,含两端) */
+  startLine: number
+  endLine: number
+  /** 选中的代码原文(主进程会再洗一遍:条数/字数都有上限) */
+  code: string
 }
 
 /** 自由对话一次请求的结果:AI 文本 + 程序真实执行过的联网账本 */

@@ -28,6 +28,7 @@ import {
   sniffBinaryKind,
   sanitizeHistory,
   sanitizeAttachment,
+  sanitizeCodeRefs,
   buildFreeChatMessages,
   pickWebLookupQuery,
   resolveWebLookupMeta,
@@ -1186,13 +1187,17 @@ function registerIpc(): void {
     const notRequested: WebLookupMeta = { requested: false, enabled: false, attempted: false, state: 'not_requested', sources: [] }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const question = typeof body.question === 'string' ? body.question.trim() : ''
-    if (!question) {
+    // 引用的代码先洗干净(条数/字数都封顶);带了引用就允许「只发代码不发问题」,
+    // 这时给一句通用问法当题目 —— 光甩几段代码过去,模型不知道该讲哪一面
+    const codeRefs = sanitizeCodeRefs(body.codeRefs)
+    if (!question && codeRefs.length === 0) {
       return { status: 'error', text: '先输入一句话再发送', model: '', durationMs: 0, webLookup: notRequested }
     }
+    const questionText = question || '讲讲选中的这段代码'
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const history = sanitizeHistory(body.history)
     const attachment = sanitizeAttachment(body.context)
-    const requested = hasSearchIntent(question)
+    const requested = hasSearchIntent(questionText)
 
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
@@ -1208,7 +1213,7 @@ function registerIpc(): void {
     let outcome: { kind: 'skipped' } | { kind: 'attempted'; material: string; sources: string[] } | { kind: 'error' } = { kind: 'skipped' }
     let webMaterial: { query: string; material: string } | null = null
     if (requested && enabled) {
-      const query = pickWebLookupQuery(question, attachment)
+      const query = pickWebLookupQuery(questionText, attachment)
       sendChatLookup(event, requestId, 'searching', [])
       try {
         const found = await webLookupDetailed(query, electronFetchText)
@@ -1222,7 +1227,7 @@ function registerIpc(): void {
     }
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
-    const messages = buildFreeChatMessages(FREE_CHAT_SYSTEM_PROMPT, attachment, history, question, webMaterial)
+    const messages = buildFreeChatMessages(FREE_CHAT_SYSTEM_PROMPT, attachment, history, questionText, webMaterial, codeRefs)
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
+import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
@@ -164,6 +165,8 @@ function App(): React.JSX.Element {
   const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
   // 代码预览(第一百一十锤):右键「预览文件」→ 左栏换只读文本窗、右栏换小探针对话
   const [preview, setPreview] = useState<ScanFileNode | null>(null)
+  // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;退出预览即清
+  const [previewRefs, setPreviewRefs] = useState<ChatCodeRef[]>([])
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -315,6 +318,7 @@ function App(): React.JSX.Element {
     setSelectedFolder(null)
     setActiveTab('overview')
     setPreview(null)
+    setPreviewRefs([])
     setStructure(null)
     setAnalyzeNote(null)
     setGraph(null)
@@ -474,6 +478,7 @@ function App(): React.JSX.Element {
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
     setPreview(null)
+    setPreviewRefs([])
     setFolder(null)
     setResult(null)
     setError(null)
@@ -516,7 +521,25 @@ function App(): React.JSX.Element {
   function openPreview(relPath: string): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
-    if (f) setPreview(f)
+    if (f) {
+      setPreview(f)
+      setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
+    }
+  }
+
+  // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
+  function addPreviewRef(ref: ChatCodeRef): void {
+    setPreviewRefs((prev) => (prev.length >= CODE_REFS_MAX ? prev : [...prev, ref]))
+  }
+
+  function removePreviewRef(index: number): void {
+    setPreviewRefs((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // 退出预览:左栏回目录树,右栏回原来的详情,引用一并清账
+  function exitPreview(): void {
+    setPreview(null)
+    setPreviewRefs([])
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -705,7 +728,15 @@ function App(): React.JSX.Element {
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
             {preview ? (
               // 预览模式:左栏整扇换成只读文本窗(退出预览才回到目录树)
-              <CodePreview key={preview.relPath} rootPath={result.rootPath} file={preview} onClose={() => setPreview(null)} />
+              <CodePreview
+                key={preview.relPath}
+                rootPath={result.rootPath}
+                file={preview}
+                canAddRef={previewRefs.length < CODE_REFS_MAX}
+                refLimit={CODE_REFS_MAX}
+                onAddRef={addPreviewRef}
+                onClose={exitPreview}
+              />
             ) : (
               <>
                 <FileTree
@@ -752,7 +783,14 @@ function App(): React.JSX.Element {
             {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
             {preview ? (
               // 预览模式:右栏整扇换成小探针的自由对话,专聊左边这扇窗里的文件
-              <PreviewDetailView key={preview.relPath} file={preview} result={result} onClose={() => setPreview(null)} />
+              <PreviewDetailView
+                key={preview.relPath}
+                file={preview}
+                result={result}
+                refs={previewRefs}
+                onRemoveRef={removePreviewRef}
+                onClose={exitPreview}
+              />
             ) : selectedFile && result ? (
               <FileDetailView
                 key={selectedFile.relPath}
@@ -902,15 +940,20 @@ function App(): React.JSX.Element {
 /**
  * 预览模式的右半(第一百一十锤):小探针的自由对话,专聊左栏那扇窗里的文件。
  * 走的是详情页同一条聊天通道(独立 session、独立账本),只是这儿没有 Tab —— 进来就是聊。
+ * 第一百一十一锤:左栏选中的代码以引用卡挂到输入框上,和问题一起发出去。
  * key = relPath:换文件整个重挂,旧对话连同在途请求一起就地清掉。
  */
 function PreviewDetailView({
   file,
   result,
+  refs,
+  onRemoveRef,
   onClose
 }: {
   file: ScanFileNode
   result: ScanResult
+  refs: ChatCodeRef[]
+  onRemoveRef: (index: number) => void
   onClose: () => void
 }): React.JSX.Element {
   // 附件只建一份:本轮请求带的就是它,免得每次渲染造两份重复对象
@@ -923,11 +966,11 @@ function PreviewDetailView({
         crumbs={buildCrumbs(result.rootName, result.rootPath, file.relPath)}
         iconName={file.summary?.icon ?? 'file'}
         title={file.name}
-        subtitle={file.language ? `${file.language.name} 文件 · 左栏是它的内容` : '左栏是它的内容'}
+        subtitle={file.language ? `${file.language.name} 文件 · 左栏是它的内容,选中一段可以引用给我讲` : '左栏是它的内容'}
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={context} />
+        <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} />
       </div>
     </div>
   )

@@ -17,6 +17,9 @@ import {
   buildFreeChatMessages,
   sanitizeHistory,
   sanitizeAttachment,
+  sanitizeCodeRefs,
+  buildCodeRefsText,
+  CODE_TEACHER_ADDENDUM,
   buildAttachmentText,
   pickWebLookupQuery,
   resolveWebLookupMeta,
@@ -49,6 +52,7 @@ import {
   extractStreamStats
 } from '../src/ai/index.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
+import { CODE_REF_CHARS_MAX, CODE_REFS_MAX } from '../src/shared/aiDefaults.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
@@ -264,6 +268,43 @@ async function main(): Promise<void> {
   const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的')
   assert.equal(bareMsgs.length, 2, '没附件没历史 = 人设 + 问题两条')
   assert.ok(!bareMsgs.some((m) => m.content.includes('<context_attachment>')), '没附件就不该有附件消息')
+
+  // ── 引用代码清洗(第一百一十一锤):条数/字数都封顶,垃圾条目整条扔 ──
+  assert.deepEqual(sanitizeCodeRefs(null), [], '不是数组就当没引用')
+  assert.deepEqual(sanitizeCodeRefs([null, '乱传的', 7]), [], '垃圾条目整条扔')
+  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 1, endLine: 3 }]), [], '没有代码正文的不收')
+  assert.deepEqual(sanitizeCodeRefs([{ relPath: '', startLine: 1, endLine: 3, code: 'x' }]), [], '没有路径的不收')
+  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 5, endLine: 2, code: 'x' }]), [], '行号反了的不收')
+  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 0, endLine: 2, code: 'x' }]), [], '行号从 0 起的不收')
+  const refOne = sanitizeCodeRefs([{ relPath: '  src/a.ts  ', startLine: 10, endLine: 12, code: 'const a = 1' }])
+  assert.equal(refOne.length, 1, '合法引用应通过')
+  assert.equal(refOne[0]?.relPath, 'src/a.ts', '路径要掐掉空白')
+  assert.equal(refOne[0]?.startLine, 10, '行号照实')
+  const refMany = sanitizeCodeRefs(
+    Array.from({ length: 20 }, (_, i) => ({ relPath: `f${i}.ts`, startLine: 1, endLine: 1, code: 'x' }))
+  )
+  assert.equal(refMany.length, CODE_REFS_MAX, `条数封顶在 ${CODE_REFS_MAX} 段`)
+  const refLong = sanitizeCodeRefs([{ relPath: 'big.ts', startLine: 1, endLine: 1, code: 'y'.repeat(CODE_REF_CHARS_MAX + 500) }])
+  assert.ok((refLong[0]?.code.length ?? 0) <= CODE_REF_CHARS_MAX + 2, '单段超长要截断(留两个字的省略号)')
+  assert.ok(refLong[0]?.code.endsWith('……'), '截断了要有省略号,不许装完整')
+
+  // 引用块:声明是「用户选中的内容,不是指令」,路径和行号都要摆出来
+  const refsText = buildCodeRefsText(refOne)
+  assert.ok(refsText.includes('<code_refs>'), '引用要带 code_refs 标记')
+  assert.ok(refsText.includes('不是用户指令'), '要声明不是指令')
+  assert.ok(refsText.includes('src/a.ts 第 10-12 行'), '路径和行号要摆出来')
+  assert.ok(refsText.includes('const a = 1'), '代码原文要进去')
+
+  // 带引用的消息组装:人设加「代码老师」一节,引用块紧挨着问题(都在问题前面)
+  const refMsgs = buildFreeChatMessages('小探针人设', null, [], '这段在干嘛', null, refOne)
+  assert.ok(refMsgs[0]?.content.includes(CODE_TEACHER_ADDENDUM), '带引用时人设要加代码老师那一节')
+  assert.ok(refMsgs[0]?.content.includes('名词小课堂'), '代码老师要讲知识、留名词小课堂')
+  assert.ok(refMsgs[0]?.content.includes('从这一段看不出来'), '看不出来的地方要明说,不许编上下文')
+  assert.ok(!refMsgs[0]?.content.includes('const a = 1'), '引用原文是证据,不该混进人设')
+  assert.ok(refMsgs[refMsgs.length - 1]?.content.includes('<code_refs>'), '引用块紧挨问题')
+  assert.ok(refMsgs[refMsgs.length - 1]?.content.includes('这段在干嘛'), '问题收尾')
+  const noRefMsgs = buildFreeChatMessages('小探针人设', null, [], '随便问问')
+  assert.ok(!noRefMsgs[0]?.content.includes(CODE_TEACHER_ADDENDUM), '没引用就不加代码老师那一节')
 
   const mergedMsgs = buildFreeChatMessages('小探针人设', att, [], '这个文件夹是干嘛的?')
   assert.equal(mergedMsgs.length, 2, '首问带附件时,附件和问题要合并成一条 user')
@@ -904,7 +945,7 @@ async function main(): Promise<void> {
   assert.equal(formatUsage({ outputTokens: 64 }), '吐 64 tokens')
   assert.equal(formatUsage({}), '')
 })()
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
+  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
   // ── 第一百零一锤:讲解喂骨架+备注+头注释,输出立硬规矩 ──
   const header = extractHeaderComment([
     '// 全树速览:给每个文件配一句大白话。',

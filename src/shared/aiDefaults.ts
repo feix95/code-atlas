@@ -5,3 +5,12 @@
 
 /** 上下文窗口默认大小(tokens):设置里留空时的兜底,也是内置引擎 -c 的默认值 */
 export const DEFAULT_CONTEXT_SIZE = 16384
+
+/** 一轮对话最多引用几段代码:再多模型也讲不细,还把上下文挤没了 */
+export const CODE_REFS_MAX = 6
+
+/** 单段引用的字数上限:引用是「一段」,不是整个文件 */
+export const CODE_REF_CHARS_MAX = 2000
+
+/** 一轮里所有引用的字数上限:几段加起来也不能把上下文吃光 */
+export const CODE_REFS_TOTAL_CHARS_MAX = 6000

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
@@ -13,9 +13,13 @@ import type { AiChatApi, ChatMessage } from '../useAiChat'
  * 资料附件卡常驻顶部(默认收起,展开能看机器扫到的原始资料);
  * 助手消息带小探针头像,本轮动过联网就在消息下方挂程序记账的状态标签。
  * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
+ * 第一百一十一锤:预览模式下左栏选中的代码以引用卡挂在这儿,和问题一起发出去。
  */
 
 const CHAT_EXAMPLES = ['你是谁？', '联网搜一下它是什么', '今天不想聊代码,讲点轻松的']
+
+/** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
+const REF_ONLY_QUESTION = '讲讲选中的这段代码'
 
 /** 联网账本 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
 function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
@@ -98,7 +102,19 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
   )
 }
 
-export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: ChatContextAttachment | null }): React.JSX.Element {
+export function FreeChatPanel({
+  chat,
+  context,
+  refs,
+  onRemoveRef
+}: {
+  chat: AiChatApi
+  context: ChatContextAttachment | null
+  /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
+  refs?: ChatCodeRef[]
+  onRemoveRef?: (index: number) => void
+}): React.JSX.Element {
+  const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
@@ -141,9 +157,11 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
   function submit(e: FormEvent): void {
     e.preventDefault()
     const q = draft.trim()
-    if (!q || chat.busy) return
+    // 挂了引用就允许空着发:这时替他说一句「讲讲选中的这段代码」,不让他对着空气发呆
+    const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
+    if (!text || chat.busy) return
     forceBottom()
-    chat.send(q)
+    chat.send(text, draftRefs)
     setDraft('')
   }
 
@@ -151,7 +169,7 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
   function sendExample(q: string): void {
     if (chat.busy) return
     forceBottom()
-    chat.send(q)
+    chat.send(q, draftRefs)
   }
 
   return (
@@ -184,6 +202,16 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
                 return (
                   <div key={m.key} className="message user">
                     {m.text}
+                    {/* 这轮引用过哪几段:自己发的话里留下痕迹,回看时知道当时给的是什么 */}
+                    {m.refs && m.refs.length > 0 && (
+                      <div className="msg-refs">
+                        {m.refs.map((r, i) => (
+                          <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="msg-ref mono">
+                            {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               }
@@ -195,10 +223,11 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
                   msg={m}
                   canRetry={m.key === lastAssistantKey && !chat.busy}
                   onRetry={() => {
-                    const q = [...chat.messages].slice(0, idx).reverse().find((x) => x.role === 'user')?.text
-                    if (q) {
+                    const prev = [...chat.messages].slice(0, idx).reverse().find((x) => x.role === 'user')
+                    if (prev) {
                       forceBottom()
-                      chat.send(q)
+                      // 重试要把这轮的引用原样带上,不然重答的就不是同一道题了
+                      chat.send(prev.text || REF_ONLY_QUESTION, prev.refs)
                     }
                   }}
                 />
@@ -213,6 +242,28 @@ export function FreeChatPanel({ chat, context }: { chat: AiChatApi; context: Cha
         )}
       </div>
       <div className="chat-bottom">
+        {draftRefs.length > 0 && (
+          <div className="chat-refs" aria-label="已引用的代码">
+            <span className="chat-refs-label">已引用</span>
+            {draftRefs.map((r, i) => (
+              <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="chat-ref">
+                <TreeIcon name="code" size={12} />
+                <span className="chat-ref-text mono" title={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}>
+                  {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
+                </span>
+                <button
+                  type="button"
+                  className="chat-ref-remove"
+                  onClick={() => onRemoveRef?.(i)}
+                  aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
+                  title="移除这段引用"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {chat.messages.length === 0 && (
           <div className="prompt-row">
             {CHAT_EXAMPLES.map((q) => (
