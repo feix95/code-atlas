@@ -19,7 +19,7 @@ import type { AiUsage, AiStreamStats,
 } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
@@ -165,7 +165,27 @@ export function sanitizeAttachment(context: unknown): ChatContextAttachment | nu
  * 渲染进程传来的引用代码先洗干净:形状不对的条目整条扔,条数按 CODE_REFS_MAX 截,
  * 单段和总量都有字数上限(超了截断并标省略号)。引用是「一段代码」,不许多到把上下文吃光。
  */
-export function sanitizeCodeRefs(raw: unknown): ChatCodeRef[] {
+/** 这轮引用的动态额度(第一百二十六锤):总量和单段各一个数,界面话术与主进程裁剪共用 */
+export interface CodeRefsBudget {
+  perRefChars: number
+  totalChars: number
+}
+
+/**
+ * 引用的动态账本(第一百二十六锤):额度跟着用户设的上下文窗口走,不再拍死。
+ * 锅里先给「人设+附件+历史+问题」(otherTokens)和回答(含思考预留)留足座位,
+ * 剩下的折成字符才是引用能带的量。穷有保底(旧材料让路也不许引用饿死),富有封顶
+ * (喂太饱小模型会懵)。字符↔token 按 estimateTokens 的保守口径:一个字算一个 token。
+ */
+export function codeRefsBudget(input: { contextTokens: number; otherTokens: number; replyTokens: number }): CodeRefsBudget {
+  const freeTokens = input.contextTokens - input.otherTokens - input.replyTokens
+  const totalChars = Math.min(CODE_REFS_TOTAL_CHARS_CEILING, Math.max(CODE_REFS_TOTAL_CHARS_MAX, freeTokens))
+  // 一段最多占总量的三分之一:头一段不许把后面的段饿死;保底和顶各自封住
+  const perRefChars = Math.min(2 * CODE_REF_CHARS_MAX, Math.max(CODE_REF_CHARS_MAX, Math.floor(totalChars / 3)))
+  return { perRefChars, totalChars }
+}
+
+export function sanitizeCodeRefs(raw: unknown, budget: CodeRefsBudget = { perRefChars: CODE_REF_CHARS_MAX, totalChars: CODE_REFS_TOTAL_CHARS_MAX }): ChatCodeRef[] {
   if (!Array.isArray(raw)) return []
   const out: ChatCodeRef[] = []
   let total = 0
@@ -179,9 +199,9 @@ export function sanitizeCodeRefs(raw: unknown): ChatCodeRef[] {
     const startLine = Math.trunc(Number(r.startLine))
     const endLine = Math.trunc(Number(r.endLine))
     if (!Number.isFinite(startLine) || !Number.isFinite(endLine) || startLine < 1 || endLine < startLine) continue
-    const budget = Math.min(CODE_REF_CHARS_MAX, CODE_REFS_TOTAL_CHARS_MAX - total)
-    if (budget <= 0) break
-    const clipped = code.length > budget ? `${code.slice(0, budget)}……` : code
+    const budgetLeft = Math.min(budget.perRefChars, budget.totalChars - total)
+    if (budgetLeft <= 0) break
+    const clipped = code.length > budgetLeft ? `${code.slice(0, budgetLeft)}……` : code
     total += clipped.length
     out.push({ relPath, startLine, endLine, code: clipped })
   }

@@ -8,6 +8,8 @@ import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
 import { collectGitChanges, collectRecentSubjects, getChangeDiff, gitChangesSignature } from '../git/index.ts'
 import {
+  codeRefsBudget,
+  estimateTokens,
   explainWithModel,
   explainWithMessages,
   buildExplainPrompt,
@@ -28,6 +30,7 @@ import {
   REPORT_ROW_LIMIT,
   sniffBinaryKind,
   sanitizeHistory,
+  buildAttachmentText,
   sanitizeAttachment,
   sanitizeCodeRefs,
   buildFreeChatMessages,
@@ -244,7 +247,7 @@ function formatSize(bytes: number): string {
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
 async function resolveChatTargetOrError(): Promise<
-  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string } | { error: string }
+  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number } | { error: string }
 > {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
@@ -265,7 +268,7 @@ async function resolveChatTargetOrError(): Promise<
   const ctx = config.contextSize ?? (await probeContextSize(resolved.target, config.provider)) ?? DEFAULT_CONTEXT_SIZE
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
-  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style }
+  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx }
 }
 
 /**
@@ -1210,10 +1213,11 @@ function registerIpc(): void {
     const notRequested: WebLookupMeta = { requested: false, enabled: false, attempted: false, state: 'not_requested', sources: [] }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const question = typeof body.question === 'string' ? body.question.trim() : ''
-    // 引用的代码先洗干净(条数/字数都封顶);带了引用就允许「只发代码不发问题」,
-    // 这时给一句通用问法当题目 —— 光甩几段代码过去,模型不知道该讲哪一面
-    const codeRefs = sanitizeCodeRefs(body.codeRefs)
-    if (!question && codeRefs.length === 0) {
+    // 带了引用就允许「只发代码不发问题」,这时给一句通用问法当题目 ——
+    // 光甩几段代码过去,模型不知道该讲哪一面。先用保底账探一下有没有引用,
+    // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs)
+    const hasRefs = sanitizeCodeRefs(body.codeRefs).length > 0
+    if (!question && !hasRefs) {
       return { status: 'error', text: '先输入一句话再发送', model: '', durationMs: 0, webLookup: notRequested }
     }
     const questionText = question || '讲讲选中的这段代码'
@@ -1252,19 +1256,24 @@ function registerIpc(): void {
     }
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
-    const messages = buildFreeChatMessages(
-      withPersonalization(FREE_CHAT_SYSTEM_PROMPT, resolved.style),
-      attachment,
-      history,
-      questionText,
-      webMaterial,
-      codeRefs
-    )
+    const systemPrompt = withPersonalization(FREE_CHAT_SYSTEM_PROMPT, resolved.style)
+    // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
+    const cap = thinking ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS : resolved.budgets.replyTokens
+    // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
+    // 剩下的折成字符才是引用能带的量;穷保底、富封顶,额度跟着用户设的上下文走
+    const otherTokens =
+      estimateTokens(systemPrompt) +
+      estimateTokens(attachment ? buildAttachmentText(attachment) : '') +
+      estimateTokens(history.map((h) => h.content).join('\n')) +
+      estimateTokens(questionText) +
+      estimateTokens(webMaterial ? webMaterial.material : '')
+    const refsBudget = codeRefsBudget({ contextTokens: resolved.ctx, otherTokens, replyTokens: cap })
+    const codeRefs = sanitizeCodeRefs(body.codeRefs, refsBudget)
+    const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
+    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs)
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
-      const cap = thinking ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS : resolved.budgets.replyTokens
       const res = await explainWithMessages(
         resolved.target,
         messages,

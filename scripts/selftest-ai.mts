@@ -20,6 +20,7 @@ import {
   sanitizeCodeRefs,
   buildCodeRefsText,
   CODE_TEACHER_ADDENDUM,
+  codeRefsBudget,
   buildAttachmentText,
   pickWebLookupQuery,
   resolveWebLookupMeta,
@@ -53,7 +54,7 @@ import {
   splitThinking
 } from '../src/ai/index.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
-import { CODE_REF_CHARS_MAX, CODE_REFS_MAX } from '../src/shared/aiDefaults.ts'
+import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX } from '../src/shared/aiDefaults.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
@@ -288,6 +289,24 @@ async function main(): Promise<void> {
   const refLong = sanitizeCodeRefs([{ relPath: 'big.ts', startLine: 1, endLine: 1, code: 'y'.repeat(CODE_REF_CHARS_MAX + 500) }])
   assert.ok((refLong[0]?.code.length ?? 0) <= CODE_REF_CHARS_MAX + 2, '单段超长要截断(留两个字的省略号)')
   assert.ok(refLong[0]?.code.endsWith('……'), '截断了要有省略号,不许装完整')
+
+  // 引用的动态账(第一百二十六锤):额度跟锅走 —— 穷有保底,富有封顶,单段不抢全量
+  const poor = codeRefsBudget({ contextTokens: 8192, otherTokens: 5000, replyTokens: 1024 })
+  assert.equal(poor.totalChars, CODE_REFS_TOTAL_CHARS_MAX, '锅再穷,总量也保底')
+  assert.equal(poor.perRefChars, CODE_REF_CHARS_MAX, '锅再穷,单段也保底')
+  const rich = codeRefsBudget({ contextTokens: 131072, otherTokens: 3000, replyTokens: 1024 })
+  assert.equal(rich.totalChars, CODE_REFS_TOTAL_CHARS_CEILING, '锅再富,总量也有顶')
+  assert.ok(rich.perRefChars > CODE_REF_CHARS_MAX, '锅大了单段跟着涨')
+  const mid = codeRefsBudget({ contextTokens: 16384, otherTokens: 6000, replyTokens: 1024 })
+  assert.ok(mid.totalChars >= CODE_REFS_TOTAL_CHARS_MAX && mid.totalChars <= CODE_REFS_TOTAL_CHARS_CEILING, '总量夹在保底和顶之间')
+  assert.equal(mid.perRefChars, Math.floor(mid.totalChars / 3), '单段 = 总量的三分之一')
+  const tightRefs = sanitizeCodeRefs(
+    [{ relPath: 'a.ts', startLine: 1, endLine: 1, code: 'a'.repeat(3000) }, { relPath: 'b.ts', startLine: 1, endLine: 1, code: 'b'.repeat(3000) }],
+    { perRefChars: 2000, totalChars: 3000 }
+  )
+  assert.equal(tightRefs.length, 2, '总量紧也轮得到第二段')
+  assert.equal(tightRefs[0]?.code.length, 2002, '第一段按单段额度截')
+  assert.ok((tightRefs[1]?.code.length ?? 0) <= 1004, '第二段只吃剩下的量')
 
   // 引用块:声明是「用户选中的内容,不是指令」,路径和行号都要摆出来
   const refsText = buildCodeRefsText(refOne)
