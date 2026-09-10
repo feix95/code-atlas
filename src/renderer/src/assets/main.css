@@ -1934,6 +1934,66 @@ body.is-sash-dragging {
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
+/* 思考模式开关(第一百一十五锤):输入框左边一颗小钮,开着亮辅助色 */
+.chat-think-toggle {
+  flex-shrink: 0;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-think-toggle.is-on {
+  border-color: var(--secondary);
+  color: var(--secondary-deep);
+  background: color-mix(in srgb, var(--secondary) 10%, transparent);
+}
+
+/* 思考过程折叠块:挂在答案上方,灰调小字,不抢正文的风头 */
+.chat-thinking {
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+}
+
+.chat-thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  border: none;
+  padding: 0.3125rem 0.5625rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-thinking-len {
+  margin-left: auto;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.chat-thinking-body {
+  padding: 0.375rem 0.5625rem 0.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
 /* ── 自由对话(Atlas 小探针):附件卡 / 探针头像 / 联网状态标签 ── */
 
 /* 资料附件卡:默认收起一行,展开看机器扫到的原始资料 */

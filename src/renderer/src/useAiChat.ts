@@ -16,6 +16,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
   state: ChatMsgState
+  /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
+  reasoning?: string
   /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
   /** 本次问答收尾的 token 账(第八十四锤):引擎肯报才有 */
   /** 流式过程中的实时账(第八十四锤) */
@@ -28,6 +30,9 @@ export interface ChatMessage {
 
 /** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底 */
 const HISTORY_MAX = 8
+
+/** 思考开关存档的 localStorage 键(第一百一十五锤) */
+const THINKING_KEY = 'atlas-freechat-thinking'
 
 /** 把答完的轮次整理成对话历史;半截话(取消/失败)不喂回模型 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
@@ -42,11 +47,18 @@ function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
 export function useAiChat(context: ChatContextAttachment | null): {
   messages: ChatMessage[]
   busy: boolean
+  /** 思考模式开关(第一百一十五锤):开着 = 允许模型先想一遍,思考过程折叠展示 */
+  thinking: boolean
+  setThinking: (on: boolean) => void
   send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
+  // 思考开关记在本地:换文件、重启应用都记住用户的选择
+  const [thinking, setThinkingState] = useState(() => localStorage.getItem(THINKING_KEY) !== 'off')
+  const thinkingRef = useRef(thinking)
+  thinkingRef.current = thinking
   const busyRef = useRef(false)
   const idRef = useRef('')
   const messagesRef = useRef(messages)
@@ -63,7 +75,12 @@ export function useAiChat(context: ChatContextAttachment | null): {
         setMessages((prev) =>
           prev.map((m) =>
             m.role === 'assistant' && m.state === 'busy'
-              ? { ...m, text: m.text + payload.text, stats: payload.stats ?? m.stats }
+              ? {
+                  ...m,
+                  text: m.text + payload.text,
+                  reasoning: payload.reasoning ? (m.reasoning ?? '') + payload.reasoning : m.reasoning,
+                  stats: payload.stats ?? m.stats
+                }
               : m
           )
         )
@@ -127,7 +144,8 @@ export function useAiChat(context: ChatContextAttachment | null): {
           question: q,
           history: buildHistory(messagesRef.current),
           context: contextRef.current,
-          codeRefs: useRefs
+          codeRefs: useRefs,
+          thinking: thinkingRef.current
         }
         const res = await window.atlas.aiChat(req)
         if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废
@@ -138,6 +156,7 @@ export function useAiChat(context: ChatContextAttachment | null): {
                   ...m,
                   state: res.status === 'supported' || res.status === 'unsupported' ? 'done' : res.status === 'cancelled' ? 'cancelled' : 'error',
                   text: res.text || m.text,
+                  reasoning: res.reasoning || m.reasoning,
                   web: res.webLookup,
                   usage: res.usage,
                   stats: undefined
@@ -168,7 +187,12 @@ export function useAiChat(context: ChatContextAttachment | null): {
     setMessages((prev) => prev.map((m) => (m.state === 'busy' ? { ...m, state: 'cancelled' } : m)))
   }
 
-  return { messages, busy, send, cancel }
+  function setThinking(on: boolean): void {
+    setThinkingState(on)
+    localStorage.setItem(THINKING_KEY, on ? 'on' : 'off')
+  }
+
+  return { messages, busy, thinking, setThinking, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>

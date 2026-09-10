@@ -280,6 +280,8 @@ export interface ModelFitVerdict {
 export interface AiDeltaPayload {
   id: string
   text: string
+  /** 思考过程的增量(第一百一十五锤):思考型模型才吐,普通请求没有 */
+  reasoning?: string
   /** 实时 token 账(第八十四锤):引擎报了就捎来,没报没有 —— 界面绝不编数 */
   stats?: AiStreamStats
 }
@@ -290,6 +292,8 @@ export interface AiExplainResult {
   status: 'supported' | 'unsupported' | 'error' | 'cancelled'
   /** 解释文本;出错时是给用户看的人话说明 */
   text: string
+  /** 模型的思考过程(第一百一十五锤):思考型模型才肯给,其他情况没有这个字段 */
+  reasoning?: string
   /** 本次用了哪个模型(方便界面回显) */
   model: string
   /** 耗时(ms) */
@@ -374,6 +378,12 @@ export interface AiChatRequest {
   context: ChatContextAttachment | null
   /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一锤);没有就是 undefined */
   codeRefs?: ChatCodeRef[]
+  /**
+   * 思考模式开关(第一百一十五锤):true = 允许模型先想一遍,思考过程展示给用户;
+   * 缺省 false = 一句话解释这类快问快答,别让思考白烧字数。只有内置引擎吃这个开关
+   * (外接服务由它们自己的设置管)。
+   */
+  thinking?: boolean
 }
 
 /**

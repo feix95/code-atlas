@@ -946,12 +946,12 @@ export function buildDiffPrompt(change: { relPath: string; kind: 'added' | 'modi
 }
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string } }>
+  choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>
   usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
 interface ChatStreamChunk {
-  choices?: Array<{ delta?: { content?: string } }>
+  choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>
   /** llama-server timings_per_token(第八十四锤):已读提示词/已吐 token/吐字速度 */
   timings?: { prompt_n?: number; predicted_n?: number; predicted_per_second?: number }
   /** OpenAI 习惯的收尾账(llama-server / LM Studio 都可能给) */
@@ -980,9 +980,10 @@ export function extractStreamStats(chunk: ChatStreamChunk, phase: 'reading' | 'w
   return hasAnything ? stats : null
 }
 
-/** SSE 流里的一次事件:一段正文和/或一份 token 账 */
+/** SSE 流里的一次事件:一段正文和/或一段思考和/或一份 token 账 */
 interface SseEvent {
   text?: string
+  reasoning?: string
   stats?: AiStreamStats
 }
 
@@ -1033,10 +1034,18 @@ async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<S
       if (payload === '[DONE]') return
       try {
         const chunk = JSON.parse(payload) as ChatStreamChunk
-        const piece = chunk.choices?.[0]?.delta?.content
+        const delta = chunk.choices?.[0]?.delta
+        const piece = delta?.content
+        const think = delta?.reasoning_content
         if (piece) writing = true
         const stats = extractStreamStats(chunk, writing ? 'writing' : 'reading')
-        if (piece || stats) yield piece ? { text: piece, stats: stats ?? undefined } : { stats: stats! }
+        if (piece || think || stats) {
+          const ev: SseEvent = {}
+          if (piece) ev.text = piece
+          if (think) ev.reasoning = think
+          if (stats) ev.stats = stats
+          yield ev
+        }
       } catch {
         // 残帧或心跳,跳过
       }
@@ -1054,9 +1063,26 @@ const FIRST_FRAME_MS = 120_000
 /** 流式:开始吐字之后,两帧之间超过这么久没动静才算真卡住 */
 const STREAM_IDLE_MS = 30_000
 
+/**
+ * 把回复里的思考区拆出来(纯函数,自测覆盖,第一百一十五锤)。
+ * 有的服务把思考装进单独的 reasoning_content 字段(llama-server 就这样);有的直接把
+ * <think>…</think> 掺在正文里(LM Studio 的部分后端)。后者在这里拆干净:
+ * 有收尾标签 → 标签里是思考、后面是正文;没写收尾(半截话/字数烧尽)→ 全算思考。
+ * 普通回复一根标签都没有,原样通过。
+ */
+export function splitThinking(text: string): { reasoning: string; answer: string } {
+  const open = text.indexOf('<think>')
+  if (open === -1) return { reasoning: '', answer: text }
+  const close = text.indexOf('</think>', open)
+  if (close === -1) return { reasoning: text.slice(open + 7).trim(), answer: '' }
+  const reasoning = text.slice(open + 7, close).trim()
+  const before = text.slice(0, open).trim()
+  const after = text.slice(close + 8).trim()
+  return { reasoning, answer: `${before}${before && after ? '\n\n' : ''}${after}` }
+}
+
 /** 读流时「没动静」超时:reader 的 abort 掐不进读队列(实测),自己赛跑自己掐 */
-class StreamIdleError extends Error {
-  /** true = 已经在吐字后卡的;false = 连第一个字都没等到 */
+class StreamIdleError extends Error {  /** true = 已经在吐字后卡的;false = 连第一个字都没等到 */
   readonly writing: boolean
   constructor(writing: boolean) {
     super(writing ? 'stream stalled mid-answer' : 'no first frame in time')
@@ -1098,17 +1124,18 @@ export function friendlyHttpError(status: number, detail: string): string | null
 export async function explainWithMessages(
   config: ChatTarget,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  onDelta?: (text: string, stats?: AiStreamStats) => void,
+  onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
-  maxTokens = 500
+  maxTokens = 500,
+  opts?: { allowThinking?: boolean }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const promptChars = messages.reduce((sum, m) => sum + m.content.length, 0)
   addDevLog(
     'request',
-    `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}`
+    `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}${opts?.allowThinking ? ' · 思考模式' : ''}`
   )
-  const result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens)
+  const result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
   const took = ((Date.now() - startedAt) / 1000).toFixed(1)
   if (result.status === 'supported') {
     const account = result.usage ? ` · ${formatUsage(result.usage)}` : ''
@@ -1122,9 +1149,10 @@ export async function explainWithMessages(
 async function explainWithMessagesCore(
   config: ChatTarget,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  onDelta?: (text: string, stats?: AiStreamStats) => void,
+  onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
-  maxTokens = 500
+  maxTokens = 500,
+  opts?: { allowThinking?: boolean }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
@@ -1139,6 +1167,7 @@ async function explainWithMessagesCore(
     watchdog = setTimeout(() => controller.abort(), ms)
   }
   let full = ''
+  let reasoningFull = ''
   let usage: AiUsage | undefined
   try {
     armWatchdog(HEADERS_TIMEOUT_MS)
@@ -1154,6 +1183,10 @@ async function explainWithMessagesCore(
         temperature: 0.2,
         max_tokens: maxTokens,
         stream: Boolean(onDelta),
+        // 思考开关(第一百一十五锤):只对内置引擎发 —— 它认 chat_template_kwargs,
+        // 能让思考型模型(Qwen3.5 这类)跳过 <think> 直接答题;外接服务不认识这个
+        // 字段,有的还会报错,所以外接的一律不塞,思考与否由它们自己的设置管
+        ...(!opts?.allowThinking && config.timings ? { chat_template_kwargs: { enable_thinking: false } } : {}),
         // 内置引擎(llama-server)才塞的旗子(第八十四锤):流里报 token 账,预处理进度看得见。
         // 外接服务不认识这些字段,不塞,行为一分不变
         ...(config.timings ? { timings_per_token: true, stream_options: { include_usage: true } } : {})
@@ -1178,7 +1211,13 @@ async function explainWithMessagesCore(
     if (!onDelta) {
       armWatchdog(BODY_TIMEOUT_MS)
       const data = (await res.json()) as ChatCompletionResponse
-      const content = data.choices?.[0]?.message?.content?.trim()
+      const message = data.choices?.[0]?.message
+      // 思考区先收好(llama-server 装在 reasoning_content 字段里)
+      reasoningFull = message?.reasoning_content?.trim() ?? ''
+      // 正文里掺的 <think> 标签也拆干净(有的服务不给你分字段)
+      const split = splitThinking(message?.content?.trim() ?? '')
+      if (split.reasoning) reasoningFull = reasoningFull ? `${reasoningFull}\n${split.reasoning}` : split.reasoning
+      const content = split.answer.trim()
       usage =
         typeof data.usage === 'object' && data.usage !== null
           ? {
@@ -1187,6 +1226,11 @@ async function explainWithMessagesCore(
             }
           : undefined
       if (!content) {
+        if (reasoningFull) {
+          // 想了一堆没写出答案(思考把字数烧完/外接服务关不掉思考):思考本身就是回复,照实交出去,
+          // 总比报「一个字都没回」强 —— 那句提示在这场景是冤枉上下文
+          return { status: 'supported', text: reasoningFull, reasoning: reasoningFull, model: config.model, durationMs: Date.now() - startedAt, usage }
+        }
         return {
           status: 'error',
           text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
@@ -1195,16 +1239,19 @@ async function explainWithMessagesCore(
           usage
         }
       }
-      return { status: 'supported', text: content, model: config.model, durationMs: Date.now() - startedAt, usage }
+      return { status: 'supported', text: content, reasoning: reasoningFull || undefined, model: config.model, durationMs: Date.now() - startedAt, usage }
     }
 
-    // 流式:逐帧喂给 onDelta(文本 + token 账),全文攒到最后一起返回。
+    // 流式:逐帧喂给 onDelta(正文 + 思考 + token 账),全文攒到最后一起返回。
     // 「没动静」的看守交棒给 sseEvents 自己(首帧/帧间两档);用户取消也由它插铃保底
     let lastStats: AiStreamStats | undefined
     clearTimeout(watchdog)
     for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
         full += ev.text
+      }
+      if (ev.reasoning) {
+        reasoningFull += ev.reasoning
       }
       // 收尾帧(usage)只带 token 数不带速度:按字段合并,别把上一帧的吐字速度冲掉
       if (ev.stats) {
@@ -1217,7 +1264,7 @@ async function explainWithMessagesCore(
             }
           : ev.stats
       }
-      onDelta(ev.text ?? '', lastStats)
+      onDelta(ev.text ?? '', lastStats, ev.reasoning)
     }
     usage = lastStats
       ? {
@@ -1226,7 +1273,15 @@ async function explainWithMessagesCore(
           tokensPerSecond: lastStats.tokensPerSecond
         }
       : undefined
+    // 正文里掺的 <think> 标签在这里拆:思考挪走,正文才干净
+    const streamSplit = splitThinking(full)
+    if (streamSplit.reasoning) reasoningFull = reasoningFull ? `${reasoningFull}\n${streamSplit.reasoning}` : streamSplit.reasoning
+    full = streamSplit.answer
     if (!full.trim()) {
+      if (reasoningFull) {
+        // 只想了没写出来:思考照实交(界面会折叠展示),别把锅甩给上下文
+        return { status: 'supported', text: reasoningFull, reasoning: reasoningFull, model: config.model, durationMs: Date.now() - startedAt, usage }
+      }
       return {
         status: 'error',
         text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
@@ -1235,7 +1290,14 @@ async function explainWithMessagesCore(
         usage
       }
     }
-    return { status: 'supported', text: full, model: config.model, durationMs: Date.now() - startedAt, usage }
+    return {
+      status: 'supported',
+      text: full,
+      reasoning: reasoningFull || undefined,
+      model: config.model,
+      durationMs: Date.now() - startedAt,
+      usage
+    }
   } catch (err) {
     // 第八十五锤:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
     const isAbort = err instanceof Error && err.name === 'AbortError'
@@ -1256,6 +1318,7 @@ async function explainWithMessagesCore(
       return {
         status: 'supported',
         text: note ? `${full}\n\n${note}` : full,
+        reasoning: reasoningFull || undefined,
         model: config.model,
         durationMs: Date.now() - startedAt,
         usage

@@ -14,3 +14,10 @@ export const CODE_REF_CHARS_MAX = 2000
 
 /** 一轮里所有引用的字数上限:几段加起来也不能把上下文吃光 */
 export const CODE_REFS_TOTAL_CHARS_MAX = 6000
+
+/**
+ * 思考模式的额外字数额度(tokens,第一百一十五锤):开了思考,模型回答前会先写
+ * 一大段推理,这段推理也算在 max_tokens 里 —— 不加额度,思考就把回答的字数吃光,
+ * 正文一个字都不剩(小葵的 Qwen3.5 就是这么「一句没回」的)。
+ */
+export const THINKING_EXTRA_TOKENS = 2048

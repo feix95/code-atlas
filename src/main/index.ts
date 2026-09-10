@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, net, screen, shell, BrowserWindow, type IpcMainIn
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
+import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -271,11 +272,13 @@ async function resolveChatTargetOrError(): Promise<
  * 流式增量推送:渲染进程带 requestId 过来,就按 id 对号入座往回推
  * 'atlas:ai-delta',边生成边显示;没带 id(老调用方)就走一次性返回。
  */
-function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string, stats?: AiStreamStats) => void) | undefined {
+function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string, stats?: AiStreamStats, reasoning?: string) => void) | undefined {
   if (typeof requestId !== 'string' || requestId === '') return undefined
-  return (text, stats) => {
+  return (text, stats, reasoning) => {
     if (event.sender.isDestroyed()) return
-    event.sender.send('atlas:ai-delta', stats ? { id: requestId, text, stats } : { id: requestId, text } satisfies AiDeltaPayload)
+    const payload: AiDeltaPayload = reasoning ? { id: requestId, text, reasoning } : { id: requestId, text }
+    if (stats) payload.stats = stats
+    event.sender.send('atlas:ai-delta', payload)
     // 引擎肯报账,状态栏的「忙」就跟着报数(第八十四锤)
     if (stats) announceActivityBusy(lastActivityProvider, stats)
   }
@@ -1215,6 +1218,8 @@ function registerIpc(): void {
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const history = sanitizeHistory(body.history)
     const attachment = sanitizeAttachment(body.context)
+    // 思考模式(第一百一十五锤):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
+    const thinking = body.thinking === true
     const requested = hasSearchIntent(questionText)
 
     const resolved = await resolveChatTargetOrError()
@@ -1256,7 +1261,16 @@ function registerIpc(): void {
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, resolved.budgets.replyTokens)
+      // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
+      const cap = thinking ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS : resolved.budgets.replyTokens
+      const res = await explainWithMessages(
+        resolved.target,
+        messages,
+        makeDeltaSender(event, requestId),
+        aborter.signal,
+        cap,
+        { allowThinking: thinking }
+      )
       // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
       const status = aborter.signal.aborted ? 'cancelled' : res.status
       return { ...res, status, webLookup: meta }

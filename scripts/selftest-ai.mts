@@ -49,7 +49,8 @@ import {
   GUESS_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
   isBinaryFile,
-  extractStreamStats
+  extractStreamStats,
+  splitThinking
 } from '../src/ai/index.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX } from '../src/shared/aiDefaults.ts'
@@ -635,6 +636,97 @@ async function main(): Promise<void> {
     assert.ok(freeBody.messages[3]?.content.includes('你是谁'), '当前问题收尾')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+
+  // ── 7½. 思考模式(第一百一十五锤):开关、思考流的拆账、掺标签的正文的账 ──
+  // 没写收尾的 <think> 全算思考;拆完正文里不留半个标签
+  const st1 = splitThinking('<think>先看看题目</think>答案是 4')
+  assert.equal(st1.reasoning, '先看看题目', '收尾标签里的算思考')
+  assert.equal(st1.answer, '答案是 4', '标签后面的算正文')
+  const st2 = splitThinking('想一半就断了:<think>还没想完')
+  assert.equal(st2.answer, '', '没写收尾就没有正文')
+  assert.ok(st2.reasoning.includes('还没想完'), '没写收尾全算思考')
+  const st3 = splitThinking('普通回复,一根标签都没有')
+  assert.equal(st3.reasoning, '', '普通回复不产生思考')
+  assert.equal(st3.answer, '普通回复,一根标签都没有', '普通回复原样通过')
+
+  const thinkServer = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString('utf8')
+    })
+    req.on('end', () => {
+      thinkBodies.push(body)
+      if (body.includes('"stream":true')) {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+        res.write('data: {"choices":[{"delta":{"reasoning_content":"用户问的是加法,1+1=2"}}]}\n\n')
+        res.write('data: {"choices":[{"delta":{"content":"等于 2"}}]}\n\n')
+        res.end('data: [DONE]\n\n')
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content: '等于 2', reasoning_content: '用户问的是加法,1+1=2' } }] }))
+    })
+  })
+  const thinkBodies: string[] = []
+  await new Promise<void>((resolve) => thinkServer.listen(0, '127.0.0.1', resolve))
+  const thinkAddr = thinkServer.address()
+  assert.ok(thinkAddr && typeof thinkAddr === 'object', '思考假服务应监听在端口上')
+  // timings: true 模拟内置引擎:只有内置引擎吃 enable_thinking 开关
+  const builtinTarget = { baseUrl: `http://127.0.0.1:${thinkAddr.port}/v1`, model: 'think-model', timings: true } as const
+  try {
+    // 开思考:不发 enable_thinking:false;思考帧和正文帧分开到账
+    const pieces: string[] = []
+    const thoughts: string[] = []
+    const thinkRes = await explainWithMessages(
+      builtinTarget,
+      [{ role: 'user', content: '1+1=?' }],
+      (_t, _s, r) => {
+        if (r) thoughts.push(r)
+        pieces.push(_t)
+      },
+      undefined,
+      500,
+      { allowThinking: true }
+    )
+    assert.equal(thinkRes.status, 'supported', '思考流应成功')
+    assert.equal(thinkRes.text, '等于 2', '正文只收正文帧')
+    assert.equal(thinkRes.reasoning, '用户问的是加法,1+1=2', '思考区单独收账')
+    assert.equal(pieces.join(''), '等于 2', '增量正文不含思考')
+    assert.equal(thoughts.join(''), '用户问的是加法,1+1=2', '增量思考单独推送')
+    const onBody = JSON.parse(thinkBodies[0] ?? '') as { chat_template_kwargs?: { enable_thinking?: boolean } }
+    assert.equal(onBody.chat_template_kwargs, undefined, '开思考就不发关思考的旗子')
+
+    // 默认(一句话解释的路):内置引擎要带上 enable_thinking:false,别让思考白烧字数;
+    // 非流式回复里装在 reasoning_content 字段的思考也要单独收账
+    const offRes = await explainWithMessages(builtinTarget, [{ role: 'user', content: '1+1=?' }])
+    assert.equal(offRes.status, 'supported', '关思考的请求也应成功')
+    assert.equal(offRes.text, '等于 2', '非流式正文照常解析')
+    assert.equal(offRes.reasoning, '用户问的是加法,1+1=2', '非流式的思考区单独收账')
+    const offBody = JSON.parse(thinkBodies[thinkBodies.length - 1] ?? '') as { chat_template_kwargs?: { enable_thinking?: boolean } }
+    assert.equal(offBody.chat_template_kwargs?.enable_thinking, false, '默认要发关思考的旗子(内置引擎)')
+
+    // 只想了没写出来:思考照实交出去,不该报「一个字都没回」
+    const onlyThinkServer = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content: '', reasoning_content: '想了很久,字数用尽了' } }] }))
+    })
+    await new Promise<void>((resolve) => onlyThinkServer.listen(0, '127.0.0.1', resolve))
+    try {
+      const onlyAddr = onlyThinkServer.address()
+      assert.ok(onlyAddr && typeof onlyAddr === 'object')
+      const onlyRes = await explainWithModel(
+        { baseUrl: `http://127.0.0.1:${onlyAddr.port}/v1`, model: 'm' },
+        '难问题'
+      )
+      assert.equal(onlyRes.status, 'supported', '只有思考也应算成功,不该报错')
+      assert.ok(onlyRes.text.includes('字数用尽'), '思考就是这次的回复')
+      assert.equal(onlyRes.reasoning, '想了很久,字数用尽了', '思考区也要单独记账')
+    } finally {
+      await new Promise<void>((resolve) => onlyThinkServer.close(() => resolve()))
+    }
+  } finally {
+    await new Promise<void>((resolve) => thinkServer.close(() => resolve()))
   }
 
   // ── 8. 服务连不上:应返回 error 状态而不是抛异常 ──

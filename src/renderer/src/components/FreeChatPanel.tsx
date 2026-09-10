@@ -40,6 +40,24 @@ function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'g
   }
 }
 
+/** 思考过程折叠块(第一百一十五锤):边想边展开,答完自动收起,想看随时点开。
+ * 用户亲手点过就以用户为准(null = 还没点过,默认「忙着就开,答完就收」) */
+function ThinkingBlock({ reasoning, busy }: { reasoning: string; busy: boolean }): React.JSX.Element | null {
+  const [toggled, setToggled] = useState<boolean | null>(null)
+  const open = toggled ?? busy
+  if (reasoning.trim() === '') return null
+  return (
+    <div className={`chat-thinking${open ? ' is-open' : ''}`}>
+      <button type="button" className="chat-thinking-toggle" onClick={() => setToggled(!open)} aria-expanded={open}>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+        思考过程
+        <span className="chat-thinking-len">{reasoning.length.toLocaleString('en-US')} 字</span>
+      </button>
+      {open && <div className="chat-thinking-body">{reasoning}</div>}
+    </div>
+  )
+}
+
 function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetry?: boolean; onRetry?: () => void }): React.JSX.Element {
   const label = webLabel(msg.web)
   const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
@@ -56,8 +74,12 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
       <div className="chat-answer-row">
         <AtlasProbe state={probe} className="chat-avatar" />
         <div className="message answer">
-          {msg.state === 'busy' && !msg.text && <span className="chat-typing">小探针正在思考……</span>}
+          {msg.state === 'busy' && !msg.text && !msg.reasoning && <span className="chat-typing">小探针正在思考……</span>}
+          {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
           {msg.text && <MiniMD text={msg.text} caret={msg.state === 'busy'} />}
+          {msg.state === 'done' && !msg.text && msg.reasoning && (
+            <span className="chat-typing chat-muted">想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。</span>
+          )}
           {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
           {msg.state === 'cancelled' && msg.text && <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>}
           {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
@@ -291,6 +313,19 @@ export function FreeChatPanel({
           )
         )}
         <form className="chat-input" onSubmit={submit}>
+          <button
+            type="button"
+            className={`chat-think-toggle${chat.thinking ? ' is-on' : ''}`}
+            onClick={() => chat.setThinking(!chat.thinking)}
+            aria-pressed={chat.thinking}
+            title={
+              chat.thinking
+                ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
+                : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
+            }
+          >
+            <span aria-hidden="true">💭</span>思考{chat.thinking ? '开' : '关'}
+          </button>
           <input
             ref={inputRef}
             type="text"
