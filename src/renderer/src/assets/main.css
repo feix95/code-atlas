@@ -2163,6 +2163,16 @@ body.is-sash-dragging {
   flex: 1;
 }
 
+/* 程序垫的灰字条(第一百二十四锤):「参考资料换成了 xxx」,居中小字,不像谁说的话 */
+.chat-note {
+  margin: var(--space-2) auto;
+  padding: 0 0.75rem;
+  max-width: 85%;
+  text-align: center;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
 .chat-webstatus {
   margin-left: 2.125rem;
   margin-top: 2px;

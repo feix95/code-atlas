@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { ChatCodeRef, ChatContextAttachment, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
@@ -26,7 +26,7 @@ import {
   type RecentProject
 } from './recents'
 import { useAiAsk } from './useAiAsk'
-import { useAiChat } from './useAiChat'
+import { useAiChat, type AiChatApi } from './useAiChat'
 import { useChatSuggestions } from './useChatSuggestions'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
@@ -50,7 +50,7 @@ const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'structure', label: '结构与关系' }
 ]
 
-const FOLDER_TABS = [
+const FOLDER_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '概览' },
   { key: 'chat', label: 'Atlas 小探针' }
 ]
@@ -195,6 +195,18 @@ function App(): React.JSX.Element {
   }))
   // 后退/前进跳转途中记录器闭嘴:恢复旧位置引发的一串选中不许再记新账
   const navTravelingRef = useRef(false)
+  // 自由对话账本上移(第一百二十四锤):全 app 只养一份,挂在 App 顶层 ——
+  // 换文件、换文件夹、进出预览,聊天记录都活着;对话的是谁,由「当前参考资料」附件说话
+  const chatContext = !result
+    ? null
+    : preview
+      ? buildFileAttachment(preview, null)
+      : selectedFile
+        ? buildFileAttachment(selectedFile, structure)
+        : selectedFolder
+          ? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
+          : null
+  const chat = useAiChat(chatContext)
   const folderRef = useRef(folder)
   useEffect(() => {
     folderRef.current = folder
@@ -400,7 +412,10 @@ function App(): React.JSX.Element {
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
-    if (!opts?.keepTab) setActiveTab('overview')
+    // 聊天中点文件(第一百二十四锤):不切台、不抢话头,只把新资料塞给探针接着聊
+    const chatting = activeTab === 'chat'
+    if (!opts?.keepTab && !chatting) setActiveTab('overview')
+    if (chatting && chat.messages.length > 0) chat.note(`参考资料换成了 ${file.name}`)
 
     if (!file.language) {
       setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「Atlas 小探针」问', kind: 'info' })
@@ -461,6 +476,11 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
+    // 聊天中点文件夹(第一百二十四锤):同文件的处理,不切台,只换附件
+    if (activeTab === 'chat') {
+      if (chat.messages.length > 0) chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
+      return
+    }
     setActiveTab('overview')
   }
 
@@ -791,6 +811,8 @@ function App(): React.JSX.Element {
                 refs={previewRefs}
                 onRemoveRef={removePreviewRef}
                 onClose={exitPreview}
+                chat={chat}
+                chatContext={chatContext ?? buildFileAttachment(preview, null)}
               />
             ) : selectedFile && result ? (
               <FileDetailView
@@ -813,6 +835,8 @@ function App(): React.JSX.Element {
                 note={notes[selectedFile.relPath] ?? null}
                 onNoteSave={saveNote}
                 autoOpenNote={noteEditRequest === selectedFile.relPath}
+                chat={chat}
+                chatContext={chatContext ?? buildFileAttachment(selectedFile, structure)}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -826,6 +850,10 @@ function App(): React.JSX.Element {
                 note={notes[selectedFolder.relPath] ?? null}
                 onNoteSave={saveNote}
                 autoOpenNote={noteEditRequest === selectedFolder.relPath}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                chat={chat}
+                chatContext={chatContext ?? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)}
               />
             ) : (
               <ProjectOverview
@@ -940,26 +968,27 @@ function App(): React.JSX.Element {
 
 /**
  * 预览模式的右半(第一百一十锤):小探针的自由对话,专聊左栏那扇窗里的文件。
- * 走的是详情页同一条聊天通道(独立 session、独立账本),只是这儿没有 Tab —— 进来就是聊。
+ * 走的是详情页同一条聊天通道,只是这儿没有 Tab —— 进来就是聊。
  * 第一百一十一锤:左栏选中的代码以引用卡挂到输入框上,和问题一起发出去。
- * key = relPath:换文件整个重挂,旧对话连同在途请求一起就地清掉。
+ * 第一百二十四锤:聊天账本上移到 App,换文件不再重挂、对话不再蒸发。
  */
 function PreviewDetailView({
   file,
   result,
   refs,
   onRemoveRef,
-  onClose
+  onClose,
+  chat,
+  chatContext
 }: {
   file: ScanFileNode
   result: ScanResult
   refs: ChatCodeRef[]
   onRemoveRef: (index: number) => void
   onClose: () => void
+  chat: AiChatApi
+  chatContext: ChatContextAttachment
 }): React.JSX.Element {
-  // 附件只建一份:本轮请求带的就是它,免得每次渲染造两份重复对象
-  const context = buildFileAttachment(file, null)
-  const chat = useAiChat(context)
   // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新
   const suggestions = useChatSuggestions({ rootPath: result.rootPath, file, messages: chat.messages, busy: chat.busy })
 
@@ -973,7 +1002,7 @@ function PreviewDetailView({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} />
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} />
       </div>
     </div>
   )
@@ -983,6 +1012,7 @@ function PreviewDetailView({
  * 文件详情:固定头部(面包屑/文件名/徽章/关闭)+ 三个 Tab(概览/Atlas 小探针/结构与关系)。
  * key = relPath:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消,
  * 旧响应回来也盖不到新文件头上。
+ * 第一百二十四锤:自由对话的账本搬去了 App 顶层,换文件聊天记录不蒸发,组件只管收 chat 用。
  */
 function FileDetailView({
   file,
@@ -1002,7 +1032,9 @@ function FileDetailView({
   gitLoading,
   note,
   onNoteSave,
-  autoOpenNote
+  autoOpenNote,
+  chat,
+  chatContext
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1025,6 +1057,8 @@ function FileDetailView({
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
   autoOpenNote?: boolean
+  chat: AiChatApi
+  chatContext: ChatContextAttachment
 }): React.JSX.Element {
   // AI 解释:概览卡、小探针共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
@@ -1032,9 +1066,6 @@ function FileDetailView({
   )
   // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动
   const presets = usePresetQuestions({ rootPath: result.rootPath, file, note: note?.text })
-  // 自由聊天:独立通道、独立 session。钩子挂在详情层,概览↔自由对话来回切不掉聊天记录;
-  // 换文件时整个详情重挂(key=relPath),旧 session 连同在途请求一起就地清掉
-  const chat = useAiChat(buildFileAttachment(file, structure))
 
   const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
   const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
@@ -1116,13 +1147,14 @@ function FileDetailView({
             )}
           </>
         )}
-        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={buildFileAttachment(file, structure)} />}
+        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={chatContext} />}
       </div>
     </div>
   )
 }
 
-/** 文件夹详情:静态目录概览为主;讲解卡在概览页,自由对话是独立 Tab/独立通道 */
+/** 文件夹详情:静态目录概览为主;讲解卡在概览页,自由对话是独立 Tab/独立通道。
+ * 第一百二十四锤:聊天账本在 App 顶层,Tab 也上移(聊天中换文件夹不被踢回概览) */
 function FolderDetailView({
   dir,
   result,
@@ -1132,7 +1164,11 @@ function FolderDetailView({
   onRefreshed,
   note,
   onNoteSave,
-  autoOpenNote
+  autoOpenNote,
+  activeTab,
+  onTabChange,
+  chat,
+  chatContext
 }: {
   dir: ScanDirNode
   result: ScanResult
@@ -1145,10 +1181,12 @@ function FolderDetailView({
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
   autoOpenNote?: boolean
+  activeTab: DetailTab
+  onTabChange: (tab: DetailTab) => void
+  chat: AiChatApi
+  chatContext: ChatContextAttachment
 }): React.JSX.Element {
-  const [tab, setTab] = useState('overview')
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
-  const chat = useAiChat(buildFolderAttachment(dir, dir.name || result.rootName))
 
   const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
   if (dir.relPath === '') badges.push({ label: '项目根', tone: 'blue' })
@@ -1168,24 +1206,24 @@ function FolderDetailView({
         autoOpenNote={autoOpenNote}
         badges={badges}
         tabs={FOLDER_TABS}
-        activeTab={tab}
-        onTabChange={setTab}
+        activeTab={activeTab}
+        onTabChange={(key) => onTabChange(key as DetailTab)}
         onClose={onClose}
       />
-      <div className={`detail-body${tab === 'chat' ? ' is-chat' : ''}`}>
-        {tab === 'overview' && (
+      <div className={`detail-body${activeTab === 'chat' ? ' is-chat' : ''}`}>
+        {activeTab === 'overview' && (
           <FolderOverview
             dir={dir}
             noteText={note?.text}
             ai={ai}
-            onGoChat={() => setTab('chat')}
+            onGoChat={() => onTabChange('chat')}
             gitInfo={gitInfo}
             rootPath={result.rootPath}
             onJump={onJump}
             onRefreshed={onRefreshed}
           />
         )}
-        {tab === 'chat' && <FreeChatPanel chat={chat} context={buildFolderAttachment(dir, dir.name || result.rootName)} />}
+        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={chatContext} />}
       </div>
     </div>
   )

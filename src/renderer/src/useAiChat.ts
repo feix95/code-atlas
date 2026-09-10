@@ -13,7 +13,8 @@ export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'
 
 export interface ChatMessage {
   key: string
-  role: 'user' | 'assistant'
+  /** note = 程序垫的灰字条(如「参考资料换成了 xxx」),不发模型、不进历史 */
+  role: 'user' | 'assistant' | 'note'
   text: string
   state: ChatMsgState
   /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
@@ -34,11 +35,11 @@ const HISTORY_MAX = 8
 /** 思考开关存档的 localStorage 键(第一百一十五锤) */
 const THINKING_KEY = 'atlas-freechat-thinking'
 
-/** 把答完的轮次整理成对话历史;半截话(取消/失败)不喂回模型 */
+/** 把答完的轮次整理成对话历史;半截话(取消/失败)不喂回模型;程序垫的灰字条(note)也不喂 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
   const out: AiChatRequest['history'] = []
   for (const m of messages) {
-    if (m.state !== 'done' || !m.text) continue
+    if (m.role === 'note' || m.state !== 'done' || !m.text) continue
     out.push({ role: m.role, content: m.text })
   }
   return out.slice(-HISTORY_MAX)
@@ -50,6 +51,8 @@ export function useAiChat(context: ChatContextAttachment | null): {
   /** 思考模式开关(第一百一十五锤):开着 = 允许模型先想一遍,思考过程折叠展示 */
   thinking: boolean
   setThinking: (on: boolean) => void
+  /** 程序垫一条灰字(第一百二十四锤):如「参考资料换成了 xxx」,不进历史、不发给模型 */
+  note: (text: string) => void
   send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
@@ -192,7 +195,11 @@ export function useAiChat(context: ChatContextAttachment | null): {
     localStorage.setItem(THINKING_KEY, on ? 'on' : 'off')
   }
 
-  return { messages, busy, thinking, setThinking, send, cancel }
+  function note(text: string): void {
+    setMessages((prev) => [...prev, { key: crypto.randomUUID(), role: 'note', text, state: 'done', web: null }])
+  }
+
+  return { messages, busy, thinking, setThinking, note, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>
