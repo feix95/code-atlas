@@ -3,6 +3,7 @@ import type { DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDi
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
+import { CodePreview } from './components/CodePreview'
 import { FileOverview } from './components/FileOverview'
 import { FileRelations } from './components/FileRelations'
 import { FileTree } from './components/FileTree'
@@ -161,6 +162,8 @@ function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteMap>({})
   // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
   const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
+  // 代码预览(第一百一十锤):右键「预览文件」→ 左栏换只读文本窗、右栏换小探针对话
+  const [preview, setPreview] = useState<ScanFileNode | null>(null)
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -311,6 +314,7 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setSelectedFolder(null)
     setActiveTab('overview')
+    setPreview(null)
     setStructure(null)
     setAnalyzeNote(null)
     setGraph(null)
@@ -469,6 +473,7 @@ function App(): React.JSX.Element {
     if (!folder) return
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
+    setPreview(null)
     setFolder(null)
     setResult(null)
     setError(null)
@@ -505,6 +510,13 @@ function App(): React.JSX.Element {
       handleSelectFolder(d)
       setNoteEditRequest(relPath)
     }
+  }
+
+  // 右键「预览文件」(第一百一十锤):在树上找到文件节点,左栏换成只读文本窗
+  function openPreview(relPath: string): void {
+    if (!result) return
+    const f = findFile(result.tree, relPath)
+    if (f) setPreview(f)
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -691,27 +703,35 @@ function App(): React.JSX.Element {
           {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
               不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
-            <FileTree
-              root={result.tree}
-              notes={notes}
-              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
-              expandingPath={expanding}
-              onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
-              onSelectFolder={handleSelectFolder}
-              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-              onNoteEdit={editNoteFromTree}
-              onNoteRemove={(relPath) => saveNote(relPath, '')}
-            />
-            <footer className="sidebar-footer">
-              <span>
-                <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
-                {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
-              </span>
-              <span className="mono">
-                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
-              </span>
-            </footer>
-            {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
+            {preview ? (
+              // 预览模式:左栏整扇换成只读文本窗(退出预览才回到目录树)
+              <CodePreview key={preview.relPath} rootPath={result.rootPath} file={preview} onClose={() => setPreview(null)} />
+            ) : (
+              <>
+                <FileTree
+                  root={result.tree}
+                  notes={notes}
+                  selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+                  expandingPath={expanding}
+                  onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
+                  onSelectFolder={handleSelectFolder}
+                  onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+                  onNoteEdit={editNoteFromTree}
+                  onNoteRemove={(relPath) => saveNote(relPath, '')}
+                  onPreview={openPreview}
+                />
+                <footer className="sidebar-footer">
+                  <span>
+                    <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
+                    {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
+                  </span>
+                  <span className="mono">
+                    {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
+                  </span>
+                </footer>
+                {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
+              </>
+            )}
           </aside>
           <div
             className="sash"
@@ -730,7 +750,10 @@ function App(): React.JSX.Element {
           />
           <section className="detail">
             {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
-            {selectedFile && result ? (
+            {preview ? (
+              // 预览模式:右栏整扇换成小探针的自由对话,专聊左边这扇窗里的文件
+              <PreviewDetailView key={preview.relPath} file={preview} result={result} onClose={() => setPreview(null)} />
+            ) : selectedFile && result ? (
               <FileDetailView
                 key={selectedFile.relPath}
                 file={selectedFile}
@@ -877,7 +900,41 @@ function App(): React.JSX.Element {
 }
 
 /**
- * 文件详情:固定头部(面包屑/文件名/徽章/关闭)+ 五个 Tab。
+ * 预览模式的右半(第一百一十锤):小探针的自由对话,专聊左栏那扇窗里的文件。
+ * 走的是详情页同一条聊天通道(独立 session、独立账本),只是这儿没有 Tab —— 进来就是聊。
+ * key = relPath:换文件整个重挂,旧对话连同在途请求一起就地清掉。
+ */
+function PreviewDetailView({
+  file,
+  result,
+  onClose
+}: {
+  file: ScanFileNode
+  result: ScanResult
+  onClose: () => void
+}): React.JSX.Element {
+  // 附件只建一份:本轮请求带的就是它,免得每次渲染造两份重复对象
+  const context = buildFileAttachment(file, null)
+  const chat = useAiChat(context)
+
+  return (
+    <div className="detail-page">
+      <DetailHeader
+        crumbs={buildCrumbs(result.rootName, result.rootPath, file.relPath)}
+        iconName={file.summary?.icon ?? 'file'}
+        title={file.name}
+        subtitle={file.language ? `${file.language.name} 文件 · 左栏是它的内容` : '左栏是它的内容'}
+        onClose={onClose}
+      />
+      <div className="detail-body is-chat">
+        <FreeChatPanel chat={chat} context={context} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 文件详情:固定头部(面包屑/文件名/徽章/关闭)+ 三个 Tab(概览/Atlas 小探针/结构与关系)。
  * key = relPath:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消,
  * 旧响应回来也盖不到新文件头上。
  */

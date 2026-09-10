@@ -624,6 +624,99 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-size: 0.625rem;
 }
 
+/* ── 代码预览(第一百一十锤):左栏的只读文本窗 ──
+   只摆纯文本 + 行号,不描语法色;等宽字、不折行,横向自己滚 */
+.code-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.code-pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.code-pane-icon {
+  display: inline-flex;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.code-pane-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.code-pane-exit {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--font-xs);
+}
+
+.code-pane-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+
+/* 只载入了开头一段 / 读不了:琥珀色是「留个心眼」,不是出错 */
+.code-pane-note.is-warn {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* 正文区:行号钉在左边不跟横向滚动跑,纵横向都自己滚 */
+.code-view {
+  display: flex;
+  align-items: flex-start;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) 0 var(--space-4);
+  background: var(--surface);
+}
+
+.code-gutter,
+.code-text {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--muted-2);
+  text-align: right;
+  user-select: none;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.code-text {
+  padding: 0 var(--space-3);
+  color: var(--text);
+}
+
 .status-dot {
   display: inline-block;
   width: 0.4375rem;

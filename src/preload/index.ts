@@ -10,6 +10,7 @@ import type {
   DriveInfo,
   FeatureLocateResult,
   FileStructure,
+  FilePreviewResult,
   GitChangesResult,
   ModelFitVerdict,
   ModelStatus,
@@ -93,6 +94,9 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.invoke('atlas:scan-subdir', rootPath, relPath),
   analyzeFile: (rootPath: string, relPath: string, languageId: string): Promise<FileStructure | null> =>
     ipcRenderer.invoke('atlas:analyze-file', rootPath, relPath, languageId),
+  /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话,不硬塞乱码) */
+  readPreview: (rootPath: string, relPath: string): Promise<FilePreviewResult> =>
+    ipcRenderer.invoke('atlas:read-preview', rootPath, relPath),
   depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke('atlas:dep-graph', rootPath),
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),

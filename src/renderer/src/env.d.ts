@@ -10,6 +10,7 @@ import type {
   DepGraphResult,
   DriveInfo,
   FeatureLocateResult,
+  FilePreviewResult,
   FileStructure,
   GitChangesResult,
   ModelFitVerdict,
@@ -44,6 +45,8 @@ declare global {
       scanFolder: (folderPath: string) => Promise<ScanResult>
       scanSubdir: (rootPath: string, relPath: string) => Promise<ScanResult>
       analyzeFile: (rootPath: string, relPath: string, languageId: string) => Promise<FileStructure | null>
+      /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话) */
+      readPreview: (rootPath: string, relPath: string) => Promise<FilePreviewResult>
       depGraph: (rootPath: string) => Promise<DepGraphResult>
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>

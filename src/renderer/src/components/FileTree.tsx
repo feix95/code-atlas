@@ -180,22 +180,30 @@ interface FileTreeProps {
   onNoteEdit?: (relPath: string) => void
   /** 右键「清除备注」 */
   onNoteRemove?: (relPath: string) => void
+  /** 右键「预览文件」(第一百一十锤):App 把左栏换成文本预览 */
+  onPreview?: (relPath: string) => void
 }
 
-export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreview }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
-  // 右键菜单:记住在谁身上、屏幕哪个位置;点别处/再右键即收
-  const [menu, setMenu] = useState<{ x: number; y: number; relPath: string; hasNote: boolean } | null>(null)
+  // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收
+  const [menu, setMenu] = useState<{ x: number; y: number; relPath: string; hasNote: boolean; isFile: boolean } | null>(null)
+
+  // 菜单项数决定它大概多高:夹住边界时别让最后一项掉到窗口外面
+  const menuRows = (hasNote: boolean, isFile: boolean): number => 1 + (hasNote ? 1 : 0) + (isFile && onPreview ? 1 : 0)
 
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
-    if (!onNoteEdit) return
+    if (!onNoteEdit && !onPreview) return
     e.preventDefault()
+    const hasNote = notes?.[node.relPath] !== undefined
+    const isFile = node.type === 'file'
     setMenu({
       x: Math.min(e.clientX, window.innerWidth - 170),
-      y: Math.min(e.clientY, window.innerHeight - 110),
+      y: Math.min(e.clientY, window.innerHeight - (40 + menuRows(hasNote, isFile) * 34)),
       relPath: node.relPath,
-      hasNote: notes?.[node.relPath] !== undefined
+      hasNote,
+      isFile
     })
   }
 
@@ -252,6 +260,18 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
             }}
           />
           <div className="tree-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+            {menu.isFile && onPreview && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onPreview(menu.relPath)
+                  setMenu(null)
+                }}
+              >
+                预览文件
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

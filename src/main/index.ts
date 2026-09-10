@@ -42,18 +42,20 @@ import {
   GUESS_SYSTEM_PROMPT,
   REPORT_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
-  LOCATE_NODE_BUDGET
+  LOCATE_NODE_BUDGET,
+  isBinaryFile
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
+import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, ChatTarget, DriveInfo, FeatureLocateResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -705,6 +707,48 @@ function registerIpc(): void {
       throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
     })
     return analyzeSource(code, languageId)
+  })
+
+  // 代码预览读文件(第一百一十锤):右键「预览文件」用的那条通道。
+  // 路径契约同 analyze-file —— 收 (rootPath, relPath),绝对路径只经 joinRoot 解析,
+  // relPath 越界(.. 上跳、盘符注入)在这儿被拦。守卫三道:二进制不受理、超大不受理、
+  // 能读的也只给前一段(行数/字数双封顶),账目如实回给界面,绝不静默腰斩。
+  ipcMain.handle('atlas:read-preview', async (_event, rootPath: unknown, relPath: unknown): Promise<FilePreviewResult> => {
+    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+      throw new Error('参数不合法')
+    }
+    const absPath = joinRoot(rootPath, relPath)
+    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+    if (stat instanceof Error) {
+      throw new Error(accessDeniedMessage(stat, '文件', relPath), { cause: stat })
+    }
+    if (!stat.isFile()) {
+      throw new Error(`这个路径不是一个文件:${relPath}`)
+    }
+    const name = relPath.split('/').pop() ?? relPath
+    // 后缀一看就是二进制/媒体的,连读都不用读
+    if (isBinaryFile(name)) {
+      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这是二进制或媒体文件,里面没有能当文本看的代码' }
+    }
+    if (stat.size > PREVIEW_MAX_BYTES) {
+      return {
+        status: 'too-big',
+        text: '',
+        totalLines: 0,
+        truncated: false,
+        reason: `这个文件有 ${formatSize(stat.size)},太大了,预览只伺候 ${formatSize(PREVIEW_MAX_BYTES)} 以内的文本`
+      }
+    }
+    // 读内容也可能撞上独占/上锁(EBUSY/EPERM),走人话口径,不吐生面孔
+    const buf = await fs.readFile(absPath).catch((err: NodeJS.ErrnoException) => {
+      throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+    })
+    // 后缀骗人的(改名的二进制)在这儿补一道:开头有 NUL 字节就不是文本
+    if (looksBinary(buf.subarray(0, 8192))) {
+      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了' }
+    }
+    const clip = clipPreview(buf.toString('utf8'))
+    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, truncated: clip.truncated, reason: '' }
   })
 
   // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot

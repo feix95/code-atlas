@@ -405,3 +405,19 @@ export interface FeatureLocateResult {
   model: string
   durationMs: number
 }
+
+/**
+ * 代码预览的读文件结果(第一百一十锤):只给「够看懂」的一段,超了如实标 truncated。
+ * 二进制/超大各有专门状态,让界面说人话 —— 绝不硬塞一屏乱码。
+ */
+export interface FilePreviewResult {
+  status: 'ok' | 'binary' | 'too-big'
+  /** status='ok' 时的正文(可能被截断) */
+  text: string
+  /** 文件真实总行数(ok 时才有;截断时拿它对账「只载入了前 N 行」) */
+  totalLines: number
+  /** 正文被截断过(行数或字数触顶) */
+  truncated: boolean
+  /** 不是 ok 时的原因(人话) */
+  reason: string
+}
