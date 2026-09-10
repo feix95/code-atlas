@@ -52,6 +52,8 @@ export function CodePreview({
   const [result, setResult] = useState<FilePreviewResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [sel, setSel] = useState<Selection | null>(null)
+  // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
+  const [showButton, setShowButton] = useState(false)
   const [copied, setCopied] = useState(false)
   const codeTextRef = useRef<HTMLPreElement>(null)
   const codeViewRef = useRef<HTMLDivElement>(null)
@@ -81,59 +83,62 @@ export function CodePreview({
     return Array.from({ length: count }, (_, i) => String(i + 1)).join('\n')
   }, [text])
 
-  /** 从当前选区算一遍落点;没选东西、或选的是别处的字,一律清场 */
-  const readSelection = useCallback((): void => {
+  /** 从当前选区算一遍完整信息;没选东西、或选的是别处的字,回 null */
+  const computeSelection = useCallback((): Selection | null => {
     const el = codeTextRef.current
     const s = window.getSelection()
-    if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) {
-      setSel(null)
-      return
-    }
+    if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return null
     const code = s.toString()
-    if (code.trim() === '') {
-      setSel(null)
-      return
-    }
+    if (code.trim() === '') return null
     const rects = Array.from(s.getRangeAt(0).getClientRects())
     const geom = selectionGeometry(rects)
-    if (!geom) {
-      setSel(null)
-      return
-    }
+    if (!geom) return null
     const view = codeViewRef.current?.getBoundingClientRect()
     const full = el.textContent ?? ''
     const start = Math.min(s.anchorOffset, s.focusOffset)
     const end = Math.max(s.anchorOffset, s.focusOffset)
-    setSel({
+    return {
       ...geom,
-      // 贴在栏边上的选区,别让浮钮跨到隔壁聊天区去
-      buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right) : geom.buttonX,
+      // 以选区右上角为锚、居中浮着;夹紧留出钮的一半身位,贴着栏边选的也不越出栏外
+      buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right, 100) : geom.buttonX,
       startLine: countNewlines(full.slice(0, start)) + 1,
       // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
       endLine: countNewlines(full.slice(0, Math.max(start, end - 1))) + 1,
       code
-    })
+    }
   }, [])
 
-  // 选区一变就算一遍落点:只有选的是代码正文才算数(行号栏选中的东西不算引用)
+  /**
+   * 记号跟着选区走(拖到哪儿标到哪儿),返回算好的这一份。
+   * 浮钮的露脸状态不归它管,那是调用方的事:拖动中一律不露,
+   * 手松开(pointerup)或键盘选完(keyup)才请出来。
+   * 第一百一十四锤补:从前一按下就露,按钮跟着鼠标跑,你会从它身上拖过去,
+   * 它的标签还会被一起吞进选区 —— 看着就像选区坏了。
+   */
+  const followSelection = useCallback((): Selection | null => {
+    const next = computeSelection()
+    setSel(next)
+    return next
+  }, [computeSelection])
+
+  // 选区一变就重画记号;选区没了,浮钮也跟着收
   useEffect(() => {
     if (result?.status !== 'ok') return
-    const onSelectionChange = (): void => readSelection()
+    const onSelectionChange = (): void => {
+      if (followSelection() === null) setShowButton(false)
+    }
     document.addEventListener('selectionchange', onSelectionChange)
     return () => document.removeEventListener('selectionchange', onSelectionChange)
-  }, [result, readSelection])
+  }, [result, followSelection])
 
   // 滚动/改窗口大小会让视口坐标失效:重算落点,只在整个选区滚出视野时才收起来。
-  // (从前是滚一下就清掉,手一抖浮钮就没了 —— 选区还在,记号却不在了,说不通。)
+  // (只挪记号,不动浮钮的露脸状态 —— 滚一下不该把它收了。)
   useEffect(() => {
     const view = codeViewRef.current
     let frame = 0
     const reposition = (): void => {
       frame = 0
-      const el = codeTextRef.current
-      const s = window.getSelection()
-      if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return
-      readSelection()
+      if (followSelection() === null) setShowButton(false)
     }
     const schedule = (): void => {
       if (frame === 0) frame = requestAnimationFrame(reposition)
@@ -145,15 +150,42 @@ export function CodePreview({
       window.removeEventListener('resize', schedule)
       view?.removeEventListener('scroll', schedule)
     }
-  }, [result, readSelection])
+  }, [result, followSelection])
+
+  // 选完才算数:鼠标松开、或键盘选完(shift+方向键抬手),这时才把浮钮请出来。
+  // 捕获阶段听:鼠标在哪儿松开都收得到(拖到隔壁聊天区放手,也算选完了)。
+  useEffect(() => {
+    if (result?.status !== 'ok') return
+    const onPointerDown = (e: PointerEvent): void => {
+      // 点在浮钮自己身上不算「开始新选区」—— 否则它会在 click 之前先消失,点了没反应
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('.code-select-btn')) return
+      setShowButton(false)
+    }
+    const onDone = (): void => {
+      if (followSelection() !== null) setShowButton(true)
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('pointerup', onDone, true)
+    window.addEventListener('keyup', onDone, true)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointerup', onDone, true)
+      window.removeEventListener('keyup', onDone, true)
+    }
+  }, [result, followSelection])
 
   /**
    * Ctrl+A 只选正文(第一百一十四锤):浏览器的 Ctrl+A 是文档级的,普通 div 管不住它,
    * 所以这里自己接管 —— 拦下按键,用 Range 把代码正文整个包住选上(行号栏天然在外)。
    * 只在这一栏拦:事件来自输入框(比如右栏聊天框)时一律放行,让它们用原生那套。
+   * 全选没有拖动过程,当场就把浮钮请出来。
    */
   function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
-    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') {
+      setShowButton(false) // 键盘一动手先把旧浮钮收起来,选完(keyup)再重新露脸
+      return
+    }
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
     const el = codeTextRef.current
@@ -164,7 +196,7 @@ export function CodePreview({
     const s = window.getSelection()
     s?.removeAllRanges()
     s?.addRange(range)
-    readSelection()
+    if (followSelection() !== null) setShowButton(true)
   }
 
   /** 复制全文:复制的就是眼前载入的这份(没重新读文件),所见即所得 */
@@ -254,21 +286,26 @@ export function CodePreview({
             style={{ left: `${sel.barLeft}px`, top: `${sel.barTop}px`, height: `${sel.barHeight}px` }}
             aria-hidden="true"
           />
-          <button
-            type="button"
-            className="code-select-btn"
-            style={{ left: `${Math.round(sel.buttonX)}px`, top: `${Math.round(sel.buttonY)}px` }}
-            disabled={!canAddRef}
-            title={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
-            onClick={() => {
-              onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
-              window.getSelection()?.removeAllRanges()
-              setSel(null)
-            }}
-          >
-            {label}
-          </button>
         </>
+      )}
+      {sel && showButton && (
+        <button
+          type="button"
+          className="code-select-btn"
+          style={{ left: `${Math.round(sel.buttonX)}px`, top: `${Math.round(sel.buttonY)}px` }}
+          disabled={!canAddRef}
+          title={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
+          // 按下时别让浏览器动选区:一按就折叠的话,这个按钮会先被卸载,click 就丢了
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
+            window.getSelection()?.removeAllRanges()
+            setSel(null)
+            setShowButton(false)
+          }}
+        >
+          {label}
+        </button>
       )}
     </div>
   )

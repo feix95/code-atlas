@@ -58,7 +58,8 @@ function main(): void {
   assert.equal(oneLine?.endX, 180, '末标记在最后一行右缘')
   assert.equal(oneLine?.startY, 109, '首标记垂直居中于那一行')
   assert.equal(oneLine?.barHeight, 18, '只有一行时竖线就是那一行的高度')
-  assert.equal(oneLine?.buttonX, 180, '单行时浮钮锚在行右缘')
+  assert.equal(oneLine?.buttonX, 180, '单行时浮钮锚在选区右侧')
+  assert.equal(oneLine?.buttonY, 100, '浮钮锚在选区上沿(浮在整块上方)')
   const threeLines = selectionGeometry([
     { left: 40, top: 100, right: 300, bottom: 118 },
     { left: 40, top: 118, right: 260, bottom: 136 },
@@ -67,8 +68,8 @@ function main(): void {
   assert.equal(threeLines?.startX, 40, '多行:首标记看第一行')
   assert.equal(threeLines?.endX, 120, '多行:末标记看最后一行 —— 不是包围盒的右边')
   assert.equal(threeLines?.barHeight, 54, '竖线从第一行顶贯到最后一行底')
-  assert.equal(threeLines?.buttonX, 120, '浮钮锚在最后一行右上,不飘到整块中间')
-  assert.equal(threeLines?.buttonY, 136, '浮钮跟着最后一行')
+  assert.equal(threeLines?.buttonX, 300, '浮钮锚在包围盒最右 —— 整块选区的右上角,不是最后一行的右边')
+  assert.equal(threeLines?.buttonY, 100, '浮钮锚在包围盒顶 —— 不跟着最后一行往下跑')
   // 竖线最短也得看得见(空行也可能是 0 高)
   assert.equal(selectionGeometry([{ left: 0, top: 50, right: 10, bottom: 50 }])?.barHeight, 2, '零高选区竖线给最小可见高度')
 

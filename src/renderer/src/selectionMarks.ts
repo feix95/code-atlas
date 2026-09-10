@@ -11,7 +11,7 @@ export interface Rect {
 }
 
 export interface SelectionGeometry {
-  /** 浮钮锚点:最后一行的右上角(跟着你松手的地方,不飘到整块中间) */
+  /** 浮钮锚点:选区包围盒的右上角(浮在整块右上,不跟着鼠标跑) */
   buttonX: number
   buttonY: number
   /** 首标记:第一行的左侧,垂直居中于那一行 */
@@ -30,14 +30,17 @@ export interface SelectionGeometry {
  * 选区的每一行矩形 → 四样东西的落点(纯函数,自测覆盖)。
  * rects 是 range.getClientRects() 的产物:一行一个,顺序就是文档顺序。
  * 一行都没有(选了个空)时回 null,让调用方清场。
+ *
+ * 首尾标记各认自己那一行(末标记要看最后一行的右边,不是包围盒的右边);
+ * 浮钮认的是包围盒的右上角 —— 它是「整块选区的右上角」,短选区、长选区都不跑偏。
  */
 export function selectionGeometry(rects: Rect[]): SelectionGeometry | null {
   const first = rects[0]
   const last = rects[rects.length - 1]
   if (!first || !last) return null
   return {
-    buttonX: last.right,
-    buttonY: last.top,
+    buttonX: Math.max(...rects.map((r) => r.right)),
+    buttonY: Math.min(...rects.map((r) => r.top)),
     startX: first.left,
     startY: (first.top + first.bottom) / 2,
     endX: last.right,

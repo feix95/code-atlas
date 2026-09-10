@@ -733,6 +733,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   display: inline-flex;
   color: var(--accent);
   pointer-events: none;
+  user-select: none;
 }
 
 .code-mark.is-start {
@@ -754,7 +755,8 @@ body.is-maximized .traffic-lights .is-max i::after {
   pointer-events: none;
 }
 
-/* 选区浮钮(第一百一十一锤):以选区上沿中点为锚浮在代码上,选了就能引 */
+/* 选区浮钮(第一百一十一锤):以选区右上角为锚,居中浮在整块上方。
+   user-select:none 是保险 —— 浮层自己绝不能成为可选中的内容(被拖过时会被吞进选区) */
 .code-select-btn {
   position: fixed;
   z-index: 30;
@@ -768,6 +770,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-family: inherit;
   font-size: var(--font-xs);
   white-space: nowrap;
+  user-select: none;
   cursor: pointer;
 }
 
