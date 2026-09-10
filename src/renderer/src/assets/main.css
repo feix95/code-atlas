@@ -1864,31 +1864,6 @@ body.is-sash-dragging {
   gap: var(--space-2);
 }
 
-/* 新对话(第一百二十七锤):聊起来后浮在消息区右上角的翻篇钮,不占排版 */
-.chat-new {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.5rem;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  height: 1.5rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--font-xs);
-  cursor: pointer;
-}
-
-.chat-new:hover {
-  color: var(--text);
-  border-color: var(--accent-line);
-  background: var(--hover);
-}
-
 /* 跳到最新(第六十一锤):不在底部时浮出;新内容到了按钮重挂一次,蹦一下报信 */
 .chat-jump {
   position: absolute;

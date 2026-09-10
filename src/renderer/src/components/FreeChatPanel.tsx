@@ -291,17 +291,6 @@ export function FreeChatPanel({
       )}
       {/* 开场白和聊起来的气泡共用同一个消息区骨架:开场白也撑满中段,输入栏两种状态钉在同一个底 */}
       <div className="chat-messages-wrap">
-        {chat.messages.length > 0 && (
-          <button
-            type="button"
-            className="chat-new"
-            onClick={chat.newChat}
-            title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
-          >
-            <TreeIcon name="plus" size={12} />
-            新对话
-          </button>
-        )}
         <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
           {chat.messages.length === 0 ? (
             <div className="chat-intro">
@@ -388,28 +377,31 @@ export function FreeChatPanel({
             ))}
           </div>
         )}
-        {suggestions ? (
-          // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
-          !chat.busy &&
-          suggestions.length > 0 && (
-            <div className="prompt-row">
-              {suggestions.map((q) => (
-                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          )
-        ) : (
-          chat.messages.length === 0 && (
-            <div className="prompt-row">
-              {CHAT_EXAMPLES.map((q) => (
-                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          )
+        {(chat.messages.length > 0 || (suggestions ? !chat.busy && suggestions.length > 0 : chat.messages.length === 0)) && (
+        <div className="prompt-row">
+          {/* 新对话(第一百二十七锤补,小葵点名):推荐胶囊那排的第一条,聊起来才出现 */}
+          {chat.messages.length > 0 && (
+            <button type="button" className="prompt" onClick={chat.newChat} title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)">
+              ＋ 新对话
+            </button>
+          )}
+          {suggestions ? (
+            // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
+            !chat.busy &&
+            suggestions.map((q) => (
+              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                {q}
+              </button>
+            ))
+          ) : (
+            chat.messages.length === 0 &&
+            CHAT_EXAMPLES.map((q) => (
+              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                {q}
+              </button>
+            ))
+          )}
+        </div>
         )}
         {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
             写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}
