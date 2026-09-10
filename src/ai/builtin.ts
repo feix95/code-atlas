@@ -8,6 +8,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import os from 'node:os'
 import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
+import { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { addDevLog } from '../shared/devlog.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
@@ -233,7 +234,7 @@ export function judgeModelFit(
   modelBytes: number,
   ramBytes: number,
   vramBytes: number | null,
-  contextTokens = 4096
+  contextTokens = DEFAULT_CONTEXT_SIZE
 ): ModelFitVerdictPure {
   if (vramBytes !== null && vramBytes > 0) {
     // 第八十六锤:显存是权重 + 上下文缓存一起抢的,量尺把缓存估进去再说话
@@ -486,13 +487,13 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
 /**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
  * 已在跑就直接复用;没跑就收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
- * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填保守 4096。
+ * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填按默认(shared/aiDefaults)。
  * 引擎优先用 app 自带的,用户只管选模型文件。
  * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面;状态栏同步收到播报。
  */
 export async function ensureBuiltinServer(
   settings: AiBuiltinSettings,
-  contextSize = 4096,
+  contextSize = DEFAULT_CONTEXT_SIZE,
   manualContext: number | null = null
 ): Promise<{ baseUrl: string; model: string }> {
   if (isBuiltinRunning() && readyPromise) return readyPromise
@@ -558,7 +559,7 @@ async function startAndWaitReady(
   serverPath: string,
   modelPath: string,
   baseUrl: string,
-  contextSize = 4096
+  contextSize = DEFAULT_CONTEXT_SIZE
 ): Promise<{ baseUrl: string; model: string }> {
   startedKey = settingsKey({ serverPath, modelPath })
   stopping = false // 新的一轮启动:上次「主动叫停」的标记就地清账

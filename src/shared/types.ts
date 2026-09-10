@@ -213,7 +213,7 @@ export interface AiConfig {
   /**
    * 模型上下文大小(tokens),整个 AI 层按它按比例算预算(地图/回复长度等)。
    * 留空 = 自动向模型服务探测(LM Studio /api/v0/models、llama-server /props);
-   * 探测不到再退回保守默认 4096。撞墙自动减半重试当最后保险丝。
+   * 探测不到再退回默认窗口(DEFAULT_CONTEXT_SIZE,住在 shared/aiDefaults)。撞墙自动减半重试当最后保险丝。
    */
   contextSize?: number
   /**

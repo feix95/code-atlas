@@ -18,6 +18,7 @@ import type { AiUsage, AiStreamStats,
 } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
 import { addDevLog } from '../shared/devlog.ts'
+import { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
@@ -106,7 +107,7 @@ export const FREE_CHAT_SYSTEM_PROMPT = `你是 Code Atlas 里的"Atlas 小探针
 
 回答自然、具体,不要每次都重复自己的身份,也不要用固定模板结束对话。`
 
-/** 追问历史的上限:本地模型上下文只有 4096,证据每轮都要全量重摆,历史只留最近几条垫底 */
+/** 追问历史的上限:证据每轮都要全量重摆,历史只留最近几条垫底,把上下文留给证据 */
 const CHAT_HISTORY_MAX = 5
 const CHAT_HISTORY_CONTENT_MAX = 500
 
@@ -126,7 +127,7 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   return cleaned
 }
 
-/** 附件资料正文的上限:自由对话的证据从简,别把本地模型的 4096 上下文挤爆 */
+/** 附件资料正文的上限:自由对话的证据从简,别把模型的上下文挤爆 */
 const ATTACHMENT_DETAILS_MAX = 4000
 
 /**
@@ -458,8 +459,9 @@ confidence 是你的把握 0~100。看着地图实在指不出来的,就输出 {
 export const LOCATE_NODE_BUDGET = 400
 
 /**
- * 项目地图的 token 预算(估算):本地模型的上下文普遍只有 4k(小葵实测 4096 被地图撑爆,
- * 第六十八锤),地图必须留足人设/问题/回复的地盘。宁可低估预算,也不许把上下文挤爆。
+ * 项目地图的 token 预算(估算):第六十八锤那会儿本地模型上下文普遍只有 4k(小葵实测 4096
+ * 被地图撑爆),地图必须留足人设/问题/回复的地盘 —— 这个数就是那时定的;默认窗口后来提到
+ * 16384,预算仍宁小勿大,不跟着涨。宁可低估预算,也不许把上下文挤爆。
  */
 export const LOCATE_TOKEN_BUDGET = 2200
 
@@ -570,8 +572,8 @@ export function filterLocateHits(root: ScanDirNode, hits: FeatureHit[]): Feature
 
 /* ── 模型上下文自适应(第六十九锤):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
 
-/** 拿不到真实上下文时的保守默认:按最差的 4k 小模型配,宁可浪费大模型的力,不许挤爆 */
-export const DEFAULT_CONTEXT_SIZE = 4096
+/** 拿不到真实上下文时的默认:和内置引擎的默认窗口同一个数(数住在 shared/aiDefaults),转出去给老调用方 */
+export { DEFAULT_CONTEXT_SIZE }
 
 /** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
 export function isContextOverflow(text: string): boolean {

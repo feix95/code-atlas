@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
+import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 
@@ -873,7 +874,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           id="cfg-context-size"
                           inputMode="numeric"
                           value={contextRaw}
-                          placeholder="自动向模型服务探测(探测不到按 4096 算)"
+                          placeholder={`自动向模型服务探测(探测不到按 ${DEFAULT_CONTEXT_SIZE} 算)`}
                           onChange={(e) => {
                             // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
                             setContextRaw(e.target.value.replace(/[^0-9]/g, ''))

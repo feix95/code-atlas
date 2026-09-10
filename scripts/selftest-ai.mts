@@ -745,6 +745,12 @@ async function main(): Promise<void> {
   assert.ok(budgetsSmall.mapTokens >= 600, '地图有安全下限,再小的上下文也不许把地图掐死')
   const budgetsJunk = budgetsForContext(100)
   assert.equal(budgetsJunk.mapTokens, Math.floor(DEFAULT_CONTEXT_SIZE * 0.55), '离谱输入退回保守默认')
+  // 默认窗口是主进程/渲染层/引擎三边共用的一个数(shared/aiDefaults):值本身 + 引擎量尺认它
+  assert.equal(DEFAULT_CONTEXT_SIZE, 16384, '默认上下文窗口 = 16384')
+  assert.ok(
+    judgeModelFit(14 * 1024 ** 3, 32 * 1024 ** 3, 16 * 1024 ** 3).detail.includes(String(DEFAULT_CONTEXT_SIZE)),
+    '量尺不传上下文时按共享默认算,不许各写各的数'
+  )
 
   // ── 11. 模型状态栏(第七十锤):进度解析不打诳语 + LM Studio 状态映射 ──
   assert.equal(parseLoadProgress({ progress: 0.3525 }), 35.25, 'llama.cpp 新版:0~1 按比例 ×100')

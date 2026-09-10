@@ -6,7 +6,7 @@ import type { ChatContextAttachment, FileStructure, ScanDirNode, ScanFileNode } 
  * 切换对象时旧资料不会混进新对话。
  */
 
-/** 附件正文上限:自由对话的证据从简,给本地模型的 4096 上下文留余地 */
+/** 附件正文上限:自由对话的证据从简,给模型的上下文留余地 */
 const DETAILS_MAX = 4000
 
 /** 逐行拼正文,超长就地截断,绝不静默丢一半句子 */
