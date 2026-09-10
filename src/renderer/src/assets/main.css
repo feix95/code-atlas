@@ -1784,6 +1784,13 @@ body.is-sash-dragging {
   gap: var(--space-3);
 }
 
+/* 拖文件悬停的亮框(第一百二十五锤):松手就挂上,不用文案教 */
+.chat-shell.free-chat.is-dragover {
+  outline: 2px dashed var(--secondary);
+  outline-offset: -0.375rem;
+  border-radius: var(--radius-md);
+}
+
 .chat-intro {
   color: var(--muted);
   font-size: var(--font-md);

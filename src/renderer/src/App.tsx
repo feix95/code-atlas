@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
+import { planWholeFileRef } from '@shared/preview'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
@@ -557,6 +558,37 @@ function App(): React.JSX.Element {
     setPreviewRefs((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // 拖文件进聊天挂引用(第一百二十五锤):读一份 → 按「整份引用」的账裁好 → 挂卡;
+  // 文件夹和读不了的垫灰字指路,不装死。引用额度满了也照实说
+  async function handleDropNode(kind: 'file' | 'folder', relPath: string): Promise<void> {
+    if (!result || !folder) return
+    if (kind === 'folder') {
+      chat.note('文件夹挂不上引用——点它一下,就能给探针换参考资料')
+      return
+    }
+    if (previewRefs.length >= CODE_REFS_MAX) {
+      chat.note(`一轮最多引用 ${CODE_REFS_MAX} 段,想换新的先摘一段`)
+      return
+    }
+    const f = findFile(result.tree, relPath)
+    if (!f) return
+    try {
+      const res = await window.atlas.readPreview(folder, relPath)
+      if (res.status !== 'ok') {
+        chat.note(res.reason)
+        return
+      }
+      const plan = planWholeFileRef({ text: res.text, refLimit: CODE_REFS_MAX, canAddRef: true, previewTruncated: res.truncated })
+      if (plan.code.trim() === '') {
+        chat.note('这个文件是空的,挂了也没东西可讲')
+        return
+      }
+      addPreviewRef({ relPath: f.relPath, startLine: plan.startLine, endLine: plan.endLine, code: plan.code })
+    } catch {
+      chat.note('这个文件读不了(可能被系统占用),挂不上引用')
+    }
+  }
+
   // 退出预览:左栏回目录树,右栏回原来的详情,引用一并清账
   function exitPreview(): void {
     setPreview(null)
@@ -814,6 +846,26 @@ function App(): React.JSX.Element {
                 chat={chat}
                 chatContext={chatContext ?? buildFileAttachment(preview, null)}
               />
+            ) : selectedFile && result && activeTab === 'chat' ? (
+              // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
+              <ChatTabDetailPage
+                crumbs={buildCrumbs(result.rootName, result.rootPath, selectedFile.relPath)}
+                iconName={selectedFile.summary?.icon ?? 'file'}
+                title={selectedFile.name}
+                subtitle={selectedFile.language ? `${selectedFile.language.name} 文件 · 聊天接着聊,资料已经换成它了` : '聊天接着聊,资料已经换成它了'}
+                tabs={FILE_TABS}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                note={notes[selectedFile.relPath] ?? null}
+                onNoteSave={(text) => saveNote(selectedFile.relPath, text)}
+                autoOpenNote={noteEditRequest === selectedFile.relPath}
+                onClose={clearSelection}
+                chat={chat}
+                chatContext={chatContext ?? buildFileAttachment(selectedFile, structure)}
+                refs={previewRefs}
+                onRemoveRef={removePreviewRef}
+                onDropNode={handleDropNode}
+              />
             ) : selectedFile && result ? (
               <FileDetailView
                 key={selectedFile.relPath}
@@ -835,8 +887,25 @@ function App(): React.JSX.Element {
                 note={notes[selectedFile.relPath] ?? null}
                 onNoteSave={saveNote}
                 autoOpenNote={noteEditRequest === selectedFile.relPath}
+              />
+            ) : selectedFolder && result && activeTab === 'chat' ? (
+              <ChatTabDetailPage
+                crumbs={buildCrumbs(result.rootName, result.rootPath, selectedFolder.relPath)}
+                iconName={selectedFolder.summary?.icon ?? 'folder'}
+                title={selectedFolder.name || result.rootName}
+                subtitle={selectedFolder.summary?.text ?? '文件夹'}
+                tabs={FOLDER_TABS}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                note={notes[selectedFolder.relPath] ?? null}
+                onNoteSave={(text) => saveNote(selectedFolder.relPath, text)}
+                autoOpenNote={noteEditRequest === selectedFolder.relPath}
+                onClose={clearSelection}
                 chat={chat}
-                chatContext={chatContext ?? buildFileAttachment(selectedFile, structure)}
+                chatContext={chatContext ?? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)}
+                refs={previewRefs}
+                onRemoveRef={removePreviewRef}
+                onDropNode={handleDropNode}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -852,8 +921,6 @@ function App(): React.JSX.Element {
                 autoOpenNote={noteEditRequest === selectedFolder.relPath}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                chat={chat}
-                chatContext={chatContext ?? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)}
               />
             ) : (
               <ProjectOverview
@@ -967,6 +1034,71 @@ function App(): React.JSX.Element {
 }
 
 /**
+ * 聊天详情页(第一百二十五锤):文件/文件夹详情在聊天 Tab 下的稳定替身。
+ * 从前聊天面板住在详情组件里,换文件整个重挂,面板闪一下、草稿和滚动位置全没;
+ * 现在这一页是 App 渲染树上的常客,换谁资料,面板本体都纹丝不动。
+ */
+function ChatTabDetailPage({
+  crumbs,
+  iconName,
+  title,
+  subtitle,
+  badges,
+  tabs,
+  activeTab,
+  onTabChange,
+  note,
+  onNoteSave,
+  autoOpenNote,
+  onClose,
+  chat,
+  chatContext,
+  refs,
+  onRemoveRef,
+  onDropNode
+}: {
+  crumbs: Crumb[]
+  iconName: string
+  title: string
+  subtitle?: string
+  badges?: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }>
+  tabs: Array<{ key: DetailTab; label: string }>
+  activeTab: DetailTab
+  onTabChange: (tab: DetailTab) => void
+  note?: NoteEntry | null
+  onNoteSave?: (text: string) => void
+  autoOpenNote?: boolean
+  onClose: () => void
+  chat: AiChatApi
+  chatContext: ChatContextAttachment
+  refs?: ChatCodeRef[]
+  onRemoveRef?: (index: number) => void
+  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+}): React.JSX.Element {
+  return (
+    <div className="detail-page">
+      <DetailHeader
+        crumbs={crumbs}
+        iconName={iconName}
+        title={title}
+        subtitle={subtitle}
+        note={note}
+        onNoteSave={onNoteSave}
+        autoOpenNote={autoOpenNote}
+        badges={badges}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(key) => onTabChange(key as DetailTab)}
+        onClose={onClose}
+      />
+      <div className="detail-body is-chat">
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} />
+      </div>
+    </div>
+  )
+}
+
+/**
  * 预览模式的右半(第一百一十锤):小探针的自由对话,专聊左栏那扇窗里的文件。
  * 走的是详情页同一条聊天通道,只是这儿没有 Tab —— 进来就是聊。
  * 第一百一十一锤:左栏选中的代码以引用卡挂到输入框上,和问题一起发出去。
@@ -1032,9 +1164,7 @@ function FileDetailView({
   gitLoading,
   note,
   onNoteSave,
-  autoOpenNote,
-  chat,
-  chatContext
+  autoOpenNote
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1057,8 +1187,6 @@ function FileDetailView({
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
   autoOpenNote?: boolean
-  chat: AiChatApi
-  chatContext: ChatContextAttachment
 }): React.JSX.Element {
   // AI 解释:概览卡、小探针共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
@@ -1147,7 +1275,6 @@ function FileDetailView({
             )}
           </>
         )}
-        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={chatContext} />}
       </div>
     </div>
   )
@@ -1166,9 +1293,7 @@ function FolderDetailView({
   onNoteSave,
   autoOpenNote,
   activeTab,
-  onTabChange,
-  chat,
-  chatContext
+  onTabChange
 }: {
   dir: ScanDirNode
   result: ScanResult
@@ -1183,8 +1308,6 @@ function FolderDetailView({
   autoOpenNote?: boolean
   activeTab: DetailTab
   onTabChange: (tab: DetailTab) => void
-  chat: AiChatApi
-  chatContext: ChatContextAttachment
 }): React.JSX.Element {
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
 
@@ -1223,7 +1346,6 @@ function FolderDetailView({
             onRefreshed={onRefreshed}
           />
         )}
-        {activeTab === 'chat' && <FreeChatPanel chat={chat} context={chatContext} />}
       </div>
     </div>
   )

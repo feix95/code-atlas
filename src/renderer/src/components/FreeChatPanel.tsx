@@ -136,7 +136,8 @@ export function FreeChatPanel({
   context,
   refs,
   onRemoveRef,
-  suggestions
+  suggestions,
+  onDropNode
 }: {
   chat: AiChatApi
   context: ChatContextAttachment | null
@@ -145,9 +146,13 @@ export function FreeChatPanel({
   onRemoveRef?: (index: number) => void
   /** 随对话演进的推荐问题(第一百一十二锤):传了就一直挂着,不传就退回开场示例 */
   suggestions?: string[]
+  /** 拖文件进聊天挂引用(第一百二十五锤):传了才接拖拽;文件夹/读不了的由 App 端垫灰字指路 */
+  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
 }): React.JSX.Element {
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
+  // 拖拽悬停的亮框提示:松手就挂上,不用文案教
+  const [dragOver, setDragOver] = useState(false)
   // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
   const [expanded, setExpanded] = useState(false)
   // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
@@ -237,7 +242,43 @@ export function FreeChatPanel({
   const capped = lineCount >= 5 || expanded
 
   return (
-    <div className="chat-shell free-chat">
+    <div
+      className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
+      onDragOver={
+        onDropNode
+          ? (e) => {
+              if (!e.dataTransfer.types.includes('application/x-atlas-node')) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'copy'
+              setDragOver(true)
+            }
+          : undefined
+      }
+      onDragLeave={
+        onDropNode
+          ? (e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return
+              setDragOver(false)
+            }
+          : undefined
+      }
+      onDrop={
+        onDropNode
+          ? (e) => {
+              setDragOver(false)
+              const raw = e.dataTransfer.getData('application/x-atlas-node')
+              if (!raw) return
+              e.preventDefault()
+              try {
+                const node = JSON.parse(raw) as { kind: 'file' | 'folder'; relPath: string }
+                if (node.relPath) onDropNode(node.kind, node.relPath)
+              } catch {
+                // 不是咱家的货,不接
+              }
+            }
+          : undefined
+      }
+    >
       {context && (
         <details className="chat-attach">
           <summary>

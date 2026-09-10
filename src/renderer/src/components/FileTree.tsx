@@ -46,6 +46,12 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
         <button
           type="button"
           className="tree-main"
+          draggable
+          onDragStart={(e) => {
+            // 拖拽挂引用(第一百二十五锤):带上类型,文件夹到了对面好指路
+            e.dataTransfer.setData('application/x-atlas-node', JSON.stringify({ kind: 'file', relPath: node.relPath }))
+            e.dataTransfer.effectAllowed = 'copy'
+          }}
           onClick={() => onSelectFile(node.relPath, node)}
           onDoubleClick={() => onPreview?.(node.relPath)}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
@@ -111,6 +117,11 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
         <button
           type="button"
           className="tree-main"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData('application/x-atlas-node', JSON.stringify({ kind: 'folder', relPath: dir.relPath }))
+            e.dataTransfer.effectAllowed = 'copy'
+          }}
           onClick={() => {
             // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描
             onSelectFolder(dir)
