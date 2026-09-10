@@ -98,7 +98,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
       >
         <button
           type="button"
-          className={`tree-caret${dir.lazy ? ' is-lazy' : ''}`}
+          className={`tree-caret${dir.lazy ? ' is-lazy' : ''}${expanded && !dir.lazy ? ' is-open' : ''}`}
           aria-label={dir.lazy ? `展开并扫描 ${dir.name}` : expanded ? `收起 ${dir.name}` : `展开 ${dir.name}`}
           aria-expanded={dir.lazy ? undefined : expanded}
           onClick={toggleExpand}
@@ -108,7 +108,11 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
         <button
           type="button"
           className="tree-main"
-          onClick={() => onSelectFolder(dir)}
+          onClick={() => {
+            // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描
+            onSelectFolder(dir)
+            toggleExpand()
+          }}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, dir) : undefined}
           title={dir.summary?.text}
         >
