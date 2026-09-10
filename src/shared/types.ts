@@ -1,5 +1,7 @@
 // 主进程与渲染进程共用的数据契约,两边都从这里导入,防止口径不一
 
+import type { PersonalizationConfig } from './personalization.ts'
+
 /** 全树速览给节点配的一句大白话标签(规则引擎现场算,不劳烦 AI) */
 export interface NodeSummary {
   /** 图标册里的图标名(见渲染层 Icons.tsx 的册子);界面按名画线稿,不用彩色 emoji */
@@ -216,6 +218,11 @@ export interface AiConfig {
    * 探测不到再退回默认窗口(DEFAULT_CONTEXT_SIZE,住在 shared/aiDefaults)。撞墙自动减半重试当最后保险丝。
    */
   contextSize?: number
+  /**
+   * 说话方式偏好(第一百一十三锤):语气/特质/自订指令。
+   * 全默认时拼出来的风格段是空串 —— 提示词逐字不变,老配置升级上来行为与从前完全一致。
+   */
+  personalization?: PersonalizationConfig
   /**
    * 联网查证开关,默认关(本地优先、默认离线):开着的唯一作用是——讲解认不出
    * 某个软件/品牌时,拿「名字」去免费公开源查一下再修正答案;不发路径、不发别的

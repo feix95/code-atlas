@@ -44,6 +44,9 @@ import {
   REPORT_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
   LOCATE_NODE_BUDGET,
+  SYSTEM_PROMPT,
+  STYLE_SAMPLE_SYSTEM,
+  STYLE_SAMPLE_QUESTION,
   isBinaryFile
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
@@ -52,6 +55,7 @@ import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinR
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
+import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalization } from '../shared/personalization.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
@@ -92,16 +96,27 @@ async function respondWithEvidence(
   question: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number } },
+  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
   const hasQuestion = typeof question === 'string' && question.trim() !== ''
+  // 人设口径保持原样:给了就用给的,没给就是文件讲解官那一套;个性化一律叠在最上面
+  const persona = withPersonalization(system ?? SYSTEM_PROMPT, resolved.style)
   if (resolved.webLookup && lookupName && !hasQuestion) {
-    return explainWithWebLookup(requestId, evidence, system ?? FOLDER_SYSTEM_PROMPT, lookupName, resolved.target, onDelta, resolved.budgets.replyTokens)
+    // 联网那条老规矩没变:没人设时它本来就用导游那一套(和普通流不同,别一起改)
+    return explainWithWebLookup(
+      requestId,
+      evidence,
+      withPersonalization(system ?? FOLDER_SYSTEM_PROMPT, resolved.style),
+      lookupName,
+      resolved.target,
+      onDelta,
+      resolved.budgets.replyTokens
+    )
   }
   return explainWithCancel(requestId, (signal) =>
-    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), system, onDelta, signal, resolved.budgets.replyTokens)
+    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens)
   )
 }
 
@@ -228,7 +243,7 @@ function formatSize(bytes: number): string {
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
 async function resolveChatTargetOrError(): Promise<
-  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number } } | { error: string }
+  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string } | { error: string }
 > {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
@@ -247,7 +262,9 @@ async function resolveChatTargetOrError(): Promise<
   lastActivityProvider = config.provider
   announceActivityBusy(config.provider)
   const ctx = config.contextSize ?? (await probeContextSize(resolved.target, config.provider)) ?? DEFAULT_CONTEXT_SIZE
-  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx) }
+  // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
+  const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
+  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style }
 }
 
 /**
@@ -898,7 +915,7 @@ function registerIpc(): void {
     }
     const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
     return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, prompt, DIFF_SYSTEM_PROMPT, makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
+      explainWithModel(resolved.target, prompt, withPersonalization(DIFF_SYSTEM_PROMPT, resolved.style), makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
     )
   })
 
@@ -929,7 +946,7 @@ function registerIpc(): void {
         explainWithMessages(
           resolved.target,
           [
-            { role: 'system', content: REPORT_SYSTEM_PROMPT },
+            { role: 'system', content: withPersonalization(REPORT_SYSTEM_PROMPT, resolved.style) },
             {
               role: 'user',
               content: buildReportPrompt(
@@ -978,6 +995,8 @@ function registerIpc(): void {
       throw new Error('参数不合法')
     }
     const root = tree as ScanDirNode
+    // 这一路故意不吃个性化(第一百一十三锤):带路人要吐严格 JSON,
+    // 掺进语气/格式要求有把格式带歪的风险,而它本来也不该有「文风」
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
       return { status: 'error', hits: [], text: resolved.error, model: '', durationMs: 0 } satisfies FeatureLocateResult
@@ -987,8 +1006,7 @@ function registerIpc(): void {
         explainWithMessages(
           resolved.target,
           [
-            { role: 'system', content: LOCATE_SYSTEM_PROMPT },
-            { role: 'user', content: buildLocatePrompt({ digest: buildTreeDigest(root, LOCATE_NODE_BUDGET, tokenBudget), question: question.trim() }) }
+            { role: 'system', content: LOCATE_SYSTEM_PROMPT },            { role: 'user', content: buildLocatePrompt({ digest: buildTreeDigest(root, LOCATE_NODE_BUDGET, tokenBudget), question: question.trim() }) }
           ],
           undefined,
           signal,
@@ -1227,7 +1245,14 @@ function registerIpc(): void {
     }
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
-    const messages = buildFreeChatMessages(FREE_CHAT_SYSTEM_PROMPT, attachment, history, questionText, webMaterial, codeRefs)
+    const messages = buildFreeChatMessages(
+      withPersonalization(FREE_CHAT_SYSTEM_PROMPT, resolved.style),
+      attachment,
+      history,
+      questionText,
+      webMaterial,
+      codeRefs
+    )
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
@@ -1239,6 +1264,21 @@ function registerIpc(): void {
       if (requestId !== '') explainAborters.delete(requestId)
       if (explainAborters.size === 0) announceActivityIdle()
     }
+  })
+
+  // 试一句(第一百一十三锤):设置页改完说话方式,拿草稿当场念一段听效果。
+  // 关键在「草稿」二字 —— 走的是传进来的那份个性化,不是存档里的那份,
+  // 所以还没点「应用更改」也能试,试完不满意直接退回,不用先存再改。
+  ipcMain.handle('atlas:ai-style-sample', async (event, personalization: unknown, requestId?: unknown): Promise<AiExplainResult> => {
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+    }
+    const style = buildPersonalizationPrompt(sanitizePersonalization(personalization))
+    const system = withPersonalization(STYLE_SAMPLE_SYSTEM, style)
+    return explainWithCancel(requestId, (signal) =>
+      explainWithModel(resolved.target, STYLE_SAMPLE_QUESTION, system, makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
+    )
   })
 
   // 掐掉还在生成的讲解:渲染进程换了讲解目标/关掉卡片时喊一声,模型立刻空出来讲下一个

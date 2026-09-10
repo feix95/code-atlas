@@ -3331,6 +3331,147 @@ body.is-maximized .cfg-layer {
   background: var(--line-soft);
 }
 
+/* ── 个性化(第一百一十三锤):下拉 + 多行输入 + 试一句 ──
+   原生控件包一层皮:键盘和无障碍是白送的,皮全用设置页自家的 token,看着还是一家人 */
+.cfg-select {
+  flex: none;
+  min-width: 7.5rem;
+  height: 1.875rem;
+  padding: 0 0.5rem;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.cfg-select:hover {
+  border-color: var(--accent-line);
+}
+
+.cfg-select:focus-visible,
+.cfg-textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 分组小标题:特质那一组的门脸,和行内 label 拉开层级 */
+.cfg-group-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.875rem 1.0625rem 0.125rem;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.cfg-group-note span {
+  color: var(--muted);
+  font-size: 0.625rem;
+  font-weight: 400;
+}
+
+/* 整行竖排(自订指令、试一句):控件占满宽度,不跟文案抢行 */
+.cfg-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.625rem;
+}
+
+.cfg-row-stack .cfg-copy p {
+  max-width: none;
+}
+
+.cfg-textarea {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.cfg-textarea::placeholder {
+  color: var(--muted-2);
+}
+
+.cfg-sample-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.cfg-btn:hover:not(:disabled) {
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.cfg-btn:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  background: var(--surface-soft);
+  cursor: not-allowed;
+}
+
+.cfg-btn.is-ghost {
+  color: var(--muted);
+  border-color: var(--line);
+  background: transparent;
+}
+
+.cfg-btn.is-ghost:hover {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+/* 试一句的结果:摆的就是模型原文,换行照原样,不做二次排版 */
+.cfg-sample {
+  max-height: 14rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  overflow: auto;
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cfg-sample.is-error {
+  color: var(--danger);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  white-space: normal;
+}
+
 .cfg-themes {
   display: flex;
   align-items: stretch;

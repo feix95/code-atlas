@@ -62,6 +62,8 @@ declare global {
       ) => Promise<AiExplainResult>
       aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string) => Promise<AiExplainResult>
       aiChat: (req: AiChatRequest) => Promise<AiChatResult>
+      /** 试一句(第一百一十三锤):拿还没保存的个性化草稿念一段,当场听效果 */
+      aiStyleSample: (personalization: unknown, requestId?: string) => Promise<AiExplainResult>
       onChatLookup: (callback: (payload: AiChatLookupPayload) => void) => () => void
       gitChanges: (rootPath: string) => Promise<GitChangesResult>
       gitExplainChange: (rootPath: string, relPath: string, requestId?: string) => Promise<AiExplainResult>

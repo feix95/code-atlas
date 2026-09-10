@@ -108,6 +108,9 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke('atlas:ai-chat', req),
+  /** 试一句(第一百一十三锤):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
+  aiStyleSample: (personalization: unknown, requestId?: string): Promise<AiExplainResult> =>
+    ipcRenderer.invoke('atlas:ai-style-sample', personalization, requestId),
   /** 订阅自由对话的联网状态播报(查询中/查到/没查到);返回退订函数 */
   onChatLookup: (callback: (payload: AiChatLookupPayload) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: AiChatLookupPayload): void => callback(payload)

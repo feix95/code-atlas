@@ -4,14 +4,16 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { AiConfig, ChatTarget } from '../shared/types.ts'
+import { DEFAULT_PERSONALIZATION, sanitizePersonalization } from '../shared/personalization.ts'
 
-/** 默认指向 LM Studio 本地服务;模型名留空 = 还没配置,由界面引导填。联网查证默认关 */
+/** 默认指向 LM Studio 本地服务;模型名留空 = 还没配置,由界面引导填。联网查证默认关,说话方式是全默认 */
 export function defaultAiConfig(): AiConfig {
   return {
     provider: 'lmstudio',
     lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: '', apiKey: '' },
     builtin: { serverPath: '', modelPath: '' },
-    webLookup: false
+    webLookup: false,
+    personalization: { ...DEFAULT_PERSONALIZATION }
   }
 }
 
@@ -52,7 +54,9 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       // 老配置没这个字段 = 默认关,行为与从前完全一致
       webLookup: parsed.webLookup === true,
       // 手动上下文(留空 = 自动探测);上一版存取两边都把它弄丢了,这里补上回读
-      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= 512 ? parsed.contextSize : undefined
+      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= 512 ? parsed.contextSize : undefined,
+      // 说话方式(第一百一十三锤):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
+      personalization: sanitizePersonalization(parsed.personalization)
     }
   } catch {
     return fallback
@@ -73,7 +77,9 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
     },
     webLookup: config.webLookup === true,
     // JSON.stringify 会直接丢掉 undefined:没填上下文时落盘就是没有这个字段,读取走自动探测
-    contextSize: typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : undefined
+    contextSize: typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : undefined,
+    // 说话方式照洗一遍再落盘:脏数据不许进存档(键顺序和读档那边保持一致,免得假「有改动」)
+    personalization: sanitizePersonalization(config.personalization)
   }
   await fs.writeFile(aiConfigPath(userDataDir), JSON.stringify(normalized, null, 2), 'utf8')
   return normalized

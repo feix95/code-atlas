@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
+import {
+  CUSTOM_MAX,
+  DEFAULT_PERSONALIZATION,
+  LEVEL_OPTIONS,
+  TONE_OPTIONS,
+  TRAITS,
+  type PersonalizationConfig
+} from '@shared/personalization'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 
@@ -21,7 +29,7 @@ function clampContextSize(raw: string): number | undefined {
   return Math.max(CONTEXT_MIN, Math.min(CONTEXT_MAX, Number(digits)))
 }
 
-type SectionKey = 'appearance' | 'ai' | 'advanced'
+type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
 type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
 
 /** 效果图同款线性小图标(lucide 线条),随字号一起缩放 */
@@ -178,6 +186,7 @@ const THEME_SUB: Record<AppearancePreset, string> = {
 const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: string }> = [
   { key: 'appearance', icon: 'palette', name: '外观与阅读', sub: '配色与界面大小' },
   { key: 'ai', icon: 'bot', name: '智能辅助', sub: '模型与在线验证' },
+  { key: 'personal', icon: 'sparkles', name: '个性化', sub: '语气与说话方式' },
   { key: 'advanced', icon: 'sliders', name: '高级选项', sub: '本地模型与连接详情' }
 ]
 
@@ -207,9 +216,12 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [fitNote, setFitNote] = useState<ModelFitVerdict | null>(null)
   // 第八十九锤:上下文框的打字草稿(纯字符串,和存档里的数字分开管)
   const [contextRaw, setContextRaw] = useState<string>('')
+  // 试一句的结果(第一百一十三锤):拿草稿试,没应用更改也能听
+  const [sample, setSample] = useState<{ kind: 'busy' } | { kind: 'done'; text: string } | { kind: 'error'; text: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLElement | null>(null)
   const aiRef = useRef<HTMLElement | null>(null)
+  const personalRef = useRef<HTMLElement | null>(null)
   const advancedRef = useRef<HTMLElement | null>(null)
 
   // AI 配置只读一次存档;之后界面上的每一下都是草稿,应用更改才落盘
@@ -338,6 +350,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   function sectionEl(key: SectionKey): HTMLElement | null {
     if (key === 'appearance') return appearanceRef.current
     if (key === 'ai') return aiRef.current
+    if (key === 'personal') return personalRef.current
     return advancedRef.current
   }
 
@@ -352,7 +365,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     const el = scrollRef.current
     if (!el) return
     let current: SectionKey = 'appearance'
-    for (const key of ['appearance', 'ai', 'advanced'] as SectionKey[]) {
+    for (const key of ['appearance', 'ai', 'personal', 'advanced'] as SectionKey[]) {
       const node = sectionEl(key)
       if (node && node.offsetTop - el.scrollTop <= 72) current = key
     }
@@ -415,6 +428,29 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   }
   const source = sourceState()
   const scaleShown = dragValue ?? draftScale
+
+  // 说话方式(第一百一十三锤):草稿里没有就是全默认 —— 界面照默认摆
+  const personal = draftConfig?.personalization ?? DEFAULT_PERSONALIZATION
+  function updatePersonal(patch: Partial<PersonalizationConfig>): void {
+    if (!draftConfig) return
+    setDraftConfig({ ...draftConfig, personalization: { ...personal, ...patch } })
+  }
+
+  /**
+   * 试一句(第一百一十三锤):拿当前草稿念一段,当场听说话方式的效果。
+   * 故意走草稿而不是存档 —— 还没点「应用更改」就能试,不满意直接退回,不用先存再改。
+   * 答完上一句之前再点不接(和别处的按钮一个规矩)。
+   */
+  async function tryStyle(): Promise<void> {
+    if (!draftConfig || sample?.kind === 'busy') return
+    setSample({ kind: 'busy' })
+    try {
+      const res = await window.atlas.aiStyleSample(personal)
+      setSample(res.status === 'error' ? { kind: 'error', text: res.text } : { kind: 'done', text: res.text })
+    } catch (err) {
+      setSample({ kind: 'error', text: friendlyErr(err) })
+    }
+  }
 
   const footerState = (() => {
     if (applyState.kind === 'saving') return { tone: 'amber' as const, text: '正在保存……' }
@@ -760,7 +796,129 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                 </div>
               </section>
 
-              {/* ── 03 高级选项 ── */}
+              {/* ── 03 个性化 ── */}
+              <section
+                className="cfg-section"
+                ref={(el) => {
+                  personalRef.current = el
+                }}
+              >
+                <div className="cfg-section-head">
+                  <div>
+                    <span className="cfg-step">03</span>
+                    <h3>个性化</h3>
+                  </div>
+                  <span>决定 AI 怎么跟你说话</span>
+                </div>
+                <div className="cfg-panel">
+                  {!draftConfig ? (
+                    <div className="cfg-row">
+                      <div className="cfg-copy">
+                        <label>说话方式</label>
+                        <p>读取配置中……</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="cfg-row">
+                        <div className="cfg-copy">
+                          <label>基本风格和语气</label>
+                          <p>设定 AI 回答时的整体基调。不选「默认」就等于加一条说法要求;选「默认」时一个字都不加,和现在一样。</p>
+                        </div>
+                        <select
+                          className="cfg-select"
+                          value={personal.tone}
+                          aria-label="基本风格和语气"
+                          onChange={(e) => updatePersonal({ tone: e.target.value as PersonalizationConfig['tone'] })}
+                        >
+                          {TONE_OPTIONS.map((o) => (
+                            <option key={o.key} value={o.key}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="cfg-divider" />
+                      <p className="cfg-group-note">
+                        特质 <span>基本风格和语气以外的其他自选项</span>
+                      </p>
+                      {TRAITS.map((t) => (
+                        <div className="cfg-row" key={t.key}>
+                          <div className="cfg-copy">
+                            <label>{t.label}</label>
+                            <p>{t.hint}</p>
+                          </div>
+                          <select
+                            className="cfg-select"
+                            value={personal[t.key]}
+                            aria-label={t.label}
+                            onChange={(e) => updatePersonal({ [t.key]: e.target.value } as Partial<PersonalizationConfig>)}
+                          >
+                            {LEVEL_OPTIONS.map((o) => (
+                              <option key={o.key} value={o.key}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                      <div className="cfg-divider" />
+                      <div className="cfg-row cfg-row-stack">
+                        <div className="cfg-copy">
+                          <label>
+                            自订指令
+                            <span className="cfg-flag">
+                              {personal.custom.length}/{CUSTOM_MAX}
+                            </span>
+                          </label>
+                          <p>想让它怎么称呼你、喜欢什么样的表达,直接写在这儿(比如「叫我小葵,你可以自称哥」)。</p>
+                        </div>
+                        <textarea
+                          className="cfg-textarea"
+                          rows={5}
+                          maxLength={CUSTOM_MAX}
+                          value={personal.custom}
+                          spellCheck={false}
+                          aria-label="自订指令"
+                          placeholder="例:我喜欢生动有趣、有活人感的表达;别猜我的反应、别列一堆点;说话简洁,抓住我提问的重点。"
+                          onChange={(e) => updatePersonal({ custom: e.target.value })}
+                        />
+                      </div>
+                      <div className="cfg-privacy">
+                        <Icon name="shield" size={12} />
+                        <span>自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 —— 这几条铁律不跟着变。</span>
+                      </div>
+                      <div className="cfg-divider" />
+                      <div className="cfg-row cfg-row-stack">
+                        <div className="cfg-copy">
+                          <label>试一句</label>
+                          <p>拿上面这套说法,让当前模型当场念一段小代码 —— 光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。</p>
+                        </div>
+                        <div className="cfg-sample-actions">
+                          <button type="button" className="cfg-btn" onClick={() => void tryStyle()} disabled={sample?.kind === 'busy'}>
+                            <Icon name="sparkles" size={13} />
+                            {sample?.kind === 'busy' ? '正在念……' : '试一句'}
+                          </button>
+                          {sample?.kind === 'done' && (
+                            <button type="button" className="cfg-btn is-ghost" onClick={() => setSample(null)}>
+                              收起
+                            </button>
+                          )}
+                        </div>
+                        {sample?.kind === 'busy' && (
+                          <div className="cfg-copy">
+                            <p>正在让模型按这套说法说一遍,第一次可能要等模型热身……</p>
+                          </div>
+                        )}
+                        {sample?.kind === 'done' && <pre className="cfg-sample">{sample.text}</pre>}
+                        {sample?.kind === 'error' && <p className="cfg-sample is-error">{sample.text}</p>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              {/* ── 04 高级选项 ── */}
               <section
                 className="cfg-section"
                 ref={(el) => {
@@ -769,7 +927,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
               >
                 <div className="cfg-section-head">
                   <div>
-                    <span className="cfg-step">03</span>
+                    <span className="cfg-step">04</span>
                     <h3>高级选项</h3>
                   </div>
                   <span>按需展开,减少意外修改</span>
