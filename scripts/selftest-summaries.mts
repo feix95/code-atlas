@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { annotateSummaries } from '../src/summarizer/index.ts'
 import { findCategory, LOCATE_CATEGORIES } from '../src/shared/locateCategories.ts'
-import { DEFAULT_PRESET_QUESTIONS, rulePresetQuestions } from '../src/shared/presetQuestions.ts'
+import { DEFAULT_PRESET_QUESTIONS, parsePredictedQuestions, rulePresetQuestions } from '../src/shared/presetQuestions.ts'
+import { FOLLOW_UP_QUESTIONS, ruleChatSuggestions } from '../src/shared/chatSuggestions.ts'
 import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 let fileSeq = 0
@@ -248,8 +249,28 @@ async function main(): Promise<void> {
   assert.ok(rulePresetQuestions({ name: 'README.md', icon: 'doc', text: '文档' }).includes('信息过时了吗？'), '文档出文档专属题')
   assert.deepEqual(rulePresetQuestions({ name: 'zzz.xyz' }), DEFAULT_PRESET_QUESTIONS, '认不出的文件回万金油四问,永不空场')
 
+  // ── 15. 预览对话的推荐问题(第一百一十二锤):聊没聊过分流 + 模型出的题过筛 ──
+  assert.deepEqual(
+    ruleChatSuggestions(false, { name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
+    rulePresetQuestions({ name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
+    '没聊过:跟概览页一个规矩,按文件类别出题'
+  )
+  assert.deepEqual(
+    ruleChatSuggestions(true, { name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
+    FOLLOW_UP_QUESTIONS,
+    '聊过一轮:换追问真言,顺着对话往下问'
+  )
+  assert.equal(FOLLOW_UP_QUESTIONS.length, 3, '追问真言也是三条,和推荐位齐')
+  assert.deepEqual(
+    parsePredictedQuestions('1. 这个函数为什么这么写\n2) 能举个例子吗\n3、这里有什么坑'),
+    ['这个函数为什么这么写', '能举个例子吗', '这里有什么坑'],
+    '编号/括号/顿号开头的题都要剥得干净'
+  )
+  assert.deepEqual(parsePredictedQuestions(`- 短\n* 够长的一个问题\n${'很'.repeat(50)}`), ['够长的一个问题'], '太短和太长都扔掉')
+  assert.deepEqual(parsePredictedQuestions(''), [], '空回复回空表,不硬凑')
+
   console.log('✅ 全树速览自测全部通过')
-  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典')
+  console.log('   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典 · 类目直找 · 预设问题规则层 · 预览对话推荐问题')
 }
 
 main().catch((err) => {

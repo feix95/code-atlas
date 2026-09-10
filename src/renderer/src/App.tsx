@@ -27,6 +27,7 @@ import {
 } from './recents'
 import { useAiAsk } from './useAiAsk'
 import { useAiChat } from './useAiChat'
+import { useChatSuggestions } from './useChatSuggestions'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
@@ -959,6 +960,8 @@ function PreviewDetailView({
   // 附件只建一份:本轮请求带的就是它,免得每次渲染造两份重复对象
   const context = buildFileAttachment(file, null)
   const chat = useAiChat(context)
+  // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新
+  const suggestions = useChatSuggestions({ rootPath: result.rootPath, file, messages: chat.messages, busy: chat.busy })
 
   return (
     <div className="detail-page">
@@ -970,7 +973,7 @@ function PreviewDetailView({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} />
+        <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} />
       </div>
     </div>
   )

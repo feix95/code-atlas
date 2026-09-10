@@ -106,13 +106,16 @@ export function FreeChatPanel({
   chat,
   context,
   refs,
-  onRemoveRef
+  onRemoveRef,
+  suggestions
 }: {
   chat: AiChatApi
   context: ChatContextAttachment | null
   /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
   refs?: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
+  /** 随对话演进的推荐问题(第一百一十二锤):传了就一直挂着,不传就退回开场示例 */
+  suggestions?: string[]
 }): React.JSX.Element {
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
@@ -264,14 +267,28 @@ export function FreeChatPanel({
             ))}
           </div>
         )}
-        {chat.messages.length === 0 && (
-          <div className="prompt-row">
-            {CHAT_EXAMPLES.map((q) => (
-              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                {q}
-              </button>
-            ))}
-          </div>
+        {suggestions ? (
+          // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
+          !chat.busy &&
+          suggestions.length > 0 && (
+            <div className="prompt-row">
+              {suggestions.map((q) => (
+                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          chat.messages.length === 0 && (
+            <div className="prompt-row">
+              {CHAT_EXAMPLES.map((q) => (
+                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          )
         )}
         <form className="chat-input" onSubmit={submit}>
           <input

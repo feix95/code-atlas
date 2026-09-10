@@ -68,3 +68,16 @@ export function rulePresetQuestions(input: PresetFileInput): string[] {
   }
   return DEFAULT_PRESET_QUESTIONS
 }
+
+/**
+ * 模型吐回来的题先过一遍筛(纯函数,自测覆盖):剥掉编号和项目符号,
+ * 只留像样的短句 —— 太短(一个字)/太长(一整段)的都扔掉,最多 3 条。
+ * 概览页的预设问题和预览对话的推荐问题共用这一把尺子。
+ */
+export function parsePredictedQuestions(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim().replace(/^\d+[.、)]\s*/, '').replace(/^[-*]\s*/, '').trim())
+    .filter((line) => line.length >= 4 && line.length <= 40)
+    .slice(0, 3)
+}

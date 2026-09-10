@@ -4,7 +4,7 @@
 // 垃圾回收铁律:预测结果按文件缓存,LRU 上限 40 个,不囤积。
 import { useEffect, useMemo, useState } from 'react'
 import type { ScanFileNode } from '@shared/types'
-import { rulePresetQuestions } from '@shared/presetQuestions'
+import { parsePredictedQuestions, rulePresetQuestions } from '@shared/presetQuestions'
 
 /** 让模型只出题不答题的问法:输出短、格式死,小模型也稳 */
 const PREDICT_QUESTION =
@@ -16,14 +16,6 @@ const CACHE_MAX = 40
 
 function cacheKey(rootPath: string, relPath: string): string {
   return `${rootPath.replace(/[\\/]+/g, '/').toLowerCase()}#${relPath}`
-}
-
-function parsePredicted(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim().replace(/^\d+[.、)]\s*/, '').replace(/^[-*]\s*/, '').trim())
-    .filter((line) => line.length >= 4 && line.length <= 40)
-    .slice(0, 3)
 }
 
 export function usePresetQuestions(input: {
@@ -72,7 +64,7 @@ export function usePresetQuestions(input: {
         )
         if (!alive || activeId !== requestId) return
         if (res.status !== 'supported') return
-        const questions = parsePredicted(res.text)
+        const questions = parsePredictedQuestions(res.text)
         if (questions.length < 2) return // 模型没出够题,不硬凑
         cache.delete(key)
         cache.set(key, questions)
