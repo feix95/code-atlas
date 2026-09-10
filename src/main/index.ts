@@ -799,6 +799,8 @@ function registerIpc(): void {
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
       webLookup: c.webLookup === true,
+      // 个性化(第一百一十三锤)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
+      personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
       contextSize: typeof c.contextSize === 'number' && c.contextSize >= 512 ? c.contextSize : undefined
     })

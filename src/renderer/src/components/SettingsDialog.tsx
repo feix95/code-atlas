@@ -1,17 +1,77 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import {
   CUSTOM_MAX,
   DEFAULT_PERSONALIZATION,
-  LEVEL_OPTIONS,
   TONE_OPTIONS,
-  TRAITS,
-  type PersonalizationConfig
+  type PersonalizationConfig,
+  type ToneKey
 } from '@shared/personalization'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
+
+/** 语气下拉(第一百一十八锤补,照小葵的参考图):档名+介绍两行式 —— 原生 option
+ * 画不出两行,这一颗自己画。点外面或按 Esc 收起,选中项亮着。 */
+function ToneSelect({ value, onChange }: { value: ToneKey; onChange: (t: ToneKey) => void }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: PointerEvent): void {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  const current = TONE_OPTIONS.find((o) => o.key === value) ?? TONE_OPTIONS[0]
+  return (
+    <div className="tone-select" ref={rootRef}>
+      <button type="button" className="tone-select-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {current.label}
+        {/* 箭头照抄本文件图标册的 chevron(和其他控件同一颗),钉到最右;小葵点名加粗放大 */}
+        <span className="tone-select-caret">
+          <Icon name="chevron" size={14} strokeWidth={4} />
+        </span>
+      </button>
+      {open && (
+        <div className="tone-select-list" role="listbox" aria-label="基本风格和语气">
+          {TONE_OPTIONS.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              role="option"
+              aria-selected={o.key === value}
+              className={`tone-select-item${o.key === value ? ' is-active' : ''}`}
+              onClick={() => {
+                onChange(o.key)
+                setOpen(false)
+              }}
+            >
+              <span className="tone-select-item-copy">
+                <span className="tone-select-label">{o.label}</span>
+                <span className="tone-select-hint">{o.hint}</span>
+              </span>
+              {o.key === value && (
+                <span className="tone-select-tick" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // 界面大小范围(跟根字号缩放引擎配套):80% ~ 180%
 const SCALE_MIN = 0.8
@@ -162,9 +222,9 @@ const ICON_PATHS: Record<string, ReactNode> = {
   folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
 }
 
-function Icon({ name, size = 15 }: { name: string; size?: number }): React.JSX.Element {
+function Icon({ name, size = 15, strokeWidth = 2 }: { name: string; size?: number; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {ICON_PATHS[name]}
     </svg>
   )
@@ -679,19 +739,6 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                       <output className="cfg-scale-value">{Math.round(scaleShown * 100)}%</output>
                     </div>
                   </div>
-                  <div className="cfg-preview-strip">
-                    <span className="cfg-preview-label">
-                      <Icon name="eye" size={12} />
-                      实时预览
-                    </span>
-                    <span className="cfg-mini" style={{ '--preview-accent': previewAccent } as CSSProperties}>
-                      <i className="cfg-mini-dot" />
-                      <i className="cfg-mini-line-long" />
-                      <i className="cfg-mini-line" />
-                      <em>App.tsx</em>
-                    </span>
-                    <span className="cfg-preview-note">界面文字将以 {Math.round(scaleShown * 100)}% 比例显示</span>
-                  </div>
                 </div>
               </section>
 
@@ -823,45 +870,9 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>基本风格和语气</label>
-                          <p>设定 AI 回答时的整体基调。不选「默认」就等于加一条说法要求;选「默认」时一个字都不加,和现在一样。</p>
                         </div>
-                        <select
-                          className="cfg-select"
-                          value={personal.tone}
-                          aria-label="基本风格和语气"
-                          onChange={(e) => updatePersonal({ tone: e.target.value as PersonalizationConfig['tone'] })}
-                        >
-                          {TONE_OPTIONS.map((o) => (
-                            <option key={o.key} value={o.key}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
+                        <ToneSelect value={personal.tone} onChange={(tone) => updatePersonal({ tone })} />
                       </div>
-                      <div className="cfg-divider" />
-                      <p className="cfg-group-note">
-                        特质 <span>基本风格和语气以外的其他自选项</span>
-                      </p>
-                      {TRAITS.map((t) => (
-                        <div className="cfg-row" key={t.key}>
-                          <div className="cfg-copy">
-                            <label>{t.label}</label>
-                            <p>{t.hint}</p>
-                          </div>
-                          <select
-                            className="cfg-select"
-                            value={personal[t.key]}
-                            aria-label={t.label}
-                            onChange={(e) => updatePersonal({ [t.key]: e.target.value } as Partial<PersonalizationConfig>)}
-                          >
-                            {LEVEL_OPTIONS.map((o) => (
-                              <option key={o.key} value={o.key}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
                       <div className="cfg-divider" />
                       <div className="cfg-row cfg-row-stack">
                         <div className="cfg-copy">
@@ -879,7 +890,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           value={personal.custom}
                           spellCheck={false}
                           aria-label="自订指令"
-                          placeholder={'例:叫我小葵,你可以自称哥。\n说话简洁,别列一堆点,别猜我的反应。'}
+                          placeholder={'例如：告诉 AI 你的偏好、身份或回答风格，这些会在之后的对话中持续生效。'}
                           onChange={(e) => updatePersonal({ custom: e.target.value })}
                         />
                       </div>

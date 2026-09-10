@@ -69,6 +69,31 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
       window.setTimeout(() => setCopied(false), 800)
     })
   }
+  // 复制/重试这一小排:有 token 账时贴在账目右边同行,没账时自己在正文下面一行
+  const showActions = (msg.state === 'done' || msg.state === 'cancelled') && msg.text !== ''
+  const actions = showActions && (
+    <div className="msg-actions">
+      {copied && (
+        <span className="msg-copied" role="status">
+          已复制
+        </span>
+      )}
+      <button
+        type="button"
+        className="msg-action"
+        onClick={copyAnswer}
+        aria-label={copied ? '已复制' : '复制这条回答'}
+        title={copied ? '已复制' : '复制'}
+      >
+        <TreeIcon name="copy" size={13} />
+      </button>
+      {canRetry && onRetry && (
+        <button type="button" className="msg-action" onClick={onRetry} aria-label="重试生成" title="重试">
+          <IconRefresh size={13} />
+        </button>
+      )}
+    </div>
+  )
   return (
     <div className="chat-turn">
       <div className="chat-answer-row">
@@ -87,34 +112,16 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
           {msg.state === 'busy' && (msg.stats || msg.text) && (
             <div className="chat-stats">{msg.stats ? formatStreamStats(msg.stats) : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}</div>
           )}
+          {/* 复制/重试:有 token 账时和账同一行、贴在右边(小葵点的红框位置) */}
+          {showActions && !msg.usage && actions}
           {msg.state !== 'busy' && msg.usage && (
-            <div className="chat-stats chat-usage">本次 · {formatUsage(msg.usage)}</div>
+            <div className="chat-stats chat-usage">
+              <span>本次 · {formatUsage(msg.usage)}</span>
+              {actions}
+            </div>
           )}
         </div>
       </div>
-      {(msg.state === 'done' || msg.state === 'cancelled') && msg.text && (
-        <div className="msg-actions">
-          {copied && (
-            <span className="msg-copied" role="status">
-              已复制
-            </span>
-          )}
-          <button
-            type="button"
-            className="msg-action"
-            onClick={copyAnswer}
-            aria-label={copied ? '已复制' : '复制这条回答'}
-            title={copied ? '已复制' : '复制'}
-          >
-            <TreeIcon name="copy" size={13} />
-          </button>
-          {canRetry && onRetry && (
-            <button type="button" className="msg-action" onClick={onRetry} aria-label="重试生成" title="重试">
-              <IconRefresh size={13} />
-            </button>
-          )}
-        </div>
-      )}
       {label && (
         <div className="chat-webstatus">
           <Badge label={label.text} tone={label.tone} />
@@ -141,7 +148,11 @@ export function FreeChatPanel({
 }): React.JSX.Element {
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
+  const [expanded, setExpanded] = useState(false)
+  // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
+  const [lineCount, setLineCount] = useState(1)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
@@ -181,6 +192,10 @@ export function FreeChatPanel({
 
   function submit(e: FormEvent): void {
     e.preventDefault()
+    sendDraft()
+  }
+
+  function sendDraft(): void {
     const q = draft.trim()
     // 挂了引用就允许空着发:这时替他说一句「讲讲选中的这段代码」,不让他对着空气发呆
     const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
@@ -188,6 +203,15 @@ export function FreeChatPanel({
     forceBottom()
     chat.send(text, draftRefs)
     setDraft('')
+    if (expanded) setExpanded(false)
+  }
+
+  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补) */
+  function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key !== 'Enter' || e.shiftKey) return
+    if (e.nativeEvent.isComposing) return
+    e.preventDefault()
+    sendDraft()
   }
 
   /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
@@ -196,6 +220,21 @@ export function FreeChatPanel({
     forceBottom()
     chat.send(q, draftRefs)
   }
+
+  // 弹性长高的账(小葵点名):空 = 一行;有一到四行长到几行;五行封顶,
+  // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    const line = Number.parseFloat(getComputedStyle(el).lineHeight) || 24
+    el.style.height = 'auto'
+    const realLines = Math.max(1, Math.round(el.scrollHeight / line))
+    // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
+    el.style.height = `${expanded ? 10 * line : Math.min(el.scrollHeight, 5 * line)}px`
+    setLineCount(realLines)
+    if (expanded && realLines < 5) setExpanded(false)
+  }, [draft, expanded])
+  const capped = lineCount >= 5 || expanded
 
   return (
     <div className="chat-shell free-chat">
@@ -312,36 +351,56 @@ export function FreeChatPanel({
             </div>
           )
         )}
-        <form className="chat-input" onSubmit={submit}>
-          <button
-            type="button"
-            className={`chat-think-toggle${chat.thinking ? ' is-on' : ''}`}
-            onClick={() => chat.setThinking(!chat.thinking)}
-            aria-pressed={chat.thinking}
-            title={
-              chat.thinking
-                ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
-                : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
-            }
-          >
-            <span aria-hidden="true">💭</span>思考{chat.thinking ? '开' : '关'}
-          </button>
-          <input
+        {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
+            写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}
+        <form
+          className={`chat-input${lineCount >= 2 ? ' is-multiline' : ''}${capped ? ' is-capped' : ''}`}
+          onSubmit={submit}
+        >
+          <textarea
             ref={inputRef}
-            type="text"
             value={draft}
             placeholder={chat.busy ? '小探针正在回答上一个问题……' : '随便聊点什么……'}
             aria-label="输入自由对话"
+            rows={1}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onDraftKeyDown}
           />
-          <button type="submit" className="btn btn-primary" disabled={chat.busy}>
-            {chat.busy ? '回答中……' : '发送'}
-          </button>
-          {chat.busy && (
-            <button type="button" className="btn btn-ghost" onClick={chat.cancel}>
-              停一停
+          {capped && (
+            <button
+              type="button"
+              className="composer-expand"
+              onClick={() => setExpanded(!expanded)}
+              aria-label={expanded ? '收合输入框' : '展开输入框'}
+              title={expanded ? '收合' : '多撑五行'}
+            >
+              <TreeIcon name={expanded ? 'collapse' : 'expand'} size={12} />
             </button>
           )}
+          <div className="composer-bar">
+            {chat.busy && (
+              <button type="button" className="btn btn-ghost composer-stop" onClick={chat.cancel}>
+                停一停
+              </button>
+            )}
+            <button
+              type="button"
+              className={`chat-think-toggle${chat.thinking ? ' is-on' : ''}`}
+              onClick={() => chat.setThinking(!chat.thinking)}
+              aria-pressed={chat.thinking}
+              title={
+                chat.thinking
+                  ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
+                  : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
+              }
+            >
+              <TreeIcon name="brain" size={14} />
+              思考
+            </button>
+            <button type="submit" className="chat-send" disabled={chat.busy} aria-label={chat.busy ? '回答中' : '发送'} title={chat.busy ? '回答中……' : '发送'}>
+              <TreeIcon name="arrowUp" size={19} strokeWidth={4} />
+            </button>
+          </div>
         </form>
       </div>
     </div>

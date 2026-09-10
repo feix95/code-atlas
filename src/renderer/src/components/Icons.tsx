@@ -61,9 +61,9 @@ export function IconFolder({ size = 14 }: { size?: number }): React.JSX.Element 
 
 /* ── 树图标册(第一百零六锤):一图一义,全部 24 线稿、currentColor、随主题换装 ── */
 
-function Line({ children, size = 13 }: { children: React.ReactNode; size?: number }): React.JSX.Element {
+function Line({ children, size = 13, strokeWidth = 2 }: { children: React.ReactNode; size?: number; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {children}
     </svg>
   )
@@ -104,10 +104,17 @@ const BOOK: Record<string, React.ReactNode> = {
   gitbranch: <><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="12" r="3" /><path d="M6 9v6" /><path d="M15 6a6 6 0 0 1 3 6" /></>,
   // 选区首尾的一对角括号(第一百一十四锤):一正一反,读作「从这里开始 / 到这里结束」
   markStart: <path d="M15 3H8v18h7" />,
-  markEnd: <path d="M9 3h7v18H9" />
+  markEnd: <path d="M9 3h7v18H9" />,
+  // 思考模式(第一百一十八锤):小葵给的参考图是颗脑子,线稿照脑回的双瓣画
+  brain: <><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" /><path d="M17.599 6.5a3 3 0 0 0 .399-1.375" /><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /></>,
+  // 发送(第一百一十八锤):小葵点名要「向上的箭头」
+  arrowUp: <><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></>,
+  // 输入框展开/收合(小葵给的参考图):两角外扩 / 收回
+  expand: <><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></>,
+  collapse: <><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>
 }
 
-/** 按册画图:查无此图时老实回「文件」底样,不空手 */
-export function TreeIcon({ name, size = 13 }: { name: string; size?: number }): React.JSX.Element {
-  return <Line size={size}>{BOOK[name] ?? BOOK['file']}</Line>
+/** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头) */
+export function TreeIcon({ name, size = 13, strokeWidth }: { name: string; size?: number; strokeWidth?: number }): React.JSX.Element {
+  return <Line size={size} strokeWidth={strokeWidth}>{BOOK[name] ?? BOOK['file']}</Line>
 }

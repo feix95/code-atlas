@@ -1,97 +1,42 @@
 // ── 第一百一十三锤:个性化(说话方式)──
-// 用户想让 AI 怎么跟他说话:整体语气 + 四个特质档位 + 一段自订指令。
+// 用户想让 AI 怎么跟他说话:整体语气 + 一段自订指令。
 // 这里只管两件纯事:拼成提示词、把脏存档洗干净 —— 不碰配置读写,不碰界面。
 //
 // 一条铁律写在装配函数里:自订指令只改说法,不改事实 —— 所以风格段后面永远跟着
 // 一句 HONESTY_TAIL,把「不许编造」这几条重新钉一遍。顺序本身就是优先级。
 
-/** 整体语气 */
-export type ToneKey = 'default' | 'friendly' | 'professional' | 'direct' | 'warm'
-
-/** 特质档位:更少 / 默认 / 更多 */
-export type LevelKey = 'less' | 'default' | 'more'
+/** 整体语气(第一百一十八锤补,小葵定的三档人设):友善 / 专业 / 幽默;没有「默认」档,默认就是友善 */
+export type ToneKey = 'friendly' | 'professional' | 'humorous'
 
 export interface PersonalizationConfig {
   tone: ToneKey
-  /** 对读者处境的体谅 */
-  warmth: LevelKey
-  /** 语气里的劲头 */
-  enthusiasm: LevelKey
-  /** 正文要不要分点分标题 */
-  structure: LevelKey
-  /** 用不用表情符号 */
-  emoji: LevelKey
   /** 用户自己写的说法要求 */
   custom: string
 }
 
-/** 四个特质的键(语气和自订指令另算) */
-export type TraitKey = 'warmth' | 'enthusiasm' | 'structure' | 'emoji'
-
 /** 自订指令的字数上限:再长就是拿上下文换废话了 */
 export const CUSTOM_MAX = 500
 
-export const TONE_OPTIONS: Array<{ key: ToneKey; label: string }> = [
-  { key: 'default', label: '默认' },
-  { key: 'friendly', label: '友善' },
-  { key: 'professional', label: '专业' },
-  { key: 'direct', label: '直接' },
-  { key: 'warm', label: '热情' }
+export const TONE_OPTIONS: Array<{ key: ToneKey; label: string; hint: string }> = [
+  { key: 'friendly', label: '友善', hint: '温暖且健谈' },
+  { key: 'professional', label: '专业', hint: '讲究且细致' },
+  { key: 'humorous', label: '幽默', hint: '轻松且直白' }
 ]
 
-export const LEVEL_OPTIONS: Array<{ key: LevelKey; label: string }> = [
-  { key: 'less', label: '更少' },
-  { key: 'default', label: '默认' },
-  { key: 'more', label: '更多' }
-]
-
-/** 特质清单:界面按它排下拉、拼提示词也按它走 —— 一处定义,两边都认,加项只改这里 */
-export const TRAITS: Array<{ key: TraitKey; label: string; hint: string }> = [
-  { key: 'warmth', label: '温暖', hint: '对你处境的体谅程度' },
-  { key: 'enthusiasm', label: '热情', hint: '语气里的劲头' },
-  { key: 'structure', label: '标题和列表', hint: '正文要不要分点分层' },
-  { key: 'emoji', label: '表情符号', hint: '只影响 AI 说的话,界面自己永远不出现表情' }
-]
-
-/**
- * 全默认的个性化:拿它拼出来是空字符串。
- * 这是「没动过这一栏的人,提示词一字不变」的保证 —— 老配置升级上来行为与从前逐字相同。
- */
 export const DEFAULT_PERSONALIZATION: PersonalizationConfig = {
-  tone: 'default',
-  warmth: 'default',
-  enthusiasm: 'default',
-  structure: 'default',
-  emoji: 'default',
+  tone: 'friendly',
   custom: ''
 }
 
 const TONE_LINES: Record<ToneKey, string> = {
-  default: '',
-  friendly: '语气随和一些,像同事之间说话,不用端着。',
-  professional: '保持专业克制:用词准确,不寒暄、不闲聊、不卖萌。',
-  direct: '开门见山:先给结论,再补必要的解释,别铺垫。',
-  warm: '精神饱满一点,愿意多讲一句对他有用的;但别夸张,也别一味鼓励。'
-}
-
-const TRAIT_LINES: Record<TraitKey, Record<Exclude<LevelKey, 'default'>, string>> = {
-  warmth: {
-    more: '多体谅读者:他可能是新手,看不懂的地方多解释半句,别让他觉得是自己笨。',
-    less: '少寒暄少共情,把话都用在事情上。'
-  },
-  enthusiasm: {
-    more: '语气积极一点,该肯定的地方就肯定一句。',
-    less: '语气平实,不用表达情绪。'
-  },
-  structure: {
-    more: '要点多的时候就用列表或小标题分开,方便扫读。',
-    // 「更少」只约束正文排版:结尾的「名词小课堂」是学习功能,不是排版花活,照旧保留
-    less: '能用一段通顺的话说清就别列点,也别用标题分层(结尾的「名词小课堂」照旧保留)。'
-  },
-  emoji: {
-    more: '可以适当用表情符号让语气活一点,但别滥用,一句话最多一个。',
-    less: '不要用表情符号。'
-  }
+  // 三档人设的 prompt 都是小葵逐字定的(第一百一十八锤补),改一个字先问她;
+  // 没有「默认」档:默认就是友善,照样加这段
+  friendly:
+    '你是一个友善、温暖、健谈的人。说话像跟好朋友聊天,语气自然有温度,会主动关心对方、记得细节、顺着情绪接话。健谈但不啰嗦,适当展开想法或小故事,让对话流动。真诚喜欢对方,用温和玩笑和鼓励拉近距离。对方开心一起高兴,低落时先接住情绪。不说教、不冷冰冰。语言口语化,像面对面聊天。让对话舒服、有温度、让人想继续聊。',
+  professional:
+    '你是一位专注于项目与代码讲解的专业导师。性格冷静、耐心、有分寸,像经验丰富的前辈在认真带人。核心注意力始终放在用户哪里还没真正懂上:主动察觉理解漏洞,把模糊的地方讲清楚,把容易卡住的点拆开。不急着给结论或方案,先帮用户把逻辑理顺、把盲区补上。语气沉稳克制,不废话、不卖弄,只让用户真正看懂。',
+  humorous:
+    '你自称哥,说话生动有趣,热情洋溢,充满活人感。你理性且同时具有人情味,最喜欢说大白话。始终先关注用户哪里可能还没懂,再用好玩又清楚的方式把那个点讲透。整体氛围轻松、有活力。喜欢用生活里的小比喻、夸张的对比、或者突然的神转折,把复杂的项目结构或代码逻辑讲得生动起来。'
 }
 
 /** 风格段后面永远跟着的这一句:把铁律重新钉一遍 —— 位置在最后,顺序就是优先级 */
@@ -100,21 +45,15 @@ export const HONESTY_TAIL =
 
 /**
  * 把个性化拼成一段提示词(纯函数,自测覆盖)。
- * 全默认返回空串 —— 空串意味着「一个字都不加」,不是「加一句说默认」。
+ * 风格段永远非空 —— 语气没有空档,默认就是友善。
  */
 export function buildPersonalizationPrompt(p: PersonalizationConfig): string {
   const lines: string[] = []
-  const tone = TONE_LINES[p.tone]
-  if (tone) lines.push(tone)
-  for (const trait of TRAITS) {
-    const level = p[trait.key]
-    if (level !== 'default') lines.push(TRAIT_LINES[trait.key][level])
-  }
+  lines.push(TONE_LINES[p.tone])
   const rawCustom = p.custom.trim()
   // 最后一道闸:这里是文本进模型前的最后一站,超长的就地裁断并留省略号(读档那边也会裁)
   const custom = rawCustom.length > CUSTOM_MAX ? `${rawCustom.slice(0, CUSTOM_MAX)}……` : rawCustom
   if (custom) lines.push(`用户自己提的说法要求(优先级最高,但仍不许越过上面的事实铁律):\n«${custom}»`)
-  if (lines.length === 0) return ''
   return ['【这个用户偏好的说话方式】', ...lines].join('\n')
 }
 
@@ -130,13 +69,8 @@ export function withPersonalization(system: string, style: string): string {
 export function sanitizePersonalization(raw: unknown): PersonalizationConfig {
   if (typeof raw !== 'object' || raw === null) return { ...DEFAULT_PERSONALIZATION }
   const r = raw as Record<string, unknown>
-  const level = (v: unknown, fallback: LevelKey): LevelKey => (v === 'less' || v === 'default' || v === 'more' ? v : fallback)
   return {
     tone: TONE_OPTIONS.some((t) => t.key === r.tone) ? (r.tone as ToneKey) : DEFAULT_PERSONALIZATION.tone,
-    warmth: level(r.warmth, DEFAULT_PERSONALIZATION.warmth),
-    enthusiasm: level(r.enthusiasm, DEFAULT_PERSONALIZATION.enthusiasm),
-    structure: level(r.structure, DEFAULT_PERSONALIZATION.structure),
-    emoji: level(r.emoji, DEFAULT_PERSONALIZATION.emoji),
     custom: typeof r.custom === 'string' ? r.custom.trim().slice(0, CUSTOM_MAX) : ''
   }
 }
