@@ -659,7 +659,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .code-pane-exit,
-.code-pane-copy {
+.code-pane-ref {
   flex-shrink: 0;
   padding: 0.25rem 0.5rem;
   font-size: var(--font-xs);

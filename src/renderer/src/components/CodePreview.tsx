@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
 import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
+import { planWholeFileRef } from '@shared/preview'
 import { friendlyErr } from '../errText'
 import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry } from '../selectionMarks'
 import { Notice } from './Notice'
@@ -30,7 +31,7 @@ function countNewlines(text: string): number {
  * 不可预览的情况(二进制/超大/读不了)老实说明白,绝不硬塞一屏乱码。
  * 第一百一十一锤:选中一段代码,选区上方冒出「引用到对话」,点了挂到右栏的输入框上。
  * 第一百一十四锤:选区美术 —— 选中色跟辅助色走,首尾各一枚角括号,左缘一条竖线;
- * Ctrl+A 只选正文;顶栏给一颗「复制全文」。
+ * Ctrl+A 只选正文;顶栏给一颗钮,把整份代码挂到右栏对话(第一百一十四锤补2)。
  */
 export function CodePreview({
   rootPath,
@@ -54,7 +55,7 @@ export function CodePreview({
   const [sel, setSel] = useState<Selection | null>(null)
   // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
   const [showButton, setShowButton] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [added, setAdded] = useState(false)
   const codeTextRef = useRef<HTMLPreElement>(null)
   const codeViewRef = useRef<HTMLDivElement>(null)
 
@@ -199,13 +200,28 @@ export function CodePreview({
     if (followSelection() !== null) setShowButton(true)
   }
 
-  /** 复制全文:复制的就是眼前载入的这份(没重新读文件),所见即所得 */
-  function copyAll(): void {
-    if (text === '') return
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 800)
+  /** 整份引用:把眼前载入的这份代码整个挂到右栏输入框上(不重新读文件,所见即所得) */
+  const wholeRef = useMemo(
+    () =>
+      planWholeFileRef({
+        text,
+        refLimit,
+        canAddRef,
+        previewTruncated: result?.status === 'ok' && result.truncated
+      }),
+    [text, refLimit, canAddRef, result]
+  )
+
+  function addWholeRef(): void {
+    if (!wholeRef.canAdd || wholeRef.code.trim() === '') return
+    onAddRef({
+      relPath: file.relPath,
+      startLine: wholeRef.startLine,
+      endLine: wholeRef.endLine,
+      code: wholeRef.code
     })
+    setAdded(true)
+    window.setTimeout(() => setAdded(false), 1000)
   }
 
   const label = sel
@@ -231,12 +247,13 @@ export function CodePreview({
         {result?.status === 'ok' && text !== '' && (
           <button
             type="button"
-            className="btn btn-ghost code-pane-copy"
-            onClick={copyAll}
-            title={result.truncated ? '复制已载入的开头一段(文件太长,没全载)' : '复制这份代码的全文'}
+            className="btn btn-ghost code-pane-ref"
+            disabled={!wholeRef.canAdd}
+            onClick={addWholeRef}
+            title={wholeRef.title}
           >
-            <TreeIcon name="copy" size={12} />
-            {copied ? '已复制' : '复制全文'}
+            <TreeIcon name="clip" size={12} />
+            {added ? '已引用' : wholeRef.label}
           </button>
         )}
         <button type="button" className="btn btn-ghost code-pane-exit" onClick={onClose}>
