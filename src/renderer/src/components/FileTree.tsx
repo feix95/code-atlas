@@ -18,10 +18,12 @@ interface TreeRowProps {
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
+  /** 双击文件进预览(第一百二十三锤):跟右键「预览文件」同一条路 */
+  onPreview?: (relPath: string) => void
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy, onPreview }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -45,6 +47,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           type="button"
           className="tree-main"
           onClick={() => onSelectFile(node.relPath, node)}
+          onDoubleClick={() => onPreview?.(node.relPath)}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
           title={node.summary?.text}
         >
@@ -148,6 +151,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
             onSelectFile={onSelectFile}
             onSelectFolder={onSelectFolder}
             onExpandLazy={onExpandLazy}
+            onPreview={onPreview}
           />
         ))}
     </div>
@@ -244,6 +248,7 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
               onSelectFile={onSelectFile}
               onSelectFolder={onSelectFolder}
               onExpandLazy={onExpandLazy}
+              onPreview={onPreview}
             />
           ) : (
             <div className="empty-state">

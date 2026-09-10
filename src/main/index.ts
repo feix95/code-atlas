@@ -749,7 +749,7 @@ function registerIpc(): void {
     const name = relPath.split('/').pop() ?? relPath
     // 后缀一看就是二进制/媒体的,连读都不用读
     if (isBinaryFile(name)) {
-      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这是二进制或媒体文件,里面没有能当文本看的代码' }
+      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这是二进制或媒体文件,里面没有能当文本看的字;想了解它的话,右栏的小探针可以按类型给你讲' }
     }
     if (stat.size > PREVIEW_MAX_BYTES) {
       return {
