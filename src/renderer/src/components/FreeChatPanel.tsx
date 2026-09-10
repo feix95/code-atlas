@@ -291,6 +291,17 @@ export function FreeChatPanel({
       )}
       {/* 开场白和聊起来的气泡共用同一个消息区骨架:开场白也撑满中段,输入栏两种状态钉在同一个底 */}
       <div className="chat-messages-wrap">
+        {chat.messages.length > 0 && (
+          <button
+            type="button"
+            className="chat-new"
+            onClick={chat.newChat}
+            title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
+          >
+            <TreeIcon name="plus" size={12} />
+            新对话
+          </button>
+        )}
         <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
           {chat.messages.length === 0 ? (
             <div className="chat-intro">

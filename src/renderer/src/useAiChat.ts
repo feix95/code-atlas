@@ -53,6 +53,8 @@ export function useAiChat(context: ChatContextAttachment | null): {
   setThinking: (on: boolean) => void
   /** 程序垫一条灰字(第一百二十四锤):如「参考资料换成了 xxx」,不进历史、不发给模型 */
   note: (text: string) => void
+  /** 开新对话(第一百二十七锤):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
+  newChat: () => void
   send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
@@ -199,7 +201,16 @@ export function useAiChat(context: ChatContextAttachment | null): {
     setMessages((prev) => [...prev, { key: crypto.randomUUID(), role: 'note', text, state: 'done', web: null }])
   }
 
-  return { messages, busy, thinking, setThinking, note, send, cancel }
+  function newChat(): void {
+    // 探针还在答就先掐话头,别让旧对话的残响落进新账本
+    if (idRef.current) void window.atlas.aiCancel(idRef.current)
+    idRef.current = ''
+    busyRef.current = false
+    setBusy(false)
+    setMessages([])
+  }
+
+  return { messages, busy, thinking, setThinking, note, newChat, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>
