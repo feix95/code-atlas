@@ -377,14 +377,11 @@ export function FreeChatPanel({
             ))}
           </div>
         )}
-        {(chat.messages.length > 0 || (suggestions ? !chat.busy && suggestions.length > 0 : chat.messages.length === 0)) && (
         <div className="prompt-row">
-          {/* 新对话(第一百二十七锤补,小葵点名):推荐胶囊那排的第一条,聊起来才出现 */}
-          {chat.messages.length > 0 && (
-            <button type="button" className="prompt" onClick={chat.newChat} title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)">
-              ＋ 新对话
-            </button>
-          )}
+          {/* 新对话(第一百二十七锤补):常驻第一格 —— 聊没聊过都在,想翻篇随时点得着 */}
+          <button type="button" className="prompt" onClick={chat.newChat} title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)">
+            新对话
+          </button>
           {suggestions ? (
             // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
             !chat.busy &&
@@ -402,7 +399,6 @@ export function FreeChatPanel({
             ))
           )}
         </div>
-        )}
         {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
             写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}
         <form
