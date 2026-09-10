@@ -12,8 +12,14 @@ export const CODE_REFS_MAX = 6
 /** 单段引用的字数上限:引用是「一段」,不是整个文件 */
 export const CODE_REF_CHARS_MAX = 2000
 
-/** 一轮里所有引用的字数上限:几段加起来也不能把上下文吃光 */
+/** 一轮里所有引用的字数上限:几段加起来也不能把上下文吃光(动态账的保底地面) */
 export const CODE_REFS_TOTAL_CHARS_MAX = 6000
+
+/**
+ * 一轮引用总量的天花板(动态账的顶,第一百二十六锤):额度跟着用户的上下文窗口
+ * 动态算,但锅再大也不超这个数 —— 喂太饱,小模型会懵。
+ */
+export const CODE_REFS_TOTAL_CHARS_CEILING = 12000
 
 /**
  * 思考模式的额外字数额度(tokens,第一百一十五锤):开了思考,模型回答前会先写
