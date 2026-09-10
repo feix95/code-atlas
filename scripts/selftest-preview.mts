@@ -2,6 +2,7 @@
 // 纯函数,不碰任何系统东西 —— 跑起来就是几行字符串的事。
 import assert from 'node:assert/strict'
 import { clipPreview, looksBinary, PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES } from '../src/shared/preview.ts'
+import { clampButtonX, refButtonLabel, selectionGeometry } from '../src/renderer/src/selectionMarks.ts'
 
 function main(): void {
   // ── 1. 正常文本:账目老实 ──
@@ -49,8 +50,44 @@ function main(): void {
   assert.equal(looksBinary(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01])), true, 'PNG 头里的 NUL 抓得住')
   assert.equal(looksBinary(new Uint8Array([])), false, '空的一段不冤枉')
 
+  // ── 8. 选区几何(第一百一十四锤):首尾标记、左缘竖线、浮钮锚点 ──
+  assert.equal(selectionGeometry([]), null, '一行都没有就不画标记')
+  const oneLine = selectionGeometry([{ left: 40, top: 100, right: 180, bottom: 118 }])
+  assert.ok(oneLine, '单行选区要算得出来')
+  assert.equal(oneLine?.startX, 40, '首标记在第一行左缘')
+  assert.equal(oneLine?.endX, 180, '末标记在最后一行右缘')
+  assert.equal(oneLine?.startY, 109, '首标记垂直居中于那一行')
+  assert.equal(oneLine?.barHeight, 18, '只有一行时竖线就是那一行的高度')
+  assert.equal(oneLine?.buttonX, 180, '单行时浮钮锚在行右缘')
+  const threeLines = selectionGeometry([
+    { left: 40, top: 100, right: 300, bottom: 118 },
+    { left: 40, top: 118, right: 260, bottom: 136 },
+    { left: 40, top: 136, right: 120, bottom: 154 }
+  ])
+  assert.equal(threeLines?.startX, 40, '多行:首标记看第一行')
+  assert.equal(threeLines?.endX, 120, '多行:末标记看最后一行 —— 不是包围盒的右边')
+  assert.equal(threeLines?.barHeight, 54, '竖线从第一行顶贯到最后一行底')
+  assert.equal(threeLines?.buttonX, 120, '浮钮锚在最后一行右上,不飘到整块中间')
+  assert.equal(threeLines?.buttonY, 136, '浮钮跟着最后一行')
+  // 竖线最短也得看得见(空行也可能是 0 高)
+  assert.equal(selectionGeometry([{ left: 0, top: 50, right: 10, bottom: 50 }])?.barHeight, 2, '零高选区竖线给最小可见高度')
+
+  // ── 9. 浮钮文案(第一百一十四锤):额度满了说额度,选太长了照实说会截断 ──
+  const base = { canAddRef: true, refLimit: 6, charCap: 2000, startLine: 1, endLine: 20, charCount: 300 }
+  assert.equal(refButtonLabel(base), '引用到对话(第 1-20 行)', '正常选区就报行号')
+  assert.equal(refButtonLabel({ ...base, canAddRef: false }), '最多引用 6 段', '额度满了直说')
+  const tooLong = refButtonLabel({ ...base, charCount: 2001 })
+  assert.ok(tooLong.includes('太长') && tooLong.includes('2000'), '选太长要说清只会带前 2000 字,不许装看不见')
+  assert.equal(refButtonLabel({ ...base, charCount: 2000 }), '引用到对话(第 1-20 行)', '刚好到上限不算太长')
+
+  // ── 10. 浮钮横向夹紧(第一百一十四锤):贴着栏边的选区,别让钮跨到隔壁去 ──
+  assert.equal(clampButtonX(500, 0, 600), 500, '在中间就照原样')
+  assert.equal(clampButtonX(20, 0, 600), 90, '太靠左拉回来')
+  assert.equal(clampButtonX(590, 0, 600), 510, '太靠右拉回来')
+  assert.equal(clampButtonX(10, 0, 100), 50, '栏太窄就居中,别把钮挤没')
+
   console.log('✅ 代码预览自测全部通过')
-  console.log('   裁剪账目(行数/字数双闸/总行数照实) · 换行归一 · 空文件 · 边界不误报 · 二进制嗅探')
+  console.log('   裁剪账目(行数/字数双闸/总行数照实) · 换行归一 · 空文件 · 边界不误报 · 二进制嗅探 · 选区几何与浮钮文案')
 }
 
 main()

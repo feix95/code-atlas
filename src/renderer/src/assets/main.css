@@ -658,7 +658,8 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-size: var(--font-sm);
 }
 
-.code-pane-exit {
+.code-pane-exit,
+.code-pane-copy {
   flex-shrink: 0;
   padding: 0.25rem 0.5rem;
   font-size: var(--font-xs);
@@ -715,6 +716,42 @@ body.is-maximized .traffic-lights .is-max i::after {
 .code-text {
   padding: 0 var(--space-3);
   color: var(--text);
+}
+
+/* ── 选区美术(第一百一十四锤)──
+   选中色跟辅助色走:系统默认那套蓝和别处长得一样,分不出「进了引用功能」。
+   只作用于代码正文,别的面板保持系统默认。 */
+.code-text::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+}
+
+/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
+.code-mark {
+  position: fixed;
+  z-index: 29;
+  display: inline-flex;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.code-mark.is-start {
+  transform: translate(calc(-100% - 3px), -50%);
+}
+
+.code-mark.is-end {
+  transform: translate(3px, -50%);
+}
+
+/* 选中范围的左缘竖线:一眼看出这一段是一个整体 */
+.code-sel-bar {
+  position: fixed;
+  z-index: 28;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 /* 选区浮钮(第一百一十一锤):以选区上沿中点为锚浮在代码上,选了就能引 */
@@ -3399,8 +3436,10 @@ body.is-maximized .cfg-layer {
   resize: vertical;
 }
 
+/* 占位示例:写的是两行短句,行距给足,换行也整齐,不像甩了一整段在框里 */
 .cfg-textarea::placeholder {
   color: var(--muted-2);
+  line-height: 1.9;
 }
 
 .cfg-sample-actions {

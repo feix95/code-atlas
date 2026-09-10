@@ -101,7 +101,10 @@ const BOOK: Record<string, React.ReactNode> = {
   arrows: <><path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="M16 21l4-4-4-4" /><path d="M20 17H4" /></>,
   clip: <><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></>,
   copy: <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
-  gitbranch: <><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="12" r="3" /><path d="M6 9v6" /><path d="M15 6a6 6 0 0 1 3 6" /></>
+  gitbranch: <><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="12" r="3" /><path d="M6 9v6" /><path d="M15 6a6 6 0 0 1 3 6" /></>,
+  // 选区首尾的一对角括号(第一百一十四锤):一正一反,读作「从这里开始 / 到这里结束」
+  markStart: <path d="M15 3H8v18h7" />,
+  markEnd: <path d="M9 3h7v18H9" />
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手 */

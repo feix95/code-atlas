@@ -871,7 +871,6 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                               {personal.custom.length}/{CUSTOM_MAX}
                             </span>
                           </label>
-                          <p>想让它怎么称呼你、喜欢什么样的表达,直接写在这儿(比如「叫我小葵,你可以自称哥」)。</p>
                         </div>
                         <textarea
                           className="cfg-textarea"
@@ -880,7 +879,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           value={personal.custom}
                           spellCheck={false}
                           aria-label="自订指令"
-                          placeholder="例:我喜欢生动有趣、有活人感的表达;别猜我的反应、别列一堆点;说话简洁,抓住我提问的重点。"
+                          placeholder={'例:叫我小葵,你可以自称哥。\n说话简洁,别列一堆点,别猜我的反应。'}
                           onChange={(e) => updatePersonal({ custom: e.target.value })}
                         />
                       </div>

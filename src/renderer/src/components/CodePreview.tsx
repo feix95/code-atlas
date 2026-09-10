@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
+import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
 import { friendlyErr } from '../errText'
+import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry } from '../selectionMarks'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 
-/** 选区浮钮的落点:按钮以「选区上沿中点」为锚,往上抬一点,别压住选中的行 */
-interface Selection {
-  x: number
-  y: number
+/** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
+interface Selection extends SelectionGeometry {
   startLine: number
   endLine: number
   code: string
@@ -29,6 +29,8 @@ function countNewlines(text: string): number {
  * 正文只活在这个组件的 state 里:退出预览组件一卸,内容跟着就走,不留垃圾。
  * 不可预览的情况(二进制/超大/读不了)老实说明白,绝不硬塞一屏乱码。
  * 第一百一十一锤:选中一段代码,选区上方冒出「引用到对话」,点了挂到右栏的输入框上。
+ * 第一百一十四锤:选区美术 —— 选中色跟辅助色走,首尾各一枚角括号,左缘一条竖线;
+ * Ctrl+A 只选正文;顶栏给一颗「复制全文」。
  */
 export function CodePreview({
   rootPath,
@@ -50,7 +52,9 @@ export function CodePreview({
   const [result, setResult] = useState<FilePreviewResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [sel, setSel] = useState<Selection | null>(null)
+  const [copied, setCopied] = useState(false)
   const codeTextRef = useRef<HTMLPreElement>(null)
+  const codeViewRef = useRef<HTMLDivElement>(null)
 
   // 组件按 relPath 挂 key:换文件 = 重挂,旧文件的内容不会串到新文件头上
   useEffect(() => {
@@ -77,42 +81,114 @@ export function CodePreview({
     return Array.from({ length: count }, (_, i) => String(i + 1)).join('\n')
   }, [text])
 
-  // 选区一变就算一遍行号:只有选的是代码正文才算数(行号栏选中的东西不算引用)
+  /** 从当前选区算一遍落点;没选东西、或选的是别处的字,一律清场 */
+  const readSelection = useCallback((): void => {
+    const el = codeTextRef.current
+    const s = window.getSelection()
+    if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) {
+      setSel(null)
+      return
+    }
+    const code = s.toString()
+    if (code.trim() === '') {
+      setSel(null)
+      return
+    }
+    const rects = Array.from(s.getRangeAt(0).getClientRects())
+    const geom = selectionGeometry(rects)
+    if (!geom) {
+      setSel(null)
+      return
+    }
+    const view = codeViewRef.current?.getBoundingClientRect()
+    const full = el.textContent ?? ''
+    const start = Math.min(s.anchorOffset, s.focusOffset)
+    const end = Math.max(s.anchorOffset, s.focusOffset)
+    setSel({
+      ...geom,
+      // 贴在栏边上的选区,别让浮钮跨到隔壁聊天区去
+      buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right) : geom.buttonX,
+      startLine: countNewlines(full.slice(0, start)) + 1,
+      // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
+      endLine: countNewlines(full.slice(0, Math.max(start, end - 1))) + 1,
+      code
+    })
+  }, [])
+
+  // 选区一变就算一遍落点:只有选的是代码正文才算数(行号栏选中的东西不算引用)
   useEffect(() => {
     if (result?.status !== 'ok') return
-    function onSelectionChange(): void {
-      const el = codeTextRef.current
-      const selection = window.getSelection()
-      if (!el || !selection || selection.isCollapsed || selection.rangeCount === 0 || !el.contains(selection.anchorNode)) {
-        setSel(null)
-        return
-      }
-      const code = selection.toString()
-      if (code.trim() === '') {
-        setSel(null)
-        return
-      }
-      const full = el.textContent ?? ''
-      const anchor = selection.anchorOffset
-      const focus = selection.focusOffset
-      const start = Math.min(anchor, focus)
-      const end = Math.max(anchor, focus)
-      const rect = selection.getRangeAt(0).getBoundingClientRect()
-      setSel({
-        x: rect.left + rect.width / 2,
-        y: rect.top,
-        startLine: countNewlines(full.slice(0, start)) + 1,
-        // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
-        endLine: countNewlines(full.slice(0, Math.max(start, end - 1))) + 1,
-        code
-      })
-    }
+    const onSelectionChange = (): void => readSelection()
     document.addEventListener('selectionchange', onSelectionChange)
     return () => document.removeEventListener('selectionchange', onSelectionChange)
-  }, [result])
+  }, [result, readSelection])
+
+  // 滚动/改窗口大小会让视口坐标失效:重算落点,只在整个选区滚出视野时才收起来。
+  // (从前是滚一下就清掉,手一抖浮钮就没了 —— 选区还在,记号却不在了,说不通。)
+  useEffect(() => {
+    const view = codeViewRef.current
+    let frame = 0
+    const reposition = (): void => {
+      frame = 0
+      const el = codeTextRef.current
+      const s = window.getSelection()
+      if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return
+      readSelection()
+    }
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(reposition)
+    }
+    window.addEventListener('resize', schedule)
+    view?.addEventListener('scroll', schedule, { passive: true })
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      window.removeEventListener('resize', schedule)
+      view?.removeEventListener('scroll', schedule)
+    }
+  }, [result, readSelection])
+
+  /**
+   * Ctrl+A 只选正文(第一百一十四锤):浏览器的 Ctrl+A 是文档级的,普通 div 管不住它,
+   * 所以这里自己接管 —— 拦下按键,用 Range 把代码正文整个包住选上(行号栏天然在外)。
+   * 只在这一栏拦:事件来自输入框(比如右栏聊天框)时一律放行,让它们用原生那套。
+   */
+  function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+    const el = codeTextRef.current
+    if (!el) return
+    e.preventDefault()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const s = window.getSelection()
+    s?.removeAllRanges()
+    s?.addRange(range)
+    readSelection()
+  }
+
+  /** 复制全文:复制的就是眼前载入的这份(没重新读文件),所见即所得 */
+  function copyAll(): void {
+    if (text === '') return
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 800)
+    })
+  }
+
+  const label = sel
+    ? refButtonLabel({
+        canAddRef,
+        refLimit,
+        charCap: CODE_REF_CHARS_MAX,
+        startLine: sel.startLine,
+        endLine: sel.endLine,
+        charCount: sel.code.length
+      })
+    : ''
 
   return (
-    <div className="code-pane">
+    <div className="code-pane" onKeyDown={onPaneKeyDown}>
       <div className="code-pane-head">
         <span className="code-pane-icon" aria-hidden="true">
           <TreeIcon name={file.summary?.icon ?? 'file'} size={15} />
@@ -120,6 +196,17 @@ export function CodePreview({
         <span className="code-pane-name mono" title={file.relPath}>
           {file.relPath}
         </span>
+        {result?.status === 'ok' && text !== '' && (
+          <button
+            type="button"
+            className="btn btn-ghost code-pane-copy"
+            onClick={copyAll}
+            title={result.truncated ? '复制已载入的开头一段(文件太长,没全载)' : '复制这份代码的全文'}
+          >
+            <TreeIcon name="copy" size={12} />
+            {copied ? '已复制' : '复制全文'}
+          </button>
+        )}
         <button type="button" className="btn btn-ghost code-pane-exit" onClick={onClose}>
           退出预览
         </button>
@@ -139,10 +226,9 @@ export function CodePreview({
           )}
           <div
             className="code-view"
+            ref={codeViewRef}
             tabIndex={0}
-            aria-label={`${file.relPath} 的内容预览,选中一段可以引用给小探针`}
-            // 滚动时按钮算的视口坐标就跟不上了,干脆收起来,免得浮在错误的位置
-            onScroll={() => setSel(null)}
+            aria-label={`${file.relPath} 的内容预览,选中一段可以引用给小探针;按 Ctrl+A 全选这里的代码`}
           >
             <pre className="code-gutter" aria-hidden="true">
               {gutter}
@@ -154,20 +240,35 @@ export function CodePreview({
         </>
       )}
       {sel && (
-        <button
-          type="button"
-          className="code-select-btn"
-          style={{ left: `${Math.round(sel.x)}px`, top: `${Math.round(sel.y)}px` }}
-          disabled={!canAddRef}
-          title={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
-          onClick={() => {
-            onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
-            window.getSelection()?.removeAllRanges()
-            setSel(null)
-          }}
-        >
-          {canAddRef ? `引用到对话(第 ${sel.startLine}-${sel.endLine} 行)` : `最多引用 ${refLimit} 段`}
-        </button>
+        <>
+          {/* 从哪开始、到哪结束:一正一反的角括号,贴在第一个字左边、最后一个字右边 */}
+          <span className="code-mark is-start" style={{ left: `${sel.startX}px`, top: `${sel.startY}px` }} aria-hidden="true">
+            <TreeIcon name="markStart" size={13} />
+          </span>
+          <span className="code-mark is-end" style={{ left: `${sel.endX}px`, top: `${sel.endY}px` }} aria-hidden="true">
+            <TreeIcon name="markEnd" size={13} />
+          </span>
+          {/* 左缘竖线:一眼看出这一段是一个整体 */}
+          <span
+            className="code-sel-bar"
+            style={{ left: `${sel.barLeft}px`, top: `${sel.barTop}px`, height: `${sel.barHeight}px` }}
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            className="code-select-btn"
+            style={{ left: `${Math.round(sel.buttonX)}px`, top: `${Math.round(sel.buttonY)}px` }}
+            disabled={!canAddRef}
+            title={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
+            onClick={() => {
+              onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
+              window.getSelection()?.removeAllRanges()
+              setSel(null)
+            }}
+          >
+            {label}
+          </button>
+        </>
       )}
     </div>
   )
