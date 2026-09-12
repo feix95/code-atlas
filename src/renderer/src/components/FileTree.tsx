@@ -123,8 +123,16 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => {
-            // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描
+            // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描。
+            // 主文件夹例外(第一百三十五锤):点根 = 选中 + 保证展开,永不收起 ——
+            // 收起根节点整棵树缩成光杆,没有使用价值,点它的人只想要项目概况;
+            // 真想收根节点,箭头那条路还在
             onSelectFolder(dir)
+            if (dir.relPath === '') {
+              if (!expanded && dir.lazy) onExpandLazy(dir.relPath)
+              else if (!expanded) setOpen(true)
+              return
+            }
             toggleExpand()
           }}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, dir) : undefined}
