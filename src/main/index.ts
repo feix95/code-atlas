@@ -10,9 +10,11 @@ import {
   AGENT_MAX_ROUNDS,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
+  agentPromptBudget,
   agentReadChars,
   agentRound,
   agentStepText,
+  compressAgentMessages,
   extractToolCalls,
   mergeUsage,
   sanitizeAgentRelPath,
@@ -746,12 +748,27 @@ async function runAgentChat(input: {
   if (systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${AGENT_ADDENDUM}` }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
+  // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成纸条时,按它解锁重读
+  const callIdToKey = new Map<string, string>()
+  const promptBudget = agentPromptBudget(ctx, replyCap)
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
   let rounds = 0
-  addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字`)
+  addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
+    // 锅快满了先腾地方(第一百三十七锤):早先翻看的大段原文提炼成占位纸条,
+    // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
+    const compressed = compressAgentMessages(messages, promptBudget)
+    if (compressed) {
+      for (const callId of compressed.freedCallIds) {
+        const key = callIdToKey.get(callId)
+        if (key) doneCalls.delete(key)
+      }
+      messages.splice(0, messages.length, ...compressed.messages)
+      sendAgentStep(event, requestId, `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位纸条 —— 要重温随时能再翻`)
+      addDevLog('request', `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了纸条,腾出约 ${compressed.freedCallIds.length} 处重读权`)
+    }
     const useTools = rounds < AGENT_MAX_ROUNDS
     if (!useTools) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
     rounds += 1
@@ -806,6 +823,7 @@ async function runAgentChat(input: {
         continue
       }
       doneCalls.add(key)
+      callIdToKey.set(call.id, key)
       const exec = callName === 'list_files' ? await agentListFiles(rootPath, relPath) : await agentReadFile(rootPath, relPath, readChars)
       sendAgentStep(event, requestId, agentStepText(callName, relPath === '' ? '(项目根目录)' : relPath, exec.ok ? 'done' : 'error', exec.hint))
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })

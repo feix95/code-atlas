@@ -24,11 +24,92 @@ export const AGENT_MAX_DEPTH = 12
 export const AGENT_FILE_MAX_BYTES = 5 * 1024 * 1024
 
 /**
- * 单次读文件的字数额度,看锅下菜:锅小少读点,锅大放宽到 8000 字。
- * 16384 的锅 → 4096 字;8192 → 2048(触底);32768 往上 → 8000(封顶)。
+ * 单次读文件的字数额度,看锅下菜:锅小少读点,锅大放宽到 12000 字。
+ * 16384 的锅 → 5461 字;8192 → 2731(触底保护前);4096 → 2000(触底);32768 往上 → 12000(封顶)。
+ * 第一百三十七锤放宽了一档(原 8000/除四):锅快满有自动压缩接着(同一锤),
+ * 读可以大胆些 —— 一次读全,好过读半截再花一轮补读。
  */
 export function agentReadChars(contextTokens: number): number {
-  return Math.min(8000, Math.max(2000, Math.floor(contextTokens / 4)))
+  return Math.min(12000, Math.max(2000, Math.floor(contextTokens / 3)))
+}
+
+/** 账面换算:约几个字算一个 token。代码偏 4 字一个,中文偏 2 字一个,取 3 打粗账 */
+export const AGENT_CHARS_PER_TOKEN = 3
+
+/** 压缩时留原样的最近工具结果条数:最新的资料模型正要用,绝不压 */
+export const AGENT_KEEP_RECENT_TOOLS = 2
+
+/** 工具结果压成占位纸条的门槛:比这短的字数压了也省不出几个 token,不值得动 */
+export const AGENT_STUB_MIN_CHARS = 300
+
+/** 占位纸条保留原文开头的字数:留个开头,模型还记得这段大概是什么 */
+export const AGENT_STUB_HEAD_CHARS = 200
+
+/**
+ * 对话账面估算(纯函数,自测覆盖):所有消息按字数折成约多少 token。
+ * assistant 的工具调用参数也是账面的一部分(arguments 可能是很长的 JSON)。
+ */
+export function estimateMessagesTokens(messages: AgentChatMessage[]): number {
+  let chars = 0
+  for (const message of messages) {
+    chars += (typeof message.content === 'string' ? message.content : '').length
+    if ('tool_calls' in message && message.tool_calls) {
+      for (const call of message.tool_calls) {
+        chars += call.function.name.length + call.function.arguments.length + 16
+      }
+    }
+  }
+  return Math.ceil(chars / AGENT_CHARS_PER_TOKEN)
+}
+
+/**
+ * 提示词侧的预算(纯函数,自测覆盖):锅减去留给答案的空间(replyCap,思考另算的
+ * 也含在调用方传进来的数里),再打八折当警戒线 —— 账面超过它就压缩。
+ * 算出来再小也不低于 2048:锅再小,压到没东西可读还不如让引擎自己喊挤。
+ */
+export function agentPromptBudget(ctx: number, replyCap: number): number {
+  const usable = Math.max(2048, ctx - Math.max(1024, replyCap))
+  return Math.max(2048, Math.floor(usable * 0.8))
+}
+
+/** 压缩的结果:换好的新对话 + 被压掉的工具结果 id(主进程据此解锁「不许翻第二遍」) */
+export interface AgentCompression {
+  messages: AgentChatMessage[]
+  freedCallIds: string[]
+  compressedCount: number
+}
+
+/**
+ * 上下文自动压缩(纯函数,自测覆盖,第一百三十七锤):账面超过预算时,把较早的
+ * 工具结果(翻文件读进来的大段原文)换成占位纸条,最近 2 条留原样。
+ * 只动 tool 消息 —— 人设、用户的提问、assistant 的喊话都不碰;协议要求
+ * tool 结果和 assistant 的 tool_calls 成对,只缩内容不动条数,对账关系不破。
+ * 不超预算返回 null(啥也不用做);原数组不动,压不压、压多少都由调用方拍板。
+ */
+export function compressAgentMessages(messages: AgentChatMessage[], budgetTokens: number): AgentCompression | null {
+  if (estimateMessagesTokens(messages) <= budgetTokens) return null
+  const toolIdx: number[] = []
+  for (const [index, message] of messages.entries()) {
+    if (message.role === 'tool') toolIdx.push(index)
+  }
+  // 倒数第 1、2 条留原样,更早的长条目压成纸条
+  const keepFrom = Math.max(0, toolIdx.length - AGENT_KEEP_RECENT_TOOLS)
+  const freedCallIds: string[] = []
+  let compressedCount = 0
+  const next = messages.map((message, index) => {
+    if (message.role !== 'tool' || !toolIdx.includes(index) || toolIdx.indexOf(index) >= keepFrom) return message
+    if (message.content.length <= AGENT_STUB_MIN_CHARS) return message
+    compressedCount += 1
+    freedCallIds.push(message.tool_call_id)
+    const head = message.content.slice(0, AGENT_STUB_HEAD_CHARS).replaceAll('\n', ' ')
+    return {
+      role: 'tool' as const,
+      tool_call_id: message.tool_call_id,
+      content: `${head}……(这条是早先翻看的资料,对话锅快满了,已提炼成占位纸条;原文约 ${message.content.length} 字。要重温就再调一次工具重读,允许重读)`
+    }
+  })
+  if (compressedCount === 0) return null
+  return { messages: next, freedCallIds, compressedCount }
 }
 
 /**
@@ -91,7 +172,9 @@ export const AGENT_ADDENDUM = `
 - 需要看某个文件的具体内容时,用 read_file 读它
 - 路径一律用项目内的相对路径;当前参考资料里提到的路径可以直接用
 - 规矩:同一样东西不翻第二遍;翻几次能答的就别翻个没完;资料够了就直接回答,
-  回答时像平常一样说人话,不要提「工具」「函数」这些词,就说你翻了翻项目`
+  回答时像平常一样说人话,不要提「工具」「函数」这些词,就说你翻了翻项目
+- 翻看记录太多时,较早的会提炼成占位纸条(写着原文约多少字);纸条只是提词,
+  要重温原文就再调一次工具重读,这种重读不算翻第二遍`
 /** 同一样东西翻第二遍时,当工具结果喂回去的提醒(缰绳之一) */
 export const REPEAT_NUDGE =
   '这个你刚才已经看过了,名单和内容都没变 —— 别再翻,直接用已经看到的资料继续干活或回答。'

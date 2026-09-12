@@ -4,19 +4,24 @@
 import assert from 'node:assert/strict'
 import {
   AGENT_ADDENDUM,
+  AGENT_KEEP_RECENT_TOOLS,
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_ROUNDS,
   AGENT_TOOLS,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
+  agentPromptBudget,
   agentReadChars,
   agentStepText,
   assembleToolCalls,
+  compressAgentMessages,
+  estimateMessagesTokens,
   extractToolCalls,
   mergeUsage,
   parseToolArgs,
   sanitizeAgentRelPath,
-  toolCallKey
+  toolCallKey,
+  type AgentChatMessage
 } from '../src/ai/agent.ts'
 
 function main(): void {
@@ -33,10 +38,11 @@ function main(): void {
   assert.equal(sanitizeAgentRelPath('/etc/passwd'), null, '绝对路径拒收')
   assert.equal(sanitizeAgentRelPath('.\\..\\secrets'), null, '反斜杠版上跳也拒收')
 
-  // ── 2. 读文件额度:看锅下菜,穷有底富有顶 ──
+  // ── 2. 读文件额度:看锅下菜,穷有底富有顶(第一百三十七锤放宽一档,压缩接客) ──
   assert.equal(agentReadChars(4096), 2000, '小锅触底:一段也保 2000 字')
-  assert.equal(agentReadChars(16384), 4096, '16384 的锅读 4096 字')
-  assert.equal(agentReadChars(65536), 8000, '大锅封顶:最多 8000 字')
+  assert.equal(agentReadChars(16384), 5461, '16384 的锅读约 5461 字')
+  assert.equal(agentReadChars(32768), 10922, '32768 的锅读约 10922 字')
+  assert.equal(agentReadChars(65536), 12000, '大锅封顶:最多 12000 字')
 
   // ── 3. 工具参数清洗:arguments 是字符串 JSON、直接对象、坏账三种都接得住 ──
   assert.deepEqual(parseToolArgs('{"relPath":"src"}'), { relPath: 'src' }, '字符串 JSON 解析')
@@ -116,7 +122,42 @@ function main(): void {
   const [noArgs] = assembleToolCalls([{ index: 0, id: 'c', function: { name: 'list_files' } }])
   assert.equal(noArgs.args, null, '一个字参数都没给的,args 为 null 走「参数不合法」的喂回')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 全部通过')
+  // ── 11. 上下文自动压缩(第一百三十七锤):锅快满时旧资料变纸条,近的留原样 ──
+  const longContent = 'A'.repeat(2000)
+  const shortContent = 'B'.repeat(100)
+  const conversation: AgentChatMessage[] = [
+    { role: 'system', content: '你是助手' },
+    { role: 'user', content: '帮我找东西' },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'read_file', arguments: '{"relPath":"a.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'c1', content: longContent },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'c2', type: 'function', function: { name: 'read_file', arguments: '{"relPath":"b.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'c2', content: longContent },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'c3', type: 'function', function: { name: 'read_file', arguments: '{"relPath":"c.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'c3', content: longContent },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'c4', type: 'function', function: { name: 'read_file', arguments: '{"relPath":"d.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'c4', content: shortContent }
+  ]
+  const budget = agentPromptBudget(16384, 2048)
+  assert.ok(budget >= 8000 && budget <= 20000, '16384 的锅扣完答案额度再打八折,警戒线是个讲道理的数')
+  assert.equal(compressAgentMessages(conversation, Number.MAX_SAFE_INTEGER), null, '账面没超预算:一根手指都不动')
+  const squeezed = compressAgentMessages(conversation, 100)
+  assert.ok(squeezed, '超了预算:要动手压缩')
+  assert.equal(squeezed!.compressedCount, 2, '四条工具结果里,两条长的旧账压成纸条')
+  assert.deepEqual(squeezed!.freedCallIds, ['c1', 'c2'], '被压的 id 上报名单,主进程好解锁重读')
+  const squeezedTools = squeezed!.messages.filter((m) => m.role === 'tool')
+  assert.ok(squeezedTools[0].content.includes('占位纸条'), '旧账第一条换成了纸条')
+  assert.ok(squeezedTools[0].content.includes('2000'), '纸条注明原文约多少字')
+  assert.ok(squeezedTools[1].content.includes('占位纸条'), '旧账第二条同样换成纸条')
+  assert.equal(squeezedTools[2].content, longContent, '倒数第二条留原样:最新的资料模型正要用')
+  assert.equal(squeezedTools[3].content, shortContent, '最新一条留原样')
+  assert.deepEqual(squeezed!.messages[0], conversation[0], '人设不碰')
+  assert.deepEqual(squeezed!.messages[1], conversation[1], '用户的提问不碰')
+  assert.equal(squeezed!.messages.length, conversation.length, '只缩内容不动条数:tool 和 tool_calls 的对账关系不破')
+  assert.ok(conversation[3].role === 'tool' && conversation[3].content === longContent, '原对话数组一个字都不动(纯函数)')
+  assert.equal(compressAgentMessages(conversation, estimateMessagesTokens(conversation)), null, '账面刚好等于预算:不压')
+  assert.ok(AGENT_KEEP_RECENT_TOOLS >= 1 && AGENT_KEEP_RECENT_TOOLS <= 4, '留原样的条数得是个讲道理的数')
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 全部通过')
 }
 
 main()
