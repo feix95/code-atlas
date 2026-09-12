@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef } from '@shared/preview'
@@ -105,6 +106,20 @@ function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | null {
   return null
 }
 
+/** 收齐全树的 relPath,给聊天文件链接建索引用:AI 提到谁,就拿这份花名册查户口 */
+function collectRelPaths(node: ScanTreeNode): string[] {
+  const out: string[] = []
+  const walk = (n: ScanTreeNode): void => {
+    if (n.type === 'file') {
+      out.push(n.relPath)
+      return
+    }
+    for (const child of n.children) walk(child)
+  }
+  walk(node)
+  return out
+}
+
 /** 按 relPath 找目录节点:功能定位指中文件夹时,跳转走这里 */
 function findDir(node: ScanTreeNode, relPath: string): ScanDirNode | null {
   if (node.type === 'directory') {
@@ -169,6 +184,11 @@ function App(): React.JSX.Element {
   const [preview, setPreview] = useState<ScanFileNode | null>(null)
   // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;退出预览即清
   const [previewRefs, setPreviewRefs] = useState<ChatCodeRef[]>([])
+  // 聊天文件链接的跳行目标:点了带行号的链接,预览窗滚到那一行;seq 计数让同一行连点也能再跳
+  const [previewJump, setPreviewJump] = useState<{ line: number; seq: number } | null>(null)
+  const jumpSeqRef = useRef(0)
+  // 文件链接索引:扫描树一变就重建,AI 提到的文件拿它查户口;查得到的才画成可点链接
+  const fileLinkIndex = useMemo(() => (result ? buildFileLinkIndex(collectRelPaths(result.tree)) : null), [result])
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -550,8 +570,27 @@ function App(): React.JSX.Element {
     if (f) {
       setPreview(f)
       setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
+      setPreviewJump(null) // 从树上进的预览不带跳行,清掉旧的免得莫名滚一下
     }
   }
+
+  // 点聊天里的文件链接:树上查到就开左边预览,带行号的连滚带跳直达那一行;
+  // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞
+  function openFileLink(relPath: string, line?: number): void {
+    if (!result) return
+    const f = findFile(result.tree, relPath)
+    if (!f) {
+      chat.note(`${relPath} 现在不在目录树里了(可能刚被删掉或改名),开不了预览`)
+      return
+    }
+    setPreview(f)
+    setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
+    jumpSeqRef.current += 1
+    setPreviewJump(line !== undefined ? { line, seq: jumpSeqRef.current } : null)
+  }
+
+  // 文件链接上下文:索引 + 点击去处;没扫出树(还在首页)就没有链接这回事
+  const fileLinks: FileLinkTarget | null = fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink } : null
 
   // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
   function addPreviewRef(ref: ChatCodeRef): void {
@@ -793,6 +832,7 @@ function App(): React.JSX.Element {
                 refLimit={CODE_REFS_MAX}
                 onAddRef={addPreviewRef}
                 onClose={exitPreview}
+                jump={previewJump}
               />
             ) : (
               <>
@@ -849,6 +889,7 @@ function App(): React.JSX.Element {
                 onClose={exitPreview}
                 chat={chat}
                 chatContext={chatContext ?? buildFileAttachment(preview, null)}
+                fileLinks={fileLinks}
               />
             ) : selectedFile && result && activeTab === 'chat' ? (
               // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
@@ -869,6 +910,7 @@ function App(): React.JSX.Element {
                 refs={previewRefs}
                 onRemoveRef={removePreviewRef}
                 onDropNode={handleDropNode}
+                fileLinks={fileLinks}
               />
             ) : selectedFile && result ? (
               <FileDetailView
@@ -1059,7 +1101,8 @@ function ChatTabDetailPage({
   chatContext,
   refs,
   onRemoveRef,
-  onDropNode
+  onDropNode,
+  fileLinks
 }: {
   crumbs: Crumb[]
   iconName: string
@@ -1078,6 +1121,7 @@ function ChatTabDetailPage({
   refs?: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+  fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   return (
     <div className="detail-page">
@@ -1096,7 +1140,7 @@ function ChatTabDetailPage({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} />
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} />
       </div>
     </div>
   )
@@ -1115,7 +1159,8 @@ function PreviewDetailView({
   onRemoveRef,
   onClose,
   chat,
-  chatContext
+  chatContext,
+  fileLinks
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1124,6 +1169,7 @@ function PreviewDetailView({
   onClose: () => void
   chat: AiChatApi
   chatContext: ChatContextAttachment
+  fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新
   const suggestions = useChatSuggestions({ rootPath: result.rootPath, file, messages: chat.messages, busy: chat.busy })
@@ -1138,7 +1184,7 @@ function PreviewDetailView({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} />
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} />
       </div>
     </div>
   )

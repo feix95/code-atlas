@@ -39,7 +39,8 @@ export function CodePreview({
   canAddRef,
   refLimit,
   onAddRef,
-  onClose
+  onClose,
+  jump
 }: {
   rootPath: string
   file: ScanFileNode
@@ -49,6 +50,8 @@ export function CodePreview({
   refLimit: number
   onAddRef: (ref: ChatCodeRef) => void
   onClose: () => void
+  /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
+  jump?: { line: number; seq: number } | null
 }): React.JSX.Element {
   const [result, setResult] = useState<FilePreviewResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -77,6 +80,22 @@ export function CodePreview({
   }, [rootPath, file.relPath])
 
   const text = result?.status === 'ok' ? result.text : ''
+
+  // 聊天文件链接点的跳行:正文载入后滚到目标行。行号是模型报的,只能信个大概 ——
+  // 超出文件就夹到最后一行,负数夹回第一行,最坏结果是停在文件尾,绝不是红字报错。
+  // 目标行落在视口上三分之一,让眼睛先看到它上面的东西(它在讲哪段代码,有上下文)。
+  useEffect(() => {
+    if (!jump || result?.status !== 'ok') return
+    const view = codeViewRef.current
+    const pre = codeTextRef.current
+    if (!view || !pre) return
+    const total = text === '' ? 0 : text.split('\n').length
+    if (total === 0) return
+    const target = Math.min(Math.max(jump.line, 1), total)
+    const lh = Number.parseFloat(window.getComputedStyle(pre).lineHeight)
+    const lineHeight = Number.isFinite(lh) && lh > 0 ? lh : 20
+    view.scrollTop = Math.max(0, (target - 1) * lineHeight - view.clientHeight / 3)
+  }, [jump, result, text])
 
   // 行号拼成一整段文本(一个节点),而不是两千个 span —— 大文件也不给 DOM 添堵
   const gutter = useMemo(() => {
