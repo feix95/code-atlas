@@ -387,7 +387,7 @@ export async function agentRound(
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
-      const friendly = friendlyHttpError(res.status, detail)
+      const friendly = friendlyHttpError(res.status, detail, config.engine)
       return {
         status: 'error',
         text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`,

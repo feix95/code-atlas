@@ -111,7 +111,7 @@ export function resolveAiTarget(
     return {
       ok: true,
       // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四锤)
-      target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model, timings: true }
+      target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model, timings: true, engine: 'builtin' }
     }
   }
   if (!config.lmstudio.model.trim()) {
@@ -119,6 +119,6 @@ export function resolveAiTarget(
   }
   return {
     ok: true,
-    target: { baseUrl: config.lmstudio.baseUrl, model: config.lmstudio.model, apiKey: config.lmstudio.apiKey || undefined }
+    target: { baseUrl: config.lmstudio.baseUrl, model: config.lmstudio.model, apiKey: config.lmstudio.apiKey || undefined, engine: 'lmstudio' }
   }
 }

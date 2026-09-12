@@ -1032,35 +1032,42 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                         </>
                       )}
 
-                      <div className="cfg-field-head">
-                        <label htmlFor="cfg-context-size">模型上下文</label>
-                        <span>tokens · 留空自动探测</span>
-                      </div>
-                      <div className="cfg-path-input">
-                        <Icon name="gauge" size={13} />
-                        <input
-                          id="cfg-context-size"
-                          inputMode="numeric"
-                          value={contextRaw}
-                          placeholder={`自动向模型服务探测(探测不到按 ${DEFAULT_CONTEXT_SIZE} 算)`}
-                          onChange={(e) => {
-                            // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
-                            setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
-                          }}
-                          onBlur={() => {
-                            // 失焦落账:数字归到合法范围,空串交回自动探测;框里当场改字,眼见为实
-                            const committed = clampContextSize(contextRaw)
-                            setContextRaw(committed === undefined ? '' : String(committed))
-                            if (draftConfig.contextSize !== committed) {
-                              setDraftConfig({ ...draftConfig, contextSize: committed })
-                            }
-                          }}
-                        />
-                      </div>
-                      <p className="cfg-field-help">
-                        模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。
-                        范围 512 ~ 1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
-                      </p>
+                      {/* 模型上下文认主内置引擎:它在那边是真参数(喂给引擎的 -c);
+                          LM Studio 的锅归 LM Studio 管,App 只信探测,这边连框都不给 —— 免得填个数
+                          和那边打架 */}
+                      {draftConfig.provider === 'builtin' && (
+                        <>
+                          <div className="cfg-field-head">
+                            <label htmlFor="cfg-context-size">模型上下文</label>
+                            <span>tokens · 留空自动探测</span>
+                          </div>
+                          <div className="cfg-path-input">
+                            <Icon name="gauge" size={13} />
+                            <input
+                              id="cfg-context-size"
+                              inputMode="numeric"
+                              value={contextRaw}
+                              placeholder={`自动向模型服务探测(探测不到按 ${DEFAULT_CONTEXT_SIZE} 算)`}
+                              onChange={(e) => {
+                                // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
+                                setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
+                              }}
+                              onBlur={() => {
+                                // 失焦落账:数字归到合法范围,空串交回自动探测;框里当场改字,眼见为实
+                                const committed = clampContextSize(contextRaw)
+                                setContextRaw(committed === undefined ? '' : String(committed))
+                                if (draftConfig.contextSize !== committed) {
+                                  setDraftConfig({ ...draftConfig, contextSize: committed })
+                                }
+                              }}
+                            />
+                          </div>
+                          <p className="cfg-field-help">
+                            模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。
+                            范围 512 ~ 1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

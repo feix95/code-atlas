@@ -36,6 +36,7 @@ import {
   timeoutText,
   friendlyHttpError,
   budgetsForContext,
+  resolveContextSize,
   DEFAULT_CONTEXT_SIZE,
   hasWebLookupSignal,
   hasSearchIntent,
@@ -530,6 +531,7 @@ async function main(): Promise<void> {
   assert.ok(lmOk.ok, 'LM Studio 配好模型应解析成功')
   assert.equal(lmOk.ok && lmOk.target.baseUrl, 'http://127.0.0.1:1234/v1', '目标地址来自 lmstudio 设置')
   assert.equal(lmOk.ok && lmOk.target.model, 'gpt-本地', '目标模型名来自 lmstudio 设置')
+  assert.equal(lmOk.ok && lmOk.target.engine, 'lmstudio', '外接目标盖章 lmstudio(报错话术按它分家)')
 
   const lmNoModel = resolveAiTarget(lmConfig(''))
   assert.ok(!lmNoModel.ok, 'LM Studio 没选模型应解析失败')
@@ -543,6 +545,7 @@ async function main(): Promise<void> {
   assert.ok(biOk.ok, '内置 Provider 有运行时应解析成功')
   assert.equal(biOk.ok && biOk.target.baseUrl, 'http://127.0.0.1:8766/v1', '目标地址来自子进程运行时')
   assert.equal(biOk.ok && biOk.target.model, 'qwen-7b', '目标模型名来自子进程报告')
+  assert.equal(biOk.ok && biOk.target.engine, 'builtin', '内置目标盖章 builtin(报错话术按它分家)')
 
   // ── 6.5 引擎自动定位:填了就用填的;没填找 app 自带的;都没有给人话错误 ──
   const exeDir = await mkdtemp(join(tmpdir(), 'codeatlas-builtin-'))
@@ -1042,6 +1045,19 @@ async function main(): Promise<void> {
   assert.ok(friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes('脑容量'), '小葵的 400 翻译成人话')
   assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
   assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
+  // ── 上下文指路话术按引擎分家 ──
+  assert.ok(friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('LM Studio'), '外接的指路去 LM Studio 调大')
+  assert.ok(!friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('模型上下文'), '外接不再指去设置里那个消失的框')
+  assert.ok(friendlyHttpError(400, 'exceeds the available context size', 'builtin')?.includes('模型上下文'), '内置照旧指去设置')
+  assert.ok(friendlyHttpError(400, 'exceeds the available context size')?.includes('模型上下文'), '不带引擎名号按内置口径(兼容老调用)')
+
+  // ── 上下文认主:手填数只在内置当真,LM Studio 只信探测 ──
+  assert.equal(resolveContextSize('builtin', 8192, 32768), 8192, '内置:手填的数说了算,探测结果不抢座')
+  assert.equal(resolveContextSize('builtin', undefined, 32768), 32768, '内置:没手填就吃探测')
+  assert.equal(resolveContextSize('builtin', undefined, null), DEFAULT_CONTEXT_SIZE, '内置:两头都没有落默认窗口')
+  assert.equal(resolveContextSize('lmstudio', 4096, 32768), 32768, 'LM Studio:存档里的旧手填数隐身,只信探测')
+  assert.equal(resolveContextSize('lmstudio', undefined, null), DEFAULT_CONTEXT_SIZE, 'LM Studio:探测失败按默认兜底')
+  assert.equal(resolveContextSize('lmstudio', 4096, null), DEFAULT_CONTEXT_SIZE, 'LM Studio:旧数加探测失败,一样兜底不认旧数')
 
   // ── 第八十六锤:KV 缓存估算(纯函数) ──
   assert.equal(estimateKvBytes(4096, 14.26 * G), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')

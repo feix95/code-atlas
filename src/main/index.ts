@@ -74,7 +74,8 @@ import {
   SYSTEM_PROMPT,
   STYLE_SAMPLE_SYSTEM,
   STYLE_SAMPLE_QUESTION,
-  isBinaryFile
+  isBinaryFile,
+  resolveContextSize
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
@@ -288,7 +289,9 @@ async function resolveChatTargetOrError(): Promise<
   // 过了这关就是真要使唤模型了:状态栏进「忙」(第八十四锤)
   lastActivityProvider = config.provider
   announceActivityBusy(config.provider)
-  const ctx = config.contextSize ?? (await probeContextSize(resolved.target, config.provider)) ?? DEFAULT_CONTEXT_SIZE
+  // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的锅归它自己管,
+  // 一律只信探测(存档里给内置填的旧数隐身不管事),探测不到按默认窗口兜底
+  const ctx = resolveContextSize(config.provider, config.contextSize, await probeContextSize(resolved.target, config.provider))
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
   return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx }

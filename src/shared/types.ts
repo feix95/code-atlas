@@ -240,6 +240,11 @@ export interface ChatTarget {
    * 引擎才肯在流里报「读了多少 token / 吐了多少 token / 多快」。外接服务不认识这些旗子,不塞
    */
   timings?: boolean
+  /**
+   * 引擎名号(resolveAiTarget 盖章):报错话术按它分家 —— 上下文装不下时,
+   * 内置指去设置调「模型上下文」,外接指去 LM Studio 调大再重载模型
+   */
+  engine?: 'builtin' | 'lmstudio'
 }
 
 /**

@@ -753,6 +753,20 @@ export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens
   }
 }
 
+/**
+ * 上下文认主:手动填的「模型上下文」只属于内置引擎 —— 它是真参数,
+ * 直接喂给引擎的 -c;LM Studio 的锅归 LM Studio 管,App 一律只信探测,存档里的手填数不看
+ * (不然设置页藏了字段,旧数还隐身管事)。探测失败(接口没开全/版本老)按默认窗口兜底。
+ */
+export function resolveContextSize(
+  provider: 'builtin' | 'lmstudio',
+  manual: number | undefined,
+  probed: number | null
+): number {
+  if (provider === 'builtin' && manual !== undefined && manual >= 512) return manual
+  return probed !== null && probed >= 512 ? probed : DEFAULT_CONTEXT_SIZE
+}
+
 /** 常见二进制/媒体后缀(小写含点):这些读不出文本,走「文件头认类型」那一支 */
 const BINARY_EXTS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tif', '.tiff',
@@ -1138,10 +1152,14 @@ export function timeoutText(): string {
   return '等了很久没等到第一个字:材料大预处理就慢,引擎也可能卡住了 —— 不想等就「取消」,清点一下参考材料再问'
 }
 
-/** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文) */
-export function friendlyHttpError(status: number, detail: string): string | null {
+/** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文)。
+ * 上下文的指路话术按引擎分家:内置指回设置里的「模型上下文」,
+ * 外接 LM Studio 的上下文设置不归 App 管,指去 LM Studio 调大再重载模型 */
+export function friendlyHttpError(status: number, detail: string, engine?: 'builtin' | 'lmstudio'): string | null {
   if (isContextOverflow(`${status} ${detail}`)) {
-    return '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
+    return engine === 'lmstudio'
+      ? '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去 LM Studio 把上下文调大,再重新加载模型'
+      : '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
   }
   return null
 }
@@ -1232,7 +1250,7 @@ async function explainWithMessagesCore(
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
-      const friendly = friendlyHttpError(res.status, detail)
+      const friendly = friendlyHttpError(res.status, detail, config.engine)
       if (friendly) {
         return { status: 'error', text: friendly, model: config.model, durationMs: Date.now() - startedAt }
       }
