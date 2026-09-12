@@ -18,7 +18,7 @@
 
 - 一次只开发一个模块;禁止假实现 / TODO 占位 / 空函数
 - 每完成一个模块必须自测(typecheck / lint / test / build 全绿)
-- **大锤单独走,琐碎攒着走(2026-09-07 小葵改规矩)**:新功能、成块的改动照旧一锤一 commit 一 push;对已有功能的小琐碎改动(改个数值、调个位置这类),不单独 push —— 本地不 Commit(或随便 Commit 但先不 Push),攒满 5 条后在本地只做 1 次逻辑完整的 git commit,再 push 这一次。攒了哪几条看下面的「攒条清单」;锤号照旧只记 CHANGELOG.md(攒条落地时一批各记各的)
+- **大锤单独走,琐碎攒着走(2026-09-07 小葵改规矩)**:新功能、成块的改动照旧一锤一 commit 一 push;对已有功能的小琐碎改动(改个数值、调个位置这类),不单独 push —— 本地不 Commit(或随便 Commit 但先不 Push),攒满 5 条后在本地只做 1 次逻辑完整的 git commit,再 push 这一次。攒了哪几条看下面的「攒条清单」;攒条落地时 CHANGELOG 按一行式规范照常记(清单里留着的旧锤号引用仅作历史索引,不再新增)
 - 攒条未落地时来了大锤:大锤照旧单独 commit + push;两边若改到同一个文件会纠缠,先把攒条批次落地(哪怕不满 5 条)再开大锤
 - 路径契约:节点只存 relPath,主进程唯一经 shared/paths 的 joinRoot 拼绝对路径
 - UI 文案说人话:界面出现的每个词,非程序员要看得懂(用户是小白,不懂 llama-server 这类术语)
@@ -42,7 +42,7 @@
 
 - commit message 用 Conventional Commits:`<类型>(<范围>): <大白话说明>`
 - 类型固定从这几种里选:`feat`(新功能)、`fix`(修 bug)、`docs`(只改文档)、`refactor`(整理不改行为)、`chore`(杂活:依赖/配置/构建)、`perf`(性能优化);范围按实际改动模块起名(如 scanner / window / ai / appearance)
-- 「第几锤」编号不进 commit message,只记进 CHANGELOG.md(一条改动两笔记录:git log 一行规范话,CHANGELOG 一条大白话)
+- commit message 和 CHANGELOG.md 都用 Conventional Commits 一行式:`<类型>(<范围>): <大白话说明>`(2026-09-13 小葵定:CHANGELOG 换 commit 式范本,不再用「第几锤」编号,新记录按时间顺序往最下面加)
 - 历史已推的 commit 保持原样,不重写历史
 
 ## 攒条清单(琐碎改动批次,落地一批清一次)
