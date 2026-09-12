@@ -485,8 +485,82 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
 }
 
 /**
+ * 单飞闸门(纯函数,自测覆盖,第一百三十六锤):同一时刻只放一个任务进场,
+ * 后到的调用直接等同一份承诺 —— 哪怕参数不同(引擎一个 app 只养一份,
+ * 后到的就地等第一份,不自己再拉)。任务收场(成或败)闸门自动放行。
+ * 修的病:两个请求同秒到达时,旧的「先检查后启动」两头都看见引擎没起,
+ * 各自 spawn 一份 llama-server,同一个模型往内存装两遍(实测一晚吃掉 29GB)。
+ */
+export function createSingleFlight<A extends unknown[], T>(task: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+  let inFlight: Promise<T> | null = null
+  return (...args: A) => {
+    if (inFlight) return inFlight
+    const running = task(...args)
+    inFlight = running
+    const release = (): void => {
+      if (inFlight === running) inFlight = null
+    }
+    running.then(release, release)
+    return running
+  }
+}
+
+const startBuiltinSingleFlight = createSingleFlight(
+  async (
+    settings: AiBuiltinSettings,
+    contextSize: number,
+    manualContext: number | null
+  ): Promise<{ baseUrl: string; model: string }> => {
+    let serverPath: string
+    try {
+      serverPath = resolveServerProgram(settings.serverPath)
+    } catch (err) {
+      announceBuiltinError(settings.modelPath, err)
+      throw err
+    }
+    const modelPath = settings.modelPath.trim()
+    if (!modelPath) {
+      const err = new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
+      announceBuiltinError(modelPath, err)
+      throw err
+    }
+
+    // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
+    const reap = await reapOrphanServer()
+    if (reap.blockedBy) {
+      const err = new Error(`内置模型的端口 ${BUILTIN_PORT} 被别的程序占着(${reap.blockedBy}),先关掉那个程序再试`)
+      announceBuiltinError(modelPath, err)
+      throw err
+    }
+
+    const baseUrl = `http://127.0.0.1:${BUILTIN_PORT}/v1`
+    readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize)
+    try {
+      const target = await readyPromise
+      return target
+    } catch (err) {
+      // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
+      const facts = builtinIdleFacts(modelPath)
+      if (stopping) {
+        announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
+      } else {
+        // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
+        if (err instanceof EngineExitError) {
+          const spec = await queryMachineSpec()
+          err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, Math.max(512, Math.floor(contextSize))), manualContext)
+        }
+        announceBuiltinError(modelPath, err)
+      }
+      stopBuiltinServer()
+      throw err
+    }
+  }
+)
+
+/**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
- * 已在跑就直接复用;没跑就收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
+ * 已在跑就直接复用;没跑就走单飞闸门拉起(同秒并发的第二个请求等同一份,
+ * 绝不双生,第一百三十六锤):收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
  * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填按默认(shared/aiDefaults)。
  * 引擎优先用 app 自带的,用户只管选模型文件。
  * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面;状态栏同步收到播报。
@@ -497,50 +571,7 @@ export async function ensureBuiltinServer(
   manualContext: number | null = null
 ): Promise<{ baseUrl: string; model: string }> {
   if (isBuiltinRunning() && readyPromise) return readyPromise
-
-  let serverPath: string
-  try {
-    serverPath = resolveServerProgram(settings.serverPath)
-  } catch (err) {
-    announceBuiltinError(settings.modelPath, err)
-    throw err
-  }
-  const modelPath = settings.modelPath.trim()
-  if (!modelPath) {
-    const err = new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
-    announceBuiltinError(modelPath, err)
-    throw err
-  }
-
-  // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
-  const reap = await reapOrphanServer()
-  if (reap.blockedBy) {
-    const err = new Error(`内置模型的端口 ${BUILTIN_PORT} 被别的程序占着(${reap.blockedBy}),先关掉那个程序再试`)
-    announceBuiltinError(modelPath, err)
-    throw err
-  }
-
-  const baseUrl = `http://127.0.0.1:${BUILTIN_PORT}/v1`
-  readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize)
-  try {
-    const target = await readyPromise
-    return target
-  } catch (err) {
-    // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
-    const facts = builtinIdleFacts(modelPath)
-    if (stopping) {
-      announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
-    } else {
-      // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
-      if (err instanceof EngineExitError) {
-        const spec = await queryMachineSpec()
-        err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, Math.max(512, Math.floor(contextSize))), manualContext)
-      }
-      announceBuiltinError(modelPath, err)
-    }
-    stopBuiltinServer()
-    throw err
-  }
+  return startBuiltinSingleFlight(settings, contextSize, manualContext)
 }
 
 /** 就绪后问服务加载了哪个模型(llama-server 以模型文件名作为模型 id) */

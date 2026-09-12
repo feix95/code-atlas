@@ -56,7 +56,7 @@ import {
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX } from '../src/shared/aiDefaults.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
@@ -574,6 +574,34 @@ async function main(): Promise<void> {
     'tasklist CSV 应抠出映像名'
   )
   assert.equal(parseTasklistImage('INFO: 没有运行的任务匹配指定的标准。'), '', '查无此进程应得空串,绝不凭空杀人')
+
+  // ── 6.5 单飞闸门(第一百三十六锤):并发的第二个调用等同一份,绝不各起各的 ──
+  {
+    let spawns = 0
+    let releaseGate: (v: string) => void = () => {}
+    const gate = new Promise<string>((resolve) => {
+      releaseGate = resolve
+    })
+    const gated = createSingleFlight(async () => {
+      spawns += 1
+      return gate
+    })
+    // 三路并发(模拟「点文件出预测 + 发聊天」挤在同一秒):只该 spawn 一份
+    const three = [gated(), gated(), gated()]
+    assert.equal(spawns, 1, '三路并发只跑一次任务,后到的等同一份')
+    releaseGate('引擎就绪')
+    assert.deepEqual(await Promise.all(three), ['引擎就绪', '引擎就绪', '引擎就绪'], '三路拿到同一个结果')
+    // 任务收场闸门放行:下一轮是新任务(对应「启动失败后能重试」)
+    const second = gated()
+    assert.equal(spawns, 2, '上一场收工后,新调用重新开跑')
+    // 失败同样放行,且失败会传给等它的所有调用
+    const boom = createSingleFlight(async () => {
+      throw new Error('引擎没起来')
+    })
+    await assert.rejects(boom(), /引擎没起来/, '失败原样抛出')
+    await assert.rejects(boom(), /引擎没起来/, '失败后闸门已放行,下次能重试')
+    void second
+  }
 
   // ── 7. 用本地假模型服务验证整条 fetch → 解析链路(非流式 + SSE 流式) ──
   const receivedBodies: string[] = []
