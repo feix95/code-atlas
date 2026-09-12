@@ -19,6 +19,7 @@ import {
   compressAgentMessages,
   estimateMessagesTokens,
   extractToolCalls,
+  looksLikeToolsUnsupported,
   mergeUsage,
   parseToolArgs,
   sanitizeAgentRelPath,
@@ -172,6 +173,14 @@ function main(): void {
   assert.ok(conversation[3].role === 'tool' && conversation[3].content === longContent, '原对话数组一个字都不动(纯函数)')
   assert.equal(compressAgentMessages(conversation, estimateMessagesTokens(conversation)), null, '账面刚好等于预算:不压')
   assert.ok(AGENT_KEEP_RECENT_TOOLS >= 1 && AGENT_KEEP_RECENT_TOOLS <= 4, '留原样的条数得是个讲道理的数')
+
+  // ── 12. 工具能力探测的判别(第一百四十锤):只认「请求被拒 + 点名工具」的错 ──
+  assert.equal(looksLikeToolsUnsupported(400, '{"error":"tools is not supported by this model"}'), true, '400 + 点名 tools:不认工具')
+  assert.equal(looksLikeToolsUnsupported(422, 'Unknown parameter: function calling unavailable'), true, '422 + 点名 function:同样不认')
+  assert.equal(looksLikeToolsUnsupported(404, 'tool use not found'), true, '404 + 点名 tool:也认')
+  assert.equal(looksLikeToolsUnsupported(400, 'context window exceeded'), false, '400 但跟工具无关:不冒领')
+  assert.equal(looksLikeToolsUnsupported(500, 'tools error'), false, '500 是服务端自己呛到:不冒领')
+  assert.equal(looksLikeToolsUnsupported(200, 'tools'), false, '200 根本不是错误:不认')
 
   console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 全部通过')
 }

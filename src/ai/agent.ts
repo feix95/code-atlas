@@ -292,7 +292,19 @@ export function mergeUsage(a: AiUsage | undefined, b: AiUsage | undefined): AiUs
 /** agent 单轮请求的结果:要么拿到模型消息(可能带工具调用),要么带人话错误退场 */
 export type AgentRoundResult =
   | { status: 'ok'; raw: AgentRawAssistant; reasoning?: string; usage?: AiUsage }
-  | { status: 'error' | 'cancelled'; text: string }
+  | { status: 'error'; text: string; toolsUnsupported?: boolean }
+  | { status: 'cancelled'; text: string }
+
+/**
+ * 看报错像不像「这个引擎/模型不认工具调用」(纯函数,自测覆盖,第一百四十锤)。
+ * 只看 400/404/422 这几档「请求本身被拒」的错,再瞄一眼报错正文里有没有
+ * tool/function 字样 —— 500 这类服务端自己呛到的、跟工具无关的错不冒领。
+ * 误判的最坏结果也只是这轮按普通对话回答,不会卡死谁。
+ */
+export function looksLikeToolsUnsupported(status: number, detail: string): boolean {
+  if (status !== 400 && status !== 404 && status !== 422) return false
+  return /tool|function/i.test(detail)
+}
 
 /** 流式轮次边收边推给界面的事件(第一百三十四锤):增量 + token 账 + 回滚令 */
 export interface AgentStreamEvent {
@@ -378,7 +390,8 @@ export async function agentRound(
       const friendly = friendlyHttpError(res.status, detail)
       return {
         status: 'error',
-        text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`
+        text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`,
+        toolsUnsupported: looksLikeToolsUnsupported(res.status, detail)
       }
     }
     // 响应头到手,首帧后的耐心交给 sseEvents 自己的看门狗

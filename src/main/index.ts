@@ -813,6 +813,14 @@ function sendAgentDelta(event: IpcMainInvokeEvent, requestId: string, ev: AgentS
 }
 
 /**
+ * 翻文件模式里「不认工具调用」的引擎黑名单(第一百四十锤,只记会话内存,零落盘):
+ * 键 = baseUrl|模型名。有的外接服务(甚至不带工具模板的模型文件)收到 tools 字段
+ * 直接甩 400,循环还没起步就断 —— 摔过一跤的记下来,下次直接按普通对话回答,
+ * 不再拿石头砸自己的脚。
+ */
+const noToolEngines = new Set<string>()
+
+/**
  * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
  * 直到模型交出不带工具调用的正文答案。缰绳三根:轮数封顶(到顶后撤掉工具表
  * 逼它交卷)、同一样东西不许翻第二遍、每轮之间都听用户的取消。
@@ -834,9 +842,15 @@ async function runAgentChat(input: {
 }): Promise<AiChatResult> {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
   const messages: AgentChatMessage[] = [...baseMessages]
+  // 这引擎摔过「不认工具调用」的跤就直接按普通对话走,连守则都不垫
+  const engineKey = `${target.baseUrl}|${target.model}`
+  let engineNoTools = noToolEngines.has(engineKey)
+  if (engineNoTools) {
+    sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
+  }
   // 人设后面垫翻文件守则:教它何时动手、动手几次、答话照旧说人话
   const systemIdx = messages.findIndex((m) => m.role === 'system')
-  if (systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${AGENT_ADDENDUM}` }
+  if (!engineNoTools && systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${AGENT_ADDENDUM}` }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成纸条时,按它解锁重读
@@ -845,10 +859,12 @@ async function runAgentChat(input: {
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
   let rounds = 0
+  // 兜底降级后的重答轮不算「轮数烧完」,别把逼卷令也塞进去
+  let skipNudgeOnce = false
   addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
-    // 锅快满了先腾地方(第一百三十七锤):早先翻看的大段原文提炼成占位纸条,
+    // 锅快满了先腾地方(第一百三十八锤):早先翻看的大段原文提炼成占位纸条,
     // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
     const compressed = compressAgentMessages(messages, promptBudget)
     if (compressed) {
@@ -860,8 +876,10 @@ async function runAgentChat(input: {
       sendAgentStep(event, requestId, `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位纸条 —— 要重温随时能再翻`)
       addDevLog('request', `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了纸条,腾出约 ${compressed.freedCallIds.length} 处重读权`)
     }
-    const useTools = rounds < AGENT_MAX_ROUNDS
-    if (!useTools) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
+    const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
+    // 逼卷令只在「真烧完了轮数」时发;引擎天生不支持工具或刚兜底降级的,发这话是驴唇不对马嘴
+    if (rounds >= AGENT_MAX_ROUNDS && !skipNudgeOnce) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
+    skipNudgeOnce = false
     rounds += 1
     const round = await agentRound(target, messages, {
       signal,
@@ -871,6 +889,23 @@ async function runAgentChat(input: {
       onDelta: (ev) => sendAgentDelta(event, requestId, ev)
     })
     if (round.status !== 'ok') {
+      // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
+      // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
+      // 普通请求再出错照实报给用户
+      if (round.status === 'error' && round.toolsUnsupported === true && useTools && !engineNoTools) {
+        noToolEngines.add(engineKey)
+        engineNoTools = true
+        skipNudgeOnce = true
+        sendAgentStep(event, requestId, '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型')
+        const sysIdx = messages.findIndex((m) => m.role === 'system')
+        if (sysIdx >= 0 && (messages[sysIdx] as { content: string }).content.endsWith(AGENT_ADDENDUM)) {
+          messages[sysIdx] = {
+            role: 'system',
+            content: (messages[sysIdx] as { content: string }).content.slice(0, -AGENT_ADDENDUM.length)
+          }
+        }
+        continue
+      }
       return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
     }
     usage = mergeUsage(usage, round.usage)
