@@ -25,6 +25,7 @@ import {
   type AgentStreamEvent
 } from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
+import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -1675,7 +1676,9 @@ function registerIpc(): void {
     const refsBudget = codeRefsBudget({ contextTokens: resolved.ctx, otherTokens, replyTokens: cap })
     const codeRefs = sanitizeCodeRefs(body.codeRefs, refsBudget)
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
-    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs)
+    // 手动压缩的早前对话摘要(第一百四十二锤):/compact 之后每次请求都带,垫在历史前面当背景记忆
+    const summary = sanitizeCompactSummary(body.summary)
+    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs, summary)
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (body.agent === true) {
@@ -1725,6 +1728,38 @@ function registerIpc(): void {
       // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
       const status = aborter.signal.aborted ? 'cancelled' : res.status
       return { ...res, status, webLookup: meta }
+    } finally {
+      if (requestId !== '') explainAborters.delete(requestId)
+      if (explainAborters.size === 0) announceActivityIdle()
+    }
+  })
+
+  // /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成一份要点摘要,
+  // 渲染进程拦下 /compact 后走这条专属通道。流式增量照走 atlas:ai-delta 按 requestId 对号,
+  // 「停一停」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
+  ipcMain.handle('atlas:ai-compact', async (event, req: unknown): Promise<AiExplainResult> => {
+    const startedAt = Date.now()
+    const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
+    const requestId = typeof body.requestId === 'string' ? body.requestId : ''
+    const history = sanitizeCompactHistory(body.history)
+    if (history.length === 0) {
+      return { status: 'error', text: '没有可压缩的对话:先聊几句再来', model: '', durationMs: Date.now() - startedAt }
+    }
+    const resolved = await resolveChatTargetOrError()
+    if ('error' in resolved) {
+      return { status: 'error', text: resolved.error, model: '', durationMs: Date.now() - startedAt }
+    }
+    const aborter = new AbortController()
+    if (requestId !== '') explainAborters.set(requestId, aborter)
+    try {
+      return await explainWithMessages(
+        resolved.target,
+        buildCompactMessages(history),
+        makeDeltaSender(event, requestId),
+        aborter.signal,
+        resolved.budgets.replyTokens,
+        { allowThinking: false }
+      )
     } finally {
       if (requestId !== '') explainAborters.delete(requestId)
       if (explainAborters.size === 0) announceActivityIdle()

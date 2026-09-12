@@ -53,6 +53,17 @@ import {
   extractStreamStats,
   splitThinking
 } from '../src/ai/index.ts'
+import {
+  isCompactCommand,
+  buildCompactMessages,
+  sanitizeCompactHistory,
+  sanitizeCompactSummary,
+  buildSummaryText,
+  COMPACT_INSTRUCTION,
+  COMPACT_SUMMARY_TAG,
+  COMPACT_SUMMARY_CHARS,
+  COMPACT_HISTORY_MAX_MESSAGES
+} from '../src/shared/compact.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX } from '../src/shared/aiDefaults.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
@@ -1120,6 +1131,69 @@ async function main(): Promise<void> {
 
   const guessPrompt = buildGuessPrompt({ relPath: 'x.xyz', name: 'x.xyz', absPath: 'C:/x.xyz', languageName: '', preview: 'hello', note: '临时文件' })
   assert.ok(guessPrompt.includes('项目主人备注:临时文件'), '猜猜官也吃备注')
+
+  // ── 第一百四十二锤:/compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列) ──
+  // isCompactCommand:整句就是 /compact 才算,大小写不拘;后面跟了字的不算
+  assert.equal(isCompactCommand('/compact'), true, '光杆 /compact 要认')
+  assert.equal(isCompactCommand('  /Compact  '), true, '首尾空白和大小写不拘')
+  assert.equal(isCompactCommand('/compact 帮我压缩'), false, '跟了别的字不算命令')
+  assert.equal(isCompactCommand('/compress'), false, '别的命令不认')
+  assert.equal(isCompactCommand(''), false, '空串不算')
+
+  // sanitizeCompactHistory:只收两条腿、单条封顶、总条数取最近的一段;摘要打头的按大上限放行
+  assert.deepEqual(sanitizeCompactHistory('not an array'), [], '非数组回空')
+  const longTurn = '很'.repeat(2000)
+  const oldSummary = `${COMPACT_SUMMARY_TAG}\n${'摘'.repeat(3500)}`
+  const washed = sanitizeCompactHistory([
+    { role: 'system', content: '不该收的角色' },
+    { role: 'user', content: '   ' },
+    { role: 'user', content: longTurn },
+    { role: 'assistant', content: '答了一句' },
+    { role: 'user', content: oldSummary }
+  ])
+  assert.equal(washed.length, 3, '坏角色和空条目要扔')
+  assert.ok(washed[0].content.startsWith('很') && washed[0].content.length < longTurn.length, '超长对话要截断')
+  assert.ok(washed[0].content.endsWith('……(后半截省略)'), '截断要注明')
+  assert.equal(washed[2].content.length, oldSummary.length, '旧摘要在放行上限内不截')
+  const manyTurns: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  for (let i = 0; i < COMPACT_HISTORY_MAX_MESSAGES + 10; i += 1) manyTurns.push({ role: 'user', content: `第 ${i} 句` })
+  const washedMany = sanitizeCompactHistory(manyTurns)
+  assert.equal(washedMany.length, COMPACT_HISTORY_MAX_MESSAGES, '条数封顶')
+  assert.ok(washedMany[0].content.includes(`第 ${manyTurns.length - COMPACT_HISTORY_MAX_MESSAGES} 句`), '留的是最近的,老的扔掉')
+
+  // buildCompactMessages:人设打头,收尾指令垫后,中间是洗过的史料
+  const compactMsgs = buildCompactMessages([{ role: 'user', content: '聊过的内容' }])
+  assert.equal(compactMsgs[0].role, 'system')
+  assert.ok(compactMsgs[0].content.includes('对话压缩员'), '压缩员人设打头')
+  assert.ok(compactMsgs[0].content.includes('不补编'), '不许编造要进人设')
+  assert.deepEqual(compactMsgs[1], { role: 'user', content: '聊过的内容' })
+  assert.equal(compactMsgs[compactMsgs.length - 1].content, COMPACT_INSTRUCTION, '收尾是提炼指令')
+
+  // sanitizeCompactSummary:形状不对回空,超长截断
+  assert.equal(sanitizeCompactSummary(42), '', '非字符串回空')
+  assert.equal(sanitizeCompactSummary('   '), '', '纯空白回空')
+  const longSummary = '长'.repeat(COMPACT_SUMMARY_CHARS + 500)
+  const clippedSummary = sanitizeCompactSummary(longSummary)
+  assert.ok(clippedSummary.startsWith('长'.repeat(10)) && clippedSummary.length < longSummary.length, '超长摘要要截')
+  assert.ok(clippedSummary.endsWith('……(摘要过长,只取前一部分)'), '截断要注明')
+
+  // buildSummaryText:标签、背景记忆口径、原文都在
+  const summaryBlock = buildSummaryText('聊过 500ms 防抖')
+  assert.ok(summaryBlock.includes(COMPACT_SUMMARY_TAG), '摘要自报家门要在')
+  assert.ok(summaryBlock.includes('不要把摘要原文复读一遍'), '复读禁令要在')
+  assert.ok(summaryBlock.includes('聊过 500ms 防抖'), '摘要原文要在')
+
+  // buildFreeChatMessages:摘要块垫在附件后、历史前;没摘要就不出现
+  const withSummary = buildFreeChatMessages('人设', att, [{ role: 'user', content: '最近的问题' }], '新的问题', null, [], summaryBlock)
+  // 相邻同角色会合并成一条,三个块可能在同一消息里:改在拼好的正文里比先后
+  const joined = withSummary.map((m) => m.content).join('\n')
+  const attAt = joined.indexOf('<context_attachment>')
+  const sumAt = joined.indexOf('<earlier_chat_summary>')
+  const histAt = joined.indexOf('最近的问题')
+  assert.ok(attAt >= 0 && sumAt > attAt && histAt > sumAt, '顺序:附件 → 摘要 → 历史')
+  assert.ok(joined.includes('新的问题'), '当前问题照旧在')
+  const noSummary = buildFreeChatMessages('人设', null, [], '随便问问')
+  assert.ok(noSummary.every((m) => !m.content.includes('<earlier_chat_summary>')), '没摘要不留空块')
 
   console.log('✅ AI 人话解释自测全部通过')
 }

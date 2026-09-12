@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
+import { isCompactCommand } from '@shared/compact'
 import { Badge } from './DetailHeader'
 import { Notice } from './Notice'
 import { AtlasProbe, type ProbeState } from './AtlasProbe'
@@ -202,6 +203,16 @@ export function FreeChatPanel({
 
   function sendDraft(): void {
     const q = draft.trim()
+    // /compact 手动压缩命令(第一百四十二锤):不当问题发,拦下来直接压缩;
+    // 忙着回答时不接,跟发消息一个规矩
+    if (isCompactCommand(q)) {
+      if (chat.busy) return
+      forceBottom()
+      chat.compact()
+      setDraft('')
+      if (expanded) setExpanded(false)
+      return
+    }
     // 挂了引用就允许空着发:这时替他说一句「讲讲选中的这段代码」,不让他对着空气发呆
     const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
     if (!text || chat.busy) return
@@ -321,11 +332,23 @@ export function FreeChatPanel({
               if (m.role === 'note') {
                 // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话。
                 // 探针干活的步骤(第一百四十一锤)走时间线小样:左对齐带点,和居中的通知灰字分开
-                return m.kind === 'step' ? (
-                  <div key={m.key} className="chat-note is-step" role="status">
-                    {m.text}
-                  </div>
-                ) : (
+                if (m.kind === 'step') {
+                  return (
+                    <div key={m.key} className="chat-note is-step" role="status">
+                      {m.text}
+                    </div>
+                  )
+                }
+                // 压缩摘要卡(第一百四十二锤):旧对话的提炼成果,点开看全文,不用的时候收着不占地
+                if (m.kind === 'summary') {
+                  return (
+                    <details key={m.key} className="chat-note is-summary" role="status">
+                      <summary>旧对话已压缩成摘要(点开看)</summary>
+                      <p>{m.text}</p>
+                    </details>
+                  )
+                }
+                return (
                   <div key={m.key} className="chat-note" role="status">
                     {m.text}
                   </div>

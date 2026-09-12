@@ -21,6 +21,7 @@ import { parseLoadProgress } from './builtin.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
+import { buildSummaryText } from '../shared/compact.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -247,7 +248,9 @@ export function buildFreeChatMessages(
   history: AiHistoryMessage[],
   question: string,
   webMaterial?: { query: string; material: string } | null,
-  codeRefs: ChatCodeRef[] = []
+  codeRefs: ChatCodeRef[] = [],
+  /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
+  summary?: string
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const tail = webMaterial
     ? `${question}\n\n(已按你的要求联网查询「${webMaterial.query}」,公开资料如下:\n${webMaterial.material}\n请把资料里跟它对得上的信息讲出来:它是什么、是谁家的、有哪些部分;资料没帮助才照常回答,别硬编。)`
@@ -255,6 +258,7 @@ export function buildFreeChatMessages(
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: codeRefs.length > 0 ? `${system}\n\n${CODE_TEACHER_ADDENDUM}` : system },
     ...(attachment ? [{ role: 'user' as const, content: buildAttachmentText(attachment) }] : []),
+    ...(summary ? [{ role: 'user' as const, content: buildSummaryText(summary) }] : []),
     ...history,
     ...(codeRefs.length > 0 ? [{ role: 'user' as const, content: buildCodeRefsText(codeRefs) }] : []),
     { role: 'user', content: tail }

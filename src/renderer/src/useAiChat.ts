@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiStreamStats, AiUsage, AiChatRequest, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { AiStreamStats, AiUsage, AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import { COMPACT_SUMMARY_TAG } from '@shared/compact'
 import { friendlyErr } from './errText'
 
 /**
@@ -17,8 +18,9 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'note'
   text: string
   state: ChatMsgState
-  /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式,和居中通知灰字分开 */
-  kind?: 'step'
+  /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式;
+   * summary(第一百四十二锤)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型 */
+  kind?: 'step' | 'summary'
   /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
   reasoning?: string
   /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
@@ -33,6 +35,37 @@ export interface ChatMessage {
 
 /** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底 */
 const HISTORY_MAX = 8
+
+/** /compact 压缩完保留最近几条原文(第一百四十二锤):摘要垫底 + 这几条原文,衔接不断片 */
+const COMPACT_KEEP_RECENT = 4
+
+/** 找最新一张摘要卡(从后往前找):压缩过就有,每次发请求都当背景记忆带上 */
+function findSummary(messages: ChatMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i]
+    if (m.role === 'note' && m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') return m.text
+  }
+  return null
+}
+
+/**
+ * /compact 的压缩史料(第一百四十二锤):全量的对话记录,不受 HISTORY_MAX 限制 ——
+ * 正是要把「将被扔掉的老对话」交给模型提炼;旧摘要卡转写成打标签的一条,再压时融进新摘要。
+ */
+function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
+  const out: AiHistoryMessage[] = []
+  for (const m of messages) {
+    if (m.role === 'note') {
+      if (m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') {
+        out.push({ role: 'user', content: `${COMPACT_SUMMARY_TAG}(旧摘要,一并融进新摘要)\n${m.text}` })
+      }
+      continue
+    }
+    if (m.state !== 'done' || m.text.trim() === '') continue
+    out.push({ role: m.role, content: m.text })
+  }
+  return out
+}
 
 /** 思考开关存档的 localStorage 键(第一百一十五锤) */
 const THINKING_KEY = 'atlas-freechat-thinking'
@@ -67,6 +100,8 @@ export function useAiChat(
   note: (text: string) => void
   /** 开新对话(第一百二十七锤):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
   newChat: () => void
+  /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
+  compact: () => void
   send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
@@ -176,7 +211,9 @@ export function useAiChat(
     ])
     void (async () => {
       try {
-        // 历史取发送前的消息(不含本轮),当前问题单独走 question 字段
+        // 历史取发送前的消息(不含本轮),当前问题单独走 question 字段;
+        // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆(第一百四十二锤)
+        const summary = findSummary(messagesRef.current)
         const req: AiChatRequest = {
           requestId,
           question: q,
@@ -185,7 +222,8 @@ export function useAiChat(
           codeRefs: useRefs,
           thinking: thinkingRef.current,
           agent: agentRef.current || undefined,
-          rootPath: rootPath ?? undefined
+          rootPath: rootPath ?? undefined,
+          summary: summary ?? undefined
         }
         const res = await window.atlas.aiChat(req)
         if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废
@@ -227,6 +265,56 @@ export function useAiChat(
     setMessages((prev) => prev.map((m) => (m.state === 'busy' ? { ...m, state: 'cancelled' } : m)))
   }
 
+  /**
+   * /compact 手动压缩(第一百四十二锤):输入框拦下命令后走这条。
+   * 生成中显示成一个正在回答的气泡(流式增量照糊上去),成功后气泡当场变身摘要卡 ——
+   * 旧对话(含上一代摘要)全数交给模型提炼,只留最近几条原文,之后的请求靠 summary 字段
+   * 把摘要带给模型。没聊过东西就不劳烦模型,垫一句灰字了事。
+   */
+  function compact(): void {
+    if (busyRef.current) return
+    const history = buildCompactHistory(messagesRef.current)
+    if (history.length === 0) {
+      note('还没聊什么,没东西可压:先聊几句再来 /compact')
+      return
+    }
+    const requestId = crypto.randomUUID()
+    idRef.current = requestId
+    busyRef.current = true
+    setBusy(true)
+    const botKey = requestId
+    setMessages((prev) => [...prev, { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }])
+    void (async () => {
+      try {
+        const res = await window.atlas.aiCompact({ requestId, history })
+        if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废
+        if (res.status === 'supported' && res.text.trim() !== '') {
+          setMessages((prev) => {
+            const card: ChatMessage = { key: `${requestId}-summary`, role: 'note', kind: 'summary', text: res.text.trim(), state: 'done', web: null }
+            // 旧对话让位:只留最近几条做好的原文(摘要里已包含更早的),旧摘要卡一并退休
+            const kept = prev.filter((m) => m.role !== 'note' && m.state === 'done' && m.text.trim() !== '' && m.key !== botKey)
+            return [card, ...kept.slice(-COMPACT_KEEP_RECENT)]
+          })
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.key === botKey ? { ...m, state: res.status === 'cancelled' ? 'cancelled' : 'error', text: res.text || m.text } : m
+            )
+          )
+        }
+      } catch (err) {
+        if (idRef.current !== requestId) return
+        setMessages((prev) => prev.map((m) => (m.key === botKey ? { ...m, state: 'error', text: friendlyErr(err) } : m)))
+      } finally {
+        if (idRef.current === requestId) {
+          busyRef.current = false
+          idRef.current = ''
+          setBusy(false)
+        }
+      }
+    })()
+  }
+
   function setThinking(on: boolean): void {
     setThinkingState(on)
     localStorage.setItem(THINKING_KEY, on ? 'on' : 'off')
@@ -250,7 +338,7 @@ export function useAiChat(
     setMessages([])
   }
 
-  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, send, cancel }
+  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, compact, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>

@@ -3,6 +3,7 @@ import type {
   AiChatLookupPayload,
   AiChatRequest,
   AiChatResult,
+  AiCompactRequest,
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
@@ -108,6 +109,8 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.invoke('atlas:ai-explain-folder', rootPath, relPath, requestId, question),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke('atlas:ai-chat', req),
+  /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
+  aiCompact: (req: AiCompactRequest): Promise<AiExplainResult> => ipcRenderer.invoke('atlas:ai-compact', req),
   /** 试一句(第一百一十三锤):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
   aiStyleSample: (personalization: unknown, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:ai-style-sample', personalization, requestId),

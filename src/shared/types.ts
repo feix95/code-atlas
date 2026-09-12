@@ -395,6 +395,18 @@ export interface AiChatRequest {
   agent?: boolean
   /** 翻文件模式的项目根(绝对路径):工具只许在这个目录里看,越界一律拒 */
   rootPath?: string
+  /**
+   * 手动压缩生成的早前对话摘要(第一百四十二锤):用户发 /compact 后,旧对话被提炼成
+   * 摘要卡,之后的每次请求都带上来当背景记忆;没有压缩过就是 undefined。
+   */
+  summary?: string
+}
+
+/** /compact 手动压缩一次请求的载荷(渲染进程 → 主进程,第一百四十二锤) */
+export interface AiCompactRequest {
+  requestId: string
+  /** 目前为止的对话记录(含旧摘要卡转写的条目):渲染进程全量带上,主进程自己洗 */
+  history: AiHistoryMessage[]
 }
 
 /**

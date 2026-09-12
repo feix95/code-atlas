@@ -4,6 +4,7 @@ import type {
   AiChatLookupPayload,
   AiChatRequest,
   AiChatResult,
+  AiCompactRequest,
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
@@ -62,6 +63,8 @@ declare global {
       ) => Promise<AiExplainResult>
       aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string) => Promise<AiExplainResult>
       aiChat: (req: AiChatRequest) => Promise<AiChatResult>
+      /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要 */
+      aiCompact: (req: AiCompactRequest) => Promise<AiExplainResult>
       /** 试一句(第一百一十三锤):拿还没保存的个性化草稿念一段,当场听效果 */
       aiStyleSample: (personalization: unknown, requestId?: string) => Promise<AiExplainResult>
       onChatLookup: (callback: (payload: AiChatLookupPayload) => void) => () => void
