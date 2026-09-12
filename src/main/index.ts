@@ -8,6 +8,8 @@ import {
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_DEPTH,
   AGENT_MAX_ROUNDS,
+  AGENT_SEARCH_MAX_FILES,
+  AGENT_SEARCH_MAX_MATCHES,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
   agentPromptBudget,
@@ -668,6 +670,95 @@ async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: 
   return { ok: true, text, hint: `共 ${lines.length} 个` }
 }
 
+/**
+ * search_content 的执行手(第一百三十九锤):在项目(或某个子文件夹)里按关键词搜
+ * 文本文件内容,大小写不敏感,报「文件:行号:那行原文」。缰绳:忽略名单/符号链接/
+ * 深度跟 list_files 同一份;二进制和超 5MB 的文件直接放过;扫的文件数和命中条数
+ * 到量就收,照实注明「没搜完」—— 绝不让一个关键词把机器烧干。
+ */
+async function agentSearchContent(
+  rootPath: string,
+  relPath: string,
+  keyword: string
+): Promise<{ ok: boolean; text: string; hint?: string }> {
+  let abs: string
+  try {
+    abs = joinRoot(rootPath, relPath)
+  } catch {
+    return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
+  }
+  const stat = await fs.stat(abs).catch(() => null)
+  if (!stat) return { ok: false, text: `打不开或不存在:${relPath}` }
+  if (!stat.isDirectory()) {
+    return { ok: false, text: `${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它` }
+  }
+  const needle = keyword.toLowerCase()
+  const scopeLabel = relPath === '' ? '整个项目' : relPath
+  const matches: string[] = []
+  const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
+  let scanned = 0
+  let locked = 0
+  let filesTruncated = false
+  let matchesTruncated = false
+  outer: while (queue.length > 0) {
+    const item = queue[0]
+    queue.shift()
+    let dirents
+    try {
+      dirents = await fs.readdir(item.abs, { withFileTypes: true })
+    } catch {
+      locked += 1
+      continue
+    }
+    for (const d of dirents) {
+      if (IGNORED_NAMES.has(d.name)) continue
+      if (d.isSymbolicLink()) continue // 符号链接不跟进:既是安全边界也防绕环
+      const childRel = item.rel ? `${item.rel}/${d.name}` : d.name
+      if (d.isDirectory()) {
+        if (item.depth < AGENT_MAX_DEPTH) queue.push({ abs: join(item.abs, d.name), rel: childRel, depth: item.depth + 1 })
+        continue
+      }
+      if (!d.isFile()) continue
+      if (scanned >= AGENT_SEARCH_MAX_FILES) {
+        filesTruncated = true
+        break outer
+      }
+      if (isBinaryFile(childRel)) continue
+      const childAbs = join(item.abs, d.name)
+      const fstat = await fs.stat(childAbs).catch(() => null)
+      if (!fstat || fstat.size > AGENT_FILE_MAX_BYTES) continue
+      const raw = await fs.readFile(childAbs, 'utf8').catch(() => null)
+      if (raw === null) {
+        locked += 1
+        continue
+      }
+      scanned += 1
+      if (raw.includes('\u0000')) continue // 后缀骗过名字的混入二进制,照放过
+      for (const [index, line] of raw.split('\n').entries()) {
+        if (!line.toLowerCase().includes(needle)) continue
+        const trimmed = line.trim()
+        matches.push(`${childRel}:${index + 1}:${trimmed.length > 120 ? `${trimmed.slice(0, 120)}……` : trimmed}`)
+        if (matches.length >= AGENT_SEARCH_MAX_MATCHES) {
+          matchesTruncated = true
+          break outer
+        }
+      }
+    }
+  }
+  if (matches.length === 0) {
+    let text = `在 ${scopeLabel} 里没搜到「${keyword}」(翻了 ${scanned} 个文本文件)。可能真没有,也可能藏在二进制/超大的文件里,或者换个更短的关键词再试`
+    if (filesTruncated) text += `(文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完)`
+    return { ok: true, text }
+  }
+  let text = matches.join('\n')
+  const tails: string[] = []
+  if (matchesTruncated) tails.push(`命中太多,只显示前 ${AGENT_SEARCH_MAX_MATCHES} 条`)
+  if (filesTruncated) tails.push(`文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完`)
+  if (locked > 0) tails.push(`${locked} 个文件打不开,跳过了`)
+  if (tails.length > 0) text += `\n(${tails.join(';')})`
+  return { ok: true, text, hint: `${scopeLabel}命中 ${matches.length} 处` }
+}
+
 /** read_file 的执行手:读文本文件,超长只读开头一段并注明,绝不静默截断 */
 async function agentReadFile(
   rootPath: string,
@@ -809,23 +900,37 @@ async function runAgentChat(input: {
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
-      const relPath = sanitizeAgentRelPath(call.args === null ? null : call.args.relPath)
-      const callName = call.name === 'read_file' || call.name === 'list_files' ? call.name : null
-      if (!callName || relPath === null) {
-        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', String(call.args?.relPath ?? '(没给路径)'), 'error', callName ? '路径不合法,要用项目内的相对路径' : '没有这个工具'))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: '参数不合法:要用项目内的相对路径(如 src/index.ts),根目录传空字符串' })
+      const callName = call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' ? call.name : null
+      // search 的范围是可选项:不传就搜整个项目;其余工具的 relPath 必填
+      const relPath = callName === 'search_content' && call.args?.relPath === undefined ? '' : sanitizeAgentRelPath(call.args?.relPath)
+      const keyword = callName === 'search_content' && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
+      if (!callName || relPath === null || (callName === 'search_content' && keyword === '')) {
+        const why = !callName
+          ? '没有这个工具'
+          : callName === 'search_content'
+            ? '要给关键词(keyword),如 500 或 DWELL_MS'
+            : '路径不合法,要用项目内的相对路径'
+        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', String(call.args?.keyword ?? call.args?.relPath ?? '(没给参数)'), 'error', why))
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: `参数不合法:${why}。路径要用项目内的相对路径(如 src/index.ts),根目录传空字符串` })
         continue
       }
-      const key = toolCallKey(callName, relPath)
+      // search 的防打转键带上关键词:同一个范围搜「500」和「DWELL_MS」是两笔账
+      const key = callName === 'search_content' ? toolCallKey(callName, `${relPath}#${keyword}`) : toolCallKey(callName, relPath)
+      const stepTarget = callName === 'search_content' ? keyword : relPath === '' ? '(项目根目录)' : relPath
       if (doneCalls.has(key)) {
-        sendAgentStep(event, requestId, agentStepText(callName, relPath, 'repeat'))
+        sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
         toolResults.push({ role: 'tool', tool_call_id: call.id, content: REPEAT_NUDGE })
         continue
       }
       doneCalls.add(key)
       callIdToKey.set(call.id, key)
-      const exec = callName === 'list_files' ? await agentListFiles(rootPath, relPath) : await agentReadFile(rootPath, relPath, readChars)
-      sendAgentStep(event, requestId, agentStepText(callName, relPath === '' ? '(项目根目录)' : relPath, exec.ok ? 'done' : 'error', exec.hint))
+      const exec =
+        callName === 'list_files'
+          ? await agentListFiles(rootPath, relPath)
+          : callName === 'search_content'
+            ? await agentSearchContent(rootPath, relPath, keyword)
+            : await agentReadFile(rootPath, relPath, readChars)
+      sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
     }
     messages.push(...toolResults)

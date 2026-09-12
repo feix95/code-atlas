@@ -7,6 +7,8 @@ import {
   AGENT_KEEP_RECENT_TOOLS,
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_ROUNDS,
+  AGENT_SEARCH_MAX_FILES,
+  AGENT_SEARCH_MAX_MATCHES,
   AGENT_TOOLS,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
@@ -73,20 +75,31 @@ function main(): void {
   assert.ok(REPEAT_NUDGE.includes('已经看过'), '重复提醒要说人话')
   assert.ok(ROUND_CAP_NUDGE.includes('别再调用'), '逼卷令要拦住工具')
 
-  // ── 6. 工具表:只有「看」的两件,写文件的工具根本不存在 ──
-  assert.equal(AGENT_TOOLS.length, 2, '只发两件工具')
+  // ── 6. 工具表:只有「看」的三件,写文件的工具根本不存在 ──
+  assert.equal(AGENT_TOOLS.length, 3, '只发三件工具')
   assert.deepEqual(
     AGENT_TOOLS.map((t) => t.function.name),
-    ['list_files', 'read_file'],
-    '工具名单对齐:列名单 + 读文件'
+    ['list_files', 'read_file', 'search_content'],
+    '工具名单对齐:列名单 + 读文件 + 搜内容'
   )
   for (const tool of AGENT_TOOLS) {
-    assert.deepEqual(tool.function.parameters.required, ['relPath'], `${tool.function.name} 必须带 relPath`)
+    const required: readonly string[] = tool.function.parameters.required
+    assert.ok(
+      required.length === 1 && (required[0] === 'relPath' || required[0] === 'keyword'),
+      `${tool.function.name} 必填字段要么 relPath 要么 keyword`
+    )
   }
+
+  // search_content 的必填是关键词不是路径,单独再钉一遍
+  const searchTool = AGENT_TOOLS.find((t) => t.function.name === 'search_content')!
+  assert.deepEqual(searchTool.function.parameters.required, ['keyword'], 'search_content 必须带 keyword')
+  assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
 
   // ── 7. 步骤播报:翻什么、看成没看成,一句大白话 ──
   assert.ok(agentStepText('list_files', 'src', 'done', '共 3 个').includes('src'), '翻完要带上目标名')
   assert.ok(agentStepText('read_file', 'src/a.ts', 'done').includes('读了'), '读文件说「读了」')
+  assert.ok(agentStepText('search_content', '500', 'done', '整个项目命中 12 处').includes('搜了'), '搜内容说「搜了」')
+  assert.ok(agentStepText('search_content', '500', 'done', '整个项目命中 12 处').includes('命中 12 处'), '搜索步骤带命中数')
   assert.ok(agentStepText('read_file', 'src/a.ts', 'repeat').includes('已经看过'), '重复翻看有专门的话')
   assert.ok(agentStepText('list_files', 'src', 'error', '路径越界').includes('看不了'), '翻不了要老实说')
 
@@ -99,10 +112,13 @@ function main(): void {
   assert.deepEqual(mergeUsage(undefined, { promptTokens: 9 }), { promptTokens: 9 }, '空账并入实账')
   assert.equal(mergeUsage(undefined, undefined), undefined, '两轮都没账就是没账')
 
-  // ── 9. 缰绳的数:轮数封顶、名单封顶、守则垫在人设后 ──
+  // ── 9. 缰绳的数:轮数封顶、名单封顶、搜索封顶、守则垫在人设后 ──
   assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 12, '轮数封顶得是个讲道理的数')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
+  assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
+  assert.ok(AGENT_SEARCH_MAX_MATCHES >= 20 && AGENT_SEARCH_MAX_MATCHES <= 200, '搜索命中条数封顶得是个讲道理的数')
   assert.ok(AGENT_ADDENDUM.includes('翻文件') && AGENT_ADDENDUM.includes('相对路径'), '守则要教模型用相对路径翻文件')
+  assert.ok(AGENT_ADDENDUM.includes('search_content'), '守则要教模型用搜索找内容')
 
   // ── 10. 流式工具调用碎片的拼装(第一百三十四锤):参数逐段续、多调用按 index 分组 ──
   const assembled = assembleToolCalls([

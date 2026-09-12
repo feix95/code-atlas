@@ -17,6 +17,10 @@ export const AGENT_MAX_ROUNDS = 8
 /** list_files 名单条数封顶:名字虽便宜,C 盘级别的目录也不能真全列 */
 export const AGENT_LIST_MAX_ENTRIES = 400
 
+/** search_content 的缰绳:最多扫 2000 个文本文件、最多报 50 条命中,别让一个关键词把机器烧干 */
+export const AGENT_SEARCH_MAX_FILES = 2000
+export const AGENT_SEARCH_MAX_MATCHES = 50
+
 /** 目录下钻深度上限:和扫描器一个思路,超深目录不陪它玩 */
 export const AGENT_MAX_DEPTH = 12
 
@@ -130,7 +134,7 @@ export function sanitizeAgentRelPath(raw: unknown): string | null {
   return parts.filter((p) => p !== '.').join('/')
 }
 
-/** OpenAI tools 格式的工具表:只有「看」的两件,写文件的工具根本不存在 */
+/** OpenAI tools 格式的工具表:只有「看」的三件,写文件的工具根本不存在 */
 export const AGENT_TOOLS = [
   {
     type: 'function',
@@ -161,6 +165,25 @@ export const AGENT_TOOLS = [
         required: ['relPath']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_content',
+      description:
+        '在整个项目(或某个文件夹)里按关键词搜文件内容,返回命中的文件、行号和那一行原文。想找「某个词/某个数值/某段代码写在哪个文件里」就用它,比一个个开文件快得多。关键词要短而准(函数名、常量值这类),太长的整句容易一处都搜不到。',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: { type: 'string', description: '要搜的关键词,越短越准,如 DWELL_MS 或 500' },
+          relPath: {
+            type: 'string',
+            description: '可选:只搜这个文件夹下面,如 src/renderer;不传或传空字符串就搜整个项目'
+          }
+        },
+        required: ['keyword']
+      }
+    }
   }
 ] as const
 
@@ -169,6 +192,7 @@ export const AGENT_ADDENDUM = `
 
 【翻文件模式】你现在可以自己翻这个项目的文件:
 - 需要找文件、看目录结构时,用 list_files 列名单
+- 需要找「某个词/数值/代码写在哪个文件」时,用 search_content 按关键词搜内容,又快又准
 - 需要看某个文件的具体内容时,用 read_file 读它
 - 路径一律用项目内的相对路径;当前参考资料里提到的路径可以直接用
 - 规矩:同一样东西不翻第二遍;翻几次能答的就别翻个没完;资料够了就直接回答,
@@ -242,15 +266,16 @@ export function toolCallKey(name: string, relPath: string): string {
 
 /** 每个工具步骤给界面垫的一句大白话(纯函数,自测覆盖):翻什么、看成没看成,一眼明白 */
 export function agentStepText(
-  tool: 'list_files' | 'read_file',
+  tool: 'list_files' | 'read_file' | 'search_content',
   target: string,
   state: 'done' | 'repeat' | 'error',
   hint?: string
 ): string {
-  const what = tool === 'list_files' ? '的文件名单' : '的内容'
+  const what = tool === 'list_files' ? '的文件名单' : tool === 'read_file' ? '的内容' : ''
+  const verb = tool === 'list_files' ? '翻了' : tool === 'read_file' ? '读了' : '搜了'
   if (state === 'repeat') return `「${target}」刚才已经看过了,不用再翻`
   if (state === 'error') return `「${target}」看不了${hint ? `:${hint}` : ''}`
-  return `${tool === 'list_files' ? '翻了' : '读了'}「${target}」${what}${hint ? `(${hint})` : ''}`
+  return `${verb}「${target}」${what}${hint ? `(${hint})` : ''}`
 }
 
 /** 多轮的 token 账并成一本总账(纯函数,自测覆盖):读写累加,速度认最后一轮的 */
