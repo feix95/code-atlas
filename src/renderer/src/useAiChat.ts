@@ -17,6 +17,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'note'
   text: string
   state: ChatMsgState
+  /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式,和居中通知灰字分开 */
+  kind?: 'step'
   /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
   reasoning?: string
   /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
@@ -101,7 +103,7 @@ export function useAiChat(
         // 只给人看,不进对话历史 —— 模型干了什么,用户一眼有数
         if (payload.step) {
           setMessages((prev) => {
-            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: payload.step!.text, state: 'done', web: null }
+            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: payload.step!.text, state: 'done', web: null, kind: 'step' }
             const last = prev[prev.length - 1]
             const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
             return [...prev.slice(0, at), note, ...prev.slice(at)]

@@ -319,8 +319,13 @@ export function FreeChatPanel({
           ) : (
             chat.messages.map((m, idx) => {
               if (m.role === 'note') {
-                // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话
-                return (
+                // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话。
+                // 探针干活的步骤(第一百四十一锤)走时间线小样:左对齐带点,和居中的通知灰字分开
+                return m.kind === 'step' ? (
+                  <div key={m.key} className="chat-note is-step" role="status">
+                    {m.text}
+                  </div>
+                ) : (
                   <div key={m.key} className="chat-note" role="status">
                     {m.text}
                   </div>

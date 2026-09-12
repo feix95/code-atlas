@@ -2176,6 +2176,28 @@ body.is-sash-dragging {
   font-size: var(--font-xs);
 }
 
+/* 探针干活的步骤条(第一百四十一锤):左对齐 + 行首小圆点,连翻几样时像一条
+   时间线;上下留 0.25rem 紧凑堆叠,跟前后气泡隔出呼吸感(间距显式设置) */
+.chat-note.is-step {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0.25rem auto;
+  padding: 0 0.75rem;
+  max-width: 85%;
+  text-align: left;
+}
+
+.chat-note.is-step::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  transform: translateY(-2px);
+}
+
 .chat-webstatus {
   margin-left: 2.125rem;
   margin-top: 2px;
