@@ -173,6 +173,17 @@ function App(): React.JSX.Element {
   // 扫描完成的轻提示:报个数就自己退场,不挡路
   const [scanToast, setScanToast] = useState<string | null>(null)
   const scanToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话,十几秒后自己退场
+  const [revived, setRevived] = useState(false)
+  useEffect(() => {
+    const off = window.atlas.onRendererRevived(() => setRevived(true))
+    return off
+  }, [])
+  useEffect(() => {
+    if (!revived) return
+    const t = setTimeout(() => setRevived(false), 15_000)
+    return () => clearTimeout(t)
+  }, [revived])
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -744,6 +755,11 @@ function App(): React.JSX.Element {
 
   return (
     <div className="app">
+      {revived && (
+        <div className="revive-note" role="alert">
+          画面刚才断了一次,已经自动接上 —— 正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
+        </div>
+      )}
       <TitleBar />
       <header className="topbar">
         <button

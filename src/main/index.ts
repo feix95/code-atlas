@@ -79,7 +79,7 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
@@ -88,7 +88,7 @@ import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -549,10 +549,47 @@ function createWindow(): void {
   ipcMain.removeAllListeners('atlas:first-frame')
   ipcMain.on('atlas:first-frame', () => showOnce('first-frame'))
   // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
+  // 「接回横幅」:救生圈动过手(reload 完/GPU 重启完)就捎个信,让页面弹一句人话
+  let revivePending = false
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.invalidate()
     // 顺手把模型状态问一轮:状态栏一开屏就有真话可说,不用干等轮询
     void refreshModelStatus().catch(() => {})
+    if (revivePending) {
+      revivePending = false
+      mainWindow.webContents.send('atlas:renderer-revived')
+    }
+  })
+  // 救生圈(2026-09-13 小葵两次报案:「界面凭空消失,后台还开着」)。这窗是透明无边框的,
+  // 渲染层一崩或 GPU 进程一打嗝重启,窗口就整窗透明 —— 看着像消失,其实进程全活着。
+  // 渲染层真崩:记进后台账本(账本住主进程,渲染层死了也活着),reload 把页面重挂回来。
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit') return
+    addDevLog('system', `画面断了一次(渲染层 ${details.reason}),已自动重接 —— 页面回到刚打开的样子`)
+    revivePending = true
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.reload()
+  })
+  // GPU 进程打嗝:页面本身是活的(实测 CPU/内存/连接全正常),只是透明窗再也等不来新画面。
+  // 催一帧 + 藏了再亮,逼 DWM 重开一块新画布,页面状态(聊天/扫描结果)一分不丢。
+  // Electron 44 起 GPU 的事件只挂在 app 级(child-process-gone),按 processType 认出 GPU 再动手
+  const onGpuGone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails & { type: string }): void => {
+    if (details.type !== 'GPU' || details.reason === 'clean-exit') return
+    addDevLog('system', `画面断了一次(GPU 进程 ${details.reason}),已自动重接 —— 你正在看的内容没丢`)
+    if (mainWindow.isDestroyed()) return
+    mainWindow.webContents.invalidate()
+    if (mainWindow.isVisible()) {
+      mainWindow.hide()
+      mainWindow.show()
+    }
+    mainWindow.webContents.send('atlas:renderer-revived')
+  }
+  app.on('child-process-gone', onGpuGone)
+  mainWindow.on('closed', () => {
+    app.removeListener('child-process-gone', onGpuGone)
+  })
+  // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔,让后台账本有话可查(不动手,等它自己醒)
+  mainWindow.webContents.on('unresponsive', () => {
+    addDevLog('system', '画面卡住了一阵(渲染层没响应) —— 记一笔备查')
   })
   // 外接 LM Studio 没法订阅它的内部状态:低频去问(10 秒一轮,本地请求很轻);
   // 内置引擎靠播报员事件推,不占这个轮询
@@ -1268,6 +1305,27 @@ function registerIpc(): void {
     const config = await loadAiConfig(app.getPath('userData'))
     const ctx = typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : DEFAULT_CONTEXT_SIZE
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
+  })
+
+  // 模型档案(上下文档位的账本):出厂上下文上限、层数头数、机器家底,一次端给设置页;
+  // 档案翻不出来各条目就是 null,设置页自己退到粗估,不报错不拦人
+  ipcMain.handle('atlas:model-context-info', async (_event, modelPath: unknown): Promise<ModelContextInfo | null> => {
+    if (typeof modelPath !== 'string' || !modelPath.trim()) return null
+    const p = modelPath.trim()
+    const sizeBytes = await fs
+      .stat(p)
+      .then((s) => s.size)
+      .catch(() => null)
+    const shape = await readModelShape(p)
+    if (sizeBytes === null && shape === null) return null
+    const spec = await queryMachineSpec()
+    return { sizeBytes, nativeContext: shape?.contextLength ?? null, shape, ramBytes: spec.ramBytes, vramBytes: spec.vramBytes }
+  })
+
+  // 渲染层的报错小纸条:window.onerror / unhandledrejection 抓到的都送进后台账本 ——
+  // 渲染层就算当场断气,主进程的账本还活着,下回排查有现场可看
+  ipcMain.on('atlas:renderer-error', (_event, text: unknown) => {
+    if (typeof text === 'string' && text.trim()) addDevLog('system', `页面报错:${text.slice(0, 500)}`)
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型(弹窗认准来叫它的窗,同上)

@@ -30,8 +30,9 @@
     "test:devlog": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-devlog.mts",
     "test:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-preview.mts",
     "test:filelinks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-filelinks.mts",
+    "test:contextbill": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-contextbill.mts",
     "test:personalization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-personalization.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:personalization"
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

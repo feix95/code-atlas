@@ -13,6 +13,7 @@ import type {
   FileStructure,
   FilePreviewResult,
   GitChangesResult,
+  ModelContextInfo,
   ModelFitVerdict,
   ModelStatus,
   ScanDirNode,
@@ -150,6 +151,19 @@ contextBridge.exposeInMainWorld('atlas', {
   },
   /** 量尺(第七十三锤):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
   modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> => ipcRenderer.invoke('atlas:model-fit-check', modelPath),
+  /** 模型档案(上下文档位的账本):出厂上限 + 层数头数 + 机器家底,一次端齐;翻不到回 null */
+  modelContextInfo: (modelPath: string): Promise<ModelContextInfo | null> =>
+    ipcRenderer.invoke('atlas:model-context-info', modelPath),
+  /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声,页面弹人话横幅;返回退订函数 */
+  onRendererRevived: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('atlas:renderer-revived', listener)
+    return () => ipcRenderer.removeListener('atlas:renderer-revived', listener)
+  },
+  /** 报错小纸条:渲染层抓到的 JS 错误送进后台账本(主进程的账本不随渲染层陪葬) */
+  reportRendererError: (text: string): void => {
+    ipcRenderer.send('atlas:renderer-error', text)
+  },
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),

@@ -94,11 +94,17 @@ export function ModelStatusBar(): React.JSX.Element {
             日志
           </button>
         </span>
-        {/* 进度线:贴着整条底栏底下走,按底栏全长当最大;就绪时满宽绿线退场;其他状态一根毛都不画 */}
-        {(status.state === 'loading' || status.state === 'ready') && (
+        {/* 进度线:贴着整条底栏底下走,按底栏全长当最大;就绪时满宽绿线退场。
+            没真进度(引擎不报数)就什么都不画 —— 信号灯在呼吸、文案在报"热身中",
+            再来一段来回扫的空车皮就是两套动画说同一句话(小葵拍的板:拆掉) */}
+
+        {status.state === 'ready' && (
+          <i className="model-bar" style={{ width: '100%' }} aria-hidden="true" />
+        )}
+        {status.state === 'loading' && status.progress !== null && (
           <i
-            className={`model-bar${status.progress === null ? ' is-unknown' : ''}`}
-            style={status.progress !== null ? { width: `${Math.min(100, Math.max(0, status.progress))}%` } : undefined}
+            className="model-bar"
+            style={{ width: `${Math.min(100, Math.max(0, status.progress))}%` }}
             aria-hidden="true"
           />
         )}

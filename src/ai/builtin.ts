@@ -5,11 +5,18 @@
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
-import type { AiBuiltinSettings, ModelStatus } from '../shared/types.ts'
+import type { AiBuiltinSettings, GgufShape, ModelStatus } from '../shared/types.ts'
 import { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { estimateKvBytes } from '../shared/contextBill.ts'
+import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
+
+// 上下文缓存(KV)的估算搬去 shared/contextBill.ts 了(档位账本跟滑块共用一份);
+// 这里转一手,老朋友(量尺/自测)照旧从 builtin 进
+export { estimateKvBytes }
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 const BUILTIN_PORT = 8766
@@ -219,15 +226,33 @@ export interface ModelFitVerdictPure {
  * 有显存:≤90% 显存 = 全进卡(最快);再往上挤到「显存+一半内存」= 能跑但落内存会慢;
  * 超过 = 必然靠硬盘硬扛,直接劝退。没问到显存:只看内存,权重超过内存七成就算挤。
  */
-/** 上下文缓存(KV)的估算(纯函数,自测覆盖):光看权重块头会说「装得下」,
- * 实际跑起来上下文一占就溢出显存、预处理慢吞吞(小葵 C 盘大项目的病根)。
- * 架构细节拿不到,按模型块头分档粗估每 token 的缓存开销:≥8GB 按 64 层大模型算,
- * 4~8GB 减半,更小的再减半 —— 宁可粗,不可无;量尺的话里标明是估的。
+/**
+ * 翻模型档案(GGUF 头):出厂上下文上限、层数、头数 —— 档位滑块拿它封顶,
+ * 黑板账拿它精算。翻不出来(不是 GGUF / 头部超长 / 读失败)老实回 null,不拦人。
+ * 头部从 2MB 起步逐级加码读:词表大条目可能把头部顶到几 MB 开外。
  */
-export function estimateKvBytes(contextTokens: number, modelBytes: number): number {
-  if (!Number.isFinite(contextTokens) || contextTokens <= 0) return 0
-  const perToken = modelBytes >= 8 * GB ? 256 * 1024 : modelBytes >= 4 * GB ? 128 * 1024 : 64 * 1024
-  return Math.round(contextTokens * perToken)
+const GGUF_HEAD_SIZES = [2 * 1024 * 1024, 16 * 1024 * 1024, 128 * 1024 * 1024]
+
+export async function readModelShape(modelPath: string): Promise<GgufShape | null> {
+  let handle: Awaited<ReturnType<typeof open>> | null = null
+  try {
+    handle = await open(modelPath, 'r')
+    const fileSize = (await handle.stat()).size
+    for (const size of GGUF_HEAD_SIZES) {
+      const len = Math.min(size, fileSize)
+      const buf = Buffer.alloc(len)
+      const { bytesRead } = await handle.read(buf, 0, len, 0)
+      if (bytesRead < len) return null
+      const parsed = parseGgufHeader(buf)
+      if (parsed.status === 'ok') return parsed.shape
+      if (parsed.status === 'bad') return null
+    }
+    return null
+  } catch {
+    return null
+  } finally {
+    await handle?.close().catch(() => {})
+  }
 }
 
 export function judgeModelFit(

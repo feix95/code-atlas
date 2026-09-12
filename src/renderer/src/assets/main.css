@@ -4195,29 +4195,16 @@ body.is-maximized .cfg-layer {
   line-height: 1.6;
 }
 
+/* 高级面板常开(小葵定的板:换模型高频,折叠退役;防误改的保险在「保存」那一环) */
 .cfg-advanced {
-  transition: border-color 0.16s ease;
-}
-
-.cfg-advanced.is-open {
   border-color: var(--accent-line);
 }
 
-.cfg-advanced-trigger {
-  width: 100%;
+.cfg-advanced-head {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
   padding: 0.8125rem 1rem;
-  border: 0;
-  color: var(--text);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cfg-advanced-trigger:hover {
-  background: var(--surface-soft);
 }
 
 .cfg-advanced-icon {
@@ -4231,47 +4218,24 @@ body.is-maximized .cfg-layer {
   background: var(--accent-soft);
 }
 
-.cfg-advanced-trigger strong,
-.cfg-advanced-trigger small {
+.cfg-advanced-head strong,
+.cfg-advanced-head small {
   display: block;
 }
 
-.cfg-advanced-trigger strong {
+.cfg-advanced-head strong {
   font-size: 0.625rem;
 }
 
-.cfg-advanced-trigger small {
+.cfg-advanced-head small {
   margin-top: 0.1875rem;
   color: var(--muted-2);
   font-size: 0.625rem;
 }
 
-.cfg-chevron {
-  margin-left: auto;
-  color: var(--muted-2);
-  transition: transform 0.18s ease;
-}
-
-.cfg-advanced.is-open .cfg-chevron {
-  transform: rotate(180deg);
-}
-
 .cfg-advanced-body {
   padding: 0 1rem 0.9375rem;
   border-top: 1px solid var(--line-soft);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .cfg-advanced-body {
-    animation: cfg-reveal 0.18s ease;
-  }
-}
-
-@keyframes cfg-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
 }
 
 .cfg-field-head {
@@ -4685,7 +4649,8 @@ body.is-maximized .cfg-layer {
 }
 
 /* 热身进度条(第七十四锤):拉通整条底栏底下,按底栏全长当最大;
-   服务没报进度时(is-unknown)就一小段来回扫,不给假数字;
+   只在引擎报真进度时画(慢慢长),没真进度就一根都不画 —— 信号灯的呼吸
+   已经把"在忙"说清楚了,再来段来回扫的空车皮是两套动画说同一句话;
    前进端点带个小发光(currentColor 跟着状态变色:热身主色、就绪变绿) */
 .model-bar {
   position: absolute;
@@ -4699,6 +4664,7 @@ body.is-maximized .cfg-layer {
   transition: width 0.6s ease;
 }
 
+/* 车头微光:只驮真进度慢慢爬,不跑空车;就绪时跟条子一起变绿退场 */
 .model-bar::after {
   content: '';
   position: absolute;
@@ -4711,25 +4677,6 @@ body.is-maximized .cfg-layer {
   background: currentColor;
   box-shadow: 0 0 0.5rem 0.125rem currentColor;
   opacity: 0.85;
-}
-
-.model-bar.is-unknown {
-  width: 32%;
-  animation: model-sweep 1.6s ease-in-out infinite;
-}
-
-@keyframes model-sweep {
-  0% {
-    transform: translateX(-40%);
-    opacity: 0.4;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(280%);
-    opacity: 0.4;
-  }
 }
 
 /* 就绪后进度条退场:满宽一条绿,1.5 秒后隐掉,别一直压着底栏(端点发光跟着变绿) */
@@ -4748,8 +4695,7 @@ body.is-maximized .cfg-layer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .model-dot,
-  .model-bar.is-unknown {
+  .model-dot {
     animation: none;
   }
 }
@@ -4767,6 +4713,75 @@ body.is-maximized .cfg-layer {
 .cfg-fit-note.is-too-big,
 .cfg-fit-note.is-missing {
   color: var(--danger);
+}
+
+.cfg-fit-note.is-unknown {
+  color: var(--muted-2);
+}
+
+/* ── 上下文档位滑块(2026-09-13):程序员档位 2 的幂,拖滑块或点刻度都行,和输入框互通 ── */
+
+.cfg-ctx-notch {
+  margin-top: 0.625rem;
+}
+
+.cfg-ctx-range input {
+  width: 100%;
+  display: block;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.cfg-ctx-ticks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.cfg-ctx-ticks button {
+  padding: 0.1875rem 0.5625rem;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.cfg-ctx-ticks button:hover {
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+.cfg-ctx-ticks button.is-active {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+/* ── 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话 ── */
+
+.revive-note {
+  position: fixed;
+  top: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  max-width: min(34rem, calc(100vw - 3rem));
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
 }
 
 /* ── 第八十七锤:Developer 日志窗口 —— 独立小窗,引擎原话/请求报账/应用记账一本账 ──

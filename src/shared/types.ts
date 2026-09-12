@@ -281,6 +281,29 @@ export interface ModelFitVerdict {
   sizeBytes: number | null
 }
 
+/** GGUF 档案头翻出来的模型身条目(上下文档位的账本用):翻不到的条目老实是 null */
+export interface GgufShape {
+  /** 出厂上下文上限(训练时定死的,超过它模型就开始记岔) */
+  contextLength: number | null
+  /** 层数(block_count) */
+  blockCount: number | null
+  /** 注意力头数 */
+  headCount: number | null
+  /** KV 头数(GQA 模型比头数小) */
+  kvHeadCount: number | null
+  /** 嵌入维度(拿它除以头数 = 每头宽度) */
+  embeddingLength: number | null
+}
+
+/** 设置页上下文档位的账本原料:模型档案 + 机器家底,一次端齐(翻不到的条目是 null) */
+export interface ModelContextInfo {
+  sizeBytes: number | null
+  nativeContext: number | null
+  shape: GgufShape | null
+  ramBytes: number
+  vramBytes: number | null
+}
+
 /** 流式输出的增量推送(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiDeltaPayload {
   id: string

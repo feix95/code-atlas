@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { AiConfig, ModelFitVerdict } from '@shared/types'
+import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
+import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
 import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import {
   CUSTOM_MAX,
@@ -245,8 +246,8 @@ const THEME_SUB: Record<AppearancePreset, string> = {
 
 const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: string }> = [
   { key: 'appearance', icon: 'palette', name: '外观与阅读', sub: '配色与界面大小' },
-  { key: 'ai', icon: 'bot', name: '智能辅助', sub: '模型与在线验证' },
   { key: 'personal', icon: 'sparkles', name: '个性化', sub: '语气与说话方式' },
+  { key: 'ai', icon: 'bot', name: '智能辅助', sub: '模型与在线验证' },
   { key: 'advanced', icon: 'sliders', name: '高级选项', sub: '本地模型与连接详情' }
 ]
 
@@ -264,7 +265,6 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [draftScale, setDraftScale] = useState(() => window.atlas.getUiScale())
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
   const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
@@ -273,7 +273,10 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
   const [modelsBusy, setModelsBusy] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
-  const [fitNote, setFitNote] = useState<ModelFitVerdict | null>(null)
+  const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({ path: '', verdict: null })
+  // 上下文档位的账本原料(救生圈这锤):模型档案 + 机器家底,带着取数时的路径对号,
+  // 路径一换旧结论自动作废 —— 不用在 effect 里手动清,也躲开「effect 里同步 setState」的坑
+  const [ctxInfoFetched, setCtxInfoFetched] = useState<{ path: string; info: ModelContextInfo | null }>({ path: '', info: null })
   // 第八十九锤:上下文框的打字草稿(纯字符串,和存档里的数字分开管)
   const [contextRaw, setContextRaw] = useState<string>('')
   // 试一句的结果(第一百一十三锤):拿草稿试,没应用更改也能听
@@ -301,7 +304,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     window.atlas.appVersion().then(setAppVersion).catch(() => {})
   }, [])
 
-  // 量尺(第七十三锤):模型路径一变就问「带得动吗」;路径清空就不显示(旧结论作废)
+  // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
+  // 结果带着路径入库,显示时按「取数路径 === 当前路径」对号,换人/清空自动失效
   const modelPathDraft = draftConfig?.builtin.modelPath ?? ''
   useEffect(() => {
     if (!modelPathDraft.trim()) return
@@ -309,13 +313,58 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
     void window.atlas
       .modelFitCheck(modelPathDraft)
       .then((v) => {
-        if (alive) setFitNote(v)
+        if (alive) setFitCheck({ path: modelPathDraft, verdict: v })
+      })
+      .catch(() => {})
+    void window.atlas
+      .modelContextInfo(modelPathDraft)
+      .then((v) => {
+        if (alive) setCtxInfoFetched({ path: modelPathDraft, info: v })
       })
       .catch(() => {})
     return () => {
       alive = false
     }
   }, [modelPathDraft])
+  const fitNote = fitCheck.path === modelPathDraft ? fitCheck.verdict : null
+  const ctxInfo = ctxInfoFetched.path === modelPathDraft ? ctxInfoFetched.info : null
+
+  // ── 上下文档位滑块 + 黑板账单(2026-09-13 小葵拍的板)──
+  // 滑块走程序员老规矩 2 的幂(4k/8k/16k/…);最大档照模型出厂上限封顶,翻不出档案按 64k 兜底;
+  // 输入框自由填写照旧,两边随时互通;账单跟着框里现在的数实时算,扛不住当场喊。
+  const contextNotches = useMemo(
+    () => CONTEXT_NOTCHES.filter((n) => n <= (ctxInfo?.nativeContext ?? FALLBACK_CONTEXT_CAP)),
+    [ctxInfo]
+  )
+  const committedCtx = clampContextSize(contextRaw)
+  const ctxNotchIndex = useMemo(() => {
+    const target = committedCtx ?? DEFAULT_CONTEXT_SIZE
+    let best = 0
+    for (let i = 1; i < contextNotches.length; i++) {
+      if (Math.abs(contextNotches[i] - target) < Math.abs(contextNotches[best] - target)) best = i
+    }
+    return best
+  }, [committedCtx, contextNotches])
+  const ctxBill = useMemo(
+    () =>
+      ctxInfo
+        ? formatContextBill({
+            contextTokens: committedCtx ?? DEFAULT_CONTEXT_SIZE,
+            isAuto: committedCtx === undefined,
+            modelBytes: ctxInfo.sizeBytes,
+            shape: ctxInfo.shape,
+            ramBytes: ctxInfo.ramBytes,
+            vramBytes: ctxInfo.vramBytes
+          })
+        : null,
+    [ctxInfo, committedCtx]
+  )
+  function commitContextValue(v: number): void {
+    setContextRaw(String(v))
+    if (draftConfig && draftConfig.contextSize !== v) {
+      setDraftConfig({ ...draftConfig, contextSize: v })
+    }
+  }
 
   // 视觉预览:草稿一变,界面当场变(还没落盘,撤销/关弹窗就退回)
   useEffect(() => {
@@ -742,7 +791,92 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                 </div>
               </section>
 
-              {/* ── 02 智能辅助 ── */}
+              {/* ── 02 个性化(小葵定的版式:挪到外观与阅读下面,智能辅助和高级选项这对 AI 配置连成一片) ── */}
+              <section
+                className="cfg-section"
+                ref={(el) => {
+                  personalRef.current = el
+                }}
+              >
+                <div className="cfg-section-head">
+                  <div>
+                    <span className="cfg-step">02</span>
+                    <h3>个性化</h3>
+                  </div>
+                  <span>决定 AI 怎么跟你说话</span>
+                </div>
+                <div className="cfg-panel">
+                  {!draftConfig ? (
+                    <div className="cfg-row">
+                      <div className="cfg-copy">
+                        <label>说话方式</label>
+                        <p>读取配置中……</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="cfg-row">
+                        <div className="cfg-copy">
+                          <label>基本风格和语气</label>
+                        </div>
+                        <ToneSelect value={personal.tone} onChange={(tone) => updatePersonal({ tone })} />
+                      </div>
+                      <div className="cfg-divider" />
+                      <div className="cfg-row cfg-row-stack">
+                        <div className="cfg-copy">
+                          <label>
+                            自订指令
+                            <span className="cfg-flag">
+                              {personal.custom.length}/{CUSTOM_MAX}
+                            </span>
+                          </label>
+                        </div>
+                        <textarea
+                          className="cfg-textarea"
+                          rows={5}
+                          maxLength={CUSTOM_MAX}
+                          value={personal.custom}
+                          spellCheck={false}
+                          aria-label="自订指令"
+                          placeholder={'例如：告诉 AI 你的偏好、身份或回答风格，这些会在之后的对话中持续生效。'}
+                          onChange={(e) => updatePersonal({ custom: e.target.value })}
+                        />
+                      </div>
+                      <div className="cfg-privacy">
+                        <Icon name="shield" size={12} />
+                        <span>自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 —— 这几条铁律不跟着变。</span>
+                      </div>
+                      <div className="cfg-divider" />
+                      <div className="cfg-row cfg-row-stack">
+                        <div className="cfg-copy">
+                          <label>试一句</label>
+                          <p>拿上面这套说法,让当前模型当场念一段小代码 —— 光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。</p>
+                        </div>
+                        <div className="cfg-sample-actions">
+                          <button type="button" className="cfg-btn" onClick={() => void tryStyle()} disabled={sample?.kind === 'busy'}>
+                            <Icon name="sparkles" size={13} />
+                            {sample?.kind === 'busy' ? '正在念……' : '试一句'}
+                          </button>
+                          {sample?.kind === 'done' && (
+                            <button type="button" className="cfg-btn is-ghost" onClick={() => setSample(null)}>
+                              收起
+                            </button>
+                          )}
+                        </div>
+                        {sample?.kind === 'busy' && (
+                          <div className="cfg-copy">
+                            <p>正在让模型按这套说法说一遍,第一次可能要等模型热身……</p>
+                          </div>
+                        )}
+                        {sample?.kind === 'done' && <pre className="cfg-sample">{sample.text}</pre>}
+                        {sample?.kind === 'error' && <p className="cfg-sample is-error">{sample.text}</p>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              {/* ── 03 智能辅助 ── */}
               <section
                 className="cfg-section"
                 ref={(el) => {
@@ -751,7 +885,7 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
               >
                 <div className="cfg-section-head">
                   <div>
-                    <span className="cfg-step">02</span>
+                    <span className="cfg-step">03</span>
                     <h3>智能辅助</h3>
                   </div>
                   <span>决定分析请求从哪里出发</span>
@@ -843,91 +977,6 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                 </div>
               </section>
 
-              {/* ── 03 个性化 ── */}
-              <section
-                className="cfg-section"
-                ref={(el) => {
-                  personalRef.current = el
-                }}
-              >
-                <div className="cfg-section-head">
-                  <div>
-                    <span className="cfg-step">03</span>
-                    <h3>个性化</h3>
-                  </div>
-                  <span>决定 AI 怎么跟你说话</span>
-                </div>
-                <div className="cfg-panel">
-                  {!draftConfig ? (
-                    <div className="cfg-row">
-                      <div className="cfg-copy">
-                        <label>说话方式</label>
-                        <p>读取配置中……</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="cfg-row">
-                        <div className="cfg-copy">
-                          <label>基本风格和语气</label>
-                        </div>
-                        <ToneSelect value={personal.tone} onChange={(tone) => updatePersonal({ tone })} />
-                      </div>
-                      <div className="cfg-divider" />
-                      <div className="cfg-row cfg-row-stack">
-                        <div className="cfg-copy">
-                          <label>
-                            自订指令
-                            <span className="cfg-flag">
-                              {personal.custom.length}/{CUSTOM_MAX}
-                            </span>
-                          </label>
-                        </div>
-                        <textarea
-                          className="cfg-textarea"
-                          rows={5}
-                          maxLength={CUSTOM_MAX}
-                          value={personal.custom}
-                          spellCheck={false}
-                          aria-label="自订指令"
-                          placeholder={'例如：告诉 AI 你的偏好、身份或回答风格，这些会在之后的对话中持续生效。'}
-                          onChange={(e) => updatePersonal({ custom: e.target.value })}
-                        />
-                      </div>
-                      <div className="cfg-privacy">
-                        <Icon name="shield" size={12} />
-                        <span>自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 —— 这几条铁律不跟着变。</span>
-                      </div>
-                      <div className="cfg-divider" />
-                      <div className="cfg-row cfg-row-stack">
-                        <div className="cfg-copy">
-                          <label>试一句</label>
-                          <p>拿上面这套说法,让当前模型当场念一段小代码 —— 光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。</p>
-                        </div>
-                        <div className="cfg-sample-actions">
-                          <button type="button" className="cfg-btn" onClick={() => void tryStyle()} disabled={sample?.kind === 'busy'}>
-                            <Icon name="sparkles" size={13} />
-                            {sample?.kind === 'busy' ? '正在念……' : '试一句'}
-                          </button>
-                          {sample?.kind === 'done' && (
-                            <button type="button" className="cfg-btn is-ghost" onClick={() => setSample(null)}>
-                              收起
-                            </button>
-                          )}
-                        </div>
-                        {sample?.kind === 'busy' && (
-                          <div className="cfg-copy">
-                            <p>正在让模型按这套说法说一遍,第一次可能要等模型热身……</p>
-                          </div>
-                        )}
-                        {sample?.kind === 'done' && <pre className="cfg-sample">{sample.text}</pre>}
-                        {sample?.kind === 'error' && <p className="cfg-sample is-error">{sample.text}</p>}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </section>
-
               {/* ── 04 高级选项 ── */}
               <section
                 className="cfg-section"
@@ -940,10 +989,12 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                     <span className="cfg-step">04</span>
                     <h3>高级选项</h3>
                   </div>
-                  <span>按需展开,减少意外修改</span>
+                  <span>本地模型与连接详情(常开:换模型是常干活,不再折着藏)</span>
                 </div>
-                <div className={`cfg-panel cfg-advanced${advancedOpen ? ' is-open' : ''}`}>
-                  <button type="button" className="cfg-advanced-trigger" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(!advancedOpen)}>
+                {/* 常开面板(小葵定的板:换模型是高频活,折叠的那一下点击纯属过路费;
+                    防误改的保险在「保存」那一环 —— 不点保存,改了也白改) */}
+                <div className="cfg-panel cfg-advanced">
+                  <div className="cfg-advanced-head">
                     <span className="cfg-advanced-icon">
                       <Icon name="sliders" size={13} />
                     </span>
@@ -951,11 +1002,8 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                       <strong>本地模型连接</strong>
                       <small>{isBuiltin ? '推理引擎已内置,这里选大脑文件' : 'LM Studio 的服务地址与模型名'}</small>
                     </span>
-                    <span className="cfg-chevron">
-                      <Icon name="chevron" size={14} />
-                    </span>
-                  </button>
-                  {advancedOpen && draftConfig && (
+                  </div>
+                  {draftConfig && (
                     <div className="cfg-advanced-body">
                       {isBuiltin ? (
                         <>
@@ -1066,6 +1114,47 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                             模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。
                             范围 512 ~ 1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
                           </p>
+                          {/* 档位滑块(2026-09-13):程序员档位一拨就填好,刻度也能直接点;拖动 = 切到手动档 */}
+                          {contextNotches.length > 0 && (
+                            <div className="cfg-ctx-notch">
+                              <div className="cfg-ctx-range">
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={contextNotches.length - 1}
+                                  step={1}
+                                  value={ctxNotchIndex}
+                                  aria-label="模型上下文档位滑块"
+                                  onChange={(e) => commitContextValue(contextNotches[Number(e.target.value)])}
+                                />
+                              </div>
+                              <div className="cfg-ctx-ticks">
+                                {contextNotches.map((n, i) => (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    className={i === ctxNotchIndex ? 'is-active' : ''}
+                                    title={`${n.toLocaleString('en-US')} tokens`}
+                                    onClick={() => commitContextValue(n)}
+                                  >
+                                    {n / 1024}k
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {ctxInfo?.nativeContext != null && (
+                            <p className="cfg-field-help">
+                              这台模型的出厂上限是 {ctxInfo.nativeContext.toLocaleString('en-US')} tokens,滑块到顶就是它 ——
+                              再往上模型自己也记不住前文,不设这个档。
+                            </p>
+                          )}
+                          {/* 黑板账单:拖一下滑块/改一个字就重新报一次价,扛不住当场喊,不等人白等 */}
+                          {ctxBill && (
+                            <p className={`cfg-field-help cfg-fit-note is-${ctxBill.level}`}>
+                              {ctxBill.level === 'ok' ? '✓' : ctxBill.level === 'unknown' ? '…' : '!'} {ctxBill.text}
+                            </p>
+                          )}
                         </>
                       )}
                     </div>
