@@ -286,6 +286,8 @@ export interface AiDeltaPayload {
   stats?: AiStreamStats
   /** agent 的工具步骤播报(第一百二十八锤):翻文件模式下每翻一样播一句大白话 */
   step?: { text: string }
+  /** agent 流式的回滚(第一百三十四锤):中间轮次预吐的字被证明不是答案(模型喊了工具),收回重讲 */
+  reset?: boolean
 }
 
 /** AI 人话解释的结果 */

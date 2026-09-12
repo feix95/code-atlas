@@ -17,7 +17,8 @@ import {
   mergeUsage,
   sanitizeAgentRelPath,
   toolCallKey,
-  type AgentChatMessage
+  type AgentChatMessage,
+  type AgentStreamEvent
 } from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
@@ -706,11 +707,16 @@ function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: strin
   event.sender.send('atlas:ai-delta', payload)
 }
 
-/** 把这轮的思考过程推给界面(非流式只能论轮播:一轮想完推一轮,字级别的流式收尾留给下一锤) */
-function sendAgentReasoning(event: IpcMainInvokeEvent, requestId: string, reasoning: string): void {
+/** agent 流式轮次的增量转发(第一百三十四锤):思考/正文逐帧推给界面,token 账同帧喂状态条 */
+function sendAgentDelta(event: IpcMainInvokeEvent, requestId: string, ev: AgentStreamEvent): void {
   if (requestId === '' || event.sender.isDestroyed()) return
-  const payload: AiDeltaPayload = { id: requestId, text: '', reasoning }
+  const payload: AiDeltaPayload = { id: requestId, text: ev.text ?? '' }
+  if (ev.reasoning) payload.reasoning = ev.reasoning
+  if (ev.stats) payload.stats = ev.stats
+  if (ev.reset) payload.reset = true
   event.sender.send('atlas:ai-delta', payload)
+  // 引擎肯报账,状态条的「忙」就跟着报数(和普通聊天同一待遇)
+  if (ev.stats) announceActivityBusy(lastActivityProvider, ev.stats)
 }
 
 /**
@@ -749,15 +755,18 @@ async function runAgentChat(input: {
     const useTools = rounds < AGENT_MAX_ROUNDS
     if (!useTools) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
     rounds += 1
-    const round = await agentRound(target, messages, { signal, maxTokens: replyCap, allowThinking, useTools })
+    const round = await agentRound(target, messages, {
+      signal,
+      maxTokens: replyCap,
+      allowThinking,
+      useTools,
+      onDelta: (ev) => sendAgentDelta(event, requestId, ev)
+    })
     if (round.status !== 'ok') {
       return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
     }
     usage = mergeUsage(usage, round.usage)
-    if (round.reasoning) {
-      reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
-      sendAgentReasoning(event, requestId, round.reasoning)
-    }
+    if (round.reasoning) reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
     // 状态条的实时计数是流式增量顺手喂的,翻文件按轮非流式没增量可蹭 ——
     // 每轮收完账自己报一次,左下角不至于整场只挂「在干活……」
     if (usage) {

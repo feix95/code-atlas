@@ -91,6 +91,12 @@ export function useAiChat(
     () =>
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
+        // agent 流式的回滚令(第一百三十四锤):中间轮次预吐的字被证明不是答案
+        // (模型喊了工具),把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
+        if (payload.reset) {
+          setMessages((prev) => prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: '' } : m)))
+          return
+        }
         // 翻文件模式的工具步骤播报:垫一条灰字(排在正在回答的气泡前面),
         // 只给人看,不进对话历史 —— 模型干了什么,用户一眼有数
         if (payload.step) {

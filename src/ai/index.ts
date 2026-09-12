@@ -971,11 +971,19 @@ interface ChatCompletionResponse {
 }
 
 interface ChatStreamChunk {
-  choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>
+  choices?: Array<{ delta?: { content?: string; reasoning_content?: string; tool_calls?: ToolCallDelta[] } }>
   /** llama-server timings_per_token(第八十四锤):已读提示词/已吐 token/吐字速度 */
   timings?: { prompt_n?: number; predicted_n?: number; predicted_per_second?: number }
   /** OpenAI 习惯的收尾账(llama-server / LM Studio 都可能给) */
   usage?: { prompt_tokens?: number; completion_tokens?: number }
+}
+
+/** 流式一帧里的工具调用碎片(第一百三十四锤):参数按 index 分组、arguments 逐段拼 */
+export interface ToolCallDelta {
+  index?: number
+  id?: string
+  type?: string
+  function?: { name?: string; arguments?: string }
 }
 
 /** 从一帧流里抠出 token 账(纯函数,自测覆盖);啥都没有回 null,绝不编数 */
@@ -1000,19 +1008,21 @@ export function extractStreamStats(chunk: ChatStreamChunk, phase: 'reading' | 'w
   return hasAnything ? stats : null
 }
 
-/** SSE 流里的一次事件:一段正文和/或一段思考和/或一份 token 账 */
-interface SseEvent {
+/** SSE 流里的一次事件:一段正文和/或一段思考和/或一份 token 账和/或工具调用碎片 */
+export interface SseEvent {
   text?: string
   reasoning?: string
   stats?: AiStreamStats
+  toolCalls?: ToolCallDelta[]
 }
 
 /**
  * 解析 OpenAI 流式(SSE)响应体,逐帧吐出「新增文本 + token 账」。
  * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
  * timings/usage 帧照常转发(llama-server 吐字帧里捎 timings,收尾捎 usage)。
+ * 工具调用碎片照原样转发(agent 的流式循环自己按 index 拼,第一百三十四锤)。
  */
-async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<SseEvent> {
+export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<SseEvent> {
   const reader = res.body?.getReader()
   if (!reader) return
   const decoder = new TextDecoder()
@@ -1057,12 +1067,14 @@ async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<S
         const delta = chunk.choices?.[0]?.delta
         const piece = delta?.content
         const think = delta?.reasoning_content
-        if (piece) writing = true
+        const calls = delta?.tool_calls
+        if (piece || calls) writing = true
         const stats = extractStreamStats(chunk, writing ? 'writing' : 'reading')
-        if (piece || think || stats) {
+        if (piece || think || calls || stats) {
           const ev: SseEvent = {}
           if (piece) ev.text = piece
           if (think) ev.reasoning = think
+          if (calls) ev.toolCalls = calls
           if (stats) ev.stats = stats
           yield ev
         }

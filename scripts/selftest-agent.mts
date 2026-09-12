@@ -11,6 +11,7 @@ import {
   REPEAT_NUDGE,
   agentReadChars,
   agentStepText,
+  assembleToolCalls,
   extractToolCalls,
   mergeUsage,
   parseToolArgs,
@@ -97,7 +98,25 @@ function main(): void {
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_ADDENDUM.includes('翻文件') && AGENT_ADDENDUM.includes('相对路径'), '守则要教模型用相对路径翻文件')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 全部通过')
+  // ── 10. 流式工具调用碎片的拼装(第一百三十四锤):参数逐段续、多调用按 index 分组 ──
+  const assembled = assembleToolCalls([
+    { index: 0, id: 'call_a', function: { name: 'list_files', arguments: '' } },
+    { index: 0, function: { arguments: '{"relPath":"s' } },
+    { index: 0, function: { arguments: 'rc"}' } },
+    { index: 1, id: 'call_b', function: { name: 'read_file', arguments: '{"relPa' } },
+    { index: 1, function: { arguments: 'th":"README.md"}' } }
+  ])
+  assert.equal(assembled.length, 2, '两个 index 拼成两个调用')
+  assert.equal(assembled[0].id, 'call_a', 'id 认首帧的')
+  assert.equal(assembled[0].name, 'list_files', '名字认首帧的')
+  assert.deepEqual(assembled[0].args, { relPath: 'src' }, 'arguments 分段续成完整 JSON')
+  assert.deepEqual(assembled[1].args, { relPath: 'README.md' }, '第二个调用的参数同样拼得齐')
+  const [noIndex] = assembleToolCalls([{ function: { name: 'read_file', arguments: '{"relPath":"x"}' } }])
+  assert.equal(noIndex.id, 'call_0', '缺 index 的当第 0 个,id 补序号')
+  const [noArgs] = assembleToolCalls([{ index: 0, id: 'c', function: { name: 'list_files' } }])
+  assert.equal(noArgs.args, null, '一个字参数都没给的,args 为 null 走「参数不合法」的喂回')
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 全部通过')
 }
 
 main()

@@ -8,8 +8,8 @@
 // 1. 只发「看」的工具(列名单/读文件),没有「改」的 —— 想作恶连入口都没有
 // 2. 路径一律走项目内的相对路径,主进程拼绝对路径前还有 joinRoot 二道岗
 // 3. 缰绳:轮数封顶 + 同一样东西不许翻第二遍,防止小模型原地转圈烧锅
-import type { AiUsage, ChatTarget } from '../shared/types.ts'
-import { friendlyHttpError, splitThinking } from './index.ts'
+import type { AiStreamStats, AiUsage, ChatTarget } from '../shared/types.ts'
+import { friendlyHttpError, splitThinking, sseEvents, type ToolCallDelta } from './index.ts'
 
 /** 工具轮数封顶:8 轮翻不满就逼它交卷(再多的部分下一问继续) */
 export const AGENT_MAX_ROUNDS = 8
@@ -186,21 +186,56 @@ export type AgentRoundResult =
   | { status: 'ok'; raw: AgentRawAssistant; reasoning?: string; usage?: AiUsage }
   | { status: 'error' | 'cancelled'; text: string }
 
-/** 等响应头的耐心(和普通聊天同一口径:大提示词预处理可能整段静默) */
-const HEADERS_TIMEOUT_MS = 120_000
-/** 等完整回复的耐心 */
-const BODY_TIMEOUT_MS = 120_000
+/** 流式轮次边收边推给界面的事件(第一百三十四锤):增量 + token 账 + 回滚令 */
+export interface AgentStreamEvent {
+  text?: string
+  reasoning?: string
+  stats?: AiStreamStats
+  /** 中间轮次预吐的字被证明不是答案(模型喊了工具),让界面把已吐的字收回去 */
+  reset?: boolean
+}
 
 /**
- * agent 的单轮请求(非流式):带上工具表问模型,拿回它的回信原样。
- * 用非流式是第一锤的取舍 —— 中间轮次的产出是工具调用不是正文,流式没意义;
- * 等答案的体感靠步骤播报垫着,最终答案的分段吐字留给下一锤。
+ * 把流式一帧帧的工具调用碎片拼成完整的调用表(纯函数,自测覆盖)。
+ * OpenAI 方言:参数按 index 分组,arguments 是逐段续的字符串,名字和 id 只在首帧出现;
+ * 缺 index 的(个别服务)当第 0 个,缺 id 的补序号 —— 和非流式的 extractToolCalls 同一套兜底。
+ */
+export function assembleToolCalls(chunks: ToolCallDelta[]): AgentToolCall[] {
+  const slots = new Map<number, { id?: string; name?: string; args: string }>()
+  for (const chunk of chunks) {
+    const index = typeof chunk.index === 'number' && Number.isFinite(chunk.index) ? chunk.index : 0
+    const slot = slots.get(index) ?? { args: '' }
+    if (slot.id === undefined && typeof chunk.id === 'string' && chunk.id !== '') slot.id = chunk.id
+    if (slot.name === undefined && typeof chunk.function?.name === 'string' && chunk.function.name !== '') {
+      slot.name = chunk.function.name
+    }
+    if (typeof chunk.function?.arguments === 'string') slot.args += chunk.function.arguments
+    slots.set(index, slot)
+  }
+  return [...slots.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([index, slot]) => ({
+      id: slot.id ?? `call_${index}`,
+      name: slot.name ?? '',
+      args: slot.args === '' ? null : parseToolArgs(slot.args),
+      rawArguments: slot.args
+    }))
+}
+
+/** 等响应头的耐心(和普通聊天同一口径:大提示词预处理可能整段静默;首帧之后由 sseEvents 自己的看门狗接管) */
+const HEADERS_TIMEOUT_MS = 120_000
+
+/**
+ * agent 的单轮请求(流式,第一百三十四锤):带上工具表问模型,边收边拼边推。
+ * 思考和正文逐帧走 onDelta 推给界面(左下角的 token 账同帧捎走),等答案不再是黑洞;
+ * 工具调用的参数碎片按 index 现场拼(assembleToolCalls)。
  * useTools = false 时(轮数烧完的逼卷轮)不带工具表,模型只能交答案。
+ * 中间轮次预吐的正文若被证明不是答案(模型喊了工具),先发 reset 令让界面收回去。
  */
 export async function agentRound(
   config: ChatTarget,
   messages: AgentChatMessage[],
-  opts: { signal?: AbortSignal; maxTokens: number; allowThinking?: boolean; useTools: boolean }
+  opts: { signal?: AbortSignal; maxTokens: number; allowThinking?: boolean; useTools: boolean; onDelta?: (ev: AgentStreamEvent) => void }
 ): Promise<AgentRoundResult> {
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
   const controller = new AbortController()
@@ -222,7 +257,8 @@ export async function agentRound(
         messages,
         temperature: 0.2,
         max_tokens: opts.maxTokens,
-        stream: false,
+        stream: true,
+        stream_options: { include_usage: true },
         ...(opts.useTools ? { tools: AGENT_TOOLS, tool_choice: 'auto' } : {}),
         // 和普通聊天同一口径:思考开关只对内置引擎发(外接服务不认这个字段)
         ...(!opts.allowThinking && config.timings ? { chat_template_kwargs: { enable_thinking: false } } : {})
@@ -237,29 +273,46 @@ export async function agentRound(
         text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`
       }
     }
+    // 响应头到手,首帧后的耐心交给 sseEvents 自己的看门狗
     clearTimeout(watchdog)
-    watchdog = setTimeout(() => controller.abort(), BODY_TIMEOUT_MS)
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: AgentRawAssistant & { reasoning_content?: string } }>
-      usage?: { prompt_tokens?: number; completion_tokens?: number }
+    let content = ''
+    let reasoning = ''
+    const fragments: ToolCallDelta[] = []
+    let lastStats: AiStreamStats | undefined
+    for await (const ev of sseEvents(res, controller.signal)) {
+      if (ev.text) content += ev.text
+      if (ev.reasoning) reasoning += ev.reasoning
+      if (ev.toolCalls) fragments.push(...ev.toolCalls)
+      if (ev.stats) lastStats = ev.stats
+      if (opts.onDelta && (ev.text || ev.reasoning || ev.stats)) {
+        opts.onDelta({ text: ev.text, reasoning: ev.reasoning, stats: ev.stats })
+      }
     }
-    const raw = data.choices?.[0]?.message
-    if (!raw) {
-      return { status: 'error', text: '模型连上了,但没回话 —— 再问一次试试' }
+    const usage: AiUsage | undefined = lastStats
+      ? { promptTokens: lastStats.promptTokens, outputTokens: lastStats.outputTokens, tokensPerSecond: lastStats.tokensPerSecond }
+      : undefined
+    // 正文里掺的 <think> 标签拆干净(有的后端把思考掺在正文里):拆出了思考原文,
+    // 说明预吐的字不干净,发 reset 令收回去,把干净的答案重讲一遍
+    const split = splitThinking(content)
+    const answer = split.answer
+    if (opts.onDelta && split.reasoning !== '') {
+      opts.onDelta({ reset: true })
+      if (answer.trim() !== '') opts.onDelta({ text: answer })
     }
-    const usage =
-      typeof data.usage === 'object' && data.usage !== null
-        ? { promptTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
-        : undefined
-    // 思考内容有两个藏身处,都得翻:llama-server 开了 --jinja 后装在 reasoning_content
-    // 字段里,有的后端直接把 <think>…</think> 掺在正文里。第一百二十八锤只拆了正文
-    // 那一种,jinja 一生效思考就整段丢地上(小葵验收抓个正着)。
-    // reasoning_content 同时从回填对话的消息里剥掉 —— 思考是给人看的,不原样还给服务端。
-    const { reasoning_content: serverThinking, ...bare } = raw
-    const split = splitThinking(bare.content ?? '')
-    const cleaned: AgentRawAssistant = split.answer.trim() === '' ? { ...bare, content: null } : { ...bare, content: split.answer }
-    const reasoning = serverThinking?.trim() || split.reasoning || undefined
-    return { status: 'ok', raw: cleaned, reasoning, usage }
+    const calls = assembleToolCalls(fragments)
+    if (calls.length > 0) {
+      // 这轮喊了工具:预吐的正文不是最终答案(有的模型边想边嘀咕),收回,
+      // 界面只剩思考块和步骤灰字,等下一轮的正文
+      if (opts.onDelta && answer.trim() !== '') opts.onDelta({ reset: true })
+      const cleaned: AgentRawAssistant = {
+        role: 'assistant',
+        content: answer.trim() === '' ? null : answer,
+        tool_calls: calls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.rawArguments } }))
+      }
+      return { status: 'ok', raw: cleaned, reasoning: reasoning || split.reasoning || undefined, usage }
+    }
+    const cleaned: AgentRawAssistant = answer.trim() === '' ? { role: 'assistant', content: null } : { role: 'assistant', content: answer }
+    return { status: 'ok', raw: cleaned, reasoning: reasoning || split.reasoning || undefined, usage }
   } catch (err) {
     if (opts.signal?.aborted) return { status: 'cancelled', text: '取消了 —— 这轮没等到输出' }
     const isTimeout = err instanceof Error && err.name === 'AbortError'
