@@ -4,7 +4,8 @@ import type { ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } f
 import { identifyFileLanguage } from '../parser/index.ts'
 
 /** 扫描时直接绕开的目录/文件:依赖包、版本库、构建产物等"仓库杂物" */
-const IGNORED_NAMES = new Set([
+// agent 的 list_files(第一百二十八锤)用同一份名单:AI 翻文件时同样不进这些杂物堆
+export const IGNORED_NAMES = new Set([
   'node_modules',
   '.git',
   '.svn',

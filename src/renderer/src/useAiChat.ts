@@ -35,6 +35,9 @@ const HISTORY_MAX = 8
 /** 思考开关存档的 localStorage 键(第一百一十五锤) */
 const THINKING_KEY = 'atlas-freechat-thinking'
 
+/** 翻文件(agent)开关的 localStorage 键(第一百二十八锤) */
+const AGENT_KEY = 'atlas-freechat-agent'
+
 /** 把答完的轮次整理成对话历史;半截话(取消/失败)不喂回模型;程序垫的灰字条(note)也不喂 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
   const out: AiChatRequest['history'] = []
@@ -45,12 +48,19 @@ function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
   return out.slice(-HISTORY_MAX)
 }
 
-export function useAiChat(context: ChatContextAttachment | null): {
+export function useAiChat(
+  context: ChatContextAttachment | null,
+  /** 翻文件模式(agent)的项目根:沙盒的墙,工具只许在这目录里看;没开项目传 null */
+  rootPath: string | null
+): {
   messages: ChatMessage[]
   busy: boolean
   /** 思考模式开关(第一百一十五锤):开着 = 允许模型先想一遍,思考过程折叠展示 */
   thinking: boolean
   setThinking: (on: boolean) => void
+  /** 翻文件模式开关(第一百二十八锤):开着 = 允许小探针自己列名单/读文件(只读) */
+  agent: boolean
+  setAgent: (on: boolean) => void
   /** 程序垫一条灰字(第一百二十四锤):如「参考资料换成了 xxx」,不进历史、不发给模型 */
   note: (text: string) => void
   /** 开新对话(第一百二十七锤):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
@@ -64,6 +74,10 @@ export function useAiChat(context: ChatContextAttachment | null): {
   const [thinking, setThinkingState] = useState(() => localStorage.getItem(THINKING_KEY) !== 'off')
   const thinkingRef = useRef(thinking)
   thinkingRef.current = thinking
+  // 翻文件开关同样记在本地;默认关 —— 让模型自己动手是能力升级,但由用户点名才开
+  const [agent, setAgentState] = useState(() => localStorage.getItem(AGENT_KEY) === 'on')
+  const agentRef = useRef(agent)
+  agentRef.current = agent
   const busyRef = useRef(false)
   const idRef = useRef('')
   const messagesRef = useRef(messages)
@@ -77,6 +91,17 @@ export function useAiChat(context: ChatContextAttachment | null): {
     () =>
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
+        // 翻文件模式的工具步骤播报:垫一条灰字(排在正在回答的气泡前面),
+        // 只给人看,不进对话历史 —— 模型干了什么,用户一眼有数
+        if (payload.step) {
+          setMessages((prev) => {
+            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: payload.step!.text, state: 'done', web: null }
+            const last = prev[prev.length - 1]
+            const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
+            return [...prev.slice(0, at), note, ...prev.slice(at)]
+          })
+          return
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.role === 'assistant' && m.state === 'busy'
@@ -150,7 +175,9 @@ export function useAiChat(context: ChatContextAttachment | null): {
           history: buildHistory(messagesRef.current),
           context: contextRef.current,
           codeRefs: useRefs,
-          thinking: thinkingRef.current
+          thinking: thinkingRef.current,
+          agent: agentRef.current || undefined,
+          rootPath: rootPath ?? undefined
         }
         const res = await window.atlas.aiChat(req)
         if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废
@@ -197,6 +224,11 @@ export function useAiChat(context: ChatContextAttachment | null): {
     localStorage.setItem(THINKING_KEY, on ? 'on' : 'off')
   }
 
+  function setAgent(on: boolean): void {
+    setAgentState(on)
+    localStorage.setItem(AGENT_KEY, on ? 'on' : 'off')
+  }
+
   function note(text: string): void {
     setMessages((prev) => [...prev, { key: crypto.randomUUID(), role: 'note', text, state: 'done', web: null }])
   }
@@ -210,7 +242,7 @@ export function useAiChat(context: ChatContextAttachment | null): {
     setMessages([])
   }
 
-  return { messages, busy, thinking, setThinking, note, newChat, send, cancel }
+  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>

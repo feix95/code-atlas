@@ -569,7 +569,7 @@ async function startAndWaitReady(
   // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
   addDevLog(
     'system',
-    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${Math.max(512, Math.floor(contextSize))} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT}`
+    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${Math.max(512, Math.floor(contextSize))} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)`
   )
   child = spawn(
     serverPath,
@@ -583,7 +583,10 @@ async function startAndWaitReady(
       '-c',
       String(Math.max(512, Math.floor(contextSize))),
       '-ngl',
-      '999'
+      '999',
+      // --jinja(第一百二十八锤):让引擎用模型自带的对话模板,工具调用(agent 的
+      // 翻文件)靠它才开得了;chat_template_kwargs 的思考开关也走这条路。换模型后生效
+      '--jinja'
     ],
     {
       windowsHide: true,

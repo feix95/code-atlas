@@ -445,6 +445,21 @@ export function FreeChatPanel({
               <TreeIcon name="brain" size={14} />
               思考
             </button>
+            {/* 翻文件开关(第一百二十八锤):开着小探针就能自己翻项目的文件名单和文件内容(只读) */}
+            <button
+              type="button"
+              className={`chat-think-toggle chat-agent-toggle${chat.agent ? ' is-on' : ''}`}
+              onClick={() => chat.setAgent(!chat.agent)}
+              aria-pressed={chat.agent}
+              title={
+                chat.agent
+                  ? '翻文件模式开着:小探针能自己翻项目里的文件名单、读文件内容,「哪里有 xx」它自己去找。点一下关掉'
+                  : '翻文件模式关着:小探针只看你当前给它的资料。点一下打开,它就能自己翻项目里的文件'
+              }
+            >
+              <TreeIcon name="folderSearch" size={14} />
+              翻文件
+            </button>
             <button type="submit" className="chat-send" disabled={chat.busy} aria-label={chat.busy ? '回答中' : '发送'} title={chat.busy ? '回答中……' : '发送'}>
               <TreeIcon name="arrowUp" size={19} strokeWidth={4} />
             </button>

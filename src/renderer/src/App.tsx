@@ -207,7 +207,8 @@ function App(): React.JSX.Element {
         : selectedFolder
           ? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
           : null
-  const chat = useAiChat(chatContext)
+  // 翻文件模式(agent)的项目根从这儿递进去:沙盒只认这个目录,越界的活儿一律不接
+  const chat = useAiChat(chatContext, result?.rootPath ?? null)
   const folderRef = useRef(folder)
   useEffect(() => {
     folderRef.current = folder

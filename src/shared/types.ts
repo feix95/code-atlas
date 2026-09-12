@@ -284,6 +284,8 @@ export interface AiDeltaPayload {
   reasoning?: string
   /** 实时 token 账(第八十四锤):引擎报了就捎来,没报没有 —— 界面绝不编数 */
   stats?: AiStreamStats
+  /** agent 的工具步骤播报(第一百二十八锤):翻文件模式下每翻一样播一句大白话 */
+  step?: { text: string }
 }
 
 /** AI 人话解释的结果 */
@@ -384,6 +386,13 @@ export interface AiChatRequest {
    * (外接服务由它们自己的设置管)。
    */
   thinking?: boolean
+  /**
+   * 翻文件模式(agent,第一百二十八锤):true = 允许小探针自己翻项目 —— 列文件名单、
+   * 读文件内容。只有「看」的工具,没有「改」的;轮数和重复翻看都有缰绳管着。
+   */
+  agent?: boolean
+  /** 翻文件模式的项目根(绝对路径):工具只许在这个目录里看,越界一律拒 */
+  rootPath?: string
 }
 
 /**

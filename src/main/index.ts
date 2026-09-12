@@ -1,7 +1,24 @@
 import { app, dialog, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
-import { scanDirectory } from '../scanner/index.ts'
+import { scanDirectory, IGNORED_NAMES } from '../scanner/index.ts'
+import {
+  AGENT_ADDENDUM,
+  AGENT_FILE_MAX_BYTES,
+  AGENT_LIST_MAX_ENTRIES,
+  AGENT_MAX_DEPTH,
+  AGENT_MAX_ROUNDS,
+  ROUND_CAP_NUDGE,
+  REPEAT_NUDGE,
+  agentReadChars,
+  agentRound,
+  agentStepText,
+  extractToolCalls,
+  mergeUsage,
+  sanitizeAgentRelPath,
+  toolCallKey,
+  type AgentChatMessage
+} from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
@@ -64,7 +81,7 @@ import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -584,6 +601,207 @@ function createWindow(): void {
       if (png.length > 0) await fs.writeFile(join(probeDir, `probe-dpr${scale}.png`), png)
       app.quit()
     })()
+  }
+}
+
+// ── 翻文件模式(agent,第一百二十八锤)的后厨 ──
+// 模型自己喊「看看这个文件夹 / 读这个文件」,主进程是唯一动手的那只手:
+// 只有两件只读工具,路径全走 joinRoot 沙盒,越界/二进制/超大文件一律拒,
+// 拒的话术当「工具结果」喂回给模型让它自己换路,循环绝不因为一次碰壁就断。
+
+/** list_files 的执行手:递归列文件/文件夹名单(只捡名字),条数和深度都有缰绳 */
+async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: boolean; text: string; hint?: string }> {
+  let abs: string
+  try {
+    abs = joinRoot(rootPath, relPath)
+  } catch {
+    return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
+  }
+  const lines: string[] = []
+  let truncated = false
+  let locked = 0 // 打不开的子目录数(权限/被占用),如实报给模型
+  const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
+  while (queue.length > 0 && !truncated) {
+    const item = queue.shift() as { abs: string; rel: string; depth: number }
+    let dirents
+    try {
+      dirents = await fs.readdir(item.abs, { withFileTypes: true })
+    } catch {
+      locked += 1
+      continue
+    }
+    const dirs: string[] = []
+    const files: string[] = []
+    for (const d of dirents) {
+      if (IGNORED_NAMES.has(d.name)) continue
+      if (d.isSymbolicLink()) continue // 符号链接不跟进:既是安全边界也防绕环
+      if (d.isDirectory()) dirs.push(d.name)
+      else if (d.isFile()) files.push(d.name)
+    }
+    dirs.sort((a, b) => a.localeCompare(b))
+    files.sort((a, b) => a.localeCompare(b))
+    for (const name of [...files, ...dirs]) {
+      if (lines.length >= AGENT_LIST_MAX_ENTRIES) {
+        truncated = true
+        break
+      }
+      const isDir = dirs.includes(name)
+      const childRel = item.rel ? `${item.rel}/${name}` : name
+      lines.push(isDir ? `${childRel}/` : childRel)
+      if (isDir && item.depth < AGENT_MAX_DEPTH) {
+        queue.push({ abs: join(item.abs, name), rel: childRel, depth: item.depth + 1 })
+      }
+    }
+  }
+  if (lines.length === 0) {
+    const why = locked > 0 ? `这个文件夹里什么都没列出来(${locked} 个子项打不开)` : '这个文件夹是空的'
+    return { ok: true, text: why }
+  }
+  let text = lines.join('\n')
+  const tails: string[] = []
+  if (truncated) tails.push(`名单太长,只列了前 ${AGENT_LIST_MAX_ENTRIES} 个`)
+  if (locked > 0) tails.push(`${locked} 个子文件夹打不开,跳过了`)
+  if (tails.length > 0) text += `\n(${tails.join(';')})`
+  return { ok: true, text, hint: `共 ${lines.length} 个` }
+}
+
+/** read_file 的执行手:读文本文件,超长只读开头一段并注明,绝不静默截断 */
+async function agentReadFile(
+  rootPath: string,
+  relPath: string,
+  maxChars: number
+): Promise<{ ok: boolean; text: string; hint?: string }> {
+  let abs: string
+  try {
+    abs = joinRoot(rootPath, relPath)
+  } catch {
+    return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
+  }
+  const stat = await fs.stat(abs).catch(() => null)
+  if (!stat) return { ok: false, text: `打不开或不存在:${relPath}` }
+  if (stat.isDirectory()) return { ok: false, text: `${relPath} 是个文件夹不是文件;要看里面有什么,用 list_files 列名单` }
+  if (isBinaryFile(relPath)) {
+    return { ok: false, text: `${relPath} 是二进制文件,读不了文本内容;这类文件只能看名字猜用途` }
+  }
+  if (stat.size > AGENT_FILE_MAX_BYTES) {
+    return { ok: false, text: `${relPath} 太大了(超过 5MB),不适合整个读;建议让用户在预览里挑一段引用发过来` }
+  }
+  const raw = await fs.readFile(abs, 'utf8').catch(() => null)
+  if (raw === null) return { ok: false, text: `读 ${relPath} 时出了岔子(权限或编码),读不了` }
+  if (raw.length === 0) return { ok: true, text: `${relPath} 是个空文件` }
+  if (raw.length > maxChars) {
+    return {
+      ok: true,
+      text: `${raw.slice(0, maxChars)}\n……(文件太长,只读了开头约 ${maxChars} 字,全文共 ${raw.length} 字)`,
+      hint: `读了开头 ${maxChars} 字 / 全文 ${raw.length} 字`
+    }
+  }
+  return { ok: true, text: raw, hint: `全文 ${raw.length} 字` }
+}
+
+/** 每翻一样就往界面播一句大白话(挂在流式增量通道上,渲染层认 step 字段) */
+function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: string): void {
+  if (requestId === '' || event.sender.isDestroyed()) return
+  const payload: AiDeltaPayload = { id: requestId, text: '', step: { text } }
+  event.sender.send('atlas:ai-delta', payload)
+}
+
+/**
+ * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
+ * 直到模型交出不带工具调用的正文答案。缰绳三根:轮数封顶(到顶后撤掉工具表
+ * 逼它交卷)、同一样东西不许翻第二遍、每轮之间都听用户的取消。
+ * 模型不会喊工具也没关系:第一轮就交正文,当普通回答返回 —— 不装 agent 空转。
+ */
+async function runAgentChat(input: {
+  event: IpcMainInvokeEvent
+  requestId: string
+  target: ChatTarget
+  systemPrompt: string
+  baseMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  rootPath: string
+  ctx: number
+  replyCap: number
+  allowThinking: boolean
+  signal: AbortSignal
+  startedAt: number
+  webLookup: WebLookupMeta
+}): Promise<AiChatResult> {
+  const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
+  const messages: AgentChatMessage[] = [...baseMessages]
+  // 人设后面垫翻文件守则:教它何时动手、动手几次、答话照旧说人话
+  const systemIdx = messages.findIndex((m) => m.role === 'system')
+  if (systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${AGENT_ADDENDUM}` }
+  const readChars = agentReadChars(ctx)
+  const doneCalls = new Set<string>()
+  let usage: AiUsage | undefined
+  let reasoningAll: string | undefined
+  let rounds = 0
+  addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字`)
+  for (;;) {
+    if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
+    const useTools = rounds < AGENT_MAX_ROUNDS
+    if (!useTools) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
+    rounds += 1
+    const round = await agentRound(target, messages, { signal, maxTokens: replyCap, allowThinking, useTools })
+    if (round.status !== 'ok') {
+      return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
+    }
+    usage = mergeUsage(usage, round.usage)
+    if (round.reasoning) reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
+    const raw = round.raw
+    const calls = useTools ? extractToolCalls(raw) : []
+    if (calls.length === 0 || !useTools) {
+      const text = (raw.content ?? '').trim()
+      if (text === '') {
+        return agentResult(input, 'error', '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试', usage, reasoningAll)
+      }
+      addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
+      return agentResult(input, 'supported', text, usage, reasoningAll)
+    }
+    // 工具调用原样回填进对话(服务端要求 assistant 消息和 tool 结果成对出现)
+    messages.push(raw)
+    const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
+    for (const call of calls) {
+      if (signal.aborted) break
+      const relPath = sanitizeAgentRelPath(call.args === null ? null : call.args.relPath)
+      const callName = call.name === 'read_file' || call.name === 'list_files' ? call.name : null
+      if (!callName || relPath === null) {
+        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', String(call.args?.relPath ?? '(没给路径)'), 'error', callName ? '路径不合法,要用项目内的相对路径' : '没有这个工具'))
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: '参数不合法:要用项目内的相对路径(如 src/index.ts),根目录传空字符串' })
+        continue
+      }
+      const key = toolCallKey(callName, relPath)
+      if (doneCalls.has(key)) {
+        sendAgentStep(event, requestId, agentStepText(callName, relPath, 'repeat'))
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: REPEAT_NUDGE })
+        continue
+      }
+      doneCalls.add(key)
+      const exec = callName === 'list_files' ? await agentListFiles(rootPath, relPath) : await agentReadFile(rootPath, relPath, readChars)
+      sendAgentStep(event, requestId, agentStepText(callName, relPath === '' ? '(项目根目录)' : relPath, exec.ok ? 'done' : 'error', exec.hint))
+      toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
+    }
+    messages.push(...toolResults)
+    addDevLog('request', `翻文件第 ${rounds} 轮:模型要看 ${calls.length} 样东西`)
+  }
+}
+
+/** 把循环的收尾折成统一的聊天结果(token 总账、思考汇总、耗时都在) */
+function agentResult(
+  input: { target: ChatTarget; startedAt: number; webLookup: WebLookupMeta },
+  status: AiChatResult['status'],
+  text: string,
+  usage: AiUsage | undefined,
+  reasoning: string | undefined
+): AiChatResult {
+  return {
+    status,
+    text,
+    reasoning,
+    model: input.target.model,
+    durationMs: Date.now() - input.startedAt,
+    usage,
+    webLookup: input.webLookup
   }
 }
 
@@ -1271,6 +1489,41 @@ function registerIpc(): void {
     const codeRefs = sanitizeCodeRefs(body.codeRefs, refsBudget)
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
     const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs)
+    // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
+    // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
+    if (body.agent === true) {
+      const agentRoot = typeof body.rootPath === 'string' && body.rootPath.trim() !== '' ? body.rootPath : ''
+      if (agentRoot === '') {
+        return {
+          status: 'error',
+          text: '翻文件模式得先打开一个项目才有得翻:关掉「翻文件」开关,或先在左边打开项目再问',
+          model: '',
+          durationMs: Date.now() - startedAt,
+          webLookup: meta
+        }
+      }
+      const aborter = new AbortController()
+      if (requestId !== '') explainAborters.set(requestId, aborter)
+      try {
+        return await runAgentChat({
+          event,
+          requestId,
+          target: resolved.target,
+          systemPrompt,
+          baseMessages: messages,
+          rootPath: agentRoot,
+          ctx: resolved.ctx,
+          replyCap: cap,
+          allowThinking: thinking,
+          signal: aborter.signal,
+          startedAt,
+          webLookup: meta
+        })
+      } finally {
+        if (requestId !== '') explainAborters.delete(requestId)
+        if (explainAborters.size === 0) announceActivityIdle()
+      }
+    }
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
