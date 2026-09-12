@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { isCompactCommand } from '@shared/compact'
 import { Badge } from './DetailHeader'
@@ -8,6 +9,36 @@ import { AtlasProbe, type ProbeState } from './AtlasProbe'
 import { IconRefresh, TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
+
+/**
+ * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
+ * 路径百分百真实,同一套检测顺手让它们也可点。没传 fileLinks 就原样纯文字。
+ */
+function FileNoteText({ text, fileLinks }: { text: string; fileLinks?: FileLinkTarget | null }): React.JSX.Element {
+  if (!fileLinks) return <>{text}</>
+  const spans = findFileLinks(text, fileLinks.index)
+  if (spans.length === 0) return <>{text}</>
+  const nodes: React.ReactNode[] = []
+  let last = 0
+  spans.forEach((s, i) => {
+    if (s.start > last) nodes.push(text.slice(last, s.start))
+    nodes.push(
+      <button
+        key={i}
+        type="button"
+        className="md-file-link"
+        onClick={() => fileLinks.onOpen(s.relPath, s.line)}
+        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''}`}
+      >
+        {s.relPath}
+        {s.line !== undefined ? `:${s.line}` : ''}
+      </button>
+    )
+    last = s.end
+  })
+  if (last < text.length) nodes.push(text.slice(last))
+  return <>{nodes}</>
+}
 
 /**
  * 自由对话面板:和 Atlas 小探针开放式聊天,问题不限于当前文件。
@@ -59,7 +90,17 @@ function ThinkingBlock({ reasoning, busy }: { reasoning: string; busy: boolean }
   )
 }
 
-function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetry?: boolean; onRetry?: () => void }): React.JSX.Element {
+function AssistantBubble({
+  msg,
+  canRetry,
+  onRetry,
+  fileLinks
+}: {
+  msg: ChatMessage
+  canRetry?: boolean
+  onRetry?: () => void
+  fileLinks?: FileLinkTarget | null
+}): React.JSX.Element {
   const label = webLabel(msg.web)
   const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
   // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
@@ -102,7 +143,7 @@ function AssistantBubble({ msg, canRetry, onRetry }: { msg: ChatMessage; canRetr
         <div className="message answer">
           {msg.state === 'busy' && !msg.text && !msg.reasoning && <span className="chat-typing">小探针正在思考……</span>}
           {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
-          {msg.text && <MiniMD text={msg.text} caret={msg.state === 'busy'} />}
+          {msg.text && <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />}
           {msg.state === 'done' && !msg.text && msg.reasoning && (
             <span className="chat-typing chat-muted">想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。</span>
           )}
@@ -138,7 +179,8 @@ export function FreeChatPanel({
   refs,
   onRemoveRef,
   suggestions,
-  onDropNode
+  onDropNode,
+  fileLinks
 }: {
   chat: AiChatApi
   context: ChatContextAttachment | null
@@ -149,6 +191,8 @@ export function FreeChatPanel({
   suggestions?: string[]
   /** 拖文件进聊天挂引用(第一百二十五锤):传了才接拖拽;文件夹/读不了的由 App 端垫灰字指路 */
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+  /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
+  fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
@@ -156,6 +200,28 @@ export function FreeChatPanel({
   const [dragOver, setDragOver] = useState(false)
   // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
   const [expanded, setExpanded] = useState(false)
+  // 外接引擎标记:思考开关的悬停提示按它分家 —— 思考暗号只有内置引擎听得懂,
+  // 外接 LM Studio 时开关管不着思考,提示里得指路去 LM Studio 的模型设置调
+  const [isExternalEngine, setIsExternalEngine] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void window.atlas
+      .aiConfigGet()
+      .then((c) => {
+        if (alive) setIsExternalEngine(c.provider === 'lmstudio')
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  // 悬停时顺手刷新一遍:设置里换了引擎,回来悬停就能看到对的说法,不用重启
+  function refreshEngineOnHover(): void {
+    void window.atlas
+      .aiConfigGet()
+      .then((c) => setIsExternalEngine(c.provider === 'lmstudio'))
+      .catch(() => {})
+  }
   // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
   const [lineCount, setLineCount] = useState(1)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -335,7 +401,7 @@ export function FreeChatPanel({
                 if (m.kind === 'step') {
                   return (
                     <div key={m.key} className="chat-note is-step" role="status">
-                      {m.text}
+                      <FileNoteText text={m.text} fileLinks={fileLinks} />
                     </div>
                   )
                 }
@@ -344,13 +410,15 @@ export function FreeChatPanel({
                   return (
                     <details key={m.key} className="chat-note is-summary" role="status">
                       <summary>旧对话已压缩成摘要(点开看)</summary>
-                      <p>{m.text}</p>
+                      <p>
+                        <FileNoteText text={m.text} fileLinks={fileLinks} />
+                      </p>
                     </details>
                   )
                 }
                 return (
                   <div key={m.key} className="chat-note" role="status">
-                    {m.text}
+                    <FileNoteText text={m.text} fileLinks={fileLinks} />
                   </div>
                 )
               }
@@ -378,6 +446,7 @@ export function FreeChatPanel({
                   key={m.key}
                   msg={m}
                   canRetry={m.key === lastAssistantKey && !chat.busy}
+                  fileLinks={fileLinks}
                   onRetry={() => {
                     const prev = [...chat.messages].slice(0, idx).reverse().find((x) => x.role === 'user')
                     if (prev) {
@@ -481,10 +550,15 @@ export function FreeChatPanel({
               onClick={() => chat.setThinking(!chat.thinking)}
               aria-pressed={chat.thinking}
               aria-label="思考模式开关"
+              onMouseEnter={refreshEngineOnHover}
               title={
                 chat.thinking
-                  ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
-                  : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
+                  ? isExternalEngine
+                    ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉。不过外接 LM Studio 时这个开关管不着思考 —— 想关,去 LM Studio 那边的模型设置里调'
+                    : '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
+                  : isExternalEngine
+                    ? '思考模式关着:回答快,复杂问题可能想不周全。点一下打开。不过外接 LM Studio 时这个开关不控制思考 —— 想开关它,去 LM Studio 那边的模型设置里调'
+                    : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
               }
             >
               <TreeIcon name="brain" size={14} />
