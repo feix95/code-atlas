@@ -1918,13 +1918,15 @@ body.is-sash-dragging {
 }
 
 /* 一体化输入舱(第一百一十八锤补,照小葵的参考图):
- * 空 = 一条单行胶囊,文字左、思考+发送右,齐肩;
- * 写了一到四行只向上长,按钮落到舱内底行右侧;
+ * 空 = 一条单行胶囊,文字和按钮排并排坐一行(按钮在正常文档流里,
+ *   文字区宽度永远自动 = 舱宽 - 按钮宽,字绝不可能钻到按钮底下);
+ * 写了一到四行只向上长,按钮排落到舱内底行右侧;
  * 满五行封顶,右上角出现拨杆,拨上去多撑五行(共十行),舱内自己滚 */
 .chat-input {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 0.25rem;
   padding: 0.5rem 0.625rem 0.4375rem;
   border: 1px solid var(--line);
@@ -1937,10 +1939,10 @@ body.is-sash-dragging {
 }
 
 .chat-input textarea {
+  flex: 1 1 auto;
   min-width: 0;
-  align-self: stretch;
   height: 1.5rem;
-  padding: 0 7.75rem 0 0.125rem;
+  padding: 0 0.125rem;
   border: none;
   outline: none;
   background: transparent;
@@ -1952,12 +1954,15 @@ body.is-sash-dragging {
   overflow: hidden;
 }
 
-/* 两行起,右侧只留给拨杆一角,按钮挪去底行,文字可以铺满整行 */
-.chat-input.is-multiline textarea {
-  padding-right: 2.125rem;
+/* 两行起舱改竖排:文字铺满整行,按钮排落到舱内底行右侧 */
+.chat-input.is-multiline {
+  flex-direction: column;
+  align-items: stretch;
 }
 
+/* 拨杆只在这时才渲染(满五行),右上角给它留一角,别压着文字 */
 .chat-input.is-capped textarea {
+  padding-right: 2.125rem;
   overflow-y: auto;
 }
 
@@ -1982,34 +1987,25 @@ body.is-sash-dragging {
   color: var(--text);
 }
 
-/* 按钮排:单行时贴着舱的右缘垂直居中(和文字齐肩,参考图 1);
- * 两行起落到底行右侧(参考图 2),不再压着文字 */
+/* 按钮排:一直在正常文档流里 —— 单行时和文字并排坐(align-items 居中,和文字齐肩,参考图 1);
+ * 两行起落到底行右侧(参考图 2)。不加底色:它底下再没有压着的文字了 */
 .composer-bar {
-  position: absolute;
-  top: 50%;
-  right: 0.625rem;
-  transform: translateY(-50%);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--surface);
-  padding-left: 0.375rem;
 }
 
 .chat-input.is-multiline .composer-bar {
-  position: static;
-  transform: none;
   justify-content: flex-end;
-  background: transparent;
-  padding-left: 0;
 }
 
 .composer-stop {
   margin-right: auto;
 }
 
-/* 思考模式开关(第一百一十八锤,照小葵的参考图):脑图标+文字的胶囊,
- * 开着辅助色点亮,关着通体灰;钉在发送钮左边 */
+/* 思考/翻文件开关(小葵拍的板):纯图标的胶囊,开着辅助色点亮,关着通体灰;
+ * 是啥开关靠悬停提示说,点不点得着靠整个胶囊的 padding box */
 .chat-think-toggle {
   flex-shrink: 0;
   display: flex;

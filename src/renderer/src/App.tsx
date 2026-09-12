@@ -414,10 +414,11 @@ function App(): React.JSX.Element {
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
-    // 聊天中点文件(第一百二十四锤):不切台、不抢话头,只把新资料塞给探针接着聊
+    // 聊天中点文件(第一百二十四锤):不切台、不抢话头,只把新资料塞给探针接着聊。
+    // 点的就是当前这个就不垫字:资料一个字没变,刷一条「换成了」纯属垃圾(小葵点的)
     const chatting = activeTab === 'chat'
     if (!opts?.keepTab && !chatting) setActiveTab('overview')
-    if (chatting && chat.messages.length > 0) chat.note(`参考资料换成了 ${file.name}`)
+    if (chatting && chat.messages.length > 0 && selectedFile?.relPath !== relPath) chat.note(`参考资料换成了 ${file.name}`)
 
     if (!file.language) {
       setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「Atlas 小探针」问', kind: 'info' })
@@ -478,9 +479,11 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
-    // 聊天中点文件夹(第一百二十四锤):同文件的处理,不切台,只换附件
+    // 聊天中点文件夹(第一百二十四锤):同文件的处理,不切台,只换附件;
+    // 点的就是当前这个就不垫字(资料没变,刷「换成了」是垃圾)
     if (activeTab === 'chat') {
-      if (chat.messages.length > 0) chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
+      if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
+        chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
       return
     }
     setActiveTab('overview')

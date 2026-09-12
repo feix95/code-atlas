@@ -706,6 +706,13 @@ function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: strin
   event.sender.send('atlas:ai-delta', payload)
 }
 
+/** 把这轮的思考过程推给界面(非流式只能论轮播:一轮想完推一轮,字级别的流式收尾留给下一锤) */
+function sendAgentReasoning(event: IpcMainInvokeEvent, requestId: string, reasoning: string): void {
+  if (requestId === '' || event.sender.isDestroyed()) return
+  const payload: AiDeltaPayload = { id: requestId, text: '', reasoning }
+  event.sender.send('atlas:ai-delta', payload)
+}
+
 /**
  * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
  * 直到模型交出不带工具调用的正文答案。缰绳三根:轮数封顶(到顶后撤掉工具表
@@ -747,7 +754,20 @@ async function runAgentChat(input: {
       return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
     }
     usage = mergeUsage(usage, round.usage)
-    if (round.reasoning) reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
+    if (round.reasoning) {
+      reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
+      sendAgentReasoning(event, requestId, round.reasoning)
+    }
+    // 状态条的实时计数是流式增量顺手喂的,翻文件按轮非流式没增量可蹭 ——
+    // 每轮收完账自己报一次,左下角不至于整场只挂「在干活……」
+    if (usage) {
+      announceActivityBusy(lastActivityProvider, {
+        phase: 'writing',
+        promptTokens: usage.promptTokens,
+        outputTokens: usage.outputTokens,
+        tokensPerSecond: usage.tokensPerSecond
+      })
+    }
     const raw = round.raw
     const calls = useTools ? extractToolCalls(raw) : []
     if (calls.length === 0 || !useTools) {

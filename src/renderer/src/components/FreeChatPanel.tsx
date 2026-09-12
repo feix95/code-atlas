@@ -227,18 +227,33 @@ export function FreeChatPanel({
   }
 
   // 弹性长高的账(小葵点名):空 = 一行;有一到四行长到几行;五行封顶,
-  // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位
+  // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位。
+  // 防抖(小葵报的病):文字卡在换行临界点时,打一个字涨两行、删一个字缩一行,舱来回蹦。
+  // 治法是「涨快缩慢」:涨按实际行数,缩要富余 —— 量行宽时右侧多留一截,
+  // 文字连这一截都省出来才准缩回一行。另外单行/多行两种布局的行宽不一样
+  // (单行舱文字让着按钮排,多行舱铺满),量行数时给多行舱补上按钮排的地盘,
+  // 两种布局按同一个尺度量,免得「多行里量着放得下、缩回单行立刻又放不下」来回打架。
+  const BAR_RESERVE = '13rem' // 单行舱右侧按钮排的地盘(俩图标胶囊+发送钮,忙时还有「停一停」,往宽了备)
+  const COLLAPSE_SLACK = '4rem' // 缩回一行的富余:比按钮排还宽出这么多才缩
   useEffect(() => {
     const el = inputRef.current
     if (!el) return
     const line = Number.parseFloat(getComputedStyle(el).lineHeight) || 24
+    const multi = lineCount >= 2
     el.style.height = 'auto'
+    // 统一量尺:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
+    el.style.paddingRight = multi ? BAR_RESERVE : ''
     const realLines = Math.max(1, Math.round(el.scrollHeight / line))
+    // 收缩判定:在统一量尺上再加一截富余,连富余都省出来还是一行,才真缩
+    el.style.paddingRight = multi ? `calc(${BAR_RESERVE} + ${COLLAPSE_SLACK})` : COLLAPSE_SLACK
+    const slackLines = Math.max(1, Math.round(el.scrollHeight / line))
+    el.style.paddingRight = ''
+    const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
     // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
-    el.style.height = `${expanded ? 10 * line : Math.min(el.scrollHeight, 5 * line)}px`
-    setLineCount(realLines)
+    el.style.height = `${expanded ? 10 * line : Math.min(shown * line, 5 * line)}px`
+    setLineCount(shown)
     if (expanded && realLines < 5) setExpanded(false)
-  }, [draft, expanded])
+  }, [draft, expanded, lineCount])
   const capped = lineCount >= 5 || expanded
 
   return (
@@ -431,11 +446,13 @@ export function FreeChatPanel({
                 停一停
               </button>
             )}
+            {/* 思考开关(小葵拍的板:纯图标胶囊,是啥靠悬停提示说) */}
             <button
               type="button"
               className={`chat-think-toggle${chat.thinking ? ' is-on' : ''}`}
               onClick={() => chat.setThinking(!chat.thinking)}
               aria-pressed={chat.thinking}
+              aria-label="思考模式开关"
               title={
                 chat.thinking
                   ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
@@ -443,14 +460,14 @@ export function FreeChatPanel({
               }
             >
               <TreeIcon name="brain" size={14} />
-              思考
             </button>
-            {/* 翻文件开关(第一百二十八锤):开着小探针就能自己翻项目的文件名单和文件内容(只读) */}
+            {/* 翻文件开关(第一百二十八锤;小葵拍的板:纯图标胶囊):开着小探针就能自己翻项目的文件名单和文件内容(只读) */}
             <button
               type="button"
               className={`chat-think-toggle chat-agent-toggle${chat.agent ? ' is-on' : ''}`}
               onClick={() => chat.setAgent(!chat.agent)}
               aria-pressed={chat.agent}
+              aria-label="翻文件模式开关"
               title={
                 chat.agent
                   ? '翻文件模式开着:小探针能自己翻项目里的文件名单、读文件内容,「哪里有 xx」它自己去找。点一下关掉'
@@ -458,7 +475,6 @@ export function FreeChatPanel({
               }
             >
               <TreeIcon name="folderSearch" size={14} />
-              翻文件
             </button>
             <button type="submit" className="chat-send" disabled={chat.busy} aria-label={chat.busy ? '回答中' : '发送'} title={chat.busy ? '回答中……' : '发送'}>
               <TreeIcon name="arrowUp" size={19} strokeWidth={4} />

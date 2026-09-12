@@ -240,7 +240,7 @@ export async function agentRound(
     clearTimeout(watchdog)
     watchdog = setTimeout(() => controller.abort(), BODY_TIMEOUT_MS)
     const data = (await res.json()) as {
-      choices?: Array<{ message?: AgentRawAssistant }>
+      choices?: Array<{ message?: AgentRawAssistant & { reasoning_content?: string } }>
       usage?: { prompt_tokens?: number; completion_tokens?: number }
     }
     const raw = data.choices?.[0]?.message
@@ -251,10 +251,14 @@ export async function agentRound(
       typeof data.usage === 'object' && data.usage !== null
         ? { promptTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
         : undefined
-    // 正文里掺的 <think> 标签拆干净,和普通聊天同一口径
-    const split = splitThinking(raw.content ?? '')
-    const cleaned: AgentRawAssistant = split.answer.trim() === '' ? { ...raw, content: null } : { ...raw, content: split.answer }
-    const reasoning = split.reasoning || undefined
+    // 思考内容有两个藏身处,都得翻:llama-server 开了 --jinja 后装在 reasoning_content
+    // 字段里,有的后端直接把 <think>…</think> 掺在正文里。第一百二十八锤只拆了正文
+    // 那一种,jinja 一生效思考就整段丢地上(小葵验收抓个正着)。
+    // reasoning_content 同时从回填对话的消息里剥掉 —— 思考是给人看的,不原样还给服务端。
+    const { reasoning_content: serverThinking, ...bare } = raw
+    const split = splitThinking(bare.content ?? '')
+    const cleaned: AgentRawAssistant = split.answer.trim() === '' ? { ...bare, content: null } : { ...bare, content: split.answer }
+    const reasoning = serverThinking?.trim() || split.reasoning || undefined
     return { status: 'ok', raw: cleaned, reasoning, usage }
   } catch (err) {
     if (opts.signal?.aborted) return { status: 'cancelled', text: '取消了 —— 这轮没等到输出' }
