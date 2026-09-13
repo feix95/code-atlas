@@ -3218,14 +3218,31 @@ body.is-sash-dragging {
   }
 }
 
+/* ── 预览进场的软着陆(小葵报「点绿字跳预览整窗闪一下」):跳转那一下左右两扇
+ *   同帧大换血 —— 目录树整棵拆掉换预览窗、聊天面板整扇重挂,透明窗在这种大重绘
+ *   帧上容易掉一帧底色,硬切观感也生硬;两扇挂载时各淡入一小拍,把闪摊成渐显。
+ *   预览内换文件两扇都不重挂(各有记账复位),不会反复闪动画 ── */
+@media (prefers-reduced-motion: no-preference) {
+  .soft-in {
+    animation: soft-in 0.16s ease-out;
+  }
+}
+
+@keyframes soft-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ── 滚动条:细一圈,不抢内容 ── */
 
 ::-webkit-scrollbar {
   width: 0.5625rem;
   height: 0.5625rem;
-}
-
-::-webkit-scrollbar-thumb {
+}::-webkit-scrollbar-thumb {
   background: var(--line);
   border-radius: 0.625rem;
   border: 2px solid transparent;

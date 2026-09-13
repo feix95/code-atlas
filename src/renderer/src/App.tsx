@@ -1256,7 +1256,7 @@ function PreviewDetailView({
   })
 
   return (
-    <div className="detail-page">
+    <div className="detail-page soft-in">
       <DetailHeader
         crumbs={buildCrumbs(result.rootName, result.rootPath, file.relPath)}
         iconName={file.summary?.icon ?? 'file'}

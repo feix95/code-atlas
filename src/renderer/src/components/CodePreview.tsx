@@ -343,7 +343,7 @@ export function CodePreview({
     : ''
 
   return (
-    <div className="code-pane" onKeyDown={onPaneKeyDown}>
+    <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
       <div className="code-pane-head">
         <span className="code-pane-icon" aria-hidden="true">
           <TreeIcon name={file.summary?.icon ?? 'file'} size={15} />
