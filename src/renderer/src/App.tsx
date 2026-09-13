@@ -741,6 +741,11 @@ function App(): React.JSX.Element {
       if (!src || !dst) return prev
       const idx = src.tabs.findIndex((t) => t.id === id)
       const moved = src.tabs.splice(idx, 1)[0]
+      // 抽走的正好是源组正亮着的那张:激活指针当场落回剩下的页签(末张露出当新顶牌,
+      // 小葵拍的扑克牌逻辑) —— 不落的话指针成死引用,组里明明还有牌,正文却亮空底板
+      if (src.activeId === id) {
+        src.activeId = src.tabs.length > 0 ? src.tabs[src.tabs.length - 1].id : null
+      }
       const at = atIndex === null || atIndex > dst.tabs.length ? dst.tabs.length : Math.max(0, atIndex)
       dst.tabs.splice(at, 0, moved)
       dst.activeId = moved.id
@@ -1509,7 +1514,10 @@ function App(): React.JSX.Element {
                     )}
                     <div
                       className="pane-group"
-                      style={groups.length === 2 && gi === 0 ? { width: `${(paneSplit * 100).toFixed(2)}%` } : undefined}
+                      /* 占比用 flex 缩写传:.pane-group 的 CSS 是 flex:1(basis 钉死 0%),
+                         内联 width 会被 flex 布局无视 —— 拖分割条账本在变、画面纹丝不动(小葵报的案)。
+                         第一组 0 0 定死占比,第二组照旧 flex:1 吃剩余 */
+                      style={groups.length === 2 && gi === 0 ? { flex: `0 0 ${(paneSplit * 100).toFixed(2)}%` } : undefined}
                       onPointerDown={() => setActiveGroupId(g.id)}
                     >
                       <TabBar
