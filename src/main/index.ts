@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, dialog, globalShortcut, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory, IGNORED_NAMES } from '../scanner/index.ts'
@@ -599,8 +599,31 @@ function createWindow(): void {
   const modelStatusTimer = setInterval(() => {
     void refreshModelStatus().catch(() => {})
   }, 10_000)
+  // 5 秒心跳:强制重画一帧(第四案的自动补丁)。内容没变时这一下几乎零成本;
+  // 但只要 Windows 合成器哪一下把透明窗掉了链子,最多 5 秒就有一帧新画递过去,
+  // 窗口自己接上 —— 不用等小葵来报案。
+  const repaintHeartbeat = setInterval(() => {
+    if (mainWindow.isDestroyed() || mainWindow.isMinimized() || !mainWindow.isVisible()) return
+    mainWindow.webContents.invalidate()
+  }, 5_000)
+  // 手动拉起(保底):万一还是隐身了,按 Ctrl+Alt+0,主进程把窗重画 + 藏了再亮一遍。
+  // 不重载页面 —— 聊天记录一条不丢。
+  globalShortcut.register('CommandOrControl+Alt+0', () => {
+    if (mainWindow.isDestroyed()) return
+    console.log('[window] 手动拉起画面(Ctrl+Alt+0)')
+    addDevLog('system', '手动拉起画面(Ctrl+Alt+0)')
+    mainWindow.webContents.invalidate()
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.hide()
+    setTimeout(() => {
+      if (!mainWindow.isDestroyed()) mainWindow.show()
+    }, 120)
+  })
   mainWindow.on('closed', () => {
     clearInterval(modelStatusTimer)
+    clearInterval(repaintHeartbeat)
+    globalShortcut.unregister('CommandOrControl+Alt+0')
     // 主窗走了,Developer 日志窗没有独活的意义:一起带走,应用照常退出
     if (devLogWindow && !devLogWindow.isDestroyed()) devLogWindow.close()
   })
@@ -1327,7 +1350,10 @@ function registerIpc(): void {
   // 渲染层的报错小纸条:window.onerror / unhandledrejection 抓到的都送进后台账本 ——
   // 渲染层就算当场断气,主进程的账本还活着,下回排查有现场可看
   ipcMain.on('atlas:renderer-error', (_event, text: unknown) => {
-    if (typeof text === 'string' && text.trim()) addDevLog('system', `页面报错:${text.slice(0, 500)}`)
+    if (typeof text === 'string' && text.trim()) {
+      console.log(`[renderer] 页面报错:${text.slice(0, 300)}`)
+      addDevLog('system', `页面报错:${text.slice(0, 500)}`)
+    }
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型(弹窗认准来叫它的窗,同上)
@@ -1887,6 +1913,16 @@ async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
 // 软件渲染(Skia)的每一帧都不经过显卡驱动,透明窗从此跟驱动打嗝绝缘。
 // 咱家是文本/列表界面,没有视频大图要喂,软件合成的代价付得起。必须在 app 就绪前调用。
 app.disableHardwareAcceleration()
+// 第四案(软件渲染版照样隐身)补刀:凶手不在显卡,在 Windows 合成器那一层。
+// 两道开关都冲着「无声断供」去:
+// ① Chromium 的原生窗口遮挡计算在 Windows 上有老毛病,会把没被遮住的窗误判成
+//    「被遮住了」从而停画 —— 这是社区公认的窗口凭空消失惯犯,直接关掉这个 feature;
+// ② 见 createWindow 里的 5 秒一次强制重画(让 DWM 随时都能接上新帧)。
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+// 退出时把全局快捷键一并还回去,不留幽灵热键占着系统
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
 
 app.whenReady().then(() => {
   createWindow()
