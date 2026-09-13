@@ -512,7 +512,15 @@ export function FreeChatPanel({
     >
       {context && (
         <details className="chat-attach">
-          <summary>
+          <summary
+            title={`${context.relPath || '(项目根目录)'};右键:复制路径 / 在资源管理器中显示 / 备注`}
+            onContextMenu={(e) => {
+              // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
+              if (!fileLinks?.onMenu) return
+              e.preventDefault()
+              fileLinks.onMenu(context.relPath, e.clientX, e.clientY)
+            }}
+          >
             <TreeIcon name="clip" size={12} />
             当前参考资料:<strong>{context.name}</strong>
             <span className="chat-attach-summary">{context.summary}</span>

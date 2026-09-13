@@ -357,7 +357,7 @@ export function CodePreview({
           onContextMenu={(e) => {
             // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
             e.preventDefault()
-            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY, noteMenu)
+            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY, noteMenu ? { note: noteMenu } : undefined)
           }}
         >
           {file.relPath}

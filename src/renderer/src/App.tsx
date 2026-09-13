@@ -1039,9 +1039,11 @@ function App(): React.JSX.Element {
     if (!cur) return
     const nm = noteMenuRef.current
     openFilePathMenuFor(cur.rootPath, relPath, x, y, {
-      hasNote: nm.hasNote(relPath),
-      onEdit: () => nm.onEdit(relPath),
-      onRemove: () => nm.onRemove(relPath)
+      note: {
+        hasNote: nm.hasNote(relPath),
+        onEdit: () => nm.onEdit(relPath),
+        onRemove: () => nm.onRemove(relPath)
+      }
     })
   }, [])
   const fileLinks: FileLinkTarget | null = useMemo(

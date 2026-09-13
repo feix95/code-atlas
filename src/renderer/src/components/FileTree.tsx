@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
+import { openFilePathMenuFor } from './filePathMenuStore'
 
 interface TreeRowProps {
   node: ScanTreeNode
   depth: number
   /** 本项目的手动备注表:备注过的行亮小葵自己的话,压过引擎一句话 */
   notes?: NoteMap
-  /** 右键菜单(第一百零二锤):编辑备注的直接入口 */
+  /** 右键菜单(第一百零二锤起,现统一走全局文件菜单):把节点报给 App 层换动作 */
   onRowContextMenu?: (e: React.MouseEvent, node: ScanTreeNode) => void
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
@@ -211,35 +212,17 @@ interface FileTreeProps {
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
-  /** 右键「写/编辑备注」:App 负责选中节点并弹详情页的编辑框 */
+  /** 右键「写/编辑备注」的原料(菜单统一走全局):App 负责选中节点并弹详情页的编辑框 */
   onNoteEdit?: (relPath: string) => void
-  /** 右键「清除备注」 */
+  /** 右键「清除备注」的原料 */
   onNoteRemove?: (relPath: string) => void
-  /** 右键「预览文件」(第一百一十锤):开/激活预览页签 */
+  /** 右键「预览文件」的原料(第一百一十锤):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
 }
 
 export function FileTree({ root, rootPath, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
-  // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收。
-  // copied/revealMsg = 导向项的现场反馈:复制成功亮「已复制✓」,失败说人话,一拍自己收摊
-  const [menu, setMenu] = useState<{
-    x: number
-    y: number
-    relPath: string
-    hasNote: boolean
-    isFile: boolean
-    copied?: 'ok' | 'fail'
-    revealMsg?: string | null
-  } | null>(null)
-  const menuTimerRef = useRef<number | null>(null)
-  useEffect(
-    () => () => {
-      if (menuTimerRef.current !== null) window.clearTimeout(menuTimerRef.current)
-    },
-    []
-  )
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // reveal 联动的后半程:展开靠 forceExpand 已由渲染接管,这里只负责把目标行滚进视野。
@@ -250,46 +233,21 @@ export function FileTree({ root, rootPath, notes, selectedPath, expandingPath, r
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedPath, revealPaths])
 
-  // 菜单项数决定它大概多高:夹住边界时别让最后一项掉到窗口外面
-  // (导向两项 + 预览 + 写备注 + 清除备注,最多五项)
-  const menuRows = (hasNote: boolean, isFile: boolean): number => 2 + (isFile && onPreviewFile ? 1 : 0) + 1 + (hasNote ? 1 : 0)
-
+  /** 右键统一走全局文件菜单(菜单统一大锤):带路两件 + 预览(文件) + 备注系列,
+   *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/收摊/反馈都是全局那张的事 */
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
-    if (!rootPath && !onNoteEdit && !onPreviewFile) return
+    if (!rootPath) return
     e.preventDefault()
-    // 新开菜单顺带清上一份的反馈和计时器,现场干净
-    if (menuTimerRef.current !== null) window.clearTimeout(menuTimerRef.current)
-    const hasNote = notes?.[node.relPath] !== undefined
     const isFile = node.type === 'file'
-    setMenu({
-      x: Math.min(e.clientX, window.innerWidth - 170),
-      y: Math.min(e.clientY, window.innerHeight - (40 + menuRows(hasNote, isFile) * 34)),
-      relPath: node.relPath,
-      hasNote,
-      isFile
-    })
-  }
-
-  /** 复制完整路径:成功亮「已复制✓」一拍再收摊,失败说人话多留一拍 */
-  function copyMenuPath(): void {
-    if (!rootPath || !menu || menu.copied !== undefined) return
-    void window.atlas.copyFilePath(rootPath, menu.relPath).then((r) => {
-      const ok = r.ok && r.path !== undefined
-      setMenu((m) => (m ? { ...m, copied: ok ? 'ok' : 'fail' } : m))
-      menuTimerRef.current = window.setTimeout(() => setMenu(null), ok ? 900 : 1600)
-    })
-  }
-
-  /** 在资源管理器中显示:成功不用菜单夸 —— 资源管理器窗口自己弹出来,就是最响亮的反馈 */
-  function revealMenuPath(): void {
-    if (!rootPath || !menu || menu.revealMsg !== undefined) return
-    void window.atlas.revealFilePath(rootPath, menu.relPath).then((r) => {
-      if (r.ok) {
-        setMenu(null)
-        return
-      }
-      setMenu((m) => (m ? { ...m, revealMsg: r.message ?? '没打开成' } : m))
-      menuTimerRef.current = window.setTimeout(() => setMenu(null), 1600)
+    openFilePathMenuFor(rootPath, node.relPath, e.clientX, e.clientY, {
+      preview: isFile && onPreviewFile ? () => onPreviewFile(node.relPath) : undefined,
+      note: onNoteEdit
+        ? {
+            hasNote: notes?.[node.relPath] !== undefined,
+            onEdit: () => onNoteEdit(node.relPath),
+            onRemove: onNoteRemove ? () => onNoteRemove(node.relPath) : undefined
+          }
+        : undefined
     })
   }
 
@@ -337,65 +295,6 @@ export function FileTree({ root, rootPath, notes, selectedPath, expandingPath, r
           )}
         </div>
       </div>
-      {menu && (
-        <>
-          <div
-            className="menu-backdrop"
-            onClick={() => setMenu(null)}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setMenu(null)
-            }}
-          />
-          <div className="tree-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
-            {/* 导向两件套(菜单统一大锤,小葵拍的:对着文件/文件夹右键都有),文件和文件夹同款 */}
-            {rootPath && (
-              <button type="button" role="menuitem" onClick={copyMenuPath} title={menu.relPath}>
-                {menu.copied === 'ok' ? '已复制 ✓' : menu.copied === 'fail' ? '没复制成,这路径有问题' : '复制完整路径'}
-              </button>
-            )}
-            {rootPath && (
-              <button type="button" role="menuitem" onClick={revealMenuPath} title={menu.relPath}>
-                {menu.revealMsg ?? '在文件资源管理器中显示'}
-              </button>
-            )}
-            {menu.isFile && onPreviewFile && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onPreviewFile(menu.relPath)
-                  setMenu(null)
-                }}
-              >
-                预览文件
-              </button>
-            )}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onNoteEdit?.(menu.relPath)
-                setMenu(null)
-              }}
-            >
-              {menu.hasNote ? '编辑备注' : '写备注'}
-            </button>
-            {menu.hasNote && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onNoteRemove?.(menu.relPath)
-                  setMenu(null)
-                }}
-              >
-                清除备注
-              </button>
-            )}
-          </div>
-        </>
-      )}
     </>
   )
 }
