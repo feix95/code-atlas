@@ -231,7 +231,10 @@ async function main(): Promise<void> {
   ]
   const clean = sanitizeHistory(rawHistory)
   assert.equal(clean.length, 5, '历史条数封顶 5')
-  assert.equal(clean[1]?.content.length, 502, '超长历史要截断(500 字 + 省略号)')
+  assert.ok(clean[1]?.content.startsWith(`${longText.slice(0, 500)}……`), '超长历史要截断(500 字 + 省略号)')
+  // 截断标注(LLM 优化锤):半截话是小模型最爱的续写钩子,得打招呼「不用接着写」
+  assert.ok(clean[1]?.content.includes('不用接着写'), '截断的历史要打「不用接着写」的标注')
+  assert.ok(clean[1]!.content.length > 500 + 2, '标注是附在截断条目上的,内容本体不变')
   assert.ok(clean.every((m) => m.role === 'user' || m.role === 'assistant'), '只收 user/assistant 两种角色')
 
   // 附件清洗:形状不对一律当没有;字段洗净;正文封顶

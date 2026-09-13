@@ -2285,6 +2285,89 @@ body.is-sash-dragging {
   line-height: 1.6;
 }
 
+/* 命中清单卡(LLM 优化锤):search_content 搜到的命中程序直接摆卡,模型不再当抄写员。
+   和摘要卡同一张「档案卡」脸:细边框圆角、左对齐;「文件:行号」可点跳预览那一行,
+   行原文单行省略(数据本身截过 120 字,悬停 title 看全貌)。间距全部显式设置。 */
+.chat-note.is-matches {
+  margin: 0.25rem auto;
+  padding: 0.5rem 0.75rem;
+  max-width: 85%;
+  text-align: left;
+  font-size: var(--font-xs);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.chat-note.is-matches .chat-matches-head {
+  margin: 0 0 0.375rem;
+  color: var(--muted-2);
+}
+
+.chat-note.is-matches .chat-matches-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chat-note.is-matches .chat-matches-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chat-note.is-matches .chat-match-loc {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.25em;
+  border: 0;
+  border-radius: 0.25rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--mono, 'Consolas', monospace);
+  font-size: 1.05em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-note.is-matches .chat-match-loc:hover {
+  background: var(--accent-line);
+  text-decoration: underline;
+}
+
+.chat-note.is-matches .chat-match-loc:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chat-note.is-matches .chat-match-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-2);
+}
+
+.chat-note.is-matches .chat-matches-toggle {
+  margin: 0.375rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.chat-note.is-matches .chat-matches-toggle:hover {
+  text-decoration: underline;
+}
+
 .chat-webstatus {
   margin-left: 2.125rem;
   margin-top: 2px;

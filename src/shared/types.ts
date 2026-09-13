@@ -304,6 +304,25 @@ export interface ModelContextInfo {
   vramBytes: number | null
 }
 
+/** 一条结构化搜索命中:文件相对路径 + 行号 + 那一行原文(超长截 120 字) */
+export interface AgentSearchMatch {
+  relPath: string
+  line: number
+  text: string
+}
+
+/**
+ * 命中清单卡的数据(第十六锤·LLM 优化):search_content 搜完,主进程把结构化命中
+ * 走旁路直接推给界面画卡 —— 格式主动权归程序,不再让小模型当抄写员。
+ * 这些数据只走内存通道,零落盘。
+ */
+export interface AgentSearchCard {
+  keyword: string
+  items: AgentSearchMatch[]
+  /** 命中多到收不下(AGENT_SEARCH_MAX_MATCHES 封顶)时注明,免得用户以为就这些 */
+  truncated: boolean
+}
+
 /** 流式输出的增量推送(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiDeltaPayload {
   id: string
@@ -316,6 +335,8 @@ export interface AiDeltaPayload {
   step?: { text: string }
   /** agent 流式的回滚(第一百三十四锤):中间轮次预吐的字被证明不是答案(模型喊了工具),收回重讲 */
   reset?: boolean
+  /** agent 的命中清单卡(LLM 优化锤):search_content 搜到的结构化命中走旁路直递,程序画卡 */
+  matches?: AgentSearchCard
 }
 
 /** AI 人话解释的结果 */

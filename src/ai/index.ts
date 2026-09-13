@@ -121,7 +121,9 @@ export const FREE_CHAT_SYSTEM_PROMPT = `你是 Code Atlas 里的"Atlas 小探针
 const CHAT_HISTORY_MAX = 5
 const CHAT_HISTORY_CONTENT_MAX = 500
 
-/** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆 */
+/** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆。
+ * 超长截断的那条要打「不用续写」的标注(LLM 优化锤):半截没说完的话是小模型最爱的续写钩子,
+ * 不打招呼它会倾向把旧清单接着编完,而不是回答新问题。 */
 export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   if (!Array.isArray(history)) return []
   const cleaned: AiHistoryMessage[] = []
@@ -131,7 +133,13 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
     if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') continue
     const text = content.trim()
     if (!text) continue
-    cleaned.push({ role, content: text.length > CHAT_HISTORY_CONTENT_MAX ? `${text.slice(0, CHAT_HISTORY_CONTENT_MAX)}……` : text })
+    cleaned.push({
+      role,
+      content:
+        text.length > CHAT_HISTORY_CONTENT_MAX
+          ? `${text.slice(0, CHAT_HISTORY_CONTENT_MAX)}……\n(这是旧对话的历史记录,超出部分已截断 —— 不用接着写,真正要回答的问题在最后一条消息里)`
+          : text
+    })
     if (cleaned.length >= CHAT_HISTORY_MAX) break
   }
   return cleaned

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiStreamStats, AiUsage, AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { AgentSearchCard, AiStreamStats, AiUsage, AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { COMPACT_SUMMARY_TAG } from '@shared/compact'
 import { friendlyErr } from './errText'
 
@@ -19,8 +19,11 @@ export interface ChatMessage {
   text: string
   state: ChatMsgState
   /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式;
-   * summary(第一百四十二锤)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型 */
-  kind?: 'step' | 'summary'
+   * summary(第一百四十二锤)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型;
+   * matches(LLM 优化锤)= 命中清单卡,search_content 搜到的结构化命中程序直接摆卡 */
+  kind?: 'step' | 'summary' | 'matches'
+  /** kind = 'matches' 时的卡数据(主进程旁路直递的完整命中) */
+  matches?: AgentSearchCard
   /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
   reasoning?: string
   /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
@@ -139,6 +142,18 @@ export function useAiChat(
         if (payload.step) {
           setMessages((prev) => {
             const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: payload.step!.text, state: 'done', web: null, kind: 'step' }
+            const last = prev[prev.length - 1]
+            const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
+            return [...prev.slice(0, at), note, ...prev.slice(at)]
+          })
+          return
+        }
+        // 命中清单卡(LLM 优化锤):search_content 的结构化命中走旁路直递,程序自己画卡
+        // —— 一条不丢、行号一个不错,可点跳预览。和步骤灰字一样只给人看,不进对话历史
+        if (payload.matches) {
+          const card = payload.matches
+          setMessages((prev) => {
+            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: '', state: 'done', web: null, kind: 'matches', matches: card }
             const last = prev[prev.length - 1]
             const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
             return [...prev.slice(0, at), note, ...prev.slice(at)]

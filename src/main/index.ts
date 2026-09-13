@@ -8,6 +8,7 @@ import {
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_DEPTH,
   AGENT_MAX_ROUNDS,
+  AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
   ROUND_CAP_NUDGE,
@@ -16,10 +17,12 @@ import {
   agentReadChars,
   agentRound,
   agentStepText,
+  buildAgentReminder,
   compressAgentMessages,
   extractToolCalls,
   mergeUsage,
   sanitizeAgentRelPath,
+  stripLastAgentReminder,
   toolCallKey,
   type AgentChatMessage,
   type AgentStreamEvent
@@ -88,7 +91,7 @@ import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import type { AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -785,26 +788,28 @@ async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: 
  * 文本文件内容,大小写不敏感,报「文件:行号:那行原文」。缰绳:忽略名单/符号链接/
  * 深度跟 list_files 同一份;二进制和超 5MB 的文件直接放过;扫的文件数和命中条数
  * 到量就收,照实注明「没搜完」—— 绝不让一个关键词把机器烧干。
+ * 除喂模型的 text 外,还把结构化命中(matches)一并交回:主进程拿它走旁路推给
+ * 界面画「命中清单卡」,格式主动权归程序,不再让小模型当抄写员。
  */
 async function agentSearchContent(
   rootPath: string,
   relPath: string,
   keyword: string
-): Promise<{ ok: boolean; text: string; hint?: string }> {
+): Promise<{ ok: boolean; text: string; hint?: string; matches: AgentSearchMatch[]; matchesTruncated: boolean }> {
   let abs: string
   try {
     abs = joinRoot(rootPath, relPath)
   } catch {
-    return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
+    return { ok: false, text: `路径越界了(不在项目内):${relPath}`, matches: [], matchesTruncated: false }
   }
   const stat = await fs.stat(abs).catch(() => null)
-  if (!stat) return { ok: false, text: `打不开或不存在:${relPath}` }
+  if (!stat) return { ok: false, text: `打不开或不存在:${relPath}`, matches: [], matchesTruncated: false }
   if (!stat.isDirectory()) {
-    return { ok: false, text: `${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它` }
+    return { ok: false, text: `${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它`, matches: [], matchesTruncated: false }
   }
   const needle = keyword.toLowerCase()
   const scopeLabel = relPath === '' ? '整个项目' : relPath
-  const matches: string[] = []
+  const matches: AgentSearchMatch[] = []
   const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
   let scanned = 0
   let locked = 0
@@ -847,7 +852,11 @@ async function agentSearchContent(
       for (const [index, line] of raw.split('\n').entries()) {
         if (!line.toLowerCase().includes(needle)) continue
         const trimmed = line.trim()
-        matches.push(`${childRel}:${index + 1}:${trimmed.length > 120 ? `${trimmed.slice(0, 120)}……` : trimmed}`)
+        matches.push({
+          relPath: childRel,
+          line: index + 1,
+          text: trimmed.length > 120 ? `${trimmed.slice(0, 120)}……` : trimmed
+        })
         if (matches.length >= AGENT_SEARCH_MAX_MATCHES) {
           matchesTruncated = true
           break outer
@@ -858,15 +867,15 @@ async function agentSearchContent(
   if (matches.length === 0) {
     let text = `在 ${scopeLabel} 里没搜到「${keyword}」(翻了 ${scanned} 个文本文件)。可能真没有,也可能藏在二进制/超大的文件里,或者换个更短的关键词再试`
     if (filesTruncated) text += `(文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完)`
-    return { ok: true, text }
+    return { ok: true, text, matches: [], matchesTruncated: false }
   }
-  let text = matches.join('\n')
+  let text = matches.map((m) => `${m.relPath}:${m.line}:${m.text}`).join('\n')
   const tails: string[] = []
   if (matchesTruncated) tails.push(`命中太多,只显示前 ${AGENT_SEARCH_MAX_MATCHES} 条`)
   if (filesTruncated) tails.push(`文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完`)
   if (locked > 0) tails.push(`${locked} 个文件打不开,跳过了`)
   if (tails.length > 0) text += `\n(${tails.join(';')})`
-  return { ok: true, text, hint: `${scopeLabel}命中 ${matches.length} 处` }
+  return { ok: true, text, hint: `${scopeLabel}命中 ${matches.length} 处`, matches, matchesTruncated }
 }
 
 /** read_file 的执行手:读文本文件,超长只读开头一段并注明,绝不静默截断 */
@@ -907,6 +916,17 @@ async function agentReadFile(
 function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: string): void {
   if (requestId === '' || event.sender.isDestroyed()) return
   const payload: AiDeltaPayload = { id: requestId, text: '', step: { text } }
+  event.sender.send('atlas:ai-delta', payload)
+}
+
+/**
+ * 命中清单卡走旁路(LLM 优化锤):search_content 搜到的结构化命中直接推给界面画卡,
+ * 每条「文件:行号:原文」原样到用户眼前、可点跳转 —— 不再让小模型当抄写员,
+ * 一条不丢、行号一个不错。只走内存通道,零落盘。
+ */
+function sendAgentMatches(event: IpcMainInvokeEvent, requestId: string, card: AgentSearchCard): void {
+  if (requestId === '' || event.sender.isDestroyed()) return
+  const payload: AiDeltaPayload = { id: requestId, text: '', matches: card }
   event.sender.send('atlas:ai-delta', payload)
 }
 
@@ -952,6 +972,16 @@ async function runAgentChat(input: {
 }): Promise<AiChatResult> {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
   const messages: AgentChatMessage[] = [...baseMessages]
+  // 本轮用户真正的问题 = 组装消息里最后一条 user(附件/摘要/历史都垫在它前面);
+  // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下
+  let currentQuestion = ''
+  for (let i = baseMessages.length - 1; i >= 0; i--) {
+    const m = baseMessages[i]
+    if (m.role === 'user') {
+      currentQuestion = m.content
+      break
+    }
+  }
   // 这引擎摔过「不认工具调用」的跤就直接按普通对话走,连守则都不垫
   const engineKey = `${target.baseUrl}|${target.model}`
   let engineNoTools = noToolEngines.has(engineKey)
@@ -971,6 +1001,8 @@ async function runAgentChat(input: {
   let rounds = 0
   // 兜底降级后的重答轮不算「轮数烧完」,别把逼卷令也塞进去
   let skipNudgeOnce = false
+  // 提醒卡兜底只许用一次:撤卡重答还 4xx 就不是卡的锅了,照实报错
+  let reminderFailsafe = false
   addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
@@ -1014,6 +1046,20 @@ async function runAgentChat(input: {
             content: (messages[sysIdx] as { content: string }).content.slice(0, -AGENT_ADDENDUM.length)
           }
         }
+        continue
+      }
+      // 提醒卡兜底:个别外接引擎不认「tool 结果后面跟 user 消息」的形态,甩 4xx ——
+      // 撤掉提醒卡退回无卡形态重答一轮(只兜一次);再错就照实报给用户,不跟它耗
+      if (
+        round.status === 'error' &&
+        !reminderFailsafe &&
+        (round.httpStatus === 400 || round.httpStatus === 404 || round.httpStatus === 422) &&
+        messages.some((m) => m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))
+      ) {
+        reminderFailsafe = true
+        skipNudgeOnce = true
+        messages.splice(0, messages.length, ...messages.filter((m) => !(m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))))
+        sendAgentStep(event, requestId, '这个模型不太习惯多出来的小纸条,撤掉重答')
         continue
       }
       return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
@@ -1069,16 +1115,26 @@ async function runAgentChat(input: {
       }
       doneCalls.add(key)
       callIdToKey.set(call.id, key)
-      const exec =
+      // 三个执行手统一形状:matches/matchesTruncated 只有 search_content 会带
+      const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean } =
         callName === 'list_files'
           ? await agentListFiles(rootPath, relPath)
           : callName === 'search_content'
             ? await agentSearchContent(rootPath, relPath, keyword)
             : await agentReadFile(rootPath, relPath, readChars)
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
+      // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
+      // 用户看到的是程序摆的完整清单,不用模型转手抄写
+      if (callName === 'search_content' && exec.ok && exec.matches && exec.matches.length > 0) {
+        sendAgentMatches(event, requestId, { keyword, items: exec.matches, truncated: exec.matchesTruncated === true })
+      }
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
     }
     messages.push(...toolResults)
+    // 每轮工具结果后垫提醒卡(LLM 优化锤):撤掉上一张再垫新的,对话里永远只挂
+    // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事
+    messages.splice(0, messages.length, ...stripLastAgentReminder(messages))
+    messages.push({ role: 'user', content: buildAgentReminder(currentQuestion) })
     addDevLog('request', `翻文件第 ${rounds} 轮:模型要看 ${calls.length} 样东西`)
   }
 }
