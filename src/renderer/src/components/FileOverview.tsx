@@ -117,24 +117,29 @@ export function FileOverview({
         onGoChat={onGoChat}
       />
 
-      <div className="section-label">
-        文件关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
-      </div>
+      {/* 关系模组:和上面两个卡一个模组相(壳+头),没分析过/分析中也是同款壳,不摆露天标签 */}
       {graph ? (
         <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
-      ) : graphLoading ? (
-        <div className="card-waiting">
-          <ProgressDots />
-          正在连线……
-        </div>
       ) : (
-        <div className="card-waiting">
-          还没分析过文件关系。
-          <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
-            分析文件关系
-          </button>
-          {graphNote && <Notice kind="error">{graphNote}</Notice>}
-        </div>
+        <section className="card relation-card">
+          <header className="relation-card-head">
+            文件关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
+          </header>
+          {graphLoading ? (
+            <p className="relation-empty-note">
+              <ProgressDots />
+              正在连线……
+            </p>
+          ) : (
+            <p className="relation-empty-note">
+              还没分析过文件关系,点一下跑一遍全项目连线。
+              <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
+                分析文件关系
+              </button>
+              {graphNote && <Notice kind="error">{graphNote}</Notice>}
+            </p>
+          )}
+        </section>
       )}
     </>
   )
