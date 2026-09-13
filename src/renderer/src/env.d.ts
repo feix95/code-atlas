@@ -81,6 +81,8 @@ declare global {
       /** 模型状态栏(第七十锤):查一次现状;取消热身/卸下模型(仅内置模型有效) */
       modelStatusGet: () => Promise<ModelStatus>
       modelEject: () => Promise<{ ok: boolean; message?: string }>
+      /** 右键文件链接复制完整路径:主进程 joinRoot 拼绝对路径写进剪贴板,只复制不打开 */
+      copyFilePath: (rootPath: string, relPath: string) => Promise<{ ok: boolean; path?: string; message?: string }>
       /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数 */
       onModelStatus: (callback: (status: ModelStatus) => void) => () => void
       /** 量尺:模型块头 vs 机器尺寸,选模型那一刻就给结论(绿装得下/黄有点挤/红装不下) */

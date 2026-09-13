@@ -9,6 +9,8 @@ import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
 import { FileOverview } from './components/FileOverview'
 import { FileRelations } from './components/FileRelations'
+import { FilePathMenu } from './components/FilePathMenu'
+import { openFilePathMenu } from './components/filePathMenuStore'
 import { FileTree } from './components/FileTree'
 import { FolderOverview } from './components/FolderOverview'
 import { FreeChatPanel } from './components/FreeChatPanel'
@@ -631,10 +633,24 @@ function App(): React.JSX.Element {
     setPreviewJump(line !== undefined ? { line, seq: jumpSeqRef.current } : null)
   }, [])
 
-  // 文件链接上下文:索引 + 点击去处;没扫出树(还在首页)就没有链接这回事
+  // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事
+  const openFileLinkMenu = useCallback((relPath: string, x: number, y: number): void => {
+    const cur = resultRef.current
+    if (!cur) return
+    const rootPath = cur.rootPath
+    openFilePathMenu({
+      x,
+      y,
+      relPath,
+      copy: async () => {
+        const r = await window.atlas.copyFilePath(rootPath, relPath)
+        return r.ok && r.path !== undefined ? r.path : null
+      }
+    })
+  }, [])
   const fileLinks: FileLinkTarget | null = useMemo(
-    () => (fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink } : null),
-    [fileLinkIndex, openFileLink]
+    () => (fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink, onMenu: openFileLinkMenu } : null),
+    [fileLinkIndex, openFileLink, openFileLinkMenu]
   )
 
   // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
@@ -1124,6 +1140,9 @@ function App(): React.JSX.Element {
 
       {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见 */}
       <ModelStatusBar />
+
+      {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
+      <FilePathMenu />
 
       {showSettings && (
         <SettingsDialog

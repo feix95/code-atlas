@@ -1,4 +1,4 @@
-import { app, dialog, globalShortcut, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, clipboard, dialog, globalShortcut, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import { scanDirectory, IGNORED_NAMES } from '../scanner/index.ts'
@@ -2010,6 +2010,21 @@ function registerIpc(): void {
   ipcMain.handle('atlas:web-lookup', (_event, query: unknown) => {
     if (typeof query !== 'string' || query.trim() === '') return ''
     return webLookup(query, electronFetchText)
+  })
+
+  // 右键文件链接复制完整路径:只往剪贴板写一个字符串,不开文件不执行任何东西 ——
+  // 找到真文件后「开不开、怎么开」完全留给用户自己决定。路径照契约走 joinRoot 解析
+  ipcMain.handle('atlas:copy-file-path', (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
+      return { ok: false as const, message: '路径信息不完整,复制不了' }
+    }
+    try {
+      const abs = joinRoot(rootPath, relPath)
+      clipboard.writeText(abs)
+      return { ok: true as const, path: abs }
+    } catch (err) {
+      return { ok: false as const, message: err instanceof Error ? err.message : '复制失败' }
+    }
   })
 }
 

@@ -35,7 +35,12 @@ const FileNoteText = memo(function FileNoteText({
         type="button"
         className="md-file-link"
         onClick={() => fileLinks.onOpen(s.relPath, s.line)}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''}`}
+        onContextMenu={(e) => {
+          if (!fileLinks.onMenu) return
+          e.preventDefault()
+          fileLinks.onMenu(s.relPath, e.clientX, e.clientY)
+        }}
+        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键可复制完整路径`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}
@@ -110,7 +115,12 @@ const MatchListCard = memo(function MatchListCard({
               type="button"
               className="chat-match-loc"
               onClick={() => fileLinks?.onOpen(it.relPath, it.line)}
-              title={fileLinks ? `打开预览:${it.relPath} 第 ${it.line} 行` : it.relPath}
+              onContextMenu={(e) => {
+                if (!fileLinks?.onMenu) return
+                e.preventDefault()
+                fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
+              }}
+              title={fileLinks ? `打开预览:${it.relPath} 第 ${it.line} 行;右键可复制完整路径` : it.relPath}
             >
               {it.relPath}:{it.line}
             </button>

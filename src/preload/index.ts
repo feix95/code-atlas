@@ -143,6 +143,9 @@ contextBridge.exposeInMainWorld('atlas', {
   // ── 模型状态栏(第七十锤):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
   modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke('atlas:model-status-get'),
   modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('atlas:model-eject'),
+  /** 右键文件链接复制完整路径:主进程 joinRoot 拼绝对路径写进剪贴板,只复制不打开 */
+  copyFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; path?: string; message?: string }> =>
+    ipcRenderer.invoke('atlas:copy-file-path', rootPath, relPath),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void => callback(status)

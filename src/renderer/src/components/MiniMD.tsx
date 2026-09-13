@@ -27,7 +27,12 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
         type="button"
         className="md-file-link"
         onClick={() => links.onOpen(s.relPath, s.line)}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''}`}
+        onContextMenu={(e) => {
+          if (!links.onMenu) return
+          e.preventDefault()
+          links.onMenu(s.relPath, e.clientX, e.clientY)
+        }}
+        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键可复制完整路径`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}

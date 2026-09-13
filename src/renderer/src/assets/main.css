@@ -5326,6 +5326,48 @@ body.is-maximized .cfg-layer {
   outline-offset: 1px;
 }
 
+/* ── 文件路径右键菜单:绿字链接右键弹出,复制完整路径进剪贴板(只复制不打开,
+ *   开不开文件交给用户)── */
+.file-path-menu {
+  position: fixed;
+  z-index: 95;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.file-path-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-path-menu-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.file-path-menu-item.is-ok {
+  color: var(--green);
+}
+
+.file-path-menu-item.is-fail {
+  color: var(--danger);
+}
+
 .md-hr {
   border: 0;
   border-top: 1px solid var(--line);
