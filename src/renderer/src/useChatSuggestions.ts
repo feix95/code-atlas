@@ -35,8 +35,10 @@ export function useChatSuggestions(input: {
   file: ScanFileNode
   messages: ChatMessage[]
   busy: boolean
+  /** 总闸(聊天偏好开关):关掉时规则题不出、AI 预测不跑,一律空手而回 */
+  enabled: boolean
 }): { questions: string[]; source: 'ai' | 'rule' } {
-  const { rootPath, file, messages, busy } = input
+  const { rootPath, file, messages, busy, enabled } = input
 
   // 预测吃这口证据:答完的轮数 + 最近一轮的一问一答
   const turns = messages.filter((m) => m.role === 'assistant' && m.state === 'done' && m.text !== '').length
@@ -45,16 +47,18 @@ export function useChatSuggestions(input: {
   const lastQuestion = lastUser?.text ?? ''
   const lastAnswer = (lastAssistant?.text ?? '').slice(0, ANSWER_DIGEST_MAX)
 
-  // 第一层:规则预测,换轮次瞬间就有
+  // 第一层:规则预测,换轮次瞬间就有;总闸关了就一道题都不出
   const rule = useMemo(
     () =>
-      ruleChatSuggestions(turns > 0, {
-        name: file.name,
-        icon: file.summary?.icon,
-        text: file.summary?.text,
-        languageId: file.language?.id
-      }),
-    [turns, file]
+      enabled
+        ? ruleChatSuggestions(turns > 0, {
+            name: file.name,
+            icon: file.summary?.icon,
+            text: file.summary?.text,
+            languageId: file.language?.id
+          })
+        : [],
+    [enabled, turns, file]
   )
 
   // AI 预测结果带钥匙存:换了轮次钥匙就对不上,自动视为「还没预测」,不用抢跑 setState
@@ -63,9 +67,10 @@ export function useChatSuggestions(input: {
   const aiQuestions = aiState?.key === currentKey ? aiState.questions : null
 
   // 第二层:AI 预测,后台跑;没聊过不麻烦模型(规则层按文件出的题就够),
-  // 正在回答时也不抢 —— 让模型专心答题,答完再预测下一问
+  // 正在回答时也不抢 —— 让模型专心答题,答完再预测下一问;
+  // 总闸关了整个第二层直接下班,一次模型调用都不花
   useEffect(() => {
-    if (busy || turns === 0) return
+    if (!enabled || busy || turns === 0) return
     const key = currentKey
     let alive = true
     let activeId = ''
@@ -107,8 +112,8 @@ export function useChatSuggestions(input: {
       alive = false
       if (activeId) void window.atlas.aiCancel(activeId)
     }
-    // 依赖带 currentKey:每一轮答完都重跑一次预测
-  }, [currentKey, busy, turns, rootPath, file, lastQuestion, lastAnswer])
+    // 依赖带 currentKey:每一轮答完都重跑一次预测;enabled 一变也要重新对表
+  }, [enabled, currentKey, busy, turns, rootPath, file, lastQuestion, lastAnswer])
 
   return { questions: aiQuestions ?? rule, source: aiQuestions ? 'ai' : 'rule' }
 }

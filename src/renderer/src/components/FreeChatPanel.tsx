@@ -192,7 +192,8 @@ export function FreeChatPanel({
   onRemoveRef,
   suggestions,
   onDropNode,
-  fileLinks
+  fileLinks,
+  suggestionsOn
 }: {
   chat: AiChatApi
   context: ChatContextAttachment | null
@@ -205,6 +206,8 @@ export function FreeChatPanel({
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
   /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
   fileLinks?: FileLinkTarget | null
+  /** 推荐问题总闸(聊天偏好):关了推荐和开场示例都不出,只剩「新对话」按钮 */
+  suggestionsOn: boolean
 }): React.JSX.Element {
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
@@ -530,22 +533,24 @@ export function FreeChatPanel({
           <button type="button" className="prompt" onClick={chat.newChat} title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)">
             新对话
           </button>
-          {suggestions ? (
-            // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
-            !chat.busy &&
-            suggestions.map((q) => (
-              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                {q}
-              </button>
-            ))
-          ) : (
-            chat.messages.length === 0 &&
-            CHAT_EXAMPLES.map((q) => (
-              <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                {q}
-              </button>
-            ))
-          )}
+          {suggestionsOn ? (
+            suggestions ? (
+              // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
+              !chat.busy &&
+              suggestions.map((q) => (
+                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                  {q}
+                </button>
+              ))
+            ) : (
+              chat.messages.length === 0 &&
+              CHAT_EXAMPLES.map((q) => (
+                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                  {q}
+                </button>
+              ))
+            )
+          ) : null}
         </div>
         {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
             写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}

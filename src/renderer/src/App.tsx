@@ -30,6 +30,7 @@ import {
 import { useAiAsk } from './useAiAsk'
 import { useAiChat, type AiChatApi } from './useAiChat'
 import { useChatSuggestions } from './useChatSuggestions'
+import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
 import { Notice } from './components/Notice'
@@ -217,6 +218,8 @@ function App(): React.JSX.Element {
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // 聊天推荐问题总闸(聊天偏好,存本机):关了聊天框上面那排推荐就不出,模型预测也一并省掉
+  const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const [treeNote, setTreeNote] = useState<string | null>(null)
@@ -921,6 +924,7 @@ function App(): React.JSX.Element {
                 chat={chat}
                 chatContext={chatContext ?? buildFileAttachment(preview, null)}
                 fileLinks={fileLinks}
+                suggestionsOn={chatSuggestionsOn}
               />
             ) : selectedFile && result && activeTab === 'chat' ? (
               // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
@@ -942,6 +946,7 @@ function App(): React.JSX.Element {
                 onRemoveRef={removePreviewRef}
                 onDropNode={handleDropNode}
                 fileLinks={fileLinks}
+                suggestionsOn={chatSuggestionsOn}
               />
             ) : selectedFile && result ? (
               <FileDetailView
@@ -983,6 +988,7 @@ function App(): React.JSX.Element {
                 refs={previewRefs}
                 onRemoveRef={removePreviewRef}
                 onDropNode={handleDropNode}
+                suggestionsOn={chatSuggestionsOn}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
@@ -1103,6 +1109,11 @@ function App(): React.JSX.Element {
       {showSettings && (
         <SettingsDialog
           workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+          chatSuggestionsOn={chatSuggestionsOn}
+          onChatSuggestionsChange={(v) => {
+            setChatSuggestionsOn(v)
+            saveChatSuggestionsOn(v)
+          }}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -1133,7 +1144,8 @@ function ChatTabDetailPage({
   refs,
   onRemoveRef,
   onDropNode,
-  fileLinks
+  fileLinks,
+  suggestionsOn
 }: {
   crumbs: Crumb[]
   iconName: string
@@ -1153,6 +1165,7 @@ function ChatTabDetailPage({
   onRemoveRef?: (index: number) => void
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
   fileLinks?: FileLinkTarget | null
+  suggestionsOn: boolean
 }): React.JSX.Element {
   return (
     <div className="detail-page">
@@ -1171,7 +1184,7 @@ function ChatTabDetailPage({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} />
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
       </div>
     </div>
   )
@@ -1191,7 +1204,8 @@ function PreviewDetailView({
   onClose,
   chat,
   chatContext,
-  fileLinks
+  fileLinks,
+  suggestionsOn
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1201,9 +1215,16 @@ function PreviewDetailView({
   chat: AiChatApi
   chatContext: ChatContextAttachment
   fileLinks?: FileLinkTarget | null
+  suggestionsOn: boolean
 }): React.JSX.Element {
-  // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新
-  const suggestions = useChatSuggestions({ rootPath: result.rootPath, file, messages: chat.messages, busy: chat.busy })
+  // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新;总闸关了全歇
+  const suggestions = useChatSuggestions({
+    rootPath: result.rootPath,
+    file,
+    messages: chat.messages,
+    busy: chat.busy,
+    enabled: suggestionsOn
+  })
 
   return (
     <div className="detail-page">
@@ -1215,7 +1236,7 @@ function PreviewDetailView({
         onClose={onClose}
       />
       <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} />
+        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
       </div>
     </div>
   )

@@ -256,7 +256,18 @@ const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: strin
  * 逻辑是「暂存 + 预览 + 应用」:所有改动先进草稿、界面即时预览,
  * 点「应用更改」才落盘;恢复默认直接退回;关弹窗(×、Esc、点遮罩)在有未应用的更改时先弹确认,确认丢弃才退回。
  */
-export function SettingsDialog({ workspaceName, onClose }: { workspaceName: string | null; onClose: () => void }): React.JSX.Element {
+export function SettingsDialog({
+  workspaceName,
+  chatSuggestionsOn,
+  onChatSuggestionsChange,
+  onClose
+}: {
+  workspaceName: string | null
+  /** 聊天推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
+  chatSuggestionsOn: boolean
+  onChatSuggestionsChange: (v: boolean) => void
+  onClose: () => void
+}): React.JSX.Element {
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
   const [draftAppearance, setDraftAppearance] = useState<Appearance>(loadAppearance)
   const [savedConfig, setSavedConfig] = useState<AiConfig | null>(null)
@@ -955,6 +966,26 @@ export function SettingsDialog({ workspaceName, onClose }: { workspaceName: stri
                           aria-label="联网查证"
                           className={`cfg-switch${draftConfig.webLookup ? ' is-on' : ''}`}
                           onClick={() => setDraftConfig({ ...draftConfig, webLookup: !draftConfig.webLookup })}
+                        >
+                          <span />
+                        </button>
+                      </div>
+                      {/* 聊天推荐问题(攒条):聊天面板的事跟联网查证作伴;拨一下立刻生效,不走下面的应用更改 */}
+                      <div className="cfg-row">
+                        <div className="cfg-copy">
+                          <label>
+                            聊天推荐问题
+                            <span className={`cfg-flag${chatSuggestionsOn ? ' is-on' : ''}`}>{chatSuggestionsOn ? '已开启' : '已关闭'}</span>
+                          </label>
+                          <p>聊天框上面自动冒出的那排「可以问问看」,觉得问不上就关;关了也不再为猜这些问题白花模型的功夫。拨了马上生效,不用点应用更改。</p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={chatSuggestionsOn}
+                          aria-label="聊天推荐问题"
+                          className={`cfg-switch${chatSuggestionsOn ? ' is-on' : ''}`}
+                          onClick={() => onChatSuggestionsChange(!chatSuggestionsOn)}
                         >
                           <span />
                         </button>
