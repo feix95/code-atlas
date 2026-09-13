@@ -353,6 +353,8 @@ export interface AiExplainResult {
   durationMs: number
   /** 本次问答的 token 账(第八十四锤):引擎肯报才有,绝不编数 */
   usage?: AiUsage
+  /** 复读机警报(第一百四十三锤):true = 回答尾巴在原地打转。AI 层内部流转用,截断交卷后清掉 */
+  repetitionDetected?: boolean
 }
 
 /** 一次问答的 token 账(第八十四锤):读了多少提示词、吐了多少字、多快 */

@@ -27,3 +27,18 @@ export const CODE_REFS_TOTAL_CHARS_CEILING = 12000
  * 正文一个字都不剩(小葵的 Qwen3.5 就是这么「一句没回」的)。
  */
 export const THINKING_EXTRA_TOKENS = 2048
+
+/**
+ * 反重复采样参数(第一百四十三锤,复读机防线):内置引擎的请求体原样带上。
+ * repeat_penalty/repeat_last_n 是传统的「说过的词降权」;dry_* 是 DRY 采样,
+ * 专治「同一个短语无限循环」—— 序列说到第三遍开始罚,越滚罚得越重(指数级)。
+ * 只对内置引擎发:外接服务的采样旋钮在它们自己界面里管,咱们不越权,行为一分不变;
+ * 引擎版本老不认这些字段也只是安静忽略,零风险。
+ */
+export const AI_ANTI_REPEAT_PARAMS = {
+  repeat_penalty: 1.1,
+  repeat_last_n: 256,
+  dry_multiplier: 0.8,
+  dry_base: 1.75,
+  dry_allowed_length: 2
+} as const

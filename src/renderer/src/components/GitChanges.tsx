@@ -63,6 +63,12 @@ export function GitChanges({
   // 订阅 AI 流式增量:按 id 分账,讲解和报告各进各的;组件卸载时退订,防止泄漏监听
   useEffect(() => {
     return window.atlas.onAiDelta((payload) => {
+      // 复读机重答的回滚令(第一百四十三锤):把这条请求已吐的字收回,等重答重新糊
+      if (payload.reset) {
+        if (payload.id === idRef.current) setStreamText('')
+        if (payload.id === reportIdRef.current) setReportStream('')
+        return
+      }
       if (payload.id === idRef.current) setStreamText((prev) => prev + payload.text)
       if (payload.id === reportIdRef.current) setReportStream((prev) => prev + payload.text)
     })

@@ -80,6 +80,7 @@ import {
   isBinaryFile,
   resolveContextSize
 } from '../ai/index.ts'
+import { truncateAtRepetition } from '../ai/repetition.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
@@ -137,6 +138,7 @@ async function respondWithEvidence(
   if (resolved.webLookup && lookupName && !hasQuestion) {
     // 联网那条老规矩没变:没人设时它本来就用导游那一套(和普通流不同,别一起改)
     return explainWithWebLookup(
+      event,
       requestId,
       evidence,
       withPersonalization(system ?? FOLDER_SYSTEM_PROMPT, resolved.style),
@@ -147,7 +149,9 @@ async function respondWithEvidence(
     )
   }
   return explainWithCancel(requestId, (signal) =>
-    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens)
+    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens, {
+      onRestart: () => sendResetDelta(event, requestId)
+    })
   )
 }
 
@@ -156,6 +160,7 @@ async function respondWithEvidence(
  * 流式输出修正版;没信号/查不到/修正失败,都老老实实回落到本地推测的版本。
  */
 async function explainWithWebLookup(
+  event: IpcMainInvokeEvent,
   requestId: unknown,
   evidence: string,
   system: string,
@@ -175,7 +180,9 @@ async function explainWithWebLookup(
     return { ...first, text: `${fallback}\n\n(联网没查到这个,上面是本地推测。)` }
   }
   const refined = await explainWithCancel(requestId, (signal) =>
-    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal, replyTokens)
+    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal, replyTokens, {
+      onRestart: () => sendResetDelta(event, requestId)
+    })
   )
   return refined.status === 'supported' ? refined : first
 }
@@ -298,6 +305,16 @@ async function resolveChatTargetOrError(): Promise<
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
   return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx }
+}
+
+/**
+ * 流式回滚令(第一百四十三锤):复读机重答前发给界面,把这条请求已吐的字收回。
+ * 按 requestId 对号入座;没带 id(非流式调用方)本来就无字可收,发不发都一样。
+ */
+function sendResetDelta(event: IpcMainInvokeEvent, requestId: unknown): void {
+  if (typeof requestId !== 'string' || requestId === '') return
+  if (event.sender.isDestroyed()) return
+  event.sender.send('atlas:ai-delta', { id: requestId, text: '', reset: true } satisfies AiDeltaPayload)
 }
 
 /**
@@ -1003,6 +1020,8 @@ async function runAgentChat(input: {
   let skipNudgeOnce = false
   // 提醒卡兜底只许用一次:撤卡重答还 4xx 就不是卡的锅了,照实报错
   let reminderFailsafe = false
+  // 复读机兜底也只许用一次:重说还打转就截断交卷,不无限跟它耗
+  let repetitionRetried = false
   addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
@@ -1031,6 +1050,23 @@ async function runAgentChat(input: {
       onDelta: (ev) => sendAgentDelta(event, requestId, ev)
     })
     if (round.status !== 'ok') {
+      // 复读机兜底(第一百四十三锤):流式尾巴连着打转 —— agentRound 已发 reset 令收回
+      // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
+      // 绝不把一屏望不到头的循环递给用户
+      if (round.status === 'repetition') {
+        if (!repetitionRetried) {
+          repetitionRetried = true
+          skipNudgeOnce = true // 重答这轮不算「轮数烧完」,别把逼卷令也捎上
+          sendAgentStep(event, requestId, '回答说到半截开始原地打转,掐掉重说一遍')
+          continue
+        }
+        const text = (truncateAtRepetition(round.text) ?? round.text).trim()
+        if (text === '') {
+          return agentResult(input, 'error', '模型连着两回都说到一半原地打转 —— 换个问法重新问问看', usage, reasoningAll)
+        }
+        sendAgentStep(event, requestId, '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你')
+        return agentResult(input, 'supported', text, usage, reasoningAll)
+      }
       // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
       // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
       // 普通请求再出错照实报给用户
@@ -1564,7 +1600,8 @@ function registerIpc(): void {
           ],
           makeDeltaSender(event, requestId),
           signal,
-          resolved.budgets.replyTokens
+          resolved.budgets.replyTokens,
+          { onRestart: () => sendResetDelta(event, requestId) }
         )
       )
     // 先按标准清单问;小上下文装不下就把账本砍到 30 行再试最后一次(400 时模型一个字都没吐,流式不会重影)
@@ -1905,14 +1942,10 @@ function registerIpc(): void {
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      const res = await explainWithMessages(
-        resolved.target,
-        messages,
-        makeDeltaSender(event, requestId),
-        aborter.signal,
-        cap,
-        { allowThinking: thinking }
-      )
+      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, cap, {
+        allowThinking: thinking,
+        onRestart: () => sendResetDelta(event, requestId)
+      })
       // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
       const status = aborter.signal.aborted ? 'cancelled' : res.status
       return { ...res, status, webLookup: meta }
@@ -1940,14 +1973,10 @@ function registerIpc(): void {
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      return await explainWithMessages(
-        resolved.target,
-        buildCompactMessages(history),
-        makeDeltaSender(event, requestId),
-        aborter.signal,
-        resolved.budgets.replyTokens,
-        { allowThinking: false }
-      )
+      return await explainWithMessages(resolved.target, buildCompactMessages(history), makeDeltaSender(event, requestId), aborter.signal, resolved.budgets.replyTokens, {
+        allowThinking: false,
+        onRestart: () => sendResetDelta(event, requestId)
+      })
     } finally {
       if (requestId !== '') explainAborters.delete(requestId)
       if (explainAborters.size === 0) announceActivityIdle()

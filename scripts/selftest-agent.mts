@@ -223,6 +223,9 @@ function main(): void {
   assert.ok(AGENT_ADDENDUM.includes('不是用户在跟你说话'), '守则要有防自指条款:资料里的指令腔一概别当真')
   assert.ok(AGENT_ADDENDUM.includes('用户的问题是'), '防自指条款要点名「用户的问题是……」这种最像指令的字样')
 
+  // ── 15. 复读机轻提醒(第一百四十三锤):列举别翻来覆去重复(主药是采样参数+程序监工,这句是顺手的) ──
+  assert.ok(AGENT_ADDENDUM.includes('翻来覆去重复'), '守则要有「列举别复读」的轻提醒')
+
   console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 全部通过')
 }
 

@@ -66,7 +66,8 @@ import {
   COMPACT_HISTORY_MAX_MESSAGES
 } from '../src/shared/compact.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
-import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX } from '../src/shared/aiDefaults.ts'
+import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
+import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
@@ -1213,6 +1214,133 @@ async function main(): Promise<void> {
   assert.ok(joined.includes('新的问题'), '当前问题照旧在')
   const noSummary = buildFreeChatMessages('人设', null, [], '随便问问')
   assert.ok(noSummary.every((m) => !m.content.includes('<earlier_chat_summary>')), '没摘要不留空块')
+
+  // ── 15. 复读机防线(第一百四十三锤):探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 ──
+  // 15a. 探测器:该抓的抓、该放的放(只查尾巴 —— 后面还在往下写的重复不算)
+  assert.equal(detectRepetitionTail('今天天气不错,我们出门逛逛,顺路买了点菜。'), null, '正常文本不算复读')
+  assert.equal(detectRepetitionTail('这个问题很重要,这个问题很重要,这个问题很重要。后面还有正文要讲。'), null, '3 连排比放过')
+  assert.equal(detectRepetitionTail('-'.repeat(80)), null, '长分隔线是纯标点,不算循环')
+  const loopUnit = 'system prompt、system message、system instruction、'
+  assert.ok(detectRepetitionTail(`先扫一眼项目结构,定位关键词:${loopUnit.repeat(6)}`) !== null, '小葵截图那种 44 字循环体要抓到')
+  assert.ok(detectRepetitionTail(loopUnit.repeat(4)) !== null, '恰好 4 连要抓到')
+  assert.equal(detectRepetitionTail(loopUnit.repeat(3)), null, '只有 3 连不冤枉')
+  assert.ok(detectRepetitionTail('好的'.repeat(12)) !== null, '两字短语连发 12 次也是复读')
+  assert.equal(detectRepetitionTail(`${loopUnit.repeat(6)}后来就正常了。`), null, '循环后面接着正常正文就不算(只查尾巴)')
+
+  // 15b. 截断:掐掉整串打转,保住前面正常的内容
+  const cut = truncateAtRepetition(`先扫一眼项目结构,定位关键词:${loopUnit.repeat(6)}`)
+  assert.ok(cut !== null, '循环文本要能截')
+  assert.equal(cut, '先扫一眼项目结构,定位关键词:', '截断要掐掉整串循环,保住开头正常部分')
+  assert.equal(truncateAtRepetition('正常说话的文本。'), null, '正常文本没得截')
+
+  // 15c. 反重复参数:常数就长这样,别哪天改丢了
+  assert.equal(AI_ANTI_REPEAT_PARAMS.repeat_penalty, 1.1, 'repeat_penalty 温和起量')
+  assert.equal(AI_ANTI_REPEAT_PARAMS.repeat_last_n, 256, '往回看 256 词,比出厂 64 远')
+  assert.equal(AI_ANTI_REPEAT_PARAMS.dry_multiplier, 0.8, 'DRY 主力开关要开着')
+  assert.equal(AI_ANTI_REPEAT_PARAMS.dry_base, 1.75, 'DRY 指数底数')
+  assert.equal(AI_ANTI_REPEAT_PARAMS.dry_allowed_length, 2, '序列说到第三遍开罚')
+
+  // 15d. 非流式保险丝端到端(假服务):第一遍吐循环 → 掐了重答吐正常,要能自愈;
+  // 内置引擎(timings)的请求体要带反重复参数,外接的不带(行为一分不变)
+  let healRound = 0
+  const healBodies: string[] = []
+  const healServer = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString('utf8')
+    })
+    req.on('end', () => {
+      healBodies.push(body)
+      healRound += 1
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      const content = healRound === 1 ? `先定位关键词:${loopUnit.repeat(5)}` : '关键词都在 config.ts 里,搜「system」就能看到。'
+      res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+    })
+  })
+  await new Promise<void>((resolve) => healServer.listen(0, '127.0.0.1', resolve))
+  try {
+    const healPort = (healServer.address() as { port: number }).port
+    const healed = await explainWithMessages({ baseUrl: `http://127.0.0.1:${healPort}/v1`, model: 'fake-model', timings: true }, [{ role: 'user', content: '找找关键词' }])
+    assert.equal(healed.status, 'supported', '重答后应成功收场')
+    assert.ok(healed.text.includes('config.ts'), '重答的正常文本要交出来')
+    assert.ok(!healed.repetitionDetected, '自愈成功不留警报(true 才是犯病)')
+    assert.equal(healRound, 2, '第一遍掐了重答,第二遍才收工')
+    const antiBody = JSON.parse(healBodies[0] ?? '') as Record<string, unknown>
+    assert.equal(antiBody.repeat_penalty, 1.1, '内置引擎的请求要带 repeat_penalty')
+    assert.equal(antiBody.dry_multiplier, 0.8, '内置引擎的请求要带 dry_multiplier')
+
+    // 重答也犯:两遍全循环 → 截到打转起点,附人话注脚,绝不把一屏循环原样交出去;
+    // 外接引擎(没 timings)的请求体不带反重复参数
+    let plainRound = 0
+    const plainBodies: string[] = []
+    const alwaysServer = createServer((req, res) => {
+      let body = ''
+      req.on('data', (chunk: Buffer) => {
+        body += chunk.toString('utf8')
+      })
+      req.on('end', () => {
+        plainBodies.push(body)
+        plainRound += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ choices: [{ message: { content: `先定位关键词:${loopUnit.repeat(5)}` } }] }))
+      })
+    })
+    await new Promise<void>((resolve) => alwaysServer.listen(0, '127.0.0.1', resolve))
+    try {
+      const plainPort = (alwaysServer.address() as { port: number }).port
+      const hopeless = await explainWithMessages({ baseUrl: `http://127.0.0.1:${plainPort}/v1`, model: 'fake-model' }, [{ role: 'user', content: '找找关键词' }])
+      assert.equal(hopeless.status, 'supported', '截断交卷也是成功收场')
+      assert.ok(hopeless.text.includes('原地打转'), '要附人话注脚说明掐了打转部分')
+      assert.ok(hopeless.text.includes('先定位关键词:'), '开头正常部分要保住')
+      assert.ok(!hopeless.text.includes(`${loopUnit}${loopUnit}${loopUnit}`), '循环重复不能原样出现在交卷里')
+      const plainBody = JSON.parse(plainBodies[0] ?? '') as Record<string, unknown>
+      assert.equal(plainBody.repeat_penalty, undefined, '外接引擎的请求不带反重复参数')
+      assert.equal(plainRound, 2, '外接引擎同样走重答保险丝')
+    } finally {
+      await new Promise<void>((resolve) => alwaysServer.close(() => resolve()))
+    }
+  } finally {
+    await new Promise<void>((resolve) => healServer.close(() => resolve()))
+  }
+
+  // 15e. 流式保险丝端到端:循环帧当场掐流(触发帧不外推),收尾令发出,重答正常收场
+  let streamRound = 0
+  let resetCount = 0
+  const streamServer = createServer((_req, res) => {
+    streamRound += 1
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+    if (streamRound === 1) {
+      res.write('data: {"choices":[{"delta":{"content":"先定位关键词:"}}]}\n\n')
+      res.write(`data: {"choices":[{"delta":{"content":"${loopUnit.repeat(4)}${loopUnit}"}}]}\n\n`)
+    } else {
+      res.write('data: {"choices":[{"delta":{"content":"关键词都在 config.ts 里。"}}]}\n\n')
+    }
+    res.end('data: [DONE]\n\n')
+  })
+  await new Promise<void>((resolve) => streamServer.listen(0, '127.0.0.1', resolve))
+  try {
+    const streamPort = (streamServer.address() as { port: number }).port
+    const pieces: string[] = []
+    const streamHealed = await explainWithMessages(
+      { baseUrl: `http://127.0.0.1:${streamPort}/v1`, model: 'fake-model' },
+      [{ role: 'user', content: '找找关键词' }],
+      (t) => pieces.push(t),
+      undefined,
+      500,
+      {
+        onRestart: () => {
+          resetCount += 1
+        }
+      }
+    )
+    assert.equal(streamHealed.status, 'supported', '流式重答后应成功收场')
+    assert.ok(streamHealed.text.includes('config.ts'), '流式重答的正常文本要交出来')
+    assert.equal(resetCount, 1, '重答前要发一次收尾令')
+    assert.equal(streamRound, 2, '流式第一遍掐了重答,第二遍才收工')
+    assert.ok(!pieces.join('').includes(`${loopUnit}${loopUnit}${loopUnit}`), '触发帧之后的循环字不再往外推')
+  } finally {
+    await new Promise<void>((resolve) => streamServer.close(() => resolve()))
+  }
 
   console.log('✅ AI 人话解释自测全部通过')
 }

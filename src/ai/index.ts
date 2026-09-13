@@ -18,8 +18,9 @@ import type { AiUsage, AiStreamStats,
   WebLookupMeta
 } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
+import { detectRepetitionTail, truncateAtRepetition } from './repetition.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { AI_ANTI_REPEAT_PARAMS, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
 import { buildSummaryText } from '../shared/compact.ts'
 
@@ -1191,7 +1192,7 @@ export async function explainWithMessages(
   onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
   maxTokens = 500,
-  opts?: { allowThinking?: boolean }
+  opts?: { allowThinking?: boolean; /** 复读机重答前的收尾令(第一百四十三锤):聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const promptChars = messages.reduce((sum, m) => sum + m.content.length, 0)
@@ -1199,7 +1200,28 @@ export async function explainWithMessages(
     'request',
     `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}${opts?.allowThinking ? ' · 思考模式' : ''}`
   )
-  const result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
+  let result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
+  // 复读机保险丝(第一百四十三锤):模型嘴皮子抽筋了 —— 发收尾令收回已吐的字,重答一遍;
+  // 重答还犯就截到打转起点,附注脚交卷,绝不把一屏望不到头的循环原样递给用户
+  if (result.repetitionDetected) {
+    addDevLog('request', '复读机警报:回答在原地打转,掐掉重说一遍')
+    opts?.onRestart?.()
+    const retry = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
+    if (!retry.repetitionDetected) {
+      result = retry
+    } else {
+      addDevLog('request', '复读机警报:重说一回还在打转,截断交卷')
+      const body = (truncateAtRepetition(retry.text) ?? retry.text).trim()
+      result = {
+        ...retry,
+        text:
+          body === ''
+            ? '模型连着两回都说到一半原地打转 —— 换个问法重新问问看'
+            : `${body}\n\n(说到这儿开始原地打转,重说了一回也没绕出来,先把说完的交给你;建议换个问法重新问)`,
+        repetitionDetected: undefined
+      }
+    }
+  }
   const took = ((Date.now() - startedAt) / 1000).toFixed(1)
   if (result.status === 'supported') {
     const account = result.usage ? ` · ${formatUsage(result.usage)}` : ''
@@ -1245,6 +1267,9 @@ async function explainWithMessagesCore(
         model: config.model,
         messages,
         temperature: 0.2,
+        // 反重复采样(第一百四十三锤):复读机防线的引擎侧闸门,只对内置引擎发 ——
+        // 外接服务不认这些字段,不塞,行为一分不变
+        ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),
         max_tokens: maxTokens,
         stream: Boolean(onDelta),
         // 思考开关(第一百一十五锤):只对内置引擎发 —— 它认 chat_template_kwargs,
@@ -1303,16 +1328,33 @@ async function explainWithMessagesCore(
           usage
         }
       }
-      return { status: 'supported', text: content, reasoning: reasoningFull || undefined, model: config.model, durationMs: Date.now() - startedAt, usage }
+      // 非流式没有逐帧监工的机会,交卷前整篇查一次尾巴(第一百四十三锤):犯没犯都由上层定夺
+      return {
+        status: 'supported',
+        text: content,
+        reasoning: reasoningFull || undefined,
+        model: config.model,
+        durationMs: Date.now() - startedAt,
+        usage,
+        repetitionDetected: detectRepetitionTail(split.answer) !== null
+      }
     }
 
     // 流式:逐帧喂给 onDelta(正文 + 思考 + token 账),全文攒到最后一起返回。
     // 「没动静」的看守交棒给 sseEvents 自己(首帧/帧间两档);用户取消也由它插铃保底
     let lastStats: AiStreamStats | undefined
+    // 复读机监工(第一百四十三锤):尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
+    let looped = false
     clearTimeout(watchdog)
     for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
         full += ev.text
+        if (!looped && detectRepetitionTail(full)) {
+          looped = true
+          // abort 是把连接收干净(流没读完),犯没犯病由 looped 标记说话,不走报错
+          controller.abort()
+          break
+        }
       }
       if (ev.reasoning) {
         reasoningFull += ev.reasoning
@@ -1360,7 +1402,8 @@ async function explainWithMessagesCore(
       reasoning: reasoningFull || undefined,
       model: config.model,
       durationMs: Date.now() - startedAt,
-      usage
+      usage,
+      repetitionDetected: looped
     }
   } catch (err) {
     // 第八十五锤:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
@@ -1406,7 +1449,8 @@ export async function explainWithModel(
   system: string = SYSTEM_PROMPT,
   onDelta?: (text: string, stats?: AiStreamStats) => void,
   signal?: AbortSignal,
-  maxTokens = 500
+  maxTokens = 500,
+  opts?: { onRestart?: () => void }
 ): Promise<AiExplainResult> {
-  return explainWithMessages(config, [{ role: 'system', content: system }, { role: 'user', content: prompt }], onDelta, signal, maxTokens)
+  return explainWithMessages(config, [{ role: 'system', content: system }, { role: 'user', content: prompt }], onDelta, signal, maxTokens, opts)
 }

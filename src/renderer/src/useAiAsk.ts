@@ -39,6 +39,11 @@ export function useAiAsk(send: AiSendFn): {
   useEffect(() => {
     return window.atlas.onAiDelta((payload) => {
       if (!idRef.current || payload.id !== idRef.current) return
+      // 复读机重答的回滚令(第一百四十三锤):把已吐的字收回,等重答的字重新糊上来
+      if (payload.reset) {
+        setTurns((prev) => prev.map((t) => (t.state === 'busy' ? { ...t, text: '' } : t)))
+        return
+      }
       setTurns((prev) => prev.map((t) => (t.state === 'busy' ? { ...t, text: t.text + payload.text } : t)))
     })
   }, [])
