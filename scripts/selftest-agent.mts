@@ -32,7 +32,7 @@ import {
   toolCallKey,
   type AgentChatMessage
 } from '../src/ai/agent.ts'
-import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, sanitizeWebQuery } from '../src/ai/weblookup.ts'
+import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
 
 function main(): void {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
@@ -271,10 +271,21 @@ function main(): void {
   assert.equal(WEB_SEARCH_PAGE_COUNT, 2, 'web_search 默认抓两条正文')
   assert.ok(WEB_PAGE_TEXT_MAX_CHARS >= 500 && WEB_PAGE_TEXT_MAX_CHARS <= 1500, '每条正文的字数是个讲道理的数')
 
+  // ── 16b. 维基相关性把关(联网验收锤):弱关联垃圾不许截胡,真命中的放行 ──
+  const hit = (title: string, snippet: string): WebSearchHit => ({ title, snippet, url: 'https://x.wiki/a', source: '维基百科(zh)' })
+  assert.equal(wikiHitsRelevant('永结无间 卸载残留', [hit('WhatsApp', '即时通讯软件'), hit('糖果传奇', '休闲游戏')]), false, '查询词一段都对不上 = 弱关联垃圾,当没查到')
+  assert.equal(wikiHitsRelevant('永劫无间', [hit('永劫无间', '动作竞技游戏')]), true, '标题含查询词 = 相关,放行')
+  assert.equal(wikiHitsRelevant('永结无间 卸载残留', [hit('卸载', '软件卸载残留文件的清理方法')]), true, '多段查询只要有一段(「卸载残留」在摘要里)对上就算相关')
+  assert.equal(wikiHitsRelevant('visual studio code', [hit('Visual Studio Code', 'Microsoft editor')]), true, '英文对账不区分大小写')
+  assert.equal(wikiHitsRelevant('a b', [hit('随便什么', '完全无关')]), true, '没有 ≥2 字的可对账段:不把关,行为与从前一致')
+  assert.equal(wikiHitsRelevant('永劫无间', []), false, '没命中就是没查到')
+
   // ── 17. 上网守则:开了「联网查证」才垫的一段,教它查证、守隐私、防上当 ──
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
   assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('换词再查'), '要教模型结果不对路时换词重查')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
   assert.ok(!AGENT_ADDENDUM.includes('web_search'), '没开联网时守则不提 web_search:模型连有这工具都不该知道')
 

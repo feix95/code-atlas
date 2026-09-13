@@ -68,7 +68,25 @@ export interface WebSearchHit {
   source: string
 }
 
-/** 维基百科条目搜索(单语言):最多 3 条,链接按条目名拼出官方地址 */
+/**
+ * 维基命中的相关性把关(纯函数,自测覆盖):维基搜索是字面检索,操作性/组合
+ * 问题常配回一堆弱关联条目(问「永结无间 卸载残留」给你 WhatsApp 和糖果传奇),
+ * 而按序兜底的链条一看「有结果」就收工,真正能答的真搜索引擎轮不上场。把关
+ * 规则:查询按空格切段(≥2 字才算数),任何一段在任一命中的标题或摘要里出现
+ * 才算相关 —— 一段都对不上就当没查到,让后面的源接手。
+ * 只把关维基,不过问 DDG:DDG 是真搜索引擎,自带错别字纠错和相关性排序
+ * (搜「永结无间」会自动纠正成「永劫无间」,结果字面可能不含原词),程序再
+ * 拿原词对账反而会把好结果误杀。
+ */
+export function wikiHitsRelevant(query: string, hits: WebSearchHit[]): boolean {
+  if (hits.length === 0) return false
+  const segments = query.toLowerCase().split(/\s+/).map((s) => s.trim()).filter((s) => s.length >= 2)
+  if (segments.length === 0) return true // 没有可对账的段(比如光一个字),不把关
+  const hay = hits.map((h) => `${h.title} ${h.snippet}`.toLowerCase()).join('\n')
+  return segments.some((seg) => hay.includes(seg))
+}
+
+/** 维基百科条目搜索(单语言):最多 3 条,链接按条目名拼出官方地址;弱关联垃圾过不了相关性把关 */
 async function searchWikipediaHits(lang: string, query: string, fetchText: LookupTransport): Promise<WebSearchHit[]> {
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&format=json&utf8=1&srlimit=3` +
@@ -86,7 +104,7 @@ async function searchWikipediaHits(lang: string, query: string, fetchText: Looku
       source: `维基百科(${lang})`
     })
   }
-  return out
+  return wikiHitsRelevant(query, out) ? out : []
 }
 
 /** DuckDuckGo 的跳转壳链接里剥出真实地址(//duckduckgo.com/l/?uddg=<编码后的真链接>),剥不出就当无效 */
