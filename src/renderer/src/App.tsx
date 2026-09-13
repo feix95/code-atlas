@@ -8,7 +8,6 @@ import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
 import { FileOverview } from './components/FileOverview'
-import { FileRelations } from './components/FileRelations'
 import { FilePathMenu } from './components/FilePathMenu'
 import { openFilePathMenuFor } from './components/filePathMenuStore'
 import { FileTree } from './components/FileTree'
@@ -46,13 +45,14 @@ function driveCapacity(d: DriveInfo): string {
   return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
-// 文件详情的三个 Tab(第一百零五锤:修改建议退役,结构与关系并成一栏垫底)
+// 文件详情的三个 Tab(第一百零五锤:修改建议退役,结构与关系并成一栏;
+// 关系后搬进概览(小葵拍板:垫底的 Tab 曝光率太低,好功能得摆在默认页)
 type DetailTab = 'overview' | 'structure' | 'chat'
 
 const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '概览' },
   { key: 'chat', label: 'Atlas 小探针' },
-  { key: 'structure', label: '结构与关系' }
+  { key: 'structure', label: '结构' }
 ]
 
 const FOLDER_TABS: Array<{ key: DetailTab; label: string }> = [
@@ -1373,8 +1373,12 @@ function FileDetailView({
             analyzing={analyzing}
             analyzeNote={analyzeNote}
             graph={graph}
+            graphLoading={graphLoading}
+            graphNote={graphNote}
+            onLoadGraph={onLoadGraph}
             ai={ai}
             onGoChat={() => onTabChange('chat')}
+            onJump={onJump}
           />
         )}
         {activeTab === 'structure' && (
@@ -1388,25 +1392,6 @@ function FileDetailView({
             {!analyzing && analyzeNote?.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
             {!analyzing && analyzeNote?.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
             {!analyzing && structure && <StructureGrid structure={structure} />}
-            <div className="section-label">
-              关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
-            </div>
-            {graph ? (
-              <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
-            ) : graphLoading ? (
-              <div className="card-waiting">
-                <ProgressDots />
-                正在连线……
-              </div>
-            ) : (
-              <div className="card-waiting">
-                还没分析过文件关系。
-                <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
-                  分析文件关系
-                </button>
-                {graphNote && <Notice kind="error">{graphNote}</Notice>}
-              </div>
-            )}
           </>
         )}
       </div>

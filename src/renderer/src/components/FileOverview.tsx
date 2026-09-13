@@ -1,12 +1,15 @@
 import type { DepGraphResult, FileStructure, ScanFileNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
 import type { AiAssistApi } from '../useAiAsk'
+import { FileRelations } from './FileRelations'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
 /**
  * 文件「概览」Tab:全是选中那一下就到手的静态信息(结构统计、关系数字),
  * 一眼能看懂这文件是干嘛的;AI 卡片只给入口,不自动开跑。
+ * 文件关系也住在最下面(小葵拍板:原先垫底的「结构与关系」Tab 曝光率太低,
+ * 搬进默认页,能看到的就有);全项目连线是重活,第一次点按钮才分析,一次全会话记账。
  */
 export function FileOverview({
   file,
@@ -16,8 +19,12 @@ export function FileOverview({
   analyzing,
   analyzeNote,
   graph,
+  graphLoading,
+  graphNote,
+  onLoadGraph,
   ai,
-  onGoChat
+  onGoChat,
+  onJump
 }: {
   file: ScanFileNode
   /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
@@ -28,9 +35,15 @@ export function FileOverview({
   analyzing: boolean
   analyzeNote: { text: string; kind: 'info' | 'error' } | null
   graph: DepGraphResult | null
+  graphLoading: boolean
+  graphNote: string | null
+  /** 关系还没分析过时,点按钮跑全项目连线分析 */
+  onLoadGraph: () => void
   ai: AiAssistApi
   /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
   onGoChat?: () => void
+  /** 关系里点文件跳转(保持当前 Tab,顺着关系链看) */
+  onJump: (relPath: string) => void
 }): React.JSX.Element {
   const relNode = graph?.nodes.find((n) => n.relPath === file.relPath)
   const count = (arr: string[] | undefined): number => arr?.length ?? 0
@@ -103,6 +116,26 @@ export function FileOverview({
         mainLabel="解释这个文件"
         onGoChat={onGoChat}
       />
+
+      <div className="section-label">
+        文件关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
+      </div>
+      {graph ? (
+        <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
+      ) : graphLoading ? (
+        <div className="card-waiting">
+          <ProgressDots />
+          正在连线……
+        </div>
+      ) : (
+        <div className="card-waiting">
+          还没分析过文件关系。
+          <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
+            分析文件关系
+          </button>
+          {graphNote && <Notice kind="error">{graphNote}</Notice>}
+        </div>
+      )}
     </>
   )
 }
