@@ -682,13 +682,24 @@ body.is-maximized .traffic-lights .is-max i::after {
 
 /* 正文区:行号钉在左边不跟横向滚动跑,纵横向都自己滚 */
 .code-view {
-  display: flex;
-  align-items: flex-start;
   min-height: 0;
   flex: 1;
   overflow: auto;
   padding: var(--space-3) 0 var(--space-4);
   background: var(--surface);
+}
+
+/* 虚拟滚动(全文预览这锤):轨道撑出全文行程(高度由组件按 总行数×行高 算),
+   可视段(.code-row)整体平移到滚动位置 —— 元素永远只有一屏,滚动条是全文的 */
+.code-track {
+  position: relative;
+  min-width: max-content;
+}
+
+.code-row {
+  display: flex;
+  align-items: flex-start;
+  will-change: transform;
 }
 
 .code-gutter,

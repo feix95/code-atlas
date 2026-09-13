@@ -1198,14 +1198,13 @@ function registerIpc(): void {
     const name = relPath.split('/').pop() ?? relPath
     // 后缀一看就是二进制/媒体的,连读都不用读
     if (isBinaryFile(name)) {
-      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这是二进制或媒体文件,里面没有能当文本看的字;想了解它的话,右栏的小探针可以按类型给你讲' }
+      return { status: 'binary', text: '', totalLines: 0, reason: '这是二进制或媒体文件,里面没有能当文本看的字;想了解它的话,右栏的小探针可以按类型给你讲' }
     }
     if (stat.size > PREVIEW_MAX_BYTES) {
       return {
         status: 'too-big',
         text: '',
         totalLines: 0,
-        truncated: false,
         reason: `这个文件有 ${formatSize(stat.size)},太大了,预览只伺候 ${formatSize(PREVIEW_MAX_BYTES)} 以内的文本`
       }
     }
@@ -1215,10 +1214,10 @@ function registerIpc(): void {
     })
     // 后缀骗人的(改名的二进制)在这儿补一道:开头有 NUL 字节就不是文本
     if (looksBinary(buf.subarray(0, 8192))) {
-      return { status: 'binary', text: '', totalLines: 0, truncated: false, reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了' }
+      return { status: 'binary', text: '', totalLines: 0, reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了' }
     }
     const clip = clipPreview(buf.toString('utf8'))
-    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, truncated: clip.truncated, reason: '' }
+    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, reason: '' }
   })
 
   // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot

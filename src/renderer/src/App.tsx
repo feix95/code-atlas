@@ -632,7 +632,7 @@ function App(): React.JSX.Element {
         chat.note(res.reason)
         return
       }
-      const plan = planWholeFileRef({ text: res.text, refLimit: CODE_REFS_MAX, canAddRef: true, previewTruncated: res.truncated })
+      const plan = planWholeFileRef({ text: res.text, refLimit: CODE_REFS_MAX, canAddRef: true })
       if (plan.code.trim() === '') {
         chat.note('这个文件是空的,挂了也没东西可讲')
         return

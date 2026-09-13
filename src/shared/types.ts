@@ -495,12 +495,10 @@ export interface FeatureLocateResult {
  */
 export interface FilePreviewResult {
   status: 'ok' | 'binary' | 'too-big'
-  /** status='ok' 时的正文(可能被截断) */
+  /** status='ok' 时的正文(全文,只做过换行归一) */
   text: string
-  /** 文件真实总行数(ok 时才有;截断时拿它对账「只载入了前 N 行」) */
+  /** 文件真实总行数(ok 时才有) */
   totalLines: number
-  /** 正文被截断过(行数或字数触顶) */
-  truncated: boolean
   /** 不是 ok 时的原因(人话) */
   reason: string
 }
