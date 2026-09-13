@@ -1007,6 +1007,7 @@ function App(): React.JSX.Element {
                 onRemoveRef={removePreviewRef}
                 onDropNode={handleDropNode}
                 suggestionsOn={chatSuggestionsOn}
+                fileLinks={fileLinks}
               />
             ) : selectedFolder && result ? (
               <FolderDetailView
