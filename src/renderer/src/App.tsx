@@ -853,9 +853,10 @@ function App(): React.JSX.Element {
               不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
             {preview ? (
-              // 预览模式:左栏整扇换成只读文本窗(退出预览才回到目录树)
+              // 预览模式:左栏整扇换成只读文本窗(退出预览才回到目录树)。
+              // 不再挂 key={relPath} 强制重挂:换文件的复位(内容/选区/滚动位)由
+              // 组件自己按文件名记账,省掉整棵树拆了重装的开销(隐身案这锤)
               <CodePreview
-                key={preview.relPath}
                 rootPath={result.rootPath}
                 file={preview}
                 canAddRef={previewRefs.length < CODE_REFS_MAX}

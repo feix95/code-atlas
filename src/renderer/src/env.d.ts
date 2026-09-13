@@ -91,6 +91,8 @@ declare global {
       onRendererRevived: (callback: () => void) => () => void
       /** 报错小纸条:渲染层抓到的 JS 错误送进后台账本 */
       reportRendererError: (text: string) => void
+      /** 画面心跳(救生圈2.0):rAF 每秒报一跳;窗露着心跳停了,主进程自动重挂救命 */
+      frameHeartbeat: () => void
       /** Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 */
       devLogsPull: () => Promise<DevLogEntry[]>
       devLogsClear: () => Promise<void>

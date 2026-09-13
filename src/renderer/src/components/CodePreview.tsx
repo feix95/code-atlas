@@ -55,35 +55,61 @@ export function CodePreview({
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
 }): React.JSX.Element {
-  const [result, setResult] = useState<FilePreviewResult | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [sel, setSel] = useState<Selection | null>(null)
-  // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
-  const [showButton, setShowButton] = useState(false)
-  const [added, setAdded] = useState(false)
   const codeTextRef = useRef<HTMLPreElement>(null)
   const codeViewRef = useRef<HTMLDivElement>(null)
+  // ── 换文件就地复位(隐身案这锤):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
+  //    所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂,绝不串台 ──
+  /** 读文件这笔账:读到什么/出什么错,记在哪个文件名下 */
+  const [loadedAt, setLoadedAt] = useState<{ file: string; result: FilePreviewResult | null; err: string | null }>({
+    file: '',
+    result: null,
+    err: null
+  })
+  const result = loadedAt.file === file.relPath ? loadedAt.result : null
+  const err = loadedAt.file === file.relPath ? loadedAt.err : null
+  /** 选区记号:选了哪段,记在哪个文件上 */
+  const [selAt, setSelAt] = useState<{ file: string; sel: Selection | null }>({ file: '', sel: null })
+  const sel = selAt.file === file.relPath ? selAt.sel : null
+  /** 三个一闪而过的小开关(浮钮/已引用/已复制)共用一本账 */
+  const [uiAt, setUiAt] = useState<{ file: string; showButton: boolean; added: boolean; copiedAll: boolean }>({
+    file: '',
+    showButton: false,
+    added: false,
+    copiedAll: false
+  })
+  // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
+  const showButton = uiAt.file === file.relPath && uiAt.showButton
+  const added = uiAt.file === file.relPath && uiAt.added
+  const copiedAll = uiAt.file === file.relPath && uiAt.copiedAll
+  /** 改小开关:只动当前文件的账;换了文件才姗姗来迟的开关(迟到定时器),当没看见 */
+  const patchUi = useCallback(
+    (patch: Partial<{ showButton: boolean; added: boolean; copiedAll: boolean }>): void => {
+      setUiAt((prev) => (prev.file === file.relPath ? { ...prev, ...patch } : prev))
+    },
+    [file.relPath]
+  )
   // ── 虚拟滚动(全文预览这锤):全文在手,画面只画可视区那一截 ──
   const [lineHeight, setLineHeight] = useState(20)
-  const [scrollTop, setScrollTop] = useState(0)
+  /** 滚动位滚到哪儿,记在哪份文件名下:换文件自动回楼顶 */
+  const [scrollAt, setScrollAt] = useState<{ file: string; top: number }>({ file: '', top: 0 })
+  const scrollTop = scrollAt.file === file.relPath ? scrollAt.top : 0
   const [viewportHeight, setViewportHeight] = useState(0)
-  const [copiedAll, setCopiedAll] = useState(false)
   const scrollRafRef = useRef(0)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // 可视区第一行的行号:选区行号 = 这一行 + 选区里的换行数(划中的行号报真号)
   const chunkBaseRef = useRef(1)
 
-  // 组件按 relPath 挂 key:换文件 = 重挂,旧文件的内容不会串到新文件头上
+  // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事。
+  // 账记在文件名下:新文件还没回话时,旧文件的内容一秒都不冒名顶替
   useEffect(() => {
     let alive = true
-    // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事
     window.atlas
       .readPreview(rootPath, file.relPath)
       .then((res) => {
-        if (alive) setResult(res)
+        if (alive) setLoadedAt({ file: file.relPath, result: res, err: null })
       })
       .catch((e) => {
-        if (alive) setErr(friendlyErr(e))
+        if (alive) setLoadedAt({ file: file.relPath, result: null, err: friendlyErr(e) })
       })
     return () => {
       alive = false
@@ -125,9 +151,9 @@ export function CodePreview({
     if (scrollRafRef.current !== 0) return
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = 0
-      setScrollTop(codeViewRef.current?.scrollTop ?? 0)
+      setScrollAt({ file: file.relPath, top: codeViewRef.current?.scrollTop ?? 0 })
     })
-  }, [])
+  }, [file.relPath])
   useEffect(
     () => () => {
       if (scrollRafRef.current !== 0) cancelAnimationFrame(scrollRafRef.current)
@@ -139,12 +165,17 @@ export function CodePreview({
   // 聊天文件链接点的跳行:正文载入后滚到目标行。行号是模型报的,只能信个大概 ——
   // 超出文件就夹到最后一行,负数夹回第一行,最坏结果是停在文件尾,绝不是红字报错。
   // 目标行落在视口上三分之一,让眼睛先看到它上面的东西(它在讲哪段代码,有上下文)。
+  // 下一帧再动身:换文件头一帧新轨道还没立稳,当场写滚动位会被旧高度夹住、落点差一截;
+  // 等浏览器把新文件的布局铺好再滚,一步到位(外援建议,这锤采纳)
   useEffect(() => {
-    if (!jump || result?.status !== 'ok') return
-    const view = codeViewRef.current
-    if (!view || total === 0) return
-    const target = Math.min(Math.max(jump.line, 1), total)
-    view.scrollTop = Math.max(0, (target - 1) * lineHeight - view.clientHeight / 3)
+    if (!jump || result?.status !== 'ok' || total === 0) return
+    const raf = requestAnimationFrame(() => {
+      const el = codeViewRef.current
+      if (!el) return
+      const target = Math.min(Math.max(jump.line, 1), total)
+      el.scrollTop = Math.max(0, (target - 1) * lineHeight - el.clientHeight / 3)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [jump, result, total, lineHeight])
 
   // 该画哪几行(纯函数) + 这一段的正文和行号格子;轨道总高 = 总行数 × 行高,滚动条行程是全文的
@@ -199,19 +230,19 @@ export function CodePreview({
    */
   const followSelection = useCallback((): Selection | null => {
     const next = computeSelection()
-    setSel(next)
+    setSelAt({ file: file.relPath, sel: next })
     return next
-  }, [computeSelection])
+  }, [computeSelection, file.relPath])
 
   // 选区一变就重画记号;选区没了,浮钮也跟着收
   useEffect(() => {
     if (result?.status !== 'ok') return
     const onSelectionChange = (): void => {
-      if (followSelection() === null) setShowButton(false)
+      if (followSelection() === null) patchUi({ showButton: false })
     }
     document.addEventListener('selectionchange', onSelectionChange)
     return () => document.removeEventListener('selectionchange', onSelectionChange)
-  }, [result, followSelection])
+  }, [result, followSelection, patchUi])
 
   // 滚动/改窗口大小会让视口坐标失效:重算落点,只在整个选区滚出视野时才收起来。
   // (只挪记号,不动浮钮的露脸状态 —— 滚一下不该把它收了。)
@@ -220,7 +251,7 @@ export function CodePreview({
     let frame = 0
     const reposition = (): void => {
       frame = 0
-      if (followSelection() === null) setShowButton(false)
+      if (followSelection() === null) patchUi({ showButton: false })
     }
     const schedule = (): void => {
       if (frame === 0) frame = requestAnimationFrame(reposition)
@@ -232,7 +263,7 @@ export function CodePreview({
       window.removeEventListener('resize', schedule)
       view?.removeEventListener('scroll', schedule)
     }
-  }, [result, followSelection])
+  }, [result, followSelection, patchUi])
 
   // 选完才算数:鼠标松开、或键盘选完(shift+方向键抬手),这时才把浮钮请出来。
   // 捕获阶段听:鼠标在哪儿松开都收得到(拖到隔壁聊天区放手,也算选完了)。
@@ -242,10 +273,10 @@ export function CodePreview({
       // 点在浮钮自己身上不算「开始新选区」—— 否则它会在 click 之前先消失,点了没反应
       const target = e.target as HTMLElement | null
       if (target?.closest?.('.code-select-btn')) return
-      setShowButton(false)
+      patchUi({ showButton: false })
     }
     const onDone = (): void => {
-      if (followSelection() !== null) setShowButton(true)
+      if (followSelection() !== null) patchUi({ showButton: true })
     }
     window.addEventListener('pointerdown', onPointerDown, true)
     window.addEventListener('pointerup', onDone, true)
@@ -255,7 +286,7 @@ export function CodePreview({
       window.removeEventListener('pointerup', onDone, true)
       window.removeEventListener('keyup', onDone, true)
     }
-  }, [result, followSelection])
+  }, [result, followSelection, patchUi])
 
   /**
    * Ctrl+A 复制全文(全文预览这锤):虚拟滚动后元素里只有一屏,浏览器的「全选」最多
@@ -264,7 +295,7 @@ export function CodePreview({
    */
   function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
     if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') {
-      setShowButton(false) // 键盘一动手先把旧浮钮收起来,选完(keyup)再重新露脸
+      patchUi({ showButton: false }) // 键盘一动手先把旧浮钮收起来,选完(keyup)再重新露脸
       return
     }
     const target = e.target as HTMLElement
@@ -274,9 +305,9 @@ export function CodePreview({
     void navigator.clipboard
       .writeText(text)
       .then(() => {
-        setCopiedAll(true)
+        patchUi({ copiedAll: true })
         if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-        copiedTimerRef.current = setTimeout(() => setCopiedAll(false), 2000)
+        copiedTimerRef.current = setTimeout(() => patchUi({ copiedAll: false }), 2000)
       })
       .catch(() => {})
   }
@@ -295,8 +326,8 @@ export function CodePreview({
       endLine: wholeRef.endLine,
       code: wholeRef.code
     })
-    setAdded(true)
-    window.setTimeout(() => setAdded(false), 1000)
+    patchUi({ added: true })
+    window.setTimeout(() => patchUi({ added: false }), 1000)
   }
 
   const label = sel
@@ -396,8 +427,8 @@ export function CodePreview({
           onClick={() => {
             onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
             window.getSelection()?.removeAllRanges()
-            setSel(null)
-            setShowButton(false)
+            setSelAt({ file: file.relPath, sel: null })
+            patchUi({ showButton: false })
           }}
         >
           {label}

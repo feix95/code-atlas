@@ -606,12 +606,49 @@ function createWindow(): void {
     if (mainWindow.isDestroyed() || mainWindow.isMinimized() || !mainWindow.isVisible()) return
     mainWindow.webContents.invalidate()
   }, 5_000)
-  // 手动拉起(保底):万一还是隐身了,按 Ctrl+Alt+0,主进程把窗重画 + 藏了再亮一遍。
-  // 不重载页面 —— 聊天记录一条不丢。
+  // ── 救生圈 2.0(第五案实测定性后立):隐身的真身是「渲染进程活着,画面管线却永久
+  // 停摆」——实测这种状态下重画/藏亮/改尺寸全都叫不醒,唯一有效的解药是整页重挂
+  // (重载后画面 100% 复活)。所以不再干等它自己醒:渲染层用 rAF 每秒报一跳
+  // 「画面循环还在转」;窗明明露着、心跳却停了 10 秒以上,主进程直接 reload 重挂管线,
+  // 自动满血,不用小葵按任何键。心跳同时是常驻取证:rAF 停没停,后台账本里看得见。
+  // 只认主窗发的跳(日志窗共用同一个渲染入口,别让它替主窗保平安)。
+  let lastFrameBeat = Date.now()
+  const onFrameBeat = (event: Electron.IpcMainEvent): void => {
+    if (!mainWindow.isDestroyed() && event.sender === mainWindow.webContents) lastFrameBeat = Date.now()
+  }
+  ipcMain.on('atlas:frame-heartbeat', onFrameBeat)
+  const frameBeatWatchdog = setInterval(() => {
+    if (mainWindow.isDestroyed() || mainWindow.isMinimized() || !mainWindow.isVisible()) return
+    const gap = Date.now() - lastFrameBeat
+    if (gap <= 10_000) return
+    console.log(`[window] 画面心跳停了 ${gap}ms,自动整页重挂(救生圈2.0)`)
+    addDevLog('system', `画面管线停了约 ${Math.round(gap / 1000)} 秒,已自动重挂救回 —— 刚才没聊完的内容没能保住,抱歉`)
+    revivePending = true
+    lastFrameBeat = Date.now() // 重挂期间先续上账,免得看门狗连开两枪
+    mainWindow.webContents.reload()
+  }, 3_000)
+  // 手动拉起(保底,两段式):第一按还是无损那套(重画 + 藏了再亮,聊天记录不丢);
+  // 3 秒内连按第二下 = 无损招数全试过还没亮,直接整页重挂保命(实测唯一解药)。
+  let hotkeyArmed = false
+  let hotkeyArmTimer: NodeJS.Timeout | null = null
   globalShortcut.register('CommandOrControl+Alt+0', () => {
     if (mainWindow.isDestroyed()) return
-    console.log('[window] 手动拉起画面(Ctrl+Alt+0)')
-    addDevLog('system', '手动拉起画面(Ctrl+Alt+0)')
+    if (hotkeyArmed) {
+      if (hotkeyArmTimer) clearTimeout(hotkeyArmTimer)
+      hotkeyArmed = false
+      console.log('[window] 手动拉起第二按:整页重挂保命(Ctrl+Alt+0 ×2)')
+      addDevLog('system', '手动拉起第二按:整页重挂保命(Ctrl+Alt+0 ×2)')
+      revivePending = true
+      mainWindow.webContents.reload()
+      return
+    }
+    hotkeyArmed = true
+    if (hotkeyArmTimer) clearTimeout(hotkeyArmTimer)
+    hotkeyArmTimer = setTimeout(() => {
+      hotkeyArmed = false
+    }, 3_000)
+    console.log('[window] 手动拉起画面(Ctrl+Alt+0;还不亮就 3 秒内再按一次整页重挂)')
+    addDevLog('system', '手动拉起画面(Ctrl+Alt+0;画面还是不亮的话,3 秒内再按一次整页重挂)')
     mainWindow.webContents.invalidate()
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -623,6 +660,9 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     clearInterval(modelStatusTimer)
     clearInterval(repaintHeartbeat)
+    clearInterval(frameBeatWatchdog)
+    ipcMain.removeListener('atlas:frame-heartbeat', onFrameBeat)
+    if (hotkeyArmTimer) clearTimeout(hotkeyArmTimer)
     globalShortcut.unregister('CommandOrControl+Alt+0')
     // 主窗走了,Developer 日志窗没有独活的意义:一起带走,应用照常退出
     if (devLogWindow && !devLogWindow.isDestroyed()) devLogWindow.close()

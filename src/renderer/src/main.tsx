@@ -18,9 +18,24 @@ window.addEventListener('error', (e) => {
   window.atlas?.reportRendererError(`${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`)
 })
 window.addEventListener('unhandledrejection', (e) => {
-  const reason = e.reason instanceof Error ? `${e.reason.name}: ${e.reason.message}` : String(e.reason)
+  const reason = e.reason instanceof Error ? `${e.reason.name}:${e.reason.message}` : String(e.reason)
   window.atlas?.reportRendererError(`未兑现的承诺:${reason}`)
 })
+
+// 画面心跳(救生圈2.0):rAF 每秒向主进程报一跳「画面循环还在转」。隐身案实测定性 ——
+// 渲染进程活着但画面管线停摆时,外面的任何抢救都叫不醒,只有整页重挂能救;主进程就靠
+// 这跳判断何时动手。日志窗(?view=devlogs)不掺和,主进程那边也只认主窗的跳。
+if (view !== 'devlogs') {
+  let lastBeat = 0
+  const beat = (t: number): void => {
+    if (t - lastBeat >= 1000) {
+      lastBeat = t
+      window.atlas?.frameHeartbeat()
+    }
+    requestAnimationFrame(beat)
+  }
+  requestAnimationFrame(beat)
+}
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

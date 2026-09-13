@@ -164,6 +164,10 @@ contextBridge.exposeInMainWorld('atlas', {
   reportRendererError: (text: string): void => {
     ipcRenderer.send('atlas:renderer-error', text)
   },
+  /** 画面心跳(救生圈2.0):rAF 每秒报一跳「画面循环还在转」;窗露着心跳却停了,主进程自动重挂救命 */
+  frameHeartbeat: (): void => {
+    ipcRenderer.send('atlas:frame-heartbeat')
+  },
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),

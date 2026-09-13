@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type FormEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
@@ -96,15 +96,21 @@ function ThinkingBlock({ reasoning, busy }: { reasoning: string; busy: boolean }
   )
 }
 
-function AssistantBubble({
+// 回答气泡上 memo(隐身案这锤):流式输出每补一段字,消息区就重画一次;气泡不 memo,
+// 旧消息全量陪跑,聊得越久越沉。memo 生效的前提是 props 身份稳定 —— msg 是消息对象
+// 本身(流式只换正在写的那条,旧的不动)、onRetry 由父层用 ref 稳住、fileLinks 同理。
+const AssistantBubble = memo(function AssistantBubble({
   msg,
   canRetry,
+  retryIndex,
   onRetry,
   fileLinks
 }: {
   msg: ChatMessage
   canRetry?: boolean
-  onRetry?: () => void
+  /** 重试按钮回传自己在消息列表里的座位号,回调本体在父层一个身份用到底 */
+  retryIndex: number
+  onRetry?: (idx: number) => void
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const label = webLabel(msg.web)
@@ -136,7 +142,7 @@ function AssistantBubble({
         <TreeIcon name="copy" size={13} />
       </button>
       {canRetry && onRetry && (
-        <button type="button" className="msg-action" onClick={onRetry} aria-label="重试生成" title="重试">
+        <button type="button" className="msg-action" onClick={() => onRetry(retryIndex)} aria-label="重试生成" title="重试">
           <IconRefresh size={13} />
         </button>
       )}
@@ -177,7 +183,7 @@ function AssistantBubble({
       )}
     </div>
   )
-}
+})
 
 export function FreeChatPanel({
   chat,
@@ -259,6 +265,38 @@ export function FreeChatPanel({
     atBottomRef.current = true
     setShowJump(false)
   }
+
+  // 重试回调的稳定三件套(隐身案这锤):消息列表、发话器、回底函数每轮渲染都是新身份,
+  // 直接进闭包的话,每条气泡拿到的 onRetry 都不一样,刚上的 memo 当场破功 —— 请进 ref,
+  // retryFrom 从此一个身份用到底。
+  const retryCtxRef = useRef({ messages: chat.messages, send: chat.send, forceBottom })
+  useEffect(() => {
+    retryCtxRef.current = { messages: chat.messages, send: chat.send, forceBottom }
+  })
+  const retryFrom = useCallback((idx: number): void => {
+    const { messages, send, forceBottom: fb } = retryCtxRef.current
+    // 重答的应该是最新这个问题:从这条回答往前找最近的用户提问,引用原样带上再问一遍
+    let prev: ChatMessage | undefined
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        prev = messages[i]
+        break
+      }
+    }
+    if (!prev) return
+    fb()
+    send(prev.text || REF_ONLY_QUESTION, prev.refs)
+  }, [])
+
+  // 重试只挂在最后一条回答上,历史回答不翻烧饼。这份账一轮渲染算一次 —— 原先写在
+  // map 里,每条消息都把整个数组复制一遍倒着找,消息一多、流式一刷就是 O(n²),
+  // 聊久了主线程越扛越沉(外援指认的沉疴,这锤拆掉)
+  const lastAssistantKey = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      if (chat.messages[i].role === 'assistant') return chat.messages[i].key
+    }
+    return undefined
+  }, [chat.messages])
 
   // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就让箭头 key 变一变、蹦一下
   useEffect(() => {
@@ -445,22 +483,14 @@ export function FreeChatPanel({
                   </div>
                 )
               }
-              // 重试只挂在最后一条回答上:重答的应该是最新这个问题,历史回答不翻烧饼
-              const lastAssistantKey = [...chat.messages].reverse().find((x) => x.role === 'assistant')?.key
               return (
                 <AssistantBubble
                   key={m.key}
                   msg={m}
                   canRetry={m.key === lastAssistantKey && !chat.busy}
+                  retryIndex={idx}
+                  onRetry={retryFrom}
                   fileLinks={fileLinks}
-                  onRetry={() => {
-                    const prev = [...chat.messages].slice(0, idx).reverse().find((x) => x.role === 'user')
-                    if (prev) {
-                      forceBottom()
-                      // 重试要把这轮的引用原样带上,不然重答的就不是同一道题了
-                      chat.send(prev.text || REF_ONLY_QUESTION, prev.refs)
-                    }
-                  }}
                 />
               )
             })
