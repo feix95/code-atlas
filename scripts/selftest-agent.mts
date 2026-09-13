@@ -11,20 +11,27 @@ import {
   AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
+  AGENT_SEARCH_MAX_PATH_HITS,
   AGENT_TOOLS,
   AGENT_TOOLS_LOCAL,
   AGENT_WEB_ADDENDUM,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
+  SALVAGE_CITE_NUDGE,
+  SALVAGE_NUDGE_MAX,
+  SALVAGE_SEARCH_NUDGE,
   agentPromptBudget,
   agentReadChars,
   agentStepText,
+  answerCitesAnyHit,
   assembleToolCalls,
   buildAgentReminder,
   compressAgentMessages,
   emergencySlim,
   estimateMessagesTokens,
   extractToolCalls,
+  findAnswerGap,
+  isFindQuestion,
   looksLikeToolsUnsupported,
   mergeUsage,
   parseToolArgs,
@@ -334,7 +341,39 @@ function main(): void {
   const slimmedNoSystem = emergencySlim(noSystem)
   assert.ok(slimmedNoSystem && slimmedNoSystem.messages.length === 1 && slimmedNoSystem.messages[0].role === 'user', '没有 system 也照裁:不硬造 system')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 全部通过')
+  // ── 20. 质检闸(救敷衍):找位置题不搜不交卷、搜到不引用也拦 ──
+  assert.equal(isFindQuestion('找找我的 skills 都安装在哪了'), true, '「找找+在哪」= 找位置题')
+  assert.equal(isFindQuestion('我的 skills 都安装在哪了'), true, '光「在哪」也算找位置题')
+  assert.equal(isFindQuestion('Where are my skills installed'), true, '英文 where 也认(大小写放平)')
+  assert.equal(isFindQuestion('帮我卸载永劫无间'), false, '操作题不是找位置题,闸不多管闲事')
+  assert.equal(isFindQuestion('Rust 是什么'), false, '概念题不拦')
+  assert.equal(isFindQuestion('这个项目用什么语言写的'), false, '泛泛的问话不误伤')
+
+  assert.equal(answerCitesAnyHit('你装的 skills 在 node_modules/foo-skill/package.json 里', ['node_modules/foo-skill/package.json']), true, '答案引用了命中路径 = 有具体文件')
+  assert.equal(answerCitesAnyHit('大概在 node_modules\\foo-skill 这个文件夹', ['node_modules/foo-skill/package.json']), false, '只报文件夹没到文件 = 没引用')
+  assert.equal(answerCitesAnyHit('答案里写 src/other.ts', ['node_modules/foo-skill/package.json']), false, '引用的是没搜到的路径 = 对不上账,算没引用')
+  assert.equal(answerCitesAnyHit('在 a/B.ts:12 那行', ['a/b.ts']), true, '带行号的引用也算(大小写/行号后缀不碍事)')
+
+  assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: false, hitPaths: [], answer: 'skills 在 xxx 文件夹' }), 'no-search', '判据一:没搜过就交卷,拦')
+  assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: false, hitPaths: [], answer: '' }), 'no-search', '判据一不看答案内容:没搜就是没搜')
+  assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: true, hitPaths: [], answer: '搜了没找着,真没有' }), null, '搜了颗粒无收 = 合法的「真没有」,放行')
+  assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: true, hitPaths: ['a/b.ts'], answer: '在 a/b.ts 第 3 行' }), null, '判据二:答案引用了命中文件,放行')
+  assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: true, hitPaths: ['a/b.ts'], answer: '在 a 文件夹里' }), 'no-files', '判据二:搜到了却只报文件夹,拦')
+  assert.equal(findAnswerGap({ isFindQuestion: false, searchUsed: false, hitPaths: [], answer: '随便答' }), null, '不是找位置题,闸不拦')
+  assert.ok(SALVAGE_SEARCH_NUDGE.includes('search_content') && SALVAGE_SEARCH_NUDGE.includes('真没有'), '判据一的提醒要点名工具、许它说真没有')
+  assert.ok(SALVAGE_CITE_NUDGE.includes('具体文件'), '判据二的提醒要逼到具体文件')
+  assert.ok(SALVAGE_NUDGE_MAX === 2, '补救提醒封顶两次,不无限跟它耗')
+
+  // ── 21. 守则三步 SOP + 工具说明的新口风 ──
+  assert.ok(AGENT_ADDENDUM.includes('固定三步走'), '守则要写固定流程,不靠 9B 临场发挥')
+  assert.ok(AGENT_ADDENDUM.includes('验货'), 'SOP 第二步要进去验货,不是看名字像就算')
+  assert.ok(AGENT_ADDENDUM.includes('只有文件夹没有文件 = 还没查完'), '验收判据要量化:没到文件不算查完')
+  assert.ok(!AGENT_ADDENDUM.includes('web_search'), '新守则段落照旧不提 web_search:没开联网时模型不该知道')
+  assert.ok(searchTool.function.description.includes('路径'), 'search_content 说明要点明文件路径也搜')
+  assert.ok(searchTool.function.description.includes('光看文件夹名字不算'), '说明里把「光看文件夹名不算找过」写死')
+  assert.ok(AGENT_SEARCH_MAX_PATH_HITS >= 5 && AGENT_SEARCH_MAX_PATH_HITS <= 50, '路径命中封顶是个讲道理的数,不许一窝蜂挤掉内容命中')
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸与三步 SOP 全部通过')
 }
 
 main()

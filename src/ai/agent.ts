@@ -19,9 +19,12 @@ export const AGENT_MAX_ROUNDS = 8
 /** list_files 名单条数封顶:名字虽便宜,C 盘级别的目录也不能真全列 */
 export const AGENT_LIST_MAX_ENTRIES = 400
 
-/** search_content 的缰绳:最多扫 2000 个文本文件、最多报 50 条命中,别让一个关键词把机器烧干 */
+/** search_content 的缰绳:最多扫 2000 个文本文件、内容命中最多报 50 条,
+ *  路径命中(文件路径里含关键词)单独封顶 20 条 —— 找安装位置类问题靠它给证据,
+ *  但一窝蜂的路径命中不许把内容命中的名额吃光 */
 export const AGENT_SEARCH_MAX_FILES = 2000
 export const AGENT_SEARCH_MAX_MATCHES = 50
+export const AGENT_SEARCH_MAX_PATH_HITS = 20
 
 /** 目录下钻深度上限:和扫描器一个思路,超深目录不陪它玩 */
 export const AGENT_MAX_DEPTH = 12
@@ -167,7 +170,7 @@ export const AGENT_TOOLS_LOCAL = [
     function: {
       name: 'list_files',
       description:
-        '列出项目里某个文件夹下的全部文件和子文件夹名字(递归,含子文件夹内部)。想知道「项目里有没有 xx 文件」「src 下都有什么」就用它。路径一律用相对路径,项目根目录传空字符串。',
+        '列出项目里某个文件夹下的全部文件和子文件夹名字(递归,含子文件夹内部)。想知道「某个文件夹下都有什么」就用它。注意:名单只能看到名字,要找到具体文件、给出能点开的位置,得再配合 search_content 搜。路径一律用相对路径,项目根目录传空字符串。',
       parameters: {
         type: 'object',
         properties: {
@@ -197,7 +200,7 @@ export const AGENT_TOOLS_LOCAL = [
     function: {
       name: 'search_content',
       description:
-        '在整个项目(或某个文件夹)里按关键词搜文件内容,返回命中的文件、行号和那一行原文。想找「某个词/某个数值/某段代码写在哪个文件里」就用它,比一个个开文件快得多。关键词要短而准(函数名、常量值这类),太长的整句容易一处都搜不到。',
+        '在整个项目(或某个文件夹)里按关键词搜,文件路径和文件内容都算:路径里含这个词的文件会单独标出(找「xx 装在哪/在哪」这类问题,先看路径命中,那多半就是它住的地方),内容里含这个词的报文件、行号和那行原文。凡是「找 xx」「xx 在哪」要给出具体位置的,必须用它搜到具体文件才算找过,光看文件夹名字不算。关键词要短而准(名字、函数名、常量值这类),太长的整句容易一处都搜不到。',
       parameters: {
         type: 'object',
         properties: {
@@ -246,7 +249,12 @@ export const AGENT_ADDENDUM = `
 
 【翻文件模式】你现在可以自己翻这个项目的文件:
 - 需要找文件、看目录结构时,用 list_files 列名单
-- 需要找「某个词/数值/代码写在哪个文件」时,用 search_content 按关键词搜内容,又快又准
+- search_content 搜关键词,文件路径和文件内容都算:路径里含这个词的文件会单独标出,
+  那多半就是它住的地方
+- 帮人找东西、找安装位置这类没指名到具体文件的题,按固定三步走,别临场发挥:
+  1) 看已经垫好的资料或 list_files 圈出名字可疑的文件夹(目录很大就先挑可疑的子目录,别一口气全列)
+  2) 用 search_content 搜进去验货,确认里面真是要找的东西,不是名字像 —— 光看文件夹名字下结论是猜,不算找到
+  3) 答案里给到具体文件(能点开跳转的那种);只有文件夹没有文件 = 还没查完;真没有就明说没找到
 - 需要看某个文件的具体内容时,用 read_file 读它
 - 路径一律用项目内的相对路径;当前参考资料里提到的路径可以直接用
 - search_content 搜到的命中清单,程序会直接完整摆给用户看(每条可点跳转):
@@ -281,6 +289,61 @@ export const REPEAT_NUDGE =
 /** 工具轮数烧完后的逼卷令:当一条普通消息插进对话,模型只能交答案 */
 export const ROUND_CAP_NUDGE =
   '(翻看步数已到上限)别再调用任何工具了,就用现在已经看到的资料,直接把答案完整说完。'
+
+/** 质检闸的补救提醒封顶两次:两次都掰不过来就随它交卷,不无限跟它耗 */
+export const SALVAGE_NUDGE_MAX = 2
+
+/** 质检闸·判据一(过程)的补救提醒:找东西的题一次都没搜就交卷,拦下逼它先搜 */
+export const SALVAGE_SEARCH_NUDGE =
+  '(程序提醒)你这题是在帮人找东西,但到现在一次文件都没搜过 —— 用 search_content 挑一两个短关键词搜搜看(它连文件路径都能搜),搜完再答;真没有就明说没找到。'
+
+/** 质检闸·判据二(结果)的补救提醒:搜是搜了,答案里却一个具体文件都没引用,拦下逼它补 */
+export const SALVAGE_CITE_NUDGE =
+  '(程序提醒)答案里最好给到具体文件(能点开跳转的那种),只报文件夹不算找齐 —— 从搜到的命中里挑相关的写进答案;真没有合适的就明说。'
+
+/** 找位置题的特征词(宁保守勿激进,和联网分流的 prefersWebFirst 一个路数):
+ *  命中才认「找东西的题」,质检闸只管这类,别的不多管闲事 */
+const FIND_QUESTION_WORDS = [
+  '在哪', '哪里', '哪儿', '找找', '找出', '找到', '搜一下', '搜搜', '搜出',
+  '安装在哪', '装在哪', '安装位置', '安装目录', '装到哪', 'where', 'locate'
+]
+
+/** 这是不是一道「找东西/找位置」的题(纯函数,自测覆盖):质检闸的门卫 */
+export function isFindQuestion(question: string): boolean {
+  const q = question.toLowerCase()
+  return FIND_QUESTION_WORDS.some((w) => q.includes(w))
+}
+
+/** 答案里有没有引用具体文件(纯函数,自测覆盖):拿本场搜索的命中路径对账,
+ *  斜杠方向和大小写都放平了比 —— 模型抄路径爱跑偏 */
+export function answerCitesAnyHit(answer: string, hitPaths: string[]): boolean {
+  const norm = answer.toLowerCase().replace(/\\/g, '/')
+  return hitPaths.some((p) => {
+    const path = p.toLowerCase().replace(/\\/g, '/')
+    return path !== '' && norm.includes(path)
+  })
+}
+
+/** 质检闸的裁决(纯函数,自测覆盖) */
+export type FindSalvageVerdict = 'no-search' | 'no-files'
+
+/**
+ * 质检闸(纯函数,自测覆盖):找位置题的答案交卷前过一遍 ——
+ * 判据一(过程):一次都没搜过 → 逼它先搜;判据二(结果):搜到了东西,答案里
+ * 却一个具体文件都没引用 → 逼它把文件写进答案。搜了但颗粒无收(hitPaths 空)
+ * 是合法的「真没有」,放行;不是找位置题也放行。返回 null = 放行交卷。
+ */
+export function findAnswerGap(input: {
+  isFindQuestion: boolean
+  searchUsed: boolean
+  hitPaths: string[]
+  answer: string
+}): FindSalvageVerdict | null {
+  if (!input.isFindQuestion) return null
+  if (!input.searchUsed) return 'no-search'
+  if (input.hitPaths.length === 0) return null
+  return answerCitesAnyHit(input.answer, input.hitPaths) ? null : 'no-files'
+}
 
 /** 提醒卡的内容前缀:撤旧卡、兜底识别都靠它认(别在别处拼这个前缀) */
 export const AGENT_REMINDER_PREFIX = '(程序提醒 · 本轮要回答的问题:'

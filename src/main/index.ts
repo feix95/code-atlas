@@ -12,9 +12,13 @@ import {
   AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
+  AGENT_SEARCH_MAX_PATH_HITS,
   AGENT_WEB_ADDENDUM,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
+  SALVAGE_CITE_NUDGE,
+  SALVAGE_NUDGE_MAX,
+  SALVAGE_SEARCH_NUDGE,
   agentPromptBudget,
   agentReadChars,
   agentRound,
@@ -23,6 +27,8 @@ import {
   compressAgentMessages,
   extractToolCalls,
   emergencySlim,
+  findAnswerGap,
+  isFindQuestion,
   mergeUsage,
   sanitizeAgentRelPath,
   stripLastAgentReminder,
@@ -804,10 +810,13 @@ async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: 
 }
 
 /**
- * search_content 的执行手(第一百三十九锤):在项目(或某个子文件夹)里按关键词搜
- * 文本文件内容,大小写不敏感,报「文件:行号:那行原文」。缰绳:忽略名单/符号链接/
- * 深度跟 list_files 同一份;二进制和超 5MB 的文件直接放过;扫的文件数和命中条数
- * 到量就收,照实注明「没搜完」—— 绝不让一个关键词把机器烧干。
+ * search_content 的执行手(第一百三十九锤):在项目(或某个子文件夹)里按关键词搜,
+ * 文件路径和文本文件内容都算,大小写不敏感。内容命中报「文件:行号:那行原文」;
+ * 路径命中(文件路径里含关键词,找安装位置类问题的证据)单独记,输出时排最前,
+ * 二进制/超大的文件名字对上也照收 —— 名字就是证据,不用翻开看。
+ * 缰绳:忽略名单/符号链接/深度跟 list_files 同一份;二进制和超 5MB 的文件内容不读;
+ * 扫的文件数、内容命中条数、路径命中条数各自到量就收,照实注明「没搜完」——
+ * 绝不让一个关键词把机器烧干。
  * 除喂模型的 text 外,还把结构化命中(matches)一并交回:主进程拿它走旁路推给
  * 界面画「命中清单卡」,格式主动权归程序,不再让小模型当抄写员。
  */
@@ -829,12 +838,14 @@ async function agentSearchContent(
   }
   const needle = keyword.toLowerCase()
   const scopeLabel = relPath === '' ? '整个项目' : relPath
-  const matches: AgentSearchMatch[] = []
+  const contentMatches: AgentSearchMatch[] = []
+  const pathMatches: AgentSearchMatch[] = []
   const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
   let scanned = 0
   let locked = 0
   let filesTruncated = false
   let matchesTruncated = false
+  let pathHitsTruncated = false
   outer: while (queue.length > 0) {
     const item = queue[0]
     queue.shift()
@@ -858,6 +869,15 @@ async function agentSearchContent(
         filesTruncated = true
         break outer
       }
+      // 路径命中:文件路径里含这个词就算,排在内容命中前面(找「xx 装在哪」的证据)。
+      // 二进制/超大文件也照收 —— 名字就是证据,不用翻开看
+      if (childRel.toLowerCase().includes(needle)) {
+        if (pathMatches.length >= AGENT_SEARCH_MAX_PATH_HITS) {
+          pathHitsTruncated = true
+        } else {
+          pathMatches.push({ relPath: childRel, line: 0, text: `路径里含「${keyword}」`, kind: 'path' })
+        }
+      }
       if (isBinaryFile(childRel)) continue
       const childAbs = join(item.abs, d.name)
       const fstat = await fs.stat(childAbs).catch(() => null)
@@ -872,26 +892,34 @@ async function agentSearchContent(
       for (const [index, line] of raw.split('\n').entries()) {
         if (!line.toLowerCase().includes(needle)) continue
         const trimmed = line.trim()
-        matches.push({
+        contentMatches.push({
           relPath: childRel,
           line: index + 1,
           text: trimmed.length > 120 ? `${trimmed.slice(0, 120)}……` : trimmed
         })
-        if (matches.length >= AGENT_SEARCH_MAX_MATCHES) {
+        if (contentMatches.length >= AGENT_SEARCH_MAX_MATCHES) {
           matchesTruncated = true
           break outer
         }
       }
     }
   }
+  const matches = [...pathMatches, ...contentMatches]
   if (matches.length === 0) {
-    let text = `在 ${scopeLabel} 里没搜到「${keyword}」(翻了 ${scanned} 个文本文件)。可能真没有,也可能藏在二进制/超大的文件里,或者换个更短的关键词再试`
+    let text = `在 ${scopeLabel} 里没搜到「${keyword}」,文件路径和内容都没对上的(翻了 ${scanned} 个文本文件)。可能真没有,也可能藏在二进制/超大的文件里,或者换个更短的关键词再试`
     if (filesTruncated) text += `(文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完)`
     return { ok: true, text, matches: [], matchesTruncated: false }
   }
-  let text = matches.map((m) => `${m.relPath}:${m.line}:${m.text}`).join('\n')
+  const sections: string[] = []
+  if (pathMatches.length > 0) {
+    const head = pathHitsTruncated ? `路径对上的文件(只收前 ${AGENT_SEARCH_MAX_PATH_HITS} 个):` : '路径对上的文件:'
+    sections.push([head, ...pathMatches.map((m) => m.relPath)].join('\n'))
+  }
+  if (contentMatches.length > 0) sections.push(['内容对上的(文件:行号:原文):', ...contentMatches.map((m) => `${m.relPath}:${m.line}:${m.text}`)].join('\n'))
+  let text = sections.join('\n')
   const tails: string[] = []
-  if (matchesTruncated) tails.push(`命中太多,只显示前 ${AGENT_SEARCH_MAX_MATCHES} 条`)
+  if (matchesTruncated) tails.push(`内容命中太多,只显示前 ${AGENT_SEARCH_MAX_MATCHES} 条`)
+  if (pathHitsTruncated) tails.push(`路径命中太多,只收前 ${AGENT_SEARCH_MAX_PATH_HITS} 个`)
   if (filesTruncated) tails.push(`文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完`)
   if (locked > 0) tails.push(`${locked} 个文件打不开,跳过了`)
   if (tails.length > 0) text += `\n(${tails.join(';')})`
@@ -1032,6 +1060,11 @@ async function runAgentChat(input: {
   if (!engineNoTools && systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${addendum}` }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
+  // 质检闸的账本:本场真执行过 search_content 没有、搜到的文件路径(答案引用对账用)、
+  // 已经拦了几次(封顶两次,掰不过来就随它交卷)
+  let searchUsed = false
+  const searchHitPaths = new Set<string>()
+  let salvageNudges = 0
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成纸条时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
@@ -1159,6 +1192,33 @@ async function runAgentChat(input: {
       if (text === '') {
         return agentResult(input, 'error', '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试', usage, reasoningAll)
       }
+      // 质检闸(救敷衍):找位置题的答案交卷前过两道判据 —— 一次文件都没搜过(逼它先搜)、
+      // 搜到了东西却一个具体文件都不引用(逼它把文件写进答案,答案里可点跳转的链接全靠这个)。
+      // 拦下重答(先收回已吐的字再垫补救提醒),封顶两次,掰不过来就随它交卷,不无限跟它耗;
+      // 轮数已烧完的逼卷轮不拦 —— 那轮它没工具可调,拦了也白拦
+      if (useTools && salvageNudges < SALVAGE_NUDGE_MAX && rounds < AGENT_MAX_ROUNDS) {
+        const gap = findAnswerGap({
+          isFindQuestion: isFindQuestion(currentQuestion),
+          searchUsed,
+          hitPaths: [...searchHitPaths],
+          answer: text
+        })
+        if (gap) {
+          salvageNudges += 1
+          skipNudgeOnce = true
+          messages.push(raw)
+          messages.push({ role: 'user', content: gap === 'no-search' ? SALVAGE_SEARCH_NUDGE : SALVAGE_CITE_NUDGE })
+          sendResetDelta(event, requestId)
+          sendAgentStep(
+            event,
+            requestId,
+            gap === 'no-search'
+              ? '这题是找东西,它一次文件都没搜就想交卷 —— 程序拦下,让它先搜再答'
+              : '答案里没落到具体文件 —— 程序拦下,让它把搜到的文件写进答案再交'
+          )
+          continue
+        }
+      }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       return agentResult(input, 'supported', text, usage, reasoningAll)
     }
@@ -1207,6 +1267,7 @@ async function runAgentChat(input: {
         continue
       }
       doneCalls.add(key)
+      if (callName === 'search_content') searchUsed = true // 质检闸的账:真发起过搜索才算搜过
       callIdToKey.set(call.id, key)
       // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
       const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean } =
@@ -1222,6 +1283,8 @@ async function runAgentChat(input: {
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
       if (callName === 'search_content' && exec.ok && exec.matches && exec.matches.length > 0) {
         sendAgentMatches(event, requestId, { keyword, items: exec.matches, truncated: exec.matchesTruncated === true })
+        // 质检闸的对账本:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
+        for (const m of exec.matches) searchHitPaths.add(m.relPath)
       }
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
     }

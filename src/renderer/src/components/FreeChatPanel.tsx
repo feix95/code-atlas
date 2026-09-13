@@ -133,15 +133,15 @@ const MatchListCard = memo(function MatchListCard({
             <button
               type="button"
               className="chat-match-loc"
-              onClick={() => fileLinks?.onOpen(it.relPath, it.line)}
+              onClick={() => fileLinks?.onOpen(it.relPath, it.kind === 'path' ? undefined : it.line)}
               onContextMenu={(e) => {
                 if (!fileLinks?.onMenu) return
                 e.preventDefault()
                 fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
               }}
-              title={fileLinks ? `打开预览:${it.relPath} 第 ${it.line} 行;右键:复制路径 / 在资源管理器中显示` : it.relPath}
+              title={fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath}
             >
-              {it.relPath}:{it.line}
+              {it.kind === 'path' ? it.relPath : `${it.relPath}:${it.line}`}
             </button>
             <span className="chat-match-text" title={it.text}>{it.text}</span>
           </li>

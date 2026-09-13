@@ -304,11 +304,17 @@ export interface ModelContextInfo {
   vramBytes: number | null
 }
 
-/** 一条结构化搜索命中:文件相对路径 + 行号 + 那一行原文(超长截 120 字) */
+/**
+ * 一条结构化搜索命中:文件相对路径 + 行号 + 那一行原文(超长截 120 字)。
+ * kind 缺省 = 内容命中;line 才有意义;kind = 'path' = 路径命中(文件路径里含
+ * 关键词,没有行号,line 恒为 0,text 放给用户看的一句说明)—— 找安装位置类
+ * 问题靠它给证据。
+ */
 export interface AgentSearchMatch {
   relPath: string
   line: number
   text: string
+  kind?: 'path'
 }
 
 /**
