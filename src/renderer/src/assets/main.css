@@ -1014,6 +1014,12 @@ body.is-maximized .traffic-lights .is-max i::after {
   white-space: nowrap;
 }
 
+/* 文件名上主题色(菜单统一大锤陪件,小葵拍的):跟聊天里的绿字文件一家,降低学习成本;
+ * 文件夹保持素色 —— 扫一眼就知道哪边是能打开看的文件。选中态本来就整行主题色,不打架 */
+.tree-row.is-file .tree-name {
+  color: var(--accent);
+}
+
 /* 一句大白话摘要:次要文字,挤了就省略 */
 .tree-summary {
   flex: 1 1 auto;

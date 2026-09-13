@@ -1019,11 +1019,30 @@ function App(): React.JSX.Element {
     openPreviewRef.current(relPath)
   }, [])
 
-  // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事
+  // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事。
+  // 备注三件套的活口(菜单统一大锤):每次渲染同步最新账,菜单回调经 ref 取用 ——
+  // 身份一个用到底,fileLinks 的 useMemo 不用陪着 notes 每次换新
+  const noteMenuRef = useRef<{
+    hasNote: (relPath: string) => boolean
+    onEdit: (relPath: string) => void
+    onRemove: (relPath: string) => void
+  }>({ hasNote: () => false, onEdit: () => {}, onRemove: () => {} })
+  useEffect(() => {
+    noteMenuRef.current = {
+      hasNote: (relPath) => notes[relPath] !== undefined,
+      onEdit: (relPath) => editNoteFromTree(relPath),
+      onRemove: (relPath) => saveNote(relPath, '')
+    }
+  })
   const openFileLinkMenu = useCallback((relPath: string, x: number, y: number): void => {
     const cur = resultRef.current
     if (!cur) return
-    openFilePathMenuFor(cur.rootPath, relPath, x, y)
+    const nm = noteMenuRef.current
+    openFilePathMenuFor(cur.rootPath, relPath, x, y, {
+      hasNote: nm.hasNote(relPath),
+      onEdit: () => nm.onEdit(relPath),
+      onRemove: () => nm.onRemove(relPath)
+    })
   }, [])
   const fileLinks: FileLinkTarget | null = useMemo(
     () => (fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink, onMenu: openFileLinkMenu } : null),
@@ -1322,6 +1341,11 @@ function App(): React.JSX.Element {
           onAddRef={addPreviewRef}
           onClose={() => closeTab(tab.id)}
           jump={previewJump}
+          noteMenu={{
+            hasNote: notes[file.relPath] !== undefined,
+            onEdit: () => editNoteFromTree(file.relPath),
+            onRemove: () => saveNote(file.relPath, '')
+          }}
         />
       )
     }
@@ -1450,6 +1474,7 @@ function App(): React.JSX.Element {
             {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
             <FileTree
               root={result.tree}
+              rootPath={result.rootPath}
               notes={notes}
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
               expandingPath={expanding}

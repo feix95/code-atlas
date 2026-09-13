@@ -7,7 +7,7 @@ import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
-import { openFilePathMenuFor } from './filePathMenuStore'
+import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuStore'
 
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
@@ -43,7 +43,8 @@ export function CodePreview({
   refLimit,
   onAddRef,
   onClose,
-  jump
+  jump,
+  noteMenu
 }: {
   rootPath: string
   file: ScanFileNode
@@ -55,6 +56,8 @@ export function CodePreview({
   onClose: () => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
+  /** 备注三件套(菜单统一大锤):头部文件名右键菜单带上写/清备注,跟树里、聊天里一个规格 */
+  noteMenu?: FilePathNoteActions
 }): React.JSX.Element {
   const codeTextRef = useRef<HTMLPreElement>(null)
   const codeViewRef = useRef<HTMLDivElement>(null)
@@ -350,11 +353,11 @@ export function CodePreview({
         </span>
         <span
           className="code-pane-name mono is-file-menu"
-          title={`${file.relPath};右键:复制路径 / 在资源管理器中显示`}
+          title={`${file.relPath};右键:复制路径 / 在资源管理器中显示 / 备注`}
           onContextMenu={(e) => {
-            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,复制/显现两件事
+            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
             e.preventDefault()
-            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY)
+            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY, noteMenu)
           }}
         >
           {file.relPath}

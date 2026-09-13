@@ -2,24 +2,25 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { closeFilePathMenu, currentFilePathMenu, subscribeFilePathMenu, type FilePathMenuRequest } from './filePathMenuStore'
 
 /**
- * 文件路径右键菜单(绿字文件链接 / 预览器头部文件名共用):右键弹出的小菜单,两件事——
+ * 文件路径右键菜单(绿字文件链接 / 预览器头部文件名共用):右键弹出的小菜单,统一三件套——
  * 1. 复制完整路径(盘符开头那种)进剪贴板;
- * 2. 在文件资源管理器中显示(资源管理器弹出、文件选中高亮)。
- * 两件都只「带路」不「开门」:开不开文件、怎么开,交给用户看到真实文件后自己决定。
+ * 2. 在文件资源管理器中显示(资源管理器弹出、文件选中高亮);
+ * 3. 备注系列(可选段,给了才摆):写/编辑备注,有备注再带清除。
+ * 前两件只「带路」不「开门」:开不开文件、怎么开,交给用户看到真实文件后自己决定。
  *
  * 菜单是自绘的(暗色主题一个皮肤,不弹系统白菜单),全局单例:挂在 App 根部一次,
  * 各处的链接按钮只管喊 openFilePathMenu 报坐标,不用每处自己养一份菜单状态。
  */
 
-/** 菜单的估尺寸:两项窄窄一条;贴窗口边时按它往里收,别弹出窗外 */
+/** 菜单的估尺寸:宽窄一条,高按行数算(一项一行约 34px);贴窗口边时按它往里收,别弹出窗外 */
 const MENU_W = 200
-const MENU_H = 72
+const ROW_H = 34
 const EDGE = 8
 
-function clampedPosition(x: number, y: number): { left: number; top: number } {
+function clampedPosition(x: number, y: number, rows: number): { left: number; top: number } {
   return {
     left: Math.max(EDGE, Math.min(x, window.innerWidth - MENU_W - EDGE)),
-    top: Math.max(EDGE, Math.min(y, window.innerHeight - MENU_H - EDGE))
+    top: Math.max(EDGE, Math.min(y, window.innerHeight - (rows * ROW_H + 10) - EDGE))
   }
 }
 
@@ -72,7 +73,9 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
     closeFilePathMenu()
   }
 
-  const pos = clampedPosition(request.x, request.y)
+  const note = request.note ?? null
+  const rows = 2 + (note ? 1 : 0) + (note !== null && note.hasNote && note.onRemove ? 1 : 0)
+  const pos = clampedPosition(request.x, request.y, rows)
   return (
     <div className="file-path-menu" style={{ left: pos.left, top: pos.top }} role="menu">
       <button
@@ -107,6 +110,34 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
       >
         {revealFail ?? '在文件资源管理器中显示'}
       </button>
+      {note && (
+        <button
+          type="button"
+          role="menuitem"
+          className="file-path-menu-item"
+          onClick={() => {
+            note.onEdit()
+            closeFilePathMenu()
+          }}
+          title={request.relPath}
+        >
+          {note.hasNote ? '编辑备注' : '写备注'}
+        </button>
+      )}
+      {note !== null && note.hasNote && note.onRemove && (
+        <button
+          type="button"
+          role="menuitem"
+          className="file-path-menu-item"
+          onClick={() => {
+            note.onRemove?.()
+            closeFilePathMenu()
+          }}
+          title={request.relPath}
+        >
+          清除备注
+        </button>
+      )}
     </div>
   )
 }

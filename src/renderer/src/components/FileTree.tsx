@@ -200,6 +200,8 @@ function filterTree(node: ScanDirNode, q: string): ScanDirNode | null {
 
 interface FileTreeProps {
   root: ScanDirNode
+  /** 项目根(导向菜单用,菜单统一大锤):复制完整路径/资源管理器显示,得知道扫描根才拼得出绝对路径 */
+  rootPath?: string
   /** 本项目手动备注表(第九十八锤);不传就只亮引擎一句话 */
   notes?: NoteMap
   selectedPath: string | null
@@ -217,11 +219,27 @@ interface FileTreeProps {
   onPreviewFile?: (relPath: string) => void
 }
 
-export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, rootPath, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
-  // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收
-  const [menu, setMenu] = useState<{ x: number; y: number; relPath: string; hasNote: boolean; isFile: boolean } | null>(null)
+  // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收。
+  // copied/revealMsg = 导向项的现场反馈:复制成功亮「已复制✓」,失败说人话,一拍自己收摊
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    relPath: string
+    hasNote: boolean
+    isFile: boolean
+    copied?: 'ok' | 'fail'
+    revealMsg?: string | null
+  } | null>(null)
+  const menuTimerRef = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (menuTimerRef.current !== null) window.clearTimeout(menuTimerRef.current)
+    },
+    []
+  )
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // reveal 联动的后半程:展开靠 forceExpand 已由渲染接管,这里只负责把目标行滚进视野。
@@ -233,11 +251,14 @@ export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths
   }, [selectedPath, revealPaths])
 
   // 菜单项数决定它大概多高:夹住边界时别让最后一项掉到窗口外面
-  const menuRows = (hasNote: boolean, isFile: boolean): number => 1 + (hasNote ? 1 : 0) + (isFile && onPreviewFile ? 1 : 0)
+  // (导向两项 + 预览 + 写备注 + 清除备注,最多五项)
+  const menuRows = (hasNote: boolean, isFile: boolean): number => 2 + (isFile && onPreviewFile ? 1 : 0) + 1 + (hasNote ? 1 : 0)
 
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
-    if (!onNoteEdit && !onPreviewFile) return
+    if (!rootPath && !onNoteEdit && !onPreviewFile) return
     e.preventDefault()
+    // 新开菜单顺带清上一份的反馈和计时器,现场干净
+    if (menuTimerRef.current !== null) window.clearTimeout(menuTimerRef.current)
     const hasNote = notes?.[node.relPath] !== undefined
     const isFile = node.type === 'file'
     setMenu({
@@ -246,6 +267,29 @@ export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths
       relPath: node.relPath,
       hasNote,
       isFile
+    })
+  }
+
+  /** 复制完整路径:成功亮「已复制✓」一拍再收摊,失败说人话多留一拍 */
+  function copyMenuPath(): void {
+    if (!rootPath || !menu || menu.copied !== undefined) return
+    void window.atlas.copyFilePath(rootPath, menu.relPath).then((r) => {
+      const ok = r.ok && r.path !== undefined
+      setMenu((m) => (m ? { ...m, copied: ok ? 'ok' : 'fail' } : m))
+      menuTimerRef.current = window.setTimeout(() => setMenu(null), ok ? 900 : 1600)
+    })
+  }
+
+  /** 在资源管理器中显示:成功不用菜单夸 —— 资源管理器窗口自己弹出来,就是最响亮的反馈 */
+  function revealMenuPath(): void {
+    if (!rootPath || !menu || menu.revealMsg !== undefined) return
+    void window.atlas.revealFilePath(rootPath, menu.relPath).then((r) => {
+      if (r.ok) {
+        setMenu(null)
+        return
+      }
+      setMenu((m) => (m ? { ...m, revealMsg: r.message ?? '没打开成' } : m))
+      menuTimerRef.current = window.setTimeout(() => setMenu(null), 1600)
     })
   }
 
@@ -304,6 +348,17 @@ export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths
             }}
           />
           <div className="tree-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+            {/* 导向两件套(菜单统一大锤,小葵拍的:对着文件/文件夹右键都有),文件和文件夹同款 */}
+            {rootPath && (
+              <button type="button" role="menuitem" onClick={copyMenuPath} title={menu.relPath}>
+                {menu.copied === 'ok' ? '已复制 ✓' : menu.copied === 'fail' ? '没复制成,这路径有问题' : '复制完整路径'}
+              </button>
+            )}
+            {rootPath && (
+              <button type="button" role="menuitem" onClick={revealMenuPath} title={menu.relPath}>
+                {menu.revealMsg ?? '在文件资源管理器中显示'}
+              </button>
+            )}
             {menu.isFile && onPreviewFile && (
               <button
                 type="button"
