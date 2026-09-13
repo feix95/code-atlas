@@ -28,6 +28,7 @@ export function TabBar({
   onClose,
   onPinToggle,
   onMoveTab,
+  onDragTab,
   enabledKinds,
   onToggleKind
 }: {
@@ -42,6 +43,8 @@ export function TabBar({
   onPinToggle: (id: string) => void
   /** 挪页签:toGroup 空 = 另一组(单组时=往右拆新组); atIndex 空 = 放到那组末尾 */
   onMoveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
+  /** 拖动开始/结束喊一声(App 要知道谁在拖,好判定「中心分屏」该不该许诺) */
+  onDragTab: (id: string | null) => void
   enabledKinds: Set<PaneKind>
   onToggleKind: (kind: PaneKind, on: boolean) => void
 }): React.JSX.Element {
@@ -121,6 +124,7 @@ export function TabBar({
               e.dataTransfer.setData('application/x-atlas-tab', t.id)
               e.dataTransfer.effectAllowed = 'move'
               setDraggingId(t.id)
+              onDragTab(t.id)
             }}
             onDragOver={(e) => {
               if (e.dataTransfer.types.includes('application/x-atlas-tab')) {
@@ -145,6 +149,7 @@ export function TabBar({
               setDropBefore(null)
               setDropZone(false)
               setDraggingId(null)
+              onDragTab(null)
             }}
             onClick={() => onActivate(t.id)}
             onDoubleClick={() => onPinToggle(t.id)}
@@ -220,7 +225,11 @@ export function TabBar({
                 role="menuitemcheckbox"
                 aria-checked={on}
                 className={`kindmenu-item${on ? ' is-on' : ''}`}
-                onClick={() => onToggleKind(k, !on)}
+                onClick={() => {
+                  onToggleKind(k, !on)
+                  // 选完就收(小葵拍的):勾一个/取消一个,菜单自己走,不用再点外面
+                  setMenu(null)
+                }}
               >
                 <span className="kindmenu-check" aria-hidden="true">
                   {on ? '✓' : ''}

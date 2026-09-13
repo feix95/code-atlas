@@ -29,6 +29,13 @@ export const KIND_CAPS: Record<'file' | 'directory', PaneKind[]> = {
   directory: ['overview', 'chat']
 }
 
+/**
+ * 跟随型品类:这些页签是「当前选中对象的常驻窗口」,勾着显示就该在栏上 ——
+ * 被 × 掉了,树里一动就自动补回来(装着新对象)。文件预览是按需品类(双击/绿字才开),
+ * 不在其列,被关了就安安静静等用户点名。
+ */
+export const FOLLOW_KINDS: PaneKind[] = ['overview', 'chat']
+
 /** 第二层过滤:哪些品类勾选显示,记进本机(跨重启记住自己的勾法) */
 const KINDS_KEY = 'atlas.pane-kinds'
 

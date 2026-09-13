@@ -1420,12 +1420,30 @@ body.is-sash-dragging .pane-sash::after {
   outline-offset: -1px;
 }
 
-/* 页签正文容器:页签条下面的一次一个房间 */
+/* ── 页签正文容器:页签条下面的一次一个房间 ── */
+
 .pane-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* 拖页签悬在正文中心:虚线框亮起,许诺「松手拆成两栏/挪到这一组」(边缘松手可不算数) */
+.pane-drop-hint {
+  position: absolute;
+  inset: 8%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-size: var(--font-md);
+  pointer-events: none;
 }
 
 /* 预览品类还没装文件(空槽)/文件没了:一句指路,不装死 */
@@ -1488,20 +1506,8 @@ body.is-sash-dragging .pane-sash::after {
   display: none;
 }
 
-/* ── 预览页签的合并布局:左源码右伴聊,一条细缝隔开,各自滚各自的 ── */
-
-.preview-split {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  gap: 1px;
-  background: var(--line);
-}
-
-.preview-split > * {
-  min-width: 0;
-}
+/* 代码预览的合并布局(preview-split)已随「预览拆伴聊」退役:预览是纯源码窗,
+   想边看代码边聊就把探针页签拖到另一组拼一屏 */
 
 .preview-chat {
   flex: 1;

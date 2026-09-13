@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChatCodeRef, ChatContextAttachment, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
@@ -29,12 +29,11 @@ import {
   type RecentProject
 } from './recents'
 import { useAiAsk } from './useAiAsk'
-import { useAiChat, type AiChatApi, type ChatMessage } from './useAiChat'
-import { useChatSuggestions } from './useChatSuggestions'
+import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
-import { KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
+import { FOLLOW_KINDS, KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh } from './components/Icons'
@@ -266,6 +265,18 @@ function App(): React.JSX.Element {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   // 左右两组的比例(左边占多少),分割条拖完记进本机
   const [paneSplit, setPaneSplit] = useState(readPaneSplit)
+  // 拖页签时的落点标记:正悬在哪个组的正文中心(中心松手=分屏/挪组,边缘松手=什么也不发生)
+  const [dropMark, setDropMark] = useState<{ groupId: string; center: boolean } | null>(null)
+  // 正被拖着的页签(dragOver 时浏览器不给读 dataTransfer,来源判断全靠它)
+  const [draggingTab, setDraggingTab] = useState<string | null>(null)
+
+  // 正文中心的分屏提示只在该有动作的时候亮:单组拆两栏,或拖的是别组页签;
+  // 两组还拖自己组的页签在自己组中心晃,松手也没动作,就不许诺空头支票
+  function showDropHint(groupId: string): boolean {
+    if (!draggingTab) return false
+    if (groups.length === 1) return true
+    return groups.some((g) => g.id !== groupId && g.tabs.some((t) => t.id === draggingTab))
+  }
   const [enabledKinds, setEnabledKinds] = useState<Set<PaneKind>>(loadEnabledKinds)
   // 系统自动勾回品类时刚点亮的那张页签:轻强调一下让用户察觉(小葵点的,别做得太静默)
   const [flashTabId, setFlashTabId] = useState<string | null>(null)
@@ -314,19 +325,14 @@ function App(): React.JSX.Element {
   const visibleOfGroup = useCallback((g: PaneGroup | null) => (g ? g.tabs.filter((t) => enabledKinds.has(t.kind)) : []), [enabledKinds])
   const activeTabObj = activeGroup?.tabs.find((t) => t.id === activeGroup.activeId) ?? null
   // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
-  const activeFileNode = useMemo(
-    () => (activeTabObj && activeTabObj.relPath !== '' && result ? findFile(result.tree, activeTabObj.relPath) : null),
-    [activeTabObj, result]
-  )
-  // 公用场的聊天上下文:预览页签激活时聊左栏那扇窗,其余时候跟着选中的文件/文件夹走;
-  // 什么都没选就聊项目根 —— 探针随时都在,不挑时候
+  // —— 预览页签改版后不再自带聊天,聊天上下文只认树里选中的对象,这个派生退役了
+  // 公用场的聊天上下文:跟着选中的文件/文件夹走;什么都没选就聊项目根 —— 探针随时都在,不挑时候
   const chatContext = useMemo(() => {
     if (!result) return null
-    if (activeTabObj?.kind === 'preview' && activeFileNode) return buildFileAttachment(activeFileNode, null)
     if (selectedFile) return buildFileAttachment(selectedFile, structure)
     if (selectedFolder) return buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
     return buildFolderAttachment(result.tree, result.rootName)
-  }, [result, activeTabObj, activeFileNode, selectedFile, selectedFolder, structure])
+  }, [result, selectedFile, selectedFolder, structure])
   // 翻文件模式(agent)的项目根从这儿递进去:沙盒只认这个目录,越界的活儿一律不接
   const chat = useAiChat(chatContext, result?.rootPath ?? null)
   const folderRef = useRef(folder)
@@ -617,6 +623,18 @@ function App(): React.JSX.Element {
     }))
   }
 
+  // 跟随型品类(概览/探针)的页签被 × 掉了:树里一动就自动补回来,装着当前的对象 ——
+  // 勾着显示的品类,跟随页签就该在栏上(小葵拍板);预览是按需品类,不在此列,不抢激活
+  function ensureFollowTabs(node: ScanFileNode | ScanDirNode): void {
+    if (!activeGroup) return
+    const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
+    const missing = FOLLOW_KINDS.filter(
+      (k) => enabledKinds.has(k) && caps.includes(k) && !activeGroup.tabs.some((t) => t.kind === k && !t.pinned)
+    )
+    if (missing.length === 0) return
+    patchGroup(activeGroup.id, (g) => ({ ...g, tabs: [...g.tabs, ...missing.map((k) => paneTabFor(k, node))] }))
+  }
+
   // 品类开关(页签栏空白右键的菜单):勾 = 显示这个品类,不勾 = 藏起来。
   // 藏只是藏,页签实例连着钉住状态一起留着,再勾上原样回来
   function toggleKind(kind: PaneKind, on: boolean): void {
@@ -700,6 +718,7 @@ function App(): React.JSX.Element {
     // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
     if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath) chat.note(`参考资料换成了 ${file.name}`)
     retargetFollowTabs(file)
+    ensureFollowTabs(file)
     // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览
     const kind = activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
     ensureKindTab(kind, file)
@@ -740,6 +759,7 @@ function App(): React.JSX.Element {
     if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
       chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
     retargetFollowTabs(node)
+    ensureFollowTabs(node)
     const kind = activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
     ensureKindTab(kind, node)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
@@ -961,6 +981,10 @@ function App(): React.JSX.Element {
   // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
   function addPreviewRef(ref: ChatCodeRef): void {
     setPreviewRefs((prev) => (prev.length >= CODE_REFS_MAX ? prev : [...prev, ref]))
+    // 引用卡如今住在探针页签的输入框上(预览拆了伴聊):闪一下那张页签,告诉用户挂哪儿了
+    const probeGroup = groups.find((g) => g === activeGroup && g.tabs.some((t) => t.kind === 'chat' && !t.pinned)) ?? groups.find((g) => g.tabs.some((t) => t.kind === 'chat' && !t.pinned))
+    const probe = probeGroup?.tabs.find((t) => t.kind === 'chat' && !t.pinned)
+    if (probe) markFlash(probe.id)
   }
 
   function removePreviewRef(index: number): void {
@@ -1234,30 +1258,19 @@ function App(): React.JSX.Element {
         </div>
       )
     }
-    // 预览页签:左源码右伴聊 —— 「边看代码边聊」的门牌
+    // 预览页签:纯源码窗(小葵拍板的拆分) —— 想边看代码边聊,把探针页签拖去另一组拼一屏
     if (file) {
       return (
-        <div className="preview-split" key={tab.id}>
-          <CodePreview
-            rootPath={result.rootPath}
-            file={file}
-            canAddRef={previewRefs.length < CODE_REFS_MAX}
-            refLimit={CODE_REFS_MAX}
-            onAddRef={addPreviewRef}
-            onClose={() => closeTab(tab.id)}
-            jump={previewJump}
-          />
-          <PreviewChatPane
-            file={file}
-            result={result}
-            refs={previewRefs}
-            onRemoveRef={removePreviewRef}
-            chat={chat}
-            chatContext={chatContext ?? buildFileAttachment(file, null)}
-            fileLinks={fileLinks}
-            suggestionsOn={chatSuggestionsOn}
-          />
-        </div>
+        <CodePreview
+          key={tab.id}
+          rootPath={result.rootPath}
+          file={file}
+          canAddRef={previewRefs.length < CODE_REFS_MAX}
+          refLimit={CODE_REFS_MAX}
+          onAddRef={addPreviewRef}
+          onClose={() => closeTab(tab.id)}
+          jump={previewJump}
+        />
       )
     }
     return (
@@ -1451,14 +1464,6 @@ function App(): React.JSX.Element {
                       className="pane-group"
                       style={groups.length === 2 && gi === 0 ? { width: `${(paneSplit * 100).toFixed(2)}%` } : undefined}
                       onPointerDown={() => setActiveGroupId(g.id)}
-                      onDragOver={(e) => {
-                        if (e.dataTransfer.types.includes('application/x-atlas-tab')) e.preventDefault()
-                      }}
-                      onDrop={(e) => {
-                        const id = e.dataTransfer.getData('application/x-atlas-tab')
-                        // 别组页签拖进来才算搬家;自己组内拖拽放手在正文上等于没动
-                        if (id && !g.tabs.some((t) => t.id === id)) moveTab(id, 'sibling', null)
-                      }}
                     >
                       <TabBar
                         tabs={vis}
@@ -1469,10 +1474,52 @@ function App(): React.JSX.Element {
                         onClose={closeTab}
                         onPinToggle={pinToggleTab}
                         onMoveTab={moveTab}
+                        onDragTab={setDraggingTab}
                         enabledKinds={enabledKinds}
                         onToggleKind={toggleKind}
                       />
-                      <div className="pane-body">
+                      <div
+                        className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
+                        onDragOver={(e) => {
+                          // 只认页签拖拽;树里拖文件挂引用走的是另一个 mime,不掺和
+                          if (!e.dataTransfer.types.includes('application/x-atlas-tab')) return
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = 'move'
+                          const host = e.currentTarget.getBoundingClientRect()
+                          // 中心判定(小葵拍的):横竖各取正中一半,松手在这儿才分屏
+                          const inCenter =
+                            e.clientX > host.left + host.width * 0.25 &&
+                            e.clientX < host.right - host.width * 0.25 &&
+                            e.clientY > host.top + host.height * 0.25 &&
+                            e.clientY < host.bottom - host.height * 0.25
+                          setDropMark((prev) => (prev?.groupId === g.id && prev.center === inCenter ? prev : { groupId: g.id, center: inCenter }))
+                        }}
+                        onDragLeave={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropMark(null)
+                        }}
+                        onDrop={(e) => {
+                          const id = e.dataTransfer.getData('application/x-atlas-tab') || draggingTab
+                          const center = dropMark?.groupId === g.id && dropMark.center
+                          const fromG = id ? groups.find((grp) => grp.tabs.some((t) => t.id === id)) : null
+                          setDropMark(null)
+                          if (!id || !center || !fromG) return
+                          // 中心松手 = 分屏判定(小葵拍的):别组页签拖来 = 挪来这一组;
+                          // 自己组页签 + 只有单组 = 拆成两栏;两组还往自己组中心拖 = 什么也不发生
+                          if (fromG.id !== g.id || groups.length === 1) moveTab(id, 'sibling', null)
+                        }}
+                      >
+                        {act && !(act.kind === 'chat' && act.pinned) ? (
+                          // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
+                          renderTabBody(act)
+                        ) : !act ? (
+                          // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
+                          <PaneEmptyBoard />
+                        ) : null}
+                        {dropMark?.groupId === g.id && dropMark.center && showDropHint(g.id) && (
+                          <div className="pane-drop-hint" aria-hidden="true">
+                            {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
+                          </div>
+                        )}
                         {act && !(act.kind === 'chat' && act.pinned) ? (
                           // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
                           renderTabBody(act)
@@ -1605,47 +1652,6 @@ function App(): React.JSX.Element {
           onClose={() => setShowSettings(false)}
         />
       )}
-    </div>
-  )
-}
-
-/**
- * 预览页签的右半(页签地基):小探针的自由对话列,专聊左边那扇源码窗里的文件。
- * 从前它是右栏整扇(PreviewDetailView,自带详情头);预览成页签后头没了 ——
- * 页签条管身份,CodePreview 管文件名,它只管聊。走的是详情页同一条聊天通道。
- * 第一百一十一锤:源码里选中的代码以引用卡挂到输入框上,和问题一起发出去。
- */
-function PreviewChatPane({
-  file,
-  result,
-  refs,
-  onRemoveRef,
-  chat,
-  chatContext,
-  fileLinks,
-  suggestionsOn
-}: {
-  file: ScanFileNode
-  result: ScanResult
-  refs: ChatCodeRef[]
-  onRemoveRef: (index: number) => void
-  chat: AiChatApi
-  chatContext: ChatContextAttachment
-  fileLinks?: FileLinkTarget | null
-  suggestionsOn: boolean
-}): React.JSX.Element {
-  // 推荐问题随对话演进(第一百一十二锤):规则层秒出,AI 层每答完一轮悄悄换新;总闸关了全歇
-  const suggestions = useChatSuggestions({
-    rootPath: result.rootPath,
-    file,
-    messages: chat.messages,
-    busy: chat.busy,
-    enabled: suggestionsOn
-  })
-
-  return (
-    <div className="preview-chat soft-in">
-      <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
     </div>
   )
 }
