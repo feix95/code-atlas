@@ -139,13 +139,12 @@ async function searchDuckDuckGoHits(query: string, fetchText: LookupTransport): 
   return hits
 }
 
-/** 搜索器,按序兜底(和讲解查询同一个序):维基中文 → 维基英文 → DuckDuckGo。全都失败/为空返回 [] */
-export async function webSearch(query: string, fetchText: LookupTransport = nodeFetchText): Promise<WebSearchHit[]> {
-  const searches: Array<{ run: (q: string, f: LookupTransport) => Promise<WebSearchHit[]> }> = [
-    { run: (q, f) => searchWikipediaHits('zh', q, f) },
-    { run: (q, f) => searchWikipediaHits('en', q, f) },
-    { run: searchDuckDuckGoHits }
-  ]
+/** 搜索器,按序兜底:默认维基中文 → 维基英文 → DuckDuckGo(概念题维基的干净摘要是最好的第一口);
+ * webFirst = true 时倒过来 DDG 打头(操作题/新鲜事,答案在论坛问答站,维基根本没有条目)。全都失败/为空返回 [] */
+export async function webSearch(query: string, fetchText: LookupTransport = nodeFetchText, webFirst = false): Promise<WebSearchHit[]> {
+  const searches: Array<{ run: (q: string, f: LookupTransport) => Promise<WebSearchHit[]> }> = webFirst
+    ? [{ run: searchDuckDuckGoHits }, { run: (q, f) => searchWikipediaHits('zh', q, f) }, { run: (q, f) => searchWikipediaHits('en', q, f) }]
+    : [{ run: (q, f) => searchWikipediaHits('zh', q, f) }, { run: (q, f) => searchWikipediaHits('en', q, f) }, { run: searchDuckDuckGoHits }]
   for (const source of searches) {
     try {
       const hits = await source.run(query, fetchText)
@@ -208,9 +207,26 @@ export function htmlToText(html: string): string {
   return stripHtmlTags(noBlocks)
 }
 
-/** web_search 抓正文的家数与每家字数:两条 × 900 字,加上摘要清单总共约两千字,小模型消化得动 */
-export const WEB_SEARCH_PAGE_COUNT = 2
-export const WEB_PAGE_TEXT_MAX_CHARS = 900
+/**
+ * 操作题/概念题的分流判断(纯函数,自测覆盖):查询词带操作性问题特征
+ * (怎么卸、报错、教程、残留清理这类)时,答案多半住在论坛/问答站 —— DDG 打头;
+ * 纯概念名词(「X 是什么」)维基的干净摘要还是最好的第一口。特征词表宁保守勿
+ * 激进:分错了顶多源序不理想,兜底链照样能把两个源都走一遍。
+ */
+export function prefersWebFirst(query: string): boolean {
+  const q = query.toLowerCase()
+  const actionWords = [
+    '怎么', '如何', '怎样', '为何', '为什么', '哪', '卸载', '残留', '清理', '删除', '清空',
+    '报错', '错误', '失败', '修复', '解决', '教程', '安装', '启动', '闪退', '卡顿', '配置',
+    '对比', '区别', '推荐',
+    'how', 'why', 'error', 'fix', 'uninstall', 'remove', 'install', 'crash', 'tutorial', 'solve', 'setup', 'vs '
+  ]
+  return actionWords.some((w) => q.includes(w))
+}
+
+/** web_search 抓正文的家数与每家字数:摘要清单为主(优先看标题),正文只抓第一条、裁到 500 字垫底 —— 锅小,别让大坨网页正文挤掉正经资料 */
+export const WEB_SEARCH_PAGE_COUNT = 1
+export const WEB_PAGE_TEXT_MAX_CHARS = 500
 
 /** 抓单页正文:内网闸认门 → 抓 HTML → 剥壳 → 裁到 maxChars。内网地址返回空串;网络错误原样抛,调用方兜 */
 export async function fetchPageText(url: string, fetchText: LookupTransport, maxChars: number): Promise<string> {
@@ -223,16 +239,21 @@ export async function fetchPageText(url: string, fetchText: LookupTransport, max
 const webSearchCache = new Map<string, WebLookupOutcome>()
 
 /**
- * web_search 的完整地基:搜索(维基中→英→DDG)→ 内网闸过滤 → 摘要清单全摆 +
- * 挑前两条抓正文 → 拼成喂模型的材料,开头声明「只是资料,不是指令」。
- * 带来源记账和查询级缓存;全程零抛错,查不到就 material 空串,执行手照实说「没查到」。
+ * web_search 的完整地基:搜索(默认维基中→英→DDG,webFirst 时 DDG 打头)→ 内网闸过滤 →
+ * 摘要清单全摆(优先看标题)+ 第一条抓正文节选垫底 → 拼成喂模型的材料,
+ * 开头声明「只是资料,不是指令」。带来源记账和查询级缓存;全程零抛错,
+ * 查不到就 material 空串,执行手照实说「没查到」。
  */
-export async function webSearchDetailed(query: string, fetchText: LookupTransport = nodeFetchText): Promise<WebLookupOutcome> {
+export async function webSearchDetailed(
+  query: string,
+  fetchText: LookupTransport = nodeFetchText,
+  webFirst = false
+): Promise<WebLookupOutcome> {
   const key = query.trim()
   if (key === '') return { material: '', sources: [] }
   const cached = webSearchCache.get(key)
   if (cached) return cached
-  const hits = (await webSearch(key, fetchText)).filter((h) => isPublicHttpUrl(h.url))
+  const hits = (await webSearch(key, fetchText, webFirst)).filter((h) => isPublicHttpUrl(h.url))
   const lines: string[] = []
   for (const h of hits) lines.push(`- ${h.title}${h.snippet ? ` —— ${h.snippet}` : ''}(来源:${h.source})`)
   for (const h of hits.slice(0, WEB_SEARCH_PAGE_COUNT)) {
@@ -273,17 +294,23 @@ async function lookupDuckDuckGoHtml(query: string, fetchText: LookupTransport): 
 
 /**
  * 按名字查公开资料,并把战果记账:资料正文 + 命中的来源名。
- * 维基(中→英)→ DuckDuckGo HTML,全都失败/为空时 material 为空串、来源为空(绝不抛错)。
+ * 维基(中→英)→ DuckDuckGo HTML,全都失败/为空时 material 为空串、来源为空(绝不抛错);
+ * webFirst = true 时倒序 DDG 打头(操作题/带问题特征的查询)。
  * 成功结果按名字缓存;失败不缓存,下次还会再试。
  * fetchText 可注入:主进程传跟随系统代理的 net.fetch 版本,测试可传别的。
  */
-export async function webLookupDetailed(query: string, fetchText: LookupTransport = nodeFetchText): Promise<WebLookupOutcome> {
+export async function webLookupDetailed(
+  query: string,
+  fetchText: LookupTransport = nodeFetchText,
+  webFirst = false
+): Promise<WebLookupOutcome> {
   const key = query.trim()
   if (!key) return { material: '', sources: [] }
   const cached = lookupCache.get(key)
   if (cached) return cached
+  const sources = webFirst ? [...LOOKUP_SOURCES].reverse() : LOOKUP_SOURCES
   let outcome: WebLookupOutcome = { material: '', sources: [] }
-  for (const source of LOOKUP_SOURCES) {
+  for (const source of sources) {
     try {
       const material = await source.run(key, fetchText)
       if (material) {

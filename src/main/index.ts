@@ -22,6 +22,7 @@ import {
   buildAgentReminder,
   compressAgentMessages,
   extractToolCalls,
+  emergencySlim,
   mergeUsage,
   sanitizeAgentRelPath,
   stripLastAgentReminder,
@@ -83,7 +84,7 @@ import {
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
-import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
+import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, prefersWebFirst, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
@@ -932,12 +933,14 @@ async function agentReadFile(
 }
 
 /**
- * web_search 的执行手(联网锤):免费档搜索(维基中→英→DDG)+ 挑前两条抓正文,
+ * web_search 的执行手(联网锤):免费档搜索 + 第一条正文节选,源序按模型点的 source 走 ——
+ * 传 web 就 DDG 打头,传 wiki 维基打头,不传按查询词自动分流(操作题 DDG 先上)。
  * 三道闸(搜索词安检/内网闸/防上当声明)都扎在 weblookup.ts 的纯函数层,这边只管跑和报。
  * 查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
  */
-async function agentWebSearch(query: string): Promise<{ ok: boolean; text: string; hint?: string }> {
-  const found = await webSearchDetailed(query, electronFetchText)
+async function agentWebSearch(query: string, source: string | undefined): Promise<{ ok: boolean; text: string; hint?: string }> {
+  const webFirst = source === 'web' ? true : source === 'wiki' ? false : prefersWebFirst(query)
+  const found = await webSearchDetailed(query, electronFetchText, webFirst)
   if (found.material === '') {
     return { ok: false, text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准', hint: '没查到' }
   }
@@ -1041,6 +1044,8 @@ async function runAgentChat(input: {
   let reminderFailsafe = false
   // 复读机兜底也只许用一次:重说还打转就截断交卷,不无限跟它耗
   let repetitionRetried = false
+  // 紧急瘦身也只许用一次:裁旧账重试还爆,就是这锅真装不下,照实报错
+  let slimRetried = false
   addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
@@ -1117,6 +1122,21 @@ async function runAgentChat(input: {
         messages.splice(0, messages.length, ...messages.filter((m) => !(m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))))
         sendAgentStep(event, requestId, '这个模型不太习惯多出来的小纸条,撤掉重答')
         continue
+      }
+      // 紧急瘦身兜底:轮间的纸条压缩是保养,服务直接甩「上下文装不下」拒收时只有整段裁旧账能救 ——
+      // 只保 system 和最新真问题(400 拒收时模型一个字没吐,重试不重影);只兜一次,再爆就照实报错
+      if (round.status === 'error' && isContextOverflow(round.text) && !slimRetried) {
+        slimRetried = true
+        const slimmed = emergencySlim(messages)
+        if (slimmed) {
+          messages.splice(0, messages.length, ...slimmed.messages)
+          // 旧账清了,防打转的账本跟着清:被裁掉结果的旧工具调用,模型要重温得允许重翻
+          doneCalls.clear()
+          callIdToKey.clear()
+          skipNudgeOnce = true
+          sendAgentStep(event, requestId, `对话把模型的脑容量撑爆了:把翻看前的旧账整段清掉(约 ${slimmed.dropped} 条),保住你最新的问题,重答一遍`)
+          continue
+        }
       }
       return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
     }
@@ -1195,7 +1215,7 @@ async function runAgentChat(input: {
           : callName === 'search_content'
             ? await agentSearchContent(rootPath, relPath, keyword)
             : callName === 'web_search'
-              ? await agentWebSearch(query ?? '')
+              ? await agentWebSearch(query ?? '', call.args?.source === 'wiki' || call.args?.source === 'web' ? call.args.source : undefined)
               : await agentReadFile(rootPath, relPath, readChars)
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
@@ -1915,7 +1935,8 @@ function registerIpc(): void {
       const query = pickWebLookupQuery(questionText, attachment)
       sendChatLookup(event, requestId, 'searching', [])
       try {
-        const found = await webLookupDetailed(query, electronFetchText)
+        // 操作题(怎么卸/报错/教程这类)DDG 打头,概念题维基先上 —— 分流判断在纯函数层
+        const found = await webLookupDetailed(query, electronFetchText, prefersWebFirst(query))
         outcome = { kind: 'attempted', material: found.material, sources: found.sources }
         if (found.material) webMaterial = { query, material: found.material }
       } catch {
@@ -1982,10 +2003,24 @@ function registerIpc(): void {
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      const res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, cap, {
+      const streamOpts = {
         allowThinking: thinking,
         onRestart: () => sendResetDelta(event, requestId)
-      })
+      }
+      let res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, cap, streamOpts)
+      // 上下文爆了的自动救援(自动压缩那案):服务拒收时模型一个字没吐,把旧聊天史砍到最近 2 条重试一轮;
+      // 只兜一次,再爆就照实给指路话,不跟它无限耗
+      if (res.status === 'error' && isContextOverflow(res.text)) {
+        sendResetDelta(event, requestId)
+        const slimMessages = buildFreeChatMessages(systemPrompt, attachment, history.slice(-2), questionText2, webMaterial, codeRefs, summary)
+        res = await explainWithMessages(resolved.target, slimMessages, makeDeltaSender(event, requestId), aborter.signal, cap, streamOpts)
+        if (res.status === 'error' && isContextOverflow(res.text)) {
+          res = {
+            ...res,
+            text: '这段对话把模型的上下文撑爆了(已经自动清掉旧聊天重试过还是不行):点「新对话」轻装上阵,或者把模型的上下文调大再来。'
+          }
+        }
+      }
       // 用户主动掐掉(经 atlas:ai-cancel):如实记 cancelled,不算模型出错
       const status = aborter.signal.aborted ? 'cancelled' : res.status
       return { ...res, status, webLookup: meta }

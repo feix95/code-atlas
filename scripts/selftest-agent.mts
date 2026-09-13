@@ -22,6 +22,7 @@ import {
   assembleToolCalls,
   buildAgentReminder,
   compressAgentMessages,
+  emergencySlim,
   estimateMessagesTokens,
   extractToolCalls,
   looksLikeToolsUnsupported,
@@ -32,7 +33,7 @@ import {
   toolCallKey,
   type AgentChatMessage
 } from '../src/ai/agent.ts'
-import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
+import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, prefersWebFirst, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
 
 function main(): void {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
@@ -104,9 +105,11 @@ function main(): void {
   assert.deepEqual(searchTool.function.parameters.required, ['keyword'], 'search_content 必须带 keyword')
   assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
 
-  // web_search 的必填是搜索词 query
+  // web_search 的必填是搜索词 query;source 可选参数只认 wiki/web
   const webTool = AGENT_TOOLS.find((t) => t.function.name === 'web_search')!
   assert.deepEqual(webTool.function.parameters.required, ['query'], 'web_search 必须带 query')
+  assert.ok(!webTool.function.parameters.required.includes('source'), 'source 是可选项:不传走程序自动分流')
+  assert.ok(webTool.function.parameters.properties.source, 'web_search 要有 source 参数让模型挑源')
 
   // ── 7. 步骤播报:翻什么、看成没看成,一句大白话 ──
   assert.ok(agentStepText('list_files', 'src', 'done', '共 3 个').includes('src'), '翻完要带上目标名')
@@ -268,8 +271,8 @@ function main(): void {
   assert.ok(!page.includes('<p>') && !page.includes('<b>'), '标签剥干净')
   assert.ok(!page.includes('外壳'), 'head 整块剥掉')
 
-  assert.equal(WEB_SEARCH_PAGE_COUNT, 2, 'web_search 默认抓两条正文')
-  assert.ok(WEB_PAGE_TEXT_MAX_CHARS >= 500 && WEB_PAGE_TEXT_MAX_CHARS <= 1500, '每条正文的字数是个讲道理的数')
+  assert.equal(WEB_SEARCH_PAGE_COUNT, 1, 'web_search 默认只抓一条正文:摘要清单为主,别让大坨正文挤锅')
+  assert.ok(WEB_PAGE_TEXT_MAX_CHARS >= 400 && WEB_PAGE_TEXT_MAX_CHARS <= 800, '每条正文的字数是个讲道理的数(瘦身后的轻量档)')
 
   // ── 16b. 维基相关性把关(联网验收锤):弱关联垃圾不许截胡,真命中的放行 ──
   const hit = (title: string, snippet: string): WebSearchHit => ({ title, snippet, url: 'https://x.wiki/a', source: '维基百科(zh)' })
@@ -284,12 +287,54 @@ function main(): void {
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
   assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('source 参数'), '要教模型用 source 挑源(wiki/web)')
   assert.ok(AGENT_WEB_ADDENDUM.includes('换词再查'), '要教模型结果不对路时换词重查')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
   assert.ok(!AGENT_ADDENDUM.includes('web_search'), '没开联网时守则不提 web_search:模型连有这工具都不该知道')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 全部通过')
+  // ── 18. 操作题/概念题分流(联网分流锤):怎么卸/报错这类走网页搜索打头 ──
+  assert.equal(prefersWebFirst('永劫无间 卸载残留'), true, '卸载残留是操作题,DDG 打头')
+  assert.equal(prefersWebFirst('npm install 报错 EACCES 怎么解决'), true, '报错+怎么解决,DDG 打头')
+  assert.equal(prefersWebFirst('skills 都装在哪了'), true, '「在哪」是找路问题,DDG 打头')
+  assert.equal(prefersWebFirst('Rust 是什么'), false, '概念题维基先上')
+  assert.equal(prefersWebFirst('LLM 大语言模型'), false, '纯名词维基先上')
+  assert.equal(prefersWebFirst('Claude Code'), false, '软件名无操作特征,维基先上')
+
+  // ── 19. 紧急瘦身(压缩那案的兜底):爆锅时整段裁旧账,只保 system 和最新真问题 ──
+  const fat: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '旧问题一' },
+    { role: 'assistant', content: '旧答案一' },
+    { role: 'user', content: '旧问题二' },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'read_file', arguments: '{"relPath":"a.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'c1', content: '文件内容一大坨' },
+    { role: 'user', content: buildAgentReminder('旧问题二') },
+    { role: 'user', content: '最新的真问题' }
+  ]
+  const slimmed = emergencySlim(fat)
+  assert.ok(slimmed, '肥对话要裁得动')
+  assert.equal(slimmed!.dropped, 6, '真问题之前的 6 条旧账全清')
+  assert.deepEqual(
+    slimmed!.messages.map((m) => m.role),
+    ['system', 'user'],
+    '只剩 system 和最新真问题:assistant/tool 的成对关系整段一起走,协议不破'
+  )
+  assert.equal((slimmed!.messages[1] as { content: string }).content, '最新的真问题', '保住的是最新的真问题')
+  assert.ok(fat[1] && 'content' in fat[1] && fat[1].content === '旧问题一', '原数组一个字不动(纯函数)')
+  const onlyQuestion: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '唯一的问题' }
+  ]
+  assert.equal(emergencySlim(onlyQuestion), null, '前面没有可裁的旧账:返回 null 照实报错,不硬撑')
+  const noSystem: AgentChatMessage[] = [
+    { role: 'user', content: '旧问题' },
+    { role: 'user', content: '新问题' }
+  ]
+  const slimmedNoSystem = emergencySlim(noSystem)
+  assert.ok(slimmedNoSystem && slimmedNoSystem.messages.length === 1 && slimmedNoSystem.messages[0].role === 'user', '没有 system 也照裁:不硬造 system')
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 全部通过')
 }
 
 main()
