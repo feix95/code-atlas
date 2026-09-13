@@ -2,11 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { NoteEntry } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
 
-export interface DetailTabDef {
-  key: string
-  label: string
-}
-
 export interface Crumb {
   label: string
   /** 完整路径,悬停时看全文;不传就只显示 label */
@@ -16,8 +11,9 @@ export interface Crumb {
 export type BadgeTone = 'blue' | 'green' | 'amber' | 'red' | 'muted'
 
 /**
- * 详情区固定头部:面包屑路径 + 实体名 + 副标题 + 徽章 + 关闭钮 + Tab 栏。
- * 头部钉在详情区顶部不跟内容滚 —— 不管滚到哪儿,都知道自己在看谁。
+ * 概览页签正文的轻头部:面包屑路径 + 实体名 + 副标题 + 徽章 + 备注钮。
+ * (页签改版后内页 Tab 和关闭钮退役了 —— 关闭归页签条管,聊天是独立的品类页签)
+ * 头部钉在正文顶部不跟内容滚 —— 不管滚到哪儿,都知道自己在看谁。
  * 第九十八锤:传了 onNoteSave 就有「写备注」入口 —— 小葵的一句话优先亮成副标题。
  */
 export function DetailHeader({
@@ -28,11 +24,7 @@ export function DetailHeader({
   note,
   onNoteSave,
   autoOpenNote,
-  badges,
-  tabs,
-  activeTab,
-  onTabChange,
-  onClose
+  badges
 }: {
   crumbs: Crumb[]
   /** 图标册里的名字(第一百零六锤):按册画线稿 */
@@ -43,13 +35,9 @@ export function DetailHeader({
   note?: NoteEntry | null
   /** 传了才显示备注入口;空串 = 删除备注 */
   onNoteSave?: (text: string) => void
-  /** 树上右键「写/编辑备注」时置真:详情头自动展开编辑框(第一百零二锤) */
+  /** 树上右键「写/编辑备注」时置真:头部自动展开编辑框(第一百零二锤) */
   autoOpenNote?: boolean
   badges?: Array<{ label: string; tone: BadgeTone }>
-  tabs?: DetailTabDef[]
-  activeTab?: string
-  onTabChange?: (key: string) => void
-  onClose: () => void
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -119,9 +107,6 @@ export function DetailHeader({
             <NotePen size={15} tapping={tapping} />
           </button>
         )}
-        <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭详情,回到项目概览">
-          ×
-        </button>
       </div>
       {editing && (
         <div className="note-editor">
@@ -146,21 +131,6 @@ export function DetailHeader({
             取消
           </button>
         </div>
-      )}
-      {tabs && tabs.length > 0 && (
-        <nav className="tabs" aria-label="详情标签">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              className={`tab${activeTab === t.key ? ' is-active' : ''}`}
-              aria-current={activeTab === t.key ? 'page' : undefined}
-              onClick={() => onTabChange?.(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
       )}
     </header>
   )

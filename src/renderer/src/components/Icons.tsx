@@ -113,7 +113,9 @@ const BOOK: Record<string, React.ReactNode> = {
   expand: <><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></>,
   collapse: <><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>,
   // 翻文件(第一百二十八锤):文件夹上搁一枚放大镜 —— 自己动手翻项目
-  folderSearch: <><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" /><circle cx="17" cy="17" r="3.5" /><path d="m19.8 19.8 2.2 2.2" /></>
+  folderSearch: <><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" /><circle cx="17" cy="17" r="3.5" /><path d="m19.8 19.8 2.2 2.2" /></>,
+  // 钉住(页签改版):一枚图钉 —— 双击页签把它钉住,树里换文件它不动
+  pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头) */

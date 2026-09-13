@@ -29,11 +29,12 @@ import {
   type RecentProject
 } from './recents'
 import { useAiAsk } from './useAiAsk'
-import { useAiChat, type AiChatApi } from './useAiChat'
+import { useAiChat, type AiChatApi, type ChatMessage } from './useAiChat'
 import { useChatSuggestions } from './useChatSuggestions'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useWindowMaximized } from './useWindowMaximized'
+import { KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh } from './components/Icons'
@@ -45,30 +46,31 @@ function driveCapacity(d: DriveInfo): string {
   return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
-// 文件详情的两个 Tab:概览 + Atlas 小探针。
-// 旧第三个「结构」Tab 已退役:结构清单跟关系一起搬进概览垫底(小葵拍板:
-// 冷门内容不占 Tab 位),文件/文件夹详情统一成两页
-type DetailTab = 'overview' | 'chat'
-
-const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
-  { key: 'overview', label: '概览' },
-  { key: 'chat', label: 'Atlas 小探针' }
-]
-
-const FOLDER_TABS: Array<{ key: DetailTab; label: string }> = [
-  { key: 'overview', label: '概览' },
-  { key: 'chat', label: 'Atlas 小探针' }
-]
-
-/** 右栏页签(页签地基):kind 区分「文件详情」和「源码预览」两种页签,同文件可各开一张。
- *  pinned=false 是临时页签 —— 全栏最多一张,被下一次单击顶替;双击(树上或页签上)转正 */
+/**
+ * 右栏页签(小葵的页签模型,2026-09-13 线框图定稿):
+ * 页签分三个品类 —— 概览 / Atlas 小探针(自由对话) / 文件预览,品类能不能挂在某个节点上,
+ * 由 paneKinds 的两层过滤管(先卡类型上限,再卡显示开关)。
+ * 没钉的页签是「跟随页签」:左侧树点谁,它就换成谁的内容;每个品类同时只有一张在跟随。
+ * 双击页签 = 钉住(pin):内容定在当时的节点上,树里换文件它不动,新文件的同品类额外新开一张。
+ * 对话页签钉住 = 这场对话分家单过(记录搬给它,公用场清空重开)。
+ */
 interface PaneTab {
   id: string
-  kind: 'file' | 'preview'
+  kind: PaneKind
+  /** 跟随页签=当前跟着的节点(每次跟随换装);钉住的=定死的节点。空串=项目主页/空槽 */
   relPath: string
   name: string
   icon: string
   pinned: boolean
+  /** 对话页签钉住分家时的初始记录(保活面板挂载时吃掉,之后各长各的) */
+  seed?: ChatMessage[]
+}
+
+// 页签 id 发号器:页签身份跟内容走是两回事,跟随页签换装不换 id(聊天草稿不丢)
+let tabSeq = 0
+function nextTabId(): string {
+  tabSeq += 1
+  return `tab:${tabSeq}`
 }
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
@@ -238,10 +240,14 @@ function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteMap>({})
   // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
   const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
-  // 右栏页签(页签地基):文件详情和源码预览各自成签,树从此常驻左栏不再换装。
-  // activeTabId = null 是底色页(文件夹详情/项目主页),页签全关时回到它
+  // 右栏页签(小葵的页签模型):页签分品类,没钉的跟着树走,钉住的定在原地;
+  // 品类显示开关记进本机,页签实例留着(取消勾选只是藏起来,再勾上连钉住状态都回来)
   const [tabs, setTabs] = useState<PaneTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const [enabledKinds, setEnabledKinds] = useState<Set<PaneKind>>(loadEnabledKinds)
+  // 系统自动勾回品类时刚点亮的那张页签:轻强调一下让用户察觉(小葵点的,别做得太静默)
+  const [flashTabId, setFlashTabId] = useState<string | null>(null)
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
   const [revealPaths, setRevealPaths] = useState<Set<string>>(new Set())
   // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;换预览文件即清
@@ -254,7 +260,6 @@ function App(): React.JSX.Element {
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [structure, setStructure] = useState<FileStructure | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   // 结构分析的票号:连点两个文件时,慢的旧响应回来不许盖新的账
@@ -280,27 +285,32 @@ function App(): React.JSX.Element {
   }))
   // 后退/前进跳转途中记录器闭嘴:恢复旧位置引发的一串选中不许再记新账
   const navTravelingRef = useRef(false)
-  // 自由对话账本上移(第一百二十四锤):全 app 只养一份,挂在 App 顶层 ——
-  // 换文件、换文件夹、切页签,聊天记录都活着;对话的是谁,由「当前参考资料」附件说话
-  const activeTabObj = tabs.find((t) => t.id === activeTabId) ?? null
-  // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后文件没了就渲染兜底)
+  // 自由对话的公用场(第一百二十四锤的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
+  // 换文件、换文件夹、切页签,聊天记录都活着;钉住对话页签时才把记录分家给新页签
+  // 显示开关过滤后的页签才上页签栏;取消勾选的页签实例还留着,勾回来连钉住状态一起回来
+  const visibleTabs = useMemo(() => tabs.filter((t) => enabledKinds.has(t.kind)), [tabs, enabledKinds])
+  const activeTabObj = visibleTabs.find((t) => t.id === activeTabId) ?? null
+  // 激活页签指向的文件/文件夹节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
   const activeFileNode = useMemo(
-    () => (activeTabObj?.kind === 'file' && result ? findFile(result.tree, activeTabObj.relPath) : null),
+    () => (activeTabObj && (activeTabObj.kind === 'preview' || (activeTabObj.kind === 'overview' && activeTabObj.pinned)) && activeTabObj.relPath !== '' && result ? findFile(result.tree, activeTabObj.relPath) : null),
     [activeTabObj, result]
   )
-  const activePreview = useMemo(
-    () => (activeTabObj?.kind === 'preview' && result ? findFile(result.tree, activeTabObj.relPath) : null),
+  const activeDirNode = useMemo(
+    () => (activeTabObj?.kind === 'overview' && activeTabObj.pinned && result ? findDir(result.tree, activeTabObj.relPath) : null),
     [activeTabObj, result]
   )
-  const chatContext = !result
-    ? null
-    : activePreview
-      ? buildFileAttachment(activePreview, null)
-      : selectedFile
-        ? buildFileAttachment(selectedFile, structure)
-        : selectedFolder
-          ? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
-          : null
+  // 公用场的聊天上下文:预览页签激活时聊左栏那扇窗,其余时候跟着选中的文件/文件夹走;
+  // 什么都没选就聊项目根 —— 探针随时都在,不挑时候
+  const chatContext = useMemo(() => {
+    if (!result) return null
+    if (activeTabObj?.kind === 'preview' && activeTabObj.relPath !== '') {
+      const f = findFile(result.tree, activeTabObj.relPath)
+      if (f) return buildFileAttachment(f, null)
+    }
+    if (selectedFile) return buildFileAttachment(selectedFile, structure)
+    if (selectedFolder) return buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
+    return buildFolderAttachment(result.tree, result.rootName)
+  }, [result, activeTabObj, selectedFile, selectedFolder, structure])
   // 翻文件模式(agent)的项目根从这儿递进去:沙盒只认这个目录,越界的活儿一律不接
   const chat = useAiChat(chatContext, result?.rootPath ?? null)
   const folderRef = useRef(folder)
@@ -413,6 +423,12 @@ function App(): React.JSX.Element {
     scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
   }
 
+  // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
+  function pushNav(loc: NavLocation): void {
+    if (navTravelingRef.current) return
+    setNav((prev) => pushNavLocation(prev.stack, prev.index, loc))
+  }
+
   // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条。
   // 扫成的图递还给调用方(后退/前进恢复选中要在新树上找人);扫砸了回 null
   async function scanPath(dir: string): Promise<ScanResult | null> {
@@ -425,9 +441,7 @@ function App(): React.JSX.Element {
     setError(null)
     setSelectedFile(null)
     setSelectedFolder(null)
-    setActiveTab('overview')
-    setTabs([])
-    setActiveTabId(null)
+    resetPaneTabs()
     setRevealPaths(new Set())
     setPreviewRefs([])
     setStructure(null)
@@ -500,51 +514,118 @@ function App(): React.JSX.Element {
     await scanPath(dir)
   }
 
-  /**
-   * 选中文件(页签地基后它就是「打开文件页签」的唯一入口):
-   * 页签层 —— 同文件已开就激活(顺带响应钉住);keepTab 且当前是文件页签就原地换内容
-   * (关系链浏览);否则写临时位,被下一次单击顶替,双击才转正。
-   * 数据层 —— 静态详情立即出,本地结构分析自动跑(不耗模型),AI 绝不自动启动。
-   * fromTab = 从页签切换/关闭接力过来的:页签层已就位,不记导航、不重置内页 Tab。
-   */
-  async function handleSelectFile(
-    relPath: string,
-    file: ScanFileNode,
-    opts?: { keepTab?: boolean; pin?: boolean; fromTab?: boolean }
-  ): Promise<void> {
-    const seq = ++analyzeSeq.current
-    if (!opts?.fromTab) pushNav({ folder, file: relPath, dir: null })
+  // ── 页签层(小葵的页签模型:品类页签 + 双击钉住 + 空白右键品类菜单) ──
 
-    let targetId = `file:${relPath}`
-    const existing = tabs.find((t) => t.kind === 'file' && t.relPath === relPath)
-    const cur = tabs.find((t) => t.id === activeTabId)
-    if (existing) {
-      targetId = existing.id
-      if (opts?.pin && !existing.pinned) {
-        setTabs((prev) => prev.map((t) => (t.id === existing.id ? { ...t, pinned: true } : t)))
-      }
-    } else if (opts?.keepTab && cur && cur.kind === 'file') {
-      // 原地换内容:还是那张页签,只是装的文件换了,钉住状态保留
-      targetId = `file:${relPath}`
-      setTabs((prev) =>
-        prev.map((t) => (t.id === cur.id ? { ...t, id: targetId, relPath, name: file.name, icon: file.summary?.icon ?? 'file' } : t))
-      )
-    } else {
-      const tab: PaneTab = { id: targetId, kind: 'file', relPath, name: file.name, icon: file.summary?.icon ?? 'file', pinned: !!opts?.pin }
-      const temp = tabs.find((t) => !t.pinned)
-      setTabs((prev) => (temp ? prev.map((t) => (t.id === temp.id ? tab : t)) : [...prev, tab]))
+  // 开一张新图/回家时页签重置:概览+探针两张跟随页签就位(勾着的品类才可见),
+  // 激活可见的第一张;预览不预开 —— 双击文件才开
+  function resetPaneTabs(): void {
+    const overview = paneTabFor('overview', null)
+    const probe = paneTabFor('chat', null)
+    setTabs([overview, probe])
+    setActiveTabId(enabledKinds.has('overview') ? overview.id : enabledKinds.has('chat') ? probe.id : null)
+  }
+
+  // 系统自动勾回品类时给刚亮起的页签一点轻强调:让用户察觉「设置刚被自动改了」,
+  // 过几天不会莫名其妙 —— 不弹窗、不出声,就是页签卡上闪一下(小葵点的细节)
+  function markFlash(id: string): void {
+    setFlashTabId(id)
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
+    flashTimerRef.current = setTimeout(() => setFlashTabId(null), 1200)
+  }
+
+  // 按品类造一张页签:跟随页签挂品类名牌(装着谁看正文头部,页签栏才分得清品类);
+  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装)
+  function paneTabFor(kind: PaneKind, node: ScanFileNode | ScanDirNode | null): PaneTab {
+    return {
+      id: nextTabId(),
+      kind,
+      relPath: node?.relPath ?? '',
+      name: KIND_LABELS[kind],
+      icon: KIND_ICONS[kind],
+      pinned: false
     }
-    setActiveTabId(targetId)
-    if (result) setRevealPaths(new Set(dirChainOf(result.tree, relPath)))
+  }
 
+  // 钉住瞬间页签该固化的门面:换成具体节点的名和图标,分得清钉的是谁;节点没了退回品类名牌
+  function solidFace(kind: PaneKind, relPath: string): { name: string; icon: string } {
+    const f = relPath === '' ? null : result ? findFile(result.tree, relPath) : null
+    if (f) return { name: f.name, icon: f.summary?.icon ?? 'file' }
+    const d = relPath === '' ? (result?.tree ?? null) : result ? findDir(result.tree, relPath) : null
+    if (d) return { name: d.name || result?.rootName || KIND_LABELS[kind], icon: d.summary?.icon ?? 'folder' }
+    return { name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
+  }
+
+  // 让某品类的页签亮起来装着 node:有跟随页签就确认内容到位,没有(被钉死/被关了/被藏了)
+  // 就新开一张 —— 钉住的那张永远不碰,这正是「固定了,新内容额外新开一张」的来由。
+  // auto = 入口撞上被关掉的品类,系统自动勾回来:顺带给页签一点轻强调
+  function ensureKindTab(kind: PaneKind, node: ScanFileNode | ScanDirNode | null, auto = false): void {
+    if (!enabledKinds.has(kind)) {
+      const next = new Set(enabledKinds)
+      next.add(kind)
+      setEnabledKinds(next)
+      saveEnabledKinds(next)
+    }
+    const slot = tabs.find((t) => t.kind === kind && !t.pinned)
+    if (slot) {
+      setActiveTabId(slot.id)
+      if (auto) markFlash(slot.id)
+      return
+    }
+    const tab = paneTabFor(kind, node)
+    setTabs((prev) => [...prev, tab])
+    setActiveTabId(tab.id)
+    if (auto) markFlash(tab.id)
+  }
+
+  // 跟随页签全员转向:没钉的页签都是「当前选中的镜子」,树里点谁它们的 relPath 一起换过去
+  // (名字图标不动 —— 页签栏挂的是品类名牌);钉住的不碰,节点类型用不上的品类(preview 撞
+  // 上文件夹)也不跟,安分守己
+  function retargetFollowTabs(node: ScanFileNode | ScanDirNode): void {
+    const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
+    setTabs((prev) => prev.map((t) => (!t.pinned && caps.includes(t.kind) ? { ...t, relPath: node.relPath } : t)))
+  }
+
+  // 品类开关(页签栏空白右键的菜单):勾 = 显示这个品类,不勾 = 藏起来。
+  // 藏只是藏,页签实例连着钉住状态一起留着,再勾上原样回来
+  function toggleKind(kind: PaneKind, on: boolean): void {
+    if (on) {
+      if (!enabledKinds.has(kind)) {
+        const next = new Set(enabledKinds)
+        next.add(kind)
+        setEnabledKinds(next)
+        saveEnabledKinds(next)
+      }
+      ensureKindTab(kind, selectedFile ?? selectedFolder, true)
+      return
+    }
+    const next = new Set(enabledKinds)
+    next.delete(kind)
+    setEnabledKinds(next)
+    saveEnabledKinds(next)
+    // 藏的正好是激活品类:就近挪到剩下的可见页签,全空就是底板
+    if (activeTabObj?.kind === kind) {
+      const rest = visibleTabs.filter((t) => t.kind !== kind)
+      setActiveTabId(rest.length > 0 ? rest[rest.length - 1].id : null)
+    }
+  }
+
+  /**
+   * 树里单击文件(小葵拍的规矩:单击就是换内容):选中它,右栏跟随页签全体转向它;
+   * 激活的页签要是钉着,新内容就额外开一张新页签。本地结构分析照旧自动跑(不耗模型)。
+   */
+  async function followFile(file: ScanFileNode): Promise<void> {
+    const seq = ++analyzeSeq.current
+    pushNav({ folder, file: file.relPath, dir: null })
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
-    // 聊天中点文件(第一百二十四锤):不切台、不抢话头,只把新资料塞给探针接着聊。
-    // 点的就是当前这个就不垫字:资料一个字没变,刷一条「换成了」纯属垃圾(小葵点的)
-    const chatting = activeTab === 'chat'
-    if (!opts?.keepTab && !opts?.fromTab && !chatting) setActiveTab('overview')
-    if (chatting && chat.messages.length > 0 && selectedFile?.relPath !== relPath) chat.note(`参考资料换成了 ${file.name}`)
+    // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
+    if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath) chat.note(`参考资料换成了 ${file.name}`)
+    retargetFollowTabs(file)
+    // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览
+    const kind = activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
+    ensureKindTab(kind, file)
+    if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     if (!file.language) {
       setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「Atlas 小探针」问', kind: 'info' })
@@ -555,7 +636,7 @@ function App(): React.JSX.Element {
     try {
       // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
       if (!result) return
-      const fs = await window.atlas.analyzeFile(result.rootPath, relPath, file.language.id)
+      const fs = await window.atlas.analyzeFile(result.rootPath, file.relPath, file.language.id)
       if (seq !== analyzeSeq.current) return // 用户已经点了别的文件,这份旧账作废
       if (fs) {
         setStructure(fs)
@@ -568,6 +649,22 @@ function App(): React.JSX.Element {
     } finally {
       if (seq === analyzeSeq.current) setAnalyzing(false)
     }
+  }
+
+  // 树里点文件夹:选中出概览,页签规矩同文件;箭头管展开,点名字不触发扫描
+  function followDir(node: ScanDirNode): void {
+    pushNav({ folder, file: null, dir: node.relPath })
+    setSelectedFolder(node)
+    setSelectedFile(null)
+    setStructure(null)
+    setAnalyzeNote(null)
+    // 聊天中点文件夹(第一百二十四锤老规矩):只换资料不抢台 —— 探针页签本来就没动,垫字即可
+    if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
+      chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
+    retargetFollowTabs(node)
+    const kind = activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
+    ensureKindTab(kind, node)
+    if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
 
   async function handleLoadGraph(): Promise<void> {
@@ -584,81 +681,91 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,再走同一条选中链路
-  // keepTab:从关系卡跳的保持「关系」Tab,顺着依赖链一路看;从概览跳的回到概览
+  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,走同一条跟随链路;
   // 文件找不到再找目录:功能定位指中「整个功能住在这个文件夹」时也能跳
-  function jumpTo(relPath: string, keepTab = false): void {
+  function jumpTo(relPath: string): void {
     if (!result) return
     const found = findFile(result.tree, relPath)
     if (found) {
-      void handleSelectFile(found.relPath, found, { keepTab })
+      followFile(found)
       return
     }
     const dir = findDir(result.tree, relPath)
-    if (dir) handleSelectFolder(dir)
+    if (dir) followDir(dir)
   }
 
   // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发。
-  // 文件夹详情是底色页 —— 切过去等于把激活页签收起来(页签不关,回来还在)
-  function handleSelectFolder(node: ScanDirNode): void {
-    pushNav({ folder, file: null, dir: node.relPath })
-    setSelectedFolder(node)
-    setSelectedFile(null)
-    setStructure(null)
-    setAnalyzeNote(null)
-    // 聊天中点文件夹(第一百二十四锤):同文件的处理,不切台,只换附件;
-    // 点的就是当前这个就不垫字(资料没变,刷「换成了」是垃圾)
-    if (activeTab === 'chat') {
-      if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
-        chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
-      return
-    }
-    setActiveTabId(null)
-    setActiveTab('overview')
-  }
+  // (followDir 在上面,和文件共用一套页签规矩)
 
-  // 底色页的 ×:清掉文件夹选中回项目主页;页签是页签的事,这里不碰
+  // 后退/前进回到「没选中」的一站:选中清空,概览页签回项目主页(它的零状态)
   function clearSelection(): void {
     setSelectedFolder(null)
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
-    setActiveTabId(null)
-    setActiveTab('overview')
+    ensureKindTab('overview', null)
   }
 
-  // 页签操作:激活(文件页签顺带把数据装回来)、钉住(纯页签层,不重跑分析)、关闭(VS Code 接力规矩)
+  // 页签操作:激活(树里顺势照过来)、双击钉住/拆钉(对话页签的分家规矩在里面)、关闭(接力规矩)
   function activateTab(id: string): void {
     if (id === activeTabId) return
-    const t = tabs.find((x) => x.id === id)
+    const t = visibleTabs.find((x) => x.id === id)
     setActiveTabId(id)
-    if (t?.kind === 'file') {
-      const f = result && findFile(result.tree, t.relPath)
-      if (f) void handleSelectFile(f.relPath, f, { fromTab: true })
-    }
+    // 点亮页签时树里顺势照过来:父目录链展开+滚到可见 —— 点钉住的旧文件也能在树里找到家
+    if (t && t.relPath && result) setRevealPaths(new Set(dirChainOf(result.tree, t.relPath)))
   }
 
-  function pinTab(id: string): void {
-    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: true } : t)))
+  function pinToggleTab(id: string): void {
+    const t = tabs.find((x) => x.id === id)
+    if (!t) return
+    if (!t.pinned) {
+      // 钉住 = 固化门面:页签名换成具体节点,树里再怎么换它都是这张脸
+      const face = solidFace(t.kind, t.relPath)
+      if (t.kind === 'chat') {
+        // 探针正说着话就先别钉:分家会把半截回答留在公用场,钉出去的页签缺尾巴
+        if (chat.busy) {
+          chat.note('探针正说着话,等这句答完再钉')
+          return
+        }
+        if (chat.messages.length > 0) {
+          // 钉住 = 这场对话分家单过:记录搬给这张页签,公用场清空从头聊 ——
+          // 之后树里点新文件,新开的探针页签就是新对话(小葵拍的规定死)
+          const seed = chat.messages.slice()
+          setTabs((prev) => prev.map((x) => (x.id === id ? { ...x, pinned: true, seed, ...face } : x)))
+          chat.newChat()
+          return
+        }
+      }
+      setTabs((prev) => prev.map((x) => (x.id === id ? { ...x, pinned: true, ...face } : x)))
+      return
+    }
+    if (t.kind === 'chat') {
+      // 对话页签不拆钉:拆了它的记录没地方挂,会害用户丢对话
+      chat.note('钉住的对话不拆钉:想聊新的,点聊天面板里的「新对话」,或者关掉这张页签再开')
+      return
+    }
+    // 拆钉 = 变回跟随页签:挂回品类名牌,立刻转向当前选中的对象(类型对得上才转),别端着旧内容
+    const node = selectedFile ?? selectedFolder
+    const caps = node ? KIND_CAPS[node.type === 'file' ? 'file' : 'directory'] : null
+    const relPath = node && caps && caps.includes(t.kind) ? node.relPath : t.relPath
+    setTabs((prev) =>
+      prev.map((x) =>
+        x.id === id ? { ...x, pinned: false, relPath, name: KIND_LABELS[t.kind], icon: KIND_ICONS[t.kind] } : x
+      )
+    )
   }
 
   function closeTab(id: string): void {
-    const idx = tabs.findIndex((t) => t.id === id)
+    const idx = visibleTabs.findIndex((t) => t.id === id)
     if (idx === -1) return
-    const next = tabs.filter((t) => t.id !== id)
-    setTabs(next)
+    const nextVis = visibleTabs.filter((t) => t.id !== id)
+    setTabs((prev) => prev.filter((t) => t.id !== id))
     if (id !== activeTabId) return
-    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底色页(VS Code 同款)
-    const nextActive = next[idx] ?? next[idx - 1] ?? null
+    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底板(VS Code 同款)。
+    // 钉住的对话页签关掉 = 那场对话跟着蒸发(纯内存,记录不落盘)
+    const nextActive = nextVis[idx] ?? nextVis[idx - 1] ?? null
     setActiveTabId(nextActive?.id ?? null)
-    if (nextActive?.kind === 'file') {
-      const f = result && findFile(result.tree, nextActive.relPath)
-      if (f) void handleSelectFile(f.relPath, f, { fromTab: true })
-    } else if (!nextActive) {
-      setSelectedFile(null)
-      setStructure(null)
-      setAnalyzeNote(null)
-    }
+    if (nextActive?.relPath && result) setRevealPaths(new Set(dirChainOf(result.tree, nextActive.relPath)))
   }
 
   // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
@@ -669,6 +776,7 @@ function App(): React.JSX.Element {
     clearSelection()
     setTabs([])
     setActiveTabId(null)
+    setFlashTabId(null)
     setRevealPaths(new Set())
     setPreviewRefs([])
     setFolder(null)
@@ -693,49 +801,35 @@ function App(): React.JSX.Element {
     })
   }
 
-  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点让详情页出来,再弹编辑框
+  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点让概览页签出来,再弹编辑框
   function editNoteFromTree(relPath: string): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
     if (f) {
-      void handleSelectFile(f.relPath, f)
+      followFile(f)
       setNoteEditRequest(relPath)
       return
     }
     const d = findDir(result.tree, relPath)
     if (d) {
-      handleSelectFolder(d)
+      followDir(d)
       setNoteEditRequest(relPath)
     }
   }
 
-  // 开一张预览页签(页签地基):同文件的预览页签已开就激活,否则写临时位(可被下一次顶替)。
-  // 引用就地清账 —— 行号是跟着文件走的;jump 带行号时预览窗滚过去
-  function openPreviewTab(relPath: string, jump: { line: number; seq: number } | null): void {
+  // 树上双击/右键「预览文件」:让「文件预览」页签亮起来装着它(预览被藏了就自动勾回)。
+  // 文件还不是当前选中才走跟随链路 —— 双击总伴着单击,别把导航账记重了
+  function openPreview(relPath: string): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
     if (!f) return
-    setPreviewRefs([])
-    setPreviewJump(jump)
-    const targetId = `preview:${relPath}`
-    const existing = tabs.find((t) => t.kind === 'preview' && t.relPath === relPath)
-    if (!existing) {
-      const tab: PaneTab = { id: targetId, kind: 'preview', relPath, name: f.name, icon: f.summary?.icon ?? 'file', pinned: false }
-      const temp = tabs.find((t) => !t.pinned)
-      setTabs((prev) => (temp ? prev.map((t) => (t.id === temp.id ? tab : t)) : [...prev, tab]))
-    }
-    setActiveTabId(targetId)
-    setRevealPaths(new Set(dirChainOf(result.tree, relPath)))
+    if (selectedFile?.relPath !== relPath) followFile(f)
+    ensureKindTab('preview', f)
   }
 
-  // 树上右键「预览文件」(第一百一十锤):从树上进的预览不带跳行
-  function openPreview(relPath: string): void {
-    openPreviewTab(relPath, null)
-  }
-
-  // 点聊天里的文件链接:树上查到就开预览页签,带行号的连滚带跳直达那一行;
+  // 点聊天里的文件链接:树上查到就选中+开预览,带行号的连滚带跳直达那一行;
   // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞。
-  // 用 refs 持有最新的 result/chat/openPreviewTab,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
+  // 用 refs 持有最新的 result/chat/openPreview,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
   // 流式输出时只有正在吐字的那条消息重画,别的消息一个字都不动(聊多了也不给画面上强度)
   const chatRef = useRef(chat)
   useEffect(() => {
@@ -745,9 +839,9 @@ function App(): React.JSX.Element {
   useEffect(() => {
     resultRef.current = result
   })
-  const openPreviewTabRef = useRef(openPreviewTab)
+  const openPreviewRef = useRef(openPreview)
   useEffect(() => {
-    openPreviewTabRef.current = openPreviewTab
+    openPreviewRef.current = openPreview
   })
   const openFileLink = useCallback((relPath: string, line?: number): void => {
     const cur = resultRef.current
@@ -757,7 +851,10 @@ function App(): React.JSX.Element {
       return
     }
     jumpSeqRef.current += 1
-    openPreviewTabRef.current(relPath, line !== undefined ? { line, seq: jumpSeqRef.current } : null)
+    // 引用就地清账 —— 行号是跟着文件走的
+    setPreviewRefs([])
+    setPreviewJump(line !== undefined ? { line, seq: jumpSeqRef.current } : null)
+    openPreviewRef.current(relPath)
   }, [])
 
   // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事
@@ -811,19 +908,10 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 退出预览的老函数已退役(页签地基):预览窗的 × 现在直接关页签(closeTab)
+  // 退出预览的老函数已退役(页签地基);树上双击钉住也退役了(小葵的页签模型:
+  // 钉不钉只看页签上的双击,树的双击专职开预览)
 
-  // 树上双击钉住:第一次 click 已经把临时页签开好,这里只翻钉子 ——
-  // 不重跑分析、不重复垫字,纯页签层的一步
-  function pinFileFromTree(relPath: string): void {
-    setTabs((prev) => prev.map((t) => (t.kind === 'file' && t.relPath === relPath ? { ...t, pinned: true } : t)))
-  }
-
-  // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
-  function pushNav(loc: NavLocation): void {
-    if (navTravelingRef.current) return
-    setNav((prev) => pushNavLocation(prev.stack, prev.index, loc))
-  }
+  // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
   // 后退/前进本体:游标挪一步,再按那站的样子把界面摆回去 —— 换项目就重扫,还在本项目就恢复选中
   async function goNav(delta: number): Promise<void> {
@@ -852,14 +940,14 @@ function App(): React.JSX.Element {
     if (loc.file) {
       const f = findFile(scanned.tree, loc.file)
       if (f) {
-        void handleSelectFile(f.relPath, f)
+        followFile(f)
         return
       }
     }
     if (loc.dir) {
       const d = findDir(scanned.tree, loc.dir)
       if (d) {
-        handleSelectFolder(d)
+        followDir(d)
         return
       }
     }
@@ -1012,12 +1100,11 @@ function App(): React.JSX.Element {
             <FileTree
               root={result.tree}
               notes={notes}
-              selectedPath={activeFileNode?.relPath ?? activePreview?.relPath ?? selectedFolder?.relPath ?? null}
+              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
               expandingPath={expanding}
               revealPaths={revealPaths}
-              onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
-              onPinFile={pinFileFromTree}
-              onSelectFolder={handleSelectFolder}
+              onSelectFile={(_relPath, file) => followFile(file)}
+              onSelectFolder={followDir}
               onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
               onNoteEdit={editNoteFromTree}
               onNoteRemove={(relPath) => saveNote(relPath, '')}
@@ -1051,136 +1138,200 @@ function App(): React.JSX.Element {
           />
           <section className="detail">
             {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
-            {activeTabObj && result ? (
-              // 页签态:顶上一条页签条,下面只渲染激活那张(VS Code 的克制:一次一个房间)
-              <>
-                <TabBar tabs={tabs} activeId={activeTabId} onActivate={activateTab} onClose={closeTab} onPin={pinTab} />
-                {activeTabObj.kind === 'preview' && activePreview ? (
-                  // 预览页签:合并页签,左源码右伴聊 —— 「边看代码边聊」有了自己的门牌
-                  <div className="preview-split" key={activeTabObj.id}>
-                    <CodePreview
-                      rootPath={result.rootPath}
-                      file={activePreview}
-                      canAddRef={previewRefs.length < CODE_REFS_MAX}
-                      refLimit={CODE_REFS_MAX}
-                      onAddRef={addPreviewRef}
-                      onClose={() => closeTab(activeTabObj.id)}
-                      jump={previewJump}
-                    />
-                    <PreviewChatPane
-                      file={activePreview}
+            <TabBar
+              tabs={visibleTabs}
+              activeId={activeTabId}
+              flashId={flashTabId}
+              onActivate={activateTab}
+              onClose={closeTab}
+              onPinToggle={pinToggleTab}
+              enabledKinds={enabledKinds}
+              onToggleKind={toggleKind}
+            />
+            {activeTabObj ? (
+              // 页签态:顶上一条页签条,下面只渲染激活那张(VS Code 的克制:一次一个房间)。
+              // 钉住的对话页签不在正房渲染 —— 它走下面的保活层,切走也不能拆账本
+              activeTabObj.kind === 'chat' && activeTabObj.pinned ? null : (
+                <div className="pane-body">
+                  {activeTabObj.kind === 'overview' ? (
+                    activeTabObj.pinned ? (
+                      // 钉住的概览:定在 pin 时的那个节点上(空槽 = 项目主页也照钉)
+                      activeTabObj.relPath === '' ? (
+                        <ProjectOverview
+                          key={activeTabObj.id}
+                          result={result}
+                          graph={graph}
+                          graphLoading={graphLoading}
+                          graphNote={graphNote}
+                          onLoadGraph={() => void handleLoadGraph()}
+                          onJump={jumpTo}
+                          gitInfo={gitInfo}
+                          onRefreshed={setGitInfo}
+                        />
+                      ) : activeFileNode ? (
+                        <FileOverviewPage
+                          key={activeTabObj.id}
+                          file={activeFileNode}
+                          result={result}
+                          structure={activeTabObj.relPath === selectedFile?.relPath ? structure : null}
+                          analyzing={activeTabObj.relPath === selectedFile?.relPath && analyzing}
+                          analyzeNote={activeTabObj.relPath === selectedFile?.relPath ? analyzeNote : null}
+                          graph={graph}
+                          graphLoading={graphLoading}
+                          graphNote={graphNote}
+                          onLoadGraph={() => void handleLoadGraph()}
+                          onJump={jumpTo}
+                          gitInfo={gitInfo}
+                          gitLoading={gitLoading}
+                          note={notes[activeFileNode.relPath] ?? null}
+                          onNoteSave={saveNote}
+                          autoOpenNote={noteEditRequest === activeFileNode.relPath}
+                          suggestionsOn={chatSuggestionsOn}
+                          onGoChat={() => ensureKindTab('chat', activeFileNode)}
+                        />
+                      ) : activeDirNode ? (
+                        <FolderOverviewPage
+                          key={activeTabObj.id}
+                          dir={activeDirNode}
+                          result={result}
+                          gitInfo={gitInfo}
+                          onJump={jumpTo}
+                          onRefreshed={setGitInfo}
+                          note={notes[activeDirNode.relPath] ?? null}
+                          onNoteSave={saveNote}
+                          autoOpenNote={noteEditRequest === activeDirNode.relPath}
+                          onGoChat={() => ensureKindTab('chat', activeDirNode)}
+                        />
+                      ) : (
+                        // 钉的节点在树里没了(重扫被删):退到项目主页,不装死
+                        <ProjectOverview
+                          key={activeTabObj.id}
+                          result={result}
+                          graph={graph}
+                          graphLoading={graphLoading}
+                          graphNote={graphNote}
+                          onLoadGraph={() => void handleLoadGraph()}
+                          onJump={jumpTo}
+                          gitInfo={gitInfo}
+                          onRefreshed={setGitInfo}
+                        />
+                      )
+                    ) : selectedFolder ? (
+                      // 跟随概览:左侧树选中谁就显示谁的概览(文件夹)
+                      <FolderOverviewPage
+                        key={selectedFolder.relPath || '(root)'}
+                        dir={selectedFolder}
+                        result={result}
+                        gitInfo={gitInfo}
+                        onJump={jumpTo}
+                        onRefreshed={setGitInfo}
+                        note={notes[selectedFolder.relPath] ?? null}
+                        onNoteSave={saveNote}
+                        autoOpenNote={noteEditRequest === selectedFolder.relPath}
+                        onGoChat={() => ensureKindTab('chat', selectedFolder)}
+                      />
+                    ) : selectedFile ? (
+                      // 跟随概览:左侧树选中谁就显示谁的概览(文件)
+                      <FileOverviewPage
+                        key={selectedFile.relPath}
+                        file={selectedFile}
+                        result={result}
+                        structure={structure}
+                        analyzing={analyzing}
+                        analyzeNote={analyzeNote}
+                        graph={graph}
+                        graphLoading={graphLoading}
+                        graphNote={graphNote}
+                        onLoadGraph={() => void handleLoadGraph()}
+                        onJump={jumpTo}
+                        gitInfo={gitInfo}
+                        gitLoading={gitLoading}
+                        note={notes[selectedFile.relPath] ?? null}
+                        onNoteSave={saveNote}
+                        autoOpenNote={noteEditRequest === selectedFile.relPath}
+                        suggestionsOn={chatSuggestionsOn}
+                        onGoChat={() => ensureKindTab('chat', selectedFile)}
+                      />
+                    ) : (
+                      // 什么都没选:概览页签的零状态 = 项目主页
+                      <ProjectOverview
+                        key={result.rootPath}
+                        result={result}
+                        graph={graph}
+                        graphLoading={graphLoading}
+                        graphNote={graphNote}
+                        onLoadGraph={() => void handleLoadGraph()}
+                        onJump={jumpTo}
+                        gitInfo={gitInfo}
+                        onRefreshed={setGitInfo}
+                      />
+                    )
+                  ) : activeTabObj.kind === 'chat' ? (
+                    // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四锤的老规矩)
+                    <div className="preview-chat soft-in">
+                      <FreeChatPanel
+                        chat={chat}
+                        context={chatContext}
+                        refs={previewRefs}
+                        onRemoveRef={removePreviewRef}
+                        onDropNode={handleDropNode}
+                        fileLinks={fileLinks}
+                        suggestionsOn={chatSuggestionsOn}
+                      />
+                    </div>
+                  ) : activeFileNode ? (
+                    // 预览页签:左源码右伴聊 —— 「边看代码边聊」的门牌
+                    <div className="preview-split" key={activeTabObj.id}>
+                      <CodePreview
+                        rootPath={result.rootPath}
+                        file={activeFileNode}
+                        canAddRef={previewRefs.length < CODE_REFS_MAX}
+                        refLimit={CODE_REFS_MAX}
+                        onAddRef={addPreviewRef}
+                        onClose={() => closeTab(activeTabObj.id)}
+                        jump={previewJump}
+                      />
+                      <PreviewChatPane
+                        file={activeFileNode}
+                        result={result}
+                        refs={previewRefs}
+                        onRemoveRef={removePreviewRef}
+                        chat={chat}
+                        chatContext={chatContext ?? buildFileAttachment(activeFileNode, null)}
+                        fileLinks={fileLinks}
+                        suggestionsOn={chatSuggestionsOn}
+                      />
+                    </div>
+                  ) : (
+                    <div className="pane-hint">
+                      {activeTabObj.relPath === ''
+                        ? '在左侧文件树双击一个文件,代码就在这儿看'
+                        : '这个文件不在树里了(可能被删了或改名了),双击树里的文件换一个看'}
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              // 一张页签都不显示(品类全被取消勾选):大 logo 底板,页签栏还在,右键空白处能勾回来
+              <PaneEmptyBoard />
+            )}
+            {/* 钉住的对话保活层:账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
+            {result &&
+              tabs
+                .filter((t) => t.kind === 'chat' && t.pinned)
+                .map((t) => (
+                  <div key={t.id} className={`pinned-chat-host${t.id === activeTabId ? '' : ' is-hidden'}`}>
+                    <PinnedChatPane
+                      tab={t}
                       result={result}
-                      refs={previewRefs}
-                      onRemoveRef={removePreviewRef}
-                      chat={chat}
-                      chatContext={chatContext ?? buildFileAttachment(activePreview, null)}
-                      fileLinks={fileLinks}
-                      suggestionsOn={chatSuggestionsOn}
-                    />
-                  </div>
-                ) : activeTabObj.kind === 'file' && activeFileNode ? (
-                  activeTab === 'chat' ? (
-                    // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
-                    <ChatTabDetailPage
-                      crumbs={buildCrumbs(result.rootName, result.rootPath, activeFileNode.relPath)}
-                      iconName={activeFileNode.summary?.icon ?? 'file'}
-                      title={activeFileNode.name}
-                      subtitle={
-                        activeFileNode.language
-                          ? `${activeFileNode.language.name} 文件 · 聊天接着聊,资料已经换成它了`
-                          : '聊天接着聊,资料已经换成它了'
-                      }
-                      tabs={FILE_TABS}
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      note={notes[activeFileNode.relPath] ?? null}
-                      onNoteSave={(text) => saveNote(activeFileNode.relPath, text)}
-                      autoOpenNote={noteEditRequest === activeFileNode.relPath}
-                      onClose={() => closeTab(activeTabObj.id)}
-                      chat={chat}
-                      chatContext={chatContext ?? buildFileAttachment(activeFileNode, structure)}
                       refs={previewRefs}
                       onRemoveRef={removePreviewRef}
                       onDropNode={handleDropNode}
                       fileLinks={fileLinks}
                       suggestionsOn={chatSuggestionsOn}
                     />
-                  ) : (
-                    <FileDetailView
-                      key={activeFileNode.relPath}
-                      file={activeFileNode}
-                      result={result}
-                      structure={structure}
-                      analyzing={analyzing}
-                      analyzeNote={analyzeNote}
-                      graph={graph}
-                      graphLoading={graphLoading}
-                      graphNote={graphNote}
-                      onLoadGraph={() => void handleLoadGraph()}
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      onClose={() => closeTab(activeTabObj.id)}
-                      onJump={(p) => jumpTo(p, true)}
-                      gitInfo={gitInfo}
-                      gitLoading={gitLoading}
-                      note={notes[activeFileNode.relPath] ?? null}
-                      onNoteSave={saveNote}
-                      autoOpenNote={noteEditRequest === activeFileNode.relPath}
-                      suggestionsOn={chatSuggestionsOn}
-                    />
-                  )
-                ) : null}
-              </>
-            ) : selectedFolder && result && activeTab === 'chat' ? (
-              // 底色页的文件夹聊天(锤 A 不动聊天):文件夹详情「Atlas 小探针」内页还是老样子
-              <ChatTabDetailPage
-                crumbs={buildCrumbs(result.rootName, result.rootPath, selectedFolder.relPath)}
-                iconName={selectedFolder.summary?.icon ?? 'folder'}
-                title={selectedFolder.name || result.rootName}
-                subtitle={selectedFolder.summary?.text ?? '文件夹'}
-                tabs={FOLDER_TABS}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                note={notes[selectedFolder.relPath] ?? null}
-                onNoteSave={(text) => saveNote(selectedFolder.relPath, text)}
-                autoOpenNote={noteEditRequest === selectedFolder.relPath}
-                onClose={clearSelection}
-                chat={chat}
-                chatContext={chatContext ?? buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)}
-                refs={previewRefs}
-                onRemoveRef={removePreviewRef}
-                onDropNode={handleDropNode}
-                suggestionsOn={chatSuggestionsOn}
-                fileLinks={fileLinks}
-              />
-            ) : selectedFolder && result ? (
-              <FolderDetailView
-                key={selectedFolder.relPath || '(root)'}
-                dir={selectedFolder}
-                result={result}
-                onClose={clearSelection}
-                gitInfo={gitInfo}
-                onJump={(p) => jumpTo(p)}
-                onRefreshed={setGitInfo}
-                note={notes[selectedFolder.relPath] ?? null}
-                onNoteSave={saveNote}
-                autoOpenNote={noteEditRequest === selectedFolder.relPath}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
-            ) : (
-              <ProjectOverview
-                key={result.rootPath}
-                result={result}
-                graph={graph}
-                graphLoading={graphLoading}
-                graphNote={graphNote}
-                onLoadGraph={() => void handleLoadGraph()}
-                onJump={(p) => jumpTo(p)}
-                gitInfo={gitInfo}
-                onRefreshed={setGitInfo}
-              />
-            )}
+                  </div>
+                ))}
           </section>
         </main>
       ) : (
@@ -1288,75 +1439,6 @@ function App(): React.JSX.Element {
 }
 
 /**
- * 聊天详情页(第一百二十五锤):文件/文件夹详情在聊天 Tab 下的稳定替身。
- * 从前聊天面板住在详情组件里,换文件整个重挂,面板闪一下、草稿和滚动位置全没;
- * 现在这一页是 App 渲染树上的常客,换谁资料,面板本体都纹丝不动。
- */
-function ChatTabDetailPage({
-  crumbs,
-  iconName,
-  title,
-  subtitle,
-  badges,
-  tabs,
-  activeTab,
-  onTabChange,
-  note,
-  onNoteSave,
-  autoOpenNote,
-  onClose,
-  chat,
-  chatContext,
-  refs,
-  onRemoveRef,
-  onDropNode,
-  fileLinks,
-  suggestionsOn
-}: {
-  crumbs: Crumb[]
-  iconName: string
-  title: string
-  subtitle?: string
-  badges?: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }>
-  tabs: Array<{ key: DetailTab; label: string }>
-  activeTab: DetailTab
-  onTabChange: (tab: DetailTab) => void
-  note?: NoteEntry | null
-  onNoteSave?: (text: string) => void
-  autoOpenNote?: boolean
-  onClose: () => void
-  chat: AiChatApi
-  chatContext: ChatContextAttachment
-  refs?: ChatCodeRef[]
-  onRemoveRef?: (index: number) => void
-  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
-  fileLinks?: FileLinkTarget | null
-  suggestionsOn: boolean
-}): React.JSX.Element {
-  return (
-    <div className="detail-page">
-      <DetailHeader
-        crumbs={crumbs}
-        iconName={iconName}
-        title={title}
-        subtitle={subtitle}
-        note={note}
-        onNoteSave={onNoteSave}
-        autoOpenNote={autoOpenNote}
-        badges={badges}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(key) => onTabChange(key as DetailTab)}
-        onClose={onClose}
-      />
-      <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
-      </div>
-    </div>
-  )
-}
-
-/**
  * 预览页签的右半(页签地基):小探针的自由对话列,专聊左边那扇源码窗里的文件。
  * 从前它是右栏整扇(PreviewDetailView,自带详情头);预览成页签后头没了 ——
  * 页签条管身份,CodePreview 管文件名,它只管聊。走的是详情页同一条聊天通道。
@@ -1398,12 +1480,11 @@ function PreviewChatPane({
 }
 
 /**
- * 文件详情:固定头部(面包屑/文件名/徽章/关闭)+ 三个 Tab(概览/Atlas 小探针/结构与关系)。
- * key = relPath:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消,
- * 旧响应回来也盖不到新文件头上。
- * 第一百二十四锤:自由对话的账本搬去了 App 顶层,换文件聊天记录不蒸发,组件只管收 chat 用。
+ * 概览页签的正文(文件版):讲解卡 + 结构清单 + 关系卡,头顶一条轻头部(面包屑/徽章/备注)。
+ * 内页 Tab 已退役 —— 「聊天」是独立的品类页签,概览想聊天就喊一声把探针页签点亮。
+ * key = 页签/文件身份:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消。
  */
-function FileDetailView({
+function FileOverviewPage({
   file,
   result,
   structure,
@@ -1413,16 +1494,14 @@ function FileDetailView({
   graphLoading,
   graphNote,
   onLoadGraph,
-  activeTab,
-  onTabChange,
-  onClose,
   onJump,
   gitInfo,
   gitLoading,
   note,
   onNoteSave,
   autoOpenNote,
-  suggestionsOn
+  suggestionsOn,
+  onGoChat
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1433,22 +1512,21 @@ function FileDetailView({
   graphLoading: boolean
   graphNote: string | null
   onLoadGraph: () => void
-  activeTab: DetailTab
-  onTabChange: (tab: DetailTab) => void
-  onClose: () => void
-  /** 关系卡跳转:保持当前 Tab */
+  /** 关系卡跳转 */
   onJump: (relPath: string) => void
   gitInfo: GitChangesResult | null
   gitLoading: boolean
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
-  /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
+  /** 树上右键「写/编辑备注」:头部自动展开编辑框 */
   autoOpenNote?: boolean
   /** 推荐问题总闸(设置里的「推荐问题」):关了概览 AI 卡不出预设题,烧模型的预测也一并歇 */
   suggestionsOn: boolean
+  /** 「去聊两句」:把 Atlas 小探针页签点亮装着这个文件 */
+  onGoChat: () => void
 }): React.JSX.Element {
-  // AI 解释:概览卡、小探针共用,证据优先的单问单答,绝不自动开跑
+  // AI 解释:概览卡,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
@@ -1484,62 +1562,52 @@ function FileDetailView({
         onNoteSave={(text) => onNoteSave(file.relPath, text)}
         autoOpenNote={autoOpenNote}
         badges={badges}
-        tabs={FILE_TABS}
-        activeTab={activeTab}
-        onTabChange={(key) => onTabChange(key as DetailTab)}
-        onClose={onClose}
       />
-      <div className={`detail-body${activeTab === 'chat' ? ' is-chat' : ''}`}>
-        {activeTab === 'overview' && (
-          <FileOverview
-            file={file}
-            noteText={note?.text}
-            presets={presets.questions}
-            structure={structure}
-            analyzing={analyzing}
-            analyzeNote={analyzeNote}
-            graph={graph}
-            graphLoading={graphLoading}
-            graphNote={graphNote}
-            onLoadGraph={onLoadGraph}
-            ai={ai}
-            onGoChat={() => onTabChange('chat')}
-            onJump={onJump}
-          />
-        )}
+      <div className="detail-body">
+        <FileOverview
+          file={file}
+          noteText={note?.text}
+          presets={presets.questions}
+          structure={structure}
+          analyzing={analyzing}
+          analyzeNote={analyzeNote}
+          graph={graph}
+          graphLoading={graphLoading}
+          graphNote={graphNote}
+          onLoadGraph={onLoadGraph}
+          ai={ai}
+          onGoChat={onGoChat}
+          onJump={onJump}
+        />
       </div>
     </div>
   )
 }
 
-/** 文件夹详情:静态目录概览为主;讲解卡在概览页,自由对话是独立 Tab/独立通道。
- * 第一百二十四锤:聊天账本在 App 顶层,Tab 也上移(聊天中换文件夹不被踢回概览) */
-function FolderDetailView({
+/** 概览页签的正文(文件夹版):静态目录概览为主,讲解卡在页面里;聊天是独立的品类页签 */
+function FolderOverviewPage({
   dir,
   result,
-  onClose,
   gitInfo,
   onJump,
   onRefreshed,
   note,
   onNoteSave,
   autoOpenNote,
-  activeTab,
-  onTabChange
+  onGoChat
 }: {
   dir: ScanDirNode
   result: ScanResult
-  onClose: () => void
   gitInfo: GitChangesResult | null
   onJump: (relPath: string) => void
   onRefreshed: (result: GitChangesResult) => void
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
-  /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
+  /** 树上右键「写/编辑备注」:头部自动展开编辑框 */
   autoOpenNote?: boolean
-  activeTab: DetailTab
-  onTabChange: (tab: DetailTab) => void
+  /** 「去聊两句」:把 Atlas 小探针页签点亮装着这个文件夹 */
+  onGoChat: () => void
 }): React.JSX.Element {
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
 
@@ -1560,25 +1628,71 @@ function FolderDetailView({
         onNoteSave={(text) => onNoteSave(dir.relPath, text)}
         autoOpenNote={autoOpenNote}
         badges={badges}
-        tabs={FOLDER_TABS}
-        activeTab={activeTab}
-        onTabChange={(key) => onTabChange(key as DetailTab)}
-        onClose={onClose}
       />
-      <div className={`detail-body${activeTab === 'chat' ? ' is-chat' : ''}`}>
-        {activeTab === 'overview' && (
-          <FolderOverview
-            dir={dir}
-            noteText={note?.text}
-            ai={ai}
-            onGoChat={() => onTabChange('chat')}
-            gitInfo={gitInfo}
-            rootPath={result.rootPath}
-            onJump={onJump}
-            onRefreshed={onRefreshed}
-          />
-        )}
+      <div className="detail-body">
+        <FolderOverview
+          dir={dir}
+          noteText={note?.text}
+          ai={ai}
+          onGoChat={onGoChat}
+          gitInfo={gitInfo}
+          rootPath={result.rootPath}
+          onJump={onJump}
+          onRefreshed={onRefreshed}
+        />
       </div>
+    </div>
+  )
+}
+
+/**
+ * 钉住的对话页签正文:pin 那一刻从公用场分家出来的独立账本(出生自带当时的记录),
+ * 上下文也定死在 pin 时的节点上 —— 树里换文件,这页对话纹丝不动。
+ * 它住在保活层里(只藏不拆),关掉页签才是这场对话的终点。
+ */
+function PinnedChatPane({
+  tab,
+  result,
+  refs,
+  onRemoveRef,
+  onDropNode,
+  fileLinks,
+  suggestionsOn
+}: {
+  tab: PaneTab
+  result: ScanResult
+  refs: ChatCodeRef[]
+  onRemoveRef: (index: number) => void
+  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+  fileLinks?: FileLinkTarget | null
+  suggestionsOn: boolean
+}): React.JSX.Element {
+  // 上下文定死在 pin 时的节点:文件在就是文件附件,文件夹/项目根就是文件夹附件,没了就空着
+  const context = useMemo(() => {
+    const f = tab.relPath === '' ? null : findFile(result.tree, tab.relPath)
+    if (f) return buildFileAttachment(f, null)
+    const d = tab.relPath === '' ? result.tree : findDir(result.tree, tab.relPath)
+    if (d) return buildFolderAttachment(d, d.name || result.rootName)
+    return null
+  }, [result, tab.relPath])
+  const chat = useAiChat(context, result.rootPath, tab.seed)
+
+  return (
+    <div className="preview-chat soft-in">
+      <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
+    </div>
+  )
+}
+
+/** 页签全关光时的底板:大 logo + 一句指路(页签栏还在,右键空白处能勾回来) */
+function PaneEmptyBoard(): React.JSX.Element {
+  return (
+    <div className="pane-empty">
+      <span className="pane-empty-mark" aria-hidden="true">
+        ⌁
+      </span>
+      <p className="pane-empty-title">页签都关掉了</p>
+      <p className="pane-empty-hint">在左侧文件树点一个文件就能打开;想勾回功能页,在页签栏空白处右键</p>
     </div>
   )
 }

@@ -89,7 +89,10 @@ function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
 export function useAiChat(
   context: ChatContextAttachment | null,
   /** 翻文件模式(agent)的项目根:沙盒的墙,工具只许在这目录里看;没开项目传 null */
-  rootPath: string | null
+  rootPath: string | null,
+  /** 出生自带的记录(页签改版):对话页签被钉住时,公用那场的记录当场分家给它,
+   *  新实例带着这些记录起步,之后各长各的;不传就从空聊天开始 */
+  initialMessages?: ChatMessage[]
 ): {
   messages: ChatMessage[]
   busy: boolean
@@ -108,7 +111,7 @@ export function useAiChat(
   send: (question: string, refs?: ChatCodeRef[]) => void
   cancel: () => void
 } {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? [])
   const [busy, setBusy] = useState(false)
   // 思考开关记在本地:换文件、重启应用都记住用户的选择
   const [thinking, setThinkingState] = useState(() => localStorage.getItem(THINKING_KEY) !== 'off')

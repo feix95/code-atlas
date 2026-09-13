@@ -20,14 +20,12 @@ interface TreeRowProps {
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
-  /** 双击文件 = 钉住页签(页签地基):临时页签转正,点别的文件不再被顶替 */
-  onPinFile?: (relPath: string) => void
-  /** 右键「预览文件」:开/激活预览页签 */
+  /** 双击文件 = 打开预览页签(小葵的页签模型):右栏「文件预览」品类跟着亮 */
   onPreviewFile?: (relPath: string) => void
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, forceExpand, onSelectFile, onSelectFolder, onExpandLazy, onPinFile, onPreviewFile }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, forceExpand, onSelectFile, onSelectFolder, onExpandLazy, onPreviewFile }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -58,7 +56,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => onSelectFile(node.relPath, node)}
-          onDoubleClick={() => onPinFile?.(node.relPath)}
+          onDoubleClick={() => onPreviewFile?.(node.relPath)}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
           title={node.summary?.text}
         >
@@ -176,7 +174,6 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
             onSelectFile={onSelectFile}
             onSelectFolder={onSelectFolder}
             onExpandLazy={onExpandLazy}
-            onPinFile={onPinFile}
             onPreviewFile={onPreviewFile}
           />
         ))}
@@ -218,11 +215,9 @@ interface FileTreeProps {
   onNoteRemove?: (relPath: string) => void
   /** 右键「预览文件」(第一百一十锤):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
-  /** 双击文件 = 钉住页签(页签地基) */
-  onPinFile?: (relPath: string) => void
 }
 
-export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile, onPinFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
   // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收
@@ -288,7 +283,6 @@ export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths
               onSelectFile={onSelectFile}
               onSelectFolder={onSelectFolder}
               onExpandLazy={onExpandLazy}
-              onPinFile={onPinFile}
               onPreviewFile={onPreviewFile}
             />
           ) : (

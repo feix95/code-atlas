@@ -1177,8 +1177,9 @@ body.is-sash-dragging {
   pointer-events: none;
 }
 
-/* ── 页签条(页签地基):文件/预览两种页签,学 VS Code 的克制 ——
-   图标+名字,× 悬停才现身;未钉的页签名斜体(临时页签),激活页签顶一条主题色细线 ── */
+/* ── 页签条(小葵的页签模型):页签分品类(概览/Atlas 小探针/文件预览),没钉的跟着左侧树走,
+   钉住的最左换成图钉小图标(双击页签钉/拆);页签卡之间的空白右键弹品类菜单;
+   × 悬停才现身,激活页签顶一条主题色细线 ── */
 
 .tabbar {
   display: flex;
@@ -1230,8 +1231,83 @@ body.is-sash-dragging {
   text-overflow: ellipsis;
 }
 
-.tabbar-tab.is-temp .tabbar-name {
-  font-style: italic;
+/* 页签卡之外的空白:右键弹品类菜单的地盘,平时一点存在感都没有 */
+.tabbar-blank {
+  flex: 1;
+  min-width: 4rem;
+  align-self: stretch;
+}
+
+/* 系统自动勾回品类时,刚亮起的页签轻强调一下(小葵点的:别做得太静默):
+   一抹主题色淡进页签再散掉,不弹窗、不出声,让用户察觉「设置刚被自动改了」 */
+@keyframes tab-flash {
+  0% {
+    background: color-mix(in srgb, var(--accent) 25%, var(--surface));
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.tabbar-tab.is-flash {
+  animation: tab-flash 1.1s ease-out 1;
+}
+
+/* 品类菜单:从页签栏空白处右键弹出;勾选 = 显示该品类的页签。
+   fixed 定位按视口坐标摆,不吃页签条横向滚动的裁剪 */
+.tabbar-kindmenu {
+  position: fixed;
+  z-index: 40;
+  min-width: 11rem;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop);
+}
+
+.kindmenu-title {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.kindmenu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kindmenu-item:hover {
+  background: var(--surface-soft);
+}
+
+.kindmenu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  flex: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.kindmenu-note {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-2) 0;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted-2);
+  font-size: var(--font-xs);
 }
 
 /* 关闭钮:悬停页签才现身;点击热区就是它自己的 padding box,不玩视觉藏猫猫 */
@@ -1256,6 +1332,74 @@ body.is-sash-dragging {
 .tabbar-close:hover {
   color: var(--text-strong);
   background: var(--canvas-tint);
+}
+
+/* 页签正文容器:页签条下面的一次一个房间 */
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 预览品类还没装文件(空槽)/文件没了:一句指路,不装死 */
+.pane-hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+/* 品类全关光的底板:大 logo 居中,页签栏还在 —— 右键空白处能勾回来(VS Code 关光编辑器同款) */
+.pane-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.pane-empty-mark {
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--line);
+}
+
+.pane-empty-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-md);
+}
+
+.pane-empty-hint {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+}
+
+/* 钉住的对话保活层:常驻渲染树只藏不拆(拆了那场对话就真没了);藏非激活的 */
+.pinned-chat-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pinned-chat-host > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.pinned-chat-host.is-hidden {
+  display: none;
 }
 
 /* ── 预览页签的合并布局:左源码右伴聊,一条细缝隔开,各自滚各自的 ── */
