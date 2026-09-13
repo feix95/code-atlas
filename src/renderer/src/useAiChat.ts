@@ -106,6 +106,8 @@ export function useAiChat(
   note: (text: string) => void
   /** 开新对话(第一百二十七锤):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
   newChat: () => void
+  /** 概览 AI 卡的解释过户(「去追问」,小葵拍的):那边单问单答的一轮原样搬进来当垫底,追问才接得上 */
+  adopt: (userText: string, answer: string) => void
   /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
   compact: () => void
   send: (question: string, refs?: ChatCodeRef[]) => void
@@ -356,7 +358,23 @@ export function useAiChat(
     setMessages([])
   }
 
-  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, compact, send, cancel }
+  /**
+   * 概览 AI 卡的解释过户(「去追问」,小葵拍的):解释卡是证据优先的单问单答,和这边分家记两本账,
+   * 点「去追问」不能让解释原地蒸发 —— 问句答句原样搬进公用对话当垫底,追问才接得上。
+   * 两条都按正经消息入账(照常喂历史);探针正答着话就不搬,免得整段旧账插进正在打的话缝里
+   */
+  function adopt(userText: string, answer: string): void {
+    const q = userText.trim()
+    const a = answer.trim()
+    if (!q || !a || busyRef.current) return
+    setMessages((prev) => [
+      ...prev,
+      { key: crypto.randomUUID(), role: 'user', text: q, state: 'done', web: null },
+      { key: crypto.randomUUID(), role: 'assistant', text: a, state: 'done', web: null }
+    ])
+  }
+
+  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, adopt, compact, send, cancel }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>

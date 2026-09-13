@@ -1511,6 +1511,9 @@ body.is-sash-dragging .pane-sash::after {
 
 .preview-chat {
   flex: 1;
+  /* min-height:0 是这条链的命门:pane-body 是纵向 flex,子项默认最小高度=内容高度,
+     缺了它聊天一长就把面板撑出窗底,内部滚动条形不成,输入框跟着出逃(小葵报的案) */
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;

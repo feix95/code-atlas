@@ -1,6 +1,6 @@
 import type { GitChangesResult, ScanDirNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
-import { type AiAssistApi } from '../useAiAsk'
+import { type AiAssistApi, type AiTurn } from '../useAiAsk'
 import { GitDoor } from './GitDoor'
 import { Notice } from './Notice'
 
@@ -56,8 +56,8 @@ export function FolderOverview({
   /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
   noteText?: string
   ai: AiAssistApi
-  /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
-  onGoChat?: () => void
+  /** 给了就在 AI 卡上显示「去追问」:跳到自由对话 Tab,并把这边解释好的一轮带上 */
+  onGoChat?: (turn: AiTurn | null) => void
   /** 项目 git 总账:有未提交改动就亮出 git 门 */
   gitInfo?: GitChangesResult | null
   /** git 门的展开内容(账本 + AI 干活报告)要用的三个参数 */

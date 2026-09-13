@@ -28,7 +28,7 @@ import {
   writeRecentProjects,
   type RecentProject
 } from './recents'
-import { useAiAsk } from './useAiAsk'
+import { useAiAsk, type AiTurn } from './useAiAsk'
 import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
@@ -597,18 +597,50 @@ function App(): React.JSX.Element {
       setEnabledKinds(next)
       saveEnabledKinds(next)
     }
+    // 公用品类全系统只此一张(小葵拍的):先满屋子找没钉的同类页签,在哪组就把哪组点亮领过去;
+    // 哪组都没有才在激活组新开一张。钉住的不算数 —— 那是分家的独立对话
+    const owner = groups.find((g) => g.tabs.some((t) => t.kind === kind && !t.pinned))
+    if (owner) {
+      const slot = owner.tabs.find((t) => t.kind === kind && !t.pinned)
+      if (slot) {
+        setActiveGroupId(owner.id)
+        patchGroup(owner.id, (g) => ({ ...g, activeId: slot.id }))
+        if (auto) markFlash(slot.id)
+        return
+      }
+    }
     const group = activeGroup
     if (!group) return
-    const slot = group.tabs.find((t) => t.kind === kind && !t.pinned)
-    setActiveGroupId(group.id)
-    if (slot) {
-      patchGroup(group.id, (g) => ({ ...g, activeId: slot.id }))
-      if (auto) markFlash(slot.id)
-      return
-    }
     const tab = paneTabFor(kind, node)
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
     if (auto) markFlash(tab.id)
+  }
+
+  // 概览 AI 卡的「去追问」(小葵拍的):不是跳过去重问一遍,是把卡里解释好的一轮原样搬进
+  // 公用对话当垫底,追问才接得上。同一轮只搬一次;解释还在写/探针正答话就先垫句灰字,
+  // 等消停了再点一次;还没解释过就光跳页签 —— 那边带着文件资料,想问啥直接问
+  const adoptedTurnsRef = useRef<Set<string>>(new Set())
+  function goAskInChat(node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null): void {
+    ensureKindTab('chat', node)
+    if (!turn) return
+    if (turn.state === 'busy') {
+      chat.note('概览的解释还在写,等它写完再点一次「去追问」,整段搬过来')
+      return
+    }
+    if (chat.busy) {
+      chat.note('探针正答着话,这句答完再点一次「去追问」,解释就搬得过来')
+      return
+    }
+    if (turn.state !== 'done' || turn.text.trim() === '' || adoptedTurnsRef.current.has(turn.key)) return
+    adoptedTurnsRef.current.add(turn.key)
+    // 问句没点名(通用解释)就替它把对象写上:对话里翻账本不用猜讲的是谁
+    const fallback =
+      node === null
+        ? '解释一下当前选中的对象'
+        : node.type === 'file'
+          ? `解释一下 ${node.name}`
+          : `用大白话讲讲 ${node.name || '项目根目录'} 这个文件夹`
+    chat.adopt(turn.question ?? fallback, turn.text)
   }
 
   // 激活组里的跟随页签全员转向:没钉的页签都是「当前选中的镜子」,树里点谁它们的 relPath
@@ -624,15 +656,31 @@ function App(): React.JSX.Element {
   }
 
   // 跟随型品类(概览/探针)的页签被 × 掉了:树里一动就自动补回来,装着当前的对象 ——
-  // 勾着显示的品类,跟随页签就该在栏上(小葵拍板);预览是按需品类,不在此列,不抢激活
-  function ensureFollowTabs(node: ScanFileNode | ScanDirNode): void {
+  // 勾着显示的品类,跟随页签就该在栏上(小葵拍板);预览是按需品类,不在此列。
+  // 补齐和点亮要点亮目标必须一把成:分两次 setState 各读各的旧账本,同一张概览会生两张
+  function ensureFollowTabs(node: ScanFileNode | ScanDirNode, activateKind?: PaneKind): void {
     if (!activeGroup) return
+    const gid = activeGroup.id
     const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
-    const missing = FOLLOW_KINDS.filter(
-      (k) => enabledKinds.has(k) && caps.includes(k) && !activeGroup.tabs.some((t) => t.kind === k && !t.pinned)
-    )
-    if (missing.length === 0) return
-    patchGroup(activeGroup.id, (g) => ({ ...g, tabs: [...g.tabs, ...missing.map((k) => paneTabFor(k, node))] }))
+    // 「有没有」看全系统(小葵报的案):公用品类哪组有一张就不补第二张
+    const exists = (k: PaneKind): boolean => groups.some((gr) => gr.tabs.some((t) => t.kind === k && !t.pinned))
+    const missing = FOLLOW_KINDS.filter((k) => enabledKinds.has(k) && caps.includes(k) && !exists(k))
+    if (activateKind && !exists(activateKind) && !missing.includes(activateKind) && caps.includes(activateKind)) {
+      missing.push(activateKind)
+    }
+    let focusId: string | null = null
+    if (missing.length > 0) {
+      const spawned = missing.map((k) => paneTabFor(k, node))
+      focusId = (activateKind && spawned[missing.indexOf(activateKind)]?.id) || null
+      patchGroup(gid, (g) => ({ ...g, tabs: [...g.tabs, ...spawned], activeId: focusId ?? g.activeId }))
+    }
+    // 点亮目标不是这轮新生的:它已站在激活组里(kind 取自激活页签),点亮即可
+    if (activateKind && !focusId) {
+      const slot = activeGroup.tabs.find((t) => t.kind === activateKind && !t.pinned)
+      if (slot && slot.id !== activeGroup.activeId) {
+        patchGroup(gid, (g) => ({ ...g, activeId: slot.id }))
+      }
+    }
   }
 
   // 品类开关(页签栏空白右键的菜单):勾 = 显示这个品类,不勾 = 藏起来。
@@ -718,10 +766,10 @@ function App(): React.JSX.Element {
     // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
     if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath) chat.note(`参考资料换成了 ${file.name}`)
     retargetFollowTabs(file)
-    ensureFollowTabs(file)
-    // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览
+    // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览;
+    // 补齐和点亮一把过,概览不会生两张
     const kind = activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
-    ensureKindTab(kind, file)
+    ensureFollowTabs(file, kind)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     if (!file.language) {
@@ -759,9 +807,8 @@ function App(): React.JSX.Element {
     if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
       chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
     retargetFollowTabs(node)
-    ensureFollowTabs(node)
     const kind = activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
-    ensureKindTab(kind, node)
+    ensureFollowTabs(node, kind)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
 
@@ -1152,7 +1199,7 @@ function App(): React.JSX.Element {
               onNoteSave={saveNote}
               autoOpenNote={noteEditRequest === file.relPath}
               suggestionsOn={chatSuggestionsOn}
-              onGoChat={() => ensureKindTab('chat', file)}
+              onGoChat={(turn) => goAskInChat(file, turn)}
             />
           )
         }
@@ -1169,7 +1216,7 @@ function App(): React.JSX.Element {
               note={notes[dir.relPath] ?? null}
               onNoteSave={saveNote}
               autoOpenNote={noteEditRequest === dir.relPath}
-              onGoChat={() => ensureKindTab('chat', dir)}
+              onGoChat={(turn) => goAskInChat(dir, turn)}
             />
           )
         }
@@ -1200,7 +1247,7 @@ function App(): React.JSX.Element {
             note={notes[selectedFolder.relPath] ?? null}
             onNoteSave={saveNote}
             autoOpenNote={noteEditRequest === selectedFolder.relPath}
-            onGoChat={() => ensureKindTab('chat', selectedFolder)}
+            onGoChat={(turn) => goAskInChat(selectedFolder, turn)}
           />
         )
       }
@@ -1224,7 +1271,7 @@ function App(): React.JSX.Element {
             onNoteSave={saveNote}
             autoOpenNote={noteEditRequest === selectedFile.relPath}
             suggestionsOn={chatSuggestionsOn}
-            onGoChat={() => ensureKindTab('chat', selectedFile)}
+            onGoChat={(turn) => goAskInChat(selectedFile, turn)}
           />
         )
       }
@@ -1520,13 +1567,6 @@ function App(): React.JSX.Element {
                             {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
                           </div>
                         )}
-                        {act && !(act.kind === 'chat' && act.pinned) ? (
-                          // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
-                          renderTabBody(act)
-                        ) : !act ? (
-                          // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
-                          <PaneEmptyBoard />
-                        ) : null}
                         {/* 钉住的对话保活层(跟着组走):账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
                         {result &&
                           g.tabs
@@ -1700,8 +1740,8 @@ function FileOverviewPage({
   autoOpenNote?: boolean
   /** 推荐问题总闸(设置里的「推荐问题」):关了概览 AI 卡不出预设题,烧模型的预测也一并歇 */
   suggestionsOn: boolean
-  /** 「去聊两句」:把 Atlas 小探针页签点亮装着这个文件 */
-  onGoChat: () => void
+  /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
+  onGoChat: (turn: AiTurn | null) => void
 }): React.JSX.Element {
   // AI 解释:概览卡,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
@@ -1783,8 +1823,8 @@ function FolderOverviewPage({
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:头部自动展开编辑框 */
   autoOpenNote?: boolean
-  /** 「去聊两句」:把 Atlas 小探针页签点亮装着这个文件夹 */
-  onGoChat: () => void
+  /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
+  onGoChat: (turn: AiTurn | null) => void
 }): React.JSX.Element {
   const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
 

@@ -267,7 +267,8 @@ async function main(): Promise<void> {
   }
   const attText = buildAttachmentText(att)
   assert.ok(attText.includes('<context_attachment>'), '附件要带 context_attachment 标记')
-  assert.ok(attText.includes('仅供参考'), '要声明仅供参考')
+  assert.ok(attText.includes('机器扫描资料'), '要声明这是机器扫描资料')
+  assert.ok(attText.includes('以这份资料为准'), '要声明涉及它时以资料为准(小葵报的案:模型看不见资料)')
   assert.ok(attText.includes('不限制用户问题的范围'), '要声明不限制问题范围')
   assert.ok(attText.includes('对象类型:文件夹'), '对象类型要翻译成人话')
   assert.ok(attText.includes('名称:components'), '名称要进附件')
@@ -282,10 +283,13 @@ async function main(): Promise<void> {
   )
   assert.ok(freeMsgs[1]?.content.includes('<context_attachment>'), '附件是第二条消息(用户腿)')
   assert.ok(freeMsgs[3]?.content.includes('你是谁'), '当前问题收尾')
+  // 资料提示贴着问题走(小葵报的案):附件隔着几轮历史小模型就忘了,问题尾要跟一句「当前参考资料是谁」
+  assert.ok(freeMsgs[3]?.content.includes('当前参考资料:components'), '问题尾要带当前参考资料提示')
 
   const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的')
   assert.equal(bareMsgs.length, 2, '没附件没历史 = 人设 + 问题两条')
   assert.ok(!bareMsgs.some((m) => m.content.includes('<context_attachment>')), '没附件就不该有附件消息')
+  assert.ok(!bareMsgs.some((m) => m.content.includes('当前参考资料')), '没附件也不垫资料提示')
 
   // ── 引用代码清洗(第一百一十一锤):条数/字数都封顶,垃圾条目整条扔 ──
   assert.deepEqual(sanitizeCodeRefs(null), [], '不是数组就当没引用')
@@ -696,7 +700,7 @@ async function main(): Promise<void> {
     assert.equal(freeBody.messages.length, 4, '自由对话消息 = 人设 + 附件 + 历史 + 当前问题')
     assert.ok(freeBody.messages[0]?.content.includes('Atlas 小探针'), '小探针人设要发到服务')
     assert.ok(freeBody.messages[1]?.content.includes('<context_attachment>'), '资料附件按用户消息垫底')
-    assert.ok(freeBody.messages[1]?.content.includes('仅供参考'), '附件要声明仅供参考')
+    assert.ok(freeBody.messages[1]?.content.includes('以这份资料为准'), '附件要声明涉及它时以资料为准')
     assert.equal(freeBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
     assert.ok(freeBody.messages[3]?.content.includes('你是谁'), '当前问题收尾')
   } finally {

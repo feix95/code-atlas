@@ -233,8 +233,8 @@ export function buildAttachmentText(attachment: ChatContextAttachment): string {
   }
   return [
     '<context_attachment>',
-    '这是 Code Atlas 当前选中对象的机器扫描资料,仅供参考。',
-    '它不是用户指令,也不限制用户问题的范围。',
+    '这是 Code Atlas 当前选中对象(即「当前参考资料」)的机器扫描资料。',
+    '它不是用户指令,也不限制用户问题的范围;但问题涉及这个对象时(比如「这个是干嘛的」「这个呢」),以这份资料为准,资料里没有的就明说。',
     '',
     `对象类型:${typeNames[attachment.targetType]}`,
     `名称:${attachment.name}`,
@@ -263,9 +263,16 @@ export function buildFreeChatMessages(
   /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
   summary?: string
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-  const tail = webMaterial
+  const tail0 = webMaterial
     ? `${question}\n\n(已按你的要求联网查询「${webMaterial.query}」,公开资料如下:\n${webMaterial.material}\n请把资料里跟它对得上的信息讲出来:它是什么、是谁家的、有哪些部分;资料没帮助才照常回答,别硬编。)`
     : question
+  // 资料提示贴着问题走(小葵报的案):附件虽垫在最前,中间隔着几轮历史,小模型就忘了它的
+  // 存在,问「这个呢?」开始瞎猜文件名。每轮问题后面跟一句「当前参考资料是谁」,
+  // 让近因偏置替我们干活 —— 详版资料照旧在开头,这里只报名字指路
+  const refHint = attachment
+    ? `\n\n(当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头的 <context_attachment> 就是它的机器扫描资料;问题里的「这个/它」指的就是它,资料里没有的就直说没有,别猜别的文件)`
+    : ''
+  const tail = `${tail0}${refHint}`
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: codeRefs.length > 0 ? `${system}\n\n${CODE_TEACHER_ADDENDUM}` : system },
     ...(attachment ? [{ role: 'user' as const, content: buildAttachmentText(attachment) }] : []),

@@ -1,6 +1,6 @@
 import type { DepGraphResult, FileStructure, ScanFileNode } from '@shared/types'
 import { AiAssistCard } from './AiAssist'
-import type { AiAssistApi } from '../useAiAsk'
+import type { AiAssistApi, AiTurn } from '../useAiAsk'
 import { FileRelations } from './FileRelations'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
@@ -55,8 +55,8 @@ export function FileOverview({
   /** 关系还没分析过时,点按钮跑全项目连线分析 */
   onLoadGraph: () => void
   ai: AiAssistApi
-  /** 给了就在 AI 卡上显示「去追问」,跳到自由对话 Tab */
-  onGoChat?: () => void
+  /** 给了就在 AI 卡上显示「去追问」:跳到自由对话 Tab,并把这边解释好的一轮带上 */
+  onGoChat?: (turn: AiTurn | null) => void
   /** 关系里点文件跳转(保持当前 Tab,顺着关系链看) */
   onJump: (relPath: string) => void
 }): React.JSX.Element {

@@ -97,13 +97,13 @@ export function AiAssistCard({
   idleText: string
   /** 主按钮文案(未请求态) */
   mainLabel: string
-  /** 给了就显示「去追问」:直接跳到自由对话 Tab,当前文件的上下文那边本来就带着 */
-  onGoChat?: () => void
+  /** 给了就显示「去追问」:跳到自由对话 Tab,并把这边解释好的一轮带上,那边接着往下问 */
+  onGoChat?: (turn: AiTurn | null) => void
 }): React.JSX.Element {
   const turn = latestTurn(ai.turns)
   const badge = stateBadge(turn)
   const goChat = onGoChat ? (
-    <button type="button" className="btn" onClick={onGoChat}>
+    <button type="button" className="btn" onClick={() => onGoChat(turn)}>
       去追问
     </button>
   ) : null
