@@ -957,7 +957,7 @@ export function SettingsDialog({
                             联网查证
                             <span className={`cfg-flag${draftConfig.webLookup ? ' is-on' : ''}`}>{draftConfig.webLookup ? '已开启' : '默认关闭'}</span>
                           </label>
-                          <p>讲解认不出某个软件/文件时,允许按「名字」查公开资料来修正回答。</p>
+                          <p>讲解认不出某个软件/文件时,按「名字」查公开资料修正回答;对话翻文件模式里,模型也能自己上网查资料。发出去的只有搜索词,本地文件内容绝不出门。</p>
                         </div>
                         <button
                           type="button"

@@ -12,6 +12,8 @@ import {
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
   AGENT_TOOLS,
+  AGENT_TOOLS_LOCAL,
+  AGENT_WEB_ADDENDUM,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
   agentPromptBudget,
@@ -30,6 +32,7 @@ import {
   toolCallKey,
   type AgentChatMessage
 } from '../src/ai/agent.ts'
+import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, sanitizeWebQuery } from '../src/ai/weblookup.ts'
 
 function main(): void {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
@@ -80,14 +83,15 @@ function main(): void {
   assert.ok(REPEAT_NUDGE.includes('已经看过'), '重复提醒要说人话')
   assert.ok(ROUND_CAP_NUDGE.includes('别再调用'), '逼卷令要拦住工具')
 
-  // ── 6. 工具表:只有「看」的三件,写文件的工具根本不存在 ──
-  assert.equal(AGENT_TOOLS.length, 3, '只发三件工具')
+  // ── 6. 工具表:本地只有「看」的三件,写文件的工具根本不存在;联网开着才多一件 web_search ──
+  assert.equal(AGENT_TOOLS_LOCAL.length, 3, '本地只发三件工具')
   assert.deepEqual(
-    AGENT_TOOLS.map((t) => t.function.name),
+    AGENT_TOOLS_LOCAL.map((t) => t.function.name),
     ['list_files', 'read_file', 'search_content'],
     '工具名单对齐:列名单 + 读文件 + 搜内容'
   )
-  for (const tool of AGENT_TOOLS) {
+  assert.equal(AGENT_TOOLS.length, 4, '联网查证开着,全量工具表多一件 web_search')
+  for (const tool of AGENT_TOOLS_LOCAL) {
     const required: readonly string[] = tool.function.parameters.required
     assert.ok(
       required.length === 1 && (required[0] === 'relPath' || required[0] === 'keyword'),
@@ -96,9 +100,13 @@ function main(): void {
   }
 
   // search_content 的必填是关键词不是路径,单独再钉一遍
-  const searchTool = AGENT_TOOLS.find((t) => t.function.name === 'search_content')!
+  const searchTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'search_content')!
   assert.deepEqual(searchTool.function.parameters.required, ['keyword'], 'search_content 必须带 keyword')
   assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
+
+  // web_search 的必填是搜索词 query
+  const webTool = AGENT_TOOLS.find((t) => t.function.name === 'web_search')!
+  assert.deepEqual(webTool.function.parameters.required, ['query'], 'web_search 必须带 query')
 
   // ── 7. 步骤播报:翻什么、看成没看成,一句大白话 ──
   assert.ok(agentStepText('list_files', 'src', 'done', '共 3 个').includes('src'), '翻完要带上目标名')
@@ -107,6 +115,9 @@ function main(): void {
   assert.ok(agentStepText('search_content', '500', 'done', '整个项目命中 12 处').includes('命中 12 处'), '搜索步骤带命中数')
   assert.ok(agentStepText('read_file', 'src/a.ts', 'repeat').includes('已经看过'), '重复翻看有专门的话')
   assert.ok(agentStepText('list_files', 'src', 'error', '路径越界').includes('看不了'), '翻不了要老实说')
+  assert.ok(agentStepText('web_search', 'skills 装在哪', 'done', '维基百科(中文)').includes('上网查了'), '查网说「上网查了」')
+  assert.ok(agentStepText('web_search', 'skills 装在哪', 'repeat').includes('查过'), '重复查有专门的话')
+  assert.ok(agentStepText('web_search', 'skills 装在哪', 'error', '没查到').includes('查不了'), '查网失败说「查不了」')
 
   // ── 8. token 总账:读写累加,速度认最后一轮 ──
   assert.deepEqual(
@@ -226,7 +237,48 @@ function main(): void {
   // ── 15. 复读机轻提醒(第一百四十三锤):列举别翻来覆去重复(主药是采样参数+程序监工,这句是顺手的) ──
   assert.ok(AGENT_ADDENDUM.includes('翻来覆去重复'), '守则要有「列举别复读」的轻提醒')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 全部通过')
+  // ── 16. web_search 的三道闸(联网锤):搜索词安检 / 内网闸 / 正文剥壳 ──
+  assert.equal(sanitizeWebQuery('  Claude Code\nskills 在哪  '), 'Claude Code skills 在哪', '换行压成空格,正常词放行')
+  assert.equal(sanitizeWebQuery(undefined), null, '不是字符串拒收')
+  assert.equal(sanitizeWebQuery('   '), null, '空词拒收')
+  assert.equal(sanitizeWebQuery('查'.repeat(201)), null, '超长拒收')
+  assert.equal(sanitizeWebQuery('C:\\Users\\me\\secret'), null, '盘符路径拒收:本地信息绝不出门')
+  assert.equal(sanitizeWebQuery('/etc/passwd'), null, '绝对路径拒收')
+  assert.equal(sanitizeWebQuery('src\\index.ts'), null, '反斜杠路径拒收')
+
+  assert.equal(isPublicHttpUrl('https://html.duckduckgo.com/html/?q=a'), true, '公网 https 放行')
+  assert.equal(isPublicHttpUrl('http://example.com/'), true, '公网 http 放行')
+  assert.equal(isPublicHttpUrl('http://localhost:5173/'), false, 'localhost 拒收')
+  assert.equal(isPublicHttpUrl('http://127.0.0.1:8766/api'), false, '环回地址拒收')
+  assert.equal(isPublicHttpUrl('http://192.168.1.2/'), false, '192.168 内网段拒收')
+  assert.equal(isPublicHttpUrl('http://10.0.0.1/'), false, '10 内网段拒收')
+  assert.equal(isPublicHttpUrl('http://172.16.5.5/'), false, '172.16 内网段拒收')
+  assert.equal(isPublicHttpUrl('http://169.254.1.1/'), false, '链路本地拒收')
+  assert.equal(isPublicHttpUrl('http://[::1]/'), false, 'IPv6 环回拒收')
+  assert.equal(isPublicHttpUrl('ftp://example.com/file'), false, '非 http(s) 协议拒收')
+  assert.equal(isPublicHttpUrl('file:///C:/secret'), false, 'file 协议拒收')
+  assert.equal(isPublicHttpUrl('not a url'), false, '不是 URL 拒收')
+
+  const page = htmlToText(
+    '<html><head><title>外壳</title><style>.x{}</style></head><body><script>evil()</script><p>正文第一段</p>  <b>加粗</b> &amp; 尾巴</body></html>'
+  )
+  assert.ok(page.includes('正文第一段'), '正文要留下来')
+  assert.ok(page.includes('&') && page.includes('尾巴'), '实体解码、正文连续')
+  assert.ok(!page.includes('evil'), 'script 整块剥掉')
+  assert.ok(!page.includes('<p>') && !page.includes('<b>'), '标签剥干净')
+  assert.ok(!page.includes('外壳'), 'head 整块剥掉')
+
+  assert.equal(WEB_SEARCH_PAGE_COUNT, 2, 'web_search 默认抓两条正文')
+  assert.ok(WEB_PAGE_TEXT_MAX_CHARS >= 500 && WEB_PAGE_TEXT_MAX_CHARS <= 1500, '每条正文的字数是个讲道理的数')
+
+  // ── 17. 上网守则:开了「联网查证」才垫的一段,教它查证、守隐私、防上当 ──
+  assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
+  assert.ok(!AGENT_ADDENDUM.includes('web_search'), '没开联网时守则不提 web_search:模型连有这工具都不该知道')
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 全部通过')
 }
 
 main()

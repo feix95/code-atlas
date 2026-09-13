@@ -12,6 +12,7 @@ import {
   AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
+  AGENT_WEB_ADDENDUM,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
   agentPromptBudget,
@@ -82,7 +83,7 @@ import {
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
-import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
+import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
@@ -930,6 +931,19 @@ async function agentReadFile(
   return { ok: true, text: raw, hint: `全文 ${raw.length} 字` }
 }
 
+/**
+ * web_search 的执行手(联网锤):免费档搜索(维基中→英→DDG)+ 挑前两条抓正文,
+ * 三道闸(搜索词安检/内网闸/防上当声明)都扎在 weblookup.ts 的纯函数层,这边只管跑和报。
+ * 查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
+ */
+async function agentWebSearch(query: string): Promise<{ ok: boolean; text: string; hint?: string }> {
+  const found = await webSearchDetailed(query, electronFetchText)
+  if (found.material === '') {
+    return { ok: false, text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准', hint: '没查到' }
+  }
+  return { ok: true, text: found.material, hint: found.sources.join('、') }
+}
+
 /** 每翻一样就往界面播一句大白话(挂在流式增量通道上,渲染层认 step 字段) */
 function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: string): void {
   if (requestId === '' || event.sender.isDestroyed()) return
@@ -987,6 +1001,8 @@ async function runAgentChat(input: {
   signal: AbortSignal
   startedAt: number
   webLookup: WebLookupMeta
+  /** 联网查证开着 = 工具表里多一件 web_search,人设后面多垫一段上网守则 */
+  webSearchEnabled: boolean
 }): Promise<AiChatResult> {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
   const messages: AgentChatMessage[] = [...baseMessages]
@@ -1006,9 +1022,11 @@ async function runAgentChat(input: {
   if (engineNoTools) {
     sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
   }
-  // 人设后面垫翻文件守则:教它何时动手、动手几次、答话照旧说人话
+  // 人设后面垫翻文件守则:教它何时动手、动手几次、答话照旧说人话;
+  // 联网查证开着再垫一段上网守则(模型这才知道有 web_search)。拆除兜底认同一把尺子,别拆岔了
+  const addendum = input.webSearchEnabled ? `${AGENT_ADDENDUM}${AGENT_WEB_ADDENDUM}` : AGENT_ADDENDUM
   const systemIdx = messages.findIndex((m) => m.role === 'system')
-  if (!engineNoTools && systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${AGENT_ADDENDUM}` }
+  if (!engineNoTools && systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${addendum}` }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成纸条时,按它解锁重读
@@ -1048,6 +1066,7 @@ async function runAgentChat(input: {
       maxTokens: replyCap,
       allowThinking,
       useTools,
+      webSearchEnabled: input.webSearchEnabled,
       onDelta: (ev) => sendAgentDelta(event, requestId, ev)
     })
     if (round.status !== 'ok') {
@@ -1077,10 +1096,10 @@ async function runAgentChat(input: {
         skipNudgeOnce = true
         sendAgentStep(event, requestId, '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型')
         const sysIdx = messages.findIndex((m) => m.role === 'system')
-        if (sysIdx >= 0 && (messages[sysIdx] as { content: string }).content.endsWith(AGENT_ADDENDUM)) {
+        if (sysIdx >= 0 && (messages[sysIdx] as { content: string }).content.endsWith(addendum)) {
           messages[sysIdx] = {
             role: 'system',
-            content: (messages[sysIdx] as { content: string }).content.slice(0, -AGENT_ADDENDUM.length)
+            content: (messages[sysIdx] as { content: string }).content.slice(0, -addendum.length)
           }
         }
         continue
@@ -1128,23 +1147,40 @@ async function runAgentChat(input: {
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
-      const callName = call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' ? call.name : null
-      // search 的范围是可选项:不传就搜整个项目;其余工具的 relPath 必填
-      const relPath = callName === 'search_content' && call.args?.relPath === undefined ? '' : sanitizeAgentRelPath(call.args?.relPath)
+      const callName = call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' || call.name === 'web_search' ? call.name : null
+      // search 的范围是可选项:不传就搜整个项目;其余工具的 relPath 必填;web_search 不吃路径
+      const relPath = callName === 'web_search' ? '' : callName === 'search_content' && call.args?.relPath === undefined ? '' : sanitizeAgentRelPath(call.args?.relPath)
       const keyword = callName === 'search_content' && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
-      if (!callName || relPath === null || (callName === 'search_content' && keyword === '')) {
+      const rawQuery = call.args?.query
+      // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
+      const query = callName === 'web_search' ? sanitizeWebQuery(rawQuery) : null
+      const queryMissing = callName === 'web_search' && (typeof rawQuery !== 'string' || rawQuery.trim() === '')
+      if (!callName || relPath === null || (callName === 'search_content' && keyword === '') || (callName === 'web_search' && query === null)) {
         const why = !callName
           ? '没有这个工具'
-          : callName === 'search_content'
-            ? '要给关键词(keyword),如 500 或 DWELL_MS'
-            : '路径不合法,要用项目内的相对路径'
-        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', String(call.args?.keyword ?? call.args?.relPath ?? '(没给参数)'), 'error', why))
+          : callName === 'web_search'
+            ? queryMissing
+              ? '要给搜索词(query),写概念词、软件名或短的公开问题'
+              : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
+            : callName === 'search_content'
+              ? '要给关键词(keyword),如 500 或 DWELL_MS'
+              : '路径不合法,要用项目内的相对路径'
+        const badTarget =
+          callName === 'web_search'
+            ? String(rawQuery ?? '(没给搜索词)')
+            : String(call.args?.keyword ?? call.args?.relPath ?? '(没给参数)')
+        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', badTarget, 'error', why))
         toolResults.push({ role: 'tool', tool_call_id: call.id, content: `参数不合法:${why}。路径要用项目内的相对路径(如 src/index.ts),根目录传空字符串` })
         continue
       }
-      // search 的防打转键带上关键词:同一个范围搜「500」和「DWELL_MS」是两笔账
-      const key = callName === 'search_content' ? toolCallKey(callName, `${relPath}#${keyword}`) : toolCallKey(callName, relPath)
-      const stepTarget = callName === 'search_content' ? keyword : relPath === '' ? '(项目根目录)' : relPath
+      // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
+      const key =
+        callName === 'search_content'
+          ? toolCallKey(callName, `${relPath}#${keyword}`)
+          : callName === 'web_search'
+            ? toolCallKey(callName, query ?? '')
+            : toolCallKey(callName, relPath)
+      const stepTarget = callName === 'search_content' ? keyword : callName === 'web_search' ? (query ?? '') : relPath === '' ? '(项目根目录)' : relPath
       if (doneCalls.has(key)) {
         sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
         toolResults.push({ role: 'tool', tool_call_id: call.id, content: REPEAT_NUDGE })
@@ -1152,13 +1188,15 @@ async function runAgentChat(input: {
       }
       doneCalls.add(key)
       callIdToKey.set(call.id, key)
-      // 三个执行手统一形状:matches/matchesTruncated 只有 search_content 会带
+      // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
       const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean } =
         callName === 'list_files'
           ? await agentListFiles(rootPath, relPath)
           : callName === 'search_content'
             ? await agentSearchContent(rootPath, relPath, keyword)
-            : await agentReadFile(rootPath, relPath, readChars)
+            : callName === 'web_search'
+              ? await agentWebSearch(query ?? '')
+              : await agentReadFile(rootPath, relPath, readChars)
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
@@ -1933,7 +1971,8 @@ function registerIpc(): void {
           allowThinking: thinking,
           signal: aborter.signal,
           startedAt,
-          webLookup: meta
+          webLookup: meta,
+          webSearchEnabled: resolved.webLookup === true
         })
       } finally {
         if (requestId !== '') explainAborters.delete(requestId)
