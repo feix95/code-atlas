@@ -15,15 +15,19 @@ interface TreeRowProps {
   expandingPath: string | null
   /** 搜索过滤词;空串 = 不过滤(过滤时全树按名字匹配,目录自动全展开) */
   filter: string
+  /** reveal 联动:这条链上的目录强制展开(页签/绿字跳过来的文件,树里可能还收着) */
+  forceExpand?: boolean
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
-  /** 双击文件进预览(第一百二十三锤):跟右键「预览文件」同一条路 */
-  onPreview?: (relPath: string) => void
+  /** 双击文件 = 钉住页签(页签地基):临时页签转正,点别的文件不再被顶替 */
+  onPinFile?: (relPath: string) => void
+  /** 右键「预览文件」:开/激活预览页签 */
+  onPreviewFile?: (relPath: string) => void
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, onSelectFile, onSelectFolder, onExpandLazy, onPreview }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, forceExpand, onSelectFile, onSelectFolder, onExpandLazy, onPinFile, onPreviewFile }: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -34,8 +38,8 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
     wasLazy.current = lazy
   }, [node])
 
-  // 过滤态下目录一律摊开,不看你之前的展开手癖
-  const expanded = filter !== '' || open
+  // 过滤态下目录一律摊开,不看你之前的展开手癖;reveal 链上的目录同等待遇
+  const expanded = filter !== '' || open || !!forceExpand
 
   if (node.type === 'file') {
     const note = notes?.[node.relPath]
@@ -47,13 +51,14 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           type="button"
           className="tree-main"
           draggable
+          data-reveal-file={node.relPath}
           onDragStart={(e) => {
             // 拖拽挂引用(第一百二十五锤):带上类型,文件夹到了对面好指路
             e.dataTransfer.setData('application/x-atlas-node', JSON.stringify({ kind: 'file', relPath: node.relPath }))
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => onSelectFile(node.relPath, node)}
-          onDoubleClick={() => onPreview?.(node.relPath)}
+          onDoubleClick={() => onPinFile?.(node.relPath)}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
           title={node.summary?.text}
         >
@@ -167,10 +172,12 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
             selectedPath={selectedPath}
             expandingPath={expandingPath}
             filter={filter}
+            forceExpand={forceExpand}
             onSelectFile={onSelectFile}
             onSelectFolder={onSelectFolder}
             onExpandLazy={onExpandLazy}
-            onPreview={onPreview}
+            onPinFile={onPinFile}
+            onPreviewFile={onPreviewFile}
           />
         ))}
     </div>
@@ -200,6 +207,8 @@ interface FileTreeProps {
   notes?: NoteMap
   selectedPath: string | null
   expandingPath: string | null
+  /** reveal 联动(页签地基):激活的页签/跳转目标在树里的父目录链,这些目录强制展开 */
+  revealPaths?: Set<string>
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
@@ -207,21 +216,32 @@ interface FileTreeProps {
   onNoteEdit?: (relPath: string) => void
   /** 右键「清除备注」 */
   onNoteRemove?: (relPath: string) => void
-  /** 右键「预览文件」(第一百一十锤):App 把左栏换成文本预览 */
-  onPreview?: (relPath: string) => void
+  /** 右键「预览文件」(第一百一十锤):开/激活预览页签 */
+  onPreviewFile?: (relPath: string) => void
+  /** 双击文件 = 钉住页签(页签地基) */
+  onPinFile?: (relPath: string) => void
 }
 
-export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreview }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile, onPinFile }: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
   // 右键菜单:记住在谁身上、屏幕哪个位置、是不是文件(预览只给文件);点别处/再右键即收
   const [menu, setMenu] = useState<{ x: number; y: number; relPath: string; hasNote: boolean; isFile: boolean } | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // reveal 联动的后半程:展开靠 forceExpand 已由渲染接管,这里只负责把目标行滚进视野。
+  // 纯 DOM 操作不碰 state,树没扫到目标(链上目录收着)时查不到节点,静静放过
+  useEffect(() => {
+    if (!selectedPath) return
+    const el = scrollRef.current?.querySelector(`[data-reveal-file="${selectedPath}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [selectedPath, revealPaths])
 
   // 菜单项数决定它大概多高:夹住边界时别让最后一项掉到窗口外面
-  const menuRows = (hasNote: boolean, isFile: boolean): number => 1 + (hasNote ? 1 : 0) + (isFile && onPreview ? 1 : 0)
+  const menuRows = (hasNote: boolean, isFile: boolean): number => 1 + (hasNote ? 1 : 0) + (isFile && onPreviewFile ? 1 : 0)
 
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
-    if (!onNoteEdit && !onPreview) return
+    if (!onNoteEdit && !onPreviewFile) return
     e.preventDefault()
     const hasNote = notes?.[node.relPath] !== undefined
     const isFile = node.type === 'file'
@@ -253,7 +273,7 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
           />
         </label>
       </div>
-      <div className="tree-scroll">
+      <div className="tree-scroll" ref={scrollRef}>
         <div className="tree">
           {shown ? (
             <TreeRow
@@ -264,10 +284,12 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
               selectedPath={selectedPath}
               expandingPath={expandingPath}
               filter={q}
+              forceExpand={revealPaths?.has(shown.relPath)}
               onSelectFile={onSelectFile}
               onSelectFolder={onSelectFolder}
               onExpandLazy={onExpandLazy}
-              onPreview={onPreview}
+              onPinFile={onPinFile}
+              onPreviewFile={onPreviewFile}
             />
           ) : (
             <div className="empty-state">
@@ -288,12 +310,12 @@ export function FileTree({ root, notes, selectedPath, expandingPath, onSelectFil
             }}
           />
           <div className="tree-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
-            {menu.isFile && onPreview && (
+            {menu.isFile && onPreviewFile && (
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  onPreview(menu.relPath)
+                  onPreviewFile(menu.relPath)
                   setMenu(null)
                 }}
               >

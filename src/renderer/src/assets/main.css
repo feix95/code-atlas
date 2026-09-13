@@ -1177,6 +1177,110 @@ body.is-sash-dragging {
   pointer-events: none;
 }
 
+/* ── 页签条(页签地基):文件/预览两种页签,学 VS Code 的克制 ——
+   图标+名字,× 悬停才现身;未钉的页签名斜体(临时页签),激活页签顶一条主题色细线 ── */
+
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--line);
+}
+
+.tabbar-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 11rem;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-right: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+
+.tabbar-tab:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tabbar-tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.tabbar-tab.is-active {
+  background: var(--surface);
+  color: var(--text-strong);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tabbar-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.tabbar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabbar-tab.is-temp .tabbar-name {
+  font-style: italic;
+}
+
+/* 关闭钮:悬停页签才现身;点击热区就是它自己的 padding box,不玩视觉藏猫猫 */
+.tabbar-close {
+  flex: none;
+  opacity: 0;
+  padding: 0.125rem var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tabbar-tab:hover .tabbar-close,
+.tabbar-close:focus-visible {
+  opacity: 1;
+}
+
+.tabbar-close:hover {
+  color: var(--text-strong);
+  background: var(--canvas-tint);
+}
+
+/* ── 预览页签的合并布局:左源码右伴聊,一条细缝隔开,各自滚各自的 ── */
+
+.preview-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  background: var(--line);
+}
+
+.preview-split > * {
+  min-width: 0;
+}
+
+.preview-chat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
 .detail-page {
   display: flex;
   flex-direction: column;

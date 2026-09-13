@@ -11,6 +11,7 @@ import { FileOverview } from './components/FileOverview'
 import { FilePathMenu } from './components/FilePathMenu'
 import { openFilePathMenuFor } from './components/filePathMenuStore'
 import { FileTree } from './components/FileTree'
+import { TabBar } from './components/TabBar'
 import { FolderOverview } from './components/FolderOverview'
 import { FreeChatPanel } from './components/FreeChatPanel'
 import { ModelStatusBar } from './components/ModelStatusBar'
@@ -58,6 +59,17 @@ const FOLDER_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '概览' },
   { key: 'chat', label: 'Atlas 小探针' }
 ]
+
+/** 右栏页签(页签地基):kind 区分「文件详情」和「源码预览」两种页签,同文件可各开一张。
+ *  pinned=false 是临时页签 —— 全栏最多一张,被下一次单击顶替;双击(树上或页签上)转正 */
+interface PaneTab {
+  id: string
+  kind: 'file' | 'preview'
+  relPath: string
+  name: string
+  icon: string
+  pinned: boolean
+}
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
 function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): ScanDirNode {
@@ -158,6 +170,22 @@ function clampSidebar(width: number): number {
   return Math.min(Math.max(width, MIN_SIDEBAR_WIDTH), max)
 }
 
+/** 从树根下钻到目标文件的父目录链(reveal 联动用):这些目录要在树里强制展开。
+ *  中途撞到没扫描的目录就到那为止 —— 文件能被找到,链上目录必然都已扫实 */
+function dirChainOf(root: ScanDirNode, relPath: string): string[] {
+  if (relPath === '') return []
+  const chain: string[] = []
+  let cur: ScanDirNode = root
+  const parts = relPath.split('/')
+  for (let i = 0; i < parts.length - 1; i++) {
+    const next = cur.children.find((c) => c.type === 'directory' && c.name === parts[i])
+    if (!next || next.type !== 'directory') return chain
+    chain.push(next.relPath)
+    cur = next
+  }
+  return chain
+}
+
 function App(): React.JSX.Element {
   // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
   // 树活着心跳才跳;哪天渲染期异常把整棵树卸了(2026-09-13 的 MiniMD 隐身案就是),
@@ -210,9 +238,13 @@ function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteMap>({})
   // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
   const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
-  // 代码预览(第一百一十锤):右键「预览文件」→ 左栏换只读文本窗、右栏换小探针对话
-  const [preview, setPreview] = useState<ScanFileNode | null>(null)
-  // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;退出预览即清
+  // 右栏页签(页签地基):文件详情和源码预览各自成签,树从此常驻左栏不再换装。
+  // activeTabId = null 是底色页(文件夹详情/项目主页),页签全关时回到它
+  const [tabs, setTabs] = useState<PaneTab[]>([])
+  const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
+  const [revealPaths, setRevealPaths] = useState<Set<string>>(new Set())
+  // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;换预览文件即清
   const [previewRefs, setPreviewRefs] = useState<ChatCodeRef[]>([])
   // 聊天文件链接的跳行目标:点了带行号的链接,预览窗滚到那一行;seq 计数让同一行连点也能再跳
   const [previewJump, setPreviewJump] = useState<{ line: number; seq: number } | null>(null)
@@ -249,11 +281,21 @@ function App(): React.JSX.Element {
   // 后退/前进跳转途中记录器闭嘴:恢复旧位置引发的一串选中不许再记新账
   const navTravelingRef = useRef(false)
   // 自由对话账本上移(第一百二十四锤):全 app 只养一份,挂在 App 顶层 ——
-  // 换文件、换文件夹、进出预览,聊天记录都活着;对话的是谁,由「当前参考资料」附件说话
+  // 换文件、换文件夹、切页签,聊天记录都活着;对话的是谁,由「当前参考资料」附件说话
+  const activeTabObj = tabs.find((t) => t.id === activeTabId) ?? null
+  // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后文件没了就渲染兜底)
+  const activeFileNode = useMemo(
+    () => (activeTabObj?.kind === 'file' && result ? findFile(result.tree, activeTabObj.relPath) : null),
+    [activeTabObj, result]
+  )
+  const activePreview = useMemo(
+    () => (activeTabObj?.kind === 'preview' && result ? findFile(result.tree, activeTabObj.relPath) : null),
+    [activeTabObj, result]
+  )
   const chatContext = !result
     ? null
-    : preview
-      ? buildFileAttachment(preview, null)
+    : activePreview
+      ? buildFileAttachment(activePreview, null)
       : selectedFile
         ? buildFileAttachment(selectedFile, structure)
         : selectedFolder
@@ -384,7 +426,9 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setSelectedFolder(null)
     setActiveTab('overview')
-    setPreview(null)
+    setTabs([])
+    setActiveTabId(null)
+    setRevealPaths(new Set())
     setPreviewRefs([])
     setStructure(null)
     setAnalyzeNote(null)
@@ -457,19 +501,49 @@ function App(): React.JSX.Element {
   }
 
   /**
-   * 选中文件:只更新选中,立即出静态详情;本地结构分析自动跑(不耗模型),
-   * AI 绝不自动启动。keepTab = 从关系卡跳过来时保持当前 Tab,详情区不换页。
+   * 选中文件(页签地基后它就是「打开文件页签」的唯一入口):
+   * 页签层 —— 同文件已开就激活(顺带响应钉住);keepTab 且当前是文件页签就原地换内容
+   * (关系链浏览);否则写临时位,被下一次单击顶替,双击才转正。
+   * 数据层 —— 静态详情立即出,本地结构分析自动跑(不耗模型),AI 绝不自动启动。
+   * fromTab = 从页签切换/关闭接力过来的:页签层已就位,不记导航、不重置内页 Tab。
    */
-  async function handleSelectFile(relPath: string, file: ScanFileNode, opts?: { keepTab?: boolean }): Promise<void> {
+  async function handleSelectFile(
+    relPath: string,
+    file: ScanFileNode,
+    opts?: { keepTab?: boolean; pin?: boolean; fromTab?: boolean }
+  ): Promise<void> {
     const seq = ++analyzeSeq.current
-    pushNav({ folder, file: relPath, dir: null })
+    if (!opts?.fromTab) pushNav({ folder, file: relPath, dir: null })
+
+    let targetId = `file:${relPath}`
+    const existing = tabs.find((t) => t.kind === 'file' && t.relPath === relPath)
+    const cur = tabs.find((t) => t.id === activeTabId)
+    if (existing) {
+      targetId = existing.id
+      if (opts?.pin && !existing.pinned) {
+        setTabs((prev) => prev.map((t) => (t.id === existing.id ? { ...t, pinned: true } : t)))
+      }
+    } else if (opts?.keepTab && cur && cur.kind === 'file') {
+      // 原地换内容:还是那张页签,只是装的文件换了,钉住状态保留
+      targetId = `file:${relPath}`
+      setTabs((prev) =>
+        prev.map((t) => (t.id === cur.id ? { ...t, id: targetId, relPath, name: file.name, icon: file.summary?.icon ?? 'file' } : t))
+      )
+    } else {
+      const tab: PaneTab = { id: targetId, kind: 'file', relPath, name: file.name, icon: file.summary?.icon ?? 'file', pinned: !!opts?.pin }
+      const temp = tabs.find((t) => !t.pinned)
+      setTabs((prev) => (temp ? prev.map((t) => (t.id === temp.id ? tab : t)) : [...prev, tab]))
+    }
+    setActiveTabId(targetId)
+    if (result) setRevealPaths(new Set(dirChainOf(result.tree, relPath)))
+
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
     // 聊天中点文件(第一百二十四锤):不切台、不抢话头,只把新资料塞给探针接着聊。
     // 点的就是当前这个就不垫字:资料一个字没变,刷一条「换成了」纯属垃圾(小葵点的)
     const chatting = activeTab === 'chat'
-    if (!opts?.keepTab && !chatting) setActiveTab('overview')
+    if (!opts?.keepTab && !opts?.fromTab && !chatting) setActiveTab('overview')
     if (chatting && chat.messages.length > 0 && selectedFile?.relPath !== relPath) chat.note(`参考资料换成了 ${file.name}`)
 
     if (!file.language) {
@@ -524,7 +598,8 @@ function App(): React.JSX.Element {
     if (dir) handleSelectFolder(dir)
   }
 
-  // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发
+  // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发。
+  // 文件夹详情是底色页 —— 切过去等于把激活页签收起来(页签不关,回来还在)
   function handleSelectFolder(node: ScanDirNode): void {
     pushNav({ folder, file: null, dir: node.relPath })
     setSelectedFolder(node)
@@ -538,15 +613,52 @@ function App(): React.JSX.Element {
         chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
       return
     }
+    setActiveTabId(null)
     setActiveTab('overview')
   }
 
+  // 底色页的 ×:清掉文件夹选中回项目主页;页签是页签的事,这里不碰
   function clearSelection(): void {
-    setSelectedFile(null)
     setSelectedFolder(null)
+    setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
+    setActiveTabId(null)
     setActiveTab('overview')
+  }
+
+  // 页签操作:激活(文件页签顺带把数据装回来)、钉住(纯页签层,不重跑分析)、关闭(VS Code 接力规矩)
+  function activateTab(id: string): void {
+    if (id === activeTabId) return
+    const t = tabs.find((x) => x.id === id)
+    setActiveTabId(id)
+    if (t?.kind === 'file') {
+      const f = result && findFile(result.tree, t.relPath)
+      if (f) void handleSelectFile(f.relPath, f, { fromTab: true })
+    }
+  }
+
+  function pinTab(id: string): void {
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: true } : t)))
+  }
+
+  function closeTab(id: string): void {
+    const idx = tabs.findIndex((t) => t.id === id)
+    if (idx === -1) return
+    const next = tabs.filter((t) => t.id !== id)
+    setTabs(next)
+    if (id !== activeTabId) return
+    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底色页(VS Code 同款)
+    const nextActive = next[idx] ?? next[idx - 1] ?? null
+    setActiveTabId(nextActive?.id ?? null)
+    if (nextActive?.kind === 'file') {
+      const f = result && findFile(result.tree, nextActive.relPath)
+      if (f) void handleSelectFile(f.relPath, f, { fromTab: true })
+    } else if (!nextActive) {
+      setSelectedFile(null)
+      setStructure(null)
+      setAnalyzeNote(null)
+    }
   }
 
   // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
@@ -555,7 +667,9 @@ function App(): React.JSX.Element {
     if (!folder) return
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
-    setPreview(null)
+    setTabs([])
+    setActiveTabId(null)
+    setRevealPaths(new Set())
     setPreviewRefs([])
     setFolder(null)
     setResult(null)
@@ -595,20 +709,33 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 右键「预览文件」(第一百一十锤):在树上找到文件节点,左栏换成只读文本窗
-  function openPreview(relPath: string): void {
+  // 开一张预览页签(页签地基):同文件的预览页签已开就激活,否则写临时位(可被下一次顶替)。
+  // 引用就地清账 —— 行号是跟着文件走的;jump 带行号时预览窗滚过去
+  function openPreviewTab(relPath: string, jump: { line: number; seq: number } | null): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
-    if (f) {
-      setPreview(f)
-      setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
-      setPreviewJump(null) // 从树上进的预览不带跳行,清掉旧的免得莫名滚一下
+    if (!f) return
+    setPreviewRefs([])
+    setPreviewJump(jump)
+    const targetId = `preview:${relPath}`
+    const existing = tabs.find((t) => t.kind === 'preview' && t.relPath === relPath)
+    if (!existing) {
+      const tab: PaneTab = { id: targetId, kind: 'preview', relPath, name: f.name, icon: f.summary?.icon ?? 'file', pinned: false }
+      const temp = tabs.find((t) => !t.pinned)
+      setTabs((prev) => (temp ? prev.map((t) => (t.id === temp.id ? tab : t)) : [...prev, tab]))
     }
+    setActiveTabId(targetId)
+    setRevealPaths(new Set(dirChainOf(result.tree, relPath)))
   }
 
-  // 点聊天里的文件链接:树上查到就开左边预览,带行号的连滚带跳直达那一行;
+  // 树上右键「预览文件」(第一百一十锤):从树上进的预览不带跳行
+  function openPreview(relPath: string): void {
+    openPreviewTab(relPath, null)
+  }
+
+  // 点聊天里的文件链接:树上查到就开预览页签,带行号的连滚带跳直达那一行;
   // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞。
-  // 用 refs 持有最新的 result/chat,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
+  // 用 refs 持有最新的 result/chat/openPreviewTab,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
   // 流式输出时只有正在吐字的那条消息重画,别的消息一个字都不动(聊多了也不给画面上强度)
   const chatRef = useRef(chat)
   useEffect(() => {
@@ -618,18 +745,19 @@ function App(): React.JSX.Element {
   useEffect(() => {
     resultRef.current = result
   })
+  const openPreviewTabRef = useRef(openPreviewTab)
+  useEffect(() => {
+    openPreviewTabRef.current = openPreviewTab
+  })
   const openFileLink = useCallback((relPath: string, line?: number): void => {
     const cur = resultRef.current
     if (!cur) return
-    const f = findFile(cur.tree, relPath)
-    if (!f) {
+    if (!findFile(cur.tree, relPath)) {
       chatRef.current.note(`${relPath} 现在不在目录树里了(可能刚被删掉或改名),开不了预览`)
       return
     }
-    setPreview(f)
-    setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
     jumpSeqRef.current += 1
-    setPreviewJump(line !== undefined ? { line, seq: jumpSeqRef.current } : null)
+    openPreviewTabRef.current(relPath, line !== undefined ? { line, seq: jumpSeqRef.current } : null)
   }, [])
 
   // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事
@@ -683,10 +811,12 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 退出预览:左栏回目录树,右栏回原来的详情,引用一并清账
-  function exitPreview(): void {
-    setPreview(null)
-    setPreviewRefs([])
+  // 退出预览的老函数已退役(页签地基):预览窗的 × 现在直接关页签(closeTab)
+
+  // 树上双击钉住:第一次 click 已经把临时页签开好,这里只翻钉子 ——
+  // 不重跑分析、不重复垫字,纯页签层的一步
+  function pinFileFromTree(relPath: string): void {
+    setTabs((prev) => prev.map((t) => (t.kind === 'file' && t.relPath === relPath ? { ...t, pinned: true } : t)))
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -878,45 +1008,31 @@ function App(): React.JSX.Element {
           {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
               不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
-            {preview ? (
-              // 预览模式:左栏整扇换成只读文本窗(退出预览才回到目录树)。
-              // 不再挂 key={relPath} 强制重挂:换文件的复位(内容/选区/滚动位)由
-              // 组件自己按文件名记账,省掉整棵树拆了重装的开销(隐身案这锤)
-              <CodePreview
-                rootPath={result.rootPath}
-                file={preview}
-                canAddRef={previewRefs.length < CODE_REFS_MAX}
-                refLimit={CODE_REFS_MAX}
-                onAddRef={addPreviewRef}
-                onClose={exitPreview}
-                jump={previewJump}
-              />
-            ) : (
-              <>
-                <FileTree
-                  root={result.tree}
-                  notes={notes}
-                  selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
-                  expandingPath={expanding}
-                  onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
-                  onSelectFolder={handleSelectFolder}
-                  onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-                  onNoteEdit={editNoteFromTree}
-                  onNoteRemove={(relPath) => saveNote(relPath, '')}
-                  onPreview={openPreview}
-                />
-                <footer className="sidebar-footer">
-                  <span>
-                    <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
-                    {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
-                  </span>
-                  <span className="mono">
-                    {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
-                  </span>
-                </footer>
-                {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
-              </>
-            )}
+            {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
+            <FileTree
+              root={result.tree}
+              notes={notes}
+              selectedPath={activeFileNode?.relPath ?? activePreview?.relPath ?? selectedFolder?.relPath ?? null}
+              expandingPath={expanding}
+              revealPaths={revealPaths}
+              onSelectFile={(relPath, file) => void handleSelectFile(relPath, file)}
+              onPinFile={pinFileFromTree}
+              onSelectFolder={handleSelectFolder}
+              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+              onNoteEdit={editNoteFromTree}
+              onNoteRemove={(relPath) => saveNote(relPath, '')}
+              onPreviewFile={openPreview}
+            />
+            <footer className="sidebar-footer">
+              <span>
+                <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
+                {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
+              </span>
+              <span className="mono">
+                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
+              </span>
+            </footer>
+            {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
           </aside>
           <div
             className="sash"
@@ -935,66 +1051,88 @@ function App(): React.JSX.Element {
           />
           <section className="detail">
             {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
-            {preview ? (
-              // 预览模式:右栏整扇换成小探针的自由对话,专聊左边这扇窗里的文件
-              <PreviewDetailView
-                key={preview.relPath}
-                file={preview}
-                result={result}
-                refs={previewRefs}
-                onRemoveRef={removePreviewRef}
-                onClose={exitPreview}
-                chat={chat}
-                chatContext={chatContext ?? buildFileAttachment(preview, null)}
-                fileLinks={fileLinks}
-                suggestionsOn={chatSuggestionsOn}
-              />
-            ) : selectedFile && result && activeTab === 'chat' ? (
-              // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
-              <ChatTabDetailPage
-                crumbs={buildCrumbs(result.rootName, result.rootPath, selectedFile.relPath)}
-                iconName={selectedFile.summary?.icon ?? 'file'}
-                title={selectedFile.name}
-                subtitle={selectedFile.language ? `${selectedFile.language.name} 文件 · 聊天接着聊,资料已经换成它了` : '聊天接着聊,资料已经换成它了'}
-                tabs={FILE_TABS}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                note={notes[selectedFile.relPath] ?? null}
-                onNoteSave={(text) => saveNote(selectedFile.relPath, text)}
-                autoOpenNote={noteEditRequest === selectedFile.relPath}
-                onClose={clearSelection}
-                chat={chat}
-                chatContext={chatContext ?? buildFileAttachment(selectedFile, structure)}
-                refs={previewRefs}
-                onRemoveRef={removePreviewRef}
-                onDropNode={handleDropNode}
-                fileLinks={fileLinks}
-                suggestionsOn={chatSuggestionsOn}
-              />
-            ) : selectedFile && result ? (
-              <FileDetailView
-                key={selectedFile.relPath}
-                file={selectedFile}
-                result={result}
-                structure={structure}
-                analyzing={analyzing}
-                analyzeNote={analyzeNote}
-                graph={graph}
-                graphLoading={graphLoading}
-                graphNote={graphNote}
-                onLoadGraph={() => void handleLoadGraph()}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                onClose={clearSelection}
-                onJump={(p) => jumpTo(p, true)}
-                gitInfo={gitInfo}
-                gitLoading={gitLoading}
-                note={notes[selectedFile.relPath] ?? null}
-                onNoteSave={saveNote}
-                autoOpenNote={noteEditRequest === selectedFile.relPath}
-                suggestionsOn={chatSuggestionsOn}
-              />
+            {activeTabObj && result ? (
+              // 页签态:顶上一条页签条,下面只渲染激活那张(VS Code 的克制:一次一个房间)
+              <>
+                <TabBar tabs={tabs} activeId={activeTabId} onActivate={activateTab} onClose={closeTab} onPin={pinTab} />
+                {activeTabObj.kind === 'preview' && activePreview ? (
+                  // 预览页签:合并页签,左源码右伴聊 —— 「边看代码边聊」有了自己的门牌
+                  <div className="preview-split" key={activeTabObj.id}>
+                    <CodePreview
+                      rootPath={result.rootPath}
+                      file={activePreview}
+                      canAddRef={previewRefs.length < CODE_REFS_MAX}
+                      refLimit={CODE_REFS_MAX}
+                      onAddRef={addPreviewRef}
+                      onClose={() => closeTab(activeTabObj.id)}
+                      jump={previewJump}
+                    />
+                    <PreviewChatPane
+                      file={activePreview}
+                      result={result}
+                      refs={previewRefs}
+                      onRemoveRef={removePreviewRef}
+                      chat={chat}
+                      chatContext={chatContext ?? buildFileAttachment(activePreview, null)}
+                      fileLinks={fileLinks}
+                      suggestionsOn={chatSuggestionsOn}
+                    />
+                  </div>
+                ) : activeTabObj.kind === 'file' && activeFileNode ? (
+                  activeTab === 'chat' ? (
+                    // 聊天 Tab 的稳定替身(第一百二十五锤):换文件只换面包屑和附件卡,面板不重挂
+                    <ChatTabDetailPage
+                      crumbs={buildCrumbs(result.rootName, result.rootPath, activeFileNode.relPath)}
+                      iconName={activeFileNode.summary?.icon ?? 'file'}
+                      title={activeFileNode.name}
+                      subtitle={
+                        activeFileNode.language
+                          ? `${activeFileNode.language.name} 文件 · 聊天接着聊,资料已经换成它了`
+                          : '聊天接着聊,资料已经换成它了'
+                      }
+                      tabs={FILE_TABS}
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                      note={notes[activeFileNode.relPath] ?? null}
+                      onNoteSave={(text) => saveNote(activeFileNode.relPath, text)}
+                      autoOpenNote={noteEditRequest === activeFileNode.relPath}
+                      onClose={() => closeTab(activeTabObj.id)}
+                      chat={chat}
+                      chatContext={chatContext ?? buildFileAttachment(activeFileNode, structure)}
+                      refs={previewRefs}
+                      onRemoveRef={removePreviewRef}
+                      onDropNode={handleDropNode}
+                      fileLinks={fileLinks}
+                      suggestionsOn={chatSuggestionsOn}
+                    />
+                  ) : (
+                    <FileDetailView
+                      key={activeFileNode.relPath}
+                      file={activeFileNode}
+                      result={result}
+                      structure={structure}
+                      analyzing={analyzing}
+                      analyzeNote={analyzeNote}
+                      graph={graph}
+                      graphLoading={graphLoading}
+                      graphNote={graphNote}
+                      onLoadGraph={() => void handleLoadGraph()}
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                      onClose={() => closeTab(activeTabObj.id)}
+                      onJump={(p) => jumpTo(p, true)}
+                      gitInfo={gitInfo}
+                      gitLoading={gitLoading}
+                      note={notes[activeFileNode.relPath] ?? null}
+                      onNoteSave={saveNote}
+                      autoOpenNote={noteEditRequest === activeFileNode.relPath}
+                      suggestionsOn={chatSuggestionsOn}
+                    />
+                  )
+                ) : null}
+              </>
             ) : selectedFolder && result && activeTab === 'chat' ? (
+              // 底色页的文件夹聊天(锤 A 不动聊天):文件夹详情「Atlas 小探针」内页还是老样子
               <ChatTabDetailPage
                 crumbs={buildCrumbs(result.rootName, result.rootPath, selectedFolder.relPath)}
                 iconName={selectedFolder.summary?.icon ?? 'folder'}
@@ -1219,17 +1357,16 @@ function ChatTabDetailPage({
 }
 
 /**
- * 预览模式的右半(第一百一十锤):小探针的自由对话,专聊左栏那扇窗里的文件。
- * 走的是详情页同一条聊天通道,只是这儿没有 Tab —— 进来就是聊。
- * 第一百一十一锤:左栏选中的代码以引用卡挂到输入框上,和问题一起发出去。
- * 第一百二十四锤:聊天账本上移到 App,换文件不再重挂、对话不再蒸发。
+ * 预览页签的右半(页签地基):小探针的自由对话列,专聊左边那扇源码窗里的文件。
+ * 从前它是右栏整扇(PreviewDetailView,自带详情头);预览成页签后头没了 ——
+ * 页签条管身份,CodePreview 管文件名,它只管聊。走的是详情页同一条聊天通道。
+ * 第一百一十一锤:源码里选中的代码以引用卡挂到输入框上,和问题一起发出去。
  */
-function PreviewDetailView({
+function PreviewChatPane({
   file,
   result,
   refs,
   onRemoveRef,
-  onClose,
   chat,
   chatContext,
   fileLinks,
@@ -1239,7 +1376,6 @@ function PreviewDetailView({
   result: ScanResult
   refs: ChatCodeRef[]
   onRemoveRef: (index: number) => void
-  onClose: () => void
   chat: AiChatApi
   chatContext: ChatContextAttachment
   fileLinks?: FileLinkTarget | null
@@ -1255,17 +1391,8 @@ function PreviewDetailView({
   })
 
   return (
-    <div className="detail-page soft-in">
-      <DetailHeader
-        crumbs={buildCrumbs(result.rootName, result.rootPath, file.relPath)}
-        iconName={file.summary?.icon ?? 'file'}
-        title={file.name}
-        subtitle={file.language ? `${file.language.name} 文件 · 左栏是它的内容,选中一段可以引用给我讲` : '左栏是它的内容'}
-        onClose={onClose}
-      />
-      <div className="detail-body is-chat">
-        <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
-      </div>
+    <div className="preview-chat soft-in">
+      <FreeChatPanel chat={chat} context={chatContext} refs={refs} onRemoveRef={onRemoveRef} suggestions={suggestions.questions} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
     </div>
   )
 }
