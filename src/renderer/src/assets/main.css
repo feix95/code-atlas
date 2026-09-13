@@ -658,6 +658,17 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-size: var(--font-sm);
 }
 
+/* 预览器头部的文件名带了右键菜单(复制路径/在资源管理器中显示):染主题色示意,
+ * 左键不动作(已经在预览它了),右键才算数 */
+.code-pane-name.is-file-menu {
+  color: var(--accent);
+  cursor: context-menu;
+}
+
+.code-pane-name.is-file-menu:hover {
+  text-decoration: underline;
+}
+
 .code-pane-exit,
 .code-pane-ref {
   flex-shrink: 0;
@@ -5331,7 +5342,7 @@ body.is-maximized .cfg-layer {
 .file-path-menu {
   position: fixed;
   z-index: 95;
-  min-width: 11rem;
+  min-width: 12rem;
   padding: 0.25rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);

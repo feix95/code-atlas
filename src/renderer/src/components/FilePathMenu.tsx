@@ -2,17 +2,18 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { closeFilePathMenu, currentFilePathMenu, subscribeFilePathMenu, type FilePathMenuRequest } from './filePathMenuStore'
 
 /**
- * 文件路径右键菜单(小锤「右键绿字复制路径」):绿字文件链接上右键弹出的小菜单,
- * 把文件的完整路径(盘符开头那种)复制进剪贴板。只复制不打开 —— 找到真文件后
- * 开不开、怎么开,完全交给用户看到真实文件后自己决定。
+ * 文件路径右键菜单(绿字文件链接 / 预览器头部文件名共用):右键弹出的小菜单,两件事——
+ * 1. 复制完整路径(盘符开头那种)进剪贴板;
+ * 2. 在文件资源管理器中显示(资源管理器弹出、文件选中高亮)。
+ * 两件都只「带路」不「开门」:开不开文件、怎么开,交给用户看到真实文件后自己决定。
  *
  * 菜单是自绘的(暗色主题一个皮肤,不弹系统白菜单),全局单例:挂在 App 根部一次,
  * 各处的链接按钮只管喊 openFilePathMenu 报坐标,不用每处自己养一份菜单状态。
  */
 
-/** 菜单的估尺寸:就一项,窄窄一条;贴窗口边时按它往里收,别弹出窗外 */
-const MENU_W = 176
-const MENU_H = 40
+/** 菜单的估尺寸:两项窄窄一条;贴窗口边时按它往里收,别弹出窗外 */
+const MENU_W = 200
+const MENU_H = 72
 const EDGE = 8
 
 function clampedPosition(x: number, y: number): { left: number; top: number } {
@@ -51,7 +52,8 @@ export function FilePathMenu(): React.JSX.Element | null {
 }
 
 function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.JSX.Element {
-  const [phase, setPhase] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const [revealFail, setRevealFail] = useState<string | null>(null)
   const timerRef = useRef<number | null>(null)
   useEffect(
     () => () => {
@@ -60,12 +62,14 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
     []
   )
 
-  async function handleCopy(): Promise<void> {
-    if (phase !== 'idle') return
-    const abs = await request.copy()
-    setPhase(abs === null ? 'fail' : 'ok')
-    // 反馈停一拍再收摊,让用户亲眼看到「已复制」,不是菜单凭空消失
-    timerRef.current = window.setTimeout(closeFilePathMenu, abs === null ? 1400 : 900)
+  function noteThenClose(text: string | null): void {
+    if (text !== null) {
+      setRevealFail(text)
+      timerRef.current = window.setTimeout(closeFilePathMenu, 1600)
+      return
+    }
+    // 显示成功不用菜单夸 —— 资源管理器窗口自己弹出来,就是最响亮的反馈
+    closeFilePathMenu()
   }
 
   const pos = clampedPosition(request.x, request.y)
@@ -74,13 +78,34 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
       <button
         type="button"
         role="menuitem"
-        className={`file-path-menu-item${phase === 'ok' ? ' is-ok' : ''}${phase === 'fail' ? ' is-fail' : ''}`}
+        className={`file-path-menu-item${copied === 'ok' ? ' is-ok' : ''}${copied === 'fail' ? ' is-fail' : ''}`}
         onClick={() => {
-          void handleCopy()
+          if (copied !== 'idle') return
+          void request.copy().then((abs) => {
+            setCopied(abs === null ? 'fail' : 'ok')
+            if (abs === null) {
+              timerRef.current = window.setTimeout(closeFilePathMenu, 1600)
+              return
+            }
+            // 反馈停一拍再收摊,让用户亲眼看到「已复制」,不是菜单凭空消失
+            timerRef.current = window.setTimeout(closeFilePathMenu, 900)
+          })
         }}
         title={request.relPath}
       >
-        {phase === 'ok' ? '已复制 ✓' : phase === 'fail' ? '没复制成,这路径有问题' : '复制完整路径'}
+        {copied === 'ok' ? '已复制 ✓' : copied === 'fail' ? '没复制成,这路径有问题' : '复制完整路径'}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={`file-path-menu-item${revealFail !== null ? ' is-fail' : ''}`}
+        onClick={() => {
+          if (revealFail !== null) return
+          void request.reveal().then(noteThenClose)
+        }}
+        title={request.relPath}
+      >
+        {revealFail ?? '在文件资源管理器中显示'}
       </button>
     </div>
   )

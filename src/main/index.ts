@@ -1,5 +1,6 @@
 import { app, clipboard, dialog, globalShortcut, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import { scanDirectory, IGNORED_NAMES } from '../scanner/index.ts'
 import {
@@ -2024,6 +2025,22 @@ function registerIpc(): void {
       return { ok: true as const, path: abs }
     } catch (err) {
       return { ok: false as const, message: err instanceof Error ? err.message : '复制失败' }
+    }
+  })
+
+  // 右键文件链接「在文件资源管理器中显示」:把资源管理器拉到文件面前、选中高亮,
+  // 照样不开文件不执行任何东西 —— 到家门口为止,开不开门用户自己定
+  ipcMain.handle('atlas:reveal-file-path', (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
+      return { ok: false as const, message: '路径信息不完整,打不开' }
+    }
+    try {
+      const abs = joinRoot(rootPath, relPath)
+      if (!existsSync(abs)) return { ok: false as const, message: '这个文件好像已经不在了,可能被移动或删除过' }
+      shell.showItemInFolder(abs)
+      return { ok: true as const }
+    } catch (err) {
+      return { ok: false as const, message: err instanceof Error ? err.message : '打不开文件夹' }
     }
   })
 }

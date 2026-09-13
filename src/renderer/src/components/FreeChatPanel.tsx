@@ -40,7 +40,7 @@ const FileNoteText = memo(function FileNoteText({
           e.preventDefault()
           fileLinks.onMenu(s.relPath, e.clientX, e.clientY)
         }}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键可复制完整路径`}
+        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}
@@ -64,6 +64,25 @@ const CHAT_EXAMPLES = ['你是谁？', '联网搜一下它是什么', '今天不
 
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
 const REF_ONLY_QUESTION = '讲讲选中的这段代码'
+
+/**
+ * 聊天面板的滚动记忆(按对话指纹记名):点聊天里的绿字跳预览时,聊天面板会从另一个
+ * 条件分支整个重挂(文件夹聊天/文件聊天/预览三处分身),粘底开关一重置,面板就被
+ * 压到最底,用户正看着的那条直接滚出视野。按「首尾消息指纹」记一份滚动位置:
+ * 同一场对话重挂就回到原地;真新对话(指纹对不上)才滚到最新。
+ */
+interface ChatScrollMemory {
+  fingerprint: string
+  top: number
+  atBottom: boolean
+}
+let chatScrollMemory: ChatScrollMemory | null = null
+
+function messagesFingerprint(messages: ChatMessage[]): string {
+  const first = messages[0]?.key ?? ''
+  const last = messages[messages.length - 1]?.key ?? ''
+  return `${messages.length}:${first}:${last}`
+}
 
 /** 联网账本 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
 function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
@@ -120,7 +139,7 @@ const MatchListCard = memo(function MatchListCard({
                 e.preventDefault()
                 fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
               }}
-              title={fileLinks ? `打开预览:${it.relPath} 第 ${it.line} 行;右键可复制完整路径` : it.relPath}
+              title={fileLinks ? `打开预览:${it.relPath} 第 ${it.line} 行;右键:复制路径 / 在资源管理器中显示` : it.relPath}
             >
               {it.relPath}:{it.line}
             </button>
@@ -311,6 +330,7 @@ export function FreeChatPanel({
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32
     atBottomRef.current = nearBottom
     setShowJump(!nearBottom)
+    chatScrollMemory = { fingerprint: messagesFingerprint(chat.messages), top: el.scrollTop, atBottom: nearBottom }
   }
 
   function jumpToLatest(): void {
@@ -360,10 +380,23 @@ export function FreeChatPanel({
     return undefined
   }, [chat.messages])
 
-  // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就让箭头 key 变一变、蹦一下
+  // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就让箭头 key 变一变、蹦一下。
+  // 面板挂载后的第一轮是「认门」:同一场对话从别的分支重挂过来(点绿字跳预览最常见),
+  // 按滚动记忆回到用户刚才的位置;真新对话(指纹对不上)才滚到最新
+  const restoredRef = useRef(false)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    if (!restoredRef.current) {
+      restoredRef.current = true
+      const fp = messagesFingerprint(chat.messages)
+      const saved = chatScrollMemory?.fingerprint === fp ? chatScrollMemory : null
+      atBottomRef.current = saved ? saved.atBottom : true
+      // 位置一设,scroll 事件会自己来报信,贴底箭头交给 onMessagesScroll 接管
+      el.scrollTop = saved && !saved.atBottom ? saved.top : el.scrollHeight
+      chatScrollMemory = { fingerprint: fp, top: el.scrollTop, atBottom: atBottomRef.current }
+      return
+    }
     if (atBottomRef.current) el.scrollTop = el.scrollHeight
     else setNewBeat((c) => c + 1)
   }, [chat.messages])

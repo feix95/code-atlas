@@ -3,13 +3,16 @@
  * 只导出组件)。模块级单例:全 app 同时最多一张菜单,链接按钮只管喊「开」。
  */
 
-/** 菜单打开时要带的行李:鼠标位置 + 规范 relPath + 复制动作(App 层提供,带扫描根) */
+/** 菜单打开时要带的行李:鼠标位置 + 规范 relPath + 两个动作(都由 App 层提供,带扫描根) */
 export interface FilePathMenuRequest {
   x: number
   y: number
   relPath: string
-  /** 复制成功返回绝对路径;失败返回 null(菜单里说人话,不弹错误框) */
+  /** 复制完整路径:成功返回绝对路径;失败返回 null(菜单里说人话,不弹错误框) */
   copy: () => Promise<string | null>
+  /** 在文件资源管理器中显示:成功返回 null(资源管理器弹出本身就是反馈);
+   *  失败返回要显示的人话(比如文件已经不在了) */
+  reveal: () => Promise<string | null>
 }
 
 let menuRequest: FilePathMenuRequest | null = null
@@ -21,7 +24,27 @@ export function openFilePathMenu(request: FilePathMenuRequest): void {
   emit()
 }
 
-/** 收摊(点菜单外面 / 滚动 / Esc / 复制完的自动关,都走这儿) */
+/**
+ * 一站式开菜单:知道扫描根的调用方(聊天链接的 App 层、预览器头部)传 (rootPath, relPath)
+ * 加鼠标坐标就行,复制/显现两个动作都在这儿接好,不用每处自己拼闭包
+ */
+export function openFilePathMenuFor(rootPath: string, relPath: string, x: number, y: number): void {
+  openFilePathMenu({
+    x,
+    y,
+    relPath,
+    copy: async () => {
+      const r = await window.atlas.copyFilePath(rootPath, relPath)
+      return r.ok && r.path !== undefined ? r.path : null
+    },
+    reveal: async () => {
+      const r = await window.atlas.revealFilePath(rootPath, relPath)
+      return r.ok ? null : (r.message ?? '没打开成')
+    }
+  })
+}
+
+/** 收摊(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
 export function closeFilePathMenu(): void {
   menuRequest = null
   emit()

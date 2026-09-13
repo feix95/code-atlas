@@ -32,7 +32,7 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
           e.preventDefault()
           links.onMenu(s.relPath, e.clientX, e.clientY)
         }}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键可复制完整路径`}
+        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}

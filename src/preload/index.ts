@@ -146,6 +146,9 @@ contextBridge.exposeInMainWorld('atlas', {
   /** 右键文件链接复制完整路径:主进程 joinRoot 拼绝对路径写进剪贴板,只复制不打开 */
   copyFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; path?: string; message?: string }> =>
     ipcRenderer.invoke('atlas:copy-file-path', rootPath, relPath),
+  /** 右键文件链接「在文件资源管理器中显示」:资源管理器弹出并选中文件,不开文件 */
+  revealFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke('atlas:reveal-file-path', rootPath, relPath),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void => callback(status)

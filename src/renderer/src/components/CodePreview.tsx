@@ -7,6 +7,7 @@ import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
+import { openFilePathMenuFor } from './filePathMenuStore'
 
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
@@ -347,7 +348,15 @@ export function CodePreview({
         <span className="code-pane-icon" aria-hidden="true">
           <TreeIcon name={file.summary?.icon ?? 'file'} size={15} />
         </span>
-        <span className="code-pane-name mono" title={file.relPath}>
+        <span
+          className="code-pane-name mono is-file-menu"
+          title={`${file.relPath};右键:复制路径 / 在资源管理器中显示`}
+          onContextMenu={(e) => {
+            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,复制/显现两件事
+            e.preventDefault()
+            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY)
+          }}
+        >
           {file.relPath}
         </span>
         {result?.status === 'ok' && text !== '' && (
