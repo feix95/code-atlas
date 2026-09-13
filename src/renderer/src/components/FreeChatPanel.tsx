@@ -4,6 +4,7 @@ import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { isCompactCommand } from '@shared/compact'
 import { Badge } from './DetailHeader'
+import { ErrorBoundary } from './ErrorBoundary'
 import { Notice } from './Notice'
 import { AtlasProbe, type ProbeState } from './AtlasProbe'
 import { IconRefresh, TreeIcon } from './Icons'
@@ -487,14 +488,17 @@ export function FreeChatPanel({
                 )
               }
               return (
-                <AssistantBubble
-                  key={m.key}
-                  msg={m}
-                  canRetry={m.key === lastAssistantKey && !chat.busy}
-                  retryIndex={idx}
-                  onRetry={retryFrom}
-                  fileLinks={fileLinks}
-                />
+                // 消息级兜底网(2026-09-13 隐身案):一条回答画崩了只挂这一条,
+                // 提示+就地重试;以前会掀桌炸掉整棵树,窗直接隐身
+                <ErrorBoundary key={m.key} note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。" retryLabel="再试一次">
+                  <AssistantBubble
+                    msg={m}
+                    canRetry={m.key === lastAssistantKey && !chat.busy}
+                    retryIndex={idx}
+                    onRetry={retryFrom}
+                    fileLinks={fileLinks}
+                  />
+                </ErrorBoundary>
               )
             })
           )}

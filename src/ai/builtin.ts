@@ -32,6 +32,8 @@ let child: ChildProcess | null = null
 let readyPromise: Promise<{ baseUrl: string; model: string }> | null = null
 /** 当前子进程是用哪组设置拉起的(serverPath|modelPath),换模型时判断要不要重启 */
 let startedKey = ''
+/** 当前子进程实际喂给 -c 的上下文档位(归一后的数),改档位时判断要不要重启(2026-09-13) */
+let startedCtx = 0
 
 // ── 第七十锤:模型状态播报 ──
 // 引擎在干嘛(没叫醒/热身到百分之几/就绪/出岔子)由这里记账并喊给状态栏。
@@ -381,6 +383,13 @@ export function builtinNeedsRestart(settings: AiBuiltinSettings): boolean {
   return startedKey !== settingsKey(settings)
 }
 
+/** 上下文档位有变而旧引擎还按旧档跑着:得重启才作数(2026-09-13 白屏案顺带的账)。
+ * 以前改档位被「引擎已在跑就复用」一口吞掉 —— 滑块拖了、保存了、界面还显示新数,
+ * 引擎压根没听见,静默不生效;现在对不上账就明说,由调用方决定何时重启。 */
+export function builtinContextDiffers(contextSize: number): boolean {
+  if (!isBuiltinRunning()) return false
+  return startedCtx !== Math.max(512, Math.floor(contextSize))
+}
 /**
  * 引擎自动定位:用户不该知道 llama-server 是啥。
  * 设置里填了程序路径就用填的(高级用法);没填就找 app 自带的引擎
@@ -595,7 +604,13 @@ export async function ensureBuiltinServer(
   contextSize = DEFAULT_CONTEXT_SIZE,
   manualContext: number | null = null
 ): Promise<{ baseUrl: string; model: string }> {
-  if (isBuiltinRunning() && readyPromise) return readyPromise
+  if (isBuiltinRunning() && readyPromise) {
+    // 上下文档位对不上账(2026-09-13):旧引擎还按旧 -c 跑着,新档位静默不生效 ——
+    // 就地解散,按新档重拉(下面的单飞开头会收尸并等端口真正放行,不会撞端口)
+    if (!builtinContextDiffers(contextSize)) return readyPromise
+    addDevLog('system', `上下文档位改成了 ${Math.max(512, Math.floor(contextSize))},重启引擎让它生效`)
+    stopBuiltinServer()
+  }
   return startBuiltinSingleFlight(settings, contextSize, manualContext)
 }
 
@@ -618,6 +633,7 @@ async function startAndWaitReady(
   contextSize = DEFAULT_CONTEXT_SIZE
 ): Promise<{ baseUrl: string; model: string }> {
   startedKey = settingsKey({ serverPath, modelPath })
+  startedCtx = Math.max(512, Math.floor(contextSize)) // 跟 -c 参数同款归一,档位对账就认这个数
   stopping = false // 新的一轮启动:上次「主动叫停」的标记就地清账
   const facts = builtinIdleFacts(modelPath)
   const startedAt = Date.now()
@@ -770,4 +786,5 @@ export function stopBuiltinServer(): void {
   child = null
   readyPromise = null
   startedKey = ''
+  startedCtx = 0
 }

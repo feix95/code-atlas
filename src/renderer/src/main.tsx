@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { DevLogsPage } from './DevLogsPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { initAppearance } from './appearance'
 import './assets/main.css'
 
@@ -22,23 +23,24 @@ window.addEventListener('unhandledrejection', (e) => {
   window.atlas?.reportRendererError(`未兑现的承诺:${reason}`)
 })
 
-// 画面心跳(救生圈2.0):rAF 每秒向主进程报一跳「画面循环还在转」。隐身案实测定性 ——
-// 渲染进程活着但画面管线停摆时,外面的任何抢救都叫不醒,只有整页重挂能救;主进程就靠
-// 这跳判断何时动手。日志窗(?view=devlogs)不掺和,主进程那边也只认主窗的跳。
-if (view !== 'devlogs') {
-  let lastBeat = 0
-  const beat = (t: number): void => {
-    if (t - lastBeat >= 1000) {
-      lastBeat = t
-      window.atlas?.frameHeartbeat()
-    }
-    requestAnimationFrame(beat)
-  }
-  requestAnimationFrame(beat)
-}
+// 画面心跳(救生圈2.0)住在 App 组件里(React 树内):树活着心跳才跳。
+// 不再放这儿(树外)—— 2026-09-13 白屏案实锤:渲染期异常把 React 树整棵卸载时,
+// 树外的 rAF 照跳不误,主进程看门狗被假心跳骗住永远不出手,窗就永久白屏隐身。
 
+// 顶层兜底网(2026-09-13 隐身案第二课):渲染期异常以前会把整棵 React 树卸掉,
+// 透明窗一白屏就是整窗「隐身」—— 现在最外层网接住,窗还在、话说人话、一键整页重挂。
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    {view === 'devlogs' ? <DevLogsPage /> : <App />}
+    {view === 'devlogs' ? (
+      <DevLogsPage />
+    ) : (
+      <ErrorBoundary
+        variant="top"
+        note="界面出了个岔子崩了,别慌,程序还在。点下面按钮整个重新打开就能接着用;刚聊的内容没能保住,抱歉。"
+        reloadLabel="重新打开界面"
+      >
+        <App />
+      </ErrorBoundary>
+    )}
   </React.StrictMode>
 )

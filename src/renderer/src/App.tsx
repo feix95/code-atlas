@@ -158,6 +158,23 @@ function clampSidebar(width: number): number {
 }
 
 function App(): React.JSX.Element {
+  // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
+  // 树活着心跳才跳;哪天渲染期异常把整棵树卸了(2026-09-13 的 MiniMD 隐身案就是),
+  // 本 effect 的清账函数停掉 rAF,主进程看门狗 10 秒内发现心跳停摆,自动整页重挂救回。
+  // StrictMode 下挂两遍也安全:每个实例只取消自己的那一跳。
+  useEffect(() => {
+    let lastBeat = 0
+    let handle = 0
+    const beat = (t: number): void => {
+      if (t - lastBeat >= 1000) {
+        lastBeat = t
+        window.atlas?.frameHeartbeat()
+      }
+      handle = requestAnimationFrame(beat)
+    }
+    handle = requestAnimationFrame(beat)
+    return () => cancelAnimationFrame(handle)
+  }, [])
   // 首页盘符列表(第六十锤):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
   const [drives, setDrives] = useState<DriveInfo[] | null>(null)
   const [drivesNote, setDrivesNote] = useState<string | null>(null)

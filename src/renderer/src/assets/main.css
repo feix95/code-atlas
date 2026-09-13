@@ -2187,6 +2187,55 @@ body.is-sash-dragging {
   font-size: var(--font-xs);
 }
 
+/* 渲染兜底网(2026-09-13 隐身案):某块内容画崩时垫的人话卡。
+   消息级是列表里的一张琥珀色小卡;顶层网铺满窗口,居中说清「怎么重新打开」。
+   间距全部显式设置,按钮和文字之间留呼吸感。 */
+.err-boundary {
+  margin: var(--space-2) auto;
+  padding: 0.75rem 1rem;
+  max-width: 85%;
+  border: 1px solid var(--amber-line);
+  border-radius: 10px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: var(--font-xs);
+  text-align: center;
+}
+
+.err-boundary p {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.err-boundary-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.err-boundary-actions button {
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--amber-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--amber);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.err-boundary-actions button:hover {
+  background: var(--amber-soft);
+  filter: brightness(0.96);
+}
+
+/* 顶层网:占满窗口中央,字号回到正文书档档,别让用户觉得是坏掉的缩略图 */
+.err-boundary.is-top {
+  max-width: 30rem;
+  margin: 30vh auto auto;
+  padding: 1.25rem 1.5rem;
+  font-size: var(--font-sm);
+}
+
 /* 探针干活的步骤条(第一百四十一锤):左对齐 + 行首小圆点,连翻几样时像一条
    时间线;上下留 0.25rem 紧凑堆叠,跟前后气泡隔出呼吸感(间距显式设置) */
 .chat-note.is-step {

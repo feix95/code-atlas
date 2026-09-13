@@ -55,20 +55,24 @@ function inline(text: string, links?: FileLinkTarget): ReactNode[] {
   if (codeLast < text.length) pushMd(text.slice(codeLast))
   return out
 
-  // 第二刀:**加粗** 和 [文字](链接);两样都不碰的普通字才轮到文件检测
+  // 第二刀:**加粗** 和 [文字](链接);两样都不碰的普通字才轮到文件检测。
+  // 铁律:这里必须用自己的匹配变量(pm)—— 外层 codeRe 的 while 手里正握着 m,
+  // pushMd 一旦复用,自己循环结束会把 m 置成 null,外层下一条 m[1] 当场读 null 炸整棵树
+  // (2026-09-13 隐身案真凶:「先文字后行内代码」的回答必炸,React 树卸载=透明窗白屏=整窗隐身)
   function pushMd(t: string): void {
     const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g
+    let pm: RegExpExecArray | null
     let last = 0
-    while ((m = re.exec(t)) !== null) {
-      if (m.index > last) out.push(...fileNodes(t.slice(last, m.index), links, kc))
-      if (m[1] !== undefined) out.push(<strong key={kc.n++}>{fileNodes(m[1], links, kc)}</strong>)
+    while ((pm = re.exec(t)) !== null) {
+      if (pm.index > last) out.push(...fileNodes(t.slice(last, pm.index), links, kc))
+      if (pm[1] !== undefined) out.push(<strong key={kc.n++}>{fileNodes(pm[1], links, kc)}</strong>)
       else
         out.push(
-          <span key={kc.n++} className="md-link" title={m[3]}>
-            {m[2]}
+          <span key={kc.n++} className="md-link" title={pm[3]}>
+            {pm[2]}
           </span>
         )
-      last = m.index + m[0].length
+      last = pm.index + pm[0].length
     }
     if (last < t.length) out.push(...fileNodes(t.slice(last), links, kc))
   }

@@ -79,7 +79,7 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
-import { builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
+import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
@@ -628,7 +628,10 @@ function createWindow(): void {
     mainWindow.webContents.reload()
   }, 3_000)
   // 手动拉起(保底,两段式):第一按还是无损那套(重画 + 藏了再亮,聊天记录不丢);
-  // 3 秒内连按第二下 = 无损招数全试过还没亮,直接整页重挂保命(实测唯一解药)。
+  // 10 秒内连按第二下 = 无损招数全试过还没亮,直接整页重挂保命(实测唯一解药)。
+  // 保命窗口 3 秒改 10 秒(2026-09-13 白屏案):小白遇到隐身第一下按完会先看一眼结果,
+  // 3 秒根本来不及按第二下 —— 那晚小葵连按三下全超时,保命招一次都没触发过。
+  const HOTKEY_ARM_MS = 10_000
   let hotkeyArmed = false
   let hotkeyArmTimer: NodeJS.Timeout | null = null
   globalShortcut.register('CommandOrControl+Alt+0', () => {
@@ -646,9 +649,9 @@ function createWindow(): void {
     if (hotkeyArmTimer) clearTimeout(hotkeyArmTimer)
     hotkeyArmTimer = setTimeout(() => {
       hotkeyArmed = false
-    }, 3_000)
-    console.log('[window] 手动拉起画面(Ctrl+Alt+0;还不亮就 3 秒内再按一次整页重挂)')
-    addDevLog('system', '手动拉起画面(Ctrl+Alt+0;画面还是不亮的话,3 秒内再按一次整页重挂)')
+    }, HOTKEY_ARM_MS)
+    console.log('[window] 手动拉起画面(Ctrl+Alt+0;还不亮就 10 秒内再按一次整页重挂)')
+    addDevLog('system', '手动拉起画面(Ctrl+Alt+0;画面还是不亮的话,10 秒内再按一次整页重挂)')
     mainWindow.webContents.invalidate()
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -1324,7 +1327,7 @@ function registerIpc(): void {
       stopBuiltinServer()
       broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
-    if (saved.provider === 'builtin' && builtinNeedsRestart(saved.builtin)) {
+    if (saved.provider === 'builtin' && (builtinNeedsRestart(saved.builtin) || builtinContextDiffers(saved.contextSize ?? DEFAULT_CONTEXT_SIZE))) {
       stopBuiltinServer()
       broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
