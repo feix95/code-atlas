@@ -1238,6 +1238,34 @@ body.is-sash-dragging {
   align-self: stretch;
 }
 
+/* 拖页签搬家时的落点提示:扫过整条页签栏 = 落到这组末尾 */
+.tabbar.is-drop-zone {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* 拖到某张页签上 = 插到它前面:左缘一条主题色细线 */
+.tabbar-tab {
+  position: relative;
+}
+
+.tabbar-tab.is-drop-before::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+
+.kindmenu-item-danger {
+  color: var(--danger);
+}
+
+.kindmenu-item-danger:hover {
+  background: var(--danger-soft);
+}
+
 /* 系统自动勾回品类时,刚亮起的页签轻强调一下(小葵点的:别做得太静默):
    一抹主题色淡进页签再散掉,不弹窗、不出声,让用户察觉「设置刚被自动改了」 */
 @keyframes tab-flash {
@@ -1332,6 +1360,64 @@ body.is-sash-dragging {
 .tabbar-close:hover {
   color: var(--text-strong);
   background: var(--canvas-tint);
+}
+
+/* ── 左右分组(积木式拼装):一组 = 一条页签栏 + 一块正文,最多两组,
+   中间分割条拖比例(左边占比记进本机);组搬空了自己消亡 ── */
+
+.pane-groups {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.pane-group {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-group + .pane-group {
+  border-left: 1px solid var(--line);
+}
+
+/* 分割条:跟左栏分割条一家 —— 平时一根细线,悬停/拖动时变主题色加粗 */
+.pane-sash {
+  flex: none;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+}
+
+.pane-sash::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--line);
+  transition:
+    background 0.15s ease,
+    width 0.15s ease;
+}
+
+.pane-sash:hover::after,
+.pane-sash:focus-visible::after,
+body.is-sash-dragging .pane-sash::after {
+  width: 2px;
+  background: var(--accent);
+}
+
+.pane-sash:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 /* 页签正文容器:页签条下面的一次一个房间 */
