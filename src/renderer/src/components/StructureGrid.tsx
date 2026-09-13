@@ -18,18 +18,10 @@ function buildSections(structure: FileStructure): StructureSection[] {
   ].filter((section) => section.items.length > 0)
 }
 
-/** 「结构」Tab 的正文:本地 AST 解析结果,选中后自动算好摆在这儿 */
+/** 「结构」卡(概览垫底模组)的正文:本地 AST 解析出的零件清单,选中后自动算好。
+ * 判空在外层(FileOverview):六节全空的文件整卡不摆,这里只会拿到有零件的结构 */
 export function StructureGrid({ structure }: { structure: FileStructure }): React.JSX.Element {
   const sections = buildSections(structure)
-  // 六节全空说明这文件里没有可辨认的结构(比如纯常量脚本),得给个说法
-  if (sections.length === 0) {
-    return (
-      <div className="empty-state">
-        <p className="empty-title">这个文件里没找到函数、类、组件之类的结构</p>
-        <p className="empty-hint">多半是配置、常量或纯数据文件</p>
-      </div>
-    )
-  }
   return (
     <div className="structure-grid">
       {sections.map((section) => (

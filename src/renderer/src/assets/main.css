@@ -2600,7 +2600,7 @@ body.is-sash-dragging {
   text-decoration: underline;
 }
 
-/* ── 结构 Tab ── */
+/* ── 结构卡(旧「结构」Tab 退役,清单搬进概览垫底,套关系卡同款壳) ── */
 
 .structure-grid {
   display: grid;

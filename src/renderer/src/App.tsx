@@ -16,7 +16,6 @@ import { FreeChatPanel } from './components/FreeChatPanel'
 import { ModelStatusBar } from './components/ModelStatusBar'
 import { ProjectOverview } from './components/ProjectOverview'
 import { SettingsDialog } from './components/SettingsDialog'
-import { StructureGrid } from './components/StructureGrid'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
 import { pushNavLocation, stepNavIndex, type NavLocation } from './navHistory'
@@ -45,14 +44,14 @@ function driveCapacity(d: DriveInfo): string {
   return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
-// 文件详情的三个 Tab(第一百零五锤:修改建议退役,结构与关系并成一栏;
-// 关系后搬进概览(小葵拍板:垫底的 Tab 曝光率太低,好功能得摆在默认页)
-type DetailTab = 'overview' | 'structure' | 'chat'
+// 文件详情的两个 Tab:概览 + Atlas 小探针。
+// 旧第三个「结构」Tab 已退役:结构清单跟关系一起搬进概览垫底(小葵拍板:
+// 冷门内容不占 Tab 位),文件/文件夹详情统一成两页
+type DetailTab = 'overview' | 'chat'
 
 const FILE_TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'overview', label: '概览' },
-  { key: 'chat', label: 'Atlas 小探针' },
-  { key: 'structure', label: '结构' }
+  { key: 'chat', label: 'Atlas 小探针' }
 ]
 
 const FOLDER_TABS: Array<{ key: DetailTab; label: string }> = [
@@ -1380,19 +1379,6 @@ function FileDetailView({
             onGoChat={() => onTabChange('chat')}
             onJump={onJump}
           />
-        )}
-        {activeTab === 'structure' && (
-          <>
-            {analyzing && (
-              <div className="card-waiting">
-                <ProgressDots />
-                正在解析结构……
-              </div>
-            )}
-            {!analyzing && analyzeNote?.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
-            {!analyzing && analyzeNote?.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
-            {!analyzing && structure && <StructureGrid structure={structure} />}
-          </>
         )}
       </div>
     </div>

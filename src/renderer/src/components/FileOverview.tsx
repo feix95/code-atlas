@@ -4,12 +4,27 @@ import type { AiAssistApi } from '../useAiAsk'
 import { FileRelations } from './FileRelations'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
+import { StructureGrid } from './StructureGrid'
+
+/** 六节零件全空的文件(配置/常量/纯数据)连结构卡都不摆,不立空架子 */
+function hasStructureParts(structure: FileStructure): boolean {
+  return (
+    structure.functions.length > 0 ||
+    structure.classes.length > 0 ||
+    structure.interfaces.length > 0 ||
+    structure.reactComponents.length > 0 ||
+    structure.exports.length > 0 ||
+    structure.imports.length > 0
+  )
+}
 
 /**
  * 文件「概览」Tab:全是选中那一下就到手的静态信息(结构统计、关系数字),
  * 一眼能看懂这文件是干嘛的;AI 卡片只给入口,不自动开跑。
- * 文件关系也住在最下面(小葵拍板:原先垫底的「结构与关系」Tab 曝光率太低,
- * 搬进默认页,能看到的就有);全项目连线是重活,第一次点按钮才分析,一次全会话记账。
+ * 文件关系住在下面(小葵拍板:原先垫底的「结构与关系」Tab 曝光率太低,
+ * 搬进默认页,能看到的就有);旧「结构」Tab 整页退役后,零件清单也搬进来垫底
+ * ——冷门内容不占 Tab 位,文件/文件夹详情统一成 概览+小探针 两页。
+ * 全项目连线是重活,第一次点按钮才分析,一次全会话记账。
  */
 export function FileOverview({
   file,
@@ -47,6 +62,8 @@ export function FileOverview({
 }): React.JSX.Element {
   const relNode = graph?.nodes.find((n) => n.relPath === file.relPath)
   const count = (arr: string[] | undefined): number => arr?.length ?? 0
+  // 旧「结构」Tab 的清单:解析完、真有零件才摆卡
+  const showStructure = !analyzing && structure !== null && hasStructureParts(structure)
 
   return (
     <>
@@ -136,9 +153,20 @@ export function FileOverview({
               <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
                 分析文件关系
               </button>
-              {graphNote && <Notice kind="error">{graphNote}</Notice>}
+          {graphNote && <Notice kind="error">{graphNote}</Notice>}
             </p>
           )}
+        </section>
+      )}
+
+      {/* 结构卡:旧「结构」Tab 搬进来垫底,和关系卡一个模组相(壳+头);
+          六节全空的文件(配置/常量)整卡藏掉 */}
+      {showStructure && (
+        <section className="card relation-card">
+          <header className="relation-card-head">
+            结构 <span>文件里有哪些函数、类、组件</span>
+          </header>
+          <StructureGrid structure={structure} />
         </section>
       )}
     </>
