@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
@@ -586,22 +586,36 @@ function App(): React.JSX.Element {
   }
 
   // 点聊天里的文件链接:树上查到就开左边预览,带行号的连滚带跳直达那一行;
-  // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞
-  function openFileLink(relPath: string, line?: number): void {
-    if (!result) return
-    const f = findFile(result.tree, relPath)
+  // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞。
+  // 用 refs 持有最新的 result/chat,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
+  // 流式输出时只有正在吐字的那条消息重画,别的消息一个字都不动(聊多了也不给画面上强度)
+  const chatRef = useRef(chat)
+  useEffect(() => {
+    chatRef.current = chat
+  })
+  const resultRef = useRef(result)
+  useEffect(() => {
+    resultRef.current = result
+  })
+  const openFileLink = useCallback((relPath: string, line?: number): void => {
+    const cur = resultRef.current
+    if (!cur) return
+    const f = findFile(cur.tree, relPath)
     if (!f) {
-      chat.note(`${relPath} 现在不在目录树里了(可能刚被删掉或改名),开不了预览`)
+      chatRef.current.note(`${relPath} 现在不在目录树里了(可能刚被删掉或改名),开不了预览`)
       return
     }
     setPreview(f)
     setPreviewRefs([]) // 换了文件,上一份引用就地清账(行号是跟着文件走的)
     jumpSeqRef.current += 1
     setPreviewJump(line !== undefined ? { line, seq: jumpSeqRef.current } : null)
-  }
+  }, [])
 
   // 文件链接上下文:索引 + 点击去处;没扫出树(还在首页)就没有链接这回事
-  const fileLinks: FileLinkTarget | null = fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink } : null
+  const fileLinks: FileLinkTarget | null = useMemo(
+    () => (fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink } : null),
+    [fileLinkIndex, openFileLink]
+  )
 
   // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
   function addPreviewRef(ref: ChatCodeRef): void {

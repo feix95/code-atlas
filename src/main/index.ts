@@ -565,6 +565,7 @@ function createWindow(): void {
   // 渲染层真崩:记进后台账本(账本住主进程,渲染层死了也活着),reload 把页面重挂回来。
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit') return
+    console.log(`[window] 渲染层断了(${details.reason}),自动重接`)
     addDevLog('system', `画面断了一次(渲染层 ${details.reason}),已自动重接 —— 页面回到刚打开的样子`)
     revivePending = true
     if (!mainWindow.isDestroyed()) mainWindow.webContents.reload()
@@ -574,6 +575,7 @@ function createWindow(): void {
   // Electron 44 起 GPU 的事件只挂在 app 级(child-process-gone),按 processType 认出 GPU 再动手
   const onGpuGone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails & { type: string }): void => {
     if (details.type !== 'GPU' || details.reason === 'clean-exit') return
+    console.log(`[window] GPU 进程断了(${details.reason}),重开画布`)
     addDevLog('system', `画面断了一次(GPU 进程 ${details.reason}),已自动重接 —— 你正在看的内容没丢`)
     if (mainWindow.isDestroyed()) return
     mainWindow.webContents.invalidate()
@@ -589,6 +591,7 @@ function createWindow(): void {
   })
   // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔,让后台账本有话可查(不动手,等它自己醒)
   mainWindow.webContents.on('unresponsive', () => {
+    console.log('[window] 渲染层没响应了一阵')
     addDevLog('system', '画面卡住了一阵(渲染层没响应) —— 记一笔备查')
   })
   // 外接 LM Studio 没法订阅它的内部状态:低频去问(10 秒一轮,本地请求很轻);
@@ -1877,6 +1880,13 @@ async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
     }
   }
 }
+
+// 根治「画面凭空消失」(2026-09-13 小葵三次报案,第三次坐实:进程和页面全活着,
+// 没有任何事件可抓,聊多了必犯)—— 这台 Win10 的透明无边框窗,显卡合成链一打嗝就整窗
+// 透明蒸发,而且悄无声息,救生圈的监听根本收不到通知。那就釜底抽薪:不让 GPU 参与合成,
+// 软件渲染(Skia)的每一帧都不经过显卡驱动,透明窗从此跟驱动打嗝绝缘。
+// 咱家是文本/列表界面,没有视频大图要喂,软件合成的代价付得起。必须在 app 就绪前调用。
+app.disableHardwareAcceleration()
 
 app.whenReady().then(() => {
   createWindow()

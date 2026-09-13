@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 
 /**
@@ -158,8 +158,10 @@ function parseBlocks(text: string, links?: FileLinkTarget): ReactNode[] {
   return out
 }
 
-/** 用法:<MiniMD text={回答} />;流式生成中传 caret 在末尾挂光标;传 fileLinks 让文件名变可点 */
-export function MiniMD({
+/** 用法:<MiniMD text={回答} />;流式生成中传 caret 在末尾挂光标;传 fileLinks 让文件名变可点。
+ * memo(2026-09-13):聊天里每条消息的正文不变就不重画 —— 流式吐字时只有 busy 那条动,
+ * 旧消息的解析一遍都不跑;聊得再多,画面上的工作量也只跟「这一屏」挂钩 */
+export const MiniMD = memo(function MiniMD({
   text,
   caret,
   fileLinks
@@ -174,4 +176,4 @@ export function MiniMD({
       {caret && <span className="stream-caret">▌</span>}
     </div>
   )
-}
+})

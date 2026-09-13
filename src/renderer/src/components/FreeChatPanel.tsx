@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { memo, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
@@ -14,7 +14,13 @@ import type { AiChatApi, ChatMessage } from '../useAiChat'
  * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
  * 路径百分百真实,同一套检测顺手让它们也可点。没传 fileLinks 就原样纯文字。
  */
-function FileNoteText({ text, fileLinks }: { text: string; fileLinks?: FileLinkTarget | null }): React.JSX.Element {
+const FileNoteText = memo(function FileNoteText({
+  text,
+  fileLinks
+}: {
+  text: string
+  fileLinks?: FileLinkTarget | null
+}): React.JSX.Element {
   if (!fileLinks) return <>{text}</>
   const spans = findFileLinks(text, fileLinks.index)
   if (spans.length === 0) return <>{text}</>
@@ -38,7 +44,7 @@ function FileNoteText({ text, fileLinks }: { text: string; fileLinks?: FileLinkT
   })
   if (last < text.length) nodes.push(text.slice(last))
   return <>{nodes}</>
-}
+})
 
 /**
  * 自由对话面板:和 Atlas 小探针开放式聊天,问题不限于当前文件。
