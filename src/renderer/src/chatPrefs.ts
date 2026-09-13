@@ -1,6 +1,6 @@
 // 聊天面板的偏好开关:存 localStorage(界面的事,每台机器自己一套,不进 AI 配置文件)。
-// 第一条:聊天推荐问题 —— 关掉后聊天框上面那排「可以问问看」不再出现,
-// 预测下一问的那次模型调用也一并省掉(见 useChatSuggestions 的 enabled 短路)。
+// 第一条:推荐问题 —— 关掉后聊天框上面和文件预览 AI 卡下面那排「可以问问看」都不再出现,
+// 为猜这些问题烧的两处模型调用也一并省掉(见 useChatSuggestions / usePresetQuestions 的 enabled 短路)。
 
 export const CHAT_PREFS_KEY = 'atlas.chatPrefs'
 

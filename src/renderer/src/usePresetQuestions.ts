@@ -26,8 +26,10 @@ export function usePresetQuestions(input: {
   file: ScanFileNode
   /** 小葵的备注原话:预测也吃这口证据 */
   note?: string
+  /** 总闸(设置里的「推荐问题」):关了不出题,连烧模型的 AI 预测也不许跑 */
+  enabled: boolean
 }): { questions: string[]; source: 'ai' | 'rule' } {
-  const { rootPath, file, note } = input
+  const { rootPath, file, note, enabled } = input
   // 第一层:规则预测,选中瞬间就有
   const rule = useMemo(
     () => rulePresetQuestions({ name: file.name, icon: file.summary?.icon, text: file.summary?.text, languageId: file.language?.id }),
@@ -43,6 +45,8 @@ export function usePresetQuestions(input: {
   // 500ms 驻留 —— 点得快说明人还在逛,中途换目标的定时器直接作废,只有最终停下的
   // 那个文件才真出题(规则层的问题一直在,等待期界面不空)
   useEffect(() => {
+    // 总闸关着就整个歇业:题不显示,预测更不许烧模型(拨回开 = 关闸,驻留/请求照样作废)
+    if (!enabled) return
     const key = currentKey
     let alive = true
     let activeId = ''
@@ -91,8 +95,10 @@ export function usePresetQuestions(input: {
       if (dwell) clearTimeout(dwell)
       if (activeId) void window.atlas.aiCancel(activeId)
     }
-    // 依赖带 currentKey:换文件/换项目时重跑预测;rootPath 是出题请求要用的钥匙半边
-  }, [currentKey, file, note, rootPath])
+    // 依赖带 currentKey:换文件/换项目时重跑预测;rootPath 是出题请求要用的钥匙半边;
+    // enabled 进依赖:拨开关时正在路上的预测就地作废
+  }, [currentKey, file, note, rootPath, enabled])
 
-  return { questions: aiQuestions ?? rule, source: aiQuestions ? 'ai' : 'rule' }
+  // 总闸关着交白卷(界面自然一颗题都不画);开着才按「AI 优先,规则垫底」出牌
+  return { questions: enabled ? (aiQuestions ?? rule) : [], source: enabled && aiQuestions ? 'ai' : 'rule' }
 }

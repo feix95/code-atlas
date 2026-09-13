@@ -263,7 +263,7 @@ export function SettingsDialog({
   onClose
 }: {
   workspaceName: string | null
-  /** 聊天推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
+  /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
   chatSuggestionsOn: boolean
   onChatSuggestionsChange: (v: boolean) => void
   onClose: () => void
@@ -970,20 +970,22 @@ export function SettingsDialog({
                           <span />
                         </button>
                       </div>
-                      {/* 聊天推荐问题(攒条):聊天面板的事跟联网查证作伴;拨一下立刻生效,不走下面的应用更改 */}
+                      {/* 推荐问题总闸:自由聊天和文件预览 AI 卡两头的推荐问题一把抓;拨一下立刻生效,不走下面的应用更改 */}
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>
-                            聊天推荐问题
+                            推荐问题
                             <span className={`cfg-flag${chatSuggestionsOn ? ' is-on' : ''}`}>{chatSuggestionsOn ? '已开启' : '已关闭'}</span>
                           </label>
-                          <p>聊天框上面自动冒出的那排「可以问问看」,觉得问不上就关;关了也不再为猜这些问题白花模型的功夫。拨了马上生效,不用点应用更改。</p>
+                          <p>
+                            聊天框和文件预览的 AI 卡下面自动冒出的那排「可以问问看」,觉得问不上就关;关了也不再为猜这些问题白花模型的功夫。拨了马上生效,不用点应用更改。
+                          </p>
                         </div>
                         <button
                           type="button"
                           role="switch"
                           aria-checked={chatSuggestionsOn}
-                          aria-label="聊天推荐问题"
+                          aria-label="推荐问题"
                           className={`cfg-switch${chatSuggestionsOn ? ' is-on' : ''}`}
                           onClick={() => onChatSuggestionsChange(!chatSuggestionsOn)}
                         >

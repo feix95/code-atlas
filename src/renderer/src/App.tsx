@@ -235,7 +235,7 @@ function App(): React.JSX.Element {
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  // 聊天推荐问题总闸(聊天偏好,存本机):关了聊天框上面那排推荐就不出,模型预测也一并省掉
+  // 推荐问题总闸(聊天偏好,存本机):关了聊天框上面和预览 AI 卡下面的推荐都不出,两处模型预测也一并省掉
   const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
@@ -986,6 +986,7 @@ function App(): React.JSX.Element {
                 note={notes[selectedFile.relPath] ?? null}
                 onNoteSave={saveNote}
                 autoOpenNote={noteEditRequest === selectedFile.relPath}
+                suggestionsOn={chatSuggestionsOn}
               />
             ) : selectedFolder && result && activeTab === 'chat' ? (
               <ChatTabDetailPage
@@ -1283,7 +1284,8 @@ function FileDetailView({
   gitLoading,
   note,
   onNoteSave,
-  autoOpenNote
+  autoOpenNote,
+  suggestionsOn
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1306,13 +1308,15 @@ function FileDetailView({
   onNoteSave: (relPath: string, text: string) => void
   /** 树上右键「写/编辑备注」:详情头自动展开编辑框 */
   autoOpenNote?: boolean
+  /** 推荐问题总闸(设置里的「推荐问题」):关了概览 AI 卡不出预设题,烧模型的预测也一并歇 */
+  suggestionsOn: boolean
 }): React.JSX.Element {
   // AI 解释:概览卡、小探针共用,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
-  // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动
-  const presets = usePresetQuestions({ rootPath: result.rootPath, file, note: note?.text })
+  // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动;总闸关了全歇
+  const presets = usePresetQuestions({ rootPath: result.rootPath, file, note: note?.text, enabled: suggestionsOn })
 
   const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
   const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
