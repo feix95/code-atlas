@@ -530,4 +530,10 @@ export interface FilePreviewResult {
   totalLines: number
   /** 不是 ok 时的原因(人话) */
   reason: string
+  /**
+   * status='ok' 时的分色账(可选,预览分色这锤):外层是行,中层是行内的段,
+   * 每段 [起始列, 结束列, 角色编号](列从 0 起,不含换行符;角色编号对 shared/highlight 的 HL_KINDS)。
+   * 缺省 = 这份不上色(超闸 / 语言不认识 / 解析出错),界面照常白字,绝不是出错。
+   */
+  colors?: number[][][]
 }

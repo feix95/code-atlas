@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
+import { HL_KINDS } from '@shared/highlight'
 import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef, visibleLineRange } from '@shared/preview'
 import { friendlyErr } from '../errText'
@@ -26,6 +27,44 @@ function countNewlines(text: string): number {
 }
 
 /**
+ * 一个光标位置在整份文本里的字符偏移:从正文第一个字起数,走到那个节点加上节点内偏移。
+ * 分色后正文里多了上色的小 span,「相对父节点的偏移」数出来的行号会错位 ——
+ * 改用 TreeWalker 数全文偏移,跟 DOM 怎么分包没有半点关系,选区行号的老语义原样保留。
+ */
+function textOffsetIn(el: HTMLElement, node: Node, offset: number): number {
+  let total = 0
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  for (let cur = walker.nextNode(); cur; cur = walker.nextNode()) {
+    if (cur === node) return total + offset
+    total += cur.textContent?.length ?? 0
+  }
+  return -1
+}
+
+/**
+ * 一行分色(预览分色这锤):按主进程给的段落账把这一行切成带色的小段,
+ * 段与段之间的空隙是没角色的正文。没有账、账对不上都老实整行原色 ——
+ * 化妆只许锦上添花,不许把字吃掉。
+ */
+function renderColoredLine(lineText: string, segs: number[][] | undefined): React.ReactNode[] {
+  if (lineText === '' || !segs || segs.length === 0) return [<span key="w">{lineText}</span>]
+  const parts: React.ReactNode[] = []
+  let pos = 0
+  segs.forEach((seg, i) => {
+    if (!Array.isArray(seg) || seg.length < 3) return
+    const s = Math.max(pos, Math.min(lineText.length, seg[0]))
+    const e = Math.max(s, Math.min(lineText.length, seg[1]))
+    if (e <= s) return
+    if (s > pos) parts.push(<span key={`t${i}`}>{lineText.slice(pos, s)}</span>)
+    const cls = HL_KINDS[seg[2]]
+    parts.push(<span key={`k${i}`} className={cls ? `tok-${cls}` : undefined}>{lineText.slice(s, e)}</span>)
+    pos = e
+  })
+  if (pos < lineText.length) parts.push(<span key="tail">{lineText.slice(pos)}</span>)
+  return parts
+}
+
+/**
  * 代码预览(第一百一十锤):树上右键「预览文件」后,左栏从目录树换成这扇只读的文本窗。
  * 只摆纯文本 + 行号 —— 不描语法色(那是另一锤的事),看得清、选得中就行。
  * 正文只活在这个组件的 state 里:退出预览组件一卸,内容跟着就走,不留垃圾。
@@ -35,6 +74,9 @@ function countNewlines(text: string): number {
  * 顶栏给一颗钮,把整份代码挂到右栏对话(第一百一十四锤补2)。
  * 全文预览(2026-09-13):虚拟滚动 —— 全文在手,轨道撑出全文行程,画面只画可视区一截;
  * 行数/字数两道闸退役,Ctrl+A 改成复制全文。
+ * 预览分色(2026-09-14):主进程拿 tree-sitter 解析出「哪几个字是什么角色」,每行一个
+ * span 按段落账上色(tok-*,色号抄 VS Code 官方 Dark+/Light+,跟界面深浅色联动);
+ * 行高一点没动;选中引用的行号改用 TreeWalker 数全文偏移,跟 DOM 分包无关。
  */
 export function CodePreview({
   rootPath,
@@ -121,6 +163,8 @@ export function CodePreview({
   }, [rootPath, file.relPath])
 
   const text = result?.status === 'ok' ? result.text : ''
+  /** 分色账(预览分色这锤):主进程按行给好的段落;没有 = 这份不上色,白字照常 */
+  const colors = result?.status === 'ok' ? result.colors : undefined
 
   // 全文在手:按行切一份备用(纯字符串,不占画面);画面永远只画 range 那一截
   const lines = useMemo(() => (text === '' ? [] : text.split('\n')), [text])
@@ -189,8 +233,8 @@ export function CodePreview({
     chunkBaseRef.current = range.start
   }, [range.start])
   const offsetY = (range.start - 1) * lineHeight
-  const chunk = useMemo(
-    () => (total === 0 ? '' : lines.slice(range.start - 1, range.end).join('\n')),
+  const chunkLines = useMemo(
+    () => (total === 0 ? [] : lines.slice(range.start - 1, range.end)),
     [lines, total, range.start, range.end]
   )
   const gutter = useMemo(() => {
@@ -205,22 +249,28 @@ export function CodePreview({
     const el = codeTextRef.current
     const s = window.getSelection()
     if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return null
+    const anchorNode = s.anchorNode
+    const focusNode = s.focusNode
+    if (!anchorNode || !focusNode || !el.contains(anchorNode) || !el.contains(focusNode)) return null
     const code = s.toString()
     if (code.trim() === '') return null
     const rects = Array.from(s.getRangeAt(0).getClientRects())
     const geom = selectionGeometry(rects)
     if (!geom) return null
     const view = codeViewRef.current?.getBoundingClientRect()
-    const full = el.textContent ?? ''
-    const start = Math.min(s.anchorOffset, s.focusOffset)
-    const end = Math.max(s.anchorOffset, s.focusOffset)
+    // 全文偏移(分色后正文里有上色的 span,只有 TreeWalker 数出来的偏移跟 DOM 结构无关)
+    const a = textOffsetIn(el, anchorNode, s.anchorOffset)
+    const f = textOffsetIn(el, focusNode, s.focusOffset)
+    if (a < 0 || f < 0) return null
+    const start = Math.min(a, f)
+    const end = Math.max(a, f)
     return {
       ...geom,
       // 以选区右上角为锚、居中浮着;夹紧留出钮的一半身位,贴着栏边选的也不越出栏外
       buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right, 100) : geom.buttonX,
-      startLine: chunkBaseRef.current + countNewlines(full.slice(0, start)),
+      startLine: chunkBaseRef.current + countNewlines((el.textContent ?? '').slice(0, start)),
       // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
-      endLine: chunkBaseRef.current + countNewlines(full.slice(0, Math.max(start, end - 1))),
+      endLine: chunkBaseRef.current + countNewlines((el.textContent ?? '').slice(0, Math.max(start, end - 1))),
       code
     }
   }, [])
@@ -396,14 +446,24 @@ export function CodePreview({
             aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用给小探针;按 Ctrl+A 复制全文`}
             onScroll={onScroll}
           >
-            {/* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏 */}
+            {/* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏。
+                分色(预览分色这锤):每行一个 span、行内按段落账上色;行高一点没动,
+                虚拟滚动「量一次行高」的老地基本字不摇 */}
             <div className="code-track" style={{ height: total * lineHeight }}>
               <div className="code-row" style={{ transform: `translateY(${offsetY}px)` }}>
                 <pre className="code-gutter" aria-hidden="true">
                   {gutter}
                 </pre>
                 <pre className="code-text" ref={codeTextRef}>
-                  {chunk}
+                  {chunkLines.map((lineText, i) => {
+                    const lineNo = range.start + i
+                    return (
+                      <span key={lineNo} className="code-line" data-line={lineNo}>
+                        {renderColoredLine(lineText, colors?.[lineNo - 1])}
+                        {'\n'}
+                      </span>
+                    )
+                  })}
                 </pre>
               </div>
             </div>

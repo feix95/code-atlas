@@ -62,6 +62,17 @@
   --hover: #e9edf0;
   --selected-bg: #dfe4e8;
   --shadow-pop: 0 0.5rem 1.5rem rgba(12, 44, 67, 0.16);
+  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题 ── */
+  --tok-ctl: #af00db;
+  --tok-kw: #0000ff;
+  --tok-str: #a31515;
+  --tok-com: #008000;
+  --tok-num: #098658;
+  --tok-fn: #795e26;
+  --tok-type: #267f99;
+  --tok-var: #001080;
+  --tok-regex: #811f3f;
+  --tok-symbol: #800000;
 }
 
 /* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场 */
@@ -98,6 +109,17 @@
   --hover: #293238;
   --selected-bg: #2e3841;
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
+  --tok-ctl: #c586c0;
+  --tok-kw: #569cd6;
+  --tok-str: #ce9178;
+  --tok-com: #6a9955;
+  --tok-num: #b5cea8;
+  --tok-fn: #dcdcaa;
+  --tok-type: #4ec9b0;
+  --tok-var: #9cdcfe;
+  --tok-regex: #d16969;
+  --tok-symbol: #d7ba7d;
 }
 
 * {
@@ -747,6 +769,18 @@ body.is-maximized .traffic-lights .is-max i::after {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
   color: inherit;
 }
+
+/* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
+.tok-ctl { color: var(--tok-ctl); }
+.tok-kw { color: var(--tok-kw); }
+.tok-str { color: var(--tok-str); }
+.tok-com { color: var(--tok-com); }
+.tok-num { color: var(--tok-num); }
+.tok-fn { color: var(--tok-fn); }
+.tok-type { color: var(--tok-type); }
+.tok-var { color: var(--tok-var); }
+.tok-regex { color: var(--tok-regex); }
+.tok-symbol { color: var(--tok-symbol); }
 
 /* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
 .code-mark {

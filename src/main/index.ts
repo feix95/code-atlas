@@ -96,6 +96,7 @@ import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBu
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
+import { highlightSource } from '../highlight/index.ts'
 import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalization } from '../shared/personalization.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
@@ -1500,7 +1501,10 @@ function registerIpc(): void {
       return { status: 'binary', text: '', totalLines: 0, reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了' }
     }
     const clip = clipPreview(buf.toString('utf8'))
-    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, reason: '' }
+    // 预览分色(这锤):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
+    // 解析出错都老实回 null —— 界面白字照常,分色永远不拖累预览本身。
+    const colors = await highlightSource(clip.text, name)
+    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, colors: colors ?? undefined, reason: '' }
   })
 
   // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot
