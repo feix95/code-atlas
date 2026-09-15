@@ -2,7 +2,7 @@
 // 安全规矩:只用 execFile + 参数数组,绝不经过 shell;git 输出的仓库内路径
 // 一律剥成 relPath(路径契约),渲染进程只认 relPath,读文件经 joinRoot。
 import { execFile } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { promises as fs, realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { joinRoot } from '../shared/paths.ts'
 import type { GitChange, GitChangesResult } from '../shared/types.ts'
@@ -99,6 +99,19 @@ function stripPrefix(repoPath: string, prefix: string): string {
   return unified.startsWith(prefix) ? unified.slice(prefix.length) : unified
 }
 
+/** 两个真实存在的路径归一到「同一种写法」再算相对:
+ *  Windows 下 git 报的仓库根可能是长路径,而进程环境(TEMP 等)给的是 8.3 短名
+ *  (GitHub Actions 的 runner 就长这样:C:\Users\RUNNER~1\...),字符串逐段对不上,
+ *  relative() 就算出怪前缀把 relPath 弄脏 —— realpathSync 把两边都展开成真实长路径再比。
+ *  路径万一失效(理论到不了),退回 resolve 原样,行为与从前一致 */
+function realPath(p: string): string {
+  try {
+    return realpathSync(p)
+  } catch {
+    return resolve(p)
+  }
+}
+
 /**
  * 收集项目当前的 git 改动总览。
  * 不是 git 仓库时不抛错,老老实实返回 isGitRepo=false,让界面说话。
@@ -119,7 +132,7 @@ export async function collectGitChanges(rootPath: string): Promise<GitChangesRes
     .catch(() => '(还没有提交)')
 
   // 用户所选文件夹可能只是仓库的一个子目录:算出它相对仓库根的前缀,输出路径统一剥掉
-  const relFromRoot = relative(resolve(repoRoot), resolve(rootPath)).replace(/\\/g, '/')
+  const relFromRoot = relative(realPath(repoRoot), realPath(rootPath)).replace(/\\/g, '/')
   const prefix = relFromRoot === '' ? '' : `${relFromRoot}/`
 
   const statusOut = await runGit(rootPath, ['status', '--porcelain=v1', '-z', '--', '.'])
