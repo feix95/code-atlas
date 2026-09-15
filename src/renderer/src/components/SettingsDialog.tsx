@@ -1067,7 +1067,18 @@ export function SettingsDialog({
                             <Icon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} />
                             {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 GGUF 榜,按大小和更新时间自己挑'}
                           </button>
-                          {shelfOpen && <ModelShelfPanel />}
+                          {shelfOpen && (
+                            <ModelShelfPanel
+                              onModelReady={() => {
+                                // 下载完主进程已把配置写盘(Provider 切内置 + 模型路径指向新文件);
+                                // 这儿重读一遍,让草稿和已存档都对着新现实,用户点「应用更改」也不会覆盖掉
+                                void window.atlas.aiConfigGet().then((c) => {
+                                  setSavedConfig(c)
+                                  setDraftConfig(c)
+                                })
+                              }}
+                            />
+                          )}
                           {modelPathDraft.trim() && fitNote && fitNote.level !== 'empty' && (
                             <p className={`cfg-field-help cfg-fit-note is-${fitNote.level}`}>
                               {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '!'} {fitNote.title}:{fitNote.detail}

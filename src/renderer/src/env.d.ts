@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { Appearance } from '../../../shared/appearancePrefs.ts'
-import type { RepoFile, ShelfResult } from '../../../shared/modelShelf.ts'
+import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../../../shared/modelShelf.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -60,6 +60,10 @@ declare global {
       /** 模型货架:实时榜(主进程双源拉取,顺带本机家底)+ 仓库文件清单 */
       modelShelf: () => Promise<ShelfResult>
       modelFiles: (repoId: string) => Promise<RepoFile[]>
+      /** 一键到位:点文件 → 断点续传下载到 userData/models → 自动填 AI 配置;返回最终路径 */
+      modelDownloadStart: (repoId: string, filePath: string) => Promise<string>
+      modelDownloadCancel: () => Promise<boolean>
+      onModelDownloadProgress: (callback: (p: ModelDownloadProgress) => void) => () => void
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>

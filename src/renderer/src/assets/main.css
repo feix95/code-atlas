@@ -6049,3 +6049,46 @@ body.is-maximized .cfg-layer {
 .cfg-shelf-toggle:hover {
   background: var(--hover);
 }
+/* 下载控件:按钮/百分比/细进度条,与文件行同基线 */
+.shelf-dl-btn {
+  flex: none;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.625rem;
+  font-size: var(--font-xs);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.shelf-dl-btn:hover {
+  background: var(--hover);
+}
+.shelf-dl-pct {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.6rem;
+  text-align: right;
+}
+.shelf-dl-bar {
+  flex: none;
+  width: 5rem;
+  height: 0.3rem;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.shelf-dl-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.shelf-dl-done {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--green);
+}

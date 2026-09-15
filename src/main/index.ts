@@ -93,6 +93,7 @@ import { truncateAtRepetition } from '../ai/repetition.ts'
 import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, prefersWebFirst, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
+import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
@@ -1535,6 +1536,19 @@ function registerIpc(): void {
     if (typeof repoId !== 'string' || repoId === '') throw new Error('参数不合法')
     return fetchRepoFiles(repoId)
   })
+
+  // 模型下载(一键到位):货架点文件 → 断点续传拉到 userData/models → 自动填进 AI 配置。
+  // 下载是长活,进度走事件推送;窗口可能还没建好/已关,win 取当下最新的主窗,拿不到就静默下
+  ipcMain.handle('atlas:model-download-start', async (_event, args: unknown) => {
+    if (typeof args !== 'object' || args === null) throw new Error('参数不合法')
+    const { repoId, filePath } = args as Record<string, unknown>
+    if (typeof repoId !== 'string' || typeof filePath !== 'string') throw new Error('参数不合法')
+    const win = BrowserWindow.getAllWindows()[0] ?? null
+    const finalPath = await startModelDownload({ win, userDataDir: app.getPath('userData'), repoId, filePath })
+    await pointConfigAtModel(app.getPath('userData'), finalPath)
+    return finalPath
+  })
+  ipcMain.handle('atlas:model-download-cancel', () => cancelModelDownload())
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
   ipcMain.handle('atlas:ai-config-get', () => loadAiConfig(app.getPath('userData')))

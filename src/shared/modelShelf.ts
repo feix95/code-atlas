@@ -12,6 +12,21 @@ export interface ShelfResult {
   source: 'huggingface' | 'mirror'
 }
 
+/** 下载进度广播(主进程 → 渲染层,订阅式) */
+export interface ModelDownloadProgress {
+  repoId: string
+  filePath: string
+  /** 已落盘字节(含续传的部分) */
+  receivedBytes: number
+  /** 文件总字节;问不到 Content-Length 时 null */
+  totalBytes: number | null
+  /** 下载完成的最终路径;未完成 = null */
+  finalPath: string | null
+  /** 出错人话(重试全失败);null = 正常进行中 */
+  error: string | null
+  cancelled: boolean
+}
+
 /** 货架上的一行(清洗后的最终形态,全是要直接上界面的字段) */
 export interface ShelfEntry {
   /** 仓库全名,如 unsloth/Qwen3-4B-Instruct-GGUF */

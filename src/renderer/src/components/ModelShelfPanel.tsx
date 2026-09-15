@@ -5,15 +5,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ProgressDots } from './ProgressDots.tsx'
 import {
-  applyShelfQuery,
-  formatDownloads,
   formatGgufSize,
-  formatRelativeDays,
-  judgeRun,
-  runVerdictLabel,
+  type ModelDownloadProgress,
   type RepoFile,
   type ShelfEntry,
   type ShelfQuery
+} from '../../../shared/modelShelf.ts'
+import {
+  applyShelfQuery,
+  formatDownloads,
+  formatRelativeDays,
+  judgeRun,
+  runVerdictLabel
 } from '../../../shared/modelShelf.ts'
 
 interface ShelfState {
@@ -23,7 +26,16 @@ interface ShelfState {
   fromMirror: boolean
 }
 
-export function ModelShelfPanel(): React.JSX.Element {
+/** 下载中的那单(进度条用);donePath = 刚下完的(显示「已就位」) */
+interface DownloadState {
+  repoId: string
+  filePath: string
+  receivedBytes: number
+  totalBytes: number | null
+  donePath: string | null
+}
+
+export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: string) => void }): React.JSX.Element {
   const [shelf, setShelf] = useState<ShelfState | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** 挂载就要拉货,初始 loading 即 true,不在 effect 里同步 set(会级联渲染) */
@@ -34,6 +46,34 @@ export function ModelShelfPanel(): React.JSX.Element {
   const [maxGb, setMaxGb] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<ShelfQuery['sortBy']>('downloads')
   const [desc, setDesc] = useState(true)
+  const [download, setDownload] = useState<DownloadState | null>(null)
+
+  // 下载进度:主进程边下边喊,这儿只管画;finalPath 到了 = 完成,报给设置页自动填路径
+  useEffect(() => {
+    const off = window.atlas.onModelDownloadProgress((p: ModelDownloadProgress) => {
+      if (p.finalPath) {
+        setDownload((prev) => (prev ? { ...prev, donePath: p.finalPath } : prev))
+        onModelReady?.(p.finalPath)
+      } else if (!p.error && !p.cancelled) {
+        setDownload((prev) =>
+          prev ? { ...prev, receivedBytes: p.receivedBytes, totalBytes: p.totalBytes } : prev
+        )
+      }
+    })
+    return off
+  }, [onModelReady])
+
+  const startDownload = useCallback((repoId: string, filePath: string) => {
+    setDownload({ repoId, filePath, receivedBytes: 0, totalBytes: null, donePath: null })
+    window.atlas.modelDownloadStart(repoId, filePath).catch(() => {
+      // 失败/取消:进度事件里已带人话,这里把行上状态松开
+      setDownload(null)
+    })
+  }, [])
+
+  const cancelDownload = useCallback(() => {
+    void window.atlas.modelDownloadCancel()
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -169,14 +209,42 @@ export function ModelShelfPanel(): React.JSX.Element {
                   {!filesLoading && (files[entry.id]?.length ?? 0) === 0 && (
                     <p className="shelf-note is-soft">这个仓库里没认出 gguf 文件(可能是分卷压缩或空仓库)。</p>
                   )}
-                  {(files[entry.id] ?? []).map((f) => (
-                    <div key={f.path} className="shelf-file-row">
-                      <span className="shelf-file-path" title={f.path}>
-                        {f.path}
-                      </span>
-                      <span className="shelf-meta">{formatGgufSize(f.sizeBytes)}</span>
-                    </div>
-                  ))}
+                  {(files[entry.id] ?? []).map((f) => {
+                    const active =
+                      download && download.repoId === entry.id && download.filePath === f.path ? download : null
+                    const donePath = active?.donePath ?? null
+                    const pct =
+                      active !== null && donePath === null && active.totalBytes !== null && active.totalBytes > 0
+                        ? Math.min(100, Math.round((active.receivedBytes / active.totalBytes) * 100))
+                        : null
+                    return (
+                      <div key={f.path} className="shelf-file-row">
+                        <span className="shelf-file-path" title={f.path}>
+                          {f.path}
+                        </span>
+                        <span className="shelf-meta">{formatGgufSize(f.sizeBytes)}</span>
+                        {donePath !== null ? (
+                          <span className="shelf-dl-done">✓ 已就位,去上面看看模型路径</span>
+                        ) : active !== null ? (
+                          <>
+                            <span className="shelf-dl-pct">
+                              {pct !== null ? `${pct}%` : formatGgufSize(active.receivedBytes)}
+                            </span>
+                            <span className="shelf-dl-bar" aria-hidden="true">
+                              <i style={{ width: `${pct ?? 5}%` }} />
+                            </span>
+                            <button type="button" className="shelf-dl-btn" onClick={cancelDownload}>
+                              取消
+                            </button>
+                          </>
+                        ) : (
+                          <button type="button" className="shelf-dl-btn" onClick={() => startDownload(entry.id, f.path)}>
+                            下载并使用
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </li>

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Appearance } from '../shared/appearancePrefs.ts'
-import type { RepoFile, ShelfResult } from '../shared/modelShelf.ts'
+import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -113,6 +113,15 @@ contextBridge.exposeInMainWorld('atlas', {
   // 模型货架:实时榜(双源拉取+本机家底)+ 仓库文件清单
   modelShelf: (): Promise<ShelfResult> => ipcRenderer.invoke('atlas:model-shelf'),
   modelFiles: (repoId: string): Promise<RepoFile[]> => ipcRenderer.invoke('atlas:model-files', repoId),
+  // 一键到位:点文件 → 断点续传下载 → 自动填 AI 配置;进度走事件推送
+  modelDownloadStart: (repoId: string, filePath: string): Promise<string> =>
+    ipcRenderer.invoke('atlas:model-download-start', { repoId, filePath }),
+  modelDownloadCancel: (): Promise<boolean> => ipcRenderer.invoke('atlas:model-download-cancel'),
+  onModelDownloadProgress: (callback: (p: ModelDownloadProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, p: ModelDownloadProgress): void => callback(p)
+    ipcRenderer.on('atlas:model-download-progress', listener)
+    return () => ipcRenderer.removeListener('atlas:model-download-progress', listener)
+  },
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
