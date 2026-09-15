@@ -10,6 +10,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder",
+    "dist:dir": "electron-vite build && electron-builder --dir",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -17,6 +19,7 @@
     "test:parser": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-parser.mts",
     "test:analyzer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-analyzer.mts",
     "test:highlight": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-highlight.mts",
+    "test:wasmpaths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-wasmpaths.mts",
     "test:paths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-paths.mts",
     "test:depgraph": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-depgraph.mts",
     "test:ai": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-ai.mts",
@@ -33,7 +36,12 @@
     "test:filelinks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-filelinks.mts",
     "test:contextbill": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-contextbill.mts",
     "test:personalization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-personalization.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization"
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "web-tree-sitter": "^0.20.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -42,6 +50,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^44.1.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
@@ -52,11 +61,6 @@
     "tree-sitter-wasms": "^0.1.13",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.69.0",
-    "vite": "^7.3.6",
-    "web-tree-sitter": "^0.20.8"
-  },
-  "dependencies": {
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "vite": "^7.3.6"
   }
 }

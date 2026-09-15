@@ -1,30 +1,26 @@
 import { join } from 'node:path'
 import Parser from 'web-tree-sitter'
 import type { FileStructure } from '../shared/types.ts'
+import { currentResourcesPath, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
 
 type TSLanguage = InstanceType<typeof Parser.Language>
 type TSQuery = ReturnType<TSLanguage['query']>
 
-// 开发与自测都从项目根运行,直接按 node_modules 定位 wasm。
-// 打包发布时这些 wasm 要作为资源文件带上,到打包阶段再调整解析方式。
-const NODE_MODULES = join(process.cwd(), 'node_modules')
-
-function engineWasmPath(): string {
-  return join(NODE_MODULES, 'web-tree-sitter', 'tree-sitter.wasm')
-}
+// wasm 寻路收口到 native/wasmPaths.ts:开发/自测走 node_modules,打包后走 resources/wasm/。
+const WASM_OPTS = () => ({ resourcesPath: currentResourcesPath(), cwd: process.cwd() })
 
 function grammarWasmPath(file: string): string {
-  return join(NODE_MODULES, 'tree-sitter-wasms', 'out', file)
+  return join(grammarWasmDir(WASM_OPTS()), file)
 }
 
 let enginePromise: Promise<void> | null = null
 function ensureEngine(): Promise<void> {
-  enginePromise ??= Parser.init({ locateFile: () => engineWasmPath() })
+  enginePromise ??= Parser.init({ locateFile: () => engineWasmPath(WASM_OPTS()) })
   return enginePromise
 }
 
-/** 本模块支持的 AST 分析语言 → 语法 wasm 文件 */
-const GRAMMAR_FILES: Record<string, string> = {
+/** 本模块支持的 AST 分析语言 → 语法 wasm 文件(export 给打包清单自测对账用) */
+export const GRAMMAR_FILES: Record<string, string> = {
   typescript: 'tree-sitter-tsx.wasm',
   'typescript-react': 'tree-sitter-tsx.wasm',
   javascript: 'tree-sitter-tsx.wasm',

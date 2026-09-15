@@ -1,0 +1,43 @@
+# CodeAtlas 打包配置:产出 Windows 安装包(nsis)
+# 铁则:tree-sitter 的语法字典是运行时按真实文件读的,asar 包不住这种用法 ——
+# 所以用 extraResources 把「用到的字典」放进 <安装目录>/resources/wasm/,
+# 运行时由 src/native/wasmPaths.ts 认文件寻路(文件在才走打包分支)。
+# 新增语言支持时:同步把对应的 tree-sitter-<语言>.wasm 加进下面 filter 清单!
+appId: com.feix95.codeatlas
+productName: CodeAtlas
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+extraResources:
+  # 引擎本体(186KB)
+  - from: node_modules/web-tree-sitter/tree-sitter.wasm
+    to: wasm/tree-sitter.wasm
+  # 各语言语法字典(按需带,全家 50MB 不搬;与 analyzer/highlight 的 GRAMMAR_FILES 对应)
+  - from: node_modules/tree-sitter-wasms/out
+    to: wasm
+    filter:
+      - tree-sitter-tsx.wasm
+      - tree-sitter-python.wasm
+      - tree-sitter-java.wasm
+      - tree-sitter-go.wasm
+      - tree-sitter-c.wasm
+      - tree-sitter-cpp.wasm
+      - tree-sitter-c_sharp.wasm
+      - tree-sitter-rust.wasm
+      - tree-sitter-json.wasm
+      - tree-sitter-css.wasm
+      - tree-sitter-html.wasm
+      - tree-sitter-bash.wasm
+      - tree-sitter-yaml.wasm
+      - tree-sitter-toml.wasm
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: ${productName}-Setup-${version}.${ext}
