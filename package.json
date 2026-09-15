@@ -1,7 +1,7 @@
 {
   "name": "code-atlas",
   "productName": "CodeAtlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI 代码地图 —— 帮你不用读代码,也能看懂整个项目",
   "main": "./out/main/index.js",
   "author": "xiaokui",
