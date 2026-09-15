@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Appearance } from '../shared/appearancePrefs.ts'
+import type { RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -109,6 +110,9 @@ contextBridge.exposeInMainWorld('atlas', {
   readPreview: (rootPath: string, relPath: string): Promise<FilePreviewResult> =>
     ipcRenderer.invoke('atlas:read-preview', rootPath, relPath),
   depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke('atlas:dep-graph', rootPath),
+  // 模型货架:实时榜(双源拉取+本机家底)+ 仓库文件清单
+  modelShelf: (): Promise<ShelfResult> => ipcRenderer.invoke('atlas:model-shelf'),
+  modelFiles: (repoId: string): Promise<RepoFile[]> => ipcRenderer.invoke('atlas:model-files', repoId),
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),

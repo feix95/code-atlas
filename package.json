@@ -20,6 +20,7 @@
     "test:analyzer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-analyzer.mts",
     "test:highlight": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-highlight.mts",
     "test:wasmpaths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-wasmpaths.mts",
+    "test:modelshelf": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-modelshelf.mts",
     "test:paths": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-paths.mts",
     "test:depgraph": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-depgraph.mts",
     "test:ai": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-ai.mts",
@@ -36,7 +37,7 @@
     "test:filelinks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-filelinks.mts",
     "test:contextbill": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-contextbill.mts",
     "test:personalization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-personalization.mts",
-    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization"
+    "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization"
   },
   "dependencies": {
     "react": "^19.2.8",

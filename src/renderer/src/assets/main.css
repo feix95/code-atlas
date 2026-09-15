@@ -5863,3 +5863,189 @@ body.is-maximized .cfg-layer {
     stroke-dashoffset: 0;
   }
 }
+
+/* ───────────────────────── 模型货架(2026-09-16) ─────────────────────────
+   零判断纯事实的实时 GGUF 榜:筛选 chips + 模型行 + 展开文件清单。
+   「带不动」整行压灰是唯一掺判断的地方 —— 保护小白别白下几十 GB。 */
+.shelf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.shelf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+.shelf-filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.shelf-filter-label {
+  font-size: var(--font-sm);
+  color: var(--muted);
+  margin-right: var(--space-1);
+}
+.shelf-chip {
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.625rem;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.shelf-chip:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.shelf-chip.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+  font-weight: 600;
+}
+.shelf-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+.shelf-note.is-error {
+  color: var(--danger);
+}
+.shelf-note.is-soft {
+  color: var(--muted-2);
+}
+.shelf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.shelf-item + .shelf-item {
+  border-top: 1px solid var(--line-soft);
+}
+.shelf-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  border: none;
+  background: none;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.shelf-row:hover {
+  background: var(--hover);
+}
+.shelf-item.is-unrunnable .shelf-row {
+  color: var(--muted-2);
+}
+.shelf-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+.shelf-item.is-unrunnable .shelf-name {
+  color: var(--muted-2);
+}
+.shelf-tag {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0.125rem 0.5rem;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+.shelf-meta {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.shelf-verdict {
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 0.125rem 0.5rem;
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+.shelf-verdict.is-no {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
+}
+.shelf-verdict.is-tight {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid var(--amber-line);
+}
+.shelf-chevron {
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg) translate(-0.1rem, -0.1rem);
+  transition: transform 0.15s ease;
+}
+.shelf-chevron.is-open {
+  transform: rotate(-135deg) translate(-0.1rem, -0.1rem);
+}
+.shelf-files {
+  padding: var(--space-1) var(--space-4) var(--space-2);
+  background: var(--surface-soft);
+  border-top: 1px dashed var(--line-soft);
+}
+.shelf-file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  font-size: var(--font-xs);
+}
+.shelf-file-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-family: var(--mono);
+}
+/* 货架入口按钮(设置弹窗内):与货架面板同族的一块横条按钮 */
+.cfg-shelf-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+.cfg-shelf-toggle:hover {
+  background: var(--hover);
+}

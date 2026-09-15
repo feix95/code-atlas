@@ -12,6 +12,7 @@ import {
 } from '@shared/personalization'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
+import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 
 /** 语气下拉(第一百一十八锤补,照小葵的参考图):档名+介绍两行式 —— 原生 option
  * 画不出两行,这一颗自己画。点外面或按 Esc 收起,选中项亮着。 */
@@ -282,6 +283,7 @@ export function SettingsDialog({
   const [models, setModels] = useState<string[]>([])
   const [modelsNote, setModelsNote] = useState<string | null>(null)
   const [modelsBusy, setModelsBusy] = useState(false)
+  const [shelfOpen, setShelfOpen] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({ path: '', verdict: null })
@@ -1057,6 +1059,15 @@ export function SettingsDialog({
                             </button>
                           </div>
                           <p className="cfg-field-help">模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。</p>
+                          <div className="cfg-field-head">
+                            <label>模型货架</label>
+                            <span>实时榜单</span>
+                          </div>
+                          <button type="button" className="cfg-shelf-toggle" onClick={() => setShelfOpen((v) => !v)}>
+                            <Icon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} />
+                            {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 GGUF 榜,按大小和更新时间自己挑'}
+                          </button>
+                          {shelfOpen && <ModelShelfPanel />}
                           {modelPathDraft.trim() && fitNote && fitNote.level !== 'empty' && (
                             <p className={`cfg-field-help cfg-fit-note is-${fitNote.level}`}>
                               {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '!'} {fitNote.title}:{fitNote.detail}

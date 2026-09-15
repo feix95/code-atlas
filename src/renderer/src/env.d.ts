@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { Appearance } from '../../../shared/appearancePrefs.ts'
+import type { RepoFile, ShelfResult } from '../../../shared/modelShelf.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -56,6 +57,9 @@ declare global {
       /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话) */
       readPreview: (rootPath: string, relPath: string) => Promise<FilePreviewResult>
       depGraph: (rootPath: string) => Promise<DepGraphResult>
+      /** 模型货架:实时榜(主进程双源拉取,顺带本机家底)+ 仓库文件清单 */
+      modelShelf: () => Promise<ShelfResult>
+      modelFiles: (repoId: string) => Promise<RepoFile[]>
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>

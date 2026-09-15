@@ -92,6 +92,7 @@ import {
 import { truncateAtRepetition } from '../ai/repetition.ts'
 import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, prefersWebFirst, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
+import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
 import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
@@ -1526,6 +1527,13 @@ function registerIpc(): void {
   ipcMain.handle('atlas:appearance-save', (_event, raw: unknown) => {
     const a = sanitizeAppearance(raw)
     return saveAppearanceFile(app.getPath('userData'), a)
+  })
+
+  // 模型货架:实时榜(只读抱抱脸公开 API,零落盘)+ 某仓库的文件清单。拉货手在 ai/modelShelf
+  ipcMain.handle('atlas:model-shelf', () => fetchModelShelf())
+  ipcMain.handle('atlas:model-files', (_event, repoId: unknown) => {
+    if (typeof repoId !== 'string' || repoId === '') throw new Error('参数不合法')
+    return fetchRepoFiles(repoId)
   })
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
