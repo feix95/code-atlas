@@ -233,3 +233,4 @@
 - chore(build): 接入 electron-builder 出第一个 Windows 安装包——wasm 字典改走 resources 行李箱(打包后体检/分色不再哑火,运行时认文件自动切路径),web-tree-sitter 挪进 dependencies 进 asar
 - refactor(appearance): 外观设置搬进主进程 appearance.json——根治「端口被挤外观变出厂设置」;localStorage 旧档首启自动收编迁移,首帧走同步通道不闪默认皮;开 dev 铁律同步简化
 - fix(git): 修子目录改动收集在短路径环境下前缀算歪(GitHub runner 的 TEMP 是 8.3 短名,git 报的仓库根是长名)——仓库根和所选路径都先 realpath 归一再算相对
+- fix(git): 子目录前缀改由 git 自报(rev-parse --show-prefix)——path.relative 对长短路径名/大小写敏感,CI 短路径环境悄悄算歪,现在零猜态
