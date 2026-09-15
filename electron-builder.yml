@@ -36,6 +36,10 @@ extraResources:
       - tree-sitter-bash.wasm
       - tree-sitter-yaml.wasm
       - tree-sitter-toml.wasm
+  # AI 引擎随包(llama.cpp CPU 版,任何 x64 机器能跑;来源见 release.yml 下载步骤,
+  # 本地开发放 vendor/llama-cpp/,已 gitignore)。运行时 resolveServerProgram 认这个位置
+  - from: vendor/llama-cpp
+    to: llama-cpp
 win:
   target:
     - target: nsis

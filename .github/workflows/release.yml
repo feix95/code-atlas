@@ -20,6 +20,17 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # AI 引擎不进 git(大二进制),CI 出包前现场下载;版本钉死,升引擎改这里
+      - name: Download llama.cpp engine (CPU x64)
+        shell: bash
+        run: |
+          LLAMA_TAG=b10988
+          curl -sL -o engine.zip "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-win-cpu-x64.zip"
+          mkdir -p vendor/llama-cpp
+          unzip -q engine.zip -d vendor/llama-cpp-extract
+          cp -r vendor/llama-cpp-extract/. vendor/llama-cpp/
+          rm -rf vendor/llama-cpp-extract engine.zip
+          test -f vendor/llama-cpp/llama-server.exe
       - run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
