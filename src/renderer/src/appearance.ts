@@ -1,29 +1,61 @@
 // 外观系统:亮暗模式 + 配色预设 + 自定义主题色/辅助色。
-// 偏好存 localStorage(界面的事,每台机器自己一套,不进 AI 配置文件)。
+// 偏好存主进程的 appearance.json(2026-09-16 起从 localStorage 搬家 —— 那份按端口分仓、
+// 端口一挤就出厂设置的存档方式退役;首启自动把 localStorage 旧档收编进新家)。
 // 生效方式:模式往 <html> 上挂 data-theme 切换样式表里的两套 token;
 // 自定义色在启动时算出一族同色系的 token 写到 :root 内联样式上,压过样式表默认值。
 
-export type AppearanceMode = 'auto' | 'light' | 'dark'
-/** preset 和自定义色互斥:选了预设就清空自定义色,点「自定义」才进 custom 档 */
-export type AppearancePreset = 'default' | 'teal' | 'violet' | 'custom'
+import {
+  type Appearance,
+  type AppearanceMode,
+  type AppearancePreset,
+  COLOR_PRESETS,
+  resolveAppearanceStartup,
+  sanitizeAppearance
+} from '../../shared/appearancePrefs.ts'
 
-export interface Appearance {
-  mode: AppearanceMode
-  preset: AppearancePreset
-  /** 自定义主题色(#rrggbb);不设就跟预设走 */
-  accent: string | null
-  /** 自定义辅助色(#rrggbb);不设就跟预设走 */
-  secondary: string | null
-}
+// 类型与预设表对外照旧从这里出(既有 import 不用动),本体住在 shared
+export type { Appearance, AppearanceMode, AppearancePreset }
+export { COLOR_PRESETS }
 
 export const APPEARANCE_KEY = 'atlas.appearance'
 
-/** 配色预设:雾空蓝 = 现在的默认皮肤(不写任何内联,和从前一模一样);另两套是现成的成套配色 */
-export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent: string; secondary: string }> = [
-  { key: 'default', name: '雾空蓝', accent: '#147dcc', secondary: '#5ac5db' },
-  { key: 'teal', name: '青碧', accent: '#0e9488', secondary: '#56c3ad' },
-  { key: 'violet', name: '丁香紫', accent: '#7c5cd6', secondary: '#b79ef0' }
-]
+/** 当前生效的外观(内存账):首次从主进程文件/旧档迁移定值,之后 saveAppearance 实时更新 */
+let current: Appearance | null = null
+
+function readLegacyRaw(): string | null {
+  try {
+    return localStorage.getItem(APPEARANCE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function loadAppearance(): Appearance {
+  if (current) return current
+  // 首次定值:主进程存档为准;主进程没存过而 localStorage 有旧档 → 收编迁移。
+  // getSync 是同步通道,页面脚本跑之前就定好外观,首帧不闪默认皮。
+  const startup = resolveAppearanceStartup({
+    stored: window.atlas.appearance.getSync(),
+    legacyRaw: readLegacyRaw()
+  })
+  current = startup.value
+  if (startup.migrate) {
+    // 旧档迁新家:异步落盘不阻塞首帧;迁完把旧仓清掉,从此不再回头
+    window.atlas.appearance.save(current)
+    try {
+      localStorage.removeItem(APPEARANCE_KEY)
+    } catch {
+      // 清不掉也不碍事:主进程存档已经在了,下次启动走「stored 在」分支
+    }
+  }
+  return current
+}
+
+export function saveAppearance(a: Appearance): void {
+  // 先清清洗:界面层理论上只会送合法值,这道闸保证存档永远干净
+  current = sanitizeAppearance(a)
+  window.atlas.appearance.save(current)
+}
 
 /** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配
  *  (--secondary-deep 是辅助色的文字安全档;--line 边框线归辅助色管;
@@ -39,32 +71,6 @@ const TOKEN_KEYS = [
   '--secondary-deep',
   '--line'
 ] as const
-
-export function loadAppearance(): Appearance {
-  try {
-    const raw = localStorage.getItem(APPEARANCE_KEY)
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<Appearance>
-      return {
-        mode: p.mode === 'light' || p.mode === 'dark' ? p.mode : 'auto',
-        preset: p.preset === 'teal' || p.preset === 'violet' || p.preset === 'custom' ? p.preset : 'default',
-        accent: isHexColor(p.accent) ? p.accent : null,
-        secondary: isHexColor(p.secondary) ? p.secondary : null
-      }
-    }
-  } catch {
-    // 存档坏了就当没配过,回到默认,不炸界面
-  }
-  return { mode: 'auto', preset: 'default', accent: null, secondary: null }
-}
-
-export function saveAppearance(a: Appearance): void {
-  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a))
-}
-
-function isHexColor(v: unknown): v is string {
-  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
-}
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(Math.max(v, lo), hi)

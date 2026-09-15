@@ -102,6 +102,8 @@ import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
+import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
+import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
@@ -1513,6 +1515,17 @@ function registerIpc(): void {
       throw new Error('路径不能为空')
     }
     return buildDependencyGraph(rootPath)
+  })
+
+  // 外观偏好:读 / 存(2026-09-16 起从 localStorage 搬进 appearance.json —— 那份按
+  // localhost 端口分仓、端口一挤就出厂设置的存档方式退役)。同步读通道是给 preload
+  // 首帧用的:页面脚本跑之前就得定外观,不然先按默认画一帧再换皮,界面会闪。
+  ipcMain.on('atlas:appearance-get-sync', (event) => {
+    event.returnValue = loadAppearanceFileSync(app.getPath('userData'))
+  })
+  ipcMain.handle('atlas:appearance-save', (_event, raw: unknown) => {
+    const a = sanitizeAppearance(raw)
+    return saveAppearanceFile(app.getPath('userData'), a)
   })
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)

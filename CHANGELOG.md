@@ -231,3 +231,4 @@
 - feat(ai): 翻文件模式加「先搜后答」质检闸+固定三步 SOP,治不搜文件瞎猜
 - feat(preview): 文件预览语法高亮上线,色号照抄 VS Code 官方配色
 - chore(build): 接入 electron-builder 出第一个 Windows 安装包——wasm 字典改走 resources 行李箱(打包后体检/分色不再哑火,运行时认文件自动切路径),web-tree-sitter 挪进 dependencies 进 asar
+- refactor(appearance): 外观设置搬进主进程 appearance.json——根治「端口被挤外观变出厂设置」;localStorage 旧档首启自动收编迁移,首帧走同步通道不闪默认皮;开 dev 铁律同步简化

@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 
+import type { Appearance } from '../../../shared/appearancePrefs.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -31,6 +32,11 @@ declare global {
         electron: () => string
       }
       pickFolder: () => Promise<string | null>
+      /** 外观偏好(存主进程 appearance.json):getSync 同步通道保首帧不闪默认皮;save 异步落盘 */
+      appearance: {
+        getSync: () => Appearance | null
+        save: (a: Appearance) => void
+      }
       /** 列盘符:只问 Windows 有哪些盘,不翻文件内容;首页盘符列表用 */
       listDrives: () => Promise<DriveInfo[]>
       /** CodeAtlas 自身版本号(设置里的版本信息行用) */

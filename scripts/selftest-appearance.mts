@@ -52,4 +52,77 @@ check('小葵的绿(#7dba32)明度带内不夹,压深字', () => {
   assert.equal(pickAccentInk(h, s, l), INK_DARK)
 })
 
-console.log('✅ 配色字色自适应自测全绿')
+// ── 外观搬家(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘 ──
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { sanitizeAppearance, resolveAppearanceStartup, defaultAppearance } from '../src/shared/appearancePrefs.ts'
+import { appearanceFilePath, loadAppearanceFileSync, saveAppearanceFile } from '../src/main/appearanceStore.ts'
+
+check('清洗:陌生存档各字段越界一律回默认', () => {
+  assert.deepEqual(sanitizeAppearance(null), defaultAppearance())
+  assert.deepEqual(sanitizeAppearance('垃圾'), defaultAppearance())
+  assert.deepEqual(
+    sanitizeAppearance({ mode: '天书', preset: '彩虹', accent: 'red', secondary: 42 }),
+    defaultAppearance()
+  )
+})
+
+check('清洗:合法值原样放行,非法 hex 拦下', () => {
+  const good = { mode: 'dark', preset: 'custom', accent: '#7dba32', secondary: '#5ac5db' }
+  assert.deepEqual(sanitizeAppearance(good), good)
+  assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', accent: '#12345' }).accent, null)
+  assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', secondary: '#gggggg' }).secondary, null)
+})
+
+check('首启决策:主进程有档听主进程的,不迁移', () => {
+  const stored = { mode: 'dark' as const, preset: 'teal' as const, accent: null, secondary: null }
+  const r = resolveAppearanceStartup({ stored, legacyRaw: '{"mode":"light"}' })
+  assert.deepEqual(r.value, stored)
+  assert.equal(r.migrate, false)
+})
+
+check('首启决策:主进程没档而旧档有效 → 收编迁移', () => {
+  const r = resolveAppearanceStartup({
+    stored: null,
+    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'violet', accent: '#7c5cd6', secondary: '#b79ef0' })
+  })
+  assert.equal(r.value.mode, 'dark')
+  assert.equal(r.value.preset, 'violet')
+  assert.equal(r.migrate, true)
+})
+
+check('首启决策:旧档是全默认/烂的 → 不值得迁移,回默认', () => {
+  assert.deepEqual(resolveAppearanceStartup({ stored: null, legacyRaw: JSON.stringify(defaultAppearance()) }), {
+    value: defaultAppearance(),
+    migrate: false
+  })
+  assert.deepEqual(resolveAppearanceStartup({ stored: null, legacyRaw: '{烂的' }), {
+    value: defaultAppearance(),
+    migrate: false
+  })
+  assert.deepEqual(resolveAppearanceStartup({ stored: null, legacyRaw: null }), {
+    value: defaultAppearance(),
+    migrate: false
+  })
+})
+
+check('落盘:存进 appearance.json 再读回来是同一份,坏文件老实回 null', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'atlas-appearance-'))
+  try {
+    // 没存过 = null(首启迁移的信号)
+    assert.equal(loadAppearanceFileSync(dir), null)
+    const a = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: '#5ac5db' }
+    await saveAppearanceFile(dir, a)
+    assert.deepEqual(loadAppearanceFileSync(dir), a)
+    assert.deepEqual(JSON.parse(readFileSync(appearanceFilePath(dir), 'utf8')), a)
+    // 烂文件:回 null,不炸
+    writeFileSync(appearanceFilePath(dir), '{烂的')
+    assert.equal(loadAppearanceFileSync(dir), null)
+    assert.ok(!existsSync(join(dir, 'nope.json')))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+console.log('✅ 配色字色自适应 + 外观搬家自测全绿')

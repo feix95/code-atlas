@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { Appearance } from '../shared/appearancePrefs.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -77,6 +78,14 @@ contextBridge.exposeInMainWorld('atlas', {
     window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
   },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('atlas:pick-folder'),
+  // 外观偏好(2026-09-16 起存主进程 appearance.json,不再用 localStorage):
+  // getSync 是同步通道,页面脚本跑之前把外观定下来,首帧不闪默认皮;save 是异步落盘
+  appearance: {
+    getSync: (): Appearance | null => ipcRenderer.sendSync('atlas:appearance-get-sync'),
+    save: (a: Appearance): void => {
+      ipcRenderer.send('atlas:appearance-save', a)
+    }
+  },
   // 列盘符(只问有哪些盘,不翻文件内容);app 版本号(设置里的版本信息行用)
   listDrives: (): Promise<DriveInfo[]> => ipcRenderer.invoke('atlas:list-drives'),
   appVersion: (): Promise<string> => ipcRenderer.invoke('atlas:app-version'),
