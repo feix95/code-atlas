@@ -5,6 +5,10 @@
 # 新增语言支持时:同步把对应的 tree-sitter-<语言>.wasm 加进下面 filter 清单!
 appId: com.feix95.codeatlas
 productName: CodeAtlas
+# CI 里打 tag 自动出的包先进 GitHub Releases 草稿箱,人工过目后点发布,不裸奔
+publish:
+  provider: github
+  releaseType: draft
 directories:
   output: dist
 files:
