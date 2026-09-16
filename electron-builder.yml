@@ -41,6 +41,9 @@ extraResources:
   - from: vendor/llama-cpp
     to: llama-cpp
 win:
+  # 应用图标(2026-09-17 小葵点头换掉 Electron 出厂原子图):build/icons-src/ 是 SVG 设计源,
+  # 跑 scripts/make-icon.mts 重新生成 ico(小尺寸走加粗简化版,任务栏 16px 不糊)
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
