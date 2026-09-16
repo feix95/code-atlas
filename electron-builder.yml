@@ -46,6 +46,10 @@ win:
       arch:
         - x64
 nsis:
-  oneClick: true
+  # 向导式安装(2026-09-16 小葵定):有「下一步」页面可选安装目录,不再双击就闷头装。
+  # per-user 安装(不需管理员权限);卸载默认保留 %APPDATA%\CodeAtlas 用户数据,
+  # README 的「彻底卸载」一节有说明(oneClick 独有的 deleteAppDataOnUninstall 在此模式不可用)
+  oneClick: false
+  allowToChangeInstallationDirectory: true
   perMachine: false
   artifactName: ${productName}-Setup-${version}.${ext}
