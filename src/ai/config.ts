@@ -7,10 +7,11 @@ import type { AiConfig, ChatTarget } from '../shared/types.ts'
 import { DEFAULT_PERSONALIZATION, sanitizePersonalization } from '../shared/personalization.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
 
-/** 默认指向 LM Studio 本地服务;模型名留空 = 还没配置,由界面引导填。联网查证默认关,说话方式是全默认 */
+/** 默认走内置引擎(2026-09-18 小葵定:新用户开箱即内置,配货架顶部「推荐模型」一键下载
+ *  正好凑成第一步);模型路径留空 = 还没下模型,界面引导去货架。联网查证默认关,说话方式是全默认 */
 export function defaultAiConfig(): AiConfig {
   return {
-    provider: 'lmstudio',
+    provider: 'builtin',
     lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: '', apiKey: '' },
     builtin: { serverPath: '', modelPath: '' },
     webLookup: false,
@@ -111,7 +112,7 @@ export function resolveAiTarget(
         ok: false,
         message: config.builtin.modelPath.trim()
           ? '内置模型正在启动,稍等几秒再试'
-          : '还没选模型:去「AI 设置」点「选择模型」,选一个 GGUF 模型文件'
+          : '还没选模型:去「AI 设置」展开模型货架,点「推荐模型」一键下载,或自己选一个 GGUF 文件'
       }
     }
     return {

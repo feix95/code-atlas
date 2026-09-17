@@ -24,7 +24,9 @@ let cache: { at: number; result: ShelfResult } | null = null
 async function fetchFromHost(host: string, timeoutMs: number): Promise<unknown> {
   const url =
     `${host}/api/models?filter=gguf&sort=downloads&direction=-1&limit=${SHELF_LIMIT}` +
-    `&expand%5B%5D=downloads&expand%5B%5D=likes&expand%5B%5D=lastModified&expand%5B%5D=pipeline_tag&expand%5B%5D=gguf`
+    `&expand%5B%5D=downloads&expand%5B%5D=likes&expand%5B%5D=lastModified&expand%5B%5D=pipeline_tag&expand%5B%5D=gguf` +
+    // tags 供准入过滤(conversational 兜底)和能力章(vision/tool-use/reasoning 线索),2026-09-18 补
+    `&expand%5B%5D=tags`
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
   if (!res.ok) throw new Error(`HF API ${res.status}`)
   return res.json()

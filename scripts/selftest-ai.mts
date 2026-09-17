@@ -640,7 +640,7 @@ async function main(): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
   try {
     const fallback = defaultAiConfig()
-    assert.equal(fallback.provider, 'lmstudio', '默认 Provider 应为 LM Studio')
+    assert.equal(fallback.provider, 'builtin', '默认 Provider 应为内置(2026-09-18 小葵定:新用户开箱即内置)')
     assert.equal(fallback.lmstudio.baseUrl, 'http://127.0.0.1:1234/v1', '默认地址应为 LM Studio 本地服务')
     assert.equal(fallback.builtin.serverPath, '', '内置 Provider 默认未配置')
 
