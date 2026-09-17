@@ -70,7 +70,8 @@ import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
-import { stripHtmlTags, webLookupDetailed } from '../src/ai/weblookup.ts'
+import { stripHtmlTags, webLookupDetailed, probeTavilyKey, looksLikeTavilyResponse, HttpStatusError, TAVILY_PROBE_QUERY, TAVILY_SEARCH_URL } from '../src/ai/weblookup.ts'
+import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus } from '../src/shared/tavily.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
@@ -436,6 +437,73 @@ async function main(): Promise<void> {
     assert.equal(getCalls, 1, 'Tavily 命中后免费源不跑;仅抓第一条正文那一脚(GET 失败被吞,不拖垮)')
   }
 
+  // ── 3.9 Tavily Key:洗污染 / 看形状 / 测一下(2026-09-17)—— 瞎填能存但不吭声的老毛病,现在当场说话 ──
+  {
+    // 洗:复制粘贴常见的污染一律剥掉
+    assert.equal(sanitizeTavilyKey('  tvly-abc123def  '), 'tvly-abc123def', '首尾空白剥掉')
+    assert.equal(sanitizeTavilyKey('"tvly-abc123def"'), 'tvly-abc123def', '两头双引号剥掉')
+    assert.equal(sanitizeTavilyKey('Bearer tvly-abc123def'), 'tvly-abc123def', 'Bearer 前缀剥掉')
+    assert.equal(sanitizeTavilyKey('bearer tvly-abc123def'), 'tvly-abc123def', '前缀大小写不敏感')
+    assert.equal(sanitizeTavilyKey('tvly-abc\n123 def'), 'tvly-abc123def', '中间夹的换行/空格一并剥掉')
+    assert.equal(sanitizeTavilyKey('   '), undefined, '洗完是空 = 没填,存档里不出现这个字段')
+    assert.equal(sanitizeTavilyKey(42), undefined, '不是字符串 = 没填')
+
+    // 形状:只回答「像不像」,不回答「能不能用」
+    assert.ok(looksLikeTavilyKey('tvly-dev-1a2b3c4d'), '官方形状认得出')
+    assert.ok(!looksLikeTavilyKey('abc'), '瞎填的认不出')
+    assert.ok(!looksLikeTavilyKey('tvly-'), '光一个前缀没内容不算')
+    assert.ok(!looksLikeTavilyKey('Bearer tvly-abc123def'), '脏值先洗再判,带前缀的不算')
+
+    // 状态码 → 结论(照 Tavily 官方文档分档)
+    assert.equal(tavilyVerdictFromStatus(200), 'ok')
+    assert.equal(tavilyVerdictFromStatus(401), 'bad-key', '401 = Key 错或没给')
+    assert.equal(tavilyVerdictFromStatus(432), 'quota', '432 = 套餐额度用完')
+    assert.equal(tavilyVerdictFromStatus(433), 'quota', '433 = 按量付费限额用完')
+    assert.equal(tavilyVerdictFromStatus(429), 'busy', '429 = 请求太频繁')
+    assert.equal(tavilyVerdictFromStatus(500), 'server')
+    assert.equal(tavilyVerdictFromStatus(418), 'other', '没见过的码走兜底,不硬猜')
+
+    // 200 的正文得真像 Tavily 的回话:网络被劫持/门户页也是 200,别被骗成「能用」
+    assert.ok(looksLikeTavilyResponse('{"query":"x","results":[]}'), '标准回话认得出')
+    assert.ok(looksLikeTavilyResponse('{"request_id":"abc"}'), '只有 request_id 也认')
+    assert.ok(!looksLikeTavilyResponse('<html>请先登录</html>'), '门户页不认')
+    assert.ok(!looksLikeTavilyResponse('{烂的'), '坏 JSON 不认')
+
+    // 测一下:真打官方接口,按状态码给结论
+    let probeUrl = ''
+    let probeAuth = ''
+    let probeBody: Record<string, unknown> = {}
+    const ok = await probeTavilyKey('tvly-abc123def', async (url, body, headers) => {
+      probeUrl = url
+      probeBody = body
+      probeAuth = headers.Authorization
+      return '{"query":"CodeAtlas key check","results":[]}'
+    })
+    assert.equal(probeUrl, TAVILY_SEARCH_URL, '打的是官方入口')
+    assert.equal(probeAuth, 'Bearer tvly-abc123def', 'Key 走认证头,不进 URL')
+    assert.equal(probeBody.max_results, 1, '探测只要 1 条结果,省额度')
+    assert.equal(probeBody.query, TAVILY_PROBE_QUERY, '探针查询词是固定那一句')
+    assert.deepEqual(ok, { verdict: 'ok', status: 200 }, '通了 = 能用')
+
+    const bad = await probeTavilyKey('tvly-wrong', async () => {
+      throw new HttpStatusError(401)
+    })
+    assert.deepEqual(bad, { verdict: 'bad-key', status: 401 }, '401 老实说「Key 不认」')
+
+    const quota = await probeTavilyKey('tvly-abc123def', async () => {
+      throw new HttpStatusError(432)
+    })
+    assert.equal(quota.verdict, 'quota', '额度用完单独成档:Key 本身没错')
+
+    const offline = await probeTavilyKey('tvly-abc123def', async () => {
+      throw new Error('getaddrinfo ENOTFOUND')
+    })
+    assert.equal(offline.verdict, 'unreachable', '连不上说连不上,不冤枉 Key')
+
+    const hijacked = await probeTavilyKey('tvly-abc123def', async () => '<html>请先登录</html>')
+    assert.deepEqual(hijacked, { verdict: 'other', status: 200 }, '200 但正文不像 Tavily:说「看不懂」,不吹「能用」')
+  }
+
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
   assert.ok(isBinaryFile('app.exe'), '可执行文件是二进制')
@@ -515,17 +583,21 @@ async function main(): Promise<void> {
       provider: 'builtin',
       lmstudio: { baseUrl: '  http://127.0.0.1:1234/v1  ', model: 'Qwen3.8-27B', apiKey: '' },
       builtin: { serverPath: ' D:\\tools\\llama-server.exe ', modelPath: 'F:\\models\\qwen.gguf' },
-      webLookup: true
+      webLookup: true,
+      // 脏 Key 存进去:洗污染这一步要在落盘前生效(2026-09-17)
+      tavilyKey: '  "tvly-abc123def"  '
     })
     assert.equal(saved.provider, 'builtin', 'Provider 应保存')
     assert.equal(saved.lmstudio.baseUrl, 'http://127.0.0.1:1234/v1', 'baseUrl 应去掉首尾空格')
     assert.equal(saved.builtin.serverPath, 'D:\\tools\\llama-server.exe', 'serverPath 应去掉首尾空格')
     assert.equal(saved.webLookup, true, '联网查证开关应保存')
+    assert.equal(saved.tavilyKey, 'tvly-abc123def', 'Tavily Key 落盘前洗掉引号和两边空白')
     const loaded = await loadAiConfig(dir)
     assert.equal(loaded.provider, 'builtin', '重新读回 Provider')
     assert.equal(loaded.lmstudio.model, 'Qwen3.8-27B', '重新读回模型名')
     assert.equal(loaded.builtin.modelPath, 'F:\\models\\qwen.gguf', '重新读回模型文件路径')
     assert.equal(loaded.webLookup, true, '重新读回联网查证开关')
+    assert.equal(loaded.tavilyKey, 'tvly-abc123def', '重新读回 Tavily Key')
     assert.equal(defaultAiConfig().webLookup, false, '联网查证默认必须是关')
 
     // 手动上下文(第七十锤补的存取):填了要能存能读,清空 = 回自动探测
@@ -552,6 +624,19 @@ async function main(): Promise<void> {
     assert.equal(migrated.provider, 'lmstudio', '老配置迁移后 Provider 应为 lmstudio')
     assert.equal(migrated.lmstudio.model, '老配置模型', '老配置的模型名应搬进 lmstudio 分支')
     assert.equal(migrated.lmstudio.apiKey, 'sk-old', '老配置的 apiKey 应保留')
+
+    // 老档里躺着脏 Key(手改过、粘过带前缀的):读出来就该是干净的(2026-09-17)
+    await writeFile(
+      aiConfigPath(dir),
+      JSON.stringify({
+        provider: 'lmstudio',
+        lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: 'm', apiKey: '' },
+        builtin: { serverPath: '', modelPath: '' },
+        tavilyKey: 'Bearer tvly-abc123def'
+      }),
+      'utf8'
+    )
+    assert.equal((await loadAiConfig(dir)).tavilyKey, 'tvly-abc123def', '读档也洗一遍:老档里的脏 Key 出来是干净的')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

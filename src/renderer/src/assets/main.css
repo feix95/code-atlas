@@ -4915,6 +4915,23 @@ body.is-maximized .cfg-layer {
   color: var(--accent);
 }
 
+/* 「测一下」这类实心小按钮的禁用态(2026-09-17):Key 空着 / 正在测的时候点不动,但也不隐身 */
+.cfg-path-input button:disabled {
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+/* Key 体检的结论行:绿 = 能用,黄 = 能用但有事(额度用完/被限流),红 = 认不了或连不上 */
+.cfg-field-help.is-ok {
+  color: var(--green);
+}
+
+.cfg-field-help.is-bad {
+  color: var(--danger);
+}
+
 .cfg-field-help {
   display: flex;
   align-items: center;

@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 
-import type { Appearance } from '../../../shared/appearancePrefs.ts'
-import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../../../shared/modelShelf.ts'
+import type { Appearance } from '../../shared/appearancePrefs.ts'
+import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../../shared/modelShelf.ts'
+import type { TavilyProbeResult } from '../../shared/tavily.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -21,8 +22,8 @@ import type {
   ModelStatus,
   ScanDirNode,
   ScanResult,
-  DevLogEntry
-} from '../../../shared/types.ts'
+      DevLogEntry
+} from '../../shared/types.ts'
 
 declare global {
   interface Window {
@@ -67,6 +68,8 @@ declare global {
       aiConfigGet: () => Promise<AiConfig>
       aiConfigSave: (config: AiConfig) => Promise<AiConfig>
       aiListModels: (baseUrl: string) => Promise<string[]>
+      /** Tavily Key 体检(2026-09-17):点「测一下」真打一次官方接口,按状态码给结论;只回结论,不回显 Key */
+      aiTestTavily: (key: string) => Promise<TavilyProbeResult>
       aiPickFile: () => Promise<string | null>
       aiExplainFile: (
         rootPath: string,

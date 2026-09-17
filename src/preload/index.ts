@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Appearance } from '../shared/appearancePrefs.ts'
+import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type {
   AiChatLookupPayload,
@@ -127,6 +128,8 @@ contextBridge.exposeInMainWorld('atlas', {
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-get'),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('atlas:ai-config-save', config),
   aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke('atlas:ai-list-models', baseUrl),
+  /** Tavily Key 体检(2026-09-17):拿框里这把 Key 真打一次官方接口,只回结论,不回显 Key */
+  aiTestTavily: (key: string): Promise<TavilyProbeResult> => ipcRenderer.invoke('atlas:ai-test-tavily', key),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke('atlas:ai-pick-file'),
   aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string, note?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke('atlas:ai-explain-file', rootPath, relPath, languageId, requestId, question, note),

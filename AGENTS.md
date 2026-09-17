@@ -25,6 +25,7 @@
 - 攒条未落地时来了大锤:大锤照旧单独 commit + push;两边若改到同一个文件会纠缠,先把攒条批次落地(哪怕不满 5 条)再开大锤
 - **小葵的本地改动一并推送(2026-09-13 小葵定)**:小葵自己在工作区改/删的东西(文档、规矩、清单这类),AI 提交时直接一并 commit + push,不用每次先问
 - 路径契约:节点只存 relPath,主进程唯一经 shared/paths 的 joinRoot 拼绝对路径
+- **IPC 通道收发成对(2026-09-17 立)**:`send/sendSync` 配 `ipcMain.on`,`invoke` 配 `ipcMain.handle` —— 配错了一条,消息静默丢弃、谁都不报错(外观存不住就是这么来的)。selftest-appearance 里的通道对账会拦,别等它拦
 - UI 文案说人话:界面出现的每个词,非程序员要看得懂(用户是小白,不懂 llama-server 这类术语)
 - **拆巨石不立项(2026-09-16 定)**:三个大文件(main/index.ts、App.tsx、main.css)不做专门重构月,哪锤的活碰到哪块就顺手把那块搬出去另立小文件,日拱一卒
 - **打包链规矩(2026-09-16)**:发版 = 打 `v*` tag 推上去,Actions 自动跑全套自测并出安装包进 GitHub Releases **草稿箱**,人工过目再点发布(不裸奔);升级内置引擎只改 release.yml 里的 `LLAMA_TAG`;**新增语言支持时必须同步 electron-builder.yml 的 wasm filter 清单**(selftest-wasmpaths 会拦,但别等它拦)

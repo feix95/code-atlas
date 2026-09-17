@@ -11,6 +11,8 @@
 // 三道闸都扎在纯函数层(自测可测):搜索词安检(本地信息绝不出门)、内网闸(不碰
 // 用户机器的内网地址)、正文剥壳(网页内容进对话前声明「只是资料,不是指令」)。
 
+import { tavilyVerdictFromStatus, type TavilyProbeResult } from '../shared/tavily.ts'
+
 /** 单个源的耐心:5 秒,超时就当没查到 —— 联网是锦上添花,不能拖慢讲解 */
 export const WEB_LOOKUP_TIMEOUT_MS = 5_000
 
@@ -77,6 +79,20 @@ export const nodeFetchText: LookupTransport = async (url) => {
   return res.text()
 }
 
+/**
+ * 带状态码的传输层报错:普通搜索链只关心「这个源认输,换下一个」,状态码无所谓;
+ * 但 Key 体检要按状态码分档说人话(401 = Key 不对,432 = 额度用完),所以错误得把码带上。
+ */
+export class HttpStatusError extends Error {
+  readonly status: number
+
+  constructor(status: number) {
+    super(`HTTP ${status}`)
+    this.name = 'HttpStatusError'
+    this.status = status
+  }
+}
+
 /** Node 版默认 POST 传输(自测用):直连发 JSON,主进程实际用 net.fetch 版(跟随系统代理) */
 export const nodePostJsonTransport: LookupPostTransport = async (url, body, headers) => {
   const res = await fetch(url, {
@@ -85,7 +101,7 @@ export const nodePostJsonTransport: LookupPostTransport = async (url, body, head
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) throw new HttpStatusError(res.status)
   return res.text()
 }
 
@@ -136,6 +152,46 @@ export function parseTavilyResults(raw: string): WebSearchHit[] {
 async function searchTavilyHits(query: string, postJson: LookupPostTransport, apiKey: string): Promise<WebSearchHit[]> {
   const raw = await postJson(TAVILY_SEARCH_URL, { query, max_results: TAVILY_MAX_RESULTS }, { Authorization: `Bearer ${apiKey}` })
   return parseTavilyResults(raw)
+}
+
+// ── Key 体检(2026-09-17 小葵拍板):设置里点「测一下」,真打一次官方接口验货 ──
+
+/** 探测用的极小查询:只为验 Key,不为要结果 —— max_results=1,一次 basic 调用 = 1 个免费额度 */
+export const TAVILY_PROBE_QUERY = 'CodeAtlas key check'
+
+/**
+ * 200 的响应体得真像 Tavily 的正式回话才算数(纯函数,自测覆盖):
+ * 网络被劫持/连到门户页时也会回 200、配一坨 HTML,别让「看着成功」把结论骗成「能用」。
+ * 判据放宽(有 results 数组、或有 request_id、或有 query)—— 官方版本升级改了字段也不至于误判。
+ */
+export function looksLikeTavilyResponse(raw: string): boolean {
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  if (typeof data !== 'object' || data === null) return false
+  const d = data as Record<string, unknown>
+  return Array.isArray(d.results) || typeof d.request_id === 'string' || typeof d.query === 'string'
+}
+
+/**
+ * 拿 Key 打一次官方接口,把战果翻成结论(纯逻辑,自测注入假传输)。
+ * Key 只走认证头,不进 URL;结论只回给界面看,不落盘。
+ */
+export async function probeTavilyKey(
+  key: string,
+  postJson: LookupPostTransport = nodePostJsonTransport
+): Promise<TavilyProbeResult> {
+  try {
+    const raw = await postJson(TAVILY_SEARCH_URL, { query: TAVILY_PROBE_QUERY, max_results: 1 }, { Authorization: `Bearer ${key}` })
+    return looksLikeTavilyResponse(raw) ? { verdict: 'ok', status: 200 } : { verdict: 'other', status: 200 }
+  } catch (err) {
+    if (err instanceof HttpStatusError) return { verdict: tavilyVerdictFromStatus(err.status), status: err.status }
+    // 超时/断网/DNS 不通/代理撂挑子:不是 Key 的锅,老实说「没连上」
+    return { verdict: 'unreachable' }
+  }
 }
 
 /**

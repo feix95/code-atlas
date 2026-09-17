@@ -90,7 +90,7 @@ import {
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
-import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport, type LookupPostTransport } from '../ai/weblookup.ts'
+import { webLookupDetailed, webLookup, webSearchDetailed, probeTavilyKey, HttpStatusError, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport, type LookupPostTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
@@ -106,6 +106,7 @@ import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } fro
 import { queryDriveKinds } from './drive-meta.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
+import { sanitizeTavilyKey } from '../shared/tavily.ts'
 import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
@@ -281,7 +282,8 @@ const electronFetchText: LookupTransport = async (url) => {
   return res.text()
 }
 
-/** POST 版传输(Tavily 用):同一个 Chromium 网络栈,JSON body + 认证头,超时口径与 GET 一致 */
+/** POST 版传输(Tavily 用):同一个 Chromium 网络栈,JSON body + 认证头,超时口径与 GET 一致。
+ *  非 2xx 抛 HttpStatusError(带状态码)—— Key 体检要按码分档说人话,普通搜索链照旧当「这个源认输」 */
 const electronPostJson: LookupPostTransport = async (url, body, headers) => {
   const res = await net.fetch(url, {
     method: 'POST',
@@ -289,7 +291,7 @@ const electronPostJson: LookupPostTransport = async (url, body, headers) => {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) throw new HttpStatusError(res.status)
   return res.text()
 }
 
@@ -1693,6 +1695,14 @@ function registerIpc(): void {
     }
     const data = (await res.json()) as { data?: Array<{ id: string }> }
     return (data.data ?? []).map((m) => m.id)
+  })
+
+  // Tavily Key 体检(2026-09-17):设置里点「测一下」→ 拿框里那把 Key 真打一次官方接口。
+  // 只回结论和状态码,绝不回显 Key 本身(报错信息里也不留);结果只在内存里给界面看,不落盘。
+  ipcMain.handle('atlas:ai-test-tavily', (_event, key: unknown) => {
+    const cleaned = sanitizeTavilyKey(key)
+    if (!cleaned) throw new Error('Key 还是空的,先填一个再测。')
+    return probeTavilyKey(cleaned, electronPostJson)
   })
 
   // git 改动总览:谁动了、动了多少行。不是 git 仓库时返回 isGitRepo=false,不炸
