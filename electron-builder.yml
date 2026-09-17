@@ -40,6 +40,9 @@ extraResources:
   # 本地开发放 vendor/llama-cpp/,已 gitignore)。运行时 resolveServerProgram 认这个位置
   - from: vendor/llama-cpp
     to: llama-cpp
+  # 托盘图标(桌宠托管第一锤):打包后 Tray 从 resources/app.ico 认;开发模式直接读 build/icon.ico
+  - from: build/icon.ico
+    to: app.ico
 win:
   # 应用图标(2026-09-17 小葵点头换掉 Electron 出厂原子图):build/icons-src/ 是 SVG 设计源,
   # 跑 scripts/make-icon.mts 重新生成 ico(小尺寸走加粗简化版,任务栏 16px 不糊)

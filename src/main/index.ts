@@ -1,4 +1,4 @@
-import { app, clipboard, dialog, globalShortcut, ipcMain, net, screen, shell, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, net, screen, shell, Tray, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import { basename, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
@@ -457,6 +457,45 @@ function announceActivityIdle(): void {
 
 let devLogWindow: BrowserWindow | null = null
 
+// ── 托盘常驻与单实例(桌宠托管第一锤,2026-09-18)──
+// 收起模式的地基:主窗引用提升到模块级,托盘和 second-instance 都要够得着它。
+let mainWindowRef: BrowserWindow | null = null
+let tray: Tray | null = null
+// 真退出旗:托盘「退出」先立旗再 quit,close 事件看见旗才放行销毁 ——
+// 不立旗的话关窗=收起,窗口永远走不到销毁那一步
+let quitting = false
+
+/** 把主窗带回前台:托盘「显示主面板」、左键点托盘、第二个实例敲门,都走这条 */
+function showMainWindow(): void {
+  const win = mainWindowRef
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  win.focus()
+}
+
+/** 托盘图标:开发模式读仓库里的 build/icon.ico;打包后从 resources/app.ico 认
+ * (electron-builder.yml 的 extraResources 负责把它搬进去) */
+function trayIconPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'app.ico') : join(app.getAppPath(), 'build/icon.ico')
+}
+
+function createTray(): void {
+  const icon = nativeImage.createFromPath(trayIconPath())
+  if (icon.isEmpty()) addDevLog('system', '托盘图标没加载出来(文件缺失?),托盘会显示默认空白图 —— 不影响功能')
+  tray = new Tray(icon)
+  tray.setToolTip('CodeAtlas')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '显示主面板', click: () => showMainWindow() },
+      { type: 'separator' },
+      { label: '退出', click: () => app.quit() }
+    ])
+  )
+  // Windows 惯例:左键点托盘 = 唤回主面板
+  tray.on('click', () => showMainWindow())
+}
+
 function openDevLogWindow(): void {
   if (devLogWindow && !devLogWindow.isDestroyed()) {
     devLogWindow.focus()
@@ -553,6 +592,8 @@ function createWindow(): void {
       backgroundThrottling: false
     }
   })
+  // 主窗引用上提(桌宠托管第一锤):托盘、second-instance 都要够得着它
+  mainWindowRef = mainWindow
 
   // 记事本落盘:平常拖大拖小/挪地方都是 debounce 攒 0.5 秒写一回,关窗那一刻清表补写;
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
@@ -583,9 +624,16 @@ function createWindow(): void {
     noteNormalBounds()
     scheduleWindowStateSave()
   })
-  mainWindow.on('close', () => {
+  mainWindow.on('close', (event) => {
     if (stateSaveTimer) clearTimeout(stateSaveTimer)
     persistWindowState()
+    // 收起模式(桌宠托管第一锤):点关闭 = 藏进托盘,程序继续跑、聊天继续在线、
+    // 任务栏和 Alt+Tab 里都不再有主窗。真退出只走托盘「退出」—— 它先立 quitting
+    // 旗再 quit,close 事件看见旗才放行销毁
+    if (!quitting) {
+      event.preventDefault()
+      mainWindow.hide()
+    }
   })
   // 上回关窗时是最大化:先把存档的正常大小落好,再进最大化,圆角描边那条链照常接手
   if (savedWindowState?.maximized) mainWindow.maximize()
@@ -722,6 +770,7 @@ function createWindow(): void {
     }, 120)
   })
   mainWindow.on('closed', () => {
+    if (mainWindowRef === mainWindow) mainWindowRef = null
     clearInterval(modelStatusTimer)
     clearInterval(repaintHeartbeat)
     clearInterval(frameBeatWatchdog)
@@ -2297,14 +2346,19 @@ app.disableHardwareAcceleration()
 //    「被遮住了」从而停画 —— 这是社区公认的窗口凭空消失惯犯,直接关掉这个 feature;
 // ② 见 createWindow 里的 5 秒一次强制重画(让 DWM 随时都能接上新帧)。
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
-// 退出时把全局快捷键一并还回去,不留幽灵热键占着系统
+// 退出时把全局快捷键一并还回去,不留幽灵热键占着系统;托盘图标一并摘掉,不留僵尸托盘
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  if (tray) {
+    tray.destroy()
+    tray = null
+  }
 })
 
-app.whenReady().then(() => {
+function startApp(): void {
   createWindow()
   registerIpc()
+  createTray()
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
@@ -2330,13 +2384,32 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+}
+
+// ── 单实例锁(桌宠托管第一锤;当年双实例 GPU 缓存大战的老伤疤,别再揭一次)──
+// 抢不到锁 = 已经有一个 CodeAtlas 在跑:本实例一个窗都不建,悄悄退场。
+// 已在跑的实例通过 second-instance 收到敲门:把主窗带焦点唤回前台。
+// 右键问一问(P2)的文件路径转交将来也接在这里(argv 里带路径)。
+app.on('before-quit', () => {
+  quitting = true
 })
+app.on('second-instance', () => {
+  showMainWindow()
+})
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.whenReady().then(startApp)
+}
 
 app.on('will-quit', () => {
   stopBuiltinServer() // 内置模型是子进程,退出时带走,不留孤儿进程占着显存
 })
 
 app.on('window-all-closed', () => {
-  // Windows / Linux:关掉所有窗口就退出应用
+  // Windows / Linux:所有窗口都没了才退出。收起模式(桌宠托管第一锤)下关窗只是
+  // 藏进托盘、窗口不销毁,这个事件不触发 —— 真退出走托盘「退出」,走到这儿时
+  // quit 已在进行,再喊一声无害
   if (process.platform !== 'darwin') app.quit()
 })
