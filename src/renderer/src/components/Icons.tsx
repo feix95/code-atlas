@@ -115,7 +115,9 @@ const BOOK: Record<string, React.ReactNode> = {
   // 翻文件(第一百二十八锤):文件夹上搁一枚放大镜 —— 自己动手翻项目
   folderSearch: <><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" /><circle cx="17" cy="17" r="3.5" /><path d="m19.8 19.8 2.2 2.2" /></>,
   // 钉住(页签改版):一枚图钉 —— 双击页签把它钉住,树里换文件它不动
-  pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>
+  pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>,
+  // 模型货架能力章(参考 LM Studio):一只眼睛 —— 这个模型看得懂图
+  eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头) */

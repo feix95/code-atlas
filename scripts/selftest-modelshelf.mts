@@ -7,6 +7,7 @@ import {
   formatGgufSize,
   formatRelativeDays as rel,
   judgeRun,
+  modalityKind,
   modalityLabel,
   runVerdictLabel,
   sanitizeRepoFiles,
@@ -37,6 +38,17 @@ console.log('── 模态标签:多模态组合优先,认不出老实说「其�
   ok(modalityLabel({ pipeline_tag: 'feature-extraction' }) === '向量(不适合聊天)', '嵌入模型 → 向量(明示不适合聊天)')
   ok(modalityLabel({ tags: ['gguf'] }) === '其他', '没线索 → 其他,不硬猜')
   ok(modalityLabel({ tags: '垃圾' }) === '其他', 'tags 不是数组 → 不炸,回其他')
+}
+
+console.log('── 模态图标档位:界面能力章按它画,判定只认 label 那句话 ──')
+{
+  ok(modalityKind('文本') === 'text', '纯文本 → text(灰文档章)')
+  ok(modalityKind('文本+图像') === 'vision', '图文 → vision(amber 眼)')
+  ok(modalityKind('文本+语音') === 'audio', '音文 → audio(green 音符)')
+  ok(modalityKind('文本+图像+语音') === 'vision-audio', '图音文全都要 → 双章齐亮')
+  ok(modalityKind('向量(不适合聊天)') === 'embed', '向量 → embed(灰数据库章)')
+  ok(modalityKind('其他') === 'other', '其他 → other(灰问号章)')
+  ok(modalityKind('天书') === 'other', '认不出的标签 → other,不硬猜')
 }
 
 console.log('── 清洗:烂条目不进列表 ──')

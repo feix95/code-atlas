@@ -68,6 +68,21 @@ export function modalityLabel(entry: { pipeline_tag?: unknown; tags?: unknown })
   return '其他'
 }
 
+/** 模态 → 图标档位(2026-09-18,参考 LM Studio 的彩色能力小圆章):界面一行画哪枚描边圆图标全看它。
+ *  判定只认 modalityLabel 那句话,label 是唯一事实源,两个函数不打架;认不出一律 other,不硬猜 */
+export type ModalityKind = 'vision-audio' | 'vision' | 'audio' | 'text' | 'embed' | 'other'
+
+export function modalityKind(label: string): ModalityKind {
+  if (label.startsWith('向量')) return 'embed'
+  const vision = label.includes('图像')
+  const audio = label.includes('语音')
+  if (vision && audio) return 'vision-audio'
+  if (vision) return 'vision'
+  if (audio) return 'audio'
+  if (label === '文本') return 'text'
+  return 'other'
+}
+
 /** HF API 单条(只挑咱要的字段,其他无视)→ 货架行;烂条目回 null 不进列表 */
 export function sanitizeShelfEntry(raw: unknown): ShelfEntry | null {
   if (typeof raw !== 'object' || raw === null) return null

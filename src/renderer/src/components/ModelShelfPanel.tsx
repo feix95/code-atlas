@@ -1,11 +1,16 @@
-// 模型货架(2026-09-16):从抱抱脸拉实时 GGUF 榜,零判断纯事实 ——
+// 模型货架(2026-09-16,2026-09-18 排版重做):从抱抱脸拉实时 GGUF 榜,零判断纯事实 ——
 // 大小/时间/模态/下载量原样摆,筛选器交给用户自己挑;唯一掺的判断是
 // 「你这机器带不动」的灰戳,那是保护小白别白下几十 GB 的兜底。
+// 行排版(小葵定,参考 LM Studio):名字做主角,下载量/时间缩进名字下方的副行小字;
+// 模态用彩色描边圆能力章(眼=看图 绿音符=听声),大小/状态章/箭头定宽列,扫一列到底。
 // 点模型行展开文件清单;「下载并使用」按钮归一键到位那一锤管。
 import { useCallback, useEffect, useState } from 'react'
 import { ProgressDots } from './ProgressDots.tsx'
+import { TreeIcon } from './Icons.tsx'
 import {
   formatGgufSize,
+  modalityKind,
+  type ModalityKind,
   type ModelDownloadProgress,
   type RepoFile,
   type ShelfEntry,
@@ -18,6 +23,39 @@ import {
   judgeRun,
   runVerdictLabel
 } from '../../../shared/modelShelf.ts'
+
+/** 能力章画法:哪个模态档亮哪几枚描边圆(2026-09-18)。灰档(纯文本/向量/未知)不抢戏,
+ *  彩档(amber 眼=看图 / 绿音符=听声)一眼分层 —— 图标全查公共图标册,不另造 */
+const MOD_BADGES: Record<ModalityKind, Array<{ name: string; cls: string }>> = {
+  'vision-audio': [
+    { name: 'eye', cls: 'is-vision' },
+    { name: 'audio', cls: 'is-audio' }
+  ],
+  vision: [{ name: 'eye', cls: 'is-vision' }],
+  audio: [{ name: 'audio', cls: 'is-audio' }],
+  text: [{ name: 'doc', cls: 'is-dim' }],
+  embed: [{ name: 'database', cls: 'is-dim' }],
+  other: [{ name: 'help', cls: 'is-dim' }]
+}
+
+/** 能力章的悬停大白话:光看图标猜不出的小白,鼠标搁上去有人给翻译 */
+const MOD_TIPS: Record<ModalityKind, string> = {
+  'vision-audio': '看得懂图,也能听声音',
+  vision: '看得懂图:截图发给它也能聊',
+  audio: '带语音:能听声音',
+  text: '纯文本模型:靠文字聊天、写代码',
+  embed: '向量模型:存资料做检索用的,不能陪聊',
+  other: '没认出类型,先当普通文本模型试'
+}
+
+/** 副行小字(名字下方那行):下载量 + 更新时间;向量模型追加一句劝退 ——
+ *  文字胶囊改图标章后,「不适合聊天」这句话总得有个不靠悬停就在明面上的地方 */
+function shelfSubLine(entry: ShelfEntry): string {
+  const parts = [`${formatDownloads(entry.downloads)} 次下载`]
+  if (entry.lastModified) parts.push(`${formatRelativeDays(entry.lastModified)}更新`)
+  if (modalityKind(entry.modalityLabel) === 'embed') parts.push('检索专用,不能陪聊')
+  return parts.join(' · ')
+}
 
 interface ShelfState {
   entries: ShelfEntry[]
@@ -189,18 +227,28 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
       <ul className="shelf-list">
         {visible.map((entry) => {
           const verdict = judgeRun(entry.ggufTotalBytes, { ramBytes: shelf?.ramBytes ?? 0, vramBytes: null })
+          const kind = modalityKind(entry.modalityLabel)
           const isOpen = expanded === entry.id
           return (
             <li key={entry.id} className={`shelf-item${verdict === 'no' ? ' is-unrunnable' : ''}`}>
               <button type="button" className="shelf-row" onClick={() => toggleRepo(entry.id)} aria-expanded={isOpen}>
-                <span className="shelf-name" title={entry.id}>
-                  {entry.id}
+                <span className="shelf-main">
+                  <span className="shelf-name" title={entry.id}>
+                    {entry.id}
+                  </span>
+                  <span className="shelf-sub">{shelfSubLine(entry)}</span>
                 </span>
-                <span className="shelf-tag">{entry.modalityLabel}</span>
-                <span className="shelf-meta">{formatGgufSize(entry.ggufTotalBytes)}</span>
-                <span className="shelf-meta">{formatDownloads(entry.downloads)} 次下载</span>
-                <span className="shelf-meta">{formatRelativeDays(entry.lastModified)}</span>
-                {verdict !== 'yes' && <span className={`shelf-verdict is-${verdict}`}>{runVerdictLabel(verdict)}</span>}
+                <span className="shelf-mods" title={MOD_TIPS[kind]}>
+                  {MOD_BADGES[kind].map((b) => (
+                    <i key={b.name} className={`shelf-mod ${b.cls}`} aria-hidden="true">
+                      <TreeIcon name={b.name} size={11} strokeWidth={2} />
+                    </i>
+                  ))}
+                </span>
+                <span className="shelf-size">{formatGgufSize(entry.ggufTotalBytes)}</span>
+                <span className="shelf-verdict-slot">
+                  {verdict !== 'yes' && <span className={`shelf-verdict is-${verdict}`}>{runVerdictLabel(verdict)}</span>}
+                </span>
                 <i className={`shelf-chevron${isOpen ? ' is-open' : ''}`} aria-hidden="true" />
               </button>
               {isOpen && (

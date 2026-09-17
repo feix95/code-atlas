@@ -5924,6 +5924,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: var(--surface-soft);
+  margin-bottom: var(--space-2);
 }
 .shelf-filter-group {
   display: flex;
@@ -5980,8 +5981,12 @@ body.is-maximized .cfg-layer {
 .shelf-item + .shelf-item {
   border-top: 1px solid var(--line-soft);
 }
+/* 行排版(2026-09-18 小葵定,参考 LM Studio):行内 grid、非名字列全定宽 ——
+   flex 时代各列内容撑宽,名字一长列就漂;现在大小/章/箭头行行竖向对齐,扫一列到底。
+   行内 grid 没有跨行轨道协商,所以「定宽」必须写实数,auto 等于没对齐。 */
 .shelf-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.6rem 3.25rem 6rem 0.6rem;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -5995,34 +6000,98 @@ body.is-maximized .cfg-layer {
 .shelf-row:hover {
   background: var(--hover);
 }
-.shelf-item.is-unrunnable .shelf-row {
-  color: var(--muted-2);
+/* 名字主角块:主名粗体,下载量/更新时间缩成副行小字 —— 决策信息(名字/大小/能不能跑)留主行,
+   参考信息(多少人下了/多久没更)降半档,不再跟主角抢一行的地盘 */
+.shelf-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
 }
 .shelf-name {
-  flex: 1 1 auto;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
   color: var(--text);
 }
-.shelf-item.is-unrunnable .shelf-name {
-  color: var(--muted-2);
-}
-.shelf-tag {
-  flex: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 0.125rem 0.5rem;
+.shelf-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--font-xs);
-  color: var(--muted);
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
 }
-.shelf-meta {
-  flex: none;
+/* 能力章列(参考 LM Studio):彩色描边小圆,一图一义 —— 眼(amber)=看得懂图,音符(green)=带语音;
+   纯文本/向量/未知是灰档,不抢戏。向量模型的「不能陪聊」劝退话在名字副行,不靠悬停 */
+.shelf-mods {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  width: 2.6rem;
+}
+.shelf-mod {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+}
+.shelf-mod.is-vision {
+  color: var(--amber);
+}
+.shelf-mod.is-audio {
+  color: var(--green);
+}
+.shelf-mod.is-dim {
+  color: var(--muted-2);
+  border-color: var(--line);
+}
+/* 大小列:右对齐 + 等宽数字,竖着比大小不用逐位对 */
+.shelf-size {
+  width: 3.25rem;
+  text-align: right;
   font-size: var(--font-xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+/* 状态章占位列:能跑的行章位空着但宽度还在,箭头才不会左右漂 */
+.shelf-verdict-slot {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 6rem;
+}
+.shelf-verdict {
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 0.125rem 0.5rem;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.shelf-verdict.is-no {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
+}
+.shelf-verdict.is-tight {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid var(--amber-line);
+}
+/* 「带不动」行:文字全线降灰,唯独红章保持饱和 —— 灰行衬一枚红章,比整行压灰对比更强。
+   (旧版行/名字各降一次的两条规则收拢成这一块) */
+.shelf-item.is-unrunnable .shelf-name,
+.shelf-item.is-unrunnable .shelf-sub,
+.shelf-item.is-unrunnable .shelf-size {
+  color: var(--muted-2);
+}
+.shelf-item.is-unrunnable .shelf-mod {
+  color: var(--muted-2);
+  border-color: var(--line-soft);
 }
 .shelf-verdict {
   flex: none;
@@ -6064,6 +6133,13 @@ body.is-maximized .cfg-layer {
   gap: var(--space-3);
   padding: var(--space-1) 0;
   font-size: var(--font-xs);
+}
+/* 文件行里的小字(文件大小等);主行改 grid 定宽后这枚只剩展开区在用 */
+.shelf-meta {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .shelf-file-path {
   flex: 1 1 auto;
