@@ -191,6 +191,15 @@ const ICON_PATHS: Record<string, ReactNode> = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  // 眯眼(小葵点的小眼睛,2026-09-17):配上面那只现有的 eye 用 —— 睁眼看得见 Key,眯眼看不见
+  eyeOff: (
+    <>
+      <path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.1 3.9" />
+      <path d="M6.1 6.1A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4-.9" />
+      <path d="m2 2 20 20" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
   rotate: (
     <>
       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -278,6 +287,8 @@ export function SettingsDialog({
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
   const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  // Tavily Key 的小眼睛(2026-09-17 小葵点):默认眯着(密文),点一下睁眼看明文,再点眯回去
+  const [tavilyKeyVisible, setTavilyKeyVisible] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [models, setModels] = useState<string[]>([])
@@ -972,26 +983,39 @@ export function SettingsDialog({
                           <span />
                         </button>
                       </div>
-                      {/* Tavily 搜索 Key(可选,2026-09-17 小葵拍板):填了源队列 Tavily 打头,不填走免费链 */}
-                      <div className="cfg-field-head">
-                        <label htmlFor="cfg-tavily-key">Tavily 搜索 Key(可选)</label>
-                        <span>填了搜索更快更稳</span>
+                      {/* Tavily 搜索 Key(可选,2026-09-17 小葵拍板):填了源队列 Tavily 打头,不填走免费链。
+                          包一层 cfg-row 口径的内边距,和上下行的左右留白对齐(小葵验收:太贴边) */}
+                      <div className="cfg-tavily-block">
+                        <div className="cfg-field-head">
+                          <label htmlFor="cfg-tavily-key">Tavily 搜索 Key(可选)</label>
+                          <span>填了搜索更快更稳</span>
+                        </div>
+                        <div className="cfg-path-input">
+                          <Icon name="globe" size={13} />
+                          <input
+                            id="cfg-tavily-key"
+                            type={tavilyKeyVisible ? 'text' : 'password'}
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={draftConfig.tavilyKey ?? ''}
+                            placeholder="tvly- 开头;不填也能用(自动走免费源)"
+                            onChange={(e) => setDraftConfig({ ...draftConfig, tavilyKey: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="cfg-eye-btn"
+                            aria-label={tavilyKeyVisible ? '隐藏 Key' : '显示 Key'}
+                            aria-pressed={tavilyKeyVisible}
+                            title={tavilyKeyVisible ? '隐藏' : '显示'}
+                            onClick={() => setTavilyKeyVisible(!tavilyKeyVisible)}
+                          >
+                            <Icon name={tavilyKeyVisible ? 'eyeOff' : 'eye'} size={13} />
+                          </button>
+                        </div>
+                        <p className="cfg-field-help">
+                          去 tavily.com 免费注册一个账号就能拿到(每月 1000 次搜索免费,不用绑卡)。Key 只存这台电脑的配置文件里,绝不进代码仓库。
+                        </p>
                       </div>
-                      <div className="cfg-path-input">
-                        <Icon name="globe" size={13} />
-                        <input
-                          id="cfg-tavily-key"
-                          type="password"
-                          autoComplete="off"
-                          spellCheck={false}
-                          value={draftConfig.tavilyKey ?? ''}
-                          placeholder="tvly- 开头;不填也能用(自动走免费源)"
-                          onChange={(e) => setDraftConfig({ ...draftConfig, tavilyKey: e.target.value })}
-                        />
-                      </div>
-                      <p className="cfg-field-help">
-                        去 tavily.com 免费注册一个账号就能拿到(每月 1000 次搜索免费,不用绑卡)。Key 只存这台电脑的配置文件里,绝不进代码仓库。
-                      </p>
                       {/* 推荐问题总闸:自由聊天和文件预览 AI 卡两头的推荐问题一把抓;拨一下立刻生效,不走下面的应用更改 */}
                       <div className="cfg-row">
                         <div className="cfg-copy">
