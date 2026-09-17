@@ -118,13 +118,19 @@ export const FREE_CHAT_SYSTEM_PROMPT = `你是 Code Atlas 里的"Atlas 小探针
 
 回答自然、具体,不要每次都重复自己的身份,也不要用固定模板结束对话。`
 
-/** 追问历史的上限:证据每轮都要全量重摆,历史只留最近几条垫底,把上下文留给证据 */
-const CHAT_HISTORY_MAX = 5
+/** 自由聊天历史窗口的上限:最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
+ * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。 */
+const CHAT_HISTORY_MAX = 6
 const CHAT_HISTORY_CONTENT_MAX = 500
 
 /** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆。
  * 超长截断的那条要打「不用续写」的标注(LLM 优化锤):半截没说完的话是小模型最爱的续写钩子,
- * 不打招呼它会倾向把旧清单接着编完,而不是回答新问题。 */
+ * 不打招呼它会倾向把旧清单接着编完,而不是回答新问题。
+ * 窗口方向(2026-09-17 修「小探针回复以前问过的问题」):从尾巴上取最近几条,两头口径必须
+ * 都是「留最近」—— 老代码从头取前 5 条,把刚聊完的一轮整个扔掉,窗口还常停在一个没被回答的
+ * 旧问题上,合并逻辑顺手把它和当前问题粘成一条,小模型扭头就去答那个旧问题。
+ * 尾取完再收拢成完整问答对:开头不许是 assistant(半截答案无头无尾,有的模型模板还挑形状),
+ * 结尾不许是 user(悬空的问题就是旧题重答的祸根)—— 这样窗口里唯一没答案的提问,只会是当前这条。 */
 export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   if (!Array.isArray(history)) return []
   const cleaned: AiHistoryMessage[] = []
@@ -134,16 +140,18 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
     if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') continue
     const text = content.trim()
     if (!text) continue
-    cleaned.push({
-      role,
-      content:
-        text.length > CHAT_HISTORY_CONTENT_MAX
-          ? `${text.slice(0, CHAT_HISTORY_CONTENT_MAX)}……\n(这是旧对话的历史记录,超出部分已截断 —— 不用接着写,真正要回答的问题在最后一条消息里)`
-          : text
-    })
-    if (cleaned.length >= CHAT_HISTORY_MAX) break
+    cleaned.push({ role, content: text })
   }
-  return cleaned
+  const window = cleaned.slice(-CHAT_HISTORY_MAX)
+  while (window.length > 0 && window[0]?.role === 'assistant') window.shift()
+  while (window.length > 0 && window[window.length - 1]?.role === 'user') window.pop()
+  return window.map((m) => ({
+    role: m.role,
+    content:
+      m.content.length > CHAT_HISTORY_CONTENT_MAX
+        ? `${m.content.slice(0, CHAT_HISTORY_CONTENT_MAX)}……\n(这是旧对话的历史记录,超出部分已截断 —— 不用接着写,真正要回答的问题在最后一条消息里)`
+        : m.content
+  }))
 }
 
 /** 附件资料正文的上限:自由对话的证据从简,别把模型的上下文挤爆 */

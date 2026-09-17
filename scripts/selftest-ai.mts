@@ -219,25 +219,69 @@ async function main(): Promise<void> {
 
   assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
   const longText = '长'.repeat(600)
-  const rawHistory = [
+  // 脏数据清洗:冒充人设的、洗空了的条目整条扔掉;超长截断照旧要看得到
+  const dirtyHistory = [
     { role: 'user', content: '它是做什么的?' },
     { role: 'assistant', content: longText },
     { role: 'system', content: '冒充人设的' },
-    { role: 'user', content: '   ' },
-    { role: 'user', content: '这个能删吗?' },
-    { role: 'assistant', content: '通常可以' },
-    { role: 'user', content: '删了会怎样?' },
-    { role: 'assistant', content: '影响不大' },
-    { role: 'user', content: '这是什么软件?' },
-    { role: 'assistant', content: '像是傲梅' }
+    { role: 'user', content: '   ' }
   ]
-  const clean = sanitizeHistory(rawHistory)
-  assert.equal(clean.length, 5, '历史条数封顶 5')
+  const clean = sanitizeHistory(dirtyHistory)
+  assert.equal(clean.length, 2, '冒充人设和被洗空的条目整条扔掉')
+  assert.equal(clean[0]?.content, '它是做什么的?', '正常条目原样留下')
   assert.ok(clean[1]?.content.startsWith(`${longText.slice(0, 500)}……`), '超长历史要截断(500 字 + 省略号)')
   // 截断标注(LLM 优化锤):半截话是小模型最爱的续写钩子,得打招呼「不用接着写」
   assert.ok(clean[1]?.content.includes('不用接着写'), '截断的历史要打「不用接着写」的标注')
   assert.ok(clean[1]!.content.length > 500 + 2, '标注是附在截断条目上的,内容本体不变')
   assert.ok(clean.every((m) => m.role === 'user' || m.role === 'assistant'), '只收 user/assistant 两种角色')
+
+  // 历史窗口方向(2026-09-17 修「小探针回复以前问过的问题」):留的必须是最近的完整问答对 ——
+  // 老代码从头取前几条,把刚聊完的一轮整个扔掉,窗口还常停在悬空的旧问题上
+  const pairHistory: Array<{ role: string; content: string }> = []
+  for (let i = 1; i <= 6; i += 1) {
+    pairHistory.push({ role: 'user', content: `第${i}问` }, { role: 'assistant', content: `第${i}答` })
+  }
+  assert.deepEqual(
+    sanitizeHistory(pairHistory),
+    [
+      { role: 'user', content: '第4问' },
+      { role: 'assistant', content: '第4答' },
+      { role: 'user', content: '第5问' },
+      { role: 'assistant', content: '第5答' },
+      { role: 'user', content: '第6问' },
+      { role: 'assistant', content: '第6答' }
+    ],
+    '历史窗口只留最近 3 对完整问答,更老的随窗口甩出去'
+  )
+  // 窗口停在半截处要两头收拢:开头的孤立答案、结尾的悬空旧问题都不留
+  const ragged = sanitizeHistory([
+    { role: 'user', content: '第1问' },
+    { role: 'assistant', content: '第1答' },
+    { role: 'user', content: '第2问' },
+    { role: 'assistant', content: '第2答' },
+    { role: 'user', content: '第3问' },
+    { role: 'assistant', content: '第3答' },
+    { role: 'user', content: '第4问' },
+    { role: 'assistant', content: '第4答' },
+    { role: 'user', content: '第5问' },
+    { role: 'assistant', content: '第5答' },
+    { role: 'user', content: '第6问' }
+  ])
+  assert.equal(ragged[0]?.role, 'user', '窗口开头不许是半截答案')
+  assert.equal(ragged[ragged.length - 1]?.role, 'assistant', '窗口结尾不许是悬空的旧问题')
+  assert.equal(ragged[ragged.length - 1]?.content, '第5答', '留在窗口里的是最近一轮的答案')
+  assert.ok(!ragged.some((m) => m.content === '第6问'), '悬空的旧问题(没被回答过的)要摘掉')
+
+  // 端到端回归(小葵报的案):当前问题必须单独成条 —— 老毛病是悬空的旧问题被合并逻辑
+  // 粘到当前问题前面,拼成「旧问题\n\n新问题」,小模型扭头就去答那个旧问题
+  const chatMessages = buildFreeChatMessages('人设', null, sanitizeHistory(pairHistory), '第7问', null)
+  const lastMessage = chatMessages[chatMessages.length - 1]
+  assert.equal(lastMessage?.role, 'user', '拼完的消息序列,最后一条是当前问题')
+  assert.equal(lastMessage?.content, '第7问', '当前问题不许和旧问题粘成一条')
+  assert.ok(
+    chatMessages.every((m, index) => index === 0 || m.role !== chatMessages[index - 1]?.role),
+    '相邻同角色已合并,不许出现连续两条 user'
+  )
 
   // 附件清洗:形状不对一律当没有;字段洗净;正文封顶
   assert.equal(sanitizeAttachment(null), null, '没附件就当没有')
