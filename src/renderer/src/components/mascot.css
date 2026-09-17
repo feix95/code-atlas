@@ -1,0 +1,187 @@
+/* 桌宠页样式(桌宠托管第二锤):临时形状动画,正式素材来了直接换。
+   三态:待机(呼吸+偶尔眨眼)/ 思考中(摇摆+头顶三点轮闪)/ 说话(上下弹+嘴一张一合)。 */
+
+/* 整个窗全透明,小家伙居中;默认不做任何底色 —— 空白处就是桌面 */
+.mascot-root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* 身体:96px 圆家伙,青绿渐变(临时配色),悬浮小阴影,拖动光标 */
+.mascot-body {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #7be3b0, #2fa874 68%, #218b5e);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  cursor: grab;
+  animation: mascot-breathe 3.2s ease-in-out infinite;
+}
+
+/* 待机:轻轻呼吸 */
+@keyframes mascot-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+/* 眨眼:眼睛是黑色小竖条,每 4.4 秒眯一下 */
+.mascot-eye {
+  position: absolute;
+  top: 38px;
+  width: 10px;
+  height: 16px;
+  border-radius: 5px;
+  background: #173f2e;
+  animation: mascot-blink 4.4s infinite;
+}
+.mascot-eye-left {
+  left: 26px;
+}
+.mascot-eye-right {
+  right: 26px;
+}
+@keyframes mascot-blink {
+  0%,
+  91%,
+  100% {
+    transform: scaleY(1);
+  }
+  94%,
+  97% {
+    transform: scaleY(0.12);
+  }
+}
+
+/* 嘴:小弧线,说话时一张一合 */
+.mascot-mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 8px;
+  border-radius: 0 0 12px 12px;
+  background: #173f2e;
+}
+
+/* 思考中:身体左右轻轻摇,嘴抿成一条线,头顶三个点轮闪 */
+.mascot-thinking .mascot-body {
+  animation: mascot-sway 1.6s ease-in-out infinite;
+}
+@keyframes mascot-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg) scale(1);
+  }
+  50% {
+    transform: rotate(4deg) scale(1.03);
+  }
+}
+.mascot-thinking .mascot-mouth {
+  height: 4px;
+  border-radius: 2px;
+}
+
+.mascot-dots {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 5px;
+}
+.mascot-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2fa874;
+  opacity: 0.25;
+}
+.mascot-thinking .mascot-dots {
+  display: flex;
+}
+.mascot-thinking .mascot-dots i {
+  animation: mascot-dot 1.2s infinite;
+}
+.mascot-thinking .mascot-dots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.mascot-thinking .mascot-dots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes mascot-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* 说话:上下小弹,嘴一张一合 */
+.mascot-speaking .mascot-body {
+  animation: mascot-bounce 0.9s ease-in-out infinite;
+}
+@keyframes mascot-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+.mascot-speaking .mascot-mouth {
+  animation: mascot-talk 0.5s ease-in-out infinite;
+}
+@keyframes mascot-talk {
+  0%,
+  100% {
+    height: 6px;
+  }
+  50% {
+    height: 14px;
+    border-radius: 6px;
+  }
+}
+
+/* 被点了一下:弹一下以示回应(key 重放,只放一遍) */
+.mascot-boing {
+  animation: mascot-boing 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 1 !important;
+}
+@keyframes mascot-boing {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 系统开了「减少动态效果」就把大动作收掉,呼吸和眨眼留着当活气儿 */
+@media (prefers-reduced-motion: reduce) {
+  .mascot-thinking .mascot-body,
+  .mascot-speaking .mascot-body,
+  .mascot-boing {
+    animation: none;
+  }
+  .mascot-speaking .mascot-mouth,
+  .mascot-thinking .mascot-dots i {
+    animation: none;
+  }
+}

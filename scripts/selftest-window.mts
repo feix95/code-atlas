@@ -11,6 +11,7 @@ import {
   readWindowState,
   writeWindowState
 } from '../src/main/window-state.ts'
+import { MASCOT_SIZE, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
 
 /** 本机假定的工作区:主屏 2560×1400,左边挂一块 1920×1040(负坐标) */
 const WORK_AREAS = [
@@ -108,6 +109,56 @@ check('placeWindowBox:没有屏幕时只给块头,坐标交给系统居中', () 
   assert.equal(placed.y, undefined)
 })
 
+// ── 桌宠的位置存档(桌宠托管第二锤):口径跟窗口记事本同门 ──
+const MASCOT_AREAS = [
+  { x: 0, y: 0, width: 1920, height: 1040 },
+  { x: -1920, y: 0, width: 1920, height: 1040 }
+]
+
+check('parseMascotState:干净存档认回,小数取整,垃圾不认', () => {
+  assert.deepEqual(parseMascotState({ x: 12.4, y: -7.6 }), { x: 12, y: -8 })
+  assert.equal(parseMascotState({ x: NaN, y: 0 }), null)
+  assert.equal(parseMascotState({ x: 1 }), null)
+  assert.equal(parseMascotState('垃圾'), null)
+  assert.equal(parseMascotState(null), null)
+})
+
+check('placeMascotBox:没存档落主屏右下角,离边留空当', () => {
+  const placed = placeMascotBox(null, MASCOT_AREAS)
+  assert.equal(placed.width, MASCOT_SIZE)
+  assert.equal(placed.height, MASCOT_SIZE)
+  assert.equal(placed.x, 1920 - MASCOT_SIZE - 24)
+  assert.equal(placed.y, 1040 - MASCOT_SIZE - 24)
+})
+
+check('placeMascotBox:完好存档原样落位,负坐标多屏认得自家屏', () => {
+  assert.deepEqual(placeMascotBox({ x: 500, y: 300 }, MASCOT_AREAS), {
+    x: 500,
+    y: 300,
+    width: MASCOT_SIZE,
+    height: MASCOT_SIZE
+  })
+  assert.deepEqual(placeMascotBox({ x: -1500, y: 800 }, MASCOT_AREAS), {
+    x: -1500,
+    y: 800,
+    width: MASCOT_SIZE,
+    height: MASCOT_SIZE
+  })
+})
+
+check('placeMascotBox:屏变小了把桌宠夹回屏内', () => {
+  const placed = placeMascotBox({ x: 5000, y: 5000 }, MASCOT_AREAS)
+  assert.ok(placed.x! + MASCOT_SIZE <= MASCOT_AREAS[0].x + MASCOT_AREAS[0].width, 'x 夹回右边缘内')
+  assert.ok(placed.y! + MASCOT_SIZE <= MASCOT_AREAS[0].y + MASCOT_AREAS[0].height, 'y 夹回下边缘内')
+})
+
+check('placeMascotBox:没有屏幕时只给块头,坐标交给系统', () => {
+  const placed = placeMascotBox({ x: 10, y: 10 }, [])
+  assert.equal(placed.width, MASCOT_SIZE)
+  assert.equal(placed.x, undefined)
+  assert.equal(placed.y, undefined)
+})
+
 async function main(): Promise<void> {
   // ── IO 落盘回环:写得进、读得出;垃圾内容和不存在的档都安静回 null ──
   const dir = mkdtempSync(join(tmpdir(), 'atlas-window-state-'))
@@ -130,10 +181,19 @@ async function main(): Promise<void> {
       assert.equal(readWindowState(dir), null)
       assert.ok(existsSync(join(dir, 'window-state.json')))
     })
+
+    // ── 桌宠存档 IO 回环(桌宠托管第二锤) ──
+    check('readMascotState:没记过回 null;写读回环;垃圾内容安静回 null', () => {
+      assert.equal(readMascotState(dir), null)
+      writeMascotState(dir, { x: -300, y: 66 })
+      assert.deepEqual(readMascotState(dir), { x: -300, y: 66 })
+      writeFileSync(join(dir, 'mascot-state.json'), '{哎呀', 'utf8')
+      assert.equal(readMascotState(dir), null)
+    })
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-  console.log('✅ 窗口记事本自测全绿')
+  console.log('✅ 窗口记事本自测全绿(含桌宠位置存档)')
 }
 
 main().catch((err) => {

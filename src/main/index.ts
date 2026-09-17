@@ -39,6 +39,7 @@ import {
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
+import { createMascotWindow, registerMascotIpc, toggleMascot } from './mascot.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -488,6 +489,7 @@ function createTray(): void {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '显示主面板', click: () => showMainWindow() },
+      { label: '显示·隐藏桌宠', click: () => toggleMascot() },
       { type: 'separator' },
       { label: '退出', click: () => app.quit() }
     ])
@@ -2359,6 +2361,9 @@ function startApp(): void {
   createWindow()
   registerIpc()
   createTray()
+  // 桌宠上岗(桌宠托管第二锤):透明小窗 + 自己的三条通道,点击唤主面板由 showMainWindow 注入
+  createMascotWindow(app.getPath('userData'))
+  registerMascotIpc({ onActivate: () => showMainWindow() })
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {

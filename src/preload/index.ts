@@ -201,6 +201,23 @@ contextBridge.exposeInMainWorld('atlas', {
   frameHeartbeat: (): void => {
     ipcRenderer.send('atlas:frame-heartbeat')
   },
+  // ── 桌宠(桌宠托管第二锤):穿透开关 + 拖动三连 + 点击唤主面板,全是单向 send(配主进程 ipcMain.on) ──
+  /** 光标在不在这只小家伙身上:在 → 主进程收穿透(可点可拖),不在 → 放行穿透(点的是桌面) */
+  mascotMouse: (inside: boolean): void => {
+    ipcRenderer.send('atlas:mascot-mouse', inside)
+  },
+  mascotDragStart: (): void => {
+    ipcRenderer.send('atlas:mascot-drag-start')
+  },
+  mascotDragMove: (): void => {
+    ipcRenderer.send('atlas:mascot-drag-move')
+  },
+  mascotDragEnd: (): void => {
+    ipcRenderer.send('atlas:mascot-drag-end')
+  },
+  mascotActivate: (): void => {
+    ipcRenderer.send('atlas:mascot-activate')
+  },
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),
