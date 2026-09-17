@@ -398,6 +398,10 @@ export function SettingsDialog({
   const [modelsNote, setModelsNote] = useState<string | null>(null)
   const [modelsBusy, setModelsBusy] = useState(false)
   const [shelfOpen, setShelfOpen] = useState(false)
+  // 资源管理器右键菜单(右键问一问):读现状拨开关;开发模式 available=false 不显示
+  const [shellMenu, setShellMenu] = useState<{ available: boolean; enabled: boolean } | null>(null)
+  const [shellMenuBusy, setShellMenuBusy] = useState(false)
+  const [shellMenuNote, setShellMenuNote] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({ path: '', verdict: null })
@@ -429,6 +433,8 @@ export function SettingsDialog({
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
     window.atlas.appVersion().then(setAppVersion).catch(() => {})
+    // 右键菜单的现状(右键问一问):available=false(开发模式)就不显示开关
+    window.atlas.shellMenuGet().then(setShellMenu).catch(() => {})
   }, [])
 
   // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
@@ -1114,6 +1120,47 @@ export function SettingsDialog({
                           <span />
                         </button>
                       </div>
+                      {/* 资源管理器右键菜单(右键问一问):拨一下立即写/删注册表(HKCU 用户级),
+                          卸载时安装器会清干净;仅安装版显示,开发模式没有安装目录可指 */}
+                      {shellMenu?.available && (
+                        <>
+                          <div className="cfg-divider" />
+                          <div className="cfg-row">
+                            <div className="cfg-copy">
+                              <label>
+                                资源管理器右键菜单
+                                <span className={`cfg-flag${shellMenu.enabled ? ' is-on' : ''}`}>{shellMenu.enabled ? '已开启' : '已关闭'}</span>
+                              </label>
+                              <p>
+                                在资源管理器右键任意文件选「问问小探针」,桌宠弹出气泡直接聊;右键文件夹「用 CodeAtlas 打开」。拨了马上生效,不用重启。Win11 的传统菜单收在「显示更多选项」里。
+                              </p>
+                              {shellMenuNote && <p className="cfg-field-help is-warn">{shellMenuNote}</p>}
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={shellMenu.enabled}
+                              aria-label="资源管理器右键菜单"
+                              className={`cfg-switch${shellMenu.enabled ? ' is-on' : ''}`}
+                              disabled={shellMenuBusy}
+                              onClick={() => {
+                                setShellMenuBusy(true)
+                                setShellMenuNote(null)
+                                window.atlas
+                                  .shellMenuSet(!shellMenu.enabled)
+                                  .then((res) => {
+                                    if (res.ok) setShellMenu({ ...shellMenu, enabled: !shellMenu.enabled })
+                                    else setShellMenuNote(res.message ?? '没成功,再试一次')
+                                  })
+                                  .catch(() => setShellMenuNote('没成功,再试一次'))
+                                  .finally(() => setShellMenuBusy(false))
+                              }}
+                            >
+                              <span />
+                            </button>
+                          </div>
+                        </>
+                      )}
                       <div className="cfg-privacy">
                         <Icon name="shield" size={12} />
                         <span>仅发送认不出的「名字」,绝不发送文件夹路径或文件内容;不开启则完全离线。</span>

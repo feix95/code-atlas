@@ -340,6 +340,10 @@ function App(): React.JSX.Element {
     folderRef.current = folder
   }, [folder])
 
+  // scanPath 的 ref 中转(右键问一问的转交监听要用;组件函数群互相调用,
+  // 直接在 effect 里引用会让 hooks 规则沿链追到后置声明),口径学 retryCtxRef
+  const scanPathRef = useRef<(dir: string) => Promise<ScanResult | null>>(async () => null)
+
   // 窗口壳:最大化时圆角描边要收掉;状态挂 body 上,抽屉(传送门挂在 body)跟着一起换装
   const maximized = useWindowMaximized()
   useEffect(() => {
@@ -451,6 +455,33 @@ function App(): React.JSX.Element {
     setNav((prev) => pushNavLocation(prev.stack, prev.index, loc))
   }
 
+  // 按品类造一张页签:跟随页签挂品类名牌(装着谁看正文头部,页签栏才分得清品类);
+  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装)
+  function paneTabFor(kind: PaneKind, node: ScanFileNode | ScanDirNode | null): PaneTab {
+    return {
+      id: nextTabId(),
+      kind,
+      relPath: node?.relPath ?? '',
+      name: KIND_LABELS[kind],
+      icon: KIND_ICONS[kind],
+      pinned: false
+    }
+  }
+
+  // 开一张新图/回家时页签重置:单组,概览+探针两张跟随页签就位(勾着的品类才可见),
+  // 激活可见的第一张;预览不预开 —— 双击文件才开
+  function resetPaneTabs(): void {
+    const overview = paneTabFor('overview', null)
+    const probe = paneTabFor('chat', null)
+    const group: PaneGroup = {
+      id: `pane:${nextTabId()}`,
+      tabs: [overview, probe],
+      activeId: enabledKinds.has('overview') ? overview.id : enabledKinds.has('chat') ? probe.id : null
+    }
+    setGroups([group])
+    setActiveGroupId(group.id)
+  }
+
   // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条。
   // 扫成的图递还给调用方(后退/前进恢复选中要在新树上找人);扫砸了回 null
   async function scanPath(dir: string): Promise<ScanResult | null> {
@@ -477,6 +508,8 @@ function App(): React.JSX.Element {
     try {
       const scanned = await window.atlas.scanFolder(dir)
       setResult(scanned)
+      // 当前根上报主进程(右键问一问):气泡拿它判断文件在不在项目里
+      window.atlas.reportCurrentRoot(dir)
       // 备注跟上新树:顺带清孤儿(垃圾不越攒越多),再写回本机
       setNotes(refreshNotesForScan(dir, scanned.tree))
       // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
@@ -506,6 +539,29 @@ function App(): React.JSX.Element {
     const dir = await window.atlas.pickFolder().catch(() => null)
     if (dir) await scanPath(dir)
   }
+
+  // scanPath 落位后再把 ref 中转接上(每轮渲染更新,事件回调里永远拿到最新的)
+  useEffect(() => {
+    scanPathRef.current = scanPath
+  })
+
+  // 右键问一问的文件夹转交:冷启动拉一次(带根启动,没项目可丢,直接开);
+  // 热转交(程序跑着被右键)有项目就先问一句,别悄悄丢掉人家正在看的项目
+  useEffect(() => {
+    void window.atlas
+      .launchOpen()
+      .then((dir) => {
+        if (dir) void scanPathRef.current(dir)
+      })
+      .catch(() => {})
+    return window.atlas.onOpenPath((dir) => {
+      if (folderRef.current) {
+        const ok = window.confirm(`把 CodeAtlas 切到「${dir}」吗?\n当前打开的项目会被换掉。`)
+        if (!ok) return
+      }
+      void scanPathRef.current(dir)
+    })
+  }, [])
 
   // 刷新 = 把当前项目重扫一遍;没开项目就点了,告诉他缺什么,按钮不装哑巴
   async function handleRefresh(): Promise<void> {
@@ -543,39 +599,12 @@ function App(): React.JSX.Element {
     setGroups((prev) => prev.map((g) => (g.id === groupId ? patch(g) : g)))
   }
 
-  // 开一张新图/回家时页签重置:单组,概览+探针两张跟随页签就位(勾着的品类才可见),
-  // 激活可见的第一张;预览不预开 —— 双击文件才开
-  function resetPaneTabs(): void {
-    const overview = paneTabFor('overview', null)
-    const probe = paneTabFor('chat', null)
-    const group: PaneGroup = {
-      id: `pane:${nextTabId()}`,
-      tabs: [overview, probe],
-      activeId: enabledKinds.has('overview') ? overview.id : enabledKinds.has('chat') ? probe.id : null
-    }
-    setGroups([group])
-    setActiveGroupId(group.id)
-  }
-
   // 系统自动勾回品类时给刚亮起的页签一点轻强调:让用户察觉「设置刚被自动改了」,
   // 过几天不会莫名其妙 —— 不弹窗、不出声,就是页签卡上闪一下(小葵点的细节)
   function markFlash(id: string): void {
     setFlashTabId(id)
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
     flashTimerRef.current = setTimeout(() => setFlashTabId(null), 1200)
-  }
-
-  // 按品类造一张页签:跟随页签挂品类名牌(装着谁看正文头部,页签栏才分得清品类);
-  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装)
-  function paneTabFor(kind: PaneKind, node: ScanFileNode | ScanDirNode | null): PaneTab {
-    return {
-      id: nextTabId(),
-      kind,
-      relPath: node?.relPath ?? '',
-      name: KIND_LABELS[kind],
-      icon: KIND_ICONS[kind],
-      pinned: false
-    }
   }
 
   // 钉住瞬间页签该固化的门面:换成具体节点的名和图标,分得清钉的是谁;节点没了退回品类名牌

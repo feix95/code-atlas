@@ -40,6 +40,9 @@ import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { createMascotWindow, registerMascotIpc, toggleMascot } from './mascot.ts'
+import { openBubbleForFile, registerBubbleIpc } from './bubble.ts'
+import { extractLaunchPath } from './launchPath.ts'
+import { readShellMenuEnabled, writeShellMenu } from './shellMenu.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -553,7 +556,7 @@ function openDevLogWindow(): void {
   }
 }
 
-function createWindow(): void {
+function createWindow(silent = false): void {
   // ── 第七十八锤:窗口尺寸记事本 ──
   // 上回把窗拉到多大、搁在哪儿,这回开窗就照旧;最大化单独记一票,还原时先落回上次的
   // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
@@ -649,6 +652,8 @@ function createWindow(): void {
   let shownVia = 'never'
   const showOnce = (why: string): void => {
     if (shown || mainWindow.isDestroyed()) return
+    // 静默启动(冷启动文件右键):窗建好但永不露面,聊天气泡才是主角;托盘「显示主面板」能唤回
+    if (silent) return
     shown = true
     shownVia = why
     mainWindow.show()
@@ -1401,6 +1406,32 @@ function agentResult(
 }
 
 function registerIpc(): void {
+  // 右键问一问的地基三件套:
+  // ① 渲染层每次开图成功后上报当前根(气泡出界判断的依据;send 配 ipcMain.on)
+  ipcMain.on('atlas:current-root', (_event, rootPath: unknown) => {
+    currentRootPath = typeof rootPath === 'string' && rootPath ? rootPath : null
+  })
+  // ② 冷启动带文件夹时,渲染层起来后拉走这个根,直接打开它(invoke 配 handle)
+  ipcMain.handle('atlas:launch-open', () => {
+    const dir = pendingLaunchDirectory
+    pendingLaunchDirectory = null
+    return dir
+  })
+  // ③ 资源管理器右键菜单开关:读现状 / 开与关(仅安装版有真开关,开发模式 available=false)
+  ipcMain.handle('atlas:shell-menu-get', async () => {
+    if (!app.isPackaged) return { available: false, enabled: false }
+    return { available: true, enabled: await readShellMenuEnabled() }
+  })
+  ipcMain.handle('atlas:shell-menu-set', async (_event, on: unknown) => {
+    if (!app.isPackaged) return { ok: false, message: '开发模式下不开这个开关:注册表要指向安装好的程序' }
+    if (typeof on !== 'boolean') return { ok: false, message: '开关状态没认出来' }
+    try {
+      await writeShellMenu(on, process.execPath)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '注册表操作没成功' }
+    }
+  })
   // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
   ipcMain.handle('atlas:window-close', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
@@ -2357,13 +2388,25 @@ app.on('will-quit', () => {
   }
 })
 
+// 冷启动的右键目标(右键问一问):程序没在跑时右键,这份 argv 就是自己进程的。
+// 文件 = 启动到托盘 + 桌宠 + 气泡,主窗不强制展开;文件夹 = 以它为根正常开主窗
+const launchTarget = extractLaunchPath(process.argv)
+// 冷启动目录由渲染层起来后 invoke 拉走(拉取通道不怕时序,比 load 完就 send 稳)
+let pendingLaunchDirectory: string | null = launchTarget?.kind === 'directory' ? launchTarget.path : null
+// 主进程记住的当前项目根(渲染层每次开图成功后上报):气泡出界判断的依据
+let currentRootPath: string | null = null
+
 function startApp(): void {
-  createWindow()
+  // 冷启动带文件:主窗照建(托盘/引擎都在),但不露面 —— 气泡才是主角
+  createWindow(launchTarget?.kind === 'file')
   registerIpc()
   createTray()
   // 桌宠上岗(桌宠托管第二锤):透明小窗 + 自己的三条通道,点击唤主面板由 showMainWindow 注入
   createMascotWindow(app.getPath('userData'))
   registerMascotIpc({ onActivate: () => showMainWindow() })
+  // 气泡通道(右键问一问):出界判断用主进程记的当前根
+  registerBubbleIpc(() => currentRootPath)
+  if (launchTarget?.kind === 'file') openBubbleForFile(launchTarget.path)
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
@@ -2393,13 +2436,28 @@ function startApp(): void {
 
 // ── 单实例锁(桌宠托管第一锤;当年双实例 GPU 缓存大战的老伤疤,别再揭一次)──
 // 抢不到锁 = 已经有一个 CodeAtlas 在跑:本实例一个窗都不建,悄悄退场。
-// 已在跑的实例通过 second-instance 收到敲门:把主窗带焦点唤回前台。
-// 右键问一问(P2)的文件路径转交将来也接在这里(argv 里带路径)。
+// 已在跑的实例通过 second-instance 收到敲门:带路径 = 右键问一问的转交
+// (文件=气泡开聊,文件夹=主窗切根);不带路径 = 就把主窗带焦点唤回前台。
 app.on('before-quit', () => {
   quitting = true
 })
-app.on('second-instance', () => {
+
+/** 右键转交/冷启动共用的落点:文件 → 桌宠弹气泡;文件夹 → 主窗切根(热转交时先唤回主窗) */
+async function handleLaunchPath(target: { path: string; kind: 'file' | 'directory' }): Promise<void> {
+  if (target.kind === 'file') {
+    openBubbleForFile(target.path)
+    return
+  }
+  // 文件夹右键「用 CodeAtlas 打开」:主窗得露出来让人看见新项目
   showMainWindow()
+  const win = mainWindowRef
+  if (win && !win.isDestroyed()) win.webContents.send('atlas:open-path', target.path)
+}
+
+app.on('second-instance', (_event, argv) => {
+  const target = extractLaunchPath(argv)
+  if (target) void handleLaunchPath(target)
+  else showMainWindow()
 })
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {

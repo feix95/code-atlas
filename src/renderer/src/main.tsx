@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { DevLogsPage } from './DevLogsPage'
 import { MascotPage } from './components/MascotPage'
+import { BubblePage } from './components/BubblePage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { initAppearance } from './appearance'
 import './assets/main.css'
@@ -37,6 +38,8 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <DevLogsPage />
     ) : view === 'mascot' ? (
       <MascotPage />
+    ) : view === 'bubble' ? (
+      <BubblePage />
     ) : (
       <ErrorBoundary
         variant="top"

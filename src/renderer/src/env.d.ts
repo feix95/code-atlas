@@ -125,6 +125,28 @@ declare global {
       mascotDragMove: () => void
       mascotDragEnd: () => void
       mascotActivate: () => void
+      /** 右键问一问:资源管理器右键菜单开关(available=false = 开发模式) */
+      shellMenuGet: () => Promise<{ available: boolean; enabled: boolean }>
+      shellMenuSet: (on: boolean) => Promise<{ ok: boolean; message?: string }>
+      /** 冷启动右键文件夹:拉走这个根直接打开(取走即清) */
+      launchOpen: () => Promise<string | null>
+      /** 开图成功后上报当前项目根:气泡出界判断的依据 */
+      reportCurrentRoot: (rootPath: string | null) => void
+      /** 气泡窗拉走右键带来的文件(路径/在不在项目里/文件内容),取走即清 */
+      bubbleOpen: () => Promise<{
+        path: string
+        fileName: string
+        folder: string
+        inProject: boolean
+        relPath: string
+        rootPath: string | null
+        content: string | null
+        readNote?: string
+      } | null>
+      /** 已开着的气泡又接到一份新文件 */
+      onBubbleFileChanged: (callback: () => void) => () => void
+      /** 主窗收右键转交的文件夹:以它为根打开(热转交) */
+      onOpenPath: (callback: (dir: string) => void) => () => void
     }
   }
 }
