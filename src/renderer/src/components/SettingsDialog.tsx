@@ -972,6 +972,26 @@ export function SettingsDialog({
                           <span />
                         </button>
                       </div>
+                      {/* Tavily 搜索 Key(可选,2026-09-17 小葵拍板):填了源队列 Tavily 打头,不填走免费链 */}
+                      <div className="cfg-field-head">
+                        <label htmlFor="cfg-tavily-key">Tavily 搜索 Key(可选)</label>
+                        <span>填了搜索更快更稳</span>
+                      </div>
+                      <div className="cfg-path-input">
+                        <Icon name="globe" size={13} />
+                        <input
+                          id="cfg-tavily-key"
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={draftConfig.tavilyKey ?? ''}
+                          placeholder="tvly- 开头;不填也能用(自动走免费源)"
+                          onChange={(e) => setDraftConfig({ ...draftConfig, tavilyKey: e.target.value })}
+                        />
+                      </div>
+                      <p className="cfg-field-help">
+                        去 tavily.com 免费注册一个账号就能拿到(每月 1000 次搜索免费,不用绑卡)。Key 只存这台电脑的配置文件里,绝不进代码仓库。
+                      </p>
                       {/* 推荐问题总闸:自由聊天和文件预览 AI 卡两头的推荐问题一把抓;拨一下立刻生效,不走下面的应用更改 */}
                       <div className="cfg-row">
                         <div className="cfg-copy">
@@ -1004,7 +1024,7 @@ export function SettingsDialog({
                       </div>
                       {privacyOpen && (
                         <div className="cfg-privacy-more">
-                          查询链:中文维基百科 → 英文维基百科 → DuckDuckGo 公开页面;单次查询 5 秒超时,查不到就回退本地推测;查询结果只用于当前回答,不做任何其他用途。
+                          查询链:填了 Tavily Key 则 Tavily 打头,之后 DuckDuckGo 公开页面 → 中文维基百科 → 英文维基百科;单次查询 5 秒超时,查不到就回退本地推测;查询结果只用于当前回答,不做任何其他用途。发出去的只有搜索词本身,不含本地路径和文件内容。
                         </div>
                       )}
                     </>

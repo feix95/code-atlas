@@ -90,7 +90,7 @@ import {
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
-import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, prefersWebFirst, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport } from '../ai/weblookup.ts'
+import { webLookupDetailed, webLookup, webSearchDetailed, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport, type LookupPostTransport } from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
@@ -142,7 +142,7 @@ async function respondWithEvidence(
   question: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string },
+  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string; tavilyKey?: string },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
@@ -159,7 +159,8 @@ async function respondWithEvidence(
       lookupName,
       resolved.target,
       onDelta,
-      resolved.budgets.replyTokens
+      resolved.budgets.replyTokens,
+      resolved.tavilyKey
     )
   }
   return explainWithCancel(requestId, (signal) =>
@@ -181,13 +182,14 @@ async function explainWithWebLookup(
   lookupName: string,
   target: ChatTarget,
   onDelta: ((text: string) => void) | undefined,
-  replyTokens: number
+  replyTokens: number,
+  tavilyKey?: string
 ): Promise<AiExplainResult> {
   const first = await explainWithCancel(requestId, (signal) =>
     explainWithModel(target, evidence + WEB_SIGNAL_INSTRUCTION, system, undefined, signal, replyTokens)
   )
   if (first.status !== 'supported' || !hasWebLookupSignal(first.text)) return first
-  const material = await webLookup(lookupName, electronFetchText).catch(() => '')
+  const material = await webLookup(lookupName, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey }).catch(() => '')
   if (!material) {
     // 查不到(没网/超时/太冷门):剥掉信号词,加上一句人话交代,回退本地推测
     const fallback = first.text.replace(/「?需要联网确认」?/g, '').trimEnd()
@@ -279,6 +281,18 @@ const electronFetchText: LookupTransport = async (url) => {
   return res.text()
 }
 
+/** POST 版传输(Tavily 用):同一个 Chromium 网络栈,JSON body + 认证头,超时口径与 GET 一致 */
+const electronPostJson: LookupPostTransport = async (url, body, headers) => {
+  const res = await net.fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.text()
+}
+
 /** 字节数 → 人话大小(提示词里给模型的证据) */
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} 字节`
@@ -295,7 +309,7 @@ function formatSize(bytes: number): string {
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
 async function resolveChatTargetOrError(): Promise<
-  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number } | { error: string }
+  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number; tavilyKey?: string } | { error: string }
 > {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
@@ -318,7 +332,7 @@ async function resolveChatTargetOrError(): Promise<
   const ctx = resolveContextSize(config.provider, config.contextSize, await probeContextSize(resolved.target, config.provider))
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
-  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx }
+  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx, tavilyKey: config.tavilyKey }
 }
 
 /**
@@ -966,14 +980,12 @@ async function agentReadFile(
 }
 
 /**
- * web_search 的执行手(联网锤):免费档搜索 + 第一条正文节选,源序按模型点的 source 走 ——
- * 传 web 就 DDG 打头,传 wiki 维基打头,不传按查询词自动分流(操作题 DDG 先上)。
- * 三道闸(搜索词安检/内网闸/防上当声明)都扎在 weblookup.ts 的纯函数层,这边只管跑和报。
- * 查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
+ * web_search 的执行手(联网锤):搜索 + 第一条正文节选。源队列在 weblookup.ts 纯函数层
+ * (Tavily 有 Key 打头 → DDG → 维基中 → 维基英),三道闸(搜索词安检/内网闸/防上当声明)
+ * 也都扎在那边,这边只管跑和报。查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
  */
-async function agentWebSearch(query: string, source: string | undefined): Promise<{ ok: boolean; text: string; hint?: string }> {
-  const webFirst = source === 'web' ? true : source === 'wiki' ? false : prefersWebFirst(query)
-  const found = await webSearchDetailed(query, electronFetchText, webFirst)
+async function agentWebSearch(query: string, tavilyKey: string | undefined): Promise<{ ok: boolean; text: string; hint?: string }> {
+  const found = await webSearchDetailed(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey })
   if (found.material === '') {
     return { ok: false, text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准', hint: '没查到' }
   }
@@ -1039,6 +1051,8 @@ async function runAgentChat(input: {
   webLookup: WebLookupMeta
   /** 联网查证开着 = 工具表里多一件 web_search,人设后面多垫一段上网守则 */
   webSearchEnabled: boolean
+  /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 小葵定) */
+  tavilyKey?: string
 }): Promise<AiChatResult> {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
   const messages: AgentChatMessage[] = [...baseMessages]
@@ -1281,7 +1295,7 @@ async function runAgentChat(input: {
           : callName === 'search_content'
             ? await agentSearchContent(rootPath, relPath, keyword)
             : callName === 'web_search'
-              ? await agentWebSearch(query ?? '', call.args?.source === 'wiki' || call.args?.source === 'web' ? call.args.source : undefined)
+              ? await agentWebSearch(query ?? '', input.tavilyKey)
               : await agentReadFile(rootPath, relPath, readChars)
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
@@ -1569,6 +1583,8 @@ function registerIpc(): void {
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
       webLookup: c.webLookup === true,
+      // Tavily Key(可选,2026-09-17):设置页填了才进档;saveAiConfig 里会洗(trim,空白当没填)
+      tavilyKey: typeof c.tavilyKey === 'string' ? c.tavilyKey : undefined,
       // 个性化(第一百一十三锤)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
       personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
@@ -2037,8 +2053,8 @@ function registerIpc(): void {
       const query = pickWebLookupQuery(questionText, attachment)
       sendChatLookup(event, requestId, 'searching', [])
       try {
-        // 操作题(怎么卸/报错/教程这类)DDG 打头,概念题维基先上 —— 分流判断在纯函数层
-        const found = await webLookupDetailed(query, electronFetchText, prefersWebFirst(query))
+        // 源队列在纯函数层:Tavily 有 Key 打头,没 Key 走免费链(DDG → 维基)
+        const found = await webLookupDetailed(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey: resolved.tavilyKey })
         outcome = { kind: 'attempted', material: found.material, sources: found.sources }
         if (found.material) webMaterial = { query, material: found.material }
       } catch {
@@ -2095,7 +2111,8 @@ function registerIpc(): void {
           signal: aborter.signal,
           startedAt,
           webLookup: meta,
-          webSearchEnabled: resolved.webLookup === true
+          webSearchEnabled: resolved.webLookup === true,
+          tavilyKey: resolved.tavilyKey
         })
       } finally {
         if (requestId !== '') explainAborters.delete(requestId)
@@ -2182,11 +2199,13 @@ function registerIpc(): void {
     explainAborters.delete(requestId)
   })
 
-  // 联网查证(可选举手):讲解认不出软件/品牌时,拿「名字」去维基百科/DuckDuckGo 查免费公开资料。
-  // 只许传名字,不许传本地路径 —— 隐私边界写在调用方;5 秒超时,查不到返回空串,上层自己回退
-  ipcMain.handle('atlas:web-lookup', (_event, query: unknown) => {
+  // 联网查证(可选举手):讲解认不出软件/品牌时,拿「名字」去公开源查免费资料。
+  // 只许传名字,不许传本地路径 —— 隐私边界写在调用方;5 秒超时,查不到返回空串,上层自己回退。
+  // Key 跟着配置走:用户填了 Tavily,这条通道也吃同一把 Key(Tavily → DDG → 维基)
+  ipcMain.handle('atlas:web-lookup', async (_event, query: unknown) => {
     if (typeof query !== 'string' || query.trim() === '') return ''
-    return webLookup(query, electronFetchText)
+    const { tavilyKey } = await loadAiConfig(app.getPath('userData'))
+    return webLookup(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey })
   })
 
   // 右键文件链接复制完整路径:只往剪贴板写一个字符串,不开文件不执行任何东西 ——

@@ -40,7 +40,7 @@ import {
   toolCallKey,
   type AgentChatMessage
 } from '../src/ai/agent.ts'
-import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, prefersWebFirst, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
+import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, parseTavilyResults, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
 
 function main(): void {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
@@ -112,11 +112,10 @@ function main(): void {
   assert.deepEqual(searchTool.function.parameters.required, ['keyword'], 'search_content 必须带 keyword')
   assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
 
-  // web_search 的必填是搜索词 query;source 可选参数只认 wiki/web
+  // web_search 的必填是搜索词 query;source 分流已随统一源队列退役(2026-09-17:Tavily→DDG→维基)
   const webTool = AGENT_TOOLS.find((t) => t.function.name === 'web_search')!
   assert.deepEqual(webTool.function.parameters.required, ['query'], 'web_search 必须带 query')
-  assert.ok(!webTool.function.parameters.required.includes('source'), 'source 是可选项:不传走程序自动分流')
-  assert.ok(webTool.function.parameters.properties.source, 'web_search 要有 source 参数让模型挑源')
+  assert.ok(!webTool.function.parameters.properties.source, 'source 参数已退役:源序程序统一排,不让模型挑')
 
   // ── 7. 步骤播报:翻什么、看成没看成,一句大白话 ──
   assert.ok(agentStepText('list_files', 'src', 'done', '共 3 个').includes('src'), '翻完要带上目标名')
@@ -294,19 +293,30 @@ function main(): void {
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
   assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
-  assert.ok(AGENT_WEB_ADDENDUM.includes('source 参数'), '要教模型用 source 挑源(wiki/web)')
   assert.ok(AGENT_WEB_ADDENDUM.includes('换词再查'), '要教模型结果不对路时换词重查')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
   assert.ok(!AGENT_ADDENDUM.includes('web_search'), '没开联网时守则不提 web_search:模型连有这工具都不该知道')
+  assert.ok(!AGENT_WEB_ADDENDUM.includes('source'), 'source 分流已退役(源序程序统一排),守则里不该再教它挑源')
 
-  // ── 18. 操作题/概念题分流(联网分流锤):怎么卸/报错这类走网页搜索打头 ──
-  assert.equal(prefersWebFirst('永劫无间 卸载残留'), true, '卸载残留是操作题,DDG 打头')
-  assert.equal(prefersWebFirst('npm install 报错 EACCES 怎么解决'), true, '报错+怎么解决,DDG 打头')
-  assert.equal(prefersWebFirst('skills 都装在哪了'), true, '「在哪」是找路问题,DDG 打头')
-  assert.equal(prefersWebFirst('Rust 是什么'), false, '概念题维基先上')
-  assert.equal(prefersWebFirst('LLM 大语言模型'), false, '纯名词维基先上')
-  assert.equal(prefersWebFirst('Claude Code'), false, '软件名无操作特征,维基先上')
+  // ── 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过 ──
+  const tavilyOk = parseTavilyResults(
+    JSON.stringify({
+      results: [
+        { title: 'AOMEI <b>Backup</b>', url: 'https://www.aomei.com/', content: 'backup &amp; restore software' },
+        { title: '', url: 'https://no-title.example/' },
+        { title: '缺链接', url: '   ' },
+        '垃圾行',
+        { title: '第三条', url: 'https://example.com/3', content: '' }
+      ]
+    })
+  )
+  assert.equal(tavilyOk.length, 2, '缺标题/缺链接/垃圾行都跳过,只收干净命中')
+  assert.equal(tavilyOk[0]?.title, 'AOMEI Backup', '标题的 HTML 标记剥干净')
+  assert.equal(tavilyOk[0]?.snippet, 'backup & restore software', '摘要剥 HTML 实体')
+  assert.equal(tavilyOk[0]?.source, 'Tavily', '来源记账是 Tavily')
+  assert.deepEqual(parseTavilyResults('不是 JSON'), [], '坏 JSON = 空清单,让兜底链接着走')
+  assert.deepEqual(parseTavilyResults('{"results": null}'), [], 'results 缺失 = 空清单')
 
   // ── 19. 紧急瘦身(压缩那案的兜底):爆锅时整段裁旧账,只保 system 和最新真问题 ──
   const fat: AgentChatMessage[] = [

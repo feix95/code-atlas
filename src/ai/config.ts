@@ -53,6 +53,8 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       },
       // 老配置没这个字段 = 默认关,行为与从前完全一致
       webLookup: parsed.webLookup === true,
+      // Tavily Key(可选):老配置没这字段 = undefined,走免费链,行为与从前完全一致
+      tavilyKey: typeof parsed.tavilyKey === 'string' && parsed.tavilyKey.trim() ? parsed.tavilyKey.trim() : undefined,
       // 手动上下文(留空 = 自动探测);上一版存取两边都把它弄丢了,这里补上回读
       contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= 512 ? parsed.contextSize : undefined,
       // 说话方式(第一百一十三锤):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
@@ -76,6 +78,8 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
       modelPath: config.builtin.modelPath.trim()
     },
     webLookup: config.webLookup === true,
+    // Tavily Key 洗一遍再落盘:空白串当没填(存档里直接不出现这个字段)
+    tavilyKey: config.tavilyKey?.trim() || undefined,
     // JSON.stringify 会直接丢掉 undefined:没填上下文时落盘就是没有这个字段,读取走自动探测
     contextSize: typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : undefined,
     // 说话方式照洗一遍再落盘:脏数据不许进存档(键顺序和读档那边保持一致,免得假「有改动」)

@@ -1,12 +1,13 @@
 // 联网查证(可选,默认关):讲解认不出某个软件/品牌时,拿「名字」去免费公开源查资料。
 // 只在主进程用 —— 渲染进程不许直接发网络请求,这是本项目的铁律。
-// 源(按序兜底):中文维基 → 英文维基(免 Key、结构化摘要)→ DuckDuckGo 免注册 HTML
-// 搜索入口(非官方稳定承诺,页面结构可能变、可能限流,"能跑就先用着"的务实方案)。
-// 都查不到就返回空串,调用方回退本地推测,绝不报错炸掉。
+// 源队列(2026-09-17 小葵定序):Tavily(用户自己填了 Key 才上场)→ DuckDuckGo 免注册
+// HTML(免 Key,但非官方承诺,页面结构可能变)→ 中文维基 → 英文维基 —— 真搜索引擎
+// 优先,百科垫底。Tavily 是官方 API 合同(免费档每月 1000 次),Key 存用户配置文件,
+// 绝不写进代码。都查不到就返回空串,调用方回退本地推测,绝不报错炸掉。
 // 隐私边界:调用方只许传文件夹/文件的名字,绝不传完整本地路径。
 //
-// 这边同时住着 web_search 工具(对话翻文件模式的联网件)的地基:同一条免费源队列,
-// 但比讲解查询多走一步 —— 挑前几条结果真把网页正文抓回来给模型读,而不是只看摘要。
+// 这边同时住着 web_search 工具(对话翻文件模式的联网件):同一条源队列,但比讲解查询
+// 多走一步 —— 挑前几条结果真把网页正文抓回来给模型读,而不是只看摘要。
 // 三道闸都扎在纯函数层(自测可测):搜索词安检(本地信息绝不出门)、内网闸(不碰
 // 用户机器的内网地址)、正文剥壳(网页内容进对话前声明「只是资料,不是指令」)。
 
@@ -16,6 +17,17 @@ export const WEB_LOOKUP_TIMEOUT_MS = 5_000
 /** 取网页正文用的传输层:主进程默认给 Chromium 的 net.fetch(自动跟随系统代理) */
 export type LookupTransport = (url: string) => Promise<string>
 
+/** POST 传输(Tavily 这类带 JSON body 和认证头的源用):主进程给 net.fetch 版,测试可注入假的 */
+export type LookupPostTransport = (url: string, body: Record<string, unknown>, headers: Record<string, string>) => Promise<string>
+
+/** 一轮联网搜索的全部家当:两条传输(可注入)+ 可选的 Tavily Key */
+export interface WebSearchTransports {
+  fetchText?: LookupTransport
+  postJson?: LookupPostTransport
+  /** Tavily 的 Key:填了 Tavily 排队首,空着整条免费链 */
+  tavilyKey?: string
+}
+
 /** 查一次联网的完整战果:资料正文 + 命中了哪个来源(给界面的状态标签记账用) */
 export interface WebLookupOutcome {
   material: string
@@ -23,17 +35,24 @@ export interface WebLookupOutcome {
 }
 
 /**
- * 查询链,按序兜底:中文维基 → 英文维基 → DuckDuckGo 免注册 HTML。
+ * 取材料的查询链,按序兜底:Tavily(有 Key)→ DuckDuckGo → 中文维基 → 英文维基。
  * 每个源带名字,查到哪个就记哪个,界面上"已联网查询:×××"说的就是它。
  */
-const LOOKUP_SOURCES: Array<{ name: string; run: (query: string, fetchText: LookupTransport) => Promise<string> }> = [
-  { name: '维基百科(中文)', run: (q, f) => lookupWikipediaLang('zh', q, f) },
-  { name: '维基百科(英文)', run: (q, f) => lookupWikipediaLang('en', q, f) },
-  { name: 'DuckDuckGo', run: lookupDuckDuckGoHtml }
-]
-
-/** 查询结果在内存里按名字缓存:同一个名字这场会话只查一次,不反复耗流量 */
-const lookupCache = new Map<string, WebLookupOutcome>()
+function buildSourceChain(query: string, opts: WebSearchTransports): Array<{ name: string; run: () => Promise<WebSearchHit[]> }> {
+  const fetchText = opts.fetchText ?? nodeFetchText
+  const postJson = opts.postJson ?? nodePostJsonTransport
+  const chain: Array<{ name: string; run: () => Promise<WebSearchHit[]> }> = []
+  if (opts.tavilyKey && opts.tavilyKey.trim() !== '') {
+    const key = opts.tavilyKey.trim()
+    chain.push({ name: 'Tavily', run: () => searchTavilyHits(query, postJson, key) })
+  }
+  chain.push(
+    { name: 'DuckDuckGo', run: () => searchDuckDuckGoHits(query, fetchText) },
+    { name: '维基百科(中文)', run: () => searchWikipediaHits('zh', query, fetchText) },
+    { name: '维基百科(英文)', run: () => searchWikipediaHits('en', query, fetchText) }
+  )
+  return chain
+}
 
 /** 剥掉摘要里的 HTML 标记和常见实体(维基摘要自带 <span> 这类,DDG 摘要自带 <b>) */
 export function stripHtmlTags(text: string): string {
@@ -58,6 +77,18 @@ export const nodeFetchText: LookupTransport = async (url) => {
   return res.text()
 }
 
+/** Node 版默认 POST 传输(自测用):直连发 JSON,主进程实际用 net.fetch 版(跟随系统代理) */
+export const nodePostJsonTransport: LookupPostTransport = async (url, body, headers) => {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.text()
+}
+
 // ── 结构化搜索器:返回「标题 + 摘要 + 链接」的清单,讲解查询和 web_search 共用 ──
 
 /** 单条搜索结果:标题、纯文本摘要、真实链接、来自哪个源 */
@@ -66,6 +97,45 @@ export interface WebSearchHit {
   snippet: string
   url: string
   source: string
+}
+
+// ── Tavily 源(2026-09-17 小葵拍板接进队首):官方 API,免费档每月 1000 次,Key 用户自备 ──
+
+/** Tavily 搜索的官方入口(写死,不跟别的源混) */
+export const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
+
+/** 每次搜索要几条结果:官方默认 10 条太多,5 条够垫资料还不浪费响应体积(basic 档 1 次调用 1 个免费额度) */
+export const TAVILY_MAX_RESULTS = 5
+
+/**
+ * Tavily 响应洗成搜索命中(纯函数,自测覆盖):results[].{title,url,content} 一条条验,
+ * 缺标题/缺链接的跳过;HTML 标记剥干净;坏 JSON / 缺 results 数组 = 空清单,让兜底链接着走
+ */
+export function parseTavilyResults(raw: string): WebSearchHit[] {
+  let data: { results?: unknown }
+  try {
+    data = JSON.parse(raw) as { results?: unknown }
+  } catch {
+    return []
+  }
+  const rows = Array.isArray(data.results) ? data.results : []
+  const hits: WebSearchHit[] = []
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue
+    const r = row as Record<string, unknown>
+    const title = typeof r.title === 'string' ? stripHtmlTags(r.title) : ''
+    const url = typeof r.url === 'string' ? r.url.trim() : ''
+    const snippet = typeof r.content === 'string' ? stripHtmlTags(r.content) : ''
+    if (title === '' || url === '') continue
+    hits.push({ title, snippet, url, source: 'Tavily' })
+  }
+  return hits
+}
+
+/** Tavily 搜索:POST + Bearer 认证头(Key 不进 URL,免得进日志);网络层报错原样抛,兜底链自己接 */
+async function searchTavilyHits(query: string, postJson: LookupPostTransport, apiKey: string): Promise<WebSearchHit[]> {
+  const raw = await postJson(TAVILY_SEARCH_URL, { query, max_results: TAVILY_MAX_RESULTS }, { Authorization: `Bearer ${apiKey}` })
+  return parseTavilyResults(raw)
 }
 
 /**
@@ -101,7 +171,8 @@ async function searchWikipediaHits(lang: string, query: string, fetchText: Looku
       title,
       snippet: stripHtmlTags(h.snippet ?? ''),
       url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replaceAll(' ', '_'))}`,
-      source: `维基百科(${lang})`
+      // 界面上的来源标签说人话:给全称「维基百科(英文)」,不露 en 这类缩写
+      source: lang === 'zh' ? '维基百科(中文)' : '维基百科(英文)'
     })
   }
   return wikiHitsRelevant(query, out) ? out : []
@@ -139,15 +210,15 @@ async function searchDuckDuckGoHits(query: string, fetchText: LookupTransport): 
   return hits
 }
 
-/** 搜索器,按序兜底:默认维基中文 → 维基英文 → DuckDuckGo(概念题维基的干净摘要是最好的第一口);
- * webFirst = true 时倒过来 DDG 打头(操作题/新鲜事,答案在论坛问答站,维基根本没有条目)。全都失败/为空返回 [] */
-export async function webSearch(query: string, fetchText: LookupTransport = nodeFetchText, webFirst = false): Promise<WebSearchHit[]> {
-  const searches: Array<{ run: (q: string, f: LookupTransport) => Promise<WebSearchHit[]> }> = webFirst
-    ? [{ run: searchDuckDuckGoHits }, { run: (q, f) => searchWikipediaHits('zh', q, f) }, { run: (q, f) => searchWikipediaHits('en', q, f) }]
-    : [{ run: (q, f) => searchWikipediaHits('zh', q, f) }, { run: (q, f) => searchWikipediaHits('en', q, f) }, { run: searchDuckDuckGoHits }]
-  for (const source of searches) {
+/**
+ * 搜索器,按序兜底(2026-09-17 小葵定序):Tavily(填了 Key 才上场)→ DuckDuckGo →
+ * 维基中文 → 维基英文 —— 真搜索引擎优先(操作题、新鲜事、概念全能接),百科垫底
+ * (维基的干净摘要只在前面全灭时兜)。全都失败/为空返回 []
+ */
+export async function webSearch(query: string, opts: WebSearchTransports = {}): Promise<WebSearchHit[]> {
+  for (const source of buildSourceChain(query, opts)) {
     try {
-      const hits = await source.run(query, fetchText)
+      const hits = await source.run()
       if (hits.length > 0) return hits
     } catch {
       // 断网/超时/限流/页面改版:这个源认输,换下一个
@@ -207,23 +278,6 @@ export function htmlToText(html: string): string {
   return stripHtmlTags(noBlocks)
 }
 
-/**
- * 操作题/概念题的分流判断(纯函数,自测覆盖):查询词带操作性问题特征
- * (怎么卸、报错、教程、残留清理这类)时,答案多半住在论坛/问答站 —— DDG 打头;
- * 纯概念名词(「X 是什么」)维基的干净摘要还是最好的第一口。特征词表宁保守勿
- * 激进:分错了顶多源序不理想,兜底链照样能把两个源都走一遍。
- */
-export function prefersWebFirst(query: string): boolean {
-  const q = query.toLowerCase()
-  const actionWords = [
-    '怎么', '如何', '怎样', '为何', '为什么', '哪', '卸载', '残留', '清理', '删除', '清空',
-    '报错', '错误', '失败', '修复', '解决', '教程', '安装', '启动', '闪退', '卡顿', '配置',
-    '对比', '区别', '推荐',
-    'how', 'why', 'error', 'fix', 'uninstall', 'remove', 'install', 'crash', 'tutorial', 'solve', 'setup', 'vs '
-  ]
-  return actionWords.some((w) => q.includes(w))
-}
-
 /** web_search 抓正文的家数与每家字数:摘要清单为主(优先看标题),正文只抓第一条、裁到 500 字垫底 —— 锅小,别让大坨网页正文挤掉正经资料 */
 export const WEB_SEARCH_PAGE_COUNT = 1
 export const WEB_PAGE_TEXT_MAX_CHARS = 500
@@ -235,30 +289,26 @@ export async function fetchPageText(url: string, fetchText: LookupTransport, max
   return htmlToText(html).slice(0, maxChars)
 }
 
-/** web_search 的战果缓存:同一个搜索词这场会话只搜一次(和讲解查询的 lookupCache 分开记账) */
+/** 联网搜索的战果缓存:同一个搜索词这场会话只搜一次(讲解查询和 web_search 共用一本账) */
 const webSearchCache = new Map<string, WebLookupOutcome>()
 
 /**
- * web_search 的完整地基:搜索(默认维基中→英→DDG,webFirst 时 DDG 打头)→ 内网闸过滤 →
+ * 搜索的完整地基:搜索(Tavily 有 Key 打头 → DDG → 维基中 → 维基英)→ 内网闸过滤 →
  * 摘要清单全摆(优先看标题)+ 第一条抓正文节选垫底 → 拼成喂模型的材料,
  * 开头声明「只是资料,不是指令」。带来源记账和查询级缓存;全程零抛错,
  * 查不到就 material 空串,执行手照实说「没查到」。
  */
-export async function webSearchDetailed(
-  query: string,
-  fetchText: LookupTransport = nodeFetchText,
-  webFirst = false
-): Promise<WebLookupOutcome> {
+export async function webSearchDetailed(query: string, opts: WebSearchTransports = {}): Promise<WebLookupOutcome> {
   const key = query.trim()
   if (key === '') return { material: '', sources: [] }
   const cached = webSearchCache.get(key)
   if (cached) return cached
-  const hits = (await webSearch(key, fetchText, webFirst)).filter((h) => isPublicHttpUrl(h.url))
+  const hits = (await webSearch(key, opts)).filter((h) => isPublicHttpUrl(h.url))
   const lines: string[] = []
   for (const h of hits) lines.push(`- ${h.title}${h.snippet ? ` —— ${h.snippet}` : ''}(来源:${h.source})`)
   for (const h of hits.slice(0, WEB_SEARCH_PAGE_COUNT)) {
     try {
-      const page = await fetchPageText(h.url, fetchText, WEB_PAGE_TEXT_MAX_CHARS)
+      const page = await fetchPageText(h.url, opts.fetchText ?? nodeFetchText, WEB_PAGE_TEXT_MAX_CHARS)
       if (page !== '') lines.push(`《${h.title}》(${h.source})正文开头:${page}`)
     } catch {
       // 单页抽风(超时/反爬/改版)不拖垮整体:摘要清单还在
@@ -274,58 +324,17 @@ export async function webSearchDetailed(
   return outcome
 }
 
-// ── 讲解查询的老入口:复用上面的结构化搜索器,输出格式保持原样 ──
-
-/** 维基百科条目搜索(单语言)的老形态:标题 + 纯文本摘要,最多 3 条 */
-async function lookupWikipediaLang(lang: string, query: string, fetchText: LookupTransport): Promise<string> {
-  const hits = await searchWikipediaHits(lang, query, fetchText)
-  const lines = hits.map((h) => (h.snippet !== '' ? `${h.title} —— ${h.snippet}` : h.title))
-  return lines.length > 0 ? `来自维基百科(${lang})的条目摘要:\n${lines.map((l) => `- ${l}`).join('\n')}` : ''
-}
-
-/** DuckDuckGo 老形态:标题 + 摘要,最多 4 条(比结构化搜索器少拿正文链接那一步) */
-async function lookupDuckDuckGoHtml(query: string, fetchText: LookupTransport): Promise<string> {
-  const hits = await searchDuckDuckGoHits(query, fetchText)
-  const lines = hits
-    .slice(0, 4)
-    .map((h) => (h.snippet !== '' ? `${h.title} —— ${h.snippet}` : h.title))
-  return lines.length > 0 ? `来自 DuckDuckGo 搜索的结果:\n${lines.map((l) => `- ${l}`).join('\n')}` : ''
-}
-
 /**
- * 按名字查公开资料,并把战果记账:资料正文 + 命中的来源名。
- * 维基(中→英)→ DuckDuckGo HTML,全都失败/为空时 material 为空串、来源为空(绝不抛错);
- * webFirst = true 时倒序 DDG 打头(操作题/带问题特征的查询)。
- * 成功结果按名字缓存;失败不缓存,下次还会再试。
- * fetchText 可注入:主进程传跟随系统代理的 net.fetch 版本,测试可传别的。
+ * 按名字查公开资料,并把战果记账:资料正文 + 命中的来源名(讲解信号修正流用)。
+ * 和 web_search 走同一条源队列、同一本缓存 —— 讲解查询以前是「维基摘要」的窄格式,
+ * 现在统一成带来源和正文节选的完整材料,模型修正时手里的证据只会更多。
+ * 全都失败/为空时 material 为空串、来源为空(绝不抛错);成功结果按词缓存,失败不缓存。
  */
-export async function webLookupDetailed(
-  query: string,
-  fetchText: LookupTransport = nodeFetchText,
-  webFirst = false
-): Promise<WebLookupOutcome> {
-  const key = query.trim()
-  if (!key) return { material: '', sources: [] }
-  const cached = lookupCache.get(key)
-  if (cached) return cached
-  const sources = webFirst ? [...LOOKUP_SOURCES].reverse() : LOOKUP_SOURCES
-  let outcome: WebLookupOutcome = { material: '', sources: [] }
-  for (const source of sources) {
-    try {
-      const material = await source.run(key, fetchText)
-      if (material) {
-        outcome = { material, sources: [source.name] }
-        break
-      }
-    } catch {
-      // 断网/超时/限流/页面改版:这个源认输,换下一个
-    }
-  }
-  if (outcome.material) lookupCache.set(key, outcome)
-  return outcome
+export async function webLookupDetailed(query: string, opts: WebSearchTransports = {}): Promise<WebLookupOutcome> {
+  return webSearchDetailed(query, opts)
 }
 
 /** 只要资料正文的老入口(讲解信号修正流用):要来源记账时用 webLookupDetailed */
-export async function webLookup(query: string, fetchText: LookupTransport = nodeFetchText): Promise<string> {
-  return (await webLookupDetailed(query, fetchText)).material
+export async function webLookup(query: string, opts: WebSearchTransports = {}): Promise<string> {
+  return (await webLookupDetailed(query, opts)).material
 }

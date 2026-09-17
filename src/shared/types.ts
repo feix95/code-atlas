@@ -228,6 +228,12 @@ export interface AiConfig {
    * 某个软件/品牌时,拿「名字」去免费公开源查一下再修正答案;不发路径、不发别的
    */
   webLookup?: boolean
+  /**
+   * Tavily 搜索的 API Key(可选,2026-09-17 小葵拍板接进来):填了联网搜索走
+   * Tavily 打头(官方 API 稳定,免费档每月 1000 次);不填走免费链(DuckDuckGo → 维基)。
+   * Key 是用户自己去 tavily.com 注册拿的,只存这份用户目录配置文件,绝不进代码仓库
+   */
+  tavilyKey?: string
 }
 
 /** 一次对话调用的运行时目标:上层业务只认它,不感知底层是 LM Studio 还是内置模型 */

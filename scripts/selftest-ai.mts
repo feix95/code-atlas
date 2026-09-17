@@ -388,30 +388,52 @@ async function main(): Promise<void> {
   assert.ok(hasSearchIntent('帮我查查这是什么软件'), '「查查」要识别为搜索意图')
   assert.ok(!hasSearchIntent('这个能删吗?'), '普通追问不该误触发联网')
 
-  // ── 3.7 webLookupDetailed:来源记账 + 缓存 + 全灭认输 ──
+  // ── 3.7 webLookupDetailed:来源记账 + 缓存 + 全灭认输(免费链:DDG → 维基中 → 维基英)──
   {
     let calls = 0
     const flakyFetch = async (url: string): Promise<string> => {
       calls++
+      if (url.includes('duckduckgo')) return '' // DDG 免注册页这回空手而归 → 落维基
       if (url.includes('zh.wikipedia')) throw new Error('被墙了') // 中文维基失败 → 换英文
       if (url.includes('en.wikipedia')) {
         return JSON.stringify({ query: { search: [{ title: 'AOMEI', snippet: 'backup <b>software</b> vendor' }] } })
       }
       return ''
     }
-    const hit = await webLookupDetailed('Aomei 来源记账', flakyFetch)
+    const hit = await webLookupDetailed('Aomei 来源记账', { fetchText: flakyFetch })
     assert.equal(hit.sources[0], '维基百科(英文)', '命中的来源要记账')
     assert.ok(hit.material.includes('AOMEI'), '资料要带条目标题')
     assert.ok(hit.material.includes('backup software vendor'), '摘要的 HTML 要剥干净')
-    const again = await webLookupDetailed('Aomei 来源记账', flakyFetch)
+    const again = await webLookupDetailed('Aomei 来源记账', { fetchText: flakyFetch })
     assert.equal(again.material, hit.material, '同名第二次走缓存')
-    assert.equal(calls, 2, '缓存生效:中文失败 1 次 + 英文成功 1 次,不再多发')
+    assert.equal(calls, 4, '缓存生效:DDG 空手 1 次 + 中文失败 1 次 + 英文成功 1 次 + 抓第一条正文 1 次,不再多发')
     const dead = await webLookupDetailed('查无此物xyz', async () => {
       throw new Error('全网断')
     })
     assert.equal(dead.material, '', '全部源失败 = 空资料')
     assert.deepEqual(dead.sources, [], '全部源失败 = 空来源')
-    assert.equal((await webLookupDetailed('   ', flakyFetch)).material, '', '空查询不劳烦网络')
+    assert.equal((await webLookupDetailed('   ', { fetchText: flakyFetch })).material, '', '空查询不劳烦网络')
+  }
+
+  // ── 3.8 Tavily 打头(2026-09-17 小葵定序):填了 Key 走官方 API,免费源一次都不跑 ──
+  {
+    let getCalls = 0
+    const found = await webLookupDetailed('傲梅官网 联网锤', {
+      fetchText: async () => {
+        getCalls++
+        throw new Error('抓正文这一脚允许失败,免费源压根不该轮到')
+      },
+      postJson: async (url, body, headers) => {
+        assert.equal(url, 'https://api.tavily.com/search', 'Tavily 走官方入口')
+        assert.equal(headers.Authorization, 'Bearer tvly-test-key', 'Key 走认证头,不进 URL 免得进日志')
+        assert.equal((body as { query: string }).query, '傲梅官网 联网锤', '搜索词原样进 body')
+        return JSON.stringify({ results: [{ title: '傲梅', url: 'https://www.aomei.com', content: '备份软件厂商' }] })
+      },
+      tavilyKey: 'tvly-test-key'
+    })
+    assert.equal(found.sources[0], 'Tavily', '填了 Key,Tavily 打头')
+    assert.ok(found.material.includes('备份软件厂商'), 'Tavily 的摘要进材料')
+    assert.equal(getCalls, 1, 'Tavily 命中后免费源不跑;仅抓第一条正文那一脚(GET 失败被吞,不拖垮)')
   }
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
