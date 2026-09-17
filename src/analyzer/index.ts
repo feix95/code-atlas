@@ -82,12 +82,13 @@ const JS_QUERY = `
   (export_statement "default" [(function_declaration) (class_declaration) (arrow_function)] @expdefanon)
 `
 
-/** Python 的提取规则:函数、类、导入 */
+/** Python 的提取规则:函数、类、导入(相对导入 module_name 是 relative_import 节点,单独一条抓) */
 const PY_QUERY = `
   (function_definition name: (identifier) @fn)
   (class_definition name: (identifier) @cls)
   (import_statement name: (dotted_name) @imp)
   (import_from_statement module_name: (dotted_name) @imp)
+  (import_from_statement module_name: (relative_import) @imp)
 `
 
 /** Java:方法/构造器、类/枚举、接口、导入 */
@@ -142,7 +143,7 @@ const CS_QUERY = `
   (using_directive (identifier) @imp)
 `
 
-/** Rust:函数(trait 里的签名也算)、struct/enum、trait、use 导入 */
+/** Rust:函数(trait 里的签名也算)、struct/enum、trait、use 导入、mod 声明(mod x; 是 Rust 引隔壁文件的方式) */
 const RUST_QUERY = `
   (function_item name: (identifier) @fn)
   (function_signature_item name: (identifier) @fn)
@@ -151,6 +152,7 @@ const RUST_QUERY = `
   (trait_item name: (type_identifier) @iface)
   (use_declaration (scoped_identifier) @imp)
   (use_declaration (identifier) @imp)
+  (mod_item name: (identifier) @imp)
 `
 
 /** 每种语言自己的提取规则 */
