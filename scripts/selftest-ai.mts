@@ -452,8 +452,10 @@ async function main(): Promise<void> {
     const again = await webLookupDetailed('Aomei 来源记账', { fetchText: flakyFetch })
     assert.equal(again.material, hit.material, '同名第二次走缓存')
     assert.equal(calls, 4, '缓存生效:DDG 空手 1 次 + 中文失败 1 次 + 英文成功 1 次 + 抓第一条正文 1 次,不再多发')
-    const dead = await webLookupDetailed('查无此物xyz', async () => {
-      throw new Error('全网断')
+    const dead = await webLookupDetailed('查无此物xyz', {
+      fetchText: async () => {
+        throw new Error('全网断')
+      }
     })
     assert.equal(dead.material, '', '全部源失败 = 空资料')
     assert.deepEqual(dead.sources, [], '全部源失败 = 空来源')
