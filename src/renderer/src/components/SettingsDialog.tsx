@@ -1164,7 +1164,7 @@ export function SettingsDialog({
                         <>
                           <div className="cfg-field-head">
                             <label htmlFor="cfg-model-path">模型文件</label>
-                            <span>GGUF</span>
+                            <span>一个文件</span>
                           </div>
                           <div className="cfg-path-input">
                             <Icon name="folder" size={13} />
@@ -1185,7 +1185,7 @@ export function SettingsDialog({
                           </div>
                           <button type="button" className="cfg-shelf-toggle" onClick={() => setShelfOpen((v) => !v)}>
                             <Icon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} />
-                            {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 GGUF 榜,按大小和更新时间自己挑'}
+                            {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 AI 模型榜,按大小挑,点开就能下'}
                           </button>
                           {shelfOpen && (
                             <ModelShelfPanel
@@ -1199,10 +1199,10 @@ export function SettingsDialog({
                               }}
                             />
                           )}
-                          {modelPathDraft.trim() && fitNote && fitNote.level !== 'empty' && (
-                            <p className={`cfg-field-help cfg-fit-note is-${fitNote.level}`}>
-                              {fitNote.level === 'ok' ? '✓' : fitNote.level === 'missing' ? '✕' : '!'} {fitNote.title}:{fitNote.detail}
-                            </p>
+                          {/* 量尺只替账单喊「文件不存在」这一嗓子(2026-09-18 小葵:两行黄字重复) ——
+                              装得下/有点挤/装不下这些账,下面跟着滑条实时动的上下文账单都算,别报两遍 */}
+                          {modelPathDraft.trim() && fitNote && fitNote.level === 'missing' && (
+                            <p className="cfg-field-help cfg-fit-note is-missing">✕ {fitNote.title}:{fitNote.detail}</p>
                           )}
                         </>
                       ) : (

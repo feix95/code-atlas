@@ -5915,21 +5915,91 @@ body.is-maximized .cfg-layer {
   flex-direction: column;
   gap: var(--space-3);
   margin-top: var(--space-3);
+  /* 与下方「模型上下文」/黄字警告拉开一截(小葵真机:再远点) */
+  margin-bottom: 2.5rem;
+  /* 右侧呼吸只管列表内框 —— 推荐卡要跟「收起货架」按钮全宽对齐(小葵真机反馈) */
 }
+/* 超大圆角内框(2026-09-18 小葵设计稿):筛选栏+列表装进同一个框。
+   阴影只留贴框的一点点(小葵真机:大投影太脏,靠描边说话,跟弹窗里其他卡片统一设计语言) */
+.shelf-frame {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-right: 2.8125rem;
+}
+/* 推荐模型卡(2026-09-18 小葵定):不搞特殊待遇 —— 去框去底,和列表行坐一桌;
+   padding 与行完全一致,文字跟下面的模型行对在同一条左线。
+   身份只剩两处小标识:蓝字「推荐模型」标签 + 右侧下载按钮 */
+.shelf-featured {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0.8125rem 1.5rem 0.8125rem 1.25rem;
+}
+.shelf-featured-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+/* 「推荐模型」小标签:并进名字行,不独占一行(2026-09-18 小葵定,两行收束) */
+.shelf-featured-tag {
+  margin-right: var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--accent);
+}
+.shelf-featured-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.shelf-featured-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+.shelf-featured-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+/* 大一号的「下载并使用」:同 shelf-dl-btn 一族,只放大加粗,配色不动 —— 别在主题对比度上冒险 */
+.shelf-featured-btn {
+  padding: 0.375rem 1rem;
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+.shelf-featured-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+.shelf-featured-progress .shelf-dl-bar {
+  width: 8rem;
+}
+/* 筛选栏:内框的第一段,与列表同底色,只隔一条淡分隔线。
+   横向间距收着排(小葵真机:必须一行放下) —— chip 上下 padding 保持高挑,左右回紧凑 */
 .shelf-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
-  margin-bottom: var(--space-2);
+  gap: 0.25rem 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--line-soft);
 }
 .shelf-filter-group {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 0.25rem;
 }
 .shelf-filter-label {
   font-size: var(--font-sm);
@@ -5937,22 +6007,23 @@ body.is-maximized .cfg-layer {
   margin-right: var(--space-1);
 }
 .shelf-chip {
-  border: 1px solid transparent;
+  border: none;
   background: none;
   border-radius: var(--radius-pill);
-  padding: 0.25rem 0.625rem;
+  padding: 0.375rem 0.625rem;
   font-size: var(--font-sm);
   color: var(--muted);
   cursor: pointer;
 }
 .shelf-chip:hover {
   color: var(--text);
-  background: var(--hover);
+  background: var(--selected-bg);
 }
+/* 选中 chip(2026-09-18 小葵设计稿):亮灰实底 + 深字,明度反差一眼认出选中;
+   这个浅灰在亮暗两套主题下都成立,写真值不走变量 */
 .shelf-chip.is-on {
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-  color: var(--accent);
+  background: #dde3e7;
+  color: #1d2226;
   font-weight: 600;
 }
 .shelf-note {
@@ -5960,7 +6031,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) 1.25rem;
   font-size: var(--font-sm);
   color: var(--muted);
 }
@@ -5970,29 +6041,93 @@ body.is-maximized .cfg-layer {
 .shelf-note.is-soft {
   color: var(--muted-2);
 }
+/* 列表:边框/圆角/底色全由内框承担,列表自己只管行 */
 .shelf-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  overflow: hidden;
 }
 .shelf-item + .shelf-item {
   border-top: 1px solid var(--line-soft);
 }
+/* 滚动窗口(2026-09-18 小葵定):货架再长也不超一屏 —— 列表(含「加载更多」)在窗里滚。
+   滚动区住在内框里,圆角裁切由内框管;padding-right 给滚动条左侧留一点空,
+   行内容和滚动条之间再隔出一截(设计稿标注:透气) */
+.shelf-scroll {
+  max-height: 48vh;
+  margin: 0;
+  padding-right: 0.625rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+.shelf-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.shelf-scroll::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+}
+.shelf-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text);
+}
+.shelf-scroll::-webkit-scrollbar-track {
+  background: none;
+}
+/* 名字后的参数量级灰字(9B 这类):解析不出不渲染,占位都不留 */
+.shelf-params {
+  margin-left: var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: 400;
+  color: var(--muted-2);
+}
+/* 榜单失败后的「再试一次」:错误不能是死路,给条出路(ux-writing 铁律) */
+.shelf-retry-btn {
+  flex: none;
+  border: 1px solid var(--danger-line);
+  background: none;
+  border-radius: var(--radius-pill);
+  padding: 0.125rem 0.625rem;
+  font-size: var(--font-xs);
+  color: var(--danger);
+  cursor: pointer;
+}
+.shelf-retry-btn:hover {
+  background: var(--danger-soft);
+}
+/* 「加载更多」(2026-09-18):榜单 60 条一屏吃不下,分页兜住滚动长度;数据全在内存,点了零请求 */
+.shelf-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0 var(--space-1);
+}
+.shelf-more button {
+  border: 1px solid var(--line);
+  background: none;
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.875rem;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.shelf-more button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
 /* 行排版(2026-09-18 小葵定,参考 LM Studio):行内 grid、非名字列全定宽 ——
-   flex 时代各列内容撑宽,名字一长列就漂;现在大小/章/箭头行行竖向对齐,扫一列到底。
+   flex 时代各列内容撑宽,名字一长列就漂;现在状态章/体积/箭头行行竖向对齐。
+   列序:名字块 | 状态章 | 体积(最右信息列,小葵定) | 箭头。
    行内 grid 没有跨行轨道协商,所以「定宽」必须写实数,auto 等于没对齐。 */
 .shelf-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.6rem 3.25rem 6rem 0.6rem;
+  grid-template-columns: minmax(0, 1fr) 5.5rem 3.25rem 0.6rem;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
   border: none;
   background: none;
-  padding: var(--space-2) var(--space-3);
+  /* 左右 1.25rem 与筛选栏对齐;右边 1.5rem —— 行内容和滚动条拉开,透气(小葵设计稿) */
+  padding: 0.8125rem 1.5rem 0.8125rem 1.25rem;
   font-size: var(--font-sm);
   text-align: left;
   cursor: pointer;
@@ -6023,33 +6158,6 @@ body.is-maximized .cfg-layer {
   color: var(--muted-2);
   font-variant-numeric: tabular-nums;
 }
-/* 能力章列(参考 LM Studio):彩色描边小圆,一图一义 —— 眼(amber)=看得懂图,音符(green)=带语音;
-   纯文本/向量/未知是灰档,不抢戏。向量模型的「不能陪聊」劝退话在名字副行,不靠悬停 */
-.shelf-mods {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  width: 2.6rem;
-}
-.shelf-mod {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-pill);
-}
-.shelf-mod.is-vision {
-  color: var(--amber);
-}
-.shelf-mod.is-audio {
-  color: var(--green);
-}
-.shelf-mod.is-dim {
-  color: var(--muted-2);
-  border-color: var(--line);
-}
 /* 大小列:右对齐 + 等宽数字,竖着比大小不用逐位对 */
 .shelf-size {
   width: 3.25rem;
@@ -6062,7 +6170,7 @@ body.is-maximized .cfg-layer {
 .shelf-verdict-slot {
   display: inline-flex;
   justify-content: flex-end;
-  min-width: 6rem;
+  min-width: 5.5rem;
 }
 .shelf-verdict {
   flex: none;
@@ -6089,27 +6197,6 @@ body.is-maximized .cfg-layer {
 .shelf-item.is-unrunnable .shelf-size {
   color: var(--muted-2);
 }
-.shelf-item.is-unrunnable .shelf-mod {
-  color: var(--muted-2);
-  border-color: var(--line-soft);
-}
-.shelf-verdict {
-  flex: none;
-  border-radius: var(--radius-pill);
-  padding: 0.125rem 0.5rem;
-  font-size: var(--font-xs);
-  font-weight: 600;
-}
-.shelf-verdict.is-no {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid var(--danger-line);
-}
-.shelf-verdict.is-tight {
-  background: var(--amber-soft);
-  color: var(--amber);
-  border: 1px solid var(--amber-line);
-}
 .shelf-chevron {
   flex: none;
   width: 0.6rem;
@@ -6122,10 +6209,66 @@ body.is-maximized .cfg-layer {
 .shelf-chevron.is-open {
   transform: rotate(-135deg) translate(-0.1rem, -0.1rem);
 }
+/* 展开区(2026-09-18 打磨,同日修漏):常驻渲染 + grid-rows 0fr→1fr 弹性过渡。
+   三层分工:files 管高度轨道,inner(overflow hidden)管裁剪 —— 裁剪层必须零 padding 零边框,
+   否则收起时 padding/border 不被裁,每行底下漏一条「乱码」(小葵真机抓到的);
+   pad 管呼吸(padding + 虚线分隔都住这层,收起时跟着内容一起被裁没)。 */
 .shelf-files {
-  padding: var(--space-1) var(--space-4) var(--space-2);
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
   background: var(--surface-soft);
+}
+.shelf-files.is-open {
+  grid-template-rows: 1fr;
+}
+.shelf-files-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.shelf-files-pad {
+  padding: var(--space-1) var(--space-4) var(--space-2);
   border-top: 1px dashed var(--line-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shelf-files {
+    transition: none;
+  }
+}
+/* 模型小档案(2026-09-18 打磨):底座/协议/收藏/总大小,全是 API 原样事实;
+   某项解析不出整格不渲染,卡自适应变矮,不放「未知」占位凑数 */
+.shelf-profile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+.shelf-profile-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.shelf-profile-label {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+.shelf-profile-value {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--text);
+}
+/* 量化等级灰字:文件名后的技术翻译(Q8_0 → 几乎无损),解析不出不渲染 */
+.shelf-quant {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
 }
 .shelf-file-row {
   display: flex;
