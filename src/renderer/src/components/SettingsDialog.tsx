@@ -10,16 +10,22 @@ import {
   type PersonalizationConfig,
   type ToneKey
 } from '@shared/personalization'
-import { looksLikeTavilyKey, type TavilyProbeResult } from '@shared/tavily'
+import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 
-/** 「测一下」的结论文案(2026-09-17):Tavily 给的状态码翻成人话,别让用户对着码猜 */
+/** 「测一下」的结论文案(2026-09-17):Tavily 给的状态码翻成人话,别让用户对着码猜。
+ *  结论是「能用」时随身报本月用量(2026-09-17 小葵提议:/usage 零成本捎带的) */
 function probeText(result: TavilyProbeResult): { cls: string; text: string } {
   switch (result.verdict) {
     case 'ok':
-      return { cls: 'is-ok', text: '这个 Key 能用,联网搜索会走 Tavily 打头。' }
+      return {
+        cls: 'is-ok',
+        text: result.usage
+          ? `这个 Key 能用 · ${tavilyUsageText(result.usage)}。联网搜索会走 Tavily 打头。`
+          : '这个 Key 能用,联网搜索会走 Tavily 打头。'
+      }
     case 'bad-key':
       return { cls: 'is-bad', text: 'Tavily 不认这个 Key:可能抄漏了一段,也可能这个 Key 被删了。' }
     case 'quota':
@@ -85,7 +91,7 @@ function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: stri
         />
         <button
           type="button"
-          title="拿这把 Key 真打一次 Tavily,测一次花 1 次搜索额度"
+          title="拿这把 Key 查一次官方用量:验证 Key 有没有效,顺手报本月还剩多少次 —— 不花搜索额度"
           disabled={probe.busy || draft === ''}
           onClick={() => void test()}
         >

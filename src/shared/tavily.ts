@@ -38,10 +38,65 @@ export function looksLikeTavilyKey(key: string): boolean {
 /** 「测一下」的战果:一个结论 + 网络层给的状态码(压根没连上时没有) */
 export type TavilyProbeVerdict = 'ok' | 'bad-key' | 'quota' | 'busy' | 'server' | 'other' | 'unreachable'
 
+/** Key 的用量细账(/usage 端点查回来的,2026-09-17「测一下」零成本改造捎带的) */
+export interface TavilyUsageInfo {
+  /** 计划名(如 Researcher);回话里没给就用「Tavily」兜着 */
+  plan: string
+  /** 本月已用次数 */
+  used: number
+  /** 计划的每月上限;没有固定上限(按量/不限)时为 null */
+  limit: number | null
+  /** 还剩多少次;没有固定上限时也是 null(显示侧另说「无固定上限」) */
+  remaining: number | null
+}
+
 export interface TavilyProbeResult {
   verdict: TavilyProbeVerdict
   /** Tavily 或网络层给的原样状态码:界面按需展示,自测按它断言 */
   status?: number
+  /** 用量细账:结论是「能用」时必带(200 的回话洗出来的);别的结论没有 */
+  usage?: TavilyUsageInfo
+}
+
+/**
+ * Tavily /usage 回话洗成用量细账(纯函数,自测覆盖)。
+ * 已用次数认账顺序:计划级(plan_usage)优先,Key 级(usage)兜底 —— 两处都没数
+ * 就是形状不像(劫持门户页/改版),返回 null,调用方按「看不懂」说,不硬编。
+ */
+export function parseTavilyUsage(raw: string): TavilyUsageInfo | null {
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (typeof data !== 'object' || data === null) return null
+  const d = data as {
+    key?: { usage?: unknown }
+    account?: { current_plan?: unknown; plan_usage?: unknown; plan_limit?: unknown }
+  }
+  const account = typeof d.account === 'object' && d.account !== null ? d.account : undefined
+  const keyInfo = typeof d.key === 'object' && d.key !== null ? d.key : undefined
+  const usedRaw =
+    typeof account?.plan_usage === 'number' && Number.isFinite(account.plan_usage)
+      ? account.plan_usage
+      : typeof keyInfo?.usage === 'number' && Number.isFinite(keyInfo.usage)
+        ? keyInfo.usage
+        : undefined
+  if (usedRaw === undefined) return null
+  const limit = typeof account?.plan_limit === 'number' && Number.isFinite(account.plan_limit) ? account.plan_limit : null
+  return {
+    plan: typeof account?.current_plan === 'string' && account.current_plan.trim() !== '' ? account.current_plan.trim() : 'Tavily',
+    used: usedRaw,
+    limit,
+    remaining: limit === null ? null : Math.max(0, limit - usedRaw)
+  }
+}
+
+/** 用量细账 → 一行大白话(纯函数,自测覆盖):界面上「测一下」成功后随身显示的那句 */
+export function tavilyUsageText(usage: TavilyUsageInfo): string {
+  if (usage.limit === null) return `${usage.plan}计划 · 本月已用 ${usage.used} 次(没有固定上限)`
+  return `${usage.plan}计划 · 本月已用 ${usage.used} / ${usage.limit} 次,还剩 ${usage.remaining ?? Math.max(0, usage.limit - usage.used)} 次`
 }
 
 /**

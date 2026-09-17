@@ -70,8 +70,8 @@ import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
 import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
-import { stripHtmlTags, webLookupDetailed, probeTavilyKey, looksLikeTavilyResponse, HttpStatusError, TAVILY_PROBE_QUERY, TAVILY_SEARCH_URL } from '../src/ai/weblookup.ts'
-import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus } from '../src/shared/tavily.ts'
+import { stripHtmlTags, webLookupDetailed, probeTavilyKey, HttpStatusError, TAVILY_USAGE_URL } from '../src/ai/weblookup.ts'
+import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus, parseTavilyUsage, tavilyUsageText } from '../src/shared/tavily.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
@@ -509,27 +509,41 @@ async function main(): Promise<void> {
     assert.equal(tavilyVerdictFromStatus(500), 'server')
     assert.equal(tavilyVerdictFromStatus(418), 'other', '没见过的码走兜底,不硬猜')
 
-    // 200 的正文得真像 Tavily 的回话:网络被劫持/门户页也是 200,别被骗成「能用」
-    assert.ok(looksLikeTavilyResponse('{"query":"x","results":[]}'), '标准回话认得出')
-    assert.ok(looksLikeTavilyResponse('{"request_id":"abc"}'), '只有 request_id 也认')
-    assert.ok(!looksLikeTavilyResponse('<html>请先登录</html>'), '门户页不认')
-    assert.ok(!looksLikeTavilyResponse('{烂的'), '坏 JSON 不认')
+    // /usage 回话洗成用量(2026-09-17「测一下」零成本改造):200 但形状不像照样不认,
+    // 已用次数计划级优先、Key 级兜底,俩数都没有 = 看不懂,不硬编
+    const realShape =
+      '{"key":{"usage":3,"limit":null,"search_usage":3},"account":{"current_plan":"Researcher","plan_usage":3,"plan_limit":1000}}'
+    assert.deepEqual(
+      parseTavilyUsage(realShape),
+      { plan: 'Researcher', used: 3, limit: 1000, remaining: 997 },
+      '实测形状:计划级已用/限额,算出剩余'
+    )
+    assert.deepEqual(
+      parseTavilyUsage('{"key":{"usage":7},"account":{"current_plan":"Free"}}'),
+      { plan: 'Free', used: 7, limit: null, remaining: null },
+      '计划级没给已用就退 Key 级;限额缺 = 无固定上限'
+    )
+    assert.equal(parseTavilyUsage('{"account":{"current_plan":"X"}}'), null, '连一个已用次数都没有 = 形状不像,不硬编')
+    assert.equal(parseTavilyUsage('<html>请先登录</html>'), null, '劫持门户页不认')
+    assert.equal(parseTavilyUsage('{烂的'), null, '坏 JSON 不认')
+    assert.equal(tavilyUsageText({ plan: 'Researcher', used: 3, limit: 1000, remaining: 997 }), 'Researcher计划 · 本月已用 3 / 1000 次,还剩 997 次', '用量一行大白话')
+    assert.equal(tavilyUsageText({ plan: 'Free', used: 7, limit: null, remaining: null }), 'Free计划 · 本月已用 7 次(没有固定上限)', '无固定上限的口风')
 
-    // 测一下:真打官方接口,按状态码给结论
+    // 测一下(2026-09-17 改打 /usage):零搜索额度成本,200 本身证明 Key 有效,附带用量
     let probeUrl = ''
     let probeAuth = ''
-    let probeBody: Record<string, unknown> = {}
-    const ok = await probeTavilyKey('tvly-abc123def', async (url, body, headers) => {
+    const ok = await probeTavilyKey('tvly-abc123def', async (url, headers) => {
       probeUrl = url
-      probeBody = body
       probeAuth = headers.Authorization
-      return '{"query":"CodeAtlas key check","results":[]}'
+      return realShape
     })
-    assert.equal(probeUrl, TAVILY_SEARCH_URL, '打的是官方入口')
+    assert.equal(probeUrl, TAVILY_USAGE_URL, '打的是用量查询入口')
     assert.equal(probeAuth, 'Bearer tvly-abc123def', 'Key 走认证头,不进 URL')
-    assert.equal(probeBody.max_results, 1, '探测只要 1 条结果,省额度')
-    assert.equal(probeBody.query, TAVILY_PROBE_QUERY, '探针查询词是固定那一句')
-    assert.deepEqual(ok, { verdict: 'ok', status: 200 }, '通了 = 能用')
+    assert.deepEqual(
+      ok,
+      { verdict: 'ok', status: 200, usage: { plan: 'Researcher', used: 3, limit: 1000, remaining: 997 } },
+      '通了 = 能用,还带回用量细账'
+    )
 
     const bad = await probeTavilyKey('tvly-wrong', async () => {
       throw new HttpStatusError(401)
@@ -540,6 +554,11 @@ async function main(): Promise<void> {
       throw new HttpStatusError(432)
     })
     assert.equal(quota.verdict, 'quota', '额度用完单独成档:Key 本身没错')
+
+    const busy = await probeTavilyKey('tvly-abc123def', async () => {
+      throw new HttpStatusError(429)
+    })
+    assert.equal(busy.verdict, 'busy', '用量接口也有自己的限流,429 照档说')
 
     const offline = await probeTavilyKey('tvly-abc123def', async () => {
       throw new Error('getaddrinfo ENOTFOUND')
