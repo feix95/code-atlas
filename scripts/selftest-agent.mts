@@ -358,11 +358,19 @@ function main(): void {
   assert.equal(isFindQuestion('帮我卸载永劫无间'), false, '操作题不是找位置题,闸不多管闲事')
   assert.equal(isFindQuestion('Rust 是什么'), false, '概念题不拦')
   assert.equal(isFindQuestion('这个项目用什么语言写的'), false, '泛泛的问话不误伤')
+  // 泛搜语气词出表(2026-09-17 小葵案):「搜一下 xx 是什么」是介绍题不是找位置题,
+  // 老词表拿「搜一下」当信号误开闸,模型用联网搜索答对了也被逼着重搜本地文件
+  assert.equal(isFindQuestion('搜一下这个文件夹是什么'), false, '「搜一下」是查概念,不是找位置,闸别开')
+  assert.equal(isFindQuestion('帮我搜搜这类工具有哪些'), false, '「搜搜」同理出表')
 
   assert.equal(answerCitesAnyHit('你装的 skills 在 node_modules/foo-skill/package.json 里', ['node_modules/foo-skill/package.json']), true, '答案引用了命中路径 = 有具体文件')
   assert.equal(answerCitesAnyHit('大概在 node_modules\\foo-skill 这个文件夹', ['node_modules/foo-skill/package.json']), false, '只报文件夹没到文件 = 没引用')
   assert.equal(answerCitesAnyHit('答案里写 src/other.ts', ['node_modules/foo-skill/package.json']), false, '引用的是没搜到的路径 = 对不上账,算没引用')
   assert.equal(answerCitesAnyHit('在 a/B.ts:12 那行', ['a/b.ts']), true, '带行号的引用也算(大小写/行号后缀不碍事)')
+  // 文件名级对账(2026-09-17):模型爱写短路径,少写前缀不再算「没引用」——老口径全路径精确匹配
+  // 太苛刻,答案明明提到了具体文件也被拦着重写一轮;可点跳转另有命中清单卡兜底,不怕放水
+  assert.equal(answerCitesAnyHit('在 logs/cc-switch.log 的日志里能看到', ['cc-switch/logs/cc-switch.log']), true, '少写前缀的短路径,文件名对上就算引用')
+  assert.equal(answerCitesAnyHit('配置写在 settings.json:21 那行', ['cc-switch/settings.json']), true, '光写文件名+行号也算(模型最常这么写)')
 
   assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: false, hitPaths: [], answer: 'skills 在 xxx 文件夹' }), 'no-search', '判据一:没搜过就交卷,拦')
   assert.equal(findAnswerGap({ isFindQuestion: true, searchUsed: false, hitPaths: [], answer: '' }), 'no-search', '判据一不看答案内容:没搜就是没搜')
@@ -372,7 +380,10 @@ function main(): void {
   assert.equal(findAnswerGap({ isFindQuestion: false, searchUsed: false, hitPaths: [], answer: '随便答' }), null, '不是找位置题,闸不拦')
   assert.ok(SALVAGE_SEARCH_NUDGE.includes('search_content') && SALVAGE_SEARCH_NUDGE.includes('真没有'), '判据一的提醒要点名工具、许它说真没有')
   assert.ok(SALVAGE_CITE_NUDGE.includes('具体文件'), '判据二的提醒要逼到具体文件')
-  assert.ok(SALVAGE_NUDGE_MAX === 2, '补救提醒封顶两次,不无限跟它耗')
+  // 纠错消息自报家门(2026-09-17 小葵定):小模型老把程序插话当用户催促,以为用户不满意让它重来
+  assert.ok(SALVAGE_SEARCH_NUDGE.includes('不是用户说话'), '判据一的提醒要亮明程序身份')
+  assert.ok(SALVAGE_CITE_NUDGE.includes('不用重新理解问题'), '判据二的提醒要说明只是补信息,不用重想')
+  assert.ok(SALVAGE_NUDGE_MAX === 1, '补救提醒封顶一次:宁可答案差点,不让用户干等转圈')
 
   // ── 21. 守则三步 SOP + 工具说明的新口风 ──
   assert.ok(AGENT_ADDENDUM.includes('固定三步走'), '守则要写固定流程,不靠 9B 临场发挥')
