@@ -53,7 +53,7 @@ check('小葵的绿(#7dba32)明度带内不夹,压深字', () => {
 })
 
 // ── 外观搬家(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘 ──
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sanitizeAppearance, resolveAppearanceStartup, defaultAppearance } from '../src/shared/appearancePrefs.ts'
@@ -125,4 +125,44 @@ check('落盘:存进 appearance.json 再读回来是同一份,坏文件老实回
   }
 })
 
-console.log('✅ 配色字色自适应 + 外观搬家自测全绿')
+// ── IPC 通道对账(2026-09-17 补网):两边收发必须成对,不然消息静默丢弃 ──
+// 起因:atlas:appearance-save 一边 ipcRenderer.send、一边 ipcMain.handle —— 一边发件、一边只收 invoke,
+// 消息没人接也没人报错,appearance.json 一次都没写成过,外观重启就回出厂。
+// 硬规矩:send/sendSync 配 ipcMain.on,invoke 配 ipcMain.handle;主进程推给渲染层的配 ipcRenderer.on。
+check('IPC 通道对账:preload 与主进程两边收发一一配对', () => {
+  const srcDir = new URL('../src/', import.meta.url)
+  const allSource = readdirSync(srcDir, { recursive: true })
+    .map((f) => String(f).replaceAll('\\', '/'))
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => readFileSync(new URL(f, srcDir), 'utf8'))
+    .join('\n')
+  const grab = (re: RegExp): Set<string> => new Set([...allSource.matchAll(re)].map((m) => m[1]!))
+
+  const sentOneWay = grab(/ipcRenderer\.(?:send|sendSync)\(\s*'([^']+)'/g)
+  const sentInvoke = grab(/ipcRenderer\.invoke\(\s*'([^']+)'/g)
+  const onListeners = grab(/ipcMain\.on\(\s*'([^']+)'/g)
+  const handleListeners = grab(/ipcMain\.handle\(\s*'([^']+)'/g)
+  const pushed = grab(/(?:webContents|sender)\.send\(\s*'([^']+)'/g)
+  const subscribed = grab(/ipcRenderer\.on\(\s*'([^']+)'/g)
+
+  // 先确认网还张得开:六张单子都得有货,哪张空了就是正则跟代码写法脱了节,别让空网假装全绿
+  const rosters: [string, Set<string>][] = [
+    ['send/sendSync', sentOneWay],
+    ['invoke', sentInvoke],
+    ['ipcMain.on', onListeners],
+    ['ipcMain.handle', handleListeners],
+    ['主进程推送', pushed],
+    ['preload 订阅', subscribed]
+  ]
+  for (const [name, roster] of rosters) {
+    assert.ok(roster.size > 0, `通道对账的「${name}」单子空了 —— 正则和代码写法可能脱节了`)
+  }
+
+  const orphans: string[] = []
+  for (const c of sentOneWay) if (!onListeners.has(c)) orphans.push(`${c}(发了,主进程没有 ipcMain.on)`)
+  for (const c of sentInvoke) if (!handleListeners.has(c)) orphans.push(`${c}(invoke 了,主进程没有 ipcMain.handle)`)
+  for (const c of pushed) if (!subscribed.has(c)) orphans.push(`${c}(主进程推了,preload 没订阅)`)
+  assert.deepEqual(orphans, [], `这些通道两边对不上:\n${orphans.join('\n')}`)
+})
+
+console.log('✅ 配色字色自适应 + 外观搬家 + IPC 通道对账自测全绿')

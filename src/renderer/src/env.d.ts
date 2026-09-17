@@ -33,10 +33,10 @@ declare global {
         electron: () => string
       }
       pickFolder: () => Promise<string | null>
-      /** 外观偏好(存主进程 appearance.json):getSync 同步通道保首帧不闪默认皮;save 异步落盘 */
+      /** 外观偏好(存主进程 appearance.json):getSync 同步通道保首帧不闪默认皮;save 走 invoke 异步落盘 */
       appearance: {
         getSync: () => Appearance | null
-        save: (a: Appearance) => void
+        save: (a: Appearance) => Promise<void>
       }
       /** 列盘符:只问 Windows 有哪些盘,不翻文件内容;首页盘符列表用 */
       listDrives: () => Promise<DriveInfo[]>

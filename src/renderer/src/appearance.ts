@@ -41,7 +41,7 @@ export function loadAppearance(): Appearance {
   current = startup.value
   if (startup.migrate) {
     // 旧档迁新家:异步落盘不阻塞首帧;迁完把旧仓清掉,从此不再回头
-    window.atlas.appearance.save(current)
+    void window.atlas.appearance.save(current)
     try {
       localStorage.removeItem(APPEARANCE_KEY)
     } catch {
@@ -54,7 +54,8 @@ export function loadAppearance(): Appearance {
 export function saveAppearance(a: Appearance): void {
   // 先清清洗:界面层理论上只会送合法值,这道闸保证存档永远干净
   current = sanitizeAppearance(a)
-  window.atlas.appearance.save(current)
+  // 落盘是异步的,调用方(点「应用更改」)不等它:存档本身已经是内存这份,写文件失败也没界面可回滚
+  void window.atlas.appearance.save(current)
 }
 
 /** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配
