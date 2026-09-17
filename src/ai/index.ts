@@ -23,6 +23,7 @@ import { addDevLog } from '../shared/devlog.ts'
 import { AI_ANTI_REPEAT_PARAMS, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
 import { buildSummaryText } from '../shared/compact.ts'
+import { CURRENT_QUESTION_PREFIX } from '../shared/chatHistory.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
@@ -129,8 +130,11 @@ const CHAT_HISTORY_CONTENT_MAX = 500
  * 窗口方向(2026-09-17 修「小探针回复以前问过的问题」):从尾巴上取最近几条,两头口径必须
  * 都是「留最近」—— 老代码从头取前 5 条,把刚聊完的一轮整个扔掉,窗口还常停在一个没被回答的
  * 旧问题上,合并逻辑顺手把它和当前问题粘成一条,小模型扭头就去答那个旧问题。
- * 尾取完再收拢成完整问答对:开头不许是 assistant(半截答案无头无尾,有的模型模板还挑形状),
- * 结尾不许是 user(悬空的问题就是旧题重答的祸根)—— 这样窗口里唯一没答案的提问,只会是当前这条。 */
+ * 尾取完再收拢成完整问答对(2026-09-18 答旧题修复·刀二):先做中间扫描 —— 相邻同角色各只留
+ * 最后一条(连续 user 必是「问了没答」的悬空旧题;连续 assistant 对称处理),这样洗完任意
+ * 相邻两条必不同角色;再两头收拢:开头不许是 assistant(半截答案无头无尾,有的模型模板还挑
+ * 形状),结尾不许是 user(悬空的问题就是旧题重答的祸根)—— 这样窗口里唯一没答案的提问,
+ * 只会是当前这条。 */
 export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   if (!Array.isArray(history)) return []
   const cleaned: AiHistoryMessage[] = []
@@ -143,9 +147,16 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
     cleaned.push({ role, content: text })
   }
   const window = cleaned.slice(-CHAT_HISTORY_MAX)
-  while (window.length > 0 && window[0]?.role === 'assistant') window.shift()
-  while (window.length > 0 && window[window.length - 1]?.role === 'user') window.pop()
-  return window.map((m) => ({
+  // 中间扫描:连续同角色的段落只留最后一条 —— 前面几条 user 都没有紧邻的回答,必是悬空
+  const collapsed: AiHistoryMessage[] = []
+  for (const m of window) {
+    const last = collapsed[collapsed.length - 1]
+    if (last && last.role === m.role) collapsed[collapsed.length - 1] = m
+    else collapsed.push(m)
+  }
+  while (collapsed.length > 0 && collapsed[0]?.role === 'assistant') collapsed.shift()
+  while (collapsed.length > 0 && collapsed[collapsed.length - 1]?.role === 'user') collapsed.pop()
+  return collapsed.map((m) => ({
     role: m.role,
     content:
       m.content.length > CHAT_HISTORY_CONTENT_MAX
@@ -280,7 +291,10 @@ export function buildFreeChatMessages(
   const refHint = attachment
     ? `\n\n(当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头的 <context_attachment> 就是它的机器扫描资料;问题里的「这个/它」指的就是它,资料里没有的就直说没有,别猜别的文件)`
     : ''
-  const tail = `${tail0}${refHint}`
+  // 注意力锚(答旧题修复·刀三):历史洗干净后旧问题都是干净短句,当前问题后面却粘着
+  // 联网资料/参考资料指路话,小模型按「长得最像待答问题」作答就会偏 —— 钉一块显式标牌,
+  // 主进程 agent 链取问题时剥掉(stripCurrentQuestionAnchor),提醒卡引用的还是干净原文
+  const tail = `${CURRENT_QUESTION_PREFIX}${tail0}${refHint}`
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: codeRefs.length > 0 ? `${system}\n\n${CODE_TEACHER_ADDENDUM}` : system },
     ...(attachment ? [{ role: 'user' as const, content: buildAttachmentText(attachment) }] : []),

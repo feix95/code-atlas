@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentSearchCard, AiStreamStats, AiUsage, AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { COMPACT_SUMMARY_TAG } from '@shared/compact'
+import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
 import { friendlyErr } from './errText'
 
 /**
@@ -35,10 +36,6 @@ export interface ChatMessage {
   /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
   refs?: ChatCodeRef[]
 }
-
-/** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底。
- * 两边口径一致(2026-09-17):都是留最近的尾巴——别改成留开头,老 bug 就是这么来的 */
-const HISTORY_MAX = 8
 
 /** /compact 压缩完保留最近几条原文(第一百四十二锤):摘要垫底 + 这几条原文,衔接不断片 */
 const COMPACT_KEEP_RECENT = 4
@@ -77,14 +74,11 @@ const THINKING_KEY = 'atlas-freechat-thinking'
 /** 翻文件(agent)开关的 localStorage 键(第一百二十八锤) */
 const AGENT_KEY = 'atlas-freechat-agent'
 
-/** 把答完的轮次整理成对话历史;半截话(取消/失败)不喂回模型;程序垫的灰字条(note)也不喂 */
+/** 历史按「轮」成对收集(答旧题修复锤):只收一问一答都落地的完整轮,报错/取消/半截的
+ * 整轮扔,悬空旧问题不再沉进历史勾着小模型答旧题。纯逻辑住 shared/chatHistory.ts,
+ * 渲染层与自测共用同一份口径;本地模型上下文有限,主进程还会再洗一遍兜底 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
-  const out: AiChatRequest['history'] = []
-  for (const m of messages) {
-    if (m.role === 'note' || m.state !== 'done' || !m.text) continue
-    out.push({ role: m.role, content: m.text })
-  }
-  return out.slice(-HISTORY_MAX)
+  return collectHistoryRounds(messages, FREE_CHAT_HISTORY_MAX)
 }
 
 export function useAiChat(

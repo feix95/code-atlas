@@ -65,6 +65,7 @@ import {
   COMPACT_SUMMARY_CHARS,
   COMPACT_HISTORY_MAX_MESSAGES
 } from '../src/shared/compact.ts'
+import { collectHistoryRounds, CURRENT_QUESTION_PREFIX, stripCurrentQuestionAnchor } from '../src/shared/chatHistory.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
@@ -272,12 +273,116 @@ async function main(): Promise<void> {
   assert.equal(ragged[ragged.length - 1]?.content, '第5答', '留在窗口里的是最近一轮的答案')
   assert.ok(!ragged.some((m) => m.content === '第6问'), '悬空的旧问题(没被回答过的)要摘掉')
 
+  // ── 答旧题修复锤(2026-09-18):历史按「轮」成对收集,悬空旧问题整轮扔 ──
+  // 报错轮:提问一发出就永久 done,回答却是 error —— 整轮都不许进历史
+  const errRound = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'assistant', state: 'done', text: '第1答' },
+      { role: 'user', state: 'done', text: '第2问' },
+      { role: 'assistant', state: 'error', text: '报错了' },
+      { role: 'user', state: 'done', text: '第3问' },
+      { role: 'assistant', state: 'done', text: '第3答' }
+    ],
+    8
+  )
+  assert.deepEqual(errRound.map((m) => m.content), ['第1问', '第1答', '第3问', '第3答'], '报错轮整轮扔,悬空旧问题不进历史')
+  // 悬空旧问题沉在历史中间的裸形态:问出去没答完,后面的正常问答把它夹在中间
+  const orphanRound = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'assistant', state: 'done', text: '第1答' },
+      { role: 'user', state: 'done', text: '第2问' },
+      { role: 'user', state: 'done', text: '第3问' },
+      { role: 'assistant', state: 'done', text: '第3答' }
+    ],
+    8
+  )
+  assert.deepEqual(orphanRound.map((m) => m.content), ['第1问', '第1答', '第3问', '第3答'], '沉在中间的悬空旧问题整轮扔')
+  // 取消轮同理
+  const cancelRound = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'assistant', state: 'cancelled', text: '半截话' },
+      { role: 'user', state: 'done', text: '第2问' },
+      { role: 'assistant', state: 'done', text: '第2答' }
+    ],
+    8
+  )
+  assert.deepEqual(cancelRound.map((m) => m.content), ['第2问', '第2答'], '取消轮整轮扔')
+  // 重试轮:同一问题问了两遍,只留最新一对
+  const retryRound = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'assistant', state: 'done', text: '第1答' },
+      { role: 'user', state: 'done', text: '第2问' },
+      { role: 'assistant', state: 'done', text: '第2答(半截)' },
+      { role: 'user', state: 'done', text: '第2问' },
+      { role: 'assistant', state: 'done', text: '第2答(重答)' },
+      { role: 'user', state: 'done', text: '第3问' },
+      { role: 'assistant', state: 'done', text: '第3答' }
+    ],
+    8
+  )
+  assert.deepEqual(retryRound.map((m) => m.content), ['第1问', '第1答', '第2问', '第2答(重答)', '第3问', '第3答'], '重试的重复提问只留最新一对')
+  // note 灰字不进历史也不打断配对;还没答完的轮不进
+  const withNotes = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'note', state: 'done', text: '步骤:翻了文件' },
+      { role: 'assistant', state: 'done', text: '第1答' }
+    ],
+    8
+  )
+  assert.deepEqual(withNotes.map((m) => m.content), ['第1问', '第1答'], 'note 灰字不进历史也不打断配对')
+  const pendingRound = collectHistoryRounds(
+    [
+      { role: 'user', state: 'done', text: '第1问' },
+      { role: 'assistant', state: 'busy', text: '' }
+    ],
+    8
+  )
+  assert.deepEqual(pendingRound, [], '还没答完的轮不进历史')
+  assert.deepEqual(collectHistoryRounds([{ role: 'user', state: 'done', text: '第1问' }], 8), [], '只有提问没有回答,整轮不要')
+
+  // 主进程兜底(答旧题修复·刀二):渲染层漏网的悬空旧问题,中间扫描照样摘 —— 连续多条 user 只留最后一条
+  const dangling = sanitizeHistory([
+    { role: 'user', content: '第1问' },
+    { role: 'user', content: '第2问' },
+    { role: 'assistant', content: '第2答' },
+    { role: 'user', content: '第3问' },
+    { role: 'assistant', content: '第3答' }
+  ])
+  assert.deepEqual(dangling.map((m) => m.content), ['第2问', '第2答', '第3问', '第3答'], '兜底:连续 user 只留最后一条,悬空旧题摘干净')
+  // 不变式:任意乱序脏输入,洗完开头必 user、结尾必 assistant、相邻必不同角色
+  const messy = sanitizeHistory([
+    { role: 'assistant', content: '开头的半截答案' },
+    { role: 'user', content: '第1问' },
+    { role: 'assistant', content: '第1答' },
+    { role: 'assistant', content: '第1答又一条' },
+    { role: 'user', content: '第2问' },
+    { role: 'user', content: '第3问' },
+    { role: 'assistant', content: '第3答' },
+    { role: 'user', content: '结尾悬空问' }
+  ])
+  assert.ok(messy.length > 0, '乱序脏输入洗完还剩正经问答')
+  assert.equal(messy[0]?.role, 'user', '不变式:开头必是 user')
+  assert.equal(messy[messy.length - 1]?.role, 'assistant', '不变式:结尾必是 assistant')
+  for (let i = 1; i < messy.length; i += 1) {
+    assert.notEqual(messy[i]?.role, messy[i - 1]?.role, '不变式:相邻两条必不同角色')
+  }
+
   // 端到端回归(小葵报的案):当前问题必须单独成条 —— 老毛病是悬空的旧问题被合并逻辑
   // 粘到当前问题前面,拼成「旧问题\n\n新问题」,小模型扭头就去答那个旧问题
   const chatMessages = buildFreeChatMessages('人设', null, sanitizeHistory(pairHistory), '第7问', null)
   const lastMessage = chatMessages[chatMessages.length - 1]
   assert.equal(lastMessage?.role, 'user', '拼完的消息序列,最后一条是当前问题')
-  assert.equal(lastMessage?.content, '第7问', '当前问题不许和旧问题粘成一条')
+  // 注意力锚(答旧题修复·刀三):当前问题钉标牌,agent 链取问题时剥掉,提醒卡引用干净原文
+  assert.ok(lastMessage?.content.startsWith(CURRENT_QUESTION_PREFIX), '当前问题要带注意力锚')
+  assert.ok(lastMessage?.content.endsWith('第7问'), '锚点后面就是当前问题原文')
+  assert.ok(!lastMessage?.content.includes('第6问'), '当前问题不许和旧问题粘成一条')
+  assert.equal(stripCurrentQuestionAnchor(lastMessage?.content ?? ''), '第7问', '剥掉锚点后问题原文干干净净')
+  assert.equal(stripCurrentQuestionAnchor('没锚的普通问题'), '没锚的普通问题', '没锚的文本原样返回')
   assert.ok(
     chatMessages.every((m, index) => index === 0 || m.role !== chatMessages[index - 1]?.role),
     '相邻同角色已合并,不许出现连续两条 user'

@@ -38,6 +38,7 @@ import {
 } from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
+import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -1069,12 +1070,13 @@ async function runAgentChat(input: {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
   const messages: AgentChatMessage[] = [...baseMessages]
   // 本轮用户真正的问题 = 组装消息里最后一条 user(附件/摘要/历史都垫在它前面);
-  // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下
+  // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下。
+  // 剥掉注意力锚(答旧题修复·刀三):提醒卡引用的是干净的问题原文,标牌不进提醒
   let currentQuestion = ''
   for (let i = baseMessages.length - 1; i >= 0; i--) {
     const m = baseMessages[i]
     if (m.role === 'user') {
-      currentQuestion = m.content
+      currentQuestion = stripCurrentQuestionAnchor(m.content)
       break
     }
   }
