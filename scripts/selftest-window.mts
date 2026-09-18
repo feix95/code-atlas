@@ -2,7 +2,9 @@
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { EventEmitter } from 'node:events'
 import assert from 'node:assert/strict'
+import type { BrowserWindow } from 'electron'
 import {
   WINDOW_MIN_HEIGHT,
   WINDOW_MIN_WIDTH,
@@ -11,7 +13,8 @@ import {
   readWindowState,
   writeWindowState
 } from '../src/main/window-state.ts'
-import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
+import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, mascotMenuLabel, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
+import { MainPanelController } from '../src/main/mainPanel.ts'
 
 /** 本机假定的工作区:主屏 2560×1400,左边挂一块 1920×1040(负坐标) */
 const WORK_AREAS = [
@@ -177,6 +180,108 @@ check('mascotCursorInside:身上算摸到,四角透明区和窗外算没摸到,�
 check('mainPanelMenuLabel:主面板在屏上给「藏起」,不在给「叫它出来」', () => {
   assert.equal(mainPanelMenuLabel(true), '隐藏主面板')
   assert.equal(mainPanelMenuLabel(false), '显示主面板')
+})
+
+check('mascotMenuLabel:藏着给「叫它出来」,露着给「藏起它」', () => {
+  assert.equal(mascotMenuLabel(true), '显示桌宠')
+  assert.equal(mascotMenuLabel(false), '隐藏桌宠')
+})
+
+class FakeMainPanelWindow extends EventEmitter {
+  visible = false
+  minimized = false
+  destroyed = false
+  readonly calls: string[] = []
+  readonly webContents = {
+    invalidate: () => {
+      this.calls.push('invalidate')
+    }
+  }
+
+  isDestroyed(): boolean {
+    return this.destroyed
+  }
+  isVisible(): boolean {
+    return this.visible
+  }
+  isMinimized(): boolean {
+    return this.minimized
+  }
+  restore(): void {
+    this.calls.push('restore')
+    this.minimized = false
+    this.emit('restore')
+  }
+  show(): void {
+    this.calls.push('show')
+    this.visible = true
+    this.emit('show')
+  }
+  hide(): void {
+    this.calls.push('hide')
+    this.visible = false
+    this.emit('hide')
+  }
+  focus(): void {
+    this.calls.push('focus')
+  }
+}
+
+check('MainPanelController:初始露着但最小化记成不在屏;restore/show/hide/minimize 事件翻账本', () => {
+  const win = new FakeMainPanelWindow()
+  win.visible = true
+  win.minimized = true
+  const controller = new MainPanelController(win as unknown as BrowserWindow)
+  assert.equal(controller.isShown(), false, '初始:露着但最小化 → 不算在屏')
+  win.restore()
+  assert.equal(controller.isShown(), true, 'restore 事件 → 记回在屏')
+  win.hide()
+  assert.equal(controller.isShown(), false, 'hide 事件 → 记下不在屏')
+  win.show()
+  assert.equal(controller.isShown(), true, 'show 事件 → 记回在屏')
+  win.minimized = true
+  win.emit('minimize')
+  assert.equal(controller.isShown(), false, 'minimize 事件 → 记下不在屏')
+  win.restore()
+  assert.equal(controller.isShown(), true)
+  win.emit('closed')
+  assert.equal(controller.isShown(), false, 'closed 事件 → 账本清零')
+})
+
+check('MainPanelController:底层谎报「露着」其实最小化时,show() 照样 restore→show→invalidate→focus', () => {
+  const win = new FakeMainPanelWindow()
+  win.visible = true
+  win.minimized = true
+  const controller = new MainPanelController(win as unknown as BrowserWindow)
+  controller.show()
+  assert.deepEqual(win.calls, ['restore', 'show', 'invalidate', 'focus'])
+  assert.equal(controller.isShown(), true)
+})
+
+check('MainPanelController:翻账才喊旁听,重复状态不吵(托盘菜单靠它换文案)', () => {
+  const win = new FakeMainPanelWindow()
+  const controller = new MainPanelController(win as unknown as BrowserWindow)
+  const seen: boolean[] = []
+  controller.onShownChange = (v) => seen.push(v)
+  win.show()
+  win.show()
+  win.hide()
+  assert.deepEqual(seen, [true, false])
+})
+
+check('MainPanelController:hide() 收窗记账;窗销毁后 show/hide 都不再碰窗', () => {
+  const win = new FakeMainPanelWindow()
+  win.visible = true
+  const controller = new MainPanelController(win as unknown as BrowserWindow)
+  controller.hide()
+  assert.deepEqual(win.calls, ['hide'])
+  assert.equal(controller.isShown(), false)
+  win.destroyed = true
+  win.calls.length = 0
+  controller.show()
+  controller.hide()
+  assert.deepEqual(win.calls, [])
+  assert.equal(controller.isShown(), false)
 })
 
 async function main(): Promise<void> {

@@ -25,6 +25,21 @@ export function MascotPage(): React.JSX.Element {
   const [mood, setMood] = useState<Mood>('idle')
   // 弹跳计数:每次点击 +1,当 key 用 —— key 一变 DOM 重建,boing 动画从头放
   const [boing, setBoing] = useState(0)
+  // 藏/露听主进程(第六案):藏起 = 页面不画身体,窗的透明度从头到尾不动,
+  // 合成链不断档。挂载先拉一次再订推送 —— 藏起期间页面重载也别当幽灵
+  const [petVisible, setPetVisible] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    void window.atlas.mascotVisibilityGet().then((v) => {
+      if (alive) setPetVisible(v)
+    })
+    const off = window.atlas.onMascotVisibility(setPetVisible)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
 
   useEffect(() => {
     moodRef.current = mood
@@ -58,30 +73,12 @@ export function MascotPage(): React.JSX.Element {
     []
   )
 
-  // 光标跟踪 + 拖动跟随:只把光标的屏幕坐标报给主进程,「在不在小家伙身上」由那边
-  // 拿窗的真实位置判定 —— 以前渲染层拿 clientX 自己算,穿透模式下收到的坐标可能
-  // 和窗对不上,算出来永远「不在身上」,窗一直穿透,拖和点全漏到桌面(拖不动的病根)
+  // 拖动跟随:按住时每次鼠标动都让主进程跟着光标挪窗。
+  // 「在不在小家伙身上」不用渲染层操心 —— 主进程轮询光标位置自己判,
+  // Electron 的鼠标转发断不断气都跟咱无关(「又拖不动」第三案的治法)
   useEffect(() => {
-    let lastX = NaN
-    let lastY = NaN
-    const onMove = (e: MouseEvent): void => {
-      // 拖动中只发「跟着挪窗」,位置报信主进程反正不看(它在锁实心)
-      if (draggingRef.current) {
-        window.atlas.mascotDragMove()
-        return
-      }
-      const x = Math.round(e.screenX)
-      const y = Math.round(e.screenY)
-      if (x !== lastX || y !== lastY) {
-        lastX = x
-        lastY = y
-        window.atlas.mascotMouse({ x, y })
-      }
-    }
-    const onLeave = (): void => {
-      lastX = NaN
-      lastY = NaN
-      window.atlas.mascotMouse(null)
+    const onMove = (): void => {
+      if (draggingRef.current) window.atlas.mascotDragMove()
     }
     const onUp = (e: MouseEvent): void => {
       if (!draggingRef.current) return
@@ -96,18 +93,14 @@ export function MascotPage(): React.JSX.Element {
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-    // 光标甩出窗口时没有 mousemove 可收 —— 穿透开着时 Electron 会补送 mouseleave,
-    // 靠它把「不在身上」报出去,不然窗卡成实心、透明区把桌面点击也挡住
-    document.addEventListener('mouseleave', onLeave)
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      document.removeEventListener('mouseleave', onLeave)
     }
   }, [])
 
   return (
-    <div className={`mascot-root mascot-${mood}`}>
+    <div className={`mascot-root mascot-${mood}${petVisible ? '' : ' mascot-off'}`}>
       <div
         key={boing}
         className={`mascot-body${boing > 0 ? ' mascot-boing' : ''}`}

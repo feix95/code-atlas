@@ -201,11 +201,8 @@ contextBridge.exposeInMainWorld('atlas', {
   frameHeartbeat: (): void => {
     ipcRenderer.send('atlas:frame-heartbeat')
   },
-  // ── 桌宠(桌宠托管第二锤):穿透开关 + 拖动三连 + 点击唤主面板,全是单向 send(配主进程 ipcMain.on) ──
-  /** 光标挪了:上报屏幕坐标(null = 光标已离开窗),「在不在小家伙身上」由主进程拿窗位置判定 */
-  mascotMouse: (pos: { x: number; y: number } | null): void => {
-    ipcRenderer.send('atlas:mascot-mouse', pos)
-  },
+  // ── 桌宠(桌宠托管第二锤):拖动三连 + 点击唤主面板 + 右键菜单,全是单向 send(配主进程 ipcMain.on)。
+  // 穿透开关不靠渲染层上报 —— 主进程轮询光标位置自己判(转发机制不可靠,第三案后弃用) ──
   /** 右键点了小家伙:主进程弹快捷菜单(唤主面板/藏桌宠/退出) */
   mascotMenu: (): void => {
     ipcRenderer.send('atlas:mascot-menu')
@@ -221,6 +218,14 @@ contextBridge.exposeInMainWorld('atlas', {
   },
   mascotActivate: (): void => {
     ipcRenderer.send('atlas:mascot-activate')
+  },
+  /** 露面状态:页面挂载时拉一次 —— 藏起期间页面重载,别让它当「看得见点不着的幽灵」 */
+  mascotVisibilityGet: (): Promise<boolean> => ipcRenderer.invoke('atlas:mascot-visible-get'),
+  /** 订阅主进程「藏/露」推送(藏起 = 页面不画身体,窗的透明度不动);返回退订函数 */
+  onMascotVisibility: (callback: (visible: boolean) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, visible: boolean): void => callback(visible)
+    ipcRenderer.on('atlas:mascot-visible', listener)
+    return () => ipcRenderer.removeListener('atlas:mascot-visible', listener)
   },
   // ── 右键问一问:资源管理器右键菜单 + 气泡聊天(invoke 配 handle、send 配 on,收发成对) ──
   /** 资源管理器右键菜单开关:读现状(available=false = 开发模式,没得拨) */

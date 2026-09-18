@@ -39,7 +39,9 @@ import {
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
-import { createMascotWindow, registerMascotIpc, toggleMascot } from './mascot.ts'
+import { createMascotWindow, isMascotHidden, registerMascotIpc, setMascotHiddenListener, toggleMascot } from './mascot.ts'
+import { mainPanelMenuLabel, mascotMenuLabel } from './mascotState.ts'
+import { MainPanelController } from './mainPanel.ts'
 import { openBubble, registerBubbleIpc } from './bubble.ts'
 import { extractLaunchPath } from './launchPath.ts'
 import { readShellMenuEnabled, writeShellMenu } from './shellMenu.ts'
@@ -465,6 +467,7 @@ let devLogWindow: BrowserWindow | null = null
 // ── 托盘常驻与单实例(桌宠托管第一锤,2026-09-18)──
 // 收起模式的地基:主窗引用提升到模块级,托盘和 second-instance 都要够得着它。
 let mainWindowRef: BrowserWindow | null = null
+let mainPanelController: MainPanelController | null = null
 let tray: Tray | null = null
 // 真退出旗:托盘「退出」先立旗再 quit,close 事件看见旗才放行销毁 ——
 // 不立旗的话关窗=收起,窗口永远走不到销毁那一步
@@ -472,11 +475,7 @@ let quitting = false
 
 /** 把主窗带回前台:托盘「显示主面板」、左键点托盘、第二个实例敲门,都走这条 */
 function showMainWindow(): void {
-  const win = mainWindowRef
-  if (!win || win.isDestroyed()) return
-  if (win.isMinimized()) win.restore()
-  if (!win.isVisible()) win.show()
-  win.focus()
+  mainPanelController?.show()
 }
 
 /** 托盘图标:开发模式读仓库里的 build/icon.ico;打包后从 resources/app.ico 认
@@ -485,19 +484,33 @@ function trayIconPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'app.ico') : join(app.getAppPath(), 'build/icon.ico')
 }
 
+/** 托盘菜单按当时真实状态下菜:主面板在屏上给「藏起它」,不在给「叫它出来」;
+ * 桌宠同理(假藏后 isVisible 会说谎,问 mascotHidden 旗) */
+function buildTrayMenu(): Menu {
+  const mainShown = mainPanelController?.isShown() ?? false
+  return Menu.buildFromTemplate([
+    {
+      label: mainPanelMenuLabel(mainShown),
+      click: () => (mainShown ? mainPanelController?.hide() : showMainWindow())
+    },
+    { label: mascotMenuLabel(isMascotHidden()), click: () => toggleMascot() },
+    { type: 'separator' },
+    { label: '退出', click: () => app.quit() }
+  ])
+}
+
+/** 主面板/桌宠露面状态一翻账就重摆菜单:别让人对着过期文案点菜 */
+function refreshTrayMenu(): void {
+  if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu())
+}
+
 function createTray(): void {
   const icon = nativeImage.createFromPath(trayIconPath())
   if (icon.isEmpty()) addDevLog('system', '托盘图标没加载出来(文件缺失?),托盘会显示默认空白图 —— 不影响功能')
   tray = new Tray(icon)
   tray.setToolTip('CodeAtlas')
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: '显示主面板', click: () => showMainWindow() },
-      { label: '显示·隐藏桌宠', click: () => toggleMascot() },
-      { type: 'separator' },
-      { label: '退出', click: () => app.quit() }
-    ])
-  )
+  tray.setContextMenu(buildTrayMenu())
+  setMascotHiddenListener(refreshTrayMenu)
   // Windows 惯例:左键点托盘 = 唤回主面板
   tray.on('click', () => showMainWindow())
 }
@@ -600,6 +613,8 @@ function createWindow(silent = false): void {
   })
   // 主窗引用上提(桌宠托管第一锤):托盘、second-instance 都要够得着它
   mainWindowRef = mainWindow
+  mainPanelController = new MainPanelController(mainWindow)
+  mainPanelController.onShownChange = refreshTrayMenu
 
   // 记事本落盘:平常拖大拖小/挪地方都是 debounce 攒 0.5 秒写一回,关窗那一刻清表补写;
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
@@ -663,8 +678,12 @@ function createWindow(silent = false): void {
   // 1) 常见快路:GPU 栈干净时它先到
   mainWindow.once('ready-to-show', () => showOnce('ready-to-show'))
   // 2) 渲染层双 rAF 信号(合成器肯给隐藏窗出帧的机器上生效,多数机器到不了这)
+  // 按 sender 认窗:桌宠/气泡/日志窗共用同一个 preload,都发 first-frame,
+  // 不过滤的话小家伙的帧会替主窗「报平安」,露窗方式记岔还是小事,提前露白窗才冤
   ipcMain.removeAllListeners('atlas:first-frame')
-  ipcMain.on('atlas:first-frame', () => showOnce('first-frame'))
+  ipcMain.on('atlas:first-frame', (event) => {
+    if (event.sender === mainWindow.webContents) showOnce('first-frame')
+  })
   // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
   // 「接回横幅」:救生圈动过手(reload 完/GPU 重启完)就捎个信,让页面弹一句人话
   let revivePending = false
@@ -778,7 +797,10 @@ function createWindow(silent = false): void {
     }, 120)
   })
   mainWindow.on('closed', () => {
-    if (mainWindowRef === mainWindow) mainWindowRef = null
+    if (mainWindowRef === mainWindow) {
+      mainWindowRef = null
+      mainPanelController = null
+    }
     clearInterval(modelStatusTimer)
     clearInterval(repaintHeartbeat)
     clearInterval(frameBeatWatchdog)
@@ -2417,12 +2439,9 @@ function startApp(): void {
   createMascotWindow(app.getPath('userData'))
   registerMascotIpc({
     onActivate: () => showMainWindow(),
-    // 「在屏上」= 显示着且没最小化;收回托盘走 mainWindow.hide()(同点 X 的收起路径)
-    isMainVisible: () =>
-      mainWindowRef !== null && !mainWindowRef.isDestroyed() && mainWindowRef.isVisible() && !mainWindowRef.isMinimized(),
-    onHideMain: () => {
-      if (mainWindowRef && !mainWindowRef.isDestroyed()) mainWindowRef.hide()
-    }
+    // 主面板的显示/隐藏/最小化/恢复都由控制器记账:在不在屏上问它,收回托盘也让它动手
+    isMainVisible: () => mainPanelController?.isShown() ?? false,
+    onHideMain: () => mainPanelController?.hide()
   })
   // 气泡通道(右键问一问):出界判断用主进程记的当前根
   registerBubbleIpc(() => currentRootPath)

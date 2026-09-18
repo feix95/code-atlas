@@ -120,12 +120,15 @@ declare global {
       devLogsOpen: () => Promise<void>
       onDevLog: (callback: (entry: DevLogEntry) => void) => () => void
       /** 桌宠(桌宠托管第二锤):光标在不在我身上(切穿透)+ 拖动三连 + 点击唤主面板 */
-      mascotMouse: (pos: { x: number; y: number } | null) => void
       mascotMenu: () => void
       mascotDragStart: () => void
       mascotDragMove: () => void
       mascotDragEnd: () => void
       mascotActivate: () => void
+      /** 桌宠露面状态:挂载时拉一次(藏起靠页面隐身,不动窗透明度) */
+      mascotVisibilityGet: () => Promise<boolean>
+      /** 订阅主进程「藏/露」推送;返回退订函数 */
+      onMascotVisibility: (callback: (visible: boolean) => void) => () => void
       /** 右键问一问:资源管理器右键菜单开关(available=false = 开发模式) */
       shellMenuGet: () => Promise<{ available: boolean; enabled: boolean }>
       shellMenuSet: (on: boolean) => Promise<{ ok: boolean; message?: string }>

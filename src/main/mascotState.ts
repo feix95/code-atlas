@@ -21,6 +21,11 @@ export function mainPanelMenuLabel(mainVisible: boolean): string {
   return mainVisible ? '隐藏主面板' : '显示主面板'
 }
 
+/** 托盘菜单「桌宠」项的文案(纯函数):藏着就给「叫它出来」,露着就给「藏起它」 */
+export function mascotMenuLabel(hidden: boolean): string {
+  return hidden ? '显示桌宠' : '隐藏桌宠'
+}
+
 /**
  * 光标在不在小家伙身上(纯函数,自测覆盖):渲染层只把光标的屏幕坐标报上来,
  * 主进程拿窗的屏幕位置对 —— 两边都用屏幕坐标,谁也不用换算,不会再有
