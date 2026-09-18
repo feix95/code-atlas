@@ -4,7 +4,7 @@
 // 生命周期:首次用到 AI 才启动(不拖慢 app 打包体积和启动速度);app 退出时杀掉。
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
@@ -475,6 +475,82 @@ async function tasklistImage(pid: number): Promise<string> {
   }
 }
 
+// ── 引擎 PID 档(收尸盲区修复,2026-09-18)──
+// 病根:reapOrphanServer 只认「正在监听 8766」的进程;可引擎加载的那几秒还没开始
+// listen —— 死在加载阶段的孤儿永远收不到尸,白占十几 GB 显存内存,下次再拉一份
+// 就是双倍账单(2026-09-18 全机卡死案的放大器)。
+// 治法:spawn 成功就把 child.pid 落盘(userData/engine-running.json);引擎一退就删档。
+// app 被强杀时档和引擎一起留下 —— 下次启动照档验尸:PID 活着且映像名是
+// llama-server.exe 才收;不在或被别的程序复用只清档不动手,绝不误杀。
+
+function enginePidPath(): string | null {
+  return warmupDir ? join(warmupDir, 'engine-running.json') : null
+}
+
+/** PID 档认读(纯函数,自测覆盖):只认正整数 pid,变形/垃圾回 null */
+export function parseEnginePidFile(raw: unknown): number | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const pid = (raw as Record<string, unknown>)['pid']
+  return typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null
+}
+
+function writeEnginePidFile(pid: number): void {
+  const file = enginePidPath()
+  if (!file) return
+  try {
+    writeFileSync(file, JSON.stringify({ pid }), 'utf8')
+  } catch {
+    // 档写不进就算了:收尸是保险绳,不该惊动加载本体
+  }
+}
+
+function removePidFile(file: string): void {
+  try {
+    rmSync(file, { force: true })
+  } catch {
+    // 删不动就算了
+  }
+}
+
+/** 引擎退出时删档:只认「档里记的正是这个 pid」才删 —— 换模型重启的竞态里,
+ * 旧引擎晚死不能把新引擎刚写的档带走 */
+function clearEnginePidFileFor(pid: number | undefined): void {
+  const file = enginePidPath()
+  if (!file || pid === undefined || !existsSync(file)) return
+  try {
+    const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))
+    if (parseEnginePidFile(raw) === pid) removePidFile(file)
+  } catch {
+    // 读不动就安静放过
+  }
+}
+
+/** 照 PID 档收尸:上次拉起没收场的引擎(含死在加载中没 listen 的) */
+async function reapOrphanByPidFile(): Promise<boolean> {
+  const file = enginePidPath()
+  if (!file || !existsSync(file)) return false
+  let pid: number | null
+  try {
+    pid = parseEnginePidFile(JSON.parse(readFileSync(file, 'utf8')))
+  } catch {
+    pid = null
+  }
+  if (pid === null) {
+    removePidFile(file)
+    return false
+  }
+  const image = await tasklistImage(pid)
+  if (image.toLowerCase() !== ENGINE_IMAGE) {
+    // PID 不在或被别的程序复用:绝不是我们的引擎,只清档不动手
+    removePidFile(file)
+    return false
+  }
+  await runCommand('taskkill', ['/PID', String(pid), '/F']).catch(() => {})
+  removePidFile(file)
+  addDevLog('system', `收尸:请走了上次没收场的引擎进程(PID ${pid},照进程档验明正身)`)
+  return true
+}
+
 export interface OrphanReapResult {
   /** 是否真的击杀过孤儿进程 */
   killed: boolean
@@ -484,15 +560,17 @@ export interface OrphanReapResult {
 
 /**
  * 收尸:崩溃或被任务管理器强杀时 will-quit 没跑,llama-server 成了孤儿,
- * 白占几个 GB 内存还堵着端口。这里找到监听 8766 的进程,验明正身才击杀;
- * 别的程序只报告不动手。非 Windows 暂不管(打包 mac 时再补对应做法)。
+ * 白占几个 GB 内存还堵着端口。双路抓:先照 PID 档抓「死在加载中没 listen」的,
+ * 再按老规矩查端口上的监听者;都验明正身才击杀,别的程序只报告不动手。
+ * 非 Windows 暂不管(打包 mac 时再补对应做法)。
  */
 export async function reapOrphanServer(): Promise<OrphanReapResult> {
   if (process.platform !== 'win32') return { killed: false }
   if (isBuiltinRunning()) return { killed: false }
-  if (!(await builtinPortOccupied())) return { killed: false }
+  const byPid = await reapOrphanByPidFile()
+  if (!(await builtinPortOccupied())) return { killed: byPid }
 
-  let killedAny = false
+  let killedAny = byPid
   let blockedBy: string | undefined
   for (const pid of await findListenerPids()) {
     const image = await tasklistImage(pid)
@@ -666,6 +744,10 @@ async function startAndWaitReady(
       stdio: ['ignore', 'pipe', 'pipe']
     }
   )
+  // 引擎活着档就在(收尸盲区修复):spawn 成功落 PID,app 被强杀留下的孤儿下次照档收尸;
+  // 闭包记死这个 pid —— 模块级 child 会被 stopBuiltinServer 置空或被新引擎换岗
+  const spawnedPid = child.pid
+  if (spawnedPid !== undefined) writeEnginePidFile(spawnedPid)
   // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
   // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
   const feedEngineStream = (stream: NodeJS.ReadableStream | null): void => {
@@ -698,6 +780,7 @@ async function startAndWaitReady(
   // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,验尸时好认
   const exitError = new Promise<never>((_, reject) => {
     child?.once('exit', (code) => {
+      clearEnginePidFileFor(spawnedPid)
       addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎启动就退出了(退出码 ${code ?? '未知'})`)
       reject(
         new EngineExitError(
@@ -763,6 +846,7 @@ async function startAndWaitReady(
     // 就绪之后再夭折(跑着跑着崩了):状态栏如实报故障,下次提问会自动重新拉起;
     // 用户主动卸下的不算,走 stopping 标记闭嘴
     child?.once('exit', (code) => {
+      clearEnginePidFileFor(spawnedPid)
       addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎中途退出了(退出码 ${code ?? '未知'})`)
       if (!stopping) {
         announceBuiltin(

@@ -70,7 +70,7 @@ import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed, probeTavilyKey, HttpStatusError, TAVILY_USAGE_URL } from '../src/ai/weblookup.ts'
 import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus, parseTavilyUsage, tavilyUsageText } from '../src/shared/tavily.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
@@ -873,6 +873,17 @@ async function main(): Promise<void> {
     'tasklist CSV 应抠出映像名'
   )
   assert.equal(parseTasklistImage('INFO: 没有运行的任务匹配指定的标准。'), '', '查无此进程应得空串,绝不凭空杀人')
+
+  // ── 6.7 引擎 PID 档认读(收尸盲区修复):只认正整数 pid,变形/垃圾回 null ──
+  assert.equal(parseEnginePidFile({ pid: 1234 }), 1234, '干净档原样认回')
+  assert.equal(parseEnginePidFile({ pid: '1234' }), null, '字符串不收')
+  assert.equal(parseEnginePidFile({ pid: 0 }), null, '0 不是合法 pid')
+  assert.equal(parseEnginePidFile({ pid: -5 }), null, '负数不收')
+  assert.equal(parseEnginePidFile({ pid: 1.5 }), null, '小数不收')
+  assert.equal(parseEnginePidFile({}), null, '空对象没 pid')
+  assert.equal(parseEnginePidFile('垃圾'), null, '垃圾回 null')
+  assert.equal(parseEnginePidFile(null), null)
+  assert.equal(parseEnginePidFile([{ pid: 7 }]), null, '数组不收')
 
   // ── 6.5 单飞闸门(第一百三十六锤):并发的第二个调用等同一份,绝不各起各的 ──
   {
