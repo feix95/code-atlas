@@ -11,7 +11,7 @@ import {
   readWindowState,
   writeWindowState
 } from '../src/main/window-state.ts'
-import { MASCOT_SIZE, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
+import { MASCOT_SIZE, mascotCursorInside, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
 
 /** 本机假定的工作区:主屏 2560×1400,左边挂一块 1920×1040(负坐标) */
 const WORK_AREAS = [
@@ -157,6 +157,20 @@ check('placeMascotBox:没有屏幕时只给块头,坐标交给系统', () => {
   assert.equal(placed.width, MASCOT_SIZE)
   assert.equal(placed.x, undefined)
   assert.equal(placed.y, undefined)
+})
+
+// ── 桌宠「摸没摸到」判定(拖不动修复):渲染层报屏幕坐标,主进程拿窗位置对 ──
+check('mascotCursorInside:身上算摸到,四角透明区和窗外算没摸到,离开信号算没摸到', () => {
+  // 窗 140 落 (100,100);判定区 = 身体 96 + 放宽 8×2 = 112 居中 → (114,114)-(226,226)
+  const win = { x: 100, y: 100, width: MASCOT_SIZE, height: MASCOT_SIZE }
+  assert.equal(mascotCursorInside(win, { x: 170, y: 170 }), true, '身体正中')
+  assert.equal(mascotCursorInside(win, { x: 114, y: 114 }), true, '判定区边角也算摸到(放宽生效)')
+  assert.equal(mascotCursorInside(win, { x: 226, y: 226 }), true, '判定区右下边角')
+  assert.equal(mascotCursorInside(win, { x: 105, y: 170 }), false, '窗内四角透明区 → 穿透点桌面')
+  assert.equal(mascotCursorInside(win, { x: 500, y: 500 }), false, '窗外远处')
+  assert.equal(mascotCursorInside(win, null), false, 'mouseleave 报的 null → 算没摸到')
+  assert.equal(mascotCursorInside(win, { x: 'abc', y: 1 }), false, '脏坐标不认')
+  assert.equal(mascotCursorInside(win, { x: 170 }), false, '缺一条腿不认')
 })
 
 async function main(): Promise<void> {

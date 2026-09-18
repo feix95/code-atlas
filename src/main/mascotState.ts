@@ -9,6 +9,32 @@ import { join } from 'node:path'
 /** 桌宠窗的边长(正方形),和 mascot.ts 的窗参数一口约定,改一处必改两处 */
 export const MASCOT_SIZE = 140
 
+/** 小圆生物身体的边长(mascot.css 里 .mascot-body 的 width/height,改一处必改两处) */
+export const MASCOT_BODY_SIZE = 96
+
+/** 摸它的判定区比身子放宽多少:贴边点也算摸到,不刮手;呼吸动画放大时照样算在身上 */
+const MASCOT_HIT_PAD = 8
+
+/**
+ * 光标在不在小家伙身上(纯函数,自测覆盖):渲染层只把光标的屏幕坐标报上来,
+ * 主进程拿窗的屏幕位置对 —— 两边都用屏幕坐标,谁也不用换算,不会再有
+ * 「窗自己拿到的坐标和真实位置对不上」的岔子(桌宠拖不动的病根)。
+ * pos = null 表示光标已经离开窗口(渲染层 mouseleave 报的),算不在身上。
+ * 判定区 = 身体居中、四周放宽 MASCOT_HIT_PAD,窗四角那圈透明区照旧穿透点桌面。
+ */
+export function mascotCursorInside(
+  winBounds: { x: number; y: number; width: number; height: number },
+  pos: unknown
+): boolean {
+  if (pos === null || typeof pos !== 'object' || Array.isArray(pos)) return false
+  const p = pos as Record<string, unknown>
+  if (!isFiniteNumber(p['x']) || !isFiniteNumber(p['y'])) return false
+  const size = MASCOT_BODY_SIZE + MASCOT_HIT_PAD * 2
+  const bx = winBounds.x + (winBounds.width - size) / 2
+  const by = winBounds.y + (winBounds.height - size) / 2
+  return (p['x'] as number) >= bx && p['x'] <= bx + size && (p['y'] as number) >= by && p['y'] <= by + size
+}
+
 /** 默认落角时离屏幕边的空当:贴太边容易被任务栏/输入法框遮住 */
 const MASCOT_EDGE = 24
 

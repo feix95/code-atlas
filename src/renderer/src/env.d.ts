@@ -120,7 +120,8 @@ declare global {
       devLogsOpen: () => Promise<void>
       onDevLog: (callback: (entry: DevLogEntry) => void) => () => void
       /** 桌宠(桌宠托管第二锤):光标在不在我身上(切穿透)+ 拖动三连 + 点击唤主面板 */
-      mascotMouse: (inside: boolean) => void
+      mascotMouse: (pos: { x: number; y: number } | null) => void
+      mascotMenu: () => void
       mascotDragStart: () => void
       mascotDragMove: () => void
       mascotDragEnd: () => void

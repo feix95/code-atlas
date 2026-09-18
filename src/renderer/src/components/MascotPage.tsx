@@ -18,8 +18,6 @@ const CLICK_SLOP_PX = 6
 const SPEAK_MS = 4000
 
 export function MascotPage(): React.JSX.Element {
-  const bodyRef = useRef<HTMLDivElement | null>(null)
-  const insideRef = useRef(false)
   const draggingRef = useRef(false)
   const downPointRef = useRef<{ x: number; y: number } | null>(null)
   const moodRef = useRef<Mood>('idle')
@@ -60,21 +58,26 @@ export function MascotPage(): React.JSX.Element {
     []
   )
 
-  // 光标跟踪 + 拖动跟随:mousemove 里做几何判定(穿透开着时 forward:true 照样送事件),
-  // 「在不在小家伙身上」变state就报给主进程切穿透;按住拖时让主进程跟着光标挪窗
+  // 光标跟踪 + 拖动跟随:只把光标的屏幕坐标报给主进程,「在不在小家伙身上」由那边
+  // 拿窗的真实位置判定 —— 以前渲染层拿 clientX 自己算,穿透模式下收到的坐标可能
+  // 和窗对不上,算出来永远「不在身上」,窗一直穿透,拖和点全漏到桌面(拖不动的病根)
   useEffect(() => {
+    let lastX = NaN
+    let lastY = NaN
     const onMove = (e: MouseEvent): void => {
-      const body = bodyRef.current
-      if (body) {
-        const r = body.getBoundingClientRect()
-        const inside =
-          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
-        if (inside !== insideRef.current) {
-          insideRef.current = inside
-          window.atlas.mascotMouse(inside)
-        }
+      const x = Math.round(e.screenX)
+      const y = Math.round(e.screenY)
+      if (x !== lastX || y !== lastY) {
+        lastX = x
+        lastY = y
+        window.atlas.mascotMouse({ x, y })
       }
       if (draggingRef.current) window.atlas.mascotDragMove()
+    }
+    const onLeave = (): void => {
+      lastX = NaN
+      lastY = NaN
+      window.atlas.mascotMouse(null)
     }
     const onUp = (e: MouseEvent): void => {
       if (!draggingRef.current) return
@@ -89,9 +92,13 @@ export function MascotPage(): React.JSX.Element {
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
+    // 光标甩出窗口时没有 mousemove 可收 —— 穿透开着时 Electron 会补送 mouseleave,
+    // 靠它把「不在身上」报出去,不然窗卡成实心、透明区把桌面点击也挡住
+    document.addEventListener('mouseleave', onLeave)
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      document.removeEventListener('mouseleave', onLeave)
     }
   }, [])
 
@@ -99,13 +106,16 @@ export function MascotPage(): React.JSX.Element {
     <div className={`mascot-root mascot-${mood}`}>
       <div
         key={boing}
-        ref={bodyRef}
         className={`mascot-body${boing > 0 ? ' mascot-boing' : ''}`}
         onMouseDown={(e) => {
           if (e.button !== 0) return
           draggingRef.current = true
           downPointRef.current = { x: e.screenX, y: e.screenY }
           window.atlas.mascotDragStart()
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          window.atlas.mascotMenu()
         }}
       >
         <div className="mascot-face">

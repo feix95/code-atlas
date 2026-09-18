@@ -4,10 +4,10 @@
 // 动画按小葵拍板先走临时形状动画(CSS 画的小圆生物),正式素材画好后直接替换,机制不动。
 // 桌宠只管壳,脑(agent 后端)一动不动 —— 忙闲状态听现成的模型广播(atlas:model-status)。
 
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { join } from 'node:path'
 import { addDevLog } from '../shared/devlog.ts'
-import { MASCOT_SIZE, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
+import { MASCOT_SIZE, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
 
 let mascotWindow: BrowserWindow | null = null
 let mascotStateDir = ''
@@ -58,6 +58,10 @@ export function createMascotWindow(stateDir: string): BrowserWindow {
   win.on('closed', () => {
     if (mascotWindow === win) mascotWindow = null
   })
+  // 桌宠渲染层的 console/报错也进 Developer 日志:小窗藏得深,犯病不能悄无声息
+  win.webContents.on('console-message', (_e, _level, message) => {
+    addDevLog('system', `桌宠页面:${message}`)
+  })
   loadMascotPage(win)
   mascotWindow = win
   addDevLog('system', '桌宠上岗')
@@ -85,11 +89,20 @@ export function toggleMascot(): void {
 /** 桌宠自己的通道(send 配 ipcMain.on,收发成对):
  * 穿透开关、拖动三连、点击唤主面板。点击唤谁由主进程注入,桌宠模块不回头依赖 index.ts */
 export function registerMascotIpc(handlers: { onActivate: () => void }): void {
-  // 渲染层 mousemove 几何判定「光标在不在这只小家伙身上」,报过来切穿透
-  ipcMain.on('atlas:mascot-mouse', (event, inside: unknown) => {
+  // 渲染层只上报光标的屏幕坐标(null = 光标已离开窗口),「在不在小家伙身上」
+  // 由主进程拿窗的屏幕位置判定 —— 修「拖不动」:渲染层自己量的坐标可能和窗的
+  // 真实位置对不上(坐标系岔子),导致它以为光标永远不在身上、穿透永远不摘。
+  // 翻转才打日志,进出各一条,不刷屏。
+  let lastInside: boolean | null = null
+  ipcMain.on('atlas:mascot-mouse', (event, pos: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win || win.isDestroyed() || typeof inside !== 'boolean') return
+    if (!win || win.isDestroyed()) return
+    const inside = mascotCursorInside(win.getBounds(), pos)
     win.setIgnoreMouseEvents(!inside, { forward: true })
+    if (inside !== lastInside) {
+      lastInside = inside
+      addDevLog('system', inside ? '桌宠:光标摸到小家伙,窗改实心可点可拖' : '桌宠:光标离开,窗恢复穿透')
+    }
   })
   // 拖动三连:按下记抓手(光标到窗左上角的偏移),移动时光标走到哪儿窗跟到哪儿,
   // 松手存档。窗始终贴着光标挪,光标永远相对窗内,mousemove 不会半路丢
@@ -115,4 +128,15 @@ export function registerMascotIpc(handlers: { onActivate: () => void }): void {
   })
   // 点击本体 = 唤回主面板(带焦点)
   ipcMain.on('atlas:mascot-activate', () => handlers.onActivate())
+  // 右键本体 = 弹快捷菜单(托盘同款三件套):唤主面板、把自己藏起来、真退出
+  ipcMain.on('atlas:mascot-menu', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed()) return
+    Menu.buildFromTemplate([
+      { label: '显示主面板', click: () => handlers.onActivate() },
+      { label: '隐藏桌宠(托盘可找回)', click: () => win.hide() },
+      { type: 'separator' },
+      { label: '退出', click: () => app.quit() }
+    ]).popup({ window: win })
+  })
 }

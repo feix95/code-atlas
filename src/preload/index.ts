@@ -202,9 +202,13 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.send('atlas:frame-heartbeat')
   },
   // ── 桌宠(桌宠托管第二锤):穿透开关 + 拖动三连 + 点击唤主面板,全是单向 send(配主进程 ipcMain.on) ──
-  /** 光标在不在这只小家伙身上:在 → 主进程收穿透(可点可拖),不在 → 放行穿透(点的是桌面) */
-  mascotMouse: (inside: boolean): void => {
-    ipcRenderer.send('atlas:mascot-mouse', inside)
+  /** 光标挪了:上报屏幕坐标(null = 光标已离开窗),「在不在小家伙身上」由主进程拿窗位置判定 */
+  mascotMouse: (pos: { x: number; y: number } | null): void => {
+    ipcRenderer.send('atlas:mascot-mouse', pos)
+  },
+  /** 右键点了小家伙:主进程弹快捷菜单(唤主面板/藏桌宠/退出) */
+  mascotMenu: (): void => {
+    ipcRenderer.send('atlas:mascot-menu')
   },
   mascotDragStart: (): void => {
     ipcRenderer.send('atlas:mascot-drag-start')
