@@ -13,11 +13,16 @@
 
 ## 开发规矩
 
-- **开 dev 的铁律(2026-09-11 小葵立,2026-09-16 简化)**:AI 帮开 `npm run dev` 前,仍须先
+- **开 dev 的铁律(2026-09-11 小葵立,2026-09-18 补两条)**:AI 帮开 `npm run dev` 前,仍须先
   杀干净旧实例(node + electron 全清,杀 node 必须按 PID 精确杀——ZCode CLI 本身跑在 node 上),
   确认 5173 已释放再启动,启动后验证 vite 监听的就是 5173。原来防的「外观设置变出厂」已根治
   (外观存主进程 appearance.json,不按端口分仓,见 2026-09-16 CHANGELOG),这条现在防的是
   端口漂移和双实例混跑。小葵自己开 dev 时,AI 不要抢着开。
+  - **做完需求主动重启(2026-09-18 小葵立)**:推完代码主动把 dev 实例关掉重启一遍(同上面流程),
+    别让小葵每次都自己敲命令行;她手上有 dev 在跑时照旧不抢。
+  - **Devin 环境带 ELECTRON_RUN_AS_NODE=1(2026-09-18 踩过)**:Devin 客户端传给 shell 的环境里有
+    这个变量,electron 会被按纯 node 跑,`electron.app` undefined 起不来 —— 开 dev 前先
+    `Remove-Item env:ELECTRON_RUN_AS_NODE` 再 `npm run dev`。
 
 - 一次只开发一个模块;禁止假实现 / TODO 占位 / 空函数
 - 每完成一个模块必须自测(typecheck / lint / test / build 全绿)
