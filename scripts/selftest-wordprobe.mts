@@ -5,6 +5,7 @@ import {
   parseWordProbePrefs,
   acceleratorFromKeyEvent,
   isFreshGrab,
+  createHotkeyBinder,
   WORD_PROBE_DEFAULT
 } from '../src/shared/wordProbe.ts'
 
@@ -49,6 +50,42 @@ check('抓取判定:非空且不同于备份才算「真抓到了」,其余当�
   assert.equal(isFreshGrab('备份', '备份'), false, '没选中(Ctrl+C 没改变剪贴板):无反应')
   assert.equal(isFreshGrab('   ', ''), false, '抓到空白:无反应')
   assert.equal(isFreshGrab('', ''), false, '什么都没有:无反应')
+})
+
+check('热键账房:换键摘旧键、关闭摘干净、注册失败不留账不瞎摘(幽灵热键修复)', () => {
+  const calls: string[] = []
+  let failNext = false
+  const ops = {
+    register: (acc: string): boolean => {
+      calls.push(`+${acc}`)
+      if (failNext) {
+        failNext = false
+        return false
+      }
+      return true
+    },
+    unregister: (acc: string): void => {
+      calls.push(`-${acc}`)
+    }
+  }
+  const fails: string[] = []
+  const bind = createHotkeyBinder(ops, (acc) => fails.push(acc))
+  const noop = (): void => {}
+
+  bind({ enabled: true, accelerator: 'Alt+Q' }, noop) // 挂默认
+  bind({ enabled: true, accelerator: 'Control+Shift+X' }, noop) // 换键:摘 Alt+Q 挂新键
+  bind({ enabled: false, accelerator: 'Control+Shift+X' }, noop) // 关闭:摘干净不再挂
+  bind({ enabled: true, accelerator: 'Alt+W' }, noop) // 重开:当前无账,直接挂
+  failNext = true
+  bind({ enabled: true, accelerator: 'Alt+E' }, noop) // 新键被占:摘旧账,注册失败不留账
+  bind({ enabled: true, accelerator: 'Alt+R' }, noop) // 再换:无旧账可摘,不瞎摘
+
+  assert.deepEqual(
+    calls,
+    ['+Alt+Q', '-Alt+Q', '+Control+Shift+X', '-Control+Shift+X', '+Alt+W', '-Alt+W', '+Alt+E', '+Alt+R'],
+    '每次换键必须精确摘掉上一只,失败不留账'
+  )
+  assert.deepEqual(fails, ['Alt+E'], '只有注册失败的那次进失败账')
 })
 
 console.log('✅ 划词问一问自测全部通过')

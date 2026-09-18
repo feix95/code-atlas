@@ -57,6 +57,38 @@ export function parseWordProbePrefs(raw: unknown): WordProbePrefs {
 }
 
 /**
+ * 热键绑定器(幽灵热键修复,2026-09-18):跟踪「上次真注册的是哪只键」。
+ * 病根:旧实现摘键只摘「出厂默认 + 新键」,上一只自定义键漏摘 —— 换键后旧键还挂在
+ * 系统上继续触发抓取,拨了开关也摘不到它,幽灵热键往别的软件里偷发 Ctrl+C。
+ * 治法:模块记住自己注册过的那一只,apply 时精确摘它;注册失败不留账,不瞎摘别人的。
+ * 纯工厂不碰 electron:主进程喂 globalShortcut,自测喂假的,同一份口径。
+ */
+export interface ShortcutOps {
+  register(accelerator: string, callback: () => void): boolean
+  unregister(accelerator: string): void
+}
+
+export function createHotkeyBinder(
+  ops: ShortcutOps,
+  onRegisterFail: (accelerator: string) => void
+): (prefs: WordProbePrefs, callback: () => void) => boolean {
+  let registered: string | null = null
+  return (prefs, callback) => {
+    if (registered !== null) {
+      ops.unregister(registered)
+      registered = null
+    }
+    if (!prefs.enabled) return true
+    if (ops.register(prefs.accelerator, callback)) {
+      registered = prefs.accelerator
+      return true
+    }
+    onRegisterFail(prefs.accelerator)
+    return false
+  }
+}
+
+/**
  * 设置页录制按键 → Electron 组合键字符串(纯函数,自测覆盖)。
  * 规则:必须带 Ctrl 或 Alt(Shift 单独打字不算数,Win 键系统抢得凶不推荐但允许叠加);
  * 单按 Esc 回 null(取消录制);主键必须是白名单里的(字母/数字/F 键/导航键)。

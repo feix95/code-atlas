@@ -11,7 +11,7 @@ import { promisify } from 'node:util'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { addDevLog } from '../shared/devlog.ts'
-import { isFreshGrab, parseWordProbePrefs, validateAccelerator, WORD_PROBE_DEFAULT, type WordProbePrefs } from '../shared/wordProbe.ts'
+import { createHotkeyBinder, isFreshGrab, parseWordProbePrefs, validateAccelerator, WORD_PROBE_DEFAULT, type WordProbePrefs } from '../shared/wordProbe.ts'
 
 const run = promisify(execFile)
 
@@ -59,16 +59,19 @@ const GRAB_SETTLE_MS = 280
 let activeDir = ''
 let deliverText: ((text: string) => void) | null = null
 
-/** 按档位挂热键:先摘旧的再挂新的;被别的软件占了(注册失败)老实回 false,不静默失效 */
+// 热键账房(幽灵热键修复):记住上次真注册的那只键,apply 时精确摘它 ——
+// 不再广撒网摘「默认 + 新键」,换键/关闭后旧键不再挂系统上继续偷发 Ctrl+C。
+// 注册失败(被别的软件占了)记一笔后台日志、老实回 false,不静默失效
+const bindHotkey = createHotkeyBinder(
+  { register: (acc, cb) => globalShortcut.register(acc, cb), unregister: (acc) => globalShortcut.unregister(acc) },
+  (acc) => addDevLog('system', `划词热键 ${acc} 没挂上(可能被别的软件占了):去设置页换一个组合键`)
+)
+
+/** 按档位挂热键:先摘上次注册的那只再挂新的;被占了老实回 false */
 function applyWordProbeHotkey(prefs: WordProbePrefs): boolean {
-  globalShortcut.unregister(WORD_PROBE_DEFAULT.accelerator)
-  globalShortcut.unregister(prefs.accelerator)
-  if (!prefs.enabled) return true // 关着就不用挂,摘干净就算成功
-  const ok = globalShortcut.register(prefs.accelerator, () => {
+  return bindHotkey(prefs, () => {
     void grabAndDeliver().catch(() => {})
   })
-  if (!ok) addDevLog('system', `划词热键 ${prefs.accelerator} 没挂上(可能被别的软件占了):去设置页换一个组合键`)
-  return ok
 }
 
 /** 热键触发:备份剪贴板 → 模拟 Ctrl+C → 等落键 → 读到新文本 → 恢复原样 → 交给气泡 */

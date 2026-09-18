@@ -44,7 +44,6 @@ import { openBubble, registerBubbleIpc } from './bubble.ts'
 import { extractLaunchPath } from './launchPath.ts'
 import { readShellMenuEnabled, writeShellMenu } from './shellMenu.ts'
 import { initWordProbe, readWordProbePrefs, setWordProbePrefs } from './wordProbe.ts'
-import { parseWordProbePrefs } from '../shared/wordProbe.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -1437,8 +1436,13 @@ function registerIpc(): void {
   // ④ 划词问一问:读档 / 改档并重挂热键(改键、拨开关即时生效;被占的热键老实回话)
   ipcMain.handle('atlas:word-probe-get', () => readWordProbePrefs(app.getPath('userData')))
   ipcMain.handle('atlas:word-probe-set', (_event, prefs: unknown) => {
-    const cleaned = parseWordProbePrefs(prefs)
-    return setWordProbePrefs(app.getPath('userData'), cleaned)
+    // 畸形入参直接拒(幽灵热键修复顺手加固):以前走 parseWordProbePrefs 坏档回默认,
+    // 一条想「关」的坏调用会被回成出厂的 enabled:true —— 不缝补,形状不对就明说
+    const s = prefs as { enabled?: unknown; accelerator?: unknown } | null
+    if (!s || typeof s.enabled !== 'boolean' || typeof s.accelerator !== 'string') {
+      return { ok: false, message: '设置没认出来:去设置页重新拨一下开关或重录一次组合键' }
+    }
+    return setWordProbePrefs(app.getPath('userData'), { enabled: s.enabled, accelerator: s.accelerator })
   })
   // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
   ipcMain.handle('atlas:window-close', (event) => {
