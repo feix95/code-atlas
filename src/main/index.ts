@@ -2415,7 +2415,15 @@ function startApp(): void {
   createTray()
   // 桌宠上岗(桌宠托管第二锤):透明小窗 + 自己的三条通道,点击唤主面板由 showMainWindow 注入
   createMascotWindow(app.getPath('userData'))
-  registerMascotIpc({ onActivate: () => showMainWindow() })
+  registerMascotIpc({
+    onActivate: () => showMainWindow(),
+    // 「在屏上」= 显示着且没最小化;收回托盘走 mainWindow.hide()(同点 X 的收起路径)
+    isMainVisible: () =>
+      mainWindowRef !== null && !mainWindowRef.isDestroyed() && mainWindowRef.isVisible() && !mainWindowRef.isMinimized(),
+    onHideMain: () => {
+      if (mainWindowRef && !mainWindowRef.isDestroyed()) mainWindowRef.hide()
+    }
+  })
   // 气泡通道(右键问一问):出界判断用主进程记的当前根
   registerBubbleIpc(() => currentRootPath)
   if (launchTarget?.kind === 'file') openBubble({ kind: 'file', path: launchTarget.path })

@@ -11,7 +11,7 @@ import {
   readWindowState,
   writeWindowState
 } from '../src/main/window-state.ts'
-import { MASCOT_SIZE, mascotCursorInside, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
+import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
 
 /** 本机假定的工作区:主屏 2560×1400,左边挂一块 1920×1040(负坐标) */
 const WORK_AREAS = [
@@ -171,6 +171,12 @@ check('mascotCursorInside:身上算摸到,四角透明区和窗外算没摸到,�
   assert.equal(mascotCursorInside(win, null), false, 'mouseleave 报的 null → 算没摸到')
   assert.equal(mascotCursorInside(win, { x: 'abc', y: 1 }), false, '脏坐标不认')
   assert.equal(mascotCursorInside(win, { x: 170 }), false, '缺一条腿不认')
+})
+
+// ── 右键菜单第一项看主面板状态下菜(小葵验收点的名)──
+check('mainPanelMenuLabel:主面板在屏上给「藏起」,不在给「叫它出来」', () => {
+  assert.equal(mainPanelMenuLabel(true), '隐藏主面板')
+  assert.equal(mainPanelMenuLabel(false), '显示主面板')
 })
 
 async function main(): Promise<void> {

@@ -15,6 +15,12 @@ export const MASCOT_BODY_SIZE = 96
 /** 摸它的判定区比身子放宽多少:贴边点也算摸到,不刮手;呼吸动画放大时照样算在身上 */
 const MASCOT_HIT_PAD = 8
 
+/** 右键菜单第一项的文案(纯函数):主面板在屏上就给「藏起它」,不在就给「叫它出来」——
+ * 在屏上还显示「显示主面板」是句废话,小葵验收时点的名 */
+export function mainPanelMenuLabel(mainVisible: boolean): string {
+  return mainVisible ? '隐藏主面板' : '显示主面板'
+}
+
 /**
  * 光标在不在小家伙身上(纯函数,自测覆盖):渲染层只把光标的屏幕坐标报上来,
  * 主进程拿窗的屏幕位置对 —— 两边都用屏幕坐标,谁也不用换算,不会再有

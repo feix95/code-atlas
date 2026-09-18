@@ -65,6 +65,11 @@ export function MascotPage(): React.JSX.Element {
     let lastX = NaN
     let lastY = NaN
     const onMove = (e: MouseEvent): void => {
+      // 拖动中只发「跟着挪窗」,位置报信主进程反正不看(它在锁实心)
+      if (draggingRef.current) {
+        window.atlas.mascotDragMove()
+        return
+      }
       const x = Math.round(e.screenX)
       const y = Math.round(e.screenY)
       if (x !== lastX || y !== lastY) {
@@ -72,7 +77,6 @@ export function MascotPage(): React.JSX.Element {
         lastY = y
         window.atlas.mascotMouse({ x, y })
       }
-      if (draggingRef.current) window.atlas.mascotDragMove()
     }
     const onLeave = (): void => {
       lastX = NaN

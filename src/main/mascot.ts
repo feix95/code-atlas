@@ -7,7 +7,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { join } from 'node:path'
 import { addDevLog } from '../shared/devlog.ts'
-import { MASCOT_SIZE, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
+import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
 
 let mascotWindow: BrowserWindow | null = null
 let mascotStateDir = ''
@@ -88,13 +88,24 @@ export function toggleMascot(): void {
 
 /** 桌宠自己的通道(send 配 ipcMain.on,收发成对):
  * 穿透开关、拖动三连、点击唤主面板。点击唤谁由主进程注入,桌宠模块不回头依赖 index.ts */
-export function registerMascotIpc(handlers: { onActivate: () => void }): void {
+export function registerMascotIpc(handlers: {
+  onActivate: () => void
+  /** 主面板现在是不是在屏上(显示且没最小化):右键菜单第一项照它翻文案 */
+  isMainVisible: () => boolean
+  /** 把主面板收回托盘:右键菜单「隐藏主面板」的动作 */
+  onHideMain: () => void
+}): void {
   // 渲染层只上报光标的屏幕坐标(null = 光标已离开窗口),「在不在小家伙身上」
   // 由主进程拿窗的屏幕位置判定 —— 修「拖不动」:渲染层自己量的坐标可能和窗的
   // 真实位置对不上(坐标系岔子),导致它以为光标永远不在身上、穿透永远不摘。
   // 翻转才打日志,进出各一条,不刷屏。
   let lastInside: boolean | null = null
+  // 拖动旗:按着的时候窗锁死实心、不判「在不在身上」—— 不修的话,判定拿窗的
+  // 旧位置对光标的新位置,窗追在光标后面每步都判成「出界」,穿透一秒开合几十次:
+  // 窗闪、松手信号漏进桌面(dragging 卡死、桌宠跟着光标满屏飘)。闪烁+漂移同根。
+  let dragging = false
   ipcMain.on('atlas:mascot-mouse', (event, pos: unknown) => {
+    if (dragging) return
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     const inside = mascotCursorInside(win.getBounds(), pos)
@@ -110,6 +121,8 @@ export function registerMascotIpc(handlers: { onActivate: () => void }): void {
   ipcMain.on('atlas:mascot-drag-start', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
+    dragging = true
+    win.setIgnoreMouseEvents(false) // 拖动全程实心,松手信号绝不漏
     const [wx, wy] = win.getPosition()
     const cursor = screen.getCursorScreenPoint()
     grab = { dx: cursor.x - wx, dy: cursor.y - wy }
@@ -123,17 +136,27 @@ export function registerMascotIpc(handlers: { onActivate: () => void }): void {
   ipcMain.on('atlas:mascot-drag-end', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
+    dragging = false
+    // 松手按当前光标位置补一次判定:还在身上保持实心,不在就恢复穿透
+    const inside = mascotCursorInside(win.getBounds(), screen.getCursorScreenPoint())
+    win.setIgnoreMouseEvents(!inside, { forward: true })
+    lastInside = inside
     const [x, y] = win.getPosition()
     writeMascotState(mascotStateDir, { x, y })
   })
   // 点击本体 = 唤回主面板(带焦点)
   ipcMain.on('atlas:mascot-activate', () => handlers.onActivate())
-  // 右键本体 = 弹快捷菜单(托盘同款三件套):唤主面板、把自己藏起来、真退出
+  // 右键本体 = 弹快捷菜单:第一项看主面板在不在屏上下菜(在 = 藏起它,不在 = 叫它出来),
+  // 再把自己藏起来、真退出 —— 在屏上还写「显示主面板」是废话,小葵验收点的名
   ipcMain.on('atlas:mascot-menu', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
+    const mainVisible = handlers.isMainVisible()
     Menu.buildFromTemplate([
-      { label: '显示主面板', click: () => handlers.onActivate() },
+      {
+        label: mainPanelMenuLabel(mainVisible),
+        click: () => (mainVisible ? handlers.onHideMain() : handlers.onActivate())
+      },
       { label: '隐藏桌宠(托盘可找回)', click: () => win.hide() },
       { type: 'separator' },
       { label: '退出', click: () => app.quit() }
