@@ -40,9 +40,11 @@ import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { createMascotWindow, registerMascotIpc, toggleMascot } from './mascot.ts'
-import { openBubbleForFile, registerBubbleIpc } from './bubble.ts'
+import { openBubble, registerBubbleIpc } from './bubble.ts'
 import { extractLaunchPath } from './launchPath.ts'
 import { readShellMenuEnabled, writeShellMenu } from './shellMenu.ts'
+import { initWordProbe, readWordProbePrefs, setWordProbePrefs } from './wordProbe.ts'
+import { parseWordProbePrefs } from '../shared/wordProbe.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -1432,6 +1434,12 @@ function registerIpc(): void {
       return { ok: false, message: err instanceof Error ? err.message : '注册表操作没成功' }
     }
   })
+  // ④ 划词问一问:读档 / 改档并重挂热键(改键、拨开关即时生效;被占的热键老实回话)
+  ipcMain.handle('atlas:word-probe-get', () => readWordProbePrefs(app.getPath('userData')))
+  ipcMain.handle('atlas:word-probe-set', (_event, prefs: unknown) => {
+    const cleaned = parseWordProbePrefs(prefs)
+    return setWordProbePrefs(app.getPath('userData'), cleaned)
+  })
   // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
   ipcMain.handle('atlas:window-close', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
@@ -2406,7 +2414,9 @@ function startApp(): void {
   registerMascotIpc({ onActivate: () => showMainWindow() })
   // 气泡通道(右键问一问):出界判断用主进程记的当前根
   registerBubbleIpc(() => currentRootPath)
-  if (launchTarget?.kind === 'file') openBubbleForFile(launchTarget.path)
+  if (launchTarget?.kind === 'file') openBubble({ kind: 'file', path: launchTarget.path })
+  // 划词问一问:全局热键抓选中文本,交给气泡预填(抓不到就完全无反应,需求表拍板)
+  initWordProbe(app.getPath('userData'), (text) => openBubble({ kind: 'text', text }))
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
@@ -2445,7 +2455,7 @@ app.on('before-quit', () => {
 /** 右键转交/冷启动共用的落点:文件 → 桌宠弹气泡;文件夹 → 主窗切根(热转交时先唤回主窗) */
 async function handleLaunchPath(target: { path: string; kind: 'file' | 'directory' }): Promise<void> {
   if (target.kind === 'file') {
-    openBubbleForFile(target.path)
+    openBubble({ kind: 'file', path: target.path })
     return
   }
   // 文件夹右键「用 CodeAtlas 打开」:主窗得露出来让人看见新项目

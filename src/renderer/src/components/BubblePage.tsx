@@ -3,13 +3,14 @@ import { useAiChat, type ChatMessage } from '../useAiChat'
 import './bubble.css'
 
 /**
- * 气泡聊天页(?view=bubble,右键问一问):资源管理器右键文件 → 桌宠旁边弹出的
- * 聊天小窗。换皮不换脑 —— 里面就是自由聊天的后端(useAiChat → aiChat),
+ * 气泡聊天页(?view=bubble,右键问一问 + 划词问一问):桌宠旁边弹出的聊天小窗。
+ * 换皮不换脑 —— 里面就是自由聊天的后端(useAiChat → aiChat),
  * 皮换成小窗:顶栏文件名、出界文件的切根提示条、精简消息区 + 输入框。
  * 出界文件策略(已拍板):
  *  - 文件在当前项目内:agent 翻文件模式开聊(根就是当前项目);
  *  - 文件在项目外:人话提示 + 「把它的文件夹设为工作目录」按钮;不点也能聊
  *    (文件内容已当资料附上,单文件聊,agent 关),点了就地切根、问答接着走。
+ * 划词问一问:全局热键抓到的选中文本直接预填输入框(可删可改),补一句就能发。
  */
 
 /** 气泡窗拉到的文件档案(主进程 bubble-open 的回包) */
@@ -41,23 +42,36 @@ function fileToContext(file: BubbleFile, relPath: string): Parameters<typeof use
 export function BubblePage(): React.JSX.Element {
   const [file, setFile] = useState<BubbleFile | null>(null)
   const [shape, setShape] = useState<ChatShape | null>(null)
+  // 划词文本(热键抓到的选中文本):预填输入框用
+  const [grabbedText, setGrabbedText] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   // 聊天记录接力棒:形态切换(单文件 → 切根)时 BubbleChat 会整块重挂,记录从这里续上
   const [history, setHistory] = useState<ChatMessage[]>([])
 
-  // 开窗先拉右键带来的文件;气泡已开着又接到新文件时,主进程喊一声,当场换人
+  const adopt = (f: { kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string }): void => {
+    if (f.kind === 'text') {
+      setFile(null)
+      setShape(null)
+      setGrabbedText(f.text)
+      setDraft(f.text)
+      return
+    }
+    setGrabbedText(null)
+    setFile(f)
+    setShape(f.inProject && f.rootPath ? { mode: 'root', file: f, root: f.rootPath } : { mode: 'single', file: f })
+  }
+
+  // 开窗先拉右键带来的文件(或划词抓到的文本);气泡已开着又接到新内容时,主进程喊一声,当场换人
   useEffect(() => {
     let alive = true
     void window.atlas.bubbleOpen().then((f) => {
       if (!alive || !f) return
-      setFile(f)
-      setShape(f.inProject && f.rootPath ? { mode: 'root', file: f, root: f.rootPath } : { mode: 'single', file: f })
+      adopt(f)
     })
     const offChanged = window.atlas.onBubbleFileChanged(() => {
       void window.atlas.bubbleOpen().then((f) => {
         if (!f) return
-        setFile(f)
-        setShape(f.inProject && f.rootPath ? { mode: 'root', file: f, root: f.rootPath } : { mode: 'single', file: f })
+        adopt(f)
       })
     })
     return () => {
@@ -66,8 +80,12 @@ export function BubblePage(): React.JSX.Element {
     }
   }, [])
 
+  if (grabbedText !== null) {
+    return <BubbleChat key="text" grabbed={grabbedText} draft={draft} setDraft={setDraft} initialHistory={history} onHistoryChange={setHistory} />
+  }
+
   if (!file || !shape) {
-    return <div className="bubble-root"><div className="bubble-empty">等右键带来的文件…</div></div>
+    return <div className="bubble-root"><div className="bubble-empty">右键文件或按热键划词,小探针就在这等你</div></div>
   }
 
   return (
@@ -84,22 +102,24 @@ export function BubblePage(): React.JSX.Element {
   )
 }
 
-/** 聊天本体:key 换形态时整块重挂,记录通过 initialHistory 接力,不丢一句 */
+/** 聊天本体:key 换形态时整块重挂,记录通过 initialHistory 接力,不丢一句。
+ * grabbed = 划词文本(纯聊天,脑与自由聊天同源);file/shape = 右键文件(带出界策略)。 */
 function BubbleChat(props: {
-  file: BubbleFile
-  shape: ChatShape
+  grabbed?: string
+  file?: BubbleFile
+  shape?: ChatShape
   draft: string
   setDraft: (v: string) => void
-  setShape: (s: ChatShape) => void
+  setShape?: (s: ChatShape) => void
   initialHistory: ChatMessage[]
   onHistoryChange: (messages: ChatMessage[]) => void
 }): React.JSX.Element {
   const { shape, setShape, setDraft, initialHistory, onHistoryChange } = props
   const chat = useAiChat(
-    fileToContext(shape.file, shape.file.relPath || shape.file.fileName),
-    shape.mode === 'root' ? shape.root : null,
+    shape ? fileToContext(shape.file, shape.file.relPath || shape.file.fileName) : null,
+    shape?.mode === 'root' ? shape.root : null,
     initialHistory.length > 0 ? initialHistory : undefined,
-    shape.mode === 'root' ? 'always' : 'never'
+    shape ? (shape.mode === 'root' ? 'always' : 'never') : 'never'
   )
   // 聊天记录逐帧接力给外层:形态切换重挂时从这里续上
   useEffect(() => {
@@ -115,24 +135,24 @@ function BubbleChat(props: {
     <div className="bubble-root">
       <div className="bubble-card">
         <div className="bubble-head">
-          <span className="bubble-title" title={shape.file.path}>
-            问问小探针 · {shape.file.fileName}
+          <span className="bubble-title" title={shape ? shape.file.path : '划词问一问'}>
+            问问小探针 · {shape ? shape.file.fileName : '划词'}
           </span>
           <button type="button" className="bubble-close" onClick={() => window.close()} aria-label="关闭气泡">
             ×
           </button>
         </div>
-        {shape.mode === 'single' && (
+        {shape?.mode === 'single' && (
           <div className="bubble-outside">
             <span>这个文件不在我打开的项目里,先就文件本身聊;想让我翻它的邻居,点下面。</span>
-            <button type="button" onClick={() => setShape({ mode: 'root', file: shape.file, root: shape.file.folder })}>
+            <button type="button" onClick={() => setShape?.({ mode: 'root', file: shape.file, root: shape.file.folder })}>
               把它的文件夹设为工作目录
             </button>
           </div>
         )}
-        {shape.mode === 'root' && <div className="bubble-rootbar">工作目录:{shape.root}</div>}
+        {shape?.mode === 'root' && <div className="bubble-rootbar">工作目录:{shape.root}</div>}
         <div className="bubble-messages">
-          <div className="bubble-note">已选文件:{shape.file.fileName}</div>
+          <div className="bubble-note">{shape ? `已选文件:${shape.file.fileName}` : '划词带来的一段文字,补一句想问什么'}</div>
           {chat.messages.map((m) =>
             m.role === 'note' ? null : (
               <div key={m.key} className={`bubble-msg bubble-${m.role} is-${m.state}`}>

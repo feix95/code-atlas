@@ -11,9 +11,12 @@ import { promises as fs } from 'node:fs'
 import { addDevLog } from '../shared/devlog.ts'
 import { sniffBinaryKind } from '../ai/index.ts'
 
+/** 待处理的气泡内容:右键问一问带来文件,划词问一问带来选中的文字 */
+export type BubblePending = { kind: 'file'; path: string } | { kind: 'text'; text: string }
+
 let bubbleWindow: BrowserWindow | null = null
-/** 右键带来的待处理文件:气泡窗 ready 后用 invoke 拉走(取走即清,不重弹) */
-let pendingFilePath: string | null = null
+/** 待处理内容:气泡窗 ready 后用 invoke 拉走(取走即清,不重弹) */
+let pending: BubblePending | null = null
 
 /** 单文件聊的内容上限:字符数。再长的文件只带开头,人话说清楚 */
 const BUBBLE_FILE_CHARS = 60_000
@@ -28,11 +31,11 @@ function bubbleBounds(): { x: number; y: number; width: number; height: number }
   return { x: wa.x + wa.width - width - 24, y: wa.y + wa.height - height - 180, width, height }
 }
 
-/** 带文件开气泡:主进程 second-instance / 冷启动都走这条 */
-export function openBubbleForFile(filePath: string): void {
-  pendingFilePath = filePath
+/** 带内容开气泡:文件(右键问一问)和划词文本(划词问一问)共用一扇窗 */
+export function openBubble(content: BubblePending): void {
+  pending = content
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-    // 已开着的气泡:换一份新文件,唤到前台
+    // 已开着的气泡:换一份新内容,唤到前台
     bubbleWindow.webContents.send('atlas:bubble-file-changed')
     bubbleWindow.show()
     bubbleWindow.focus()
@@ -79,17 +82,19 @@ export function openBubbleForFile(filePath: string): void {
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'bubble' } })
   }
-  addDevLog('system', `气泡弹开:${basename(filePath)}`)
+  addDevLog('system', `气泡弹开:${content.kind === 'file' ? basename(content.path) : `划词(${content.text.length} 字)`}`)
 }
 
 /** 气泡自己的通道(invoke 配 handle、send 配 on,收发成对) */
 export function registerBubbleIpc(getCurrentRoot: () => string | null): void {
-  // 气泡窗 ready 后拉走待处理文件 + 现场分辨「在不在当前项目里」+ 读出内容。
-  // 每次都答当前 pending(取走即清);没 pending 回 null(窗开着但没新文件)
+  // 气泡窗 ready 后拉走待处理内容(取走即清;没 pending 回 null = 窗开着但没新活)。
+  // 文件:现场分辨「在不在当前项目里」+ 读出内容;划词文本:原样带过
   ipcMain.handle('atlas:bubble-open', async () => {
-    const filePath = pendingFilePath
-    pendingFilePath = null
-    if (!filePath) return null
+    const item = pending
+    pending = null
+    if (!item) return null
+    if (item.kind === 'text') return { kind: 'text' as const, text: item.text }
+    const filePath = item.path
     const root = getCurrentRoot()
     let inProject = false
     let relPath = ''
@@ -114,6 +119,16 @@ export function registerBubbleIpc(getCurrentRoot: () => string | null): void {
     } catch {
       readNote = '这个文件现在读不出来(可能被挪走、删了,或者没有权限),先聊聊它是什么也行。'
     }
-    return { path: filePath, fileName: basename(filePath), folder: dirname(filePath), inProject, relPath, rootPath: root, content, readNote }
+    return {
+      kind: 'file' as const,
+      path: filePath,
+      fileName: basename(filePath),
+      folder: dirname(filePath),
+      inProject,
+      relPath,
+      rootPath: root,
+      content,
+      readNote
+    }
   })
 }

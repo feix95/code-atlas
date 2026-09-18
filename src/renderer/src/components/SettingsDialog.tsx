@@ -11,6 +11,7 @@ import {
   type ToneKey
 } from '@shared/personalization'
 import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
+import { acceleratorFromKeyEvent } from '@shared/wordProbe'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
@@ -402,6 +403,10 @@ export function SettingsDialog({
   const [shellMenu, setShellMenu] = useState<{ available: boolean; enabled: boolean } | null>(null)
   const [shellMenuBusy, setShellMenuBusy] = useState(false)
   const [shellMenuNote, setShellMenuNote] = useState<string | null>(null)
+  // 划词问一问:开关 + 全局热键(录制式改键:点一下,按下想要的组合键)
+  const [wordProbe, setWordProbe] = useState<{ enabled: boolean; accelerator: string } | null>(null)
+  const [wordProbeRecording, setWordProbeRecording] = useState(false)
+  const [wordProbeNote, setWordProbeNote] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({ path: '', verdict: null })
@@ -435,6 +440,8 @@ export function SettingsDialog({
     window.atlas.appVersion().then(setAppVersion).catch(() => {})
     // 右键菜单的现状(右键问一问):available=false(开发模式)就不显示开关
     window.atlas.shellMenuGet().then(setShellMenu).catch(() => {})
+    // 划词问一问的档位(开关 + 热键)
+    window.atlas.wordProbeGet().then(setWordProbe).catch(() => {})
   }, [])
 
   // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
@@ -1158,6 +1165,72 @@ export function SettingsDialog({
                             >
                               <span />
                             </button>
+                          </div>
+                        </>
+                      )}
+                      {/* 划词问一问:任意软件选中文字按热键,小探针弹气泡直接问。
+                          改键是录制式:点「换一个」,按下想要的组合键(Esc 取消);拨开关/换键即时重挂 */}
+                      {wordProbe && (
+                        <>
+                          <div className="cfg-divider" />
+                          <div className="cfg-row">
+                            <div className="cfg-copy">
+                              <label>
+                                划词问一问
+                                <span className={`cfg-flag${wordProbe.enabled ? ' is-on' : ''}`}>{wordProbe.enabled ? '已开启' : '已关闭'}</span>
+                              </label>
+                              <p>
+                                在任何软件里选中一段文字,按 {wordProbe.accelerator} ,小探针弹出气泡直接问。只在 CodeAtlas 开着的时候生效;抓取会借一下剪贴板,问完原样还给你。
+                              </p>
+                              {wordProbeNote && <p className="cfg-field-help is-warn">{wordProbeNote}</p>}
+                            </div>
+                            <div className="cfg-row-stack">
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={wordProbe.enabled}
+                                aria-label="划词问一问"
+                                className={`cfg-switch${wordProbe.enabled ? ' is-on' : ''}`}
+                                onClick={() => {
+                                  const next = { ...wordProbe, enabled: !wordProbe.enabled }
+                                  window.atlas
+                                    .wordProbeSet(next)
+                                    .then((res) => {
+                                      if (res.ok) setWordProbe(next)
+                                      else setWordProbeNote(res.message ?? '没成功,再试一次')
+                                    })
+                                    .catch(() => setWordProbeNote('没成功,再试一次'))
+                                }}
+                              >
+                                <span />
+                              </button>
+                              <button
+                                type="button"
+                                className="cfg-step"
+                                tabIndex={wordProbeRecording ? -1 : 0}
+                                onKeyDown={(e) => {
+                                  if (!wordProbeRecording) return
+                                  e.preventDefault()
+                                  const accel = acceleratorFromKeyEvent(e)
+                                  if (accel === null) {
+                                    if (e.key === 'Escape') setWordProbeRecording(false)
+                                    return
+                                  }
+                                  setWordProbeRecording(false)
+                                  const next = { ...wordProbe, accelerator: accel }
+                                  window.atlas
+                                    .wordProbeSet(next)
+                                    .then((res) => {
+                                      if (res.ok) setWordProbe(next)
+                                      else setWordProbeNote(res.message ?? '这个键挂不上,换一个试试')
+                                    })
+                                    .catch(() => setWordProbeNote('这个键挂不上,换一个试试'))
+                                }}
+                                onClick={() => setWordProbeRecording((v) => !v)}
+                              >
+                                {wordProbeRecording ? '按下组合键…(Esc 取消)' : `热键:${wordProbe.accelerator} 换一个`}
+                              </button>
+                            </div>
                           </div>
                         </>
                       )}

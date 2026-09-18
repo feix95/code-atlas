@@ -132,21 +132,29 @@ declare global {
       launchOpen: () => Promise<string | null>
       /** 开图成功后上报当前项目根:气泡出界判断的依据 */
       reportCurrentRoot: (rootPath: string | null) => void
-      /** 气泡窗拉走右键带来的文件(路径/在不在项目里/文件内容),取走即清 */
-      bubbleOpen: () => Promise<{
-        path: string
-        fileName: string
-        folder: string
-        inProject: boolean
-        relPath: string
-        rootPath: string | null
-        content: string | null
-        readNote?: string
-      } | null>
-      /** 已开着的气泡又接到一份新文件 */
+      /** 气泡窗拉走待处理内容(右键=文件;划词=文本),取走即清 */
+      bubbleOpen: () => Promise<
+        | { kind: 'text'; text: string }
+        | {
+            kind: 'file'
+            path: string
+            fileName: string
+            folder: string
+            inProject: boolean
+            relPath: string
+            rootPath: string | null
+            content: string | null
+            readNote?: string
+          }
+        | null
+      >
+      /** 已开着的气泡又接到一份新内容 */
       onBubbleFileChanged: (callback: () => void) => () => void
       /** 主窗收右键转交的文件夹:以它为根打开(热转交) */
       onOpenPath: (callback: (dir: string) => void) => () => void
+      /** 划词问一问:全局热键档位(开关+组合键)的读写 */
+      wordProbeGet: () => Promise<{ enabled: boolean; accelerator: string }>
+      wordProbeSet: (prefs: { enabled: boolean; accelerator: string }) => Promise<{ ok: boolean; message?: string }>
     }
   }
 }

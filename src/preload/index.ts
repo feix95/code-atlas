@@ -230,16 +230,8 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.send('atlas:current-root', rootPath)
   },
   /** 气泡窗拉走右键带来的文件(路径/在不在项目里/文件内容),取走即清 */
-  bubbleOpen: (): Promise<{
-    path: string
-    fileName: string
-    folder: string
-    inProject: boolean
-    relPath: string
-    rootPath: string | null
-    content: string | null
-    readNote?: string
-  } | null> => ipcRenderer.invoke('atlas:bubble-open'),
+  bubbleOpen: (): Promise<{ kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string } | null> =>
+    ipcRenderer.invoke('atlas:bubble-open'),
   /** 已开着的气泡又接到一份新文件:主进程喊一声,气泡当场换人 */
   onBubbleFileChanged: (callback: () => void): (() => void) => {
     const listener = (): void => callback()
@@ -252,6 +244,10 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.on('atlas:open-path', listener)
     return () => ipcRenderer.removeListener('atlas:open-path', listener)
   },
+  // ── 划词问一问:全局热键抓选中文本弹气泡;这里管设置页的档位读写(invoke 配 handle) ──
+  wordProbeGet: (): Promise<{ enabled: boolean; accelerator: string }> => ipcRenderer.invoke('atlas:word-probe-get'),
+  wordProbeSet: (prefs: { enabled: boolean; accelerator: string }): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke('atlas:word-probe-set', prefs),
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),
