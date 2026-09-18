@@ -614,9 +614,9 @@ export function SettingsDialog({
     const el = scrollRef.current
     if (!el) return
     let current: SectionKey = 'appearance'
-    for (const key of ['appearance', 'ai', 'personal', 'advanced'] as SectionKey[]) {
-      const node = sectionEl(key)
-      if (node && node.offsetTop - el.scrollTop <= 72) current = key
+    for (const item of NAV_ITEMS) {
+      const node = sectionEl(item.key)
+      if (node && node.offsetTop - el.scrollTop <= 72) current = item.key
     }
     setActiveSection(current)
   }
