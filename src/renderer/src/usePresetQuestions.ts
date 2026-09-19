@@ -28,8 +28,9 @@ export function usePresetQuestions(input: {
   note?: string
   /** 总闸(设置里的「推荐问题」):关了不出题,连烧模型的 AI 预测也不许跑 */
   enabled: boolean
+  allowAi?: boolean
 }): { questions: string[]; source: 'ai' | 'rule' } {
-  const { rootPath, file, note, enabled } = input
+  const { rootPath, file, note, enabled, allowAi = false } = input
   // 第一层:规则预测,选中瞬间就有
   const rule = useMemo(
     () => rulePresetQuestions({ name: file.name, icon: file.summary?.icon, text: file.summary?.text, languageId: file.language?.id }),
@@ -46,7 +47,7 @@ export function usePresetQuestions(input: {
   // 那个文件才真出题(规则层的问题一直在,等待期界面不空)
   useEffect(() => {
     // 总闸关着就整个歇业:题不显示,预测更不许烧模型(拨回开 = 关闸,驻留/请求照样作废)
-    if (!enabled) return
+    if (!enabled || !allowAi) return
     const key = currentKey
     let alive = true
     let activeId = ''
@@ -97,7 +98,7 @@ export function usePresetQuestions(input: {
     }
     // 依赖带 currentKey:换文件/换项目时重跑预测;rootPath 是出题请求要用的钥匙半边;
     // enabled 进依赖:拨开关时正在路上的预测就地作废
-  }, [currentKey, file, note, rootPath, enabled])
+  }, [currentKey, file, note, rootPath, enabled, allowAi])
 
   // 总闸关着交白卷(界面自然一颗题都不画);开着才按「AI 优先,规则垫底」出牌
   return { questions: enabled ? (aiQuestions ?? rule) : [], source: enabled && aiQuestions ? 'ai' : 'rule' }

@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import type { AiAssistApi, AiTurn } from '../useAiAsk'
+import { AiSetupContext } from '../aiSetupContext'
 import { Notice } from './Notice'
 import { MiniMD } from './MiniMD'
 import { ProgressDots } from './ProgressDots'
@@ -100,6 +102,35 @@ export function AiAssistCard({
   /** 给了就显示「去追问」:跳到自由对话 Tab,并把这边解释好的一轮带上,那边接着往下问 */
   onGoChat?: (turn: AiTurn | null) => void
 }): React.JSX.Element {
+  const setup = useContext(AiSetupContext)
+  if (setup && setup.configured !== true) {
+    return (
+      <section className="ai-card">
+        <div className="ai-card-head">
+          <span className="ai-title">
+            <span className="spark" aria-hidden="true">
+              ✦
+            </span>
+            AI 讲解
+          </span>
+        </div>
+        <div className="ai-card-body">
+          <p>
+            {setup.configured === null
+              ? '正在读取 AI 设置…'
+              : '想让 AI 用大白话讲解这个文件?先选择一个本地模型。项目地图和文件内容不受影响。'}
+          </p>
+          {setup.configured === false && (
+            <div className="ai-card-actions">
+              <button type="button" className="btn btn-primary" onClick={setup.openSettings}>
+                设置 AI
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
   const turn = latestTurn(ai.turns)
   const badge = stateBadge(turn)
   const goChat = onGoChat ? (
@@ -146,11 +177,17 @@ export function AiAssistCard({
           <>
             <TurnText turn={turn} />
             <div className="ai-card-actions">
-              {turn.state === 'error' || turn.state === 'cancelled' ? (
+              {(turn.state === 'error' || turn.state === 'cancelled') && (
                 <button type="button" className="btn btn-primary" onClick={() => ai.ask(turn.question)}>
                   {turn.state === 'error' ? '重试' : '重新分析'}
                 </button>
-              ) : (
+              )}
+              {turn.state === 'error' && setup && (
+                <button type="button" className="btn" onClick={setup.openSettings}>
+                  AI 设置
+                </button>
+              )}
+              {turn.state !== 'error' && turn.state !== 'cancelled' && (
                 <button type="button" className="btn" onClick={() => ai.ask(turn.question)}>
                   {turn.question ? '再问一次' : '再解释一次'}
                 </button>

@@ -5,6 +5,8 @@ import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMa
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef } from '@shared/preview'
 import { isTreePartial } from '@shared/scanCoverage'
+import { isAiConfigured } from '@shared/aiSetup'
+import { AiSetupContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
@@ -308,6 +310,8 @@ function App(): React.JSX.Element {
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<'appearance' | 'ai' | 'advanced'>('appearance')
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   // 推荐问题总闸(聊天偏好,存本机):关了聊天框上面和预览 AI 卡下面的推荐都不出,两处模型预测也一并省掉
   const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
@@ -541,6 +545,7 @@ function App(): React.JSX.Element {
   async function scanPath(dir: string): Promise<ScanResult | null> {
     requests.current.reset()
     const isCurrent = requests.current.begin('scan')
+    window.atlas.reportCurrentRoot(null)
     expandingRef.current = false
     analyzeSeq.current += 1
     setAnalyzing(false)
@@ -609,6 +614,26 @@ function App(): React.JSX.Element {
     const dir = await window.atlas.pickFolder().catch(() => null)
     if (dir) await scanPath(dir)
   }
+
+  function openAiSettings(): void {
+    setSettingsSection('advanced')
+    setShowSettings(true)
+  }
+
+  useEffect(() => {
+    let alive = true
+    void window.atlas
+      .aiConfigGet()
+      .then((c) => {
+        if (alive) setAiConfigured(isAiConfigured(c))
+      })
+      .catch(() => {
+        if (alive) setAiConfigured(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // scanPath 落位后再把 ref 中转接上(每轮渲染更新,事件回调里永远拿到最新的)
   useEffect(() => {
@@ -882,7 +907,7 @@ function App(): React.JSX.Element {
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     if (!file.language) {
-      setAnalyzeNote({ text: '类型没认出来,无法分析结构;想知道它是干嘛的,去「Atlas 小探针」问', kind: 'info' })
+      setAnalyzeNote({ text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。', kind: 'info' })
       return
     }
     setAnalyzing(true)
@@ -895,7 +920,7 @@ function App(): React.JSX.Element {
       if (fs) {
         setStructure(fs)
       } else {
-        setAnalyzeNote({ text: '该语言暂不支持结构分析(支持 TS/TSX/JS/JSX/Python/Java/Go/C/C++/C#/Rust)', kind: 'info' })
+        setAnalyzeNote({ text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。', kind: 'info' })
       }
     } catch (err) {
       if (seq !== analyzeSeq.current) return
@@ -1344,6 +1369,7 @@ function App(): React.JSX.Element {
               autoOpenNote={noteEditRequest === file.relPath}
               suggestionsOn={chatSuggestionsOn}
               onGoChat={(turn) => goAskInChat(file, turn)}
+              onPreview={() => openPreview(file.relPath)}
             />
           )
         }
@@ -1417,6 +1443,7 @@ function App(): React.JSX.Element {
             autoOpenNote={noteEditRequest === selectedFile.relPath}
             suggestionsOn={chatSuggestionsOn}
             onGoChat={(turn) => goAskInChat(selectedFile, turn)}
+            onPreview={() => openPreview(selectedFile.relPath)}
           />
         )
       }
@@ -1510,7 +1537,8 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <div className="app">
+    <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
+      <div className="app">
       {revived && (
         <div className="revive-note" role="alert">
           画面刚才断了一次,已经自动接上 —— 正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
@@ -1567,6 +1595,7 @@ function App(): React.JSX.Element {
             type="text"
             value={pathDraft}
             placeholder="文件夹路径,回车直接打开"
+            disabled={scanning}
             spellCheck={false}
             aria-label="文件夹路径"
             onChange={(e) => {
@@ -1583,7 +1612,15 @@ function App(): React.JSX.Element {
           </button>
           {pathHint && <div className="path-hint" role="status">{pathHint}</div>}
         </div>
-        <button type="button" className="icon-btn" onClick={() => setShowSettings(true)} aria-label="打开设置">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => {
+            setSettingsSection('appearance')
+            setShowSettings(true)
+          }}
+          aria-label="打开设置"
+        >
           ⚙
         </button>
       </header>
@@ -1760,15 +1797,38 @@ function App(): React.JSX.Element {
       ) : (
         <main className="content">
           {scanning && (
-            <div className="state">
+            <div className="state" role="status" aria-live="polite">
+              <h1>正在整理项目地图…</h1>
               <ProgressDots />
-              正在绘制地图,稍等……
+              <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
+              <button type="button" className="btn" onClick={goHome}>
+                返回首页
+              </button>
             </div>
           )}
           {!scanning && error && (
-            <div className="state">
+            <div className="state" role="alert">
+              <h1>这个文件夹没能打开</h1>
               <Notice kind="error">{error}</Notice>
-              <p className="empty-hint">检查一下路径,或点上方「打开项目」重新选一个文件夹</p>
+              <p>可以重试,或重新选择项目文件夹。</p>
+              <div className="state-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    if (folder) void scanPath(folder)
+                    else void handlePick()
+                  }}
+                >
+                  重试
+                </button>
+                <button type="button" className="btn" onClick={() => void handlePick()}>
+                  选择项目文件夹
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={goHome}>
+                  返回首页
+                </button>
+              </div>
             </div>
           )}
           {!folder && !scanning && !error && (
@@ -1795,6 +1855,8 @@ function App(): React.JSX.Element {
       {showSettings && (
         <SettingsDialog
           workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+          initialSection={settingsSection}
+          onAiConfigSaved={(c) => setAiConfigured(isAiConfigured(c))}
           chatSuggestionsOn={chatSuggestionsOn}
           onChatSuggestionsChange={(v) => {
             setChatSuggestionsOn(v)
@@ -1803,7 +1865,8 @@ function App(): React.JSX.Element {
           onClose={() => setShowSettings(false)}
         />
       )}
-    </div>
+      </div>
+    </AiSetupContext.Provider>
   )
 }
 
@@ -1829,7 +1892,8 @@ function FileOverviewPage({
   onNoteSave,
   autoOpenNote,
   suggestionsOn,
-  onGoChat
+  onGoChat,
+  onPreview
 }: {
   file: ScanFileNode
   result: ScanResult
@@ -1853,13 +1917,20 @@ function FileOverviewPage({
   suggestionsOn: boolean
   /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
   onGoChat: (turn: AiTurn | null) => void
+  onPreview: () => void
 }): React.JSX.Element {
   // AI 解释:概览卡,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
     window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
   )
   // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动;总闸关了全歇
-  const presets = usePresetQuestions({ rootPath: result.rootPath, file, note: note?.text, enabled: suggestionsOn })
+  const presets = usePresetQuestions({
+    rootPath: result.rootPath,
+    file,
+    note: note?.text,
+    enabled: suggestionsOn,
+    allowAi: ai.turns.some((turn) => turn.state === 'done')
+  })
 
   const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
   const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
@@ -1906,6 +1977,7 @@ function FileOverviewPage({
           ai={ai}
           onGoChat={onGoChat}
           onJump={onJump}
+          onPreview={onPreview}
         />
       </div>
     </div>

@@ -39,7 +39,8 @@ export function FileOverview({
   onLoadGraph,
   ai,
   onGoChat,
-  onJump
+  onJump,
+  onPreview
 }: {
   file: ScanFileNode
   /** 小葵的手动备注(第九十八锤):给了就盖过引擎一句话 */
@@ -59,6 +60,7 @@ export function FileOverview({
   onGoChat?: (turn: AiTurn | null) => void
   /** 关系里点文件跳转(保持当前 Tab,顺着关系链看) */
   onJump: (relPath: string) => void
+  onPreview: () => void
 }): React.JSX.Element {
   const relNode = graph?.nodes.find((n) => n.relPath === file.relPath)
   const count = (arr: string[] | undefined): number => arr?.length ?? 0
@@ -84,46 +86,12 @@ export function FileOverview({
           )}
           {file.ext && <span className="chip chip-muted mono">{file.ext}</span>}
         </p>
-        {analyzing && (
-          <p className="card-waiting">
-            <ProgressDots />
-            正在解析结构骨架……
-          </p>
-        )}
-        {!analyzing && analyzeNote && analyzeNote.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
-        {!analyzing && analyzeNote && analyzeNote.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
-        {!analyzing && structure && (
-          <div className="metric-grid">
-            <div className="metric">
-              <strong>{count(structure.functions)}</strong>
-              <span>函数</span>
-            </div>
-            <div className="metric">
-              <strong>{count(structure.classes)}</strong>
-              <span>类</span>
-            </div>
-            <div className="metric">
-              <strong>{count(structure.interfaces)}</strong>
-              <span>接口/类型</span>
-            </div>
-            <div className="metric">
-              <strong>{count(structure.reactComponents)}</strong>
-              <span>React 组件</span>
-            </div>
-            {relNode && (
-              <>
-                <div className="metric">
-                  <strong>{relNode.inCount}</strong>
-                  <span>被引用(影响范围)</span>
-                </div>
-                <div className="metric">
-                  <strong>{relNode.outCount}</strong>
-                  <span>引用了别人</span>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <div className="file-actions">
+          <button type="button" className="btn btn-primary" onClick={onPreview}>
+            查看文件内容
+          </button>
+          <small>只读预览,不修改原文件</small>
+        </div>
       </section>
 
       <AiAssistCard
@@ -134,41 +102,89 @@ export function FileOverview({
         onGoChat={onGoChat}
       />
 
-      {/* 关系模组:和上面两个卡一个模组相(壳+头),没分析过/分析中也是同款壳,不摆露天标签 */}
-      {graph ? (
-        <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
-      ) : (
-        <section className="card relation-card">
-          <header className="relation-card-head">
-            文件关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
-          </header>
-          {graphLoading ? (
-            <p className="relation-empty-note">
+      <details className="file-details">
+        <summary>查看内部结构与文件关系</summary>
+        <div className="file-details-body">
+          {analyzing && (
+            <p className="card-waiting">
               <ProgressDots />
-              正在连线……
-            </p>
-          ) : (
-            <p className="relation-empty-note">
-              还没分析过文件关系,点一下跑一遍全项目连线。
-              <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
-                分析文件关系
-              </button>
-          {graphNote && <Notice kind="error">{graphNote}</Notice>}
+              正在解析结构骨架……
             </p>
           )}
-        </section>
-      )}
+          {!analyzing && analyzeNote && analyzeNote.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
+          {!analyzing && analyzeNote && analyzeNote.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
+          {!analyzing && structure && (
+            <section className="card">
+              <div className="metric-grid">
+                <div className="metric">
+                  <strong>{count(structure.functions)}</strong>
+                  <span>函数</span>
+                </div>
+                <div className="metric">
+                  <strong>{count(structure.classes)}</strong>
+                  <span>类</span>
+                </div>
+                <div className="metric">
+                  <strong>{count(structure.interfaces)}</strong>
+                  <span>接口/类型</span>
+                </div>
+                <div className="metric">
+                  <strong>{count(structure.reactComponents)}</strong>
+                  <span>React 组件</span>
+                </div>
+                {relNode && (
+                  <>
+                    <div className="metric">
+                      <strong>{relNode.inCount}</strong>
+                      <span>被引用(影响范围)</span>
+                    </div>
+                    <div className="metric">
+                      <strong>{relNode.outCount}</strong>
+                      <span>引用了别人</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
 
-      {/* 结构卡:旧「结构」Tab 搬进来垫底,和关系卡一个模组相(壳+头);
-          六节全空的文件(配置/常量)整卡藏掉 */}
-      {showStructure && (
-        <section className="card relation-card">
-          <header className="relation-card-head">
-            结构 <span>文件里有哪些函数、类、组件</span>
-          </header>
-          <StructureGrid structure={structure} />
-        </section>
-      )}
+          {/* 关系模组:和上面两个卡一个模组相(壳+头),没分析过/分析中也是同款壳,不摆露天标签 */}
+          {graph ? (
+            <FileRelations relPath={file.relPath} graph={graph} onJump={onJump} />
+          ) : (
+            <section className="card relation-card">
+              <header className="relation-card-head">
+                文件关系 <span>谁引用了它、它引用谁、改它会牵连谁</span>
+              </header>
+              {graphLoading ? (
+                <p className="relation-empty-note">
+                  <ProgressDots />
+                  正在连线……
+                </p>
+              ) : (
+                <p className="relation-empty-note">
+                  还没分析过文件关系,点一下跑一遍全项目连线。
+                  <button type="button" className="btn btn-primary" onClick={onLoadGraph}>
+                    分析文件关系
+                  </button>
+                  {graphNote && <Notice kind="error">{graphNote}</Notice>}
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* 结构卡:旧「结构」Tab 搬进来垫底,和关系卡一个模组相(壳+头);
+              六节全空的文件(配置/常量)整卡藏掉 */}
+          {showStructure && (
+            <section className="card relation-card">
+              <header className="relation-card-head">
+                结构 <span>文件里有哪些函数、类、组件</span>
+              </header>
+              <StructureGrid structure={structure} />
+            </section>
+          )}
+        </div>
+      </details>
     </>
   )
 }

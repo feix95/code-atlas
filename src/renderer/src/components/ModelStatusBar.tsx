@@ -2,8 +2,9 @@
 // 加载前报上次用的模型名和大小;加载中报百分比 + 进度条,还能按取消;
 // 就绪后报状态,内置模型还能一键卸下腾内存。外接 LM Studio 的装卸归它自己管,这边只看状态。
 // 进度只有服务真报了数才显示,拿不到就老实转圈,绝不编百分比。
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import type { ModelStatus } from '../../../shared/types.ts'
+import { AiSetupContext } from '../aiSetupContext'
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return ''
@@ -15,6 +16,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 export function ModelStatusBar(): React.JSX.Element {
+  const setup = useContext(AiSetupContext)
   const [status, setStatus] = useState<ModelStatus | null>(null)
 
   useEffect(() => {
@@ -35,7 +37,35 @@ export function ModelStatusBar(): React.JSX.Element {
     }
   }, [])
 
-  if (status === null) return <footer className="model-dock" />
+  if (setup && setup.configured !== true) {
+    return (
+      <footer className="model-dock">
+        <div className="model-status" role="status" aria-live="polite">
+          <span className="model-left">
+            <span className="model-provider">{setup.configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}</span>
+            <span className="model-state">项目地图和文件阅读可以直接使用</span>
+          </span>
+          {setup.configured === false && (
+            <button type="button" className="model-act" onClick={setup.openSettings}>
+              设置 AI
+            </button>
+          )}
+        </div>
+      </footer>
+    )
+  }
+
+  if (status === null) {
+    return (
+      <footer className="model-dock">
+        {setup && (
+          <button type="button" className="model-act" onClick={setup.openSettings}>
+            AI 设置
+          </button>
+        )}
+      </footer>
+    )
+  }
 
   const providerName = status.provider === 'builtin' ? '内置' : 'LM Studio'
   const size = formatBytes(status.sizeBytes)
@@ -85,6 +115,11 @@ export function ModelStatusBar(): React.JSX.Element {
             </span>
           )}
           {size && <span className="model-size mono">{size}</span>}
+          {setup && (
+            <button type="button" className="model-act" onClick={setup.openSettings}>
+              AI 设置
+            </button>
+          )}
           <button
             type="button"
             className="model-act"

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { AgentSearchCard, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
@@ -10,6 +10,7 @@ import { AtlasProbe, type ProbeState } from './AtlasProbe'
 import { IconRefresh, TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
+import { AiSetupContext } from '../aiSetupContext'
 
 /**
  * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
@@ -60,7 +61,7 @@ const FileNoteText = memo(function FileNoteText({
  * 第一百一十一锤:预览模式下左栏选中的代码以引用卡挂在这儿,和问题一起发出去。
  */
 
-const CHAT_EXAMPLES = ['你是谁？', '联网搜一下它是什么', '今天不想聊代码,讲点轻松的']
+const CHAT_EXAMPLES = ['这个项目从哪里开始看？', '我想找一个功能，应该看哪里？', '这个文件和其他部分有什么关系？']
 
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
 const REF_ONLY_QUESTION = '讲讲选中的这段代码'
@@ -287,6 +288,7 @@ export function FreeChatPanel({
   /** 推荐问题总闸(聊天偏好):关了推荐和开场示例都不出,只剩「新对话」按钮 */
   suggestionsOn: boolean
 }): React.JSX.Element {
+  const setup = useContext(AiSetupContext)
   const draftRefs = refs ?? []
   const [draft, setDraft] = useState('')
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
@@ -353,7 +355,17 @@ export function FreeChatPanel({
   // retryFrom 从此一个身份用到底。
   const retryCtxRef = useRef({ messages: chat.messages, send: chat.send, forceBottom })
   useEffect(() => {
-    retryCtxRef.current = { messages: chat.messages, send: chat.send, forceBottom }
+    retryCtxRef.current = {
+      messages: chat.messages,
+      forceBottom,
+      send: (text: string, sendRefs?: ChatCodeRef[]) => {
+        if (setup && setup.configured !== true) {
+          if (setup.configured === false) setup.openSettings()
+          return
+        }
+        chat.send(text, sendRefs)
+      }
+    }
   })
   const retryFrom = useCallback((idx: number): void => {
     const { messages, send, forceBottom: fb } = retryCtxRef.current
@@ -407,6 +419,10 @@ export function FreeChatPanel({
   }
 
   function sendDraft(): void {
+    if (setup && setup.configured !== true) {
+      if (setup.configured === false) setup.openSettings()
+      return
+    }
     const q = draft.trim()
     // /compact 手动压缩命令(第一百四十二锤):不当问题发,拦下来直接压缩;
     // 忙着回答时不接,跟发消息一个规矩
@@ -438,6 +454,10 @@ export function FreeChatPanel({
   /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
   function sendExample(q: string): void {
     if (chat.busy) return
+    if (setup && setup.configured !== true) {
+      if (setup.configured === false) setup.openSettings()
+      return
+    }
     forceBottom()
     chat.send(q, draftRefs)
   }
@@ -634,6 +654,18 @@ export function FreeChatPanel({
               </span>
             ))}
           </div>
+        )}
+        {setup && setup.configured !== true && (
+          <p className="chat-setup-hint" role="status">
+            {setup.configured === null
+              ? '正在读取 AI 设置…'
+              : '想用对话,需要先选择一个本地模型。项目地图和文件阅读不受影响。'}
+            {setup.configured === false && (
+              <button type="button" className="btn" onClick={setup.openSettings}>
+                设置 AI
+              </button>
+            )}
+          </p>
         )}
         <div className="prompt-row">
           {/* 新对话(第一百二十七锤补):常驻第一格 —— 聊没聊过都在,想翻篇随时点得着 */}

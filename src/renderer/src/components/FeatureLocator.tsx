@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { FeatureLocateResult, ScanDirNode, ScanTreeNode } from '@shared/types'
+import { AiSetupContext } from '../aiSetupContext'
 import { findCategory, LOCATE_CATEGORIES, type CategoryResult } from '@shared/locateCategories'
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
@@ -34,6 +35,7 @@ export function FeatureLocator({
   // 类目直找(第一百零八锤):点了词条在树里现找,确定性结果
   const [local, setLocal] = useState<CategoryResult | null>(null)
   const idRef = useRef('')
+  const setup = useContext(AiSetupContext)
 
   // 卸载(换选中/关详情)时把还在路上的请求掐掉,别占着模型
   useEffect(() => {
@@ -45,6 +47,10 @@ export function FeatureLocator({
   async function ask(q: string): Promise<void> {
     const questionText = q.trim()
     if (!questionText || busy) return
+    if (setup && setup.configured !== true) {
+      if (setup.configured === false) setup.openSettings()
+      return
+    }
     const requestId = crypto.randomUUID()
     idRef.current = requestId
     setBusy(true)
@@ -87,7 +93,7 @@ export function FeatureLocator({
             type="text"
             value={question}
             placeholder="描述想找的功能,AI 带路帮你指路;也可点下方类目直达"
-            title="用法:想找什么就写什么(如「程序从哪个文件启动」「配置写在哪」),带路人照着项目地图指路;常见的类目点下方词条直接找,必中。"
+            title="用法:想找什么就写什么(如「程序从哪个文件启动」「配置写在哪」),带路人照着项目地图指路;常见的类目点下方词条直接找,按文件名称与目录规则匹配,结果仅供定位参考。"
             aria-label="描述你要找的功能"
             onChange={(e) => setQuestion(e.target.value)}
           />
@@ -108,6 +114,19 @@ export function FeatureLocator({
               </button>
             ))}
           </div>
+        )}
+        {setup && setup.configured !== true && (
+          <p className="card-text">
+            {setup.configured === null ? '正在读取 AI 设置…' : '下面的分类不用 AI。用自己的话提问,需要先设置 AI。'}
+            {setup.configured === false && (
+              <>
+                {' '}
+                <button type="button" className="btn" onClick={setup.openSettings}>
+                  设置 AI
+                </button>
+              </>
+            )}
+          </p>
         )}
         {local && !busy && (
           <>

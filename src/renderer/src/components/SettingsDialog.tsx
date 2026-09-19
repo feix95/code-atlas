@@ -376,13 +376,17 @@ export function SettingsDialog({
   workspaceName,
   chatSuggestionsOn,
   onChatSuggestionsChange,
-  onClose
+  onClose,
+  initialSection = 'appearance',
+  onAiConfigSaved
 }: {
   workspaceName: string | null
   /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
   chatSuggestionsOn: boolean
   onChatSuggestionsChange: (v: boolean) => void
   onClose: () => void
+  initialSection?: SectionKey
+  onAiConfigSaved?: (config: AiConfig) => void
 }): React.JSX.Element {
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
   const [draftAppearance, setDraftAppearance] = useState<Appearance>(loadAppearance)
@@ -391,7 +395,7 @@ export function SettingsDialog({
   const [savedScale, setSavedScale] = useState(() => window.atlas.getUiScale())
   const [draftScale, setDraftScale] = useState(() => window.atlas.getUiScale())
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
-  const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
+  const [activeSection, setActiveSection] = useState<SectionKey>(initialSection)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
@@ -434,6 +438,15 @@ export function SettingsDialog({
       })
       .catch(() => {})
   }, [])
+
+  const initialScrollRef = useRef(false)
+  useEffect(() => {
+    if (initialScrollRef.current || !draftConfig) return
+    initialScrollRef.current = true
+    requestAnimationFrame(() => {
+      sectionEl(initialSection)?.scrollIntoView({ block: 'start', behavior: 'auto' })
+    })
+  }, [draftConfig, initialSection])
 
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
@@ -550,6 +563,7 @@ export function SettingsDialog({
         const saved = await window.atlas.aiConfigSave(toSave)
         setSavedConfig(saved)
         setDraftConfig(saved)
+        onAiConfigSaved?.(saved)
         // 保存回写后框里照存档摆字(第八十九锤:存档换人的四个时刻之一)
         setContextRaw(saved.contextSize === undefined ? '' : String(saved.contextSize))
       } catch (err) {
@@ -563,7 +577,7 @@ export function SettingsDialog({
     window.atlas.setUiScale(draftScale)
     setSavedScale(draftScale)
     setApplyState({ kind: 'idle' })
-  }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale, contextRaw])
+  }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale, contextRaw, onAiConfigSaved])
 
   /** 关弹窗入口(遮罩/×/Esc 同路):保存中不响应;有草稿先弹确认,确认丢弃才真关 */
   const requestClose = useCallback((): void => {
@@ -671,9 +685,9 @@ export function SettingsDialog({
   function sourceState(): { ok: boolean; text: string } {
     if (!draftConfig) return { ok: false, text: '读取中……' }
     if (draftConfig.provider === 'builtin') {
-      return draftConfig.builtin.modelPath ? { ok: true, text: '已就绪' } : { ok: false, text: '还没选模型' }
+      return draftConfig.builtin.modelPath.trim() ? { ok: true, text: '已选择模型' } : { ok: false, text: '还没选模型' }
     }
-    return draftConfig.lmstudio.baseUrl ? { ok: true, text: '已配置' } : { ok: false, text: '还没填地址' }
+    return draftConfig.lmstudio.baseUrl.trim() && draftConfig.lmstudio.model.trim() ? { ok: true, text: '已配置' } : { ok: false, text: '请填写地址并选择模型' }
   }
   const source = sourceState()
   const scaleShown = dragValue ?? draftScale
@@ -1043,7 +1057,7 @@ export function SettingsDialog({
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>AI 来源</label>
-                          <p>两种来源都在本机跑:LM Studio 连你自己的服务端口,内置模型直接加载本地文件,代码不出电脑。</p>
+                          <p>内置模型在本机运行。连接其他服务时,代码片段会发送到你填写的服务地址,请确认它值得信任。</p>
                         </div>
                         <div className="cfg-segmented">
                           <button type="button" className={!isBuiltin ? 'is-selected' : ''} onClick={() => setDraftConfig({ ...draftConfig, provider: 'lmstudio' })}>
@@ -1071,7 +1085,7 @@ export function SettingsDialog({
                           <p>
                             {isBuiltin
                               ? '推理引擎已内置,模型文件就是 AI 的大脑;分析全程不出本机,复杂项目的首次响应可能要等模型加载。'
-                              : '需要先在本机启动 LM Studio 并加载好模型;代码片段只会发往你填的本地端口,不会离开你的设备。'}
+                              : '先启动兼容服务并选择模型。代码片段会发往填写的地址;只有本机地址才留在这台电脑。'}
                           </p>
                         </div>
                         <span className={`cfg-callout-state${source.ok ? '' : ' is-warn'}`}>
@@ -1315,6 +1329,7 @@ export function SettingsDialog({
                                 void window.atlas.aiConfigGet().then((c) => {
                                   setSavedConfig(c)
                                   setDraftConfig(c)
+                                  onAiConfigSaved?.(c)
                                 })
                               }}
                             />

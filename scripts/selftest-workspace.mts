@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { createRequestScope } from '../src/renderer/src/requestScope.ts'
 import { guideEntries, isTreePartial } from '../src/shared/scanCoverage.ts'
-import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
+import { isAiConfigured } from '../src/shared/aiSetup.ts'
+import type { AiConfig, ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
 
 {
   const scope = createRequestScope()
@@ -135,6 +136,28 @@ function dir(name: string, relPath: string, children: ScanTreeNode[], extra: Par
     ['a-dir', 'z-dir', 'a.ts', 'b.ts'],
     '排序只换顺序,relPath 原样'
   )
+}
+
+function cfg(provider: AiConfig['provider'], modelPath: string, baseUrl: string, model: string): AiConfig {
+  return {
+    provider,
+    builtin: { serverPath: '', modelPath },
+    lmstudio: { baseUrl, model, apiKey: '' }
+  }
+}
+
+{
+  assert.equal(isAiConfigured(cfg('builtin', '', '', '')), false)
+  assert.equal(isAiConfigured(cfg('builtin', '   ', '', '')), false)
+  assert.equal(isAiConfigured(cfg('builtin', 'D:\\models\\m.gguf', '', '')), true)
+}
+
+{
+  assert.equal(isAiConfigured(cfg('lmstudio', '', 'http://127.0.0.1:1234/v1', '')), false)
+  assert.equal(isAiConfigured(cfg('lmstudio', '', '不是网址', 'qwen')), false)
+  assert.equal(isAiConfigured(cfg('lmstudio', '', 'file:///tmp/v1', 'qwen')), false)
+  assert.equal(isAiConfigured(cfg('lmstudio', '', 'http://127.0.0.1:1234/v1', 'qwen')), true)
+  assert.equal(isAiConfigured(cfg('lmstudio', '', 'https://api.example.com/v1', 'qwen')), true)
 }
 
 console.log('工作区请求生命周期自测全部通过')
