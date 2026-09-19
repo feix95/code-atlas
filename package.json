@@ -41,6 +41,7 @@
     "test:wordprobe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-wordprobe.mts",
     "test:bubble": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-bubble.mts",
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-workspace.mts",
+    "test:journey": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-journey.mts",
     "test": "npm run test:scanner && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization && npm run test:shellmenu && npm run test:wordprobe && npm run test:bubble && npm run test:workspace"
   },
   "dependencies": {
@@ -65,6 +66,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "playwright": "1.55.1",
     "png-to-ico": "^3.0.2",
     "prettier": "^3.9.6",
     "tree-sitter-wasms": "^0.1.13",
