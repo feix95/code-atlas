@@ -253,9 +253,6 @@ function SharedChat(): React.JSX.Element {
           <button type="button" className="bubble-tool" onClick={() => window.atlas.openMainPanel()} title="打开主面板接着聊">
             回主面板
           </button>
-          <button type="button" className="bubble-close" onClick={() => window.close()} aria-label="关闭气泡">
-            ×
-          </button>
         </div>
         <div className="bubble-messages">
           {!ready && <div className="bubble-note">主面板还没醒,等它一下再聊……</div>}
