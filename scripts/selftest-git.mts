@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import {
   DIFF_SYSTEM_PROMPT,
@@ -178,10 +178,19 @@ async function main(): Promise<void> {
     await unlink(midPath)
 
     // ── 6. 不是 git 仓库:老实说不是,不炸 ──
+    // 临时目录可能落在某个仓库里面(TMP 指进 worktree 时就是),用 ceiling
+    // 钉住向上查找的边界,保证这个用例不管环境怎么配都真的是「不在仓库里」
     notRepoDir = await mkdtemp(join(tmpdir(), 'codeatlas-nogit-'))
-    const nr = await collectGitChanges(notRepoDir)
-    assert.equal(nr.isGitRepo, false)
-    assert.equal(nr.changes.length, 0)
+    const savedCeiling = process.env.GIT_CEILING_DIRECTORIES
+    process.env.GIT_CEILING_DIRECTORIES = dirname(notRepoDir)
+    try {
+      const nr = await collectGitChanges(notRepoDir)
+      assert.equal(nr.isGitRepo, false)
+      assert.equal(nr.changes.length, 0)
+    } finally {
+      if (savedCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES
+      else process.env.GIT_CEILING_DIRECTORIES = savedCeiling
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
     if (notRepoDir) await rm(notRepoDir, { recursive: true, force: true })

@@ -91,7 +91,6 @@
 - 扫描完成即可展示地图,修改记录在后台补齐。项目切换和返回首页必须作废上一代扫描、关系分析、目录展开与文件分析结果。
 - `npm run test:workspace` 检查请求生命周期;新任务与旧任务乱序返回时,不得覆盖内容或提前结束新任务的等待状态。
 - worktree 验收必须隔离 Electron 的 userData、sessionData、crashDumps 以及 TEMP/TMP/npm 缓存;不得使用日常应用的配置或结束其他实例的模型进程。
-- TEMP/TMP 指到 worktree 内部时,须同时设 `GIT_CEILING_DIRECTORIES=<隔离后的 TEMP 路径>`;否则 test:git 的「非仓库」用例会向上认到外层仓库,误报 isGitRepo=true。
 - 单纯浏览文件不得启动 AI 预测;规则推荐不依赖模型,AI 预测仅在用户主动完成讲解后运行。
 - `npm run build` 后运行 `npm run test:journey`:Windows 桌面上的真实 Electron 操作验收,配置和截图只写入已忽略的 `.planning/journey/`。扫描、读取和导航走真实应用;AI 回答、故障与延迟采用测试替身,不代表真实模型质量已验收。
 - 最终检查依次运行 `npm run typecheck`、`npm run lint`、`npm test`、`npm run build`、`npm run test:journey`。真实新用户完成时间、Windows 系统缩放、真实模型回答质量仍需独立验收。
