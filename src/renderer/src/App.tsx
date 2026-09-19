@@ -19,6 +19,7 @@ import { ProjectOverview } from './components/ProjectOverview'
 import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
 import { cleanErrMsg } from './errText'
+import { createRequestScope } from './requestScope'
 import { pushNavLocation, stepNavIndex, type NavLocation } from './navHistory'
 import {
   formatRecentTime,
@@ -303,6 +304,7 @@ function App(): React.JSX.Element {
   const [analyzing, setAnalyzing] = useState(false)
   // 结构分析的票号:连点两个文件时,慢的旧响应回来不许盖新的账
   const analyzeSeq = useRef(0)
+  const requests = useRef(createRequestScope())
   // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
   const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
@@ -316,6 +318,7 @@ function App(): React.JSX.Element {
   const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
+  const expandingRef = useRef(false)
   const [treeNote, setTreeNote] = useState<string | null>(null)
   // 后退/前进(第八十三锤):浏览过的位置(首页/项目/选中的文件文件夹)串成一条线,按钮挪游标
   const [nav, setNav] = useState<{ stack: NavLocation[]; index: number }>(() => ({
@@ -542,6 +545,13 @@ function App(): React.JSX.Element {
   // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条。
   // 扫成的图递还给调用方(后退/前进恢复选中要在新树上找人);扫砸了回 null
   async function scanPath(dir: string): Promise<ScanResult | null> {
+    requests.current.reset()
+    const isCurrent = requests.current.begin('scan')
+    expandingRef.current = false
+    analyzeSeq.current += 1
+    setAnalyzing(false)
+    setGraphLoading(false)
+    setGitLoading(false)
     setFolder(dir)
     setPathDraft(dir)
     setPathHint(null)
@@ -564,31 +574,40 @@ function App(): React.JSX.Element {
     setNotes({})
     try {
       const scanned = await window.atlas.scanFolder(dir)
+      if (!isCurrent()) return null
+      const root = scanned.rootPath
       setResult(scanned)
+      setFolder(root)
+      setPathDraft(root)
       // 当前根上报主进程(右键问一问):气泡拿它判断文件在不在项目里
-      window.atlas.reportCurrentRoot(dir)
+      window.atlas.reportCurrentRoot(root)
       // 备注跟上新树:顺带清孤儿(垃圾不越攒越多),再写回本机
-      setNotes(refreshNotesForScan(dir, scanned.tree))
+      setNotes(refreshNotesForScan(root, scanned.tree))
       // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
-      setRecents(rememberRecentProject(dir))
+      setRecents(rememberRecentProject(root))
       // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
-      if (dir !== folder) pushNav({ folder: dir, file: null, dir: null })
+      if (root !== folder) pushNav({ folder: root, file: null, dir: null })
       flashToast(`扫描完成:${scanned.stats.fileCount} 个文件`)
       // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
+      setScanning(false)
       setGitLoading(true)
-      try {
-        setGitInfo(await window.atlas.gitChanges(dir))
-      } catch {
-        setGitInfo(null)
-      } finally {
-        setGitLoading(false)
-      }
+      void window.atlas
+        .gitChanges(root)
+        .then((info) => {
+          if (isCurrent()) setGitInfo(info)
+        })
+        .catch(() => {
+          if (isCurrent()) setGitInfo(null)
+        })
+        .finally(() => {
+          if (isCurrent()) setGitLoading(false)
+        })
       return scanned
     } catch (err) {
-      setError(cleanErrMsg(err))
+      if (isCurrent()) setError(cleanErrMsg(err))
       return null
     } finally {
-      setScanning(false)
+      if (isCurrent()) setScanning(false)
     }
   }
 
@@ -854,6 +873,7 @@ function App(): React.JSX.Element {
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
+    setAnalyzing(false)
     // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
     if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath) chat.note(`参考资料换成了 ${file.name}`)
     retargetFollowTabs(file)
@@ -889,6 +909,8 @@ function App(): React.JSX.Element {
 
   // 树里点文件夹:选中出概览,页签规矩同文件;箭头管展开,点名字不触发扫描
   function followDir(node: ScanDirNode): void {
+    analyzeSeq.current += 1
+    setAnalyzing(false)
     pushNav({ folder, file: null, dir: node.relPath })
     setSelectedFolder(node)
     setSelectedFile(null)
@@ -905,15 +927,19 @@ function App(): React.JSX.Element {
 
   async function handleLoadGraph(): Promise<void> {
     if (!result) return
+    const isCurrent = requests.current.begin('graph')
+    const root = result.rootPath
     setGraphLoading(true)
     setGraphNote(null)
     try {
       // 路径契约:renderer 只递 rootPath,图里的节点全是主进程算好的 relPath
-      setGraph(await window.atlas.depGraph(result.rootPath))
+      const depGraph = await window.atlas.depGraph(root)
+      if (!isCurrent()) return
+      setGraph(depGraph)
     } catch (err) {
-      setGraphNote(cleanErrMsg(err))
+      if (isCurrent()) setGraphNote(cleanErrMsg(err))
     } finally {
-      setGraphLoading(false)
+      if (isCurrent()) setGraphLoading(false)
     }
   }
 
@@ -935,6 +961,8 @@ function App(): React.JSX.Element {
 
   // 后退/前进回到「没选中」的一站:选中清空,概览页签回项目主页(它的零状态)
   function clearSelection(): void {
+    analyzeSeq.current += 1
+    setAnalyzing(false)
     setSelectedFolder(null)
     setSelectedFile(null)
     setStructure(null)
@@ -1020,6 +1048,14 @@ function App(): React.JSX.Element {
   // 上次开的路径留在输入框里,想回这个项目点「前往」就行。没开项目时按钮自己变灰
   function goHome(): void {
     if (!folder) return
+    requests.current.reset()
+    analyzeSeq.current += 1
+    expandingRef.current = false
+    setAnalyzing(false)
+    setScanning(false)
+    setGraphLoading(false)
+    setGitLoading(false)
+    window.atlas.reportCurrentRoot(null)
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
     setGroups([])
@@ -1263,21 +1299,28 @@ function App(): React.JSX.Element {
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
   async function handleExpandLazy(relPath: string): Promise<void> {
-    if (!result) return
+    if (!result || expandingRef.current) return
+    expandingRef.current = true
+    const isCurrent = requests.current.begin('expand')
+    const root = result.rootPath
     setExpanding(relPath)
     setTreeNote(null)
     try {
       // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径只能由主进程 joinRoot 解析
-      const sub = await window.atlas.scanSubdir(result.rootPath, relPath)
+      const sub = await window.atlas.scanSubdir(root, relPath)
+      if (!isCurrent()) return
       setResult((prev) =>
-        prev
+        prev && prev.rootPath === root
           ? { ...prev, tree: spliceSubtree(prev.tree, relPath, sub.tree), stats: mergeStats(prev.stats, sub.stats) }
           : prev
       )
     } catch (err) {
-      setTreeNote(cleanErrMsg(err))
+      if (isCurrent()) setTreeNote(cleanErrMsg(err))
     } finally {
-      setExpanding(null)
+      if (isCurrent()) {
+        setExpanding(null)
+        expandingRef.current = false
+      }
     }
   }
 

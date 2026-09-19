@@ -2474,7 +2474,7 @@ app.on('will-quit', () => {
 
 // 冷启动的右键目标(右键问一问):程序没在跑时右键,这份 argv 就是自己进程的。
 // 文件 = 启动到托盘 + 桌宠 + 气泡,主窗不强制展开;文件夹 = 以它为根正常开主窗
-const launchTarget = extractLaunchPath(process.argv)
+const launchTarget = extractLaunchPath(process.argv, process.defaultApp === true)
 // 冷启动目录由渲染层起来后 invoke 拉走(拉取通道不怕时序,比 load 完就 send 稳)
 let pendingLaunchDirectory: string | null = launchTarget?.kind === 'directory' ? launchTarget.path : null
 // 主进程记住的当前项目根(渲染层每次开图成功后上报):气泡出界判断的依据
@@ -2561,7 +2561,7 @@ async function handleLaunchPath(target: { path: string; kind: 'file' | 'director
 }
 
 app.on('second-instance', (_event, argv) => {
-  const target = extractLaunchPath(argv)
+  const target = extractLaunchPath(argv, process.defaultApp === true)
   if (target) void handleLaunchPath(target)
   else showMainWindow()
 })

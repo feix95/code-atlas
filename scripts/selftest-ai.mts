@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -70,7 +70,7 @@ import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, inspectBuiltinConflict, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed, probeTavilyKey, HttpStatusError, TAVILY_USAGE_URL } from '../src/ai/weblookup.ts'
 import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus, parseTavilyUsage, tavilyUsageText } from '../src/shared/tavily.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
@@ -884,6 +884,36 @@ async function main(): Promise<void> {
   assert.equal(parseEnginePidFile('垃圾'), null, '垃圾回 null')
   assert.equal(parseEnginePidFile(null), null)
   assert.equal(parseEnginePidFile([{ pid: 7 }]), null, '数组不收')
+
+  assert.deepEqual(
+    await inspectBuiltinConflict({ listeners: async () => [123], image: async () => 'llama-server.exe' }),
+    { killed: false, blockedBy: 'llama-server.exe' },
+    '撞上同名引擎也只报告,绝不击杀'
+  )
+  assert.deepEqual(
+    await inspectBuiltinConflict({ listeners: async () => [123], image: async () => 'other.exe' }),
+    { killed: false, blockedBy: 'other.exe' },
+    '别的程序占口也只报告'
+  )
+  assert.deepEqual(
+    await inspectBuiltinConflict({ listeners: async () => [123], image: async () => '' }),
+    { killed: false, blockedBy: '另一个程序' },
+    '认不出名字就说「另一个程序」'
+  )
+  assert.deepEqual(
+    await inspectBuiltinConflict({ listeners: async () => [], image: async () => 'x.exe' }),
+    { killed: false },
+    '没人监听就没冲突'
+  )
+  {
+    const builtinSrc = readFileSync(new URL('../src/ai/builtin.ts', import.meta.url), 'utf8')
+    const reaperStart = builtinSrc.indexOf('function reapOrphanByPidFile')
+    const reaperEnd = builtinSrc.indexOf('export async function ensureBuiltinServer')
+    const reaperSection = builtinSrc.slice(reaperStart, reaperEnd)
+    assert.ok(reaperStart >= 0 && reaperEnd > reaperStart, '收尸段该找得到')
+    assert.ok(!reaperSection.includes(`runCommand('taskkill'`), '收尸段不许再发 taskkill')
+    assert.ok(!reaperSection.includes('.kill('), '收尸段不许终止任何进程')
+  }
 
   // ── 6.5 单飞闸门(第一百三十六锤):并发的第二个调用等同一份,绝不各起各的 ──
   {

@@ -11,8 +11,8 @@ import { existsSync, statSync } from 'node:fs'
  * 但防一手文件被删后再点);认出来还顺手分辨文件还是文件夹。
  * 没有目标(正常双击启动)回 null。
  */
-export function extractLaunchPath(argv: readonly string[]): { path: string; kind: 'file' | 'directory' } | null {
-  for (const arg of argv.slice(1)) {
+export function extractLaunchPath(argv: readonly string[], defaultApp = false): { path: string; kind: 'file' | 'directory' } | null {
+  for (const arg of argv.slice(defaultApp ? 2 : 1)) {
     if (!arg || arg.startsWith('-')) continue
     if (!existsSync(arg)) continue
     try {

@@ -448,15 +448,6 @@ export function parseTasklistImage(tasklistOut: string): string {
 }
 
 /** 8766 端口上有没有活物(llama-server 加载中回 503,也算活着) */
-async function builtinPortOccupied(): Promise<boolean> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${BUILTIN_PORT}/health`, { signal: AbortSignal.timeout(1500) })
-    return res.status === 200 || res.status === 503
-  } catch {
-    return false
-  }
-}
-
 async function findListenerPids(): Promise<number[]> {
   try {
     const out = await runCommand('netstat', ['-ano', '-p', 'tcp'])
@@ -545,10 +536,8 @@ async function reapOrphanByPidFile(): Promise<boolean> {
     removePidFile(file)
     return false
   }
-  await runCommand('taskkill', ['/PID', String(pid), '/F']).catch(() => {})
-  removePidFile(file)
-  addDevLog('system', `收尸:请走了上次没收场的引擎进程(PID ${pid},照进程档验明正身)`)
-  return true
+  addDevLog('system', `记录中的模型进程仍在运行(PID ${pid});无法确认归属,不会自动关闭`)
+  return false
 }
 
 export interface OrphanReapResult {
@@ -558,6 +547,16 @@ export interface OrphanReapResult {
   blockedBy?: string
 }
 
+export async function inspectBuiltinConflict(probe: {
+  listeners: () => Promise<number[]>
+  image: (pid: number) => Promise<string>
+}): Promise<OrphanReapResult> {
+  const pids = await probe.listeners()
+  if (pids.length === 0) return { killed: false }
+  const image = await probe.image(pids[0])
+  return { killed: false, blockedBy: image || '另一个程序' }
+}
+
 /**
  * 收尸:崩溃或被任务管理器强杀时 will-quit 没跑,llama-server 成了孤儿,
  * 白占几个 GB 内存还堵着端口。双路抓:先照 PID 档抓「死在加载中没 listen」的,
@@ -565,35 +564,10 @@ export interface OrphanReapResult {
  * 非 Windows 暂不管(打包 mac 时再补对应做法)。
  */
 export async function reapOrphanServer(): Promise<OrphanReapResult> {
-  if (process.platform !== 'win32') return { killed: false }
-  if (isBuiltinRunning()) return { killed: false }
-  const byPid = await reapOrphanByPidFile()
-  if (!(await builtinPortOccupied())) return { killed: byPid }
-
-  let killedAny = byPid
-  let blockedBy: string | undefined
-  for (const pid of await findListenerPids()) {
-    const image = await tasklistImage(pid)
-    if (!image) continue
-    if (image.toLowerCase() !== ENGINE_IMAGE) {
-      addDevLog('system', `端口 ${BUILTIN_PORT} 被别的程序占着(${image}),不动它`)
-      blockedBy = image
-      continue
-    }
-    await runCommand('taskkill', ['/PID', String(pid), '/F']).catch(() => {})
-    addDevLog('system', `收尸:请走了占着端口 ${BUILTIN_PORT} 的孤儿引擎进程(PID ${pid})`)
-    killedAny = true
-  }
+  if (process.platform !== 'win32' || isBuiltinRunning()) return { killed: false }
+  await reapOrphanByPidFile()
   // 强杀后端口释放要一两秒,等它真放开再交差
-  if (killedAny) {
-    const deadline = Date.now() + 8000
-    while (Date.now() < deadline && (await findListenerPids()).length > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-  }
-  return (await builtinPortOccupied())
-    ? { killed: killedAny, blockedBy: blockedBy ?? ENGINE_IMAGE }
-    : { killed: killedAny }
+  return inspectBuiltinConflict({ listeners: findListenerPids, image: tasklistImage })
 }
 
 /**
@@ -623,6 +597,12 @@ const startBuiltinSingleFlight = createSingleFlight(
     contextSize: number,
     manualContext: number | null
   ): Promise<{ baseUrl: string; model: string }> => {
+    const modelPath = settings.modelPath.trim()
+    if (!modelPath) {
+      const err = new Error('还没设置 AI。打开设置,选择一个本地模型;不设置也能浏览项目地图。')
+      announceBuiltinError(modelPath, err)
+      throw err
+    }
     let serverPath: string
     try {
       serverPath = resolveServerProgram(settings.serverPath)
@@ -630,17 +610,11 @@ const startBuiltinSingleFlight = createSingleFlight(
       announceBuiltinError(settings.modelPath, err)
       throw err
     }
-    const modelPath = settings.modelPath.trim()
-    if (!modelPath) {
-      const err = new Error('还没选模型:去「AI 设置」点「📂 选择模型」,选一个 .gguf 模型文件')
-      announceBuiltinError(modelPath, err)
-      throw err
-    }
 
     // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
     const reap = await reapOrphanServer()
     if (reap.blockedBy) {
-      const err = new Error(`内置模型的端口 ${BUILTIN_PORT} 被别的程序占着(${reap.blockedBy}),先关掉那个程序再试`)
+      const err = new Error('另一个程序正在使用本地模型服务。CodeAtlas 没有关闭它;请先在那个程序里停止模型,或到设置连接已有的本地服务。')
       announceBuiltinError(modelPath, err)
       throw err
     }
