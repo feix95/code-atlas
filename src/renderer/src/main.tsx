@@ -7,6 +7,7 @@ import { BubblePage } from './components/BubblePage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { initAppearance } from './appearance'
 import './assets/main.css'
+import './assets/project-guide.css'
 
 // 开画之前先把亮暗和配色定下来,免得先闪一帧错的再跳回来
 initAppearance()

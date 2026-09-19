@@ -1,4 +1,5 @@
 import type { GitChangesResult, ScanDirNode } from '@shared/types'
+import { isTreePartial } from '@shared/scanCoverage'
 import { AiAssistCard } from './AiAssist'
 import { type AiAssistApi, type AiTurn } from '../useAiAsk'
 import { GitDoor } from './GitDoor'
@@ -88,11 +89,11 @@ export function FolderOverview({
               </div>
               <div className="metric">
                 <strong>{info.totalFiles}</strong>
-                <span>含子层的全部文件</span>
+                <span>已发现的文件</span>
               </div>
               <div className="metric">
-                <strong>{dir.truncated ? '不完整' : '完整'}</strong>
-                <span>{dir.truncated ? '有的子层还没扫描' : '已扫描'}</span>
+                <strong>{isTreePartial(dir) ? '不完整' : '完整'}</strong>
+                <span>{isTreePartial(dir) ? '有的子层还没扫描' : '已扫描'}</span>
               </div>
             </div>
             {info.topLanguages.length > 0 && (

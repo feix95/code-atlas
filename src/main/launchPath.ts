@@ -12,7 +12,13 @@ import { existsSync, statSync } from 'node:fs'
  * 没有目标(正常双击启动)回 null。
  */
 export function extractLaunchPath(argv: readonly string[], defaultApp = false): { path: string; kind: 'file' | 'directory' } | null {
-  for (const arg of argv.slice(defaultApp ? 2 : 1)) {
+  let rest = argv.slice(1)
+  if (defaultApp) {
+    const entryIdx = rest.findIndex((a) => a && !a.startsWith('-'))
+    if (entryIdx < 0) return null
+    rest = rest.slice(entryIdx + 1)
+  }
+  for (const arg of rest) {
     if (!arg || arg.startsWith('-')) continue
     if (!existsSync(arg)) continue
     try {

@@ -25,29 +25,32 @@
   --font-base: 0.875rem;
   --font-lg: 1rem;
   --font-display: 1.625rem;
+  --font-hero: clamp(1.75rem, 3vw, 2.5rem);
+  --content-max: 70rem;
+  --control-height: 2.5rem;
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
   /* ── 色板(浅色)── */
-  --window: #f6f7f8;
+  --window: #f2f5f8;
   /* 画布底色:固定中性底(第七十七锤起不再跟主题色染 —— 雾铺在大片空白上就是罩子),
      垫在最外层和卡片缝隙底下;内容卡片本身保持中性白 */
-  --canvas-tint: hsl(207 5% 97%);
-  --secondary: #5ac5db; /* 辅助色:图标/分布条/预设问题 chips 等的渐变与点缀主角 */
-  --secondary-deep: #1f7e8e; /* 辅助色的文字安全档:同一色相压深,浅底上看得清 */
+  --canvas-tint: #f2f5f8;
+  --secondary: #4a8891; /* 辅助色:图标/分布条/预设问题 chips 等的渐变与点缀主角 */
+  --secondary-deep: #326a73; /* 辅助色的文字安全档:同一色相压深,浅底上看得清 */
   --surface: #ffffff;
-  --surface-soft: #fbfbfc;
-  --line: #d9dcdf;
-  --line-soft: #eef0f1;
-  --text: #282b2e;
-  --text-strong: #303a40;
-  --muted: #7d8388;
-  --muted-2: #a1a6aa;
-  --accent: #147dcc;
-  --accent-hover: #0f6db3;
+  --surface-soft: #f7f9fc;
+  --line: #d6dee8;
+  --line-soft: #e9edf3;
+  --text: #26364a;
+  --text-strong: #172c46;
+  --muted: #607086;
+  --muted-2: #728198;
+  --accent: #225eaa;
+  --accent-hover: #194b89;
   /* 实心主题色件上的字色:第七十九锤起由 appearance 按派生主题色的对比度自动翻深浅,
      亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
   --accent-ink: #ffffff;
   --accent-soft: #eef0f2;
-  --accent-line: #bfdef1;
+  --accent-line: #bfd1e8;
   --green: #38a169;
   --green-soft: #effaf3;
   --green-line: #c2e4d0;
@@ -3385,17 +3388,6 @@ body.is-sash-dragging .pane-sash::after {
 
 /* ── 首页盘符列表(第六十锤):一开就是「这台电脑」,欢迎卡退役,版本号搬进设置 ── */
 
-.drives-view {
-  margin: auto;
-  text-align: center;
-  max-width: 34rem;
-  width: 100%;
-}
-
-.drives-view h1 {
-  margin: 0 0 var(--space-2);
-}
-
 .drives-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
@@ -3405,24 +3397,11 @@ body.is-sash-dragging .pane-sash::after {
 
 /* ── 最近打开(第八十一锤):首页一排小卡,点一下回上次的项目;✕ 只删记录不动文件夹 ── */
 
-.recents {
-  margin-top: var(--space-6);
-  max-width: 46rem;
-}
-
-.recents-title {
-  color: var(--muted-2);
-  font-size: var(--font-xs);
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
 .recents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .recent-card {
@@ -3432,6 +3411,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .recent-open {
   width: 100%;
+  min-height: var(--control-height);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3508,6 +3488,7 @@ body.is-sash-dragging .pane-sash::after {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-height: var(--control-height);
   padding: var(--space-3) var(--space-4);
   text-align: left;
   background: var(--surface);

@@ -82,6 +82,8 @@ check('路径转交:从 argv 里认出真实存在的路径,跳过 exe 和开关
     assert.equal(extractLaunchPath([exe, file], true), null, '开发启动的应用入口不被误认成右键目标')
     assert.deepEqual(extractLaunchPath([exe, file, subdir], true), { path: subdir, kind: 'directory' }, '跳过入口后,下一个路径才作数')
     assert.deepEqual(extractLaunchPath([exe, file, '-v', subdir], true), { path: subdir, kind: 'directory' }, '入口后面的开关照样跳过')
+    assert.equal(extractLaunchPath([exe, '--inspect=0', '--remote-debugging-port=0', file], true), null, '入口前插了注入开关,入口照样被跳过')
+    assert.deepEqual(extractLaunchPath([exe, '--inspect=0', file, subdir], true), { path: subdir, kind: 'directory' }, '开关挤在入口前,入口后的路径仍是目标')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

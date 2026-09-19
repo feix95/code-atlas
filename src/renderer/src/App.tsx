@@ -4,6 +4,7 @@ import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef } from '@shared/preview'
+import { isTreePartial } from '@shared/scanCoverage'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
@@ -13,6 +14,7 @@ import { openFilePathMenuFor } from './components/filePathMenuStore'
 import { FileTree } from './components/FileTree'
 import { TabBar } from './components/TabBar'
 import { FolderOverview } from './components/FolderOverview'
+import { HomePage } from './components/HomePage'
 import { FreeChatPanel } from './components/FreeChatPanel'
 import { ModelStatusBar } from './components/ModelStatusBar'
 import { ProjectOverview } from './components/ProjectOverview'
@@ -22,7 +24,6 @@ import { cleanErrMsg } from './errText'
 import { createRequestScope } from './requestScope'
 import { pushNavLocation, stepNavIndex, type NavLocation } from './navHistory'
 import {
-  formatRecentTime,
   forgetRecentProject,
   readRecentProjects,
   rememberRecentProject,
@@ -37,17 +38,10 @@ import { useWindowMaximized } from './useWindowMaximized'
 import { FOLLOW_KINDS, KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
-import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh } from './components/Icons'
+import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh, TreeIcon } from './components/Icons'
 
 /** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
 const MIRROR_THROTTLE_MS = 100
-
-/** 容量读数:字节换 GB,过百就不带小数,别啰嗦 */
-function driveCapacity(d: DriveInfo): string {
-  if (!d.total) return '就绪'
-  const gb = (n: number): string => `${(n / 1024 ** 3).toFixed(n / 1024 ** 3 >= 100 ? 0 : 1)} GB`
-  return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
-}
 
 /**
  * 右栏页签(小葵的页签模型,2026-09-13 线框图定稿):
@@ -709,7 +703,11 @@ function App(): React.JSX.Element {
       const slot = owner.tabs.find((t) => t.kind === kind && !t.pinned)
       if (slot) {
         setActiveGroupId(owner.id)
-        patchGroup(owner.id, (g) => ({ ...g, activeId: slot.id }))
+        patchGroup(owner.id, (g) => ({
+          ...g,
+          tabs: g.tabs.map((t) => (t.id === slot.id ? { ...t, relPath: node?.relPath ?? '' } : t)),
+          activeId: slot.id
+        }))
         if (auto) markFlash(slot.id)
         return
       }
@@ -911,6 +909,10 @@ function App(): React.JSX.Element {
   function followDir(node: ScanDirNode): void {
     analyzeSeq.current += 1
     setAnalyzing(false)
+    if (node.relPath === '') {
+      showProjectGuide()
+      return
+    }
     pushNav({ folder, file: null, dir: node.relPath })
     setSelectedFolder(node)
     setSelectedFile(null)
@@ -968,6 +970,12 @@ function App(): React.JSX.Element {
     setStructure(null)
     setAnalyzeNote(null)
     ensureKindTab('overview', null)
+  }
+
+  function showProjectGuide(): void {
+    if (!result) return
+    clearSelection()
+    pushNav({ folder: result.rootPath, file: null, dir: null })
   }
 
   // 页签操作:激活(点亮所在组,树里顺势照过来)、双击钉住/拆钉(对话分家规矩在里面)、
@@ -1281,22 +1289,6 @@ function App(): React.JSX.Element {
     setRecentUndo(null)
   }
 
-  /** 盘的来路人话(第八十一锤):固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到照旧叫本地磁盘 */
-  function driveKindName(d: DriveInfo): string {
-    if (d.kind === 'removable') return 'U 盘或移动硬盘'
-    if (d.kind === 'network') return '网络盘'
-    if (d.kind === 'optical') return '光驱'
-    if (d.kind === 'fixed') return '固定硬盘'
-    return '本地磁盘'
-  }
-
-  /** 容量条走掉的百分比(0~100);拿不到容量回 null(不画条) */
-  function driveUsedPercent(d: DriveInfo): number | null {
-    if (!d.total) return null
-    const used = (d.total - (d.free ?? 0)) / d.total
-    return Math.round(Math.min(100, Math.max(0, used * 100)))
-  }
-
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
   async function handleExpandLazy(relPath: string): Promise<void> {
     if (!result || expandingRef.current) return
@@ -1381,6 +1373,7 @@ function App(): React.JSX.Element {
             graphNote={graphNote}
             onLoadGraph={() => void handleLoadGraph()}
             onJump={jumpTo}
+            onReadFile={openPreview}
             gitInfo={gitInfo}
             onRefreshed={setGitInfo}
           />
@@ -1436,6 +1429,7 @@ function App(): React.JSX.Element {
           graphNote={graphNote}
           onLoadGraph={() => void handleLoadGraph()}
           onJump={jumpTo}
+          onReadFile={openPreview}
           gitInfo={gitInfo}
           onRefreshed={setGitInfo}
         />
@@ -1529,8 +1523,8 @@ function App(): React.JSX.Element {
           className="brand"
           onClick={goHome}
           disabled={!folder || scanning}
-          title={folder ? '回到这台电脑' : '已经在这台电脑了'}
-          aria-label="回到这台电脑"
+          title={folder ? '回到首页' : '已经在首页了'}
+          aria-label="回到首页"
         >
           <span className="brand-mark" aria-hidden="true">
             ⌁
@@ -1601,6 +1595,10 @@ function App(): React.JSX.Element {
               不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
           <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
             {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
+            <button type="button" className="workspace-home" onClick={showProjectGuide}>
+              <TreeIcon name="bulb" />
+              项目导览
+            </button>
             <FileTree
               root={result.tree}
               rootPath={result.rootPath}
@@ -1617,8 +1615,8 @@ function App(): React.JSX.Element {
             />
             <footer className="sidebar-footer">
               <span>
-                <i className={`status-dot${result.stats.lazyCount > 0 ? ' is-amber' : ''}`} aria-hidden="true" />
-                {result.stats.lazyCount > 0 ? '部分已扫描' : '扫描完成'}
+                <i className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`} aria-hidden="true" />
+                {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
               </span>
               <span className="mono">
                 {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
@@ -1774,70 +1772,16 @@ function App(): React.JSX.Element {
             </div>
           )}
           {!folder && !scanning && !error && (
-            <div className="drives-view">
-              <h1>这台电脑</h1>
-              <p className="empty-hint">点一个盘开始扫描;想直奔某个项目,用上方「打开项目」或粘贴路径</p>
-              {recents.length > 0 && (
-                <div className="recents">
-                  <p className="recents-title">最近打开</p>
-                  <div className="recents-grid">
-                    {recents.map((r) => (
-                      <div key={r.p} className="recent-card">
-                        <button type="button" className="recent-open" onClick={() => void scanPath(r.p)} title={r.p}>
-                          <strong className="recent-name">{r.n}</strong>
-                          <small className="recent-time">{formatRecentTime(r.t)}</small>
-                        </button>
-                        <button
-                          type="button"
-                          className="recent-remove"
-                          onClick={() => removeRecent(r.p)}
-                          aria-label={`从最近列表删掉 ${r.n}`}
-                          title="只删这条记录,不动文件夹本身"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {recentUndo && (
-                <div className="recent-undo" role="status">
-                  已删除「{recentUndo.removed.n}」
-                  <button type="button" className="btn btn-ghost" onClick={undoRecentRemove}>
-                    撤销
-                  </button>
-                </div>
-              )}
-              {drives === null && !drivesNote ? (
-                <div className="state">
-                  <ProgressDots />
-                  正在列盘符……
-                </div>
-              ) : drivesNote ? (
-                <Notice kind="error">{drivesNote}</Notice>
-              ) : (
-                <div className="drives-grid">
-                  {(drives ?? []).map((d) => {
-                    const used = driveUsedPercent(d)
-                    return (
-                      <button key={d.letter} type="button" className="drive-card" onClick={() => void scanPath(d.root)}>
-                        <strong className="drive-letter">{d.letter}:</strong>
-                        <span className="drive-info">
-                          <strong>{driveKindName(d)}</strong>
-                          <small>{driveCapacity(d)}</small>
-                          {used !== null && (
-                            <i className={`drive-bar${d.free !== undefined && d.free / d.total! < 0.1 ? ' is-low' : ''}`}>
-                              <i style={{ width: `${used}%` }} />
-                            </i>
-                          )}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <HomePage
+              recents={recents}
+              drives={drives}
+              drivesNote={drivesNote}
+              recentUndo={recentUndo}
+              onPick={() => void handlePick()}
+              onOpen={(path) => void scanPath(path)}
+              onRemoveRecent={removeRecent}
+              onUndoRecent={undoRecentRemove}
+            />
           )}
         </main>
       )}
