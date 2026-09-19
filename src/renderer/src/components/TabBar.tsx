@@ -29,6 +29,8 @@ export function TabBar({
   onPinToggle,
   onMoveTab,
   onDragTab,
+  onTabDragEnd,
+  onDetachTab,
   enabledKinds,
   onToggleKind
 }: {
@@ -45,6 +47,10 @@ export function TabBar({
   onMoveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
   /** 拖动开始/结束喊一声(App 要知道谁在拖,好判定「中心分屏」该不该许诺) */
   onDragTab: (id: string | null) => void
+  /** 拖动落定喊一声是哪张(走出面板锤:拖出主窗松手 = 放出小探针,App 拿它判品类) */
+  onTabDragEnd?: (id: string) => void
+  /** 右键菜单「放到桌面」:不拖也放(走出面板锤补,小葵点的名),只对小探针页签显示 */
+  onDetachTab?: (id: string) => void
   enabledKinds: Set<PaneKind>
   onToggleKind: (kind: PaneKind, on: boolean) => void
 }): React.JSX.Element {
@@ -150,6 +156,8 @@ export function TabBar({
               setDropZone(false)
               setDraggingId(null)
               onDragTab(null)
+              // 落定上报:拖出主窗放出小探针这类「落点语义」由 App 判,这里只报是谁
+              onTabDragEnd?.(t.id)
             }}
             onClick={() => onActivate(t.id)}
             onDoubleClick={() => onPinToggle(t.id)}
@@ -260,6 +268,22 @@ export function TabBar({
           >
             {canMoveToSiblingGroup ? '挪去另一组' : '挪去右边,拆成两组'}
           </button>
+          {(() => {
+            const t = tabs.find((x) => x.id === tabMenu.tabId)
+            return t?.kind === 'chat' && !t.pinned ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="kindmenu-item"
+                onClick={() => {
+                  onDetachTab?.(t.id)
+                  setTabMenu(null)
+                }}
+              >
+                把小探针放到桌面上
+              </button>
+            ) : null
+          })()}
           <button
             type="button"
             role="menuitem"

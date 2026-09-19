@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, FreechatHost, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
@@ -37,6 +37,9 @@ import { FOLLOW_KINDS, KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, sav
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh } from './components/Icons'
+
+/** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
+const MIRROR_THROTTLE_MS = 100
 
 /** 容量读数:字节换 GB,过百就不带小数,别啰嗦 */
 function driveCapacity(d: DriveInfo): string {
@@ -262,6 +265,9 @@ function App(): React.JSX.Element {
   // 右栏页签(小葵的页签模型):页签分品类住进页签组,没钉的跟着树走,钉住的定在原地;
   // 品类显示开关记进本机,页签实例留着(取消勾选只是藏起来,再勾上连钉住状态都回来)
   const [groups, setGroups] = useState<PaneGroup[]>([])
+  // 小探针寄居形态(走出面板锤):panel = 页签里;pet = 变身桌宠趴桌面。
+  // pet 时那张公用场页签连卡带正房一起隐去 —— 页签就是桌宠,飞走了不留分身
+  const [freechatHost, setFreechatHost] = useState<FreechatHost>('panel')
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   // 左右两组的比例(左边占多少),分割条拖完记进本机
   const [paneSplit, setPaneSplit] = useState(readPaneSplit)
@@ -322,7 +328,11 @@ function App(): React.JSX.Element {
   // 换文件、换文件夹、切页签,聊天记录都活着;钉住对话页签时才把记录分家给新页签
   // 激活组 = 用户最后点的那组:树里点东西,跟随页签只在激活组里转向,另一组不被打扰
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
-  const visibleOfGroup = useCallback((g: PaneGroup | null) => (g ? g.tabs.filter((t) => enabledKinds.has(t.kind)) : []), [enabledKinds])
+  const visibleOfGroup = useCallback(
+    (g: PaneGroup | null) =>
+      g ? g.tabs.filter((t) => enabledKinds.has(t.kind) && !(freechatHost === 'pet' && t.kind === 'chat' && !t.pinned)) : [],
+    [enabledKinds, freechatHost]
+  )
   const activeTabObj = activeGroup?.tabs.find((t) => t.id === activeGroup.activeId) ?? null
   // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
   // —— 预览页签改版后不再自带聊天,聊天上下文只认树里选中的对象,这个派生退役了
@@ -335,6 +345,53 @@ function App(): React.JSX.Element {
   }, [result, selectedFile, selectedFolder, structure])
   // 翻文件模式(agent)的项目根从这儿递进去:沙盒只认这个目录,越界的活儿一律不接
   const chat = useAiChat(chatContext, result?.rootPath ?? null)
+  // chatRef 两处用:气泡代发输入的订阅回调(永远调最新场次)、openFileLink 的稳定身份(MiniMD memo)
+  const chatRef = useRef(chat)
+  useEffect(() => {
+    chatRef.current = chat
+  })
+  // 共享自由对话(桌宠气泡锤):公用场的消息流镜像给气泡窗 —— 全 app 一场对话,
+  // 气泡只是它的另一扇门。快照节流 100ms:流式刷屏不逐 token 糊 IPC,间隔内的
+  // 最后一版由定时器补上;函数经 ref 取最新,免得闭包抓着旧场次不放
+  const mirrorLastRef = useRef(0)
+  const mirrorTimerRef = useRef<number | null>(null)
+  useEffect(() => {
+    const push = (): void => {
+      mirrorLastRef.current = Date.now()
+      mirrorTimerRef.current = null
+      window.atlas.freechatMirror(chat.messages)
+    }
+    const elapsed = Date.now() - mirrorLastRef.current
+    if (elapsed >= MIRROR_THROTTLE_MS) push()
+    else if (mirrorTimerRef.current === null) {
+      mirrorTimerRef.current = window.setTimeout(push, MIRROR_THROTTLE_MS - elapsed)
+    }
+  }, [chat.messages])
+  // 气泡代发的输入:正主永远是这边的公用场,气泡只是传话的
+  useEffect(
+    () =>
+      window.atlas.onFreechatInput((payload) => {
+        if (payload.op === 'send') chatRef.current.send(payload.text)
+        else chatRef.current.cancel()
+      }),
+    []
+  )
+  // 小探针寄居形态(走出面板锤):panel = 页签里;pet = 变身桌宠。
+  // 事实源在主进程,这边只听广播换装 —— pet 时页签栏和正房都不留分身,公用场账本照活
+  useEffect(() => window.atlas.onFreechatHost(setFreechatHost), [])
+  // 页签拖出主窗松手 = 放出小探针(只有没钉住的公用场页签能走;窗外判定在主进程)
+  const onTabDragEnd = useCallback(
+    (id: string) => {
+      const t = groups.flatMap((g) => g.tabs).find((x) => x.id === id)
+      if (t?.kind === 'chat' && !t.pinned) window.atlas.freechatDetach()
+    },
+    [groups]
+  )
+  // 页签右键「放到桌面」= 不拖也放(force:主进程跳过窗外判定,桌宠落记忆位;
+  // 菜单项只对小探针页签露脸,不用再看是谁)
+  const onDetachTab = useCallback((_id: string) => {
+    window.atlas.freechatDetach(true)
+  }, [])
   const folderRef = useRef(folder)
   useEffect(() => {
     folderRef.current = folder
@@ -1022,10 +1079,7 @@ function App(): React.JSX.Element {
   // 查不到(刚被删/改名)就老实垫一句,绝不点了个寂寞。
   // 用 refs 持有最新的 result/chat/openPreview,让这个动作身份永远稳定 —— MiniMD 的 memo 才守得住:
   // 流式输出时只有正在吐字的那条消息重画,别的消息一个字都不动(聊多了也不给画面上强度)
-  const chatRef = useRef(chat)
-  useEffect(() => {
-    chatRef.current = chat
-  })
+  // (chatRef 在上方公用场声明处统一维护,这里直接拿来用)
   const resultRef = useRef(result)
   useEffect(() => {
     resultRef.current = result
@@ -1346,6 +1400,7 @@ function App(): React.JSX.Element {
     }
     if (tab.kind === 'chat') {
       // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四锤的老规矩)
+      // (小探针飞出时这张页签连卡带正房一起隐去,走不到这儿 —— 见渲染处 act 判定)
       return (
         <div className="preview-chat soft-in">
           <FreeChatPanel
@@ -1548,7 +1603,10 @@ function App(): React.JSX.Element {
             <div className="pane-groups">
               {groups.map((g, gi) => {
                 const vis = visibleOfGroup(g)
-                const act = g.tabs.find((t) => t.id === g.activeId) ?? null
+                // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
+                // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
+                const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
+                const act = actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' && !actRaw.pinned ? null : actRaw
                 return (
                   <Fragment key={g.id}>
                     {gi > 0 && (
@@ -1586,6 +1644,8 @@ function App(): React.JSX.Element {
                         onPinToggle={pinToggleTab}
                         onMoveTab={moveTab}
                         onDragTab={setDraggingTab}
+                        onTabDragEnd={onTabDragEnd}
+                        onDetachTab={onDetachTab}
                         enabledKinds={enabledKinds}
                         onToggleKind={toggleKind}
                       />

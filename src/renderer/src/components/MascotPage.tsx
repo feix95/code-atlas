@@ -7,7 +7,10 @@ import './mascot.css'
  * 动画按小葵拍板先走临时形状(CSS 画的圆家伙),正式素材画好后换皮不换机制。
  * 状态听现成的模型广播(atlas:model-status),不另埋点:
  * 思考中 = AI 请求已发出、回答未到;说话 = 回答刚送达的几秒;其余时候待机呼吸。
- * 交互:按住可拖(拖走的位置主进程记档),按下后几乎没挪 = 点击 → 唤回主面板 + 弹一下。
+ * 交互:按住可拖(拖走的位置主进程记档),按下后几乎没挪 = 点击 → 弹对话气泡 + 弹一下。
+ * 「在不在小家伙身上」不用渲染层操心 —— 主进程轮询光标位置自己判,
+ * Electron 的鼠标转发断不断气都跟咱无关(「又拖不动」第三案的治法,主仓趟平版移植)。
+ * 藏/露听主进程(第六案):藏起 = 页面不画身体,窗的透明度从头到尾不动,合成链不断档。
  */
 
 type Mood = 'idle' | 'thinking' | 'speaking'
@@ -73,12 +76,19 @@ export function MascotPage(): React.JSX.Element {
     []
   )
 
-  // 拖动跟随:按住时每次鼠标动都让主进程跟着光标挪窗。
-  // 「在不在小家伙身上」不用渲染层操心 —— 主进程轮询光标位置自己判,
-  // Electron 的鼠标转发断不断气都跟咱无关(「又拖不动」第三案的治法)
+  // 拖动跟随:按住时每次鼠标动都让主进程跟着光标挪窗(穿透判定全在主进程,见文件头)。
+  // 移动时核对左键还真按着:松手信号没传到(在窗外/焦点切换时释放)就当拖拽已结束,
+  // 不然旧拖拽不咽气,桌宠变「幽灵跟手」—— 光标走到哪儿它跟到哪儿(漂移案的帮凶)
   useEffect(() => {
-    const onMove = (): void => {
-      if (draggingRef.current) window.atlas.mascotDragMove()
+    const onMove = (e: MouseEvent): void => {
+      if (!draggingRef.current) return
+      if ((e.buttons & 1) === 0) {
+        draggingRef.current = false
+        downPointRef.current = null
+        window.atlas.mascotDragEnd()
+        return
+      }
+      window.atlas.mascotDragMove()
     }
     const onUp = (e: MouseEvent): void => {
       if (!draggingRef.current) return
@@ -111,6 +121,7 @@ export function MascotPage(): React.JSX.Element {
           window.atlas.mascotDragStart()
         }}
         onContextMenu={(e) => {
+          // 右键本体 = 快捷菜单:收回小探针/显示·隐藏主面板/藏起自己/真退出
           e.preventDefault()
           window.atlas.mascotMenu()
         }}

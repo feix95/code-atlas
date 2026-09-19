@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { Appearance } from '../../shared/appearancePrefs.ts'
+import type { ChatMessage } from './useAiChat'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../../shared/modelShelf.ts'
 import type { TavilyProbeResult } from '../../shared/tavily.ts'
 import type {
@@ -16,6 +17,8 @@ import type {
   FeatureLocateResult,
   FilePreviewResult,
   FileStructure,
+  FreechatHost,
+  FreechatInput,
   GitChangesResult,
   ModelContextInfo,
   ModelFitVerdict,
@@ -119,16 +122,15 @@ declare global {
       devLogsClear: () => Promise<void>
       devLogsOpen: () => Promise<void>
       onDevLog: (callback: (entry: DevLogEntry) => void) => () => void
-      /** 桌宠(桌宠托管第二锤):光标在不在我身上(切穿透)+ 拖动三连 + 点击唤主面板 */
-      mascotMenu: () => void
+      /** 桌宠(桌宠托管第二锤):露面状态拉取 + 藏/露订阅 + 拖动三连 + 点击激活 + 右键菜单 */
+      mascotVisibilityGet: () => Promise<boolean>
+      onMascotVisibility: (fn: (visible: boolean) => void) => () => void
       mascotDragStart: () => void
       mascotDragMove: () => void
       mascotDragEnd: () => void
       mascotActivate: () => void
-      /** 桌宠露面状态:挂载时拉一次(藏起靠页面隐身,不动窗透明度) */
-      mascotVisibilityGet: () => Promise<boolean>
-      /** 订阅主进程「藏/露」推送;返回退订函数 */
-      onMascotVisibility: (callback: (visible: boolean) => void) => () => void
+      /** 右键本体 = 快捷菜单(走出面板锤):收回小探针/看主面板/藏起/退出 */
+      mascotMenu: () => void
       /** 右键问一问:资源管理器右键菜单开关(available=false = 开发模式) */
       shellMenuGet: () => Promise<{ available: boolean; enabled: boolean }>
       shellMenuSet: (on: boolean) => Promise<{ ok: boolean; message?: string }>
@@ -136,8 +138,9 @@ declare global {
       launchOpen: () => Promise<string | null>
       /** 开图成功后上报当前项目根:气泡出界判断的依据 */
       reportCurrentRoot: (rootPath: string | null) => void
-      /** 气泡窗拉走待处理内容(右键=文件;划词=文本),取走即清 */
+      /** 气泡窗拉走待处理内容(右键=文件;划词=文本;点桌宠=共享自由对话),取走即清 */
       bubbleOpen: () => Promise<
+        | { kind: 'chat' }
         | { kind: 'text'; text: string }
         | {
             kind: 'file'
@@ -154,6 +157,22 @@ declare global {
       >
       /** 已开着的气泡又接到一份新内容 */
       onBubbleFileChanged: (callback: () => void) => () => void
+      /** 共享自由对话(桌宠气泡锤):主窗公用场 → 主进程的消息流快照镜像 */
+      freechatMirror: (messages: ChatMessage[]) => void
+      /** 气泡 → 主窗:代发输入(send/cancel),主进程中转 */
+      freechatInput: (payload: FreechatInput) => void
+      /** 主窗 ← 气泡:订阅气泡转来的输入;返回退订函数 */
+      onFreechatInput: (callback: (payload: FreechatInput) => void) => () => void
+      /** 气泡开窗先拉最新快照(null = 主窗还没醒) */
+      freechatPull: () => Promise<ChatMessage[] | null>
+      /** 气泡订阅会话快照增量;返回退订函数 */
+      onFreechatPush: (callback: (messages: ChatMessage[]) => void) => () => void
+      /** 收回小探针(走出面板锤):气泡头部钮和主窗占位卡同走这条路 */
+      openMainPanel: () => void
+      /** 放出小探针(走出面板锤):拖出窗 = 判窗外后落松手点;force = 右键菜单点的,落记忆位 */
+      freechatDetach: (force?: boolean) => void
+      /** 订阅小探针寄居形态变化(panel/pet):页签 ↔ 占位卡跟着换装;返回退订函数 */
+      onFreechatHost: (callback: (host: FreechatHost) => void) => () => void
       /** 主窗收右键转交的文件夹:以它为根打开(热转交) */
       onOpenPath: (callback: (dir: string) => void) => () => void
       /** 划词问一问:全局热键档位(开关+组合键)的读写 */

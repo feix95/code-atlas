@@ -490,6 +490,15 @@ export interface AiChatResult extends AiExplainResult {
   webLookup: WebLookupMeta
 }
 
+/** 共享自由对话(桌宠气泡锤):气泡窗 → 主窗的输入转发载荷。
+ * send = 代用户发一句话;cancel = 掐掉正在生成的回答。 */
+export type FreechatInput = { op: 'send'; text: string } | { op: 'cancel' }
+
+/** 小探针寄居形态(走出面板锤):panel = 住在主面板页签(原始形态);
+ * pet = 变身桌宠趴桌面(气泡看对话)。互斥铁律:同一时刻只显示一份。
+ * 状态唯一事实源在主进程,窗口们只听 atlas:freechat-host 广播画自己。 */
+export type FreechatHost = 'panel' | 'pet'
+
 /** 联网查询进行中/结束时的实时播报(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiChatLookupPayload {
   id: string

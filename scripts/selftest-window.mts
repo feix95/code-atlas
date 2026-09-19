@@ -162,7 +162,7 @@ check('placeMascotBox:没有屏幕时只给块头,坐标交给系统', () => {
   assert.equal(placed.y, undefined)
 })
 
-// ── 桌宠「摸没摸到」判定(拖不动修复):渲染层报屏幕坐标,主进程拿窗位置对 ──
+// ── 桌宠「摸没摸到」判定(拖不动修复→主仓趟平版):主进程轮询光标位置自己判 ──
 check('mascotCursorInside:身上算摸到,四角透明区和窗外算没摸到,离开信号算没摸到', () => {
   // 窗 140 落 (100,100);判定区 = 身体 96 + 放宽 8×2 = 112 居中 → (114,114)-(226,226)
   const win = { x: 100, y: 100, width: MASCOT_SIZE, height: MASCOT_SIZE }

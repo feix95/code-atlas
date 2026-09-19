@@ -15,6 +15,8 @@ import type {
   FeatureLocateResult,
   FileStructure,
   FilePreviewResult,
+  FreechatHost,
+  FreechatInput,
   GitChangesResult,
   ModelContextInfo,
   ModelFitVerdict,
@@ -201,11 +203,15 @@ contextBridge.exposeInMainWorld('atlas', {
   frameHeartbeat: (): void => {
     ipcRenderer.send('atlas:frame-heartbeat')
   },
-  // ── 桌宠(桌宠托管第二锤):拖动三连 + 点击唤主面板 + 右键菜单,全是单向 send(配主进程 ipcMain.on)。
-  // 穿透开关不靠渲染层上报 —— 主进程轮询光标位置自己判(转发机制不可靠,第三案后弃用) ──
-  /** 右键点了小家伙:主进程弹快捷菜单(唤主面板/藏桌宠/退出) */
-  mascotMenu: (): void => {
-    ipcRenderer.send('atlas:mascot-menu')
+  // ── 桌宠(桌宠托管第二锤):拖动三连 + 点击激活 + 右键菜单,全是单向 send(配主进程 ipcMain.on);
+  //    穿透判定全在主进程轮询,渲染层不上报(「又拖不动」第三案的治法,主仓趟平版移植) ──
+  /** 页面挂载时拉一次露面状态:藏起期间页面重载,别让它变「看得见点不着的幽灵」(invoke 配 handle) */
+  mascotVisibilityGet: (): Promise<boolean> => ipcRenderer.invoke('atlas:mascot-visible-get'),
+  /** 订主进程的藏/露推送:藏起 = 不画身体(假藏,第六案);返回退订函数 */
+  onMascotVisibility: (fn: (visible: boolean) => void): (() => void) => {
+    const h = (_e: Electron.IpcRendererEvent, v: unknown): void => fn(v === true)
+    ipcRenderer.on('atlas:mascot-visible', h)
+    return () => ipcRenderer.removeListener('atlas:mascot-visible', h)
   },
   mascotDragStart: (): void => {
     ipcRenderer.send('atlas:mascot-drag-start')
@@ -219,13 +225,9 @@ contextBridge.exposeInMainWorld('atlas', {
   mascotActivate: (): void => {
     ipcRenderer.send('atlas:mascot-activate')
   },
-  /** 露面状态:页面挂载时拉一次 —— 藏起期间页面重载,别让它当「看得见点不着的幽灵」 */
-  mascotVisibilityGet: (): Promise<boolean> => ipcRenderer.invoke('atlas:mascot-visible-get'),
-  /** 订阅主进程「藏/露」推送(藏起 = 页面不画身体,窗的透明度不动);返回退订函数 */
-  onMascotVisibility: (callback: (visible: boolean) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, visible: boolean): void => callback(visible)
-    ipcRenderer.on('atlas:mascot-visible', listener)
-    return () => ipcRenderer.removeListener('atlas:mascot-visible', listener)
+  /** 右键本体 = 快捷菜单(走出面板锤) */
+  mascotMenu: (): void => {
+    ipcRenderer.send('atlas:mascot-menu')
   },
   // ── 右键问一问:资源管理器右键菜单 + 气泡聊天(invoke 配 handle、send 配 on,收发成对) ──
   /** 资源管理器右键菜单开关:读现状(available=false = 开发模式,没得拨) */
@@ -238,14 +240,54 @@ contextBridge.exposeInMainWorld('atlas', {
   reportCurrentRoot: (rootPath: string | null): void => {
     ipcRenderer.send('atlas:current-root', rootPath)
   },
-  /** 气泡窗拉走右键带来的文件(路径/在不在项目里/文件内容),取走即清 */
-  bubbleOpen: (): Promise<{ kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string } | null> =>
+  /** 气泡窗拉走待处理内容(右键=文件;划词=文本;点桌宠=共享自由对话),取走即清 */
+  bubbleOpen: (): Promise<{ kind: 'chat' } | { kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string } | null> =>
     ipcRenderer.invoke('atlas:bubble-open'),
   /** 已开着的气泡又接到一份新文件:主进程喊一声,气泡当场换人 */
   onBubbleFileChanged: (callback: () => void): (() => void) => {
     const listener = (): void => callback()
     ipcRenderer.on('atlas:bubble-file-changed', listener)
     return () => ipcRenderer.removeListener('atlas:bubble-file-changed', listener)
+  },
+  // ── 共享自由对话(桌宠气泡锤):气泡是主窗公用场的影子窗 ——
+  // 主窗推快照(mirror/send 配 on),气泡拉最新(pull/invoke 配 handle)并订阅增量(push),
+  // 气泡的输入经主进程转回主窗(input/send 配 on,两头同通道名:气泡发、主窗收)
+  /** 主窗公用场 → 主进程:消息流快照镜像(ChatMessage[];节流后推送) */
+  freechatMirror: (messages: unknown): void => {
+    ipcRenderer.send('atlas:freechat-mirror', messages)
+  },
+  /** 气泡 → 主窗:代发输入(send/cancel);主进程中转,只认气泡窗来的 */
+  freechatInput: (payload: FreechatInput): void => {
+    ipcRenderer.send('atlas:freechat-input', payload)
+  },
+  /** 主窗 ← 气泡:订阅气泡转来的输入;返回退订函数 */
+  onFreechatInput: (callback: (payload: FreechatInput) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: FreechatInput): void => callback(payload)
+    ipcRenderer.on('atlas:freechat-input', listener)
+    return () => ipcRenderer.removeListener('atlas:freechat-input', listener)
+  },
+  /** 气泡开窗先拉最新快照(没有 = 主窗还没醒);invoke 配 handle */
+  freechatPull: (): Promise<unknown> => ipcRenderer.invoke('atlas:freechat-pull'),
+  /** 气泡订阅会话快照增量(主窗每变一次推一次);返回退订函数 */
+  onFreechatPush: (callback: (messages: unknown) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, messages: unknown): void => callback(messages)
+    ipcRenderer.on('atlas:freechat-push', listener)
+    return () => ipcRenderer.removeListener('atlas:freechat-push', listener)
+  },
+  /** 收回小探针(走出面板锤):气泡头部钮和主窗占位卡同走这条路 —— 主窗亮+页签复活+气泡收+桌宠下班 */
+  openMainPanel: (): void => {
+    ipcRenderer.send('atlas:open-main')
+  },
+  /** 放出小探针(走出面板锤):页签被拖出主窗松手 → 主进程判窗外 → 变身桌宠;
+   * force = 页签右键菜单点的「放到桌面」,不判窗外,桌宠落记忆位。send 配 on */
+  freechatDetach: (force?: boolean): void => {
+    ipcRenderer.send('atlas:freechat-detach', force === true)
+  },
+  /** 订阅小探针寄居形态变化(panel/pet):页签 ↔ 占位卡跟着换装;返回退订函数 */
+  onFreechatHost: (callback: (host: FreechatHost) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, host: FreechatHost): void => callback(host)
+    ipcRenderer.on('atlas:freechat-host', listener)
+    return () => ipcRenderer.removeListener('atlas:freechat-host', listener)
   },
   /** 主窗收右键转交的文件夹:以它为根打开(热转交;切根前的确认在渲染层做) */
   onOpenPath: (callback: (dir: string) => void): (() => void) => {

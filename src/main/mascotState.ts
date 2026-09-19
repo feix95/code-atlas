@@ -15,8 +15,8 @@ export const MASCOT_BODY_SIZE = 96
 /** 摸它的判定区比身子放宽多少:贴边点也算摸到,不刮手;呼吸动画放大时照样算在身上 */
 const MASCOT_HIT_PAD = 8
 
-/** 右键菜单第一项的文案(纯函数):主面板在屏上就给「藏起它」,不在就给「叫它出来」——
- * 在屏上还显示「显示主面板」是句废话,小葵验收时点的名 */
+/** 右键菜单「主面板」项的文案(纯函数):主面板在屏上就给「藏起它」,
+ * 不在就给「叫它出来」—— 在屏上还显示「显示主面板」是句废话 */
 export function mainPanelMenuLabel(mainVisible: boolean): string {
   return mainVisible ? '隐藏主面板' : '显示主面板'
 }
@@ -27,10 +27,9 @@ export function mascotMenuLabel(hidden: boolean): string {
 }
 
 /**
- * 光标在不在小家伙身上(纯函数,自测覆盖):渲染层只把光标的屏幕坐标报上来,
- * 主进程拿窗的屏幕位置对 —— 两边都用屏幕坐标,谁也不用换算,不会再有
- * 「窗自己拿到的坐标和真实位置对不上」的岔子(桌宠拖不动的病根)。
- * pos = null 表示光标已经离开窗口(渲染层 mouseleave 报的),算不在身上。
+ * 光标在不在小家伙身上(纯函数,自测覆盖):主进程轮询拿
+ * 「光标屏幕位置」对「窗的屏幕位置」自己判 —— 两边都用屏幕坐标,谁也不用换算,
+ * 不靠渲染层上报不靠 Electron 转发(「又拖不动」第三案的治法)。
  * 判定区 = 身体居中、四周放宽 MASCOT_HIT_PAD,窗四角那圈透明区照旧穿透点桌面。
  */
 export function mascotCursorInside(
