@@ -39,8 +39,10 @@ import {
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
-import { createMascotWindow, registerMascotIpc, toggleMascot } from './mascot.ts'
-import { openBubble, registerBubbleIpc } from './bubble.ts'
+import { createMascotWindow, getMascotWindow, hideMascot, isMascotHidden, registerMascotIpc, seatMascotAt, setMascotHiddenListener, showMascot, toggleMascot } from './mascot.ts'
+import { mascotMenuLabel } from './mascotState.ts'
+import { followBubble, hideBubble, openBubble, registerBubbleIpc, toggleBubble } from './bubble.ts'
+import { DETACH_MARGIN_PX, isOutsideBounds } from './freechatHost.ts'
 import { extractLaunchPath } from './launchPath.ts'
 import { readShellMenuEnabled, writeShellMenu } from './shellMenu.ts'
 import { initWordProbe, readWordProbePrefs, setWordProbePrefs } from './wordProbe.ts'
@@ -114,7 +116,7 @@ import { queryDriveKinds } from './drive-meta.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
-import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, FreechatHost, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -480,6 +482,55 @@ function showMainWindow(): void {
   win.focus()
 }
 
+// ── 小探针形态机(走出面板锤,2026-09-19 小葵拍板)──
+// 自由对话一份内容两种形态:panel = 住在主面板页签(原始形态);pet = 变身桌宠趴桌面。
+// 互斥铁律:同一时刻只显示一份。状态唯一事实源在这儿,广播出去各窗只管画自己。
+// 桌宠不再是常驻宠物:对话住进桌宠时它才上岗,收回主面板它就下班。
+
+let freechatHost: FreechatHost = 'panel'
+
+/** 形态变了喊一声:主窗页签 ↔ 占位卡跟着换装(目前只有主窗订阅) */
+function broadcastFreechatHost(): void {
+  const win = mainWindowRef
+  if (win && !win.isDestroyed()) win.webContents.send('atlas:freechat-host', freechatHost)
+}
+
+/** 桌宠 lazy 上岗:没窗现建,有窗直接用(回收时只藏不销,再放出秒到位) */
+function ensureMascot(): BrowserWindow {
+  const win = getMascotWindow()
+  if (win) return win
+  return createMascotWindow(app.getPath('userData'))
+}
+
+/** 放出:页签拖出主窗松手 → 桌宠在松手点落座 + 自动弹一次气泡报「接到啦」。
+ * force = 页签右键菜单点的「放到桌面」:不判窗外,桌宠落记忆位(没记忆按默认角)。
+ * 主窗渲染层已筛过「chat 品类且没钉住」,这里只做最后一步几何判定 */
+function detachFreechat(force = false): void {
+  const win = mainWindowRef
+  if (!win || win.isDestroyed() || freechatHost === 'pet') return
+  const cursor = screen.getCursorScreenPoint()
+  if (!force && !isOutsideBounds(win.getBounds(), cursor.x, cursor.y, DETACH_MARGIN_PX)) return
+  freechatHost = 'pet'
+  broadcastFreechatHost()
+  const pet = ensureMascot()
+  if (!force) seatMascotAt(cursor.x, cursor.y)
+  showMascot() // 假藏叫回:页面画回身体+穿透归轮询,不真 hide 那套(第五案)
+  openBubble({ kind: 'chat' }, pet.getBounds())
+  addDevLog('system', '小探针走出面板,变身桌宠')
+}
+
+/** 收回:气泡头钮 / 占位卡 / 桌宠右键菜单三条路汇这一条 ——
+ * 主窗亮 + 页签复活 + 气泡收 + 桌宠下班 */
+function dockFreechat(): void {
+  if (freechatHost !== 'panel') {
+    freechatHost = 'panel'
+    broadcastFreechatHost()
+  }
+  hideBubble()
+  hideMascot()
+  showMainWindow()
+}
+
 /** 托盘图标:开发模式读仓库里的 build/icon.ico;打包后从 resources/app.ico 认
  * (electron-builder.yml 的 extraResources 负责把它搬进去) */
 function trayIconPath(): string {
@@ -491,14 +542,19 @@ function createTray(): void {
   if (icon.isEmpty()) addDevLog('system', '托盘图标没加载出来(文件缺失?),托盘会显示默认空白图 —— 不影响功能')
   tray = new Tray(icon)
   tray.setToolTip('CodeAtlas')
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: '显示主面板', click: () => showMainWindow() },
-      { label: '显示·隐藏桌宠', click: () => toggleMascot() },
-      { type: 'separator' },
-      { label: '退出', click: () => app.quit() }
-    ])
-  )
+  // 「桌宠」项照真实藏/露出文案:藏起是假藏,isVisible 会说谎,只能听旗子翻牌
+  const rebuildMenu = (): void => {
+    tray?.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: '显示主面板', click: () => showMainWindow() },
+        { label: mascotMenuLabel(isMascotHidden()), click: () => toggleMascot() },
+        { type: 'separator' },
+        { label: '退出', click: () => app.quit() }
+      ])
+    )
+  }
+  rebuildMenu()
+  setMascotHiddenListener(() => rebuildMenu())
   // Windows 惯例:左键点托盘 = 唤回主面板
   tray.on('click', () => showMainWindow())
 }
@@ -2409,11 +2465,33 @@ function startApp(): void {
   createWindow(launchTarget?.kind === 'file')
   registerIpc()
   createTray()
-  // 桌宠上岗(桌宠托管第二锤):透明小窗 + 自己的三条通道,点击唤主面板由 showMainWindow 注入
-  createMascotWindow(app.getPath('userData'))
-  registerMascotIpc({ onActivate: () => showMainWindow() })
-  // 气泡通道(右键问一问):出界判断用主进程记的当前根
-  registerBubbleIpc(() => currentRootPath)
+  // 桌宠通道(走出面板锤):窗改 lazy —— 对话住进桌宠时 ensureMascot 现建,
+  // 平时桌面干干净净;点它 = 对话气泡开/关;拖拽落定那刻气泡按落点归位一次
+  // (跟随降频:不每帧都追,透明窗高频挪窗是雷区,一次挪窗攒不出膨胀)
+  registerMascotIpc({
+    onActivate: (anchor) => toggleBubble({ kind: 'chat' }, anchor),
+    onDragEnd: (anchor) => followBubble(anchor),
+    onDock: () => dockFreechat(),
+    onShowMain: () => showMainWindow(),
+    isMainVisible: () => {
+      const w = mainWindowRef
+      return !!w && !w.isDestroyed() && w.isVisible() && !w.isMinimized()
+    },
+    onHideMain: () => mainWindowRef?.hide()
+  })
+  // 页签拖出主窗 / 页签右键「放到桌面」= 放出小探针(只认主窗渲染层发来的;
+  // force=true 是右键菜单点的,跳过窗外判定,桌宠落记忆位)
+  ipcMain.on('atlas:freechat-detach', (event, force: unknown) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== mainWindowRef) return
+    detachFreechat(force === true)
+  })
+  // 气泡通道(右键问一问 + 桌宠气泡):出界判断用主进程记的当前根;
+  // 共享对话要够得着主窗;「回主面板」走 dock 收回链路(气泡+主窗占位卡同路)
+  registerBubbleIpc({
+    getCurrentRoot: () => currentRootPath,
+    getMainWindow: () => mainWindowRef,
+    dock: () => dockFreechat()
+  })
   if (launchTarget?.kind === 'file') openBubble({ kind: 'file', path: launchTarget.path })
   // 划词问一问:全局热键抓选中文本,交给气泡预填(抓不到就完全无反应,需求表拍板)
   initWordProbe(app.getPath('userData'), (text) => openBubble({ kind: 'text', text }))

@@ -7,7 +7,10 @@ import './mascot.css'
  * 动画按小葵拍板先走临时形状(CSS 画的圆家伙),正式素材画好后换皮不换机制。
  * 状态听现成的模型广播(atlas:model-status),不另埋点:
  * 思考中 = AI 请求已发出、回答未到;说话 = 回答刚送达的几秒;其余时候待机呼吸。
- * 交互:按住可拖(拖走的位置主进程记档),按下后几乎没挪 = 点击 → 唤回主面板 + 弹一下。
+ * 交互:按住可拖(拖走的位置主进程记档),按下后几乎没挪 = 点击 → 弹对话气泡 + 弹一下。
+ * 「在不在小家伙身上」不用渲染层操心 —— 主进程轮询光标位置自己判,
+ * Electron 的鼠标转发断不断气都跟咱无关(「又拖不动」第三案的治法,主仓趟平版移植)。
+ * 藏/露听主进程(第六案):藏起 = 页面不画身体,窗的透明度从头到尾不动,合成链不断档。
  */
 
 type Mood = 'idle' | 'thinking' | 'speaking'
@@ -18,8 +21,6 @@ const CLICK_SLOP_PX = 6
 const SPEAK_MS = 4000
 
 export function MascotPage(): React.JSX.Element {
-  const bodyRef = useRef<HTMLDivElement | null>(null)
-  const insideRef = useRef(false)
   const draggingRef = useRef(false)
   const downPointRef = useRef<{ x: number; y: number } | null>(null)
   const moodRef = useRef<Mood>('idle')
@@ -27,6 +28,21 @@ export function MascotPage(): React.JSX.Element {
   const [mood, setMood] = useState<Mood>('idle')
   // 弹跳计数:每次点击 +1,当 key 用 —— key 一变 DOM 重建,boing 动画从头放
   const [boing, setBoing] = useState(0)
+  // 藏/露听主进程(第六案):藏起 = 页面不画身体,窗的透明度从头到尾不动,
+  // 合成链不断档。挂载先拉一次再订推送 —— 藏起期间页面重载也别当幽灵
+  const [petVisible, setPetVisible] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    void window.atlas.mascotVisibilityGet().then((v) => {
+      if (alive) setPetVisible(v)
+    })
+    const off = window.atlas.onMascotVisibility(setPetVisible)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
 
   useEffect(() => {
     moodRef.current = mood
@@ -60,21 +76,19 @@ export function MascotPage(): React.JSX.Element {
     []
   )
 
-  // 光标跟踪 + 拖动跟随:mousemove 里做几何判定(穿透开着时 forward:true 照样送事件),
-  // 「在不在小家伙身上」变state就报给主进程切穿透;按住拖时让主进程跟着光标挪窗
+  // 拖动跟随:按住时每次鼠标动都让主进程跟着光标挪窗(穿透判定全在主进程,见文件头)。
+  // 移动时核对左键还真按着:松手信号没传到(在窗外/焦点切换时释放)就当拖拽已结束,
+  // 不然旧拖拽不咽气,桌宠变「幽灵跟手」—— 光标走到哪儿它跟到哪儿(漂移案的帮凶)
   useEffect(() => {
     const onMove = (e: MouseEvent): void => {
-      const body = bodyRef.current
-      if (body) {
-        const r = body.getBoundingClientRect()
-        const inside =
-          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
-        if (inside !== insideRef.current) {
-          insideRef.current = inside
-          window.atlas.mascotMouse(inside)
-        }
+      if (!draggingRef.current) return
+      if ((e.buttons & 1) === 0) {
+        draggingRef.current = false
+        downPointRef.current = null
+        window.atlas.mascotDragEnd()
+        return
       }
-      if (draggingRef.current) window.atlas.mascotDragMove()
+      window.atlas.mascotDragMove()
     }
     const onUp = (e: MouseEvent): void => {
       if (!draggingRef.current) return
@@ -96,16 +110,20 @@ export function MascotPage(): React.JSX.Element {
   }, [])
 
   return (
-    <div className={`mascot-root mascot-${mood}`}>
+    <div className={`mascot-root mascot-${mood}${petVisible ? '' : ' mascot-off'}`}>
       <div
         key={boing}
-        ref={bodyRef}
         className={`mascot-body${boing > 0 ? ' mascot-boing' : ''}`}
         onMouseDown={(e) => {
           if (e.button !== 0) return
           draggingRef.current = true
           downPointRef.current = { x: e.screenX, y: e.screenY }
           window.atlas.mascotDragStart()
+        }}
+        onContextMenu={(e) => {
+          // 右键本体 = 快捷菜单:收回小探针/显示·隐藏主面板/藏起自己/真退出
+          e.preventDefault()
+          window.atlas.mascotMenu()
         }}
       >
         <div className="mascot-face">

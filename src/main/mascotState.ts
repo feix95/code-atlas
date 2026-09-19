@@ -9,6 +9,42 @@ import { join } from 'node:path'
 /** 桌宠窗的边长(正方形),和 mascot.ts 的窗参数一口约定,改一处必改两处 */
 export const MASCOT_SIZE = 140
 
+/** 小圆生物身体的边长(mascot.css 里 .mascot-body 的 width/height,改一处必改两处) */
+export const MASCOT_BODY_SIZE = 96
+
+/** 摸它的判定区比身子放宽多少:贴边点也算摸到,不刮手;呼吸动画放大时照样算在身上 */
+const MASCOT_HIT_PAD = 8
+
+/** 右键菜单「主面板」项的文案(纯函数):主面板在屏上就给「藏起它」,
+ * 不在就给「叫它出来」—— 在屏上还显示「显示主面板」是句废话 */
+export function mainPanelMenuLabel(mainVisible: boolean): string {
+  return mainVisible ? '隐藏主面板' : '显示主面板'
+}
+
+/** 托盘菜单「桌宠」项的文案(纯函数):藏着就给「叫它出来」,露着就给「藏起它」 */
+export function mascotMenuLabel(hidden: boolean): string {
+  return hidden ? '显示桌宠' : '隐藏桌宠'
+}
+
+/**
+ * 光标在不在小家伙身上(纯函数,自测覆盖):主进程轮询拿
+ * 「光标屏幕位置」对「窗的屏幕位置」自己判 —— 两边都用屏幕坐标,谁也不用换算,
+ * 不靠渲染层上报不靠 Electron 转发(「又拖不动」第三案的治法)。
+ * 判定区 = 身体居中、四周放宽 MASCOT_HIT_PAD,窗四角那圈透明区照旧穿透点桌面。
+ */
+export function mascotCursorInside(
+  winBounds: { x: number; y: number; width: number; height: number },
+  pos: unknown
+): boolean {
+  if (pos === null || typeof pos !== 'object' || Array.isArray(pos)) return false
+  const p = pos as Record<string, unknown>
+  if (!isFiniteNumber(p['x']) || !isFiniteNumber(p['y'])) return false
+  const size = MASCOT_BODY_SIZE + MASCOT_HIT_PAD * 2
+  const bx = winBounds.x + (winBounds.width - size) / 2
+  const by = winBounds.y + (winBounds.height - size) / 2
+  return (p['x'] as number) >= bx && p['x'] <= bx + size && (p['y'] as number) >= by && p['y'] <= by + size
+}
+
 /** 默认落角时离屏幕边的空当:贴太边容易被任务栏/输入法框遮住 */
 const MASCOT_EDGE = 24
 

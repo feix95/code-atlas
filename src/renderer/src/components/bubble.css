@@ -1,4 +1,6 @@
-/* 气泡聊天窗(右键问一问):桌宠旁边的小聊天窗,透明底 + 圆角卡片。 */
+/* 气泡聊天窗(右键问一问 + 桌宠气泡锤):桌宠旁边的小聊天窗,透明底 + 圆角卡片。
+ * 颜色全部吃全局 token(--surface/--line/--accent 一族),亮暗主题跟主窗自动翻,
+ * 不写死色号 —— 桌宠气泡锤修过「--panel 不存在、永远米白」的色盲案。 */
 
 .bubble-root {
   width: 100vw;
@@ -14,21 +16,22 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--panel, #fbfaf7);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   overflow: hidden;
 }
 
-/* 顶栏:文件名 + 关闭 */
+/* 顶栏:标题 + 工具钮 + 关闭 */
 .bubble-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.04);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--line-soft);
 }
 .bubble-title {
   flex: 1;
@@ -51,7 +54,22 @@
   cursor: pointer;
 }
 .bubble-close:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--hover);
+}
+/* 顶栏小工具钮(共享形态的「回主面板」):和关闭钮一排,文字版 */
+.bubble-tool {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bubble-tool:hover {
+  background: var(--hover);
 }
 
 /* 出界提示条(人话 + 切根按钮) */
@@ -60,28 +78,29 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: rgba(240, 173, 78, 0.14);
-  border-bottom: 1px solid rgba(240, 173, 78, 0.35);
+  background: var(--amber-soft);
+  border-bottom: 1px solid var(--amber-line);
+  color: var(--amber);
   font-size: 12px;
 }
 .bubble-outside button {
   align-self: flex-start;
   padding: 4px 10px;
-  border: 1px solid rgba(240, 173, 78, 0.6);
+  border: 1px solid var(--amber-line);
   border-radius: 8px;
   background: transparent;
-  color: inherit;
+  color: var(--amber);
   font-size: 12px;
   cursor: pointer;
 }
 .bubble-outside button:hover {
-  background: rgba(240, 173, 78, 0.18);
+  border-color: var(--amber);
 }
 .bubble-rootbar {
   padding: 6px 12px;
   font-size: 11px;
-  opacity: 0.65;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -100,7 +119,7 @@
 .bubble-note {
   align-self: center;
   font-size: 11px;
-  opacity: 0.6;
+  color: var(--muted-2);
 }
 .bubble-msg {
   max-width: 88%;
@@ -113,21 +132,38 @@
 }
 .bubble-user {
   align-self: flex-end;
-  background: #2fa874;
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
   border-bottom-right-radius: 4px;
 }
 .bubble-assistant {
   align-self: flex-start;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
   border-bottom-left-radius: 4px;
 }
 .bubble-assistant.is-error {
-  background: rgba(196, 74, 62, 0.12);
-  color: #a03a30;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-line);
 }
 .bubble-typing {
   opacity: 0.6;
+}
+
+/* 思考过程折叠(共享形态):小字弱化,点开看全文 */
+.bubble-reasoning {
+  margin-bottom: 4px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.bubble-reasoning summary {
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.bubble-reasoning[open] {
+  white-space: pre-wrap;
 }
 
 /* 输入行 */
@@ -135,27 +171,27 @@
   display: flex;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--line-soft);
 }
 .bubble-inputrow input {
   flex: 1;
   min-width: 0;
   padding: 7px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--line);
   border-radius: 9px;
-  background: transparent;
-  color: inherit;
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
 }
 .bubble-inputrow input:focus {
-  outline: 1.5px solid #2fa874;
+  outline: 1.5px solid var(--accent);
 }
 .bubble-inputrow button {
   padding: 7px 14px;
   border: none;
   border-radius: 9px;
-  background: #2fa874;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 13px;
   cursor: pointer;
 }
@@ -167,7 +203,7 @@
 .bubble-empty {
   margin: auto;
   font-size: 12px;
-  opacity: 0.6;
+  color: var(--muted-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

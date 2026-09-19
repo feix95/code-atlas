@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAiChat, type ChatMessage } from '../useAiChat'
 import './bubble.css'
 
 /**
- * 气泡聊天页(?view=bubble,右键问一问 + 划词问一问):桌宠旁边弹出的聊天小窗。
+ * 气泡聊天页(?view=bubble,右键问一问 + 划词问一问 + 桌宠气泡锤):桌宠旁边弹出的聊天小窗。
  * 换皮不换脑 —— 里面就是自由聊天的后端(useAiChat → aiChat),
  * 皮换成小窗:顶栏文件名、出界文件的切根提示条、精简消息区 + 输入框。
  * 出界文件策略(已拍板):
@@ -11,6 +11,8 @@ import './bubble.css'
  *  - 文件在项目外:人话提示 + 「把它的文件夹设为工作目录」按钮;不点也能聊
  *    (文件内容已当资料附上,单文件聊,agent 关),点了就地切根、问答接着走。
  * 划词问一问:全局热键抓到的选中文本直接预填输入框(可删可改),补一句就能发。
+ * 桌宠气泡锤:左键点桌宠 = 共享自由对话形态 —— 气泡是主窗公用场的影子窗,
+ * 看主进程镜像来的同一份消息流,输入经主进程转回主窗;全 app 一场对话。
  */
 
 /** 气泡窗拉到的文件档案(主进程 bubble-open 的回包) */
@@ -44,11 +46,21 @@ export function BubblePage(): React.JSX.Element {
   const [shape, setShape] = useState<ChatShape | null>(null)
   // 划词文本(热键抓到的选中文本):预填输入框用
   const [grabbedText, setGrabbedText] = useState<string | null>(null)
+  // 共享自由对话形态(桌宠气泡锤):点桌宠来的,气泡当主窗公用场的影子窗
+  const [shared, setShared] = useState(false)
   const [draft, setDraft] = useState('')
   // 聊天记录接力棒:形态切换(单文件 → 切根)时 BubbleChat 会整块重挂,记录从这里续上
   const [history, setHistory] = useState<ChatMessage[]>([])
 
-  const adopt = (f: { kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string }): void => {
+  const adopt = (f: { kind: 'chat' } | { kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string }): void => {
+    if (f.kind === 'chat') {
+      setFile(null)
+      setShape(null)
+      setGrabbedText(null)
+      setShared(true)
+      return
+    }
+    setShared(false)
     if (f.kind === 'text') {
       setFile(null)
       setShape(null)
@@ -61,24 +73,26 @@ export function BubblePage(): React.JSX.Element {
     setShape(f.inProject && f.rootPath ? { mode: 'root', file: f, root: f.rootPath } : { mode: 'single', file: f })
   }
 
-  // 开窗先拉右键带来的文件(或划词抓到的文本);气泡已开着又接到新内容时,主进程喊一声,当场换人
+  // 开窗先拉待处理内容(右键文件/划词文本/点桌宠的共享对话);
+  // 气泡已开着又接到新内容时,主进程喊一声,当场换人。
+  // 不判 alive:开发模式 StrictMode 双跑 effect,第一遍的 invoke 才是真结果,
+  // 拿「已卸载」的旗标把它丢了,首点永远停在空占位(桌宠气泡锤修过这案)
   useEffect(() => {
-    let alive = true
     void window.atlas.bubbleOpen().then((f) => {
-      if (!alive || !f) return
+      if (!f) return
       adopt(f)
     })
-    const offChanged = window.atlas.onBubbleFileChanged(() => {
+    return window.atlas.onBubbleFileChanged(() => {
       void window.atlas.bubbleOpen().then((f) => {
         if (!f) return
         adopt(f)
       })
     })
-    return () => {
-      alive = false
-      offChanged()
-    }
   }, [])
+
+  if (shared) {
+    return <SharedChat />
+  }
 
   if (grabbedText !== null) {
     return <BubbleChat key="text" grabbed={grabbedText} draft={draft} setDraft={setDraft} initialHistory={history} onHistoryChange={setHistory} />
@@ -176,6 +190,112 @@ function BubbleChat(props: {
             disabled={chat.busy}
           />
           <button type="button" onClick={() => send(props.draft)} disabled={chat.busy || !props.draft.trim()}>
+            发送
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 灰字条的人话版(共享形态):step = 翻文件步骤原文;summary = 摘要卡;
+ * matches = 命中清单(结构化卡从简,只报数);普通 note 原样显示 */
+function noteText(m: ChatMessage): string {
+  if (m.kind === 'summary') return `对话摘要:${m.text}`
+  if (m.kind === 'matches') return `小探针翻「${m.matches?.keyword ?? ''}」命中 ${m.matches?.items.length ?? 0} 处`
+  return m.text
+}
+
+/** 共享自由对话形态(桌宠气泡锤):主窗公用场的影子窗 ——
+ * 看的是主进程镜像来的同一份消息流,输入经主进程转回主窗干活。
+ * 气泡自己不记账:关掉重开还是那一场,主窗发的这边同步看得见。
+ * 首版只做「看 + 说」:新对话/压缩/开关回主面板操作。 */
+function SharedChat(): React.JSX.Element {
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null)
+  const [draft, setDraft] = useState('')
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  // 开窗先拉主进程缓存的最新快照追平,之后吃增量推送;快照没来过 = 主窗还没醒
+  useEffect(() => {
+    let alive = true
+    void window.atlas.freechatPull().then((m) => {
+      if (alive && m) setMessages(m)
+    })
+    const off = window.atlas.onFreechatPush(setMessages)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
+
+  // 新话落地滚到底,跟着对话走
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [messages])
+
+  const busy = (messages ?? []).some((m) => m.role === 'assistant' && m.state === 'busy')
+  const ready = messages !== null
+
+  function send(): void {
+    const text = draft.trim()
+    if (!text || busy || !ready) return
+    window.atlas.freechatInput({ op: 'send', text })
+    setDraft('')
+  }
+
+  return (
+    <div className="bubble-root">
+      <div className="bubble-card">
+        <div className="bubble-head">
+          <span className="bubble-title" title="和主面板里的是同一场对话">
+            Atlas 小探针
+          </span>
+          <button type="button" className="bubble-tool" onClick={() => window.atlas.openMainPanel()} title="打开主面板接着聊">
+            回主面板
+          </button>
+          <button type="button" className="bubble-close" onClick={() => window.close()} aria-label="关闭气泡">
+            ×
+          </button>
+        </div>
+        <div className="bubble-messages">
+          {!ready && <div className="bubble-note">主面板还没醒,等它一下再聊……</div>}
+          {ready && messages.length === 0 && <div className="bubble-note">随便聊点什么,这边和主面板是同一场对话</div>}
+          {(messages ?? []).map((m) =>
+            m.role === 'note' ? (
+              m.text.trim() === '' && m.kind !== 'matches' ? null : (
+                <div key={m.key} className="bubble-note">
+                  {noteText(m)}
+                </div>
+              )
+            ) : (
+              <div key={m.key} className={`bubble-msg bubble-${m.role} is-${m.state}`}>
+                {m.reasoning ? (
+                  <details className="bubble-reasoning">
+                    <summary>小探针的思考过程</summary>
+                    {m.reasoning}
+                  </details>
+                ) : null}
+                {m.text}
+                {m.state === 'busy' && m.text === '' && !m.reasoning && <span className="bubble-typing">小探针在想…</span>}
+              </div>
+            )
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <div className="bubble-inputrow">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !busy && draft.trim()) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            placeholder={!ready ? '等主面板醒…' : busy ? '小探针在想…' : '随便聊点什么……'}
+            disabled={!ready || busy}
+          />
+          <button type="button" onClick={send} disabled={!ready || busy || !draft.trim()}>
             发送
           </button>
         </div>
