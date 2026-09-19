@@ -394,7 +394,9 @@ export function builtinContextDiffers(contextSize: number): boolean {
  * 引擎自动定位:用户不该知道 llama-server 是啥。
  * 设置里填了程序路径就用填的(高级用法);没填就找 app 自带的引擎
  * (dev 模式在项目根 vendor/llama-cpp/,打包后在 resources/llama-cpp/)。
- * 都找不到 → 人话错误,只有一个动作指引,不暴露任何术语。
+ * 都找不到 → 人话错误,按运行环境分一句可执行的指引:
+ * 开发版(defaultApp)指去 vendor/llama-cpp 放引擎;正式版引擎是打包自带的,
+ * 丢了等于安装坏了,让重装。两条都附 LM Studio 退路,不暴露路径给小白猜。
  */
 export function resolveServerProgram(configuredPath: string): string {
   const configured = configuredPath.trim()
@@ -412,7 +414,12 @@ export function resolveServerProgram(configuredPath: string): string {
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
   }
-  throw new Error('内置引擎还没就位:把 llama-server.exe 放进应用的 vendor\\llama-cpp\\ 文件夹里就好了')
+  const isDev = (process as { defaultApp?: boolean }).defaultApp === true
+  throw new Error(
+    isDev
+      ? '没找到内置 AI 引擎,内置模型暂时用不了。请把引擎文件(llama-server.exe)放进项目根目录的 vendor\\llama-cpp\\ 文件夹;或打开「设置 → 高级选项」改用 LM Studio。'
+      : '没找到内置 AI 引擎,内置模型暂时用不了。请重新安装应用;或打开「设置 → 高级选项」改用 LM Studio。'
+  )
 }
 
 function runCommand(cmd: string, args: string[]): Promise<string> {

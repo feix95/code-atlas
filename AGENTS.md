@@ -94,3 +94,4 @@
 - 单纯浏览文件不得启动 AI 预测;规则推荐不依赖模型,AI 预测仅在用户主动完成讲解后运行。
 - `npm run build` 后运行 `npm run test:journey`:Windows 桌面上的真实 Electron 操作验收,配置和截图只写入已忽略的 `.planning/journey/`。扫描、读取和导航走真实应用;AI 回答、故障与延迟采用测试替身,不代表真实模型质量已验收。
 - 最终检查依次运行 `npm run typecheck`、`npm run lint`、`npm test`、`npm run build`、`npm run test:journey`。真实新用户完成时间、Windows 系统缩放、真实模型回答质量仍需独立验收。
+- dev 模式内置引擎不随仓库分发:从 llama.cpp release 下载引擎(版本基准见 .github/workflows/release.yml 的 LLAMA_TAG)放进 vendor/llama-cpp/,或从本机其他检出复制该目录;不想装就在设置里改用 LM Studio,基础导览不依赖 AI。
