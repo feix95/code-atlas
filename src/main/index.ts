@@ -500,7 +500,8 @@ function ensureMascot(): BrowserWindow {
 }
 
 /** 放出:页签拖出主窗松手 → 桌宠在松手点落座 + 自动弹一次气泡报「接到啦」。
- * force = 页签右键菜单点的「放到桌面」:不判窗外,桌宠落记忆位(没记忆按默认角)。
+ * force = 页签右键菜单点的「放到桌面」:不判窗外,桌宠落记忆位(没记忆按默认角),
+ * 主面板顺手藏起来 —— 菜单点这句就是「人不要面板了」,拖放那条路不动。
  * 主窗渲染层已筛过「chat 品类且没钉住」,这里只做最后一步几何判定 */
 function detachFreechat(force = false): void {
   const win = mainWindowRef
@@ -509,6 +510,7 @@ function detachFreechat(force = false): void {
   if (!force && !isOutsideBounds(win.getBounds(), cursor.x, cursor.y, DETACH_MARGIN_PX)) return
   freechatHost = 'pet'
   broadcastFreechatHost()
+  if (force) mainPanelController?.hide()
   const pet = ensureMascot()
   if (!force) seatMascotAt(cursor.x, cursor.y)
   showMascot() // 假藏叫回:页面画回身体+穿透归轮询,不真 hide 那套(第五案)
