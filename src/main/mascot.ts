@@ -277,6 +277,9 @@ export function registerMascotIpc(handlers: {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     dragging = false
+    // 落定把内容尺寸也钉回名义值:跨缩放档拖一趟,内核画面会按旧档缩放
+    // (画面比窗大/小,点影子不灵 —— 透明窗战役·挪窝脱钩案)
+    win.setContentSize(MASCOT_SIZE, MASCOT_SIZE)
     // 松手按当前光标位置补一次判定:还在身上保持实心,不在就恢复穿透(不带 forward,见上)
     const inside = mascotCursorInside(win.getBounds(), screen.getCursorScreenPoint())
     win.setIgnoreMouseEvents(!inside)

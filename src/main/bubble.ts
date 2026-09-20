@@ -18,17 +18,39 @@ function bubbleBounds(): { x: number; y: number; width: number; height: number }
   return { x: wa.x + wa.width - BUBBLE_WIDTH - 24, y: wa.y + wa.height - BUBBLE_HEIGHT - 180, width: BUBBLE_WIDTH, height: BUBBLE_HEIGHT }
 }
 
+/** 挪窝到 anchor 落点:同屏 setBounds 连尺寸钉死;跨显示器先死后生 ——
+ *  Windows 混合缩放下,程序挪窗跨屏,窗的内核画面还按旧屏缩放档渲染
+ * (画面≠窗框:点影子不灵、输入区画出屏外 —— 透明窗战役·挪窝脱钩案);
+ * 新窗在目标屏土生土长 DPI 上下文天生对,会话快照走 freechat-pull 自动追平 */
+function reseatBubble(anchor: Rectangle): void {
+  const win = bubbleWindow
+  if (!win || win.isDestroyed()) return
+  const box = placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea))
+  const [cx, cy] = win.getPosition()
+  if (cx === box.x && cy === box.y) return
+  const from = screen.getDisplayMatching(win.getBounds())
+  const to = screen.getDisplayMatching(box)
+  if (from.id !== to.id) {
+    bubbleWindow = null
+    win.close()
+    openBubble(anchor)
+    return
+  }
+  // setBounds 连尺寸钉死,不裸 setPosition(150% 缩放下逐像素生长,雷区档案②)
+  win.setBounds({ x: box.x, y: box.y, width: BUBBLE_WIDTH, height: BUBBLE_HEIGHT })
+  win.setContentSize(BUBBLE_WIDTH, BUBBLE_HEIGHT)
+}
+
 /** 开气泡:贴桌宠落位;已开着就按当下位置重贴、唤到前台 */
 export function openBubble(anchor?: Rectangle): void {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
     // 已开着的气泡:唤到前台,顺带重贴一遍 —— 桌宠可能被拖走过,气泡不能落回老地方
-    if (anchor) {
-      const box = placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea))
-      // setBounds 连尺寸钉死,不裸 setPosition(150% 缩放下逐像素生长,雷区档案②)
-      bubbleWindow.setBounds({ x: box.x, y: box.y, width: BUBBLE_WIDTH, height: BUBBLE_HEIGHT })
+    if (anchor) reseatBubble(anchor)
+    const win = bubbleWindow
+    if (win && !win.isDestroyed()) {
+      win.show()
+      win.focus()
     }
-    bubbleWindow.show()
-    bubbleWindow.focus()
     return
   }
   const box = anchor
@@ -96,12 +118,7 @@ export function toggleBubble(anchor?: Rectangle): void {
  * 气泡开着才挪;藏着的不用管 —— 再点开时 toggle/open 会按当下位置重贴 */
 export function followBubble(anchor: Rectangle): void {
   if (!bubbleWindow || bubbleWindow.isDestroyed() || !bubbleWindow.isVisible()) return
-  const box = placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea))
-  const [cx, cy] = bubbleWindow.getPosition()
-  if (cx !== box.x || cy !== box.y) {
-    // setBounds 连尺寸钉死(雷区档案②);归位一次只挪这一回
-    bubbleWindow.setBounds({ x: box.x, y: box.y, width: BUBBLE_WIDTH, height: BUBBLE_HEIGHT })
-  }
+  reseatBubble(anchor)
 }
 
 /** 气泡收起来(走出面板锤):对话收回主面板时气泡跟着消失。
