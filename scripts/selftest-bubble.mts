@@ -2,8 +2,16 @@
 // 走出面板锤补:isOutsideBounds —— 页签拖出主窗的窗外判定(沿口缓冲带)。
 // 全是纯函数,不碰 electron 不碰真屏幕。
 import assert from 'node:assert/strict'
-import { placeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT } from '../src/main/bubblePlacement.ts'
+import {
+  placeBubbleBox,
+  resizeBubbleBox,
+  BUBBLE_WIDTH,
+  BUBBLE_HEIGHT,
+  BUBBLE_MIN_WIDTH,
+  BUBBLE_MIN_HEIGHT
+} from '../src/main/bubblePlacement.ts'
 import { isOutsideBounds, DETACH_MARGIN_PX } from '../src/main/freechatHost.ts'
+import { parseBubbleSize } from '../src/main/bubbleState.ts'
 import { createMirrorThrottle } from '../src/shared/mirrorThrottle.ts'
 
 function check(name: string, fn: () => void): void {
@@ -139,4 +147,66 @@ await checkAsync('镜像节流:尾推发最新版(气泡锁死案病根 —— �
   assert.equal(sent.at(-1), 'done-2', '尾推必须发最新一版;卡在 busy = 气泡输入锁死')
 })
 
-console.log('✅ 气泡落点 + 拖出判定 + 镜像节流自测全绿')
+// ── 气泡放大锤(2026-09-21):resizeBubbleBox 拖拽对账 + 记忆尺寸落位/存档 ──
+// 口径:拖哪个角/边,对侧边钉死;最小 280×320 夹底;不许长出家屏工作区。
+
+check('拖右下角:往右下长,左上角钉死', () => {
+  const start = { x: 100, y: 100, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'se', { x: 460, y: 580 }, { x: 560, y: 680 }, [WA])
+  assert.deepEqual(box, { x: 100, y: 100, width: 460, height: 580 })
+})
+
+check('拖左上角:往左上长,右下角钉死', () => {
+  const start = { x: 500, y: 300, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'nw', { x: 500, y: 300 }, { x: 400, y: 200 }, [WA])
+  assert.deepEqual(box, { x: 400, y: 200, width: 460, height: 580 })
+})
+
+check('拖右边中段:只改宽,高不动(垂直方向光标乱晃不掺和)', () => {
+  const start = { x: 100, y: 100, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'e', { x: 460, y: 0 }, { x: 560, y: 500 }, [WA])
+  assert.deepEqual(box, { x: 100, y: 100, width: 460, height: 480 })
+})
+
+check('往里猛缩:小到下限就停,不会再瘪', () => {
+  const start = { x: 100, y: 100, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'se', { x: 460, y: 580 }, { x: 150, y: 200 }, [WA])
+  assert.deepEqual(box, { x: 100, y: 100, width: BUBBLE_MIN_WIDTH, height: BUBBLE_MIN_HEIGHT })
+})
+
+check('往屏外拖:顶到工作区沿口夹住,不长出去', () => {
+  const start = { x: 1500, y: 100, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'e', { x: 1860, y: 0 }, { x: 3000, y: 0 }, [WA])
+  assert.deepEqual(box, { x: 1500, y: 100, width: 420, height: 480 }, '右沿最多到 1920')
+})
+
+check('往左上拖出屏:钉住的右下角不动,左上角贴着屏沿', () => {
+  const start = { x: 500, y: 300, width: 360, height: 480 }
+  const box = resizeBubbleBox(start, 'nw', { x: 500, y: 300 }, { x: -999, y: -999 }, [WA])
+  assert.deepEqual(box, { x: 0, y: 0, width: 860, height: 780 })
+})
+
+check('重开落位:记忆尺寸贴桌宠上方,大了也全须全尾', () => {
+  const pet = { x: 1920 - 140 - 24, y: 1040 - 140 - 24, width: 140, height: 140 }
+  const box = placeBubbleBox(pet, [WA], { width: 600, height: 700 })
+  assert.deepEqual({ width: box.width, height: box.height }, { width: 600, height: 700 })
+  assert.equal(box.y + box.height < pet.y, true, '还是弹桌宠上方')
+  assert.ok(inside(box, WA))
+})
+
+check('记忆尺寸比屏还大:先夹到屏再落位', () => {
+  const pet = { x: 900, y: 600, width: 140, height: 140 }
+  const box = placeBubbleBox(pet, [WA], { width: 5000, height: 3000 })
+  assert.equal(box.width, WA.width)
+  assert.equal(box.height, WA.height)
+  assert.ok(inside(box, WA))
+})
+
+check('尺寸存档:正常尺寸取整落账,垃圾/缺斤短两回 null,偏小捞回下限', () => {
+  assert.deepEqual(parseBubbleSize({ width: 520.6, height: 700.4 }), { width: 521, height: 700 })
+  assert.equal(parseBubbleSize(null), null)
+  assert.equal(parseBubbleSize({ width: 'x', height: 700 }), null)
+  assert.deepEqual(parseBubbleSize({ width: 10, height: 10 }), { width: BUBBLE_MIN_WIDTH, height: BUBBLE_MIN_HEIGHT })
+})
+
+console.log('✅ 气泡落点 + 拖出判定 + 镜像节流 + 缩放对账自测全绿')

@@ -22,6 +22,8 @@
   border-radius: 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  /* 缩放手柄层的定位锚(气泡放大锤) */
+  position: relative;
 }
 
 /* 顶栏:标题 + 工具钮 + 关闭 */
@@ -166,27 +168,67 @@
   white-space: pre-wrap;
 }
 
-/* 输入行 */
+/* 输入行(气泡放大锤):单行 input 换多行 textarea —— 自动长高五行封顶,
+ * 封顶后右上浮拨杆再撑五行;贴大段进来不再抓瞎 */
 .bubble-inputrow {
   display: flex;
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--line-soft);
+  align-items: flex-end;
 }
-.bubble-inputrow input {
+.bubble-inputwrap {
   flex: 1;
   min-width: 0;
+  position: relative;
+}
+.bubble-inputwrap textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
+  line-height: 20px;
+  font-family: inherit;
+  resize: none;
+  overflow-y: hidden;
 }
-.bubble-inputrow input:focus {
+.bubble-inputwrap.is-capped textarea {
+  overflow-y: auto;
+  /* 封顶后给右上角的拨杆让位,字别钻它底下 */
+  padding-right: 28px;
+}
+.bubble-inputwrap textarea:focus {
   outline: 1.5px solid var(--accent);
 }
-.bubble-inputrow button {
+.bubble-inputwrap textarea:disabled {
+  opacity: 0.7;
+}
+/* 撑高拨杆:五行封顶才露脸,浮在输入框右上角 */
+.bubble-expand {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubble-expand:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.bubble-inputrow > button {
   padding: 7px 14px;
   border: none;
   border-radius: 9px;
@@ -195,10 +237,63 @@
   font-size: 13px;
   cursor: pointer;
 }
-.bubble-inputrow button:disabled {
+.bubble-inputrow > button:disabled {
   opacity: 0.45;
   cursor: default;
 }
+
+/* ── 缩放手柄层(气泡放大锤)──
+ * 透明无边框窗没系统手柄:四角+四边中段的隐形热区压在卡片内沿,
+ * hover 浮出小角标/短线提示「这儿能拖」。热区必须在卡片不透明像素上,
+ * 外圈透明 padding 那环是穿透桌面的,画在那儿接不住鼠标。 */
+.bubble-grip {
+  position: absolute;
+  z-index: 5;
+  touch-action: none;
+}
+.bubble-grip::after {
+  content: '';
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.bubble-grip:hover::after {
+  opacity: 0.85;
+}
+/* 四边中段:窄条贴沿,提示是居中的一小段线 */
+.bg-n { top: 0; left: 14px; right: 14px; height: 6px; cursor: ns-resize; }
+.bg-s { bottom: 0; left: 14px; right: 14px; height: 6px; cursor: ns-resize; }
+.bg-e { right: 0; top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; }
+.bg-w { left: 0; top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; }
+.bg-n::after,
+.bg-s::after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--muted);
+}
+.bg-e::after,
+.bg-w::after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--muted);
+}
+/* 四角:小方块,提示是 L 形小角标 */
+.bg-nw { top: 0; left: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.bg-ne { top: 0; right: 0; width: 14px; height: 14px; cursor: nesw-resize; }
+.bg-se { bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.bg-sw { bottom: 0; left: 0; width: 14px; height: 14px; cursor: nesw-resize; }
+.bg-nw::after { top: 3px; left: 3px; width: 7px; height: 7px; border-top: 2px solid var(--muted); border-left: 2px solid var(--muted); border-top-left-radius: 3px; }
+.bg-ne::after { top: 3px; right: 3px; width: 7px; height: 7px; border-top: 2px solid var(--muted); border-right: 2px solid var(--muted); border-top-right-radius: 3px; }
+.bg-se::after { bottom: 3px; right: 3px; width: 7px; height: 7px; border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); border-bottom-right-radius: 3px; }
+.bg-sw::after { bottom: 3px; left: 3px; width: 7px; height: 7px; border-bottom: 2px solid var(--muted); border-left: 2px solid var(--muted); border-bottom-left-radius: 3px; }
 
 .bubble-empty {
   margin: auto;

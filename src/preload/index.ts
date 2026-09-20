@@ -10,6 +10,7 @@ import type {
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
+  BubbleResizeMsg,
   DepGraphResult,
   DriveInfo,
   FeatureLocateResult,
@@ -257,6 +258,10 @@ contextBridge.exposeInMainWorld('atlas', {
   /** 收回小探针(走出面板锤):气泡头部钮和主窗占位卡同走这条路 —— 主窗亮+页签复活+气泡收+桌宠下班 */
   openMainPanel: (): void => {
     ipcRenderer.send('atlas:open-main')
+  },
+  /** 气泡拖拽缩放三连(气泡放大锤):begin/move/end,光标屏幕坐标 DIP;send 配 on */
+  bubbleResize: (msg: BubbleResizeMsg): void => {
+    ipcRenderer.send('atlas:bubble-resize', msg)
   },
   /** 放出小探针(走出面板锤):页签被拖出主窗松手 → 主进程判窗外 → 变身桌宠;
    * force = 页签右键菜单点的「放到桌面」,不判窗外,桌宠落记忆位。send 配 on */

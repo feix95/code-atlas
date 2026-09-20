@@ -499,6 +499,16 @@ export type FreechatInput = { op: 'send'; text: string } | { op: 'cancel' }
  * 状态唯一事实源在主进程,窗口们只听 atlas:freechat-host 广播画自己。 */
 export type FreechatHost = 'panel' | 'pet'
 
+/** 气泡窗缩放手柄的方向(气泡放大锤):n/s/e/w 四条边中段,ne/nw/se/sw 四个角 */
+export type BubbleResizeDir = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+
+/** 气泡 → 主进程:拖拽缩放三连。begin 记起点(方向+按下时光标位),
+ * move 报光标当前屏幕坐标(DIP),end 收尾记账。主进程只认气泡窗发来的。 */
+export type BubbleResizeMsg =
+  | { phase: 'begin'; dir: BubbleResizeDir; x: number; y: number }
+  | { phase: 'move'; x: number; y: number }
+  | { phase: 'end' }
+
 /** 联网查询进行中/结束时的实时播报(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiChatLookupPayload {
   id: string

@@ -2458,7 +2458,8 @@ function startApp(): void {
   // 「回主面板」走 dock 收回链路(气泡+主窗占位卡同路)
   registerBubbleIpc({
     getMainWindow: () => mainWindowRef,
-    dock: () => dockFreechat()
+    dock: () => dockFreechat(),
+    stateDir: app.getPath('userData')
   })
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)

@@ -12,6 +12,7 @@ import type {
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
+  BubbleResizeMsg,
   DepGraphResult,
   DriveInfo,
   FeatureLocateResult,
@@ -143,6 +144,8 @@ declare global {
       onFreechatPush: (callback: (messages: ChatMessage[]) => void) => () => void
       /** 收回小探针(走出面板锤):气泡头部钮和主窗占位卡同走这条路 */
       openMainPanel: () => void
+      /** 气泡拖拽缩放三连(气泡放大锤):begin/move/end */
+      bubbleResize: (msg: BubbleResizeMsg) => void
       /** 放出小探针(走出面板锤):拖出窗 = 判窗外后落松手点;force = 右键菜单点的,落记忆位 */
       freechatDetach: (force?: boolean) => void
       /** 订阅小探针寄居形态变化(panel/pet):页签 ↔ 占位卡跟着换装;返回退订函数 */
