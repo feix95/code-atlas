@@ -229,26 +229,6 @@ contextBridge.exposeInMainWorld('atlas', {
   mascotMenu: (): void => {
     ipcRenderer.send('atlas:mascot-menu')
   },
-  // ── 右键问一问:资源管理器右键菜单 + 气泡聊天(invoke 配 handle、send 配 on,收发成对) ──
-  /** 资源管理器右键菜单开关:读现状(available=false = 开发模式,没得拨) */
-  shellMenuGet: (): Promise<{ available: boolean; enabled: boolean }> => ipcRenderer.invoke('atlas:shell-menu-get'),
-  /** 开/关右键菜单:写或删注册表(HKCU,用户级,不碰系统全局) */
-  shellMenuSet: (on: boolean): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('atlas:shell-menu-set', on),
-  /** 冷启动右键文件夹:渲染层起来后拉走这个根,直接打开它(取走即清) */
-  launchOpen: (): Promise<string | null> => ipcRenderer.invoke('atlas:launch-open'),
-  /** 开图成功后上报当前项目根:气泡出界判断的依据 */
-  reportCurrentRoot: (rootPath: string | null): void => {
-    ipcRenderer.send('atlas:current-root', rootPath)
-  },
-  /** 气泡窗拉走待处理内容(右键=文件;划词=文本;点桌宠=共享自由对话),取走即清 */
-  bubbleOpen: (): Promise<{ kind: 'chat' } | { kind: 'text'; text: string } | { kind: 'file'; path: string; fileName: string; folder: string; inProject: boolean; relPath: string; rootPath: string | null; content: string | null; readNote?: string } | null> =>
-    ipcRenderer.invoke('atlas:bubble-open'),
-  /** 已开着的气泡又接到一份新文件:主进程喊一声,气泡当场换人 */
-  onBubbleFileChanged: (callback: () => void): (() => void) => {
-    const listener = (): void => callback()
-    ipcRenderer.on('atlas:bubble-file-changed', listener)
-    return () => ipcRenderer.removeListener('atlas:bubble-file-changed', listener)
-  },
   // ── 共享自由对话(桌宠气泡锤):气泡是主窗公用场的影子窗 ——
   // 主窗推快照(mirror/send 配 on),气泡拉最新(pull/invoke 配 handle)并订阅增量(push),
   // 气泡的输入经主进程转回主窗(input/send 配 on,两头同通道名:气泡发、主窗收)
@@ -289,16 +269,6 @@ contextBridge.exposeInMainWorld('atlas', {
     ipcRenderer.on('atlas:freechat-host', listener)
     return () => ipcRenderer.removeListener('atlas:freechat-host', listener)
   },
-  /** 主窗收右键转交的文件夹:以它为根打开(热转交;切根前的确认在渲染层做) */
-  onOpenPath: (callback: (dir: string) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, dir: string): void => callback(dir)
-    ipcRenderer.on('atlas:open-path', listener)
-    return () => ipcRenderer.removeListener('atlas:open-path', listener)
-  },
-  // ── 划词问一问:全局热键抓选中文本弹气泡;这里管设置页的档位读写(invoke 配 handle) ──
-  wordProbeGet: (): Promise<{ enabled: boolean; accelerator: string }> => ipcRenderer.invoke('atlas:word-probe-get'),
-  wordProbeSet: (prefs: { enabled: boolean; accelerator: string }): Promise<{ ok: boolean; message?: string }> =>
-    ipcRenderer.invoke('atlas:word-probe-set', prefs),
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke('atlas:dev-log-pull'),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke('atlas:dev-log-clear'),

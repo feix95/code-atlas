@@ -1,47 +1,27 @@
 // ── 桌宠的对话气泡(右键问一问,2026-09-18;桌宠气泡锤 2026-09-19)──
-// 资源管理器右键文件 → 「问问小探针」→ 桌宠旁边弹出的聊天小窗。
-// 换皮不换脑:里面复用自由聊天的后端(useAiChat → aiChat),只换一副小窗的皮。
-// 出界文件策略(已拍板):文件在当前项目内 = 正常问答(agent 可翻文件);
-// 在项目外 = 人话提示 + 「把它的文件夹设为工作目录」按钮;不点也能就文件本身聊
-// (主进程读文件内容当资料附上 —— 用户右键点名了这个文件,就是授权读它)。
-// 桌宠气泡锤:左键点桌宠 = 气泡开/关切换,气泡里装的是主窗自由对话的镜像 ——
+// 桌宠旁边弹出的聊天小窗,装的只有共享自由对话一种形态 ——
 // 会话正主在主窗渲染层(公用场 useAiChat),气泡是影子窗:看快照、输入转回去,
 // 全 app 一场对话,主窗发的气泡看得见,气泡发的进主窗账本。
+// (右键问一问/划词问一问已下线:文件/划词两种形态连同待处理内容机制一并拆走)
 
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import type { Rectangle } from 'electron'
-import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
-import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
 import { addDevLog } from '../shared/devlog.ts'
-import { sniffBinaryKind } from '../ai/index.ts'
 import { placeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT } from './bubblePlacement.ts'
 
-/** 待处理的气泡内容:右键问一问带来文件,划词问一问带来选中的文字,点桌宠来的是共享自由对话 */
-export type BubblePending = { kind: 'file'; path: string } | { kind: 'text'; text: string } | { kind: 'chat' }
-
 let bubbleWindow: BrowserWindow | null = null
-/** 待处理内容:气泡窗 ready 后用 invoke 拉走(取走即清,不重弹) */
-let pending: BubblePending | null = null
 
-/** 单文件聊的内容上限:字符数。再长的文件只带开头,人话说清楚 */
-const BUBBLE_FILE_CHARS = 60_000
-/** 只读文件头的字节数(判二进制/防超大文件爆内存) */
-const BUBBLE_READ_HEAD_BYTES = 512
-
-/** 气泡窗弹开的位置:屏幕右下角,桌宠的邻居(右键/划词入口的默认落点) */
+/** 没拿到桌宠位置时的兜底落点:屏幕右下角(桌宠激活正常都带着 bounds 来) */
 function bubbleBounds(): { x: number; y: number; width: number; height: number } {
   const wa = screen.getPrimaryDisplay().workArea
   return { x: wa.x + wa.width - BUBBLE_WIDTH - 24, y: wa.y + wa.height - BUBBLE_HEIGHT - 180, width: BUBBLE_WIDTH, height: BUBBLE_HEIGHT }
 }
 
-/** 带内容开气泡:文件(右键问一问)、划词文本(划词问一问)、共享自由对话(点桌宠)共用一扇窗。
- * anchor = 桌宠 bounds:点桌宠来的气泡贴桌宠落位,没 anchor 走默认右下角 */
-export function openBubble(content: BubblePending, anchor?: Rectangle): void {
-  pending = content
+/** 开气泡:贴桌宠落位;已开着就按当下位置重贴、唤到前台 */
+export function openBubble(anchor?: Rectangle): void {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-    // 已开着的气泡:换一份新内容,唤到前台。
-    // 带 anchor 来的(点桌宠)顺带重贴一遍 —— 桌宠可能被拖走过,气泡不能落回老地方
-    bubbleWindow.webContents.send('atlas:bubble-file-changed')
+    // 已开着的气泡:唤到前台,顺带重贴一遍 —— 桌宠可能被拖走过,气泡不能落回老地方
     if (anchor) {
       const box = placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea))
       // setBounds 连尺寸钉死,不裸 setPosition(150% 缩放下逐像素生长,雷区档案②)
@@ -97,20 +77,17 @@ export function openBubble(content: BubblePending, anchor?: Rectangle): void {
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'bubble' } })
   }
-  addDevLog(
-    'system',
-    `气泡弹开:${content.kind === 'file' ? basename(content.path) : content.kind === 'text' ? `划词(${content.text.length} 字)` : '自由对话'}`
-  )
+  addDevLog('system', '气泡弹开:自由对话')
 }
 
 /** 点桌宠的开关语义(桌宠气泡锤):开着就藏起来(会话在主窗账本上,藏窗不丢话);
  * 关着/没有就贴桌宠弹出来 */
-export function toggleBubble(content: BubblePending, anchor?: Rectangle): void {
+export function toggleBubble(anchor?: Rectangle): void {
   if (bubbleWindow && !bubbleWindow.isDestroyed() && bubbleWindow.isVisible()) {
     bubbleWindow.hide()
     return
   }
-  openBubble(content, anchor)
+  openBubble(anchor)
 }
 
 /** 桌宠拖拽落定后气泡归位(跟随降频,雷区档案):拖动途中气泡原地不动,
@@ -140,7 +117,6 @@ export function hideBubble(): void {
  *  - 气泡 invoke pull → 拉走最新快照(开窗即追平,不用等下一次变化);
  *  - 气泡 send input → 主进程转给主窗渲染层,那边的 useAiChat 干活。 */
 export function registerBubbleIpc(deps: {
-  getCurrentRoot: () => string | null
   getMainWindow: () => BrowserWindow | null
   /** 收回小探针(走出面板锤):主窗亮 + 页签复活 + 气泡收 + 桌宠下班,一条链路 */
   dock: () => void
@@ -168,49 +144,4 @@ export function registerBubbleIpc(deps: {
     deps.dock()
   })
   ipcMain.handle('atlas:freechat-pull', () => latestMirror)
-  // 气泡窗 ready 后拉走待处理内容(取走即清;没 pending 回 null = 窗开着但没新活)。
-  // 文件:现场分辨「在不在当前项目里」+ 读出内容;划词文本:原样带过;chat:共享对话形态
-  ipcMain.handle('atlas:bubble-open', async () => {
-    const item = pending
-    pending = null
-    if (!item) return null
-    if (item.kind === 'chat') return { kind: 'chat' as const }
-    if (item.kind === 'text') return { kind: 'text' as const, text: item.text }
-    const filePath = item.path
-    const root = deps.getCurrentRoot()
-    let inProject = false
-    let relPath = ''
-    if (root) {
-      const rel = relative(root, filePath)
-      if (rel && !rel.startsWith('..') && !isAbsolute(rel)) {
-        inProject = true
-        relPath = rel.split(sep).join('/')
-      }
-    }
-    let content: string | null = null
-    let readNote: string | undefined
-    try {
-      const head = await fs.readFile(filePath).then((buf) => buf.subarray(0, BUBBLE_READ_HEAD_BYTES))
-      if (sniffBinaryKind(head, basename(filePath))) {
-        readNote = '这是个二进制文件(程序/图片/压缩包这类),内容没法直接当话聊,但可以聊聊它是干嘛的。'
-      } else {
-        const full = await fs.readFile(filePath, 'utf8')
-        content =
-          full.length > BUBBLE_FILE_CHARS ? `${full.slice(0, BUBBLE_FILE_CHARS)}\n……(文件太长,只带了开头一部分)` : full
-      }
-    } catch {
-      readNote = '这个文件现在读不出来(可能被挪走、删了,或者没有权限),先聊聊它是什么也行。'
-    }
-    return {
-      kind: 'file' as const,
-      path: filePath,
-      fileName: basename(filePath),
-      folder: dirname(filePath),
-      inProject,
-      relPath,
-      rootPath: root,
-      content,
-      readNote
-    }
-  })
 }

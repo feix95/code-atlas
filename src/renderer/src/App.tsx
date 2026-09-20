@@ -398,10 +398,6 @@ function App(): React.JSX.Element {
     folderRef.current = folder
   }, [folder])
 
-  // scanPath 的 ref 中转(右键问一问的转交监听要用;组件函数群互相调用,
-  // 直接在 effect 里引用会让 hooks 规则沿链追到后置声明),口径学 retryCtxRef
-  const scanPathRef = useRef<(dir: string) => Promise<ScanResult | null>>(async () => null)
-
   // 窗口壳:最大化时圆角描边要收掉;状态挂 body 上,抽屉(传送门挂在 body)跟着一起换装
   const maximized = useWindowMaximized()
   useEffect(() => {
@@ -545,7 +541,6 @@ function App(): React.JSX.Element {
   async function scanPath(dir: string): Promise<ScanResult | null> {
     requests.current.reset()
     const isCurrent = requests.current.begin('scan')
-    window.atlas.reportCurrentRoot(null)
     expandingRef.current = false
     analyzeSeq.current += 1
     setAnalyzing(false)
@@ -578,8 +573,6 @@ function App(): React.JSX.Element {
       setResult(scanned)
       setFolder(root)
       setPathDraft(root)
-      // 当前根上报主进程(右键问一问):气泡拿它判断文件在不在项目里
-      window.atlas.reportCurrentRoot(root)
       // 备注跟上新树:顺带清孤儿(垃圾不越攒越多),再写回本机
       setNotes(refreshNotesForScan(root, scanned.tree))
       // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
@@ -633,29 +626,6 @@ function App(): React.JSX.Element {
     return () => {
       alive = false
     }
-  }, [])
-
-  // scanPath 落位后再把 ref 中转接上(每轮渲染更新,事件回调里永远拿到最新的)
-  useEffect(() => {
-    scanPathRef.current = scanPath
-  })
-
-  // 右键问一问的文件夹转交:冷启动拉一次(带根启动,没项目可丢,直接开);
-  // 热转交(程序跑着被右键)有项目就先问一句,别悄悄丢掉人家正在看的项目
-  useEffect(() => {
-    void window.atlas
-      .launchOpen()
-      .then((dir) => {
-        if (dir) void scanPathRef.current(dir)
-      })
-      .catch(() => {})
-    return window.atlas.onOpenPath((dir) => {
-      if (folderRef.current) {
-        const ok = window.confirm(`把 CodeAtlas 切到「${dir}」吗?\n当前打开的项目会被换掉。`)
-        if (!ok) return
-      }
-      void scanPathRef.current(dir)
-    })
   }, [])
 
   // 刷新 = 把当前项目重扫一遍;没开项目就点了,告诉他缺什么,按钮不装哑巴
@@ -1088,7 +1058,6 @@ function App(): React.JSX.Element {
     setScanning(false)
     setGraphLoading(false)
     setGitLoading(false)
-    window.atlas.reportCurrentRoot(null)
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
     setGroups([])

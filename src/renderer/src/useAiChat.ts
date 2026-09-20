@@ -87,11 +87,7 @@ export function useAiChat(
   rootPath: string | null,
   /** 出生自带的记录(页签改版):对话页签被钉住时,公用那场的记录当场分家给它,
    *  新实例带着这些记录起步,之后各长各的;不传就从空聊天开始 */
-  initialMessages?: ChatMessage[],
-  /** agent 开关的来源(右键问一问的气泡用):user = 听用户开关(默认,主窗就这 mode);
-   *  always = 恒开(气泡切了根,翻文件模式是它的本职);never = 恒关(气泡单文件聊,
-   *  文件内容已当资料附上,不用工具也不读用户开关,免得和主窗串台) */
-  agentMode: 'user' | 'always' | 'never' = 'user'
+  initialMessages?: ChatMessage[]
 ): {
   messages: ChatMessage[]
   busy: boolean
@@ -119,14 +115,9 @@ export function useAiChat(
   const thinkingRef = useRef(thinking)
   thinkingRef.current = thinking
   // 翻文件开关同样记在本地;默认关 —— 让模型自己动手是能力升级,但由用户点名才开。
-  // agentMode 不是 user 时开关不归用户管(always/never 恒定),localStorage 也不动
-  const [agent, setAgentState] = useState(() =>
-    agentMode === 'never' ? false : agentMode === 'always' || localStorage.getItem(AGENT_KEY) === 'on'
-  )
+  const [agent, setAgentState] = useState(() => localStorage.getItem(AGENT_KEY) === 'on')
   const agentRef = useRef(agent)
   agentRef.current = agent
-  const agentModeRef = useRef(agentMode)
-  agentModeRef.current = agentMode
   const busyRef = useRef(false)
   const idRef = useRef('')
   const messagesRef = useRef(messages)
@@ -237,9 +228,8 @@ export function useAiChat(
       try {
         // 历史取发送前的消息(不含本轮),当前问题单独走 question 字段;
         // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆(第一百四十二锤);
-        // agent 开关按 agentMode 收口:user 听开关,always 恒开,never 恒关
         const summary = findSummary(messagesRef.current)
-        const agentOn = agentModeRef.current === 'user' ? agentRef.current : agentModeRef.current === 'always'
+        const agentOn = agentRef.current
         const req: AiChatRequest = {
           requestId,
           question: q,
@@ -347,8 +337,6 @@ export function useAiChat(
   }
 
   function setAgent(on: boolean): void {
-    // 气泡等托管场景(always/never)开关不归用户,拨了也没用
-    if (agentModeRef.current !== 'user') return
     setAgentState(on)
     localStorage.setItem(AGENT_KEY, on ? 'on' : 'off')
   }

@@ -131,32 +131,6 @@ declare global {
       mascotActivate: () => void
       /** 右键本体 = 快捷菜单(走出面板锤):收回小探针/看主面板/藏起/退出 */
       mascotMenu: () => void
-      /** 右键问一问:资源管理器右键菜单开关(available=false = 开发模式) */
-      shellMenuGet: () => Promise<{ available: boolean; enabled: boolean }>
-      shellMenuSet: (on: boolean) => Promise<{ ok: boolean; message?: string }>
-      /** 冷启动右键文件夹:拉走这个根直接打开(取走即清) */
-      launchOpen: () => Promise<string | null>
-      /** 开图成功后上报当前项目根:气泡出界判断的依据 */
-      reportCurrentRoot: (rootPath: string | null) => void
-      /** 气泡窗拉走待处理内容(右键=文件;划词=文本;点桌宠=共享自由对话),取走即清 */
-      bubbleOpen: () => Promise<
-        | { kind: 'chat' }
-        | { kind: 'text'; text: string }
-        | {
-            kind: 'file'
-            path: string
-            fileName: string
-            folder: string
-            inProject: boolean
-            relPath: string
-            rootPath: string | null
-            content: string | null
-            readNote?: string
-          }
-        | null
-      >
-      /** 已开着的气泡又接到一份新内容 */
-      onBubbleFileChanged: (callback: () => void) => () => void
       /** 共享自由对话(桌宠气泡锤):主窗公用场 → 主进程的消息流快照镜像 */
       freechatMirror: (messages: ChatMessage[]) => void
       /** 气泡 → 主窗:代发输入(send/cancel),主进程中转 */
@@ -173,11 +147,6 @@ declare global {
       freechatDetach: (force?: boolean) => void
       /** 订阅小探针寄居形态变化(panel/pet):页签 ↔ 占位卡跟着换装;返回退订函数 */
       onFreechatHost: (callback: (host: FreechatHost) => void) => () => void
-      /** 主窗收右键转交的文件夹:以它为根打开(热转交) */
-      onOpenPath: (callback: (dir: string) => void) => () => void
-      /** 划词问一问:全局热键档位(开关+组合键)的读写 */
-      wordProbeGet: () => Promise<{ enabled: boolean; accelerator: string }>
-      wordProbeSet: (prefs: { enabled: boolean; accelerator: string }) => Promise<{ ok: boolean; message?: string }>
     }
   }
 }

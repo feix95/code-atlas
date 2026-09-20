@@ -58,6 +58,6 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
-  # 卸载清理(右键问一问):把右键菜单的两个注册表键删干净,见 build/installer.nsh
+  # 旧版右键菜单的注册表清场(功能已下线):装/卸都把两个键删干净,见 build/installer.nsh
   include: build/installer.nsh
   artifactName: ${productName}-Setup-${version}.${ext}
