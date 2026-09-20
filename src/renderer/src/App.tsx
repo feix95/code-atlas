@@ -6,6 +6,7 @@ import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef } from '@shared/preview'
 import { isTreePartial } from '@shared/scanCoverage'
 import { isAiConfigured } from '@shared/aiSetup'
+import { createMirrorThrottle } from '@shared/mirrorThrottle'
 import { AiSetupContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
@@ -353,21 +354,15 @@ function App(): React.JSX.Element {
   })
   // 共享自由对话(桌宠气泡锤):公用场的消息流镜像给气泡窗 —— 全 app 一场对话,
   // 气泡只是它的另一扇门。快照节流 100ms:流式刷屏不逐 token 糊 IPC,间隔内的
-  // 最后一版由定时器补上;函数经 ref 取最新,免得闭包抓着旧场次不放
-  const mirrorLastRef = useRef(0)
-  const mirrorTimerRef = useRef<number | null>(null)
+  // 版本由尾推补 —— 补的必须是当下最新版(mirrorThrottle 记着的),旧实现补的是
+  // 排闹钟那一刻的旧快照,「忙→完」翻牌被丢 = 气泡锁死案
+  const mirrorNotify = useMemo(
+    () => createMirrorThrottle<ChatMessage[]>((m) => window.atlas.freechatMirror(m), MIRROR_THROTTLE_MS),
+    []
+  )
   useEffect(() => {
-    const push = (): void => {
-      mirrorLastRef.current = Date.now()
-      mirrorTimerRef.current = null
-      window.atlas.freechatMirror(chat.messages)
-    }
-    const elapsed = Date.now() - mirrorLastRef.current
-    if (elapsed >= MIRROR_THROTTLE_MS) push()
-    else if (mirrorTimerRef.current === null) {
-      mirrorTimerRef.current = window.setTimeout(push, MIRROR_THROTTLE_MS - elapsed)
-    }
-  }, [chat.messages])
+    mirrorNotify(chat.messages)
+  }, [chat.messages, mirrorNotify])
   // 气泡代发的输入:正主永远是这边的公用场,气泡只是传话的
   useEffect(
     () =>

@@ -4,11 +4,19 @@
 import assert from 'node:assert/strict'
 import { placeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT } from '../src/main/bubblePlacement.ts'
 import { isOutsideBounds, DETACH_MARGIN_PX } from '../src/main/freechatHost.ts'
+import { createMirrorThrottle } from '../src/shared/mirrorThrottle.ts'
 
 function check(name: string, fn: () => void): void {
   fn()
   console.log(`✓ ${name}`)
 }
+
+async function checkAsync(name: string, fn: () => Promise<void>): Promise<void> {
+  await fn()
+  console.log(`✓ ${name}`)
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 const WA = { x: 0, y: 0, width: 1920, height: 1040 } // 一块 1080p 屏的工作区(扣了任务栏)
 const inside = (b: { x: number; y: number; width: number; height: number }, wa: typeof WA): boolean =>
@@ -97,4 +105,38 @@ check('最大化窗口:松手在任务栏(窗外一截)算数,窗内拖到边不
   assert.equal(isOutsideBounds(maximized, 960, 1039, 10), false, '贴着下沿窗内 = 不算')
 })
 
-console.log('✅ 气泡落点 + 拖出判定自测全绿')
+// ── 镜像节流(气泡锁死案 2026-09-21):尾推到点必须发最新一版,不许念旧账 ──
+// 病根:旧实现的尾推定时器发的是「排闹钟那一刻」抓到的旧快照;尾推排着队时来的
+// 改动被直接跳过 —— AI 答完的「忙→完」翻牌常落在这窗口里被丢掉,主进程存底永远
+// 卡「忙」,气泡输入框锁死。
+
+await checkAsync('镜像节流:隔够间隔的推送立即照发', async () => {
+  const sent: string[] = []
+  const notify = createMirrorThrottle<string>((v) => sent.push(v), 30)
+  notify('a')
+  await sleep(50)
+  notify('b')
+  assert.deepEqual(sent, ['a', 'b'])
+})
+
+await checkAsync('镜像节流:刷屏合并 —— 窗口里的一串改动只补最后一版', async () => {
+  const sent: string[] = []
+  const notify = createMirrorThrottle<string>((v) => sent.push(v), 30)
+  notify('a')
+  notify('b')
+  notify('c')
+  await sleep(50)
+  assert.deepEqual(sent, ['a', 'c'])
+})
+
+await checkAsync('镜像节流:尾推发最新版(气泡锁死案病根 —— 最后一翻不许丢)', async () => {
+  const sent: string[] = []
+  const notify = createMirrorThrottle<string>((v) => sent.push(v), 30)
+  notify('done-1') // 立即发
+  notify('busy-字已糊完') // 进窗口,排尾推
+  notify('done-2') // 窗口内又来一版 —— 旧实现把它跳了,尾推发的是 busy 旧账
+  await sleep(50)
+  assert.equal(sent.at(-1), 'done-2', '尾推必须发最新一版;卡在 busy = 气泡输入锁死')
+})
+
+console.log('✅ 气泡落点 + 拖出判定 + 镜像节流自测全绿')
