@@ -63,6 +63,11 @@ const FileNoteText = memo(function FileNoteText({
 
 const CHAT_EXAMPLES = ['这个项目从哪里开始看？', '我想找一个功能，应该看哪里？', '这个文件和其他部分有什么关系？']
 
+/** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
+const SLASH_COMMANDS: Array<{ name: string; desc: string }> = [
+  { name: '/compact', desc: '把前面聊过的压成摘要，省出上下文' }
+]
+
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
 const REF_ONLY_QUESTION = '讲讲选中的这段代码'
 
@@ -320,6 +325,14 @@ export function FreeChatPanel({
   // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
   const [lineCount, setLineCount] = useState(1)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // 斜杠命令补全(打 / 浮出的命令清单):Esc 关面板只是藏起来,输入框内容不动;
+  // 内容一变(draft 易手)就重新能冒头 —— 关掉后接着打字照样过滤
+  const [slashDismissed, setSlashDismissed] = useState(false)
+  const [slashIndex, setSlashIndex] = useState(0)
+  // 只在「以 / 开头且还没敲空格」时出面,继续打字按前缀过滤;一条不匹配就整个不开
+  const slashMatches = draft.startsWith('/') && !/\s/.test(draft) ? SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase())) : []
+  const slashOpen = !slashDismissed && slashMatches.length > 0
+  const slashActive = Math.min(slashIndex, slashMatches.length - 1)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
@@ -443,8 +456,42 @@ export function FreeChatPanel({
     if (expanded) setExpanded(false)
   }
 
-  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补) */
+  /** 选中一条斜杠命令:填成「/xxx 」带一个尾空格,光标落在尾空格后面接着写参数
+   *  (React 重画时会按旧选区还原光标,可能把光标留回半截命令上 —— 重画完手动把它摁到末尾) */
+  function pickSlash(name: string): void {
+    const next = `${name} `
+    setDraft(next)
+    setSlashIndex(0)
+    const el = inputRef.current
+    if (el) {
+      el.focus()
+      requestAnimationFrame(() => {
+        el.selectionStart = el.selectionEnd = next.length
+      })
+    }
+  }
+
+  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补);
+   *  斜杠补全开着时,键盘先伺候面板:上下挑、回车/Tab 选定(不是发消息)、Esc 只收面板 */
   function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
+    if (slashOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        setSlashIndex((slashActive + dir + slashMatches.length) % slashMatches.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        pickSlash(slashMatches[slashActive].name)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setSlashDismissed(true)
+        return
+      }
+    }
     if (e.key !== 'Enter' || e.shiftKey) return
     if (e.nativeEvent.isComposing) return
     e.preventDefault()
@@ -697,13 +744,42 @@ export function FreeChatPanel({
           className={`chat-input${lineCount >= 2 ? ' is-multiline' : ''}${capped ? ' is-capped' : ''}`}
           onSubmit={submit}
         >
+          {/* 斜杠命令补全:打 / 浮在输入舱上方,上下键挑、回车/Tab 选定、Esc 收掉、鼠标点也算数 */}
+          {slashOpen && (
+            <div className="slash-palette" id="slash-palette" role="listbox" aria-label="斜杠命令">
+              {slashMatches.map((c, i) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  role="option"
+                  id={`slash-opt-${c.name.slice(1)}`}
+                  aria-selected={i === slashActive}
+                  className={`slash-item${i === slashActive ? ' is-active' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setSlashIndex(i)}
+                  onClick={() => pickSlash(c.name)}
+                >
+                  <span className="slash-name">{c.name}</span>
+                  <span className="slash-desc">{c.desc}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <textarea
             ref={inputRef}
             value={draft}
             placeholder={chat.busy ? '小探针正在回答上一个问题……' : '随便聊点什么……'}
             aria-label="输入自由对话"
+            aria-expanded={slashOpen}
+            aria-controls="slash-palette"
+            aria-activedescendant={slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined}
             rows={1}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              // 内容一变,补全重新能冒头(Esc 的「先别出」只管当下这句)
+              setSlashDismissed(false)
+              setSlashIndex(0)
+            }}
             onKeyDown={onDraftKeyDown}
           />
           {capped && (

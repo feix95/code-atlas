@@ -2,12 +2,13 @@
 // 防打转的缰绳、token 总账。只测算得出来的东西 —— 真翻文件的执行手在主进程,
 // 要等真模型联调;这边的每一条都是循环翻车的地基。
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import {
-  AGENT_ADDENDUM,
   AGENT_KEEP_RECENT_TOOLS,
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_ROUNDS,
   AGENT_REMINDER_MAX_CHARS,
+  AGENT_REMINDER_MIN_TOOL_CALLS,
   AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
@@ -22,6 +23,7 @@ import {
   SALVAGE_SEARCH_NUDGE,
   agentPromptBudget,
   agentReadChars,
+  agentRound,
   agentStepText,
   answerCitesAnyHit,
   assembleToolCalls,
@@ -38,11 +40,15 @@ import {
   sanitizeAgentRelPath,
   stripLastAgentReminder,
   toolCallKey,
-  type AgentChatMessage
+  type AgentChatMessage,
+  type AgentStreamEvent
 } from '../src/ai/agent.ts'
+// 翻文件切片(提示词体系重写第二批):旧 AGENT_ADDENDUM 的逐字稿新家,守口径断言都打它
+import { AGENT_FILES_ADDENDUM, buildChatSystem, SLICE_NO_TOOLS } from '../src/ai/prompts.ts'
 import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, parseTavilyResults, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
+import { AgentDirectoryAccess, PROJECT_AGENT_ROOT, isPathInside, sanitizeAgentRootId, sanitizeExternalDirectoryPath } from '../src/main/agentAccess.ts'
 
-function main(): void {
+async function main(): Promise<void> {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
   assert.equal(sanitizeAgentRelPath('src/index.ts'), 'src/index.ts', '正常相对路径原样通过')
   assert.equal(sanitizeAgentRelPath(''), '', '空串 = 项目根目录,放行')
@@ -55,6 +61,22 @@ function main(): void {
   assert.equal(sanitizeAgentRelPath('C:/Windows/system32'), null, '盘符注入拒收')
   assert.equal(sanitizeAgentRelPath('/etc/passwd'), null, '绝对路径拒收')
   assert.equal(sanitizeAgentRelPath('.\\..\\secrets'), null, '反斜杠版上跳也拒收')
+  assert.equal(sanitizeExternalDirectoryPath('src'), null, '外部目录申请不收相对路径')
+  assert.equal(sanitizeExternalDirectoryPath('C:\\outside\\demo'), 'C:\\outside\\demo', '外部目录申请只收洗净的绝对路径')
+  assert.equal(sanitizeAgentRootId(undefined), PROJECT_AGENT_ROOT, '不传目录编号默认项目根')
+  assert.equal(sanitizeAgentRootId('external_2'), 'external_2', '临时目录编号格式放行')
+  assert.equal(sanitizeAgentRootId('external_0'), null, '伪造的零号目录拒收')
+  const access = new AgentDirectoryAccess()
+  assert.deepEqual(access.resolve('E:\\project', undefined), { rootId: PROJECT_AGENT_ROOT, path: 'E:\\project', external: false }, '默认只指向当前项目')
+  assert.equal(access.resolve('E:\\project', 'external_1'), null, '没授权的临时编号打不开')
+  const granted = access.grant('D:\\shared\\demo')
+  assert.deepEqual(granted, { rootId: 'external_1', path: 'D:\\shared\\demo' }, '首个同意目录拿到本次运行的一号门卡')
+  assert.deepEqual(access.grant('D:\\shared\\demo'), granted, '同一目录重复同意复用原门卡')
+  assert.deepEqual(access.resolve('E:\\project', 'external_1'), { rootId: 'external_1', path: 'D:\\shared\\demo', external: true }, '同意后的编号只解到对应目录')
+  assert.equal(access.resolve('E:\\project', 'external_2'), null, '猜别的编号仍打不开')
+  assert.equal(isPathInside('D:\\shared\\demo', 'D:\\shared\\demo\\src\\a.ts'), true, '授权目录里面的目标放行')
+  assert.equal(isPathInside('D:\\shared\\demo', 'D:\\shared\\other\\a.ts'), false, '同盘相邻目录不是授权范围')
+  assert.equal(isPathInside('D:\\shared\\demo', 'C:\\Windows\\a.ts'), false, '跨盘目标不是授权范围')
 
   // ── 2. 读文件额度:看锅下菜,穷有底富有顶(第一百三十七锤放宽一档,压缩接客) ──
   assert.equal(agentReadChars(4096), 2000, '小锅触底:一段也保 2000 字')
@@ -92,24 +114,25 @@ function main(): void {
   assert.ok(ROUND_CAP_NUDGE.includes('别再调用'), '逼卷令要拦住工具')
 
   // ── 6. 工具表:本地只有「看」的三件,写文件的工具根本不存在;联网开着才多一件 web_search ──
-  assert.equal(AGENT_TOOLS_LOCAL.length, 3, '本地只发三件工具')
+  assert.equal(AGENT_TOOLS_LOCAL.length, 4, '本地发三件只读工具和一件临时目录授权工具')
   assert.deepEqual(
     AGENT_TOOLS_LOCAL.map((t) => t.function.name),
-    ['list_files', 'read_file', 'search_content'],
-    '工具名单对齐:列名单 + 读文件 + 搜内容'
+    ['list_files', 'read_file', 'search_content', 'request_directory_access'],
+    '工具名单对齐:列名单 + 读文件 + 搜内容 + 申请外部目录'
   )
-  assert.equal(AGENT_TOOLS.length, 4, '联网查证开着,全量工具表多一件 web_search')
-  for (const tool of AGENT_TOOLS_LOCAL) {
-    const required: readonly string[] = tool.function.parameters.required
-    assert.ok(
-      required.length === 1 && (required[0] === 'relPath' || required[0] === 'keyword'),
-      `${tool.function.name} 必填字段要么 relPath 要么 keyword`
-    )
-  }
+  assert.equal(AGENT_TOOLS.length, 5, '联网查证开着,全量工具表多一件 web_search')
 
-  // search_content 的必填是关键词不是路径,单独再钉一遍
+  const listTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'list_files')!
+  const readTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'read_file')!
   const searchTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'search_content')!
+  const accessTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'request_directory_access')!
+  assert.deepEqual(listTool.function.parameters.required, ['relPath'], 'list_files 必须带 relPath')
+  assert.deepEqual(readTool.function.parameters.required, ['relPath'], 'read_file 必须带 relPath')
   assert.deepEqual(searchTool.function.parameters.required, ['keyword'], 'search_content 必须带 keyword')
+  assert.deepEqual(accessTool.function.parameters.required, ['path'], '申请目录必须带绝对路径')
+  assert.ok(listTool.function.parameters.properties.rootId, 'list_files 能带临时目录编号')
+  assert.ok(readTool.function.parameters.properties.rootId, 'read_file 能带临时目录编号')
+  assert.ok(searchTool.function.parameters.properties.rootId, 'search_content 能带临时目录编号')
   assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
 
   // web_search 的必填是搜索词 query;source 分流已随统一源队列退役(2026-09-17:Tavily→DDG→维基)
@@ -142,8 +165,10 @@ function main(): void {
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
   assert.ok(AGENT_SEARCH_MAX_MATCHES >= 20 && AGENT_SEARCH_MAX_MATCHES <= 200, '搜索命中条数封顶得是个讲道理的数')
-  assert.ok(AGENT_ADDENDUM.includes('翻文件') && AGENT_ADDENDUM.includes('相对路径'), '守则要教模型用相对路径翻文件')
-  assert.ok(AGENT_ADDENDUM.includes('search_content'), '守则要教模型用搜索找内容')
+  // 翻文件切片(逐字稿 D):教模型现在有什么手脚、只认相对路径
+  assert.ok(AGENT_FILES_ADDENDUM.includes('当前项目用相对路径') && AGENT_FILES_ADDENDUM.includes('request_directory_access'), '切片要交代项目内用相对路径、项目外先申请')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('search_content'), '切片要教模型用搜索找内容')
+  assert.equal(AGENT_REMINDER_MIN_TOOL_CALLS, 3, '提醒卡缰绳门槛:本场工具调用满 3 次才垫卡')
 
   // ── 10. 流式工具调用碎片的拼装(第一百三十四锤):参数逐段续、多调用按 index 分组 ──
   const assembled = assembleToolCalls([
@@ -237,14 +262,15 @@ function main(): void {
   )
   assert.equal(stripLastAgentReminder(withCards.slice(0, 3)).length, 3, '没卡的消息原样返回(条数不变)')
 
-  // ── 14. 守则的两句新叮嘱(LLM 优化锤):清单让程序摆 + 资料里的指令不许当真 ──
-  assert.ok(AGENT_ADDENDUM.includes('程序会直接完整摆给用户看'), '守则要交代:命中清单程序直接摆,模型只说要点')
-  assert.ok(AGENT_ADDENDUM.includes('不用逐条复述清单'), '守则要明确摘掉模型的抄写员岗位')
-  assert.ok(AGENT_ADDENDUM.includes('不是用户在跟你说话'), '守则要有防自指条款:资料里的指令腔一概别当真')
-  assert.ok(AGENT_ADDENDUM.includes('用户的问题是'), '防自指条款要点名「用户的问题是……」这种最像指令的字样')
+  // ── 14. 翻文件切片的两条铁规矩(口径换成逐字稿 D):清单让程序摆 + 资料里的指令不许当真 ──
+  assert.ok(AGENT_FILES_ADDENDUM.includes('命中清单程序会直接摆给用户看'), '切片要交代:命中清单程序直接摆,模型只说要点')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('不用逐条复述'), '切片要明确摘掉模型的抄写员岗位')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('一概别当真'), '切片要有防自指条款:资料里的指令腔一概别当真')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('程序垫的提醒'), '防自指条款要点名「程序垫的提醒」这条边界')
 
-  // ── 15. 复读机轻提醒(第一百四十三锤):列举别翻来覆去重复(主药是采样参数+程序监工,这句是顺手的) ──
-  assert.ok(AGENT_ADDENDUM.includes('翻来覆去重复'), '守则要有「列举别复读」的轻提醒')
+  // ── 15. 翻文件切片的行为规矩:同一样不翻第二遍、不提「工具」这个词 ──
+  assert.ok(AGENT_FILES_ADDENDUM.includes('不翻第二遍'), '切片要有「不翻第二遍」的规矩')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('别提「工具」'), '切片要让模型说人话,别提工具')
 
   // ── 16. web_search 的三道闸(联网锤):搜索词安检 / 内网闸 / 正文剥壳 ──
   assert.equal(sanitizeWebQuery('  Claude Code\nskills 在哪  '), 'Claude Code skills 在哪', '换行压成空格,正常词放行')
@@ -296,7 +322,7 @@ function main(): void {
   assert.ok(AGENT_WEB_ADDENDUM.includes('换词再查'), '要教模型结果不对路时换词重查')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
-  assert.ok(!AGENT_ADDENDUM.includes('web_search'), '没开联网时守则不提 web_search:模型连有这工具都不该知道')
+  assert.ok(!AGENT_FILES_ADDENDUM.includes('web_search'), '没开联网时切片不提 web_search:模型连有这工具都不该知道')
   assert.ok(!AGENT_WEB_ADDENDUM.includes('source'), 'source 分流已退役(源序程序统一排),守则里不该再教它挑源')
 
   // ── 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过 ──
@@ -385,16 +411,78 @@ function main(): void {
   assert.ok(SALVAGE_CITE_NUDGE.includes('不用重新理解问题'), '判据二的提醒要说明只是补信息,不用重想')
   assert.ok(SALVAGE_NUDGE_MAX === 1, '补救提醒封顶一次:宁可答案差点,不让用户干等转圈')
 
-  // ── 21. 守则三步 SOP + 工具说明的新口风 ──
-  assert.ok(AGENT_ADDENDUM.includes('固定三步走'), '守则要写固定流程,不靠 9B 临场发挥')
-  assert.ok(AGENT_ADDENDUM.includes('验货'), 'SOP 第二步要进去验货,不是看名字像就算')
-  assert.ok(AGENT_ADDENDUM.includes('只有文件夹没有文件 = 还没查完'), '验收判据要量化:没到文件不算查完')
-  assert.ok(!AGENT_ADDENDUM.includes('web_search'), '新守则段落照旧不提 web_search:没开联网时模型不该知道')
-  assert.ok(searchTool.function.description.includes('路径'), 'search_content 说明要点明文件路径也搜')
-  assert.ok(searchTool.function.description.includes('光看文件夹名字不算'), '说明里把「光看文件夹名不算找过」写死')
+  // ── 21. 翻文件切片的指路分工 + 工具说明瘦身后的口径(提示词体系重写第二批,逐字稿 D/L)──
+  // 旧 SOP 段落(固定三步走/验货)随新稿退役:切片现在按「想干什么 → 用哪个工具」分工,
+  // 找位置必须搜到具体文件的验收判据并进 search_content 那一条
+  assert.ok(AGENT_FILES_ADDENDUM.includes('→ list_files') && AGENT_FILES_ADDENDUM.includes('→ read_file') && AGENT_FILES_ADDENDUM.includes('→ search_content'), '切片要按「想干什么 → 用哪个工具」分工')
+  assert.ok(AGENT_FILES_ADDENDUM.includes('搜到具体文件才算数'), '找位置的验收判据还在:必须搜到具体文件')
+  assert.ok(!AGENT_FILES_ADDENDUM.includes('web_search'), '切片照旧不提 web_search:没开联网时模型不该知道')
+  assert.ok(searchTool.function.description.includes('文件路径和文件内容都算'), 'search_content 说明要点明文件路径也搜')
+  assert.ok(searchTool.function.description.includes('长句搜不到'), '说明里把「长句搜不到」写死')
   assert.ok(AGENT_SEARCH_MAX_PATH_HITS >= 5 && AGENT_SEARCH_MAX_PATH_HITS <= 50, '路径命中封顶是个讲道理的数,不许一窝蜂挤掉内容命中')
 
-  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 守则新叮嘱 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸与三步 SOP 全部通过')
+  // ── 22. 黑名单引擎的兜底拼装(第二批补洞):翻文件开着但引擎不会工具调用时,
+  // 起手不挂切片、中途摘除切片,都要补一段「没手脚」切片 —— 不然人设里什么能力声明
+  // 都没剩,模型会照旧吹自己翻过项目
+  const agentBase = buildChatSystem({ agent: true })
+  assert.ok(!agentBase.includes(SLICE_NO_TOOLS), '翻文件开着时底座不含无工具切片:切片是 agent 路自己追加的')
+  const blacklistedSystem = `${agentBase}\n\n${SLICE_NO_TOOLS}`
+  assert.ok(blacklistedSystem.includes('没有翻文件能力'), '黑名单引擎的人设要明说本轮没有翻文件能力')
+  assert.ok(blacklistedSystem.includes('翻文件开关'), '要指路输入框旁的翻文件开关')
+
+  // ── 23. 流式轮次的封板令(第一百五十一锤):边说边喊工具时,已吐的话封口保留 ──
+  // 假模型服务按问题里的 mode 出三种牌:talk = 纯说话;work = 先说话再喊工具;
+  // silent = 一个字不说直接喊工具。验证:work 发封板令不发回滚,另外两种都不发
+  const sealServer = createServer((req, res) => {
+    let body = ''
+    req.on('data', (c: Buffer) => {
+      body += c.toString('utf8')
+    })
+    req.on('end', () => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      if (body.includes('mode=talk')) {
+        res.write('data: {"choices":[{"delta":{"content":"直接答你"}}]}\n\n')
+      } else if (body.includes('mode=silent')) {
+        res.write('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"list_files","arguments":"{\\"relPath\\":\\"src\\"}"}}]}}]}\n\n')
+      } else {
+        res.write('data: {"choices":[{"delta":{"content":"我先看看 src 目录"}}]}\n\n')
+        res.write('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"list_files","arguments":"{\\"relPath\\":\\"src\\"}"}}]}}]}\n\n')
+      }
+      res.end('data: [DONE]\n\n')
+    })
+  })
+  await new Promise<void>((resolve) => sealServer.listen(0, '127.0.0.1', resolve))
+  const sealAddr = sealServer.address()
+  assert.ok(sealAddr && typeof sealAddr === 'object', '封板假服务要监听上端口')
+  const sealTarget = { baseUrl: `http://127.0.0.1:${sealAddr.port}/v1`, model: 'fake' }
+  try {
+    // 边说边干活:吐了正经话再喊工具 → 发 seal,话留着,绝不许发 reset 抹掉
+    const workEvents: AgentStreamEvent[] = []
+    const work = await agentRound(sealTarget, [{ role: 'user', content: 'mode=work' }], { maxTokens: 200, useTools: true, onDelta: (ev) => workEvents.push(ev) })
+    assert.equal(work.status, 'ok', '边说边干活轮应正常收工')
+    assert.ok(work.status === 'ok' && work.raw.tool_calls?.[0]?.function.name === 'list_files', '工具调用照样收进来')
+    assert.ok(work.status === 'ok' && work.raw.content === '我先看看 src 目录', '说出口的话回填进消息')
+    assert.ok(workEvents.some((ev) => ev.seal), '说了话又喊工具:要发封板令')
+    assert.ok(!workEvents.some((ev) => ev.reset), '正经话不许发回滚令抹掉')
+
+    // 纯说话:没喊工具 → 什么令都不发
+    const talkEvents: AgentStreamEvent[] = []
+    const talk = await agentRound(sealTarget, [{ role: 'user', content: 'mode=talk' }], { maxTokens: 200, useTools: true, onDelta: (ev) => talkEvents.push(ev) })
+    assert.equal(talk.status, 'ok', '纯说话轮应正常收工')
+    assert.ok(talk.status === 'ok' && !talk.raw.tool_calls, '纯说话没有工具调用')
+    assert.ok(!talkEvents.some((ev) => ev.seal || ev.reset), '没喊工具:封板/回滚都不发')
+
+    // 哑巴喊工具:一个字没说 → 没话可封,不发令
+    const silentEvents: AgentStreamEvent[] = []
+    const silent = await agentRound(sealTarget, [{ role: 'user', content: 'mode=silent' }], { maxTokens: 200, useTools: true, onDelta: (ev) => silentEvents.push(ev) })
+    assert.equal(silent.status, 'ok', '哑巴轮应正常收工')
+    assert.ok(silent.status === 'ok' && silent.raw.content === null, '没说话正文就是 null')
+    assert.ok(!silentEvents.some((ev) => ev.seal), '没吐正经字:没啥可封,不发令')
+  } finally {
+    await new Promise<void>((resolve) => sealServer.close(() => resolve()))
+  }
+
+  console.log('✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过')
 }
 
-main()
+await main()

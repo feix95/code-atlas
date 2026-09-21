@@ -131,10 +131,31 @@ export function useAiChat(
     () =>
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
-        // agent 流式的回滚令(第一百三十四锤):中间轮次预吐的字被证明不是答案
-        // (模型喊了工具),把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
+        // agent 流式的回滚令(第一百三十四锤):已吐的字是垃圾/脏稿(打转、思考标签掺字),
+        // 把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
         if (payload.reset) {
           setMessages((prev) => prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: '' } : m)))
+          return
+        }
+        // agent 流式的封板令(第一百五十一锤):本轮说出口的话是正经输出(「我去翻翻 xx」),
+        // 不能抹掉 —— 当前气泡封口完工保留,另起一个新气泡接下一轮的话和思考。
+        // 新气泡沿用原 key(botKey),最终答案收尾才找得到它;封口气泡换新 key,别撞车
+        if (payload.seal) {
+          setMessages((prev) => {
+            let at = -1
+            for (let i = prev.length - 1; i >= 0; i -= 1) {
+              if (prev[i].role === 'assistant' && prev[i].state === 'busy') {
+                at = i
+                break
+              }
+            }
+            const busyMsg = at >= 0 ? prev[at] : undefined
+            // 没吐正经字就没什么可封的(光攒了思考块的话留在这条继续攒)
+            if (!busyMsg || busyMsg.text.trim() === '') return prev
+            const sealed: ChatMessage = { ...busyMsg, key: crypto.randomUUID(), state: 'done' }
+            const fresh: ChatMessage = { key: busyMsg.key, role: 'assistant', text: '', state: 'busy', web: null }
+            return [...prev.slice(0, at), sealed, fresh, ...prev.slice(at + 1)]
+          })
           return
         }
         // 翻文件模式的工具步骤播报:垫一条灰字(排在正在回答的气泡前面),

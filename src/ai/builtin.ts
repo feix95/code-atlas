@@ -369,6 +369,25 @@ export function parseLoadProgress(body: unknown): number | null {
   return null
 }
 
+export interface GpuOffloadReport {
+  offloaded: number
+  total: number
+}
+
+export function parseGpuOffloadReport(line: string): GpuOffloadReport | null {
+  const hit = line.match(/offloaded\s+(\d+)\s*\/\s*(\d+)\s+layers?\s+to\s+GPU/i)
+  if (!hit) return null
+  const offloaded = Number(hit[1])
+  const total = Number(hit[2])
+  if (!Number.isInteger(offloaded) || !Number.isInteger(total) || total <= 0 || offloaded < 0 || offloaded > total) return null
+  return { offloaded, total }
+}
+
+export function gpuOffloadWarning(report: GpuOffloadReport | null): string | undefined {
+  if (report === null || report.offloaded >= report.total) return undefined
+  return `模型只有 ${report.offloaded}/${report.total} 层放进显卡,其余要在内存里跑,吐字会明显变慢。关掉占显存的程序后点「卸下」再重载,或把「模型上下文」调小。`
+}
+
 export function isBuiltinRunning(): boolean {
   return child !== null && child.exitCode === null
 }
@@ -729,6 +748,12 @@ async function startAndWaitReady(
   // 闭包记死这个 pid —— 模块级 child 会被 stopBuiltinServer 置空或被新引擎换岗
   const spawnedPid = child.pid
   if (spawnedPid !== undefined) writeEnginePidFile(spawnedPid)
+  let latestGpuOffload: GpuOffloadReport | null = null
+  const captureEngineLine = (line: string): void => {
+    if (!line.trim()) return
+    addDevLog('engine', line)
+    latestGpuOffload = parseGpuOffloadReport(line) ?? latestGpuOffload
+  }
   // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
   // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
   const feedEngineStream = (stream: NodeJS.ReadableStream | null): void => {
@@ -738,13 +763,9 @@ async function startAndWaitReady(
       leftover += chunk.toString('utf8')
       const lines = leftover.split(/\r\n|\r|\n/)
       leftover = lines.pop() ?? ''
-      for (const line of lines) {
-        if (line.trim()) addDevLog('engine', line)
-      }
+      for (const line of lines) captureEngineLine(line)
     })
-    stream.on('end', () => {
-      if (leftover.trim()) addDevLog('engine', leftover)
-    })
+    stream.on('end', () => captureEngineLine(leftover))
   }
   feedEngineStream(child.stdout)
   feedEngineStream(child.stderr)
@@ -822,7 +843,9 @@ async function startAndWaitReady(
         ? err
         : new Error('内置模型刚就绪就没了响应,再点一次试试')
     }
-    announceBuiltin(builtinStatus('ready', model, facts.sizeBytes, 100))
+    const offloadWarning = gpuOffloadWarning(latestGpuOffload)
+    if (offloadWarning) addDevLog('system', offloadWarning)
+    announceBuiltin(builtinStatus('ready', model, facts.sizeBytes, 100, offloadWarning))
 
     // 就绪之后再夭折(跑着跑着崩了):状态栏如实报故障,下次提问会自动重新拉起;
     // 用户主动卸下的不算,走 stopping 标记闭嘴

@@ -6,9 +6,9 @@ import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import {
   CUSTOM_MAX,
   DEFAULT_PERSONALIZATION,
+  TEACHING_OPTIONS,
   TONE_OPTIONS,
-  type PersonalizationConfig,
-  type ToneKey
+  type PersonalizationConfig
 } from '@shared/personalization'
 import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
 import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
@@ -119,9 +119,20 @@ function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: stri
   )
 }
 
-/** 语气下拉(第一百一十八锤补,照小葵的参考图):档名+介绍两行式 —— 原生 option
- * 画不出两行,这一颗自己画。点外面或按 Esc 收起,选中项亮着。 */
-function ToneSelect({ value, onChange }: { value: ToneKey; onChange: (t: ToneKey) => void }): React.JSX.Element {
+/** 档位下拉(第一百一十八锤补的语气下拉,讲解深度来了就泛化成通用款,照小葵的参考图):
+ * 档名+介绍两行式 —— 原生 option 画不出两行,这一颗自己画。点外面或按 Esc 收起,选中项亮着。 */
+function OptionSelect<K extends string>({
+  options,
+  value,
+  onChange,
+  ariaLabel
+}: {
+  options: Array<{ key: K; label: string; hint: string }>
+  value: K
+  onChange: (k: K) => void
+  /** 列表弹开时的无障碍名:跟这行的 label 同名 */
+  ariaLabel: string
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -139,7 +150,7 @@ function ToneSelect({ value, onChange }: { value: ToneKey; onChange: (t: ToneKey
       window.removeEventListener('keydown', onKey)
     }
   }, [open])
-  const current = TONE_OPTIONS.find((o) => o.key === value) ?? TONE_OPTIONS[0]
+  const current = options.find((o) => o.key === value) ?? options[0]
   return (
     <div className="tone-select" ref={rootRef}>
       <button type="button" className="tone-select-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -150,8 +161,8 @@ function ToneSelect({ value, onChange }: { value: ToneKey; onChange: (t: ToneKey
         </span>
       </button>
       {open && (
-        <div className="tone-select-list" role="listbox" aria-label="基本风格和语气">
-          {TONE_OPTIONS.map((o) => (
+        <div className="tone-select-list" role="listbox" aria-label={ariaLabel}>
+          {options.map((o) => (
             <button
               key={o.key}
               type="button"
@@ -960,7 +971,15 @@ export function SettingsDialog({
                         <div className="cfg-copy">
                           <label>基本风格和语气</label>
                         </div>
-                        <ToneSelect value={personal.tone} onChange={(tone) => updatePersonal({ tone })} />
+                        <OptionSelect options={TONE_OPTIONS} value={personal.tone} onChange={(tone) => updatePersonal({ tone })} ariaLabel="基本风格和语气" />
+                      </div>
+                      <div className="cfg-divider" />
+                      <div className="cfg-row">
+                        <div className="cfg-copy">
+                          <label>讲解深度</label>
+                          <p>讲代码和文件时讲多细。「简洁」只说这东西是干什么的；「精简」先讲骨架、带几条名词小课堂；「详细」还会讲这门语言用到了哪些写法，并挑关键处展开（更耗算力，模型上下文太小时会自动退回精简，届时会明说）。</p>
+                        </div>
+                        <OptionSelect options={TEACHING_OPTIONS} value={personal.teaching} onChange={(teaching) => updatePersonal({ teaching })} ariaLabel="讲解深度" />
                       </div>
                       <div className="cfg-divider" />
                       <div className="cfg-row cfg-row-stack">

@@ -45,15 +45,29 @@ import {
   LOCATE_TOKEN_BUDGET,
   WEB_SIGNAL_INSTRUCTION,
   sniffBinaryKind,
-  SYSTEM_PROMPT,
-  FREE_CHAT_SYSTEM_PROMPT,
-  FOLDER_SYSTEM_PROMPT,
   GUESS_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
   isBinaryFile,
   extractStreamStats,
   splitThinking
 } from '../src/ai/index.ts'
+// 提示词体系重写(第二批):人设常量搬家到 prompts.ts,断言打到组装产物上
+import {
+  AGENT_FILES_ADDENDUM,
+  buildChatSystem,
+  buildExplainSystem,
+  deepSourceChars,
+  EXPLAIN_FILE_BASE,
+  EXPLAIN_FOLDER_BASE,
+  KERNEL_CORE,
+  SLICE_CHAT,
+  SLICE_NO_TOOLS,
+  TEACHING_DEEP_MIN_CTX,
+  TEACHING_DEGRADED_NOTE,
+  teachingSlice
+} from '../src/ai/prompts.ts'
+import { AGENT_TOOLS, AGENT_WEB_ADDENDUM } from '../src/ai/agent.ts'
+import { buildPersonalizationPrompt, DEFAULT_PERSONALIZATION, HONESTY_TAIL } from '../src/shared/personalization.ts'
 import {
   isCompactCommand,
   buildCompactMessages,
@@ -70,7 +84,7 @@ import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
 import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, inspectBuiltinConflict, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
+import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, gpuOffloadWarning, inspectBuiltinConflict, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseGpuOffloadReport, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
 import { stripHtmlTags, webLookupDetailed, probeTavilyKey, HttpStatusError, TAVILY_USAGE_URL } from '../src/ai/weblookup.ts'
 import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus, parseTavilyUsage, tavilyUsageText } from '../src/shared/tavily.ts'
 import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
@@ -147,8 +161,9 @@ async function main(): Promise<void> {
   assert.ok(fp.includes('文件类型分布'), '后缀分布要有标题行')
   assert.ok(fp.includes('系统目录'), '要有"认得系统目录就用常识"的引导')
   // 防摆烂条款:人设必须禁止"看不出来"一句甩烂,极端情况也要复述文件名(第三十七锤补丁)
-  assert.ok(FOLDER_SYSTEM_PROMPT.includes('不许只回一句'), '文件夹人设要明确禁止一句摆烂')
-  assert.ok(FOLDER_SYSTEM_PROMPT.includes('念出来'), '毫无辨识度时也要把观察到的文件名念出来')
+  // (第二批重写:文件夹人设 = EXPLAIN_FOLDER_BASE 底座,教学部分由教学切片接管)
+  assert.ok(EXPLAIN_FOLDER_BASE.includes('不许只回一句'), '文件夹人设要明确禁止一句摆烂')
+  assert.ok(EXPLAIN_FOLDER_BASE.includes('念出来'), '毫无辨识度时也要把观察到的文件名念出来')
 
   const fpRoot = buildFolderPrompt({
     relPath: '',
@@ -210,13 +225,16 @@ async function main(): Promise<void> {
   const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', absPath: 'X:\\demo\\e', languageName: '', preview: '' })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
 
-  // ── 3.5 自由对话:小探针人设分寸 + 历史清洗 + 附件清洗 + 消息组装 ──
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('Atlas 小探针'), '自由对话人设要点名 Atlas 小探针')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('你是谁'), '问「你是谁」要有稳定的身份答法')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('不限制用户问题的范围') || FREE_CHAT_SYSTEM_PROMPT.includes('最高优先级'), '用户问题优先,不被资料拽着走')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('回收站'), '聊天人设要保留低成本安全网(回收站观察)')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('System32'), '聊天人设要护住系统关键目录')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('不要说自己查过网页') || FREE_CHAT_SYSTEM_PROMPT.includes('没有真正执行联网查询'), '没联网不许装查过')
+  // ── 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装 ──
+  // 提示词体系重写(第二批):断言打到组装产物上,不再钉某个常量文本
+  const chatSystem = buildChatSystem({ agent: false })
+  assert.ok(chatSystem.includes('小探针'), '内核要点名本名「小探针」')
+  assert.ok(chatSystem.includes('你是谁'), '问「你是谁」要有稳定的身份答法')
+  assert.ok(chatSystem.includes('不编造') && chatSystem.includes('不假装干过活'), '内核两条铁律要在:不编造、不假装干过活')
+  assert.ok(chatSystem.includes('翻文件开关'), '无工具切片要指路「翻文件开关」')
+  assert.ok(chatSystem.includes('没翻过文件别说翻过'), '没翻过文件不许装翻过')
+  assert.ok(!buildChatSystem({ agent: true }).includes(SLICE_NO_TOOLS), 'agent 路不挂无工具切片(翻文件切片走 agent 自己的追加机制)')
+  assert.ok(buildChatSystem({ agent: true }).includes(SLICE_CHAT), 'agent 路照样有聊天切片')
 
   assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
   const longText = '长'.repeat(600)
@@ -374,7 +392,7 @@ async function main(): Promise<void> {
 
   // 端到端回归(小葵报的案):当前问题必须单独成条 —— 老毛病是悬空的旧问题被合并逻辑
   // 粘到当前问题前面,拼成「旧问题\n\n新问题」,小模型扭头就去答那个旧问题
-  const chatMessages = buildFreeChatMessages('人设', null, sanitizeHistory(pairHistory), '第7问', null)
+  const chatMessages = buildFreeChatMessages('人设', null, sanitizeHistory(pairHistory), '第7问', null, [], 'brief')
   const lastMessage = chatMessages[chatMessages.length - 1]
   assert.equal(lastMessage?.role, 'user', '拼完的消息序列,最后一条是当前问题')
   // 注意力锚(答旧题修复·刀三):当前问题钉标牌,agent 链取问题时剥掉,提醒卡引用干净原文
@@ -425,7 +443,7 @@ async function main(): Promise<void> {
   assert.ok(attText.includes('相对路径:src/renderer/components'), '相对路径要进附件')
 
   // 消息组装:附件垫底(不进历史)、历史居中、问题收尾、相邻同角色合并
-  const freeMsgs = buildFreeChatMessages('小探针人设', att, [{ role: 'assistant', content: '先前的回答' }], '你是谁?')
+  const freeMsgs = buildFreeChatMessages('小探针人设', att, [{ role: 'assistant', content: '先前的回答' }], '你是谁?', null, [], 'brief')
   assert.deepEqual(
     freeMsgs.map((m) => m.role),
     ['system', 'user', 'assistant', 'user'],
@@ -436,7 +454,7 @@ async function main(): Promise<void> {
   // 资料提示贴着问题走(小葵报的案):附件隔着几轮历史小模型就忘了,问题尾要跟一句「当前参考资料是谁」
   assert.ok(freeMsgs[3]?.content.includes('当前参考资料:components'), '问题尾要带当前参考资料提示')
 
-  const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的')
+  const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的', null, [], 'brief')
   assert.equal(bareMsgs.length, 2, '没附件没历史 = 人设 + 问题两条')
   assert.ok(!bareMsgs.some((m) => m.content.includes('<context_attachment>')), '没附件就不该有附件消息')
   assert.ok(!bareMsgs.some((m) => m.content.includes('当前参考资料')), '没附件也不垫资料提示')
@@ -485,22 +503,26 @@ async function main(): Promise<void> {
   assert.ok(refsText.includes('src/a.ts 第 10-12 行'), '路径和行号要摆出来')
   assert.ok(refsText.includes('const a = 1'), '代码原文要进去')
 
-  // 带引用的消息组装:人设加「代码老师」一节,引用块紧挨着问题(都在问题前面)
-  const refMsgs = buildFreeChatMessages('小探针人设', null, [], '这段在干嘛', null, refOne)
+  // 带引用的消息组装:人设加「代码老师」一节 + 教学切片,引用块紧挨着问题(都在问题前面)
+  const refMsgs = buildFreeChatMessages('小探针人设', null, [], '这段在干嘛', null, refOne, 'brief')
   assert.ok(refMsgs[0]?.content.includes(CODE_TEACHER_ADDENDUM), '带引用时人设要加代码老师那一节')
-  assert.ok(refMsgs[0]?.content.includes('名词小课堂'), '代码老师要讲知识、留名词小课堂')
+  assert.ok(refMsgs[0]?.content.includes('名词小课堂'), '精简档教学切片要带名词小课堂(切片接管,不在代码老师里)')
   assert.ok(refMsgs[0]?.content.includes('从这一段看不出来'), '看不出来的地方要明说,不许编上下文')
   assert.ok(!refMsgs[0]?.content.includes('const a = 1'), '引用原文是证据,不该混进人设')
   assert.ok(refMsgs[refMsgs.length - 1]?.content.includes('<code_refs>'), '引用块紧挨问题')
   assert.ok(refMsgs[refMsgs.length - 1]?.content.includes('这段在干嘛'), '问题收尾')
-  const noRefMsgs = buildFreeChatMessages('小探针人设', null, [], '随便问问')
+  const noRefMsgs = buildFreeChatMessages('小探针人设', null, [], '随便问问', null, [], 'brief')
   assert.ok(!noRefMsgs[0]?.content.includes(CODE_TEACHER_ADDENDUM), '没引用就不加代码老师那一节')
+  // off 档全场景生效(第二批):聊天里 off 就是「不教学不出术语表」
+  const offMsgs = buildFreeChatMessages('小探针人设', null, [], '这段在干嘛', null, refOne, 'off')
+  assert.ok(offMsgs[0]?.content.includes('不搞教学'), 'off 档要垫「不教学」切片')
+  assert.ok(!offMsgs[0]?.content.includes('名词小课堂'), 'off 档不出术语表')
 
-  const mergedMsgs = buildFreeChatMessages('小探针人设', att, [], '这个文件夹是干嘛的?')
+  const mergedMsgs = buildFreeChatMessages('小探针人设', att, [], '这个文件夹是干嘛的?', null, [], 'brief')
   assert.equal(mergedMsgs.length, 2, '首问带附件时,附件和问题要合并成一条 user')
   assert.ok(mergedMsgs[1]?.content.includes('components') && mergedMsgs[1]?.content.includes('这个文件夹是干嘛的'), '附件与首问合并,不出现连续两条 user')
 
-  const webMsgs = buildFreeChatMessages('小探针人设', att, [], '联网搜搜它', { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' })
+  const webMsgs = buildFreeChatMessages('小探针人设', att, [], '联网搜搜它', { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' }, [], 'brief')
   assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('Aomei 是备份软件厂商'), '联网资料要附在问题里')
   assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('把资料里跟它对得上的信息讲出来'), '要要求模型讲出对得上的信息')
 
@@ -1005,10 +1027,13 @@ async function main(): Promise<void> {
 
     // 自由对话流:附件垫底(不进历史)、人设和资料原样发出去,角色和顺序不变形
     const freeMessages = buildFreeChatMessages(
-      FREE_CHAT_SYSTEM_PROMPT,
+      buildChatSystem({ agent: false }),
       { targetType: 'folder', name: 'Aomei', relPath: 'D:/Aomei', summary: '软件残留', details: '文件:卸载说明.txt' },
       [{ role: 'assistant', content: '这是备份软件的残留' }],
-      '你是谁？'
+      '你是谁？',
+      null,
+      [],
+      'brief'
     )
     const freeRes = await explainWithMessages(target, freeMessages)
     assert.equal(freeRes.status, 'supported', '自由对话链路应通')
@@ -1016,7 +1041,7 @@ async function main(): Promise<void> {
       messages: Array<{ role: string; content: string }>
     }
     assert.equal(freeBody.messages.length, 4, '自由对话消息 = 人设 + 附件 + 历史 + 当前问题')
-    assert.ok(freeBody.messages[0]?.content.includes('Atlas 小探针'), '小探针人设要发到服务')
+    assert.ok(freeBody.messages[0]?.content.includes('小探针'), '小探针内核要发到服务')
     assert.ok(freeBody.messages[1]?.content.includes('<context_attachment>'), '资料附件按用户消息垫底')
     assert.ok(freeBody.messages[1]?.content.includes('以这份资料为准'), '附件要声明涉及它时以资料为准')
     assert.equal(freeBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
@@ -1282,6 +1307,13 @@ async function main(): Promise<void> {
   assert.equal(parseLoadProgress({ progress: 'x' }), null, '不是数不给数')
   assert.equal(parseLoadProgress({}), null, '老版引擎啥都不报 = null,界面转圈')
   assert.equal(parseLoadProgress('loading'), null, '字符串垃圾回 null')
+  assert.deepEqual(parseGpuOffloadReport('llama_model_load: offloaded 49/49 layers to GPU'), { offloaded: 49, total: 49 }, '引擎明确报告全层上显卡')
+  assert.deepEqual(parseGpuOffloadReport('load_tensors: offloaded 32 / 49 layers to GPU'), { offloaded: 32, total: 49 }, '空格方言也认,部分上显卡照实记')
+  assert.equal(parseGpuOffloadReport('CUDA0 model buffer size = 12000 MiB'), null, '只有显存数字不能推断层数')
+  assert.equal(gpuOffloadWarning({ offloaded: 49, total: 49 }), undefined, '全层上显卡不打扰用户')
+  assert.ok(gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('32/49'), '部分上显卡提醒要带引擎真数')
+  assert.ok(gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('内存'), '提醒要讲清剩余部分落内存会慢')
+  assert.equal(gpuOffloadWarning(null), undefined, '引擎没报层数就不猜')
 
   assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, 'q'), { state: 'ready', progress: 100 }, 'loaded = 就绪')
   assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loading', progress: 0.25 }] }, 'q'), { state: 'loading', progress: 25 }, 'loading 带进度就给准数')
@@ -1392,11 +1424,38 @@ async function main(): Promise<void> {
   assert.equal(estimateKvBytes(0, 14.26 * G), 0, '上下文 0 不估')
   assert.equal(estimateKvBytes(Number.NaN, 14.26 * G), 0, 'NaN 不估')
 
-  // ── 第一百零二锤:名词小课堂 + 路径层级规矩进人设 ──
-  assert.ok(SYSTEM_PROMPT.includes('名词小课堂'), '文件讲解人设要有名词小课堂')
-  assert.ok(FOLDER_SYSTEM_PROMPT.includes('名词小课堂') && FOLDER_SYSTEM_PROMPT.includes('src、renderer、dist'), '文件夹讲解要主动解释名字术语')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('名词小课堂'), '小探针人设要有名词小课堂')
-  assert.ok(FREE_CHAT_SYSTEM_PROMPT.includes('两个 src 有什么区别'), '小探针要会答目录层级对比题')
+  // ── 提示词体系重写(第二批):讲解人设 = 底座 + 教学切片;三档切片互不串味 ──
+  // 名词小课堂不再焊死在各底座里,由档位接管:off 明确不教学,brief 封顶 3 条,deep 封顶 5 条
+  assert.ok(!EXPLAIN_FILE_BASE.includes('名词小课堂') && !EXPLAIN_FOLDER_BASE.includes('名词小课堂'), '讲解底座不再自带名词小课堂(归教学切片管)')
+  assert.ok(teachingSlice('off').includes('不搞教学') && !teachingSlice('off').includes('名词小课堂'), 'off 档:不教学、不出术语表')
+  assert.ok(teachingSlice('brief').includes('先骨架后细节') && teachingSlice('brief').includes('3 条'), '精简档:先骨架后细节 + 小课堂 3 条')
+  assert.ok(!teachingSlice('brief').includes('5 条'), '精简档不串详细档的 5 条')
+  assert.ok(teachingSlice('deep').includes('5 条') && teachingSlice('deep').includes('带新手看懂'), '详细档:带新手看懂 + 小课堂 5 条')
+  assert.ok(!teachingSlice('deep').includes('不搞教学'), '详细档不串 off 的「不搞教学」')
+  const deepFile = buildExplainSystem('deep', 'file')
+  assert.ok(deepFile.includes('先骨架后细节') && deepFile.includes('5 条'), 'deep 文件讲解 = 底座 + 详细切片')
+  assert.ok(buildExplainSystem('off', 'file').includes('不搞教学'), 'off 文件讲解要带「不教学」指令')
+  assert.ok(buildExplainSystem('brief', 'folder').includes('代码地图导游'), '文件夹讲解底座还在(删了教学两条的旧导游)')
+  assert.ok(buildExplainSystem('deep', 'guess').includes('代码猜猜官'), 'guess 底座复用猜猜官原文')
+  assert.ok(!buildExplainSystem('brief', 'guess').includes('代码人话翻译官'), '三种底座不串味')
+  // 详细档的锅线和节选长度:8192 起才配 deep,节选 2000~6000 字看锅下菜
+  assert.equal(TEACHING_DEEP_MIN_CTX, 8192, 'deep 的锅线钉在 8192')
+  assert.equal(deepSourceChars(4096), 2000, '小锅节选保 2000 字底')
+  assert.equal(deepSourceChars(16384), 3686, '节选跟着锅走(16384×0.225)')
+  assert.equal(deepSourceChars(131072), 6000, '大锅节选封顶 6000 字')
+  assert.ok(TEACHING_DEGRADED_NOTE.includes('精简'), '降档灰字要交代「这次按精简讲了」')
+
+  // ── 体积红线(小葵点名的防反弹秤):装配产物不许再胖回去 ──
+  assert.ok(chatSystem.length <= 700, `闲聊底座(无工具)≤700 字,实测 ${chatSystem.length}`)
+  const agentFullSystem = KERNEL_CORE + SLICE_CHAT + AGENT_FILES_ADDENDUM + AGENT_WEB_ADDENDUM + buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' }) + HONESTY_TAIL
+  assert.ok(agentFullSystem.length <= 1500, `agent 全量人设 ≤1500 字,实测 ${agentFullSystem.length}`)
+  assert.ok(deepFile.length <= 800, `deep 文件讲解人设 ≤800 字,实测 ${deepFile.length}`)
+  const toolsJson = JSON.stringify(AGENT_TOOLS).length
+  // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
+  // OpenAI tools 协议骨架(type/function/parameters/required 一个不能少)的实测下限是
+  // 1159 字 —— 就算把 copy L 没覆盖的 web_search query 参数说明也摘掉也只到 1082。
+  // 逐字稿不能动,秤先放在实测值上,压回 1000 需要砍稿子或砍参数说明
+  assert.ok(toolsJson <= 1200, `四件工具说明书 JSON ≤1200 字(原红线 1000 与逐字稿冲突,待 lead 定夺),实测 ${toolsJson}`)
 
   console.log('✅ AI 人话解释自测全部通过')
 
@@ -1526,7 +1585,7 @@ async function main(): Promise<void> {
   assert.ok(summaryBlock.includes('聊过 500ms 防抖'), '摘要原文要在')
 
   // buildFreeChatMessages:摘要块垫在附件后、历史前;没摘要就不出现
-  const withSummary = buildFreeChatMessages('人设', att, [{ role: 'user', content: '最近的问题' }], '新的问题', null, [], summaryBlock)
+  const withSummary = buildFreeChatMessages('人设', att, [{ role: 'user', content: '最近的问题' }], '新的问题', null, [], 'brief', summaryBlock)
   // 相邻同角色会合并成一条,三个块可能在同一消息里:改在拼好的正文里比先后
   const joined = withSummary.map((m) => m.content).join('\n')
   const attAt = joined.indexOf('<context_attachment>')
@@ -1534,7 +1593,7 @@ async function main(): Promise<void> {
   const histAt = joined.indexOf('最近的问题')
   assert.ok(attAt >= 0 && sumAt > attAt && histAt > sumAt, '顺序:附件 → 摘要 → 历史')
   assert.ok(joined.includes('新的问题'), '当前问题照旧在')
-  const noSummary = buildFreeChatMessages('人设', null, [], '随便问问')
+  const noSummary = buildFreeChatMessages('人设', null, [], '随便问问', null, [], 'brief')
   assert.ok(noSummary.every((m) => !m.content.includes('<earlier_chat_summary>')), '没摘要不留空块')
 
   // ── 15. 复读机防线(第一百四十三锤):探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 ──

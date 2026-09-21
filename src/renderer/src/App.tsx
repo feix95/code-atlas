@@ -6,8 +6,9 @@ import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { planWholeFileRef } from '@shared/preview'
 import { isTreePartial } from '@shared/scanCoverage'
 import { isAiConfigured } from '@shared/aiSetup'
+import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
 import { createMirrorThrottle } from '@shared/mirrorThrottle'
-import { AiSetupContext } from './aiSetupContext'
+import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
 import { CodePreview } from './components/CodePreview'
@@ -313,6 +314,8 @@ function App(): React.JSX.Element {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsSection, setSettingsSection] = useState<'appearance' | 'ai' | 'advanced'>('appearance')
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
+  // 讲解深度(教学三档):跟着 AI 配置走;档位一换,讲解钩子就把按旧档讲的旧账清掉
+  const [teaching, setTeaching] = useState<TeachingLevel>('brief')
   // 推荐问题总闸(聊天偏好,存本机):关了聊天框上面和预览 AI 卡下面的推荐都不出,两处模型预测也一并省掉
   const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
@@ -613,7 +616,9 @@ function App(): React.JSX.Element {
     void window.atlas
       .aiConfigGet()
       .then((c) => {
-        if (alive) setAiConfigured(isAiConfigured(c))
+        if (!alive) return
+        setAiConfigured(isAiConfigured(c))
+        setTeaching(sanitizePersonalization(c.personalization).teaching)
       })
       .catch(() => {
         if (alive) setAiConfigured(false)
@@ -1502,6 +1507,7 @@ function App(): React.JSX.Element {
 
   return (
     <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
+    <TeachingContext.Provider value={teaching}>
       <div className="app">
       {revived && (
         <div className="revive-note" role="alert">
@@ -1820,7 +1826,10 @@ function App(): React.JSX.Element {
         <SettingsDialog
           workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
           initialSection={settingsSection}
-          onAiConfigSaved={(c) => setAiConfigured(isAiConfigured(c))}
+          onAiConfigSaved={(c) => {
+            setAiConfigured(isAiConfigured(c))
+            setTeaching(sanitizePersonalization(c.personalization).teaching)
+          }}
           chatSuggestionsOn={chatSuggestionsOn}
           onChatSuggestionsChange={(v) => {
             setChatSuggestionsOn(v)
@@ -1830,6 +1839,7 @@ function App(): React.JSX.Element {
         />
       )}
       </div>
+    </TeachingContext.Provider>
     </AiSetupContext.Provider>
   )
 }

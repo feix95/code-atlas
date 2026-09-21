@@ -4,11 +4,11 @@ import { existsSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import { scanDirectory, IGNORED_NAMES } from '../scanner/index.ts'
 import {
-  AGENT_ADDENDUM,
   AGENT_FILE_MAX_BYTES,
   AGENT_LIST_MAX_ENTRIES,
   AGENT_MAX_DEPTH,
   AGENT_MAX_ROUNDS,
+  AGENT_REMINDER_MIN_TOOL_CALLS,
   AGENT_REMINDER_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
@@ -82,14 +82,10 @@ import {
   hasSearchIntent,
   WEB_SIGNAL_INSTRUCTION,
   parseLmStudioModelState,
-  FREE_CHAT_SYSTEM_PROMPT,
   DIFF_SYSTEM_PROMPT,
-  FOLDER_SYSTEM_PROMPT,
-  GUESS_SYSTEM_PROMPT,
   REPORT_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
   LOCATE_NODE_BUDGET,
-  SYSTEM_PROMPT,
   STYLE_SAMPLE_SYSTEM,
   STYLE_SAMPLE_QUESTION,
   isBinaryFile,
@@ -105,11 +101,13 @@ import { BY_EXT } from '../parser/languages.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { highlightSource } from '../highlight/index.ts'
-import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalization } from '../shared/personalization.ts'
+import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalization, type TeachingLevel } from '../shared/personalization.ts'
+import { AGENT_FILES_ADDENDUM, buildChatSystem, buildExplainSystem, deepSourceChars, SLICE_NO_TOOLS, TEACHING_DEEP_MIN_CTX, TEACHING_DEGRADED_NOTE } from '../ai/prompts.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
 import { queryDriveKinds } from './drive-meta.ts'
+import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalDirectoryPath } from './agentAccess.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
@@ -133,6 +131,7 @@ function withQuestion(prompt: string, question: unknown): string {
 
 /** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
 const explainAborters = new Map<string, AbortController>()
+const agentDirectoryAccess = new AgentDirectoryAccess()
 
 /** 干活报告的签名缓存:同一份改动集(账本+最近提交主题一样)不重复烧模型,最多留 20 份 */
 const reportCache = new Map<string, AiExplainResult>()
@@ -143,37 +142,57 @@ const reportCache = new Map<string, AiExplainResult>()
  * 首次讲解走联网增强:先正常讲,答案带「需要联网确认」信号才查公开资料并修正。
  * (自由聊天不在这里 —— 它有自己的 atlas:ai-chat 通道和人设,不往这条路上堆条件。)
  */
+/**
+ * 「详细」档的锅线判定(提示词体系重写第二批):teaching 选了 deep 但模型上下文
+ * 低于 TEACHING_DEEP_MIN_CTX 时,实际按 brief 装配 —— 锅装不下源码节选,硬按详细档
+ * 讲只会挤出半截答案。degraded = true 时,讲解结果正文顶上垫一行程序备注(逐字稿 M)。
+ * 聊天/diff/报告不吃这套 —— 只有讲解主路(respondWithEvidence 这一路)降档。
+ */
+function effectiveTeaching(resolved: { teaching: TeachingLevel; ctx: number }): { teaching: TeachingLevel; degraded: boolean } {
+  const degraded = resolved.teaching === 'deep' && resolved.ctx < TEACHING_DEEP_MIN_CTX
+  return { teaching: degraded ? 'brief' : resolved.teaching, degraded }
+}
+
 async function respondWithEvidence(
   event: IpcMainInvokeEvent,
   requestId: unknown,
   question: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string; tavilyKey?: string },
+  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string; ctx: number; teaching: TeachingLevel; tavilyKey?: string },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
   const hasQuestion = typeof question === 'string' && question.trim() !== ''
-  // 人设口径保持原样:给了就用给的,没给就是文件讲解官那一套;个性化一律叠在最上面
-  const persona = withPersonalization(system ?? SYSTEM_PROMPT, resolved.style)
+  const { teaching, degraded } = effectiveTeaching(resolved)
+  // 人设口径保持原样:给了就用给的(调用方已按同一个 effectiveTeaching 装配),
+  // 没给就是文件讲解官那一套;个性化一律叠在最上面
+  const persona = withPersonalization(system ?? buildExplainSystem(teaching, 'file'), resolved.style)
+  // 降档灰字:只在真讲出来了( supported )的结果顶上垫 —— 报错/取消的文本不是讲解,垫上就成了假话
+  const withDegradedNote = (res: AiExplainResult): AiExplainResult =>
+    degraded && res.status === 'supported' ? { ...res, text: `${TEACHING_DEGRADED_NOTE}\n\n${res.text}` } : res
   if (resolved.webLookup && lookupName && !hasQuestion) {
     // 联网那条老规矩没变:没人设时它本来就用导游那一套(和普通流不同,别一起改)
-    return explainWithWebLookup(
-      event,
-      requestId,
-      evidence,
-      withPersonalization(system ?? FOLDER_SYSTEM_PROMPT, resolved.style),
-      lookupName,
-      resolved.target,
-      onDelta,
-      resolved.budgets.replyTokens,
-      resolved.tavilyKey
+    return withDegradedNote(
+      await explainWithWebLookup(
+        event,
+        requestId,
+        evidence,
+        withPersonalization(system ?? buildExplainSystem(teaching, 'folder'), resolved.style),
+        lookupName,
+        resolved.target,
+        onDelta,
+        resolved.budgets.replyTokens,
+        resolved.tavilyKey
+      )
     )
   }
-  return explainWithCancel(requestId, (signal) =>
-    explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens, {
-      onRestart: () => sendResetDelta(event, requestId)
-    })
+  return withDegradedNote(
+    await explainWithCancel(requestId, (signal) =>
+      explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens, {
+        onRestart: () => sendResetDelta(event, requestId)
+      })
+    )
   )
 }
 
@@ -327,7 +346,7 @@ function formatSize(bytes: number): string {
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
 async function resolveChatTargetOrError(): Promise<
-  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number; tavilyKey?: string } | { error: string }
+  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number; teaching: TeachingLevel; tavilyKey?: string } | { error: string }
 > {
   const config = await loadAiConfig(app.getPath('userData'))
   let runtime: BuiltinRuntime | undefined
@@ -350,7 +369,9 @@ async function resolveChatTargetOrError(): Promise<
   const ctx = resolveContextSize(config.provider, config.contextSize, await probeContextSize(resolved.target, config.provider))
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
-  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx, tavilyKey: config.tavilyKey }
+  // 讲解深度(教学三档)也在这落定:讲解底座挂哪段教学切片、deep 要不要降档,各调用点照它装配
+  const teaching = sanitizePersonalization(config.personalization).teaching
+  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx, teaching, tavilyKey: config.tavilyKey }
 }
 
 /**
@@ -452,7 +473,7 @@ function announceActivityIdle(): void {
   const base = provider === 'builtin' ? lastBuiltinStatus() : lastLmStudioStatus
   if (!base) return
   if (base.state !== 'loading' && base.state !== 'idle') {
-    broadcastModelStatus({ ...base, state: 'ready', progress: null, estimated: undefined, message: undefined })
+    broadcastModelStatus({ ...base, state: 'ready', progress: null, estimated: undefined })
   }
 }
 
@@ -915,7 +936,7 @@ function createWindow(): void {
 async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: boolean; text: string; hint?: string }> {
   let abs: string
   try {
-    abs = joinRoot(rootPath, relPath)
+    abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
     return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
   }
@@ -985,7 +1006,7 @@ async function agentSearchContent(
 ): Promise<{ ok: boolean; text: string; hint?: string; matches: AgentSearchMatch[]; matchesTruncated: boolean }> {
   let abs: string
   try {
-    abs = joinRoot(rootPath, relPath)
+    abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
     return { ok: false, text: `路径越界了(不在项目内):${relPath}`, matches: [], matchesTruncated: false }
   }
@@ -1092,7 +1113,7 @@ async function agentReadFile(
 ): Promise<{ ok: boolean; text: string; hint?: string }> {
   let abs: string
   try {
-    abs = joinRoot(rootPath, relPath)
+    abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
     return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
   }
@@ -1116,6 +1137,43 @@ async function agentReadFile(
     }
   }
   return { ok: true, text: raw, hint: `全文 ${raw.length} 字` }
+}
+
+async function agentRequestDirectoryAccess(
+  event: IpcMainInvokeEvent,
+  rawPath: unknown
+): Promise<{ ok: boolean; text: string; hint?: string; rootId?: string }> {
+  const requested = sanitizeExternalDirectoryPath(rawPath)
+  if (requested === null) return { ok: false, text: '目录路径不合法:只能申请用户明确点名的绝对文件夹路径' }
+  const canonical = await fs.realpath(requested).catch(() => null)
+  if (canonical === null) return { ok: false, text: `这个文件夹不存在或打不开:${requested}` }
+  const stat = await fs.stat(canonical).catch(() => null)
+  if (!stat?.isDirectory()) return { ok: false, text: `这不是文件夹:${requested}` }
+  const existing = agentDirectoryAccess.find(canonical)
+  if (existing) {
+    return { ok: true, text: `这个文件夹本次运行已经获准。rootId=${existing.rootId};后续只传根内相对路径。`, hint: '本次运行已允许', rootId: existing.rootId }
+  }
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const options = {
+    type: 'question' as const,
+    title: '允许读取项目外文件夹吗？',
+    message: 'AI 想读取这个项目外的文件夹',
+    detail: `${canonical}\n\n只读，不会修改文件。允许后仅在本次打开 CodeAtlas 期间有效，关闭应用就失效。`,
+    buttons: ['允许本次读取', '拒绝'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true
+  }
+  const choice = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+  if (choice.response !== 0) return { ok: false, text: `用户没有允许读取这个文件夹:${canonical}`, hint: '用户拒绝了' }
+  const granted = agentDirectoryAccess.grant(canonical)
+  if (granted === null) return { ok: false, text: '目录授权失败,没有读取任何项目外文件' }
+  return {
+    ok: true,
+    text: `用户已允许本次运行读取:${granted.path}\nrootId=${granted.rootId};后续调用 list_files/read_file/search_content 时带这个 rootId,路径只写根内相对路径。`,
+    hint: '本次运行已允许',
+    rootId: granted.rootId
+  }
 }
 
 /**
@@ -1156,6 +1214,7 @@ function sendAgentDelta(event: IpcMainInvokeEvent, requestId: string, ev: AgentS
   if (ev.reasoning) payload.reasoning = ev.reasoning
   if (ev.stats) payload.stats = ev.stats
   if (ev.reset) payload.reset = true
+  if (ev.seal) payload.seal = true
   event.sender.send('atlas:ai-delta', payload)
   // 引擎肯报账,状态条的「忙」就跟着报数(和普通聊天同一待遇)
   if (ev.stats) announceActivityBusy(lastActivityProvider, ev.stats)
@@ -1212,13 +1271,25 @@ async function runAgentChat(input: {
   if (engineNoTools) {
     sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
   }
-  // 人设后面垫翻文件守则:教它何时动手、动手几次、答话照旧说人话;
+  // 人设后面垫翻文件切片(prompts.ts 的逐字稿):教它现在有什么手脚;
   // 联网查证开着再垫一段上网守则(模型这才知道有 web_search)。拆除兜底认同一把尺子,别拆岔了
-  const addendum = input.webSearchEnabled ? `${AGENT_ADDENDUM}${AGENT_WEB_ADDENDUM}` : AGENT_ADDENDUM
+  // (旧 AGENT_ADDENDUM 自带开头的 \n\n,新切片没带 —— 在这里拼进去,摘除时 endsWith+slice 连分隔符一起裁)
+  const addendum = `\n\n${AGENT_FILES_ADDENDUM}${input.webSearchEnabled ? AGENT_WEB_ADDENDUM : ''}`
   const systemIdx = messages.findIndex((m) => m.role === 'system')
-  if (!engineNoTools && systemIdx >= 0) messages[systemIdx] = { role: 'system', content: `${(messages[systemIdx] as { content: string }).content}${addendum}` }
+  if (systemIdx >= 0) {
+    const sysContent = (messages[systemIdx] as { content: string }).content
+    // 黑名单引擎也得给句准话:agent 底座(buildChatSystem({agent:true}))里没有「没手脚」切片,
+    // 什么都不垫,模型会照旧吹自己翻过项目 —— 改垫无工具切片,明说本轮没有翻文件能力
+    messages[systemIdx] = {
+      role: 'system',
+      content: engineNoTools ? `${sysContent}\n\n${SLICE_NO_TOOLS}` : `${sysContent}${addendum}`
+    }
+  }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
+  // 提醒卡门槛和质检闸前置的共同账本:本场实际执行成功的工具调用次数
+  // (参数不合法被拒、防打转被拦的都不算 —— 没真翻过就别拿提醒卡烦它)
+  let toolCallsExecuted = 0
   // 质检闸的账本:本场真执行过 search_content 没有、搜到的文件路径(答案引用对账用)、
   // 已经拦了几次(封顶两次,掰不过来就随它交卷)
   let searchUsed = false
@@ -1229,6 +1300,11 @@ async function runAgentChat(input: {
   const promptBudget = agentPromptBudget(ctx, replyCap)
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
+  // 封板账(第一百五十一锤):中间轮的话一旦封成独立气泡,思考过程也按轮各归各 ——
+  // 早轮的思考已经随流躺在各自封口气泡里,结果里只回最后一轮的;没封过板照旧回全场总账
+  let lastRoundReasoning: string | undefined
+  let sealedAny = false
+  const resultReasoning = (): string | undefined => (sealedAny ? lastRoundReasoning : reasoningAll)
   let rounds = 0
   // 兜底降级后的重答轮不算「轮数烧完」,别把逼卷令也塞进去
   let skipNudgeOnce = false
@@ -1240,7 +1316,7 @@ async function runAgentChat(input: {
   let slimRetried = false
   addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
   for (;;) {
-    if (signal.aborted) return agentResult(input, 'cancelled', '', usage, reasoningAll)
+    if (signal.aborted) return agentResult(input, 'cancelled', '', usage, resultReasoning())
     // 锅快满了先腾地方(第一百三十八锤):早先翻看的大段原文提炼成占位纸条,
     // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
     const compressed = compressAgentMessages(messages, promptBudget)
@@ -1264,8 +1340,12 @@ async function runAgentChat(input: {
       allowThinking,
       useTools,
       webSearchEnabled: input.webSearchEnabled,
-      onDelta: (ev) => sendAgentDelta(event, requestId, ev)
+      onDelta: (ev) => {
+        if (ev.seal) sealedAny = true
+        sendAgentDelta(event, requestId, ev)
+      }
     })
+    lastRoundReasoning = round.status === 'ok' ? round.reasoning : undefined
     if (round.status !== 'ok') {
       // 复读机兜底(第一百四十三锤):流式尾巴连着打转 —— agentRound 已发 reset 令收回
       // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
@@ -1279,10 +1359,10 @@ async function runAgentChat(input: {
         }
         const text = (truncateAtRepetition(round.text) ?? round.text).trim()
         if (text === '') {
-          return agentResult(input, 'error', '模型连着两回都说到一半原地打转 —— 换个问法重新问问看', usage, reasoningAll)
+          return agentResult(input, 'error', '模型连着两回都说到一半原地打转 —— 换个问法重新问问看', usage, resultReasoning())
         }
         sendAgentStep(event, requestId, '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你')
-        return agentResult(input, 'supported', text, usage, reasoningAll)
+        return agentResult(input, 'supported', text, usage, resultReasoning())
       }
       // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
       // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
@@ -1293,11 +1373,13 @@ async function runAgentChat(input: {
         skipNudgeOnce = true
         sendAgentStep(event, requestId, '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型')
         const sysIdx = messages.findIndex((m) => m.role === 'system')
-        if (sysIdx >= 0 && (messages[sysIdx] as { content: string }).content.endsWith(addendum)) {
-          messages[sysIdx] = {
-            role: 'system',
-            content: (messages[sysIdx] as { content: string }).content.slice(0, -addendum.length)
-          }
+        if (sysIdx >= 0) {
+          let sysContent = (messages[sysIdx] as { content: string }).content
+          if (sysContent.endsWith(addendum)) sysContent = sysContent.slice(0, -addendum.length)
+          // 切片摘走后,人设里什么能力声明都没剩 —— 补一段「没手脚」切片,别让它空口吹翻过项目。
+          // includes 保险:起手黑名单分支理论上和这里互斥,但万一已经垫过就不重复加
+          if (!sysContent.includes(SLICE_NO_TOOLS)) sysContent = `${sysContent}\n\n${SLICE_NO_TOOLS}`
+          messages[sysIdx] = { role: 'system', content: sysContent }
         }
         continue
       }
@@ -1330,7 +1412,7 @@ async function runAgentChat(input: {
           continue
         }
       }
-      return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, reasoningAll)
+      return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, resultReasoning())
     }
     usage = mergeUsage(usage, round.usage)
     if (round.reasoning) reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
@@ -1349,13 +1431,15 @@ async function runAgentChat(input: {
     if (calls.length === 0 || !useTools) {
       const text = (raw.content ?? '').trim()
       if (text === '') {
-        return agentResult(input, 'error', '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试', usage, reasoningAll)
+        return agentResult(input, 'error', '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试', usage, resultReasoning())
       }
       // 质检闸(救敷衍):找位置题的答案交卷前过两道判据 —— 一次文件都没搜过(逼它先搜)、
       // 搜到了东西却一个具体文件都不引用(逼它把文件写进答案,答案里可点跳转的链接全靠这个)。
       // 拦下重答(先收回已吐的字再垫补救提醒),封顶两次,掰不过来就随它交卷,不无限跟它耗;
       // 轮数已烧完的逼卷轮不拦 —— 那轮它没工具可调,拦了也白拦
-      if (useTools && salvageNudges < SALVAGE_NUDGE_MAX && rounds < AGENT_MAX_ROUNDS) {
+      // 前置条件(提示词体系重写第二批):本场一个工具调用都没发生过就直接放行,连 no-search 也不拦 ——
+      // 模型一口答出来的题(概念题、闲聊),质检闸没资格逼它先翻文件
+      if (useTools && toolCallsExecuted > 0 && salvageNudges < SALVAGE_NUDGE_MAX && rounds < AGENT_MAX_ROUNDS) {
         const gap = findAnswerGap({
           isFindQuestion: isFindQuestion(currentQuestion),
           searchUsed,
@@ -1379,47 +1463,84 @@ async function runAgentChat(input: {
         }
       }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
-      return agentResult(input, 'supported', text, usage, reasoningAll)
+      return agentResult(input, 'supported', text, usage, resultReasoning())
     }
     // 工具调用原样回填进对话(服务端要求 assistant 消息和 tool 结果成对出现)
     messages.push(raw)
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
-      const callName = call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' || call.name === 'web_search' ? call.name : null
-      // search 的范围是可选项:不传就搜整个项目;其余工具的 relPath 必填;web_search 不吃路径
-      const relPath = callName === 'web_search' ? '' : callName === 'search_content' && call.args?.relPath === undefined ? '' : sanitizeAgentRelPath(call.args?.relPath)
+      const callName =
+        call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' || call.name === 'request_directory_access' || call.name === 'web_search'
+          ? call.name
+          : null
+      const isFileTool = callName === 'read_file' || callName === 'list_files' || callName === 'search_content'
+      const selectedRoot = isFileTool ? agentDirectoryAccess.resolve(rootPath, call.args?.rootId) : null
+      const relPath =
+        callName === 'web_search' || callName === 'request_directory_access'
+          ? ''
+          : callName === 'search_content' && call.args?.relPath === undefined
+            ? ''
+            : sanitizeAgentRelPath(call.args?.relPath)
       const keyword = callName === 'search_content' && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
       const rawQuery = call.args?.query
+      const requestedPath = callName === 'request_directory_access' ? sanitizeExternalDirectoryPath(call.args?.path) : null
       // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
       const query = callName === 'web_search' ? sanitizeWebQuery(rawQuery) : null
       const queryMissing = callName === 'web_search' && (typeof rawQuery !== 'string' || rawQuery.trim() === '')
-      if (!callName || relPath === null || (callName === 'search_content' && keyword === '') || (callName === 'web_search' && query === null)) {
+      if (
+        !callName ||
+        relPath === null ||
+        (isFileTool && selectedRoot === null) ||
+        (callName === 'search_content' && keyword === '') ||
+        (callName === 'request_directory_access' && requestedPath === null) ||
+        (callName === 'web_search' && query === null)
+      ) {
         const why = !callName
           ? '没有这个工具'
-          : callName === 'web_search'
-            ? queryMissing
-              ? '要给搜索词(query),写概念词、软件名或短的公开问题'
-              : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
-            : callName === 'search_content'
-              ? '要给关键词(keyword),如 500 或 DWELL_MS'
-              : '路径不合法,要用项目内的相对路径'
+          : isFileTool && selectedRoot === null
+            ? '目录编号无效或尚未获准,项目外目录要先申请'
+            : callName === 'request_directory_access'
+              ? '要给用户明确点名的绝对文件夹路径(path)'
+              : callName === 'web_search'
+                ? queryMissing
+                  ? '要给搜索词(query),写概念词、软件名或短的公开问题'
+                  : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
+                : callName === 'search_content'
+                  ? '要给关键词(keyword),如 500 或 DWELL_MS'
+                  : '路径不合法,要用所选根目录内的相对路径'
         const badTarget =
           callName === 'web_search'
             ? String(rawQuery ?? '(没给搜索词)')
-            : String(call.args?.keyword ?? call.args?.relPath ?? '(没给参数)')
+            : callName === 'request_directory_access'
+              ? String(call.args?.path ?? '(没给目录)')
+              : String(call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)')
         sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', badTarget, 'error', why))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: `参数不合法:${why}。路径要用项目内的相对路径(如 src/index.ts),根目录传空字符串` })
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: `参数不合法:${why}` })
         continue
       }
       // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
+      const rootKey = selectedRoot?.rootId ?? ''
       const key =
         callName === 'search_content'
-          ? toolCallKey(callName, `${relPath}#${keyword}`)
+          ? toolCallKey(callName, `${rootKey}:${relPath}#${keyword}`)
           : callName === 'web_search'
             ? toolCallKey(callName, query ?? '')
-            : toolCallKey(callName, relPath)
-      const stepTarget = callName === 'search_content' ? keyword : callName === 'web_search' ? (query ?? '') : relPath === '' ? '(项目根目录)' : relPath
+            : callName === 'request_directory_access'
+              ? toolCallKey(callName, requestedPath ?? '')
+              : toolCallKey(callName, `${rootKey}:${relPath}`)
+      const stepTarget =
+        callName === 'search_content'
+          ? keyword
+          : callName === 'web_search'
+            ? (query ?? '')
+            : callName === 'request_directory_access'
+              ? (requestedPath ?? '')
+              : relPath === ''
+                ? selectedRoot?.external
+                  ? selectedRoot.path
+                  : '(项目根目录)'
+                : relPath
       if (doneCalls.has(key)) {
         sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
         toolResults.push({ role: 'tool', tool_call_id: call.id, content: REPEAT_NUDGE })
@@ -1429,18 +1550,22 @@ async function runAgentChat(input: {
       if (callName === 'search_content') searchUsed = true // 质检闸的账:真发起过搜索才算搜过
       callIdToKey.set(call.id, key)
       // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
-      const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean } =
-        callName === 'list_files'
-          ? await agentListFiles(rootPath, relPath)
-          : callName === 'search_content'
-            ? await agentSearchContent(rootPath, relPath, keyword)
-            : callName === 'web_search'
-              ? await agentWebSearch(query ?? '', input.tavilyKey)
-              : await agentReadFile(rootPath, relPath, readChars)
+      const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean; rootId?: string } =
+        callName === 'request_directory_access'
+          ? await agentRequestDirectoryAccess(event, requestedPath)
+          : callName === 'list_files'
+            ? await agentListFiles((selectedRoot as { path: string }).path, relPath)
+            : callName === 'search_content'
+              ? await agentSearchContent((selectedRoot as { path: string }).path, relPath, keyword)
+              : callName === 'web_search'
+                ? await agentWebSearch(query ?? '', input.tavilyKey)
+                : await agentReadFile((selectedRoot as { path: string }).path, relPath, readChars)
+      if (exec.ok && selectedRoot?.external) exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
+      if (exec.ok && callName !== 'request_directory_access') toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
-      if (callName === 'search_content' && exec.ok && exec.matches && exec.matches.length > 0) {
+      if (callName === 'search_content' && !selectedRoot?.external && exec.ok && exec.matches && exec.matches.length > 0) {
         sendAgentMatches(event, requestId, { keyword, items: exec.matches, truncated: exec.matchesTruncated === true })
         // 质检闸的对账本:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
         for (const m of exec.matches) searchHitPaths.add(m.relPath)
@@ -1449,9 +1574,13 @@ async function runAgentChat(input: {
     }
     messages.push(...toolResults)
     // 每轮工具结果后垫提醒卡(LLM 优化锤):撤掉上一张再垫新的,对话里永远只挂
-    // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事
+    // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事。
+    // 缰绳门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
+    // 资料还少的头几轮垫卡只会稀释注意力;撤卡照旧每轮先撤,保证不攒
     messages.splice(0, messages.length, ...stripLastAgentReminder(messages))
-    messages.push({ role: 'user', content: buildAgentReminder(currentQuestion) })
+    if (toolCallsExecuted >= AGENT_REMINDER_MIN_TOOL_CALLS) {
+      messages.push({ role: 'user', content: buildAgentReminder(currentQuestion) })
+    }
     addDevLog('request', `翻文件第 ${rounds} 轮:模型要看 ${calls.length} 样东西`)
   }
 }
@@ -2041,11 +2170,15 @@ function registerIpc(): void {
         })
         const structure = await analyzeSource(code, languageId)
         if (structure) {
+          // 「详细」档喂源码(提示词体系重写第二批):锅够大才喂 —— 锅小 deep 已被降成 brief,
+          // 那时节选照老规矩不垫;源码刚读过就在手边,截到 deepSourceChars(ctx) 字,读不到就静默不给
+          const sourceExcerpt =
+            resolved.teaching === 'deep' && resolved.ctx >= TEACHING_DEEP_MIN_CTX ? code.slice(0, deepSourceChars(resolved.ctx)) : null
           return respondWithEvidence(
             event,
             requestId,
             question,
-            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null, note: ownerNote, headerComment: extractHeaderComment(code) }),
+            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null, note: ownerNote, headerComment: extractHeaderComment(code), sourceExcerpt }),
             undefined,
             resolved
             // 结构流证据够硬(真代码结构),不掺联网查证
@@ -2074,7 +2207,7 @@ function registerIpc(): void {
           requestId,
           question,
           buildBinaryPrompt({ relPath, name, typeInfo, sizeText: formatSize(stat.size) }),
-          GUESS_SYSTEM_PROMPT,
+          buildExplainSystem(effectiveTeaching(resolved).teaching, 'guess'),
           resolved,
           name
         )
@@ -2085,7 +2218,7 @@ function registerIpc(): void {
         requestId,
         question,
         buildGuessPrompt({ relPath, name, absPath, languageName, preview, note: ownerNote }),
-        GUESS_SYSTEM_PROMPT,
+        buildExplainSystem(effectiveTeaching(resolved).teaching, 'guess'),
         resolved,
         name
       )
@@ -2155,7 +2288,7 @@ function registerIpc(): void {
         languages: Object.fromEntries(languages),
         extCounts: Object.fromEntries(extCounts)
       }),
-      FOLDER_SYSTEM_PROMPT,
+      buildExplainSystem(effectiveTeaching(resolved).teaching, 'folder'),
       resolved,
       folderName
     )
@@ -2214,7 +2347,8 @@ function registerIpc(): void {
     }
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
-    const systemPrompt = withPersonalization(FREE_CHAT_SYSTEM_PROMPT, resolved.style)
+    // 闲聊底座 = 内核 + 聊天切片;翻文件开着时无工具切片不挂(翻文件切片由 agent 路自己追加)
+    const systemPrompt = withPersonalization(buildChatSystem({ agent: body.agent === true }), resolved.style)
     // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
     const cap = thinking ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS : resolved.budgets.replyTokens
     // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
@@ -2230,7 +2364,7 @@ function registerIpc(): void {
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
     // 手动压缩的早前对话摘要(第一百四十二锤):/compact 之后每次请求都带,垫在历史前面当背景记忆
     const summary = sanitizeCompactSummary(body.summary)
-    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs, summary)
+    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs, resolved.teaching, summary)
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (body.agent === true) {
@@ -2280,7 +2414,7 @@ function registerIpc(): void {
       // 只兜一次,再爆就照实给指路话,不跟它无限耗
       if (res.status === 'error' && isContextOverflow(res.text)) {
         sendResetDelta(event, requestId)
-        const slimMessages = buildFreeChatMessages(systemPrompt, attachment, history.slice(-2), questionText2, webMaterial, codeRefs, summary)
+        const slimMessages = buildFreeChatMessages(systemPrompt, attachment, history.slice(-2), questionText2, webMaterial, codeRefs, resolved.teaching, summary)
         res = await explainWithMessages(resolved.target, slimMessages, makeDeltaSender(event, requestId), aborter.signal, cap, streamOpts)
         if (res.status === 'error' && isContextOverflow(res.text)) {
           res = {

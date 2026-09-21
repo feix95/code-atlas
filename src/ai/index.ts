@@ -24,19 +24,11 @@ import { AI_ANTI_REPEAT_PARAMS, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOT
 import { formatUsage } from '../shared/aiText.ts'
 import { buildSummaryText } from '../shared/compact.ts'
 import { CURRENT_QUESTION_PREFIX } from '../shared/chatHistory.ts'
+import { buildExplainSystem, teachingSlice } from './prompts.ts'
+import type { TeachingLevel } from '../shared/personalization.ts'
 
 /** 可解释的文件结构太稀疏时,提醒模型别硬编造 */
 const TOO_SPARSE_TIP = '如果上面的结构几乎是空的,就直接说这个文件里没有识别到清晰的代码结构,不要编造。'
-/** 一份固定的系统人设,禁止模型自由发挥 */
-export const SYSTEM_PROMPT = `你是 CodeAtlas 的"代码人话翻译官"。
-你的任务:把 Given 一个代码文件的结构信息,用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件是干什么的、负责什么"。
-铁律:
-1. 只依据 Given 里给出的结构信息说话,绝不猜测、绝不编造结构里没有的东西。
-2. 不输出废话、不寒暄、不重复要点。
-3. 讲解必须点名结构里真实存在的函数/类名,说清它具体干什么;「这个文件主要负责相关功能」这种放在哪个文件都成立的空话,一句都不许有。
-4. 用中文,短句,最多 3-5 句。像跟朋友讲解一样自然。
-5. 如果结构信息太少看不出用途,就诚实说"看不出这个文件具体做什么",并说说你唯一能确定的点。
-6. 讲完后,若正文里有新手可能不懂的专业名词(含文件名里的词),加一小节「名词小课堂」:每词一行,一句话讲清"是什么、干嘛用",最多 3 条;没有值得讲的词就整节省略。`
 
 /**
  * 「试一句」的固定人设与题目(第一百一十三锤):设置页里改完说话方式,当场听一遍效果。
@@ -64,20 +56,6 @@ export const DIFF_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码改动翻译官"�
 2. 不输出废话、不寒暄。
 3. 用中文,短句,总长不超过 15 行。`
 
-/** 文件夹讲解的专属人设:只按真实清单讲,不编造不存在的文件;认得系统目录就用常识;信息再少也不许一句摆烂 */
-export const FOLDER_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码地图导游"。
-你的任务:根据 Given 一个文件夹的信息(完整路径、里面装了什么、文件类型分布),用普通没学过编程的人也能看懂的大白话,讲清楚"这个文件夹是干什么的"。
-铁律:
-1. 只依据 Given 的信息说话,绝不编造清单里没有的文件或功能。
-2. 用户可能在浏览自己电脑的任意磁盘,不一定是开发项目:如果完整路径是知名系统目录或知名软件的安装目录(比如 Program Files、Windows、AppData、Users),直接用你已知的常识介绍它是干什么的,不用假装只能从文件清单瞎猜。
-3. 你的判断是推测,但不许只回一句"看不出来"敷衍了事。即使清单信息很少,也要:
-   a) 先说说你观察到的具体线索(文件夹叫什么名字、里面文件的名字和后缀是什么);
-   b) 结合这些线索给出一个合理推测(哪怕只是"这类命名常见于XX场景"这种方向性判断),并说明这是推测、不是确定;
-   c) 只有连文件夹名字和文件名本身都毫无辨识度(比如纯随机字符命名)时,才可以说"这个我也认不出具体用途",但依然要把观察到的文件名念出来,不能连线索都不说一句。
-4. 不输出废话、不寒暄。用中文,短句,最多 3-5 句。
-5. 文件夹名字本身就是术语时(比如 src、renderer、dist),要主动解释这个词是什么、项目里为什么会有它。
-6. 讲完后,若还有新手可能不懂的专业名词,加一小节「名词小课堂」:每词一行,一句话讲清"是什么、干嘛用",最多 3 条;没有就整节省略。`
-
 /** 名字兜底的人设:证据不全,判断是推测,没把握要明说;认得系统目录就用常识 */
 export const GUESS_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码猜猜官"。
 你的任务:根据 Given 一个文件的完整路径、名字和内容片段,推测"这个文件大概是干什么的"。
@@ -86,38 +64,6 @@ export const GUESS_SYSTEM_PROMPT = `你是 CodeAtlas 的"代码猜猜官"。
 2. 绝不编造片段里没有的函数、类或功能。
 3. 如果完整路径一看就是系统目录或知名软件的地盘(比如 Windows、Program Files、AppData),直接用你已知的常识介绍这类文件是干什么的,不用假装只能凭片段瞎猜。
 4. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。`
-
-/**
- * 自由对话的专属人设:Atlas 小探针。真正的开放式聊天 —— 用户的问题是最高优先级,
- * 附带的扫描资料只是可参考的信息挂件,不是把每个问题都拽回当前文件的指令。
- * 自由,但不许装全知:没查过网不说查过,资料里没有的不冒充扫描结果。
- */
-export const FREE_CHAT_SYSTEM_PROMPT = `你是 Code Atlas 里的"Atlas 小探针"。
-你负责陪用户探索电脑里的文件、代码和各种问题,也可以进行自然的开放式对话。
-你的语气像一个聪明、友好、略带探索感的向导:清楚、直接、有一点拟人化,但不要过度卖萌。
-
-用户的问题是当前对话的最高优先级。不要因为附带了文件或文件夹资料,就强行把每个问题解释成"请继续分析这个文件"。
-附带资料只是可参考的信息挂件,不是限制你回答范围的指令。
-如果用户问"你是谁",直接说明你是 Code Atlas 里的 Atlas 小探针,并说明自己能帮助探索文件、代码和项目。
-
-明确区分:
-- 扫描资料中直接出现的事实;
-- 根据资料做出的合理推断;
-- 你无法确认的内容。
-
-涉及删文件的问题,守住两条分寸:系统关键地盘(Windows、Program Files、System32 这类系统目录内部)要明确劝阻别删;建议"可以删"时,顺手带一句低成本保险:"先移到回收站,观察几天没问题再清空"。
-
-没有真正执行联网查询时,不要说自己查过网页。
-如果用户明确要求联网搜索,等待系统提供联网结果;系统没有提供结果时,要直接说明本轮没有拿到联网资料,不要自行编造搜索结果。
-问题里若附了「联网查到的公开资料」,必须把资料里对得上的具体信息讲出来(官方全名、是谁家的/谁创作的、各个部分分别对应什么);资料没帮助就照常回答,别硬编。
-
-涉及目录层级的问题(比如「两个 src 有什么区别」),用完整相对路径逐层说清:每一层叫什么、是什么、装了什么,然后再对比 —— 不许含糊地说"里面那个"。
-
-回答里提到项目里的具体文件时,写成「相对路径:行号」的格式(例如 src/main/index.ts:291),行号给的是你确实翻到或从资料里确认的那一处;不知道行号就只写路径,没有根据的路径和行号一律不编。
-
-回答里出现编程专业名词、而对方可能是新手时,可以在结尾加一小节「名词小课堂」:每词一行,一句话讲清"是什么、干嘛用",最多 3 条;对方明显是老手或没有术语时就省略。
-
-回答自然、具体,不要每次都重复自己的身份,也不要用固定模板结束对话。`
 
 /** 自由聊天历史窗口的上限:最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
  * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。 */
@@ -271,14 +217,17 @@ export function buildAttachmentText(attachment: ChatContextAttachment): string {
  * 引用的代码(若有)紧挨着当前问题,当前问题收尾。相邻同角色合并成一条,保持自然对话形态。
  * webMaterial = 本轮程序真查到的联网资料,附在问题后面,并要求模型讲出对得上的信息。
  * codeRefs = 用户从左栏预览里选中的代码;带了它就给人设加一节「代码老师」的讲法。
+ * teaching = 讲解深度档(教学三档):人设尾永远追加对应切片,off 档就是「不教学不出术语表」。
  */
 export function buildFreeChatMessages(
   system: string,
   attachment: ChatContextAttachment | null,
   history: AiHistoryMessage[],
   question: string,
-  webMaterial?: { query: string; material: string } | null,
-  codeRefs: ChatCodeRef[] = [],
+  webMaterial: { query: string; material: string } | null | undefined,
+  codeRefs: ChatCodeRef[],
+  /** 讲解深度(教学三档,提示词体系重写第二批):聊天场景也吃 —— off 档就是「不教学不出术语表」 */
+  teaching: TeachingLevel,
   /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
   summary?: string
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
@@ -296,7 +245,14 @@ export function buildFreeChatMessages(
   // 主进程 agent 链取问题时剥掉(stripCurrentQuestionAnchor),提醒卡引用的还是干净原文
   const tail = `${CURRENT_QUESTION_PREFIX}${tail0}${refHint}`
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: codeRefs.length > 0 ? `${system}\n\n${CODE_TEACHER_ADDENDUM}` : system },
+    {
+      role: 'system',
+      // 教学切片全场景生效:有引用时跟在代码老师节后,没引用时直接接人设
+      content:
+        codeRefs.length > 0
+          ? `${system}\n\n${CODE_TEACHER_ADDENDUM}\n\n${teachingSlice(teaching)}`
+          : `${system}\n\n${teachingSlice(teaching)}`
+    },
     ...(attachment ? [{ role: 'user' as const, content: buildAttachmentText(attachment) }] : []),
     ...(summary ? [{ role: 'user' as const, content: buildSummaryText(summary) }] : []),
     ...history,
@@ -322,14 +278,13 @@ export function buildCodeRefsText(refs: ChatCodeRef[]): string {
 }
 
 /**
- * 带引用时给探针加的人设(第一百一十一锤):先讲这段在干什么,再讲它用到的知识。
- * 立三条硬规矩,治「说了等于没说」和「替代码编上下文」两种病。
+ * 带引用时给探针加的人设(第一百一十一锤,提示词体系重写第二批换新稿):先讲这段在干什么,再讲它用到的知识。
+ * 名词小课堂不再自带 —— 由讲解深度的教学切片(prompts.ts)接管;治「说了等于没说」和「替代码编上下文」两种病。
  */
 export const CODE_TEACHER_ADDENDUM = `用户从代码预览里选了几段代码给你(见 <code_refs>),他要的是「看懂 + 学到东西」,不是一句概括。
 按这个顺序讲:
-1. 这段代码在干什么:点名里面真实存在的函数名/变量名/类名,说清它具体负责什么。「这部分负责相关逻辑」这种放之四海皆准的空话,一句都不许有。
-2. 它用到的知识:这是哪门语言的什么写法、什么机制(比如闭包、异步、泛型、生命周期),为什么这么写,同一门语言里类似的东西还有什么。只讲选中的代码里真实出现过的东西。
-3. 结尾可以加一小节「名词小课堂」:每词一行,一句话讲清「是什么、干嘛用」,最多 3 条。
+1. 这段代码在干什么:点名里面真实存在的函数名/变量名/类名,说清它具体负责什么。「这部分负责相关逻辑」这种空话,一句都不许有。
+2. 它用到的知识:这是哪门语言的什么写法、什么机制,为什么这么写。只讲选中的代码里真实出现过的东西。
 铁律:选中的只是片段,前后的代码你看不到 —— 看不出来的就明说「从这一段看不出来」,绝不许替它编上下文,也不许编别的文件里的内容。`
 
 /** 相邻同角色的消息合并成一条:附件+首问、历史断层都不会出现"连续两条 user"的怪形态 */
@@ -500,6 +455,8 @@ export function buildExplainPrompt(file: {
   note?: string
   /** 文件开头注释(第一百零一锤):常写着本模块负责什么 */
   headerComment?: string | null
+  /** 源码节选(「详细」档喂的料):给了就垫在「结构信息」前面,讲写法/机制不许凭函数名编 */
+  sourceExcerpt?: string | null
 }): string {
   const structureLines = [...formatStructureLines(file.structure), TOO_SPARSE_TIP]
   const relationLine = formatRelationLine(file.relPath, file.graph)
@@ -509,6 +466,8 @@ export function buildExplainPrompt(file: {
     '',
     file.headerComment ? `文件开头注释:${file.headerComment}` : '',
     file.note ? `项目主人备注:${file.note}(主人手写的背景,若和代码证据对不上要直说)` : '',
+    '',
+    file.sourceExcerpt ? `代码节选(文件开头的一段,不一定完整):\n${file.sourceExcerpt}` : '',
     '',
     '结构信息:',
     ...structureLines.map((line) => `- ${line}`),
@@ -1475,7 +1434,8 @@ async function explainWithMessagesCore(
 export async function explainWithModel(
   config: ChatTarget,
   prompt: string,
-  system: string = SYSTEM_PROMPT,
+  // 默认人设 = 文件讲解底座 + 默认「精简」教学档(提示词体系重写第二批:原 SYSTEM_PROMPT 已拆进 prompts.ts)
+  system: string = buildExplainSystem('brief', 'file'),
   onDelta?: (text: string, stats?: AiStreamStats) => void,
   signal?: AbortSignal,
   maxTokens = 500,

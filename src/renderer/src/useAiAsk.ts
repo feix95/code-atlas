@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import type { AiExplainResult } from '@shared/types'
+import { TeachingContext } from './aiSetupContext'
 import { friendlyErr } from './errText'
 
 /**
@@ -54,6 +55,17 @@ export function useAiAsk(send: AiSendFn): {
       if (idRef.current) void window.atlas.aiCancel(idRef.current)
     }
   }, [])
+
+  // 档位换人,旧讲解作废(提示词体系重写第二批):讲解深度变了,旧讲解是按旧档讲的,
+  // 留着会让人以为开关没生效 —— 掐掉在跑的请求、清掉旧记录,下次提问按新档讲
+  const teaching = useContext(TeachingContext)
+  const prevTeachingRef = useRef(teaching)
+  useEffect(() => {
+    if (prevTeachingRef.current === teaching) return // 首次挂载不算换档
+    prevTeachingRef.current = teaching
+    cancel()
+    setTurns([])
+  }, [teaching])
 
   function ask(question?: string | null): void {
     if (busyRef.current) return // 请求中不许重复发起
