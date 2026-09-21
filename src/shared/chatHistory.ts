@@ -12,16 +12,25 @@ import type { AiHistoryMessage } from './types.ts'
 export const FREE_CHAT_HISTORY_MAX = 8
 
 /**
- * 当前问题的注意力锚(答旧题修复·刀三):历史洗干净后,旧问题都是干净短句,
- * 当前问题后面却粘着联网资料、参考资料指路话 —— 小模型按「长得最像待答问题」作答
- * 就会偏。给当前问题钉一块显式标牌;主进程 agent 链取问题时用 stripCurrentQuestionAnchor 剥掉。
+ * 当前问题的注意力锚(答旧题修复·刀三,2.0 换成 XML 包裹):历史洗干净后,旧问题都是
+ * 干净短句,当前问题后面却粘着联网资料、参考资料指路话 —— 小模型按「长得最像待答问题」
+ * 作答就会偏。给当前问题包一对 <current_question> 标签;早前问答都只是历史背景。
+ * 主进程 agent 链取问题时用 stripCurrentQuestionAnchor 剥掉这对标签。
  */
-export const CURRENT_QUESTION_PREFIX = '(用户本轮提出的新问题,回答以下这条;早前问答都只是历史背景)\n'
+export const CURRENT_QUESTION_PREFIX = '<current_question>\n'
+export const CURRENT_QUESTION_SUFFIX = '\n</current_question>'
 
-/** 剥掉注意力锚:agent 工具轮的提醒卡要引用干净的问题原文,别把标牌一起带上 */
+/**
+ * 剥掉注意力锚:agent 工具轮的提醒卡要引用干净的问题原文,别把标签一起带上。
+ * 闭合标签后面还粘着联网资料、参考资料指路话 —— 那些是垫给模型的上下文,不是问题本体,
+ * 一见到闭合标签就收刀。
+ */
 export function stripCurrentQuestionAnchor(text: string): string {
-  if (!text.startsWith(CURRENT_QUESTION_PREFIX)) return text
-  return text.slice(CURRENT_QUESTION_PREFIX.length).replace(/^\s+/, '')
+  let out = text
+  if (out.startsWith(CURRENT_QUESTION_PREFIX)) out = out.slice(CURRENT_QUESTION_PREFIX.length)
+  const closeIdx = out.indexOf('</current_question>')
+  if (closeIdx >= 0) out = out.slice(0, closeIdx)
+  return out.replace(/^\s+/, '').replace(/\s+$/, '')
 }
 
 /** 成对收集认的最小形状:渲染层的 ChatMessage 天然满足,自测传裸对象也行 */

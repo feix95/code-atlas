@@ -5,7 +5,6 @@ import {
   buildPersonalizationPrompt,
   CUSTOM_MAX,
   DEFAULT_PERSONALIZATION,
-  HONESTY_TAIL,
   sanitizePersonalization,
   TEACHING_OPTIONS,
   TONE_OPTIONS,
@@ -22,16 +21,16 @@ function main(): void {
   // ── 1. 默认档不垫语气(第一百五十一锤小葵定):全默认时风格段是空串,人设一字不加 ──
   assert.equal(buildPersonalizationPrompt(DEFAULT_PERSONALIZATION), '', '全默认 = 空风格段:不垫语气人设,模型原汁原味')
   assert.equal(withPersonalization('人设在此', ''), '人设在此', '没有风格段时人设逐字不变')
-  assert.ok(!withPersonalization('人设在此', '').includes(HONESTY_TAIL), '没个性化就不该多一句铁律尾')
   const defaultWithCustom = buildPersonalizationPrompt(withPatch({ custom: '叫我小葵' }))
   assert.ok(defaultWithCustom.includes('叫我小葵'), '默认语气 + 自订指令:风格段照常成段')
+  assert.ok(defaultWithCustom.includes('<style_preference>') && defaultWithCustom.includes('<custom_request>'), '风格段和自订指令都要包 XML 标签(2.0)')
   assert.ok(!defaultWithCustom.includes('温暖'), '默认档不该漏出任何语气人设句')
 
   // ── 2. 语气:默认档空着,三档人设各说各的话,互不串味 ──
   for (const opt of TONE_OPTIONS) {
     const text = buildPersonalizationPrompt(withPatch({ tone: opt.key }))
     if (opt.key === 'default') assert.equal(text, '', '默认档 = 不垫语气')
-    else assert.ok(text.includes('【这个用户偏好的说话方式】'), `语气「${opt.label}」要成段`)
+    else assert.ok(text.includes('<style_preference>'), `语气「${opt.label}」要成段(2.0 起包 style_preference 标签)`)
   }
   // 语气三档的新稿(提示词体系重写第二批,逐字稿 J):各认各的招牌词,互不串味
   const friendly = buildPersonalizationPrompt(withPatch({ tone: 'friendly' }))
@@ -57,17 +56,20 @@ function main(): void {
   assert.ok(longCustom.includes('很'.repeat(CUSTOM_MAX)), '该收的字一个不少')
   assert.ok(!longCustom.includes('很'.repeat(CUSTOM_MAX + 1)), '超长的部分要裁掉')
 
-  // ── 4. 顺序就是优先级:人设 → 风格 → 铁律尾(自订指令也在铁律尾前面)──
+  // ── 4. 顺序就是结构:人设 → 风格段(<style_preference> 里语气在前、自订指令在后、收尾划线)──
+  // 2.0 换了内核:旧铁律尾引用的「不编造/不假装干过活」已不在内核,尾巴整个删掉;
+  // 风格段收尾改垫一句「以上只改你说话的方式」,把自订指令的权力圈回说话方式上
   const styled = withPersonalization('人设在此', buildPersonalizationPrompt(withPatch({ tone: 'friendly', custom: '叫我小葵' })))
   assert.ok(styled.startsWith('人设在此'), '人设永远在最前面')
   assert.ok(styled.indexOf('温暖') < styled.indexOf('叫我小葵'), '语气排在自订指令之前')
-  assert.ok(styled.indexOf('叫我小葵') < styled.indexOf(HONESTY_TAIL), '铁律尾排在自订指令之后 —— 顺序就是优先级')
-  assert.ok(HONESTY_TAIL.includes('不编造') && HONESTY_TAIL.includes('不假装干过活'), '铁律尾新稿必须点到「不编造」和「不假装干过活」')
+  assert.ok(styled.indexOf('<custom_request>') < styled.indexOf('以上只改你说话的方式'), '自订指令之后要跟收尾划线')
+  assert.ok(styled.endsWith('</style_preference>'), '风格段闭合标签收尾')
+  assert.ok(!styled.includes('«') && !styled.includes('»'), '旧的 «» 包裹不许残留(2.0 全换 XML)')
 
   // 风格段和讲法是两路(提示词体系重写第二批):讲解深度不住进风格段 ——
   // 教学切片在 prompts.ts,换 teaching 不该往 withPersonalization 的输出里漏教学文本
   const deepStyled = withPersonalization('人设在此', buildPersonalizationPrompt(withPatch({ teaching: 'deep' })))
-  assert.ok(!deepStyled.includes('【讲法】') && !deepStyled.includes('名词小课堂'), 'teaching 非 brief 时风格段也不掺教学文本')
+  assert.ok(!deepStyled.includes('<teaching_style>') && !deepStyled.includes('名词小课堂'), 'teaching 非 brief 时风格段也不掺教学文本')
 
   // ── 5. 读档清洗:脏数据一律回默认 ──
   assert.deepEqual(sanitizePersonalization(null), DEFAULT_PERSONALIZATION, 'null 回默认')

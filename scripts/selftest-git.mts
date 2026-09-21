@@ -144,14 +144,14 @@ async function main(): Promise<void> {
     assert.ok(diffA, 'a.ts 应能取到 diff')
     assert.ok(diffA.diff.includes('-line2'), '应含被删的行')
     assert.ok(diffA.diff.includes('+line2-改'), '应含新增的行')
-    assert.ok(diffA.diff.includes('工作区'), '未暂存改动应标「工作区」')
-    assert.ok(!diffA.diff.includes('暂存区'), '不应混入暂存区标记')
+    assert.ok(diffA.diff.includes('<unstaged_changes>'), '未暂存改动应标 <unstaged_changes>')
+    assert.ok(!diffA.diff.includes('<staged_changes>'), '不应混入暂存区标记')
 
     const diffB = await getChangeDiff(root, b)
-    assert.ok(diffB && diffB.diff.includes('+delta 新') && diffB.diff.includes('暂存区'), '已暂存改动应标「暂存区」')
+    assert.ok(diffB && diffB.diff.includes('+delta 新') && diffB.diff.includes('<staged_changes>'), '已暂存改动应标 <staged_changes>')
 
     const diffC = await getChangeDiff(root, c)
-    assert.ok(diffC && diffC.diff.includes('brand new file') && diffC.diff.includes('新文件'), '新文件应读全部内容当新增')
+    assert.ok(diffC && diffC.diff.includes('brand new file') && diffC.diff.includes('<new_file>'), '新文件应读全部内容当新增')
 
     const diffE = await getChangeDiff(root, e)
     assert.ok(diffE && diffE.diff.includes('-goodbye'), '删除文件应显示被删内容')
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
       config,
       [
         { role: 'system', content: REPORT_SYSTEM_PROMPT },
-        { role: 'user', content: 'Given:一轮代码改动的完整账本。' }
+        { role: 'user', content: '<change_log>\n一轮代码改动的完整账本。\n</change_log>' }
       ],
       undefined,
       undefined,

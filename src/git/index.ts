@@ -192,23 +192,23 @@ export async function getChangeDiff(rootPath: string, change: GitChange): Promis
     if (!stat || !stat.isFile()) return null
     if (stat.size > NEW_FILE_BYTE_LIMIT) return null
     const content = await fs.readFile(absPath, 'utf8')
-    return clip({ diff: `【新文件,全部内容都是新增】\n${content}`, note: '' })
+    return clip({ diff: `<new_file>\n新文件,以下全部内容都是新增:\n\n${content}\n</new_file>`, note: '' })
   }
 
   const sections: string[] = []
   if (change.staged) {
     const staged = await runGit(rootPath, ['diff', '--no-color', '--cached', '--', change.relPath]).catch(() => '')
-    if (staged.trim()) sections.push(`【暂存区里的改动(已 git add)】\n${staged}`)
+    if (staged.trim()) sections.push(`<staged_changes>\n${staged}\n</staged_changes>`)
   }
   const unstaged = await runGit(rootPath, ['diff', '--no-color', '--', change.relPath]).catch(() => '')
-  if (unstaged.trim()) sections.push(`【工作区里的改动(还没 git add)】\n${unstaged}`)
+  if (unstaged.trim()) sections.push(`<unstaged_changes>\n${unstaged}\n</unstaged_changes>`)
 
   return clip({ diff: sections.join('\n\n'), note: '' })
 }
 
 function clip(result: ChangeDiff): ChangeDiff | null {
   if (result.diff.length <= DIFF_CHAR_LIMIT) return result
-  return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……(改动太大,只取了前面一部分)`, note: '改动太大,已截断' }
+  return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……<program_note>改动太大,只取了前面一部分</program_note>`, note: '改动太大,已截断' }
 }
 
 /**

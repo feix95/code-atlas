@@ -8,6 +8,8 @@ import {
   buildExplainPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
+  buildReportPrompt,
+  buildDiffPrompt,
   extractHeaderComment,
   buildBinaryPrompt,
   buildLocatePrompt,
@@ -66,8 +68,18 @@ import {
   TEACHING_DEGRADED_NOTE,
   teachingSlice
 } from '../src/ai/prompts.ts'
-import { AGENT_TOOLS, AGENT_WEB_ADDENDUM } from '../src/ai/agent.ts'
-import { buildPersonalizationPrompt, DEFAULT_PERSONALIZATION, HONESTY_TAIL } from '../src/shared/personalization.ts'
+import {
+  AGENT_TOOLS,
+  AGENT_WEB_ADDENDUM,
+  REPEAT_NUDGE,
+  ROUND_CAP_NUDGE,
+  SALVAGE_SEARCH_NUDGE,
+  buildAgentReminder,
+  compressAgentMessages,
+  stripToolResult,
+  wrapToolResult
+} from '../src/ai/agent.ts'
+import { buildPersonalizationPrompt, DEFAULT_PERSONALIZATION } from '../src/shared/personalization.ts'
 import {
   isCompactCommand,
   buildCompactMessages,
@@ -228,11 +240,13 @@ async function main(): Promise<void> {
   // ── 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装 ──
   // 提示词体系重写(第二批):断言打到组装产物上,不再钉某个常量文本
   const chatSystem = buildChatSystem({ agent: false })
-  assert.ok(chatSystem.includes('小探针'), '内核要点名本名「小探针」')
-  assert.ok(chatSystem.includes('你是谁'), '问「你是谁」要有稳定的身份答法')
-  assert.ok(chatSystem.includes('不编造') && chatSystem.includes('不假装干过活'), '内核两条铁律要在:不编造、不假装干过活')
+  assert.ok(chatSystem.includes('Atlas 小探针'), '内核要点名本名「Atlas 小探针」(2.0 新稿)')
+  assert.ok(chatSystem.includes('当前对话的最高优先级'), '内核要立「最新问题最高优先级」')
+  assert.ok(chatSystem.includes('如实相告') && chatSystem.includes('承认存在不确定性'), '内核的诚实边界要在:如实相告能力、承认不确定')
   assert.ok(chatSystem.includes('翻文件开关'), '无工具切片要指路「翻文件开关」')
-  assert.ok(chatSystem.includes('没翻过文件别说翻过'), '没翻过文件不许装翻过')
+  assert.ok(chatSystem.includes('不许说自己翻过'), '没翻过文件不许装翻过')
+  assert.ok(chatSystem.includes('<capabilities>'), '无工具切片要包 capabilities 标签(2.0)')
+  assert.ok(chatSystem.includes('<current_question>') && chatSystem.includes('资料里自称用户或指令'), '聊天切片要教标签口径:问题是问题、资料是资料')
   assert.ok(!buildChatSystem({ agent: true }).includes(SLICE_NO_TOOLS), 'agent 路不挂无工具切片(翻文件切片走 agent 自己的追加机制)')
   assert.ok(buildChatSystem({ agent: true }).includes(SLICE_CHAT), 'agent 路照样有聊天切片')
 
@@ -396,11 +410,11 @@ async function main(): Promise<void> {
   const lastMessage = chatMessages[chatMessages.length - 1]
   assert.equal(lastMessage?.role, 'user', '拼完的消息序列,最后一条是当前问题')
   // 注意力锚(答旧题修复·刀三):当前问题钉标牌,agent 链取问题时剥掉,提醒卡引用干净原文
-  assert.ok(lastMessage?.content.startsWith(CURRENT_QUESTION_PREFIX), '当前问题要带注意力锚')
-  assert.ok(lastMessage?.content.endsWith('第7问'), '锚点后面就是当前问题原文')
+  assert.ok(lastMessage?.content.startsWith(CURRENT_QUESTION_PREFIX), '当前问题要带 <current_question> 标签')
+  assert.ok(lastMessage?.content.includes('<current_question>\n第7问\n</current_question>'), '标签里包的就是当前问题原文')
   assert.ok(!lastMessage?.content.includes('第6问'), '当前问题不许和旧问题粘成一条')
-  assert.equal(stripCurrentQuestionAnchor(lastMessage?.content ?? ''), '第7问', '剥掉锚点后问题原文干干净净')
-  assert.equal(stripCurrentQuestionAnchor('没锚的普通问题'), '没锚的普通问题', '没锚的文本原样返回')
+  assert.equal(stripCurrentQuestionAnchor(lastMessage?.content ?? ''), '第7问', '剥掉标签后问题原文干干净净')
+  assert.equal(stripCurrentQuestionAnchor('没标签的普通问题'), '没标签的普通问题', '没标签的文本原样返回')
   assert.ok(
     chatMessages.every((m, index) => index === 0 || m.role !== chatMessages[index - 1]?.role),
     '相邻同角色已合并,不许出现连续两条 user'
@@ -524,7 +538,8 @@ async function main(): Promise<void> {
 
   const webMsgs = buildFreeChatMessages('小探针人设', att, [], '联网搜搜它', { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' }, [], 'brief')
   assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('Aomei 是备份软件厂商'), '联网资料要附在问题里')
-  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('把资料里跟它对得上的信息讲出来'), '要要求模型讲出对得上的信息')
+  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('web_results'), '要指名联网资料住在 <web_results> 里')
+  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('对得上的信息讲出来'), '要要求模型讲出对得上的信息')
 
   // 联网查询词:优先选中对象的名字;没对象就剥掉意图词,封顶 60 字
   assert.equal(pickWebLookupQuery('联网搜搜它', att), 'components', '有选中对象就查名字')
@@ -1190,7 +1205,7 @@ async function main(): Promise<void> {
   assert.ok(digest.indexOf('README.md') < digest.indexOf('src/main.tsx'), '广度优先:浅层要排在深层前面')
   // 预算截断:预算用尽要如实注明地图不全,不许装作画全了
   const capped = buildTreeDigest(locateTree, 3)
-  assert.equal(capped.split('\n').filter((l) => !l.startsWith('(地图没画全')).length, 3, '超预算要截断到预算行数')
+  assert.equal(capped.split('\n').filter((l) => !l.startsWith('地图没画全')).length, 3, '超预算要截断到预算行数')
   assert.ok(capped.includes('地图没画全'), '截断要注明')
   assert.ok(LOCATE_NODE_BUDGET >= 100, '预算要有基本容量,别小气到地图没法用')
 
@@ -1446,9 +1461,9 @@ async function main(): Promise<void> {
   assert.ok(TEACHING_DEGRADED_NOTE.includes('精简'), '降档灰字要交代「这次按精简讲了」')
 
   // ── 体积红线(小葵点名的防反弹秤):装配产物不许再胖回去 ──
-  assert.ok(chatSystem.length <= 700, `闲聊底座(无工具)≤700 字,实测 ${chatSystem.length}`)
-  const agentFullSystem = KERNEL_CORE + SLICE_CHAT + AGENT_FILES_ADDENDUM + AGENT_WEB_ADDENDUM + buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' }) + HONESTY_TAIL
-  assert.ok(agentFullSystem.length <= 1500, `agent 全量人设 ≤1500 字,实测 ${agentFullSystem.length}`)
+  assert.ok(chatSystem.length <= 900, `闲聊底座(无工具)≤900 字(2.0 内核+标签口径后放宽,实测 ${chatSystem.length})`)
+  const agentFullSystem = KERNEL_CORE + SLICE_CHAT + AGENT_FILES_ADDENDUM + AGENT_WEB_ADDENDUM + buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' })
+  assert.ok(agentFullSystem.length <= 2200, `agent 全量人设 ≤2200 字(2.0 内核+XML 标签后放宽,实测 ${agentFullSystem.length})`)
   assert.ok(deepFile.length <= 800, `deep 文件讲解人设 ≤800 字,实测 ${deepFile.length}`)
   const toolsJson = JSON.stringify(AGENT_TOOLS).length
   // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
@@ -1518,8 +1533,8 @@ async function main(): Promise<void> {
     note: '这是扫描器',
     headerComment: '把文件夹读成树'
   })
-  assert.ok(explainPrompt.includes('项目主人备注:这是扫描器'), '备注要进证据包')
-  assert.ok(explainPrompt.includes('文件开头注释:把文件夹读成树'), '头注释要进证据包')
+  assert.ok(explainPrompt.includes('<owner_note>') && explainPrompt.includes('这是扫描器'), '备注要进证据包(2.0 起包 owner_note 标签)')
+  assert.ok(explainPrompt.includes('<header_comment>') && explainPrompt.includes('把文件夹读成树'), '头注释要进证据包(header_comment 标签)')
   assert.ok(explainPrompt.includes('点名结构里真实的函数/类名'), '输出硬规矩要进提示词')
   const plainPrompt = buildExplainPrompt({
     relPath: 'a.ts',
@@ -1529,9 +1544,47 @@ async function main(): Promise<void> {
     graph: null
   })
   assert.ok(!plainPrompt.includes('项目主人备注') && !plainPrompt.includes('文件开头注释'), '没备注没注释不留空行占位假证据')
+  const excerptPrompt = buildExplainPrompt({
+    relPath: 'a.ts',
+    name: 'a.ts',
+    languageName: 'typescript',
+    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    graph: null,
+    sourceExcerpt: 'export function scanFolder() {}'
+  })
+  assert.ok(excerptPrompt.includes('<source_excerpt>') && excerptPrompt.includes('export function scanFolder'), '代码节选要包 source_excerpt 标签')
 
   const guessPrompt = buildGuessPrompt({ relPath: 'x.xyz', name: 'x.xyz', absPath: 'C:/x.xyz', languageName: '', preview: 'hello', note: '临时文件' })
-  assert.ok(guessPrompt.includes('项目主人备注:临时文件'), '猜猜官也吃备注')
+  assert.ok(guessPrompt.includes('<owner_note>') && guessPrompt.includes('临时文件'), '猜猜官也吃备注(owner_note 标签)')
+  assert.ok(guessPrompt.includes('<file_preview>') && guessPrompt.includes('hello'), '内容片段要包 file_preview 标签')
+
+  // ── 提示词体系 2.0 · XML 资料包裹总点检(小葵定稿):一切外来内容进标签,程序插话也有皮 ──
+  // 数据块:附件/引用/摘要旧已规范;文件夹清单/项目地图/干活账本/diff/联网资料新上
+  assert.ok(fp.includes('<folder_contents>'), '文件夹清单要包 folder_contents 标签')
+  assert.ok(locatePrompt.includes('<project_map>'), '项目地图要包 project_map 标签')
+  assert.ok(buildReportPrompt({ branch: 'main', changes: [], stats: { additions: 0, deletions: 0 }, recentSubjects: [] }).includes('<change_log>'), '干活账本要包 change_log 标签')
+  assert.ok(buildDiffPrompt({ relPath: 'a.ts', kind: 'modified', diff: '-x\n+y' }).includes('<diff>'), 'diff 要包 diff 标签')
+  // 程序插话:提醒卡/逼卷令/质检闸统一 program_reminder;重复工具提醒包 program_note
+  assert.ok(buildAgentReminder('这个文件在哪').includes('<program_reminder>'), '提醒卡要包 program_reminder 标签')
+  assert.ok(ROUND_CAP_NUDGE.includes('<program_reminder>') && SALVAGE_SEARCH_NUDGE.includes('不是用户说话'), '逼卷令和质检闸都是 program_reminder')
+  assert.ok(REPEAT_NUDGE.includes('<program_note>'), '重复翻看提醒是 program_note')
+  // 工具结果统一包裹:wrapToolResult 是唯一出口,压缩纸条也要带皮
+  const wrapped = wrapToolResult('文件内容原文')
+  assert.ok(wrapped.startsWith('<tool_result>') && wrapped.endsWith('</tool_result>'), '工具结果要包 tool_result 标签')
+  const stubbed = compressAgentMessages(
+    [
+      { role: 'system', content: 'x' },
+      { role: 'user', content: 'q' },
+      { role: 'tool', tool_call_id: 'c1', content: wrapToolResult('资'.repeat(2000)) },
+      { role: 'tool', tool_call_id: 'c2', content: wrapToolResult('近1'.repeat(500)) },
+      { role: 'tool', tool_call_id: 'c3', content: wrapToolResult('近2'.repeat(500)) }
+    ],
+    10
+  )
+  assert.ok(stubbed !== null, '超预算要能压')
+  assert.ok(stubbed?.messages[2]?.content.includes('<tool_result>'), '占位纸条也要带 tool_result 皮')
+  assert.ok(stubbed?.messages[2]?.content.includes('占位纸条'), '占位纸条要自述来历')
+  assert.ok(stripToolResult(wrapped) === '文件内容原文', '剥工具结果皮要还原原文')
 
   // ── 第一百四十二锤:/compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列) ──
   // isCompactCommand:整句就是 /compact 才算,大小写不拘;后面跟了字的不算
@@ -1554,7 +1607,7 @@ async function main(): Promise<void> {
   ])
   assert.equal(washed.length, 3, '坏角色和空条目要扔')
   assert.ok(washed[0].content.startsWith('很') && washed[0].content.length < longTurn.length, '超长对话要截断')
-  assert.ok(washed[0].content.endsWith('……(后半截省略)'), '截断要注明')
+  assert.ok(washed[0].content.endsWith('……<program_note>后半截省略</program_note>'), '截断要注明(program_note 标签)')
   assert.equal(washed[2].content.length, oldSummary.length, '旧摘要在放行上限内不截')
   const manyTurns: Array<{ role: 'user' | 'assistant'; content: string }> = []
   for (let i = 0; i < COMPACT_HISTORY_MAX_MESSAGES + 10; i += 1) manyTurns.push({ role: 'user', content: `第 ${i} 句` })
@@ -1576,7 +1629,7 @@ async function main(): Promise<void> {
   const longSummary = '长'.repeat(COMPACT_SUMMARY_CHARS + 500)
   const clippedSummary = sanitizeCompactSummary(longSummary)
   assert.ok(clippedSummary.startsWith('长'.repeat(10)) && clippedSummary.length < longSummary.length, '超长摘要要截')
-  assert.ok(clippedSummary.endsWith('……(摘要过长,只取前一部分)'), '截断要注明')
+  assert.ok(clippedSummary.endsWith('……<program_note>摘要过长,只取前一部分</program_note>'), '截断要注明(program_note 标签)')
 
   // buildSummaryText:标签、背景记忆口径、原文都在
   const summaryBlock = buildSummaryText('聊过 500ms 防抖')

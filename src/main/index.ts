@@ -33,6 +33,7 @@ import {
   sanitizeAgentRelPath,
   stripLastAgentReminder,
   toolCallKey,
+  wrapToolResult,
   type AgentChatMessage,
   type AgentStreamEvent
 } from '../ai/agent.ts'
@@ -126,7 +127,7 @@ function withQuestion(prompt: string, question: unknown): string {
   if (typeof question !== 'string') return prompt
   const q = question.trim()
   if (!q) return prompt
-  return `${prompt}\n\n用户的问题:${q}\n请直接围绕这个问题回答(结合上面给出的文件信息),不要泛泛做全面介绍。`
+  return `${prompt}\n\n<user_question>\n${q}\n</user_question>\n请直接围绕 <user_question> 里的问题回答(结合上面给出的文件信息),不要泛泛做全面介绍。`
 }
 
 /** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
@@ -1516,7 +1517,7 @@ async function runAgentChat(input: {
               ? String(call.args?.path ?? '(没给目录)')
               : String(call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)')
         sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', badTarget, 'error', why))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: `参数不合法:${why}` })
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: wrapToolResult(`参数不合法:${why}`) })
         continue
       }
       // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
@@ -1543,7 +1544,7 @@ async function runAgentChat(input: {
                 : relPath
       if (doneCalls.has(key)) {
         sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: REPEAT_NUDGE })
+        toolResults.push({ role: 'tool', tool_call_id: call.id, content: wrapToolResult(REPEAT_NUDGE) })
         continue
       }
       doneCalls.add(key)
@@ -1561,6 +1562,9 @@ async function runAgentChat(input: {
                 ? await agentWebSearch(query ?? '', input.tavilyKey)
                 : await agentReadFile((selectedRoot as { path: string }).path, relPath, readChars)
       if (exec.ok && selectedRoot?.external) exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
+      // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
+      // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
+      exec.text = wrapToolResult(exec.text)
       if (exec.ok && callName !== 'request_directory_access') toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,

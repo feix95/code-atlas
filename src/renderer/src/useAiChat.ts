@@ -58,7 +58,7 @@ function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
   for (const m of messages) {
     if (m.role === 'note') {
       if (m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') {
-        out.push({ role: 'user', content: `${COMPACT_SUMMARY_TAG}(旧摘要,一并融进新摘要)\n${m.text}` })
+        out.push({ role: 'user', content: `${COMPACT_SUMMARY_TAG}\n旧摘要,一并融进新摘要:\n${m.text}\n</compressed_summary>` })
       }
       continue
     }

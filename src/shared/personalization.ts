@@ -2,8 +2,9 @@
 // 用户想让 AI 怎么跟他说话:整体语气 + 一段自订指令。
 // 这里只管两件纯事:拼成提示词、把脏存档洗干净 —— 不碰配置读写,不碰界面。
 //
-// 一条铁律写在装配函数里:自订指令只改说法,不改事实 —— 所以风格段后面永远跟着
-// 一句 HONESTY_TAIL,把「不编造、不假装干过活」这两条重新钉一遍。顺序本身就是优先级。
+// 包裹规矩(提示词体系 2.0):风格段整个包在 <style_preference> 里,用户手写的那句
+// 再单独包 <custom_request> —— 标签里是用户偏好,改说法不改事实;诚实边界由内核统管,
+// 不再单独垫尾巴(2.0 内核已含「如实相告、承认不确定」)。
 
 /** 整体语气(第一百一十八锤补,小葵定的三档人设;第一百五十一锤加回「默认」档):
  * 默认 = 不垫任何语气人设,模型原汁原味;友善 / 专业 / 幽默 才是真的垫人设 */
@@ -54,10 +55,6 @@ const TONE_LINES: Record<Exclude<ToneKey, 'default'>, string> = {
     '你说话生动有趣,热情洋溢,充满活人感 —— 理性但有人情味,最爱说大白话。喜欢用生活里的小比喻、夸张的对比、突然的神转折,把话说得有意思。整体氛围轻松、有活力,不端着。'
 }
 
-/** 风格段后面永远跟着的这一句:把两条铁律重新钉一遍 —— 位置在最后,顺序就是优先级 */
-export const HONESTY_TAIL =
-  '以上只改你说话的方式,不改两条铁律:不编造、不假装干过活。'
-
 /**
  * 把个性化拼成一段提示词(纯函数,自测覆盖)。
  * 全默认(语气默认 + 没写自订指令)时返回空串 —— 人设一字不加,模型原汁原味。
@@ -68,17 +65,17 @@ export function buildPersonalizationPrompt(p: PersonalizationConfig): string {
   const rawCustom = p.custom.trim()
   // 最后一道闸:这里是文本进模型前的最后一站,超长的就地裁断并留省略号(读档那边也会裁)
   const custom = rawCustom.length > CUSTOM_MAX ? `${rawCustom.slice(0, CUSTOM_MAX)}……` : rawCustom
-  if (custom) lines.push(`用户自己提的说法要求(优先级最高,但仍不许越过上面的事实铁律):\n«${custom}»`)
+  if (custom) lines.push(`用户自己提的说法要求:\n<custom_request>\n${custom}\n</custom_request>`)
   if (lines.length === 0) return ''
-  return ['【这个用户偏好的说话方式】', ...lines].join('\n')
+  return ['<style_preference>', '这个用户偏好的说话方式:', ...lines, '以上只改你说话的方式。', '</style_preference>'].join('\n')
 }
 
 /**
- * 人设 + 风格段 + 铁律尾(纯函数,自测覆盖)。
+ * 人设 + 风格段(纯函数,自测覆盖)。
  * style 为空就原样返回人设 —— 没个性化的人拿到的是逐字相同的旧提示词。
  */
 export function withPersonalization(system: string, style: string): string {
-  return style ? `${system}\n\n${style}\n${HONESTY_TAIL}` : system
+  return style ? `${system}\n\n${style}` : system
 }
 
 /** 读档洗一遍(纯函数,自测覆盖):形状不对回默认,认不出的键值忽略,自订指令裁到上限 */

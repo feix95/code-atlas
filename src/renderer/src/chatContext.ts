@@ -14,7 +14,7 @@ function clipDetails(lines: string[]): string {
   let text = ''
   for (const line of lines) {
     if (text.length + line.length + 1 > DETAILS_MAX) {
-      return `${text}\n……(资料太长,只取了前面一部分)`
+      return `${text}\n……<program_note>资料太长,只取了前面一部分</program_note>`
     }
     text += text ? `\n${line}` : line
   }
