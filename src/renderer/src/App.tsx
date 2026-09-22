@@ -677,7 +677,7 @@ function App(): React.JSX.Element {
     const f = relPath === '' ? null : result ? findFile(result.tree, relPath) : null
     if (f) return { name: f.name, icon: f.summary?.icon ?? 'file' }
     const d = relPath === '' ? (result?.tree ?? null) : result ? findDir(result.tree, relPath) : null
-    if (d) return { name: d.name || result?.rootName || KIND_LABELS[kind], icon: d.summary?.icon ?? 'folder' }
+    if (d) return { name: d.name || result?.rootName || KIND_LABELS[kind], icon: 'folder' }
     return { name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
   }
 
@@ -1995,7 +1995,7 @@ function FolderOverviewPage({
     <div className="detail-page">
       <DetailHeader
         crumbs={buildCrumbs(result.rootName, result.rootPath, dir.relPath)}
-        iconName={dir.summary?.icon ?? 'folder'}
+        iconName="folder"
         title={dir.name || result.rootName}
         subtitle={dir.summary?.text ?? '文件夹'}
         note={note}

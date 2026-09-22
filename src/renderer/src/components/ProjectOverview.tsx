@@ -171,7 +171,7 @@ export function ProjectOverview({
                   <div className="guide-item" key={entry.relPath}>
                     <button type="button" className="guide-node" onClick={() => onJump(entry.relPath)}>
                       <span className="guide-node-icon" aria-hidden="true">
-                        <TreeIcon name={entry.summary?.icon ?? (entry.type === 'directory' ? 'folder' : 'file')} />
+                        <TreeIcon name={entry.type === 'directory' ? 'folder' : (entry.summary?.icon ?? 'file')} size={15} />
                       </span>
                       <span className="guide-node-main">
                         <strong>{entry.name}</strong>
@@ -194,7 +194,7 @@ export function ProjectOverview({
                               className="guide-child"
                               onClick={() => onJump(child.relPath)}
                             >
-                              <TreeIcon name={child.summary?.icon ?? (child.type === 'directory' ? 'folder' : 'file')} />
+                              <TreeIcon name={child.type === 'directory' ? 'folder' : (child.summary?.icon ?? 'file')} size={15} />
                               <span>{child.name}</span>
                             </button>
                           ))}

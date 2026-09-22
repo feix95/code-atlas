@@ -11,7 +11,7 @@ import {
   type PersonalizationConfig
 } from '@shared/personalization'
 import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
-import { applyAppearance, COLOR_PRESETS, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
+import { applyAppearance, COLOR_PRESETS, isDarkNow, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 
@@ -365,8 +365,7 @@ const MODES: Array<{ key: AppearanceMode; name: string }> = [
 
 const THEME_SUB: Record<AppearancePreset, string> = {
   default: '默认',
-  teal: '低对比',
-  violet: '柔和',
+  blue: '经典回归',
   custom: '手动调整'
 }
 
@@ -645,7 +644,8 @@ export function SettingsDialog({
   }
 
   function enterCustom(): void {
-    const base = COLOR_PRESETS.find((p) => p.key === draftAppearance.preset) ?? COLOR_PRESETS[0]
+    // 自定义永远跟着默认档走:不管当前选中哪个预设,种子一律是石墨的灰
+    const base = COLOR_PRESETS[0]
     updateAppearance({
       preset: 'custom',
       accent: draftAppearance.accent ?? base.accent,
@@ -676,8 +676,10 @@ export function SettingsDialog({
   }
 
   const presetDef = COLOR_PRESETS.find((p) => p.key === draftAppearance.preset) ?? COLOR_PRESETS[0]
+  // 自定义卡(色点/pickers)的兜底永远是默认档,不跟当前预设跑 —— 自定义是「石墨底上自己调色」
+  const defaultPreset = COLOR_PRESETS[0]
   const themeName = draftAppearance.preset === 'custom' ? '自定义' : presetDef.name
-  const previewAccent = draftAppearance.accent ?? presetDef.accent
+  const previewAccent = draftAppearance.accent ?? defaultPreset.accent
   const isBuiltin = draftConfig?.provider !== 'lmstudio'
 
   function sourceState(): { ok: boolean; text: string } {
@@ -860,7 +862,7 @@ export function SettingsDialog({
                         className={`cfg-theme${draftAppearance.preset === 'custom' ? ' is-selected' : ''}`}
                         onClick={enterCustom}
                       >
-                        <span className="cfg-swatch" style={{ background: `linear-gradient(135deg, ${previewAccent}, ${draftAppearance.secondary ?? presetDef.secondary})` }} />
+                        <span className="cfg-swatch" style={{ background: `linear-gradient(135deg, ${previewAccent}, ${draftAppearance.secondary ?? defaultPreset.secondary})` }} />
                         <span>
                           <strong>自定义</strong>
                           <small>{THEME_SUB.custom}</small>
@@ -879,14 +881,14 @@ export function SettingsDialog({
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>自定义颜色</label>
-                          <p>主题色管按钮、选中这些主角色;辅助色管边框线、图标这些配角色。</p>
+                          <p>主题色管按钮、选中这些主角色;辅助色管边框线、图标这些配角色;底板色管画布、面板染什么色调——只取颜色倾向,亮暗自动跟白天/黑夜走,选什么都不会翻车。</p>
                         </div>
                         <div className="cfg-colors">
                           <label className="cfg-color">
                             主题色
                             <input
                               type="color"
-                              value={draftAppearance.accent ?? presetDef.accent}
+                              value={draftAppearance.accent ?? defaultPreset.accent}
                               onChange={(e) => updateAppearance({ preset: 'custom', accent: e.target.value })}
                             />
                           </label>
@@ -894,10 +896,27 @@ export function SettingsDialog({
                             辅助色
                             <input
                               type="color"
-                              value={draftAppearance.secondary ?? presetDef.secondary}
+                              value={draftAppearance.secondary ?? defaultPreset.secondary}
                               onChange={(e) => updateAppearance({ preset: 'custom', secondary: e.target.value })}
                             />
                           </label>
+                          <label className="cfg-color">
+                            底板色
+                            <input
+                              type="color"
+                              value={draftAppearance.base ?? (isDarkNow(draftAppearance) ? '#282828' : '#f6f6f6')}
+                              onChange={(e) => updateAppearance({ preset: 'custom', base: e.target.value })}
+                            />
+                          </label>
+                          {draftAppearance.base && (
+                            <button
+                              type="button"
+                              className="cfg-color-reset"
+                              onClick={() => updateAppearance({ preset: 'custom', base: null })}
+                            >
+                              恢复石墨底
+                            </button>
+                          )}
                         </div>
                       </div>
                     </>

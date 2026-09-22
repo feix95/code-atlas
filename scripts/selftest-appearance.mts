@@ -17,21 +17,17 @@ check('hslLuminance:黑白灰三照', () => {
   assert.ok(Math.abs(hslLuminance(0, 0, 50) - 0.214) < 0.001)
 })
 
-check('亮色主题三套预设照旧白字,不许漂', () => {
-  for (const hex of ['#147dcc', '#0e9488', '#7c5cd6']) {
-    const [h, s, l] = hexToHsl(hex)
-    assert.equal(pickAccentInk(h, s, l), INK_LIGHT, `亮色预设 ${hex} 应压白字`)
-  }
+check('亮色主题石墨(深灰)照旧白字,不许漂', () => {
+  const [h, s, l] = hexToHsl('#484848')
+  assert.equal(pickAccentInk(h, s, l), INK_LIGHT, '石墨 accent 深灰应压白字')
 })
 
-check('暗色主题雾空蓝/青碧照旧深字(预设配档把明度抬进 55)', () => {
-  // 预设档沿用原配档:暗色明度带 55~85,雾空蓝 43.9→55、青碧 31.8→55
-  assert.equal(pickAccentInk(205.8, 82.1, 55), INK_DARK, '雾空蓝@暗色55 应压深字')
-  assert.equal(pickAccentInk(174.6, 82.7, 55), INK_DARK, '青碧@暗色55 应压深字')
+check('暗色主题石墨照旧深字(预设配档把明度抬进 55)', () => {
+  // 预设档沿用原配档:暗色明度带 55~85,石墨 accent 24→55
+  assert.equal(pickAccentInk(0, 0, 55), INK_DARK, '石墨@暗色55 应压深字')
 })
 
-check('暗色主题丁香紫按钮字由深翻白:对比 3.4 → 4.8 更清楚(唯一一次字色漂移,明算账)', () => {
-  // 丁香紫 60.0 本就在原暗色带内,字色按对比度改判:白
+check('中明度色亮度低于阈值压白字(字色阈值边界回归)', () => {
   assert.ok(Math.abs(hslLuminance(255.7, 59.8, 60) - 0.1679) < 0.001)
   assert.equal(pickAccentInk(255.7, 59.8, 60), INK_LIGHT)
 })
@@ -69,14 +65,19 @@ check('清洗:陌生存档各字段越界一律回默认', () => {
 })
 
 check('清洗:合法值原样放行,非法 hex 拦下', () => {
-  const good = { mode: 'dark', preset: 'custom', accent: '#7dba32', secondary: '#5ac5db' }
+  const good = { mode: 'dark', preset: 'custom', accent: '#7dba32', secondary: '#5ac5db', base: '#1f2728' }
   assert.deepEqual(sanitizeAppearance(good), good)
   assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', accent: '#12345' }).accent, null)
   assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', secondary: '#gggggg' }).secondary, null)
+  assert.equal(sanitizeAppearance({ mode: 'light', preset: 'custom', base: '蓝色' }).base, null)
+})
+
+check('清洗:雾空蓝预设是货架正编,存档里存它要认', () => {
+  assert.equal(sanitizeAppearance({ mode: 'dark', preset: 'blue' }).preset, 'blue')
 })
 
 check('首启决策:主进程有档听主进程的,不迁移', () => {
-  const stored = { mode: 'dark' as const, preset: 'teal' as const, accent: null, secondary: null }
+  const stored = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: null, base: null }
   const r = resolveAppearanceStartup({ stored, legacyRaw: '{"mode":"light"}' })
   assert.deepEqual(r.value, stored)
   assert.equal(r.migrate, false)
@@ -85,10 +86,20 @@ check('首启决策:主进程有档听主进程的,不迁移', () => {
 check('首启决策:主进程没档而旧档有效 → 收编迁移', () => {
   const r = resolveAppearanceStartup({
     stored: null,
-    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'violet', accent: '#7c5cd6', secondary: '#b79ef0' })
+    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'custom', accent: '#7c5cd6', secondary: '#b79ef0' })
   })
   assert.equal(r.value.mode, 'dark')
-  assert.equal(r.value.preset, 'violet')
+  assert.equal(r.value.preset, 'custom')
+  assert.equal(r.migrate, true)
+})
+
+check('旧档里的已下架彩色预设(teal/violet):清洗回石墨档,自选的色留着不丢', () => {
+  const r = resolveAppearanceStartup({
+    stored: null,
+    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'violet', accent: '#7c5cd6', secondary: '#b79ef0' })
+  })
+  assert.equal(r.value.preset, 'default')
+  assert.equal(r.value.accent, '#7c5cd6')
   assert.equal(r.migrate, true)
 })
 
@@ -112,7 +123,7 @@ check('落盘:存进 appearance.json 再读回来是同一份,坏文件老实回
   try {
     // 没存过 = null(首启迁移的信号)
     assert.equal(loadAppearanceFileSync(dir), null)
-    const a = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: '#5ac5db' }
+    const a = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: '#5ac5db', base: null }
     await saveAppearanceFile(dir, a)
     assert.deepEqual(loadAppearanceFileSync(dir), a)
     assert.deepEqual(JSON.parse(readFileSync(appearanceFilePath(dir), 'utf8')), a)

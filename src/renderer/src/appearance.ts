@@ -60,9 +60,11 @@ export function saveAppearance(a: Appearance): void {
 
 /** 由主题色派生的整族 token:派生时一次性全换,保持互相搭配
  *  (--secondary-deep 是辅助色的文字安全档;--line 边框线归辅助色管;
- *   --canvas-tint 不在列 —— 第七十七锤起画布回归固定中性底,不再跟主题色染) */
+ *   底板一族 --window/--canvas-tint/--surface/--surface-soft/--line-soft 只被「彩色预设档」染色 ——
+ *   自定义档和无色组合不动它们,画布照旧中性) */
 const TOKEN_KEYS = [
   '--accent',
+  '--accent-bright',
   '--accent-hover',
   '--accent-ink',
   '--accent-soft',
@@ -70,7 +72,12 @@ const TOKEN_KEYS = [
   '--selected-bg',
   '--secondary',
   '--secondary-deep',
-  '--line'
+  '--line',
+  '--window',
+  '--canvas-tint',
+  '--surface',
+  '--surface-soft',
+  '--line-soft'
 ] as const
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -136,6 +143,29 @@ export function isDarkNow(a: Appearance): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+/** 底板一族染色(雾空蓝和自定义底板色共用同一套结构):
+ *  色相/饱和度听来源色,明度永远跟主题的灰阶档走 —— 黑夜深、白天亮自动翻,
+ *  这就是「怎么调都好看」的机关;来源色近灰(s<8)时直接回落石墨中性底 */
+function paintSurfaces(root: CSSStyleDeclaration, dark: boolean, h: number, s: number): void {
+  const achro = s < 8
+  if (dark) {
+    // 分寸(小葵拍板):只留一丝色调 —— 饱和度封顶 12~15、明度比石墨灰再压一档
+    const surfSat = Math.min(s * 0.28, 12)
+    root.setProperty('--window', achro ? '#282828' : hslCss(h, surfSat, 14))
+    root.setProperty('--canvas-tint', achro ? '#1c1c1c' : hslCss(h, Math.min(s * 0.35, 15), 9))
+    root.setProperty('--surface', achro ? '#282828' : hslCss(h, surfSat, 14))
+    root.setProperty('--surface-soft', achro ? '#232323' : hslCss(h, surfSat, 12))
+    root.setProperty('--line-soft', achro ? '#2e2e2e' : hslCss(h, Math.min(s, 14), 16))
+  } else {
+    const surfSat = Math.min(s * 0.4, 18)
+    root.setProperty('--window', achro ? '#f6f6f6' : hslCss(h, surfSat, 96))
+    root.setProperty('--canvas-tint', achro ? '#ffffff' : hslCss(h, surfSat, 99))
+    root.setProperty('--surface', achro ? '#ffffff' : hslCss(h, surfSat, 99))
+    root.setProperty('--surface-soft', achro ? '#f6f6f6' : hslCss(h, surfSat, 96))
+    root.setProperty('--line-soft', achro ? '#ededed' : hslCss(h, Math.min(s, 16), 92))
+  }
+}
+
 export function applyAppearance(a: Appearance): void {
   const dark = isDarkNow(a)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
@@ -170,51 +200,72 @@ export function applyAppearance(a: Appearance): void {
   // 第七十九锤(小葵拍板):自定义彻底放开 —— 色相、饱和度给满,明度不再按亮暗主题分带,
   // 亮暗同带 5~95(极深极浅都听用户的)。原来「明度安全带」保的是按钮上固定字色的可读性,
   // 现在改由 --accent-ink 承担:按派生出的主题色算对比度,深墨/白自动翻,色自由、字不糊。
-  // 预设档(青碧/丁香紫)是配好的成套皮肤,里子仍走原来的配档,长相一分不变
-  // (唯一例外:暗色丁香紫按钮字由深翻白,对比 3.4 → 4.8 更清楚);
+  // 预设档(石墨 + 手动叠了自定义色的组合)仍走配档逻辑,长相一分不变;
   // --secondary-deep(辅助色的文字安全档)和 --line(压灰的分隔线)在两档里都保留小限位:
   // 那是派生出来的安全变体,不是用户选的颜色本身。
+  // 无彩色判据同自定义档:近灰时结构线/亮字回落样式表纯灰,不派生
 
   if (free) {
     const dl = clamp(l, 5, 95)
     const dl2 = clamp(l2, 5, 95)
+    // 无彩色判据(无色皮修):accent 选了纯灰/近灰时,结构线、亮字直接对齐样式表那套纯灰常数 ——
+    // 不派生,不然「自定义带石墨色」会整皮亮一档;彩色 accent 照旧派生
+    const achro = s < 8
+    const achro2 = s2 < 8
     root.setProperty('--accent', hslCss(h, s, dl))
+    root.setProperty(
+      '--accent-bright',
+      achro ? (dark ? '#f0f0f0' : '#000000') : dark ? hslCss(h, s, Math.min(dl + 18, 95)) : hslCss(h, s, Math.max(dl - 10, 8))
+    )
     root.setProperty('--accent-hover', hslCss(h, s, dark ? Math.min(dl + 8, 95) : Math.max(dl - 8, 5)))
     root.setProperty('--accent-ink', pickAccentInk(h, s, dl))
-    root.setProperty('--accent-soft', dark ? '#2b333a' : '#eef0f2')
-    root.setProperty('--accent-line', dark ? hslCss(h, 30, 40) : hslCss(h, s, 80))
-    root.setProperty('--selected-bg', dark ? '#2e3841' : '#dfe4e8')
+    root.setProperty('--accent-soft', dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+    root.setProperty('--accent-line', achro ? (dark ? '#555555' : '#d9d9d9') : dark ? hslCss(h, Math.min(s, 30), 40) : hslCss(h, s, 80))
+    root.setProperty('--selected-bg', dark ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.08)')
     root.setProperty('--secondary', hslCss(h2, s2, dl2))
     root.setProperty('--secondary-deep', dark ? hslCss(h2, s2, clamp(l2, 62, 82)) : hslCss(h2, s2, clamp(l2, 26, 40)))
-    root.setProperty('--line', dark ? hslCss(h2, clamp(s2, 10, 22), 27) : hslCss(h2, clamp(s2, 8, 20), 85))
+    root.setProperty('--line', achro2 ? (dark ? '#333333' : '#e4e4e4') : dark ? hslCss(h2, Math.min(s2, 22), 27) : hslCss(h2, Math.min(s2, 20), 85))
+    // 底板色(自定义第三色):跟雾空蓝同一套机关 —— 只取它的色相/饱和度当染色方向,
+    // 明度永远跟着白天/黑夜的灰阶档自动翻,不存在「黑夜选的色白天翻车」。
+    // 没选就 s=0 走无彩色分支,显性写回石墨中性底,顺便顶掉上一身彩色预设皮的染色
+    const [h3, s3] = a.base ? hexToHsl(a.base) : [0, 0]
+    paintSurfaces(root, dark, h3, s3)
     return
   }
 
   // 预设档:沿用 76 锤前的配档逻辑(明度带按亮暗分),保证三套皮肤和从前长得一样
   const sat = clamp(s, 30, 85)
   const sat2 = clamp(s2, 25, 80)
+  const achro = s < 8
+  const achro2 = s2 < 8
   if (dark) {
     const dl = clamp(l, 55, 85)
     root.setProperty('--accent', hslCss(h, sat, dl))
+    root.setProperty('--accent-bright', achro ? '#f0f0f0' : hslCss(h, sat, Math.min(dl + 18, 95)))
     root.setProperty('--accent-hover', hslCss(h, sat, Math.min(dl + 8, 88)))
     root.setProperty('--accent-ink', pickAccentInk(h, sat, dl))
-    root.setProperty('--accent-soft', '#2b333a')
-    root.setProperty('--accent-line', hslCss(h, 30, 40))
-    root.setProperty('--selected-bg', '#2e3841')
+    // 彩色预设连底板一起泛色(雾空蓝回归老皮):画布/框架/面板/软线往辅助色的色相里带,
+    // 选中底和柔底回归 accent 的半透明染色;无彩色组合照旧全套中性
+    root.setProperty('--accent-soft', achro ? 'rgba(255,255,255,0.08)' : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.14)`)
+    root.setProperty('--accent-line', achro ? '#555555' : hslCss(h, Math.min(sat, 30), 40))
+    root.setProperty('--selected-bg', achro ? 'rgba(255,255,255,0.13)' : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.20)`)
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 50, 78)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
-    root.setProperty('--line', hslCss(h2, clamp(s2, 10, 22), 27))
+    root.setProperty('--line', achro2 ? '#333333' : hslCss(h2, Math.min(s2, 16), 25))
+    paintSurfaces(root, dark, h2, s2)
   } else {
     const dl = clamp(l, 25, 62)
     root.setProperty('--accent', hslCss(h, sat, dl))
+    root.setProperty('--accent-bright', achro ? '#000000' : hslCss(h, sat, Math.max(dl - 10, 8)))
     root.setProperty('--accent-hover', hslCss(h, sat, dl - 8))
     root.setProperty('--accent-ink', pickAccentInk(h, sat, dl))
-    root.setProperty('--accent-soft', '#eef0f2')
-    root.setProperty('--accent-line', hslCss(h, sat, 80))
-    root.setProperty('--selected-bg', '#dfe4e8')
+    root.setProperty('--accent-soft', achro ? 'rgba(0,0,0,0.06)' : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.10)`)
+    root.setProperty('--accent-line', achro ? '#d9d9d9' : hslCss(h, sat, 80))
+    root.setProperty('--selected-bg', achro ? 'rgba(0,0,0,0.08)' : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.12)`)
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
-    root.setProperty('--line', hslCss(h2, clamp(s2, 8, 20), 85))
+    root.setProperty('--line', achro2 ? '#e4e4e4' : hslCss(h2, Math.min(s2, 20), 85))
+    paintSurfaces(root, dark, h2, s2)
   }
 }
 

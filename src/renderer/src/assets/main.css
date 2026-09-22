@@ -1,6 +1,6 @@
 /* ============================================================
-   CodeAtlas — 工作台视觉系统(参照 codeatlas-ui-reference.html)
-   蓝 = 选中/主操作 · 灰 = 次要信息 · 琥珀 = 不完整/留心眼 · 红 = 只给真错误
+   CodeAtlas — 工作台视觉系统(Obsidian 无色换皮)
+   灰阶 = 结构层级 · 白/黑 = 强调 · 琥珀 = 不完整/留心眼 · 红 = 只给真错误
    ============================================================ */
 
 :root {
@@ -28,29 +28,35 @@
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
   --content-max: 70rem;
   --control-height: 2.5rem;
+  /* ── 动效(Obsidian 节奏):70/140/300ms 三档 + 快进慢落的 smooth 曲线 ── */
+  --dur-1: 0.07s;
+  --dur-2: 0.14s;
+  --dur-3: 0.3s;
+  --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
-  /* ── 色板(浅色)── */
-  --window: #f2f5f8;
-  /* 画布底色:固定中性底(第七十七锤起不再跟主题色染 —— 雾铺在大片空白上就是罩子),
-     垫在最外层和卡片缝隙底下;内容卡片本身保持中性白 */
-  --canvas-tint: #f2f5f8;
-  --secondary: #4a8891; /* 辅助色:图标/分布条/预设问题 chips 等的渐变与点缀主角 */
-  --secondary-deep: #326a73; /* 辅助色的文字安全档:同一色相压深,浅底上看得清 */
+  /* ── 色板(浅色,Obsidian 无色阶)── */
+  --window: #f6f6f6;
+  /* 画布底色:内容白,框架层(--window)垫侧栏/顶栏/页签条 */
+  --canvas-tint: #ffffff;
+  --secondary: #6b6b6b; /* 辅助色:分布条/预设问题 chips 等的灰阶点缀 */
+  --secondary-deep: #4c4c4c; /* 辅助色的文字安全档 */
   --surface: #ffffff;
-  --surface-soft: #f7f9fc;
-  --line: #d6dee8;
-  --line-soft: #e9edf3;
-  --text: #26364a;
-  --text-strong: #172c46;
-  --muted: #607086;
-  --muted-2: #728198;
-  --accent: #225eaa;
-  --accent-hover: #194b89;
+  --surface-soft: #f6f6f6;
+  --line: #e4e4e4;
+  --line-soft: #ededed;
+  --text: #222222;
+  --text-strong: #000000;
+  --muted: #5c5c5c;
+  --muted-2: #ababab;
+  --accent: #262626;
+  /* accent 的亮档:当字色/细线用(实心块上另有 accent-ink),浅色下即纯黑 */
+  --accent-bright: #000000;
+  --accent-hover: #000000;
   /* 实心主题色件上的字色:第七十九锤起由 appearance 按派生主题色的对比度自动翻深浅,
      亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
   --accent-ink: #ffffff;
-  --accent-soft: #eef0f2;
-  --accent-line: #bfd1e8;
+  --accent-soft: rgba(0, 0, 0, 0.06);
+  --accent-line: #d9d9d9;
   --green: #38a169;
   --green-soft: #effaf3;
   --green-line: #c2e4d0;
@@ -62,9 +68,9 @@
   --danger-line: #f0c9c9;
   --git-add: #1a7f37;
   --git-rename: #9a6700;
-  --hover: #e9edf0;
-  --selected-bg: #dfe4e8;
-  --shadow-pop: 0 0.5rem 1.5rem rgba(12, 44, 67, 0.16);
+  --hover: rgba(0, 0, 0, 0.05);
+  --selected-bg: rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
   /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题 ── */
   --tok-ctl: #af00db;
   --tok-kw: #0000ff;
@@ -81,23 +87,25 @@
 /* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场 */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --window: #1d2226;
-  --canvas-tint: hsl(206 13% 13%);
-  --secondary: #7ecbe8;
-  --secondary-deep: #93d3e6;
-  --surface: #252b2f;
-  --surface-soft: #20262a;
-  --line: #374047;
-  --line-soft: #2c343a;
-  --text: #e5eaed;
-  --text-strong: #f0f4f6;
-  --muted: #9da8ae;
-  --muted-2: #778289;
-  --accent: #5fb0e6;
-  --accent-hover: #82c4ef;
-  --accent-ink: #10222e; /* 第七十九锤:实心主题色件字色改自适应,暗色默认压深字 */
-  --accent-soft: #2b333a;
-  --accent-line: #2e607d;
+  --window: #282828;
+  --canvas-tint: #1c1c1c;
+  --secondary: #999999;
+  --secondary-deep: #bababa;
+  --surface: #282828;
+  --surface-soft: #232323;
+  --line: #333333;
+  --line-soft: #2e2e2e;
+  --text: #dadada;
+  --text-strong: #f0f0f0;
+  --muted: #b3b3b3;
+  --muted-2: #666666;
+  --accent: #484848;
+  /* accent 的亮档:当字色/细线用,暗色下近白 */
+  --accent-bright: #f0f0f0;
+  --accent-hover: #5a5a5a;
+  --accent-ink: #f0f0f0; /* 实心灰块上的字色:近白 */
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-line: #555555;
   --green: #55c07e;
   --green-soft: #1e3527;
   --green-line: #2e5a3d;
@@ -109,8 +117,8 @@
   --danger-line: #63393e;
   --git-add: #3fb950;
   --git-rename: #d29922;
-  --hover: #293238;
-  --selected-bg: #2e3841;
+  --hover: rgba(255, 255, 255, 0.07);
+  --selected-bg: rgba(255, 255, 255, 0.13);
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
   /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
   --tok-ctl: #c586c0;
@@ -183,16 +191,12 @@ body.is-maximized .app {
   align-items: center;
   justify-content: center;
   -webkit-app-region: drag;
-  background: linear-gradient(#fafbfb, #f1f2f3);
+  background: var(--window);
   border-bottom: 1px solid var(--line);
-  color: #858b90;
+  color: var(--muted-2);
   font-size: 0.6875rem;
   letter-spacing: 0.03em;
   user-select: none;
-}
-
-:root[data-theme='dark'] .titlebar {
-  background: linear-gradient(#242a2e, #1d2226);
 }
 
 /* 三颗窗控按钮住右上角,顺序照 Windows 习惯(最小化 → 最大化 → 关闭) */
@@ -227,8 +231,8 @@ body.is-maximized .app {
   border: 1px solid rgba(0, 0, 0, 0.06);
   background: #d1d3d4;
   transition:
-    filter 0.12s ease,
-    box-shadow 0.12s ease;
+    filter 0.12s var(--ease-smooth),
+    box-shadow 0.12s var(--ease-smooth);
 }
 
 /* 圆点里的功能图标:横线=最小化,方框=最大化(最大化时变双框=还原),白叉=关闭;
@@ -269,10 +273,6 @@ body.is-maximized .traffic-lights .is-max i::after {
   background: #c5c9c8;
 }
 
-.traffic-lights .is-max:hover i::after {
-  filter: brightness(0.9);
-}
-
 .traffic-lights .is-max:active i::after {
   filter: brightness(0.82);
 }
@@ -291,7 +291,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   width: 0.4375rem;
   height: 1.5px;
   border-radius: 1px;
-  background: #fff;
+  background: #5c6165;
 }
 
 .traffic-lights .is-close i::before {
@@ -302,28 +302,28 @@ body.is-maximized .traffic-lights .is-max i::after {
   transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-/* 最小化/最大化:中性灰,两颗之间留一丝深浅差;关闭:偏红的警示色,不用 hover 就能认出危险 */
-.traffic-lights .is-min::before {
+/* 三颗窗控平时统一中性灰(Obsidian 无色皮),悬停才露 mac 本色:绿=最小化 黄=最大化 红=关闭 */
+.traffic-lights .is-min::before,
+.traffic-lights .is-max::before,
+.traffic-lights .is-close::before {
   background: #cfd2d1;
 }
 
-.traffic-lights .is-max::before {
-  background: #c5c9c8;
+.traffic-lights .is-min:hover::before {
+  background: #28c840;
 }
 
-.traffic-lights .is-close::before {
-  background: #d3736d;
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-/* 悬停必须有动静:点变深 + 外圈浅环;关闭的环也跟着带红,鼠标按下去再深一档 */
-.traffic-lights .light:hover::before {
-  filter: brightness(0.9);
-  box-shadow: 0 0 0 0.1875rem rgba(127, 127, 127, 0.22);
+.traffic-lights .is-max:hover::before {
+  background: #ffbd2e;
 }
 
 .traffic-lights .is-close:hover::before {
-  box-shadow: 0 0 0 0.1875rem rgba(211, 115, 109, 0.28);
+  background: #ff5f57;
+}
+
+/* 最大化还原态的前块跟着圆点一起换色,别留灰补丁 */
+body.is-maximized .traffic-lights .is-max:hover i::after {
+  background: #ffbd2e;
 }
 
 .traffic-lights .light:active::before {
@@ -332,7 +332,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--muted);
   outline-offset: 1px;
 }
 
@@ -365,7 +365,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   font-family: inherit;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s var(--ease-smooth);
 }
 
 .brand:hover:not(:disabled) .brand-mark {
@@ -382,7 +382,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .brand:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--muted);
   outline-offset: 2px;
 }
 
@@ -396,7 +396,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   border-radius: 0.4375rem;
   background: linear-gradient(135deg, var(--accent), var(--secondary));
   box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: filter 0.15s ease;
+  transition: filter 0.15s var(--ease-smooth);
 }
 
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
@@ -411,17 +411,19 @@ body.is-maximized .traffic-lights .is-max i::after {
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--accent);
+  /* 上缘一条受光线(Obsidian 招牌细节):控件像实体一样"凸"出来;浅色底下这条线隐形,无副作用 */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--accent-bright);
   font-size: var(--font-sm);
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.1s ease;
+    background 0.15s var(--ease-smooth),
+    border-color 0.15s var(--ease-smooth),
+    color 0.15s var(--ease-smooth),
+    transform 0.1s var(--ease-smooth);
 }
 
 .btn:hover {
@@ -440,9 +442,11 @@ body.is-maximized .traffic-lights .is-max i::after {
 
 .btn-primary {
   color: var(--accent-ink);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
-  box-shadow: 0 2px 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.28);
 }
 
 .btn-primary:hover {
@@ -482,7 +486,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .icon-btn:hover {
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--accent-soft);
   border-color: var(--accent-line);
 }
@@ -497,14 +501,14 @@ body.is-maximized .traffic-lights .is-max i::after {
   gap: var(--space-2);
   height: 1.875rem;
   padding: 0 2px 0 var(--space-2);
-  background: var(--surface);
+  background: var(--canvas-tint);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s var(--ease-smooth);
 }
 
 .path-box:focus-within {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
@@ -546,7 +550,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 
 @media (prefers-reduced-motion: no-preference) {
   .path-box.is-shaking {
-    animation: path-shake 0.35s ease;
+    animation: path-shake 0.35s var(--ease-smooth);
   }
 }
 
@@ -578,13 +582,9 @@ body.is-maximized .traffic-lights .is-max i::after {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #f0f1f2;
+  background: var(--window);
   border-right: 1px solid var(--line);
   overflow: hidden;
-}
-
-:root[data-theme='dark'] .sidebar {
-  background: #1a2024;
 }
 
 .sidebar-top {
@@ -602,12 +602,12 @@ body.is-maximized .traffic-lights .is-max i::after {
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--canvas-tint);
   font-size: var(--font-sm);
 }
 
 .search:focus-within {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .search input {
@@ -686,7 +686,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 /* 预览器头部的文件名带了右键菜单(复制路径/在资源管理器中显示):染主题色示意,
  * 左键不动作(已经在预览它了),右键才算数 */
 .code-pane-name.is-file-menu {
-  color: var(--accent);
+  color: var(--accent-bright);
   cursor: context-menu;
 }
 
@@ -722,7 +722,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   flex: 1;
   overflow: auto;
   padding: var(--space-3) 0 var(--space-4);
-  background: var(--surface);
+  background: var(--canvas-tint);
 }
 
 /* 虚拟滚动(全文预览这锤):轨道撑出全文行程(高度由组件按 总行数×行高 算),
@@ -756,7 +756,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   color: var(--muted-2);
   text-align: right;
   user-select: none;
-  background: var(--surface);
+  background: var(--canvas-tint);
   border-right: 1px solid var(--line);
 }
 
@@ -769,7 +769,7 @@ body.is-maximized .traffic-lights .is-max i::after {
    选中色跟辅助色走:系统默认那套蓝和别处长得一样,分不出「进了引用功能」。
    只作用于代码正文,别的面板保持系统默认。 */
 .code-text::selection {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-bright) 28%, transparent);
   color: inherit;
 }
 
@@ -790,7 +790,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   position: fixed;
   z-index: 29;
   display: inline-flex;
-  color: var(--accent);
+  color: var(--accent-bright);
   pointer-events: none;
   user-select: none;
 }
@@ -809,7 +809,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   z-index: 28;
   width: 2px;
   border-radius: 1px;
-  background: var(--accent);
+  background: var(--accent-bright);
   opacity: 0.7;
   pointer-events: none;
 }
@@ -821,7 +821,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   z-index: 30;
   transform: translate(-50%, calc(-100% - 8px));
   padding: 0.3125rem 0.625rem;
-  color: #fff;
+  color: var(--accent-ink);
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--accent);
@@ -864,7 +864,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   gap: 0.375rem;
   max-width: 100%;
   padding: 0.1875rem 0.375rem 0.1875rem 0.5rem;
-  color: var(--accent);
+  color: var(--accent-bright);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -940,7 +940,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   height: 1.6875rem;
   margin: 1px 0;
   border-radius: var(--radius-sm);
-  transition: background 0.13s ease;
+  transition: background 0.13s var(--ease-smooth);
   /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
@@ -951,10 +951,10 @@ body.is-maximized .traffic-lights .is-max i::after {
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧主题色细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧亮灰细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
 .tree-row.is-selected {
   background: var(--selected-bg);
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent-bright);
 }
 
 .tree-caret {
@@ -973,14 +973,11 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .tree-caret:hover {
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--accent-soft);
 }
 
-/* 展开态的箭头换辅助色(小葵点名):收起的灰、展开的青,一眼分得清开没开 */
-.tree-caret.is-open {
-  color: var(--secondary-deep);
-}
+/* 箭头一律 muted 灰(Obsidian 规矩):开没开交给旋转方向说,不靠色 */
 
 .tree-caret.is-lazy {
   color: var(--amber);
@@ -991,7 +988,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   width: 0.5625rem;
   height: 0.5625rem;
   border: 2px solid var(--accent-line);
-  border-top-color: var(--accent);
+  border-top-color: var(--accent-bright);
   border-radius: 50%;
 }
 
@@ -1017,7 +1014,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   padding: 0 0.4375rem 0 2px;
   border: none;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   font-size: var(--font-md);
   font-family: inherit;
   text-align: left;
@@ -1025,22 +1022,19 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .tree-row.is-selected .tree-main {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .tree-icon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  color: var(--muted-2);
+  /* 图标跟随行字色(Obsidian 换皮):常规 muted、选中亮档,不再单独压暗 */
+  color: inherit;
 }
 
 .tree-icon svg {
   display: block;
-}
-
-.tree-row.is-selected .tree-icon {
-  color: var(--accent);
 }
 
 .tree-name {
@@ -1051,11 +1045,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   white-space: nowrap;
 }
 
-/* 文件名上主题色(菜单统一大锤陪件,小葵拍的):跟聊天里的绿字文件一家,降低学习成本;
- * 文件夹保持素色 —— 扫一眼就知道哪边是能打开看的文件。选中态本来就整行主题色,不打架 */
-.tree-row.is-file .tree-name {
-  color: var(--accent);
-}
+/* 文件名不再单独染色(Obsidian 无色皮):树行字统一 muted,只有选中行整行提亮 */
 
 /* 一句大白话摘要:次要文字,挤了就省略 */
 .tree-summary {
@@ -1114,7 +1104,7 @@ body.is-maximized .traffic-lights .is-max i::after {
 }
 
 .note-editor input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
@@ -1175,15 +1165,15 @@ body.is-maximized .traffic-lights .is-max i::after {
   transform: translateX(-50%);
   background: var(--line);
   transition:
-    background 0.15s ease,
-    width 0.15s ease;
+    background 0.15s var(--ease-smooth),
+    width 0.15s var(--ease-smooth);
 }
 
 .sash:hover::after,
 .sash:focus-visible::after,
 body.is-sash-dragging .sash::after {
   width: 2px;
-  background: var(--accent);
+  background: var(--accent-bright);
 }
 
 body.is-sash-dragging {
@@ -1254,14 +1244,14 @@ body.is-sash-dragging {
 }
 
 .tabbar-tab:focus-visible {
-  outline: 1px solid var(--accent);
+  outline: 1px solid var(--muted);
   outline-offset: -1px;
 }
 
 .tabbar-tab.is-active {
-  background: var(--surface);
+  background: var(--canvas-tint);
   color: var(--text-strong);
-  box-shadow: inset 0 2px 0 var(--accent);
+  box-shadow: inset 0 2px 0 var(--muted);
 }
 
 .tabbar-icon {
@@ -1283,7 +1273,7 @@ body.is-sash-dragging {
 
 /* 拖页签搬家时的落点提示:扫过整条页签栏 = 落到这组末尾 */
 .tabbar.is-drop-zone {
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-bright);
 }
 
 /* 拖到某张页签上 = 插到它前面:左缘一条主题色细线 */
@@ -1298,7 +1288,7 @@ body.is-sash-dragging {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--accent);
+  background: var(--accent-bright);
 }
 
 .kindmenu-item-danger {
@@ -1369,7 +1359,7 @@ body.is-sash-dragging {
   justify-content: center;
   width: 1rem;
   flex: none;
-  color: var(--accent);
+  color: var(--accent-bright);
   font-weight: 700;
 }
 
@@ -1447,19 +1437,19 @@ body.is-sash-dragging {
   transform: translateX(-50%);
   background: var(--line);
   transition:
-    background 0.15s ease,
-    width 0.15s ease;
+    background 0.15s var(--ease-smooth),
+    width 0.15s var(--ease-smooth);
 }
 
 .pane-sash:hover::after,
 .pane-sash:focus-visible::after,
 body.is-sash-dragging .pane-sash::after {
   width: 2px;
-  background: var(--accent);
+  background: var(--accent-bright);
 }
 
 .pane-sash:focus-visible {
-  outline: 1px solid var(--accent);
+  outline: 1px solid var(--muted);
   outline-offset: -1px;
 }
 
@@ -1481,10 +1471,10 @@ body.is-sash-dragging .pane-sash::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed var(--accent);
+  border: 2px dashed var(--accent-bright);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: var(--font-md);
   pointer-events: none;
 }
@@ -1597,7 +1587,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .crumb.is-current {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .crumb-sep {
@@ -1618,7 +1608,7 @@ body.is-sash-dragging .pane-sash::after {
   display: grid;
   place-items: center;
   border-radius: var(--radius-md);
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--accent-soft);
   font-size: 0.9375rem;
   flex-shrink: 0;
@@ -1709,7 +1699,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .tab.is-active {
-  color: var(--accent);
+  color: var(--accent-bright);
   font-weight: 600;
 }
 
@@ -1721,7 +1711,7 @@ body.is-sash-dragging .pane-sash::after {
   bottom: 0;
   height: 2px;
   border-radius: 2px 2px 0 0;
-  background: var(--accent);
+  background: var(--muted);
 }
 
 /* 详情正文:独立滚动 */
@@ -1921,7 +1911,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .rec-row:hover strong {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .rec-number {
@@ -1929,7 +1919,7 @@ body.is-sash-dragging .pane-sash::after {
   height: 1.125rem;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-radius: 50%;
   background: var(--accent-soft);
   font-size: 0.625rem;
@@ -1978,7 +1968,7 @@ body.is-sash-dragging .pane-sash::after {
   padding: 2px var(--space-2);
   border-radius: var(--radius-pill);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
   font-weight: 600;
 }
 
@@ -2062,13 +2052,13 @@ body.is-sash-dragging .pane-sash::after {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: var(--font-md);
   font-weight: 650;
 }
 
 .ai-title .spark {
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: var(--font-base);
 }
 
@@ -2109,9 +2099,9 @@ body.is-sash-dragging .pane-sash::after {
   font-family: inherit;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+    color 0.15s var(--ease-smooth),
+    border-color 0.15s var(--ease-smooth),
+    background 0.15s var(--ease-smooth);
 }
 
 .prompt:hover {
@@ -2129,7 +2119,7 @@ body.is-sash-dragging .pane-sash::after {
 .stream-caret {
   display: inline-block;
   margin-left: 1px;
-  color: var(--accent);
+  color: var(--accent-bright);
   animation: caret-blink 1s step-end infinite;
 }
 
@@ -2250,7 +2240,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .message.user {
   align-self: flex-end;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
@@ -2288,7 +2278,7 @@ body.is-sash-dragging .pane-sash::after {
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-pill);
   background: var(--surface);
-  color: var(--accent);
+  color: var(--accent-bright);
   cursor: pointer;
   box-shadow: var(--shadow-pop);
   z-index: 2;
@@ -2308,7 +2298,7 @@ body.is-sash-dragging .pane-sash::after {
 
 @media (prefers-reduced-motion: no-preference) {
   .chat-jump {
-    animation: chat-jump-pop 0.45s ease;
+    animation: chat-jump-pop 0.45s var(--ease-smooth);
   }
 }
 
@@ -2780,7 +2770,7 @@ body.is-sash-dragging .pane-sash::after {
   border: 0;
   border-radius: 0.25rem;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
   font-family: var(--mono, 'Consolas', monospace);
   font-size: 1.05em;
   cursor: pointer;
@@ -2793,7 +2783,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .chat-note.is-matches .chat-match-loc:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--muted);
   outline-offset: 1px;
 }
 
@@ -2810,7 +2800,7 @@ body.is-sash-dragging .pane-sash::after {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: var(--font-xs);
   cursor: pointer;
 }
@@ -2868,7 +2858,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .atlas-probe .probe-eye {
-  fill: var(--accent);
+  fill: var(--accent-bright);
   transform-origin: center;
 }
 
@@ -3021,7 +3011,7 @@ body.is-sash-dragging .pane-sash::after {
   width: 100%;
   overflow: hidden;
   padding: 0.375rem 0;
-  color: var(--accent);
+  color: var(--accent-bright);
   border: 0;
   border-bottom: 1px solid var(--line-soft);
   background: transparent;
@@ -3177,13 +3167,13 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .git-door:hover .git-door-icon {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .git-door-branch {
   flex-shrink: 0;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .git-door-text {
@@ -3198,7 +3188,7 @@ body.is-sash-dragging .pane-sash::after {
 
 @media (prefers-reduced-motion: no-preference) {
   .git-door-caret {
-    transition: transform 0.15s ease;
+    transition: transform 0.15s var(--ease-smooth);
   }
 }
 
@@ -3227,7 +3217,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .locator-form input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
@@ -3275,7 +3265,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .locator-hit-path {
-  color: var(--accent);
+  color: var(--accent-bright);
   font-weight: 700;
   overflow-wrap: anywhere;
 }
@@ -3311,7 +3301,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .git-row.is-selected {
   background: var(--selected-bg);
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent-bright);
 }
 
 .git-badge {
@@ -3329,8 +3319,8 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .git-badge--modified {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
 }
 
 .git-badge--deleted {
@@ -3403,12 +3393,12 @@ body.is-sash-dragging .pane-sash::after {
 .chip-link:hover {
   border-color: var(--accent-line);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .chip-link.is-on {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--accent-ink);
 }
 
@@ -3475,12 +3465,12 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color 0.15s var(--ease-smooth),
+    background 0.15s var(--ease-smooth);
 }
 
 .recent-open:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--hover);
 }
 
@@ -3514,9 +3504,9 @@ body.is-sash-dragging .pane-sash::after {
   cursor: pointer;
   opacity: 0;
   transition:
-    opacity 0.12s ease,
-    color 0.12s ease,
-    background 0.12s ease;
+    opacity 0.12s var(--ease-smooth),
+    color 0.12s var(--ease-smooth),
+    background 0.12s var(--ease-smooth);
 }
 
 .recent-card:hover .recent-remove,
@@ -3548,13 +3538,13 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    border-color 0.15s var(--ease-smooth),
+    box-shadow 0.15s var(--ease-smooth),
+    transform 0.15s var(--ease-smooth);
 }
 
 .drive-card:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--accent) 14%, transparent);
   transform: translateY(-1px);
 }
@@ -3569,7 +3559,7 @@ body.is-sash-dragging .pane-sash::after {
   display: grid;
   place-items: center;
   font-size: var(--font-md);
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--accent-soft);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
@@ -3626,7 +3616,7 @@ body.is-sash-dragging .pane-sash::after {
   width: 0.3125rem;
   height: 0.3125rem;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--accent-bright);
   opacity: 0.3;
 }
 
@@ -3655,7 +3645,7 @@ body.is-sash-dragging .pane-sash::after {
 
 @media (prefers-reduced-motion: no-preference) {
   .detail-body > * {
-    animation: card-in 0.15s ease;
+    animation: card-in 0.15s var(--ease-smooth);
   }
 }
 
@@ -3746,7 +3736,7 @@ body.is-maximized .cfg-layer {
 .cfg-dim {
   position: absolute;
   inset: 0;
-  background: rgba(15, 30, 40, 0.42);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .cfg-window {
@@ -3763,13 +3753,13 @@ body.is-maximized .cfg-layer {
   border-radius: 0.8125rem;
   background: var(--window);
   box-shadow:
-    0 1.75rem 4.375rem rgba(11, 36, 51, 0.34),
-    0 0.375rem 1.0625rem rgba(17, 36, 48, 0.18);
+    0 1.75rem 4.375rem rgba(0, 0, 0, 0.36),
+    0 0.375rem 1.0625rem rgba(0, 0, 0, 0.2);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .cfg-window {
-    animation: cfg-in 0.2s ease;
+    animation: cfg-in 0.2s var(--ease-smooth);
   }
 }
 
@@ -3786,7 +3776,7 @@ body.is-maximized .cfg-layer {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(15, 30, 40, 0.32);
+  background: rgba(0, 0, 0, 0.36);
 }
 
 .cfg-confirm {
@@ -3795,12 +3785,12 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--line);
   border-radius: 0.625rem;
   background: var(--window);
-  box-shadow: 0 1.25rem 2.5rem rgba(11, 36, 51, 0.3);
+  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.32);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .cfg-confirm {
-    animation: cfg-in 0.18s ease;
+    animation: cfg-in 0.18s var(--ease-smooth);
   }
 }
 
@@ -3847,7 +3837,7 @@ body.is-maximized .cfg-layer {
   height: 2rem;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border: 1px solid var(--accent-line);
   border-radius: 0.5rem;
   background: var(--accent-soft);
@@ -3953,8 +3943,8 @@ body.is-maximized .cfg-layer {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    color 0.16s ease;
+    background 0.16s var(--ease-smooth),
+    color 0.16s var(--ease-smooth);
 }
 
 .cfg-nav-item:hover {
@@ -3963,7 +3953,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-nav-item.is-active {
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--accent-soft);
 }
 
@@ -3994,7 +3984,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-nav-item.is-active small {
-  color: var(--accent);
+  color: var(--accent-bright);
   opacity: 0.75;
 }
 
@@ -4005,7 +3995,7 @@ body.is-maximized .cfg-layer {
   width: 0.1875rem;
   height: 1.6875rem;
   border-radius: 0.25rem 0 0 0.25rem;
-  background: var(--accent);
+  background: var(--accent-bright);
 }
 
 .cfg-nav-rule {
@@ -4031,7 +4021,7 @@ body.is-maximized .cfg-layer {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-radius: 0.3125rem;
   background: var(--accent-soft);
 }
@@ -4087,7 +4077,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-eyebrow {
-  color: var(--accent);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 0.625rem;
   letter-spacing: 0.1em;
@@ -4174,7 +4164,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-step {
   min-width: 1.4375rem;
-  color: var(--accent);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 0.625rem;
 }
@@ -4341,7 +4331,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-select:focus-visible,
 .cfg-textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--muted);
   outline-offset: 1px;
 }
 
@@ -4405,7 +4395,7 @@ body.is-maximized .cfg-layer {
   gap: 0.3rem;
   height: 1.75rem;
   padding: 0 0.75rem;
-  color: var(--accent);
+  color: var(--accent-bright);
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
@@ -4416,7 +4406,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-btn:hover:not(:disabled) {
   color: var(--accent-ink);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
 }
 
@@ -4482,8 +4472,8 @@ body.is-maximized .cfg-layer {
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease;
+    border-color 0.16s var(--ease-smooth),
+    background 0.16s var(--ease-smooth);
 }
 
 .cfg-theme:hover {
@@ -4492,7 +4482,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-theme.is-selected {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-soft);
 }
 
@@ -4525,7 +4515,7 @@ body.is-maximized .cfg-layer {
   position: absolute;
   top: 0.375rem;
   right: 0.375rem;
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .cfg-colors {
@@ -4552,6 +4542,23 @@ body.is-maximized .cfg-layer {
   cursor: pointer;
 }
 
+/* 底板色一键归位(自定义档):选了底板色才出现 */
+.cfg-color-reset {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted-2);
+  font-size: 0.625rem;
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease-smooth);
+}
+.cfg-color-reset:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.1875rem;
+}
+
 .cfg-scale {
   min-width: 22.1875rem;
   display: flex;
@@ -4571,13 +4578,13 @@ body.is-maximized .cfg-layer {
   background: var(--surface);
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+    color 0.15s var(--ease-smooth),
+    border-color 0.15s var(--ease-smooth),
+    background 0.15s var(--ease-smooth);
 }
 
 .cfg-stepper:hover:not(:disabled) {
-  color: var(--accent);
+  color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
@@ -4594,7 +4601,7 @@ body.is-maximized .cfg-layer {
 .cfg-slider-wrap input {
   width: 100%;
   display: block;
-  accent-color: var(--accent);
+  accent-color: var(--accent-bright);
   cursor: pointer;
 }
 
@@ -4639,9 +4646,9 @@ body.is-maximized .cfg-layer {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
+    background 0.15s var(--ease-smooth),
+    color 0.15s var(--ease-smooth),
+    box-shadow 0.15s var(--ease-smooth);
 }
 
 .cfg-segmented button:hover {
@@ -4649,9 +4656,9 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-segmented button.is-selected {
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--surface);
-  box-shadow: 0 0.0625rem 0.25rem rgba(24, 90, 111, 0.12);
+  box-shadow: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.14);
 }
 
 .cfg-segmented strong,
@@ -4688,7 +4695,7 @@ body.is-maximized .cfg-layer {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
 }
@@ -4750,7 +4757,7 @@ body.is-maximized .cfg-layer {
   border-radius: 0.9375rem;
   background: var(--muted-2);
   cursor: pointer;
-  transition: background 0.18s ease;
+  transition: background 0.18s var(--ease-smooth);
 }
 
 .cfg-switch span {
@@ -4762,7 +4769,7 @@ body.is-maximized .cfg-layer {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: transform 0.18s ease;
+  transition: transform 0.18s var(--ease-smooth);
 }
 
 .cfg-switch.is-on {
@@ -4832,7 +4839,7 @@ body.is-maximized .cfg-layer {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
 }
@@ -4888,7 +4895,7 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-path-input:focus-within {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
@@ -4910,7 +4917,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   margin-right: 0.3125rem;
   padding: 0 0.5rem;
-  color: var(--accent);
+  color: var(--accent-bright);
   border: 1px solid var(--accent-line);
   border-radius: 0.3125rem;
   background: var(--accent-soft);
@@ -4921,7 +4928,7 @@ body.is-maximized .cfg-layer {
 .cfg-path-input button:hover {
   color: var(--accent-ink);
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 /* Tavily Key 区块(2026-09-17 小葵验收):左右留白与上下 cfg-row 对齐,不再贴边 */
@@ -4941,13 +4948,13 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-path-input button.cfg-eye-btn:hover {
-  color: var(--accent);
+  color: var(--accent-bright);
   border-color: transparent;
   background: var(--accent-soft);
 }
 
 .cfg-path-input button.cfg-eye-btn[aria-pressed='true'] {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 /* 「测一下」这类实心小按钮的禁用态(2026-09-17):Key 空着 / 正在测的时候点不动,但也不隐身 */
@@ -4998,8 +5005,8 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-chip-row button.is-selected {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
   background: var(--accent-soft);
 }
 
@@ -5021,7 +5028,7 @@ body.is-maximized .cfg-layer {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--accent-bright);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
 }
@@ -5100,9 +5107,9 @@ body.is-maximized .cfg-layer {
   font-size: 0.625rem;
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
+    background 0.16s var(--ease-smooth),
+    border-color 0.16s var(--ease-smooth),
+    color 0.16s var(--ease-smooth);
 }
 
 .cfg-btn-reset {
@@ -5119,7 +5126,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-btn-apply {
   color: var(--accent-ink);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-line);
   background: var(--accent);
   box-shadow: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
 }
@@ -5174,7 +5181,7 @@ body.is-maximized .cfg-layer {
   align-items: stretch;
   min-height: 1.875rem;
   border-top: 1px solid var(--line-soft);
-  background: var(--canvas-tint);
+  background: var(--window);
 }
 
 .model-status {
@@ -5216,7 +5223,7 @@ body.is-maximized .cfg-layer {
 }
 
 .model-status.is-busy .model-dot {
-  background: var(--accent);
+  background: var(--accent-bright);
   animation: model-breathe 1.2s ease-in-out infinite;
 }
 
@@ -5255,8 +5262,7 @@ body.is-maximized .cfg-layer {
 
 .model-state {
   flex: none;
-  color: var(--text-strong);
-  font-weight: 600;
+  color: var(--muted);
 }
 
 .model-status.is-error .model-state,
@@ -5306,8 +5312,8 @@ body.is-maximized .cfg-layer {
 }
 
 .model-act:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-bright);
 }
 
 /* 热身进度条(第七十四锤):拉通整条底栏底下,按底栏全长当最大;
@@ -5322,8 +5328,8 @@ body.is-maximized .cfg-layer {
   width: 0;
   border-radius: var(--radius-pill);
   background: currentColor;
-  color: var(--accent);
-  transition: width 0.6s ease;
+  color: var(--muted);
+  transition: width 0.6s var(--ease-smooth);
 }
 
 /* 车头微光:只驮真进度慢慢爬,不跑空车;就绪时跟条子一起变绿退场 */
@@ -5390,7 +5396,7 @@ body.is-maximized .cfg-layer {
 .cfg-ctx-range input {
   width: 100%;
   display: block;
-  accent-color: var(--accent);
+  accent-color: var(--accent-bright);
   cursor: pointer;
 }
 
@@ -5411,18 +5417,18 @@ body.is-maximized .cfg-layer {
   background: transparent;
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+    color 0.15s var(--ease-smooth),
+    border-color 0.15s var(--ease-smooth),
+    background 0.15s var(--ease-smooth);
 }
 
 .cfg-ctx-ticks button:hover {
-  color: var(--accent);
+  color: var(--accent-bright);
   border-color: var(--accent-line);
 }
 
 .cfg-ctx-ticks button.is-active {
-  color: var(--accent);
+  color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
@@ -5547,7 +5553,7 @@ body.is-maximized .cfg-layer {
 
 .devlog-filter:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .devlog-auto {
@@ -5561,7 +5567,7 @@ body.is-maximized .cfg-layer {
 }
 
 .devlog-auto input {
-  accent-color: var(--accent);
+  accent-color: var(--accent-bright);
 }
 
 .devlog-tool {
@@ -5578,7 +5584,7 @@ body.is-maximized .cfg-layer {
 
 .devlog-tool:hover {
   color: var(--text);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .devlog-list {
@@ -5667,14 +5673,14 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: var(--font-xs);
   cursor: pointer;
 }
 
 .cfg-devlog-btn:hover {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--accent-ink);
 }
 
@@ -5782,7 +5788,7 @@ body.is-maximized .cfg-layer {
 }
 
 .md .md-link {
-  color: var(--accent);
+  color: var(--accent-bright);
   text-decoration: underline;
 }
 
@@ -5793,7 +5799,7 @@ body.is-maximized .cfg-layer {
   border: 0;
   border-radius: 0.25rem;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
   font: inherit;
   font-size: 1.05em;
   font-family: var(--mono, 'Consolas', monospace);
@@ -5807,7 +5813,7 @@ body.is-maximized .cfg-layer {
 }
 
 .md-file-link:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--muted);
   outline-offset: 1px;
 }
 
@@ -5842,7 +5848,7 @@ body.is-maximized .cfg-layer {
 
 .file-path-menu-item:hover {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .file-path-menu-item.is-ok {
@@ -5888,7 +5894,7 @@ body.is-maximized .cfg-layer {
 }
 
 .msg-action:hover {
-  color: var(--accent);
+  color: var(--accent-bright);
   background: var(--hover);
 }
 
@@ -5911,7 +5917,7 @@ body.is-maximized .cfg-layer {
 @media (prefers-reduced-motion: no-preference) {
   .note-pen.is-tapping {
     transform-origin: 2.2px 14.6px;
-    animation: pen-tap 0.35s ease;
+    animation: pen-tap 0.35s var(--ease-smooth);
   }
 
   .note-pen .note-pen-trail {
@@ -5984,7 +5990,7 @@ body.is-maximized .cfg-layer {
   margin-right: var(--space-2);
   font-size: var(--font-xs);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 .shelf-featured-info {
   display: flex;
@@ -6239,7 +6245,7 @@ body.is-maximized .cfg-layer {
   border-right: 1.5px solid var(--muted);
   border-bottom: 1.5px solid var(--muted);
   transform: rotate(45deg) translate(-0.1rem, -0.1rem);
-  transition: transform 0.15s ease;
+  transition: transform 0.15s var(--ease-smooth);
 }
 .shelf-chevron.is-open {
   transform: rotate(-135deg) translate(-0.1rem, -0.1rem);
@@ -6251,7 +6257,7 @@ body.is-maximized .cfg-layer {
 .shelf-files {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s ease;
+  transition: grid-template-rows 0.28s var(--ease-smooth);
   background: var(--surface-soft);
 }
 .shelf-files.is-open {
@@ -6339,7 +6345,7 @@ body.is-maximized .cfg-layer {
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   font-size: var(--font-sm);
-  color: var(--accent);
+  color: var(--accent-bright);
   cursor: pointer;
   text-align: left;
 }
@@ -6354,7 +6360,7 @@ body.is-maximized .cfg-layer {
   border-radius: var(--radius-pill);
   padding: 0.25rem 0.625rem;
   font-size: var(--font-xs);
-  color: var(--accent);
+  color: var(--accent-bright);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -6364,7 +6370,7 @@ body.is-maximized .cfg-layer {
 .shelf-dl-pct {
   flex: none;
   font-size: var(--font-xs);
-  color: var(--accent);
+  color: var(--accent-bright);
   font-variant-numeric: tabular-nums;
   min-width: 2.6rem;
   text-align: right;
@@ -6381,8 +6387,8 @@ body.is-maximized .cfg-layer {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--accent);
-  transition: width 0.2s ease;
+  background: var(--muted);
+  transition: width 0.2s var(--ease-smooth);
 }
 .shelf-dl-done {
   flex: none;

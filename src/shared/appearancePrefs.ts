@@ -6,7 +6,7 @@
 
 export type AppearanceMode = 'auto' | 'light' | 'dark'
 /** preset 和自定义色互斥:选了预设就清空自定义色,点「自定义」才进 custom 档 */
-export type AppearancePreset = 'default' | 'teal' | 'violet' | 'custom'
+export type AppearancePreset = 'default' | 'blue' | 'custom'
 
 export interface Appearance {
   mode: AppearanceMode
@@ -15,17 +15,21 @@ export interface Appearance {
   accent: string | null
   /** 自定义辅助色(#rrggbb);不设就跟预设走 */
   secondary: string | null
+  /** 自定义底板色(#rrggbb);不设就走石墨中性底(仅自定义档生效) */
+  base: string | null
 }
 
-/** 配色预设:雾空蓝 = 现在的默认皮肤(不写任何内联,和从前一模一样);另两套是现成的成套配色 */
+/** 配色预设:石墨 = 默认无色皮(不写任何内联,样式表灰阶说了算);
+ *  雾空蓝 = 老默认皮的回归色(accent 一族照旧派生,画布也泛蓝调);
+ *  想玩别的色走「自定义」档,种子永远是石墨 */
 export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent: string; secondary: string }> = [
-  { key: 'default', name: '雾空蓝', accent: '#147dcc', secondary: '#5ac5db' },
-  { key: 'teal', name: '青碧', accent: '#0e9488', secondary: '#56c3ad' },
-  { key: 'violet', name: '丁香紫', accent: '#7c5cd6', secondary: '#b79ef0' }
+  // accent/secondary 即暗色样式表真值:进自定义档时种子是它俩,保证「自定义默认」和石墨像素级一致
+  { key: 'default', name: '石墨', accent: '#484848', secondary: '#999999' },
+  { key: 'blue', name: '雾空蓝', accent: '#147dcc', secondary: '#5ac5db' }
 ]
 
 export function defaultAppearance(): Appearance {
-  return { mode: 'auto', preset: 'default', accent: null, secondary: null }
+  return { mode: 'auto', preset: 'default', accent: null, secondary: null, base: null }
 }
 
 function isHexColor(v: unknown): v is string {
@@ -38,9 +42,10 @@ export function sanitizeAppearance(raw: unknown): Appearance {
   const p = raw as Record<string, unknown>
   return {
     mode: p.mode === 'light' || p.mode === 'dark' ? p.mode : 'auto',
-    preset: p.preset === 'teal' || p.preset === 'violet' || p.preset === 'custom' ? p.preset : 'default',
+    preset: p.preset === 'custom' || p.preset === 'blue' ? p.preset : 'default',
     accent: isHexColor(p.accent) ? p.accent : null,
-    secondary: isHexColor(p.secondary) ? p.secondary : null
+    secondary: isHexColor(p.secondary) ? p.secondary : null,
+    base: isHexColor(p.base) ? p.base : null
   }
 }
 
@@ -58,7 +63,7 @@ export function resolveAppearanceStartup(opts: {
       const legacy = sanitizeAppearance(JSON.parse(opts.legacyRaw))
       // 全默认的旧档不值得迁移(等价于没配过),免得用户目录多一个没用的文件
       const isDefault =
-        legacy.mode === 'auto' && legacy.preset === 'default' && !legacy.accent && !legacy.secondary
+        legacy.mode === 'auto' && legacy.preset === 'default' && !legacy.accent && !legacy.secondary && !legacy.base
       if (!isDefault) return { value: legacy, migrate: true }
     } catch {
       // 旧档烂了就当没配过

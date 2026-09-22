@@ -62,7 +62,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={node.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name={node.summary?.icon ?? 'file'} />}
+            {<TreeIcon name={node.summary?.icon ?? 'file'} size={15} />}
           </span>
           <span className="tree-name">{node.name}</span>
           {note ? (
@@ -143,7 +143,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={dir.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name={dir.summary?.icon ?? 'folder'} />}
+            {<TreeIcon name="folder" size={15} />}
           </span>
           <span className="tree-name">{dir.name}</span>
           {dirNote ? (
