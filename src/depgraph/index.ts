@@ -4,10 +4,10 @@ import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { joinRoot } from '../shared/paths.ts'
+import { LANGUAGES } from '../shared/languages.ts'
 import type { DepEdge, DepGraphResult, LanguageTag, ScanFileNode, ScanTreeNode, UnresolvedImport } from '../shared/types.ts'
 
 const MAX_FILE_BYTES = 1_000_000 // 和 atlas:analyze-file 同一条线:超过 1MB 的源码不解析
-const JS_EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']
 
 function collectFiles(node: ScanTreeNode, into: ScanFileNode[]): void {
   if (node.type === 'file') {
@@ -191,6 +191,9 @@ const RESOLVERS: Record<string, ImportResolver> = {
   java: resolveJavaImport,
   rust: resolveRustImport
 }
+
+/** JS/TS 的候选后缀:不养自己的名单 —— 凡走 JS 翻译器的语言,户口本后缀全算(.mts/.cts 不漏) */
+const JS_EXTS = LANGUAGES.filter((l) => RESOLVERS[l.id] === resolveJsImport).flatMap((l) => l.extensions ?? [])
 
 /**
  * 开场探测一次项目布局:go.mod 的 module 名、Java 的 Maven 标准布局、Rust 的 cargo src/ 布局。

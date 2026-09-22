@@ -778,22 +778,7 @@ export function resolveContextSize(
   return probed !== null && probed >= 512 ? probed : DEFAULT_CONTEXT_SIZE
 }
 
-/** 常见二进制/媒体后缀(小写含点):这些读不出文本,走「文件头认类型」那一支 */
-const BINARY_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tif', '.tiff',
-  '.pdf', '.zip', '.tar', '.gz', '.rar', '.7z', '.bz2', '.xz',
-  '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a', '.lib', '.class', '.jar', '.pyc', '.wasm',
-  '.woff', '.woff2', '.ttf', '.otf', '.eot',
-  '.mp3', '.wav', '.flac', '.ogg', '.mp4', '.avi', '.mov', '.mkv', '.webm',
-  '.psd', '.ai', '.sketch', '.db', '.sqlite', '.sqlite3', '.dat'
-])
-
-/** 按文件名判断是不是二进制/媒体文件(svg 是文本,不算) */
-export function isBinaryFile(name: string): boolean {
-  const dot = name.lastIndexOf('.')
-  if (dot <= 0) return false // 无后缀或隐藏文件(如 .gitignore)不当二进制
-  return BINARY_EXTS.has(name.slice(dot).toLowerCase())
-}
+/** 常见二进制/媒体后缀:单一来源在 shared/fileKinds.ts(isBinaryFile 也住那儿),别在这再养一本名单 */
 
 /** 固定格式提示词:把一个文件夹的真实清单摆给模型,让它只翻译不编造;完整路径帮它认出系统目录 */
 export function buildFolderPrompt(folder: {

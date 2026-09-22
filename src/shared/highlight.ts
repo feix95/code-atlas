@@ -3,6 +3,9 @@
 // 两边只靠这一页纸对账:角色编号的顺序、后缀认语言、字数闸。颜色本身归 CSS 管
 // (main.css 的 tok-*,抄的是 VS Code 官方 Dark+ / Light+ 两套主题的色号)。
 
+import { LANGUAGES } from './languages.ts'
+import { LANG_TO_GRAMMAR } from './grammarWasm.ts'
+
 /**
  * 分色的角色名单:顺序就是 IPC 里传的编号,渲染层拿它拼 tok-xxx 类名。
  * 大白话对号:ctl 控制流关键字(紫)、kw 普通关键字(蓝)、str 字符串(橙)、
@@ -16,44 +19,17 @@ export type HlKind = (typeof HL_KINDS)[number]
 export const HL_MAX_CHARS = 1_000_000
 
 /**
- * 后缀 → 语法语言(对上 tree-sitter-wasms 里的语法包名)。
- * TS/JS 四族共用 tsx 语法(它是超集,跟体检模块一个思路);
- * json/css/html/bash/yaml/toml 是白捡的:语法包一直在躺着,顺手收编。
- * 没收录的后缀(比如 md、各种冷门语言)老实白字,不硬上 —— 支持面故意比体检模块宽,
- * 但也只收映射表写好了的语言,宁缺毋滥。
+ * 后缀 → 语法语言:不养自己的名单 —— 从语言户口本(shared/languages.ts)倒查,
+ * 凡户口本语言在 LANG_TO_GRAMMAR(shared/grammarWasm.ts)有语法,它的后缀全映射过去
+ * (.zsh→bash、.cts→tsx 自动收编,不用想起这还有一张表)。
+ * 没语法的语言(md、scss、vue…)老实白字,宁缺毋滥;支持面仍比体检模块宽
+ * (json/css/html/bash/yaml/toml 是语法包白捡的)。
  */
-const EXT_LANG: Record<string, string> = {
-  ts: 'tsx',
-  tsx: 'tsx',
-  mts: 'tsx',
-  cts: 'tsx',
-  js: 'tsx',
-  jsx: 'tsx',
-  mjs: 'tsx',
-  cjs: 'tsx',
-  py: 'python',
-  pyw: 'python',
-  java: 'java',
-  go: 'go',
-  c: 'c',
-  h: 'c',
-  cpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  hpp: 'cpp',
-  hh: 'cpp',
-  hxx: 'cpp',
-  cs: 'c_sharp',
-  rs: 'rust',
-  json: 'json',
-  css: 'css',
-  html: 'html',
-  htm: 'html',
-  sh: 'bash',
-  bash: 'bash',
-  yaml: 'yaml',
-  yml: 'yaml',
-  toml: 'toml'
+const EXT_LANG: Record<string, string> = {}
+for (const lang of LANGUAGES) {
+  const grammar = LANG_TO_GRAMMAR[lang.id]
+  if (!grammar) continue
+  for (const ext of lang.extensions ?? []) EXT_LANG[ext.slice(1)] = grammar
 }
 
 /** 看文件名认语言:认不出返回 null(白字),大小写不敏感(.TS 也是 TS) */

@@ -1,6 +1,7 @@
 import { promises as fs, type Dirent } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } from '../shared/types.ts'
+import { DOC_EXTS } from '../shared/fileKinds.ts'
 import { identifyFileLanguage } from '../parser/index.ts'
 
 /** 扫描时直接绕开的目录/文件:依赖包、版本库、构建产物等"仓库杂物" */
@@ -44,8 +45,7 @@ const MAX_NODES = 4000
 /** 全项目同时嗅探文件的并发上限:大目录不再所有文件同时开抢,内存/磁盘句柄都有界 */
 const MAX_CONCURRENT_SNIFFS = 32
 
-/** 文档类后缀:读个开头标题,一句话说明就能亮真名(第一百锤) */
-const DOC_EXTS = new Set(['.md', '.markdown', '.txt'])
+/** 文档类后缀读个开头标题,一句话说明就能亮真名(第一百锤);名单本身住 shared/fileKinds.ts */
 
 /**
  * 读文档开头,取第一行当标题(纯嗅探,最多 256 字节,过限流门调用):

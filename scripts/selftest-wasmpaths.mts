@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { engineWasmPath, grammarWasmDir } from '../src/native/wasmPaths.ts'
+import { GRAMMAR_WASM, LANG_TO_GRAMMAR } from '../src/shared/grammarWasm.ts'
 import { GRAMMAR_FILES as HL_FILES } from '../src/highlight/index.ts'
 import { GRAMMAR_FILES as ANALYZER_FILES } from '../src/analyzer/index.ts'
 
@@ -61,6 +62,12 @@ console.log('── 行李清单对账:两家用到的语法字典,electron-buil
   const allFiles = new Set([...Object.values(HL_FILES), ...Object.values(ANALYZER_FILES)])
   const missing = [...allFiles].filter((file) => !yml.includes(file))
   ok(missing.length === 0, `两家用到的 ${allFiles.size} 个语法字典全在打包清单里${missing.length ? `(缺:${missing.join('、')})` : ''}`)
+
+  // 语法总账自洽:户口本→语法的桥,每个目的地在语法账里都有行李;两家用的件都是账上的
+  const badBridges = Object.entries(LANG_TO_GRAMMAR).filter(([, g]) => GRAMMAR_WASM[g] === undefined)
+  ok(badBridges.length === 0, `LANG_TO_GRAMMAR 每座桥都通语法账${badBridges.length ? `(断桥:${badBridges.map(([id]) => id).join('、')})` : ''}`)
+  const offLedger = [...allFiles].filter((f) => typeof f !== 'string' || !f.endsWith('.wasm') || !Object.values(GRAMMAR_WASM).includes(f))
+  ok(offLedger.length === 0, `两家用的字典全在语法账上${offLedger.length ? `(账外:${offLedger.join('、')})` : ''}`)
 
   // dev 家底也在:node_modules 里这些文件真实存在,不然自测跑不了真解析
   const grammarsDir = grammarWasmDir({ resourcesPath: undefined, cwd: CWD })

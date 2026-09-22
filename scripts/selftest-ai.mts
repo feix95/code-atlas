@@ -49,10 +49,10 @@ import {
   sniffBinaryKind,
   GUESS_SYSTEM_PROMPT,
   LOCATE_SYSTEM_PROMPT,
-  isBinaryFile,
   extractStreamStats,
   splitThinking
 } from '../src/ai/index.ts'
+import { isBinaryFile } from '../src/shared/fileKinds.ts'
 // 提示词体系重写(第二批):人设常量搬家到 prompts.ts,断言打到组装产物上
 import {
   AGENT_FILES_ADDENDUM,

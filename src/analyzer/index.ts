@@ -1,13 +1,14 @@
 import { join } from 'node:path'
 import Parser from 'web-tree-sitter'
 import type { FileStructure } from '../shared/types.ts'
-import { currentResourcesPath, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
+import { GRAMMAR_WASM, LANG_TO_GRAMMAR } from '../shared/grammarWasm.ts'
+import { currentWasmOpts, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
 
 type TSLanguage = InstanceType<typeof Parser.Language>
 type TSQuery = ReturnType<TSLanguage['query']>
 
 // wasm 寻路收口到 native/wasmPaths.ts:开发/自测走 node_modules,打包后走 resources/wasm/。
-const WASM_OPTS = () => ({ resourcesPath: currentResourcesPath(), cwd: process.cwd() })
+const WASM_OPTS = currentWasmOpts
 
 function grammarWasmPath(file: string): string {
   return join(grammarWasmDir(WASM_OPTS()), file)
@@ -17,25 +18,6 @@ let enginePromise: Promise<void> | null = null
 function ensureEngine(): Promise<void> {
   enginePromise ??= Parser.init({ locateFile: () => engineWasmPath(WASM_OPTS()) })
   return enginePromise
-}
-
-/** 本模块支持的 AST 分析语言 → 语法 wasm 文件(export 给打包清单自测对账用) */
-export const GRAMMAR_FILES: Record<string, string> = {
-  typescript: 'tree-sitter-tsx.wasm',
-  'typescript-react': 'tree-sitter-tsx.wasm',
-  javascript: 'tree-sitter-tsx.wasm',
-  'javascript-react': 'tree-sitter-tsx.wasm',
-  python: 'tree-sitter-python.wasm',
-  java: 'tree-sitter-java.wasm',
-  go: 'tree-sitter-go.wasm',
-  c: 'tree-sitter-c.wasm',
-  cpp: 'tree-sitter-cpp.wasm',
-  csharp: 'tree-sitter-c_sharp.wasm',
-  rust: 'tree-sitter-rust.wasm'
-}
-
-export function isAnalysisSupported(languageId: string): boolean {
-  return languageId in GRAMMAR_FILES
 }
 
 const languageCache = new Map<string, TSLanguage>()
@@ -168,6 +150,19 @@ const QUERIES: Record<string, string> = {
   cpp: CPP_QUERY,
   csharp: CS_QUERY,
   rust: RUST_QUERY
+}
+
+/**
+ * 本模块支持的 AST 分析语言 → 语法 wasm 文件(export 给打包清单自测对账用)。
+ * 不养自己的名单:有提取规则的语言,经 LANG_TO_GRAMMAR 过桥去语法账 GRAMMAR_WASM 取件
+ * (QUERIES 里哪门语言在 LANG_TO_GRAMMAR 没户口,取件当场是 undefined,自测立刻报警)。
+ */
+export const GRAMMAR_FILES: Record<string, string> = Object.fromEntries(
+  Object.keys(QUERIES).map((id) => [id, GRAMMAR_WASM[LANG_TO_GRAMMAR[id]!]!])
+)
+
+export function isAnalysisSupported(languageId: string): boolean {
+  return GRAMMAR_FILES[languageId] !== undefined
 }
 
 /** 剥掉字符串/系统头的包装:C 的 #include <x> 和各种引号,只留里面的名字 */

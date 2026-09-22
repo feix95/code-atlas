@@ -6,6 +6,8 @@
 // 状态类(空/锁定/未展开/截断)单走第五节规矩:像日志播报,比喻全免。
 // 纯规则引擎,不劳烦 AI:毫秒级、零成本、断网也能用;认不出就给诚实话,绝不硬凑。
 import type { NodeSummary, ScanDirNode, ScanFileNode } from '../shared/types.ts'
+import { DOC_EXTS } from '../shared/fileKinds.ts'
+import { LANGUAGES } from '../shared/languages.ts'
 import { translateName } from './words.ts'
 
 // 风险句构造器:档位3专用,同话重播时不参与降噪(见 shared/summaryDedup)
@@ -85,24 +87,12 @@ const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
   { re: /\.config\./, summary: { icon: 'gear', text: '配置文件' } }
 ]
 
-// 认得出是代码的语言 id:给"入口角色"提示用(样式/标记类语言不掺和)
-const CODE_LANG_IDS = new Set([
-  'typescript',
-  'typescript-react',
-  'javascript',
-  'javascript-react',
-  'python',
-  'java',
-  'c',
-  'cpp',
-  'csharp',
-  'go',
-  'rust',
-  'swift',
-  'kotlin',
-  'ruby',
-  'php'
-])
+// 「程序入口」候选语言:户口本里 category==='code' 的都算,
+// 但脚本/查询/界面类不算 —— main.sql 不是入口,index.vue 是组件不是入口
+const CODE_LANG_EXCLUDES = new Set(['shell', 'powershell', 'sql', 'vue', 'svelte'])
+const CODE_LANG_IDS = new Set(
+  LANGUAGES.filter((l) => l.category === 'code' && !CODE_LANG_EXCLUDES.has(l.id)).map((l) => l.id)
+)
 
 // ── 文件:后缀范畴词(档位1:只给黑话后缀配 2~4 字范畴词,不写句子) ──
 const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
@@ -166,6 +156,7 @@ const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
 }
 
 // 档位1的"沉默名单":图片/纯文本这类家喻户晓的后缀,类型标签已经说清 —— 不写字,但也不许报"没认出"
+// (这是词条政策的沉默名单,不是后缀归类;归类问题一律去 shared/fileKinds.ts 查)
 const KNOWN_SILENT_EXTS = new Set(['.txt', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])
 
 function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
@@ -327,7 +318,6 @@ const DIR_SUMMARIES: Record<string, NodeSummary> = {
 
 // 这些目录名底下若大半文件都是测试,改口报测试脚本数量(如本项目的 scripts/)
 const SCRIPTS_LIKE = new Set(['scripts', 'script', 'bin', 'tools', 'tooling'])
-const DOC_EXTS = new Set(['.md', '.txt', '.rst', '.adoc'])
 
 function isTestFileName(name: string): boolean {
   const lower = name.toLowerCase()

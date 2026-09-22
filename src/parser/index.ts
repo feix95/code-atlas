@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs'
 import type { FileHandle } from 'node:fs/promises'
 import type { LanguageTag } from '../shared/types.ts'
-import { BY_EXT, BY_FILENAME, LANGUAGES, type LanguageDef } from './languages.ts'
+import { BY_EXT, BY_FILENAME, LANGUAGES, type LanguageDef } from '../shared/languages.ts'
+import { BINARY_EXTS } from '../shared/fileKinds.ts'
 
 const ALL_BY_ID = new Map(LANGUAGES.map((l) => [l.id, l]))
 
@@ -10,32 +11,6 @@ const SNIFF_BYTES = 4096
 
 /** 比这更大的文件不嗅探:源代码不可能这么大,多半是数据/媒体,认不出就认不出 */
 const MAX_SNIFF_FILE_BYTES = 5 * 1024 * 1024
-
-/**
- * 已知二进制类后缀:内容必是字节流,嗅探也认不出语言。
- * 命中直接返回 null,零 I/O —— 不然每个视频都得整只读进内存才能"发现"它是二进制。
- * 注意只收纯二进制:svg 是文本、ts 是 TypeScript,都不在列。
- */
-const BINARY_EXTS = new Set([
-  // 图片
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tif', '.tiff', '.psd', '.heic',
-  // 音频
-  '.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.opus', '.wma', '.mid', '.midi',
-  // 视频
-  '.mp4', '.m4v', '.mkv', '.avi', '.mov', '.webm', '.wmv', '.flv', '.mpg', '.mpeg', '.3gp', '.vob',
-  // 字体
-  '.ttf', '.otf', '.woff', '.woff2', '.eot',
-  // 压缩包
-  '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.zst', '.lz4', '.br',
-  // 编译产物 / 机器码
-  '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.obj', '.lib', '.wasm', '.class', '.jar',
-  '.pyc', '.pyd',
-  // 二进制文档 / 数据库 / 磁盘镜像
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.db', '.sqlite', '.sqlite3',
-  '.iso', '.dmg', '.img',
-  // 大模型权重(本项目 vendor/ 里就有,体积动辄几个 GB)
-  '.gguf', '.safetensors', '.onnx', '.pt', '.pth'
-])
 
 /** UTF-8 BOM:文件开头可能出现,识别前要去掉 */
 const BOM = String.fromCharCode(0xfeff)

@@ -7,7 +7,8 @@
 import { join } from 'node:path'
 import Parser from 'web-tree-sitter'
 import { HL_KINDS, hlLanguageFor, HL_MAX_CHARS, type HlKind } from '../shared/highlight.ts'
-import { currentResourcesPath, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
+import { GRAMMAR_WASM } from '../shared/grammarWasm.ts'
+import { currentWasmOpts, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
 
 type TSTree = NonNullable<ReturnType<Parser['parse']>>
 type TSNode = TSTree['rootNode']
@@ -22,7 +23,7 @@ export interface HlToken {
 
 // wasm 寻路收口到 native/wasmPaths.ts(和 analyzer 同款):开发/自测走 node_modules,
 // 打包后 electron-builder 把字典放 resources/wasm/,运行时认文件自动切。
-const WASM_OPTS = () => ({ resourcesPath: currentResourcesPath(), cwd: process.cwd() })
+const WASM_OPTS = currentWasmOpts
 
 let enginePromise: Promise<void> | null = null
 function ensureEngine(): Promise<void> {
@@ -30,23 +31,8 @@ function ensureEngine(): Promise<void> {
   return enginePromise
 }
 
-/** 本模块支持的语法语言 → 语法 wasm 文件(支持面比体检模块宽,json/css/bash 这些也收;export 给打包清单自测对账用) */
-export const GRAMMAR_FILES: Record<string, string> = {
-  tsx: 'tree-sitter-tsx.wasm',
-  python: 'tree-sitter-python.wasm',
-  java: 'tree-sitter-java.wasm',
-  go: 'tree-sitter-go.wasm',
-  c: 'tree-sitter-c.wasm',
-  cpp: 'tree-sitter-cpp.wasm',
-  c_sharp: 'tree-sitter-c_sharp.wasm',
-  rust: 'tree-sitter-rust.wasm',
-  json: 'tree-sitter-json.wasm',
-  css: 'tree-sitter-css.wasm',
-  html: 'tree-sitter-html.wasm',
-  bash: 'tree-sitter-bash.wasm',
-  yaml: 'tree-sitter-yaml.wasm',
-  toml: 'tree-sitter-toml.wasm'
-}
+/** 本模块支持的语法 = 语法账全表(语法 id 直接当本模块的语言 id 用;export 给打包清单自测对账用) */
+export const GRAMMAR_FILES = GRAMMAR_WASM
 
 const languageCache = new Map<string, TSLanguage>()
 let sharedParser: Parser | null = null

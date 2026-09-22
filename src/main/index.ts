@@ -89,7 +89,6 @@ import {
   LOCATE_NODE_BUDGET,
   STYLE_SAMPLE_SYSTEM,
   STYLE_SAMPLE_QUESTION,
-  isBinaryFile,
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
@@ -98,7 +97,8 @@ import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
 import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
-import { BY_EXT } from '../parser/languages.ts'
+import { BY_EXT } from '../shared/languages.ts'
+import { isBinaryFile } from '../shared/fileKinds.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { highlightSource } from '../highlight/index.ts'

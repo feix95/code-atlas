@@ -39,3 +39,8 @@ export function grammarWasmDir(opts: WasmPathOpts): string {
   if (packed) return packed
   return join(opts.cwd, 'node_modules', 'tree-sitter-wasms', 'out')
 }
+
+/** 当前环境的寻路参数:analyzer/highlight 都用它,别各自再装一份 */
+export function currentWasmOpts(): WasmPathOpts {
+  return { resourcesPath: currentResourcesPath(), cwd: process.cwd() }
+}
