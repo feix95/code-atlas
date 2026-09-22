@@ -24,6 +24,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import type { Rectangle } from 'electron'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
+import { CH } from '../shared/ipcChannels.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
 
@@ -155,7 +156,7 @@ export function hideMascot(): void {
   stopHoverWatch()
   win.setIgnoreMouseEvents(true)
   mascotHidden = true
-  win.webContents.send('atlas:mascot-visible', false)
+  win.webContents.send(CH.mascotVisible, false)
   emitMascotHidden()
   addDevLog('system', '桌宠藏起(假藏:页面隐身+整窗穿透,不真 hide 不动透明度)')
 }
@@ -166,7 +167,7 @@ export function showMascot(): void {
   const win = mascotWindow
   if (!win || win.isDestroyed()) return
   mascotHidden = false
-  win.webContents.send('atlas:mascot-visible', true)
+  win.webContents.send(CH.mascotVisible, true)
   win.webContents.invalidate()
   watchHover(win)
   emitMascotHidden()
@@ -219,13 +220,13 @@ export function registerMascotIpc(handlers: {
   onHideMain?: () => void
 }): void {
   // 页面挂载时拉一次露面状态:藏起期间页面重载,别让它变「看得见点不着的幽灵」
-  ipcMain.handle('atlas:mascot-visible-get', () => !mascotHidden)
+  ipcMain.handle(CH.mascotVisibleGet, () => !mascotHidden)
   // 拖动三连:按下记抓手(光标到窗左上角的偏移),移动时光标走到哪儿窗跟到哪儿,
   // 松手存档。窗始终贴着光标挪,光标永远相对窗内,mousemove 不会半路丢。
   // 按下那一刻把窗锁成实心(dragging 旗),松手才还给轮询 —— 不然判定拿窗的旧位置
   // 对光标的新位置,穿透一秒开合几十次:窗闪、松手信号漏掉、桌宠跟光标满屏飘。
   let grab = { dx: MASCOT_SIZE / 2, dy: MASCOT_SIZE / 2 }
-  ipcMain.on('atlas:mascot-drag-start', (event) => {
+  ipcMain.on(CH.mascotDragStart, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     dragging = true
@@ -234,7 +235,7 @@ export function registerMascotIpc(handlers: {
     const cursor = screen.getCursorScreenPoint()
     grab = { dx: cursor.x - wx, dy: cursor.y - wy }
   })
-  ipcMain.on('atlas:mascot-drag-move', (event) => {
+  ipcMain.on(CH.mascotDragMove, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     const cursor = screen.getCursorScreenPoint()
@@ -248,7 +249,7 @@ export function registerMascotIpc(handlers: {
     // (雷区档案②:黑匣子拍到拖一趟 140→321,窗往右下长看着就是漂移)
     if (cx !== tx || cy !== ty) win.setBounds({ x: tx, y: ty, width: MASCOT_SIZE, height: MASCOT_SIZE })
   })
-  ipcMain.on('atlas:mascot-drag-end', (event) => {
+  ipcMain.on(CH.mascotDragEnd, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     dragging = false
@@ -265,13 +266,13 @@ export function registerMascotIpc(handlers: {
     handlers.onDragEnd?.(win.getBounds())
   })
   // 点击本体 = 激活(带桌宠实时位置,气泡照着它落位)
-  ipcMain.on('atlas:mascot-activate', (event) => {
+  ipcMain.on(CH.mascotActivate, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     handlers.onActivate(win && !win.isDestroyed() ? win.getBounds() : undefined)
   })
   // 右键本体 = 快捷菜单:第一项「收回小探针」(走出面板锤的回家路);
   // 主面板在屏上就给「藏起它」,不在就给「叫它出来」;再把自己藏起来、真退出
-  ipcMain.on('atlas:mascot-menu', (event) => {
+  ipcMain.on(CH.mascotMenu, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed()) return
     const mainVisible = handlers.isMainVisible?.() ?? false

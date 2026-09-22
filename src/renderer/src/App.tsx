@@ -9,6 +9,7 @@ import { isTreePartial } from '@shared/scanCoverage'
 import { isAiConfigured } from '@shared/aiSetup'
 import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
 import { createMirrorThrottle } from '@shared/mirrorThrottle'
+import { CH } from '@shared/ipcChannels'
 import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
@@ -460,8 +461,8 @@ function App(): React.JSX.Element {
       sidebarWidthRef.current = clamped
       setSidebarWidth(clamped)
     }
-    window.addEventListener('atlas:ui-scale', onUiScale)
-    return () => window.removeEventListener('atlas:ui-scale', onUiScale)
+    window.addEventListener(CH.uiScaleChanged, onUiScale)
+    return () => window.removeEventListener(CH.uiScaleChanged, onUiScale)
   }, [])
 
   // pointer capture:鼠标拖出分割条、甚至拖出窗口,move 事件照样送到条上,不跟丢

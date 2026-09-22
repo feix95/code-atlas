@@ -2,6 +2,7 @@
 // 谁对比高听谁的。预设的既有字色不许漂;极深极浅色必须翻对字。
 import assert from 'node:assert/strict'
 import { hexToHsl, hslLuminance, pickAccentInk } from '../src/renderer/src/appearance.ts'
+import { CH } from '../src/shared/ipcChannels.ts'
 
 const INK_DARK = '#10222e'
 const INK_LIGHT = '#ffffff'
@@ -147,14 +148,27 @@ check('IPC 通道对账:preload 与主进程两边收发一一配对', () => {
     .filter((f) => f.endsWith('.ts'))
     .map((f) => readFileSync(new URL(f, srcDir), 'utf8'))
     .join('\n')
-  const grab = (re: RegExp): Set<string> => new Set([...allSource.matchAll(re)].map((m) => m[1]!))
+  // 通道名两种写法都认:旧的 'atlas:xxx' 字面量 + 收口后的 CH.key(P1-3)。
+  // CH.key 经 ipcChannels 总账解析回真实通道名再对账 —— 表即权威,字面量反而该绝迹
+  const chByKey = new Map<string, string>(Object.entries(CH).map(([k, v]) => [k, v]))
+  const arg = String.raw`(?:'([^']+)'|CH\.(\w+))`
+  const grab = (re: RegExp): Set<string> =>
+    new Set(
+      [...allSource.matchAll(re)]
+        .map((m) => m[1] ?? (m[2] ? chByKey.get(m[2]) : undefined))
+        .filter((c): c is string => typeof c === 'string')
+    )
 
-  const sentOneWay = grab(/ipcRenderer\.(?:send|sendSync)\(\s*'([^']+)'/g)
-  const sentInvoke = grab(/ipcRenderer\.invoke\(\s*'([^']+)'/g)
-  const onListeners = grab(/ipcMain\.on\(\s*'([^']+)'/g)
-  const handleListeners = grab(/ipcMain\.handle\(\s*'([^']+)'/g)
-  const pushed = grab(/(?:webContents|sender)\.send\(\s*'([^']+)'/g)
-  const subscribed = grab(/ipcRenderer\.on\(\s*'([^']+)'/g)
+  const sentOneWay = grab(new RegExp(String.raw`ipcRenderer\.(?:send|sendSync)\(\s*${arg}`, 'g'))
+  const sentInvoke = grab(new RegExp(String.raw`ipcRenderer\.invoke\(\s*${arg}`, 'g'))
+  const onListeners = grab(new RegExp(String.raw`ipcMain\.on\(\s*${arg}`, 'g'))
+  const handleListeners = grab(new RegExp(String.raw`ipcMain\.handle\(\s*${arg}`, 'g'))
+  const pushed = grab(new RegExp(String.raw`(?:webContents|sender)\.send\(\s*${arg}`, 'g'))
+  const subscribed = grab(new RegExp(String.raw`ipcRenderer\.on\(\s*${arg}`, 'g'))
+
+  // CH 表自身也得干净:不许有两个键指向同一个通道名(指错键就会发错线)
+  const chValues = Object.values(CH)
+  assert.equal(new Set(chValues).size, chValues.length, 'ipcChannels 总账里有重名通道')
 
   // 先确认网还张得开:六张单子都得有货,哪张空了就是正则跟代码写法脱了节,别让空网假装全绿
   const rosters: [string, Set<string>][] = [

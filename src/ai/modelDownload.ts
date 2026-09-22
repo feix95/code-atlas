@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { BrowserWindow } from 'electron'
 import { HF_HOSTS, type ModelDownloadProgress } from '../shared/modelShelf.ts'
+import { CH } from '../shared/ipcChannels.ts'
 import { loadAiConfig, saveAiConfig } from './config.ts'
 
 /** 下载落点:userData/models/<仓库名>/<文件名>。目录归咱管,用户只看到结果路径 */
@@ -33,7 +34,7 @@ function resolveUrls(repoId: string, filePath: string): string[] {
 let current: { controller: AbortController } | null = null
 
 function announce(win: BrowserWindow | null, p: ModelDownloadProgress): void {
-  win?.webContents.send('atlas:model-download-progress', p)
+  win?.webContents.send(CH.modelDownloadProgress, p)
 }
 
 /** 把 web 响应体一段段追加进 .part 文件;取消/断流时抛错,.part 留着给下次续传 */

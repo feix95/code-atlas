@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
 import { HL_KINDS } from '@shared/highlight'
 import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
+import { CH } from '@shared/ipcChannels'
 import { planWholeFileRef, visibleLineRange } from '@shared/preview'
 import { friendlyErr } from '../errText'
 import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry } from '../selectionMarks'
@@ -180,8 +181,8 @@ export function CodePreview({
       if (Number.isFinite(lh) && lh > 0) setLineHeight(lh)
     }
     measure()
-    window.addEventListener('atlas:ui-scale', measure)
-    return () => window.removeEventListener('atlas:ui-scale', measure)
+    window.addEventListener(CH.uiScaleChanged, measure)
+    return () => window.removeEventListener(CH.uiScaleChanged, measure)
   }, [result])
 
   // 视口高度:可视行数靠它;窗口/分栏改尺寸跟着重算

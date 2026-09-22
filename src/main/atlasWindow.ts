@@ -5,6 +5,7 @@
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { CH } from '../shared/ipcChannels.ts'
 
 /** 视图名户口:?view= 参数和渲染入口(main.tsx)的分诊表对账 —— 主窗不带参,默认页就是它 */
 export const VIEWS = {
@@ -60,11 +61,11 @@ export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {})
     const onFirstFrame = (event: Electron.IpcMainEvent): void => {
       if (event.sender !== win.webContents) return
       showOnce('first-frame')
-      ipcMain.removeListener('atlas:first-frame', onFirstFrame)
+      ipcMain.removeListener(CH.firstFrame, onFirstFrame)
     }
-    if (opts.firstFrame === 'exclusive') ipcMain.removeAllListeners('atlas:first-frame')
-    ipcMain.on('atlas:first-frame', onFirstFrame)
-    win.on('closed', () => ipcMain.removeListener('atlas:first-frame', onFirstFrame))
+    if (opts.firstFrame === 'exclusive') ipcMain.removeAllListeners(CH.firstFrame)
+    ipcMain.on(CH.firstFrame, onFirstFrame)
+    win.on('closed', () => ipcMain.removeListener(CH.firstFrame, onFirstFrame))
   }
   // 3) 看门狗:唯一无条件的兜底。隐藏的透明窗此刻多半还没内容,
   //    用户看到「窗口浮现」的实际时刻仍是首帧画好之时

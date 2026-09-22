@@ -110,6 +110,7 @@ import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, w
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL } from '../shared/aiDefaults.ts'
+import { CH } from '../shared/ipcChannels.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalDirectoryPath } from './agentAccess.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
@@ -385,7 +386,7 @@ async function resolveChatTargetOrError(): Promise<
 function sendResetDelta(event: IpcMainInvokeEvent, requestId: unknown): void {
   if (typeof requestId !== 'string' || requestId === '') return
   if (event.sender.isDestroyed()) return
-  event.sender.send('atlas:ai-delta', { id: requestId, text: '', reset: true } satisfies AiDeltaPayload)
+  event.sender.send(CH.aiDelta, { id: requestId, text: '', reset: true } satisfies AiDeltaPayload)
 }
 
 /**
@@ -398,7 +399,7 @@ function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text:
     if (event.sender.isDestroyed()) return
     const payload: AiDeltaPayload = reasoning ? { id: requestId, text, reasoning } : { id: requestId, text }
     if (stats) payload.stats = stats
-    event.sender.send('atlas:ai-delta', payload)
+    event.sender.send(CH.aiDelta, payload)
     // 引擎肯报账,状态栏的「忙」就跟着报数(第八十四锤)
     if (stats) announceActivityBusy(lastActivityProvider, stats)
   }
@@ -408,7 +409,7 @@ function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text:
 function sendChatLookup(event: IpcMainInvokeEvent, requestId: unknown, state: AiChatLookupPayload['state'], sources: string[]): void {
   if (typeof requestId !== 'string' || requestId === '') return
   if (!event.sender.isDestroyed()) {
-    event.sender.send('atlas:ai-chat-lookup', { id: requestId, state, sources } satisfies AiChatLookupPayload)
+    event.sender.send(CH.aiChatLookup, { id: requestId, state, sources } satisfies AiChatLookupPayload)
   }
 }
 
@@ -420,7 +421,7 @@ function broadcastModelStatus(status: ModelStatus): void {
   // 第八十八锤:必须挨个窗都发 —— Developer 日志窗进了队,「[0]」不一定是主窗;
   // 广播喂给没人听的日志窗,主窗底栏就冻死在「还没叫醒」
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('atlas:model-status', status)
+    if (!win.isDestroyed()) win.webContents.send(CH.modelStatus, status)
   }
 }
 
@@ -511,7 +512,7 @@ let freechatHost: FreechatHost = 'panel'
 /** 形态变了喊一声:主窗页签 ↔ 占位卡跟着换装(目前只有主窗订阅) */
 function broadcastFreechatHost(): void {
   const win = mainWindowRef
-  if (win && !win.isDestroyed()) win.webContents.send('atlas:freechat-host', freechatHost)
+  if (win && !win.isDestroyed()) win.webContents.send(CH.freechatHost, freechatHost)
 }
 
 /** 桌宠 lazy 上岗:没窗现建,有窗直接用(回收时只藏不销,再放出秒到位) */
@@ -724,7 +725,7 @@ function createWindow(): void {
     void refreshModelStatus().catch(() => {})
     if (revivePending) {
       revivePending = false
-      mainWindow.webContents.send('atlas:renderer-revived')
+      mainWindow.webContents.send(CH.rendererRevived)
     }
   })
   // 救生圈(2026-09-13 小葵两次报案:「界面凭空消失,后台还开着」)。这窗是透明无边框的,
@@ -750,7 +751,7 @@ function createWindow(): void {
       mainWindow.hide()
       mainWindow.show()
     }
-    mainWindow.webContents.send('atlas:renderer-revived')
+    mainWindow.webContents.send(CH.rendererRevived)
   }
   app.on('child-process-gone', onGpuGone)
   mainWindow.on('closed', () => {
@@ -783,7 +784,7 @@ function createWindow(): void {
   const onFrameBeat = (event: Electron.IpcMainEvent): void => {
     if (!mainWindow.isDestroyed() && event.sender === mainWindow.webContents) lastFrameBeat = Date.now()
   }
-  ipcMain.on('atlas:frame-heartbeat', onFrameBeat)
+  ipcMain.on(CH.frameHeartbeat, onFrameBeat)
   const frameBeatWatchdog = setInterval(() => {
     if (mainWindow.isDestroyed() || mainWindow.isMinimized() || !mainWindow.isVisible()) return
     const gap = Date.now() - lastFrameBeat
@@ -835,7 +836,7 @@ function createWindow(): void {
     clearInterval(modelStatusTimer)
     clearInterval(repaintHeartbeat)
     clearInterval(frameBeatWatchdog)
-    ipcMain.removeListener('atlas:frame-heartbeat', onFrameBeat)
+    ipcMain.removeListener(CH.frameHeartbeat, onFrameBeat)
     if (hotkeyArmTimer) clearTimeout(hotkeyArmTimer)
     globalShortcut.unregister('CommandOrControl+Alt+0')
     // 主窗走了,Developer 日志窗没有独活的意义:一起带走,应用照常退出
@@ -844,7 +845,7 @@ function createWindow(): void {
 
   // 最大化是两副面孔:贴满屏幕时圆角描边必须收掉,四角才不漏出怪缝 —— 状态一变就喊渲染进程换装
   const syncMaximized = (maximized: boolean): void => {
-    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('atlas:window-maximized', maximized)
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(CH.windowMaximized, maximized)
   }
   mainWindow.on('maximize', () => syncMaximized(true))
   mainWindow.on('unmaximize', () => syncMaximized(false))
@@ -1149,7 +1150,7 @@ async function agentWebSearch(query: string, tavilyKey: string | undefined): Pro
 function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: string): void {
   if (requestId === '' || event.sender.isDestroyed()) return
   const payload: AiDeltaPayload = { id: requestId, text: '', step: { text } }
-  event.sender.send('atlas:ai-delta', payload)
+  event.sender.send(CH.aiDelta, payload)
 }
 
 /**
@@ -1160,7 +1161,7 @@ function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: strin
 function sendAgentMatches(event: IpcMainInvokeEvent, requestId: string, card: AgentSearchCard): void {
   if (requestId === '' || event.sender.isDestroyed()) return
   const payload: AiDeltaPayload = { id: requestId, text: '', matches: card }
-  event.sender.send('atlas:ai-delta', payload)
+  event.sender.send(CH.aiDelta, payload)
 }
 
 /** agent 流式轮次的增量转发(第一百三十四锤):思考/正文逐帧推给界面,token 账同帧喂状态条 */
@@ -1171,7 +1172,7 @@ function sendAgentDelta(event: IpcMainInvokeEvent, requestId: string, ev: AgentS
   if (ev.stats) payload.stats = ev.stats
   if (ev.reset) payload.reset = true
   if (ev.seal) payload.seal = true
-  event.sender.send('atlas:ai-delta', payload)
+  event.sender.send(CH.aiDelta, payload)
   // 引擎肯报账,状态条的「忙」就跟着报数(和普通聊天同一待遇)
   if (ev.stats) announceActivityBusy(lastActivityProvider, ev.stats)
 }
@@ -1565,24 +1566,24 @@ function agentResult(
 
 function registerIpc(): void {
   // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
-  ipcMain.handle('atlas:window-close', (event) => {
+  ipcMain.handle(CH.windowClose, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
   })
-  ipcMain.handle('atlas:window-minimize', (event) => {
+  ipcMain.handle(CH.windowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })
-  ipcMain.handle('atlas:window-maximize-toggle', (event) => {
+  ipcMain.handle(CH.windowMaximizeToggle, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return false
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
     return win.isMaximized()
   })
-  ipcMain.handle('atlas:window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+  ipcMain.handle(CH.windowIsMaximized, (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
 
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
   // 第八十八锤:对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
-  ipcMain.handle('atlas:pick-folder', async (event) => {
+  ipcMain.handle(CH.pickFolder, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = { properties: ['openDirectory'] }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
@@ -1595,7 +1596,7 @@ function registerIpc(): void {
   // 掉线的网络映射盘以前能拖住整列;②盘的来路(固定/移动/网络/光驱)一次 PowerShell 问齐,
   // 失败/超时就当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(带 5 秒小缓存,
   // 回首页重列盘符时不用次次都起 PowerShell)。卷标不再问 —— 小葵拍板:盘就认大写字母,直白
-  ipcMain.handle('atlas:list-drives', async (): Promise<DriveInfo[]> => {
+  ipcMain.handle(CH.listDrives, async (): Promise<DriveInfo[]> => {
     /** 单个询问加超时:到点回 null,慢半拍的输家就地安静,不许变未处理的拒绝 */
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> => {
       let timer: ReturnType<typeof setTimeout> | null = null
@@ -1637,19 +1638,19 @@ function registerIpc(): void {
   })
 
   // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)
-  ipcMain.handle('atlas:app-version', () => app.getVersion())
+  ipcMain.handle(CH.appVersion, () => app.getVersion())
 
   // ── Developer 日志(第八十七锤):拉全量 / 清账 / 开窗 ──
-  ipcMain.handle('atlas:dev-log-pull', () => devLogSnapshot())
-  ipcMain.handle('atlas:dev-log-clear', () => {
+  ipcMain.handle(CH.devLogPull, () => devLogSnapshot())
+  ipcMain.handle(CH.devLogClear, () => {
     clearDevLogs()
   })
-  ipcMain.handle('atlas:dev-log-open', () => {
+  ipcMain.handle(CH.devLogOpen, () => {
     openDevLogWindow()
   })
 
   // 扫描指定文件夹,返回目录树 + 统计;顺手给每个节点打大白话速览标签
-  ipcMain.handle('atlas:scan-folder', async (_event, folderPath: unknown) => {
+  ipcMain.handle(CH.scanFolder, async (_event, folderPath: unknown) => {
     if (typeof folderPath !== 'string' || folderPath.trim() === '') {
       throw new Error('路径不能为空')
     }
@@ -1675,7 +1676,7 @@ function registerIpc(): void {
   })
 
   // 分级扫描:点开某个还没探的子文件夹,只探这一层(预算内收工),返回子树 + 这一份统计
-  ipcMain.handle('atlas:scan-subdir', (_event, rootPath: unknown, relPath: unknown) => {
+  ipcMain.handle(CH.scanSubdir, (_event, rootPath: unknown, relPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath.trim() === '' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -1689,7 +1690,7 @@ function registerIpc(): void {
 
   // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)
   // 路径契约:收 (rootPath, relPath),绝对路径只能由 joinRoot 在这儿解析
-  ipcMain.handle('atlas:analyze-file', async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
+  ipcMain.handle(CH.analyzeFile, async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
       throw new Error('参数不合法')
     }
@@ -1713,7 +1714,7 @@ function registerIpc(): void {
   // 路径契约同 analyze-file —— 收 (rootPath, relPath),绝对路径只经 joinRoot 解析,
   // relPath 越界(.. 上跳、盘符注入)在这儿被拦。守卫三道:二进制不受理、超大不受理、
   // 能读的也只给前一段(行数/字数双封顶),账目如实回给界面,绝不静默腰斩。
-  ipcMain.handle('atlas:read-preview', async (_event, rootPath: unknown, relPath: unknown): Promise<FilePreviewResult> => {
+  ipcMain.handle(CH.readPreview, async (_event, rootPath: unknown, relPath: unknown): Promise<FilePreviewResult> => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -1754,7 +1755,7 @@ function registerIpc(): void {
   })
 
   // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot
-  ipcMain.handle('atlas:dep-graph', (_event, rootPath: unknown) => {
+  ipcMain.handle(CH.depGraph, (_event, rootPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath.trim() === '') {
       throw new Error('路径不能为空')
     }
@@ -1764,24 +1765,24 @@ function registerIpc(): void {
   // 外观偏好:读 / 存(2026-09-16 起从 localStorage 搬进 appearance.json —— 那份按
   // localhost 端口分仓、端口一挤就出厂设置的存档方式退役)。同步读通道是给 preload
   // 首帧用的:页面脚本跑之前就得定外观,不然先按默认画一帧再换皮,界面会闪。
-  ipcMain.on('atlas:appearance-get-sync', (event) => {
+  ipcMain.on(CH.appearanceGetSync, (event) => {
     event.returnValue = loadAppearanceFileSync(app.getPath('userData'))
   })
-  ipcMain.handle('atlas:appearance-save', (_event, raw: unknown) => {
+  ipcMain.handle(CH.appearanceSave, (_event, raw: unknown) => {
     const a = sanitizeAppearance(raw)
     return saveAppearanceFile(app.getPath('userData'), a)
   })
 
   // 模型货架:实时榜(只读抱抱脸公开 API,零落盘)+ 某仓库的文件清单。拉货手在 ai/modelShelf
-  ipcMain.handle('atlas:model-shelf', () => fetchModelShelf())
-  ipcMain.handle('atlas:model-files', (_event, repoId: unknown) => {
+  ipcMain.handle(CH.modelShelf, () => fetchModelShelf())
+  ipcMain.handle(CH.modelFiles, (_event, repoId: unknown) => {
     if (typeof repoId !== 'string' || repoId === '') throw new Error('参数不合法')
     return fetchRepoFiles(repoId)
   })
 
   // 模型下载(一键到位):货架点文件 → 断点续传拉到 userData/models → 自动填进 AI 配置。
   // 下载是长活,进度走事件推送;窗口可能还没建好/已关,win 取当下最新的主窗,拿不到就静默下
-  ipcMain.handle('atlas:model-download-start', async (_event, args: unknown) => {
+  ipcMain.handle(CH.modelDownloadStart, async (_event, args: unknown) => {
     if (typeof args !== 'object' || args === null) throw new Error('参数不合法')
     const { repoId, filePath } = args as Record<string, unknown>
     if (typeof repoId !== 'string' || typeof filePath !== 'string') throw new Error('参数不合法')
@@ -1790,11 +1791,11 @@ function registerIpc(): void {
     await pointConfigAtModel(app.getPath('userData'), finalPath)
     return finalPath
   })
-  ipcMain.handle('atlas:model-download-cancel', () => cancelModelDownload())
+  ipcMain.handle(CH.modelDownloadCancel, () => cancelModelDownload())
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
-  ipcMain.handle('atlas:ai-config-get', () => loadAiConfig(app.getPath('userData')))
-  ipcMain.handle('atlas:ai-config-save', async (_event, config: unknown) => {
+  ipcMain.handle(CH.aiConfigGet, () => loadAiConfig(app.getPath('userData')))
+  ipcMain.handle(CH.aiConfigSave, async (_event, config: unknown) => {
     if (typeof config !== 'object' || config === null) throw new Error('配置不合法')
     const c = config as Partial<AiConfig>
     const lm = c.lmstudio
@@ -1834,7 +1835,7 @@ function registerIpc(): void {
   })
 
   // ── 模型状态栏(第七十锤):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
-  ipcMain.handle('atlas:model-status-get', async (): Promise<ModelStatus> => {
+  ipcMain.handle(CH.modelStatusGet, async (): Promise<ModelStatus> => {
     const config = await loadAiConfig(app.getPath('userData'))
     if (config.provider === 'builtin') {
       // 引擎播报员有最新账就照账说;还没开播报过就拿配置兜底(上次用的模型 + 文件大小)
@@ -1842,7 +1843,7 @@ function registerIpc(): void {
     }
     return probeLmStudioStatus(config)
   })
-  ipcMain.handle('atlas:model-eject', async (): Promise<{ ok: boolean; message?: string }> => {
+  ipcMain.handle(CH.modelEject, async (): Promise<{ ok: boolean; message?: string }> => {
     const config = await loadAiConfig(app.getPath('userData'))
     if (config.provider !== 'builtin') {
       return { ok: false, message: '外接模型的装卸归 LM Studio 管,这边只看状态' }
@@ -1854,7 +1855,7 @@ function registerIpc(): void {
   })
 
   // 量尺(第七十三锤):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
-  ipcMain.handle('atlas:model-fit-check', async (_event, modelPath: unknown): Promise<ModelFitVerdict> => {
+  ipcMain.handle(CH.modelFitCheck, async (_event, modelPath: unknown): Promise<ModelFitVerdict> => {
     if (typeof modelPath !== 'string' || !modelPath.trim()) {
       return { level: 'empty', title: '', detail: '', sizeBytes: null }
     }
@@ -1874,7 +1875,7 @@ function registerIpc(): void {
 
   // 模型档案(上下文档位的账本):出厂上下文上限、层数头数、机器家底,一次端给设置页;
   // 档案翻不出来各条目就是 null,设置页自己退到粗估,不报错不拦人
-  ipcMain.handle('atlas:model-context-info', async (_event, modelPath: unknown): Promise<ModelContextInfo | null> => {
+  ipcMain.handle(CH.modelContextInfo, async (_event, modelPath: unknown): Promise<ModelContextInfo | null> => {
     if (typeof modelPath !== 'string' || !modelPath.trim()) return null
     const p = modelPath.trim()
     const sizeBytes = await fs
@@ -1889,7 +1890,7 @@ function registerIpc(): void {
 
   // 渲染层的报错小纸条:window.onerror / unhandledrejection 抓到的都送进后台账本 ——
   // 渲染层就算当场断气,主进程的账本还活着,下回排查有现场可看
-  ipcMain.on('atlas:renderer-error', (_event, text: unknown) => {
+  ipcMain.on(CH.rendererError, (_event, text: unknown) => {
     if (typeof text === 'string' && text.trim()) {
       console.log(`[renderer] 页面报错:${text.slice(0, 300)}`)
       addDevLog('system', `页面报错:${text.slice(0, 500)}`)
@@ -1897,7 +1898,7 @@ function registerIpc(): void {
   })
 
   // 「AI 设置」选模型文件:引擎已内置,用户只需要挑一个 GGUF 模型(弹窗认准来叫它的窗,同上)
-  ipcMain.handle('atlas:ai-pick-file', async (event) => {
+  ipcMain.handle(CH.aiPickFile, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = {
       properties: ['openFile'],
@@ -1911,7 +1912,7 @@ function registerIpc(): void {
   })
 
   // 连接测试 + 列出本地模型:叫 LM Studio 报告它加载了哪些模型
-  ipcMain.handle('atlas:ai-list-models', async (_event, baseUrl: unknown) => {
+  ipcMain.handle(CH.aiListModels, async (_event, baseUrl: unknown) => {
     if (typeof baseUrl !== 'string' || baseUrl.trim() === '') throw new Error('地址不能为空')
     const url = `${baseUrl.replace(/\/+$/, '')}/models`
     // 5 秒没应答就当没通:LM Studio 卡死时别让界面跟着无限转圈
@@ -1926,14 +1927,14 @@ function registerIpc(): void {
   // Tavily Key 体检(2026-09-17):设置里点「测一下」→ 拿框里那把 Key 查一次官方用量。
   // 打 /usage 不花搜索额度,Key 有效还能白带回本月剩余次数;只回结论,绝不回显 Key 本身
   // (报错信息里也不留);结果只在内存里给界面看,不落盘。
-  ipcMain.handle('atlas:ai-test-tavily', (_event, key: unknown) => {
+  ipcMain.handle(CH.aiTestTavily, (_event, key: unknown) => {
     const cleaned = sanitizeTavilyKey(key)
     if (!cleaned) throw new Error('Key 还是空的,先填一个再测。')
     return probeTavilyKey(cleaned, electronGetJson)
   })
 
   // git 改动总览:谁动了、动了多少行。不是 git 仓库时返回 isGitRepo=false,不炸
-  ipcMain.handle('atlas:git-changes', (_event, rootPath: unknown) => {
+  ipcMain.handle(CH.gitChanges, (_event, rootPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath.trim() === '') {
       throw new Error('路径不能为空')
     }
@@ -1942,7 +1943,7 @@ function registerIpc(): void {
 
   // 人话讲解一个改动:diff 由主进程现场重取(不信任渲染进程传内容),再喂本地模型
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
-  ipcMain.handle('atlas:git-explain-change', async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
+  ipcMain.handle(CH.gitExplainChange, async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
     }
@@ -1974,7 +1975,7 @@ function registerIpc(): void {
   // AI 干活报告(第六十三锤):整轮改动翻成大白话审计 —— 干了什么/账对不对/要不要细看。
   // 账本由主进程现场重取(渲染进程递不进假货);改动集没变就走签名缓存,不重复烧模型。
   // 报告比单句讲解长(三段式),生成上限放宽到 900 tokens。
-  ipcMain.handle('atlas:git-report', async (event, rootPath: unknown, requestId?: unknown) => {
+  ipcMain.handle(CH.gitReport, async (event, rootPath: unknown, requestId?: unknown) => {
     if (typeof rootPath !== 'string' || rootPath.trim() === '') {
       throw new Error('路径不能为空')
     }
@@ -2036,7 +2037,7 @@ function registerIpc(): void {
 
   // 功能定位(第六十七锤):「这个功能在哪」—— 渲染进程把扫描树递过来(不重扫不读文件),
   // 带路人照着地图指路;指回来的每个地址都对照真树点名,编造的一律拦下,全被拦就老实说指不了。
-  ipcMain.handle('atlas:locate-feature', async (_event, tree: unknown, question: unknown, requestId?: unknown) => {
+  ipcMain.handle(CH.locateFeature, async (_event, tree: unknown, question: unknown, requestId?: unknown) => {
     if (
       !tree ||
       typeof tree !== 'object' ||
@@ -2100,7 +2101,7 @@ function registerIpc(): void {
   // 不认识的用名字 + 内容片段让模型猜(声明不确定);二进制直接本地人话,不劳烦模型
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
-    'atlas:ai-explain-file',
+    CH.aiExplainFile,
     async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown, note?: unknown) => {
       if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
         throw new Error('参数不合法')
@@ -2187,7 +2188,7 @@ function registerIpc(): void {
   // 人话解释一个文件夹:目录清单就是证据;空文件夹直接本地人话,不劳烦模型
   // relPath 传 '' 表示解释项目根目录本身;自由聊天有专门的 atlas:ai-chat 通道
   ipcMain.handle(
-    'atlas:ai-explain-folder',
+    CH.aiExplainFolder,
     async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown) => {
     if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
       throw new Error('参数不合法')
@@ -2257,7 +2258,7 @@ function registerIpc(): void {
   // 垫在最前面,仅供参考,不进历史 —— 换对象不带旧资料,旧对话也不污染新对象。
   // 用户点名要联网(联网/搜搜/查查…)且开关开着,程序先按名字真查一份资料再开答;
   // 查询的每一步状态(查着了/没查到/没开开关)都以程序账本为准回传,模型说了不算。
-  ipcMain.handle('atlas:ai-chat', async (event, req: unknown): Promise<AiChatResult> => {
+  ipcMain.handle(CH.aiChat, async (event, req: unknown): Promise<AiChatResult> => {
     const startedAt = Date.now()
     const notRequested: WebLookupMeta = { requested: false, enabled: false, attempted: false, state: 'not_requested', sources: [] }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
@@ -2394,7 +2395,7 @@ function registerIpc(): void {
   // /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成一份要点摘要,
   // 渲染进程拦下 /compact 后走这条专属通道。流式增量照走 atlas:ai-delta 按 requestId 对号,
   // 「停一停」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
-  ipcMain.handle('atlas:ai-compact', async (event, req: unknown): Promise<AiExplainResult> => {
+  ipcMain.handle(CH.aiCompact, async (event, req: unknown): Promise<AiExplainResult> => {
     const startedAt = Date.now()
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
@@ -2422,7 +2423,7 @@ function registerIpc(): void {
   // 试一句(第一百一十三锤):设置页改完说话方式,拿草稿当场念一段听效果。
   // 关键在「草稿」二字 —— 走的是传进来的那份个性化,不是存档里的那份,
   // 所以还没点「应用更改」也能试,试完不满意直接退回,不用先存再改。
-  ipcMain.handle('atlas:ai-style-sample', async (event, personalization: unknown, requestId?: unknown): Promise<AiExplainResult> => {
+  ipcMain.handle(CH.aiStyleSample, async (event, personalization: unknown, requestId?: unknown): Promise<AiExplainResult> => {
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
       return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
@@ -2435,7 +2436,7 @@ function registerIpc(): void {
   })
 
   // 掐掉还在生成的讲解:渲染进程换了讲解目标/关掉卡片时喊一声,模型立刻空出来讲下一个
-  ipcMain.handle('atlas:ai-cancel', (_event, requestId: unknown) => {
+  ipcMain.handle(CH.aiCancel, (_event, requestId: unknown) => {
     if (typeof requestId !== 'string' || requestId === '') return
     explainAborters.get(requestId)?.abort()
     explainAborters.delete(requestId)
@@ -2444,7 +2445,7 @@ function registerIpc(): void {
   // 联网查证(可选举手):讲解认不出软件/品牌时,拿「名字」去公开源查免费资料。
   // 只许传名字,不许传本地路径 —— 隐私边界写在调用方;5 秒超时,查不到返回空串,上层自己回退。
   // Key 跟着配置走:用户填了 Tavily,这条通道也吃同一把 Key(Tavily → DDG → 维基)
-  ipcMain.handle('atlas:web-lookup', async (_event, query: unknown) => {
+  ipcMain.handle(CH.webLookup, async (_event, query: unknown) => {
     if (typeof query !== 'string' || query.trim() === '') return ''
     const { tavilyKey } = await loadAiConfig(app.getPath('userData'))
     return webLookup(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey })
@@ -2452,7 +2453,7 @@ function registerIpc(): void {
 
   // 右键文件链接复制完整路径:只往剪贴板写一个字符串,不开文件不执行任何东西 ——
   // 找到真文件后「开不开、怎么开」完全留给用户自己决定。路径照契约走 joinRoot 解析
-  ipcMain.handle('atlas:copy-file-path', (_event, rootPath: unknown, relPath: unknown) => {
+  ipcMain.handle(CH.copyFilePath, (_event, rootPath: unknown, relPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
       return { ok: false as const, message: '路径信息不完整,复制不了' }
     }
@@ -2467,7 +2468,7 @@ function registerIpc(): void {
 
   // 右键文件链接「在文件资源管理器中显示」:把资源管理器拉到文件面前、选中高亮,
   // 照样不开文件不执行任何东西 —— 到家门口为止,开不开门用户自己定
-  ipcMain.handle('atlas:reveal-file-path', (_event, rootPath: unknown, relPath: unknown) => {
+  ipcMain.handle(CH.revealFilePath, (_event, rootPath: unknown, relPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
       return { ok: false as const, message: '路径信息不完整,打不开' }
     }
@@ -2543,7 +2544,7 @@ function startApp(): void {
   })
   // 页签拖出主窗 / 页签右键「放到桌面」= 放出小探针(只认主窗渲染层发来的;
   // force=true 是右键菜单点的,跳过窗外判定,桌宠落记忆位)
-  ipcMain.on('atlas:freechat-detach', (event, force: unknown) => {
+  ipcMain.on(CH.freechatDetach, (event, force: unknown) => {
     if (BrowserWindow.fromWebContents(event.sender) !== mainWindowRef) return
     detachFreechat(force === true)
   })
@@ -2558,7 +2559,7 @@ function startApp(): void {
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('atlas:dev-log', entry)
+      if (!win.isDestroyed()) win.webContents.send(CH.devLog, entry)
     }
   })
   addDevLog('system', 'CodeAtlas 启动')

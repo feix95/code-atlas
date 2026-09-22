@@ -303,3 +303,5 @@
 - refactor(core): 「带得动」判定系数进 shared/modelShelf(MODEL_FIT_*),货架判定/黑板账/量尺/悬停文案四面共表;HF 双源域名货架与下载共用一份
 
 - refactor(window): 开窗样板收口 main/atlasWindow.ts——WEB_PREFS 安全开关四窗一副,露窗三保险(ready-to-show/首帧/看门狗)armRevealWatchdog 一处上弦,?view= 加载与视图名 VIEWS 统一对账
+
+- refactor(core): AtlasApi 类型收口——preload 桥对象提 const atlasApi 再 expose,Window.atlas 声明改 typeof 推导(env.d.ts 120 行手抄镜像退役);ChatMessage 契约挪 shared/types;69 个 IPC 通道名收 shared/ipcChannels 总账(CH.*),收发 165 处全引总账,通道对账自测学会解 CH

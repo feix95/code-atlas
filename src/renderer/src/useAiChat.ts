@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentSearchCard, AiStreamStats, AiUsage, AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+import type { AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, ChatMessage } from '@shared/types'
 import { COMPACT_SUMMARY_TAG } from '@shared/compact'
 import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
 import { friendlyErr } from './errText'
+
+// ChatMessage/ChatMsgState 户口在 shared/types.ts:它是主窗 → 主进程 → 气泡 的镜像快照契约,
+// 不只是本钩子的 UI 状态 —— 转一手,老朋友(App/BubblePage)照旧从这里进
+export type { ChatMessage, ChatMsgState } from '@shared/types'
 
 /**
  * 自由对话状态机(纯钩子,不含组件):和文件解释的 useAiAsk 完全分家,
@@ -11,31 +15,6 @@ import { friendlyErr } from './errText'
  * 这样换文件时旧资料自动消失,旧对话也不污染新对象。
  * 探针的联网账本(web)以主进程回传为准:边查边收实时播报,收尾以结果里的账本为准。
  */
-export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'
-
-export interface ChatMessage {
-  key: string
-  /** note = 程序垫的灰字条(如「参考资料换成了 xxx」),不发模型、不进历史 */
-  role: 'user' | 'assistant' | 'note'
-  text: string
-  state: ChatMsgState
-  /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式;
-   * summary(第一百四十二锤)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型;
-   * matches(LLM 优化锤)= 命中清单卡,search_content 搜到的结构化命中程序直接摆卡 */
-  kind?: 'step' | 'summary' | 'matches'
-  /** kind = 'matches' 时的卡数据(主进程旁路直递的完整命中) */
-  matches?: AgentSearchCard
-  /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
-  reasoning?: string
-  /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
-  /** 本次问答收尾的 token 账(第八十四锤):引擎肯报才有 */
-  /** 流式过程中的实时账(第八十四锤) */
-  stats?: AiStreamStats
-  usage?: AiUsage
-  web: WebLookupMeta | null
-  /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
-  refs?: ChatCodeRef[]
-}
 
 /** /compact 压缩完保留最近几条原文(第一百四十二锤):摘要垫底 + 这几条原文,衔接不断片 */
 const COMPACT_KEEP_RECENT = 4

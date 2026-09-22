@@ -511,6 +511,38 @@ export type BubbleResizeMsg =
   | { phase: 'move'; x: number; y: number }
   | { phase: 'end' }
 
+/** 自由对话一条消息的出险状态:busy 生成中 / done 完工 / error 出错 / cancelled 被掐 */
+export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'
+
+/**
+ * 共享自由对话的一条消息(桌宠气泡锤):既是主窗公用场的 UI 状态,也是
+ * 主窗 → 主进程 → 气泡 的镜像快照契约 —— 三边同一形状,不许各画各的。
+ * 消息只有用户和探针两种;note = 程序垫的灰字条,不发模型、不进历史。
+ */
+export interface ChatMessage {
+  key: string
+  /** note = 程序垫的灰字条(如「参考资料换成了 xxx」),不发模型、不进历史 */
+  role: 'user' | 'assistant' | 'note'
+  text: string
+  state: ChatMsgState
+  /** note 的细分(第一百四十一锤):step = 翻文件模式探针干活的步骤,时间线样式;
+   * summary(第一百四十二锤)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型;
+   * matches(LLM 优化锤)= 命中清单卡,search_content 搜到的结构化命中程序直接摆卡 */
+  kind?: 'step' | 'summary' | 'matches'
+  /** kind = 'matches' 时的卡数据(主进程旁路直递的完整命中) */
+  matches?: AgentSearchCard
+  /** 模型的思考过程(第一百一十五锤):思考型模型才有的字,界面折叠展示 */
+  reasoning?: string
+  /** 流式过程中的实时账(第八十四锤) */
+  stats?: AiStreamStats
+  /** 本次问答收尾的 token 账(第八十四锤):引擎肯报才有 */
+  usage?: AiUsage
+  /** 助手消息才挂的联网账本;还没收到任何账本时为 null(界面就不挂标签) */
+  web: WebLookupMeta | null
+  /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
+  refs?: ChatCodeRef[]
+}
+
 /** 联网查询进行中/结束时的实时播报(主进程 → 渲染进程),按 requestId 对号入座 */
 export interface AiChatLookupPayload {
   id: string

@@ -7,6 +7,7 @@
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import type { Rectangle } from 'electron'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
+import { CH } from '../shared/ipcChannels.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { placeBubbleBox, resizeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT, type PlacementBox } from './bubblePlacement.ts'
 import { readBubbleSize, writeBubbleSize } from './bubbleState.ts'
@@ -140,26 +141,26 @@ export function registerBubbleIpc(deps: {
   /** 最新一份会话快照:气泡开窗先拉这个,之后吃增量推送 */
   let latestMirror: unknown = null
   // 主窗公用场 → 镜像:只认主窗发来的(别的窗冒名不收),快照换主进程推给气泡
-  ipcMain.on('atlas:freechat-mirror', (event, messages: unknown) => {
+  ipcMain.on(CH.freechatMirror, (event, messages: unknown) => {
     if (BrowserWindow.fromWebContents(event.sender) !== deps.getMainWindow()) return
     latestMirror = messages
-    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.webContents.send('atlas:freechat-push', messages)
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.webContents.send(CH.freechatPush, messages)
   })
   // 气泡 → 主窗的输入:只认气泡窗发来的,转给主窗渲染层调 chat.send/cancel
-  ipcMain.on('atlas:freechat-input', (event, payload: unknown) => {
+  ipcMain.on(CH.freechatInput, (event, payload: unknown) => {
     if (BrowserWindow.fromWebContents(event.sender) !== bubbleWindow) return
     const main = deps.getMainWindow()
-    if (main && !main.isDestroyed()) main.webContents.send('atlas:freechat-input', payload)
+    if (main && !main.isDestroyed()) main.webContents.send(CH.freechatInput, payload)
   })
   // 「回主面板」:气泡头部按钮和主窗占位卡走同一条收回链路(走出面板锤)。
   // 只认这两扇窗发来的;以前只唤主窗不藏气泡 —— 气泡被盖在主窗背后,
   // 系统里还算开着,再点桌宠先执行「关」、要再点一下才开(小葵验收点的名)
-  ipcMain.on('atlas:open-main', (event) => {
+  ipcMain.on(CH.openMain, (event) => {
     const sender = BrowserWindow.fromWebContents(event.sender)
     if (sender !== bubbleWindow && sender !== deps.getMainWindow()) return
     deps.dock()
   })
-  ipcMain.handle('atlas:freechat-pull', () => latestMirror)
+  ipcMain.handle(CH.freechatPull, () => latestMirror)
 
   // 气泡拖拽缩放(气泡放大锤):渲染层报光标屏幕坐标,主进程对账 setBounds ——
   // 钉对侧边/夹最小值/不出屏的账全在 resizeBubbleBox 纯函数里,自测有量。
@@ -167,7 +168,7 @@ export function registerBubbleIpc(deps: {
   const isDir = (v: unknown): v is BubbleResizeDir =>
     v === 'n' || v === 'ne' || v === 'e' || v === 'se' || v === 's' || v === 'sw' || v === 'w' || v === 'nw'
   const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-  ipcMain.on('atlas:bubble-resize', (event, msg: BubbleResizeMsg) => {
+  ipcMain.on(CH.bubbleResize, (event, msg: BubbleResizeMsg) => {
     if (BrowserWindow.fromWebContents(event.sender) !== bubbleWindow) return
     const win = bubbleWindow
     if (!win || win.isDestroyed() || !msg || typeof msg !== 'object') return
