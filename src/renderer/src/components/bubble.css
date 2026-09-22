@@ -20,7 +20,7 @@
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  /* 不画 box-shadow:透明窗首帧阴影来不及合成会闪一块白底,宁可不要 */
   overflow: hidden;
   /* 缩放手柄层的定位锚(气泡放大锤) */
   position: relative;

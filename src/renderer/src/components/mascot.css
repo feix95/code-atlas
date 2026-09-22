@@ -12,14 +12,14 @@
   user-select: none;
 }
 
-/* 身体:96px 圆家伙,青绿渐变(临时配色),悬浮小阴影,拖动光标 */
+/* 身体:96px 圆家伙,青绿渐变(临时配色),拖动光标。
+   不画 box-shadow:透明窗首帧阴影来不及合成会闪一块白底,宁可不要 */
 .mascot-body {
   position: relative;
   width: 96px;
   height: 96px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #7be3b0, #2fa874 68%, #218b5e);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
   cursor: grab;
   animation: mascot-breathe 3.2s ease-in-out infinite;
 }
