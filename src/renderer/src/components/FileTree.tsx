@@ -4,6 +4,10 @@ import type { NoteMap } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
 import { openFilePathMenuFor } from './filePathMenuStore'
 
+/** 文件树图标总控:本树内所有 icon(文件/文件夹)共享这一个尺寸,改这里全场生效;
+ *  只管这棵树,跟其他区域的图标尺寸互不相干 */
+const TREE_ICON_SIZE = 15
+
 interface TreeRowProps {
   node: ScanTreeNode
   depth: number
@@ -62,7 +66,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={node.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name={node.summary?.icon ?? 'file'} size={15} />}
+            {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} />}
           </span>
           <span className="tree-name">{node.name}</span>
           {note ? (
@@ -143,7 +147,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           title={dir.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name="folder" size={15} />}
+            {<TreeIcon name="folder" size={TREE_ICON_SIZE} />}
           </span>
           <span className="tree-name">{dir.name}</span>
           {dirNote ? (

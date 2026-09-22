@@ -330,6 +330,14 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   filter: brightness(0.82);
 }
 
+/* 窗控钮不画焦点提示:全局 :focus-visible 的 outline 画在方盒上像个怪框,
+   挪成圆点光环又被误判成「圆点变大」—— Electron 失焦/重获焦会把鼠标点过的钮
+   误判成键盘焦点,任何焦点标记在这儿都是时隐时现的「渲染故障」。窗控钮是鼠标
+   领地,Tab 本来也很少走到,直接豁免干净 */
+.traffic-lights .light:focus-visible {
+  outline: none;
+}
+
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
 :focus-visible {
   outline: 2px solid var(--muted);
@@ -4003,36 +4011,42 @@ body.is-maximized .cfg-layer {
   background: var(--line-soft);
 }
 
+/* 卡框左右缘对齐导航项盒子(margin 0 + 侧栏 padding 0.6875),
+   chip 落在 0.6875+0.625=1.3125rem —— 跟导航 chip 一条竖线 */
 .cfg-nav-context {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0.4375rem;
-  padding: 0.625rem 0.5rem;
+  margin: 0;
+  padding: 0.625rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface) 55%, transparent);
 }
 
+/* chip 跟导航项同款(27px 方盒 + radius-sm),图标在方框里居中;accent 色保留身份 */
 .cfg-context-icon {
-  width: 1.4375rem;
-  height: 1.4375rem;
+  width: 1.6875rem;
+  height: 1.6875rem;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
   color: var(--accent-bright);
-  border-radius: 0.3125rem;
+  border-radius: var(--radius-sm);
   background: var(--accent-soft);
 }
 
+/* 只给文字行的 span 立 block;图标 chip(cfg-context-icon 也是 span)不能被误伤,
+   不然 display:grid 被顶掉、图标就贴到 chip 左上角去了 —— 之前「小电脑蹲左上」的病根 */
 .cfg-nav-context strong,
-.cfg-nav-context span {
+.cfg-nav-context div span {
   display: block;
 }
 
+/* 标题字号跟导航项一致(0.6875rem),不再小一号 */
 .cfg-nav-context strong {
   color: var(--text);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 
 .cfg-nav-context span {
@@ -5704,6 +5718,16 @@ body.is-maximized .cfg-layer {
   display: block;
 }
 
+/* 图标一图一色(图标册 v5):svg 上挂 --ic(深底色)和 --ic-l(浅底色,同色相明度×0.58);
+   默认浅主题吃 --ic-l,html 挂 data-theme='dark' 时切 --ic */
+.ticon {
+  color: var(--ic-l, currentColor);
+}
+
+:root[data-theme='dark'] .ticon {
+  color: var(--ic, currentColor);
+}
+
 /* ── 迷你 Markdown(第一百零七锤):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
 .md {
   white-space: normal;
@@ -5915,7 +5939,8 @@ body.is-maximized .cfg-layer {
 /* 小笔写字动画(第一百零九锤补):保存瞬间以笔尖为轴轻磕一下,笔迹从笔尖划出淡出 */
 @media (prefers-reduced-motion: no-preference) {
   .note-pen.is-tapping {
-    transform-origin: 2.2px 14.6px;
+    /* 轴心=笔尖(pencil-line 24 栅格稿的笔尖约在 12%,87%);用百分比写,图标缩放不用跟着改 */
+    transform-origin: 12% 87%;
     animation: pen-tap 0.35s var(--ease-smooth);
   }
 

@@ -1,12 +1,68 @@
-/** 备注小笔(第九十八锤):细线单色,跟设置齿轮、git 分支一家 —— 不用彩色 emoji(小葵裁定)。
- *  第一百零九锤补:写字动画 —— 「is-tapping」时以笔尖为轴轻磕一下并从笔尖划出一道笔迹淡出 */
+/* ── 图标配色(图标册 v5 落地):一图一色,实线稿无填充。
+ *  --ic  深底色(直接存)
+ *  --ic-l 浅底色(同色相、明度 ×0.58,跟 v5 预览页同一公式换算)
+ *  默认吃 --ic-l(浅色主题),:root[data-theme='dark'] 时切 --ic —— 规则在 main.css .ticon ── */
+const ICON_COLORS: Record<string, string> = {
+  file: '#8fa8cc', folder: '#eab75c', doc: '#63aef2', config: '#b28ef2', style: '#f2789f',
+  terminal: '#5fd49a', image: '#a78bfa', audio: '#4fd0c0', video: '#f2807a', font: '#96a8f0',
+  archive: '#d9a06c', test: '#5fd0a0', entry: '#5ec98a', lock: '#e5b960', key: '#f2cd6b',
+  package: '#e8936b', code: '#56c8ea', database: '#7aa8f0', globe: '#62bcd9', component: '#6fd3a7',
+  table: '#6bc4c4', wrench: '#9fb0c3', data: '#f0c75e', gear: '#b6aee6',
+  bulb: '#f5d060', clip: '#9fb0c3', copy: '#9fb0c3', pin: '#f27676', arrowUp: '#6aaef5',
+  expand: '#9fb0c3', collapse: '#9fb0c3', folderSearch: '#eab75c', brain: '#f292b8',
+  markStart: '#56c8ea', markEnd: '#56c8ea', bot: '#f5a35f', help: '#7aa8f0', check: '#a78bfa',
+  cpu: '#f08fa8', arrows: '#93a6c4', arrowLeft: '#93a6c4', arrowRight: '#93a6c4',
+  refresh: '#4fd0a8', notepen: '#d9b26b'
+}
+
+function hexToHsl(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, l]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let h: number
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0)
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  return [h / 6, s, l]
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  const hue = (t: number): number => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  const to = (v: number): string => Math.round(v * 255).toString(16).padStart(2, '0')
+  return `#${to(hue(h + 1 / 3))}${to(hue(h))}${to(hue(h - 1 / 3))}`
+}
+
+/** 给 svg 挂双主题色令牌:深底 --ic、浅底 --ic-l(明度×0.58) */
+function tint(hex: string): React.CSSProperties {
+  const [h, s, l] = hexToHsl(hex)
+  return { '--ic': hex, '--ic-l': hslToHex(h, Math.min(1, s * 1.06), l * 0.58) } as React.CSSProperties
+}
+
+/** 备注小笔(v5 换 Lucide pencil-line 官方稿,顺带从 16 栅格升 24):
+ *  「is-tapping」时以笔尖为轴轻磕一下并从笔尖划出一道笔迹淡出 */
 export function NotePen({ size = 12, tapping = false }: { size?: number; tapping?: boolean }): React.JSX.Element {
   return (
     <svg
-      className={`note-pen${tapping ? ' is-tapping' : ''}`}
+      className={`note-pen ticon${tapping ? ' is-tapping' : ''}`}
+      style={tint(ICON_COLORS.notepen)}
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -14,56 +70,56 @@ export function NotePen({ size = 12, tapping = false }: { size?: number; tapping
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M11.3 2.5a1.9 1.9 0 0 1 2.7 2.7L5.6 13.6l-3.4.9.9-3.4Z" />
-      <path d="m9.9 3.9 2.7 2.7" />
-      <path className="note-pen-trail" d="M2 15.5h5" />
+      <path className="note-pen-trail" d="M13 21h8" />
+      <path d="m15 5 4 4" />
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
     </svg>
   )
 }
 
-/** 顶栏线稿图标家族(第一百零三锤):跟备注小笔一家 —— 细线单色,currentColor 吃主题色 */
-export function IconArrowLeft({ size = 14 }: { size?: number }): React.JSX.Element {
+/** 顶栏线稿图标家族(第一百零三锤;v5 上色:跟文件树一套令牌;
+ *  mono=true 时去色吃 currentColor —— 顶栏那组走单色,聊天/Git 面板的同款照旧彩色) */
+export function IconArrowLeft({ size = 14, mono = false, strokeWidth = 2 }: { size?: number; mono?: boolean; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg className="top-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M19 12H5" />
+    <svg className={mono ? 'top-icon' : 'top-icon ticon'} style={mono ? undefined : tint(ICON_COLORS.arrowLeft)} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
     </svg>
   )
 }
 
-export function IconArrowRight({ size = 14 }: { size?: number }): React.JSX.Element {
+export function IconArrowRight({ size = 14, mono = false, strokeWidth = 2 }: { size?: number; mono?: boolean; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg className="top-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={mono ? 'top-icon' : 'top-icon ticon'} style={mono ? undefined : tint(ICON_COLORS.arrowRight)} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
     </svg>
   )
 }
 
-export function IconRefresh({ size = 14 }: { size?: number }): React.JSX.Element {
+export function IconRefresh({ size = 14, mono = false, strokeWidth = 2 }: { size?: number; mono?: boolean; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg className="top-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
+    <svg className={mono ? 'top-icon' : 'top-icon ticon'} style={mono ? undefined : tint(ICON_COLORS.refresh)} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
     </svg>
   )
 }
 
-export function IconFolder({ size = 14 }: { size?: number }): React.JSX.Element {
+/* 「打开项目」钮上的文件夹不吃彩色:它坐在 accent 底上,得跟按钮文字同色(accent-ink)保住对比度 */
+export function IconFolder({ size = 14, strokeWidth = 2 }: { size?: number; strokeWidth?: number }): React.JSX.Element {
   return (
-    <svg className="top-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="top-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
     </svg>
   )
 }
 
-/* ── 树图标册(第一百零六锤):一图一义,全部 24 线稿、currentColor、随主题换装 ── */
+/* ── 树图标册:一图一义、24 线稿、一图一色(v5:小葵手改稿 + Lucide 官方稿混编) ── */
 
-function Line({ children, size = 13, strokeWidth = 2 }: { children: React.ReactNode; size?: number; strokeWidth?: number }): React.JSX.Element {
+function Line({ children, size = 13, strokeWidth = 2, color }: { children: React.ReactNode; size?: number; strokeWidth?: number; color?: string }): React.JSX.Element {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={color ? 'ticon' : undefined} style={color ? tint(color) : undefined} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {children}
     </svg>
   )
@@ -71,26 +127,35 @@ function Line({ children, size = 13, strokeWidth = 2 }: { children: React.ReactN
 
 /** 图标册:名字 → 线稿。新词条先查册领图,一图一义,不许一个图顶两个岗 */
 const BOOK: Record<string, React.ReactNode> = {
-  file: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" /><path d="M14 2v6h6" /></>,
-  folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />,
+  // 兜底文件(v5 换 Lucide file-question-mark):认不出的文件就画个问号
+  file: <><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /><path d="M12 17h.01" /><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3" /></>,
+  // 文件夹(小葵稿):加一道盒盖横线
+  folder: <><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /><path d="M2 10.5h20" /></>,
   doc: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" /><path d="M14 2v6h6" /><path d="M8 13h8" /><path d="M8 17h8" /></>,
   config: <><path d="M21 4h-7" /><path d="M10 4H3" /><path d="M21 12h-9" /><path d="M8 12H3" /><path d="M21 20h-5" /><path d="M12 20H3" /><path d="M14 2v4" /><path d="M8 10v4" /><path d="M16 18v4" /></>,
-  style: <path d="M12 2.7s-6.5 6.6-6.5 11a6.5 6.5 0 0 0 13 0c0-4.4-6.5-11-6.5-11Z" />,
+  // 样式(v5 换 Lucide paint-roller):刷样式=刷漆
+  style: <><rect width="16" height="6" x="2" y="2" rx="2" /><path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect width="4" height="6" x="8" y="16" rx="1" /></>,
   terminal: <><path d="M4 17l6-5-6-5" /><path d="M12 19h8" /></>,
-  image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-4.5-4.5L6 21" /></>,
+  image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" fill="currentColor" stroke="none" /><path d="M21 15l-4.5-4.5L6 21" /></>,
   audio: <><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></>,
   video: <><rect x="2" y="6" width="14" height="12" rx="2" /><path d="M22 8l-6 4 6 4V8Z" /></>,
   font: <><path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" /></>,
   archive: <><rect x="2" y="3" width="20" height="5" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></>,
-  test: <><path d="M10 2v7.5L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V2" /><path d="M8.5 2h7" /><path d="M7 16h10" /></>,
-  entry: <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></>,
+  // 测试(v5 换 Lucide file-check 角标版):文件折角 + 右下角对勾
+  test: <><path d="M10.5 22H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v6" /><path d="M14 2v5a1 1 0 0 0 1 1h5" /><path d="m14 20 2 2 4-4" /></>,
+  // 入口(小葵稿):箭头尾部分一长一短两截
+  entry: <><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M10.4 8.6l3.9 3.4-3.9 3.4" /><path d="M3 12h6" /><path d="M7.6 12h1.9" /></>,
   lock: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
-  key: <><circle cx="7.5" cy="15.5" r="3.5" /><path d="M21 2l-9.6 9.6" /><path d="M15.5 7.5l3 3L22 7l-3-3" /></>,
-  package: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M3.27 6.96 12 12.01l8.73-5.05" /><path d="M12 22.08V12" /></>,
+  // 密钥(v5 换 Lucide key-round):圆环在右上,齿朝左下
+  key: <><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" /><circle cx="16.5" cy="7.5" r=".5" fill="currentColor" stroke="none" /></>,
+  // 依赖清单(v5 换 Lucide package 官方稿):顶面一道胶带
+  package: <><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" /></>,
   code: <><path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" /></>,
-  database: <><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" /></>,
+  // 数据库(v5 换 Lucide server):两层机架盒 + 左侧指示灯
+  database: <><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></>,
   globe: <><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" /><path d="M2 12h20" /></>,
-  component: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+  // 组件(v5 换 Lucide blocks):积木块
+  component: <><path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2" /><rect x="14" y="2" width="8" height="8" rx="1" /></>,
   table: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /><path d="M12 3v18" /></>,
   check: <><circle cx="12" cy="12" r="10" /><path d="M8.5 12.5l2.5 2.5 5-6" /></>,
   bot: <><rect x="4" y="9" width="16" height="11" rx="2" /><path d="M12 9V5" /><path d="M9 5h6" /><path d="M9 14v.01" /><path d="M15 14v.01" /></>,
@@ -102,6 +167,10 @@ const BOOK: Record<string, React.ReactNode> = {
   clip: <><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></>,
   copy: <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   gitbranch: <><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="12" r="3" /><path d="M6 9v6" /><path d="M15 6a6 6 0 0 1 3 6" /></>,
+  // .json 花括号(v5 新户口):summarizer 发 'data',以前一直落文件兜底
+  data: <><path d="M9 3.5c-2.2 0-3 1.1-3 2.8v3c0 1.2-.9 1.9-2 2.2 1.1.3 2 1 2 2.2v3c0 1.7.8 2.8 3 2.8" /><path d="M15 3.5c2.2 0 3 1.1 3 2.8v3c0 1.2.9 1.9 2 2.2-1.1.3-2 1-2 2.2v3c0 1.7-.8 2.8-3 2.8" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></>,
+  // 齿轮(v5 新户口,Lucide settings):设置钮 + *.config.*/config 目录的 '⚙️' 统一改发 'gear'
+  gear: <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></>,
   // 选区首尾的一对角括号(第一百一十四锤):一正一反,读作「从这里开始 / 到这里结束」
   markStart: <path d="M15 3H8v18h7" />,
   markEnd: <path d="M9 3h7v18H9" />,
@@ -118,7 +187,9 @@ const BOOK: Record<string, React.ReactNode> = {
   pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>
 }
 
-/** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头) */
-export function TreeIcon({ name, size = 13, strokeWidth }: { name: string; size?: number; strokeWidth?: number }): React.JSX.Element {
-  return <Line size={size} strokeWidth={strokeWidth}>{BOOK[name] ?? BOOK['file']}</Line>
+/** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头);
+ *  mono=true 去色吃 currentColor(顶栏那种单色岗用),不传照旧一图一色 */
+export function TreeIcon({ name, size = 13, strokeWidth, mono = false }: { name: string; size?: number; strokeWidth?: number; mono?: boolean }): React.JSX.Element {
+  const key = name in BOOK ? name : 'file'
+  return <Line size={size} strokeWidth={strokeWidth} color={mono ? undefined : ICON_COLORS[key]}>{BOOK[key]}</Line>
 }

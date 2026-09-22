@@ -47,6 +47,11 @@ import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh, TreeIcon } from
 /** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
 const MIRROR_THROTTLE_MS = 100
 
+/** 顶栏图标旋钮:打开项目/后退/前进/刷新/设置 五颗共享一套规格,跟文件树等别处分组互不相关。
+ *  描边数换算:图标是 24 栅格,18px 下想真看出 2px 粗,strokeWidth = 2×24/18 ≈ 2.7 */
+const TOPBAR_ICON_SIZE = 18
+const TOPBAR_ICON_STROKE = 2.7
+
 /**
  * 右栏页签(小葵的页签模型,2026-09-13 线框图定稿):
  * 页签分三个品类 —— 概览 / Atlas 小探针(自由对话) / 文件预览,品类能不能挂在某个节点上,
@@ -1530,10 +1535,10 @@ function App(): React.JSX.Element {
           CodeAtlas
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
-          <IconFolder />
+          <IconFolder size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} />
           {scanning ? '扫描中……' : '打开项目'}
         </button>
-        {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰 */}
+        {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰;三颗全走 mono 单色 */}
         <button
           type="button"
           className="btn btn-ghost"
@@ -1542,7 +1547,7 @@ function App(): React.JSX.Element {
           title="后退"
           aria-label="后退"
         >
-          <IconArrowLeft />
+          <IconArrowLeft size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
         </button>
         <button
           type="button"
@@ -1552,11 +1557,17 @@ function App(): React.JSX.Element {
           title="前进"
           aria-label="前进"
         >
-          <IconArrowRight />
+          <IconArrowRight size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} disabled={scanning}>
-          <IconRefresh />
-          {scanning ? '扫描中……' : '刷新'}
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => void handleRefresh()}
+          disabled={scanning}
+          title={scanning ? '扫描中……' : '刷新'}
+          aria-label="刷新"
+        >
+          <IconRefresh size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
         </button>
         <div className={`path-box${pathShaking ? ' is-shaking' : ''}`} onAnimationEnd={() => setPathShaking(false)}>
           <input
@@ -1591,7 +1602,7 @@ function App(): React.JSX.Element {
           }}
           aria-label="打开设置"
         >
-          ⚙
+          <TreeIcon name="gear" size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
         </button>
       </header>
 

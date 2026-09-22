@@ -357,6 +357,9 @@ function Icon({ name, size = 15, strokeWidth = 2 }: { name: string; size?: numbe
   )
 }
 
+/** 设置侧栏「工作区偏好」组导航图标旋钮:四颗条目共享一个大小,跟别处互不相关 */
+const NAV_ICON_SIZE = 18
+
 const MODES: Array<{ key: AppearanceMode; name: string }> = [
   { key: 'auto', name: '跟随系统' },
   { key: 'light', name: '白天' },
@@ -760,7 +763,7 @@ export function SettingsDialog({
                 onClick={() => gotoSection(item.key)}
               >
                 <span className="cfg-nav-icon">
-                  <Icon name={item.icon} size={14} />
+                  <Icon name={item.icon} size={NAV_ICON_SIZE} />
                 </span>
                 <span>
                   <strong>{item.name}</strong>
@@ -772,7 +775,7 @@ export function SettingsDialog({
             <div className="cfg-nav-rule" />
             <div className="cfg-nav-context">
               <span className="cfg-context-icon">
-                <Icon name="monitor" size={13} />
+                <Icon name="monitor" size={NAV_ICON_SIZE} />
               </span>
               <div>
                 <strong>当前工作区</strong>

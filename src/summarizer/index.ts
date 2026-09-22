@@ -82,7 +82,7 @@ const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
   { re: /^\.env(\.|$)/, summary: TIER3('key', '配置开关，常包含密钥，不要外传') },
   { re: /^dockerfile\./, summary: { icon: 'package', text: 'Docker 说明：项目怎么打包运行' } },
   { re: /\.d\.ts$/, summary: { icon: 'doc', text: '类型说明：库的类型清单' } },
-  { re: /\.config\./, summary: { icon: '⚙️', text: '配置文件' } }
+  { re: /\.config\./, summary: { icon: 'gear', text: '配置文件' } }
 ]
 
 // 认得出是代码的语言 id:给"入口角色"提示用(样式/标记类语言不掺和)
@@ -272,24 +272,24 @@ const DIR_SUMMARIES: Record<string, NodeSummary> = {
   pages: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
   screens: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
   layouts: { icon: 'component', text: '界面按钮、卡片等可复用组件' },
-  config: { icon: '⚙️', text: '配置文件' },
-  configs: { icon: '⚙️', text: '配置文件' },
-  configuration: { icon: '⚙️', text: '配置文件' },
-  settings: { icon: '⚙️', text: '配置文件' },
-  styles: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
-  style: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
-  css: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
-  scss: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
-  sass: { icon: '🎨', text: '界面的颜色、字体、间距样式' },
-  types: { icon: '📐', text: '类型定义' },
-  typings: { icon: '📐', text: '类型定义' },
-  interfaces: { icon: '📐', text: '类型定义' },
-  api: { icon: '📡', text: '供其他程序调用的接口' },
-  apis: { icon: '📡', text: '供其他程序调用的接口' },
-  routes: { icon: '📡', text: '供其他程序调用的接口' },
-  controllers: { icon: '📡', text: '供其他程序调用的接口' },
-  endpoints: { icon: '📡', text: '供其他程序调用的接口' },
-  hooks: { icon: '🪝', text: '可复用的界面逻辑' },
+  config: { icon: 'gear', text: '配置文件' },
+  configs: { icon: 'gear', text: '配置文件' },
+  configuration: { icon: 'gear', text: '配置文件' },
+  settings: { icon: 'gear', text: '配置文件' },
+  styles: { icon: 'style', text: '界面的颜色、字体、间距样式' },
+  style: { icon: 'style', text: '界面的颜色、字体、间距样式' },
+  css: { icon: 'style', text: '界面的颜色、字体、间距样式' },
+  scss: { icon: 'style', text: '界面的颜色、字体、间距样式' },
+  sass: { icon: 'style', text: '界面的颜色、字体、间距样式' },
+  types: { icon: 'data', text: '类型定义' },
+  typings: { icon: 'data', text: '类型定义' },
+  interfaces: { icon: 'data', text: '类型定义' },
+  api: { icon: 'globe', text: '供其他程序调用的接口' },
+  apis: { icon: 'globe', text: '供其他程序调用的接口' },
+  routes: { icon: 'globe', text: '供其他程序调用的接口' },
+  controllers: { icon: 'globe', text: '供其他程序调用的接口' },
+  endpoints: { icon: 'globe', text: '供其他程序调用的接口' },
+  hooks: { icon: 'code', text: '可复用的界面逻辑' },
   store: { icon: 'database', text: '数据和数据库代码' },
   stores: { icon: 'database', text: '数据和数据库代码' },
   state: { icon: 'database', text: '数据和数据库代码' },
@@ -365,7 +365,7 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
 
   // 词根词典(第九十九锤):业务起的名(scanner/summarizer)按词根给个身份词
   const dirWords = translateName(node.name)
-  if (dirWords) return { icon: '📦', text: dirWords }
+  if (dirWords) return { icon: 'folder', text: dirWords }
 
   // 状态播报:分级扫描还没展开这层,老实说"还没展开",别让人以为是个空文件夹
   if (node.lazy) {
