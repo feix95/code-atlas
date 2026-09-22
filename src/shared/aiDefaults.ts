@@ -23,6 +23,25 @@ export function normalizeContextSize(contextSize: number): number {
  *  普通聊天和 agent 同一口径;首帧之后由流式看门狗自己接管 */
 export const AI_HEADERS_TIMEOUT_MS = 120_000
 
+/** 非流式收正文的耐心(毫秒):响应头到手后,整篇 JSON 还得等服务写完 */
+export const AI_BODY_TIMEOUT_MS = 120_000
+
+/** 流式第一帧的耐心(毫秒):头到手 ≠ 开吐,大提示词预处理可能整段静默 */
+export const AI_STREAM_FIRST_FRAME_MS = 120_000
+
+/** 流式帧与帧之间的耐心(毫秒):吐着吐着卡住,超过它就当流死了 */
+export const AI_STREAM_IDLE_MS = 30_000
+
+/** 探测 LM Studio 的耐心(毫秒):状态栏探测和上下文探测同一口径 ——
+ *  本地服务 3 秒没回音就是没开/卡死,别拖累界面 */
+export const PROBE_LMSTUDIO_MS = 3_000
+
+/** 向已就绪服务要模型清单的耐心(毫秒):LM Studio 连接测试和内置引擎 fetchModelId 同一口径 */
+export const PROBE_MODELS_MS = 5_000
+
+/** 内置引擎 /health 轮询一格的耐心(毫秒):循环等就绪里每跳问一次 */
+export const PROBE_HEALTH_MS = 2_000
+
 /** 聊天请求的采样温度:讲解类任务要稳不要飘,普通聊天和 agent 同一口径 */
 export const CHAT_TEMPERATURE = 0.2
 

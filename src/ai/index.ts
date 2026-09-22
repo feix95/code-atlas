@@ -20,7 +20,8 @@ import type { AiUsage, AiStreamStats,
 import { parseLoadProgress } from './builtin.ts'
 import { detectRepetitionTail, truncateAtRepetition } from './repetition.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { AI_ANTI_REPEAT_PARAMS, AI_HEADERS_TIMEOUT_MS, ATTACHMENT_DETAILS_MAX, CHAT_TEMPERATURE, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { AI_ANTI_REPEAT_PARAMS, AI_BODY_TIMEOUT_MS, AI_STREAM_FIRST_FRAME_MS, AI_STREAM_IDLE_MS, ATTACHMENT_DETAILS_MAX, CHAT_TEMPERATURE, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
+import { fetchWithTimeout, postChatCompletions, stripApiSuffix } from './http.ts'
 import { formatUsage } from '../shared/aiText.ts'
 import { buildSummaryText } from '../shared/compact.ts'
 import { CURRENT_QUESTION_PREFIX, CURRENT_QUESTION_SUFFIX } from '../shared/chatHistory.ts'
@@ -672,10 +673,9 @@ export function filterLocateHits(root: ScanDirNode, hits: FeatureHit[]): Feature
 /** 拿不到真实上下文时的默认:和内置引擎的默认窗口同一个数(数住在 shared/aiDefaults),转出去给老调用方 */
 export { DEFAULT_CONTEXT_SIZE }
 
-/** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
-export function isContextOverflow(text: string): boolean {
-  return /exceeds the available context|context size|context length|too many tokens|n_ctx/i.test(text)
-}
+// 「上下文装不下」嗅探 + HTTP 错误人话翻译的户口搬进了 ai/http.ts(请求底座批);
+// 转一手 re-export,老朋友(main/自测)照旧从这里进
+export { isContextOverflow, friendlyHttpError } from './http.ts'
 
 /** LM Studio 扩展接口的模型列表 → 目标模型的上下文长度(纯函数;认不出回 null) */
 export function parseLmStudioContext(raw: string, model: string): number | null {
@@ -737,14 +737,14 @@ export async function probeContextSize(target: ChatTarget, kind: 'lmstudio' | 'b
   const key = `${target.baseUrl}|${target.model}`
   const cached = ctxProbeCache.get(key)
   if (cached && Date.now() - cached.at < CTX_PROBE_TTL_MS) return cached.value
-  const root = target.baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+  const root = stripApiSuffix(target.baseUrl)
   let value: number | null = null
   try {
     if (kind === 'lmstudio') {
-      const res = await fetch(`${root}/api/v0/models`, { signal: AbortSignal.timeout(3000) })
+      const res = await fetchWithTimeout(`${root}/api/v0/models`, PROBE_LMSTUDIO_MS)
       if (res.ok) value = parseLmStudioContext(await res.text(), target.model)
     } else {
-      const res = await fetch(`${root}/props`, { signal: AbortSignal.timeout(3000) })
+      const res = await fetchWithTimeout(`${root}/props`, PROBE_LMSTUDIO_MS)
       if (res.ok) value = parseLlamaProps(await res.text())
     }
   } catch {
@@ -1053,7 +1053,7 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
     let idleTimer: ReturnType<typeof setTimeout> | undefined
     const idleBell = new Promise<'idle'>((resolve) => {
       // 首帧前的静默是大提示词的预处理,给足两分钟;吐字中途 30 秒没动静才算真卡住
-      idleTimer = setTimeout(() => resolve('idle'), writing ? STREAM_IDLE_MS : FIRST_FRAME_MS)
+      idleTimer = setTimeout(() => resolve('idle'), writing ? AI_STREAM_IDLE_MS : AI_STREAM_FIRST_FRAME_MS)
     })
     const raced = await Promise.race([reader.read(), idleBell, abortBell])
     clearTimeout(idleTimer)
@@ -1100,14 +1100,8 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
   }
 }
 
-// 等响应头的耐心户口在 shared/aiDefaults.ts(AI_HEADERS_TIMEOUT_MS):模型加载/排队可能很久,首次可达一分钟以上
-/** 非流式:读完整回复的耐心 */
-const BODY_TIMEOUT_MS = 120_000
-/** 流式:吐第一个字之前的耐心 —— 大提示词的预处理在这段里,引擎可能整段静默,必须给足
- * (第八十五锤:30 秒静默掐读是小葵冤案的帮凶,首帧前的耐心对齐响应头 = 两分钟) */
-const FIRST_FRAME_MS = 120_000
-/** 流式:开始吐字之后,两帧之间超过这么久没动静才算真卡住 */
-const STREAM_IDLE_MS = 30_000
+// 看门狗四档的户口都在 shared/aiDefaults.ts(AI_HEADERS/AI_BODY/AI_STREAM_FIRST_FRAME/AI_STREAM_IDLE):
+// 首帧前的耐心对齐响应头 = 两分钟(第八十五锤:30 秒静默掐读是小葵冤案的帮凶)
 
 /**
  * 把回复里的思考区拆出来(纯函数,自测覆盖,第一百一十五锤)。
@@ -1146,18 +1140,6 @@ export function halfNote(kind: 'stall' | 'disconnect' | 'watchdog'): string {
 /** 等不到任何输出的超时话术(纯函数,自测覆盖) */
 export function timeoutText(): string {
   return '等了很久没等到第一个字:材料大预处理就慢,引擎也可能卡住了 —— 不想等就「取消」,清点一下参考材料再问'
-}
-
-/** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文)。
- * 上下文的指路话术按引擎分家:内置指回设置里的「模型上下文」,
- * 外接 LM Studio 的上下文设置不归 App 管,指去 LM Studio 调大再重载模型 */
-export function friendlyHttpError(status: number, detail: string, engine?: 'builtin' | 'lmstudio'): string | null {
-  if (isContextOverflow(`${status} ${detail}`)) {
-    return engine === 'lmstudio'
-      ? '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去 LM Studio 把上下文调大,再重新加载模型'
-      : '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
-  }
-  return null
 }
 
 /**
@@ -1227,28 +1209,16 @@ async function explainWithMessagesCore(
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
-  const controller = new AbortController()
-  if (signal) {
-    if (signal.aborted) controller.abort()
-    else signal.addEventListener('abort', () => controller.abort(), { once: true })
-  }
   let watchdog: ReturnType<typeof setTimeout> | undefined
-  const armWatchdog = (ms: number): void => {
-    clearTimeout(watchdog)
-    watchdog = setTimeout(() => controller.abort(), ms)
-  }
   let full = ''
   let reasoningFull = ''
   let usage: AiUsage | undefined
   try {
-    armWatchdog(AI_HEADERS_TIMEOUT_MS)
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {})
-      },
-      body: JSON.stringify({
+    // 控制器接力 + 响应头看门狗 + POST 壳子都归 postChatCompletions(请求底座一处管);
+    // 这里只配这一路的请求体
+    const post = await postChatCompletions(
+      config,
+      {
         model: config.model,
         messages,
         temperature: CHAT_TEMPERATURE,
@@ -1264,26 +1234,17 @@ async function explainWithMessagesCore(
         // 内置引擎(llama-server)才塞的旗子(第八十四锤):流里报 token 账,预处理进度看得见。
         // 外接服务不认识这些字段,不塞,行为一分不变
         ...(config.timings ? { timings_per_token: true, stream_options: { include_usage: true } } : {})
-      }),
-      signal: controller.signal
-    })
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      const friendly = friendlyHttpError(res.status, detail, config.engine)
-      if (friendly) {
-        return { status: 'error', text: friendly, model: config.model, durationMs: Date.now() - startedAt }
-      }
-      return {
-        status: 'error',
-        text: `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`,
-        model: config.model,
-        durationMs: Date.now() - startedAt
-      }
+      },
+      { signal }
+    )
+    if (!post.ok) {
+      return { status: 'error', text: post.text, model: config.model, durationMs: Date.now() - startedAt }
     }
+    const { res, controller, disarm } = post
+    disarm() // 响应头到手:头段的看门狗下岗,后段各换各的监工
 
     if (!onDelta) {
-      armWatchdog(BODY_TIMEOUT_MS)
+      watchdog = setTimeout(() => controller.abort(), AI_BODY_TIMEOUT_MS)
       const data = (await res.json()) as ChatCompletionResponse
       const message = data.choices?.[0]?.message
       // 思考区先收好(llama-server 装在 reasoning_content 字段里)
@@ -1330,7 +1291,6 @@ async function explainWithMessagesCore(
     let lastStats: AiStreamStats | undefined
     // 复读机监工(第一百四十三锤):尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
     let looped = false
-    clearTimeout(watchdog)
     for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
         full += ev.text

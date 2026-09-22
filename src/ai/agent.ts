@@ -9,9 +9,10 @@
 // 2. 路径一律走项目内的相对路径,主进程拼绝对路径前还有 joinRoot 二道岗
 // 3. 缰绳:轮数封顶 + 同一样东西不许翻第二遍,防止小模型原地转圈烧锅
 import type { AiStreamStats, AiUsage, ChatTarget } from '../shared/types.ts'
-import { friendlyHttpError, splitThinking, sseEvents, type ToolCallDelta } from './index.ts'
+import { splitThinking, sseEvents, type ToolCallDelta } from './index.ts'
+import { postChatCompletions } from './http.ts'
 import { detectRepetitionTail } from './repetition.ts'
-import { AI_ANTI_REPEAT_PARAMS, AI_HEADERS_TIMEOUT_MS, CHAT_TEMPERATURE } from '../shared/aiDefaults.ts'
+import { AI_ANTI_REPEAT_PARAMS, CHAT_TEMPERATURE } from '../shared/aiDefaults.ts'
 
 /** 工具轮数封顶:8 轮翻不满就逼它交卷(再多的部分下一问继续) */
 export const AGENT_MAX_ROUNDS = 8
@@ -553,21 +554,12 @@ export async function agentRound(
   opts: { signal?: AbortSignal; maxTokens: number; allowThinking?: boolean; useTools: boolean; webSearchEnabled?: boolean; onDelta?: (ev: AgentStreamEvent) => void }
 ): Promise<AgentRoundResult> {
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
-  const controller = new AbortController()
-  if (opts.signal) {
-    if (opts.signal.aborted) controller.abort()
-    else opts.signal.addEventListener('abort', () => controller.abort(), { once: true })
-  }
-  let watchdog: ReturnType<typeof setTimeout> | undefined
   try {
-    watchdog = setTimeout(() => controller.abort(), AI_HEADERS_TIMEOUT_MS)
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {})
-      },
-      body: JSON.stringify({
+    // 控制器接力 + 响应头看门狗 + POST 壳子都归 postChatCompletions(请求底座一处管);
+    // 这里只配 agent 这路的请求体(工具表按「联网查证」开关分层)
+    const post = await postChatCompletions(
+      config,
+      {
         model: config.model,
         messages,
         temperature: CHAT_TEMPERATURE,
@@ -581,21 +573,20 @@ export async function agentRound(
         ...(opts.useTools ? { tools: opts.webSearchEnabled === true ? AGENT_TOOLS : AGENT_TOOLS_LOCAL, tool_choice: 'auto' } : {}),
         // 和普通聊天同一口径:思考开关只对内置引擎发(外接服务不认这个字段)
         ...(!opts.allowThinking && config.timings ? { chat_template_kwargs: { enable_thinking: false } } : {})
-      }),
-      signal: controller.signal
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      const friendly = friendlyHttpError(res.status, detail, config.engine)
+      },
+      { signal: opts.signal }
+    )
+    if (!post.ok) {
       return {
         status: 'error',
-        text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`,
-        toolsUnsupported: looksLikeToolsUnsupported(res.status, detail),
-        httpStatus: res.status
+        text: post.text,
+        toolsUnsupported: looksLikeToolsUnsupported(post.httpStatus, post.detail),
+        httpStatus: post.httpStatus
       }
     }
-    // 响应头到手,首帧后的耐心交给 sseEvents 自己的看门狗
-    clearTimeout(watchdog)
+    // 响应头到手:头段的看门狗下岗,首帧后的耐心交给 sseEvents 自己的看门狗
+    const { res, controller } = post
+    post.disarm()
     let content = ''
     let reasoning = ''
     const fragments: ToolCallDelta[] = []
@@ -656,7 +647,5 @@ export async function agentRound(
       status: 'error',
       text: isTimeout ? '等了很久模型都没回话,翻看停在这了 —— 再问一次试试' : `连接断了,模型服务可能停了(${baseUrl})`
     }
-  } finally {
-    clearTimeout(watchdog)
   }
 }

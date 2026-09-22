@@ -146,6 +146,11 @@ export function sanitizeShelfList(raw: unknown): ShelfEntry[] {
  *  货架拉取(ai/modelShelf)和断点续传下载(ai/modelDownload)共用这一份 */
 export const HF_HOSTS = ['https://huggingface.co', 'https://hf-mirror.com'] as const
 
+/** 直连 HF 的耐心(毫秒):连不上别拖累界面,短超时快换镜像 */
+export const HF_API_TIMEOUT_MS = 8_000
+/** 镜像兜底的耐心(毫秒):都走到镜像了多等一会,别再折腾用户 */
+export const HF_MIRROR_TIMEOUT_MS = 15_000
+
 /** 「带得动」判定的三杆秤(四面判定面共用,调系数只许动这里):
  *  显存杆:模型 + 上下文缓存 ≤ 显存 × 0.9 → 整个进显卡;
  *  内存宽裕杆:≤ 内存 × 0.5 → 装得下;

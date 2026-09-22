@@ -9,7 +9,8 @@ import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
 import type { AiBuiltinSettings, GgufShape, ModelStatus } from '../shared/types.ts'
-import { DEFAULT_CONTEXT_SIZE, normalizeContextSize } from '../shared/aiDefaults.ts'
+import { DEFAULT_CONTEXT_SIZE, normalizeContextSize, PROBE_HEALTH_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
+import { fetchWithTimeout } from './http.ts'
 import { estimateKvBytes } from '../shared/contextBill.ts'
 import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from '../shared/modelShelf.ts'
 import { parseGgufHeader } from '../shared/gguf.ts'
@@ -695,7 +696,7 @@ export async function ensureBuiltinServer(
 
 /** 就绪后问服务加载了哪个模型(llama-server 以模型文件名作为模型 id) */
 async function fetchModelId(baseUrl: string): Promise<string> {
-  const modelsRes = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(5000) })
+  const modelsRes = await fetchWithTimeout(`${baseUrl}/models`, PROBE_MODELS_MS)
   if (!modelsRes.ok) {
     throw new Error(`内置模型已就绪,但拿不到模型信息(${modelsRes.status}),再点一次试试`)
   }
@@ -810,7 +811,7 @@ async function startAndWaitReady(
     // 2 分钟的硬超时只会掐死健康的加载;真死锁交给用户手里的「取消」
     while (isBuiltinRunning()) {
       try {
-        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) })
+        const res = await fetchWithTimeout(healthUrl, PROBE_HEALTH_MS)
         if (res.ok) break // 200 = 模型加载完毕
         if (res.status === 503) {
           // 还在加载:服务报了进度就用真数,没报就按上次耗时估一条,每秒往前走

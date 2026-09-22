@@ -109,8 +109,9 @@ import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../s
 import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, writeWindowState, type WindowBox } from './window-state.ts'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
-import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL } from '../shared/aiDefaults.ts'
+import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
+import { fetchWithTimeout, stripApiSuffix } from '../ai/http.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalDirectoryPath } from './agentAccess.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
@@ -428,17 +429,17 @@ function broadcastModelStatus(status: ModelStatus): void {
 /** 问一轮 LM Studio:模型加载了没/热身到多少;服务没开就老实说没连上,不装没事 */
 async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
   const model = config.lmstudio.model.trim()
-  const root = (config.lmstudio.baseUrl.trim() || DEFAULT_LMSTUDIO_BASE_URL).replace(/\/v1\/?$/, '')
+  const root = stripApiSuffix(config.lmstudio.baseUrl.trim() || DEFAULT_LMSTUDIO_BASE_URL)
   const base = { provider: 'lmstudio' as const, modelName: model, sizeBytes: null, progress: null }
   if (!model) return { ...base, state: 'idle', message: '还没填模型名:去「AI 设置」连一下 LM Studio' }
   try {
-    const res = await fetch(`${root}/api/v0/models`, { signal: AbortSignal.timeout(3000) })
+    const res = await fetchWithTimeout(`${root}/api/v0/models`, PROBE_LMSTUDIO_MS)
     if (res.ok) {
       const parsed = parseLmStudioModelState(await res.json().catch(() => null), model)
       return { ...base, state: parsed.state, progress: parsed.progress }
     }
     // 老版本 LM Studio 没有 v0 接口:OpenAI 兼容口能列出模型就当就绪
-    const legacy = await fetch(`${root}/v1/models`, { signal: AbortSignal.timeout(3000) })
+    const legacy = await fetchWithTimeout(`${root}/v1/models`, PROBE_LMSTUDIO_MS)
     return { ...base, state: legacy.ok ? 'ready' : 'unreachable' }
   } catch {
     return { ...base, state: 'unreachable', message: 'LM Studio 没连上:那边开了「开发者」本地服务,这边才看得到' }
@@ -1915,8 +1916,8 @@ function registerIpc(): void {
   ipcMain.handle(CH.aiListModels, async (_event, baseUrl: unknown) => {
     if (typeof baseUrl !== 'string' || baseUrl.trim() === '') throw new Error('地址不能为空')
     const url = `${baseUrl.replace(/\/+$/, '')}/models`
-    // 5 秒没应答就当没通:LM Studio 卡死时别让界面跟着无限转圈
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) }).catch(() => null)
+    // 没应答就当没通(耐心档位在 shared/aiDefaults 的 PROBE_MODELS_MS):卡死时别让界面跟着无限转圈
+    const res = await fetchWithTimeout(url, PROBE_MODELS_MS).catch(() => null)
     if (!res || !res.ok) {
       throw new Error(`连不上模型服务,检查 LM Studio 是否已启动(${baseUrl})`)
     }

@@ -3,13 +3,16 @@
 // 国内直连 HF 经常连不上,镜像兜底是标配,不是可选项。
 // 缓存只在内存里留 5 分钟,重启即清、零落盘:货架是浏览用的,不给用户电脑留垃圾。
 import {
+  HF_API_TIMEOUT_MS,
   HF_HOSTS,
+  HF_MIRROR_TIMEOUT_MS,
   sanitizeRepoFiles,
   sanitizeShelfList,
   type RepoFile,
   type ShelfResult
 } from '../shared/modelShelf.ts'
 import { queryMachineSpec } from './builtin.ts'
+import { fetchWithTimeout } from './http.ts'
 
 // 拉货源的户口在 shared/modelShelf.ts(HF_HOSTS):主源直连,备源国内镜像,下载那边同认一份
 
@@ -27,7 +30,7 @@ async function fetchFromHost(host: string, timeoutMs: number): Promise<unknown> 
     `&expand%5B%5D=downloads&expand%5B%5D=likes&expand%5B%5D=lastModified&expand%5B%5D=pipeline_tag&expand%5B%5D=gguf` +
     // tags 供准入过滤(conversational 兜底)和能力章(vision/tool-use/reasoning 线索),2026-09-18 补
     `&expand%5B%5D=tags`
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  const res = await fetchWithTimeout(url, timeoutMs)
   if (!res.ok) throw new Error(`HF API ${res.status}`)
   return res.json()
 }
@@ -35,13 +38,13 @@ async function fetchFromHost(host: string, timeoutMs: number): Promise<unknown> 
 export async function fetchModelShelf(): Promise<ShelfResult> {
   if (cache && Date.now() - cache.at < SHELF_CACHE_MS) return cache.result
 
-  // 先试直连(短超时,连不上别拖累界面),失败换镜像
+  // 先试直连(短超时,连不上别拖累界面),失败换镜像 —— 两档耐心户口在 shared/modelShelf
   let raw: unknown
   let source: ShelfResult['source'] = 'huggingface'
   try {
-    raw = await fetchFromHost(HF_HOSTS[0], 8_000)
+    raw = await fetchFromHost(HF_HOSTS[0], HF_API_TIMEOUT_MS)
   } catch {
-    raw = await fetchFromHost(HF_HOSTS[1], 15_000)
+    raw = await fetchFromHost(HF_HOSTS[1], HF_MIRROR_TIMEOUT_MS)
     source = 'mirror'
   }
 
@@ -64,7 +67,7 @@ export async function fetchRepoFiles(repoId: string): Promise<RepoFile[]> {
   const path = `/api/models/${repoId}/tree/main?recursive=true`
   for (let i = 0; i < HF_HOSTS.length; i++) {
     try {
-      const res = await fetch(`${HF_HOSTS[i]}${path}`, { signal: AbortSignal.timeout(i === 0 ? 8_000 : 15_000) })
+      const res = await fetchWithTimeout(`${HF_HOSTS[i]}${path}`, i === 0 ? HF_API_TIMEOUT_MS : HF_MIRROR_TIMEOUT_MS)
       if (!res.ok) throw new Error(`HF API ${res.status}`)
       return sanitizeRepoFiles(await res.json())
     } catch (err) {
