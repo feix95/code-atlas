@@ -5,7 +5,9 @@
 .bubble-root {
   width: 100vw;
   height: 100vh;
-  padding: 10px;
+  /* 不留外圈透明裙边:当年是给阴影留的余地,阴影早摘了——这圈死像素在软件渲染的
+     透明窗里会被糊成一圈白边(小探针窗那圈白边就是它),窗边界=卡片边界才干净 */
+  padding: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -245,7 +247,7 @@
 /* ── 缩放手柄层(气泡放大锤)──
  * 透明无边框窗没系统手柄:四角+四边中段的隐形热区压在卡片内沿,
  * hover 浮出小角标/短线提示「这儿能拖」。热区必须在卡片不透明像素上,
- * 外圈透明 padding 那环是穿透桌面的,画在那儿接不住鼠标。 */
+ * 卡片圆角外的透明像素是穿透桌面的,画在那儿接不住鼠标。 */
 .bubble-grip {
   position: absolute;
   z-index: 5;
