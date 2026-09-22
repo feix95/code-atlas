@@ -42,7 +42,8 @@ export interface ContextBill {
   text: string
 }
 
-function formatGB(bytes: number): string {
+/** 字节数 → 「x.x GB」人话(整 GB 省小数):上下文黑板和内置量尺(builtin)共用一把尺 */
+export function formatGB(bytes: number): string {
   return `${(bytes / GB).toFixed(1).replace(/\.0$/, '')} GB`
 }
 

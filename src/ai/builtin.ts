@@ -11,7 +11,7 @@ import os from 'node:os'
 import type { AiBuiltinSettings, GgufShape, ModelStatus } from '../shared/types.ts'
 import { DEFAULT_CONTEXT_SIZE, normalizeContextSize, PROBE_HEALTH_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
 import { fetchWithTimeout } from './http.ts'
-import { estimateKvBytes } from '../shared/contextBill.ts'
+import { estimateKvBytes, formatGB } from '../shared/contextBill.ts'
 import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from '../shared/modelShelf.ts'
 import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
@@ -213,10 +213,6 @@ export async function queryMachineSpec(): Promise<MachineSpec> {
   const spec: MachineSpec = { ramBytes, vramBytes, gpuName }
   machineSpecCache = spec
   return spec
-}
-
-function formatGB(bytes: number): string {
-  return `${(bytes / GB).toFixed(1).replace(/\.0$/, '')} GB`
 }
 
 export interface ModelFitVerdictPure {

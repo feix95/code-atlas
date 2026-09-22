@@ -307,3 +307,5 @@
 - refactor(core): AtlasApi 类型收口——preload 桥对象提 const atlasApi 再 expose,Window.atlas 声明改 typeof 推导(env.d.ts 120 行手抄镜像退役);ChatMessage 契约挪 shared/types;69 个 IPC 通道名收 shared/ipcChannels 总账(CH.*),收发 165 处全引总账,通道对账自测学会解 CH
 
 - refactor(ai): 请求/探测底座收口 ai/http.ts——postChatCompletions 管控制器接力+响应头看门狗+POST 壳子(普通流式和 agent 不再各抄 25 行);friendlyHttpError/isContextOverflow 随迁;fetchWithTimeout+PROBE_*_MS 档位收编十处裸探测(LM Studio 状态/上下文/列模型/内置 health/HF 双源),流式看门狗三档进 shared/aiDefaults
+
+- refactor(ai): formatGB 双胞胎灭门——户口收 shared/contextBill 一把尺,builtin 删掉本地复刻改引
