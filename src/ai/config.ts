@@ -4,6 +4,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { AiConfig, ChatTarget } from '../shared/types.ts'
+import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL } from '../shared/aiDefaults.ts'
 import { DEFAULT_PERSONALIZATION, sanitizePersonalization } from '../shared/personalization.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
 
@@ -12,7 +13,7 @@ import { sanitizeTavilyKey } from '../shared/tavily.ts'
 export function defaultAiConfig(): AiConfig {
   return {
     provider: 'builtin',
-    lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: '', apiKey: '' },
+    lmstudio: { baseUrl: DEFAULT_LMSTUDIO_BASE_URL, model: '', apiKey: '' },
     builtin: { serverPath: '', modelPath: '' },
     webLookup: false,
     personalization: { ...DEFAULT_PERSONALIZATION }
@@ -59,7 +60,7 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       // 读档也洗一遍(2026-09-17):老档里可能躺着带引号/带 Bearer 前缀的脏值,读出来就是干净的
       tavilyKey: sanitizeTavilyKey(parsed.tavilyKey),
       // 手动上下文(留空 = 自动探测);上一版存取两边都把它弄丢了,这里补上回读
-      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= 512 ? parsed.contextSize : undefined,
+      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= CONTEXT_SIZE_MIN ? parsed.contextSize : undefined,
       // 说话方式(第一百一十三锤):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
       personalization: sanitizePersonalization(parsed.personalization)
     }
@@ -84,7 +85,7 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
     // Tavily Key 洗一遍再落盘:剥掉引号/Bearer 前缀/中间空白,洗完是空当没填(存档里直接不出现这个字段)
     tavilyKey: sanitizeTavilyKey(config.tavilyKey),
     // JSON.stringify 会直接丢掉 undefined:没填上下文时落盘就是没有这个字段,读取走自动探测
-    contextSize: typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : undefined,
+    contextSize: typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN ? config.contextSize : undefined,
     // 说话方式照洗一遍再落盘:脏数据不许进存档(键顺序和读档那边保持一致,免得假「有改动」)
     personalization: sanitizePersonalization(config.personalization)
   }

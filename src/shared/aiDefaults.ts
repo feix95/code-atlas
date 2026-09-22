@@ -6,6 +6,33 @@
 /** 上下文窗口默认大小(tokens):设置里留空时的兜底,也是内置引擎 -c 的默认值 */
 export const DEFAULT_CONTEXT_SIZE = 16384
 
+/** 模型上下文的合法下限(tokens):读档校验、档位对账、自动探测的合格线,都从它起 */
+export const CONTEXT_SIZE_MIN = 512
+/** 模型上下文的合法上限(tokens):设置页输入框的封顶 */
+export const CONTEXT_SIZE_MAX = 1_048_576
+
+/**
+ * 上下文档位的归一化(纯函数):喂引擎 -c、对账「档位改了没」、启动记账,都认这个数 ——
+ * 最小 512 + 取整。以前同一表达式散写七处,改一处漏一处账就对不上。
+ */
+export function normalizeContextSize(contextSize: number): number {
+  return Math.max(CONTEXT_SIZE_MIN, Math.floor(contextSize))
+}
+
+/** 等响应头的耐心(毫秒):模型加载/排队可能很久,大提示词预处理可能整段静默 ——
+ *  普通聊天和 agent 同一口径;首帧之后由流式看门狗自己接管 */
+export const AI_HEADERS_TIMEOUT_MS = 120_000
+
+/** 聊天请求的采样温度:讲解类任务要稳不要飘,普通聊天和 agent 同一口径 */
+export const CHAT_TEMPERATURE = 0.2
+
+/** 附件资料正文上限(字):自由对话的证据从简,别把模型的上下文挤爆 ——
+ *  渲染层整理附件时按它截,主进程洗附件时按它验,一把尺 */
+export const ATTACHMENT_DETAILS_MAX = 4000
+
+/** LM Studio 默认服务地址:配置出厂值、输入框占位提示、状态探测兜底,三处同一个 */
+export const DEFAULT_LMSTUDIO_BASE_URL = 'http://127.0.0.1:1234/v1'
+
 /** 一轮对话最多引用几段代码:再多模型也讲不细,还把上下文挤没了 */
 export const CODE_REFS_MAX = 6
 

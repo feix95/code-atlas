@@ -3,6 +3,7 @@ import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, FreechatHos
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { planWholeFileRef } from '@shared/preview'
 import { isTreePartial } from '@shared/scanCoverage'
 import { isAiConfigured } from '@shared/aiSetup'
@@ -1611,7 +1612,7 @@ function App(): React.JSX.Element {
         <main className="workspace">
           {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
               不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
-          <aside className="sidebar" style={{ width: `${(sidebarWidth / (16 * uiScale)).toFixed(4)}rem` }}>
+          <aside className="sidebar" style={{ width: `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem` }}>
             {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
             <button type="button" className="workspace-home" onClick={showProjectGuide}>
               <TreeIcon name="bulb" />

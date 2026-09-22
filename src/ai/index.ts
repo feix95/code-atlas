@@ -20,7 +20,7 @@ import type { AiUsage, AiStreamStats,
 import { parseLoadProgress } from './builtin.ts'
 import { detectRepetitionTail, truncateAtRepetition } from './repetition.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { AI_ANTI_REPEAT_PARAMS, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { AI_ANTI_REPEAT_PARAMS, AI_HEADERS_TIMEOUT_MS, ATTACHMENT_DETAILS_MAX, CHAT_TEMPERATURE, CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { formatUsage } from '../shared/aiText.ts'
 import { buildSummaryText } from '../shared/compact.ts'
 import { CURRENT_QUESTION_PREFIX, CURRENT_QUESTION_SUFFIX } from '../shared/chatHistory.ts'
@@ -115,8 +115,7 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   }))
 }
 
-/** 附件资料正文的上限:自由对话的证据从简,别把模型的上下文挤爆 */
-const ATTACHMENT_DETAILS_MAX = 4000
+// 附件正文上限的户口在 shared/aiDefaults.ts(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,这里洗附件按它验
 
 /**
  * 渲染进程传来的资料附件先洗干净:形状不对一律当 null(没附件),字段全收成
@@ -684,7 +683,7 @@ export function parseLmStudioContext(raw: string, model: string): number | null 
     const data = JSON.parse(raw) as { data?: Array<{ id?: string; loaded_context_length?: number; max_context_length?: number }> }
     const hit = (data.data ?? []).find((m) => m.id === model)
     const ctx = hit?.loaded_context_length ?? hit?.max_context_length
-    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= 512 ? Math.round(ctx) : null
+    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= CONTEXT_SIZE_MIN ? Math.round(ctx) : null
   } catch {
     return null
   }
@@ -695,7 +694,7 @@ export function parseLlamaProps(raw: string): number | null {
   try {
     const data = JSON.parse(raw) as { default_generation_settings?: { n_ctx?: number }; n_ctx?: number }
     const ctx = data.default_generation_settings?.n_ctx ?? data.n_ctx
-    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= 512 ? Math.round(ctx) : null
+    return typeof ctx === 'number' && Number.isFinite(ctx) && ctx >= CONTEXT_SIZE_MIN ? Math.round(ctx) : null
   } catch {
     return null
   }
@@ -757,7 +756,7 @@ export async function probeContextSize(target: ChatTarget, kind: 'lmstudio' | 'b
 
 /** 按真实上下文算各路预算(纯函数):地图 ≈ 55%,回复 ≈ 20%;两端各留安全下限 */
 export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens: number } {
-  const safe = ctx >= 512 ? ctx : DEFAULT_CONTEXT_SIZE
+  const safe = ctx >= CONTEXT_SIZE_MIN ? ctx : DEFAULT_CONTEXT_SIZE
   return {
     mapTokens: Math.max(600, Math.floor(safe * 0.55)),
     replyTokens: Math.max(256, Math.min(1024, Math.floor(safe * 0.2)))
@@ -774,8 +773,8 @@ export function resolveContextSize(
   manual: number | undefined,
   probed: number | null
 ): number {
-  if (provider === 'builtin' && manual !== undefined && manual >= 512) return manual
-  return probed !== null && probed >= 512 ? probed : DEFAULT_CONTEXT_SIZE
+  if (provider === 'builtin' && manual !== undefined && manual >= CONTEXT_SIZE_MIN) return manual
+  return probed !== null && probed >= CONTEXT_SIZE_MIN ? probed : DEFAULT_CONTEXT_SIZE
 }
 
 /** 常见二进制/媒体后缀:单一来源在 shared/fileKinds.ts(isBinaryFile 也住那儿),别在这再养一本名单 */
@@ -1101,8 +1100,7 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
   }
 }
 
-/** 等响应头的耐心(模型加载/排队可能很久,首次可达一分钟以上) */
-const HEADERS_TIMEOUT_MS = 120_000
+// 等响应头的耐心户口在 shared/aiDefaults.ts(AI_HEADERS_TIMEOUT_MS):模型加载/排队可能很久,首次可达一分钟以上
 /** 非流式:读完整回复的耐心 */
 const BODY_TIMEOUT_MS = 120_000
 /** 流式:吐第一个字之前的耐心 —— 大提示词的预处理在这段里,引擎可能整段静默,必须给足
@@ -1243,7 +1241,7 @@ async function explainWithMessagesCore(
   let reasoningFull = ''
   let usage: AiUsage | undefined
   try {
-    armWatchdog(HEADERS_TIMEOUT_MS)
+    armWatchdog(AI_HEADERS_TIMEOUT_MS)
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -1253,7 +1251,7 @@ async function explainWithMessagesCore(
       body: JSON.stringify({
         model: config.model,
         messages,
-        temperature: 0.2,
+        temperature: CHAT_TEMPERATURE,
         // 反重复采样(第一百四十三锤):复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),

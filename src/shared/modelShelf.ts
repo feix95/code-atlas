@@ -142,18 +142,33 @@ export function sanitizeShelfList(raw: unknown): ShelfEntry[] {
   return raw.map(sanitizeShelfEntry).filter((e): e is ShelfEntry => e !== null)
 }
 
+/** 拉货/下载的双源域名:主源直连,备源国内镜像;API 与 resolve 路径同构,只换域名。
+ *  货架拉取(ai/modelShelf)和断点续传下载(ai/modelDownload)共用这一份 */
+export const HF_HOSTS = ['https://huggingface.co', 'https://hf-mirror.com'] as const
+
+/** 「带得动」判定的三杆秤(四面判定面共用,调系数只许动这里):
+ *  显存杆:模型 + 上下文缓存 ≤ 显存 × 0.9 → 整个进显卡;
+ *  内存宽裕杆:≤ 内存 × 0.5 → 装得下;
+ *  内存上限杆:≤ 内存 × 0.7 → 塞得下但系统会挤,再往上就是装不下(给系统留活路)。 */
+export const MODEL_FIT_VRAM_RATIO = 0.9
+export const MODEL_FIT_RAM_OK_RATIO = 0.5
+export const MODEL_FIT_RAM_MAX_RATIO = 0.7
+/** 「接近预算」的贴线宽度:占到预算这几成就亮 tight 提醒 */
+export const MODEL_FIT_TIGHT_EDGE = 0.7
+
 /** 带得动判定(纯函数):gguf 加载进内存大约要 1.2× 文件大小(RAM 里还要留系统开销),
  *  没有独显也能跑(CPU 慢但能跑),所以只按内存卡「带不动」,显存只用来标注「顺不顺」。
  *  - yes:内存宽裕(文件 ≤ 可用预算)
  *  - tight:贴线(预算的 70% 以上,提醒一句)
  *  - no:超出预算,标「超出内存预算」
- *  预算 = 内存 × 0.7(给系统和其他程序留活路)。内存拿不到(0)时一律 yes(不拦,老实不拦) */
+ *  预算 = 内存 × MODEL_FIT_RAM_MAX_RATIO(给系统和其他程序留活路)。
+ *  内存拿不到(0)时一律 yes(不拦,老实不拦) */
 export function judgeRun(fileSizeBytes: number | null, spec: ShelfMachineSpec): RunVerdict {
   if (fileSizeBytes === null || fileSizeBytes <= 0) return 'yes'
   if (spec.ramBytes <= 0) return 'yes'
-  const budget = spec.ramBytes * 0.7
+  const budget = spec.ramBytes * MODEL_FIT_RAM_MAX_RATIO
   if (fileSizeBytes > budget) return 'no'
-  if (fileSizeBytes > budget * 0.7) return 'tight'
+  if (fileSizeBytes > budget * MODEL_FIT_TIGHT_EDGE) return 'tight'
   return 'yes'
 }
 

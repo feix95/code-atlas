@@ -8,7 +8,7 @@ import { createWriteStream, existsSync, statSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { BrowserWindow } from 'electron'
-import type { ModelDownloadProgress } from '../shared/modelShelf.ts'
+import { HF_HOSTS, type ModelDownloadProgress } from '../shared/modelShelf.ts'
 import { loadAiConfig, saveAiConfig } from './config.ts'
 
 /** 下载落点:userData/models/<仓库名>/<文件名>。目录归咱管,用户只看到结果路径 */
@@ -25,9 +25,9 @@ function safeTarget(userDataDir: string, repoId: string, filePath: string): stri
   return join(dir, basename(filePath))
 }
 
-/** resolve 链接:直连与镜像同构,只换域名 */
+/** resolve 链接:直连与镜像同构,只换域名;域名表和货架拉取共用(shared/modelShelf 的 HF_HOSTS) */
 function resolveUrls(repoId: string, filePath: string): string[] {
-  return [`https://huggingface.co/${repoId}/resolve/main/${filePath}`, `https://hf-mirror.com/${repoId}/resolve/main/${filePath}`]
+  return HF_HOSTS.map((host) => `${host}/${repoId}/resolve/main/${filePath}`)
 }
 
 let current: { controller: AbortController } | null = null

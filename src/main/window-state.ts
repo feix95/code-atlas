@@ -24,7 +24,7 @@ export interface WindowState {
   maximized: boolean
 }
 
-/** 和 createWindow 的 minWidth/minHeight 一口约定,改一处必改两处 */
+/** 窗口最小尺寸:存档安检的下限、createWindow 的窗框下限,同认这一份 */
 export const WINDOW_MIN_WIDTH = 960
 export const WINDOW_MIN_HEIGHT = 640
 

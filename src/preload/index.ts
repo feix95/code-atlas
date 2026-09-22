@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { ROOT_FONT_BASE_PX, clampUiScale } from '../shared/uiScale.ts'
 import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
@@ -33,10 +34,8 @@ import type {
 // 现在改成改根字号:html 的 font-size = 16px × 系数,布局/字号/图标全挂 rem 跟着变,
 // 没有第二套坐标系,鼠标坐标和视觉永远 1:1。存 localStorage,页面脚本跑之前就定好,不会先小后大闪一下。
 // 超出范围的旧存档贴边处理(不再静默跳回 100%,用户调过 180% 就给他 180%)
+// 档位/基准/夹紧的户口在 shared/uiScale.ts:设置页滑块和侧栏 rem 换算同认那一份
 const UI_SCALE_KEY = 'atlas.ui-scale'
-const ROOT_FONT_BASE_PX = 16
-export const SCALE_MIN = 0.8
-export const SCALE_MAX = 1.8
 
 function applyRootFont(factor: number): void {
   const set = (): void => {
@@ -48,9 +47,7 @@ function applyRootFont(factor: number): void {
 }
 
 function readUiScale(): number {
-  const v = Number(localStorage.getItem(UI_SCALE_KEY))
-  if (!Number.isFinite(v) || v <= 0) return 1
-  return Math.min(Math.max(v, SCALE_MIN), SCALE_MAX)
+  return clampUiScale(Number(localStorage.getItem(UI_SCALE_KEY)))
 }
 applyRootFont(readUiScale())
 
@@ -70,7 +67,7 @@ contextBridge.exposeInMainWorld('atlas', {
   },
   getUiScale: (): number => readUiScale(),
   setUiScale: (factor: number): void => {
-    const f = Math.min(Math.max(Number(factor) || 1, SCALE_MIN), SCALE_MAX)
+    const f = clampUiScale(Number(factor))
     localStorage.setItem(UI_SCALE_KEY, String(f))
     applyRootFont(f)
     // 喊一声界面:侧栏宽度这类「按比例跟缩放」的布局要实时跟着重算
@@ -78,7 +75,7 @@ contextBridge.exposeInMainWorld('atlas', {
   },
   // 设置弹窗的暂存预览:根字号跟着草稿走,但不写 localStorage —— 点「应用更改」才真正 setUiScale 落盘
   previewUiScale: (factor: number): void => {
-    const f = Math.min(Math.max(Number(factor) || 1, SCALE_MIN), SCALE_MAX)
+    const f = clampUiScale(Number(factor))
     applyRootFont(f)
     window.dispatchEvent(new CustomEvent('atlas:ui-scale', { detail: f }))
   },

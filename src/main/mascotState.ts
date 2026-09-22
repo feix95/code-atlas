@@ -9,7 +9,8 @@ import { join } from 'node:path'
 /** 桌宠窗的边长(正方形),和 mascot.ts 的窗参数一口约定,改一处必改两处 */
 export const MASCOT_SIZE = 140
 
-/** 小圆生物身体的边长(mascot.css 里 .mascot-body 的 width/height,改一处必改两处) */
+/** 小圆生物身体的边长:点击判定区照它算;视觉那头的同名契约是
+ *  mascot.css 里 .mascot-body 的 --mascot-body —— 改大小两边一起改 */
 export const MASCOT_BODY_SIZE = 96
 
 /** 摸它的判定区比身子放宽多少:贴边点也算摸到,不刮手;呼吸动画放大时照样算在身上 */

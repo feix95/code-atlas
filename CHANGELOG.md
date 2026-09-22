@@ -298,3 +298,6 @@
 - fix(window): 小探针气泡窗摘掉 10px 透明裙边治白边——阴影时代的死像素在软渲透明窗里糊成一圈白,窗边界=卡片边界
 - refactor(core): 后缀花名册收一本账——二进制/文档后缀进 shared/fileKinds(并集收口,.docx/.gguf 预览不再当文本读乱码),语言户口本挪 shared/languages,depgraph 补后缀改查户口本(.mts/.cts 导入不再丢边)
 - refactor(core): tree-sitter 语法账单源——GRAMMAR_WASM/LANG_TO_GRAMMAR 进 shared/grammarWasm,highlight 的 EXT_LANG 和 analyzer 的 GRAMMAR_FILES 全改派生(.zsh 顺手收编),WASM_OPTS 收进 wasmPaths
+
+- refactor(core): 常量收口 shared——uiScale(缩放档位)/analysisLimits(解析上限)/aiDefaults(响应头·温度·附件上限·LM Studio 地址·上下文归一)各立户口;窗口下限/日志容量/引擎文件名/桌宠尺寸不再绕开常量
+- refactor(core): 「带得动」判定系数进 shared/modelShelf(MODEL_FIT_*),货架判定/黑板账/量尺/悬停文案四面共表;HF 双源域名货架与下载共用一份

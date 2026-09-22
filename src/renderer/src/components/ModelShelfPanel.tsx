@@ -24,6 +24,7 @@ import {
   formatDownloads,
   formatRelativeDays,
   judgeRun,
+  MODEL_FIT_RAM_MAX_RATIO,
   runVerdictLabel
 } from '../../../shared/modelShelf.ts'
 import { loadShelfPrefs, saveShelfPrefs, type ShelfPrefs } from '../shelfPrefs.ts'
@@ -41,9 +42,10 @@ const FEATURED_MODEL = {
   sizeLabel: '8.9 GB'
 } as const
 
-/** 状态章的悬停大白话:专业词上章,人话兜底 —— 判定口径(内存 × 0.7 预算)在这儿说清 */
+/** 状态章的悬停大白话:专业词上章,人话兜底 —— 判定口径(内存 × 系数预算)在这儿说清,
+ *  系数跟判定函数同一份户口(shared/modelShelf 的 MODEL_FIT_*),调了不会文案对不上账 */
 const VERDICT_TIPS: Record<'no' | 'tight', string> = {
-  no: '模型体积超出这台机器的可用内存预算(总内存 × 0.7,给系统留活路),下载了也加载不起来',
+  no: `模型体积超出这台机器的可用内存预算(总内存 × ${MODEL_FIT_RAM_MAX_RATIO},给系统留活路),下载了也加载不起来`,
   tight: '接近内存预算上限,能跑但可能偏慢'
 }
 

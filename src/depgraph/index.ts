@@ -5,9 +5,8 @@ import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { LANGUAGES } from '../shared/languages.ts'
+import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import type { DepEdge, DepGraphResult, LanguageTag, ScanFileNode, ScanTreeNode, UnresolvedImport } from '../shared/types.ts'
-
-const MAX_FILE_BYTES = 1_000_000 // 和 atlas:analyze-file 同一条线:超过 1MB 的源码不解析
 
 function collectFiles(node: ScanTreeNode, into: ScanFileNode[]): void {
   if (node.type === 'file') {
@@ -247,7 +246,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
     // 路径契约:全项目唯一的绝对路径拼接点就是 joinRoot
     const absPath = joinRoot(scan.rootPath, file.relPath)
     const stat = await fs.stat(absPath).catch(() => null)
-    if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) {
+    if (!stat || !stat.isFile() || stat.size > SOURCE_PARSE_MAX_BYTES) {
       skipped++
       continue
     }

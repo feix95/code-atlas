@@ -9,8 +9,9 @@ import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
 import type { AiBuiltinSettings, GgufShape, ModelStatus } from '../shared/types.ts'
-import { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
+import { DEFAULT_CONTEXT_SIZE, normalizeContextSize } from '../shared/aiDefaults.ts'
 import { estimateKvBytes } from '../shared/contextBill.ts'
+import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from '../shared/modelShelf.ts'
 import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
 
@@ -267,32 +268,32 @@ export function judgeModelFit(
     // 第八十六锤:显存是权重 + 上下文缓存一起抢的,量尺把缓存估进去再说话
     const kv = estimateKvBytes(contextTokens, modelBytes)
     const need = modelBytes + kv
-    if (need <= vramBytes * 0.9) {
+    if (need <= vramBytes * MODEL_FIT_VRAM_RATIO) {
       return {
         level: 'ok',
         title: '装得下',
         detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)≈ ${formatGB(need)},显存 ${formatGB(vramBytes)} —— 整个进显卡,跑得动`
       }
     }
-    if (need <= vramBytes + ramBytes * 0.5) {
+    if (need <= vramBytes + ramBytes * MODEL_FIT_RAM_OK_RATIO) {
       return {
         level: 'tight',
         title: '有点挤',
         detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)超出了显存 ${formatGB(vramBytes)},多出来的要落内存 —— 能跑,但读大材料时会明显变慢;把「模型上下文」调小能快回来`
       }
     }
-    const suggest = Math.floor(Math.max(1, vramBytes * 0.9 - kv) / GB)
+    const suggest = Math.floor(Math.max(1, vramBytes * MODEL_FIT_VRAM_RATIO - kv) / GB)
     return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条` }
   }
   // 纯内存跑(问不到显存,A/老卡):量尺只答装不装得下,缓存不另估 —— 内存机型本身就慢,
   // 缓存那点开销改变不了结论,别拿估出来的数字吓人
-  if (modelBytes <= ramBytes * 0.5) {
+  if (modelBytes <= ramBytes * MODEL_FIT_RAM_OK_RATIO) {
     return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下` }
   }
-  if (modelBytes <= ramBytes * 0.7) {
+  if (modelBytes <= ramBytes * MODEL_FIT_RAM_MAX_RATIO) {
     return { level: 'tight', title: '有点挤', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 塞得下但系统会挤,跑起来偏慢` }
   }
-  const suggest = Math.floor((ramBytes * 0.5) / GB)
+  const suggest = Math.floor((ramBytes * MODEL_FIT_RAM_OK_RATIO) / GB)
   return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},内存只有 ${formatGB(ramBytes)} —— 建议换 ${suggest} GB 以下的模型` }
 }
 
@@ -407,7 +408,7 @@ export function builtinNeedsRestart(settings: AiBuiltinSettings): boolean {
  * 引擎压根没听见,静默不生效;现在对不上账就明说,由调用方决定何时重启。 */
 export function builtinContextDiffers(contextSize: number): boolean {
   if (!isBuiltinRunning()) return false
-  return startedCtx !== Math.max(512, Math.floor(contextSize))
+  return startedCtx !== normalizeContextSize(contextSize)
 }
 /**
  * 引擎自动定位:用户不该知道 llama-server 是啥。
@@ -425,10 +426,10 @@ export function resolveServerProgram(configuredPath: string): string {
     }
     return configured
   }
-  const candidates: string[] = [join(process.cwd(), 'vendor', 'llama-cpp', 'llama-server.exe')]
+  const candidates: string[] = [join(process.cwd(), 'vendor', 'llama-cpp', ENGINE_IMAGE)]
   const resourcesPath = (process as { resourcesPath?: string }).resourcesPath
   if (typeof resourcesPath === 'string') {
-    candidates.push(join(resourcesPath, 'llama-cpp', 'llama-server.exe'))
+    candidates.push(join(resourcesPath, 'llama-cpp', ENGINE_IMAGE))
   }
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
@@ -659,7 +660,7 @@ const startBuiltinSingleFlight = createSingleFlight(
         // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
         if (err instanceof EngineExitError) {
           const spec = await queryMachineSpec()
-          err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, Math.max(512, Math.floor(contextSize))), manualContext)
+          err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, normalizeContextSize(contextSize)), manualContext)
         }
         announceBuiltinError(modelPath, err)
       }
@@ -686,7 +687,7 @@ export async function ensureBuiltinServer(
     // 上下文档位对不上账(2026-09-13):旧引擎还按旧 -c 跑着,新档位静默不生效 ——
     // 就地解散,按新档重拉(下面的单飞开头会收尸并等端口真正放行,不会撞端口)
     if (!builtinContextDiffers(contextSize)) return readyPromise
-    addDevLog('system', `上下文档位改成了 ${Math.max(512, Math.floor(contextSize))},重启引擎让它生效`)
+    addDevLog('system', `上下文档位改成了 ${normalizeContextSize(contextSize)},重启引擎让它生效`)
     stopBuiltinServer()
   }
   return startBuiltinSingleFlight(settings, contextSize, manualContext)
@@ -711,7 +712,7 @@ async function startAndWaitReady(
   contextSize = DEFAULT_CONTEXT_SIZE
 ): Promise<{ baseUrl: string; model: string }> {
   startedKey = settingsKey({ serverPath, modelPath })
-  startedCtx = Math.max(512, Math.floor(contextSize)) // 跟 -c 参数同款归一,档位对账就认这个数
+  startedCtx = normalizeContextSize(contextSize) // 跟 -c 参数同款归一,档位对账就认这个数
   stopping = false // 新的一轮启动:上次「主动叫停」的标记就地清账
   const facts = builtinIdleFacts(modelPath)
   const startedAt = Date.now()
@@ -719,7 +720,7 @@ async function startAndWaitReady(
   // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
   addDevLog(
     'system',
-    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${Math.max(512, Math.floor(contextSize))} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)`
+    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${normalizeContextSize(contextSize)} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)`
   )
   child = spawn(
     serverPath,
@@ -731,7 +732,7 @@ async function startAndWaitReady(
       '--host',
       '127.0.0.1',
       '-c',
-      String(Math.max(512, Math.floor(contextSize))),
+      String(normalizeContextSize(contextSize)),
       '-ngl',
       '999',
       // --jinja(第一百二十八锤):让引擎用模型自带的对话模板,工具调用(agent 的

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
-import { DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
+import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, DEFAULT_LMSTUDIO_BASE_URL } from '@shared/aiDefaults'
+import { SCALE_MAX, SCALE_MIN } from '@shared/uiScale'
 import {
   CUSTOM_MAX,
   DEFAULT_PERSONALIZATION,
@@ -191,20 +192,17 @@ function OptionSelect<K extends string>({
   )
 }
 
-// 界面大小范围(跟根字号缩放引擎配套):80% ~ 180%
-const SCALE_MIN = 0.8
-const SCALE_MAX = 1.8
+// 界面大小范围/上下文合法范围的户口在 shared(uiScale.ts / aiDefaults.ts):
+// 滑块档位、preload 根字号引擎、引擎 -c 归一化,三面同认一份
 
 // 第八十九锤:模型上下文的合法范围。夹紧只发生在失焦/保存那一刻 —— 以前每敲一个键就夹,
 // 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
-const CONTEXT_MIN = 512
-const CONTEXT_MAX = 1_048_576
 
 /** 上下文输入框的落账规则:空串 = 交回自动探测(undefined);数字夹进合法范围 */
 function clampContextSize(raw: string): number | undefined {
   const digits = raw.replace(/[^0-9]/g, '')
   if (digits === '') return undefined
-  return Math.max(CONTEXT_MIN, Math.min(CONTEXT_MAX, Number(digits)))
+  return Math.max(CONTEXT_SIZE_MIN, Math.min(CONTEXT_SIZE_MAX, Number(digits)))
 }
 
 type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
@@ -1272,7 +1270,7 @@ export function SettingsDialog({
                             <input
                               id="cfg-baseurl"
                               value={draftConfig.lmstudio.baseUrl}
-                              placeholder="http://127.0.0.1:1234/v1"
+                              placeholder={DEFAULT_LMSTUDIO_BASE_URL}
                               onChange={(e) => setDraftConfig({ ...draftConfig, lmstudio: { ...draftConfig.lmstudio, baseUrl: e.target.value } })}
                             />
                           </div>
@@ -1307,7 +1305,7 @@ export function SettingsDialog({
                             </div>
                           )}
                           {modelsNote && <p className="cfg-field-help is-warn">{modelsNote}</p>}
-                          <p className="cfg-field-help">LM Studio 里开「开发者」本地服务,地址一般是 http://127.0.0.1:1234/v1。</p>
+                          <p className="cfg-field-help">LM Studio 里开「开发者」本地服务,地址一般是 {DEFAULT_LMSTUDIO_BASE_URL}。</p>
                         </>
                       )}
 

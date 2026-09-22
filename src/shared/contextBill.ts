@@ -1,4 +1,5 @@
 import type { GgufShape } from './types.ts'
+import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from './modelShelf.ts'
 
 /**
  * 上下文档位的账本(纯函数,自测覆盖):滑块的档、黑板的账、大白话的结论都在这里算,
@@ -69,10 +70,10 @@ export function formatContextBill(opts: {
     : `按 ${opts.contextTokens} tokens 算:`
   const total = `模型 ${formatGB(opts.modelBytes)} + 上下文黑板 ${formatGB(kv)}(${kvHow})≈ ${formatGB(need)}`
   if (opts.vramBytes !== null && opts.vramBytes > 0) {
-    if (need <= opts.vramBytes * 0.9) {
+    if (need <= opts.vramBytes * MODEL_FIT_VRAM_RATIO) {
       return { level: 'ok', text: `${head}${total},显存 ${formatGB(opts.vramBytes)} —— 整个进显卡,稳` }
     }
-    if (need <= opts.vramBytes + opts.ramBytes * 0.5) {
+    if (need <= opts.vramBytes + opts.ramBytes * MODEL_FIT_RAM_OK_RATIO) {
       return {
         level: 'tight',
         text: `${head}${total},超出显存 ${formatGB(opts.vramBytes)},多出来的落内存 —— 能跑,读大材料会变慢`
@@ -84,10 +85,10 @@ export function formatContextBill(opts: {
     }
   }
   // 问不到显存:只拿内存说话
-  if (need <= opts.ramBytes * 0.5) {
+  if (need <= opts.ramBytes * MODEL_FIT_RAM_OK_RATIO) {
     return { level: 'ok', text: `${head}${total},内存 ${formatGB(opts.ramBytes)} —— 装得下` }
   }
-  if (need <= opts.ramBytes * 0.7) {
+  if (need <= opts.ramBytes * MODEL_FIT_RAM_MAX_RATIO) {
     return { level: 'tight', text: `${head}${total},内存 ${formatGB(opts.ramBytes)} —— 塞得下但系统会挤,跑起来偏慢` }
   }
   return {

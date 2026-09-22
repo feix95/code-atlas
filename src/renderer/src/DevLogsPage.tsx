@@ -4,10 +4,7 @@
 // 隐私线:账本只记元数据和引擎输出,用户问了什么、材料里有什么,一个字不进账。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DevLogEntry, DevLogSource } from '../../shared/types.ts'
-import { devLogSourceName, formatDevLogTime } from '../../shared/devlog.ts'
-
-/** 窗口端自己也对齐账本容量:订阅久了别让浏览器端悄悄长胖 */
-const PAGE_MAX = 2000
+import { DEVLOG_MAX, devLogSourceName, formatDevLogTime } from '../../shared/devlog.ts'
 
 type SourceFilter = 'all' | DevLogSource
 
@@ -39,14 +36,14 @@ export function DevLogsPage(): React.JSX.Element {
       setEntries((prev) => {
         // 按 id 去重(拉旧账和订阅可能有重叠瞬间),超容量丢最旧的
         if (prev.length > 0 && prev[prev.length - 1].id >= entry.id) return prev
-        const next = prev.length >= PAGE_MAX ? [...prev.slice(-(PAGE_MAX - 1)), entry] : [...prev, entry]
+        const next = prev.length >= DEVLOG_MAX ? [...prev.slice(-(DEVLOG_MAX - 1)), entry] : [...prev, entry]
         return next
       })
     })
     void window.atlas
       .devLogsPull()
       .then((snapshot) => {
-        if (alive) setEntries(snapshot.slice(-PAGE_MAX))
+        if (alive) setEntries(snapshot.slice(-DEVLOG_MAX))
       })
       .catch(() => {})
     return () => {

@@ -11,7 +11,7 @@
 import type { AiStreamStats, AiUsage, ChatTarget } from '../shared/types.ts'
 import { friendlyHttpError, splitThinking, sseEvents, type ToolCallDelta } from './index.ts'
 import { detectRepetitionTail } from './repetition.ts'
-import { AI_ANTI_REPEAT_PARAMS } from '../shared/aiDefaults.ts'
+import { AI_ANTI_REPEAT_PARAMS, AI_HEADERS_TIMEOUT_MS, CHAT_TEMPERATURE } from '../shared/aiDefaults.ts'
 
 /** 工具轮数封顶:8 轮翻不满就逼它交卷(再多的部分下一问继续) */
 export const AGENT_MAX_ROUNDS = 8
@@ -536,8 +536,8 @@ export function assembleToolCalls(chunks: ToolCallDelta[]): AgentToolCall[] {
     }))
 }
 
-/** 等响应头的耐心(和普通聊天同一口径:大提示词预处理可能整段静默;首帧之后由 sseEvents 自己的看门狗接管) */
-const HEADERS_TIMEOUT_MS = 120_000
+// 等响应头的耐心户口在 shared/aiDefaults.ts(AI_HEADERS_TIMEOUT_MS):
+// 和普通聊天同一口径(大提示词预处理可能整段静默;首帧之后由 sseEvents 自己的看门狗接管)
 
 /**
  * agent 的单轮请求(流式,第一百三十四锤):带上工具表问模型,边收边拼边推。
@@ -560,7 +560,7 @@ export async function agentRound(
   }
   let watchdog: ReturnType<typeof setTimeout> | undefined
   try {
-    watchdog = setTimeout(() => controller.abort(), HEADERS_TIMEOUT_MS)
+    watchdog = setTimeout(() => controller.abort(), AI_HEADERS_TIMEOUT_MS)
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -570,7 +570,7 @@ export async function agentRound(
       body: JSON.stringify({
         model: config.model,
         messages,
-        temperature: 0.2,
+        temperature: CHAT_TEMPERATURE,
         // 反重复采样(第一百四十三锤):复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),

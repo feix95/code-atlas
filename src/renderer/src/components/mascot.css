@@ -12,12 +12,15 @@
   user-select: none;
 }
 
-/* 身体:96px 圆家伙,青绿渐变(临时配色),拖动光标。
+/* 身体:圆家伙一只,青绿渐变(临时配色),拖动光标。
    不画 box-shadow:透明窗首帧阴影来不及合成会闪一块白底,宁可不要 */
 .mascot-body {
+  /* 边长是跨层契约:主进程的点击判定区(main/mascotState.ts 的 MASCOT_BODY_SIZE)
+     照这个数算 —— 改大小两边一起改,只改一边就是「点身体边缘没反应」 */
+  --mascot-body: 96px;
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: var(--mascot-body);
+  height: var(--mascot-body);
   border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #7be3b0, #2fa874 68%, #218b5e);
   cursor: grab;

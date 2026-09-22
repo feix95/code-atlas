@@ -106,7 +106,9 @@ import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalizatio
 import { AGENT_FILES_ADDENDUM, buildChatSystem, buildExplainSystem, deepSourceChars, SLICE_NO_TOOLS, TEACHING_DEEP_MIN_CTX, TEACHING_DEGRADED_NOTE } from '../ai/prompts.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
-import { placeWindowBox, readWindowState, writeWindowState, type WindowBox } from './window-state.ts'
+import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, writeWindowState, type WindowBox } from './window-state.ts'
+import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
+import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL } from '../shared/aiDefaults.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalDirectoryPath } from './agentAccess.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
@@ -424,7 +426,7 @@ function broadcastModelStatus(status: ModelStatus): void {
 /** 问一轮 LM Studio:模型加载了没/热身到多少;服务没开就老实说没连上,不装没事 */
 async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
   const model = config.lmstudio.model.trim()
-  const root = config.lmstudio.baseUrl.trim().replace(/\/v1\/?$/, '') || 'http://127.0.0.1:1234'
+  const root = (config.lmstudio.baseUrl.trim() || DEFAULT_LMSTUDIO_BASE_URL).replace(/\/v1\/?$/, '')
   const base = { provider: 'lmstudio' as const, modelName: model, sizeBytes: null, progress: null }
   if (!model) return { ...base, state: 'idle', message: '还没填模型名:去「AI 设置」连一下 LM Studio' }
   try {
@@ -658,8 +660,8 @@ function createWindow(): void {
     width: placedBox?.width ?? 1200,
     height: placedBox?.height ?? 800,
     ...(placedBox && placedBox.x !== undefined && placedBox.y !== undefined ? { x: placedBox.x, y: placedBox.y } : {}),
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: WINDOW_MIN_WIDTH,
+    minHeight: WINDOW_MIN_HEIGHT,
     title: 'CodeAtlas',
     // 圆角悬浮壳回归(模块四):frame:false 摘系统框,transparent 让四角露出真实桌面,
     // 14px 圆角 + 悬浮阴影全由 CSS 画。系统级圆角(DWM roundedCorners)只有 Windows 11
@@ -1747,7 +1749,7 @@ function registerIpc(): void {
     if (!stat.isFile()) {
       throw new Error(`这个路径不是一个文件:${relPath}`)
     }
-    if (stat.size > 1_000_000) return null // 超过 1MB 的源码不解析,避免卡顿
+    if (stat.size > SOURCE_PARSE_MAX_BYTES) return null // 超过上限的源码不解析,避免卡顿
     const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
       throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
     })
@@ -1861,7 +1863,7 @@ function registerIpc(): void {
       // 个性化(第一百一十三锤)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
       personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
-      contextSize: typeof c.contextSize === 'number' && c.contextSize >= 512 ? c.contextSize : undefined
+      contextSize: typeof c.contextSize === 'number' && c.contextSize >= CONTEXT_SIZE_MIN ? c.contextSize : undefined
     })
     // 垃圾不白占:切走了内置模式,或换了模型/引擎设置,旧子进程就地解散,
     // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账
@@ -1913,7 +1915,7 @@ function registerIpc(): void {
     const spec = await queryMachineSpec()
     // 上下文缓存跟着配置走(第八十六锤):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
     const config = await loadAiConfig(app.getPath('userData'))
-    const ctx = typeof config.contextSize === 'number' && config.contextSize >= 512 ? config.contextSize : DEFAULT_CONTEXT_SIZE
+    const ctx = typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN ? config.contextSize : DEFAULT_CONTEXT_SIZE
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
 
@@ -2167,7 +2169,7 @@ function registerIpc(): void {
       const name = relPath.split('/').pop() ?? relPath
 
       // 结构流:证据最硬 —— 函数/类/导入导出都摆给模型
-      if (isAnalysisSupported(languageId) && stat.size <= 1_000_000) {
+      if (isAnalysisSupported(languageId) && stat.size <= SOURCE_PARSE_MAX_BYTES) {
         // 读内容也可能撞上独占/上锁(EBUSY/EPERM),同样走人话口径,不吐生面孔
         const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
           throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })

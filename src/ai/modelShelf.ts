@@ -3,6 +3,7 @@
 // 国内直连 HF 经常连不上,镜像兜底是标配,不是可选项。
 // 缓存只在内存里留 5 分钟,重启即清、零落盘:货架是浏览用的,不给用户电脑留垃圾。
 import {
+  HF_HOSTS,
   sanitizeRepoFiles,
   sanitizeShelfList,
   type RepoFile,
@@ -10,8 +11,7 @@ import {
 } from '../shared/modelShelf.ts'
 import { queryMachineSpec } from './builtin.ts'
 
-/** 拉货源:主源直连,备源国内镜像;镜像与 HF 的 API 路径同构,只换域名 */
-const HF_HOSTS = ['https://huggingface.co', 'https://hf-mirror.com'] as const
+// 拉货源的户口在 shared/modelShelf.ts(HF_HOSTS):主源直连,备源国内镜像,下载那边同认一份
 
 /** 货架一次拉几行 */
 export const SHELF_LIMIT = 60
