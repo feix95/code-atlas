@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
+import { DRAG_MIME_NODE } from '@shared/dragTypes'
 import type { NoteMap } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
 import { openFilePathMenuFor } from './filePathMenuStore'
@@ -57,7 +58,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           data-reveal-file={node.relPath}
           onDragStart={(e) => {
             // 拖拽挂引用(第一百二十五锤):带上类型,文件夹到了对面好指路
-            e.dataTransfer.setData('application/x-atlas-node', JSON.stringify({ kind: 'file', relPath: node.relPath }))
+            e.dataTransfer.setData(DRAG_MIME_NODE, JSON.stringify({ kind: 'file', relPath: node.relPath }))
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => onSelectFile(node.relPath, node)}
@@ -127,7 +128,7 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           className="tree-main"
           draggable
           onDragStart={(e) => {
-            e.dataTransfer.setData('application/x-atlas-node', JSON.stringify({ kind: 'folder', relPath: dir.relPath }))
+            e.dataTransfer.setData(DRAG_MIME_NODE, JSON.stringify({ kind: 'folder', relPath: dir.relPath }))
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => {

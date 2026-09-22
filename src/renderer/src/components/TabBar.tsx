@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
+import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { TreeIcon } from './Icons'
 import { KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
 
@@ -102,7 +103,7 @@ export function TabBar({
       aria-label="已打开的页签"
       onDragOver={(e) => {
         // 拖着页签扫过整条页签栏(含空白):按住入场券,松手落到这组末尾
-        if (e.dataTransfer.types.includes('application/x-atlas-tab')) {
+        if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
           setDropBefore(null)
@@ -127,13 +128,13 @@ export function TabBar({
             title={title}
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.setData('application/x-atlas-tab', t.id)
+              e.dataTransfer.setData(DRAG_MIME_TAB, t.id)
               e.dataTransfer.effectAllowed = 'move'
               setDraggingId(t.id)
               onDragTab(t.id)
             }}
             onDragOver={(e) => {
-              if (e.dataTransfer.types.includes('application/x-atlas-tab')) {
+              if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
                 e.preventDefault()
                 e.stopPropagation()
                 e.dataTransfer.dropEffect = 'move'
@@ -143,7 +144,7 @@ export function TabBar({
             onDrop={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              const id = e.dataTransfer.getData('application/x-atlas-tab')
+              const id = e.dataTransfer.getData(DRAG_MIME_TAB)
               setDropBefore(null)
               setDropZone(false)
               if (id && id !== t.id) {
@@ -200,7 +201,7 @@ export function TabBar({
         className="tabbar-blank"
         onContextMenu={openKindMenu}
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes('application/x-atlas-tab')) {
+          if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
             e.preventDefault()
             e.dataTransfer.dropEffect = 'move'
             setDropZone(true)
@@ -208,7 +209,7 @@ export function TabBar({
           }
         }}
         onDrop={(e) => {
-          const id = e.dataTransfer.getData('application/x-atlas-tab')
+          const id = e.dataTransfer.getData(DRAG_MIME_TAB)
           setDropZone(false)
           if (id) onMoveTab(id, draggingId === id ? null : 'sibling', null)
         }}

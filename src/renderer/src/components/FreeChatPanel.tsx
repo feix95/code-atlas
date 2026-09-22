@@ -1,8 +1,9 @@
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+﻿import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { AgentSearchCard, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
+import { DRAG_MIME_NODE, type DragNodePayload } from '@shared/dragTypes'
 import { Badge } from './DetailHeader'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Notice } from './Notice'
@@ -548,7 +549,7 @@ export function FreeChatPanel({
       onDragOver={
         onDropNode
           ? (e) => {
-              if (!e.dataTransfer.types.includes('application/x-atlas-node')) return
+              if (!e.dataTransfer.types.includes(DRAG_MIME_NODE)) return
               e.preventDefault()
               e.dataTransfer.dropEffect = 'copy'
               setDragOver(true)
@@ -567,11 +568,11 @@ export function FreeChatPanel({
         onDropNode
           ? (e) => {
               setDragOver(false)
-              const raw = e.dataTransfer.getData('application/x-atlas-node')
+              const raw = e.dataTransfer.getData(DRAG_MIME_NODE)
               if (!raw) return
               e.preventDefault()
               try {
-                const node = JSON.parse(raw) as { kind: 'file' | 'folder'; relPath: string }
+                const node = JSON.parse(raw) as DragNodePayload
                 if (node.relPath) onDropNode(node.kind, node.relPath)
               } catch {
                 // 不是咱家的货,不接

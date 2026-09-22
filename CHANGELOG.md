@@ -312,3 +312,5 @@
 
 - refactor(ai): 提示词标签总账 shared/promptTags(TAG.*)——拼装层 15 种 XML 标签全部引户口,旧常量(COMPACT_SUMMARY_TAG/CURRENT_QUESTION_*/TOOL_RESULT_*)转派生;"</compressed_summary>" 手抄闭标签和 chatContext 私养的附件上限一并收编;prompts.ts 逐字定稿文案不动
 - refactor(ai): agent 工具名总账 shared/agentTools——五件工具名/ToolName/asToolName 认名闸/步骤播报词表一处登记,schema 定义与主进程分发链全引户口本;自测断言户口完整性
+
+- refactor(ui): 三层预测内核收口 predictedQuestions.ts——LRU 缓存/竞态闸/请求壳一份,概览与对话两钩只留点火条件;拖拽 MIME 与载荷契约收 shared/dragTypes,收发两方全引总账

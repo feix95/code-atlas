@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, FreechatHost, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
@@ -10,6 +10,7 @@ import { isAiConfigured } from '@shared/aiSetup'
 import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
 import { createMirrorThrottle } from '@shared/mirrorThrottle'
 import { CH } from '@shared/ipcChannels'
+import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { DetailHeader, type Crumb } from './components/DetailHeader'
@@ -1714,7 +1715,7 @@ function App(): React.JSX.Element {
                         className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
                         onDragOver={(e) => {
                           // 只认页签拖拽;树里拖文件挂引用走的是另一个 mime,不掺和
-                          if (!e.dataTransfer.types.includes('application/x-atlas-tab')) return
+                          if (!e.dataTransfer.types.includes(DRAG_MIME_TAB)) return
                           e.preventDefault()
                           e.dataTransfer.dropEffect = 'move'
                           const host = e.currentTarget.getBoundingClientRect()
@@ -1730,7 +1731,7 @@ function App(): React.JSX.Element {
                           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropMark(null)
                         }}
                         onDrop={(e) => {
-                          const id = e.dataTransfer.getData('application/x-atlas-tab') || draggingTab
+                          const id = e.dataTransfer.getData(DRAG_MIME_TAB) || draggingTab
                           const center = dropMark?.groupId === g.id && dropMark.center
                           const fromG = id ? groups.find((grp) => grp.tabs.some((t) => t.id === id)) : null
                           setDropMark(null)
