@@ -12,6 +12,9 @@ import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
 import { AiSetupContext } from '../aiSetupContext'
 
+/** 输入栏右侧三颗圆钮(思考/翻文件/发送)图标旋钮:共享一个大小,跟别处分组互不相关 */
+const CHAT_ACTION_ICON_SIZE = 16
+
 /**
  * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
  * 路径百分百真实,同一套检测顺手让它们也可点。没传 fileLinks 就原样纯文字。
@@ -817,7 +820,7 @@ export function FreeChatPanel({
                     : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
               }
             >
-              <TreeIcon name="brain" size={14} />
+              <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
             </button>
             {/* 翻文件开关(第一百二十八锤;小葵拍的板:纯图标胶囊):开着小探针就能自己翻项目的文件名单和文件内容(只读) */}
             <button
@@ -832,10 +835,10 @@ export function FreeChatPanel({
                   : '翻文件模式关着:小探针只看你当前给它的资料。点一下打开,它就能自己翻项目里的文件'
               }
             >
-              <TreeIcon name="folderSearch" size={14} />
+              <TreeIcon name="folderSearch" size={CHAT_ACTION_ICON_SIZE} mono />
             </button>
             <button type="submit" className="chat-send" disabled={chat.busy} aria-label={chat.busy ? '回答中' : '发送'} title={chat.busy ? '回答中……' : '发送'}>
-              <TreeIcon name="arrowUp" size={19} strokeWidth={4} />
+              <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
             </button>
           </div>
         </form>
