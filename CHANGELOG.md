@@ -301,3 +301,5 @@
 
 - refactor(core): 常量收口 shared——uiScale(缩放档位)/analysisLimits(解析上限)/aiDefaults(响应头·温度·附件上限·LM Studio 地址·上下文归一)各立户口;窗口下限/日志容量/引擎文件名/桌宠尺寸不再绕开常量
 - refactor(core): 「带得动」判定系数进 shared/modelShelf(MODEL_FIT_*),货架判定/黑板账/量尺/悬停文案四面共表;HF 双源域名货架与下载共用一份
+
+- refactor(window): 开窗样板收口 main/atlasWindow.ts——WEB_PREFS 安全开关四窗一副,露窗三保险(ready-to-show/首帧/看门狗)armRevealWatchdog 一处上弦,?view= 加载与视图名 VIEWS 统一对账

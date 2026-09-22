@@ -107,6 +107,7 @@ import { AGENT_FILES_ADDENDUM, buildChatSystem, buildExplainSystem, deepSourceCh
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, writeWindowState, type WindowBox } from './window-state.ts'
+import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL } from '../shared/aiDefaults.ts'
 import { queryDriveKinds } from './drive-meta.ts'
@@ -605,42 +606,16 @@ function openDevLogWindow(): void {
     backgroundColor: '#00000000',
     hasShadow: false,
     show: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      backgroundThrottling: false
-    }
+    webPreferences: WEB_PREFS
   })
   devLogWindow = win
   win.on('closed', () => {
     if (devLogWindow === win) devLogWindow = null
   })
-  // 露窗三保险,和主窗同一条链:ready-to-show 快路 + 渲染层双 rAF 首帧信号
+  // 露窗三保险和主窗同一条链(工厂上弦):ready-to-show 快路 + 渲染层双 rAF 首帧信号
   // (按 sender 认窗,不抢主窗的信号)+ 3 秒看门狗,绝不永久隐身
-  let shown = false
-  const showOnce = (): void => {
-    if (shown || win.isDestroyed()) return
-    shown = true
-    win.show()
-  }
-  win.once('ready-to-show', showOnce)
-  const onFirstFrame = (_event: Electron.IpcMainEvent): void => {
-    if (_event.sender === win.webContents) {
-      showOnce()
-      ipcMain.removeListener('atlas:first-frame', onFirstFrame)
-    }
-  }
-  ipcMain.on('atlas:first-frame', onFirstFrame)
-  setTimeout(showOnce, 3000)
-  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-    const url = new URL(process.env['ELECTRON_RENDERER_URL'])
-    url.searchParams.set('view', 'devlogs')
-    void win.loadURL(url.toString())
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'devlogs' } })
-  }
+  armRevealWatchdog(win, { firstFrame: 'shared' })
+  loadView(win, VIEWS.devlogs)
 }
 
 function createWindow(): void {
@@ -675,14 +650,7 @@ function createWindow(): void {
     hasShadow: false, // 系统影子跟着方框走,会描出一圈直角细线;悬浮阴影改由 CSS 画圆角的
     autoHideMenuBar: true,
     show: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      // 首帧探测靠渲染层 rAF 发信号;窗口还藏着时后台节流会把 rAF 憋死,必须关掉
-      backgroundThrottling: false
-    }
+    webPreferences: WEB_PREFS
   })
   // 主窗引用上提(桌宠托管第一锤):托盘、second-instance 都要够得着它
   mainWindowRef = mainWindow
@@ -732,28 +700,20 @@ function createWindow(): void {
   // 上回关窗时是最大化:先把存档的正常大小落好,再进最大化,圆角描边那条链照常接手
   if (savedWindowState?.maximized) mainWindow.maximize()
 
-  // ── 露窗链:多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身 ──
+  // ── 露窗链(工厂上弦):多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身 ──
   // 本机实测(模块四验收):ready-to-show 只在 GPU 缓存健康时才来 —— 缓存被另一个
   // 实例锁住(Gpu Cache Creation failed)或被污染时就永远装死;当年「窗隐身」就是
-  // 两实例缓存大战 + show 眼巴巴等 ready-to-show 叠出来的。所以下面每一路都只当快路,
+  // 两实例缓存大战 + show 眼巴巴等 ready-to-show 叠出来的。所以每一路都只当快路,
   // 谁都不许当唯一依靠,3 秒看门狗才是保底。
-  let shown = false
+  // 主窗独占 first-frame 通道(exclusive):桌宠/气泡/日志窗共用同一个 preload 都发信号,
+  // 不独占不过滤的话,小家伙的帧会替主窗「报平安」,提前露白窗才冤
   let shownVia = 'never'
-  const showOnce = (why: string): void => {
-    if (shown || mainWindow.isDestroyed()) return
-    shown = true
-    shownVia = why
-    mainWindow.show()
-    console.log(`[window] 露窗方式:${why}`)
-  }
-  // 1) 常见快路:GPU 栈干净时它先到
-  mainWindow.once('ready-to-show', () => showOnce('ready-to-show'))
-  // 2) 渲染层双 rAF 信号(合成器肯给隐藏窗出帧的机器上生效,多数机器到不了这)
-  // 按 sender 认窗:桌宠/气泡/日志窗共用同一个 preload,都发 first-frame,
-  // 不过滤的话小家伙的帧会替主窗「报平安」,露窗方式记岔还是小事,提前露白窗才冤
-  ipcMain.removeAllListeners('atlas:first-frame')
-  ipcMain.on('atlas:first-frame', (event) => {
-    if (event.sender === mainWindow.webContents) showOnce('first-frame')
+  armRevealWatchdog(mainWindow, {
+    firstFrame: 'exclusive',
+    beforeShow: (_win, via) => {
+      shownVia = via
+      console.log(`[window] 露窗方式:${via}`)
+    }
   })
   // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
   // 「接回横幅」:救生圈动过手(reload 完/GPU 重启完)就捎个信,让页面弹一句人话
@@ -881,9 +841,6 @@ function createWindow(): void {
     // 主窗走了,Developer 日志窗没有独活的意义:一起带走,应用照常退出
     if (devLogWindow && !devLogWindow.isDestroyed()) devLogWindow.close()
   })
-  // 4) 看门狗(唯一无条件的兜底):3 秒硬拉露窗 —— 宁可早闪一下,不可隐身躲猫猫。
-  //    隐藏的透明窗此刻多半还没内容,用户看到「窗口浮现」的实际时刻仍是首帧画好之时
-  setTimeout(() => showOnce('watchdog-3s'), 3000)
 
   // 最大化是两副面孔:贴满屏幕时圆角描边必须收掉,四角才不漏出怪缝 —— 状态一变就喊渲染进程换装
   const syncMaximized = (maximized: boolean): void => {
@@ -898,12 +855,8 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // 开发模式加载 Vite 开发服务器,打包后加载本地文件
-  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  // 开发模式加载 Vite 开发服务器,打包后加载本地文件(工厂代跑;主窗不带 ?view=,默认页就是它)
+  loadView(mainWindow)
 
   // 验收探针(只在设置了 ATLAS_PROBE_DIR 时启用):露窗后截整窗图 + 记账再退出,
   // 专门伺候「100%/125%/150% 三档缩放实测」当证据;正常跑应用完全不碰这段

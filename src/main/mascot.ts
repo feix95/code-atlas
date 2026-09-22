@@ -23,7 +23,7 @@
 
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import type { Rectangle } from 'electron'
-import { join } from 'node:path'
+import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
 
@@ -118,27 +118,12 @@ export function createMascotWindow(stateDir: string): BrowserWindow {
     // 点桌宠弹对话气泡,自己不抢焦点:桌宠是门面不是主角
     focusable: false,
     show: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      // 呼吸/眨眼这些小动画不能被后台节流憋死
-      backgroundThrottling: false
-    }
+    webPreferences: WEB_PREFS
   })
   win.setAlwaysOnTop(true, 'floating')
-  // 露窗走主窗同一条经验的简化版:ready-to-show 快路 + 3 秒看门狗,绝不永久隐身
-  let shown = false
-  const showOnce = (): void => {
-    if (shown || win.isDestroyed()) return
-    shown = true
-    // 露面即把尺寸钉回名义值:透明窗出生就可能被系统喂胖几像素(雷区档案②的出生版)
-    win.setContentSize(MASCOT_SIZE, MASCOT_SIZE)
-    win.show()
-  }
-  win.once('ready-to-show', showOnce)
-  setTimeout(showOnce, 3000)
+  // 露窗走主窗同一条经验的简化版(工厂上弦):ready-to-show 快路 + 3 秒看门狗,绝不永久隐身;
+  // 露面即把尺寸钉回名义值:透明窗出生就可能被系统喂胖几像素(雷区档案②的出生版)
+  armRevealWatchdog(win, { beforeShow: (w) => w.setContentSize(MASCOT_SIZE, MASCOT_SIZE) })
   win.on('closed', () => {
     stopHoverWatch()
     if (mascotWindow === win) mascotWindow = null
@@ -148,7 +133,7 @@ export function createMascotWindow(stateDir: string): BrowserWindow {
   win.webContents.on('console-message', (details) => {
     addDevLog('system', `桌宠页面:${details.message}`)
   })
-  loadMascotPage(win)
+  loadView(win, VIEWS.mascot)
   // 穿透归轮询管:窗一露面 watch 就上弦 —— 页面加载前后那几秒短暂实心,
   // 点错也只是点到这只小窗,不咬人
   watchHover(win)
@@ -157,16 +142,6 @@ export function createMascotWindow(stateDir: string): BrowserWindow {
   emitMascotHidden()
   addDevLog('system', '桌宠上岗')
   return win
-}
-
-function loadMascotPage(win: BrowserWindow): void {
-  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-    const url = new URL(process.env['ELECTRON_RENDERER_URL'])
-    url.searchParams.set('view', 'mascot')
-    void win.loadURL(url.toString())
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'mascot' } })
-  }
 }
 
 /** 藏起桌宠(假藏):不真 hide() —— focusable:false 的窗在 Windows 上 hide/show 一回,

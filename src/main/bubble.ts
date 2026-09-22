@@ -4,9 +4,9 @@
 // 全 app 一场对话,主窗发的气泡看得见,气泡发的进主窗账本。
 // (右键问一问/划词问一问已下线:文件/划词两种形态连同待处理内容机制一并拆走)
 
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, ipcMain, screen } from 'electron'
 import type { Rectangle } from 'electron'
-import { join } from 'node:path'
+import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { placeBubbleBox, resizeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT, type PlacementBox } from './bubblePlacement.ts'
 import { readBubbleSize, writeBubbleSize } from './bubbleState.ts'
@@ -82,37 +82,19 @@ export function openBubble(anchor?: Rectangle): void {
     resizable: false,
     autoHideMenuBar: true,
     show: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      backgroundThrottling: false
-    }
+    webPreferences: WEB_PREFS
   })
   bubbleWindow = win
   win.on('closed', () => {
     if (bubbleWindow === win) bubbleWindow = null
   })
-  // 露窗照主窗的简化方抓药:ready-to-show 快路 + 3 秒看门狗
-  let shown = false
-  const showOnce = (): void => {
-    if (shown || win.isDestroyed()) return
-    shown = true
-    // 露面即把尺寸钉回名义值:透明窗出生就可能被系统喂胖几像素(雷区档案②)
-    win.setContentSize(box.width, box.height)
-    win.show()
-    win.focus()
-  }
-  win.once('ready-to-show', showOnce)
-  setTimeout(showOnce, 3000)
-  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-    const url = new URL(process.env['ELECTRON_RENDERER_URL'])
-    url.searchParams.set('view', 'bubble')
-    void win.loadURL(url.toString())
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { view: 'bubble' } })
-  }
+  // 露窗照主窗的简化方抓药(工厂上弦):ready-to-show 快路 + 3 秒看门狗;
+  // 露面即把尺寸钉回名义值:透明窗出生就可能被系统喂胖几像素(雷区档案②)
+  armRevealWatchdog(win, {
+    beforeShow: (w) => w.setContentSize(box.width, box.height),
+    afterShow: (w) => w.focus()
+  })
+  loadView(win, VIEWS.bubble)
   addDevLog('system', '气泡弹开:自由对话')
 }
 
