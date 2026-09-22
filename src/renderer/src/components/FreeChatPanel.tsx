@@ -2,7 +2,7 @@ import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, ty
 import type { AgentSearchCard, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
-import { isCompactCommand } from '@shared/compact'
+import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
 import { Badge } from './DetailHeader'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Notice } from './Notice'
@@ -68,7 +68,7 @@ const CHAT_EXAMPLES = ['这个项目从哪里开始看？', '我想找一个功�
 
 /** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
 const SLASH_COMMANDS: Array<{ name: string; desc: string }> = [
-  { name: '/compact', desc: '把前面聊过的压成摘要，省出上下文' }
+  { name: COMPACT_COMMAND, desc: '把前面聊过的压成摘要，省出上下文' }
 ]
 
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */

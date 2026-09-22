@@ -309,3 +309,6 @@
 - refactor(ai): 请求/探测底座收口 ai/http.ts——postChatCompletions 管控制器接力+响应头看门狗+POST 壳子(普通流式和 agent 不再各抄 25 行);friendlyHttpError/isContextOverflow 随迁;fetchWithTimeout+PROBE_*_MS 档位收编十处裸探测(LM Studio 状态/上下文/列模型/内置 health/HF 双源),流式看门狗三档进 shared/aiDefaults
 
 - refactor(ai): formatGB 双胞胎灭门——户口收 shared/contextBill 一把尺,builtin 删掉本地复刻改引
+
+- refactor(ai): 提示词标签总账 shared/promptTags(TAG.*)——拼装层 15 种 XML 标签全部引户口,旧常量(COMPACT_SUMMARY_TAG/CURRENT_QUESTION_*/TOOL_RESULT_*)转派生;"</compressed_summary>" 手抄闭标签和 chatContext 私养的附件上限一并收编;prompts.ts 逐字定稿文案不动
+- refactor(ai): agent 工具名总账 shared/agentTools——五件工具名/ToolName/asToolName 认名闸/步骤播报词表一处登记,schema 定义与主进程分发链全引户口本;自测断言户口完整性

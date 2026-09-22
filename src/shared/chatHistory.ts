@@ -7,6 +7,7 @@
  * 治法:历史只收「一问一答都落地了」的完整轮,半截的、报错的、被停的整轮扔掉。
  */
 import type { AiHistoryMessage } from './types.ts'
+import { TAG } from './promptTags.ts'
 
 /** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底 */
 export const FREE_CHAT_HISTORY_MAX = 8
@@ -17,8 +18,8 @@ export const FREE_CHAT_HISTORY_MAX = 8
  * 作答就会偏。给当前问题包一对 <current_question> 标签;早前问答都只是历史背景。
  * 主进程 agent 链取问题时用 stripCurrentQuestionAnchor 剥掉这对标签。
  */
-export const CURRENT_QUESTION_PREFIX = '<current_question>\n'
-export const CURRENT_QUESTION_SUFFIX = '\n</current_question>'
+export const CURRENT_QUESTION_PREFIX = `${TAG.currentQuestion.open}\n`
+export const CURRENT_QUESTION_SUFFIX = `\n${TAG.currentQuestion.close}`
 
 /**
  * 剥掉注意力锚:agent 工具轮的提醒卡要引用干净的问题原文,别把标签一起带上。
@@ -28,7 +29,7 @@ export const CURRENT_QUESTION_SUFFIX = '\n</current_question>'
 export function stripCurrentQuestionAnchor(text: string): string {
   let out = text
   if (out.startsWith(CURRENT_QUESTION_PREFIX)) out = out.slice(CURRENT_QUESTION_PREFIX.length)
-  const closeIdx = out.indexOf('</current_question>')
+  const closeIdx = out.indexOf(TAG.currentQuestion.close)
   if (closeIdx >= 0) out = out.slice(0, closeIdx)
   return out.replace(/^\s+/, '').replace(/\s+$/, '')
 }

@@ -47,6 +47,7 @@ import {
 import { AGENT_FILES_ADDENDUM, buildChatSystem, SLICE_NO_TOOLS } from '../src/ai/prompts.ts'
 import { WEB_PAGE_TEXT_MAX_CHARS, WEB_SEARCH_PAGE_COUNT, htmlToText, isPublicHttpUrl, parseTavilyResults, sanitizeWebQuery, wikiHitsRelevant, type WebSearchHit } from '../src/ai/weblookup.ts'
 import { AgentDirectoryAccess, PROJECT_AGENT_ROOT, isPathInside, sanitizeAgentRootId, sanitizeExternalDirectoryPath } from '../src/main/agentAccess.ts'
+import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 
 async function main(): Promise<void> {
   // ── 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 ──
@@ -121,6 +122,23 @@ async function main(): Promise<void> {
     '工具名单对齐:列名单 + 读文件 + 搜内容 + 申请外部目录'
   )
   assert.equal(AGENT_TOOLS.length, 5, '联网查证开着,全量工具表多一件 web_search')
+
+  // 工具名总账(shared/agentTools):名单、词表、认名闸三样互相对得上 —— 多一件少一件当场拦
+  const registered = Object.values(TOOL_NAMES)
+  assert.equal(registered.length, 5, '户口本登记五件工具')
+  assert.deepEqual(
+    AGENT_TOOLS.map((t) => t.function.name).sort(),
+    [...registered].sort(),
+    '发给模型的工具表全部出自户口本'
+  )
+  assert.deepEqual(
+    Object.keys(TOOL_STEP_WORDS).sort(),
+    [...registered].sort(),
+    '播报词表和户口本同一份名单'
+  )
+  for (const name of registered) assert.equal(asToolName(name), name, `户口本能认出 ${name}`)
+  assert.equal(asToolName('delete_file'), null, '不认识的工具名拒收(写文件工具不存在)')
+  assert.equal(asToolName(''), null, '空名拒收')
 
   const listTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'list_files')!
   const readTool = AGENT_TOOLS_LOCAL.find((t) => t.function.name === 'read_file')!

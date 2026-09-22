@@ -4,6 +4,7 @@
 import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { joinRoot } from '../shared/paths.ts'
+import { TAG } from '../shared/promptTags.ts'
 import type { GitChange, GitChangesResult } from '../shared/types.ts'
 
 /** 单文件 diff 喂给模型的上限(字符数),超出截断并注明 */
@@ -208,7 +209,7 @@ export async function getChangeDiff(rootPath: string, change: GitChange): Promis
 
 function clip(result: ChangeDiff): ChangeDiff | null {
   if (result.diff.length <= DIFF_CHAR_LIMIT) return result
-  return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……<program_note>改动太大,只取了前面一部分</program_note>`, note: '改动太大,已截断' }
+  return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……${TAG.programNote.open}改动太大,只取了前面一部分${TAG.programNote.close}`, note: '改动太大,已截断' }
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, ChatMessage } from '@shared/types'
-import { COMPACT_SUMMARY_TAG } from '@shared/compact'
+import { TAG } from '@shared/promptTags'
 import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
 import { friendlyErr } from './errText'
 
@@ -37,7 +37,7 @@ function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
   for (const m of messages) {
     if (m.role === 'note') {
       if (m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') {
-        out.push({ role: 'user', content: `${COMPACT_SUMMARY_TAG}\n旧摘要,一并融进新摘要:\n${m.text}\n</compressed_summary>` })
+        out.push({ role: 'user', content: `${TAG.compressedSummary.open}\n旧摘要,一并融进新摘要:\n${m.text}\n${TAG.compressedSummary.close}` })
       }
       continue
     }

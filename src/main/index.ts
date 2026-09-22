@@ -38,6 +38,7 @@ import {
   type AgentStreamEvent
 } from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
+import { asToolName, TOOL_NAMES } from '../shared/agentTools.ts'
 import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { createMascotWindow, getMascotWindow, hideMascot, isMascotHidden, registerMascotIpc, seatMascotAt, setMascotHiddenListener, showMascot, toggleMascot } from './mascot.ts'
@@ -1428,71 +1429,68 @@ async function runAgentChat(input: {
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
-      const callName =
-        call.name === 'read_file' || call.name === 'list_files' || call.name === 'search_content' || call.name === 'request_directory_access' || call.name === 'web_search'
-          ? call.name
-          : null
-      const isFileTool = callName === 'read_file' || callName === 'list_files' || callName === 'search_content'
+      const callName = asToolName(call.name)
+      const isFileTool = callName === TOOL_NAMES.readFile || callName === TOOL_NAMES.listFiles || callName === TOOL_NAMES.searchContent
       const selectedRoot = isFileTool ? agentDirectoryAccess.resolve(rootPath, call.args?.rootId) : null
       const relPath =
-        callName === 'web_search' || callName === 'request_directory_access'
+        callName === TOOL_NAMES.webSearch || callName === TOOL_NAMES.requestDirectoryAccess
           ? ''
-          : callName === 'search_content' && call.args?.relPath === undefined
+          : callName === TOOL_NAMES.searchContent && call.args?.relPath === undefined
             ? ''
             : sanitizeAgentRelPath(call.args?.relPath)
-      const keyword = callName === 'search_content' && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
+      const keyword = callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
       const rawQuery = call.args?.query
-      const requestedPath = callName === 'request_directory_access' ? sanitizeExternalDirectoryPath(call.args?.path) : null
+      const requestedPath = callName === TOOL_NAMES.requestDirectoryAccess ? sanitizeExternalDirectoryPath(call.args?.path) : null
       // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
-      const query = callName === 'web_search' ? sanitizeWebQuery(rawQuery) : null
-      const queryMissing = callName === 'web_search' && (typeof rawQuery !== 'string' || rawQuery.trim() === '')
+      const query = callName === TOOL_NAMES.webSearch ? sanitizeWebQuery(rawQuery) : null
+      const queryMissing = callName === TOOL_NAMES.webSearch && (typeof rawQuery !== 'string' || rawQuery.trim() === '')
       if (
         !callName ||
         relPath === null ||
         (isFileTool && selectedRoot === null) ||
-        (callName === 'search_content' && keyword === '') ||
-        (callName === 'request_directory_access' && requestedPath === null) ||
-        (callName === 'web_search' && query === null)
+        (callName === TOOL_NAMES.searchContent && keyword === '') ||
+        (callName === TOOL_NAMES.requestDirectoryAccess && requestedPath === null) ||
+        (callName === TOOL_NAMES.webSearch && query === null)
       ) {
         const why = !callName
           ? '没有这个工具'
           : isFileTool && selectedRoot === null
             ? '目录编号无效或尚未获准,项目外目录要先申请'
-            : callName === 'request_directory_access'
+            : callName === TOOL_NAMES.requestDirectoryAccess
               ? '要给用户明确点名的绝对文件夹路径(path)'
-              : callName === 'web_search'
+              : callName === TOOL_NAMES.webSearch
                 ? queryMissing
                   ? '要给搜索词(query),写概念词、软件名或短的公开问题'
                   : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
-                : callName === 'search_content'
+                : callName === TOOL_NAMES.searchContent
                   ? '要给关键词(keyword),如 500 或 DWELL_MS'
                   : '路径不合法,要用所选根目录内的相对路径'
         const badTarget =
-          callName === 'web_search'
+          callName === TOOL_NAMES.webSearch
             ? String(rawQuery ?? '(没给搜索词)')
-            : callName === 'request_directory_access'
+            : callName === TOOL_NAMES.requestDirectoryAccess
               ? String(call.args?.path ?? '(没给目录)')
               : String(call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)')
-        sendAgentStep(event, requestId, agentStepText(callName ?? 'list_files', badTarget, 'error', why))
+        sendAgentStep(event, requestId, agentStepText(callName ?? TOOL_NAMES.listFiles, badTarget, 'error', why))
         toolResults.push({ role: 'tool', tool_call_id: call.id, content: wrapToolResult(`参数不合法:${why}`) })
         continue
       }
       // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
       const rootKey = selectedRoot?.rootId ?? ''
       const key =
-        callName === 'search_content'
+        callName === TOOL_NAMES.searchContent
           ? toolCallKey(callName, `${rootKey}:${relPath}#${keyword}`)
-          : callName === 'web_search'
+          : callName === TOOL_NAMES.webSearch
             ? toolCallKey(callName, query ?? '')
-            : callName === 'request_directory_access'
+            : callName === TOOL_NAMES.requestDirectoryAccess
               ? toolCallKey(callName, requestedPath ?? '')
               : toolCallKey(callName, `${rootKey}:${relPath}`)
       const stepTarget =
-        callName === 'search_content'
+        callName === TOOL_NAMES.searchContent
           ? keyword
-          : callName === 'web_search'
+          : callName === TOOL_NAMES.webSearch
             ? (query ?? '')
-            : callName === 'request_directory_access'
+            : callName === TOOL_NAMES.requestDirectoryAccess
               ? (requestedPath ?? '')
               : relPath === ''
                 ? selectedRoot?.external
@@ -1505,28 +1503,28 @@ async function runAgentChat(input: {
         continue
       }
       doneCalls.add(key)
-      if (callName === 'search_content') searchUsed = true // 质检闸的账:真发起过搜索才算搜过
+      if (callName === TOOL_NAMES.searchContent) searchUsed = true // 质检闸的账:真发起过搜索才算搜过
       callIdToKey.set(call.id, key)
       // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
       const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean; rootId?: string } =
-        callName === 'request_directory_access'
+        callName === TOOL_NAMES.requestDirectoryAccess
           ? await agentRequestDirectoryAccess(event, requestedPath)
-          : callName === 'list_files'
+          : callName === TOOL_NAMES.listFiles
             ? await agentListFiles((selectedRoot as { path: string }).path, relPath)
-            : callName === 'search_content'
+            : callName === TOOL_NAMES.searchContent
               ? await agentSearchContent((selectedRoot as { path: string }).path, relPath, keyword)
-              : callName === 'web_search'
+              : callName === TOOL_NAMES.webSearch
                 ? await agentWebSearch(query ?? '', input.tavilyKey)
                 : await agentReadFile((selectedRoot as { path: string }).path, relPath, readChars)
       if (exec.ok && selectedRoot?.external) exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
       // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
       // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
       exec.text = wrapToolResult(exec.text)
-      if (exec.ok && callName !== 'request_directory_access') toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
+      if (exec.ok && callName !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
       sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
-      if (callName === 'search_content' && !selectedRoot?.external && exec.ok && exec.matches && exec.matches.length > 0) {
+      if (callName === TOOL_NAMES.searchContent && !selectedRoot?.external && exec.ok && exec.matches && exec.matches.length > 0) {
         sendAgentMatches(event, requestId, { keyword, items: exec.matches, truncated: exec.matchesTruncated === true })
         // 质检闸的对账本:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
         for (const m of exec.matches) searchHitPaths.add(m.relPath)

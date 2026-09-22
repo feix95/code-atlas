@@ -92,6 +92,7 @@ import {
   COMPACT_HISTORY_MAX_MESSAGES
 } from '../src/shared/compact.ts'
 import { collectHistoryRounds, CURRENT_QUESTION_PREFIX, stripCurrentQuestionAnchor } from '../src/shared/chatHistory.ts'
+import { TAG } from '../src/shared/promptTags.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
 import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
@@ -126,6 +127,14 @@ function lmConfig(model: string, baseUrl = 'http://127.0.0.1:1234/v1'): AiConfig
 }
 
 async function main(): Promise<void> {
+  // ── 0. 标签户口(shared/promptTags):每个标签开闭成对、派生常量都出自这张表 ──
+  for (const [key, tag] of Object.entries(TAG)) {
+    assert.ok(tag.open.startsWith('<') && tag.open.endsWith('>'), `${key} 的开标签要是 <...> 形`)
+    assert.equal(tag.close, `</${tag.open.slice(1)}`, `${key} 的闭标签要和开标签同名`)
+  }
+  assert.equal(CURRENT_QUESTION_PREFIX, `${TAG.currentQuestion.open}\n`, '当前问题前缀从户口派生')
+  assert.equal(COMPACT_SUMMARY_TAG, TAG.compressedSummary.open, '压缩摘要标签从户口派生')
+
   // ── 1. 提示词构建:固定、把证据摆进去、绝不引入结构外的内容 ──
   const prompt = buildExplainPrompt({
     relPath: 'src/main.tsx',

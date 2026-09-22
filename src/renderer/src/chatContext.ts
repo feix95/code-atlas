@@ -1,20 +1,21 @@
 import type { ChatContextAttachment, FileStructure, ScanDirNode, ScanFileNode } from '@shared/types'
+import { ATTACHMENT_DETAILS_MAX } from '@shared/aiDefaults'
+import { TAG } from '@shared/promptTags'
 
 /**
  * 自由对话的「资料附件」构建器:从扫描树里现场整理当前选中对象的资料。
  * 附件只是参考信息挂件,不是对话历史 —— 每次发请求都带当下最新的这份,
  * 切换对象时旧资料不会混进新对话。
+ * 附件正文上限的户口在 shared/aiDefaults(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,
+ * 主进程洗附件按它验,一把尺。
  */
-
-/** 附件正文上限:自由对话的证据从简,给模型的上下文留余地 */
-const DETAILS_MAX = 4000
 
 /** 逐行拼正文,超长就地截断,绝不静默丢一半句子 */
 function clipDetails(lines: string[]): string {
   let text = ''
   for (const line of lines) {
-    if (text.length + line.length + 1 > DETAILS_MAX) {
-      return `${text}\n……<program_note>资料太长,只取了前面一部分</program_note>`
+    if (text.length + line.length + 1 > ATTACHMENT_DETAILS_MAX) {
+      return `${text}\n……${TAG.programNote.open}资料太长,只取了前面一部分${TAG.programNote.close}`
     }
     text += text ? `\n${line}` : line
   }
