@@ -30,10 +30,15 @@ import type { AiConfig, GitChange } from '../src/shared/types.ts'
 
 function git(cwd: string, ...args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', ['-c', 'core.quotepath=false', ...args], { cwd, windowsHide: true }, (err, stdout) => {
-      if (err) reject(new Error(`git ${args.join(' ')} 失败:${err.message}`))
-      else resolve(stdout)
-    })
+    execFile(
+      'git',
+      ['-c', 'core.quotepath=false', ...args],
+      { cwd, windowsHide: true },
+      (err, stdout) => {
+        if (err) reject(new Error(`git ${args.join(' ')} 失败:${err.message}`))
+        else resolve(stdout)
+      }
+    )
   })
 }
 
@@ -148,10 +153,16 @@ async function main(): Promise<void> {
     assert.ok(!diffA.diff.includes('<staged_changes>'), '不应混入暂存区标记')
 
     const diffB = await getChangeDiff(root, b)
-    assert.ok(diffB && diffB.diff.includes('+delta 新') && diffB.diff.includes('<staged_changes>'), '已暂存改动应标 <staged_changes>')
+    assert.ok(
+      diffB && diffB.diff.includes('+delta 新') && diffB.diff.includes('<staged_changes>'),
+      '已暂存改动应标 <staged_changes>'
+    )
 
     const diffC = await getChangeDiff(root, c)
-    assert.ok(diffC && diffC.diff.includes('brand new file') && diffC.diff.includes('<new_file>'), '新文件应读全部内容当新增')
+    assert.ok(
+      diffC && diffC.diff.includes('brand new file') && diffC.diff.includes('<new_file>'),
+      '新文件应读全部内容当新增'
+    )
 
     const diffE = await getChangeDiff(root, e)
     assert.ok(diffE && diffE.diff.includes('-goodbye'), '删除文件应显示被删内容')
@@ -230,7 +241,10 @@ async function main(): Promise<void> {
     })
     assert.ok(rp.includes('分支:main'), '提示词应含分支')
     assert.ok(rp.includes('a.ts'), '提示词应含改动文件')
-    assert.ok(rp.includes('+1 −1') || rp.includes('+0 −1') || rp.includes('+2') || rp.includes('+1'), '提示词应含行数账')
+    assert.ok(
+      rp.includes('+1 −1') || rp.includes('+0 −1') || rp.includes('+2') || rp.includes('+1'),
+      '提示词应含行数账'
+    )
     assert.ok(rp.includes('窗口圆角'), '提示词应含提交主题线索')
     assert.ok(!rp.includes(reportRoot), '提示词不许带绝对路径(路径契约)')
 
@@ -243,12 +257,30 @@ async function main(): Promise<void> {
       deletions: 0,
       binary: false
     }))
-    const capped = buildReportPrompt({ branch: 'main', changes: many, stats: { additions: 100, deletions: 0 }, recentSubjects: [] })
-    assert.equal(capped.split('\n').filter((l) => l.startsWith('- 修改')).length, REPORT_ROW_LIMIT, '清单行数要封顶')
+    const capped = buildReportPrompt({
+      branch: 'main',
+      changes: many,
+      stats: { additions: 100, deletions: 0 },
+      recentSubjects: []
+    })
+    assert.equal(
+      capped.split('\n').filter((l) => l.startsWith('- 修改')).length,
+      REPORT_ROW_LIMIT,
+      '清单行数要封顶'
+    )
     assert.ok(capped.includes('还有 20 个小改动'), '封顶后要注明还有多少零碎改动')
     const binaryRow = buildReportPrompt({
       branch: 'main',
-      changes: [{ relPath: 'pic.png', kind: 'modified', staged: true, additions: -1, deletions: -1, binary: true }],
+      changes: [
+        {
+          relPath: 'pic.png',
+          kind: 'modified',
+          staged: true,
+          additions: -1,
+          deletions: -1,
+          binary: true
+        }
+      ],
       stats: { additions: 0, deletions: 0 },
       recentSubjects: []
     })
@@ -286,10 +318,17 @@ async function main(): Promise<void> {
   const address = server.address()
   assert.ok(address && typeof address === 'object', '假服务应监听在端口上')
   try {
-    const config: AiConfig = { baseUrl: `http://127.0.0.1:${address.port}/v1`, model: 'fake-model', apiKey: '' }
+    const config: AiConfig = {
+      baseUrl: `http://127.0.0.1:${address.port}/v1`,
+      model: 'fake-model',
+      apiKey: ''
+    }
     const res2 = await explainWithModel(config, dp, DIFF_SYSTEM_PROMPT)
     assert.equal(res2.status, 'supported', '假服务应返回成功')
-    const sent = JSON.parse(received[0] ?? '{}') as { messages: Array<{ role: string; content: string }>; max_tokens?: number }
+    const sent = JSON.parse(received[0] ?? '{}') as {
+      messages: Array<{ role: string; content: string }>
+      max_tokens?: number
+    }
     assert.ok(sent.messages[0]?.content.includes('改动翻译官'), '系统人设应是「改动翻译官」')
     assert.ok(sent.messages[1]?.content.includes('src/app.ts'), '用户提示词应是改动内容')
 
@@ -305,7 +344,10 @@ async function main(): Promise<void> {
       900
     )
     assert.equal(reportRes.status, 'supported', '报告假服务应返回成功')
-    const reportSent = JSON.parse(received[1] ?? '{}') as { messages: Array<{ role: string; content: string }>; max_tokens?: number }
+    const reportSent = JSON.parse(received[1] ?? '{}') as {
+      messages: Array<{ role: string; content: string }>
+      max_tokens?: number
+    }
     assert.ok(reportSent.messages[0]?.content.includes('干活审计官'), '系统人设应是「干活审计官」')
     assert.equal(reportSent.max_tokens, 900, '报告的生成上限应是 900')
   } finally {
@@ -313,7 +355,9 @@ async function main(): Promise<void> {
   }
 
   console.log('✅ git 修改翻译自测全部通过')
-  console.log('   真仓库改动收集 · 子目录场景 · 五种 diff · 大文件边界 · 非仓库兜底 · 提示词固定 · 改动翻译官人设 · 干活报告(主题/签名/封顶/审计官人设)')
+  console.log(
+    '   真仓库改动收集 · 子目录场景 · 五种 diff · 大文件边界 · 非仓库兜底 · 提示词固定 · 改动翻译官人设 · 干活报告(主题/签名/封顶/审计官人设)'
+  )
 }
 
 main().catch((err) => {

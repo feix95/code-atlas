@@ -9,9 +9,7 @@ import type { GgufShape } from './types.ts'
  */
 
 export type GgufParseResult =
-  | { status: 'ok'; shape: GgufShape }
-  | { status: 'truncated' }
-  | { status: 'bad' }
+  { status: 'ok'; shape: GgufShape } | { status: 'truncated' } | { status: 'bad' }
 
 /** 头部截断了(缓冲区不够长,再读大一点也许就好) */
 class TruncatedError extends Error {}
@@ -49,7 +47,11 @@ function readString(buf: Buffer, off: number): { text: string; next: number } {
 }
 
 /** 读一个定长标量;string/array 不是标量,回 null 让调用方走各自的道 */
-function readScalar(buf: Buffer, off: number, type: number): { next: number; value: number } | null {
+function readScalar(
+  buf: Buffer,
+  off: number,
+  type: number
+): { next: number; value: number } | null {
   const size = FIXED_SIZES[type] ?? null
   if (size === null) return null
   need(size, off, buf)
@@ -96,7 +98,8 @@ function skipValue(buf: Buffer, off: number, type: number): number {
 export function parseGgufHeader(buf: Buffer): GgufParseResult {
   try {
     if (buf.length < 24) throw new TruncatedError()
-    if (buf[0] !== 0x47 || buf[1] !== 0x47 || buf[2] !== 0x55 || buf[3] !== 0x46) throw new BadGgufError()
+    if (buf[0] !== 0x47 || buf[1] !== 0x47 || buf[2] !== 0x55 || buf[3] !== 0x46)
+      throw new BadGgufError()
     const version = buf.readUInt32LE(4)
     if (version < 2 || version > 3) throw new BadGgufError()
     const tensorCount = readU64(buf, 8)

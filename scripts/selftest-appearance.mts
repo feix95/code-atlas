@@ -53,8 +53,16 @@ check('小葵的绿(#7dba32)明度带内不夹,压深字', () => {
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sanitizeAppearance, resolveAppearanceStartup, defaultAppearance } from '../src/shared/appearancePrefs.ts'
-import { appearanceFilePath, loadAppearanceFileSync, saveAppearanceFile } from '../src/main/appearanceStore.ts'
+import {
+  sanitizeAppearance,
+  resolveAppearanceStartup,
+  defaultAppearance
+} from '../src/shared/appearancePrefs.ts'
+import {
+  appearanceFilePath,
+  loadAppearanceFileSync,
+  saveAppearanceFile
+} from '../src/main/appearanceStore.ts'
 
 check('清洗:陌生存档各字段越界一律回默认', () => {
   assert.deepEqual(sanitizeAppearance(null), defaultAppearance())
@@ -66,10 +74,19 @@ check('清洗:陌生存档各字段越界一律回默认', () => {
 })
 
 check('清洗:合法值原样放行,非法 hex 拦下', () => {
-  const good = { mode: 'dark', preset: 'custom', accent: '#7dba32', secondary: '#5ac5db', base: '#1f2728' }
+  const good = {
+    mode: 'dark',
+    preset: 'custom',
+    accent: '#7dba32',
+    secondary: '#5ac5db',
+    base: '#1f2728'
+  }
   assert.deepEqual(sanitizeAppearance(good), good)
   assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', accent: '#12345' }).accent, null)
-  assert.equal(sanitizeAppearance({ mode: 'light', preset: 'teal', secondary: '#gggggg' }).secondary, null)
+  assert.equal(
+    sanitizeAppearance({ mode: 'light', preset: 'teal', secondary: '#gggggg' }).secondary,
+    null
+  )
   assert.equal(sanitizeAppearance({ mode: 'light', preset: 'custom', base: '蓝色' }).base, null)
 })
 
@@ -78,7 +95,13 @@ check('清洗:雾空蓝预设是货架正编,存档里存它要认', () => {
 })
 
 check('首启决策:主进程有档听主进程的,不迁移', () => {
-  const stored = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: null, base: null }
+  const stored = {
+    mode: 'dark' as const,
+    preset: 'custom' as const,
+    accent: '#7dba32',
+    secondary: null,
+    base: null
+  }
   const r = resolveAppearanceStartup({ stored, legacyRaw: '{"mode":"light"}' })
   assert.deepEqual(r.value, stored)
   assert.equal(r.migrate, false)
@@ -87,7 +110,12 @@ check('首启决策:主进程有档听主进程的,不迁移', () => {
 check('首启决策:主进程没档而旧档有效 → 收编迁移', () => {
   const r = resolveAppearanceStartup({
     stored: null,
-    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'custom', accent: '#7c5cd6', secondary: '#b79ef0' })
+    legacyRaw: JSON.stringify({
+      mode: 'dark',
+      preset: 'custom',
+      accent: '#7c5cd6',
+      secondary: '#b79ef0'
+    })
   })
   assert.equal(r.value.mode, 'dark')
   assert.equal(r.value.preset, 'custom')
@@ -97,7 +125,12 @@ check('首启决策:主进程没档而旧档有效 → 收编迁移', () => {
 check('旧档里的已下架彩色预设(teal/violet):清洗回石墨档,自选的色留着不丢', () => {
   const r = resolveAppearanceStartup({
     stored: null,
-    legacyRaw: JSON.stringify({ mode: 'dark', preset: 'violet', accent: '#7c5cd6', secondary: '#b79ef0' })
+    legacyRaw: JSON.stringify({
+      mode: 'dark',
+      preset: 'violet',
+      accent: '#7c5cd6',
+      secondary: '#b79ef0'
+    })
   })
   assert.equal(r.value.preset, 'default')
   assert.equal(r.value.accent, '#7c5cd6')
@@ -105,10 +138,13 @@ check('旧档里的已下架彩色预设(teal/violet):清洗回石墨档,自选�
 })
 
 check('首启决策:旧档是全默认/烂的 → 不值得迁移,回默认', () => {
-  assert.deepEqual(resolveAppearanceStartup({ stored: null, legacyRaw: JSON.stringify(defaultAppearance()) }), {
-    value: defaultAppearance(),
-    migrate: false
-  })
+  assert.deepEqual(
+    resolveAppearanceStartup({ stored: null, legacyRaw: JSON.stringify(defaultAppearance()) }),
+    {
+      value: defaultAppearance(),
+      migrate: false
+    }
+  )
   assert.deepEqual(resolveAppearanceStartup({ stored: null, legacyRaw: '{烂的' }), {
     value: defaultAppearance(),
     migrate: false
@@ -124,7 +160,13 @@ check('落盘:存进 appearance.json 再读回来是同一份,坏文件老实回
   try {
     // 没存过 = null(首启迁移的信号)
     assert.equal(loadAppearanceFileSync(dir), null)
-    const a = { mode: 'dark' as const, preset: 'custom' as const, accent: '#7dba32', secondary: '#5ac5db', base: null }
+    const a = {
+      mode: 'dark' as const,
+      preset: 'custom' as const,
+      accent: '#7dba32',
+      secondary: '#5ac5db',
+      base: null
+    }
     await saveAppearanceFile(dir, a)
     assert.deepEqual(loadAppearanceFileSync(dir), a)
     assert.deepEqual(JSON.parse(readFileSync(appearanceFilePath(dir), 'utf8')), a)
@@ -184,8 +226,10 @@ check('IPC 通道对账:preload 与主进程两边收发一一配对', () => {
   }
 
   const orphans: string[] = []
-  for (const c of sentOneWay) if (!onListeners.has(c)) orphans.push(`${c}(发了,主进程没有 ipcMain.on)`)
-  for (const c of sentInvoke) if (!handleListeners.has(c)) orphans.push(`${c}(invoke 了,主进程没有 ipcMain.handle)`)
+  for (const c of sentOneWay)
+    if (!onListeners.has(c)) orphans.push(`${c}(发了,主进程没有 ipcMain.on)`)
+  for (const c of sentInvoke)
+    if (!handleListeners.has(c)) orphans.push(`${c}(invoke 了,主进程没有 ipcMain.handle)`)
   for (const c of pushed) if (!subscribed.has(c)) orphans.push(`${c}(主进程推了,preload 没订阅)`)
   assert.deepEqual(orphans, [], `这些通道两边对不上:\n${orphans.join('\n')}`)
 })

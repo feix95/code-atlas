@@ -265,10 +265,34 @@
   opacity: 0.85;
 }
 /* 四边中段:窄条贴沿,提示是居中的一小段线 */
-.bg-n { top: 0; left: 14px; right: 14px; height: 6px; cursor: ns-resize; }
-.bg-s { bottom: 0; left: 14px; right: 14px; height: 6px; cursor: ns-resize; }
-.bg-e { right: 0; top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; }
-.bg-w { left: 0; top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; }
+.bg-n {
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.bg-s {
+  bottom: 0;
+  left: 14px;
+  right: 14px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.bg-e {
+  right: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.bg-w {
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  cursor: ew-resize;
+}
 .bg-n::after,
 .bg-s::after {
   left: 50%;
@@ -290,14 +314,70 @@
   background: var(--muted);
 }
 /* 四角:小方块,提示是 L 形小角标 */
-.bg-nw { top: 0; left: 0; width: 14px; height: 14px; cursor: nwse-resize; }
-.bg-ne { top: 0; right: 0; width: 14px; height: 14px; cursor: nesw-resize; }
-.bg-se { bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
-.bg-sw { bottom: 0; left: 0; width: 14px; height: 14px; cursor: nesw-resize; }
-.bg-nw::after { top: 3px; left: 3px; width: 7px; height: 7px; border-top: 2px solid var(--muted); border-left: 2px solid var(--muted); border-top-left-radius: 3px; }
-.bg-ne::after { top: 3px; right: 3px; width: 7px; height: 7px; border-top: 2px solid var(--muted); border-right: 2px solid var(--muted); border-top-right-radius: 3px; }
-.bg-se::after { bottom: 3px; right: 3px; width: 7px; height: 7px; border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); border-bottom-right-radius: 3px; }
-.bg-sw::after { bottom: 3px; left: 3px; width: 7px; height: 7px; border-bottom: 2px solid var(--muted); border-left: 2px solid var(--muted); border-bottom-left-radius: 3px; }
+.bg-nw {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.bg-ne {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+.bg-se {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.bg-sw {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+.bg-nw::after {
+  top: 3px;
+  left: 3px;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid var(--muted);
+  border-left: 2px solid var(--muted);
+  border-top-left-radius: 3px;
+}
+.bg-ne::after {
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid var(--muted);
+  border-right: 2px solid var(--muted);
+  border-top-right-radius: 3px;
+}
+.bg-se::after {
+  bottom: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-bottom: 2px solid var(--muted);
+  border-right: 2px solid var(--muted);
+  border-bottom-right-radius: 3px;
+}
+.bg-sw::after {
+  bottom: 3px;
+  left: 3px;
+  width: 7px;
+  height: 7px;
+  border-bottom: 2px solid var(--muted);
+  border-left: 2px solid var(--muted);
+  border-bottom-left-radius: 3px;
+}
 
 .bubble-empty {
   margin: auto;

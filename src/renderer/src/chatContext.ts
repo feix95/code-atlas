@@ -26,15 +26,27 @@ function clipDetails(lines: string[]): string {
 const MAX_LIST = 30
 
 /** 文件的资料附件:路径/类型 + 结构骨架(点开过文件才有结构;没有就只摆基本盘) */
-export function buildFileAttachment(file: ScanFileNode, structure: FileStructure | null): ChatContextAttachment {
-  const lines = [`相对路径:${file.relPath}`, `类型:${file.language ? file.language.name : '(没认出类型)'}`]
+export function buildFileAttachment(
+  file: ScanFileNode,
+  structure: FileStructure | null
+): ChatContextAttachment {
+  const lines = [
+    `相对路径:${file.relPath}`,
+    `类型:${file.language ? file.language.name : '(没认出类型)'}`
+  ]
   if (structure) {
-    if (structure.functions.length > 0) lines.push(`函数:${structure.functions.slice(0, MAX_LIST).join(', ')}`)
-    if (structure.classes.length > 0) lines.push(`类:${structure.classes.slice(0, MAX_LIST).join(', ')}`)
-    if (structure.interfaces.length > 0) lines.push(`接口/类型:${structure.interfaces.slice(0, MAX_LIST).join(', ')}`)
-    if (structure.reactComponents.length > 0) lines.push(`React 组件:${structure.reactComponents.slice(0, MAX_LIST).join(', ')}`)
-    if (structure.imports.length > 0) lines.push(`导入:${structure.imports.slice(0, MAX_LIST).join(', ')}`)
-    if (structure.exports.length > 0) lines.push(`导出:${structure.exports.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.functions.length > 0)
+      lines.push(`函数:${structure.functions.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.classes.length > 0)
+      lines.push(`类:${structure.classes.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.interfaces.length > 0)
+      lines.push(`接口/类型:${structure.interfaces.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.reactComponents.length > 0)
+      lines.push(`React 组件:${structure.reactComponents.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.imports.length > 0)
+      lines.push(`导入:${structure.imports.slice(0, MAX_LIST).join(', ')}`)
+    if (structure.exports.length > 0)
+      lines.push(`导出:${structure.exports.slice(0, MAX_LIST).join(', ')}`)
   }
   return {
     targetType: 'file',
@@ -50,7 +62,10 @@ export function buildFileAttachment(file: ScanFileNode, structure: FileStructure
  * .exe/.dll/.log 这些是认出系统文件夹的关键证据)。
  * 分级扫描没探开的目录(lazy)老实说明只知名字,不装作看过里面。
  */
-export function buildFolderAttachment(dir: ScanDirNode, displayName: string): ChatContextAttachment {
+export function buildFolderAttachment(
+  dir: ScanDirNode,
+  displayName: string
+): ChatContextAttachment {
   const lines: string[] = [`相对路径:${dir.relPath || '(项目根目录)'}`]
   if (dir.lazy) {
     lines.push('(这个文件夹还没点开扫描,目前只知道名字和位置,里面有什么还没看)')

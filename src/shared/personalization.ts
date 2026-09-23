@@ -67,7 +67,13 @@ export function buildPersonalizationPrompt(p: PersonalizationConfig): string {
   const custom = rawCustom.length > CUSTOM_MAX ? `${rawCustom.slice(0, CUSTOM_MAX)}……` : rawCustom
   if (custom) lines.push(`用户自己提的说法要求:\n<custom_request>\n${custom}\n</custom_request>`)
   if (lines.length === 0) return ''
-  return ['<style_preference>', '这个用户偏好的说话方式:', ...lines, '以上只改你说话的方式。', '</style_preference>'].join('\n')
+  return [
+    '<style_preference>',
+    '这个用户偏好的说话方式:',
+    ...lines,
+    '以上只改你说话的方式。',
+    '</style_preference>'
+  ].join('\n')
 }
 
 /**
@@ -83,8 +89,12 @@ export function sanitizePersonalization(raw: unknown): PersonalizationConfig {
   if (typeof raw !== 'object' || raw === null) return { ...DEFAULT_PERSONALIZATION }
   const r = raw as Record<string, unknown>
   return {
-    tone: TONE_OPTIONS.some((t) => t.key === r.tone) ? (r.tone as ToneKey) : DEFAULT_PERSONALIZATION.tone,
-    teaching: TEACHING_OPTIONS.some((t) => t.key === r.teaching) ? (r.teaching as TeachingLevel) : DEFAULT_PERSONALIZATION.teaching,
+    tone: TONE_OPTIONS.some((t) => t.key === r.tone)
+      ? (r.tone as ToneKey)
+      : DEFAULT_PERSONALIZATION.tone,
+    teaching: TEACHING_OPTIONS.some((t) => t.key === r.teaching)
+      ? (r.teaching as TeachingLevel)
+      : DEFAULT_PERSONALIZATION.teaching,
     custom: typeof r.custom === 'string' ? r.custom.trim().slice(0, CUSTOM_MAX) : ''
   }
 }

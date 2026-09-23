@@ -67,7 +67,10 @@ export async function fetchRepoFiles(repoId: string): Promise<RepoFile[]> {
   const path = `/api/models/${repoId}/tree/main?recursive=true`
   for (let i = 0; i < HF_HOSTS.length; i++) {
     try {
-      const res = await fetchWithTimeout(`${HF_HOSTS[i]}${path}`, i === 0 ? HF_API_TIMEOUT_MS : HF_MIRROR_TIMEOUT_MS)
+      const res = await fetchWithTimeout(
+        `${HF_HOSTS[i]}${path}`,
+        i === 0 ? HF_API_TIMEOUT_MS : HF_MIRROR_TIMEOUT_MS
+      )
       if (!res.ok) throw new Error(`HF API ${res.status}`)
       return sanitizeRepoFiles(await res.json())
     } catch (err) {

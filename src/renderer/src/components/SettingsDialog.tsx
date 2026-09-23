@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
-import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, DEFAULT_LMSTUDIO_BASE_URL } from '@shared/aiDefaults'
+import {
+  CONTEXT_SIZE_MAX,
+  CONTEXT_SIZE_MIN,
+  DEFAULT_CONTEXT_SIZE,
+  DEFAULT_LMSTUDIO_BASE_URL
+} from '@shared/aiDefaults'
 import { SCALE_MAX, SCALE_MIN } from '@shared/uiScale'
 import {
   CUSTOM_MAX,
@@ -12,7 +17,16 @@ import {
   type PersonalizationConfig
 } from '@shared/personalization'
 import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
-import { applyAppearance, COLOR_PRESETS, isDarkNow, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
+import {
+  applyAppearance,
+  COLOR_PRESETS,
+  isDarkNow,
+  loadAppearance,
+  saveAppearance,
+  type Appearance,
+  type AppearanceMode,
+  type AppearancePreset
+} from '../appearance'
 import { friendlyErr } from '../errText'
 import { TreeIcon } from './Icons'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
@@ -31,15 +45,24 @@ function probeText(result: TavilyProbeResult): { cls: string; text: string } {
     case 'bad-key':
       return { cls: 'is-bad', text: 'Tavily 不认这个 Key:可能抄漏了一段,也可能这个 Key 被删了。' }
     case 'quota':
-      return { cls: 'is-warn', text: 'Key 是对的,但这个月的搜索额度用完了(免费档每月 1000 次,下个月自动回血)。' }
+      return {
+        cls: 'is-warn',
+        text: 'Key 是对的,但这个月的搜索额度用完了(免费档每月 1000 次,下个月自动回血)。'
+      }
     case 'busy':
       return { cls: 'is-warn', text: 'Tavily 说请求太频繁,过一会儿再测。' }
     case 'server':
-      return { cls: 'is-warn', text: `Tavily 那边自己出状况了(状态码 ${result.status ?? '?'}),等会儿再试。` }
+      return {
+        cls: 'is-warn',
+        text: `Tavily 那边自己出状况了(状态码 ${result.status ?? '?'}),等会儿再试。`
+      }
     case 'unreachable':
       return { cls: 'is-bad', text: '连不上 Tavily:检查网络或代理 —— 这不一定是 Key 的问题。' }
     default:
-      return { cls: 'is-warn', text: `没测出结论(状态码 ${result.status ?? '?'}):回应看不懂,可能网络被中间拦了。` }
+      return {
+        cls: 'is-warn',
+        text: `没测出结论(状态码 ${result.status ?? '?'}):回应看不懂,可能网络被中间拦了。`
+      }
   }
 }
 
@@ -49,9 +72,20 @@ function probeText(result: TavilyProbeResult): { cls: string; text: string } {
  * 自成一小块:眼睛和体检结果都是它自己的事,不占大弹窗的状态位;结论随身带着被测的那把 Key,
  * 框里字一改旧结论自动作废,不用手动清。
  */
-function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: string) => void }): React.JSX.Element {
+function TavilyKeyField({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (v: string) => void
+}): React.JSX.Element {
   const [visible, setVisible] = useState(false)
-  const [probe, setProbe] = useState<{ key: string; result: TavilyProbeResult | null; busy: boolean; err: string | null }>({
+  const [probe, setProbe] = useState<{
+    key: string
+    result: TavilyProbeResult | null
+    busy: boolean
+    err: string | null
+  }>({
     key: '',
     result: null,
     busy: false,
@@ -111,11 +145,18 @@ function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: stri
         </button>
       </div>
       {shapeOdd && !line && !errLine && (
-        <p className="cfg-field-help is-warn">提示:Tavily 的 Key 是 tvly- 开头的,这个看着不像 —— 存是能存,但多半用不上。</p>
+        <p className="cfg-field-help is-warn">
+          提示:Tavily 的 Key 是 tvly- 开头的,这个看着不像 —— 存是能存,但多半用不上。
+        </p>
       )}
-      {(line || errLine) && <p className={`cfg-field-help ${line ? line.cls : 'is-bad'}`}>{line ? line.text : errLine}</p>}
+      {(line || errLine) && (
+        <p className={`cfg-field-help ${line ? line.cls : 'is-bad'}`}>
+          {line ? line.text : errLine}
+        </p>
+      )}
       <p className="cfg-field-help">
-        去 tavily.com 免费注册一个账号就能拿到(每月 1000 次搜索免费,不用绑卡)。Key 只存这台电脑的配置文件里,绝不进代码仓库。
+        去 tavily.com 免费注册一个账号就能拿到(每月 1000 次搜索免费,不用绑卡)。Key
+        只存这台电脑的配置文件里,绝不进代码仓库。
       </p>
     </div>
   )
@@ -155,7 +196,13 @@ function OptionSelect<K extends string>({
   const current = options.find((o) => o.key === value) ?? options[0]
   return (
     <div className="tone-select" ref={rootRef}>
-      <button type="button" className="tone-select-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button
+        type="button"
+        className="tone-select-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
         {current.label}
         {/* 箭头照抄本文件图标册的 chevron(和其他控件同一颗),钉到最右;小葵点名加粗放大 */}
         <span className="tone-select-caret">
@@ -269,14 +316,22 @@ export function SettingsDialog({
   const [shelfOpen, setShelfOpen] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
-  const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({ path: '', verdict: null })
+  const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({
+    path: '',
+    verdict: null
+  })
   // 上下文档位的账本原料(救生圈这锤):模型档案 + 机器家底,带着取数时的路径对号,
   // 路径一换旧结论自动作废 —— 不用在 effect 里手动清,也躲开「effect 里同步 setState」的坑
-  const [ctxInfoFetched, setCtxInfoFetched] = useState<{ path: string; info: ModelContextInfo | null }>({ path: '', info: null })
+  const [ctxInfoFetched, setCtxInfoFetched] = useState<{
+    path: string
+    info: ModelContextInfo | null
+  }>({ path: '', info: null })
   // 第八十九锤:上下文框的打字草稿(纯字符串,和存档里的数字分开管)
   const [contextRaw, setContextRaw] = useState<string>('')
   // 试一句的结果(第一百一十三锤):拿草稿试,没应用更改也能听
-  const [sample, setSample] = useState<{ kind: 'busy' } | { kind: 'done'; text: string } | { kind: 'error'; text: string } | null>(null)
+  const [sample, setSample] = useState<
+    { kind: 'busy' } | { kind: 'done'; text: string } | { kind: 'error'; text: string } | null
+  >(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const appearanceRef = useRef<HTMLElement | null>(null)
   const aiRef = useRef<HTMLElement | null>(null)
@@ -285,7 +340,8 @@ export function SettingsDialog({
 
   // AI 配置只读一次存档;之后界面上的每一下都是草稿,应用更改才落盘
   useEffect(() => {
-    void window.atlas.aiConfigGet()
+    void window.atlas
+      .aiConfigGet()
       .then((c) => {
         setSavedConfig(c)
         setDraftConfig(c)
@@ -306,7 +362,10 @@ export function SettingsDialog({
 
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
-    window.atlas.appVersion().then(setAppVersion).catch(() => {})
+    window.atlas
+      .appVersion()
+      .then(setAppVersion)
+      .catch(() => {})
   }, [])
 
   // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
@@ -381,9 +440,13 @@ export function SettingsDialog({
 
   const appearanceDirty = JSON.stringify(draftAppearance) !== JSON.stringify(savedAppearance)
   const scaleDirty = draftScale !== savedScale
-  const configDirty = savedConfig !== null && draftConfig !== null && JSON.stringify(draftConfig) !== JSON.stringify(savedConfig)
+  const configDirty =
+    savedConfig !== null &&
+    draftConfig !== null &&
+    JSON.stringify(draftConfig) !== JSON.stringify(savedConfig)
   // 第八十九锤:上下文框里没失焦的字也算草稿 —— 打了数还没点别处就关窗,照样弹「确认丢弃」
-  const contextDirty = savedConfig !== null && clampContextSize(contextRaw) !== savedConfig.contextSize
+  const contextDirty =
+    savedConfig !== null && clampContextSize(contextRaw) !== savedConfig.contextSize
   const dirty = appearanceDirty || scaleDirty || configDirty || contextDirty
 
   const updateAppearance = useCallback((patch: Partial<Appearance>): void => {
@@ -411,7 +474,10 @@ export function SettingsDialog({
       try {
         // 第八十九锤:兜键盘流的底 —— 点「应用更改」前如果框里还有没失焦的字,保存这一刻也夹进合法范围
         const committed = clampContextSize(contextRaw)
-        const toSave = committed === draftConfig.contextSize ? draftConfig : { ...draftConfig, contextSize: committed }
+        const toSave =
+          committed === draftConfig.contextSize
+            ? draftConfig
+            : { ...draftConfig, contextSize: committed }
         const saved = await window.atlas.aiConfigSave(toSave)
         setSavedConfig(saved)
         setDraftConfig(saved)
@@ -429,7 +495,15 @@ export function SettingsDialog({
     window.atlas.setUiScale(draftScale)
     setSavedScale(draftScale)
     setApplyState({ kind: 'idle' })
-  }, [dirty, applyState.kind, draftAppearance, draftConfig, draftScale, contextRaw, onAiConfigSaved])
+  }, [
+    dirty,
+    applyState.kind,
+    draftAppearance,
+    draftConfig,
+    draftScale,
+    contextRaw,
+    onAiConfigSaved
+  ])
 
   /** 关弹窗入口(遮罩/×/Esc 同路):保存中不响应;有草稿先弹确认,确认丢弃才真关 */
   const requestClose = useCallback((): void => {
@@ -495,7 +569,9 @@ export function SettingsDialog({
   }
 
   function stepScale(dir: number): void {
-    setDraftScale((prev) => Math.round(Math.min(Math.max(prev + dir, SCALE_MIN), SCALE_MAX) * 100) / 100)
+    setDraftScale(
+      (prev) => Math.round(Math.min(Math.max(prev + dir, SCALE_MIN), SCALE_MAX) * 100) / 100
+    )
   }
 
   function enterCustom(): void {
@@ -527,7 +603,8 @@ export function SettingsDialog({
   async function pickModel(): Promise<void> {
     if (!draftConfig) return
     const picked = await window.atlas.aiPickFile().catch(() => null)
-    if (picked) setDraftConfig({ ...draftConfig, builtin: { ...draftConfig.builtin, modelPath: picked } })
+    if (picked)
+      setDraftConfig({ ...draftConfig, builtin: { ...draftConfig.builtin, modelPath: picked } })
   }
 
   const presetDef = COLOR_PRESETS.find((p) => p.key === draftAppearance.preset) ?? COLOR_PRESETS[0]
@@ -540,9 +617,13 @@ export function SettingsDialog({
   function sourceState(): { ok: boolean; text: string } {
     if (!draftConfig) return { ok: false, text: '读取中……' }
     if (draftConfig.provider === 'builtin') {
-      return draftConfig.builtin.modelPath.trim() ? { ok: true, text: '已选择模型' } : { ok: false, text: '还没选模型' }
+      return draftConfig.builtin.modelPath.trim()
+        ? { ok: true, text: '已选择模型' }
+        : { ok: false, text: '还没选模型' }
     }
-    return draftConfig.lmstudio.baseUrl.trim() && draftConfig.lmstudio.model.trim() ? { ok: true, text: '已配置' } : { ok: false, text: '请填写地址并选择模型' }
+    return draftConfig.lmstudio.baseUrl.trim() && draftConfig.lmstudio.model.trim()
+      ? { ok: true, text: '已配置' }
+      : { ok: false, text: '请填写地址并选择模型' }
   }
   const source = sourceState()
   const scaleShown = dragValue ?? draftScale
@@ -564,7 +645,11 @@ export function SettingsDialog({
     setSample({ kind: 'busy' })
     try {
       const res = await window.atlas.aiStyleSample(personal)
-      setSample(res.status === 'error' ? { kind: 'error', text: res.text } : { kind: 'done', text: res.text })
+      setSample(
+        res.status === 'error'
+          ? { kind: 'error', text: res.text }
+          : { kind: 'done', text: res.text }
+      )
     } catch (err) {
       setSample({ kind: 'error', text: friendlyErr(err) })
     }
@@ -573,7 +658,8 @@ export function SettingsDialog({
   const footerState = (() => {
     if (applyState.kind === 'saving') return { tone: 'amber' as const, text: '正在保存……' }
     if (applyState.kind === 'error') return { tone: 'red' as const, text: applyState.text }
-    if (dirty) return { tone: 'amber' as const, text: '有未应用的更改 —— 应用后生效,关闭前会先确认' }
+    if (dirty)
+      return { tone: 'amber' as const, text: '有未应用的更改 —— 应用后生效,关闭前会先确认' }
     return { tone: 'green' as const, text: '所有设置已同步' }
   })()
 
@@ -598,7 +684,12 @@ export function SettingsDialog({
                 有未保存的更改
               </span>
             )}
-            <button type="button" className="cfg-close" onClick={requestClose} aria-label="关闭设置">
+            <button
+              type="button"
+              className="cfg-close"
+              onClick={requestClose}
+              aria-label="关闭设置"
+            >
               <TreeIcon name="x" size={15} mono />
             </button>
           </div>
@@ -621,7 +712,9 @@ export function SettingsDialog({
                   <strong>{item.name}</strong>
                   <small>{item.sub}</small>
                 </span>
-                {activeSection === item.key && <span className="cfg-nav-marker" aria-hidden="true" />}
+                {activeSection === item.key && (
+                  <span className="cfg-nav-marker" aria-hidden="true" />
+                )}
               </button>
             ))}
             <div className="cfg-nav-rule" />
@@ -690,7 +783,9 @@ export function SettingsDialog({
                   <div className="cfg-row">
                     <div className="cfg-copy">
                       <label>配色主题</label>
-                      <p>选择一组在文件树、详情面板和状态信息中使用的颜色。换回任何预设会扔掉自定义色,两边不打架。</p>
+                      <p>
+                        选择一组在文件树、详情面板和状态信息中使用的颜色。换回任何预设会扔掉自定义色,两边不打架。
+                      </p>
                     </div>
                     <div className="cfg-themes">
                       {COLOR_PRESETS.map((p) => (
@@ -698,9 +793,16 @@ export function SettingsDialog({
                           key={p.key}
                           type="button"
                           className={`cfg-theme${draftAppearance.preset === p.key ? ' is-selected' : ''}`}
-                          onClick={() => updateAppearance({ preset: p.key, accent: null, secondary: null })}
+                          onClick={() =>
+                            updateAppearance({ preset: p.key, accent: null, secondary: null })
+                          }
                         >
-                          <span className="cfg-swatch" style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.secondary})` }} />
+                          <span
+                            className="cfg-swatch"
+                            style={{
+                              background: `linear-gradient(135deg, ${p.accent}, ${p.secondary})`
+                            }}
+                          />
                           <span>
                             <strong>{p.name}</strong>
                             <small>{THEME_SUB[p.key]}</small>
@@ -717,7 +819,12 @@ export function SettingsDialog({
                         className={`cfg-theme${draftAppearance.preset === 'custom' ? ' is-selected' : ''}`}
                         onClick={enterCustom}
                       >
-                        <span className="cfg-swatch" style={{ background: `linear-gradient(135deg, ${previewAccent}, ${draftAppearance.secondary ?? defaultPreset.secondary})` }} />
+                        <span
+                          className="cfg-swatch"
+                          style={{
+                            background: `linear-gradient(135deg, ${previewAccent}, ${draftAppearance.secondary ?? defaultPreset.secondary})`
+                          }}
+                        />
                         <span>
                           <strong>自定义</strong>
                           <small>{THEME_SUB.custom}</small>
@@ -736,7 +843,9 @@ export function SettingsDialog({
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>自定义颜色</label>
-                          <p>主题色管按钮、选中这些主角色;辅助色管边框线、图标这些配角色;底板色管画布、面板染什么色调——只取颜色倾向,亮暗自动跟白天/黑夜走,选什么都不会翻车。</p>
+                          <p>
+                            主题色管按钮、选中这些主角色;辅助色管边框线、图标这些配角色;底板色管画布、面板染什么色调——只取颜色倾向,亮暗自动跟白天/黑夜走,选什么都不会翻车。
+                          </p>
                         </div>
                         <div className="cfg-colors">
                           <label className="cfg-color">
@@ -744,7 +853,9 @@ export function SettingsDialog({
                             <input
                               type="color"
                               value={draftAppearance.accent ?? defaultPreset.accent}
-                              onChange={(e) => updateAppearance({ preset: 'custom', accent: e.target.value })}
+                              onChange={(e) =>
+                                updateAppearance({ preset: 'custom', accent: e.target.value })
+                              }
                             />
                           </label>
                           <label className="cfg-color">
@@ -752,15 +863,22 @@ export function SettingsDialog({
                             <input
                               type="color"
                               value={draftAppearance.secondary ?? defaultPreset.secondary}
-                              onChange={(e) => updateAppearance({ preset: 'custom', secondary: e.target.value })}
+                              onChange={(e) =>
+                                updateAppearance({ preset: 'custom', secondary: e.target.value })
+                              }
                             />
                           </label>
                           <label className="cfg-color">
                             底板色
                             <input
                               type="color"
-                              value={draftAppearance.base ?? (isDarkNow(draftAppearance) ? '#282828' : '#f6f6f6')}
-                              onChange={(e) => updateAppearance({ preset: 'custom', base: e.target.value })}
+                              value={
+                                draftAppearance.base ??
+                                (isDarkNow(draftAppearance) ? '#282828' : '#f6f6f6')
+                              }
+                              onChange={(e) =>
+                                updateAppearance({ preset: 'custom', base: e.target.value })
+                              }
                             />
                           </label>
                           {draftAppearance.base && (
@@ -783,7 +901,13 @@ export function SettingsDialog({
                       <p>调整文件树、标签和辅助文字的整体缩放。当前仅影响本机显示。</p>
                     </div>
                     <div className="cfg-scale">
-                      <button type="button" className="cfg-stepper" aria-label="调小界面" onClick={() => stepScale(-0.05)} disabled={draftScale <= SCALE_MIN + 0.001}>
+                      <button
+                        type="button"
+                        className="cfg-stepper"
+                        aria-label="调小界面"
+                        onClick={() => stepScale(-0.05)}
+                        disabled={draftScale <= SCALE_MIN + 0.001}
+                      >
                         <TreeIcon name="minus" size={13} mono />
                       </button>
                       <div className="cfg-slider-wrap">
@@ -808,7 +932,13 @@ export function SettingsDialog({
                           <span>180%</span>
                         </div>
                       </div>
-                      <button type="button" className="cfg-stepper" aria-label="调大界面" onClick={() => stepScale(0.05)} disabled={draftScale >= SCALE_MAX - 0.001}>
+                      <button
+                        type="button"
+                        className="cfg-stepper"
+                        aria-label="调大界面"
+                        onClick={() => stepScale(0.05)}
+                        disabled={draftScale >= SCALE_MAX - 0.001}
+                      >
                         <TreeIcon name="plus" size={13} mono />
                       </button>
                       <output className="cfg-scale-value">{Math.round(scaleShown * 100)}%</output>
@@ -845,15 +975,27 @@ export function SettingsDialog({
                         <div className="cfg-copy">
                           <label>基本风格和语气</label>
                         </div>
-                        <OptionSelect options={TONE_OPTIONS} value={personal.tone} onChange={(tone) => updatePersonal({ tone })} ariaLabel="基本风格和语气" />
+                        <OptionSelect
+                          options={TONE_OPTIONS}
+                          value={personal.tone}
+                          onChange={(tone) => updatePersonal({ tone })}
+                          ariaLabel="基本风格和语气"
+                        />
                       </div>
                       <div className="cfg-divider" />
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>讲解深度</label>
-                          <p>讲代码和文件时讲多细。「简洁」只说这东西是干什么的；「精简」先讲骨架、带几条名词小课堂；「详细」还会讲这门语言用到了哪些写法，并挑关键处展开（更耗算力，模型上下文太小时会自动退回精简，届时会明说）。</p>
+                          <p>
+                            讲代码和文件时讲多细。「简洁」只说这东西是干什么的；「精简」先讲骨架、带几条名词小课堂；「详细」还会讲这门语言用到了哪些写法，并挑关键处展开（更耗算力，模型上下文太小时会自动退回精简，届时会明说）。
+                          </p>
                         </div>
-                        <OptionSelect options={TEACHING_OPTIONS} value={personal.teaching} onChange={(teaching) => updatePersonal({ teaching })} ariaLabel="讲解深度" />
+                        <OptionSelect
+                          options={TEACHING_OPTIONS}
+                          value={personal.teaching}
+                          onChange={(teaching) => updatePersonal({ teaching })}
+                          ariaLabel="讲解深度"
+                        />
                       </div>
                       <div className="cfg-divider" />
                       <div className="cfg-row cfg-row-stack">
@@ -872,27 +1014,44 @@ export function SettingsDialog({
                           value={personal.custom}
                           spellCheck={false}
                           aria-label="自订指令"
-                          placeholder={'例如：告诉 AI 你的偏好、身份或回答风格，这些会在之后的对话中持续生效。'}
+                          placeholder={
+                            '例如：告诉 AI 你的偏好、身份或回答风格，这些会在之后的对话中持续生效。'
+                          }
                           onChange={(e) => updatePersonal({ custom: e.target.value })}
                         />
                       </div>
                       <div className="cfg-privacy">
                         <TreeIcon name="shield" size={12} mono />
-                        <span>自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 —— 这几条铁律不跟着变。</span>
+                        <span>
+                          自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 ——
+                          这几条铁律不跟着变。
+                        </span>
                       </div>
                       <div className="cfg-divider" />
                       <div className="cfg-row cfg-row-stack">
                         <div className="cfg-copy">
                           <label>试一句</label>
-                          <p>拿上面这套说法,让当前模型当场念一段小代码 —— 光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。</p>
+                          <p>
+                            拿上面这套说法,让当前模型当场念一段小代码 ——
+                            光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。
+                          </p>
                         </div>
                         <div className="cfg-sample-actions">
-                          <button type="button" className="cfg-btn" onClick={() => void tryStyle()} disabled={sample?.kind === 'busy'}>
+                          <button
+                            type="button"
+                            className="cfg-btn"
+                            onClick={() => void tryStyle()}
+                            disabled={sample?.kind === 'busy'}
+                          >
                             <TreeIcon name="sparkles" size={13} mono />
                             {sample?.kind === 'busy' ? '正在念……' : '试一句'}
                           </button>
                           {sample?.kind === 'done' && (
-                            <button type="button" className="cfg-btn is-ghost" onClick={() => setSample(null)}>
+                            <button
+                              type="button"
+                              className="cfg-btn is-ghost"
+                              onClick={() => setSample(null)}
+                            >
                               收起
                             </button>
                           )}
@@ -903,7 +1062,9 @@ export function SettingsDialog({
                           </div>
                         )}
                         {sample?.kind === 'done' && <pre className="cfg-sample">{sample.text}</pre>}
-                        {sample?.kind === 'error' && <p className="cfg-sample is-error">{sample.text}</p>}
+                        {sample?.kind === 'error' && (
+                          <p className="cfg-sample is-error">{sample.text}</p>
+                        )}
                       </div>
                     </>
                   )}
@@ -937,17 +1098,27 @@ export function SettingsDialog({
                       <div className="cfg-row">
                         <div className="cfg-copy">
                           <label>AI 来源</label>
-                          <p>内置模型在本机运行。连接其他服务时,代码片段会发送到你填写的服务地址,请确认它值得信任。</p>
+                          <p>
+                            内置模型在本机运行。连接其他服务时,代码片段会发送到你填写的服务地址,请确认它值得信任。
+                          </p>
                         </div>
                         <div className="cfg-segmented">
-                          <button type="button" className={!isBuiltin ? 'is-selected' : ''} onClick={() => setDraftConfig({ ...draftConfig, provider: 'lmstudio' })}>
+                          <button
+                            type="button"
+                            className={!isBuiltin ? 'is-selected' : ''}
+                            onClick={() => setDraftConfig({ ...draftConfig, provider: 'lmstudio' })}
+                          >
                             <TreeIcon name="cloud" size={14} mono />
                             <span>
                               <strong>LM Studio</strong>
                               <small>外部服务</small>
                             </span>
                           </button>
-                          <button type="button" className={isBuiltin ? 'is-selected' : ''} onClick={() => setDraftConfig({ ...draftConfig, provider: 'builtin' })}>
+                          <button
+                            type="button"
+                            className={isBuiltin ? 'is-selected' : ''}
+                            onClick={() => setDraftConfig({ ...draftConfig, provider: 'builtin' })}
+                          >
                             <TreeIcon name="drive" size={14} mono />
                             <span>
                               <strong>内置模型</strong>
@@ -961,7 +1132,9 @@ export function SettingsDialog({
                           <TreeIcon name={isBuiltin ? 'drive' : 'cloud'} size={13} mono />
                         </span>
                         <div>
-                          <strong>{isBuiltin ? '使用内置模型(本机直跑)' : '使用 LM Studio(外部服务)'}</strong>
+                          <strong>
+                            {isBuiltin ? '使用内置模型(本机直跑)' : '使用 LM Studio(外部服务)'}
+                          </strong>
                           <p>
                             {isBuiltin
                               ? '推理引擎已内置,模型文件就是 AI 的大脑;分析全程不出本机,复杂项目的首次响应可能要等模型加载。'
@@ -978,9 +1151,13 @@ export function SettingsDialog({
                         <div className="cfg-copy">
                           <label>
                             联网查证
-                            <span className={`cfg-flag${draftConfig.webLookup ? ' is-on' : ''}`}>{draftConfig.webLookup ? '已开启' : '默认关闭'}</span>
+                            <span className={`cfg-flag${draftConfig.webLookup ? ' is-on' : ''}`}>
+                              {draftConfig.webLookup ? '已开启' : '默认关闭'}
+                            </span>
                           </label>
-                          <p>讲解认不出某个软件/文件时,按「名字」查公开资料修正回答;对话翻文件模式里,模型也能自己上网查资料。发出去的只有搜索词,本地文件内容绝不出门。</p>
+                          <p>
+                            讲解认不出某个软件/文件时,按「名字」查公开资料修正回答;对话翻文件模式里,模型也能自己上网查资料。发出去的只有搜索词,本地文件内容绝不出门。
+                          </p>
                         </div>
                         <button
                           type="button"
@@ -988,7 +1165,9 @@ export function SettingsDialog({
                           aria-checked={draftConfig.webLookup}
                           aria-label="联网查证"
                           className={`cfg-switch${draftConfig.webLookup ? ' is-on' : ''}`}
-                          onClick={() => setDraftConfig({ ...draftConfig, webLookup: !draftConfig.webLookup })}
+                          onClick={() =>
+                            setDraftConfig({ ...draftConfig, webLookup: !draftConfig.webLookup })
+                          }
                         >
                           <span />
                         </button>
@@ -1004,10 +1183,13 @@ export function SettingsDialog({
                         <div className="cfg-copy">
                           <label>
                             推荐问题
-                            <span className={`cfg-flag${chatSuggestionsOn ? ' is-on' : ''}`}>{chatSuggestionsOn ? '已开启' : '已关闭'}</span>
+                            <span className={`cfg-flag${chatSuggestionsOn ? ' is-on' : ''}`}>
+                              {chatSuggestionsOn ? '已开启' : '已关闭'}
+                            </span>
                           </label>
                           <p>
-                            聊天框和文件预览的 AI 卡下面自动冒出的那排「可以问问看」,觉得问不上就关;关了也不再为猜这些问题白花模型的功夫。拨了马上生效,不用点应用更改。
+                            聊天框和文件预览的 AI
+                            卡下面自动冒出的那排「可以问问看」,觉得问不上就关;关了也不再为猜这些问题白花模型的功夫。拨了马上生效,不用点应用更改。
                           </p>
                         </div>
                         <button
@@ -1023,7 +1205,9 @@ export function SettingsDialog({
                       </div>
                       <div className="cfg-privacy">
                         <TreeIcon name="shield" size={12} mono />
-                        <span>仅发送认不出的「名字」,绝不发送文件夹路径或文件内容;不开启则完全离线。</span>
+                        <span>
+                          仅发送认不出的「名字」,绝不发送文件夹路径或文件内容;不开启则完全离线。
+                        </span>
                         <button type="button" onClick={() => setPrivacyOpen(!privacyOpen)}>
                           {privacyOpen ? '收起' : '查看数据范围'}
                           <TreeIcon name="chevron" size={11} mono />
@@ -1031,7 +1215,9 @@ export function SettingsDialog({
                       </div>
                       {privacyOpen && (
                         <div className="cfg-privacy-more">
-                          查询链:填了 Tavily Key 则 Tavily 打头,之后 DuckDuckGo 公开页面 → 中文维基百科 → 英文维基百科;单次查询 5 秒超时,查不到就回退本地推测;查询结果只用于当前回答,不做任何其他用途。发出去的只有搜索词本身,不含本地路径和文件内容。
+                          查询链:填了 Tavily Key 则 Tavily 打头,之后 DuckDuckGo 公开页面 →
+                          中文维基百科 → 英文维基百科;单次查询 5
+                          秒超时,查不到就回退本地推测;查询结果只用于当前回答,不做任何其他用途。发出去的只有搜索词本身,不含本地路径和文件内容。
                         </div>
                       )}
                     </>
@@ -1062,7 +1248,11 @@ export function SettingsDialog({
                     </span>
                     <span>
                       <strong>本地模型连接</strong>
-                      <small>{isBuiltin ? '推理引擎已内置,这里选大脑文件' : 'LM Studio 的服务地址与模型名'}</small>
+                      <small>
+                        {isBuiltin
+                          ? '推理引擎已内置,这里选大脑文件'
+                          : 'LM Studio 的服务地址与模型名'}
+                      </small>
                     </span>
                   </div>
                   {draftConfig && (
@@ -1079,20 +1269,33 @@ export function SettingsDialog({
                               id="cfg-model-path"
                               value={draftConfig.builtin.modelPath}
                               placeholder="例如 D:\models\my-model.gguf"
-                              onChange={(e) => setDraftConfig({ ...draftConfig, builtin: { ...draftConfig.builtin, modelPath: e.target.value } })}
+                              onChange={(e) =>
+                                setDraftConfig({
+                                  ...draftConfig,
+                                  builtin: { ...draftConfig.builtin, modelPath: e.target.value }
+                                })
+                              }
                             />
                             <button type="button" onClick={() => void pickModel()}>
                               选择模型
                             </button>
                           </div>
-                          <p className="cfg-field-help">模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。</p>
+                          <p className="cfg-field-help">
+                            模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。
+                          </p>
                           <div className="cfg-field-head">
                             <label>模型货架</label>
                             <span>实时榜单</span>
                           </div>
-                          <button type="button" className="cfg-shelf-toggle" onClick={() => setShelfOpen((v) => !v)}>
+                          <button
+                            type="button"
+                            className="cfg-shelf-toggle"
+                            onClick={() => setShelfOpen((v) => !v)}
+                          >
                             <TreeIcon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} mono />
-                            {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 AI 模型榜,按大小挑,点开就能下'}
+                            {shelfOpen
+                              ? '收起货架'
+                              : '逛逛模型货架——实时热门 AI 模型榜,按大小挑,点开就能下'}
                           </button>
                           {shelfOpen && (
                             <ModelShelfPanel
@@ -1110,7 +1313,9 @@ export function SettingsDialog({
                           {/* 量尺只替账单喊「文件不存在」这一嗓子(2026-09-18 小葵:两行黄字重复) ——
                               装得下/有点挤/装不下这些账,下面跟着滑条实时动的上下文账单都算,别报两遍 */}
                           {modelPathDraft.trim() && fitNote && fitNote.level === 'missing' && (
-                            <p className="cfg-field-help cfg-fit-note is-missing">✕ {fitNote.title}:{fitNote.detail}</p>
+                            <p className="cfg-field-help cfg-fit-note is-missing">
+                              ✕ {fitNote.title}:{fitNote.detail}
+                            </p>
                           )}
                         </>
                       ) : (
@@ -1125,7 +1330,12 @@ export function SettingsDialog({
                               id="cfg-baseurl"
                               value={draftConfig.lmstudio.baseUrl}
                               placeholder={DEFAULT_LMSTUDIO_BASE_URL}
-                              onChange={(e) => setDraftConfig({ ...draftConfig, lmstudio: { ...draftConfig.lmstudio, baseUrl: e.target.value } })}
+                              onChange={(e) =>
+                                setDraftConfig({
+                                  ...draftConfig,
+                                  lmstudio: { ...draftConfig.lmstudio, baseUrl: e.target.value }
+                                })
+                              }
                             />
                           </div>
                           <div className="cfg-field-head">
@@ -1138,7 +1348,12 @@ export function SettingsDialog({
                               id="cfg-model-name"
                               value={draftConfig.lmstudio.model}
                               placeholder="或手动填写"
-                              onChange={(e) => setDraftConfig({ ...draftConfig, lmstudio: { ...draftConfig.lmstudio, model: e.target.value } })}
+                              onChange={(e) =>
+                                setDraftConfig({
+                                  ...draftConfig,
+                                  lmstudio: { ...draftConfig.lmstudio, model: e.target.value }
+                                })
+                              }
                             />
                             <button type="button" onClick={() => void listModels()}>
                               {modelsBusy ? '连接中……' : '读取模型'}
@@ -1151,7 +1366,12 @@ export function SettingsDialog({
                                   key={m}
                                   type="button"
                                   className={m === draftConfig.lmstudio.model ? 'is-selected' : ''}
-                                  onClick={() => setDraftConfig({ ...draftConfig, lmstudio: { ...draftConfig.lmstudio, model: m } })}
+                                  onClick={() =>
+                                    setDraftConfig({
+                                      ...draftConfig,
+                                      lmstudio: { ...draftConfig.lmstudio, model: m }
+                                    })
+                                  }
                                 >
                                   {m}
                                 </button>
@@ -1159,7 +1379,10 @@ export function SettingsDialog({
                             </div>
                           )}
                           {modelsNote && <p className="cfg-field-help is-warn">{modelsNote}</p>}
-                          <p className="cfg-field-help">LM Studio 里开「开发者」本地服务,地址一般是 {DEFAULT_LMSTUDIO_BASE_URL}。</p>
+                          <p className="cfg-field-help">
+                            LM Studio 里开「开发者」本地服务,地址一般是 {DEFAULT_LMSTUDIO_BASE_URL}
+                            。
+                          </p>
                         </>
                       )}
 
@@ -1194,8 +1417,10 @@ export function SettingsDialog({
                             />
                           </div>
                           <p className="cfg-field-help">
-                            模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 —— 换大模型自动多喂,换小模型自动省着用。
-                            范围 512 ~ 1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
+                            模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算
+                            —— 换大模型自动多喂,换小模型自动省着用。 范围 512 ~
+                            1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 =
+                            交回自动探测。
                           </p>
                           {/* 档位滑块(2026-09-13):程序员档位一拨就填好,刻度也能直接点;拖动 = 切到手动档 */}
                           {contextNotches.length > 0 && (
@@ -1208,7 +1433,9 @@ export function SettingsDialog({
                                   step={1}
                                   value={ctxNotchIndex}
                                   aria-label="模型上下文档位滑块"
-                                  onChange={(e) => commitContextValue(contextNotches[Number(e.target.value)])}
+                                  onChange={(e) =>
+                                    commitContextValue(contextNotches[Number(e.target.value)])
+                                  }
                                 />
                               </div>
                               <div className="cfg-ctx-ticks">
@@ -1228,14 +1455,19 @@ export function SettingsDialog({
                           )}
                           {ctxInfo?.nativeContext != null && (
                             <p className="cfg-field-help">
-                              这台模型的出厂上限是 {ctxInfo.nativeContext.toLocaleString('en-US')} tokens,滑块到顶就是它 ——
-                              再往上模型自己也记不住前文,不设这个档。
+                              这台模型的出厂上限是 {ctxInfo.nativeContext.toLocaleString('en-US')}{' '}
+                              tokens,滑块到顶就是它 —— 再往上模型自己也记不住前文,不设这个档。
                             </p>
                           )}
                           {/* 黑板账单:拖一下滑块/改一个字就重新报一次价,扛不住当场喊,不等人白等 */}
                           {ctxBill && (
                             <p className={`cfg-field-help cfg-fit-note is-${ctxBill.level}`}>
-                              {ctxBill.level === 'ok' ? '✓' : ctxBill.level === 'unknown' ? '…' : '!'} {ctxBill.text}
+                              {ctxBill.level === 'ok'
+                                ? '✓'
+                                : ctxBill.level === 'unknown'
+                                  ? '…'
+                                  : '!'}{' '}
+                              {ctxBill.text}
                             </p>
                           )}
                         </>
@@ -1246,11 +1478,18 @@ export function SettingsDialog({
 
                 {/* Developer 日志(第八十七锤):模型后台原话的常设入口,不用展开高级面板就够得着 */}
                 <div className="cfg-devlog-row">
-                  <button type="button" className="cfg-devlog-btn" onClick={() => void window.atlas.devLogsOpen()}>
+                  <button
+                    type="button"
+                    className="cfg-devlog-btn"
+                    onClick={() => void window.atlas.devLogsOpen()}
+                  >
                     <TreeIcon name="monitor" size={13} mono />
                     打开后台日志
                   </button>
-                  <p className="cfg-field-help">Developer 日志:引擎原话、每笔请求的报账、应用的记账,全在一本账里 —— 模型在干嘛、卡在哪,开窗就知道。</p>
+                  <p className="cfg-field-help">
+                    Developer 日志:引擎原话、每笔请求的报账、应用的记账,全在一本账里 ——
+                    模型在干嘛、卡在哪,开窗就知道。
+                  </p>
                 </div>
 
                 <div className="cfg-versions">
@@ -1259,8 +1498,8 @@ export function SettingsDialog({
                     版本
                   </span>
                   <span className="mono">
-                    CodeAtlas {appVersion ?? '…'} · Electron {window.atlas.versions.electron()} · Node {window.atlas.versions.node()} · Chromium{' '}
-                    {window.atlas.versions.chrome()}
+                    CodeAtlas {appVersion ?? '…'} · Electron {window.atlas.versions.electron()} ·
+                    Node {window.atlas.versions.node()} · Chromium {window.atlas.versions.chrome()}
                   </span>
                 </div>
 
@@ -1271,8 +1510,9 @@ export function SettingsDialog({
                   <div>
                     <strong>当前配置</strong>
                     <p>
-                      {themeName} · {Math.round(draftScale * 100)}% · {isBuiltin ? '内置模型 本机直跑' : 'LM Studio 外部服务'} ·
-                      联网查证{draftConfig?.webLookup ? '已开启' : '关闭'}
+                      {themeName} · {Math.round(draftScale * 100)}% ·{' '}
+                      {isBuiltin ? '内置模型 本机直跑' : 'LM Studio 外部服务'} · 联网查证
+                      {draftConfig?.webLookup ? '已开启' : '关闭'}
                     </p>
                   </div>
                   <span className={`cfg-summary-state${dirty ? ' is-dirty' : ''}`}>
@@ -1291,11 +1531,21 @@ export function SettingsDialog({
             {footerState.text}
           </div>
           <div className="cfg-foot-actions">
-            <button type="button" className="cfg-btn-reset" onClick={revert} disabled={!dirty || applyState.kind === 'saving'}>
+            <button
+              type="button"
+              className="cfg-btn-reset"
+              onClick={revert}
+              disabled={!dirty || applyState.kind === 'saving'}
+            >
               <TreeIcon name="refresh" size={13} mono />
               恢复默认
             </button>
-            <button type="button" className="cfg-btn-apply" onClick={() => void apply()} disabled={!dirty || applyState.kind === 'saving'}>
+            <button
+              type="button"
+              className="cfg-btn-apply"
+              onClick={() => void apply()}
+              disabled={!dirty || applyState.kind === 'saving'}
+            >
               <TreeIcon name="save" size={13} mono />
               {applyState.kind === 'saving' ? '应用中……' : '应用更改'}
             </button>
@@ -1319,7 +1569,12 @@ export function SettingsDialog({
               <button type="button" className="cfg-btn-reset" onClick={discardAndClose}>
                 丢弃并关闭
               </button>
-              <button type="button" className="cfg-btn-apply" autoFocus onClick={() => setConfirmDiscard(false)}>
+              <button
+                type="button"
+                className="cfg-btn-apply"
+                autoFocus
+                onClick={() => setConfirmDiscard(false)}
+              >
                 继续编辑
               </button>
             </div>

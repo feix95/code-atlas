@@ -82,7 +82,12 @@ function file(name: string, relPath: string): ScanFileNode {
   return { type: 'file', name, relPath, ext: '' }
 }
 
-function dir(name: string, relPath: string, children: ScanTreeNode[], extra: Partial<ScanDirNode> = {}): ScanDirNode {
+function dir(
+  name: string,
+  relPath: string,
+  children: ScanTreeNode[],
+  extra: Partial<ScanDirNode> = {}
+): ScanDirNode {
   return { type: 'directory', name, relPath, children, ...extra }
 }
 
@@ -101,7 +106,9 @@ function dir(name: string, relPath: string, children: ScanTreeNode[], extra: Par
 }
 
 {
-  const tree = dir('root', '', [dir('a', 'a', [dir('b', 'a/b', [file('x.ts', 'a/b/x.ts')], { truncated: true })])])
+  const tree = dir('root', '', [
+    dir('a', 'a', [dir('b', 'a/b', [file('x.ts', 'a/b/x.ts')], { truncated: true })])
+  ])
   assert.equal(isTreePartial(tree), true)
 }
 
@@ -138,7 +145,12 @@ function dir(name: string, relPath: string, children: ScanTreeNode[], extra: Par
   )
 }
 
-function cfg(provider: AiConfig['provider'], modelPath: string, baseUrl: string, model: string): AiConfig {
+function cfg(
+  provider: AiConfig['provider'],
+  modelPath: string,
+  baseUrl: string,
+  model: string
+): AiConfig {
   return {
     provider,
     builtin: { serverPath: '', modelPath },

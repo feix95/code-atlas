@@ -9,11 +9,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const base = join(root, '.planning', 'journey')
 await mkdir(base, { recursive: true })
 const run = await mkdtemp(join(base, 'run-'))
-for (const name of ['profile', 'session', 'crashes', 'tmp', 'shots', 'project/src', 'project/docs', 'empty', 'second']) {
+for (const name of [
+  'profile',
+  'session',
+  'crashes',
+  'tmp',
+  'shots',
+  'project/src',
+  'project/docs',
+  'empty',
+  'second'
+]) {
   await mkdir(join(run, name), { recursive: true })
 }
 const project = join(run, 'project')
-await writeFile(join(project, 'README.md'), '# Sample project\nThis application helps organize tasks.\n')
+await writeFile(
+  join(project, 'README.md'),
+  '# Sample project\nThis application helps organize tasks.\n'
+)
 await writeFile(join(project, 'src/main.ts'), 'export const start = () => 1\n')
 await writeFile(join(project, 'docs/guide.md'), '# Getting started\n')
 await writeFile(join(project, 'package.json'), '{"name":"sample-project","private":true}')
@@ -21,7 +34,9 @@ await writeFile(join(run, 'second/README.md'), '# Second project\n')
 const main = join(root, 'out/main/index.js')
 assert.ok(existsSync(main), 'Run npm run build before test:journey')
 const bootstrap = join(run, 'bootstrap.cjs')
-await writeFile(bootstrap, `
+await writeFile(
+  bootstrap,
+  `
 const { app, ipcMain, net } = require('electron')
 const cp = require('node:child_process')
 const path = require('node:path')
@@ -61,29 +76,46 @@ ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...
   return result
 })
 require(${JSON.stringify(main)})
-`)
+`
+)
 const env = { ...process.env, TEMP: join(run, 'tmp'), TMP: join(run, 'tmp') }
 delete env.ELECTRON_RUN_AS_NODE
 const electron = await _electron.launch({
   executablePath: join(root, 'node_modules/electron/dist/electron.exe'),
-  args: [bootstrap], cwd: root, env, timeout: 30_000
+  args: [bootstrap],
+  cwd: root,
+  env,
+  timeout: 30_000
 })
 try {
   const page = await electron.firstWindow()
   page.setDefaultTimeout(12_000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
-  const control = async (patch: Record<string, unknown>) => electron.evaluate((_electron, value) => {
-    Object.assign((globalThis as typeof globalThis & { __journey: Record<string, unknown> }).__journey, value)
-  }, patch)
-  const release = async () => electron.evaluate(() => {
-    const state = (globalThis as typeof globalThis & { __journey: { releases: Array<() => void> } }).__journey
-    state.releases.splice(0).forEach((fn) => fn())
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
   })
-  const calls = async (channel: string) => electron.evaluate((_electron, name) => {
-    return (globalThis as typeof globalThis & { __journey: { calls: Record<string, number> } }).__journey.calls[name] ?? 0
-  }, channel)
+  const control = async (patch: Record<string, unknown>) =>
+    electron.evaluate((_electron, value) => {
+      Object.assign(
+        (globalThis as typeof globalThis & { __journey: Record<string, unknown> }).__journey,
+        value
+      )
+    }, patch)
+  const release = async () =>
+    electron.evaluate(() => {
+      const state = (
+        globalThis as typeof globalThis & { __journey: { releases: Array<() => void> } }
+      ).__journey
+      state.releases.splice(0).forEach((fn) => fn())
+    })
+  const calls = async (channel: string) =>
+    electron.evaluate((_electron, name) => {
+      return (
+        (globalThis as typeof globalThis & { __journey: { calls: Record<string, number> } })
+          .__journey.calls[name] ?? 0
+      )
+    }, channel)
   const shot = (name: string) => page.screenshot({ path: join(run, 'shots', `${name}.png`) })
   const open = async (folder: string) => {
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(folder)
@@ -111,7 +143,10 @@ try {
   await release()
   await control({ holdGit: false })
   await page.getByRole('button', { name: /读项目说明/ }).click()
-  await page.locator('.code-text').filter({ hasText: 'This application helps organize tasks.' }).waitFor()
+  await page
+    .locator('.code-text')
+    .filter({ hasText: 'This application helps organize tasks.' })
+    .waitFor()
   await selectMain()
   await page.waitForTimeout(800)
   assert.equal(await calls('atlas:ai-explain-file'), 0, 'Browsing must not start AI predictions')
@@ -121,7 +156,10 @@ try {
   await page.locator('#cfg-model-path').waitFor()
   await page.waitForTimeout(200)
   const picker = await page.locator('#cfg-model-path').boundingBox()
-  assert.ok(picker && picker.y >= 0 && picker.y + picker.height <= (await page.evaluate(() => innerHeight)), 'AI setup must scroll to model selection')
+  assert.ok(
+    picker && picker.y >= 0 && picker.y + picker.height <= (await page.evaluate(() => innerHeight)),
+    'AI setup must scroll to model selection'
+  )
   await shot('setup')
   await page.keyboard.press('Escape')
   await page.getByRole('dialog', { name: '设置', exact: true }).waitFor({ state: 'hidden' })
@@ -152,7 +190,10 @@ try {
   await open(project)
   await selectMain()
   await page.locator('.ai-card').getByRole('button', { name: '解释这个文件', exact: true }).click()
-  await page.locator('.ai-card').getByText('测试回复：这是测试夹具里的 main.ts。', { exact: true }).waitFor()
+  await page
+    .locator('.ai-card')
+    .getByText('测试回复：这是测试夹具里的 main.ts。', { exact: true })
+    .waitFor()
   await shot('ai-fixture-success')
   await control({ mode: 'error' })
   await selectMain()
@@ -167,10 +208,14 @@ try {
   await page.waitForTimeout(100)
   assert.ok((await calls('atlas:ai-cancel')) > 0)
   assert.match(await page.locator('.ai-card .badge').innerText(), /已取消/)
-  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'dark'
+  })
   await shot('file-dark')
   assert.deepEqual(errors, [], 'Renderer must not report errors')
-  console.log('Journey passed: real scanning/reading/navigation/setup/recovery, mocked AI success/error/cancel, delayed Git and stale graph.')
+  console.log(
+    'Journey passed: real scanning/reading/navigation/setup/recovery, mocked AI success/error/cancel, delayed Git and stale graph.'
+  )
   console.log('AI responses are test fixtures; model quality is not verified.')
   console.log(`Local screenshots: ${join(run, 'shots')}`)
 } finally {

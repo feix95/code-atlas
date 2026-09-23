@@ -52,35 +52,107 @@ async function prepare(languageId: string): Promise<Parser> {
 
 // ── 控制流关键字(紫):VS Code 把「管流程的词」单独上一档色,照办 ──
 const CONTROL_WORDS = new Set([
-  'if', 'else', 'elif', 'for', 'while', 'do', 'switch', 'case', 'default',
-  'return', 'break', 'continue', 'throw', 'try', 'catch', 'finally',
-  'yield', 'await', 'async', 'new', 'delete', 'typeof', 'instanceof', 'in', 'of',
-  'goto', 'range', 'select', 'fallthrough', 'match', 'loop', 'until',
-  'then', 'fi', 'done', 'esac', 'except', 'raise', 'with', 'defer', 'go'
+  'if',
+  'else',
+  'elif',
+  'for',
+  'while',
+  'do',
+  'switch',
+  'case',
+  'default',
+  'return',
+  'break',
+  'continue',
+  'throw',
+  'try',
+  'catch',
+  'finally',
+  'yield',
+  'await',
+  'async',
+  'new',
+  'delete',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'goto',
+  'range',
+  'select',
+  'fallthrough',
+  'match',
+  'loop',
+  'until',
+  'then',
+  'fi',
+  'done',
+  'esac',
+  'except',
+  'raise',
+  'with',
+  'defer',
+  'go'
 ])
 
 /** 光杆常量词:JSON/Python 这些语法里 true/None 是「具名」节点,不像 JS 是匿名 token,
     通用匿名分支接不住,单独给它们开张词表 */
-const BARE_KEYWORDS = new Set(['true', 'false', 'null', 'None', 'True', 'False', 'nil', 'undefined', 'NaN'])
+const BARE_KEYWORDS = new Set([
+  'true',
+  'false',
+  'null',
+  'None',
+  'True',
+  'False',
+  'nil',
+  'undefined',
+  'NaN'
+])
 
 /** 整段当注释的节点(各家语法对注释的叫法不一样,收齐) */
 const COMMENT_NODES = new Set(['comment', 'line_comment', 'block_comment', 'html_comment'])
 
 /** 整段当字符串的节点(进来就不下钻了:字符串里的字都一个色) */
 const STRING_NODES = new Set([
-  'string', 'string_literal', 'interpreted_string_literal', 'raw_string_literal',
-  'system_lib_string', 'string_fragment', 'f_string_content', 'character_literal',
-  'byte_string', 'verbatim_string_literal', 'string_value',
-  'quoted_attribute_value', 'attribute_value'
+  'string',
+  'string_literal',
+  'interpreted_string_literal',
+  'raw_string_literal',
+  'system_lib_string',
+  'string_fragment',
+  'f_string_content',
+  'character_literal',
+  'byte_string',
+  'verbatim_string_literal',
+  'string_value',
+  'quoted_attribute_value',
+  'attribute_value'
 ])
 
 /** 整段当数字的节点(各家叫法收齐;css 的色值 #336699 也按数字算) */
 const NUMBER_NODES = new Set([
-  'number', 'number_literal', 'integer', 'integer_literal', 'decimal_integer_literal',
-  'hex_integer_literal', 'octal_integer_literal', 'binary_integer_literal',
-  'decimal_floating_point_literal', 'hex_floating_point_literal', 'float', 'float_literal',
-  'decimal_float', 'decimal_number', 'octal_number', 'binary_number',
-  'int_literal', 'imaginary_literal', 'integer_value', 'float_value', 'percentage_value', 'color_value'
+  'number',
+  'number_literal',
+  'integer',
+  'integer_literal',
+  'decimal_integer_literal',
+  'hex_integer_literal',
+  'octal_integer_literal',
+  'binary_integer_literal',
+  'decimal_floating_point_literal',
+  'hex_floating_point_literal',
+  'float',
+  'float_literal',
+  'decimal_float',
+  'decimal_number',
+  'octal_number',
+  'binary_number',
+  'int_literal',
+  'imaginary_literal',
+  'integer_value',
+  'float_value',
+  'percentage_value',
+  'color_value'
 ])
 
 /** 整段当正则的节点(TS 的 /…/ 和 bash 的 [[ =~ ]] 都对上) */
@@ -91,7 +163,10 @@ const TYPE_NODES = new Set(['type_identifier', 'predefined_type', 'primitive_typ
 
 /** 普通名字类节点:变量、属性、字段 —— 大概率浅蓝,例外靠父节点修正 */
 const IDENT_NODES = new Set([
-  'identifier', 'property_identifier', 'shorthand_property_identifier', 'field_identifier'
+  'identifier',
+  'property_identifier',
+  'shorthand_property_identifier',
+  'field_identifier'
 ])
 
 /**
@@ -103,8 +178,12 @@ const LANG_NODES: Record<string, Record<string, HlKind>> = {
   tsx: { tag_name: 'type', attribute_name: 'var', jsx_attribute_name: 'var' },
   html: { tag_name: 'kw', attribute_name: 'var', doctype: 'kw' },
   css: {
-    tag_name: 'symbol', class_name: 'symbol', id_name: 'symbol',
-    property_name: 'var', plain_value: 'str', at_keyword: 'kw'
+    tag_name: 'symbol',
+    class_name: 'symbol',
+    id_name: 'symbol',
+    property_name: 'var',
+    plain_value: 'str',
+    at_keyword: 'kw'
   },
   bash: { variable_name: 'var', command_name: 'var' },
   yaml: { string_scalar: 'str', block_scalar: 'str' },
@@ -122,14 +201,26 @@ const LANG_NODES: Record<string, Record<string, HlKind>> = {
 function identKind(parentType: string | null, field: string | null): HlKind {
   if (parentType !== null) {
     if (field === 'name') {
-      if (parentType.includes('function') || parentType.includes('method') || parentType.includes('constructor')) return 'fn'
       if (
-        parentType.includes('class') || parentType.includes('interface') || parentType.includes('struct') ||
-        parentType.includes('enum') || parentType.includes('trait') || parentType === 'type_alias_declaration'
-      ) return 'type'
+        parentType.includes('function') ||
+        parentType.includes('method') ||
+        parentType.includes('constructor')
+      )
+        return 'fn'
+      if (
+        parentType.includes('class') ||
+        parentType.includes('interface') ||
+        parentType.includes('struct') ||
+        parentType.includes('enum') ||
+        parentType.includes('trait') ||
+        parentType === 'type_alias_declaration'
+      )
+        return 'type'
     }
     if (field === 'function' || field === 'callee') {
-      return parentType === 'new_expression' || parentType === 'object_creation_expression' ? 'type' : 'fn'
+      return parentType === 'new_expression' || parentType === 'object_creation_expression'
+        ? 'type'
+        : 'fn'
     }
     if (parentType === 'decorator' || parentType.includes('invocation')) return 'fn'
   }
@@ -141,7 +232,12 @@ function identKind(parentType: string | null, field: string | null): HlKind {
  * 返回角色 → 整段上色,不再往里钻;返回 undefined → 不上色,继续往里钻。
  * 顺序有讲究:json 的键(字符串当键使)要在通用字符串表之前特判,不然永远判成字符串。
  */
-function classify(lang: string, node: TSNode, parentType: string | null, field: string | null): HlKind | undefined {
+function classify(
+  lang: string,
+  node: TSNode,
+  parentType: string | null,
+  field: string | null
+): HlKind | undefined {
   const t = node.type
   // 匿名叶子:就是语法里的字面 token。是符号(括号分号箭头)不上色;
   // 是纯字母的词,流程词给紫,其余给关键字蓝(true/false/null/this 也在这儿对号)
@@ -181,7 +277,12 @@ function walk(lang: string, tree: TSTree, out: HlToken[]): void {
   try {
     while (true) {
       const node = cursor.currentNode()
-      const kind = classify(lang, node, node.parent?.type ?? null, cursor.currentFieldName() ?? null)
+      const kind = classify(
+        lang,
+        node,
+        node.parent?.type ?? null,
+        cursor.currentFieldName() ?? null
+      )
       if (kind === undefined) {
         // 这段没角色:钻进去看它的孩子
         if (cursor.gotoFirstChild()) continue
@@ -205,7 +306,9 @@ function walk(lang: string, tree: TSTree, out: HlToken[]): void {
 }
 
 /** 角色编号对账表:IPC 传的是数字,省得每片段都 indexOf */
-const KIND_INDEX: Record<HlKind, number> = Object.fromEntries(HL_KINDS.map((k, i) => [k, i])) as Record<HlKind, number>
+const KIND_INDEX: Record<HlKind, number> = Object.fromEntries(
+  HL_KINDS.map((k, i) => [k, i])
+) as Record<HlKind, number>
 
 /**
  * 把「全文偏移的片段」切成「按行的段落账」(纯函数,自测覆盖):
@@ -249,7 +352,10 @@ export function tokensToLineSegments(text: string, tokens: HlToken[]): number[][
  * 把一段代码解析成按行的分色账。fileName 用来看后缀认语言;
  * 返回 null = 这份不上色(超闸 / 语言不认识 / 出错),调用方照常白字,绝不是报错。
  */
-export async function highlightSource(code: string, fileName: string): Promise<number[][][] | null> {
+export async function highlightSource(
+  code: string,
+  fileName: string
+): Promise<number[][][] | null> {
   const language = hlLanguageFor(fileName)
   if (language === null || code.length > HL_MAX_CHARS) return null
   if (!GRAMMAR_FILES[language]) return null

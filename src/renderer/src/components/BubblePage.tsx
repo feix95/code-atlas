@@ -22,7 +22,8 @@ const GRIP_DIRS: BubbleResizeDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'
  * matches = 命中清单(结构化卡从简,只报数);普通 note 原样显示 */
 function noteText(m: ChatMessage): string {
   if (m.kind === 'summary') return `对话摘要:${m.text}`
-  if (m.kind === 'matches') return `小探针翻「${m.matches?.keyword ?? ''}」命中 ${m.matches?.items.length ?? 0} 处`
+  if (m.kind === 'matches')
+    return `小探针翻「${m.matches?.keyword ?? ''}」命中 ${m.matches?.items.length ?? 0} 处`
   return m.text
 }
 
@@ -68,8 +69,10 @@ export function BubblePage(): React.JSX.Element {
     if (!el) return
     const st = getComputedStyle(el)
     const line = Number.parseFloat(st.lineHeight) || LINE_FALLBACK
-    const padV = (Number.parseFloat(st.paddingTop) || 0) + (Number.parseFloat(st.paddingBottom) || 0)
-    const borderV = (Number.parseFloat(st.borderTopWidth) || 0) + (Number.parseFloat(st.borderBottomWidth) || 0)
+    const padV =
+      (Number.parseFloat(st.paddingTop) || 0) + (Number.parseFloat(st.paddingBottom) || 0)
+    const borderV =
+      (Number.parseFloat(st.borderTopWidth) || 0) + (Number.parseFloat(st.borderBottomWidth) || 0)
     el.style.height = 'auto'
     const realLines = Math.max(1, Math.round((el.scrollHeight - padV) / line))
     const shown = Math.min(realLines, INPUT_CAP_LINES)
@@ -124,13 +127,20 @@ export function BubblePage(): React.JSX.Element {
           <span className="bubble-title" title="和主面板里的是同一场对话">
             Atlas 小探针
           </span>
-          <button type="button" className="bubble-tool" onClick={() => window.atlas.openMainPanel()} title="打开主面板接着聊">
+          <button
+            type="button"
+            className="bubble-tool"
+            onClick={() => window.atlas.openMainPanel()}
+            title="打开主面板接着聊"
+          >
             回主面板
           </button>
         </div>
         <div className="bubble-messages">
           {!ready && <div className="bubble-note">主面板还没醒,等它一下再聊……</div>}
-          {ready && messages.length === 0 && <div className="bubble-note">随便聊点什么,这边和主面板是同一场对话</div>}
+          {ready && messages.length === 0 && (
+            <div className="bubble-note">随便聊点什么,这边和主面板是同一场对话</div>
+          )}
           {(messages ?? []).map((m) =>
             m.role === 'note' ? (
               m.text.trim() === '' && m.kind !== 'matches' ? null : (
@@ -147,7 +157,9 @@ export function BubblePage(): React.JSX.Element {
                   </details>
                 ) : null}
                 {m.text}
-                {m.state === 'busy' && m.text === '' && !m.reasoning && <span className="bubble-typing">小探针在想…</span>}
+                {m.state === 'busy' && m.text === '' && !m.reasoning && (
+                  <span className="bubble-typing">小探针在想…</span>
+                )}
               </div>
             )
           )}

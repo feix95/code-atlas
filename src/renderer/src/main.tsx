@@ -23,7 +23,8 @@ window.addEventListener('error', (e) => {
   window.atlas?.reportRendererError(`${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`)
 })
 window.addEventListener('unhandledrejection', (e) => {
-  const reason = e.reason instanceof Error ? `${e.reason.name}:${e.reason.message}` : String(e.reason)
+  const reason =
+    e.reason instanceof Error ? `${e.reason.name}:${e.reason.message}` : String(e.reason)
   window.atlas?.reportRendererError(`未兑现的承诺:${reason}`)
 })
 

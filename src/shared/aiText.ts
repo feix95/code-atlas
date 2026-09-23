@@ -9,9 +9,12 @@ const fmt = (n: number): string => n.toLocaleString('en-US')
 /** 流式实时账 → 一句话:「读材料中 · 已读 2,048 tokens」/「已吐 128 tokens · 12 tokens/s」 */
 export function formatStreamStats(stats: AiStreamStats): string {
   const tps = stats.tokensPerSecond
-  const speed = tps !== undefined ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : ''
+  const speed =
+    tps !== undefined ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : ''
   if (stats.phase === 'reading') {
-    return stats.promptTokens !== undefined ? `读材料中 · 已读 ${fmt(stats.promptTokens)} tokens` : '读材料中……'
+    return stats.promptTokens !== undefined
+      ? `读材料中 · 已读 ${fmt(stats.promptTokens)} tokens`
+      : '读材料中……'
   }
   const out = stats.outputTokens !== undefined ? `已吐 ${fmt(stats.outputTokens)} tokens` : '吐字中'
   return `${out}${speed}`
@@ -24,6 +27,7 @@ export function formatUsage(usage: AiUsage): string {
   if (usage.outputTokens !== undefined) parts.push(`吐 ${fmt(usage.outputTokens)}`)
   if (parts.length === 0) return ''
   const tps = usage.tokensPerSecond
-  const speed = tps !== undefined ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : ''
+  const speed =
+    tps !== undefined ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : ''
   return `${parts.join(' · ')} tokens${speed}`
 }

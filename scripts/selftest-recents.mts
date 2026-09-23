@@ -15,7 +15,14 @@ function check(name: string, fn: () => void): void {
 }
 
 check('parseRecentProjects:没记过/垃圾一概回空数组', () => {
-  for (const junk of [null, 'x', 42, {}, [1, 'a'], [{ p: '' }, { p: 'a', n: 'b' }, { p: 'a', n: 1 }, { p: 'a', n: 'b', t: 'x' }]]) {
+  for (const junk of [
+    null,
+    'x',
+    42,
+    {},
+    [1, 'a'],
+    [{ p: '' }, { p: 'a', n: 'b' }, { p: 'a', n: 1 }, { p: 'a', n: 'b', t: 'x' }]
+  ]) {
     const got = parseRecentProjects(junk)
     assert.ok(Array.isArray(got))
     assert.equal(got.length, 0, `垃圾应被整条扔掉:${JSON.stringify(junk)}`)

@@ -44,10 +44,14 @@ const KINDS_KEY = 'atlas.pane-kinds'
 export function loadEnabledKinds(): Set<PaneKind> {
   const list = readPref<string[] | null>(KINDS_KEY, null)
   // 存档坏了/是空名单就当没存过,回到出厂全开
-  if (Array.isArray(list) && list.length > 0) return new Set(KIND_ORDER.filter((k) => list.includes(k)))
+  if (Array.isArray(list) && list.length > 0)
+    return new Set(KIND_ORDER.filter((k) => list.includes(k)))
   return new Set(KIND_ORDER)
 }
 
 export function saveEnabledKinds(kinds: Set<PaneKind>): void {
-  writePref(KINDS_KEY, KIND_ORDER.filter((k) => kinds.has(k)))
+  writePref(
+    KINDS_KEY,
+    KIND_ORDER.filter((k) => kinds.has(k))
+  )
 }

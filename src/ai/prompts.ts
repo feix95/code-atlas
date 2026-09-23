@@ -97,8 +97,16 @@ export function buildChatSystem(opts: { agent: boolean }): string {
 }
 
 /** 讲解人设(纯函数):对应底座 + 教学切片;guess 底座复用 index.ts 里原地不动的猜猜官 */
-export function buildExplainSystem(level: TeachingLevel, kind: 'file' | 'folder' | 'guess'): string {
-  const base = kind === 'file' ? EXPLAIN_FILE_BASE : kind === 'folder' ? EXPLAIN_FOLDER_BASE : GUESS_SYSTEM_PROMPT
+export function buildExplainSystem(
+  level: TeachingLevel,
+  kind: 'file' | 'folder' | 'guess'
+): string {
+  const base =
+    kind === 'file'
+      ? EXPLAIN_FILE_BASE
+      : kind === 'folder'
+        ? EXPLAIN_FOLDER_BASE
+        : GUESS_SYSTEM_PROMPT
   return `${base}\n\n${teachingSlice(level)}`
 }
 

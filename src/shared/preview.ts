@@ -24,7 +24,8 @@ export interface PreviewClip {
 export function clipPreview(raw: string): PreviewClip {
   const normalized = raw.replace(/\r\n?/g, '\n')
   const lines = normalized.split('\n')
-  const totalLines = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+  const totalLines =
+    lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
   return { text: normalized, totalLines }
 }
 

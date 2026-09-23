@@ -13,7 +13,10 @@ function latestTurn(turns: AiTurn[]): AiTurn | null {
   return turns.length > 0 ? turns[turns.length - 1] : null
 }
 
-function stateBadge(turn: AiTurn | null): { label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' } {
+function stateBadge(turn: AiTurn | null): {
+  label: string
+  tone: 'blue' | 'green' | 'amber' | 'red' | 'muted'
+} {
   if (!turn) return { label: '尚未请求', tone: 'muted' }
   switch (turn.state) {
     case 'busy':
@@ -51,7 +54,9 @@ export function TurnText({ turn }: { turn: AiTurn }): React.JSX.Element {
         {turn.text ? (
           <>
             分析已取消,已经生成的这部分先留给你:
-            <div className="explain-text"><MiniMD text={turn.text} /></div>
+            <div className="explain-text">
+              <MiniMD text={turn.text} />
+            </div>
           </>
         ) : (
           '分析已取消。'
@@ -59,7 +64,11 @@ export function TurnText({ turn }: { turn: AiTurn }): React.JSX.Element {
       </div>
     )
   }
-  return <div className="explain-text"><MiniMD text={turn.text} /></div>
+  return (
+    <div className="explain-text">
+      <MiniMD text={turn.text} />
+    </div>
+  )
 }
 
 interface PresetRowProps {
@@ -74,7 +83,13 @@ function PresetRow({ presets, disabled, onPick }: PresetRowProps): React.JSX.Ele
   return (
     <div className="prompt-row">
       {presets.map((q) => (
-        <button key={q} type="button" className="prompt" disabled={disabled} onClick={() => onPick(q)}>
+        <button
+          key={q}
+          type="button"
+          className="prompt"
+          disabled={disabled}
+          onClick={() => onPick(q)}
+        >
           {q}
         </button>
       ))}
@@ -178,7 +193,11 @@ export function AiAssistCard({
             <TurnText turn={turn} />
             <div className="ai-card-actions">
               {(turn.state === 'error' || turn.state === 'cancelled') && (
-                <button type="button" className="btn btn-primary" onClick={() => ai.ask(turn.question)}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => ai.ask(turn.question)}
+                >
                   {turn.state === 'error' ? '重试' : '重新分析'}
                 </button>
               )}

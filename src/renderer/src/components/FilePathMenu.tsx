@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { closeFilePathMenu, currentFilePathMenu, subscribeFilePathMenu, type FilePathMenuRequest } from './filePathMenuStore'
+import {
+  closeFilePathMenu,
+  currentFilePathMenu,
+  subscribeFilePathMenu,
+  type FilePathMenuRequest
+} from './filePathMenuStore'
 import { useMenuDismiss } from '../useMenuDismiss'
 
 /**
@@ -62,7 +67,11 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
   }
 
   const note = request.note ?? null
-  const rows = 2 + (request.preview ? 1 : 0) + (note ? 1 : 0) + (note !== null && note.hasNote && note.onRemove ? 1 : 0)
+  const rows =
+    2 +
+    (request.preview ? 1 : 0) +
+    (note ? 1 : 0) +
+    (note !== null && note.hasNote && note.onRemove ? 1 : 0)
   const pos = clampedPosition(request.x, request.y, rows)
   return (
     <div className="file-path-menu" style={{ left: pos.left, top: pos.top }} role="menu">
@@ -84,7 +93,11 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
         }}
         title={request.relPath}
       >
-        {copied === 'ok' ? '已复制 ✓' : copied === 'fail' ? '没复制成,这路径有问题' : '复制完整路径'}
+        {copied === 'ok'
+          ? '已复制 ✓'
+          : copied === 'fail'
+            ? '没复制成,这路径有问题'
+            : '复制完整路径'}
       </button>
       <button
         type="button"

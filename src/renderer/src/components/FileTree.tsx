@@ -31,7 +31,20 @@ interface TreeRowProps {
 }
 
 // 路径契约:relPath 由扫描器生成并存在节点上,界面只读取、绝不拼接
-function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expandingPath, filter, forceExpand, onSelectFile, onSelectFolder, onExpandLazy, onPreviewFile }: TreeRowProps): React.JSX.Element | null {
+function TreeRow({
+  node,
+  depth,
+  notes,
+  onRowContextMenu,
+  selectedPath,
+  expandingPath,
+  filter,
+  forceExpand,
+  onSelectFile,
+  onSelectFolder,
+  onExpandLazy,
+  onPreviewFile
+}: TreeRowProps): React.JSX.Element | null {
   // 首层文件夹默认展开,再深的收起来,避免一上来铺满屏
   const [open, setOpen] = useState(depth < 1)
   // 分级扫描:点箭头把还没探的目录探进来;探完(节点从 lazy 变实)自动张开给孩子看
@@ -49,7 +62,10 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
     const note = notes?.[node.relPath]
     // 缩进挂 rem(每层 18px 基准 = 1.125rem),跟着根字号一起缩放
     return (
-      <div className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`} style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}>
+      <div
+        className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`}
+        style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}
+      >
         <span className="tree-caret" aria-hidden="true" />
         <button
           type="button"
@@ -58,7 +74,10 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           data-reveal-file={node.relPath}
           onDragStart={(e) => {
             // 拖拽挂引用(第一百二十五锤):带上类型,文件夹到了对面好指路
-            e.dataTransfer.setData(DRAG_MIME_NODE, JSON.stringify({ kind: 'file', relPath: node.relPath }))
+            e.dataTransfer.setData(
+              DRAG_MIME_NODE,
+              JSON.stringify({ kind: 'file', relPath: node.relPath })
+            )
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => onSelectFile(node.relPath, node)}
@@ -117,18 +136,27 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
         <button
           type="button"
           className={`tree-caret${dir.lazy ? ' is-lazy' : ''}${expanded && !dir.lazy ? ' is-open' : ''}`}
-          aria-label={dir.lazy ? `展开并扫描 ${dir.name}` : expanded ? `收起 ${dir.name}` : `展开 ${dir.name}`}
+          aria-label={
+            dir.lazy ? `展开并扫描 ${dir.name}` : expanded ? `收起 ${dir.name}` : `展开 ${dir.name}`
+          }
           aria-expanded={dir.lazy ? undefined : expanded}
           onClick={toggleExpand}
         >
-          {expandingPath === dir.relPath ? <span className="tree-spin" aria-hidden="true" /> : <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>}
+          {expandingPath === dir.relPath ? (
+            <span className="tree-spin" aria-hidden="true" />
+          ) : (
+            <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+          )}
         </button>
         <button
           type="button"
           className="tree-main"
           draggable
           onDragStart={(e) => {
-            e.dataTransfer.setData(DRAG_MIME_NODE, JSON.stringify({ kind: 'folder', relPath: dir.relPath }))
+            e.dataTransfer.setData(
+              DRAG_MIME_NODE,
+              JSON.stringify({ kind: 'folder', relPath: dir.relPath })
+            )
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => {
@@ -162,7 +190,9 @@ function TreeRow({ node, depth, notes, onRowContextMenu, selectedPath, expanding
           {/* 未扫描/不完整都是琥珀色:是「留个心眼」不是「出事了」,红色只留给真失败 */}
           {dir.lazy && <span className="tree-badge is-warn">未扫描</span>}
           {dir.truncated && !dir.lazy && <span className="tree-badge is-warn">不完整</span>}
-          {!dir.lazy && dir.children.length > 0 && <span className="tree-count">{dir.children.length}</span>}
+          {!dir.lazy && dir.children.length > 0 && (
+            <span className="tree-count">{dir.children.length}</span>
+          )}
         </button>
       </div>
       {expanded &&
@@ -225,7 +255,20 @@ interface FileTreeProps {
   onPreviewFile?: (relPath: string) => void
 }
 
-export function FileTree({ root, rootPath, notes, selectedPath, expandingPath, revealPaths, onSelectFile, onSelectFolder, onExpandLazy, onNoteEdit, onNoteRemove, onPreviewFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({
+  root,
+  rootPath,
+  notes,
+  selectedPath,
+  expandingPath,
+  revealPaths,
+  onSelectFile,
+  onSelectFolder,
+  onExpandLazy,
+  onNoteEdit,
+  onNoteRemove,
+  onPreviewFile
+}: FileTreeProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
   const scrollRef = useRef<HTMLDivElement>(null)

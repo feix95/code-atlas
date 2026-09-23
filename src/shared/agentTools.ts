@@ -25,11 +25,41 @@ export function asToolName(name: string): ToolName | null {
  */
 export const TOOL_STEP_WORDS: Record<
   ToolName,
-  { verb: string; /** done 句尾的名词(「翻了 xx 的内容」) */ what: string; repeat: string; error: string }
+  {
+    verb: string
+    /** done 句尾的名词(「翻了 xx 的内容」) */ what: string
+    repeat: string
+    error: string
+  }
 > = {
-  [TOOL_NAMES.listFiles]: { verb: '翻了', what: '的文件名单', repeat: '刚才已经看过了,不用再翻', error: '看不了' },
-  [TOOL_NAMES.readFile]: { verb: '读了', what: '的内容', repeat: '刚才已经看过了,不用再翻', error: '看不了' },
-  [TOOL_NAMES.searchContent]: { verb: '搜了', what: '', repeat: '刚才已经看过了,不用再翻', error: '看不了' },
-  [TOOL_NAMES.requestDirectoryAccess]: { verb: '申请读取了', what: '', repeat: '刚才已经申请过了', error: '没有获准读取' },
-  [TOOL_NAMES.webSearch]: { verb: '上网查了', what: '', repeat: '刚才已经查过了,不用再查', error: '查不了' }
+  [TOOL_NAMES.listFiles]: {
+    verb: '翻了',
+    what: '的文件名单',
+    repeat: '刚才已经看过了,不用再翻',
+    error: '看不了'
+  },
+  [TOOL_NAMES.readFile]: {
+    verb: '读了',
+    what: '的内容',
+    repeat: '刚才已经看过了,不用再翻',
+    error: '看不了'
+  },
+  [TOOL_NAMES.searchContent]: {
+    verb: '搜了',
+    what: '',
+    repeat: '刚才已经看过了,不用再翻',
+    error: '看不了'
+  },
+  [TOOL_NAMES.requestDirectoryAccess]: {
+    verb: '申请读取了',
+    what: '',
+    repeat: '刚才已经申请过了',
+    error: '没有获准读取'
+  },
+  [TOOL_NAMES.webSearch]: {
+    verb: '上网查了',
+    what: '',
+    repeat: '刚才已经查过了,不用再查',
+    error: '查不了'
+  }
 }

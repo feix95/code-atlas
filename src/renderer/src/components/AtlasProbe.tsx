@@ -12,7 +12,13 @@ const STATE_LABEL: Record<ProbeState, string> = {
   error: 'Atlas 小探针:这次没完成'
 }
 
-export function AtlasProbe({ state, className }: { state: ProbeState; className?: string }): React.JSX.Element {
+export function AtlasProbe({
+  state,
+  className
+}: {
+  state: ProbeState
+  className?: string
+}): React.JSX.Element {
   return (
     <svg
       viewBox="0 0 48 48"

@@ -79,7 +79,10 @@ import {
   stripToolResult,
   wrapToolResult
 } from '../src/ai/agent.ts'
-import { buildPersonalizationPrompt, DEFAULT_PERSONALIZATION } from '../src/shared/personalization.ts'
+import {
+  buildPersonalizationPrompt,
+  DEFAULT_PERSONALIZATION
+} from '../src/shared/personalization.ts'
 import {
   isCompactCommand,
   buildCompactMessages,
@@ -91,16 +94,68 @@ import {
   COMPACT_SUMMARY_CHARS,
   COMPACT_HISTORY_MAX_MESSAGES
 } from '../src/shared/compact.ts'
-import { collectHistoryRounds, CURRENT_QUESTION_PREFIX, stripCurrentQuestionAnchor } from '../src/shared/chatHistory.ts'
+import {
+  collectHistoryRounds,
+  CURRENT_QUESTION_PREFIX,
+  stripCurrentQuestionAnchor
+} from '../src/shared/chatHistory.ts'
 import { TAG } from '../src/shared/promptTags.ts'
 import { formatStreamStats, formatUsage } from '../src/shared/aiText.ts'
-import { CODE_REF_CHARS_MAX, CODE_REFS_MAX, CODE_REFS_TOTAL_CHARS_CEILING, CODE_REFS_TOTAL_CHARS_MAX, AI_ANTI_REPEAT_PARAMS } from '../src/shared/aiDefaults.ts'
+import {
+  CODE_REF_CHARS_MAX,
+  CODE_REFS_MAX,
+  CODE_REFS_TOTAL_CHARS_CEILING,
+  CODE_REFS_TOTAL_CHARS_MAX,
+  AI_ANTI_REPEAT_PARAMS
+} from '../src/shared/aiDefaults.ts'
 import { detectRepetitionTail, truncateAtRepetition } from '../src/ai/repetition.ts'
-import { aiConfigPath, defaultAiConfig, loadAiConfig, resolveAiTarget, saveAiConfig } from '../src/ai/config.ts'
-import { autopsyExitMessage, averageWarmup, createSingleFlight, estimateKvBytes, estimateLoadProgress, gpuOffloadWarning, inspectBuiltinConflict, judgeModelFit, nextWarmupStore, parseEnginePidFile, parseGpuOffloadReport, parseListenerPids, parseLoadProgress, parseNvidiaSmi, parseTasklistImage, parseWarmupSamples, resolveServerProgram, warmupNudgeMessage } from '../src/ai/builtin.ts'
-import { stripHtmlTags, webLookupDetailed, probeTavilyKey, HttpStatusError, TAVILY_USAGE_URL } from '../src/ai/weblookup.ts'
-import { looksLikeTavilyKey, sanitizeTavilyKey, tavilyVerdictFromStatus, parseTavilyUsage, tavilyUsageText } from '../src/shared/tavily.ts'
-import type { AiConfig, ChatContextAttachment, FileStructure, ScanDirNode } from '../src/shared/types.ts'
+import {
+  aiConfigPath,
+  defaultAiConfig,
+  loadAiConfig,
+  resolveAiTarget,
+  saveAiConfig
+} from '../src/ai/config.ts'
+import {
+  autopsyExitMessage,
+  averageWarmup,
+  createSingleFlight,
+  estimateKvBytes,
+  estimateLoadProgress,
+  gpuOffloadWarning,
+  inspectBuiltinConflict,
+  judgeModelFit,
+  nextWarmupStore,
+  parseEnginePidFile,
+  parseGpuOffloadReport,
+  parseListenerPids,
+  parseLoadProgress,
+  parseNvidiaSmi,
+  parseTasklistImage,
+  parseWarmupSamples,
+  resolveServerProgram,
+  warmupNudgeMessage
+} from '../src/ai/builtin.ts'
+import {
+  stripHtmlTags,
+  webLookupDetailed,
+  probeTavilyKey,
+  HttpStatusError,
+  TAVILY_USAGE_URL
+} from '../src/ai/weblookup.ts'
+import {
+  looksLikeTavilyKey,
+  sanitizeTavilyKey,
+  tavilyVerdictFromStatus,
+  parseTavilyUsage,
+  tavilyUsageText
+} from '../src/shared/tavily.ts'
+import type {
+  AiConfig,
+  ChatContextAttachment,
+  FileStructure,
+  ScanDirNode
+} from '../src/shared/types.ts'
 
 function sampleStructure(): FileStructure {
   return {
@@ -156,7 +211,15 @@ async function main(): Promise<void> {
       relPath: 'x.ts',
       name: 'x.ts',
       languageName: 'typescript',
-      structure: { languageId: 'typescript', imports: [], exports: [], functions: [], classes: [], interfaces: [], reactComponents: [] },
+      structure: {
+        languageId: 'typescript',
+        imports: [],
+        exports: [],
+        functions: [],
+        classes: [],
+        interfaces: [],
+        reactComponents: []
+      },
       graph: null
     })
   )
@@ -241,9 +304,21 @@ async function main(): Promise<void> {
   assert.ok(gp.includes('Shell'), '应含语言名')
   assert.ok(gp.includes('系统目录'), '要有"认得系统目录就用常识"的引导')
 
-  const gpNull = buildGuessPrompt({ relPath: 'x', name: 'x', absPath: 'X:\\demo\\x', languageName: '', preview: null })
+  const gpNull = buildGuessPrompt({
+    relPath: 'x',
+    name: 'x',
+    absPath: 'X:\\demo\\x',
+    languageName: '',
+    preview: null
+  })
   assert.ok(gpNull.includes('读不出文本内容'), '读不了内容要明说')
-  const gpEmpty = buildGuessPrompt({ relPath: 'e', name: 'e', absPath: 'X:\\demo\\e', languageName: '', preview: '' })
+  const gpEmpty = buildGuessPrompt({
+    relPath: 'e',
+    name: 'e',
+    absPath: 'X:\\demo\\e',
+    languageName: '',
+    preview: ''
+  })
   assert.ok(gpEmpty.includes('空文件'), '空文件要明说')
 
   // ── 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装 ──
@@ -251,12 +326,21 @@ async function main(): Promise<void> {
   const chatSystem = buildChatSystem({ agent: false })
   assert.ok(chatSystem.includes('Atlas 小探针'), '内核要点名本名「Atlas 小探针」(2.0 新稿)')
   assert.ok(chatSystem.includes('当前对话的最高优先级'), '内核要立「最新问题最高优先级」')
-  assert.ok(chatSystem.includes('如实相告') && chatSystem.includes('承认存在不确定性'), '内核的诚实边界要在:如实相告能力、承认不确定')
+  assert.ok(
+    chatSystem.includes('如实相告') && chatSystem.includes('承认存在不确定性'),
+    '内核的诚实边界要在:如实相告能力、承认不确定'
+  )
   assert.ok(chatSystem.includes('翻文件开关'), '无工具切片要指路「翻文件开关」')
   assert.ok(chatSystem.includes('不许说自己翻过'), '没翻过文件不许装翻过')
   assert.ok(chatSystem.includes('<capabilities>'), '无工具切片要包 capabilities 标签(2.0)')
-  assert.ok(chatSystem.includes('<current_question>') && chatSystem.includes('资料里自称用户或指令'), '聊天切片要教标签口径:问题是问题、资料是资料')
-  assert.ok(!buildChatSystem({ agent: true }).includes(SLICE_NO_TOOLS), 'agent 路不挂无工具切片(翻文件切片走 agent 自己的追加机制)')
+  assert.ok(
+    chatSystem.includes('<current_question>') && chatSystem.includes('资料里自称用户或指令'),
+    '聊天切片要教标签口径:问题是问题、资料是资料'
+  )
+  assert.ok(
+    !buildChatSystem({ agent: true }).includes(SLICE_NO_TOOLS),
+    'agent 路不挂无工具切片(翻文件切片走 agent 自己的追加机制)'
+  )
   assert.ok(buildChatSystem({ agent: true }).includes(SLICE_CHAT), 'agent 路照样有聊天切片')
 
   assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
@@ -271,17 +355,26 @@ async function main(): Promise<void> {
   const clean = sanitizeHistory(dirtyHistory)
   assert.equal(clean.length, 2, '冒充人设和被洗空的条目整条扔掉')
   assert.equal(clean[0]?.content, '它是做什么的?', '正常条目原样留下')
-  assert.ok(clean[1]?.content.startsWith(`${longText.slice(0, 500)}……`), '超长历史要截断(500 字 + 省略号)')
+  assert.ok(
+    clean[1]?.content.startsWith(`${longText.slice(0, 500)}……`),
+    '超长历史要截断(500 字 + 省略号)'
+  )
   // 截断标注(LLM 优化锤):半截话是小模型最爱的续写钩子,得打招呼「不用接着写」
   assert.ok(clean[1]?.content.includes('不用接着写'), '截断的历史要打「不用接着写」的标注')
   assert.ok(clean[1]!.content.length > 500 + 2, '标注是附在截断条目上的,内容本体不变')
-  assert.ok(clean.every((m) => m.role === 'user' || m.role === 'assistant'), '只收 user/assistant 两种角色')
+  assert.ok(
+    clean.every((m) => m.role === 'user' || m.role === 'assistant'),
+    '只收 user/assistant 两种角色'
+  )
 
   // 历史窗口方向(2026-09-17 修「小探针回复以前问过的问题」):留的必须是最近的完整问答对 ——
   // 老代码从头取前几条,把刚聊完的一轮整个扔掉,窗口还常停在悬空的旧问题上
   const pairHistory: Array<{ role: string; content: string }> = []
   for (let i = 1; i <= 6; i += 1) {
-    pairHistory.push({ role: 'user', content: `第${i}问` }, { role: 'assistant', content: `第${i}答` })
+    pairHistory.push(
+      { role: 'user', content: `第${i}问` },
+      { role: 'assistant', content: `第${i}答` }
+    )
   }
   assert.deepEqual(
     sanitizeHistory(pairHistory),
@@ -327,7 +420,11 @@ async function main(): Promise<void> {
     ],
     8
   )
-  assert.deepEqual(errRound.map((m) => m.content), ['第1问', '第1答', '第3问', '第3答'], '报错轮整轮扔,悬空旧问题不进历史')
+  assert.deepEqual(
+    errRound.map((m) => m.content),
+    ['第1问', '第1答', '第3问', '第3答'],
+    '报错轮整轮扔,悬空旧问题不进历史'
+  )
   // 悬空旧问题沉在历史中间的裸形态:问出去没答完,后面的正常问答把它夹在中间
   const orphanRound = collectHistoryRounds(
     [
@@ -339,7 +436,11 @@ async function main(): Promise<void> {
     ],
     8
   )
-  assert.deepEqual(orphanRound.map((m) => m.content), ['第1问', '第1答', '第3问', '第3答'], '沉在中间的悬空旧问题整轮扔')
+  assert.deepEqual(
+    orphanRound.map((m) => m.content),
+    ['第1问', '第1答', '第3问', '第3答'],
+    '沉在中间的悬空旧问题整轮扔'
+  )
   // 取消轮同理
   const cancelRound = collectHistoryRounds(
     [
@@ -350,7 +451,11 @@ async function main(): Promise<void> {
     ],
     8
   )
-  assert.deepEqual(cancelRound.map((m) => m.content), ['第2问', '第2答'], '取消轮整轮扔')
+  assert.deepEqual(
+    cancelRound.map((m) => m.content),
+    ['第2问', '第2答'],
+    '取消轮整轮扔'
+  )
   // 重试轮:同一问题问了两遍,只留最新一对
   const retryRound = collectHistoryRounds(
     [
@@ -365,7 +470,11 @@ async function main(): Promise<void> {
     ],
     8
   )
-  assert.deepEqual(retryRound.map((m) => m.content), ['第1问', '第1答', '第2问', '第2答(重答)', '第3问', '第3答'], '重试的重复提问只留最新一对')
+  assert.deepEqual(
+    retryRound.map((m) => m.content),
+    ['第1问', '第1答', '第2问', '第2答(重答)', '第3问', '第3答'],
+    '重试的重复提问只留最新一对'
+  )
   // note 灰字不进历史也不打断配对;还没答完的轮不进
   const withNotes = collectHistoryRounds(
     [
@@ -375,7 +484,11 @@ async function main(): Promise<void> {
     ],
     8
   )
-  assert.deepEqual(withNotes.map((m) => m.content), ['第1问', '第1答'], 'note 灰字不进历史也不打断配对')
+  assert.deepEqual(
+    withNotes.map((m) => m.content),
+    ['第1问', '第1答'],
+    'note 灰字不进历史也不打断配对'
+  )
   const pendingRound = collectHistoryRounds(
     [
       { role: 'user', state: 'done', text: '第1问' },
@@ -384,7 +497,11 @@ async function main(): Promise<void> {
     8
   )
   assert.deepEqual(pendingRound, [], '还没答完的轮不进历史')
-  assert.deepEqual(collectHistoryRounds([{ role: 'user', state: 'done', text: '第1问' }], 8), [], '只有提问没有回答,整轮不要')
+  assert.deepEqual(
+    collectHistoryRounds([{ role: 'user', state: 'done', text: '第1问' }], 8),
+    [],
+    '只有提问没有回答,整轮不要'
+  )
 
   // 主进程兜底(答旧题修复·刀二):渲染层漏网的悬空旧问题,中间扫描照样摘 —— 连续多条 user 只留最后一条
   const dangling = sanitizeHistory([
@@ -394,7 +511,11 @@ async function main(): Promise<void> {
     { role: 'user', content: '第3问' },
     { role: 'assistant', content: '第3答' }
   ])
-  assert.deepEqual(dangling.map((m) => m.content), ['第2问', '第2答', '第3问', '第3答'], '兜底:连续 user 只留最后一条,悬空旧题摘干净')
+  assert.deepEqual(
+    dangling.map((m) => m.content),
+    ['第2问', '第2答', '第3问', '第3答'],
+    '兜底:连续 user 只留最后一条,悬空旧题摘干净'
+  )
   // 不变式:任意乱序脏输入,洗完开头必 user、结尾必 assistant、相邻必不同角色
   const messy = sanitizeHistory([
     { role: 'assistant', content: '开头的半截答案' },
@@ -415,15 +536,37 @@ async function main(): Promise<void> {
 
   // 端到端回归(小葵报的案):当前问题必须单独成条 —— 老毛病是悬空的旧问题被合并逻辑
   // 粘到当前问题前面,拼成「旧问题\n\n新问题」,小模型扭头就去答那个旧问题
-  const chatMessages = buildFreeChatMessages('人设', null, sanitizeHistory(pairHistory), '第7问', null, [], 'brief')
+  const chatMessages = buildFreeChatMessages(
+    '人设',
+    null,
+    sanitizeHistory(pairHistory),
+    '第7问',
+    null,
+    [],
+    'brief'
+  )
   const lastMessage = chatMessages[chatMessages.length - 1]
   assert.equal(lastMessage?.role, 'user', '拼完的消息序列,最后一条是当前问题')
   // 注意力锚(答旧题修复·刀三):当前问题钉标牌,agent 链取问题时剥掉,提醒卡引用干净原文
-  assert.ok(lastMessage?.content.startsWith(CURRENT_QUESTION_PREFIX), '当前问题要带 <current_question> 标签')
-  assert.ok(lastMessage?.content.includes('<current_question>\n第7问\n</current_question>'), '标签里包的就是当前问题原文')
+  assert.ok(
+    lastMessage?.content.startsWith(CURRENT_QUESTION_PREFIX),
+    '当前问题要带 <current_question> 标签'
+  )
+  assert.ok(
+    lastMessage?.content.includes('<current_question>\n第7问\n</current_question>'),
+    '标签里包的就是当前问题原文'
+  )
   assert.ok(!lastMessage?.content.includes('第6问'), '当前问题不许和旧问题粘成一条')
-  assert.equal(stripCurrentQuestionAnchor(lastMessage?.content ?? ''), '第7问', '剥掉标签后问题原文干干净净')
-  assert.equal(stripCurrentQuestionAnchor('没标签的普通问题'), '没标签的普通问题', '没标签的文本原样返回')
+  assert.equal(
+    stripCurrentQuestionAnchor(lastMessage?.content ?? ''),
+    '第7问',
+    '剥掉标签后问题原文干干净净'
+  )
+  assert.equal(
+    stripCurrentQuestionAnchor('没标签的普通问题'),
+    '没标签的普通问题',
+    '没标签的文本原样返回'
+  )
   assert.ok(
     chatMessages.every((m, index) => index === 0 || m.role !== chatMessages[index - 1]?.role),
     '相邻同角色已合并,不许出现连续两条 user'
@@ -432,8 +575,16 @@ async function main(): Promise<void> {
   // 附件清洗:形状不对一律当没有;字段洗净;正文封顶
   assert.equal(sanitizeAttachment(null), null, '没附件就当没有')
   assert.equal(sanitizeAttachment('乱传的'), null, '附件不是对象就当没有')
-  assert.equal(sanitizeAttachment({ targetType: '炸弹', name: 'x', details: 'y' }), null, '对象类型不认识就当没有')
-  assert.equal(sanitizeAttachment({ targetType: 'file', name: '', details: 'y' }), null, '没名字的附件不收')
+  assert.equal(
+    sanitizeAttachment({ targetType: '炸弹', name: 'x', details: 'y' }),
+    null,
+    '对象类型不认识就当没有'
+  )
+  assert.equal(
+    sanitizeAttachment({ targetType: 'file', name: '', details: 'y' }),
+    null,
+    '没名字的附件不收'
+  )
   const attClean = sanitizeAttachment({
     targetType: 'folder',
     name: '  components  ',
@@ -459,14 +610,25 @@ async function main(): Promise<void> {
   const attText = buildAttachmentText(att)
   assert.ok(attText.includes('<context_attachment>'), '附件要带 context_attachment 标记')
   assert.ok(attText.includes('机器扫描资料'), '要声明这是机器扫描资料')
-  assert.ok(attText.includes('以这份资料为准'), '要声明涉及它时以资料为准(小葵报的案:模型看不见资料)')
+  assert.ok(
+    attText.includes('以这份资料为准'),
+    '要声明涉及它时以资料为准(小葵报的案:模型看不见资料)'
+  )
   assert.ok(attText.includes('不限制用户问题的范围'), '要声明不限制问题范围')
   assert.ok(attText.includes('对象类型:文件夹'), '对象类型要翻译成人话')
   assert.ok(attText.includes('名称:components'), '名称要进附件')
   assert.ok(attText.includes('相对路径:src/renderer/components'), '相对路径要进附件')
 
   // 消息组装:附件垫底(不进历史)、历史居中、问题收尾、相邻同角色合并
-  const freeMsgs = buildFreeChatMessages('小探针人设', att, [{ role: 'assistant', content: '先前的回答' }], '你是谁?', null, [], 'brief')
+  const freeMsgs = buildFreeChatMessages(
+    '小探针人设',
+    att,
+    [{ role: 'assistant', content: '先前的回答' }],
+    '你是谁?',
+    null,
+    [],
+    'brief'
+  )
   assert.deepEqual(
     freeMsgs.map((m) => m.role),
     ['system', 'user', 'assistant', 'user'],
@@ -477,28 +639,67 @@ async function main(): Promise<void> {
   // 资料提示贴着问题走(小葵报的案):附件隔着几轮历史小模型就忘了,问题尾要跟一句「当前参考资料是谁」
   assert.ok(freeMsgs[3]?.content.includes('当前参考资料:components'), '问题尾要带当前参考资料提示')
 
-  const bareMsgs = buildFreeChatMessages('小探针人设', null, [], '今天聊点轻松的', null, [], 'brief')
+  const bareMsgs = buildFreeChatMessages(
+    '小探针人设',
+    null,
+    [],
+    '今天聊点轻松的',
+    null,
+    [],
+    'brief'
+  )
   assert.equal(bareMsgs.length, 2, '没附件没历史 = 人设 + 问题两条')
-  assert.ok(!bareMsgs.some((m) => m.content.includes('<context_attachment>')), '没附件就不该有附件消息')
+  assert.ok(
+    !bareMsgs.some((m) => m.content.includes('<context_attachment>')),
+    '没附件就不该有附件消息'
+  )
   assert.ok(!bareMsgs.some((m) => m.content.includes('当前参考资料')), '没附件也不垫资料提示')
 
   // ── 引用代码清洗(第一百一十一锤):条数/字数都封顶,垃圾条目整条扔 ──
   assert.deepEqual(sanitizeCodeRefs(null), [], '不是数组就当没引用')
   assert.deepEqual(sanitizeCodeRefs([null, '乱传的', 7]), [], '垃圾条目整条扔')
-  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 1, endLine: 3 }]), [], '没有代码正文的不收')
-  assert.deepEqual(sanitizeCodeRefs([{ relPath: '', startLine: 1, endLine: 3, code: 'x' }]), [], '没有路径的不收')
-  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 5, endLine: 2, code: 'x' }]), [], '行号反了的不收')
-  assert.deepEqual(sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 0, endLine: 2, code: 'x' }]), [], '行号从 0 起的不收')
-  const refOne = sanitizeCodeRefs([{ relPath: '  src/a.ts  ', startLine: 10, endLine: 12, code: 'const a = 1' }])
+  assert.deepEqual(
+    sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 1, endLine: 3 }]),
+    [],
+    '没有代码正文的不收'
+  )
+  assert.deepEqual(
+    sanitizeCodeRefs([{ relPath: '', startLine: 1, endLine: 3, code: 'x' }]),
+    [],
+    '没有路径的不收'
+  )
+  assert.deepEqual(
+    sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 5, endLine: 2, code: 'x' }]),
+    [],
+    '行号反了的不收'
+  )
+  assert.deepEqual(
+    sanitizeCodeRefs([{ relPath: 'a.ts', startLine: 0, endLine: 2, code: 'x' }]),
+    [],
+    '行号从 0 起的不收'
+  )
+  const refOne = sanitizeCodeRefs([
+    { relPath: '  src/a.ts  ', startLine: 10, endLine: 12, code: 'const a = 1' }
+  ])
   assert.equal(refOne.length, 1, '合法引用应通过')
   assert.equal(refOne[0]?.relPath, 'src/a.ts', '路径要掐掉空白')
   assert.equal(refOne[0]?.startLine, 10, '行号照实')
   const refMany = sanitizeCodeRefs(
-    Array.from({ length: 20 }, (_, i) => ({ relPath: `f${i}.ts`, startLine: 1, endLine: 1, code: 'x' }))
+    Array.from({ length: 20 }, (_, i) => ({
+      relPath: `f${i}.ts`,
+      startLine: 1,
+      endLine: 1,
+      code: 'x'
+    }))
   )
   assert.equal(refMany.length, CODE_REFS_MAX, `条数封顶在 ${CODE_REFS_MAX} 段`)
-  const refLong = sanitizeCodeRefs([{ relPath: 'big.ts', startLine: 1, endLine: 1, code: 'y'.repeat(CODE_REF_CHARS_MAX + 500) }])
-  assert.ok((refLong[0]?.code.length ?? 0) <= CODE_REF_CHARS_MAX + 2, '单段超长要截断(留两个字的省略号)')
+  const refLong = sanitizeCodeRefs([
+    { relPath: 'big.ts', startLine: 1, endLine: 1, code: 'y'.repeat(CODE_REF_CHARS_MAX + 500) }
+  ])
+  assert.ok(
+    (refLong[0]?.code.length ?? 0) <= CODE_REF_CHARS_MAX + 2,
+    '单段超长要截断(留两个字的省略号)'
+  )
   assert.ok(refLong[0]?.code.endsWith('……'), '截断了要有省略号,不许装完整')
 
   // 引用的动态账(第一百二十六锤):额度跟锅走 —— 穷有保底,富有封顶,单段不抢全量
@@ -509,10 +710,16 @@ async function main(): Promise<void> {
   assert.equal(rich.totalChars, CODE_REFS_TOTAL_CHARS_CEILING, '锅再富,总量也有顶')
   assert.ok(rich.perRefChars > CODE_REF_CHARS_MAX, '锅大了单段跟着涨')
   const mid = codeRefsBudget({ contextTokens: 16384, otherTokens: 6000, replyTokens: 1024 })
-  assert.ok(mid.totalChars >= CODE_REFS_TOTAL_CHARS_MAX && mid.totalChars <= CODE_REFS_TOTAL_CHARS_CEILING, '总量夹在保底和顶之间')
+  assert.ok(
+    mid.totalChars >= CODE_REFS_TOTAL_CHARS_MAX && mid.totalChars <= CODE_REFS_TOTAL_CHARS_CEILING,
+    '总量夹在保底和顶之间'
+  )
   assert.equal(mid.perRefChars, Math.floor(mid.totalChars / 3), '单段 = 总量的三分之一')
   const tightRefs = sanitizeCodeRefs(
-    [{ relPath: 'a.ts', startLine: 1, endLine: 1, code: 'a'.repeat(3000) }, { relPath: 'b.ts', startLine: 1, endLine: 1, code: 'b'.repeat(3000) }],
+    [
+      { relPath: 'a.ts', startLine: 1, endLine: 1, code: 'a'.repeat(3000) },
+      { relPath: 'b.ts', startLine: 1, endLine: 1, code: 'b'.repeat(3000) }
+    ],
     { perRefChars: 2000, totalChars: 3000 }
   )
   assert.equal(tightRefs.length, 2, '总量紧也轮得到第二段')
@@ -529,7 +736,10 @@ async function main(): Promise<void> {
   // 带引用的消息组装:人设加「代码老师」一节 + 教学切片,引用块紧挨着问题(都在问题前面)
   const refMsgs = buildFreeChatMessages('小探针人设', null, [], '这段在干嘛', null, refOne, 'brief')
   assert.ok(refMsgs[0]?.content.includes(CODE_TEACHER_ADDENDUM), '带引用时人设要加代码老师那一节')
-  assert.ok(refMsgs[0]?.content.includes('名词小课堂'), '精简档教学切片要带名词小课堂(切片接管,不在代码老师里)')
+  assert.ok(
+    refMsgs[0]?.content.includes('名词小课堂'),
+    '精简档教学切片要带名词小课堂(切片接管,不在代码老师里)'
+  )
   assert.ok(refMsgs[0]?.content.includes('从这一段看不出来'), '看不出来的地方要明说,不许编上下文')
   assert.ok(!refMsgs[0]?.content.includes('const a = 1'), '引用原文是证据,不该混进人设')
   assert.ok(refMsgs[refMsgs.length - 1]?.content.includes('<code_refs>'), '引用块紧挨问题')
@@ -541,28 +751,85 @@ async function main(): Promise<void> {
   assert.ok(offMsgs[0]?.content.includes('不搞教学'), 'off 档要垫「不教学」切片')
   assert.ok(!offMsgs[0]?.content.includes('名词小课堂'), 'off 档不出术语表')
 
-  const mergedMsgs = buildFreeChatMessages('小探针人设', att, [], '这个文件夹是干嘛的?', null, [], 'brief')
+  const mergedMsgs = buildFreeChatMessages(
+    '小探针人设',
+    att,
+    [],
+    '这个文件夹是干嘛的?',
+    null,
+    [],
+    'brief'
+  )
   assert.equal(mergedMsgs.length, 2, '首问带附件时,附件和问题要合并成一条 user')
-  assert.ok(mergedMsgs[1]?.content.includes('components') && mergedMsgs[1]?.content.includes('这个文件夹是干嘛的'), '附件与首问合并,不出现连续两条 user')
+  assert.ok(
+    mergedMsgs[1]?.content.includes('components') &&
+      mergedMsgs[1]?.content.includes('这个文件夹是干嘛的'),
+    '附件与首问合并,不出现连续两条 user'
+  )
 
-  const webMsgs = buildFreeChatMessages('小探针人设', att, [], '联网搜搜它', { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' }, [], 'brief')
-  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('Aomei 是备份软件厂商'), '联网资料要附在问题里')
-  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('web_results'), '要指名联网资料住在 <web_results> 里')
-  assert.ok(webMsgs[webMsgs.length - 1]?.content.includes('对得上的信息讲出来'), '要要求模型讲出对得上的信息')
+  const webMsgs = buildFreeChatMessages(
+    '小探针人设',
+    att,
+    [],
+    '联网搜搜它',
+    { query: 'Aomei', material: '维基:Aomei 是备份软件厂商' },
+    [],
+    'brief'
+  )
+  assert.ok(
+    webMsgs[webMsgs.length - 1]?.content.includes('Aomei 是备份软件厂商'),
+    '联网资料要附在问题里'
+  )
+  assert.ok(
+    webMsgs[webMsgs.length - 1]?.content.includes('web_results'),
+    '要指名联网资料住在 <web_results> 里'
+  )
+  assert.ok(
+    webMsgs[webMsgs.length - 1]?.content.includes('对得上的信息讲出来'),
+    '要要求模型讲出对得上的信息'
+  )
 
   // 联网查询词:优先选中对象的名字;没对象就剥掉意图词,封顶 60 字
   assert.equal(pickWebLookupQuery('联网搜搜它', att), 'components', '有选中对象就查名字')
-  assert.equal(pickWebLookupQuery('联网搜一下这个软件', null), '这个软件', '没对象就剥掉意图词拿问题主体')
+  assert.equal(
+    pickWebLookupQuery('联网搜一下这个软件', null),
+    '这个软件',
+    '没对象就剥掉意图词拿问题主体'
+  )
   assert.ok(pickWebLookupQuery('帮我查查', null).length <= 60, '查询词封顶 60 字')
   assert.equal(pickWebLookupQuery('帮我查查', null), '', '剥完啥都不剩就给空串,别拿垃圾去查')
 
   // 联网状态账本:程序做了什么就是什么,六种状态各有归属
-  assert.equal(resolveWebLookupMeta(false, true, { kind: 'skipped' }).state, 'not_requested', '没点名 = not_requested')
-  assert.equal(resolveWebLookupMeta(true, false, { kind: 'skipped' }).state, 'disabled', '点名但开关没开 = disabled')
-  assert.equal(resolveWebLookupMeta(true, true, { kind: 'skipped' }).state, 'failed', '点名开着但没查成 = failed')
-  assert.equal(resolveWebLookupMeta(true, true, { kind: 'error' }).state, 'failed', '查询抛错 = failed')
-  assert.equal(resolveWebLookupMeta(true, true, { kind: 'attempted', material: '', sources: [] }).state, 'empty', '查完没料 = empty')
-  const doneMeta = resolveWebLookupMeta(true, true, { kind: 'attempted', material: '资料', sources: ['维基百科(英文)'] })
+  assert.equal(
+    resolveWebLookupMeta(false, true, { kind: 'skipped' }).state,
+    'not_requested',
+    '没点名 = not_requested'
+  )
+  assert.equal(
+    resolveWebLookupMeta(true, false, { kind: 'skipped' }).state,
+    'disabled',
+    '点名但开关没开 = disabled'
+  )
+  assert.equal(
+    resolveWebLookupMeta(true, true, { kind: 'skipped' }).state,
+    'failed',
+    '点名开着但没查成 = failed'
+  )
+  assert.equal(
+    resolveWebLookupMeta(true, true, { kind: 'error' }).state,
+    'failed',
+    '查询抛错 = failed'
+  )
+  assert.equal(
+    resolveWebLookupMeta(true, true, { kind: 'attempted', material: '', sources: [] }).state,
+    'empty',
+    '查完没料 = empty'
+  )
+  const doneMeta = resolveWebLookupMeta(true, true, {
+    kind: 'attempted',
+    material: '资料',
+    sources: ['维基百科(英文)']
+  })
   assert.equal(doneMeta.state, 'completed', '查到资料 = completed')
   assert.deepEqual(doneMeta.sources, ['维基百科(英文)'], '来源要记账')
 
@@ -570,7 +837,12 @@ async function main(): Promise<void> {
   assert.ok(WEB_SIGNAL_INSTRUCTION.includes('需要联网确认'), '信号词指令要包含标记原文')
   assert.ok(hasWebLookupSignal('回答正文。\n「需要联网确认」'), '带信号的回答要认出来')
   assert.ok(!hasWebLookupSignal('普通回答,没有信号'), '普通回答不误报')
-  const refine = buildRefineMessages('导游人设', '证据清单', '首答:可能是某个软件。', '维基资料:傲梅是备份软件厂商')
+  const refine = buildRefineMessages(
+    '导游人设',
+    '证据清单',
+    '首答:可能是某个软件。',
+    '维基资料:傲梅是备份软件厂商'
+  )
   assert.deepEqual(
     refine.map((m) => m.role),
     ['system', 'user', 'assistant', 'user'],
@@ -578,7 +850,11 @@ async function main(): Promise<void> {
   )
   assert.ok(refine[3]?.content.includes('傲梅是备份软件厂商'), '联网资料要进修正消息')
   assert.ok(refine[3]?.content.includes('别硬编'), '资料对不上时要提醒维持原话')
-  assert.equal(stripHtmlTags('<span class="x">傲梅</span> &amp; 备份  软件'), '傲梅 & 备份 软件', '维基摘要的 HTML 标记要剥干净')
+  assert.equal(
+    stripHtmlTags('<span class="x">傲梅</span> &amp; 备份  软件'),
+    '傲梅 & 备份 软件',
+    '维基摘要的 HTML 标记要剥干净'
+  )
   // 追问点名联网:意图词命中,开关关着/没命中就当普通问题
   assert.ok(hasSearchIntent('联网搜搜最新信息'), '「联网搜搜」要识别为搜索意图')
   assert.ok(hasSearchIntent('帮我查查这是什么软件'), '「查查」要识别为搜索意图')
@@ -592,7 +868,9 @@ async function main(): Promise<void> {
       if (url.includes('duckduckgo')) return '' // DDG 免注册页这回空手而归 → 落维基
       if (url.includes('zh.wikipedia')) throw new Error('被墙了') // 中文维基失败 → 换英文
       if (url.includes('en.wikipedia')) {
-        return JSON.stringify({ query: { search: [{ title: 'AOMEI', snippet: 'backup <b>software</b> vendor' }] } })
+        return JSON.stringify({
+          query: { search: [{ title: 'AOMEI', snippet: 'backup <b>software</b> vendor' }] }
+        })
       }
       return ''
     }
@@ -602,7 +880,11 @@ async function main(): Promise<void> {
     assert.ok(hit.material.includes('backup software vendor'), '摘要的 HTML 要剥干净')
     const again = await webLookupDetailed('Aomei 来源记账', { fetchText: flakyFetch })
     assert.equal(again.material, hit.material, '同名第二次走缓存')
-    assert.equal(calls, 4, '缓存生效:DDG 空手 1 次 + 中文失败 1 次 + 英文成功 1 次 + 抓第一条正文 1 次,不再多发')
+    assert.equal(
+      calls,
+      4,
+      '缓存生效:DDG 空手 1 次 + 中文失败 1 次 + 英文成功 1 次 + 抓第一条正文 1 次,不再多发'
+    )
     const dead = await webLookupDetailed('查无此物xyz', {
       fetchText: async () => {
         throw new Error('全网断')
@@ -610,7 +892,11 @@ async function main(): Promise<void> {
     })
     assert.equal(dead.material, '', '全部源失败 = 空资料')
     assert.deepEqual(dead.sources, [], '全部源失败 = 空来源')
-    assert.equal((await webLookupDetailed('   ', { fetchText: flakyFetch })).material, '', '空查询不劳烦网络')
+    assert.equal(
+      (await webLookupDetailed('   ', { fetchText: flakyFetch })).material,
+      '',
+      '空查询不劳烦网络'
+    )
   }
 
   // ── 3.8 Tavily 打头(2026-09-17 小葵定序):填了 Key 走官方 API,免费源一次都不跑 ──
@@ -623,9 +909,15 @@ async function main(): Promise<void> {
       },
       postJson: async (url, body, headers) => {
         assert.equal(url, 'https://api.tavily.com/search', 'Tavily 走官方入口')
-        assert.equal(headers.Authorization, 'Bearer tvly-test-key', 'Key 走认证头,不进 URL 免得进日志')
+        assert.equal(
+          headers.Authorization,
+          'Bearer tvly-test-key',
+          'Key 走认证头,不进 URL 免得进日志'
+        )
         assert.equal((body as { query: string }).query, '傲梅官网 联网锤', '搜索词原样进 body')
-        return JSON.stringify({ results: [{ title: '傲梅', url: 'https://www.aomei.com', content: '备份软件厂商' }] })
+        return JSON.stringify({
+          results: [{ title: '傲梅', url: 'https://www.aomei.com', content: '备份软件厂商' }]
+        })
       },
       tavilyKey: 'tvly-test-key'
     })
@@ -641,7 +933,11 @@ async function main(): Promise<void> {
     assert.equal(sanitizeTavilyKey('"tvly-abc123def"'), 'tvly-abc123def', '两头双引号剥掉')
     assert.equal(sanitizeTavilyKey('Bearer tvly-abc123def'), 'tvly-abc123def', 'Bearer 前缀剥掉')
     assert.equal(sanitizeTavilyKey('bearer tvly-abc123def'), 'tvly-abc123def', '前缀大小写不敏感')
-    assert.equal(sanitizeTavilyKey('tvly-abc\n123 def'), 'tvly-abc123def', '中间夹的换行/空格一并剥掉')
+    assert.equal(
+      sanitizeTavilyKey('tvly-abc\n123 def'),
+      'tvly-abc123def',
+      '中间夹的换行/空格一并剥掉'
+    )
     assert.equal(sanitizeTavilyKey('   '), undefined, '洗完是空 = 没填,存档里不出现这个字段')
     assert.equal(sanitizeTavilyKey(42), undefined, '不是字符串 = 没填')
 
@@ -674,11 +970,23 @@ async function main(): Promise<void> {
       { plan: 'Free', used: 7, limit: null, remaining: null },
       '计划级没给已用就退 Key 级;限额缺 = 无固定上限'
     )
-    assert.equal(parseTavilyUsage('{"account":{"current_plan":"X"}}'), null, '连一个已用次数都没有 = 形状不像,不硬编')
+    assert.equal(
+      parseTavilyUsage('{"account":{"current_plan":"X"}}'),
+      null,
+      '连一个已用次数都没有 = 形状不像,不硬编'
+    )
     assert.equal(parseTavilyUsage('<html>请先登录</html>'), null, '劫持门户页不认')
     assert.equal(parseTavilyUsage('{烂的'), null, '坏 JSON 不认')
-    assert.equal(tavilyUsageText({ plan: 'Researcher', used: 3, limit: 1000, remaining: 997 }), 'Researcher计划 · 本月已用 3 / 1000 次,还剩 997 次', '用量一行大白话')
-    assert.equal(tavilyUsageText({ plan: 'Free', used: 7, limit: null, remaining: null }), 'Free计划 · 本月已用 7 次(没有固定上限)', '无固定上限的口风')
+    assert.equal(
+      tavilyUsageText({ plan: 'Researcher', used: 3, limit: 1000, remaining: 997 }),
+      'Researcher计划 · 本月已用 3 / 1000 次,还剩 997 次',
+      '用量一行大白话'
+    )
+    assert.equal(
+      tavilyUsageText({ plan: 'Free', used: 7, limit: null, remaining: null }),
+      'Free计划 · 本月已用 7 次(没有固定上限)',
+      '无固定上限的口风'
+    )
 
     // 测一下(2026-09-17 改打 /usage):零搜索额度成本,200 本身证明 Key 有效,附带用量
     let probeUrl = ''
@@ -692,7 +1000,11 @@ async function main(): Promise<void> {
     assert.equal(probeAuth, 'Bearer tvly-abc123def', 'Key 走认证头,不进 URL')
     assert.deepEqual(
       ok,
-      { verdict: 'ok', status: 200, usage: { plan: 'Researcher', used: 3, limit: 1000, remaining: 997 } },
+      {
+        verdict: 'ok',
+        status: 200,
+        usage: { plan: 'Researcher', used: 3, limit: 1000, remaining: 997 }
+      },
       '通了 = 能用,还带回用量细账'
     )
 
@@ -717,7 +1029,11 @@ async function main(): Promise<void> {
     assert.equal(offline.verdict, 'unreachable', '连不上说连不上,不冤枉 Key')
 
     const hijacked = await probeTavilyKey('tvly-abc123def', async () => '<html>请先登录</html>')
-    assert.deepEqual(hijacked, { verdict: 'other', status: 200 }, '200 但正文不像 Tavily:说「看不懂」,不吹「能用」')
+    assert.deepEqual(
+      hijacked,
+      { verdict: 'other', status: 200 },
+      '200 但正文不像 Tavily:说「看不懂」,不吹「能用」'
+    )
   }
 
   // ── 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) ──
@@ -747,8 +1063,16 @@ async function main(): Promise<void> {
 
   const zip = Buffer.alloc(4)
   zip.set([0x50, 0x4b, 0x03, 0x04], 0)
-  assert.equal(sniffBinaryKind(zip, 'report.docx')?.type, 'Word 文档(Office 打包格式)', 'ZIP 容器按后缀细分出 docx')
-  assert.equal(sniffBinaryKind(zip, 'bundle.jar')?.type, 'Java 归档包(JAR)', 'ZIP 容器按后缀细分出 jar')
+  assert.equal(
+    sniffBinaryKind(zip, 'report.docx')?.type,
+    'Word 文档(Office 打包格式)',
+    'ZIP 容器按后缀细分出 docx'
+  )
+  assert.equal(
+    sniffBinaryKind(zip, 'bundle.jar')?.type,
+    'Java 归档包(JAR)',
+    'ZIP 容器按后缀细分出 jar'
+  )
   assert.equal(sniffBinaryKind(zip, 'pack.zip')?.type, 'ZIP 压缩包', '细分不出的就叫压缩包')
 
   const mp4 = Buffer.alloc(12)
@@ -761,13 +1085,26 @@ async function main(): Promise<void> {
 
   const mz = Buffer.alloc(2)
   mz.set([0x4d, 0x5a], 0)
-  assert.equal(sniffBinaryKind(mz, 'tool.exe')?.type, 'Windows 可执行文件或库(EXE/DLL)', 'MZ 头应认出')
+  assert.equal(
+    sniffBinaryKind(mz, 'tool.exe')?.type,
+    'Windows 可执行文件或库(EXE/DLL)',
+    'MZ 头应认出'
+  )
 
-  assert.equal(sniffBinaryKind(Buffer.from([1, 2, 3, 4]), 'x.dat'), null, '认不出就返回 null,不许瞎认')
+  assert.equal(
+    sniffBinaryKind(Buffer.from([1, 2, 3, 4]), 'x.dat'),
+    null,
+    '认不出就返回 null,不许瞎认'
+  )
   assert.equal(sniffBinaryKind(Buffer.alloc(2), 'short.bin'), null, '头太短认不了')
 
   // 二进制提示词:类型/尺寸/大小进证据,开头要声明"没看到内容"
-  const bp = buildBinaryPrompt({ relPath: 'assets/hero.png', name: 'hero.png', typeInfo: 'PNG 图片,尺寸 1920×1080', sizeText: '2.3 MB' })
+  const bp = buildBinaryPrompt({
+    relPath: 'assets/hero.png',
+    name: 'hero.png',
+    typeInfo: 'PNG 图片,尺寸 1920×1080',
+    sizeText: '2.3 MB'
+  })
   assert.ok(bp.includes('PNG 图片,尺寸 1920×1080'), '类型和尺寸要进证据')
   assert.ok(bp.includes('2.3 MB'), '大小要进证据')
   assert.ok(bp.includes('assets/hero.png'), '路径要进证据')
@@ -785,14 +1122,26 @@ async function main(): Promise<void> {
   jpg.writeUInt16BE(17, 22) // 段长
   jpg.writeUInt16BE(1080, 25) // 高(SOF0 段:FF C0 @20-21、段长 @22-23、精度 @24、高 @25-26、宽 @27-28)
   jpg.writeUInt16BE(1920, 27) // 宽
-  assert.equal(sniffBinaryKind(jpg, 'photo.jpg')?.dims, '1920×1080', 'JPEG 顺着标记链走到 SOF0 读出尺寸(宽×高,与 PNG/GIF 同一约定)')
+  assert.equal(
+    sniffBinaryKind(jpg, 'photo.jpg')?.dims,
+    '1920×1080',
+    'JPEG 顺着标记链走到 SOF0 读出尺寸(宽×高,与 PNG/GIF 同一约定)'
+  )
 
   // ── 5. 配置读写往返(新双 Provider 格式)+ 老格式自动搬家 ──
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
   try {
     const fallback = defaultAiConfig()
-    assert.equal(fallback.provider, 'builtin', '默认 Provider 应为内置(2026-09-18 小葵定:新用户开箱即内置)')
-    assert.equal(fallback.lmstudio.baseUrl, 'http://127.0.0.1:1234/v1', '默认地址应为 LM Studio 本地服务')
+    assert.equal(
+      fallback.provider,
+      'builtin',
+      '默认 Provider 应为内置(2026-09-18 小葵定:新用户开箱即内置)'
+    )
+    assert.equal(
+      fallback.lmstudio.baseUrl,
+      'http://127.0.0.1:1234/v1',
+      '默认地址应为 LM Studio 本地服务'
+    )
     assert.equal(fallback.builtin.serverPath, '', '内置 Provider 默认未配置')
 
     const saved = await saveAiConfig(dir, {
@@ -805,7 +1154,11 @@ async function main(): Promise<void> {
     })
     assert.equal(saved.provider, 'builtin', 'Provider 应保存')
     assert.equal(saved.lmstudio.baseUrl, 'http://127.0.0.1:1234/v1', 'baseUrl 应去掉首尾空格')
-    assert.equal(saved.builtin.serverPath, 'D:\\tools\\llama-server.exe', 'serverPath 应去掉首尾空格')
+    assert.equal(
+      saved.builtin.serverPath,
+      'D:\\tools\\llama-server.exe',
+      'serverPath 应去掉首尾空格'
+    )
     assert.equal(saved.webLookup, true, '联网查证开关应保存')
     assert.equal(saved.tavilyKey, 'tvly-abc123def', 'Tavily Key 落盘前洗掉引号和两边空白')
     const loaded = await loadAiConfig(dir)
@@ -833,7 +1186,11 @@ async function main(): Promise<void> {
     // 老版本配置是扁平的 {baseUrl, model, apiKey}:load 时要自动搬进 lmstudio 分支
     await writeFile(
       aiConfigPath(dir),
-      JSON.stringify({ baseUrl: 'http://127.0.0.1:1234/v1', model: '老配置模型', apiKey: 'sk-old' }),
+      JSON.stringify({
+        baseUrl: 'http://127.0.0.1:1234/v1',
+        model: '老配置模型',
+        apiKey: 'sk-old'
+      }),
       'utf8'
     )
     const migrated = await loadAiConfig(dir)
@@ -852,7 +1209,11 @@ async function main(): Promise<void> {
       }),
       'utf8'
     )
-    assert.equal((await loadAiConfig(dir)).tavilyKey, 'tvly-abc123def', '读档也洗一遍:老档里的脏 Key 出来是干净的')
+    assert.equal(
+      (await loadAiConfig(dir)).tavilyKey,
+      'tvly-abc123def',
+      '读档也洗一遍:老档里的脏 Key 出来是干净的'
+    )
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -860,7 +1221,11 @@ async function main(): Promise<void> {
   // ── 6. resolveAiTarget:两个 Provider 收敛成同一个 ChatTarget ──
   const lmOk = resolveAiTarget(lmConfig('gpt-本地'))
   assert.ok(lmOk.ok, 'LM Studio 配好模型应解析成功')
-  assert.equal(lmOk.ok && lmOk.target.baseUrl, 'http://127.0.0.1:1234/v1', '目标地址来自 lmstudio 设置')
+  assert.equal(
+    lmOk.ok && lmOk.target.baseUrl,
+    'http://127.0.0.1:1234/v1',
+    '目标地址来自 lmstudio 设置'
+  )
   assert.equal(lmOk.ok && lmOk.target.model, 'gpt-本地', '目标模型名来自 lmstudio 设置')
   assert.equal(lmOk.ok && lmOk.target.engine, 'lmstudio', '外接目标盖章 lmstudio(报错话术按它分家)')
 
@@ -872,9 +1237,16 @@ async function main(): Promise<void> {
   assert.ok(!biMissing.ok, '内置 Provider 没选模型应解析失败')
   assert.ok(!biMissing.ok && biMissing.message.includes('还没选模型'), '失败要指向选模型这个动作')
 
-  const biOk = resolveAiTarget({ ...lmConfig(''), provider: 'builtin' }, { baseUrl: 'http://127.0.0.1:8766/v1', model: 'qwen-7b' })
+  const biOk = resolveAiTarget(
+    { ...lmConfig(''), provider: 'builtin' },
+    { baseUrl: 'http://127.0.0.1:8766/v1', model: 'qwen-7b' }
+  )
   assert.ok(biOk.ok, '内置 Provider 有运行时应解析成功')
-  assert.equal(biOk.ok && biOk.target.baseUrl, 'http://127.0.0.1:8766/v1', '目标地址来自子进程运行时')
+  assert.equal(
+    biOk.ok && biOk.target.baseUrl,
+    'http://127.0.0.1:8766/v1',
+    '目标地址来自子进程运行时'
+  )
   assert.equal(biOk.ok && biOk.target.model, 'qwen-7b', '目标模型名来自子进程报告')
   assert.equal(biOk.ok && biOk.target.engine, 'builtin', '内置目标盖章 builtin(报错话术按它分家)')
 
@@ -883,7 +1255,11 @@ async function main(): Promise<void> {
   try {
     const exePath = join(exeDir, 'llama-server.exe')
     await writeFile(exePath, 'fake engine')
-    assert.equal(resolveServerProgram(`  ${exePath}  `), exePath.trim(), '手动填的路径应去掉空格原样使用')
+    assert.equal(
+      resolveServerProgram(`  ${exePath}  `),
+      exePath.trim(),
+      '手动填的路径应去掉空格原样使用'
+    )
 
     let threw = ''
     try {
@@ -910,15 +1286,27 @@ async function main(): Promise<void> {
     '  TCP    127.0.0.1:18766        0.0.0.0:0              LISTENING       99',
     '  TCP    127.0.0.1:8765         1.2.3.4:5555           ESTABLISHED     42'
   ].join('\n')
-  assert.deepEqual(parseListenerPids(netstatSample, 8766), [1234, 5678], '应找出监听 8766 的 PID(18766/8765/非监听都不算)')
-  assert.deepEqual(parseListenerPids('  TCP    0.0.0.0:8766    0.0.0.0:0    LISTENING    not-a-pid', 8766), [], 'PID 不是数字就不收')
+  assert.deepEqual(
+    parseListenerPids(netstatSample, 8766),
+    [1234, 5678],
+    '应找出监听 8766 的 PID(18766/8765/非监听都不算)'
+  )
+  assert.deepEqual(
+    parseListenerPids('  TCP    0.0.0.0:8766    0.0.0.0:0    LISTENING    not-a-pid', 8766),
+    [],
+    'PID 不是数字就不收'
+  )
   assert.deepEqual(parseListenerPids('', 8766), [], '空输出给空清单')
   assert.equal(
     parseTasklistImage('"llama-server.exe","1234","Console","1","123,456 K"'),
     'llama-server.exe',
     'tasklist CSV 应抠出映像名'
   )
-  assert.equal(parseTasklistImage('INFO: 没有运行的任务匹配指定的标准。'), '', '查无此进程应得空串,绝不凭空杀人')
+  assert.equal(
+    parseTasklistImage('INFO: 没有运行的任务匹配指定的标准。'),
+    '',
+    '查无此进程应得空串,绝不凭空杀人'
+  )
 
   // ── 6.7 引擎 PID 档认读(收尸盲区修复):只认正整数 pid,变形/垃圾回 null ──
   assert.equal(parseEnginePidFile({ pid: 1234 }), 1234, '干净档原样认回')
@@ -932,7 +1320,10 @@ async function main(): Promise<void> {
   assert.equal(parseEnginePidFile([{ pid: 7 }]), null, '数组不收')
 
   assert.deepEqual(
-    await inspectBuiltinConflict({ listeners: async () => [123], image: async () => 'llama-server.exe' }),
+    await inspectBuiltinConflict({
+      listeners: async () => [123],
+      image: async () => 'llama-server.exe'
+    }),
     { killed: false, blockedBy: 'llama-server.exe' },
     '撞上同名引擎也只报告,绝不击杀'
   )
@@ -976,7 +1367,11 @@ async function main(): Promise<void> {
     const three = [gated(), gated(), gated()]
     assert.equal(spawns, 1, '三路并发只跑一次任务,后到的等同一份')
     releaseGate('引擎就绪')
-    assert.deepEqual(await Promise.all(three), ['引擎就绪', '引擎就绪', '引擎就绪'], '三路拿到同一个结果')
+    assert.deepEqual(
+      await Promise.all(three),
+      ['引擎就绪', '引擎就绪', '引擎就绪'],
+      '三路拿到同一个结果'
+    )
     // 任务收场闸门放行:下一轮是新任务(对应「启动失败后能重试」)
     const second = gated()
     assert.equal(spawns, 2, '上一场收工后,新调用重新开跑')
@@ -1009,7 +1404,11 @@ async function main(): Promise<void> {
         return
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ choices: [{ message: { content: '这个文件是应用的入口,负责启动主界面。' } }] }))
+      res.end(
+        JSON.stringify({
+          choices: [{ message: { content: '这个文件是应用的入口,负责启动主界面。' } }]
+        })
+      )
     })
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -1026,7 +1425,11 @@ async function main(): Promise<void> {
     assert.equal(result.model, 'fake-model', '回显所用模型')
 
     // 请求体断言:模型名与消息结构要对,且非流式请求不带 stream:true
-    const sent = JSON.parse(receivedBodies[0] ?? '') as { model: string; messages: Array<{ role: string; content: string }>; stream?: boolean }
+    const sent = JSON.parse(receivedBodies[0] ?? '') as {
+      model: string
+      messages: Array<{ role: string; content: string }>
+      stream?: boolean
+    }
     assert.equal(sent.model, 'fake-model', '发出去的模型名应是配置里的')
     assert.equal(sent.messages.length, 2, '应有两段消息(system + user)')
     assert.equal(sent.messages[0]?.role, 'system', '第一段是系统人设')
@@ -1040,7 +1443,10 @@ async function main(): Promise<void> {
     assert.equal(streamRes.text, pieces.join(''), '流式增量拼起来应等于最终全文')
     assert.ok(streamRes.text.includes('入口'), '流式内容应是模型回复')
     assert.ok(pieces.length >= 2, '增量应分多段到达(边生成边显示)')
-    assert.ok(receivedBodies[receivedBodies.length - 1]?.includes('"stream":true'), '传了 onDelta 就应请求流式')
+    assert.ok(
+      receivedBodies[receivedBodies.length - 1]?.includes('"stream":true'),
+      '传了 onDelta 就应请求流式'
+    )
 
     // 猜猜官人设:同一管道,换系统提示词后发出去的人设要跟着换
     const guessRes = await explainWithModel(target, gp, GUESS_SYSTEM_PROMPT)
@@ -1052,7 +1458,13 @@ async function main(): Promise<void> {
     // 自由对话流:附件垫底(不进历史)、人设和资料原样发出去,角色和顺序不变形
     const freeMessages = buildFreeChatMessages(
       buildChatSystem({ agent: false }),
-      { targetType: 'folder', name: 'Aomei', relPath: 'D:/Aomei', summary: '软件残留', details: '文件:卸载说明.txt' },
+      {
+        targetType: 'folder',
+        name: 'Aomei',
+        relPath: 'D:/Aomei',
+        summary: '软件残留',
+        details: '文件:卸载说明.txt'
+      },
       [{ role: 'assistant', content: '这是备份软件的残留' }],
       '你是谁？',
       null,
@@ -1066,8 +1478,14 @@ async function main(): Promise<void> {
     }
     assert.equal(freeBody.messages.length, 4, '自由对话消息 = 人设 + 附件 + 历史 + 当前问题')
     assert.ok(freeBody.messages[0]?.content.includes('小探针'), '小探针内核要发到服务')
-    assert.ok(freeBody.messages[1]?.content.includes('<context_attachment>'), '资料附件按用户消息垫底')
-    assert.ok(freeBody.messages[1]?.content.includes('以这份资料为准'), '附件要声明涉及它时以资料为准')
+    assert.ok(
+      freeBody.messages[1]?.content.includes('<context_attachment>'),
+      '资料附件按用户消息垫底'
+    )
+    assert.ok(
+      freeBody.messages[1]?.content.includes('以这份资料为准'),
+      '附件要声明涉及它时以资料为准'
+    )
     assert.equal(freeBody.messages[2]?.role, 'assistant', '历史里的回答要按 assistant 摆')
     assert.ok(freeBody.messages[3]?.content.includes('你是谁'), '当前问题收尾')
   } finally {
@@ -1101,7 +1519,11 @@ async function main(): Promise<void> {
         return
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ choices: [{ message: { content: '等于 2', reasoning_content: '用户问的是加法,1+1=2' } }] }))
+      res.end(
+        JSON.stringify({
+          choices: [{ message: { content: '等于 2', reasoning_content: '用户问的是加法,1+1=2' } }]
+        })
+      )
     })
   })
   const thinkBodies: string[] = []
@@ -1109,7 +1531,11 @@ async function main(): Promise<void> {
   const thinkAddr = thinkServer.address()
   assert.ok(thinkAddr && typeof thinkAddr === 'object', '思考假服务应监听在端口上')
   // timings: true 模拟内置引擎:只有内置引擎吃 enable_thinking 开关
-  const builtinTarget = { baseUrl: `http://127.0.0.1:${thinkAddr.port}/v1`, model: 'think-model', timings: true } as const
+  const builtinTarget = {
+    baseUrl: `http://127.0.0.1:${thinkAddr.port}/v1`,
+    model: 'think-model',
+    timings: true
+  } as const
   try {
     // 开思考:不发 enable_thinking:false;思考帧和正文帧分开到账
     const pieces: string[] = []
@@ -1130,7 +1556,9 @@ async function main(): Promise<void> {
     assert.equal(thinkRes.reasoning, '用户问的是加法,1+1=2', '思考区单独收账')
     assert.equal(pieces.join(''), '等于 2', '增量正文不含思考')
     assert.equal(thoughts.join(''), '用户问的是加法,1+1=2', '增量思考单独推送')
-    const onBody = JSON.parse(thinkBodies[0] ?? '') as { chat_template_kwargs?: { enable_thinking?: boolean } }
+    const onBody = JSON.parse(thinkBodies[0] ?? '') as {
+      chat_template_kwargs?: { enable_thinking?: boolean }
+    }
     assert.equal(onBody.chat_template_kwargs, undefined, '开思考就不发关思考的旗子')
 
     // 默认(一句话解释的路):内置引擎要带上 enable_thinking:false,别让思考白烧字数;
@@ -1139,13 +1567,23 @@ async function main(): Promise<void> {
     assert.equal(offRes.status, 'supported', '关思考的请求也应成功')
     assert.equal(offRes.text, '等于 2', '非流式正文照常解析')
     assert.equal(offRes.reasoning, '用户问的是加法,1+1=2', '非流式的思考区单独收账')
-    const offBody = JSON.parse(thinkBodies[thinkBodies.length - 1] ?? '') as { chat_template_kwargs?: { enable_thinking?: boolean } }
-    assert.equal(offBody.chat_template_kwargs?.enable_thinking, false, '默认要发关思考的旗子(内置引擎)')
+    const offBody = JSON.parse(thinkBodies[thinkBodies.length - 1] ?? '') as {
+      chat_template_kwargs?: { enable_thinking?: boolean }
+    }
+    assert.equal(
+      offBody.chat_template_kwargs?.enable_thinking,
+      false,
+      '默认要发关思考的旗子(内置引擎)'
+    )
 
     // 只想了没写出来:思考照实交出去,不该报「一个字都没回」
     const onlyThinkServer = createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ choices: [{ message: { content: '', reasoning_content: '想了很久,字数用尽了' } }] }))
+      res.end(
+        JSON.stringify({
+          choices: [{ message: { content: '', reasoning_content: '想了很久,字数用尽了' } }]
+        })
+      )
     })
     await new Promise<void>((resolve) => onlyThinkServer.listen(0, '127.0.0.1', resolve))
     try {
@@ -1168,7 +1606,10 @@ async function main(): Promise<void> {
   // ── 8. 服务连不上:应返回 error 状态而不是抛异常 ──
   const down = await explainWithModel({ baseUrl: 'http://127.0.0.1:1/v1', model: 'x' }, prompt)
   assert.equal(down.status, 'error', '连不上服务时状态应为 error')
-  assert.ok(down.text.includes('连接断了') || down.text.includes('连不上'), '错误信息要提示检查模型服务')
+  assert.ok(
+    down.text.includes('连接断了') || down.text.includes('连不上'),
+    '错误信息要提示检查模型服务'
+  )
 
   // ── 9. 功能定位(第六十七锤):地图摊开 / 回复解析 / 防编造过滤 ──
   assert.ok(LOCATE_SYSTEM_PROMPT.includes('不许编造'), '带路人人设要有防编造铁律')
@@ -1203,18 +1644,34 @@ async function main(): Promise<void> {
           }
         ]
       },
-      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+      {
+        type: 'file',
+        name: 'README.md',
+        relPath: 'README.md',
+        ext: '.md',
+        summary: { emoji: '📖', text: '说明书' }
+      }
     ]
   }
 
   // 地图摊开:每行带完整 relPath + 类型标注 + 一句话;广度优先(浅层先画)
   const digest = buildTreeDigest(locateTree)
   assert.ok(digest.includes('(项目根) [目录]'), '根节点要标成项目根')
-  assert.ok(digest.includes('src/main.tsx [文件·TypeScript React] —— 程序的大门'), '文件行要带路径/语言/一句话')
-  assert.ok(digest.indexOf('README.md') < digest.indexOf('src/main.tsx'), '广度优先:浅层要排在深层前面')
+  assert.ok(
+    digest.includes('src/main.tsx [文件·TypeScript React] —— 程序的大门'),
+    '文件行要带路径/语言/一句话'
+  )
+  assert.ok(
+    digest.indexOf('README.md') < digest.indexOf('src/main.tsx'),
+    '广度优先:浅层要排在深层前面'
+  )
   // 预算截断:预算用尽要如实注明地图不全,不许装作画全了
   const capped = buildTreeDigest(locateTree, 3)
-  assert.equal(capped.split('\n').filter((l) => !l.startsWith('地图没画全')).length, 3, '超预算要截断到预算行数')
+  assert.equal(
+    capped.split('\n').filter((l) => !l.startsWith('地图没画全')).length,
+    3,
+    '超预算要截断到预算行数'
+  )
   assert.ok(capped.includes('地图没画全'), '截断要注明')
   assert.ok(LOCATE_NODE_BUDGET >= 100, '预算要有基本容量,别小气到地图没法用')
 
@@ -1237,11 +1694,20 @@ async function main(): Promise<void> {
           summary: { emoji: '📄', text: `第 ${i} 号源代码文件,负责一块功能` }
         }))
       },
-      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md', summary: { emoji: '📖', text: '说明书' } }
+      {
+        type: 'file',
+        name: 'README.md',
+        relPath: 'README.md',
+        ext: '.md',
+        summary: { emoji: '📖', text: '说明书' }
+      }
     ]
   }
   const bigDigest = buildTreeDigest(bigTree)
-  assert.ok(estimateTokens(bigDigest) <= LOCATE_TOKEN_BUDGET + 80, '地图加备注不许超 token 预算(小模型 4k 也装得下)')
+  assert.ok(
+    estimateTokens(bigDigest) <= LOCATE_TOKEN_BUDGET + 80,
+    '地图加备注不许超 token 预算(小模型 4k 也装得下)'
+  )
   assert.ok(bigDigest.includes('地图没画全'), '被掐掉的部分要如实注明')
   assert.equal(estimateTokens('配置写在哪个文件'), 8, 'CJK 一字记 1 token')
 
@@ -1251,21 +1717,31 @@ async function main(): Promise<void> {
   assert.ok(locatePrompt.includes('逐字照抄'), '要硬要求模型照抄路径')
 
   // 回复解析:裸 JSON / 围栏包裹 / 前后夹话都能读;反斜杠统一成正斜杠;垃圾回空
-  const parsed = parseLocateReply('{"hits":[{"relPath":"src\\\\main.tsx","reason":"大门在这","confidence":88}]}')
+  const parsed = parseLocateReply(
+    '{"hits":[{"relPath":"src\\\\main.tsx","reason":"大门在这","confidence":88}]}'
+  )
   assert.equal(parsed.length, 1, '裸 JSON 要能解析')
   assert.equal(parsed[0]?.relPath, 'src/main.tsx', '反斜杠要统一成正斜杠')
   assert.equal(parsed[0]?.reason, '大门在这')
   assert.equal(parsed[0]?.confidence, 88)
-  const fenced = parseLocateReply('好的,指路如下:\n```json\n{"hits":[{"relPath":"src/config.ts","reason":"配置","confidence":150}]}\n```\n请查收')
+  const fenced = parseLocateReply(
+    '好的,指路如下:\n```json\n{"hits":[{"relPath":"src/config.ts","reason":"配置","confidence":150}]}\n```\n请查收'
+  )
   assert.equal(fenced[0]?.relPath, 'src/config.ts', '围栏包裹要能剥掉')
   assert.equal(fenced[0]?.confidence, 100, 'confidence 要夹在 0~100')
   const noReason = parseLocateReply('{"hits":[{"relPath":"README.md"}]}')
   assert.ok(noReason[0]?.reason.length, '没给理由要兜底一句,不许空着')
   assert.equal(parseLocateReply('我觉得是 main.tsx,不解释').length, 0, '没 JSON 要回空')
   assert.equal(parseLocateReply('{"hits":"不是数组"}').length, 0, 'hits 不是数组要回空')
-  assert.equal(parseLocateReply('{"hits":[{"reason":"没路径"}]}').length, 0, '没 relPath 的命中要扔')
+  assert.equal(
+    parseLocateReply('{"hits":[{"reason":"没路径"}]}').length,
+    0,
+    '没 relPath 的命中要扔'
+  )
   const seven = parseLocateReply(
-    JSON.stringify({ hits: Array.from({ length: 7 }, (_, i) => ({ relPath: `f${i}.ts`, reason: 'x' })) })
+    JSON.stringify({
+      hits: Array.from({ length: 7 }, (_, i) => ({ relPath: `f${i}.ts`, reason: 'x' }))
+    })
   )
   assert.equal(seven.length, 5, '命中最多 5 个,防话痨')
 
@@ -1292,18 +1768,45 @@ async function main(): Promise<void> {
     ]
   })
   assert.equal(parseLmStudioContext(lmPayload, 'qwen-4b'), 4096, 'LM Studio:已加载的上下文优先')
-  assert.equal(parseLmStudioContext(lmPayload, 'other-model'), 8192, 'LM Studio:没加载的报标称上下文')
+  assert.equal(
+    parseLmStudioContext(lmPayload, 'other-model'),
+    8192,
+    'LM Studio:没加载的报标称上下文'
+  )
   assert.equal(parseLmStudioContext(lmPayload, '不存在'), null, '模型对不上回 null')
   assert.equal(parseLmStudioContext('不是 JSON', 'qwen-4b'), null, '垃圾回复回 null')
-  assert.equal(parseLmStudioContext(JSON.stringify({ data: [{ id: 'm', max_context_length: 128 }] }), 'm'), null, '过小的上下文不可信')
+  assert.equal(
+    parseLmStudioContext(JSON.stringify({ data: [{ id: 'm', max_context_length: 128 }] }), 'm'),
+    null,
+    '过小的上下文不可信'
+  )
 
-  const llamaPayload = JSON.stringify({ default_generation_settings: { n_ctx: 4096 }, total_slots: 1 })
-  assert.equal(parseLlamaProps(llamaPayload), 4096, 'llama-server:读 default_generation_settings.n_ctx')
-  assert.equal(parseLlamaProps(JSON.stringify({ n_ctx: 8192 })), 8192, 'llama-server:顶层 n_ctx 也认')
+  const llamaPayload = JSON.stringify({
+    default_generation_settings: { n_ctx: 4096 },
+    total_slots: 1
+  })
+  assert.equal(
+    parseLlamaProps(llamaPayload),
+    4096,
+    'llama-server:读 default_generation_settings.n_ctx'
+  )
+  assert.equal(
+    parseLlamaProps(JSON.stringify({ n_ctx: 8192 })),
+    8192,
+    'llama-server:顶层 n_ctx 也认'
+  )
   assert.equal(parseLlamaProps('html 页面'), null, 'llama-server:垃圾回复回 null')
 
-  assert.ok(isContextOverflow('模型服务返回错误(400):{"error":{"message":"request (4297 tokens) exceeds the available context size (4096 tokens)"}}'), '小葵的 400 要认得出')
-  assert.ok(isContextOverflow('the request exceeds the available context size'), 'llama 措辞要认得出')
+  assert.ok(
+    isContextOverflow(
+      '模型服务返回错误(400):{"error":{"message":"request (4297 tokens) exceeds the available context size (4096 tokens)"}}'
+    ),
+    '小葵的 400 要认得出'
+  )
+  assert.ok(
+    isContextOverflow('the request exceeds the available context size'),
+    'llama 措辞要认得出'
+  )
   assert.ok(!isContextOverflow('连不上模型服务,检查 LM Studio 是否已启动'), '普通错误不许误伤')
 
   const budgets4k = budgetsForContext(4096)
@@ -1313,17 +1816,27 @@ async function main(): Promise<void> {
   assert.equal(budgetsSmall.replyTokens, 409, '2k 上下文:回复按比例缩')
   assert.ok(budgetsSmall.mapTokens >= 600, '地图有安全下限,再小的上下文也不许把地图掐死')
   const budgetsJunk = budgetsForContext(100)
-  assert.equal(budgetsJunk.mapTokens, Math.floor(DEFAULT_CONTEXT_SIZE * 0.55), '离谱输入退回保守默认')
+  assert.equal(
+    budgetsJunk.mapTokens,
+    Math.floor(DEFAULT_CONTEXT_SIZE * 0.55),
+    '离谱输入退回保守默认'
+  )
   // 默认窗口是主进程/渲染层/引擎三边共用的一个数(shared/aiDefaults):值本身 + 引擎量尺认它
   assert.equal(DEFAULT_CONTEXT_SIZE, 16384, '默认上下文窗口 = 16384')
   assert.ok(
-    judgeModelFit(14 * 1024 ** 3, 32 * 1024 ** 3, 16 * 1024 ** 3).detail.includes(String(DEFAULT_CONTEXT_SIZE)),
+    judgeModelFit(14 * 1024 ** 3, 32 * 1024 ** 3, 16 * 1024 ** 3).detail.includes(
+      String(DEFAULT_CONTEXT_SIZE)
+    ),
     '量尺不传上下文时按共享默认算,不许各写各的数'
   )
 
   // ── 11. 模型状态栏(第七十锤):进度解析不打诳语 + LM Studio 状态映射 ──
   assert.equal(parseLoadProgress({ progress: 0.3525 }), 35.25, 'llama.cpp 新版:0~1 按比例 ×100')
-  assert.equal(parseLoadProgress({ error: { message: 'Loading model', progress: 0.42 } }), 42, '进度藏在 error 里也认')
+  assert.equal(
+    parseLoadProgress({ error: { message: 'Loading model', progress: 0.42 } }),
+    42,
+    '进度藏在 error 里也认'
+  )
   assert.equal(parseLoadProgress({ progress: 87 }), 87, '1~100 直接当百分数')
   assert.equal(parseLoadProgress({ progress: 1 }), 100, '1 当 100% 收尾')
   assert.equal(parseLoadProgress({ progress: 0 }), 0, '0 就是刚开锅')
@@ -1331,19 +1844,57 @@ async function main(): Promise<void> {
   assert.equal(parseLoadProgress({ progress: 'x' }), null, '不是数不给数')
   assert.equal(parseLoadProgress({}), null, '老版引擎啥都不报 = null,界面转圈')
   assert.equal(parseLoadProgress('loading'), null, '字符串垃圾回 null')
-  assert.deepEqual(parseGpuOffloadReport('llama_model_load: offloaded 49/49 layers to GPU'), { offloaded: 49, total: 49 }, '引擎明确报告全层上显卡')
-  assert.deepEqual(parseGpuOffloadReport('load_tensors: offloaded 32 / 49 layers to GPU'), { offloaded: 32, total: 49 }, '空格方言也认,部分上显卡照实记')
-  assert.equal(parseGpuOffloadReport('CUDA0 model buffer size = 12000 MiB'), null, '只有显存数字不能推断层数')
+  assert.deepEqual(
+    parseGpuOffloadReport('llama_model_load: offloaded 49/49 layers to GPU'),
+    { offloaded: 49, total: 49 },
+    '引擎明确报告全层上显卡'
+  )
+  assert.deepEqual(
+    parseGpuOffloadReport('load_tensors: offloaded 32 / 49 layers to GPU'),
+    { offloaded: 32, total: 49 },
+    '空格方言也认,部分上显卡照实记'
+  )
+  assert.equal(
+    parseGpuOffloadReport('CUDA0 model buffer size = 12000 MiB'),
+    null,
+    '只有显存数字不能推断层数'
+  )
   assert.equal(gpuOffloadWarning({ offloaded: 49, total: 49 }), undefined, '全层上显卡不打扰用户')
-  assert.ok(gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('32/49'), '部分上显卡提醒要带引擎真数')
-  assert.ok(gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('内存'), '提醒要讲清剩余部分落内存会慢')
+  assert.ok(
+    gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('32/49'),
+    '部分上显卡提醒要带引擎真数'
+  )
+  assert.ok(
+    gpuOffloadWarning({ offloaded: 32, total: 49 })?.includes('内存'),
+    '提醒要讲清剩余部分落内存会慢'
+  )
   assert.equal(gpuOffloadWarning(null), undefined, '引擎没报层数就不猜')
 
-  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, 'q'), { state: 'ready', progress: 100 }, 'loaded = 就绪')
-  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loading', progress: 0.25 }] }, 'q'), { state: 'loading', progress: 25 }, 'loading 带进度就给准数')
-  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'loading' }] }, 'q'), { state: 'loading', progress: null }, 'LM Studio 没报进度就 null')
-  assert.deepEqual(parseLmStudioModelState({ data: [{ id: 'q', state: 'not-loaded' }] }, 'q'), { state: 'idle', progress: null }, 'not-loaded = 还没叫醒')
-  assert.equal(parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, '别的模型').state, 'idle', '查无此模型 = 还没叫醒')
+  assert.deepEqual(
+    parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, 'q'),
+    { state: 'ready', progress: 100 },
+    'loaded = 就绪'
+  )
+  assert.deepEqual(
+    parseLmStudioModelState({ data: [{ id: 'q', state: 'loading', progress: 0.25 }] }, 'q'),
+    { state: 'loading', progress: 25 },
+    'loading 带进度就给准数'
+  )
+  assert.deepEqual(
+    parseLmStudioModelState({ data: [{ id: 'q', state: 'loading' }] }, 'q'),
+    { state: 'loading', progress: null },
+    'LM Studio 没报进度就 null'
+  )
+  assert.deepEqual(
+    parseLmStudioModelState({ data: [{ id: 'q', state: 'not-loaded' }] }, 'q'),
+    { state: 'idle', progress: null },
+    'not-loaded = 还没叫醒'
+  )
+  assert.equal(
+    parseLmStudioModelState({ data: [{ id: 'q', state: 'loaded' }] }, '别的模型').state,
+    'idle',
+    '查无此模型 = 还没叫醒'
+  )
   assert.equal(parseLmStudioModelState(null, 'q').state, 'idle', '垃圾回复别炸')
 
   // ── 12. 热身估价进度(第七十一锤):数是估的,但估得有据、封顶诚实 ──
@@ -1356,20 +1907,48 @@ async function main(): Promise<void> {
   assert.equal(estimateLoadProgress(4996, 10_000), 49, '向下取整,宁可少报不虚报')
 
   const warmupRaw = { 'F:\\models\\qwen.gguf': [42_000, 8_000], 'D:\\x.gguf': 8_000 }
-  assert.deepEqual(parseWarmupSamples(warmupRaw, 'F:\\models\\qwen.gguf'), [42_000, 8_000], '数组账原样读回')
-  assert.deepEqual(parseWarmupSamples(warmupRaw, 'D:\\x.gguf'), [8_000], '老格式单个数自动当一次历史,不用删档')
+  assert.deepEqual(
+    parseWarmupSamples(warmupRaw, 'F:\\models\\qwen.gguf'),
+    [42_000, 8_000],
+    '数组账原样读回'
+  )
+  assert.deepEqual(
+    parseWarmupSamples(warmupRaw, 'D:\\x.gguf'),
+    [8_000],
+    '老格式单个数自动当一次历史,不用删档'
+  )
   assert.equal(parseWarmupSamples(warmupRaw, '没记过的.gguf'), null, '没记过就是没记过')
   assert.equal(parseWarmupSamples('垃圾', 'x'), null, '垃圾账本回 null')
-  assert.deepEqual(parseWarmupSamples({ x: [5, 20_000, 30_000] }, 'x'), [20_000, 30_000], '小于 1 秒的脏账剔除')
-  assert.deepEqual(parseWarmupSamples({ x: [1, 2, 3, 40_000, 50_000, 60_000] }, 'x'), [40_000, 50_000, 60_000], '超长账只认最近三次')
+  assert.deepEqual(
+    parseWarmupSamples({ x: [5, 20_000, 30_000] }, 'x'),
+    [20_000, 30_000],
+    '小于 1 秒的脏账剔除'
+  )
+  assert.deepEqual(
+    parseWarmupSamples({ x: [1, 2, 3, 40_000, 50_000, 60_000] }, 'x'),
+    [40_000, 50_000, 60_000],
+    '超长账只认最近三次'
+  )
   assert.equal(parseWarmupSamples({ x: [5] }, 'x'), null, '全是脏账等于没账')
 
   const warmupNext = nextWarmupStore(warmupRaw, 'F:\\models\\qwen.gguf', 39_500)
-  assert.deepEqual(warmupNext['F:\\models\\qwen.gguf'], [42_000, 8_000, 39_500], '新账入列,旧账都还在')
+  assert.deepEqual(
+    warmupNext['F:\\models\\qwen.gguf'],
+    [42_000, 8_000, 39_500],
+    '新账入列,旧账都还在'
+  )
   assert.equal(warmupNext['D:\\x.gguf'], 8_000, '别家的账不许动')
   assert.deepEqual(nextWarmupStore('垃圾', 'n.gguf', 2000)['n.gguf'], [2000], '垃圾旧账就地开新账')
-  assert.deepEqual(nextWarmupStore({ m: [10_000, 20_000, 30_000] }, 'm', 40_000)['m'], [20_000, 30_000, 40_000], '满三条再入账,最老的滚出去')
-  assert.deepEqual(nextWarmupStore({}, 'n.gguf', 5)['n.gguf'], [1000], '耗时有 1 秒下限,防小模型记出 0')
+  assert.deepEqual(
+    nextWarmupStore({ m: [10_000, 20_000, 30_000] }, 'm', 40_000)['m'],
+    [20_000, 30_000, 40_000],
+    '满三条再入账,最老的滚出去'
+  )
+  assert.deepEqual(
+    nextWarmupStore({}, 'n.gguf', 5)['n.gguf'],
+    [1000],
+    '耗时有 1 秒下限,防小模型记出 0'
+  )
 
   // 均值:一冷两热混算,估价落在中间,运气只占三分之一
   assert.equal(averageWarmup([]), null, '没样本不硬估')
@@ -1381,41 +1960,97 @@ async function main(): Promise<void> {
   assert.equal(warmupNudgeMessage(0), undefined, '刚开锅不提醒')
   assert.equal(warmupNudgeMessage(4 * 60_000 + 59_000), undefined, '差一秒到五分钟也不提醒')
   assert.ok(warmupNudgeMessage(5 * 60_000)?.includes('取消'), '到点开口:提醒里得告诉人「取消」在哪')
-  assert.ok(warmupNudgeMessage(30 * 60_000)?.includes('慢是正常的'), '等半小时也还是同一句善意提醒,不升级不恐吓')
+  assert.ok(
+    warmupNudgeMessage(30 * 60_000)?.includes('慢是正常的'),
+    '等半小时也还是同一句善意提醒,不升级不恐吓'
+  )
 
   // ── 14. 提前量尺(第七十三锤):选模型那一刻就分「装得下/有点挤/装不下」──
   const G = 1024 ** 3
-  assert.equal(parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.vramBytes, Math.round(16311 * 1024 * 1024), 'nvidia-smi 一行能抠出显存')
-  assert.equal(parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.name, 'NVIDIA GeForce RTX 5060 Ti', '显卡名也带回来')
+  assert.equal(
+    parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.vramBytes,
+    Math.round(16311 * 1024 * 1024),
+    'nvidia-smi 一行能抠出显存'
+  )
+  assert.equal(
+    parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.name,
+    'NVIDIA GeForce RTX 5060 Ti',
+    '显卡名也带回来'
+  )
   assert.equal(parseNvidiaSmi(' garbage '), null, '垃圾输出回 null')
   assert.equal(parseNvidiaSmi('AMD Radeon, N/A MiB'), null, 'N/A 显存不可信')
 
   // 小葵的实机(32GB 内存 + 16GB 4060Ti 级显存,14.26GB 模型):全进卡,绿灯
   // 第八十六锤:量尺把上下文缓存算进去 —— 小葵的 14.26GB vs 16GB 从绿翻黄(权重+缓存超出九成线)
-  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level, 'tight', '14.26GB+缓存 vs 16GB 显存:黄灯(读大材料会慢)')
-  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('上下文'), '黄灯细节要点名上下文缓存')
-  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('慢'), '黄灯细节要说清读大材料会慢')
+  assert.equal(
+    judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level,
+    'tight',
+    '14.26GB+缓存 vs 16GB 显存:黄灯(读大材料会慢)'
+  )
+  assert.ok(
+    judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('上下文'),
+    '黄灯细节要点名上下文缓存'
+  )
+  assert.ok(
+    judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).detail.includes('慢'),
+    '黄灯细节要说清读大材料会慢'
+  )
   // 上下文旋钮:调小缓存,同一块头翻回绿灯
-  assert.equal(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).level, 'ok', '同模型把上下文调到 512:缓存缩小,翻回绿灯')
-  assert.ok(judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).detail.includes('512'), '绿灯细节写明按多少 tokens 估的')
+  assert.equal(
+    judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).level,
+    'ok',
+    '同模型把上下文调到 512:缓存缩小,翻回绿灯'
+  )
+  assert.ok(
+    judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G, 512).detail.includes('512'),
+    '绿灯细节写明按多少 tokens 估的'
+  )
   // 显存小一号:能跑但落内存,黄灯;大到显存+一半内存都兜不住,红灯
-  assert.equal(judgeModelFit(10 * G, 16 * G, 8 * G).level, 'tight', '10GB 模型 vs 8GB 显存:黄灯(部分落内存)')
-  assert.equal(judgeModelFit(20 * G, 16 * G, 8 * G).level, 'too-big', '20GB 模型 vs 8GB 显存+16GB 内存:红灯')
+  assert.equal(
+    judgeModelFit(10 * G, 16 * G, 8 * G).level,
+    'tight',
+    '10GB 模型 vs 8GB 显存:黄灯(部分落内存)'
+  )
+  assert.equal(
+    judgeModelFit(20 * G, 16 * G, 8 * G).level,
+    'too-big',
+    '20GB 模型 vs 8GB 显存+16GB 内存:红灯'
+  )
   // 问不到显存(N/A 卡):只看内存,五成宽裕七成挤
   assert.equal(judgeModelFit(14 * G, 32 * G, null).level, 'ok', '无显存数据:14GB vs 32GB 内存,绿灯')
-  assert.equal(judgeModelFit(16 * G, 24 * G, null).level, 'tight', '无显存数据:16GB vs 24GB 内存,黄灯(过七成线前)')
-  assert.equal(judgeModelFit(20 * G, 24 * G, null).level, 'too-big', '无显存数据:20GB vs 24GB 内存,红灯')
-  assert.ok(judgeModelFit(20 * G, 16 * G, 8 * G).detail.includes('换'), '红灯细节要给出换多大模型的建议')
+  assert.equal(
+    judgeModelFit(16 * G, 24 * G, null).level,
+    'tight',
+    '无显存数据:16GB vs 24GB 内存,黄灯(过七成线前)'
+  )
+  assert.equal(
+    judgeModelFit(20 * G, 24 * G, null).level,
+    'too-big',
+    '无显存数据:20GB vs 24GB 内存,红灯'
+  )
+  assert.ok(
+    judgeModelFit(20 * G, 16 * G, 8 * G).detail.includes('换'),
+    '红灯细节要给出换多大模型的建议'
+  )
 
   // 验尸:撑死拿量尺数字说话;上下文填大了点它名;都不是才说文件坏
   const fitBig = judgeModelFit(20 * G, 16 * G, 8 * G)
   assert.ok(autopsyExitMessage(3, fitBig, null).includes('装不下'), '撑死:验尸话点明装不下')
   assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '验尸话保留退出码')
-  assert.ok(autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'), '撑死优先于上下文嫌疑')
+  assert.ok(
+    autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'),
+    '撑死优先于上下文嫌疑'
+  )
   const ctxMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, 131072)
-  assert.ok(ctxMsg.includes('模型上下文') && ctxMsg.includes('131072') && ctxMsg.includes('清空'), '装得下却死了+手动上下文填大:点名上下文')
+  assert.ok(
+    ctxMsg.includes('模型上下文') && ctxMsg.includes('131072') && ctxMsg.includes('清空'),
+    '装得下却死了+手动上下文填大:点名上下文'
+  )
   const brokenMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, null)
-  assert.ok(brokenMsg.includes('损坏') || brokenMsg.includes('占用'), '都不是:才归到文件损坏/被占用')
+  assert.ok(
+    brokenMsg.includes('损坏') || brokenMsg.includes('占用'),
+    '都不是:才归到文件损坏/被占用'
+  )
   assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
 
   // ── 第八十五锤:超时话术按现场分流 + 半截必留(纯函数) ──
@@ -1424,22 +2059,61 @@ async function main(): Promise<void> {
   assert.ok(halfNote('stall').includes('卡住'), '卡住注脚说卡住')
   assert.ok(timeoutText().includes('第一个字'), '空手超时话术点名没等到字')
   assert.ok(!timeoutText().includes('还在加载'), '不再冤枉「还在加载」')
-  assert.ok(friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes('脑容量'), '小葵的 400 翻译成人话')
+  assert.ok(
+    friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes(
+      '脑容量'
+    ),
+    '小葵的 400 翻译成人话'
+  )
   assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
   assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
   // ── 上下文指路话术按引擎分家 ──
-  assert.ok(friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('LM Studio'), '外接的指路去 LM Studio 调大')
-  assert.ok(!friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('模型上下文'), '外接不再指去设置里那个消失的框')
-  assert.ok(friendlyHttpError(400, 'exceeds the available context size', 'builtin')?.includes('模型上下文'), '内置照旧指去设置')
-  assert.ok(friendlyHttpError(400, 'exceeds the available context size')?.includes('模型上下文'), '不带引擎名号按内置口径(兼容老调用)')
+  assert.ok(
+    friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('LM Studio'),
+    '外接的指路去 LM Studio 调大'
+  )
+  assert.ok(
+    !friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes(
+      '模型上下文'
+    ),
+    '外接不再指去设置里那个消失的框'
+  )
+  assert.ok(
+    friendlyHttpError(400, 'exceeds the available context size', 'builtin')?.includes('模型上下文'),
+    '内置照旧指去设置'
+  )
+  assert.ok(
+    friendlyHttpError(400, 'exceeds the available context size')?.includes('模型上下文'),
+    '不带引擎名号按内置口径(兼容老调用)'
+  )
 
   // ── 上下文认主:手填数只在内置当真,LM Studio 只信探测 ──
-  assert.equal(resolveContextSize('builtin', 8192, 32768), 8192, '内置:手填的数说了算,探测结果不抢座')
+  assert.equal(
+    resolveContextSize('builtin', 8192, 32768),
+    8192,
+    '内置:手填的数说了算,探测结果不抢座'
+  )
   assert.equal(resolveContextSize('builtin', undefined, 32768), 32768, '内置:没手填就吃探测')
-  assert.equal(resolveContextSize('builtin', undefined, null), DEFAULT_CONTEXT_SIZE, '内置:两头都没有落默认窗口')
-  assert.equal(resolveContextSize('lmstudio', 4096, 32768), 32768, 'LM Studio:存档里的旧手填数隐身,只信探测')
-  assert.equal(resolveContextSize('lmstudio', undefined, null), DEFAULT_CONTEXT_SIZE, 'LM Studio:探测失败按默认兜底')
-  assert.equal(resolveContextSize('lmstudio', 4096, null), DEFAULT_CONTEXT_SIZE, 'LM Studio:旧数加探测失败,一样兜底不认旧数')
+  assert.equal(
+    resolveContextSize('builtin', undefined, null),
+    DEFAULT_CONTEXT_SIZE,
+    '内置:两头都没有落默认窗口'
+  )
+  assert.equal(
+    resolveContextSize('lmstudio', 4096, 32768),
+    32768,
+    'LM Studio:存档里的旧手填数隐身,只信探测'
+  )
+  assert.equal(
+    resolveContextSize('lmstudio', undefined, null),
+    DEFAULT_CONTEXT_SIZE,
+    'LM Studio:探测失败按默认兜底'
+  )
+  assert.equal(
+    resolveContextSize('lmstudio', 4096, null),
+    DEFAULT_CONTEXT_SIZE,
+    'LM Studio:旧数加探测失败,一样兜底不认旧数'
+  )
 
   // ── 第八十六锤:KV 缓存估算(纯函数) ──
   assert.equal(estimateKvBytes(4096, 14.26 * G), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
@@ -1450,16 +2124,37 @@ async function main(): Promise<void> {
 
   // ── 提示词体系重写(第二批):讲解人设 = 底座 + 教学切片;三档切片互不串味 ──
   // 名词小课堂不再焊死在各底座里,由档位接管:off 明确不教学,brief 封顶 3 条,deep 封顶 5 条
-  assert.ok(!EXPLAIN_FILE_BASE.includes('名词小课堂') && !EXPLAIN_FOLDER_BASE.includes('名词小课堂'), '讲解底座不再自带名词小课堂(归教学切片管)')
-  assert.ok(teachingSlice('off').includes('不搞教学') && !teachingSlice('off').includes('名词小课堂'), 'off 档:不教学、不出术语表')
-  assert.ok(teachingSlice('brief').includes('先骨架后细节') && teachingSlice('brief').includes('3 条'), '精简档:先骨架后细节 + 小课堂 3 条')
+  assert.ok(
+    !EXPLAIN_FILE_BASE.includes('名词小课堂') && !EXPLAIN_FOLDER_BASE.includes('名词小课堂'),
+    '讲解底座不再自带名词小课堂(归教学切片管)'
+  )
+  assert.ok(
+    teachingSlice('off').includes('不搞教学') && !teachingSlice('off').includes('名词小课堂'),
+    'off 档:不教学、不出术语表'
+  )
+  assert.ok(
+    teachingSlice('brief').includes('先骨架后细节') && teachingSlice('brief').includes('3 条'),
+    '精简档:先骨架后细节 + 小课堂 3 条'
+  )
   assert.ok(!teachingSlice('brief').includes('5 条'), '精简档不串详细档的 5 条')
-  assert.ok(teachingSlice('deep').includes('5 条') && teachingSlice('deep').includes('带新手看懂'), '详细档:带新手看懂 + 小课堂 5 条')
+  assert.ok(
+    teachingSlice('deep').includes('5 条') && teachingSlice('deep').includes('带新手看懂'),
+    '详细档:带新手看懂 + 小课堂 5 条'
+  )
   assert.ok(!teachingSlice('deep').includes('不搞教学'), '详细档不串 off 的「不搞教学」')
   const deepFile = buildExplainSystem('deep', 'file')
-  assert.ok(deepFile.includes('先骨架后细节') && deepFile.includes('5 条'), 'deep 文件讲解 = 底座 + 详细切片')
-  assert.ok(buildExplainSystem('off', 'file').includes('不搞教学'), 'off 文件讲解要带「不教学」指令')
-  assert.ok(buildExplainSystem('brief', 'folder').includes('代码地图导游'), '文件夹讲解底座还在(删了教学两条的旧导游)')
+  assert.ok(
+    deepFile.includes('先骨架后细节') && deepFile.includes('5 条'),
+    'deep 文件讲解 = 底座 + 详细切片'
+  )
+  assert.ok(
+    buildExplainSystem('off', 'file').includes('不搞教学'),
+    'off 文件讲解要带「不教学」指令'
+  )
+  assert.ok(
+    buildExplainSystem('brief', 'folder').includes('代码地图导游'),
+    '文件夹讲解底座还在(删了教学两条的旧导游)'
+  )
   assert.ok(buildExplainSystem('deep', 'guess').includes('代码猜猜官'), 'guess 底座复用猜猜官原文')
   assert.ok(!buildExplainSystem('brief', 'guess').includes('代码人话翻译官'), '三种底座不串味')
   // 详细档的锅线和节选长度:8192 起才配 deep,节选 2000~6000 字看锅下菜
@@ -1470,66 +2165,129 @@ async function main(): Promise<void> {
   assert.ok(TEACHING_DEGRADED_NOTE.includes('精简'), '降档灰字要交代「这次按精简讲了」')
 
   // ── 体积红线(小葵点名的防反弹秤):装配产物不许再胖回去 ──
-  assert.ok(chatSystem.length <= 900, `闲聊底座(无工具)≤900 字(2.0 内核+标签口径后放宽,实测 ${chatSystem.length})`)
-  const agentFullSystem = KERNEL_CORE + SLICE_CHAT + AGENT_FILES_ADDENDUM + AGENT_WEB_ADDENDUM + buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' })
-  assert.ok(agentFullSystem.length <= 2200, `agent 全量人设 ≤2200 字(2.0 内核+XML 标签后放宽,实测 ${agentFullSystem.length})`)
+  assert.ok(
+    chatSystem.length <= 900,
+    `闲聊底座(无工具)≤900 字(2.0 内核+标签口径后放宽,实测 ${chatSystem.length})`
+  )
+  const agentFullSystem =
+    KERNEL_CORE +
+    SLICE_CHAT +
+    AGENT_FILES_ADDENDUM +
+    AGENT_WEB_ADDENDUM +
+    buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' })
+  assert.ok(
+    agentFullSystem.length <= 2200,
+    `agent 全量人设 ≤2200 字(2.0 内核+XML 标签后放宽,实测 ${agentFullSystem.length})`
+  )
   assert.ok(deepFile.length <= 800, `deep 文件讲解人设 ≤800 字,实测 ${deepFile.length}`)
   const toolsJson = JSON.stringify(AGENT_TOOLS).length
   // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
   // OpenAI tools 协议骨架(type/function/parameters/required 一个不能少)的实测下限是
   // 1159 字 —— 就算把 copy L 没覆盖的 web_search query 参数说明也摘掉也只到 1082。
   // 逐字稿不能动,秤先放在实测值上,压回 1000 需要砍稿子或砍参数说明
-  assert.ok(toolsJson <= 1200, `四件工具说明书 JSON ≤1200 字(原红线 1000 与逐字稿冲突,待 lead 定夺),实测 ${toolsJson}`)
+  assert.ok(
+    toolsJson <= 1200,
+    `四件工具说明书 JSON ≤1200 字(原红线 1000 与逐字稿冲突,待 lead 定夺),实测 ${toolsJson}`
+  )
 
   console.log('✅ AI 人话解释自测全部通过')
 
-// ── 第八十四锤:流式 token 账(纯函数) ──
-// extractStreamStats:timings 帧(读材料段)
+  // ── 第八十四锤:流式 token 账(纯函数) ──
+  // extractStreamStats:timings 帧(读材料段)
   void (() => {
-  const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 0 } }, 'reading')
-  assert.deepEqual(s, { phase: 'reading', promptTokens: 2048, outputTokens: 0, tokensPerSecond: undefined })
-})()
-// extractStreamStats:timings 帧(吐字段,带速度)
+    const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 0 } }, 'reading')
+    assert.deepEqual(s, {
+      phase: 'reading',
+      promptTokens: 2048,
+      outputTokens: 0,
+      tokensPerSecond: undefined
+    })
+  })()
+  // extractStreamStats:timings 帧(吐字段,带速度)
   void (() => {
-  const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 128, predicted_per_second: 12.5 } }, 'writing')
-  assert.deepEqual(s, { phase: 'writing', promptTokens: 2048, outputTokens: 128, tokensPerSecond: 12.5 })
-})()
-// extractStreamStats:usage 收尾帧补 prompt
+    const s = extractStreamStats(
+      { timings: { prompt_n: 2048, predicted_n: 128, predicted_per_second: 12.5 } },
+      'writing'
+    )
+    assert.deepEqual(s, {
+      phase: 'writing',
+      promptTokens: 2048,
+      outputTokens: 128,
+      tokensPerSecond: 12.5
+    })
+  })()
+  // extractStreamStats:usage 收尾帧补 prompt
   void (() => {
-  const s = extractStreamStats({ usage: { prompt_tokens: 3000, completion_tokens: 200 } }, 'writing')
-  assert.deepEqual(s, { phase: 'writing', promptTokens: 3000, outputTokens: 200, tokensPerSecond: undefined })
-})()
-// extractStreamStats:垃圾/缺数回 null,绝不编
+    const s = extractStreamStats(
+      { usage: { prompt_tokens: 3000, completion_tokens: 200 } },
+      'writing'
+    )
+    assert.deepEqual(s, {
+      phase: 'writing',
+      promptTokens: 3000,
+      outputTokens: 200,
+      tokensPerSecond: undefined
+    })
+  })()
+  // extractStreamStats:垃圾/缺数回 null,绝不编
   void (() => {
-  assert.equal(extractStreamStats({}, 'reading'), null)
-  assert.equal(extractStreamStats({ timings: { prompt_n: 'x' } }, 'reading'), null)
-  assert.equal(extractStreamStats({ timings: { prompt_n: NaN, predicted_n: Infinity } }, 'writing'), null)
-})()
-// formatStreamStats:读材料/吐字两段话术
+    assert.equal(extractStreamStats({}, 'reading'), null)
+    assert.equal(extractStreamStats({ timings: { prompt_n: 'x' } }, 'reading'), null)
+    assert.equal(
+      extractStreamStats({ timings: { prompt_n: NaN, predicted_n: Infinity } }, 'writing'),
+      null
+    )
+  })()
+  // formatStreamStats:读材料/吐字两段话术
   void (() => {
-  assert.equal(formatStreamStats({ phase: 'reading', promptTokens: 2048 }), '读材料中 · 已读 2,048 tokens')
-  assert.equal(formatStreamStats({ phase: 'reading' }), '读材料中……')
-  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 128, tokensPerSecond: 12.5 }), '已吐 128 tokens · 13 tokens/s')
-  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 9, tokensPerSecond: 4.6 }), '已吐 9 tokens · 4.6 tokens/s')
-  assert.equal(formatStreamStats({ phase: 'writing', outputTokens: 5000, tokensPerSecond: 33.4 }), '已吐 5,000 tokens · 33 tokens/s')
-  assert.equal(formatStreamStats({ phase: 'writing' }), '吐字中')
-})()
-// formatUsage:收尾尾注,缺哪段省哪段
+    assert.equal(
+      formatStreamStats({ phase: 'reading', promptTokens: 2048 }),
+      '读材料中 · 已读 2,048 tokens'
+    )
+    assert.equal(formatStreamStats({ phase: 'reading' }), '读材料中……')
+    assert.equal(
+      formatStreamStats({ phase: 'writing', outputTokens: 128, tokensPerSecond: 12.5 }),
+      '已吐 128 tokens · 13 tokens/s'
+    )
+    assert.equal(
+      formatStreamStats({ phase: 'writing', outputTokens: 9, tokensPerSecond: 4.6 }),
+      '已吐 9 tokens · 4.6 tokens/s'
+    )
+    assert.equal(
+      formatStreamStats({ phase: 'writing', outputTokens: 5000, tokensPerSecond: 33.4 }),
+      '已吐 5,000 tokens · 33 tokens/s'
+    )
+    assert.equal(formatStreamStats({ phase: 'writing' }), '吐字中')
+  })()
+  // formatUsage:收尾尾注,缺哪段省哪段
   void (() => {
-  assert.equal(formatUsage({ promptTokens: 2048, outputTokens: 128, tokensPerSecond: 12.5 }), '读 2,048 · 吐 128 tokens · 13 tokens/s')
-  assert.equal(formatUsage({ outputTokens: 64 }), '吐 64 tokens')
-  assert.equal(formatUsage({}), '')
-})()
-  console.log('   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)')
+    assert.equal(
+      formatUsage({ promptTokens: 2048, outputTokens: 128, tokensPerSecond: 12.5 }),
+      '读 2,048 · 吐 128 tokens · 13 tokens/s'
+    )
+    assert.equal(formatUsage({ outputTokens: 64 }), '吐 64 tokens')
+    assert.equal(formatUsage({}), '')
+  })()
+  console.log(
+    '   提示词固定不编造 · 完整路径与通用后缀分布 · 自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网账本) · 二进制照样讲 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 人设随场景切换 · 功能定位(带路人/地图摊开/回复解析/防编造) · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)'
+  )
   // ── 第一百零一锤:讲解喂骨架+备注+头注释,输出立硬规矩 ──
-  const header = extractHeaderComment([
-    '// 全树速览:给每个文件配一句大白话。',
-    '// 纯规则引擎,不劳烦 AI。',
-    '',
-    'export const something = 1'
-  ].join('\n'))
-  assert.equal(header, '全树速览:给每个文件配一句大白话。 纯规则引擎,不劳烦 AI。', `块注释提取,实际:${String(header)}`)
-  const blockHeader = extractHeaderComment('/*\n * 计算两个数的最大公约数。\n */\nexport function gcd() {}')
+  const header = extractHeaderComment(
+    [
+      '// 全树速览:给每个文件配一句大白话。',
+      '// 纯规则引擎,不劳烦 AI。',
+      '',
+      'export const something = 1'
+    ].join('\n')
+  )
+  assert.equal(
+    header,
+    '全树速览:给每个文件配一句大白话。 纯规则引擎,不劳烦 AI。',
+    `块注释提取,实际:${String(header)}`
+  )
+  const blockHeader = extractHeaderComment(
+    '/*\n * 计算两个数的最大公约数。\n */\nexport function gcd() {}'
+  )
   assert.equal(blockHeader, '计算两个数的最大公约数。', `块注释提取,实际:${String(blockHeader)}`)
   assert.equal(extractHeaderComment('const x = 1'), null, '没注释老老实实回 null')
 
@@ -1537,49 +2295,119 @@ async function main(): Promise<void> {
     relPath: 'src/scanner/index.ts',
     name: 'index.ts',
     languageName: 'typescript',
-    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    structure: {
+      languageId: 'typescript',
+      functions: ['scanFolder'],
+      classes: [],
+      imports: [],
+      exports: [],
+      interfaces: [],
+      reactComponents: []
+    },
     graph: null,
     note: '这是扫描器',
     headerComment: '把文件夹读成树'
   })
-  assert.ok(explainPrompt.includes('<owner_note>') && explainPrompt.includes('这是扫描器'), '备注要进证据包(2.0 起包 owner_note 标签)')
-  assert.ok(explainPrompt.includes('<header_comment>') && explainPrompt.includes('把文件夹读成树'), '头注释要进证据包(header_comment 标签)')
+  assert.ok(
+    explainPrompt.includes('<owner_note>') && explainPrompt.includes('这是扫描器'),
+    '备注要进证据包(2.0 起包 owner_note 标签)'
+  )
+  assert.ok(
+    explainPrompt.includes('<header_comment>') && explainPrompt.includes('把文件夹读成树'),
+    '头注释要进证据包(header_comment 标签)'
+  )
   assert.ok(explainPrompt.includes('点名结构里真实的函数/类名'), '输出硬规矩要进提示词')
   const plainPrompt = buildExplainPrompt({
     relPath: 'a.ts',
     name: 'a.ts',
     languageName: 'typescript',
-    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    structure: {
+      languageId: 'typescript',
+      functions: ['scanFolder'],
+      classes: [],
+      imports: [],
+      exports: [],
+      interfaces: [],
+      reactComponents: []
+    },
     graph: null
   })
-  assert.ok(!plainPrompt.includes('项目主人备注') && !plainPrompt.includes('文件开头注释'), '没备注没注释不留空行占位假证据')
+  assert.ok(
+    !plainPrompt.includes('项目主人备注') && !plainPrompt.includes('文件开头注释'),
+    '没备注没注释不留空行占位假证据'
+  )
   const excerptPrompt = buildExplainPrompt({
     relPath: 'a.ts',
     name: 'a.ts',
     languageName: 'typescript',
-    structure: { languageId: 'typescript', functions: ['scanFolder'], classes: [], imports: [], exports: [], interfaces: [], reactComponents: [] },
+    structure: {
+      languageId: 'typescript',
+      functions: ['scanFolder'],
+      classes: [],
+      imports: [],
+      exports: [],
+      interfaces: [],
+      reactComponents: []
+    },
     graph: null,
     sourceExcerpt: 'export function scanFolder() {}'
   })
-  assert.ok(excerptPrompt.includes('<source_excerpt>') && excerptPrompt.includes('export function scanFolder'), '代码节选要包 source_excerpt 标签')
+  assert.ok(
+    excerptPrompt.includes('<source_excerpt>') &&
+      excerptPrompt.includes('export function scanFolder'),
+    '代码节选要包 source_excerpt 标签'
+  )
 
-  const guessPrompt = buildGuessPrompt({ relPath: 'x.xyz', name: 'x.xyz', absPath: 'C:/x.xyz', languageName: '', preview: 'hello', note: '临时文件' })
-  assert.ok(guessPrompt.includes('<owner_note>') && guessPrompt.includes('临时文件'), '猜猜官也吃备注(owner_note 标签)')
-  assert.ok(guessPrompt.includes('<file_preview>') && guessPrompt.includes('hello'), '内容片段要包 file_preview 标签')
+  const guessPrompt = buildGuessPrompt({
+    relPath: 'x.xyz',
+    name: 'x.xyz',
+    absPath: 'C:/x.xyz',
+    languageName: '',
+    preview: 'hello',
+    note: '临时文件'
+  })
+  assert.ok(
+    guessPrompt.includes('<owner_note>') && guessPrompt.includes('临时文件'),
+    '猜猜官也吃备注(owner_note 标签)'
+  )
+  assert.ok(
+    guessPrompt.includes('<file_preview>') && guessPrompt.includes('hello'),
+    '内容片段要包 file_preview 标签'
+  )
 
   // ── 提示词体系 2.0 · XML 资料包裹总点检(小葵定稿):一切外来内容进标签,程序插话也有皮 ──
   // 数据块:附件/引用/摘要旧已规范;文件夹清单/项目地图/干活账本/diff/联网资料新上
   assert.ok(fp.includes('<folder_contents>'), '文件夹清单要包 folder_contents 标签')
   assert.ok(locatePrompt.includes('<project_map>'), '项目地图要包 project_map 标签')
-  assert.ok(buildReportPrompt({ branch: 'main', changes: [], stats: { additions: 0, deletions: 0 }, recentSubjects: [] }).includes('<change_log>'), '干活账本要包 change_log 标签')
-  assert.ok(buildDiffPrompt({ relPath: 'a.ts', kind: 'modified', diff: '-x\n+y' }).includes('<diff>'), 'diff 要包 diff 标签')
+  assert.ok(
+    buildReportPrompt({
+      branch: 'main',
+      changes: [],
+      stats: { additions: 0, deletions: 0 },
+      recentSubjects: []
+    }).includes('<change_log>'),
+    '干活账本要包 change_log 标签'
+  )
+  assert.ok(
+    buildDiffPrompt({ relPath: 'a.ts', kind: 'modified', diff: '-x\n+y' }).includes('<diff>'),
+    'diff 要包 diff 标签'
+  )
   // 程序插话:提醒卡/逼卷令/质检闸统一 program_reminder;重复工具提醒包 program_note
-  assert.ok(buildAgentReminder('这个文件在哪').includes('<program_reminder>'), '提醒卡要包 program_reminder 标签')
-  assert.ok(ROUND_CAP_NUDGE.includes('<program_reminder>') && SALVAGE_SEARCH_NUDGE.includes('不是用户说话'), '逼卷令和质检闸都是 program_reminder')
+  assert.ok(
+    buildAgentReminder('这个文件在哪').includes('<program_reminder>'),
+    '提醒卡要包 program_reminder 标签'
+  )
+  assert.ok(
+    ROUND_CAP_NUDGE.includes('<program_reminder>') && SALVAGE_SEARCH_NUDGE.includes('不是用户说话'),
+    '逼卷令和质检闸都是 program_reminder'
+  )
   assert.ok(REPEAT_NUDGE.includes('<program_note>'), '重复翻看提醒是 program_note')
   // 工具结果统一包裹:wrapToolResult 是唯一出口,压缩纸条也要带皮
   const wrapped = wrapToolResult('文件内容原文')
-  assert.ok(wrapped.startsWith('<tool_result>') && wrapped.endsWith('</tool_result>'), '工具结果要包 tool_result 标签')
+  assert.ok(
+    wrapped.startsWith('<tool_result>') && wrapped.endsWith('</tool_result>'),
+    '工具结果要包 tool_result 标签'
+  )
   const stubbed = compressAgentMessages(
     [
       { role: 'system', content: 'x' },
@@ -1591,7 +2419,10 @@ async function main(): Promise<void> {
     10
   )
   assert.ok(stubbed !== null, '超预算要能压')
-  assert.ok(stubbed?.messages[2]?.content.includes('<tool_result>'), '占位纸条也要带 tool_result 皮')
+  assert.ok(
+    stubbed?.messages[2]?.content.includes('<tool_result>'),
+    '占位纸条也要带 tool_result 皮'
+  )
   assert.ok(stubbed?.messages[2]?.content.includes('占位纸条'), '占位纸条要自述来历')
   assert.ok(stripToolResult(wrapped) === '文件内容原文', '剥工具结果皮要还原原文')
 
@@ -1615,14 +2446,24 @@ async function main(): Promise<void> {
     { role: 'user', content: oldSummary }
   ])
   assert.equal(washed.length, 3, '坏角色和空条目要扔')
-  assert.ok(washed[0].content.startsWith('很') && washed[0].content.length < longTurn.length, '超长对话要截断')
-  assert.ok(washed[0].content.endsWith('……<program_note>后半截省略</program_note>'), '截断要注明(program_note 标签)')
+  assert.ok(
+    washed[0].content.startsWith('很') && washed[0].content.length < longTurn.length,
+    '超长对话要截断'
+  )
+  assert.ok(
+    washed[0].content.endsWith('……<program_note>后半截省略</program_note>'),
+    '截断要注明(program_note 标签)'
+  )
   assert.equal(washed[2].content.length, oldSummary.length, '旧摘要在放行上限内不截')
   const manyTurns: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  for (let i = 0; i < COMPACT_HISTORY_MAX_MESSAGES + 10; i += 1) manyTurns.push({ role: 'user', content: `第 ${i} 句` })
+  for (let i = 0; i < COMPACT_HISTORY_MAX_MESSAGES + 10; i += 1)
+    manyTurns.push({ role: 'user', content: `第 ${i} 句` })
   const washedMany = sanitizeCompactHistory(manyTurns)
   assert.equal(washedMany.length, COMPACT_HISTORY_MAX_MESSAGES, '条数封顶')
-  assert.ok(washedMany[0].content.includes(`第 ${manyTurns.length - COMPACT_HISTORY_MAX_MESSAGES} 句`), '留的是最近的,老的扔掉')
+  assert.ok(
+    washedMany[0].content.includes(`第 ${manyTurns.length - COMPACT_HISTORY_MAX_MESSAGES} 句`),
+    '留的是最近的,老的扔掉'
+  )
 
   // buildCompactMessages:人设打头,收尾指令垫后,中间是洗过的史料
   const compactMsgs = buildCompactMessages([{ role: 'user', content: '聊过的内容' }])
@@ -1637,8 +2478,14 @@ async function main(): Promise<void> {
   assert.equal(sanitizeCompactSummary('   '), '', '纯空白回空')
   const longSummary = '长'.repeat(COMPACT_SUMMARY_CHARS + 500)
   const clippedSummary = sanitizeCompactSummary(longSummary)
-  assert.ok(clippedSummary.startsWith('长'.repeat(10)) && clippedSummary.length < longSummary.length, '超长摘要要截')
-  assert.ok(clippedSummary.endsWith('……<program_note>摘要过长,只取前一部分</program_note>'), '截断要注明(program_note 标签)')
+  assert.ok(
+    clippedSummary.startsWith('长'.repeat(10)) && clippedSummary.length < longSummary.length,
+    '超长摘要要截'
+  )
+  assert.ok(
+    clippedSummary.endsWith('……<program_note>摘要过长,只取前一部分</program_note>'),
+    '截断要注明(program_note 标签)'
+  )
 
   // buildSummaryText:标签、背景记忆口径、原文都在
   const summaryBlock = buildSummaryText('聊过 500ms 防抖')
@@ -1647,7 +2494,16 @@ async function main(): Promise<void> {
   assert.ok(summaryBlock.includes('聊过 500ms 防抖'), '摘要原文要在')
 
   // buildFreeChatMessages:摘要块垫在附件后、历史前;没摘要就不出现
-  const withSummary = buildFreeChatMessages('人设', att, [{ role: 'user', content: '最近的问题' }], '新的问题', null, [], 'brief', summaryBlock)
+  const withSummary = buildFreeChatMessages(
+    '人设',
+    att,
+    [{ role: 'user', content: '最近的问题' }],
+    '新的问题',
+    null,
+    [],
+    'brief',
+    summaryBlock
+  )
   // 相邻同角色会合并成一条,三个块可能在同一消息里:改在拼好的正文里比先后
   const joined = withSummary.map((m) => m.content).join('\n')
   const attAt = joined.indexOf('<context_attachment>')
@@ -1656,19 +2512,37 @@ async function main(): Promise<void> {
   assert.ok(attAt >= 0 && sumAt > attAt && histAt > sumAt, '顺序:附件 → 摘要 → 历史')
   assert.ok(joined.includes('新的问题'), '当前问题照旧在')
   const noSummary = buildFreeChatMessages('人设', null, [], '随便问问', null, [], 'brief')
-  assert.ok(noSummary.every((m) => !m.content.includes('<earlier_chat_summary>')), '没摘要不留空块')
+  assert.ok(
+    noSummary.every((m) => !m.content.includes('<earlier_chat_summary>')),
+    '没摘要不留空块'
+  )
 
   // ── 15. 复读机防线(第一百四十三锤):探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 ──
   // 15a. 探测器:该抓的抓、该放的放(只查尾巴 —— 后面还在往下写的重复不算)
-  assert.equal(detectRepetitionTail('今天天气不错,我们出门逛逛,顺路买了点菜。'), null, '正常文本不算复读')
-  assert.equal(detectRepetitionTail('这个问题很重要,这个问题很重要,这个问题很重要。后面还有正文要讲。'), null, '3 连排比放过')
+  assert.equal(
+    detectRepetitionTail('今天天气不错,我们出门逛逛,顺路买了点菜。'),
+    null,
+    '正常文本不算复读'
+  )
+  assert.equal(
+    detectRepetitionTail('这个问题很重要,这个问题很重要,这个问题很重要。后面还有正文要讲。'),
+    null,
+    '3 连排比放过'
+  )
   assert.equal(detectRepetitionTail('-'.repeat(80)), null, '长分隔线是纯标点,不算循环')
   const loopUnit = 'system prompt、system message、system instruction、'
-  assert.ok(detectRepetitionTail(`先扫一眼项目结构,定位关键词:${loopUnit.repeat(6)}`) !== null, '小葵截图那种 44 字循环体要抓到')
+  assert.ok(
+    detectRepetitionTail(`先扫一眼项目结构,定位关键词:${loopUnit.repeat(6)}`) !== null,
+    '小葵截图那种 44 字循环体要抓到'
+  )
   assert.ok(detectRepetitionTail(loopUnit.repeat(4)) !== null, '恰好 4 连要抓到')
   assert.equal(detectRepetitionTail(loopUnit.repeat(3)), null, '只有 3 连不冤枉')
   assert.ok(detectRepetitionTail('好的'.repeat(12)) !== null, '两字短语连发 12 次也是复读')
-  assert.equal(detectRepetitionTail(`${loopUnit.repeat(6)}后来就正常了。`), null, '循环后面接着正常正文就不算(只查尾巴)')
+  assert.equal(
+    detectRepetitionTail(`${loopUnit.repeat(6)}后来就正常了。`),
+    null,
+    '循环后面接着正常正文就不算(只查尾巴)'
+  )
 
   // 15b. 截断:掐掉整串打转,保住前面正常的内容
   const cut = truncateAtRepetition(`先扫一眼项目结构,定位关键词:${loopUnit.repeat(6)}`)
@@ -1696,14 +2570,20 @@ async function main(): Promise<void> {
       healBodies.push(body)
       healRound += 1
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      const content = healRound === 1 ? `先定位关键词:${loopUnit.repeat(5)}` : '关键词都在 config.ts 里,搜「system」就能看到。'
+      const content =
+        healRound === 1
+          ? `先定位关键词:${loopUnit.repeat(5)}`
+          : '关键词都在 config.ts 里,搜「system」就能看到。'
       res.end(JSON.stringify({ choices: [{ message: { content } }] }))
     })
   })
   await new Promise<void>((resolve) => healServer.listen(0, '127.0.0.1', resolve))
   try {
     const healPort = (healServer.address() as { port: number }).port
-    const healed = await explainWithMessages({ baseUrl: `http://127.0.0.1:${healPort}/v1`, model: 'fake-model', timings: true }, [{ role: 'user', content: '找找关键词' }])
+    const healed = await explainWithMessages(
+      { baseUrl: `http://127.0.0.1:${healPort}/v1`, model: 'fake-model', timings: true },
+      [{ role: 'user', content: '找找关键词' }]
+    )
     assert.equal(healed.status, 'supported', '重答后应成功收场')
     assert.ok(healed.text.includes('config.ts'), '重答的正常文本要交出来')
     assert.ok(!healed.repetitionDetected, '自愈成功不留警报(true 才是犯病)')
@@ -1725,17 +2605,27 @@ async function main(): Promise<void> {
         plainBodies.push(body)
         plainRound += 1
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ choices: [{ message: { content: `先定位关键词:${loopUnit.repeat(5)}` } }] }))
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content: `先定位关键词:${loopUnit.repeat(5)}` } }]
+          })
+        )
       })
     })
     await new Promise<void>((resolve) => alwaysServer.listen(0, '127.0.0.1', resolve))
     try {
       const plainPort = (alwaysServer.address() as { port: number }).port
-      const hopeless = await explainWithMessages({ baseUrl: `http://127.0.0.1:${plainPort}/v1`, model: 'fake-model' }, [{ role: 'user', content: '找找关键词' }])
+      const hopeless = await explainWithMessages(
+        { baseUrl: `http://127.0.0.1:${plainPort}/v1`, model: 'fake-model' },
+        [{ role: 'user', content: '找找关键词' }]
+      )
       assert.equal(hopeless.status, 'supported', '截断交卷也是成功收场')
       assert.ok(hopeless.text.includes('原地打转'), '要附人话注脚说明掐了打转部分')
       assert.ok(hopeless.text.includes('先定位关键词:'), '开头正常部分要保住')
-      assert.ok(!hopeless.text.includes(`${loopUnit}${loopUnit}${loopUnit}`), '循环重复不能原样出现在交卷里')
+      assert.ok(
+        !hopeless.text.includes(`${loopUnit}${loopUnit}${loopUnit}`),
+        '循环重复不能原样出现在交卷里'
+      )
       const plainBody = JSON.parse(plainBodies[0] ?? '') as Record<string, unknown>
       assert.equal(plainBody.repeat_penalty, undefined, '外接引擎的请求不带反重复参数')
       assert.equal(plainRound, 2, '外接引擎同样走重答保险丝')
@@ -1780,7 +2670,10 @@ async function main(): Promise<void> {
     assert.ok(streamHealed.text.includes('config.ts'), '流式重答的正常文本要交出来')
     assert.equal(resetCount, 1, '重答前要发一次收尾令')
     assert.equal(streamRound, 2, '流式第一遍掐了重答,第二遍才收工')
-    assert.ok(!pieces.join('').includes(`${loopUnit}${loopUnit}${loopUnit}`), '触发帧之后的循环字不再往外推')
+    assert.ok(
+      !pieces.join('').includes(`${loopUnit}${loopUnit}${loopUnit}`),
+      '触发帧之后的循环字不再往外推'
+    )
   } finally {
     await new Promise<void>((resolve) => streamServer.close(() => resolve()))
   }

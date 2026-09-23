@@ -38,7 +38,12 @@ function announce(win: BrowserWindow | null, p: ModelDownloadProgress): void {
 }
 
 /** 把 web 响应体一段段追加进 .part 文件;取消/断流时抛错,.part 留着给下次续传 */
-async function streamToFile(body: ReadableStream<Uint8Array>, targetPath: string, signal: AbortSignal, onChunk: (bytes: number) => Promise<void>): Promise<void> {
+async function streamToFile(
+  body: ReadableStream<Uint8Array>,
+  targetPath: string,
+  signal: AbortSignal,
+  onChunk: (bytes: number) => Promise<void>
+): Promise<void> {
   const out = createWriteStream(targetPath, { flags: 'a' })
   const reader = body.getReader()
   try {
@@ -84,7 +89,11 @@ export async function startModelDownload(opts: {
       // 问一次文件总大小,算百分比;问不到就退化成「已下 X」
       let totalBytes: number | null = null
       try {
-        const head = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' })
+        const head = await fetch(url, {
+          method: 'HEAD',
+          signal: controller.signal,
+          redirect: 'follow'
+        })
         const len = head.headers.get('content-length')
         if (len) totalBytes = Number(len)
       } catch {

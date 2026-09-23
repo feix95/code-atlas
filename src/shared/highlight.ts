@@ -12,7 +12,18 @@ import { LANG_TO_GRAMMAR } from './grammarWasm.ts'
  * com 注释(绿)、num 数字(浅绿)、fn 函数名(黄)、type 类型名(青)、
  * var 变量/普通名字(浅蓝)、regex 正则(红)、symbol CSS 选择器(金)。
  */
-export const HL_KINDS = ['ctl', 'kw', 'str', 'com', 'num', 'fn', 'type', 'var', 'regex', 'symbol'] as const
+export const HL_KINDS = [
+  'ctl',
+  'kw',
+  'str',
+  'com',
+  'num',
+  'fn',
+  'type',
+  'var',
+  'regex',
+  'symbol'
+] as const
 export type HlKind = (typeof HL_KINDS)[number]
 
 /** 超过这个字数的正文不上色:解析在主进程同步跑,别为好看把窗口冻住(超了老实白字) */

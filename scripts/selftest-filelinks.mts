@@ -42,8 +42,12 @@ function main(): void {
 
   // ── 5. 重名的裸写不认:点了不知道开哪个,宁可不变链接 ──
   const dup = findFileLinks('README.md 和另一个 README.md', index)
-  assert.equal(dup.length, 0, '重名文件名不画链接')  // ── 6. 没后缀的词:对上根目录真实文件才认(那本身就是完整路径),普通词不认 ──
-  assert.equal(findFileLinks('看看 Makefile 咋写的', index).length, 1, '根目录 Makefile 精确对上,认')
+  assert.equal(dup.length, 0, '重名文件名不画链接') // ── 6. 没后缀的词:对上根目录真实文件才认(那本身就是完整路径),普通词不认 ──
+  assert.equal(
+    findFileLinks('看看 Makefile 咋写的', index).length,
+    1,
+    '根目录 Makefile 精确对上,认'
+  )
   assert.equal(findFileLinks('先跑 main 再说', index).length, 0, '普通裸词不认')
 
   // ── 7. 模型编的路径对不上户口:普通文字,绝不给死链接 ──
@@ -55,7 +59,10 @@ function main(): void {
   assert.equal(sloppy[0].relPath, 'src/ai/index.ts', '回的是树里的规范写法')
 
   // ── 9. 句子标点不吃进链接 ──
-  const punct = findFileLinks('见 src/ai/index.ts:3。以及 package.json,还有 (src/main/agent.ts)。', index)
+  const punct = findFileLinks(
+    '见 src/ai/index.ts:3。以及 package.json,还有 (src/main/agent.ts)。',
+    index
+  )
   assert.equal(punct.length, 3, '三种标点收尾各认一处')
   assert.equal(punct[0].end, 19, '行号后的句号不吃进来')
   assert.ok('见 src/ai/index.ts:3。'[19] === '。', '第 19 号格子还是句号')
@@ -82,7 +89,11 @@ function main(): void {
   assert.equal(cn2[0].start, 3, '中文后贴着的路径照认')
 
   // ── 13. 网址不冒领:https:// 里的路径样子货不认 ──
-  assert.equal(findFileLinks('文档在 https://example.com/src/ai/index.ts:1 看不到', index).length, 0, '网址里的路径不认')
+  assert.equal(
+    findFileLinks('文档在 https://example.com/src/ai/index.ts:1 看不到', index).length,
+    0,
+    '网址里的路径不认'
+  )
 
   // ── 14. 时间数字不冒领 ──
   assert.equal(findFileLinks('等了 12:30 才回复', index).length, 0, '12:30 不是文件')

@@ -61,7 +61,10 @@ export function parseWindowState(raw: unknown): WindowState | null {
 }
 
 /** 两块矩形的交叠面积(不搭界回 0) */
-function intersectionArea(a: WindowBox, b: { x: number; y: number; width: number; height: number }): number {
+function intersectionArea(
+  a: WindowBox,
+  b: { x: number; y: number; width: number; height: number }
+): number {
   const w = Math.min(a.x! + a.width, b.x + b.width) - Math.max(a.x!, b.x)
   const h = Math.min(a.y! + a.height, b.y + b.height) - Math.max(a.y!, b.y)
   return w > 0 && h > 0 ? w * h : 0

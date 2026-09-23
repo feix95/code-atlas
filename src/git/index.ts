@@ -21,7 +21,13 @@ export function pickKind(x: string, y: string): { kind: GitChange['kind']; stage
   const effective = x !== ' ' ? x : y
   const staged = x !== ' '
   const kind: GitChange['kind'] =
-    effective === 'A' || effective === 'C' ? 'added' : effective === 'D' ? 'deleted' : effective === 'R' ? 'renamed' : 'modified'
+    effective === 'A' || effective === 'C'
+      ? 'added'
+      : effective === 'D'
+        ? 'deleted'
+        : effective === 'R'
+          ? 'renamed'
+          : 'modified'
   return { kind, staged }
 }
 
@@ -29,7 +35,9 @@ export function pickKind(x: string, y: string): { kind: GitChange['kind']; stage
  * 解析 `git status --porcelain=v1 -z` 的输出。
  * 每条目是 `XY 路径` 以 NUL 结尾;重命名/复制条目后面还跟一段 NUL 分隔的旧路径。
  */
-export function parsePorcelainZ(out: string): Array<{ x: string; y: string; path: string; oldPath?: string }> {
+export function parsePorcelainZ(
+  out: string
+): Array<{ x: string; y: string; path: string; oldPath?: string }> {
   const parts = out.split('\0')
   const entries: Array<{ x: string; y: string; path: string; oldPath?: string }> = []
   let i = 0
@@ -62,15 +70,23 @@ export function normalizeNumstatPath(p: string): string {
 function runGit(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     // -c core.quotepath=false:中文文件名按原样输出,别转义成 \346\226\207
-    execFile('git', ['-c', 'core.quotepath=false', ...args], { cwd, windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => {
-      if (err) reject(err)
-      else resolvePromise(stdout)
-    })
+    execFile(
+      'git',
+      ['-c', 'core.quotepath=false', ...args],
+      { cwd, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err) reject(err)
+        else resolvePromise(stdout)
+      }
+    )
   })
 }
 
 /** numstat 输出 → relPath → 行数账本(统一剥掉仓库前缀、转 relPath) */
-function parseNumstat(out: string, prefix: string): Map<string, { add: number; del: number; binary: boolean }> {
+function parseNumstat(
+  out: string,
+  prefix: string
+): Map<string, { add: number; del: number; binary: boolean }> {
   const ledger = new Map<string, { add: number; del: number; binary: boolean }>()
   for (const line of out.split('\n')) {
     if (!line.trim()) continue
@@ -109,7 +125,14 @@ export async function collectGitChanges(rootPath: string): Promise<GitChangesRes
   try {
     await runGit(rootPath, ['rev-parse', '--show-toplevel'])
   } catch {
-    return { rootPath, isGitRepo: false, branch: '', changes: [], stats: empty, durationMs: Date.now() - startedAt }
+    return {
+      rootPath,
+      isGitRepo: false,
+      branch: '',
+      changes: [],
+      stats: empty,
+      durationMs: Date.now() - startedAt
+    }
   }
 
   // 仓库还没有任何提交时 HEAD 不存在,分支名给个人话兜底
@@ -121,8 +144,11 @@ export async function collectGitChanges(rootPath: string): Promise<GitChangesRes
   // 前缀让 git 自己报(--show-prefix,即「当前目录相对仓库根」),零猜态 ——
   // 不走 path.relative:那玩意对长短路径名(8.3 短名)、大小写、正反斜杠都敏感,
   // 换个环境(比如 GitHub runner 的 TEMP)就悄悄算歪,把 relPath 弄脏
-  const relFromRoot = (await runGit(rootPath, ['rev-parse', '--show-prefix'])).trim().replace(/\\/g, '/')
-  const prefix = relFromRoot === '' ? '' : relFromRoot.endsWith('/') ? relFromRoot : `${relFromRoot}/`
+  const relFromRoot = (await runGit(rootPath, ['rev-parse', '--show-prefix']))
+    .trim()
+    .replace(/\\/g, '/')
+  const prefix =
+    relFromRoot === '' ? '' : relFromRoot.endsWith('/') ? relFromRoot : `${relFromRoot}/`
 
   const statusOut = await runGit(rootPath, ['status', '--porcelain=v1', '-z', '--', '.'])
   const [unstagedNumstat, stagedNumstat] = await Promise.all([
@@ -159,7 +185,13 @@ export async function collectGitChanges(rootPath: string): Promise<GitChangesRes
   }
 
   // 最热闹的排前面,同量级按路径排,保证顺序稳定
-  changes.sort((a, b) => Math.abs(b.additions) + Math.abs(b.deletions) - Math.abs(a.additions) - Math.abs(a.deletions) || a.relPath.localeCompare(b.relPath))
+  changes.sort(
+    (a, b) =>
+      Math.abs(b.additions) +
+        Math.abs(b.deletions) -
+        Math.abs(a.additions) -
+        Math.abs(a.deletions) || a.relPath.localeCompare(b.relPath)
+  )
 
   const additions = changes.reduce((sum, c) => sum + Math.max(0, c.additions), 0)
   const deletions = changes.reduce((sum, c) => sum + Math.max(0, c.deletions), 0)
@@ -184,7 +216,10 @@ export interface ChangeDiff {
  * 暂存区与工作区的改动都算数,分节标清;untracked 的新文件直接读全部内容当「全新增」。
  * 返回 null = 没法给模型喂(二进制、文件过大),由调用层给用户人话解释。
  */
-export async function getChangeDiff(rootPath: string, change: GitChange): Promise<ChangeDiff | null> {
+export async function getChangeDiff(
+  rootPath: string,
+  change: GitChange
+): Promise<ChangeDiff | null> {
   if (change.binary) return null
 
   if (change.kind === 'untracked') {
@@ -193,15 +228,26 @@ export async function getChangeDiff(rootPath: string, change: GitChange): Promis
     if (!stat || !stat.isFile()) return null
     if (stat.size > NEW_FILE_BYTE_LIMIT) return null
     const content = await fs.readFile(absPath, 'utf8')
-    return clip({ diff: `<new_file>\n新文件,以下全部内容都是新增:\n\n${content}\n</new_file>`, note: '' })
+    return clip({
+      diff: `<new_file>\n新文件,以下全部内容都是新增:\n\n${content}\n</new_file>`,
+      note: ''
+    })
   }
 
   const sections: string[] = []
   if (change.staged) {
-    const staged = await runGit(rootPath, ['diff', '--no-color', '--cached', '--', change.relPath]).catch(() => '')
+    const staged = await runGit(rootPath, [
+      'diff',
+      '--no-color',
+      '--cached',
+      '--',
+      change.relPath
+    ]).catch(() => '')
     if (staged.trim()) sections.push(`<staged_changes>\n${staged}\n</staged_changes>`)
   }
-  const unstaged = await runGit(rootPath, ['diff', '--no-color', '--', change.relPath]).catch(() => '')
+  const unstaged = await runGit(rootPath, ['diff', '--no-color', '--', change.relPath]).catch(
+    () => ''
+  )
   if (unstaged.trim()) sections.push(`<unstaged_changes>\n${unstaged}\n</unstaged_changes>`)
 
   return clip({ diff: sections.join('\n\n'), note: '' })
@@ -209,14 +255,20 @@ export async function getChangeDiff(rootPath: string, change: GitChange): Promis
 
 function clip(result: ChangeDiff): ChangeDiff | null {
   if (result.diff.length <= DIFF_CHAR_LIMIT) return result
-  return { diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……${TAG.programNote.open}改动太大,只取了前面一部分${TAG.programNote.close}`, note: '改动太大,已截断' }
+  return {
+    diff: `${result.diff.slice(0, DIFF_CHAR_LIMIT)}\n……${TAG.programNote.open}改动太大,只取了前面一部分${TAG.programNote.close}`,
+    note: '改动太大,已截断'
+  }
 }
 
 /**
  * 最近几次提交的主题(默认 8 条):给干活报告当「这轮在干嘛」的背景线索。
  * 还没有提交、git 命令翻车 —— 一律安静回空数组,报告照样能写(少个背景而已)。
  */
-export async function collectRecentSubjects(rootPath: string, limit: number = REPORT_SUBJECT_LIMIT): Promise<string[]> {
+export async function collectRecentSubjects(
+  rootPath: string,
+  limit: number = REPORT_SUBJECT_LIMIT
+): Promise<string[]> {
   try {
     const out = await runGit(rootPath, ['log', `-${limit}`, '--format=%s'])
     return out

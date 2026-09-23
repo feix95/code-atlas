@@ -65,7 +65,8 @@ export function refButtonLabel(input: {
 }): string {
   if (!input.canAddRef) return `最多引用 ${input.refLimit} 段`
   const range = `第 ${input.startLine}-${input.endLine} 行`
-  if (input.charCount > input.charCap) return `引用到对话(${range} · 太长,只带前 ${input.charCap} 字)`
+  if (input.charCount > input.charCap)
+    return `引用到对话(${range} · 太长,只带前 ${input.charCap} 字)`
   return `引用到对话(${range})`
 }
 

@@ -70,7 +70,14 @@ export function useAiPredictedQuestions(input: {
         const requestId = crypto.randomUUID()
         activeId = requestId
         try {
-          const res = await window.atlas.aiExplainFile(rootPath, relPath, languageId, requestId, prompt, note)
+          const res = await window.atlas.aiExplainFile(
+            rootPath,
+            relPath,
+            languageId,
+            requestId,
+            prompt,
+            note
+          )
           if (!alive || activeId !== requestId) return
           if (res.status !== 'supported') return
           const questions = parsePredictedQuestions(res.text)

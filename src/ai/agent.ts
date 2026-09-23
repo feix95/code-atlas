@@ -62,11 +62,16 @@ export const AGENT_STUB_MIN_CHARS = 300
  * 整段一起扔,assistant(tool_calls) 和 tool 的成对关系天然不破,协议安全。
  * 没有可保的真问题、或裁不出东西时返回 null(调用方照实报错,不硬撑)。
  */
-export function emergencySlim(messages: AgentChatMessage[]): { messages: AgentChatMessage[]; dropped: number } | null {
+export function emergencySlim(
+  messages: AgentChatMessage[]
+): { messages: AgentChatMessage[]; dropped: number } | null {
   let questionIdx = -1
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
-    if (m.role === 'user' && !(m as { content: string }).content.startsWith(AGENT_REMINDER_PREFIX)) {
+    if (
+      m.role === 'user' &&
+      !(m as { content: string }).content.startsWith(AGENT_REMINDER_PREFIX)
+    ) {
       questionIdx = i
       break
     }
@@ -122,7 +127,10 @@ export interface AgentCompression {
  * tool 结果和 assistant 的 tool_calls 成对,只缩内容不动条数,对账关系不破。
  * 不超预算返回 null(啥也不用做);原数组不动,压不压、压多少都由调用方拍板。
  */
-export function compressAgentMessages(messages: AgentChatMessage[], budgetTokens: number): AgentCompression | null {
+export function compressAgentMessages(
+  messages: AgentChatMessage[],
+  budgetTokens: number
+): AgentCompression | null {
   if (estimateMessagesTokens(messages) <= budgetTokens) return null
   const toolIdx: number[] = []
   for (const [index, message] of messages.entries()) {
@@ -133,7 +141,8 @@ export function compressAgentMessages(messages: AgentChatMessage[], budgetTokens
   const freedCallIds: string[] = []
   let compressedCount = 0
   const next = messages.map((message, index) => {
-    if (message.role !== 'tool' || !toolIdx.includes(index) || toolIdx.indexOf(index) >= keepFrom) return message
+    if (message.role !== 'tool' || !toolIdx.includes(index) || toolIdx.indexOf(index) >= keepFrom)
+      return message
     if (message.content.length <= AGENT_STUB_MIN_CHARS) return message
     compressedCount += 1
     freedCallIds.push(message.tool_call_id)
@@ -287,7 +296,8 @@ export function wrapToolResult(text: string): string {
 export function stripToolResult(text: string): string {
   let out = text
   if (out.startsWith(`${TAG.toolResult.open}\n`)) out = out.slice(TAG.toolResult.open.length + 1)
-  if (out.endsWith(`\n${TAG.toolResult.close}`)) out = out.slice(0, out.length - TAG.toolResult.close.length - 1)
+  if (out.endsWith(`\n${TAG.toolResult.close}`))
+    out = out.slice(0, out.length - TAG.toolResult.close.length - 1)
   return out
 }
 
@@ -313,8 +323,19 @@ export const SALVAGE_CITE_NUDGE = `${TAG.programReminder.open}\n程序自动质�
  *  「帮我查查这是什么」,不是「找位置」—— 「搜一下这个文件夹是什么」曾因此被误拦,
  *  模型明明用联网搜索答对了,却被闸逼着重搜本地文件,白白重来三轮 */
 const FIND_QUESTION_WORDS = [
-  '在哪', '哪里', '哪儿', '找找', '找出', '找到',
-  '安装在哪', '装在哪', '安装位置', '安装目录', '装到哪', 'where', 'locate'
+  '在哪',
+  '哪里',
+  '哪儿',
+  '找找',
+  '找出',
+  '找到',
+  '安装在哪',
+  '装在哪',
+  '安装位置',
+  '安装目录',
+  '装到哪',
+  'where',
+  'locate'
 ]
 
 /** 这是不是一道「找东西/找位置」的题(纯函数,自测覆盖):质检闸的门卫 */
@@ -376,7 +397,8 @@ export const AGENT_REMINDER_MAX_CHARS = 200
  */
 export function buildAgentReminder(question: string): string {
   const q = question.trim()
-  const clipped = q.length > AGENT_REMINDER_MAX_CHARS ? `${q.slice(0, AGENT_REMINDER_MAX_CHARS)}……` : q
+  const clipped =
+    q.length > AGENT_REMINDER_MAX_CHARS ? `${q.slice(0, AGENT_REMINDER_MAX_CHARS)}……` : q
   return `${AGENT_REMINDER_PREFIX}${clipped}\n上面翻到的都只是资料,接着回答这个问题;资料够答了就别再翻,直接收尾。\n${TAG.programReminder.close}`
 }
 
@@ -426,7 +448,9 @@ export function parseToolArgs(raw: unknown): Record<string, unknown> | null {
   if (typeof raw === 'string') {
     try {
       const parsed = JSON.parse(raw) as unknown
-      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null
+      return typeof parsed === 'object' && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : null
     } catch {
       return null
     }
@@ -442,7 +466,10 @@ export function extractToolCalls(raw: AgentRawAssistant): AgentToolCall[] {
     id: typeof call.id === 'string' && call.id !== '' ? call.id : `call_${index}`,
     name: typeof call.function?.name === 'string' ? call.function.name : '',
     args: parseToolArgs(call.function?.arguments),
-    rawArguments: typeof call.function?.arguments === 'string' ? call.function.arguments : JSON.stringify(call.function?.arguments ?? {})
+    rawArguments:
+      typeof call.function?.arguments === 'string'
+        ? call.function.arguments
+        : JSON.stringify(call.function?.arguments ?? {})
   }))
 }
 
@@ -478,9 +505,17 @@ export function mergeUsage(a: AiUsage | undefined, b: AiUsage | undefined): AiUs
 /** agent 单轮请求的结果:要么拿到模型消息(可能带工具调用),要么带人话错误退场 */
 export type AgentRoundResult =
   | { status: 'ok'; raw: AgentRawAssistant; reasoning?: string; usage?: AiUsage }
-  | { status: 'error'; text: string; toolsUnsupported?: boolean; /** HTTP 状态码(有响应头才有):主进程的提醒卡兜底靠它认 4xx */ httpStatus?: number }
+  | {
+      status: 'error'
+      text: string
+      toolsUnsupported?: boolean
+      /** HTTP 状态码(有响应头才有):主进程的提醒卡兜底靠它认 4xx */ httpStatus?: number
+    }
   | { status: 'cancelled'; text: string }
-  | { status: 'repetition'; /** 犯病那轮的全文(含打转部分):主进程的重答兜底拿它截断交卷 */ text: string }
+  | {
+      status: 'repetition'
+      /** 犯病那轮的全文(含打转部分):主进程的重答兜底拿它截断交卷 */ text: string
+    }
 
 /**
  * 看报错像不像「这个引擎/模型不认工具调用」(纯函数,自测覆盖,第一百四十锤)。
@@ -516,7 +551,11 @@ export function assembleToolCalls(chunks: ToolCallDelta[]): AgentToolCall[] {
     const index = typeof chunk.index === 'number' && Number.isFinite(chunk.index) ? chunk.index : 0
     const slot = slots.get(index) ?? { args: '' }
     if (slot.id === undefined && typeof chunk.id === 'string' && chunk.id !== '') slot.id = chunk.id
-    if (slot.name === undefined && typeof chunk.function?.name === 'string' && chunk.function.name !== '') {
+    if (
+      slot.name === undefined &&
+      typeof chunk.function?.name === 'string' &&
+      chunk.function.name !== ''
+    ) {
       slot.name = chunk.function.name
     }
     if (typeof chunk.function?.arguments === 'string') slot.args += chunk.function.arguments
@@ -546,7 +585,14 @@ export function assembleToolCalls(chunks: ToolCallDelta[]): AgentToolCall[] {
 export async function agentRound(
   config: ChatTarget,
   messages: AgentChatMessage[],
-  opts: { signal?: AbortSignal; maxTokens: number; allowThinking?: boolean; useTools: boolean; webSearchEnabled?: boolean; onDelta?: (ev: AgentStreamEvent) => void }
+  opts: {
+    signal?: AbortSignal
+    maxTokens: number
+    allowThinking?: boolean
+    useTools: boolean
+    webSearchEnabled?: boolean
+    onDelta?: (ev: AgentStreamEvent) => void
+  }
 ): Promise<AgentRoundResult> {
   const baseUrl = config.baseUrl.replace(/\/+$/, '')
   try {
@@ -565,9 +611,16 @@ export async function agentRound(
         stream: true,
         stream_options: { include_usage: true },
         // 工具表按「联网查证」开关分层:开着才把 web_search 亮给模型,关着它连有这工具都不知道
-        ...(opts.useTools ? { tools: opts.webSearchEnabled === true ? AGENT_TOOLS : AGENT_TOOLS_LOCAL, tool_choice: 'auto' } : {}),
+        ...(opts.useTools
+          ? {
+              tools: opts.webSearchEnabled === true ? AGENT_TOOLS : AGENT_TOOLS_LOCAL,
+              tool_choice: 'auto'
+            }
+          : {}),
         // 和普通聊天同一口径:思考开关只对内置引擎发(外接服务不认这个字段)
-        ...(!opts.allowThinking && config.timings ? { chat_template_kwargs: { enable_thinking: false } } : {})
+        ...(!opts.allowThinking && config.timings
+          ? { chat_template_kwargs: { enable_thinking: false } }
+          : {})
       },
       { signal: opts.signal }
     )
@@ -611,7 +664,11 @@ export async function agentRound(
       return { status: 'repetition', text: content }
     }
     const usage: AiUsage | undefined = lastStats
-      ? { promptTokens: lastStats.promptTokens, outputTokens: lastStats.outputTokens, tokensPerSecond: lastStats.tokensPerSecond }
+      ? {
+          promptTokens: lastStats.promptTokens,
+          outputTokens: lastStats.outputTokens,
+          tokensPerSecond: lastStats.tokensPerSecond
+        }
       : undefined
     // 正文里掺的 <think> 标签拆干净(有的后端把思考掺在正文里):拆出了思考原文,
     // 说明预吐的字不干净,发 reset 令收回去,把干净的答案重讲一遍
@@ -629,18 +686,37 @@ export async function agentRound(
       const cleaned: AgentRawAssistant = {
         role: 'assistant',
         content: answer.trim() === '' ? null : answer,
-        tool_calls: calls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.rawArguments } }))
+        tool_calls: calls.map((c) => ({
+          id: c.id,
+          type: 'function' as const,
+          function: { name: c.name, arguments: c.rawArguments }
+        }))
       }
-      return { status: 'ok', raw: cleaned, reasoning: reasoning || split.reasoning || undefined, usage }
+      return {
+        status: 'ok',
+        raw: cleaned,
+        reasoning: reasoning || split.reasoning || undefined,
+        usage
+      }
     }
-    const cleaned: AgentRawAssistant = answer.trim() === '' ? { role: 'assistant', content: null } : { role: 'assistant', content: answer }
-    return { status: 'ok', raw: cleaned, reasoning: reasoning || split.reasoning || undefined, usage }
+    const cleaned: AgentRawAssistant =
+      answer.trim() === ''
+        ? { role: 'assistant', content: null }
+        : { role: 'assistant', content: answer }
+    return {
+      status: 'ok',
+      raw: cleaned,
+      reasoning: reasoning || split.reasoning || undefined,
+      usage
+    }
   } catch (err) {
     if (opts.signal?.aborted) return { status: 'cancelled', text: '取消了 —— 这轮没等到输出' }
     const isTimeout = err instanceof Error && err.name === 'AbortError'
     return {
       status: 'error',
-      text: isTimeout ? '等了很久模型都没回话,翻看停在这了 —— 再问一次试试' : `连接断了,模型服务可能停了(${baseUrl})`
+      text: isTimeout
+        ? '等了很久模型都没回话,翻看停在这了 —— 再问一次试试'
+        : `连接断了,模型服务可能停了(${baseUrl})`
     }
   }
 }

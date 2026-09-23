@@ -41,9 +41,13 @@ export function useChatSuggestions(input: {
   const { rootPath, file, messages, busy, enabled } = input
 
   // 预测吃这口证据:答完的轮数 + 最近一轮的一问一答
-  const turns = messages.filter((m) => m.role === 'assistant' && m.state === 'done' && m.text !== '').length
+  const turns = messages.filter(
+    (m) => m.role === 'assistant' && m.state === 'done' && m.text !== ''
+  ).length
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
-  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && m.state === 'done' && m.text !== '')
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((m) => m.role === 'assistant' && m.state === 'done' && m.text !== '')
   const lastQuestion = lastUser?.text ?? ''
   const lastAnswer = (lastAssistant?.text ?? '').slice(0, ANSWER_DIGEST_MAX)
 

@@ -53,11 +53,18 @@ export interface ShelfEntry {
  *  tags 里有 conversational(带聊天模板)或白名单任务标签的也算文本打底,别把能跑的误杀。
  *  (模型能力章 2026-09-18 小葵裁定撤下:API 没有工具/思考的标准字段,tags 覆盖率太低,
  *   拿不到准数据就不显示;准入过滤不受影响照常把门) */
-const CHAT_TASK_TAGS = ['text-generation', 'text2text-generation', 'translation', 'image-text-to-text']
+const CHAT_TASK_TAGS = [
+  'text-generation',
+  'text2text-generation',
+  'translation',
+  'image-text-to-text'
+]
 
 export function isChatCapable(entry: { pipeline_tag?: unknown; tags?: unknown }): boolean {
   const pipeline = typeof entry.pipeline_tag === 'string' ? entry.pipeline_tag : ''
-  const tagList = Array.isArray(entry.tags) ? entry.tags.filter((t): t is string => typeof t === 'string') : []
+  const tagList = Array.isArray(entry.tags)
+    ? entry.tags.filter((t): t is string => typeof t === 'string')
+    : []
   if (CHAT_TASK_TAGS.includes(pipeline)) return true
   return tagList.includes('conversational') || CHAT_TASK_TAGS.some((t) => tagList.includes(t))
 }
@@ -92,11 +99,14 @@ export type RunVerdict = 'yes' | 'tight' | 'no'
 /** 模态人话映射:pipeline_tag / tags 里的模态线索 → 一两个字的标签。
  *  认不出就老实回「其他」,不硬猜 */
 export function modalityLabel(entry: { pipeline_tag?: unknown; tags?: unknown }): string {
-  const tagList = Array.isArray(entry.tags) ? entry.tags.filter((t): t is string => typeof t === 'string') : []
+  const tagList = Array.isArray(entry.tags)
+    ? entry.tags.filter((t): t is string => typeof t === 'string')
+    : []
   const pipeline = typeof entry.pipeline_tag === 'string' ? entry.pipeline_tag : ''
   const has = (s: string): boolean => pipeline === s || tagList.includes(s)
   // 多模态组合优先:图文/音文混着来的,标签说全
-  const vision = has('image-text-to-text') || tagList.some((t) => t.includes('vision') || t === 'multimodal')
+  const vision =
+    has('image-text-to-text') || tagList.some((t) => t.includes('vision') || t === 'multimodal')
   const audio = has('audio-text-to-text') || tagList.some((t) => t.startsWith('audio'))
   if (vision && audio) return '文本+图像+语音'
   if (vision) return '文本+图像'
@@ -114,14 +124,18 @@ export function sanitizeShelfEntry(raw: unknown): ShelfEntry | null {
   if (typeof m.id !== 'string' || m.id === '') return null
   // 准入过滤(2026-09-18 小葵定):不是文本打底的直接不进货架,列表里根本见不着
   if (!isChatCapable(m)) return null
-  const ggufObj = typeof m.gguf === 'object' && m.gguf !== null ? (m.gguf as Record<string, unknown>) : null
+  const ggufObj =
+    typeof m.gguf === 'object' && m.gguf !== null ? (m.gguf as Record<string, unknown>) : null
   const ggufTotal = ggufObj !== null && typeof ggufObj.total === 'number' ? ggufObj.total : null
   // 档案字段(tags 里捞事实,一次性洗好,渲染层拿来就用)
-  const tagList = Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : []
+  const tagList = Array.isArray(m.tags)
+    ? m.tags.filter((t): t is string => typeof t === 'string')
+    : []
   let baseModel: string | null = null
   let license: string | null = null
   for (const t of tagList) {
-    if (baseModel === null && t.startsWith('base_model:')) baseModel = t.slice('base_model:'.length) || null
+    if (baseModel === null && t.startsWith('base_model:'))
+      baseModel = t.slice('base_model:'.length) || null
     if (license === null && t.startsWith('license:')) license = t.slice('license:'.length) || null
   }
   return {
@@ -194,10 +208,15 @@ export interface ShelfQuery {
 }
 
 export function applyShelfQuery(entries: ShelfEntry[], q: ShelfQuery): ShelfEntry[] {
-  const filtered = q.maxBytes === null ? entries : entries.filter((e) => e.ggufTotalBytes === null || e.ggufTotalBytes <= q.maxBytes!)
+  const filtered =
+    q.maxBytes === null
+      ? entries
+      : entries.filter((e) => e.ggufTotalBytes === null || e.ggufTotalBytes <= q.maxBytes!)
   const sorted = [...filtered].sort((a, b) => {
-    const av = q.sortBy === 'downloads' ? a.downloads : a.lastModified ? Date.parse(a.lastModified) : 0
-    const bv = q.sortBy === 'downloads' ? b.downloads : b.lastModified ? Date.parse(b.lastModified) : 0
+    const av =
+      q.sortBy === 'downloads' ? a.downloads : a.lastModified ? Date.parse(a.lastModified) : 0
+    const bv =
+      q.sortBy === 'downloads' ? b.downloads : b.lastModified ? Date.parse(b.lastModified) : 0
     return q.desc ? bv - av : av - bv
   })
   return sorted
@@ -247,9 +266,12 @@ export function sanitizeRepoFiles(raw: unknown): RepoFile[] {
     if (typeof m.path !== 'string' || !m.path.toLowerCase().endsWith('.gguf')) continue
     out.push({
       path: m.path,
-      sizeBytes: typeof m.size === 'number' ? m.size : typeof (m.lfs as Record<string, unknown> | undefined)?.size === 'number'
-        ? ((m.lfs as Record<string, unknown>).size as number)
-        : null,
+      sizeBytes:
+        typeof m.size === 'number'
+          ? m.size
+          : typeof (m.lfs as Record<string, unknown> | undefined)?.size === 'number'
+            ? ((m.lfs as Record<string, unknown>).size as number)
+            : null,
       quantNote: parseQuantNote(m.path)
     })
   }

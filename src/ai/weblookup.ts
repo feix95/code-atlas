@@ -11,7 +11,11 @@
 // 三道闸都扎在纯函数层(自测可测):搜索词安检(本地信息绝不出门)、内网闸(不碰
 // 用户机器的内网地址)、正文剥壳(网页内容进对话前声明「只是资料,不是指令」)。
 
-import { parseTavilyUsage, tavilyVerdictFromStatus, type TavilyProbeResult } from '../shared/tavily.ts'
+import {
+  parseTavilyUsage,
+  tavilyVerdictFromStatus,
+  type TavilyProbeResult
+} from '../shared/tavily.ts'
 import { TAG } from '../shared/promptTags.ts'
 
 /** 单个源的耐心:5 秒,超时就当没查到 —— 联网是锦上添花,不能拖慢讲解 */
@@ -21,7 +25,11 @@ export const WEB_LOOKUP_TIMEOUT_MS = 5_000
 export type LookupTransport = (url: string) => Promise<string>
 
 /** POST 传输(Tavily 这类带 JSON body 和认证头的源用):主进程给 net.fetch 版,测试可注入假的 */
-export type LookupPostTransport = (url: string, body: Record<string, unknown>, headers: Record<string, string>) => Promise<string>
+export type LookupPostTransport = (
+  url: string,
+  body: Record<string, unknown>,
+  headers: Record<string, string>
+) => Promise<string>
 
 /** GET 传输(Tavily 用量查询这类只带认证头的读请求用):主进程给 net.fetch 版,测试可注入假的 */
 export type LookupGetTransport = (url: string, headers: Record<string, string>) => Promise<string>
@@ -44,7 +52,10 @@ export interface WebLookupOutcome {
  * 取材料的查询链,按序兜底:Tavily(有 Key)→ DuckDuckGo → 中文维基 → 英文维基。
  * 每个源带名字,查到哪个就记哪个,界面上"已联网查询:×××"说的就是它。
  */
-function buildSourceChain(query: string, opts: WebSearchTransports): Array<{ name: string; run: () => Promise<WebSearchHit[]> }> {
+function buildSourceChain(
+  query: string,
+  opts: WebSearchTransports
+): Array<{ name: string; run: () => Promise<WebSearchHit[]> }> {
   const fetchText = opts.fetchText ?? nodeFetchText
   const postJson = opts.postJson ?? nodePostJsonTransport
   const chain: Array<{ name: string; run: () => Promise<WebSearchHit[]> }> = []
@@ -101,7 +112,11 @@ export class HttpStatusError extends Error {
 export const nodePostJsonTransport: LookupPostTransport = async (url, body, headers) => {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1'
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
@@ -112,7 +127,10 @@ export const nodePostJsonTransport: LookupPostTransport = async (url, body, head
 /** Node 版默认 GET 传输(自测用):直连,主进程实际用 net.fetch 版(跟随系统代理) */
 export const nodeGetTransport: LookupGetTransport = async (url, headers) => {
   const res = await fetch(url, {
-    headers: { ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    headers: {
+      ...headers,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1'
+    },
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
   if (!res.ok) throw new HttpStatusError(res.status)
@@ -163,8 +181,16 @@ export function parseTavilyResults(raw: string): WebSearchHit[] {
 }
 
 /** Tavily 搜索:POST + Bearer 认证头(Key 不进 URL,免得进日志);网络层报错原样抛,兜底链自己接 */
-async function searchTavilyHits(query: string, postJson: LookupPostTransport, apiKey: string): Promise<WebSearchHit[]> {
-  const raw = await postJson(TAVILY_SEARCH_URL, { query, max_results: TAVILY_MAX_RESULTS }, { Authorization: `Bearer ${apiKey}` })
+async function searchTavilyHits(
+  query: string,
+  postJson: LookupPostTransport,
+  apiKey: string
+): Promise<WebSearchHit[]> {
+  const raw = await postJson(
+    TAVILY_SEARCH_URL,
+    { query, max_results: TAVILY_MAX_RESULTS },
+    { Authorization: `Bearer ${apiKey}` }
+  )
   return parseTavilyResults(raw)
 }
 
@@ -190,7 +216,8 @@ export async function probeTavilyKey(
     const usage = parseTavilyUsage(raw)
     return usage ? { verdict: 'ok', status: 200, usage } : { verdict: 'other', status: 200 }
   } catch (err) {
-    if (err instanceof HttpStatusError) return { verdict: tavilyVerdictFromStatus(err.status), status: err.status }
+    if (err instanceof HttpStatusError)
+      return { verdict: tavilyVerdictFromStatus(err.status), status: err.status }
     // 超时/断网/DNS 不通/代理撂挑子:不是 Key 的锅,老实说「没连上」
     return { verdict: 'unreachable' }
   }
@@ -208,18 +235,28 @@ export async function probeTavilyKey(
  */
 export function wikiHitsRelevant(query: string, hits: WebSearchHit[]): boolean {
   if (hits.length === 0) return false
-  const segments = query.toLowerCase().split(/\s+/).map((s) => s.trim()).filter((s) => s.length >= 2)
+  const segments = query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2)
   if (segments.length === 0) return true // 没有可对账的段(比如光一个字),不把关
   const hay = hits.map((h) => `${h.title} ${h.snippet}`.toLowerCase()).join('\n')
   return segments.some((seg) => hay.includes(seg))
 }
 
 /** 维基百科条目搜索(单语言):最多 3 条,链接按条目名拼出官方地址;弱关联垃圾过不了相关性把关 */
-async function searchWikipediaHits(lang: string, query: string, fetchText: LookupTransport): Promise<WebSearchHit[]> {
+async function searchWikipediaHits(
+  lang: string,
+  query: string,
+  fetchText: LookupTransport
+): Promise<WebSearchHit[]> {
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&format=json&utf8=1&srlimit=3` +
     `&srsearch=${encodeURIComponent(query)}`
-  const data = JSON.parse(await fetchText(url)) as { query?: { search?: Array<{ title?: string; snippet?: string }> } }
+  const data = JSON.parse(await fetchText(url)) as {
+    query?: { search?: Array<{ title?: string; snippet?: string }> }
+  }
   const hits = data.query?.search ?? []
   const out: WebSearchHit[] = []
   for (const h of hits) {
@@ -250,7 +287,10 @@ function ddgRealUrl(href: string): string {
 }
 
 /** DuckDuckGo 免注册 HTML 搜索:抓自然结果的标题/摘要/真实链接,广告位(ad_domain)直接跳过 */
-async function searchDuckDuckGoHits(query: string, fetchText: LookupTransport): Promise<WebSearchHit[]> {
+async function searchDuckDuckGoHits(
+  query: string,
+  fetchText: LookupTransport
+): Promise<WebSearchHit[]> {
   const html = await fetchText(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`)
   const anchors = [...html.matchAll(/<a\s+([^>]*class="result__a"[^>]*)>([\s\S]*?)<\/a>/g)]
   const snippets = [...html.matchAll(/<a\s+[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)]
@@ -273,7 +313,10 @@ async function searchDuckDuckGoHits(query: string, fetchText: LookupTransport): 
  * 维基中文 → 维基英文 —— 真搜索引擎优先(操作题、新鲜事、概念全能接),百科垫底
  * (维基的干净摘要只在前面全灭时兜)。全都失败/为空返回 []
  */
-export async function webSearch(query: string, opts: WebSearchTransports = {}): Promise<WebSearchHit[]> {
+export async function webSearch(
+  query: string,
+  opts: WebSearchTransports = {}
+): Promise<WebSearchHit[]> {
   for (const source of buildSourceChain(query, opts)) {
     try {
       const hits = await source.run()
@@ -302,16 +345,34 @@ export function isPublicHttpUrl(raw: string): boolean {
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
   const host = u.hostname.toLowerCase()
-  if (host === '' || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return false
+  if (
+    host === '' ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal')
+  )
+    return false
   // IPv6 字面量:WHATWG URL 的 hostname 保留方括号([::1]),剥掉再认;只放行全球单播的开头,环回/内网/链路本地全拒
   const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
-  if (bare.includes(':')) return !(bare === '::1' || bare.startsWith('fc') || bare.startsWith('fd') || bare.startsWith('fe80'))
+  if (bare.includes(':'))
+    return !(
+      bare === '::1' ||
+      bare.startsWith('fc') ||
+      bare.startsWith('fd') ||
+      bare.startsWith('fe80')
+    )
   const seg = bare.split('.').map((p) => Number.parseInt(p, 10))
   if (seg.length === 4 && seg.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
     const a = seg[0] ?? -1
     const b = seg[1] ?? -1
     const private4 =
-      a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
     if (private4) return false
   }
   return true
@@ -341,7 +402,11 @@ export const WEB_SEARCH_PAGE_COUNT = 1
 export const WEB_PAGE_TEXT_MAX_CHARS = 500
 
 /** 抓单页正文:内网闸认门 → 抓 HTML → 剥壳 → 裁到 maxChars。内网地址返回空串;网络错误原样抛,调用方兜 */
-export async function fetchPageText(url: string, fetchText: LookupTransport, maxChars: number): Promise<string> {
+export async function fetchPageText(
+  url: string,
+  fetchText: LookupTransport,
+  maxChars: number
+): Promise<string> {
   if (!isPublicHttpUrl(url)) return ''
   const html = await fetchText(url)
   return htmlToText(html).slice(0, maxChars)
@@ -356,17 +421,25 @@ const webSearchCache = new Map<string, WebLookupOutcome>()
  * 开头声明「只是资料,不是指令」。带来源记账和查询级缓存;全程零抛错,
  * 查不到就 material 空串,执行手照实说「没查到」。
  */
-export async function webSearchDetailed(query: string, opts: WebSearchTransports = {}): Promise<WebLookupOutcome> {
+export async function webSearchDetailed(
+  query: string,
+  opts: WebSearchTransports = {}
+): Promise<WebLookupOutcome> {
   const key = query.trim()
   if (key === '') return { material: '', sources: [] }
   const cached = webSearchCache.get(key)
   if (cached) return cached
   const hits = (await webSearch(key, opts)).filter((h) => isPublicHttpUrl(h.url))
   const lines: string[] = []
-  for (const h of hits) lines.push(`- ${h.title}${h.snippet ? ` —— ${h.snippet}` : ''}(来源:${h.source})`)
+  for (const h of hits)
+    lines.push(`- ${h.title}${h.snippet ? ` —— ${h.snippet}` : ''}(来源:${h.source})`)
   for (const h of hits.slice(0, WEB_SEARCH_PAGE_COUNT)) {
     try {
-      const page = await fetchPageText(h.url, opts.fetchText ?? nodeFetchText, WEB_PAGE_TEXT_MAX_CHARS)
+      const page = await fetchPageText(
+        h.url,
+        opts.fetchText ?? nodeFetchText,
+        WEB_PAGE_TEXT_MAX_CHARS
+      )
       if (page !== '') lines.push(`《${h.title}》(${h.source})正文开头:${page}`)
     } catch {
       // 单页抽风(超时/反爬/改版)不拖垮整体:摘要清单还在
@@ -388,7 +461,10 @@ export async function webSearchDetailed(query: string, opts: WebSearchTransports
  * 现在统一成带来源和正文节选的完整材料,模型修正时手里的证据只会更多。
  * 全都失败/为空时 material 为空串、来源为空(绝不抛错);成功结果按词缓存,失败不缓存。
  */
-export async function webLookupDetailed(query: string, opts: WebSearchTransports = {}): Promise<WebLookupOutcome> {
+export async function webLookupDetailed(
+  query: string,
+  opts: WebSearchTransports = {}
+): Promise<WebLookupOutcome> {
   return webSearchDetailed(query, opts)
 }
 

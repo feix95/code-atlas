@@ -24,10 +24,20 @@ export interface Appearance {
 /** 配色预设:石墨 = 默认无色皮(不写任何内联,样式表灰阶说了算);
  *  雾空蓝 = 老默认皮的回归色(accent 一族照旧派生,画布也泛蓝调);
  *  想玩别的色走「自定义」档,种子永远是石墨 */
-export const COLOR_PRESETS: Array<{ key: AppearancePreset; name: string; accent: string; secondary: string }> = [
+export const COLOR_PRESETS: Array<{
+  key: AppearancePreset
+  name: string
+  accent: string
+  secondary: string
+}> = [
   // accent/secondary 即暗色样式表真值(户口在 shared/appearancePalette 的 seed):
   // 进自定义档时种子是它俩,保证「自定义默认」和石墨像素级一致
-  { key: 'default', name: '石墨', accent: NEUTRAL_PALETTE.seed.accent, secondary: NEUTRAL_PALETTE.seed.secondary },
+  {
+    key: 'default',
+    name: '石墨',
+    accent: NEUTRAL_PALETTE.seed.accent,
+    secondary: NEUTRAL_PALETTE.seed.secondary
+  },
   { key: 'blue', name: '雾空蓝', accent: '#147dcc', secondary: '#5ac5db' }
 ]
 
@@ -66,7 +76,11 @@ export function resolveAppearanceStartup(opts: {
       const legacy = sanitizeAppearance(JSON.parse(opts.legacyRaw))
       // 全默认的旧档不值得迁移(等价于没配过),免得用户目录多一个没用的文件
       const isDefault =
-        legacy.mode === 'auto' && legacy.preset === 'default' && !legacy.accent && !legacy.secondary && !legacy.base
+        legacy.mode === 'auto' &&
+        legacy.preset === 'default' &&
+        !legacy.accent &&
+        !legacy.secondary &&
+        !legacy.base
       if (!isDefault) return { value: legacy, migrate: true }
     } catch {
       // 旧档烂了就当没配过

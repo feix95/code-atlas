@@ -45,7 +45,9 @@ export function useAiAsk(send: AiSendFn): {
         setTurns((prev) => prev.map((t) => (t.state === 'busy' ? { ...t, text: '' } : t)))
         return
       }
-      setTurns((prev) => prev.map((t) => (t.state === 'busy' ? { ...t, text: t.text + payload.text } : t)))
+      setTurns((prev) =>
+        prev.map((t) => (t.state === 'busy' ? { ...t, text: t.text + payload.text } : t))
+      )
     })
   }, [])
 
@@ -84,7 +86,12 @@ export function useAiAsk(send: AiSendFn): {
             t.key === key
               ? {
                   ...t,
-                  state: res.status === 'supported' ? 'done' : res.status === 'unsupported' ? 'unsupported' : 'error',
+                  state:
+                    res.status === 'supported'
+                      ? 'done'
+                      : res.status === 'unsupported'
+                        ? 'unsupported'
+                        : 'error',
                   text: res.text
                 }
               : t
@@ -92,7 +99,9 @@ export function useAiAsk(send: AiSendFn): {
         )
       } catch (err) {
         if (idRef.current !== requestId) return
-        setTurns((prev) => prev.map((t) => (t.key === key ? { ...t, state: 'error', text: friendlyErr(err) } : t)))
+        setTurns((prev) =>
+          prev.map((t) => (t.key === key ? { ...t, state: 'error', text: friendlyErr(err) } : t))
+        )
       } finally {
         if (idRef.current === requestId) {
           busyRef.current = false
@@ -116,4 +125,3 @@ export function useAiAsk(send: AiSendFn): {
 
   return { turns, busy, ask, cancel }
 }
-

@@ -160,22 +160,72 @@ function main(): void {
       vramBytes: 24 * GB,
       ...over
     }).text
-  assert.equal(formatContextBill({ contextTokens: 8192, isAuto: false, modelBytes: null, shape: FULL_SHAPE, ramBytes: 64 * GB, vramBytes: 24 * GB }).level, 'unknown', '没模型没法算账')
+  assert.equal(
+    formatContextBill({
+      contextTokens: 8192,
+      isAuto: false,
+      modelBytes: null,
+      shape: FULL_SHAPE,
+      ramBytes: 64 * GB,
+      vramBytes: 24 * GB
+    }).level,
+    'unknown',
+    '没模型没法算账'
+  )
   assert.equal(bill({}).startsWith('按 8192 tokens 算:'), true, '手动档开头报账基数')
   assert.ok(bill({}).includes('照模型结构精算'), '有档案就说明是精算')
   assert.ok(bill({}).includes('整个进显卡'), '绰绰有余就报稳')
-  const tight = formatContextBill({ contextTokens: 131072, isAuto: false, modelBytes: 10 * GB, shape: FULL_SHAPE, ramBytes: 64 * GB, vramBytes: 24 * GB })
+  const tight = formatContextBill({
+    contextTokens: 131072,
+    isAuto: false,
+    modelBytes: 10 * GB,
+    shape: FULL_SHAPE,
+    ramBytes: 64 * GB,
+    vramBytes: 24 * GB
+  })
   assert.equal(tight.level, 'tight', '10GB 模型 + 128k 黑板 ≈ 26GB,24GB 卡落内存 = 有点挤')
-  const tooBig = formatContextBill({ contextTokens: 131072, isAuto: false, modelBytes: 10 * GB, shape: FULL_SHAPE, ramBytes: 8 * GB, vramBytes: 4 * GB })
+  const tooBig = formatContextBill({
+    contextTokens: 131072,
+    isAuto: false,
+    modelBytes: 10 * GB,
+    shape: FULL_SHAPE,
+    ramBytes: 8 * GB,
+    vramBytes: 4 * GB
+  })
   assert.equal(tooBig.level, 'too-big', '连内存一起匀不开 = 装不下')
   assert.ok(tooBig.text.includes('画面跟着整个断掉'), '装不下的话里点破上次那种炸法')
   // 没问到显存的老机器:只拿内存说话
-  const ramEdge = formatContextBill({ contextTokens: 32768, isAuto: false, modelBytes: 2 * GB, shape: null, ramBytes: 8 * GB, vramBytes: null })
+  const ramEdge = formatContextBill({
+    contextTokens: 32768,
+    isAuto: false,
+    modelBytes: 2 * GB,
+    shape: null,
+    ramBytes: 8 * GB,
+    vramBytes: null
+  })
   assert.equal(ramEdge.level, 'ok', '纯内存机型:2GB 模型 + 粗估 2GB 黑板 = 4GB,刚好压线内存一半')
-  const ramOnly = formatContextBill({ contextTokens: 65536, isAuto: false, modelBytes: 2 * GB, shape: null, ramBytes: 8 * GB, vramBytes: null })
-  assert.equal(ramOnly.level, 'too-big', '纯内存机型:2GB 模型 + 粗估 4GB 黑板 = 6GB,超出 8GB 内存七成线')
+  const ramOnly = formatContextBill({
+    contextTokens: 65536,
+    isAuto: false,
+    modelBytes: 2 * GB,
+    shape: null,
+    ramBytes: 8 * GB,
+    vramBytes: null
+  })
+  assert.equal(
+    ramOnly.level,
+    'too-big',
+    '纯内存机型:2GB 模型 + 粗估 4GB 黑板 = 6GB,超出 8GB 内存七成线'
+  )
   assert.ok(ramOnly.text.includes('按块头粗估'), '没档案就老实承认是估的')
-  const auto = formatContextBill({ contextTokens: 16384, isAuto: true, modelBytes: 10 * GB, shape: FULL_SHAPE, ramBytes: 64 * GB, vramBytes: 24 * GB })
+  const auto = formatContextBill({
+    contextTokens: 16384,
+    isAuto: true,
+    modelBytes: 10 * GB,
+    shape: FULL_SHAPE,
+    ramBytes: 64 * GB,
+    vramBytes: 24 * GB
+  })
   assert.ok(auto.text.startsWith('上下文留空'), '留空自动档注明按默认算')
 
   // ── 6. 档位表:2 的幂,出厂上限封顶,翻不出档案按 64k 兜底 ──

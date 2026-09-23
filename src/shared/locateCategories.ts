@@ -11,16 +11,30 @@ export interface CategoryDef {
 
 /** 类目词条:全项目的文件/文件夹按速览图标和文本来认,榜单按新手最常找的排 */
 export const LOCATE_CATEGORIES: CategoryDef[] = [
-  { label: '入口', match: (n, icon, text) => icon === 'entry' || /入口|启动/.test(text) || /^(index|main|app)\./i.test(n) },
+  {
+    label: '入口',
+    match: (n, icon, text) =>
+      icon === 'entry' || /入口|启动/.test(text) || /^(index|main|app)\./i.test(n)
+  },
   { label: '配置', match: (_n, icon, text) => icon === 'config' || /配置/.test(text) },
-  { label: '界面代码', match: (_n, icon, text) => icon === 'component' || /界面|组件|页面/.test(text) },
+  {
+    label: '界面代码',
+    match: (_n, icon, text) => icon === 'component' || /界面|组件|页面/.test(text)
+  },
   { label: '样式', match: (_n, icon, text) => icon === 'style' || /样式/.test(text) },
-  { label: '测试', match: (n, icon, text) => icon === 'test' || /测试/.test(text) || /\.test\.|\.spec\.|selftest/i.test(n) },
+  {
+    label: '测试',
+    match: (n, icon, text) =>
+      icon === 'test' || /测试/.test(text) || /\.test\.|\.spec\.|selftest/i.test(n)
+  },
   { label: '工具代码', match: (_n, icon, text) => icon === 'wrench' || /工具/.test(text) },
   { label: '文档', match: (_n, icon, text) => icon === 'doc' || /文档/.test(text) },
   { label: '依赖', match: (_n, icon, text) => icon === 'package' && /依赖|第三方|库/.test(text) },
   { label: '数据库', match: (_n, icon, text) => icon === 'database' || /数据库/.test(text) },
-  { label: '打包产物', match: (_n, icon, text) => icon === 'archive' || /打包产物|压缩包/.test(text) }
+  {
+    label: '打包产物',
+    match: (_n, icon, text) => icon === 'archive' || /打包产物|压缩包/.test(text)
+  }
 ]
 
 export interface CategoryHit {
@@ -48,7 +62,10 @@ export function findCategory(tree: ScanDirNode, label: string): CategoryResult {
       if (node.relPath !== '') {
         const text = node.summary?.text ?? ''
         if (cat.match(node.name, node.summary?.icon, text)) {
-          hits.push({ relPath: node.relPath, reason: node.summary ? `速览:${node.summary.text}` : '文件名匹配' })
+          hits.push({
+            relPath: node.relPath,
+            reason: node.summary ? `速览:${node.summary.text}` : '文件名匹配'
+          })
         }
       }
       if (node.type === 'directory') for (const child of node.children) walk(child)

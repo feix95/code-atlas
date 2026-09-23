@@ -22,7 +22,7 @@ const FILE_SUMMARIES: Record<string, NodeSummary> = {
   'yarn.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
   'cargo.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
   'poetry.lock': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
-  'readme': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
+  readme: { icon: 'doc', text: '项目说明：是什么、怎么运行' },
   'readme.md': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
   'readme.txt': { icon: 'doc', text: '项目说明：是什么、怎么运行' },
   '.gitignore': TIER3('lock', '告诉 Git 忽略哪些文件，不会被提交'),
@@ -39,20 +39,20 @@ const FILE_SUMMARIES: Record<string, NodeSummary> = {
   'jsconfig.json': { icon: 'config', text: 'JS 配置：帮编辑器理解代码' },
   'tsconfig.json': { icon: 'config', text: '编译配置：类型检查和编译标准' },
   'claude.md': { icon: 'bot', text: 'AI 说明：AI 干活前必读的背景' },
-  'license': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  license: { icon: 'doc', text: '许可证：规定代码能怎么用' },
   'license.md': { icon: 'doc', text: '许可证：规定代码能怎么用' },
   'license.txt': { icon: 'doc', text: '许可证：规定代码能怎么用' },
-  'licence': { icon: 'doc', text: '许可证：规定代码能怎么用' },
+  licence: { icon: 'doc', text: '许可证：规定代码能怎么用' },
   'licence.md': { icon: 'doc', text: '许可证：规定代码能怎么用' },
   'changelog.md': { icon: 'doc', text: '更新日志：每个版本改了什么' },
   'contributing.md': { icon: 'doc', text: '参与指南：如何贡献代码' },
   'code_of_conduct.md': { icon: 'doc', text: '社区公约：行为准则' },
-  'dockerfile': { icon: 'package', text: 'Docker 说明：项目怎么打包运行' },
+  dockerfile: { icon: 'package', text: 'Docker 说明：项目怎么打包运行' },
   'docker-compose.yml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
   'docker-compose.yaml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
   'compose.yml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
   'compose.yaml': { icon: 'package', text: 'Docker 编排：多个容器一起运行' },
-  'makefile': { icon: 'terminal', text: '自动化指令：一条命令跑一串任务' },
+  makefile: { icon: 'terminal', text: '自动化指令：一条命令跑一串任务' },
   'requirements.txt': { icon: 'package', text: 'Python 依赖清单' },
   'pyproject.toml': { icon: 'package', text: 'Python 项目配置' },
   'setup.py': { icon: 'package', text: 'Python 项目配置' },
@@ -70,9 +70,15 @@ const FILE_SUMMARIES: Record<string, NodeSummary> = {
 
 // ── 文件:名字模式规则(字典没精确命中时看名字形状) ──
 const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
-  { re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/, summary: { icon: 'test', text: '测试：验证代码对不对' } },
+  {
+    re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/,
+    summary: { icon: 'test', text: '测试：验证代码对不对' }
+  },
   { re: /^tsconfig\..*\.json$/, summary: { icon: 'config', text: '编译配置：类型检查和编译标准' } },
-  { re: /^(\.?prettier\.config\.|\.prettierrc)/, summary: { icon: 'style', text: '格式配置：统一缩进、引号、换行' } },
+  {
+    re: /^(\.?prettier\.config\.|\.prettierrc)/,
+    summary: { icon: 'style', text: '格式配置：统一缩进、引号、换行' }
+  },
   {
     re: /^(\.eslintrc\.(?!json|js|yml|yaml)|eslint\.config\.)/,
     summary: { icon: 'check', text: '代码检查：查出写法问题和 bug' }
@@ -157,7 +163,16 @@ const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
 
 // 档位1的"沉默名单":图片/纯文本这类家喻户晓的后缀,类型标签已经说清 —— 不写字,但也不许报"没认出"
 // (这是词条政策的沉默名单,不是后缀归类;归类问题一律去 shared/fileKinds.ts 查)
-const KNOWN_SILENT_EXTS = new Set(['.txt', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])
+const KNOWN_SILENT_EXTS = new Set([
+  '.txt',
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.webp'
+])
 
 function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   const lower = file.name.toLowerCase()
@@ -172,7 +187,11 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
 
   // 入口角色(档位2:文件名看不出来的真信息):常见代码语言的 index/main,多半是程序开始跑的地方
   const base = lower.replace(/\.[^.]+$/, '')
-  if (file.language && CODE_LANG_IDS.has(file.language.id) && (base === 'index' || base === 'main')) {
+  if (
+    file.language &&
+    CODE_LANG_IDS.has(file.language.id) &&
+    (base === 'index' || base === 'main')
+  ) {
     return { icon: 'entry', text: '入口：程序多半从这儿开始跑' }
   }
 
@@ -325,7 +344,13 @@ function isTestFileName(name: string): boolean {
 }
 
 /** 目录速览:事实先上(锁死/空)→ 名字字典 → 全文档特判 → 内容统计兜底(没名字线索时看里面装了啥) */
-function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, byLang: Map<string, number>, extCounts: Map<string, number>): NodeSummary {
+function summarizeDir(
+  node: ScanDirNode,
+  directDirs: number,
+  fileCount: number,
+  byLang: Map<string, number>,
+  extCounts: Map<string, number>
+): NodeSummary {
   const lower = node.name.toLowerCase()
   // 残账要说"至少":分级扫描截断后数出来的数是下限,不许把残账报成总数
   const n = (count: number): string => (node.truncated ? `至少 ${count}` : `${count}`)
@@ -363,7 +388,11 @@ function summarizeDir(node: ScanDirNode, directDirs: number, fileCount: number, 
   }
 
   // 全是文字资料、一份代码没有
-  if (fileCount > 0 && extCounts.size > 0 && [...extCounts.keys()].every((ext) => DOC_EXTS.has(ext))) {
+  if (
+    fileCount > 0 &&
+    extCounts.size > 0 &&
+    [...extCounts.keys()].every((ext) => DOC_EXTS.has(ext))
+  ) {
     return { icon: 'doc', text: `全是文档，${n(fileCount)} 份，没有代码` }
   }
 
@@ -408,11 +437,19 @@ function tallyDir(node: ScanDirNode): DirTally {
       tally.directDirs++
       const sub = tallyDir(child) // 先给子目录打标签,顺带收它的家底
       tally.fileCount += sub.fileCount
-      for (const [lang, count] of sub.byLang) tally.byLang.set(lang, (tally.byLang.get(lang) ?? 0) + count)
-      for (const [ext, count] of sub.extCounts) tally.extCounts.set(ext, (tally.extCounts.get(ext) ?? 0) + count)
+      for (const [lang, count] of sub.byLang)
+        tally.byLang.set(lang, (tally.byLang.get(lang) ?? 0) + count)
+      for (const [ext, count] of sub.extCounts)
+        tally.extCounts.set(ext, (tally.extCounts.get(ext) ?? 0) + count)
     }
   }
-  node.summary = summarizeDir(node, tally.directDirs, tally.fileCount, tally.byLang, tally.extCounts)
+  node.summary = summarizeDir(
+    node,
+    tally.directDirs,
+    tally.fileCount,
+    tally.byLang,
+    tally.extCounts
+  )
   return tally
 }
 

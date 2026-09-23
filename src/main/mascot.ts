@@ -26,7 +26,14 @@ import type { Rectangle } from 'electron'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, placeMascotBox, readMascotState, writeMascotState } from './mascotState.ts'
+import {
+  MASCOT_SIZE,
+  mainPanelMenuLabel,
+  mascotCursorInside,
+  placeMascotBox,
+  readMascotState,
+  writeMascotState
+} from './mascotState.ts'
 
 let mascotWindow: BrowserWindow | null = null
 let mascotStateDir = ''
@@ -101,7 +108,10 @@ function stopHoverWatch(): void {
 export function createMascotWindow(stateDir: string): BrowserWindow {
   mascotStateDir = stateDir
   const saved = readMascotState(stateDir)
-  const box = placeMascotBox(saved, screen.getAllDisplays().map((d) => d.workArea))
+  const box = placeMascotBox(
+    saved,
+    screen.getAllDisplays().map((d) => d.workArea)
+  )
   const win = new BrowserWindow({
     width: box.width,
     height: box.height,
@@ -247,7 +257,8 @@ export function registerMascotIpc(handlers: {
     const [cx, cy] = win.getPosition()
     // setBounds 连尺寸钉死:裸 setPosition 在 150% 缩放下每调一次窗体长 1px
     // (雷区档案②:黑匣子拍到拖一趟 140→321,窗往右下长看着就是漂移)
-    if (cx !== tx || cy !== ty) win.setBounds({ x: tx, y: ty, width: MASCOT_SIZE, height: MASCOT_SIZE })
+    if (cx !== tx || cy !== ty)
+      win.setBounds({ x: tx, y: ty, width: MASCOT_SIZE, height: MASCOT_SIZE })
   })
   ipcMain.on(CH.mascotDragEnd, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)

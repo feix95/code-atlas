@@ -208,7 +208,8 @@
    两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;②窗壳的圆角和描边是「窗」的装饰 */
 html,
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   height: 100%;
@@ -845,16 +846,36 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 }
 
 /* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
-.tok-ctl { color: var(--tok-ctl); }
-.tok-kw { color: var(--tok-kw); }
-.tok-str { color: var(--tok-str); }
-.tok-com { color: var(--tok-com); }
-.tok-num { color: var(--tok-num); }
-.tok-fn { color: var(--tok-fn); }
-.tok-type { color: var(--tok-type); }
-.tok-var { color: var(--tok-var); }
-.tok-regex { color: var(--tok-regex); }
-.tok-symbol { color: var(--tok-symbol); }
+.tok-ctl {
+  color: var(--tok-ctl);
+}
+.tok-kw {
+  color: var(--tok-kw);
+}
+.tok-str {
+  color: var(--tok-str);
+}
+.tok-com {
+  color: var(--tok-com);
+}
+.tok-num {
+  color: var(--tok-num);
+}
+.tok-fn {
+  color: var(--tok-fn);
+}
+.tok-type {
+  color: var(--tok-type);
+}
+.tok-var {
+  color: var(--tok-var);
+}
+.tok-regex {
+  color: var(--tok-regex);
+}
+.tok-symbol {
+  color: var(--tok-symbol);
+}
 
 /* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
 .code-mark {
@@ -3751,7 +3772,8 @@ body.is-sash-dragging .pane-sash::after {
 ::-webkit-scrollbar {
   width: 0.5625rem;
   height: 0.5625rem;
-}::-webkit-scrollbar-thumb {
+}
+::-webkit-scrollbar-thumb {
   background: var(--line);
   border-radius: var(--radius-xl);
   border: 2px solid transparent;
@@ -4542,7 +4564,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: 0.4375rem;
   padding: 0.4375rem 1.5rem 0.4375rem 0.5rem; /* 右侧统一预留对勾角标位,文字不顶到卡缘 */
-  
+
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);

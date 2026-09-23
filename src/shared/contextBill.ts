@@ -1,5 +1,9 @@
 import type { GgufShape } from './types.ts'
-import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from './modelShelf.ts'
+import {
+  MODEL_FIT_RAM_MAX_RATIO,
+  MODEL_FIT_RAM_OK_RATIO,
+  MODEL_FIT_VRAM_RATIO
+} from './modelShelf.ts'
 
 /**
  * 上下文档位的账本(纯函数,自测覆盖):滑块的档、黑板的账、大白话的结论都在这里算,
@@ -20,7 +24,8 @@ const GB = 1024 ** 3
 export function kvBytesFromShape(contextTokens: number, shape: GgufShape): number | null {
   if (!Number.isFinite(contextTokens) || contextTokens <= 0) return null
   const { blockCount, headCount, kvHeadCount, embeddingLength } = shape
-  if (blockCount === null || headCount === null || kvHeadCount === null || embeddingLength === null) return null
+  if (blockCount === null || headCount === null || kvHeadCount === null || embeddingLength === null)
+    return null
   if (blockCount <= 0 || headCount <= 0 || kvHeadCount <= 0) return null
   const headDim = embeddingLength / headCount
   if (!Number.isFinite(headDim) || headDim <= 0) return null
@@ -72,7 +77,10 @@ export function formatContextBill(opts: {
   const total = `模型 ${formatGB(opts.modelBytes)} + 上下文黑板 ${formatGB(kv)}(${kvHow})≈ ${formatGB(need)}`
   if (opts.vramBytes !== null && opts.vramBytes > 0) {
     if (need <= opts.vramBytes * MODEL_FIT_VRAM_RATIO) {
-      return { level: 'ok', text: `${head}${total},显存 ${formatGB(opts.vramBytes)} —— 整个进显卡,稳` }
+      return {
+        level: 'ok',
+        text: `${head}${total},显存 ${formatGB(opts.vramBytes)} —— 整个进显卡,稳`
+      }
     }
     if (need <= opts.vramBytes + opts.ramBytes * MODEL_FIT_RAM_OK_RATIO) {
       return {
@@ -90,7 +98,10 @@ export function formatContextBill(opts: {
     return { level: 'ok', text: `${head}${total},内存 ${formatGB(opts.ramBytes)} —— 装得下` }
   }
   if (need <= opts.ramBytes * MODEL_FIT_RAM_MAX_RATIO) {
-    return { level: 'tight', text: `${head}${total},内存 ${formatGB(opts.ramBytes)} —— 塞得下但系统会挤,跑起来偏慢` }
+    return {
+      level: 'tight',
+      text: `${head}${total},内存 ${formatGB(opts.ramBytes)} —— 塞得下但系统会挤,跑起来偏慢`
+    }
   }
   return {
     level: 'too-big',

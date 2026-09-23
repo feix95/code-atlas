@@ -1,6 +1,12 @@
 import { promises as fs, type Dirent } from 'node:fs'
 import { basename, extname, join } from 'node:path'
-import type { ScanDirNode, ScanFileNode, ScanResult, ScanStats, ScanTreeNode } from '../shared/types.ts'
+import type {
+  ScanDirNode,
+  ScanFileNode,
+  ScanResult,
+  ScanStats,
+  ScanTreeNode
+} from '../shared/types.ts'
 import { DOC_EXTS } from '../shared/fileKinds.ts'
 import { identifyFileLanguage } from '../parser/index.ts'
 
@@ -154,7 +160,13 @@ async function scanDir(
         // 目录照旧点名挂占位(顶层永远看得见,点开再探);文件不再硬列
         if (entry.isDirectory()) {
           ctx.stats.lazyCount++
-          children.push({ type: 'directory', name: entry.name, relPath: childRelPath, children: [], lazy: true })
+          children.push({
+            type: 'directory',
+            name: entry.name,
+            relPath: childRelPath,
+            children: [],
+            lazy: true
+          })
         }
         return
       }
@@ -162,7 +174,14 @@ async function scanDir(
         ctx.stats.dirCount++
         let child: ScanDirNode
         if (depth >= MAX_DEPTH) {
-          child = { type: 'directory', name: entry.name, relPath: childRelPath, children: [], truncated: true, lazy: true }
+          child = {
+            type: 'directory',
+            name: entry.name,
+            relPath: childRelPath,
+            children: [],
+            truncated: true,
+            lazy: true
+          }
         } else {
           child = await scanDir(fullPath, entry.name, childRelPath, depth + 1, ctx)
         }
@@ -179,8 +198,17 @@ async function scanDir(
           ctx.stats.byLanguage[language.id] = agg
         }
         // 文档类读个开头标题(第一百锤):一句话说明能亮真名而不是笼统一句「文档」
-        const docTitle = DOC_EXTS.has(ext) ? await ctx.gate.run(() => sniffDocTitle(fullPath)) : undefined
-        const node: ScanFileNode = { type: 'file', name: entry.name, relPath: childRelPath, ext, ...(language ? { language } : {}), ...(docTitle ? { docTitle } : {}) }
+        const docTitle = DOC_EXTS.has(ext)
+          ? await ctx.gate.run(() => sniffDocTitle(fullPath))
+          : undefined
+        const node: ScanFileNode = {
+          type: 'file',
+          name: entry.name,
+          relPath: childRelPath,
+          ext,
+          ...(language ? { language } : {}),
+          ...(docTitle ? { docTitle } : {})
+        }
         children.push(node)
       }
       // 其他类型(管道、socket 等)不进树

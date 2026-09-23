@@ -24,7 +24,11 @@ check('splitDevLogLines:回车/换行/回车换行都拆,空行纯空白不记�
 
 check('splitDevLogLines:llama.cpp 进度条一回车一帧,逐帧成行不糊成一条', () => {
   const chunk = 'loading model 10%\rloading model 20%\rloading model 30%'
-  assert.deepEqual(splitDevLogLines(chunk), ['loading model 10%', 'loading model 20%', 'loading model 30%'])
+  assert.deepEqual(splitDevLogLines(chunk), [
+    'loading model 10%',
+    'loading model 20%',
+    'loading model 30%'
+  ])
 })
 
 check('capDevLogLine:短行原样;超长掐中间留头尾并注明省了多少', () => {
@@ -42,9 +46,18 @@ check('createDevLogRing:add 自动拆行编号;满 2000 丢最旧的,编号不�
   ring.add('request', 'three')
   assert.equal(ring.count(), 3)
   const snap = ring.snapshot()
-  assert.deepEqual(snap.map((e) => e.text), ['one', 'two', 'three'])
-  assert.deepEqual(snap.map((e) => e.source), ['engine', 'engine', 'request'])
-  assert.deepEqual(snap.map((e) => e.id), [1, 2, 3])
+  assert.deepEqual(
+    snap.map((e) => e.text),
+    ['one', 'two', 'three']
+  )
+  assert.deepEqual(
+    snap.map((e) => e.source),
+    ['engine', 'engine', 'request']
+  )
+  assert.deepEqual(
+    snap.map((e) => e.id),
+    [1, 2, 3]
+  )
   for (let i = 0; i < 10; i++) ring.add('system', `n${i}`)
   assert.equal(ring.count(), 5, '容量 5 就只留 5 条')
   assert.equal(ring.snapshot()[0].text, 'n5', '最旧的滚出去')

@@ -36,7 +36,8 @@ export function looksLikeTavilyKey(key: string): boolean {
 }
 
 /** 「测一下」的战果:一个结论 + 网络层给的状态码(压根没连上时没有) */
-export type TavilyProbeVerdict = 'ok' | 'bad-key' | 'quota' | 'busy' | 'server' | 'other' | 'unreachable'
+export type TavilyProbeVerdict =
+  'ok' | 'bad-key' | 'quota' | 'busy' | 'server' | 'other' | 'unreachable'
 
 /** Key 的用量细账(/usage 端点查回来的,2026-09-17「测一下」零成本改造捎带的) */
 export interface TavilyUsageInfo {
@@ -84,9 +85,15 @@ export function parseTavilyUsage(raw: string): TavilyUsageInfo | null {
         ? keyInfo.usage
         : undefined
   if (usedRaw === undefined) return null
-  const limit = typeof account?.plan_limit === 'number' && Number.isFinite(account.plan_limit) ? account.plan_limit : null
+  const limit =
+    typeof account?.plan_limit === 'number' && Number.isFinite(account.plan_limit)
+      ? account.plan_limit
+      : null
   return {
-    plan: typeof account?.current_plan === 'string' && account.current_plan.trim() !== '' ? account.current_plan.trim() : 'Tavily',
+    plan:
+      typeof account?.current_plan === 'string' && account.current_plan.trim() !== ''
+        ? account.current_plan.trim()
+        : 'Tavily',
     used: usedRaw,
     limit,
     remaining: limit === null ? null : Math.max(0, limit - usedRaw)

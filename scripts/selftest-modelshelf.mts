@@ -35,16 +35,25 @@ const GB = 1024 ** 3
 console.log('── 模态标签:多模态组合优先,认不出老实说「其他」──')
 {
   ok(modalityLabel({ tags: ['gguf', 'text-generation'] }) === '文本', '纯文本模型 → 文本')
-  ok(modalityLabel({ tags: ['image-text-to-text', 'text-generation'] }) === '文本+图像', '图文模型 → 文本+图像')
+  ok(
+    modalityLabel({ tags: ['image-text-to-text', 'text-generation'] }) === '文本+图像',
+    '图文模型 → 文本+图像'
+  )
   ok(modalityLabel({ tags: ['audio-text-to-text'] }) === '文本+语音', '音文模型 → 文本+语音')
-  ok(modalityLabel({ pipeline_tag: 'feature-extraction' }) === '向量(不适合聊天)', '嵌入模型 → 向量(明示不适合聊天)')
+  ok(
+    modalityLabel({ pipeline_tag: 'feature-extraction' }) === '向量(不适合聊天)',
+    '嵌入模型 → 向量(明示不适合聊天)'
+  )
   ok(modalityLabel({ tags: ['gguf'] }) === '其他', '没线索 → 其他,不硬猜')
   ok(modalityLabel({ tags: '垃圾' }) === '其他', 'tags 不是数组 → 不炸,回其他')
 }
 
 console.log('── 参数量级:从仓库名解析最大的 N B,解析不出老实 null ──')
 {
-  ok(parseParamScale('mradermacher/Ornith-1.5-9B-uncensored-GGUF') === '9B', '1.5 不吃(B 只跟数字),取 9B')
+  ok(
+    parseParamScale('mradermacher/Ornith-1.5-9B-uncensored-GGUF') === '9B',
+    '1.5 不吃(B 只跟数字),取 9B'
+  )
   ok(parseParamScale('unsloth/Qwen3-4B-Instruct-GGUF') === '4B', '常见命名 → 4B')
   ok(parseParamScale('Qwen3.8-27B') === '27B', '多个数字取最大 → 27B')
   ok(parseParamScale('mixtral-8x7B-Instruct') === '56B', 'MoE 乘数 8x7B → 56B(算术事实)')
@@ -76,10 +85,16 @@ console.log('── 货架准入:不是文本打底的一律过滤(2026-09-18 �
 {
   ok(isChatCapable({ pipeline_tag: 'text-generation' }), '文本生成 → 上架')
   ok(isChatCapable({ pipeline_tag: 'image-text-to-text' }), '图文 → 上架(视觉是产品能力)')
-  ok(isChatCapable({ tags: ['conversational'] }), '没标任务但带聊天模板 → 上架(HF 大量量化仓不标任务,别误杀)')
+  ok(
+    isChatCapable({ tags: ['conversational'] }),
+    '没标任务但带聊天模板 → 上架(HF 大量量化仓不标任务,别误杀)'
+  )
   ok(isChatCapable({ tags: ['text-generation'] }), '任务标签藏在 tags 里也算')
   ok(!isChatCapable({ pipeline_tag: 'feature-extraction' }), '向量检索 → 滤')
-  ok(!isChatCapable({ pipeline_tag: 'audio-text-to-text' }), '语音模型 → 滤(产品只要文字/工具/视觉)')
+  ok(
+    !isChatCapable({ pipeline_tag: 'audio-text-to-text' }),
+    '语音模型 → 滤(产品只要文字/工具/视觉)'
+  )
   ok(!isChatCapable({ pipeline_tag: 'text-to-speech' }), 'TTS → 滤')
   ok(!isChatCapable({ pipeline_tag: 'image-to-video' }), '视频生成 → 滤')
   ok(!isChatCapable({}), '什么线索都没有 → 滤,不赌')
@@ -96,9 +111,15 @@ console.log('── 清洗:烂条目/不达标条目不进列表 ──')
     tags: ['gguf', 'base_model:Qwen/Qwen3-4B', 'license:apache-2.0'],
     gguf: { total: 4.2 * GB }
   })
-  ok(good !== null && good.ggufTotalBytes === 4.2 * GB && good.modalityLabel === '文本+图像', '合法条目各字段落位')
+  ok(
+    good !== null && good.ggufTotalBytes === 4.2 * GB && good.modalityLabel === '文本+图像',
+    '合法条目各字段落位'
+  )
   ok(good?.paramScale === '4B' && good.likes === 1022, '参数量级与收藏就地洗好,渲染层直接用')
-  ok(good?.baseModel === 'Qwen/Qwen3-4B' && good.license === 'apache-2.0', '底座/协议从 tags 捞出来,原样不加工')
+  ok(
+    good?.baseModel === 'Qwen/Qwen3-4B' && good.license === 'apache-2.0',
+    '底座/协议从 tags 捞出来,原样不加工'
+  )
   ok(
     sanitizeShelfEntry({ id: 'a/b', pipeline_tag: 'text-generation' })?.baseModel === null,
     '没标底座 → null(档案卡整格不显示)'
@@ -106,12 +127,19 @@ console.log('── 清洗:烂条目/不达标条目不进列表 ──')
   ok(sanitizeShelfEntry(null) === null, 'null → null')
   ok(sanitizeShelfEntry({ id: '' }) === null, '没名字 → null')
   ok(
-    sanitizeShelfEntry({ id: 'a/b', pipeline_tag: 'text-generation', gguf: { total: '很大' } })?.ggufTotalBytes === null,
+    sanitizeShelfEntry({ id: 'a/b', pipeline_tag: 'text-generation', gguf: { total: '很大' } })
+      ?.ggufTotalBytes === null,
     '大小字段烂 → null(界面显示未知)'
   )
-  ok(sanitizeShelfEntry({ id: 'a/b', pipeline_tag: 'feature-extraction' }) === null, '向量模型在清洗层就被滤,不进货架')
+  ok(
+    sanitizeShelfEntry({ id: 'a/b', pipeline_tag: 'feature-extraction' }) === null,
+    '向量模型在清洗层就被滤,不进货架'
+  )
   ok(sanitizeShelfList('垃圾').length === 0, '响应不是数组 → 空列表')
-  ok(sanitizeShelfList([{ id: 'a/b', tags: ['conversational'] }, '垃圾', null]).length === 1, '混着烂条目 → 只留干净那条')
+  ok(
+    sanitizeShelfList([{ id: 'a/b', tags: ['conversational'] }, '垃圾', null]).length === 1,
+    '混着烂条目 → 只留干净那条'
+  )
 }
 
 console.log('── 带不动判定:内存预算 = 总内存 × 0.7,贴线提醒 ──')
@@ -141,12 +169,34 @@ console.log('── 筛选与排序 ──')
     license: null
   })
   const entries = [mk('a/big', 40, 100, 1), mk('b/small', 4, 3000, 30), mk('c/mid', 8, 500, 10)]
-  ok(applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true }).map((e) => e.id).join(','), '只留 ≤16G 的三条中的两条')
-  assert.equal(applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true }).length, 2)
-  assert.equal(applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true })[0].id, 'b/small')
-  ok(applyShelfQuery(entries, { maxBytes: null, sortBy: 'downloads', desc: false })[0].id === 'a/big', '按下载量正序,最冷的排最前')
-  ok(applyShelfQuery(entries, { maxBytes: null, sortBy: 'lastModified', desc: true })[0].id === 'a/big', '按时间倒序,最新的排最前')
-  ok(applyShelfQuery(entries, { maxBytes: 1 * GB, sortBy: 'downloads', desc: true }).length === 0, '卡太死 → 空,界面有话接')
+  ok(
+    applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true })
+      .map((e) => e.id)
+      .join(','),
+    '只留 ≤16G 的三条中的两条'
+  )
+  assert.equal(
+    applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true }).length,
+    2
+  )
+  assert.equal(
+    applyShelfQuery(entries, { maxBytes: 16 * GB, sortBy: 'downloads', desc: true })[0].id,
+    'b/small'
+  )
+  ok(
+    applyShelfQuery(entries, { maxBytes: null, sortBy: 'downloads', desc: false })[0].id ===
+      'a/big',
+    '按下载量正序,最冷的排最前'
+  )
+  ok(
+    applyShelfQuery(entries, { maxBytes: null, sortBy: 'lastModified', desc: true })[0].id ===
+      'a/big',
+    '按时间倒序,最新的排最前'
+  )
+  ok(
+    applyShelfQuery(entries, { maxBytes: 1 * GB, sortBy: 'downloads', desc: true }).length === 0,
+    '卡太死 → 空,界面有话接'
+  )
 }
 
 console.log('── 仓库文件清洗:只留 gguf,大小认 lfs ──')

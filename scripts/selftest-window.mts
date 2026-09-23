@@ -13,7 +13,16 @@ import {
   readWindowState,
   writeWindowState
 } from '../src/main/window-state.ts'
-import { MASCOT_SIZE, mainPanelMenuLabel, mascotCursorInside, mascotMenuLabel, parseMascotState, placeMascotBox, readMascotState, writeMascotState } from '../src/main/mascotState.ts'
+import {
+  MASCOT_SIZE,
+  mainPanelMenuLabel,
+  mascotCursorInside,
+  mascotMenuLabel,
+  parseMascotState,
+  placeMascotBox,
+  readMascotState,
+  writeMascotState
+} from '../src/main/mascotState.ts'
 import { MainPanelController } from '../src/main/mainPanel.ts'
 
 /** 本机假定的工作区:主屏 2560×1400,左边挂一块 1920×1040(负坐标) */
@@ -28,12 +37,18 @@ function check(name: string, fn: () => void): void {
 }
 
 check('parseWindowState:干净存档原样认回(负坐标多屏也认)', () => {
-  const saved = parseWindowState({ box: { x: -1920, y: 0, width: 1200, height: 800 }, maximized: false })
+  const saved = parseWindowState({
+    box: { x: -1920, y: 0, width: 1200, height: 800 },
+    maximized: false
+  })
   assert.deepEqual(saved, { box: { x: -1920, y: 0, width: 1200, height: 800 }, maximized: false })
 })
 
 check('parseWindowState:小数就地取整', () => {
-  const saved = parseWindowState({ box: { x: 10.4, y: -3.6, width: 1000.6, height: 700.2 }, maximized: true })
+  const saved = parseWindowState({
+    box: { x: 10.4, y: -3.6, width: 1000.6, height: 700.2 },
+    maximized: true
+  })
   assert.equal(saved!.box.x, 10)
   assert.equal(saved!.box.y, -4)
   assert.equal(saved!.box.width, 1001)
@@ -42,7 +57,19 @@ check('parseWindowState:小数就地取整', () => {
 })
 
 check('parseWindowState:垃圾一概不认', () => {
-  for (const junk of [null, 'x', 42, [], { box: null }, { box: 'x' }, { box: {} }, { box: { x: 0, y: 0, width: 'a', height: 800 } }, { box: { x: 0, y: 0, width: NaN, height: 800 } }, { box: { x: Infinity, y: 0, width: 1000, height: 700 } }, { box: { x: 0, y: 0, width: 1000 } }]) {
+  for (const junk of [
+    null,
+    'x',
+    42,
+    [],
+    { box: null },
+    { box: 'x' },
+    { box: {} },
+    { box: { x: 0, y: 0, width: 'a', height: 800 } },
+    { box: { x: 0, y: 0, width: NaN, height: 800 } },
+    { box: { x: Infinity, y: 0, width: 1000, height: 700 } },
+    { box: { x: 0, y: 0, width: 1000 } }
+  ]) {
     assert.equal(parseWindowState(junk), null, `应回 null:${JSON.stringify(junk)}`)
   }
 })
@@ -227,36 +254,42 @@ class FakeMainPanelWindow extends EventEmitter {
   }
 }
 
-check('MainPanelController:初始露着但最小化记成不在屏;restore/show/hide/minimize 事件翻账本', () => {
-  const win = new FakeMainPanelWindow()
-  win.visible = true
-  win.minimized = true
-  const controller = new MainPanelController(win as unknown as BrowserWindow)
-  assert.equal(controller.isShown(), false, '初始:露着但最小化 → 不算在屏')
-  win.restore()
-  assert.equal(controller.isShown(), true, 'restore 事件 → 记回在屏')
-  win.hide()
-  assert.equal(controller.isShown(), false, 'hide 事件 → 记下不在屏')
-  win.show()
-  assert.equal(controller.isShown(), true, 'show 事件 → 记回在屏')
-  win.minimized = true
-  win.emit('minimize')
-  assert.equal(controller.isShown(), false, 'minimize 事件 → 记下不在屏')
-  win.restore()
-  assert.equal(controller.isShown(), true)
-  win.emit('closed')
-  assert.equal(controller.isShown(), false, 'closed 事件 → 账本清零')
-})
+check(
+  'MainPanelController:初始露着但最小化记成不在屏;restore/show/hide/minimize 事件翻账本',
+  () => {
+    const win = new FakeMainPanelWindow()
+    win.visible = true
+    win.minimized = true
+    const controller = new MainPanelController(win as unknown as BrowserWindow)
+    assert.equal(controller.isShown(), false, '初始:露着但最小化 → 不算在屏')
+    win.restore()
+    assert.equal(controller.isShown(), true, 'restore 事件 → 记回在屏')
+    win.hide()
+    assert.equal(controller.isShown(), false, 'hide 事件 → 记下不在屏')
+    win.show()
+    assert.equal(controller.isShown(), true, 'show 事件 → 记回在屏')
+    win.minimized = true
+    win.emit('minimize')
+    assert.equal(controller.isShown(), false, 'minimize 事件 → 记下不在屏')
+    win.restore()
+    assert.equal(controller.isShown(), true)
+    win.emit('closed')
+    assert.equal(controller.isShown(), false, 'closed 事件 → 账本清零')
+  }
+)
 
-check('MainPanelController:底层谎报「露着」其实最小化时,show() 照样 restore→show→invalidate→focus', () => {
-  const win = new FakeMainPanelWindow()
-  win.visible = true
-  win.minimized = true
-  const controller = new MainPanelController(win as unknown as BrowserWindow)
-  controller.show()
-  assert.deepEqual(win.calls, ['restore', 'show', 'invalidate', 'focus'])
-  assert.equal(controller.isShown(), true)
-})
+check(
+  'MainPanelController:底层谎报「露着」其实最小化时,show() 照样 restore→show→invalidate→focus',
+  () => {
+    const win = new FakeMainPanelWindow()
+    win.visible = true
+    win.minimized = true
+    const controller = new MainPanelController(win as unknown as BrowserWindow)
+    controller.show()
+    assert.deepEqual(win.calls, ['restore', 'show', 'invalidate', 'focus'])
+    assert.equal(controller.isShown(), true)
+  }
+)
 
 check('MainPanelController:翻账才喊旁听,重复状态不吵(托盘菜单靠它换文案)', () => {
   const win = new FakeMainPanelWindow()
@@ -294,7 +327,10 @@ async function main(): Promise<void> {
 
     check('writeWindowState → readWindowState 原样回环', () => {
       writeWindowState(dir, { box: { x: 8, y: 9, width: 1100, height: 750 }, maximized: false })
-      assert.deepEqual(readWindowState(dir), { box: { x: 8, y: 9, width: 1100, height: 750 }, maximized: false })
+      assert.deepEqual(readWindowState(dir), {
+        box: { x: 8, y: 9, width: 1100, height: 750 },
+        maximized: false
+      })
       const raw = JSON.parse(readFileSync(join(dir, 'window-state.json'), 'utf8'))
       assert.equal(raw.box.width, 1100)
     })

@@ -23,7 +23,13 @@ export type NoteMap = Record<string, NoteEntry>
 
 /** 项目路径 → 存储键:斜杠统一、去掉收尾斜杠、统一小写,防同一项目裂成两份 */
 export function notesStorageKey(rootPath: string): string {
-  return KEY_PREFIX + rootPath.replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase()
+  return (
+    KEY_PREFIX +
+    rootPath
+      .replace(/[\\/]+/g, '/')
+      .replace(/\/+$/, '')
+      .toLowerCase()
+  )
 }
 
 /** 原文 → 干净的备注表(纯函数,自测覆盖):垃圾整条扔、超长截断、超量淘汰最旧 */
@@ -33,7 +39,13 @@ export function parseNotes(raw: unknown): NoteMap {
   for (const [relPath, value] of Object.entries(raw as Record<string, unknown>)) {
     if (relPath === '' || typeof value !== 'object' || value === null) continue
     const v = value as Record<string, unknown>
-    if (typeof v['text'] !== 'string' || typeof v['t'] !== 'number' || !Number.isFinite(v['t']) || v['t'] <= 0) continue
+    if (
+      typeof v['text'] !== 'string' ||
+      typeof v['t'] !== 'number' ||
+      !Number.isFinite(v['t']) ||
+      v['t'] <= 0
+    )
+      continue
     const text = v['text'].trim().slice(0, NOTE_MAX_CHARS)
     if (text === '') continue
     entries.push({ relPath, entry: { text, t: v['t'] } })
@@ -79,7 +91,9 @@ export function pruneNotesAgainstTree(map: NoteMap, tree: ScanDirNode): NoteMap 
       out[relPath] = entry
       continue
     }
-    const underUnsure = unsurePrefixes.some((p) => p !== '' && (relPath === p || relPath.startsWith(`${p}/`)))
+    const underUnsure = unsurePrefixes.some(
+      (p) => p !== '' && (relPath === p || relPath.startsWith(`${p}/`))
+    )
     if (underUnsure) out[relPath] = entry
   }
   return out

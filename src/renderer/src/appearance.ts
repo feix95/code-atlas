@@ -88,7 +88,11 @@ function clamp(v: number, lo: number, hi: number): number {
 /** #rgb / #rrggbb → HSL(h∈[0,360), s/l∈[0,100]);自测要拿真实 hex 走同一条路,导出 */
 export function hexToHsl(hex: string): [number, number, number] {
   let m = hex.replace('#', '')
-  if (m.length === 3) m = m.split('').map((c) => c + c).join('')
+  if (m.length === 3)
+    m = m
+      .split('')
+      .map((c) => c + c)
+      .join('')
   const r = parseInt(m.slice(0, 2), 16) / 255
   const g = parseInt(m.slice(2, 4), 16) / 255
   const b = parseInt(m.slice(4, 6), 16) / 255
@@ -123,7 +127,17 @@ export function hslLuminance(h: number, s: number, l: number): number {
   const hp = (((h % 360) + 360) % 360) / 60
   const x = c * (1 - Math.abs((hp % 2) - 1))
   const [r1, g1, b1] =
-    hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x]
+    hp < 1
+      ? [c, x, 0]
+      : hp < 2
+        ? [x, c, 0]
+        : hp < 3
+          ? [0, c, x]
+          : hp < 4
+            ? [0, x, c]
+            : hp < 5
+              ? [x, 0, c]
+              : [c, 0, x]
   const m = lig - c / 2
   const lin = (v: number): number => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))
   return 0.2126 * lin(r1 + m) + 0.7152 * lin(g1 + m) + 0.0722 * lin(b1 + m)
@@ -218,16 +232,32 @@ export function applyAppearance(a: Appearance): void {
     root.setProperty('--accent', hslCss(h, s, dl))
     root.setProperty(
       '--accent-bright',
-      achro ? pal.accentBright : dark ? hslCss(h, s, Math.min(dl + 18, 95)) : hslCss(h, s, Math.max(dl - 10, 8))
+      achro
+        ? pal.accentBright
+        : dark
+          ? hslCss(h, s, Math.min(dl + 18, 95))
+          : hslCss(h, s, Math.max(dl - 10, 8))
     )
-    root.setProperty('--accent-hover', hslCss(h, s, dark ? Math.min(dl + 8, 95) : Math.max(dl - 8, 5)))
+    root.setProperty(
+      '--accent-hover',
+      hslCss(h, s, dark ? Math.min(dl + 8, 95) : Math.max(dl - 8, 5))
+    )
     root.setProperty('--accent-ink', pickAccentInk(h, s, dl))
     root.setProperty('--accent-soft', pal.accentSoft)
-    root.setProperty('--accent-line', achro ? pal.accentLine : dark ? hslCss(h, Math.min(s, 30), 40) : hslCss(h, s, 80))
+    root.setProperty(
+      '--accent-line',
+      achro ? pal.accentLine : dark ? hslCss(h, Math.min(s, 30), 40) : hslCss(h, s, 80)
+    )
     root.setProperty('--selected-bg', pal.selectedBg)
     root.setProperty('--secondary', hslCss(h2, s2, dl2))
-    root.setProperty('--secondary-deep', dark ? hslCss(h2, s2, clamp(l2, 62, 82)) : hslCss(h2, s2, clamp(l2, 26, 40)))
-    root.setProperty('--line', achro2 ? pal.line : dark ? hslCss(h2, Math.min(s2, 22), 27) : hslCss(h2, Math.min(s2, 20), 85))
+    root.setProperty(
+      '--secondary-deep',
+      dark ? hslCss(h2, s2, clamp(l2, 62, 82)) : hslCss(h2, s2, clamp(l2, 26, 40))
+    )
+    root.setProperty(
+      '--line',
+      achro2 ? pal.line : dark ? hslCss(h2, Math.min(s2, 22), 27) : hslCss(h2, Math.min(s2, 20), 85)
+    )
     // 底板色(自定义第三色):跟雾空蓝同一套机关 —— 只取它的色相/饱和度当染色方向,
     // 明度永远跟着白天/黑夜的灰阶档自动翻,不存在「黑夜选的色白天翻车」。
     // 没选就 s=0 走无彩色分支,显性写回石墨中性底,顺便顶掉上一身彩色预设皮的染色
@@ -245,14 +275,23 @@ export function applyAppearance(a: Appearance): void {
   if (dark) {
     const dl = clamp(l, 55, 85)
     root.setProperty('--accent', hslCss(h, sat, dl))
-    root.setProperty('--accent-bright', achro ? pal.accentBright : hslCss(h, sat, Math.min(dl + 18, 95)))
+    root.setProperty(
+      '--accent-bright',
+      achro ? pal.accentBright : hslCss(h, sat, Math.min(dl + 18, 95))
+    )
     root.setProperty('--accent-hover', hslCss(h, sat, Math.min(dl + 8, 88)))
     root.setProperty('--accent-ink', pickAccentInk(h, sat, dl))
     // 彩色预设连底板一起泛色(雾空蓝回归老皮):画布/框架/面板/软线往辅助色的色相里带,
     // 选中底和柔底回归 accent 的半透明染色;无彩色组合照旧全套中性
-    root.setProperty('--accent-soft', achro ? pal.accentSoft : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.14)`)
+    root.setProperty(
+      '--accent-soft',
+      achro ? pal.accentSoft : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.14)`
+    )
     root.setProperty('--accent-line', achro ? pal.accentLine : hslCss(h, Math.min(sat, 30), 40))
-    root.setProperty('--selected-bg', achro ? pal.selectedBg : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.20)`)
+    root.setProperty(
+      '--selected-bg',
+      achro ? pal.selectedBg : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.20)`
+    )
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 50, 78)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 62, 82)))
     root.setProperty('--line', achro2 ? pal.line : hslCss(h2, Math.min(s2, 16), 25))
@@ -260,12 +299,21 @@ export function applyAppearance(a: Appearance): void {
   } else {
     const dl = clamp(l, 25, 62)
     root.setProperty('--accent', hslCss(h, sat, dl))
-    root.setProperty('--accent-bright', achro ? pal.accentBright : hslCss(h, sat, Math.max(dl - 10, 8)))
+    root.setProperty(
+      '--accent-bright',
+      achro ? pal.accentBright : hslCss(h, sat, Math.max(dl - 10, 8))
+    )
     root.setProperty('--accent-hover', hslCss(h, sat, dl - 8))
     root.setProperty('--accent-ink', pickAccentInk(h, sat, dl))
-    root.setProperty('--accent-soft', achro ? pal.accentSoft : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.10)`)
+    root.setProperty(
+      '--accent-soft',
+      achro ? pal.accentSoft : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.10)`
+    )
     root.setProperty('--accent-line', achro ? pal.accentLine : hslCss(h, sat, 80))
-    root.setProperty('--selected-bg', achro ? pal.selectedBg : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.12)`)
+    root.setProperty(
+      '--selected-bg',
+      achro ? pal.selectedBg : `hsl(${Math.round(h)} ${Math.round(sat)}% ${Math.round(dl)}% / 0.12)`
+    )
     root.setProperty('--secondary', hslCss(h2, sat2, clamp(l2, 45, 72)))
     root.setProperty('--secondary-deep', hslCss(h2, sat2, clamp(l2, 26, 40)))
     root.setProperty('--line', achro2 ? pal.line : hslCss(h2, Math.min(s2, 20), 85))

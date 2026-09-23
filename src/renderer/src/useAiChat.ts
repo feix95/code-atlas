@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, ChatMessage } from '@shared/types'
+import type {
+  AiChatRequest,
+  AiHistoryMessage,
+  ChatCodeRef,
+  ChatContextAttachment,
+  ChatMessage
+} from '@shared/types'
 import { TAG } from '@shared/promptTags'
 import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
@@ -24,7 +30,8 @@ const COMPACT_KEEP_RECENT = 4
 function findSummary(messages: ChatMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i]
-    if (m.role === 'note' && m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') return m.text
+    if (m.role === 'note' && m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '')
+      return m.text
   }
   return null
 }
@@ -38,7 +45,10 @@ function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
   for (const m of messages) {
     if (m.role === 'note') {
       if (m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') {
-        out.push({ role: 'user', content: `${TAG.compressedSummary.open}\n旧摘要,一并融进新摘要:\n${m.text}\n${TAG.compressedSummary.close}` })
+        out.push({
+          role: 'user',
+          content: `${TAG.compressedSummary.open}\n旧摘要,一并融进新摘要:\n${m.text}\n${TAG.compressedSummary.close}`
+        })
       }
       continue
     }
@@ -116,7 +126,9 @@ export function useAiChat(
         // agent 流式的回滚令(第一百三十四锤):已吐的字是垃圾/脏稿(打转、思考标签掺字),
         // 把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
         if (payload.reset) {
-          setMessages((prev) => prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: '' } : m)))
+          setMessages((prev) =>
+            prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: '' } : m))
+          )
           return
         }
         // agent 流式的封板令(第一百五十一锤):本轮说出口的话是正经输出(「我去翻翻 xx」),
@@ -135,7 +147,13 @@ export function useAiChat(
             // 没吐正经字就没什么可封的(光攒了思考块的话留在这条继续攒)
             if (!busyMsg || busyMsg.text.trim() === '') return prev
             const sealed: ChatMessage = { ...busyMsg, key: crypto.randomUUID(), state: 'done' }
-            const fresh: ChatMessage = { key: busyMsg.key, role: 'assistant', text: '', state: 'busy', web: null }
+            const fresh: ChatMessage = {
+              key: busyMsg.key,
+              role: 'assistant',
+              text: '',
+              state: 'busy',
+              web: null
+            }
             return [...prev.slice(0, at), sealed, fresh, ...prev.slice(at + 1)]
           })
           return
@@ -144,9 +162,19 @@ export function useAiChat(
         // 只给人看,不进对话历史 —— 模型干了什么,用户一眼有数
         if (payload.step) {
           setMessages((prev) => {
-            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: payload.step!.text, state: 'done', web: null, kind: 'step' }
+            const note: ChatMessage = {
+              key: crypto.randomUUID(),
+              role: 'note',
+              text: payload.step!.text,
+              state: 'done',
+              web: null,
+              kind: 'step'
+            }
             const last = prev[prev.length - 1]
-            const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
+            const at =
+              last && last.role === 'assistant' && last.state === 'busy'
+                ? prev.length - 1
+                : prev.length
             return [...prev.slice(0, at), note, ...prev.slice(at)]
           })
           return
@@ -156,9 +184,20 @@ export function useAiChat(
         if (payload.matches) {
           const card = payload.matches
           setMessages((prev) => {
-            const note: ChatMessage = { key: crypto.randomUUID(), role: 'note', text: '', state: 'done', web: null, kind: 'matches', matches: card }
+            const note: ChatMessage = {
+              key: crypto.randomUUID(),
+              role: 'note',
+              text: '',
+              state: 'done',
+              web: null,
+              kind: 'matches',
+              matches: card
+            }
             const last = prev[prev.length - 1]
-            const at = last && last.role === 'assistant' && last.state === 'busy' ? prev.length - 1 : prev.length
+            const at =
+              last && last.role === 'assistant' && last.state === 'busy'
+                ? prev.length - 1
+                : prev.length
             return [...prev.slice(0, at), note, ...prev.slice(at)]
           })
           return
@@ -169,7 +208,9 @@ export function useAiChat(
               ? {
                   ...m,
                   text: m.text + payload.text,
-                  reasoning: payload.reasoning ? (m.reasoning ?? '') + payload.reasoning : m.reasoning,
+                  reasoning: payload.reasoning
+                    ? (m.reasoning ?? '') + payload.reasoning
+                    : m.reasoning,
                   stats: payload.stats ?? m.stats
                 }
               : m
@@ -251,7 +292,12 @@ export function useAiChat(
             m.key === botKey
               ? {
                   ...m,
-                  state: res.status === 'supported' || res.status === 'unsupported' ? 'done' : res.status === 'cancelled' ? 'cancelled' : 'error',
+                  state:
+                    res.status === 'supported' || res.status === 'unsupported'
+                      ? 'done'
+                      : res.status === 'cancelled'
+                        ? 'cancelled'
+                        : 'error',
                   text: res.text || m.text,
                   reasoning: res.reasoning || m.reasoning,
                   web: res.webLookup,
@@ -263,7 +309,9 @@ export function useAiChat(
         )
       } catch (err) {
         if (idRef.current !== requestId) return
-        setMessages((prev) => prev.map((m) => (m.key === botKey ? { ...m, state: 'error', text: friendlyErr(err) } : m)))
+        setMessages((prev) =>
+          prev.map((m) => (m.key === botKey ? { ...m, state: 'error', text: friendlyErr(err) } : m))
+        )
       } finally {
         if (idRef.current === requestId) {
           busyRef.current = false
@@ -302,28 +350,49 @@ export function useAiChat(
     busyRef.current = true
     setBusy(true)
     const botKey = requestId
-    setMessages((prev) => [...prev, { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }])
+    setMessages((prev) => [
+      ...prev,
+      { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }
+    ])
     void (async () => {
       try {
         const res = await window.atlas.aiCompact({ requestId, history })
         if (idRef.current !== requestId) return // 已取消/已换目标,这份旧账作废
         if (res.status === 'supported' && res.text.trim() !== '') {
           setMessages((prev) => {
-            const card: ChatMessage = { key: `${requestId}-summary`, role: 'note', kind: 'summary', text: res.text.trim(), state: 'done', web: null }
+            const card: ChatMessage = {
+              key: `${requestId}-summary`,
+              role: 'note',
+              kind: 'summary',
+              text: res.text.trim(),
+              state: 'done',
+              web: null
+            }
             // 旧对话让位:只留最近几条做好的原文(摘要里已包含更早的),旧摘要卡一并退休
-            const kept = prev.filter((m) => m.role !== 'note' && m.state === 'done' && m.text.trim() !== '' && m.key !== botKey)
+            const kept = prev.filter(
+              (m) =>
+                m.role !== 'note' && m.state === 'done' && m.text.trim() !== '' && m.key !== botKey
+            )
             return [card, ...kept.slice(-COMPACT_KEEP_RECENT)]
           })
         } else {
           setMessages((prev) =>
             prev.map((m) =>
-              m.key === botKey ? { ...m, state: res.status === 'cancelled' ? 'cancelled' : 'error', text: res.text || m.text } : m
+              m.key === botKey
+                ? {
+                    ...m,
+                    state: res.status === 'cancelled' ? 'cancelled' : 'error',
+                    text: res.text || m.text
+                  }
+                : m
             )
           )
         }
       } catch (err) {
         if (idRef.current !== requestId) return
-        setMessages((prev) => prev.map((m) => (m.key === botKey ? { ...m, state: 'error', text: friendlyErr(err) } : m)))
+        setMessages((prev) =>
+          prev.map((m) => (m.key === botKey ? { ...m, state: 'error', text: friendlyErr(err) } : m))
+        )
       } finally {
         if (idRef.current === requestId) {
           busyRef.current = false
@@ -345,7 +414,10 @@ export function useAiChat(
   }
 
   function note(text: string): void {
-    setMessages((prev) => [...prev, { key: crypto.randomUUID(), role: 'note', text, state: 'done', web: null }])
+    setMessages((prev) => [
+      ...prev,
+      { key: crypto.randomUUID(), role: 'note', text, state: 'done', web: null }
+    ])
   }
 
   function newChat(): void {
@@ -373,7 +445,20 @@ export function useAiChat(
     ])
   }
 
-  return { messages, busy, thinking, setThinking, agent, setAgent, note, newChat, adopt, compact, send, cancel }
+  return {
+    messages,
+    busy,
+    thinking,
+    setThinking,
+    agent,
+    setAgent,
+    note,
+    newChat,
+    adopt,
+    compact,
+    send,
+    cancel
+  }
 }
 
 export type AiChatApi = ReturnType<typeof useAiChat>

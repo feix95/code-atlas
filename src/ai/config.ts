@@ -38,7 +38,11 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
 
     // 老版本配置是扁平的 {baseUrl, model, apiKey}:自动搬进 lmstudio 分支,用户无感
     if (typeof parsed.baseUrl === 'string' && !parsed.provider) {
-      parsed.lmstudio = { baseUrl: parsed.baseUrl, model: parsed.model ?? '', apiKey: parsed.apiKey ?? '' }
+      parsed.lmstudio = {
+        baseUrl: parsed.baseUrl,
+        model: parsed.model ?? '',
+        apiKey: parsed.apiKey ?? ''
+      }
     }
 
     const lm = (parsed.lmstudio ?? {}) as Record<string, unknown>
@@ -60,7 +64,10 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       // 读档也洗一遍(2026-09-17):老档里可能躺着带引号/带 Bearer 前缀的脏值,读出来就是干净的
       tavilyKey: sanitizeTavilyKey(parsed.tavilyKey),
       // 手动上下文(留空 = 自动探测);上一版存取两边都把它弄丢了,这里补上回读
-      contextSize: typeof parsed.contextSize === 'number' && parsed.contextSize >= CONTEXT_SIZE_MIN ? parsed.contextSize : undefined,
+      contextSize:
+        typeof parsed.contextSize === 'number' && parsed.contextSize >= CONTEXT_SIZE_MIN
+          ? parsed.contextSize
+          : undefined,
       // 说话方式(第一百一十三锤):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
       personalization: sanitizePersonalization(parsed.personalization)
     }
@@ -85,7 +92,10 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
     // Tavily Key 洗一遍再落盘:剥掉引号/Bearer 前缀/中间空白,洗完是空当没填(存档里直接不出现这个字段)
     tavilyKey: sanitizeTavilyKey(config.tavilyKey),
     // JSON.stringify 会直接丢掉 undefined:没填上下文时落盘就是没有这个字段,读取走自动探测
-    contextSize: typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN ? config.contextSize : undefined,
+    contextSize:
+      typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN
+        ? config.contextSize
+        : undefined,
     // 说话方式照洗一遍再落盘:脏数据不许进存档(键顺序和读档那边保持一致,免得假「有改动」)
     personalization: sanitizePersonalization(config.personalization)
   }
@@ -119,7 +129,12 @@ export function resolveAiTarget(
     return {
       ok: true,
       // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四锤)
-      target: { baseUrl: builtinRuntime.baseUrl, model: builtinRuntime.model, timings: true, engine: 'builtin' }
+      target: {
+        baseUrl: builtinRuntime.baseUrl,
+        model: builtinRuntime.model,
+        timings: true,
+        engine: 'builtin'
+      }
     }
   }
   if (!config.lmstudio.model.trim()) {
@@ -127,6 +142,11 @@ export function resolveAiTarget(
   }
   return {
     ok: true,
-    target: { baseUrl: config.lmstudio.baseUrl, model: config.lmstudio.model, apiKey: config.lmstudio.apiKey || undefined, engine: 'lmstudio' }
+    target: {
+      baseUrl: config.lmstudio.baseUrl,
+      model: config.lmstudio.model,
+      apiKey: config.lmstudio.apiKey || undefined,
+      engine: 'lmstudio'
+    }
   }
 }

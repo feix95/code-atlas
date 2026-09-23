@@ -22,8 +22,14 @@ async function makeFixture(): Promise<string> {
     'src/components/Button.tsx',
     "import { fmt } from '../utils/format'\nimport './Button.css'\nexport default Button\nfunction Button() {}\n"
   )
-  await put('src/utils/format.ts', "import { add } from './math'\nexport function fmt(): string { return String(add(1, 2)) }\n")
-  await put('src/utils/math.ts', 'export function add(a: number, b: number): number { return a + b }\n')
+  await put(
+    'src/utils/format.ts',
+    "import { add } from './math'\nexport function fmt(): string { return String(add(1, 2)) }\n"
+  )
+  await put(
+    'src/utils/math.ts',
+    'export function add(a: number, b: number): number { return a + b }\n'
+  )
   await put('legacy/old.js', "const { fmt } = require('../src/utils/format')\nconsole.log(fmt)\n")
   await put('run.py', 'from tools.calc import add\n\nprint(add(1, 2))\n')
   await put('tools/__init__.py', '')
@@ -41,13 +47,19 @@ async function makePolyglotFixture(): Promise<string> {
     await fs.writeFile(join(root, rel), content, 'utf8')
   }
   // Python:同目录相对导入、纯点连包自身、上跳一级、连不上的相对导入、标准库
-  await put('pyproject/app/main.py', 'from .helpers import load\nfrom . import base\nfrom ..common import cache\nfrom .missing import gone\nimport os\n\nload()\ncache.save()\n')
+  await put(
+    'pyproject/app/main.py',
+    'from .helpers import load\nfrom . import base\nfrom ..common import cache\nfrom .missing import gone\nimport os\n\nload()\ncache.save()\n'
+  )
   await put('pyproject/app/helpers.py', 'def load():\n    return "data"\n')
   await put('pyproject/app/__init__.py', '')
   await put('pyproject/common/__init__.py', 'def save():\n    pass\n')
   // Go:go.mod 定 module 锚,子包目录里两个 .go(边落字典序第一个),标准库,幽灵包
   await put('go.mod', 'module example.com/greet\n\ngo 1.22\n')
-  await put('main.go', 'package main\n\nimport (\n\t"fmt"\n\t"example.com/greet/util"\n\t"example.com/greet/ghost"\n)\n\nfunc main() {\n\tutil.Hi()\n\tfmt.Println("hi")\n}\n')
+  await put(
+    'main.go',
+    'package main\n\nimport (\n\t"fmt"\n\t"example.com/greet/util"\n\t"example.com/greet/ghost"\n)\n\nfunc main() {\n\tutil.Hi()\n\tfmt.Println("hi")\n}\n'
+  )
   await put('util/extra.go', 'package util\n\nfunc Extra() {}\n')
   await put('util/helper.go', 'package util\n\nfunc Hi() {}\n')
   // Java:Maven 标准布局、静态导入砍段连类、JDK 包算外部
@@ -60,7 +72,10 @@ async function makePolyglotFixture(): Promise<string> {
     'package com.acme.core;\n\npublic class Service {\n    static void run() {}\n    static String describe() { return "svc"; }\n}\n'
   )
   // Rust:mod 声明与 crate:: 连同一文件(去重)、super:: 上跳、crate 里不存在的模块、外部 crate
-  await put('src/main.rs', 'mod utils;\n\nuse crate::utils::clean;\nuse crate::nope::Thing;\nuse serde::Serialize;\n\nfn main() {\n    let _ = clean();\n    let _ = utils::clean;\n}\n')
+  await put(
+    'src/main.rs',
+    'mod utils;\n\nuse crate::utils::clean;\nuse crate::nope::Thing;\nuse serde::Serialize;\n\nfn main() {\n    let _ = clean();\n    let _ = utils::clean;\n}\n'
+  )
   await put('src/utils.rs', 'use super::config::Port;\n\npub fn clean() -> bool {\n    true\n}\n')
   await put('src/config.rs', 'pub struct Port;\n')
   return root
@@ -90,7 +105,11 @@ async function main(): Promise<void> {
       'src/main.tsx => src/App.tsx', // 默认导入
       'src/utils/format.ts => src/utils/math.ts' // 同目录 ./math
     ]
-    assert.deepEqual(sortedEdges(graph), expected.sort((a, b) => a.localeCompare(b)), '连出来的边和预期不一致')
+    assert.deepEqual(
+      sortedEdges(graph),
+      expected.sort((a, b) => a.localeCompare(b)),
+      '连出来的边和预期不一致'
+    )
 
     // 2. 影响范围排行:format.ts 被 old.js 和 Button.tsx 引用,入度 2 应排第一
     assert.equal(graph.hubs[0]?.relPath, 'src/utils/format.ts', '入度最高的应是 format.ts')
@@ -144,7 +163,11 @@ async function main(): Promise<void> {
       'src/main.rs => src/utils.rs', // mod utils 和 use crate::utils::clean 连同一处,去重成一条
       'src/utils.rs => src/config.rs' // super:: 从 src/ 上跳到 crate 根再找 config
     ]
-    assert.deepEqual(sortedEdges(graph), polyExpected.sort((a, b) => a.localeCompare(b)), '四语混合项目的边和预期不一致')
+    assert.deepEqual(
+      sortedEdges(graph),
+      polyExpected.sort((a, b) => a.localeCompare(b)),
+      '四语混合项目的边和预期不一致'
+    )
 
     // 2. 外部记账:fmt、java.util.List、os、serde::Serialize,四种语言各一份
     assert.equal(graph.stats.externalCount, 4, '外部包应记 4 次')
@@ -153,7 +176,11 @@ async function main(): Promise<void> {
     const polyUnresolved = graph.stats.unresolved.map((u) => `${u.from} ? ${u.spec}`)
     assert.deepEqual(
       polyUnresolved.sort(),
-      ['main.go ? example.com/greet/ghost', 'pyproject/app/main.py ? .missing', 'src/main.rs ? crate::nope::Thing'],
+      [
+        'main.go ? example.com/greet/ghost',
+        'pyproject/app/main.py ? .missing',
+        'src/main.rs ? crate::nope::Thing'
+      ],
       '幽灵包/缺失模块应记为 unresolved'
     )
 
@@ -165,14 +192,19 @@ async function main(): Promise<void> {
     // 5. 路径契约在四种语言下同样成立
     const polyNodes = new Set(graph.nodes.map((n) => n.relPath))
     for (const edge of graph.edges) {
-      assert.ok(polyNodes.has(edge.from) && polyNodes.has(edge.to), `边端点必须都在节点表里:${edge.from} => ${edge.to}`)
+      assert.ok(
+        polyNodes.has(edge.from) && polyNodes.has(edge.to),
+        `边端点必须都在节点表里:${edge.from} => ${edge.to}`
+      )
     }
   } finally {
     await fs.rm(dirname(polyRoot), { recursive: true, force: true })
   }
 
   console.log('✅ 项目关系分析自测全部通过')
-  console.log('   老场景六条边精确命中 · Python 相对导入/Go go.mod/Java Maven/Rust crate 全连上 · 内部断线和外部包分开记账')
+  console.log(
+    '   老场景六条边精确命中 · Python 相对导入/Go go.mod/Java Maven/Rust crate 全连上 · 内部断线和外部包分开记账'
+  )
 }
 
 main().catch((err) => {

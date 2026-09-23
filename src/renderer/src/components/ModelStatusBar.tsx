@@ -42,7 +42,9 @@ export function ModelStatusBar(): React.JSX.Element {
       <footer className="model-dock">
         <div className="model-status" role="status" aria-live="polite">
           <span className="model-left">
-            <span className="model-provider">{setup.configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}</span>
+            <span className="model-provider">
+              {setup.configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}
+            </span>
             <span className="model-state">项目地图和文件阅读可以直接使用</span>
           </span>
           {setup.configured === false && (
@@ -79,10 +81,10 @@ export function ModelStatusBar(): React.JSX.Element {
         : status.state === 'busy'
           ? '忙'
           : status.state === 'ready'
-          ? '就绪'
-          : status.state === 'unreachable'
-            ? '没连上'
-            : '出岔子了'
+            ? '就绪'
+            : status.state === 'unreachable'
+              ? '没连上'
+              : '出岔子了'
 
   return (
     <footer className="model-dock">
@@ -91,15 +93,25 @@ export function ModelStatusBar(): React.JSX.Element {
         <span className="model-left">
           <span className="model-dot" aria-hidden="true" />
           <span className="model-provider">{providerName}</span>
-          <span className="model-state" title={status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined}>
+          <span
+            className="model-state"
+            title={
+              status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined
+            }
+          >
             {stateText}
           </span>
           {/* 取消/卸下只对内置模型生效:热身中按=取消,就绪后按=卸下腾内存;外接的装卸归 LM Studio */}
-          {status.provider === 'builtin' && (status.state === 'loading' || status.state === 'ready') && (
-            <button type="button" className="model-act" onClick={() => void window.atlas.modelEject()}>
-              {status.state === 'loading' ? '取消' : '卸下'}
-            </button>
-          )}
+          {status.provider === 'builtin' &&
+            (status.state === 'loading' || status.state === 'ready') && (
+              <button
+                type="button"
+                className="model-act"
+                onClick={() => void window.atlas.modelEject()}
+              >
+                {status.state === 'loading' ? '取消' : '卸下'}
+              </button>
+            )}
         </span>
         {/* 中:提醒/出岔子的话,空间不够自动截断,悬停看全文 */}
         {status.message && (

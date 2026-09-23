@@ -1,13 +1,30 @@
 import assert from 'node:assert/strict'
-import { NOTES_MAX, NOTE_MAX_CHARS, notesStorageKey, parseNotes, pruneNotesAgainstTree, upsertNote } from '../src/shared/notes.ts'
+import {
+  NOTES_MAX,
+  NOTE_MAX_CHARS,
+  notesStorageKey,
+  parseNotes,
+  pruneNotesAgainstTree,
+  upsertNote
+} from '../src/shared/notes.ts'
 import type { NoteMap } from '../src/shared/notes.ts'
 import type { ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 function fileNode(relPath: string): ScanFileNode {
   return { type: 'file', name: relPath.split('/').pop() ?? relPath, relPath }
 }
-function dirNode(relPath: string, children: Array<ScanDirNode | ScanFileNode> = [], extra: Partial<ScanDirNode> = {}): ScanDirNode {
-  return { type: 'directory', name: relPath.split('/').pop() ?? relPath, relPath, children, ...extra }
+function dirNode(
+  relPath: string,
+  children: Array<ScanDirNode | ScanFileNode> = [],
+  extra: Partial<ScanDirNode> = {}
+): ScanDirNode {
+  return {
+    type: 'directory',
+    name: relPath.split('/').pop() ?? relPath,
+    relPath,
+    children,
+    ...extra
+  }
 }
 
 function main(): void {
@@ -32,7 +49,10 @@ function main(): void {
   for (let i = 0; i < NOTES_MAX + 30; i++) flood[`f${i}`] = { text: `n${i}`, t: i + 1 }
   const capped = parseNotes(flood)
   assert.equal(Object.keys(capped).length, NOTES_MAX, `超量淘汰:只留 ${NOTES_MAX} 条`)
-  assert.ok(capped[`f${NOTES_MAX + 29}`] !== undefined && capped['f0'] === undefined, '淘汰的是最旧的')
+  assert.ok(
+    capped[`f${NOTES_MAX + 29}`] !== undefined && capped['f0'] === undefined,
+    '淘汰的是最旧的'
+  )
 
   // ── 3. upsert:增/改/删 + 时间戳刷新 + 老条目让位 ──
   let m: NoteMap = { old: { text: '旧备注', t: 1 } }
@@ -71,7 +91,9 @@ function main(): void {
   assert.equal(notesStorageKey('E:\\A\\B'), notesStorageKey('e:/a/b/'), '大小写和斜杠方向归一')
 
   console.log('✅ 手动备注自测全部通过')
-  console.log('   parse 垃圾回收 · 截断与上限 · upsert 增改删 · 孤儿清收(懒/截断不误删) · 存储键归一化')
+  console.log(
+    '   parse 垃圾回收 · 截断与上限 · upsert 增改删 · 孤儿清收(懒/截断不误删) · 存储键归一化'
+  )
 }
 
 main()

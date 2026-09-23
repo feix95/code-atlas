@@ -117,7 +117,9 @@ export function FeatureLocator({
         )}
         {setup && setup.configured !== true && (
           <p className="card-text">
-            {setup.configured === null ? '正在读取 AI 设置…' : '下面的分类不用 AI。用自己的话提问,需要先设置 AI。'}
+            {setup.configured === null
+              ? '正在读取 AI 设置…'
+              : '下面的分类不用 AI。用自己的话提问,需要先设置 AI。'}
             {setup.configured === false && (
               <>
                 {' '}
@@ -135,21 +137,33 @@ export function FeatureLocator({
                 {local.hits.map((hit) => {
                   const node = findNode(tree, hit.relPath)
                   return (
-                    <button key={hit.relPath} type="button" className="locator-hit" onClick={() => onJump(hit.relPath)} title="在地图里打开">
+                    <button
+                      key={hit.relPath}
+                      type="button"
+                      className="locator-hit"
+                      onClick={() => onJump(hit.relPath)}
+                      title="在地图里打开"
+                    >
                       <span className="locator-hit-top">
                         <span className="locator-hit-path mono">{hit.relPath}</span>
-                        {node?.type === 'file' && node.language && <span className="chip chip-muted">{node.language.name}</span>}
+                        {node?.type === 'file' && node.language && (
+                          <span className="chip chip-muted">{node.language.name}</span>
+                        )}
                       </span>
                       <span className="locator-hit-reason">{hit.reason}</span>
                     </button>
                   )
                 })}
                 {local.total > local.hits.length && (
-                  <p className="rec-footnote">同类一共 {local.total} 处,先列最靠前的 {local.hits.length} 个。</p>
+                  <p className="rec-footnote">
+                    同类一共 {local.total} 处,先列最靠前的 {local.hits.length} 个。
+                  </p>
                 )}
               </div>
             ) : (
-              <p className="card-waiting">这棵树里没找到「{local.label}」相关的东西 —— 换个类目,或用上面输入框问带路人。</p>
+              <p className="card-waiting">
+                这棵树里没找到「{local.label}」相关的东西 —— 换个类目,或用上面输入框问带路人。
+              </p>
             )}
           </>
         )}
@@ -164,16 +178,26 @@ export function FeatureLocator({
             {result.hits.map((hit) => {
               const node = findNode(tree, hit.relPath)
               return (
-                <button key={hit.relPath} type="button" className="locator-hit" onClick={() => onJump(hit.relPath)} title="在地图里打开">
+                <button
+                  key={hit.relPath}
+                  type="button"
+                  className="locator-hit"
+                  onClick={() => onJump(hit.relPath)}
+                  title="在地图里打开"
+                >
                   <span className="locator-hit-top">
                     <span className="locator-hit-path mono">{hit.relPath}</span>
-                    {node?.type === 'file' && node.language && <span className="chip chip-muted">{node.language.name}</span>}
+                    {node?.type === 'file' && node.language && (
+                      <span className="chip chip-muted">{node.language.name}</span>
+                    )}
                   </span>
                   <span className="locator-hit-reason">{hit.reason}</span>
                 </button>
               )
             })}
-            <p className="rec-footnote">指路是带路人的推测 —— 点卡片直接去那个文件;想接着细问,去「自由对话」。</p>
+            <p className="rec-footnote">
+              指路是带路人的推测 —— 点卡片直接去那个文件;想接着细问,去「自由对话」。
+            </p>
           </div>
         )}
         {!busy && result?.status === 'error' && <Notice kind="error">{result.text}</Notice>}

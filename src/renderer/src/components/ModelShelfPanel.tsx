@@ -51,7 +51,10 @@ const VERDICT_TIPS: Record<'no' | 'tight', string> = {
 
 /** 副行小字(名字下方那行):下载量 + 收藏 + 更新时间(2026-09-18 起收藏也上 —— 数据早拉了,别浪费) */
 function shelfSubLine(entry: ShelfEntry): string {
-  const parts = [`${formatDownloads(entry.downloads)} 次下载`, `${formatDownloads(entry.likes)} 收藏`]
+  const parts = [
+    `${formatDownloads(entry.downloads)} 次下载`,
+    `${formatDownloads(entry.likes)} 收藏`
+  ]
   if (entry.lastModified) parts.push(`${formatRelativeDays(entry.lastModified)}更新`)
   return parts.join(' · ')
 }
@@ -59,7 +62,13 @@ function shelfSubLine(entry: ShelfEntry): string {
 /** 下载百分比的数字滚动:GSAP 接管计数 span 的文本,React 只递 value,两边不打架。
  *  进度事件来一次滚一次,中途新值从旧动画的当前位置续滚(不回跳);
  *  系统关了动画就直接写死数字,一分不少 */
-function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string }): React.JSX.Element {
+function AnimatedNumber({
+  value,
+  suffix = ''
+}: {
+  value: number
+  suffix?: string
+}): React.JSX.Element {
   const spanRef = useRef<HTMLSpanElement>(null)
   const shownRef = useRef(value)
   const tweenRef = useRef<gsap.core.Tween | null>(null)
@@ -111,7 +120,11 @@ interface DownloadState {
   donePath: string | null
 }
 
-export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: string) => void }): React.JSX.Element {
+export function ModelShelfPanel({
+  onModelReady
+}: {
+  onModelReady?: (finalPath: string) => void
+}): React.JSX.Element {
   const [shelf, setShelf] = useState<ShelfState | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** 挂载就要拉货,初始 loading 即 true,不在 effect 里同步 set(会级联渲染) */
@@ -248,14 +261,11 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
   useGSAP(
     () => {
       const mm = gsap.matchMedia()
-      mm.add(
-        { reduceMotion: '(prefers-reduced-motion: reduce)' },
-        (ctx) => {
-          const reduce = ctx.conditions?.reduceMotion === true
-          if (reduce || !featuredRef.current) return
-          gsap.from(featuredRef.current, { y: -14, autoAlpha: 0, duration: 0.45, ease: 'power2.out' })
-        }
-      )
+      mm.add({ reduceMotion: '(prefers-reduced-motion: reduce)' }, (ctx) => {
+        const reduce = ctx.conditions?.reduceMotion === true
+        if (reduce || !featuredRef.current) return
+        gsap.from(featuredRef.current, { y: -14, autoAlpha: 0, duration: 0.45, ease: 'power2.out' })
+      })
       return () => mm.revert()
     },
     { scope: panelRef }
@@ -271,13 +281,10 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
       )
       if (!rows || rows.length === 0) return
       const mm = gsap.matchMedia()
-      mm.add(
-        { reduceMotion: '(prefers-reduced-motion: reduce)' },
-        (ctx) => {
-          if (ctx.conditions?.reduceMotion === true) return
-          gsap.from(rows, { autoAlpha: 0, y: 8, duration: 0.3, stagger: 0.05, ease: 'power1.out' })
-        }
-      )
+      mm.add({ reduceMotion: '(prefers-reduced-motion: reduce)' }, (ctx) => {
+        if (ctx.conditions?.reduceMotion === true) return
+        gsap.from(rows, { autoAlpha: 0, y: 8, duration: 0.3, stagger: 0.05, ease: 'power1.out' })
+      })
       return () => mm.revert()
     },
     { scope: panelRef, dependencies: [expanded] }
@@ -289,16 +296,29 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
     panelRef.current?.querySelector('.shelf-item.is-expanded')?.scrollIntoView({ block: 'nearest' })
   }, [expanded])
 
-  const visibleAll = shelf ? applyShelfQuery(shelf.entries, { maxBytes: maxGb === null ? null : maxGb * 1024 ** 3, sortBy, desc }) : []
+  const visibleAll = shelf
+    ? applyShelfQuery(shelf.entries, {
+        maxBytes: maxGb === null ? null : maxGb * 1024 ** 3,
+        sortBy,
+        desc
+      })
+    : []
   const visible = visibleAll.slice(0, visibleCount)
   const hiddenCount = visibleAll.length - visible.length
 
   // 推荐卡的下载状态:跟展开区共用同一份 download 账,认 repoId+文件路径
   const featuredActive =
-    download && download.repoId === FEATURED_MODEL.repoId && download.filePath === FEATURED_MODEL.filePath ? download : null
+    download &&
+    download.repoId === FEATURED_MODEL.repoId &&
+    download.filePath === FEATURED_MODEL.filePath
+      ? download
+      : null
   const featuredDone = featuredActive?.donePath ?? null
   const featuredPct =
-    featuredActive !== null && featuredDone === null && featuredActive.totalBytes !== null && featuredActive.totalBytes > 0
+    featuredActive !== null &&
+    featuredDone === null &&
+    featuredActive.totalBytes !== null &&
+    featuredActive.totalBytes > 0
       ? Math.min(100, Math.round((featuredActive.receivedBytes / featuredActive.totalBytes) * 100))
       : null
 
@@ -312,7 +332,9 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
               <span className="shelf-featured-tag">推荐模型</span>
               Ornith-1.5-9B-uncensored(Q8_0)
             </span>
-            <span className="shelf-featured-sub">{FEATURED_MODEL.sizeLabel} · 下载完自动配置好,即下即用</span>
+            <span className="shelf-featured-sub">
+              {FEATURED_MODEL.sizeLabel} · 下载完自动配置好,即下即用
+            </span>
           </div>
           {featuredDone !== null ? (
             <span className="shelf-dl-done">✓ 已就位,配置已自动指向它</span>
@@ -413,24 +435,37 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
         <div className="shelf-scroll">
           <ul className="shelf-list">
             {visible.map((entry) => {
-              const verdict = judgeRun(entry.ggufTotalBytes, { ramBytes: shelf?.ramBytes ?? 0, vramBytes: null })
+              const verdict = judgeRun(entry.ggufTotalBytes, {
+                ramBytes: shelf?.ramBytes ?? 0,
+                vramBytes: null
+              })
               const isOpen = expanded === entry.id
               return (
                 <li
                   key={entry.id}
                   className={`shelf-item${verdict === 'no' ? ' is-unrunnable' : ''}${isOpen ? ' is-expanded' : ''}`}
                 >
-                  <button type="button" className="shelf-row" onClick={() => toggleRepo(entry.id)} aria-expanded={isOpen}>
+                  <button
+                    type="button"
+                    className="shelf-row"
+                    onClick={() => toggleRepo(entry.id)}
+                    aria-expanded={isOpen}
+                  >
                     <span className="shelf-main">
                       <span className="shelf-name" title={entry.id}>
                         {entry.id}
-                        {entry.paramScale !== null && <span className="shelf-params">{entry.paramScale}</span>}
+                        {entry.paramScale !== null && (
+                          <span className="shelf-params">{entry.paramScale}</span>
+                        )}
                       </span>
                       <span className="shelf-sub">{shelfSubLine(entry)}</span>
                     </span>
                     <span className="shelf-verdict-slot">
                       {verdict !== 'yes' && (
-                        <span className={`shelf-verdict is-${verdict}`} title={VERDICT_TIPS[verdict]}>
+                        <span
+                          className={`shelf-verdict is-${verdict}`}
+                          title={VERDICT_TIPS[verdict]}
+                        >
                           {runVerdictLabel(verdict)}
                         </span>
                       )}
@@ -465,28 +500,44 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
                           {entry.ggufTotalBytes !== null && entry.ggufTotalBytes > 0 && (
                             <div className="shelf-profile-item">
                               <dt className="shelf-profile-label">模型总大小</dt>
-                              <dd className="shelf-profile-value">{formatGgufSize(entry.ggufTotalBytes)}</dd>
+                              <dd className="shelf-profile-value">
+                                {formatGgufSize(entry.ggufTotalBytes)}
+                              </dd>
                             </div>
                           )}
                         </dl>
-                        {filesLoading && <p className="shelf-note is-soft">正在看这个仓库里有什么文件……</p>}
+                        {filesLoading && (
+                          <p className="shelf-note is-soft">正在看这个仓库里有什么文件……</p>
+                        )}
                         {!filesLoading && (files[entry.id]?.length ?? 0) === 0 && (
-                          <p className="shelf-note is-soft">这个仓库里没认出可以直接下载的模型文件。</p>
+                          <p className="shelf-note is-soft">
+                            这个仓库里没认出可以直接下载的模型文件。
+                          </p>
                         )}
                         {(files[entry.id] ?? []).map((f) => {
                           const active =
-                            download && download.repoId === entry.id && download.filePath === f.path ? download : null
+                            download && download.repoId === entry.id && download.filePath === f.path
+                              ? download
+                              : null
                           const donePath = active?.donePath ?? null
                           const pct =
-                            active !== null && donePath === null && active.totalBytes !== null && active.totalBytes > 0
-                              ? Math.min(100, Math.round((active.receivedBytes / active.totalBytes) * 100))
+                            active !== null &&
+                            donePath === null &&
+                            active.totalBytes !== null &&
+                            active.totalBytes > 0
+                              ? Math.min(
+                                  100,
+                                  Math.round((active.receivedBytes / active.totalBytes) * 100)
+                                )
                               : null
                           return (
                             <div key={f.path} className="shelf-file-row">
                               <span className="shelf-file-path" title={f.path}>
                                 {f.path}
                               </span>
-                              {f.quantNote !== null && <span className="shelf-quant">{f.quantNote}</span>}
+                              {f.quantNote !== null && (
+                                <span className="shelf-quant">{f.quantNote}</span>
+                              )}
                               <span className="shelf-meta">{formatGgufSize(f.sizeBytes)}</span>
                               {donePath !== null ? (
                                 <span className="shelf-dl-done">✓ 已就位,配置已自动指向它</span>
@@ -495,17 +546,27 @@ export function ModelShelfPanel({ onModelReady }: { onModelReady?: (finalPath: s
                                   {pct !== null ? (
                                     <AnimatedNumber value={pct} suffix="%" />
                                   ) : (
-                                    <span className="shelf-dl-pct">{formatGgufSize(active.receivedBytes)}</span>
+                                    <span className="shelf-dl-pct">
+                                      {formatGgufSize(active.receivedBytes)}
+                                    </span>
                                   )}
                                   <span className="shelf-dl-bar" aria-hidden="true">
                                     <i style={{ width: `${pct ?? 5}%` }} />
                                   </span>
-                                  <button type="button" className="shelf-dl-btn" onClick={cancelDownload}>
+                                  <button
+                                    type="button"
+                                    className="shelf-dl-btn"
+                                    onClick={cancelDownload}
+                                  >
                                     取消
                                   </button>
                                 </>
                               ) : (
-                                <button type="button" className="shelf-dl-btn" onClick={() => startDownload(entry.id, f.path)}>
+                                <button
+                                  type="button"
+                                  className="shelf-dl-btn"
+                                  onClick={() => startDownload(entry.id, f.path)}
+                                >
                                   下载并使用
                                 </button>
                               )}

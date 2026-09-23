@@ -17,8 +17,12 @@ export function FileRelations({
   graph: DepGraphResult
   onJump: (relPath: string) => void
 }): React.JSX.Element {
-  const importers = [...new Set(graph.edges.filter((edge) => edge.to === relPath).map((edge) => edge.from))]
-  const dependencies = [...new Set(graph.edges.filter((edge) => edge.from === relPath).map((edge) => edge.to))]
+  const importers = [
+    ...new Set(graph.edges.filter((edge) => edge.to === relPath).map((edge) => edge.from))
+  ]
+  const dependencies = [
+    ...new Set(graph.edges.filter((edge) => edge.from === relPath).map((edge) => edge.to))
+  ]
   const total = importers.length + dependencies.length
 
   if (total === 0) {
@@ -43,10 +47,17 @@ export function FileRelations({
         {importers.length > 0 && (
           <section className="relation-box">
             <h3>
-              影响范围:被这些文件引用 <span className="structure-section-count">{importers.length}</span>
+              影响范围:被这些文件引用{' '}
+              <span className="structure-section-count">{importers.length}</span>
             </h3>
             {importers.map((path) => (
-              <button key={path} type="button" className="relation-link mono" title={path} onClick={() => onJump(path)}>
+              <button
+                key={path}
+                type="button"
+                className="relation-link mono"
+                title={path}
+                onClick={() => onJump(path)}
+              >
                 {path}
               </button>
             ))}
@@ -58,7 +69,13 @@ export function FileRelations({
               它引用了 <span className="structure-section-count">{dependencies.length}</span>
             </h3>
             {dependencies.map((path) => (
-              <button key={path} type="button" className="relation-link mono" title={path} onClick={() => onJump(path)}>
+              <button
+                key={path}
+                type="button"
+                className="relation-link mono"
+                title={path}
+                onClick={() => onJump(path)}
+              >
                 {path}
               </button>
             ))}

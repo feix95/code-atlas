@@ -16,12 +16,18 @@ export function sanitizeExternalDirectoryPath(raw: unknown): string | null {
 
 export function isPathInside(rootPath: string, targetPath: string): boolean {
   const rel = relative(resolve(rootPath), resolve(targetPath))
-  return rel === '' || (rel !== '..' && !rel.startsWith(`..\\`) && !rel.startsWith('../') && !isAbsolute(rel))
+  return (
+    rel === '' ||
+    (rel !== '..' && !rel.startsWith(`..\\`) && !rel.startsWith('../') && !isAbsolute(rel))
+  )
 }
 
 export async function joinAuthorizedRoot(rootPath: string, relPath: string): Promise<string> {
   const lexical = joinRoot(rootPath, relPath)
-  const [canonicalRoot, canonicalTarget] = await Promise.all([realpath(rootPath), realpath(lexical)])
+  const [canonicalRoot, canonicalTarget] = await Promise.all([
+    realpath(rootPath),
+    realpath(lexical)
+  ])
   if (!isPathInside(canonicalRoot, canonicalTarget)) throw new Error('路径越过了已授权目录')
   return canonicalTarget
 }
@@ -60,7 +66,10 @@ export class AgentDirectoryAccess {
     return { rootId, path }
   }
 
-  resolve(projectRoot: string, rawRootId: unknown): { rootId: string; path: string; external: boolean } | null {
+  resolve(
+    projectRoot: string,
+    rawRootId: unknown
+  ): { rootId: string; path: string; external: boolean } | null {
     const rootId = sanitizeAgentRootId(rawRootId)
     if (rootId === null) return null
     if (rootId === PROJECT_AGENT_ROOT) return { rootId, path: projectRoot, external: false }

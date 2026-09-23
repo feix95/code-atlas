@@ -64,7 +64,11 @@ export function placeBubbleBox(
   const width = Math.min(size.width, home.width)
   const height = Math.min(size.height, home.height)
   // 水平:以桌宠中轴居中,夹回工作区(屏比气泡还窄时贴左边,不往外跑)
-  const x = clamp(anchor.x + anchor.width / 2 - width / 2, home.x, Math.max(home.x, home.x + home.width - width))
+  const x = clamp(
+    anchor.x + anchor.width / 2 - width / 2,
+    home.x,
+    Math.max(home.x, home.x + home.width - width)
+  )
   // 垂直:上方够高弹上方,下方够高弹下方,都不够挑空大的一侧夹紧
   const spaceAbove = anchor.y - home.y
   const spaceBelow = home.y + home.height - (anchor.y + anchor.height)
@@ -72,10 +76,18 @@ export function placeBubbleBox(
   if (spaceAbove >= height + BUBBLE_GAP) y = anchor.y - height - BUBBLE_GAP
   else if (spaceBelow >= height + BUBBLE_GAP) y = anchor.y + anchor.height + BUBBLE_GAP
   else {
-    const ideal = spaceAbove >= spaceBelow ? anchor.y - height - BUBBLE_GAP : anchor.y + anchor.height + BUBBLE_GAP
+    const ideal =
+      spaceAbove >= spaceBelow
+        ? anchor.y - height - BUBBLE_GAP
+        : anchor.y + anchor.height + BUBBLE_GAP
     y = clamp(ideal, home.y, Math.max(home.y, home.y + home.height - height))
   }
-  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height)
+  }
 }
 
 /** 拖拽缩放的方向:八个手柄位(n/s/e/w 边中段,ne/nw/se/sw 角)。
@@ -120,5 +132,10 @@ export function resizeBubbleBox(
   // 钉对侧边:往西/北长的,右/下边钉死,反推回 x/y
   const x = dir.includes('w') ? start.x + start.width - width : start.x
   const y = dir.includes('n') ? start.y + start.height - height : start.y
-  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height)
+  }
 }

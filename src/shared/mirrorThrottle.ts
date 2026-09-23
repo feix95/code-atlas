@@ -9,7 +9,10 @@
  * 立即发,不够就把最新版挂尾推 —— 定时器到点发的是当下记着的最新版,
  * 不是排闹钟那一刻抓到的旧版。
  */
-export function createMirrorThrottle<T>(send: (value: T) => void, intervalMs: number): (value: T) => void {
+export function createMirrorThrottle<T>(
+  send: (value: T) => void,
+  intervalMs: number
+): (value: T) => void {
   let lastSentAt = 0
   let pending: { value: T } | null = null
   let timer: ReturnType<typeof setTimeout> | null = null

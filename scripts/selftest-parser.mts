@@ -55,7 +55,10 @@ async function main(): Promise<void> {
     'shebang bash'
   )
   assertTag(
-    identifyFromContent('mystery', buf('interface User {\n  id: number;\n}\nconst name: string = "a";\n')),
+    identifyFromContent(
+      'mystery',
+      buf('interface User {\n  id: number;\n}\nconst name: string = "a";\n')
+    ),
     'typescript',
     'content',
     'TS 语法特征'
@@ -85,13 +88,21 @@ async function main(): Promise<void> {
     'C++ 语法特征'
   )
   assertTag(
-    identifyFromContent('m5', buf('#include <stdio.h>\nint main() {\n  printf("hi");\n  return 0;\n}\n')),
+    identifyFromContent(
+      'm5',
+      buf('#include <stdio.h>\nint main() {\n  printf("hi");\n  return 0;\n}\n')
+    ),
     'c',
     'content',
     'C 语法特征(不许冒充 C++)'
   )
   assertTag(identifyFromContent('m6', buf('<?php\necho 1;\n')), 'php', 'content', 'PHP 标记')
-  assertTag(identifyFromContent('cfg', buf('name: my-app\nversion: 1\n')), 'yaml', 'content', 'YAML 结构')
+  assertTag(
+    identifyFromContent('cfg', buf('name: my-app\nversion: 1\n')),
+    'yaml',
+    'content',
+    'YAML 结构'
+  )
   assert.equal(identifyFromContent('blob', buf('a\x00b')), null, '二进制应拒绝猜')
   assert.equal(identifyFromContent('empty', buf('')), null, '空文件应拒绝猜')
 
@@ -104,19 +115,36 @@ async function main(): Promise<void> {
   await fs.writeFile(join(dir, 'blob.bin'), Buffer.from([0x00, 0x01, 0x02]))
 
   try {
-    assertTag(await identifyFileLanguage(join(dir, 'run'), 'run'), 'python', 'content', '无后缀 shebang 文件')
-    assertTag(await identifyFileLanguage(join(dir, 'app.ts'), 'app.ts'), 'typescript', 'extension', '有后缀文件')
+    assertTag(
+      await identifyFileLanguage(join(dir, 'run'), 'run'),
+      'python',
+      'content',
+      '无后缀 shebang 文件'
+    )
+    assertTag(
+      await identifyFileLanguage(join(dir, 'app.ts'), 'app.ts'),
+      'typescript',
+      'extension',
+      '有后缀文件'
+    )
     assertTag(
       await identifyFileLanguage(join(dir, 'unknown.xyz'), 'unknown.xyz'),
       'text',
       'content',
       '认不出的纯文本兜底'
     )
-    assert.equal(await identifyFileLanguage(join(dir, 'blob.bin'), 'blob.bin'), null, '二进制无语言')
+    assert.equal(
+      await identifyFileLanguage(join(dir, 'blob.bin'), 'blob.bin'),
+      null,
+      '二进制无语言'
+    )
 
     // ── 三·五、大文件防线:只读文件头,绝不整只读进内存 ──
     // 稀疏文件:先写满一段文本(头 4KB 不能有零字节),再 truncate 撑大,瞬间造出"巨型文件"
-    const smallHead = 'interface User {\n  id: number;\n}\nconst name: string = "a";\n'.padEnd(4096, ' ')
+    const smallHead = 'interface User {\n  id: number;\n}\nconst name: string = "a";\n'.padEnd(
+      4096,
+      ' '
+    )
     await fs.writeFile(join(dir, 'huge.xyz'), smallHead)
     await fs.truncate(join(dir, 'huge.xyz'), 6 * 1024 * 1024) // 6MB,超过 5MB 嗅探红线
     assert.equal(
@@ -147,10 +175,18 @@ async function main(): Promise<void> {
     await fs.writeFile(join(dir, 'notes.md'), '# Notes\n')
     const scan = await scanDirectory(dir)
 
-    assert.equal(scan.stats.byLanguage['typescript']?.count, 2, 'TypeScript 应 2 个(app.ts + medium.xyz 嗅探认出)')
+    assert.equal(
+      scan.stats.byLanguage['typescript']?.count,
+      2,
+      'TypeScript 应 2 个(app.ts + medium.xyz 嗅探认出)'
+    )
     assert.equal(scan.stats.byLanguage['rust']?.count, 1, 'Rust 应 1 个')
     assert.equal(scan.stats.byLanguage['python']?.count, 1, 'Python 应 1 个(嗅探认出)')
-    assert.equal(scan.stats.byLanguage['text']?.count, 1, '纯文本兜底只算 unknown.xyz 一个,二进制不计入')
+    assert.equal(
+      scan.stats.byLanguage['text']?.count,
+      1,
+      '纯文本兜底只算 unknown.xyz 一个,二进制不计入'
+    )
 
     const fileTag = (name: string) => scan.tree.children.find((c) => c.name === name)
     assert.equal(fileTag('app.ts')?.language?.source, 'extension')

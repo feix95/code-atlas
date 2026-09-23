@@ -106,7 +106,11 @@ export function FolderOverview({
                 ))}
               </p>
             )}
-            {noteText ? <p className="card-text">{noteText}</p> : dir.summary && <p className="card-text">{dir.summary.text}</p>}
+            {noteText ? (
+              <p className="card-text">{noteText}</p>
+            ) : (
+              dir.summary && <p className="card-text">{dir.summary.text}</p>
+            )}
           </>
         )}
       </section>

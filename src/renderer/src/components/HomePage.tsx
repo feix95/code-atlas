@@ -92,7 +92,12 @@ export function HomePage({
           <div className="recents-grid">
             {recents.map((r) => (
               <div key={r.p} className="recent-card">
-                <button type="button" className="recent-open" onClick={() => onOpen(r.p)} title={r.p}>
+                <button
+                  type="button"
+                  className="recent-open"
+                  onClick={() => onOpen(r.p)}
+                  title={r.p}
+                >
                   <strong className="recent-name">{r.n}</strong>
                   <small className="recent-time">{formatRecentTime(r.t)}</small>
                 </button>
@@ -135,13 +140,20 @@ export function HomePage({
             {(drives ?? []).map((d) => {
               const used = driveUsedPercent(d)
               return (
-                <button key={d.letter} type="button" className="drive-card" onClick={() => onOpen(d.root)}>
+                <button
+                  key={d.letter}
+                  type="button"
+                  className="drive-card"
+                  onClick={() => onOpen(d.root)}
+                >
                   <strong className="drive-letter">{d.letter}:</strong>
                   <span className="drive-info">
                     <strong>{driveKindName(d)}</strong>
                     <small>{driveCapacity(d)}</small>
                     {used !== null && (
-                      <i className={`drive-bar${d.free !== undefined && d.free / d.total! < 0.1 ? ' is-low' : ''}`}>
+                      <i
+                        className={`drive-bar${d.free !== undefined && d.free / d.total! < 0.1 ? ' is-low' : ''}`}
+                      >
                         <i style={{ width: `${used}%` }} />
                       </i>
                     )}

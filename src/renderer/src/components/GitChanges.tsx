@@ -174,7 +174,13 @@ export function GitChanges({
     }
   }
 
-  if (loading) return <div className="structure-note"><ProgressDots />正在读取 git 记录……</div>
+  if (loading)
+    return (
+      <div className="structure-note">
+        <ProgressDots />
+        正在读取 git 记录……
+      </div>
+    )
   if (note) return <Notice kind="error">{note}</Notice>
   if (!result) return <div className="structure-note">git 记录还没拿到,点「刷新」再试。</div>
 
@@ -192,10 +198,17 @@ export function GitChanges({
     <div className="git">
       <div className="git-head">
         <span className="chip is-muted">
-          {result.stats.changed} 个文件改动 · <span className="git-add">+{result.stats.additions}</span>{' '}
+          {result.stats.changed} 个文件改动 ·{' '}
+          <span className="git-add">+{result.stats.additions}</span>{' '}
           <span className="git-del">−{result.stats.deletions}</span> · {result.durationMs} ms
         </span>
-        <button type="button" className="btn btn-ghost" onClick={() => void handleRefresh()} aria-label="刷新" title="刷新">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => void handleRefresh()}
+          aria-label="刷新"
+          title="刷新"
+        >
           <IconRefresh />
         </button>
       </div>
@@ -212,11 +225,22 @@ export function GitChanges({
         <div className="git-report">
           <div className="explain-head">
             <span className="explain-title">AI 改动报告</span>
-            <button type="button" className="btn" onClick={() => void handleReport()} disabled={reporting}>
-              {reporting ? '正在分析……' : report?.status === 'supported' ? '再分析一遍' : '生成本轮报告'}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void handleReport()}
+              disabled={reporting}
+            >
+              {reporting
+                ? '正在分析……'
+                : report?.status === 'supported'
+                  ? '再分析一遍'
+                  : '生成本轮报告'}
             </button>
           </div>
-          <p className="git-report-hint">不用读代码:AI 把这轮改动讲成大白话 —— 改了什么、有没有问题、要不要细看。</p>
+          <p className="git-report-hint">
+            不用读代码:AI 把这轮改动讲成大白话 —— 改了什么、有没有问题、要不要细看。
+          </p>
           {reporting &&
             (reportStream ? (
               <div className="explain-text">
@@ -224,10 +248,15 @@ export function GitChanges({
               </div>
             ) : (
               <div className="explain-note">
-                <ProgressDots />正在分析改动……(改动多时会慢一点)
+                <ProgressDots />
+                正在分析改动……(改动多时会慢一点)
               </div>
             ))}
-          {!reporting && report?.status === 'supported' && <div className="explain-text"><MiniMD text={report.text} /></div>}
+          {!reporting && report?.status === 'supported' && (
+            <div className="explain-text">
+              <MiniMD text={report.text} />
+            </div>
+          )}
           {!reporting && report?.status === 'error' && <Notice kind="error">{report.text}</Notice>}
         </div>
       )}
@@ -253,7 +282,9 @@ export function GitChanges({
           >
             <span className={`git-badge git-badge--${change.kind}`}>{KIND_LABEL[change.kind]}</span>
             <span className="git-path">{change.relPath}</span>
-            {change.staged && change.kind !== 'untracked' && <span className="git-staged">已暂存</span>}
+            {change.staged && change.kind !== 'untracked' && (
+              <span className="git-staged">已暂存</span>
+            )}
             <StatLine add={change.additions} del={change.deletions} />
           </button>
         ))}
@@ -267,16 +298,32 @@ export function GitChanges({
               {explaining ? '模型思考中……' : '用人话讲讲这个改动'}
             </button>
           </div>
-          <button type="button" className="structure-note chip-link" onClick={() => onJump(selected.relPath)}>
+          <button
+            type="button"
+            className="structure-note chip-link"
+            onClick={() => onJump(selected.relPath)}
+          >
             ↗ 在地图里打开这个文件
           </button>
-          {explaining && (streamText ? (
-            <div className="explain-text"><MiniMD text={streamText} caret /></div>
-          ) : (
-            <div className="explain-note"><ProgressDots />正在把改动翻译成人话……(diff 长的话会慢一点)</div>
-          ))}
-          {!explaining && explain?.status === 'supported' && <div className="explain-text"><MiniMD text={explain.text} /></div>}
-          {!explaining && explain?.status === 'error' && <Notice kind="error">{explain.text}</Notice>}
+          {explaining &&
+            (streamText ? (
+              <div className="explain-text">
+                <MiniMD text={streamText} caret />
+              </div>
+            ) : (
+              <div className="explain-note">
+                <ProgressDots />
+                正在把改动翻译成人话……(diff 长的话会慢一点)
+              </div>
+            ))}
+          {!explaining && explain?.status === 'supported' && (
+            <div className="explain-text">
+              <MiniMD text={explain.text} />
+            </div>
+          )}
+          {!explaining && explain?.status === 'error' && (
+            <Notice kind="error">{explain.text}</Notice>
+          )}
         </div>
       )}
     </div>

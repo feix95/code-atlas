@@ -35,7 +35,12 @@ export function parseRecentProjects(raw: unknown): RecentProject[] {
 
 /** 某项目刚打开过:同名路径(Windows 路径不分大小写)挤掉旧账顶到最前,超长从队尾滚出去
  *  (纯函数,自测覆盖) */
-export function nextRecentProjects(raw: unknown, path: string, name: string, ts: number): RecentProject[] {
+export function nextRecentProjects(
+  raw: unknown,
+  path: string,
+  name: string,
+  ts: number
+): RecentProject[] {
   const rest = parseRecentProjects(raw).filter((r) => r.p.toLowerCase() !== path.toLowerCase())
   return [{ p: path, n: name, t: ts }, ...rest].slice(0, RECENTS_MAX)
 }
@@ -61,7 +66,12 @@ export function writeRecentProjects(list: RecentProject[]): void {
 
 /** 在 App 里当一声「刚打开过」:读 → 记 → 写,三步合成一步给调用方省心 */
 export function rememberRecentProject(path: string): RecentProject[] {
-  const list = nextRecentProjects(readPref<unknown>(RECENTS_KEY, null), path, recentNameFor(path), Date.now())
+  const list = nextRecentProjects(
+    readPref<unknown>(RECENTS_KEY, null),
+    path,
+    recentNameFor(path),
+    Date.now()
+  )
   writeRecentProjects(list)
   return list
 }
@@ -76,7 +86,8 @@ export function forgetRecentProject(path: string): RecentProject[] {
 /** 上次时间的展示话术(纯函数,自测覆盖):今天报时刻,昨天说昨天,再往前报日期 */
 export function formatRecentTime(ts: number, now: number = Date.now()): string {
   const d = new Date(ts)
-  const startOfDay = (x: Date): number => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const startOfDay = (x: Date): number =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
   const days = Math.round((startOfDay(new Date(now)) - startOfDay(d)) / 86_400_000)
   const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   if (days <= 0) return `今天 ${hm}`

@@ -27,8 +27,14 @@ async function checkAsync(name: string, fn: () => Promise<void>): Promise<void> 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 const WA = { x: 0, y: 0, width: 1920, height: 1040 } // 一块 1080p 屏的工作区(扣了任务栏)
-const inside = (b: { x: number; y: number; width: number; height: number }, wa: typeof WA): boolean =>
-  b.x >= wa.x && b.y >= wa.y && b.x + b.width <= wa.x + wa.width && b.y + b.height <= wa.y + wa.height
+const inside = (
+  b: { x: number; y: number; width: number; height: number },
+  wa: typeof WA
+): boolean =>
+  b.x >= wa.x &&
+  b.y >= wa.y &&
+  b.x + b.width <= wa.x + wa.width &&
+  b.y + b.height <= wa.y + wa.height
 
 check('桌宠蹲右下角(经典位):气泡弹它上方,整窗在屏内', () => {
   const pet = { x: 1920 - 140 - 24, y: 1040 - 140 - 24, width: 140, height: 140 }
@@ -206,7 +212,10 @@ check('尺寸存档:正常尺寸取整落账,垃圾/缺斤短两回 null,偏小�
   assert.deepEqual(parseBubbleSize({ width: 520.6, height: 700.4 }), { width: 521, height: 700 })
   assert.equal(parseBubbleSize(null), null)
   assert.equal(parseBubbleSize({ width: 'x', height: 700 }), null)
-  assert.deepEqual(parseBubbleSize({ width: 10, height: 10 }), { width: BUBBLE_MIN_WIDTH, height: BUBBLE_MIN_HEIGHT })
+  assert.deepEqual(parseBubbleSize({ width: 10, height: 10 }), {
+    width: BUBBLE_MIN_WIDTH,
+    height: BUBBLE_MIN_HEIGHT
+  })
 })
 
 console.log('✅ 气泡落点 + 拖出判定 + 镜像节流 + 缩放对账自测全绿')

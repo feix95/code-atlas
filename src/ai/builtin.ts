@@ -9,10 +9,19 @@ import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
 import type { AiBuiltinSettings, GgufShape, ModelStatus } from '../shared/types.ts'
-import { DEFAULT_CONTEXT_SIZE, normalizeContextSize, PROBE_HEALTH_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
+import {
+  DEFAULT_CONTEXT_SIZE,
+  normalizeContextSize,
+  PROBE_HEALTH_MS,
+  PROBE_MODELS_MS
+} from '../shared/aiDefaults.ts'
 import { fetchWithTimeout } from './http.ts'
 import { estimateKvBytes, formatGB } from '../shared/contextBill.ts'
-import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from '../shared/modelShelf.ts'
+import {
+  MODEL_FIT_RAM_MAX_RATIO,
+  MODEL_FIT_RAM_OK_RATIO,
+  MODEL_FIT_VRAM_RATIO
+} from '../shared/modelShelf.ts'
 import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
@@ -118,8 +127,13 @@ export function averageWarmup(samples: number[]): number | null {
 }
 
 /** 账本更新:某模型刚热身完,入一笔,只留最近 3 次(纯函数,自测覆盖;垃圾输入就地开新账) */
-export function nextWarmupStore(raw: unknown, modelPath: string, ms: number): Record<string, number[]> {
-  const base: Record<string, unknown> = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
+export function nextWarmupStore(
+  raw: unknown,
+  modelPath: string,
+  ms: number
+): Record<string, number[]> {
+  const base: Record<string, unknown> =
+    raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
   const old = parseWarmupSamples(base, modelPath) ?? []
   base[modelPath] = [...old, Math.max(1000, Math.round(ms))].slice(-WARMUP_SAMPLES)
   return base as Record<string, number[]>
@@ -194,7 +208,10 @@ export async function queryMachineSpec(): Promise<MachineSpec> {
   let vramBytes: number | null = null
   let gpuName: string | null = null
   try {
-    const out = await runCommand('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader'])
+    const out = await runCommand('nvidia-smi', [
+      '--query-gpu=name,memory.total',
+      '--format=csv,noheader'
+    ])
     const hit = parseNvidiaSmi(out.split('\n')[0] ?? '')
     if (hit) {
       vramBytes = hit.vramBytes
@@ -273,25 +290,45 @@ export function judgeModelFit(
       }
     }
     const suggest = Math.floor(Math.max(1, vramBytes * MODEL_FIT_VRAM_RATIO - kv) / GB)
-    return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条` }
+    return {
+      level: 'too-big',
+      title: '这台机器装不下',
+      detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条`
+    }
   }
   // 纯内存跑(问不到显存,A/老卡):量尺只答装不装得下,缓存不另估 —— 内存机型本身就慢,
   // 缓存那点开销改变不了结论,别拿估出来的数字吓人
   if (modelBytes <= ramBytes * MODEL_FIT_RAM_OK_RATIO) {
-    return { level: 'ok', title: '装得下', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下` }
+    return {
+      level: 'ok',
+      title: '装得下',
+      detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下`
+    }
   }
   if (modelBytes <= ramBytes * MODEL_FIT_RAM_MAX_RATIO) {
-    return { level: 'tight', title: '有点挤', detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 塞得下但系统会挤,跑起来偏慢` }
+    return {
+      level: 'tight',
+      title: '有点挤',
+      detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 塞得下但系统会挤,跑起来偏慢`
+    }
   }
   const suggest = Math.floor((ramBytes * MODEL_FIT_RAM_OK_RATIO) / GB)
-  return { level: 'too-big', title: '这台机器装不下', detail: `模型 ${formatGB(modelBytes)},内存只有 ${formatGB(ramBytes)} —— 建议换 ${suggest} GB 以下的模型` }
+  return {
+    level: 'too-big',
+    title: '这台机器装不下',
+    detail: `模型 ${formatGB(modelBytes)},内存只有 ${formatGB(ramBytes)} —— 建议换 ${suggest} GB 以下的模型`
+  }
 }
 
 /**
  * 引擎「启动就死」的验尸报告(纯函数,自测覆盖):分清撑死、上下文填爆、还是文件坏了,
  * 不再一句「可能太大」糊弄所有人。撑死要拿量尺的数字说话;上下文嫌疑只在手动填大了时点。
  */
-export function autopsyExitMessage(exitCode: number | null, fit: ModelFitVerdictPure, manualContext: number | null): string {
+export function autopsyExitMessage(
+  exitCode: number | null,
+  fit: ModelFitVerdictPure,
+  manualContext: number | null
+): string {
   if (fit.level === 'too-big') {
     return `模型在这台机器上装不下,引擎一启动就撑死了(退出码 ${exitCode ?? '未知'})。${fit.detail}`
   }
@@ -322,17 +359,38 @@ function announceBuiltin(status: ModelStatus): void {
 
 function announceBuiltinError(modelPath: string, err: unknown): void {
   const facts = builtinIdleFacts(modelPath)
-  announceBuiltin(builtinStatus('error', facts.modelName, facts.sizeBytes, null, err instanceof Error ? err.message : String(err)))
+  announceBuiltin(
+    builtinStatus(
+      'error',
+      facts.modelName,
+      facts.sizeBytes,
+      null,
+      err instanceof Error ? err.message : String(err)
+    )
+  )
 }
 
 /** 没开引擎时的展示信息:上次用的模型名 + 文件多大;文件失踪就老实说,不报假数 */
-export function builtinIdleFacts(modelPath: string): { modelName: string; sizeBytes: number | null; message?: string } {
+export function builtinIdleFacts(modelPath: string): {
+  modelName: string
+  sizeBytes: number | null
+  message?: string
+} {
   const p = modelPath.trim()
-  if (!p) return { modelName: '', sizeBytes: null, message: '还没选模型:去「AI 设置」挑一个 GGUF 模型文件' }
+  if (!p)
+    return {
+      modelName: '',
+      sizeBytes: null,
+      message: '还没选模型:去「AI 设置」挑一个 GGUF 模型文件'
+    }
   try {
     return { modelName: basename(p), sizeBytes: statSync(p).size }
   } catch {
-    return { modelName: basename(p), sizeBytes: null, message: '模型文件找不到了(可能被挪走或删了):去「AI 设置」重新选一下' }
+    return {
+      modelName: basename(p),
+      sizeBytes: null,
+      message: '模型文件找不到了(可能被挪走或删了):去「AI 设置」重新选一下'
+    }
   }
 }
 
@@ -352,7 +410,8 @@ export function parseLoadProgress(body: unknown): number | null {
     typeof body === 'number'
       ? body
       : body !== null && typeof body === 'object'
-        ? ((body as { progress?: unknown }).progress ?? (body as { error?: { progress?: unknown } }).error?.progress)
+        ? ((body as { progress?: unknown }).progress ??
+          (body as { error?: { progress?: unknown } }).error?.progress)
         : undefined
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null
   if (raw <= 1) return raw * 100
@@ -370,7 +429,14 @@ export function parseGpuOffloadReport(line: string): GpuOffloadReport | null {
   if (!hit) return null
   const offloaded = Number(hit[1])
   const total = Number(hit[2])
-  if (!Number.isInteger(offloaded) || !Number.isInteger(total) || total <= 0 || offloaded < 0 || offloaded > total) return null
+  if (
+    !Number.isInteger(offloaded) ||
+    !Number.isInteger(total) ||
+    total <= 0 ||
+    offloaded < 0 ||
+    offloaded > total
+  )
+    return null
   return { offloaded, total }
 }
 
@@ -580,7 +646,9 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
  * 修的病:两个请求同秒到达时,旧的「先检查后启动」两头都看见引擎没起,
  * 各自 spawn 一份 llama-server,同一个模型往内存装两遍(实测一晚吃掉 29GB)。
  */
-export function createSingleFlight<A extends unknown[], T>(task: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+export function createSingleFlight<A extends unknown[], T>(
+  task: (...args: A) => Promise<T>
+): (...args: A) => Promise<T> {
   let inFlight: Promise<T> | null = null
   return (...args: A) => {
     if (inFlight) return inFlight
@@ -617,7 +685,9 @@ const startBuiltinSingleFlight = createSingleFlight(
     // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
     const reap = await reapOrphanServer()
     if (reap.blockedBy) {
-      const err = new Error('另一个程序正在使用本地模型服务。CodeAtlas 没有关闭它;请先在那个程序里停止模型,或到设置连接已有的本地服务。')
+      const err = new Error(
+        '另一个程序正在使用本地模型服务。CodeAtlas 没有关闭它;请先在那个程序里停止模型,或到设置连接已有的本地服务。'
+      )
       announceBuiltinError(modelPath, err)
       throw err
     }
@@ -631,12 +701,23 @@ const startBuiltinSingleFlight = createSingleFlight(
       // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
       const facts = builtinIdleFacts(modelPath)
       if (stopping) {
-        announceBuiltin(builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE))
+        announceBuiltin(
+          builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE)
+        )
       } else {
         // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
         if (err instanceof EngineExitError) {
           const spec = await queryMachineSpec()
-          err.message = autopsyExitMessage(err.exitCode, judgeModelFit(facts.sizeBytes ?? 0, spec.ramBytes, spec.vramBytes, normalizeContextSize(contextSize)), manualContext)
+          err.message = autopsyExitMessage(
+            err.exitCode,
+            judgeModelFit(
+              facts.sizeBytes ?? 0,
+              spec.ramBytes,
+              spec.vramBytes,
+              normalizeContextSize(contextSize)
+            ),
+            manualContext
+          )
         }
         announceBuiltinError(modelPath, err)
       }
@@ -750,7 +831,14 @@ async function startAndWaitReady(
     const elapsed = Date.now() - startedAt
     const est = realProgress ?? estimateLoadProgress(elapsed, lastWarmupMs)
     announceBuiltin(
-      builtinStatus('loading', facts.modelName, facts.sizeBytes, est, warmupNudgeMessage(elapsed), est !== null && realProgress === null)
+      builtinStatus(
+        'loading',
+        facts.modelName,
+        facts.sizeBytes,
+        est,
+        warmupNudgeMessage(elapsed),
+        est !== null && realProgress === null
+      )
     )
   }
   announceLoading(null)
@@ -760,7 +848,12 @@ async function startAndWaitReady(
   const exitError = new Promise<never>((_, reject) => {
     child?.once('exit', (code) => {
       clearEnginePidFileFor(spawnedPid)
-      addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎启动就退出了(退出码 ${code ?? '未知'})`)
+      addDevLog(
+        'system',
+        stopping
+          ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})`
+          : `引擎启动就退出了(退出码 ${code ?? '未知'})`
+      )
       reject(
         new EngineExitError(
           code ?? null,
@@ -805,11 +898,15 @@ async function startAndWaitReady(
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     }
-    if (!isBuiltinRunning()) throw new EngineExitError(null, '内置模型进程提前退出了,检查路径和模型文件')
+    if (!isBuiltinRunning())
+      throw new EngineExitError(null, '内置模型进程提前退出了,检查路径和模型文件')
 
     // 热身真耗时入账:下次同一模型的估价就有据可依
     recordWarmupMs(modelPath, Date.now() - startedAt)
-    addDevLog('system', `引擎就绪:模型加载完成,耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`)
+    addDevLog(
+      'system',
+      `引擎就绪:模型加载完成,耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`
+    )
 
     // 就绪后问它加载了哪个模型;刚就绪就断线的话给人话兜底
     let model: string
@@ -828,10 +925,21 @@ async function startAndWaitReady(
     // 用户主动卸下的不算,走 stopping 标记闭嘴
     child?.once('exit', (code) => {
       clearEnginePidFileFor(spawnedPid)
-      addDevLog('system', stopping ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})` : `引擎中途退出了(退出码 ${code ?? '未知'})`)
+      addDevLog(
+        'system',
+        stopping
+          ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})`
+          : `引擎中途退出了(退出码 ${code ?? '未知'})`
+      )
       if (!stopping) {
         announceBuiltin(
-          builtinStatus('error', model, facts.sizeBytes, null, `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`)
+          builtinStatus(
+            'error',
+            model,
+            facts.sizeBytes,
+            null,
+            `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`
+          )
         )
       }
     })

@@ -36,7 +36,10 @@ async function main(): Promise<void> {
 
   // 2. 重复拼接回归:任何节点的 relPath 都不许以根名开头,也不许含反斜杠
   for (const relPath of nodes.keys()) {
-    assert.ok(!relPath.startsWith(`${result.rootName}/`), `relPath 混入了根名(重复拼接复发):${relPath}`)
+    assert.ok(
+      !relPath.startsWith(`${result.rootName}/`),
+      `relPath 混入了根名(重复拼接复发):${relPath}`
+    )
     assert.ok(!relPath.includes('\\'), `relPath 分隔符必须是 '/':${relPath}`)
   }
   assert.equal(result.tree.relPath, '', '根节点 relPath 应为空字符串')
@@ -52,7 +55,11 @@ async function main(): Promise<void> {
   assert.throws(() => joinRoot(result.rootPath, '../outside.txt'), /越界/, '../ 上跳未被拦截')
   assert.throws(() => joinRoot(result.rootPath, '/etc/passwd'), /越界/, '绝对路径注入未被拦截')
   if (process.platform === 'win32') {
-    assert.throws(() => joinRoot(result.rootPath, 'C:\\Windows\\win.ini'), /越界/, '盘符注入未被拦截')
+    assert.throws(
+      () => joinRoot(result.rootPath, 'C:\\Windows\\win.ini'),
+      /越界/,
+      '盘符注入未被拦截'
+    )
   }
 
   // ── 第二幕:中文 + 空格路径的临时项目 ──

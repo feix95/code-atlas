@@ -34,7 +34,13 @@ export function usePresetQuestions(input: {
   const { rootPath, file, note, enabled, allowAi = false } = input
   // 第一层:规则预测,选中瞬间就有
   const rule = useMemo(
-    () => rulePresetQuestions({ name: file.name, icon: file.summary?.icon, text: file.summary?.text, languageId: file.language?.id }),
+    () =>
+      rulePresetQuestions({
+        name: file.name,
+        icon: file.summary?.icon,
+        text: file.summary?.text,
+        languageId: file.language?.id
+      }),
     [file]
   )
   const currentKey = cacheKey(rootPath, file.relPath)
@@ -54,5 +60,8 @@ export function usePresetQuestions(input: {
   })
 
   // 总闸关着交白卷(界面自然一颗题都不画);开着才按「AI 优先,规则垫底」出牌
-  return { questions: enabled ? (aiQuestions ?? rule) : [], source: enabled && aiQuestions ? 'ai' : 'rule' }
+  return {
+    questions: enabled ? (aiQuestions ?? rule) : [],
+    source: enabled && aiQuestions ? 'ai' : 'rule'
+  }
 }

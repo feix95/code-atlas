@@ -43,7 +43,12 @@ export function mascotCursorInside(
   const size = MASCOT_BODY_SIZE + MASCOT_HIT_PAD * 2
   const bx = winBounds.x + (winBounds.width - size) / 2
   const by = winBounds.y + (winBounds.height - size) / 2
-  return (p['x'] as number) >= bx && p['x'] <= bx + size && (p['y'] as number) >= by && p['y'] <= by + size
+  return (
+    (p['x'] as number) >= bx &&
+    p['x'] <= bx + size &&
+    (p['y'] as number) >= by &&
+    p['y'] <= by + size
+  )
 }
 
 /** 默认落角时离屏幕边的空当:贴太边容易被任务栏/输入法框遮住 */

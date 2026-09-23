@@ -5,7 +5,12 @@ import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
 import { CH } from '@shared/ipcChannels'
 import { planWholeFileRef, visibleLineRange } from '@shared/preview'
 import { friendlyErr } from '../errText'
-import { clampButtonX, refButtonLabel, selectionGeometry, type SelectionGeometry } from '../selectionMarks'
+import {
+  clampButtonX,
+  refButtonLabel,
+  selectionGeometry,
+  type SelectionGeometry
+} from '../selectionMarks'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
@@ -68,7 +73,11 @@ function renderColoredLine(lineText: string, segs: number[][] | undefined): Reac
     if (e <= s) return
     if (s > pos) parts.push(<span key={`t${i}`}>{lineText.slice(pos, s)}</span>)
     const cls = HL_KINDS[seg[2]]
-    parts.push(<span key={`k${i}`} className={cls ? `tok-${cls}` : undefined}>{lineText.slice(s, e)}</span>)
+    parts.push(
+      <span key={`k${i}`} className={cls ? `tok-${cls}` : undefined}>
+        {lineText.slice(s, e)}
+      </span>
+    )
     pos = e
   })
   if (pos < lineText.length) parts.push(<span key="tail">{lineText.slice(pos)}</span>)
@@ -117,7 +126,11 @@ export function CodePreview({
   // ── 换文件就地复位(隐身案这锤):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
   //    所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂,绝不串台 ──
   /** 读文件这笔账:读到什么/出什么错,记在哪个文件名下 */
-  const [loadedAt, setLoadedAt] = useState<{ file: string; result: FilePreviewResult | null; err: string | null }>({
+  const [loadedAt, setLoadedAt] = useState<{
+    file: string
+    result: FilePreviewResult | null
+    err: string | null
+  }>({
     file: '',
     result: null,
     err: null
@@ -125,10 +138,18 @@ export function CodePreview({
   const result = loadedAt.file === file.relPath ? loadedAt.result : null
   const err = loadedAt.file === file.relPath ? loadedAt.err : null
   /** 选区记号:选了哪段,记在哪个文件上 */
-  const [selAt, setSelAt] = useState<{ file: string; sel: Selection | null }>({ file: '', sel: null })
+  const [selAt, setSelAt] = useState<{ file: string; sel: Selection | null }>({
+    file: '',
+    sel: null
+  })
   const sel = selAt.file === file.relPath ? selAt.sel : null
   /** 三个一闪而过的小开关(浮钮/已引用/已复制)共用一本账 */
-  const [uiAt, setUiAt] = useState<{ file: string; showButton: boolean; added: boolean; copiedAll: boolean }>({
+  const [uiAt, setUiAt] = useState<{
+    file: string
+    showButton: boolean
+    added: boolean
+    copiedAll: boolean
+  }>({
     file: '',
     showButton: false,
     added: false,
@@ -262,7 +283,8 @@ export function CodePreview({
     if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return null
     const anchorNode = s.anchorNode
     const focusNode = s.focusNode
-    if (!anchorNode || !focusNode || !el.contains(anchorNode) || !el.contains(focusNode)) return null
+    if (!anchorNode || !focusNode || !el.contains(anchorNode) || !el.contains(focusNode))
+      return null
     const code = s.toString()
     if (code.trim() === '') return null
     const rects = Array.from(s.getRangeAt(0).getClientRects())
@@ -281,7 +303,9 @@ export function CodePreview({
       buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right, 100) : geom.buttonX,
       startLine: chunkBaseRef.current + countNewlines((el.textContent ?? '').slice(0, start)),
       // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
-      endLine: chunkBaseRef.current + countNewlines((el.textContent ?? '').slice(0, Math.max(start, end - 1))),
+      endLine:
+        chunkBaseRef.current +
+        countNewlines((el.textContent ?? '').slice(0, Math.max(start, end - 1))),
       code
     }
   }, [])
@@ -364,7 +388,8 @@ export function CodePreview({
       return
     }
     const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      return
     e.preventDefault()
     if (text === '') return
     void navigator.clipboard
@@ -418,7 +443,13 @@ export function CodePreview({
           onContextMenu={(e) => {
             // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
             e.preventDefault()
-            openFilePathMenuFor(rootPath, file.relPath, e.clientX, e.clientY, noteMenu ? { note: noteMenu } : undefined)
+            openFilePathMenuFor(
+              rootPath,
+              file.relPath,
+              e.clientX,
+              e.clientY,
+              noteMenu ? { note: noteMenu } : undefined
+            )
           }}
         >
           {file.relPath}
@@ -446,7 +477,9 @@ export function CodePreview({
           正在读文件……
         </div>
       )}
-      {!err && result && result.status !== 'ok' && <p className="code-pane-note">{result.reason}</p>}
+      {!err && result && result.status !== 'ok' && (
+        <p className="code-pane-note">{result.reason}</p>
+      )}
       {!err && result?.status === 'ok' && (
         <>
           {copiedAll && <p className="code-pane-note">全文已复制到剪贴板</p>}
@@ -484,16 +517,28 @@ export function CodePreview({
       {sel && (
         <>
           {/* 从哪开始、到哪结束:一正一反的角括号,贴在第一个字左边、最后一个字右边 */}
-          <span className="code-mark is-start" style={{ left: `${sel.startX}px`, top: `${sel.startY}px` }} aria-hidden="true">
+          <span
+            className="code-mark is-start"
+            style={{ left: `${sel.startX}px`, top: `${sel.startY}px` }}
+            aria-hidden="true"
+          >
             <TreeIcon name="markStart" size={MARK_ICON_SIZE} />
           </span>
-          <span className="code-mark is-end" style={{ left: `${sel.endX}px`, top: `${sel.endY}px` }} aria-hidden="true">
+          <span
+            className="code-mark is-end"
+            style={{ left: `${sel.endX}px`, top: `${sel.endY}px` }}
+            aria-hidden="true"
+          >
             <TreeIcon name="markEnd" size={MARK_ICON_SIZE} />
           </span>
           {/* 左缘竖线:一眼看出这一段是一个整体 */}
           <span
             className="code-sel-bar"
-            style={{ left: `${sel.barLeft}px`, top: `${sel.barTop}px`, height: `${sel.barHeight}px` }}
+            style={{
+              left: `${sel.barLeft}px`,
+              top: `${sel.barTop}px`,
+              height: `${sel.barHeight}px`
+            }}
             aria-hidden="true"
           />
         </>
@@ -508,7 +553,12 @@ export function CodePreview({
           // 按下时别让浏览器动选区:一按就折叠的话,这个按钮会先被卸载,click 就丢了
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            onAddRef({ relPath: file.relPath, startLine: sel.startLine, endLine: sel.endLine, code: sel.code })
+            onAddRef({
+              relPath: file.relPath,
+              startLine: sel.startLine,
+              endLine: sel.endLine,
+              code: sel.code
+            })
             window.getSelection()?.removeAllRanges()
             setSelAt({ file: file.relPath, sel: null })
             patchUi({ showButton: false })

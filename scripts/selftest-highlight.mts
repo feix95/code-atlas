@@ -105,7 +105,10 @@ async function main(): Promise<void> {
   assert.equal(tsColors!.length, 6, '账的行数跟文本一致')
 
   // ── 5. 真解析(其他语言):python / json / css / html / bash 各点一穴 ──
-  const pyColors = await highlightSource(['def greet(name):', '    # 问好', '    return name'].join('\n'), 'tool.py')
+  const pyColors = await highlightSource(
+    ['def greet(name):', '    # 问好', '    return name'].join('\n'),
+    'tool.py'
+  )
   assert.ok(pyColors, 'Python 要出分色账')
   assert.equal(kindAt(pyColors!, 1, 1), 'kw', 'def 是关键字')
   assert.equal(kindAt(pyColors!, 1, 6), 'fn', '函数名是函数色')
@@ -137,7 +140,10 @@ async function main(): Promise<void> {
   assert.equal(kindAt(shColors!, 2, 1), 'var', '命令名有变量色(分得不完美也比白字强)')
 
   // ── 6. 跨行块注释:每行都有段;空行的账是空的 ──
-  const blockColors = await highlightSource(['/* 第一行', '   第二行 */', 'const ok = 1', '', 'const end = 2'].join('\n'), 'b.ts')
+  const blockColors = await highlightSource(
+    ['/* 第一行', '   第二行 */', 'const ok = 1', '', 'const end = 2'].join('\n'),
+    'b.ts'
+  )
   assert.ok(blockColors)
   assert.equal(kindAt(blockColors!, 1, 3), 'com', '块注释第一行是注释色')
   assert.equal(kindAt(blockColors!, 2, 5), 'com', '块注释第二行接着是注释色(跨行切段)')
@@ -152,7 +158,9 @@ async function main(): Promise<void> {
   const broken = await highlightSource('function ((( {', 'bad.ts')
   assert.ok(Array.isArray(broken), '语法坏了也照样出账(tree-sitter 容错解析),至少不炸')
 
-  console.log('✅ 预览分色自测:认语言 / 字数闸 / 行切分(跨行/合并/空行)/ TS・Python・JSON・CSS・HTML・bash 真解析 / 中文列号不漂移 / 化妆不越权 全部通过')
+  console.log(
+    '✅ 预览分色自测:认语言 / 字数闸 / 行切分(跨行/合并/空行)/ TS・Python・JSON・CSS・HTML・bash 真解析 / 中文列号不漂移 / 化妆不越权 全部通过'
+  )
 }
 
 main().catch((e) => {

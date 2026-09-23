@@ -179,7 +179,10 @@ function dedupeSorted(items: Iterable<string>): string[] {
  * 解析源码,提取结构。只结构化,不解释——解释是 AI 模块的事。
  * 返回 null = 该语言暂不支持 AST 分析(不是出错,是诚实的能力边界)。
  */
-export async function analyzeSource(code: string, languageId: string): Promise<FileStructure | null> {
+export async function analyzeSource(
+  code: string,
+  languageId: string
+): Promise<FileStructure | null> {
   if (!isAnalysisSupported(languageId)) return null
 
   const parser = await prepare(languageId)
@@ -236,8 +239,13 @@ export async function analyzeSource(code: string, languageId: string): Promise<F
     }
 
     // React 组件判定:文件确实用了 JSX,且函数/类名大写开头(行业约定)
-    if (languageId.endsWith('-react') && tree.rootNode.descendantsOfType('jsx_element').length > 0) {
-      result.reactComponents = [...result.functions, ...result.classes].filter((name) => /^[A-Z]/.test(name))
+    if (
+      languageId.endsWith('-react') &&
+      tree.rootNode.descendantsOfType('jsx_element').length > 0
+    ) {
+      result.reactComponents = [...result.functions, ...result.classes].filter((name) =>
+        /^[A-Z]/.test(name)
+      )
     }
 
     result.imports = dedupeSorted(result.imports)

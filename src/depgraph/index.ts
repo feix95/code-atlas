@@ -6,7 +6,14 @@ import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { LANGUAGES } from '../shared/languages.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
-import type { DepEdge, DepGraphResult, LanguageTag, ScanFileNode, ScanTreeNode, UnresolvedImport } from '../shared/types.ts'
+import type {
+  DepEdge,
+  DepGraphResult,
+  LanguageTag,
+  ScanFileNode,
+  ScanTreeNode,
+  UnresolvedImport
+} from '../shared/types.ts'
 
 function collectFiles(node: ScanTreeNode, into: ScanFileNode[]): void {
   if (node.type === 'file') {
@@ -50,7 +57,12 @@ interface ImportHints {
 }
 
 /** 每种语言的导入翻译器:把 analyzer 抓出来的导入说明符翻译成项目内的文件 */
-type ImportResolver = (req: { fromRel: string; spec: string; known: Set<string>; hints: ImportHints }) => ImportResolution
+type ImportResolver = (req: {
+  fromRel: string
+  spec: string
+  known: Set<string>
+  hints: ImportHints
+}) => ImportResolution
 
 function firstKnown(candidates: string[], known: Set<string>): string | null {
   for (const candidate of candidates) {
@@ -64,7 +76,15 @@ function firstKnown(candidates: string[], known: Set<string>): string | null {
  * 尝试原样、补后缀、补 /index 三轮;连不上记 unresolved(别名、css、动态路径这类)。
  * 非相对开头的(react、node:path、@scope/pkg)由 isExternalSpec 分流:外部包还是别名。
  */
-function resolveJsImport({ fromRel, spec, known }: { fromRel: string; spec: string; known: Set<string> }): ImportResolution {
+function resolveJsImport({
+  fromRel,
+  spec,
+  known
+}: {
+  fromRel: string
+  spec: string
+  known: Set<string>
+}): ImportResolution {
   if (!spec.startsWith('.')) return { to: null, external: isExternalSpec(spec) }
   const base = fromRel.split('/').slice(0, -1)
   const normalized = normalizeParts([...base, ...spec.split('/')])
@@ -94,7 +114,15 @@ function isExternalSpec(spec: string): boolean {
  * 相对导入('.x'、'..pkg')按点数从当前文件目录上跳;纯 '.' 连当前包的 __init__.py。
  * 绝对导入只按项目根找(Python 包平铺在根的主流布局);连不上按外部包记,不硬连。
  */
-function resolvePyImport({ fromRel, spec, known }: { fromRel: string; spec: string; known: Set<string> }): ImportResolution {
+function resolvePyImport({
+  fromRel,
+  spec,
+  known
+}: {
+  fromRel: string
+  spec: string
+  known: Set<string>
+}): ImportResolution {
   if (spec.startsWith('.')) {
     let up = 0
     while (spec[up] === '.') up++
@@ -126,7 +154,15 @@ function resolveGoImport({ spec, hints }: { spec: string; hints: ImportHints }):
  * 静态导入和内部类会多带一两段(com.acme.Service.run),全名找不到就砍掉最后一段再试,最多砍两段;
  * 都找不到是 JDK 或第三方包,算外部。
  */
-function resolveJavaImport({ spec, known, hints }: { spec: string; known: Set<string>; hints: ImportHints }): ImportResolution {
+function resolveJavaImport({
+  spec,
+  known,
+  hints
+}: {
+  spec: string
+  known: Set<string>
+  hints: ImportHints
+}): ImportResolution {
   const segs = spec.split('.')
   for (let cut = 0; cut <= 2 && cut < segs.length; cut++) {
     const cls = segs.slice(0, segs.length - cut).join('/')
@@ -151,15 +187,31 @@ function rustFileCandidates(root: string[], modPath: string[]): string[] {
  * 'super::x' 从当前目录上跳;裸名('mod x;' 抓出来的)就在当前目录找;
  * 多段裸名(serde::Serialize)和 '::x' 全局路径是外部 crate,不硬连。
  */
-function resolveRustImport({ fromRel, spec, known, hints }: { fromRel: string; spec: string; known: Set<string>; hints: ImportHints }): ImportResolution {
+function resolveRustImport({
+  fromRel,
+  spec,
+  known,
+  hints
+}: {
+  fromRel: string
+  spec: string
+  known: Set<string>
+  hints: ImportHints
+}): ImportResolution {
   const root = hints.rustRoot ? [hints.rustRoot] : []
   const base = fromRel.split('/').slice(0, -1)
   if (spec.startsWith('crate::')) {
     const path = spec.slice('crate::'.length).split('::')
-    const to = firstKnown([...rustFileCandidates(root, path.slice(0, -1)), ...rustFileCandidates(root, path)], known)
+    const to = firstKnown(
+      [...rustFileCandidates(root, path.slice(0, -1)), ...rustFileCandidates(root, path)],
+      known
+    )
     return { to, external: false }
   }
-  if (spec.startsWith('::') || (spec.includes('::') && !spec.startsWith('super::') && !spec.startsWith('self::'))) {
+  if (
+    spec.startsWith('::') ||
+    (spec.includes('::') && !spec.startsWith('super::') && !spec.startsWith('self::'))
+  ) {
     return { to: null, external: true }
   }
   let up = 0
@@ -176,7 +228,9 @@ function resolveRustImport({ fromRel, spec, known, hints }: { fromRel: string; s
   // 多段('super::config::Port')最后一段多半是模块里的类型/函数,先试砍段的模块文件;
   // 裸名('mod x;' 抓出来的)本身就是模块文件,不用砍
   const candidates =
-    path.length > 1 ? [...rustFileCandidates(dir, path.slice(0, -1)), ...rustFileCandidates(dir, path)] : rustFileCandidates(dir, path)
+    path.length > 1
+      ? [...rustFileCandidates(dir, path.slice(0, -1)), ...rustFileCandidates(dir, path)]
+      : rustFileCandidates(dir, path)
   return { to: firstKnown(candidates, known), external: true }
 }
 
@@ -192,7 +246,9 @@ const RESOLVERS: Record<string, ImportResolver> = {
 }
 
 /** JS/TS 的候选后缀:不养自己的名单 —— 凡走 JS 翻译器的语言,户口本后缀全算(.mts/.cts 不漏) */
-const JS_EXTS = LANGUAGES.filter((l) => RESOLVERS[l.id] === resolveJsImport).flatMap((l) => l.extensions ?? [])
+const JS_EXTS = LANGUAGES.filter((l) => RESOLVERS[l.id] === resolveJsImport).flatMap(
+  (l) => l.extensions ?? []
+)
 
 /**
  * 开场探测一次项目布局:go.mod 的 module 名、Java 的 Maven 标准布局、Rust 的 cargo src/ 布局。
@@ -210,7 +266,9 @@ async function detectImportHints(rootPath: string, known: Set<string>): Promise<
       if (best === undefined || file < best) goDirs.set(dir, file)
     }
   }
-  const hasMavenLayout = [...known].some((f) => f.endsWith('.java') && f.startsWith('src/main/java/'))
+  const hasMavenLayout = [...known].some(
+    (f) => f.endsWith('.java') && f.startsWith('src/main/java/')
+  )
   const javaRoots = hasMavenLayout ? ['src/main/java', ''] : ['']
   const rustRoot = [...known].some((f) => f.endsWith('.rs') && f.startsWith('src/')) ? 'src' : null
   return { goModule, goDirs, javaRoots, rustRoot }
@@ -227,7 +285,8 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
   const files: ScanFileNode[] = []
   collectFiles(scan.tree, files)
   const analyzable = files.filter(
-    (f): f is ScanFileNode & { language: LanguageTag } => f.language !== undefined && isAnalysisSupported(f.language.id)
+    (f): f is ScanFileNode & { language: LanguageTag } =>
+      f.language !== undefined && isAnalysisSupported(f.language.id)
   )
   const known = new Set(analyzable.map((f) => f.relPath))
   const hints = await detectImportHints(scan.rootPath, known)
@@ -265,7 +324,9 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
     const resolve = RESOLVERS[languageId] ?? null
 
     for (const spec of structure.imports) {
-      const resolution = resolve ? resolve({ fromRel: file.relPath, spec, known, hints }) : { to: null, external: true }
+      const resolution = resolve
+        ? resolve({ fromRel: file.relPath, spec, known, hints })
+        : { to: null, external: true }
       if (resolution.to) {
         // 查重 key 用 JSON 数组串:分隔符不会和路径内容撞(以前用 \u0000,连累整个文件被判成二进制)
         const key = JSON.stringify([file.relPath, resolution.to])

@@ -9,7 +9,9 @@ import { AI_HEADERS_TIMEOUT_MS } from '../shared/aiDefaults.ts'
 
 /** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
 export function isContextOverflow(text: string): boolean {
-  return /exceeds the available context|context size|context length|too many tokens|n_ctx/i.test(text)
+  return /exceeds the available context|context size|context length|too many tokens|n_ctx/i.test(
+    text
+  )
 }
 
 /** 「服务地址 → 服务根」:设置里存的是 .../v1 这种 API 基址,探测口(/api/v0/*、/props、/health)
@@ -19,14 +21,22 @@ export function stripApiSuffix(baseUrl: string): string {
 }
 
 /** 探测类 fetch 小件(P2-18):fetch + AbortSignal.timeout 一把抓,超时档位全走 PROBE_*_MS 常量 */
-export function fetchWithTimeout(url: string, timeoutMs: number, init?: RequestInit): Promise<Response> {
+export function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  init?: RequestInit
+): Promise<Response> {
   return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
 }
 
 /** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文)。
  * 上下文的指路话术按引擎分家:内置指回设置里的「模型上下文」,
  * 外接 LM Studio 的上下文设置不归 App 管,指去 LM Studio 调大再重载模型 */
-export function friendlyHttpError(status: number, detail: string, engine?: 'builtin' | 'lmstudio'): string | null {
+export function friendlyHttpError(
+  status: number,
+  detail: string,
+  engine?: 'builtin' | 'lmstudio'
+): string | null {
   if (isContextOverflow(`${status} ${detail}`)) {
     return engine === 'lmstudio'
       ? '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去 LM Studio 把上下文调大,再重新加载模型'
@@ -60,7 +70,10 @@ export async function postChatCompletions(
     if (opts.signal.aborted) controller.abort()
     else opts.signal.addEventListener('abort', () => controller.abort(), { once: true })
   }
-  const watchdog = setTimeout(() => controller.abort(), opts?.headersTimeoutMs ?? AI_HEADERS_TIMEOUT_MS)
+  const watchdog = setTimeout(
+    () => controller.abort(),
+    opts?.headersTimeoutMs ?? AI_HEADERS_TIMEOUT_MS
+  )
   const disarm = (): void => clearTimeout(watchdog)
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -80,7 +93,8 @@ export async function postChatCompletions(
         ok: false,
         httpStatus: res.status,
         detail,
-        text: friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`
+        text:
+          friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`
       }
     }
     return { ok: true, res, controller, disarm }

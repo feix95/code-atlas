@@ -76,14 +76,21 @@ export function TabBar({
     e.preventDefault()
     setTabMenu(null)
     // 菜单按视口坐标 fixed 摆放(不吃页签条横向滚动的裁剪),快贴到右/下缘时往回收一点
-    setMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 170) })
+    setMenu({
+      x: Math.min(e.clientX, window.innerWidth - 200),
+      y: Math.min(e.clientY, window.innerHeight - 170)
+    })
   }
 
   function openTabMenu(e: React.MouseEvent, tabId: string): void {
     e.preventDefault()
     e.stopPropagation()
     setMenu(null)
-    setTabMenu({ x: Math.min(e.clientX, window.innerWidth - 190), y: Math.min(e.clientY, window.innerHeight - 130), tabId })
+    setTabMenu({
+      x: Math.min(e.clientX, window.innerWidth - 190),
+      y: Math.min(e.clientY, window.innerHeight - 130),
+      tabId
+    })
   }
 
   return (

@@ -77,7 +77,10 @@ export function DetailHeader({
       <nav className="crumbs" aria-label="所在位置">
         {crumbs.map((c, i) => (
           <span key={`${c.label}-${i}`} className="crumb-group">
-            <span className={i === crumbs.length - 1 ? 'crumb is-current' : 'crumb'} title={c.title ?? c.label}>
+            <span
+              className={i === crumbs.length - 1 ? 'crumb is-current' : 'crumb'}
+              title={c.title ?? c.label}
+            >
               {c.label}
             </span>
             {i < crumbs.length - 1 && <span className="crumb-sep">/</span>}

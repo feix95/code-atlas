@@ -38,7 +38,12 @@ export function GitDoor({
 
   return (
     <div className="git-door-box">
-      <button type="button" className="git-door" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      <button
+        type="button"
+        className="git-door"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
         <span className="git-door-icon" aria-hidden="true">
           <BranchIcon />
           <span className="git-door-badge">{gitInfo.stats.changed}</span>
@@ -51,7 +56,12 @@ export function GitDoor({
       </button>
       {open && (
         <div className="git-door-panel">
-          <GitChanges rootPath={rootPath} onJump={onJump} initial={gitInfo} onRefreshed={onRefreshed} />
+          <GitChanges
+            rootPath={rootPath}
+            onJump={onJump}
+            initial={gitInfo}
+            onRefreshed={onRefreshed}
+          />
         </div>
       )}
     </div>

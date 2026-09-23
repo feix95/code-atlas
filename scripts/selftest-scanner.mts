@@ -30,7 +30,11 @@ async function main(): Promise<void> {
     assert.equal(result.stats.dirCount, 3, `文件夹数应为3,实际${result.stats.dirCount}`)
 
     // 2. node_modules 和 .git 被忽略
-    assert.equal(result.stats.ignoredCount, 3, '应忽略 node_modules / .git / System Volume Information 三项')
+    assert.equal(
+      result.stats.ignoredCount,
+      3,
+      '应忽略 node_modules / .git / System Volume Information 三项'
+    )
     const childNames = result.tree.children.map((c) => c.name)
     assert.ok(!childNames.includes('node_modules'), 'node_modules 不该出现在树里')
     assert.ok(!childNames.includes('.git'), '.git 不该出现在树里')
@@ -45,7 +49,10 @@ async function main(): Promise<void> {
     assert.deepEqual(childNames, ['docs', 'src', 'package.json', 'photo.PNG'], '文件夹应排在文件前')
     const src = result.tree.children.find((c) => c.name === 'src')
     assert.equal(src?.type, 'directory')
-    assert.deepEqual(src?.children.map((c) => c.name), ['components', 'index.ts'])
+    assert.deepEqual(
+      src?.children.map((c) => c.name),
+      ['components', 'index.ts']
+    )
 
     // 5. 元信息
     assert.equal(result.rootName, root.split(/[\\/]/).pop(), '根目录名应正确')
@@ -56,7 +63,9 @@ async function main(): Promise<void> {
     await assert.rejects(() => scanDirectory(join(root, 'package.json')), /这不是一个文件夹/)
 
     console.log('✅ 目录扫描器自测全部通过')
-    console.log(`   文件 ${result.stats.fileCount} · 文件夹 ${result.stats.dirCount} · 耗时 ${result.durationMs}ms`)
+    console.log(
+      `   文件 ${result.stats.fileCount} · 文件夹 ${result.stats.dirCount} · 耗时 ${result.durationMs}ms`
+    )
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -84,12 +93,17 @@ async function main(): Promise<void> {
     const big = await scanDirectory(bigRoot)
     const externalGrew = process.memoryUsage().external - before
 
-    assert.equal(big.stats.fileCount, MANY + 6, `文件数应为 ${MANY + 6}(2000 小文件 + 5 视频壳 + 1 大文件)`)
+    assert.equal(
+      big.stats.fileCount,
+      MANY + 6,
+      `文件数应为 ${MANY + 6}(2000 小文件 + 5 视频壳 + 1 大文件)`
+    )
     assert.equal(big.stats.byExt['.mp4'], 1, '视频壳照常按后缀计数')
 
     const videos = big.tree.children.find((c) => c.name === 'videos')
     assert.ok(
-      videos?.type === 'directory' && videos.children.every((c) => c.type === 'file' && c.language === undefined),
+      videos?.type === 'directory' &&
+        videos.children.every((c) => c.type === 'file' && c.language === undefined),
       '视频壳一律无语言标签(黑名单零 I/O 放过)'
     )
     const mystery = big.tree.children.find((c) => c.name === 'mystery-big')
@@ -103,7 +117,9 @@ async function main(): Promise<void> {
       externalGrew < 16 * 1024 * 1024,
       `嗅探内存必须与大文件体积无关:外部内存涨了 ${(externalGrew / 1024 / 1024).toFixed(1)}MB(红线 16MB)`
     )
-    console.log(`✅ 大文件夹防线自测通过:${big.stats.fileCount} 个文件 · ${big.durationMs}ms · 外部内存增量 ${(externalGrew / 1024 / 1024).toFixed(2)}MB`)
+    console.log(
+      `✅ 大文件夹防线自测通过:${big.stats.fileCount} 个文件 · ${big.durationMs}ms · 外部内存增量 ${(externalGrew / 1024 / 1024).toFixed(2)}MB`
+    )
   } finally {
     await fs.rm(bigRoot, { recursive: true, force: true })
   }
@@ -118,7 +134,10 @@ async function main(): Promise<void> {
 
   try {
     const tier = await scanDirectory(tierRoot)
-    assert.ok(tier.stats.fileCount <= 4000, `预算内必须收工,实际探了 ${tier.stats.fileCount} 个文件`)
+    assert.ok(
+      tier.stats.fileCount <= 4000,
+      `预算内必须收工,实际探了 ${tier.stats.fileCount} 个文件`
+    )
     assert.ok(tier.tree.lazy !== true, '根节点自己就是这张图,不挂"还没探"')
 
     const bigNode = tier.tree.children.find((c) => c.name === 'big')
@@ -139,12 +158,17 @@ async function main(): Promise<void> {
     const sub = await scanDirectory(join(tierRoot, 'big'), 'big')
     assert.equal(sub.tree.relPath, 'big', '子树根的 relPath 应带全项目前缀')
     const subChild = sub.tree.children.find((c) => c.type === 'file')
-    assert.ok(subChild && subChild.relPath.startsWith('big/'), `子树节点的 relPath 必须以 'big/' 开头,实际 ${subChild?.relPath}`)
+    assert.ok(
+      subChild && subChild.relPath.startsWith('big/'),
+      `子树节点的 relPath 必须以 'big/' 开头,实际 ${subChild?.relPath}`
+    )
     // 预算中途用尽:子树根照实挂 truncated(前端透传成"不完整"徽标)和 lazy(记账,拼树时清掉)
     assert.equal(sub.tree.truncated, true, '子目录预算用尽要挂 truncated,不许装完整')
     assert.equal(sub.tree.lazy, true, '被截断的子目录自己也要记一笔 lazy')
 
-    console.log(`✅ 分级扫描自测通过:预算内探了 ${tier.stats.fileCount} 个文件 · ${tier.stats.lazyCount} 个目录挂"还没探"`)
+    console.log(
+      `✅ 分级扫描自测通过:预算内探了 ${tier.stats.fileCount} 个文件 · ${tier.stats.lazyCount} 个目录挂"还没探"`
+    )
   } finally {
     await fs.rm(tierRoot, { recursive: true, force: true })
   }
@@ -166,7 +190,8 @@ async function main(): Promise<void> {
     const whole = await scanDirectory(subRoot)
     assert.equal(whole.tree.relPath, '', '整项目扫描的根 relPath 仍是空串')
     const srcNode = whole.tree.children.find((c) => c.name === 'src')
-    const lib = srcNode?.type === 'directory' ? srcNode.children.find((c) => c.name === 'lib') : undefined
+    const lib =
+      srcNode?.type === 'directory' ? srcNode.children.find((c) => c.name === 'lib') : undefined
     assert.ok(lib && lib.relPath === 'src/lib', '整项目扫描行为不变:子节点 relPath 照旧从根起算')
 
     console.log('✅ 分级扫描路径契约自测通过:子树 relPath 是全局坐标,拼回大树不断链')

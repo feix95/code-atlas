@@ -105,19 +105,26 @@ const atlasApi = {
   windowIsMaximized: (): Promise<boolean> => ipcRenderer.invoke(CH.windowIsMaximized),
   /** 订阅最大化/还原状态变化;返回退订函数,组件卸载时调用 */
   onWindowMaximized: (callback: (maximized: boolean) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, maximized: boolean): void => callback(maximized)
+    const listener = (_event: Electron.IpcRendererEvent, maximized: boolean): void =>
+      callback(maximized)
     ipcRenderer.on(CH.windowMaximized, listener)
     return () => ipcRenderer.removeListener(CH.windowMaximized, listener)
   },
-  scanFolder: (folderPath: string): Promise<ScanResult> => ipcRenderer.invoke(CH.scanFolder, folderPath),
+  scanFolder: (folderPath: string): Promise<ScanResult> =>
+    ipcRenderer.invoke(CH.scanFolder, folderPath),
   scanSubdir: (rootPath: string, relPath: string): Promise<ScanResult> =>
     ipcRenderer.invoke(CH.scanSubdir, rootPath, relPath),
-  analyzeFile: (rootPath: string, relPath: string, languageId: string): Promise<FileStructure | null> =>
+  analyzeFile: (
+    rootPath: string,
+    relPath: string,
+    languageId: string
+  ): Promise<FileStructure | null> =>
     ipcRenderer.invoke(CH.analyzeFile, rootPath, relPath, languageId),
   /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话,不硬塞乱码) */
   readPreview: (rootPath: string, relPath: string): Promise<FilePreviewResult> =>
     ipcRenderer.invoke(CH.readPreview, rootPath, relPath),
-  depGraph: (rootPath: string): Promise<DepGraphResult> => ipcRenderer.invoke(CH.depGraph, rootPath),
+  depGraph: (rootPath: string): Promise<DepGraphResult> =>
+    ipcRenderer.invoke(CH.depGraph, rootPath),
   // 模型货架:实时榜(双源拉取+本机家底)+ 仓库文件清单
   modelShelf: (): Promise<ShelfResult> => ipcRenderer.invoke(CH.modelShelf),
   modelFiles: (repoId: string): Promise<RepoFile[]> => ipcRenderer.invoke(CH.modelFiles, repoId),
@@ -126,41 +133,68 @@ const atlasApi = {
     ipcRenderer.invoke(CH.modelDownloadStart, { repoId, filePath }),
   modelDownloadCancel: (): Promise<boolean> => ipcRenderer.invoke(CH.modelDownloadCancel),
   onModelDownloadProgress: (callback: (p: ModelDownloadProgress) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, p: ModelDownloadProgress): void => callback(p)
+    const listener = (_event: Electron.IpcRendererEvent, p: ModelDownloadProgress): void =>
+      callback(p)
     ipcRenderer.on(CH.modelDownloadProgress, listener)
     return () => ipcRenderer.removeListener(CH.modelDownloadProgress, listener)
   },
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke(CH.aiConfigGet),
-  aiConfigSave: (config: AiConfig): Promise<AiConfig> => ipcRenderer.invoke(CH.aiConfigSave, config),
-  aiListModels: (baseUrl: string): Promise<string[]> => ipcRenderer.invoke(CH.aiListModels, baseUrl),
+  aiConfigSave: (config: AiConfig): Promise<AiConfig> =>
+    ipcRenderer.invoke(CH.aiConfigSave, config),
+  aiListModels: (baseUrl: string): Promise<string[]> =>
+    ipcRenderer.invoke(CH.aiListModels, baseUrl),
   /** Tavily Key 体检(2026-09-17):拿框里这把 Key 真打一次官方接口,只回结论,不回显 Key */
-  aiTestTavily: (key: string): Promise<TavilyProbeResult> => ipcRenderer.invoke(CH.aiTestTavily, key),
+  aiTestTavily: (key: string): Promise<TavilyProbeResult> =>
+    ipcRenderer.invoke(CH.aiTestTavily, key),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke(CH.aiPickFile),
-  aiExplainFile: (rootPath: string, relPath: string, languageId: string, requestId?: string, question?: string, note?: string): Promise<AiExplainResult> =>
+  aiExplainFile: (
+    rootPath: string,
+    relPath: string,
+    languageId: string,
+    requestId?: string,
+    question?: string,
+    note?: string
+  ): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiExplainFile, rootPath, relPath, languageId, requestId, question, note),
-  aiExplainFolder: (rootPath: string, relPath: string, requestId?: string, question?: string): Promise<AiExplainResult> =>
+  aiExplainFolder: (
+    rootPath: string,
+    relPath: string,
+    requestId?: string,
+    question?: string
+  ): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiExplainFolder, rootPath, relPath, requestId, question),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke(CH.aiChat, req),
   /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
-  aiCompact: (req: AiCompactRequest): Promise<AiExplainResult> => ipcRenderer.invoke(CH.aiCompact, req),
+  aiCompact: (req: AiCompactRequest): Promise<AiExplainResult> =>
+    ipcRenderer.invoke(CH.aiCompact, req),
   /** 试一句(第一百一十三锤):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
   aiStyleSample: (personalization: unknown, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiStyleSample, personalization, requestId),
   /** 订阅自由对话的联网状态播报(查询中/查到/没查到);返回退订函数 */
   onChatLookup: (callback: (payload: AiChatLookupPayload) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: AiChatLookupPayload): void => callback(payload)
+    const listener = (_event: Electron.IpcRendererEvent, payload: AiChatLookupPayload): void =>
+      callback(payload)
     ipcRenderer.on(CH.aiChatLookup, listener)
     return () => ipcRenderer.removeListener(CH.aiChatLookup, listener)
   },
-  gitChanges: (rootPath: string): Promise<GitChangesResult> => ipcRenderer.invoke(CH.gitChanges, rootPath),
-  gitExplainChange: (rootPath: string, relPath: string, requestId?: string): Promise<AiExplainResult> =>
+  gitChanges: (rootPath: string): Promise<GitChangesResult> =>
+    ipcRenderer.invoke(CH.gitChanges, rootPath),
+  gitExplainChange: (
+    rootPath: string,
+    relPath: string,
+    requestId?: string
+  ): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.gitExplainChange, rootPath, relPath, requestId),
   /** AI 干活报告:整轮改动翻成大白话审计,流式增量走 atlas:ai-delta,按 requestId 对号 */
   gitReport: (rootPath: string, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.gitReport, rootPath, requestId),
   /** 功能定位:「这个功能在哪」—— 扫描树递给主进程当地图,带路人指路,防编造校验在主进程 */
-  locateFeature: (tree: ScanDirNode, question: string, requestId?: string): Promise<FeatureLocateResult> =>
+  locateFeature: (
+    tree: ScanDirNode,
+    question: string,
+    requestId?: string
+  ): Promise<FeatureLocateResult> =>
     ipcRenderer.invoke(CH.locateFeature, tree, question, requestId),
   /** 掐掉还在生成的讲解:换了讲解目标/关掉卡片时喊一声,模型立刻空出来 */
   aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke(CH.aiCancel, requestId),
@@ -168,7 +202,8 @@ const atlasApi = {
   webLookup: (query: string): Promise<string> => ipcRenderer.invoke(CH.webLookup, query),
   /** 订阅 AI 流式增量;返回退订函数,组件卸载时调用,防止泄漏监听 */
   onAiDelta: (callback: (payload: AiDeltaPayload) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void => callback(payload)
+    const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void =>
+      callback(payload)
     ipcRenderer.on(CH.aiDelta, listener)
     return () => ipcRenderer.removeListener(CH.aiDelta, listener)
   },
@@ -176,19 +211,24 @@ const atlasApi = {
   modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke(CH.modelStatusGet),
   modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke(CH.modelEject),
   /** 右键文件链接复制完整路径:主进程 joinRoot 拼绝对路径写进剪贴板,只复制不打开 */
-  copyFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; path?: string; message?: string }> =>
+  copyFilePath: (
+    rootPath: string,
+    relPath: string
+  ): Promise<{ ok: boolean; path?: string; message?: string }> =>
     ipcRenderer.invoke(CH.copyFilePath, rootPath, relPath),
   /** 右键文件链接「在文件资源管理器中显示」:资源管理器弹出并选中文件,不开文件 */
   revealFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; message?: string }> =>
     ipcRenderer.invoke(CH.revealFilePath, rootPath, relPath),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void => callback(status)
+    const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void =>
+      callback(status)
     ipcRenderer.on(CH.modelStatus, listener)
     return () => ipcRenderer.removeListener(CH.modelStatus, listener)
   },
   /** 量尺(第七十三锤):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
-  modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> => ipcRenderer.invoke(CH.modelFitCheck, modelPath),
+  modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> =>
+    ipcRenderer.invoke(CH.modelFitCheck, modelPath),
   /** 模型档案(上下文档位的账本):出厂上限 + 层数头数 + 机器家底,一次端齐;翻不到回 null */
   modelContextInfo: (modelPath: string): Promise<ModelContextInfo | null> =>
     ipcRenderer.invoke(CH.modelContextInfo, modelPath),
@@ -245,7 +285,8 @@ const atlasApi = {
   },
   /** 主窗 ← 气泡:订阅气泡转来的输入;返回退订函数 */
   onFreechatInput: (callback: (payload: FreechatInput) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: FreechatInput): void => callback(payload)
+    const listener = (_event: Electron.IpcRendererEvent, payload: FreechatInput): void =>
+      callback(payload)
     ipcRenderer.on(CH.freechatInput, listener)
     return () => ipcRenderer.removeListener(CH.freechatInput, listener)
   },
@@ -253,7 +294,8 @@ const atlasApi = {
   freechatPull: (): Promise<ChatMessage[] | null> => ipcRenderer.invoke(CH.freechatPull),
   /** 气泡订阅会话快照增量(主窗每变一次推一次);返回退订函数 */
   onFreechatPush: (callback: (messages: ChatMessage[]) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, messages: ChatMessage[]): void => callback(messages)
+    const listener = (_event: Electron.IpcRendererEvent, messages: ChatMessage[]): void =>
+      callback(messages)
     ipcRenderer.on(CH.freechatPush, listener)
     return () => ipcRenderer.removeListener(CH.freechatPush, listener)
   },
@@ -282,7 +324,8 @@ const atlasApi = {
   devLogsOpen: (): Promise<void> => ipcRenderer.invoke(CH.devLogOpen),
   /** 订阅新日志条目;返回退订函数,组件卸载时调用 */
   onDevLog: (callback: (entry: DevLogEntry) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: DevLogEntry): void => callback(entry)
+    const listener = (_event: Electron.IpcRendererEvent, entry: DevLogEntry): void =>
+      callback(entry)
     ipcRenderer.on(CH.devLog, listener)
     return () => ipcRenderer.removeListener(CH.devLog, listener)
   }

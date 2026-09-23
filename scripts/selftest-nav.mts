@@ -1,6 +1,12 @@
 // 后退/前进的线轴自测(第八十三锤):去重、剪前进线、封顶请客、游标夹边,纯函数逐条过
 import assert from 'node:assert/strict'
-import { NAV_MAX, pushNavLocation, sameLocation, stepNavIndex, type NavLocation } from '../src/renderer/src/navHistory.ts'
+import {
+  NAV_MAX,
+  pushNavLocation,
+  sameLocation,
+  stepNavIndex,
+  type NavLocation
+} from '../src/renderer/src/navHistory.ts'
 
 const HOME: NavLocation = { folder: null, file: null, dir: null }
 const proj = (name: string): NavLocation => ({ folder: `C:\\${name}`, file: null, dir: null })

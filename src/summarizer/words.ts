@@ -320,7 +320,8 @@ export function translateName(name: string): string | null {
   const tokens = splitNameTokens(name)
   const parts: string[] = []
   for (const token of tokens) {
-    const hit = WORD_BOOK[token] ?? (token.endsWith('s') ? WORD_BOOK[token.slice(0, -1)] : undefined)
+    const hit =
+      WORD_BOOK[token] ?? (token.endsWith('s') ? WORD_BOOK[token.slice(0, -1)] : undefined)
     if (hit !== undefined) parts.push(hit)
   }
   if (parts.length === 0 || parts.every((p) => GENERIC_WORDS.has(p))) return null

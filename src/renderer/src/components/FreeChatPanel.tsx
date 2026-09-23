@@ -1,5 +1,19 @@
-﻿import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import type { AgentSearchCard, ChatCodeRef, ChatContextAttachment, WebLookupMeta } from '@shared/types'
+﻿import {
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent
+} from 'react'
+import type {
+  AgentSearchCard,
+  ChatCodeRef,
+  ChatContextAttachment,
+  WebLookupMeta
+} from '@shared/types'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
@@ -71,7 +85,11 @@ const FileNoteText = memo(function FileNoteText({
  * 第一百一十一锤:预览模式下左栏选中的代码以引用卡挂在这儿,和问题一起发出去。
  */
 
-const CHAT_EXAMPLES = ['这个项目从哪里开始看？', '我想找一个功能，应该看哪里？', '这个文件和其他部分有什么关系？']
+const CHAT_EXAMPLES = [
+  '这个项目从哪里开始看？',
+  '我想找一个功能，应该看哪里？',
+  '这个文件和其他部分有什么关系？'
+]
 
 /** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
 const SLASH_COMMANDS: Array<{ name: string; desc: string }> = [
@@ -101,7 +119,9 @@ function messagesFingerprint(messages: ChatMessage[]): string {
 }
 
 /** 联网账本 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
-function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
+function webLabel(
+  meta: WebLookupMeta | null
+): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
   if (!meta || !meta.requested) return null
   switch (meta.state) {
     case 'not_requested':
@@ -111,7 +131,10 @@ function webLabel(meta: WebLookupMeta | null): { text: string; tone: 'blue' | 'g
     case 'searching':
       return { text: '正在联网查询…', tone: 'blue' }
     case 'completed':
-      return { text: `已联网查询:${meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'}`, tone: 'green' }
+      return {
+        text: `已联网查询:${meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'}`,
+        tone: 'green'
+      }
     case 'failed':
       return { text: '联网查询失败,以下内容不是联网结论', tone: 'amber' }
     case 'empty':
@@ -149,22 +172,33 @@ const MatchListCard = memo(function MatchListCard({
             <button
               type="button"
               className="chat-match-loc"
-              onClick={() => fileLinks?.onOpen(it.relPath, it.kind === 'path' ? undefined : it.line)}
+              onClick={() =>
+                fileLinks?.onOpen(it.relPath, it.kind === 'path' ? undefined : it.line)
+              }
               onContextMenu={(e) => {
                 if (!fileLinks?.onMenu) return
                 e.preventDefault()
                 fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
               }}
-              title={fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath}
+              title={
+                fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath
+              }
             >
               {it.kind === 'path' ? it.relPath : `${it.relPath}:${it.line}`}
             </button>
-            <span className="chat-match-text" title={it.text}>{it.text}</span>
+            <span className="chat-match-text" title={it.text}>
+              {it.text}
+            </span>
           </li>
         ))}
       </ul>
       {card.items.length > MATCH_PREVIEW_COUNT && (
-        <button type="button" className="chat-matches-toggle" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+        <button
+          type="button"
+          className="chat-matches-toggle"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+        >
           {expanded ? '收起' : `展开全部 ${card.items.length} 条`}
         </button>
       )}
@@ -174,13 +208,24 @@ const MatchListCard = memo(function MatchListCard({
 
 /** 思考过程折叠块(第一百一十五锤):边想边展开,答完自动收起,想看随时点开。
  * 用户亲手点过就以用户为准(null = 还没点过,默认「忙着就开,答完就收」) */
-function ThinkingBlock({ reasoning, busy }: { reasoning: string; busy: boolean }): React.JSX.Element | null {
+function ThinkingBlock({
+  reasoning,
+  busy
+}: {
+  reasoning: string
+  busy: boolean
+}): React.JSX.Element | null {
   const [toggled, setToggled] = useState<boolean | null>(null)
   const open = toggled ?? busy
   if (reasoning.trim() === '') return null
   return (
     <div className={`chat-thinking${open ? ' is-open' : ''}`}>
-      <button type="button" className="chat-thinking-toggle" onClick={() => setToggled(!open)} aria-expanded={open}>
+      <button
+        type="button"
+        className="chat-thinking-toggle"
+        onClick={() => setToggled(!open)}
+        aria-expanded={open}
+      >
         <span aria-hidden="true">{open ? '▾' : '▸'}</span>
         思考过程
         <span className="chat-thinking-len">{reasoning.length.toLocaleString('en-US')} 字</span>
@@ -208,7 +253,8 @@ const AssistantBubble = memo(function AssistantBubble({
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const label = webLabel(msg.web)
-  const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
+  const probe: ProbeState =
+    msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
   // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
   const [copied, flashCopied] = useFlashFlag(800)
   function copyAnswer(): void {
@@ -233,7 +279,13 @@ const AssistantBubble = memo(function AssistantBubble({
         <TreeIcon name="copy" size={MSG_ACTION_ICON_SIZE} />
       </button>
       {canRetry && onRetry && (
-        <button type="button" className="msg-action" onClick={() => onRetry(retryIndex)} aria-label="重试生成" title="重试">
+        <button
+          type="button"
+          className="msg-action"
+          onClick={() => onRetry(retryIndex)}
+          aria-label="重试生成"
+          title="重试"
+        >
           <IconRefresh size={MSG_ACTION_ICON_SIZE} />
         </button>
       )}
@@ -244,18 +296,34 @@ const AssistantBubble = memo(function AssistantBubble({
       <div className="chat-answer-row">
         <AtlasProbe state={probe} className="chat-avatar" />
         <div className="message answer">
-          {msg.state === 'busy' && !msg.text && !msg.reasoning && <span className="chat-typing">小探针正在思考……</span>}
+          {msg.state === 'busy' && !msg.text && !msg.reasoning && (
+            <span className="chat-typing">小探针正在思考……</span>
+          )}
           {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
-          {msg.text && <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />}
+          {msg.text && (
+            <MiniMD
+              text={msg.text}
+              caret={msg.state === 'busy'}
+              fileLinks={fileLinks ?? undefined}
+            />
+          )}
           {msg.state === 'done' && !msg.text && msg.reasoning && (
-            <span className="chat-typing chat-muted">想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。</span>
+            <span className="chat-typing chat-muted">
+              想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。
+            </span>
           )}
           {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
-          {msg.state === 'cancelled' && msg.text && <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>}
+          {msg.state === 'cancelled' && msg.text && (
+            <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
+          )}
           {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
           {/* 实时 token 账(第八十四锤):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
           {msg.state === 'busy' && (msg.stats || msg.text) && (
-            <div className="chat-stats">{msg.stats ? formatStreamStats(msg.stats) : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}</div>
+            <div className="chat-stats">
+              {msg.stats
+                ? formatStreamStats(msg.stats)
+                : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}
+            </div>
           )}
           {/* 复制/重试:有 token 账时和账同一行、贴在右边(小葵点的红框位置) */}
           {showActions && !msg.usage && actions}
@@ -337,7 +405,10 @@ export function FreeChatPanel({
   const [slashDismissed, setSlashDismissed] = useState(false)
   const [slashIndex, setSlashIndex] = useState(0)
   // 只在「以 / 开头且还没敲空格」时出面,继续打字按前缀过滤;一条不匹配就整个不开
-  const slashMatches = draft.startsWith('/') && !/\s/.test(draft) ? SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase())) : []
+  const slashMatches =
+    draft.startsWith('/') && !/\s/.test(draft)
+      ? SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase()))
+      : []
   const slashOpen = !slashDismissed && slashMatches.length > 0
   const slashActive = Math.min(slashIndex, slashMatches.length - 1)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
@@ -352,7 +423,11 @@ export function FreeChatPanel({
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32
     atBottomRef.current = nearBottom
     setShowJump(!nearBottom)
-    chatScrollMemory = { fingerprint: messagesFingerprint(chat.messages), top: el.scrollTop, atBottom: nearBottom }
+    chatScrollMemory = {
+      fingerprint: messagesFingerprint(chat.messages),
+      top: el.scrollTop,
+      atBottom: nearBottom
+    }
   }
 
   function jumpToLatest(): void {
@@ -611,7 +686,9 @@ export function FreeChatPanel({
               <p className="chat-intro-title">我是 Atlas 小探针。</p>
               <p>
                 你可以问我当前项目,也可以聊点完全无关的事情。
-                {context ? '当前选中的资料会作为可选参考附在消息旁。' : '没有选中任何文件,就纯聊天。'}
+                {context
+                  ? '当前选中的资料会作为可选参考附在消息旁。'
+                  : '没有选中任何文件,就纯聊天。'}
               </p>
             </div>
           ) : (
@@ -655,7 +732,10 @@ export function FreeChatPanel({
                     {m.refs && m.refs.length > 0 && (
                       <div className="msg-refs">
                         {m.refs.map((r, i) => (
-                          <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="msg-ref mono">
+                          <span
+                            key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
+                            className="msg-ref mono"
+                          >
                             {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
                           </span>
                         ))}
@@ -667,7 +747,11 @@ export function FreeChatPanel({
               return (
                 // 消息级兜底网(2026-09-13 隐身案):一条回答画崩了只挂这一条,
                 // 提示+就地重试;以前会掀桌炸掉整棵树,窗直接隐身
-                <ErrorBoundary key={m.key} note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。" retryLabel="再试一次">
+                <ErrorBoundary
+                  key={m.key}
+                  note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。"
+                  retryLabel="再试一次"
+                >
                   <AssistantBubble
                     msg={m}
                     canRetry={m.key === lastAssistantKey && !chat.busy}
@@ -681,7 +765,14 @@ export function FreeChatPanel({
           )}
         </div>
         {showJump && (
-          <button key={newBeat} type="button" className="chat-jump" onClick={jumpToLatest} aria-label="跳到最新消息" title="跳到最新消息">
+          <button
+            key={newBeat}
+            type="button"
+            className="chat-jump"
+            onClick={jumpToLatest}
+            aria-label="跳到最新消息"
+            title="跳到最新消息"
+          >
             <i aria-hidden="true" />
           </button>
         )}
@@ -693,7 +784,10 @@ export function FreeChatPanel({
             {draftRefs.map((r, i) => (
               <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="chat-ref">
                 <TreeIcon name="code" size={INLINE_ICON_SIZE} />
-                <span className="chat-ref-text mono" title={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}>
+                <span
+                  className="chat-ref-text mono"
+                  title={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
+                >
                   {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
                 </span>
                 <button
@@ -723,27 +817,30 @@ export function FreeChatPanel({
         )}
         <div className="prompt-row">
           {/* 新对话(第一百二十七锤补):常驻第一格 —— 聊没聊过都在,想翻篇随时点得着 */}
-          <button type="button" className="prompt" onClick={chat.newChat} title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)">
+          <button
+            type="button"
+            className="prompt"
+            onClick={chat.newChat}
+            title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
+          >
             新对话
           </button>
-          {suggestionsOn ? (
-            suggestions ? (
-              // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
-              !chat.busy &&
-              suggestions.map((q) => (
-                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                  {q}
-                </button>
-              ))
-            ) : (
-              chat.messages.length === 0 &&
-              CHAT_EXAMPLES.map((q) => (
-                <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                  {q}
-                </button>
-              ))
-            )
-          ) : null}
+          {suggestionsOn
+            ? suggestions
+              ? // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
+                !chat.busy &&
+                suggestions.map((q) => (
+                  <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                    {q}
+                  </button>
+                ))
+              : chat.messages.length === 0 &&
+                CHAT_EXAMPLES.map((q) => (
+                  <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
+                    {q}
+                  </button>
+                ))
+            : null}
         </div>
         {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
             写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}
@@ -779,7 +876,9 @@ export function FreeChatPanel({
             aria-label="输入自由对话"
             aria-expanded={slashOpen}
             aria-controls="slash-palette"
-            aria-activedescendant={slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined}
+            aria-activedescendant={
+              slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined
+            }
             rows={1}
             onChange={(e) => {
               setDraft(e.target.value)
@@ -841,7 +940,13 @@ export function FreeChatPanel({
             >
               <TreeIcon name="folderSearch" size={CHAT_ACTION_ICON_SIZE} mono />
             </button>
-            <button type="submit" className="chat-send" disabled={chat.busy} aria-label={chat.busy ? '回答中' : '发送'} title={chat.busy ? '回答中……' : '发送'}>
+            <button
+              type="submit"
+              className="chat-send"
+              disabled={chat.busy}
+              aria-label={chat.busy ? '回答中' : '发送'}
+              title={chat.busy ? '回答中……' : '发送'}
+            >
               <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
             </button>
           </div>

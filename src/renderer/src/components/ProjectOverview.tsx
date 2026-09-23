@@ -21,7 +21,15 @@ function topEntries(
     .slice(0, n)
 }
 
-function BarRow({ label, count, total }: { label: string; count: number; total: number }): React.JSX.Element {
+function BarRow({
+  label,
+  count,
+  total
+}: {
+  label: string
+  count: number
+  total: number
+}): React.JSX.Element {
   return (
     <div className="bar-row">
       <span className="bar-label">{label}</span>
@@ -36,9 +44,7 @@ function BarRow({ label, count, total }: { label: string; count: number; total: 
 /** 在扫描树里找根目录下的 README(推荐阅读的天然入口) */
 function findReadme(node: ScanTreeNode): string | null {
   if (node.type !== 'directory') return null
-  const readme = node.children.find(
-    (c) => c.type === 'file' && /^readme(?:\.|$)/i.test(c.name)
-  )
+  const readme = node.children.find((c) => c.type === 'file' && /^readme(?:\.|$)/i.test(c.name))
   return readme && readme.type === 'file' ? readme.relPath : null
 }
 
@@ -77,7 +83,13 @@ export function ProjectOverview({
   const entries = guideEntries(result.tree)
   const shown = entries.slice(0, visibleCount)
 
-  const recs: Array<{ key: string; path: string; reason: string; onClick?: () => void; mono?: boolean }> = []
+  const recs: Array<{
+    key: string
+    path: string
+    reason: string
+    onClick?: () => void
+    mono?: boolean
+  }> = []
 
   if (graph && graph.hubs.length > 0) {
     for (const hub of graph.hubs.slice(0, 5)) {
@@ -163,25 +175,40 @@ export function ProjectOverview({
           <h2>项目由这些部分组成</h2>
           <p className="guide-hint">点击名称查看;这是一张目录地图,不是文件调用关系图。</p>
           {entries.length === 0 ? (
-            <p className="guide-empty">这个文件夹里没有可展示的文件。它可能是空的,或内容都属于已忽略的依赖和构建文件。</p>
+            <p className="guide-empty">
+              这个文件夹里没有可展示的文件。它可能是空的,或内容都属于已忽略的依赖和构建文件。
+            </p>
           ) : (
             <>
               <div className="guide-list">
                 {shown.map((entry) => (
                   <div className="guide-item" key={entry.relPath}>
-                    <button type="button" className="guide-node" onClick={() => onJump(entry.relPath)}>
+                    <button
+                      type="button"
+                      className="guide-node"
+                      onClick={() => onJump(entry.relPath)}
+                    >
                       <span className="guide-node-icon" aria-hidden="true">
-                        <TreeIcon name={entry.type === 'directory' ? 'folder' : (entry.summary?.icon ?? 'file')} size={15} />
+                        <TreeIcon
+                          name={
+                            entry.type === 'directory' ? 'folder' : (entry.summary?.icon ?? 'file')
+                          }
+                          size={15}
+                        />
                       </span>
                       <span className="guide-node-main">
                         <strong>{entry.name}</strong>
                         <span>
                           {entry.summary?.text ??
-                            (entry.type === 'directory' ? '文件夹,打开查看里面的文件' : '文件,打开查看说明和内容')}
+                            (entry.type === 'directory'
+                              ? '文件夹,打开查看里面的文件'
+                              : '文件,打开查看说明和内容')}
                         </span>
                         <span className="guide-node-path mono">{entry.relPath}</span>
                       </span>
-                      <span className="badge">{entry.type === 'directory' ? '文件夹' : '文件'}</span>
+                      <span className="badge">
+                        {entry.type === 'directory' ? '文件夹' : '文件'}
+                      </span>
                     </button>
                     {entry.type === 'directory' && entry.children.length > 0 && (
                       <div className="guide-children">
@@ -194,7 +221,14 @@ export function ProjectOverview({
                               className="guide-child"
                               onClick={() => onJump(child.relPath)}
                             >
-                              <TreeIcon name={child.type === 'directory' ? 'folder' : (child.summary?.icon ?? 'file')} size={15} />
+                              <TreeIcon
+                                name={
+                                  child.type === 'directory'
+                                    ? 'folder'
+                                    : (child.summary?.icon ?? 'file')
+                                }
+                                size={15}
+                              />
                               <span>{child.name}</span>
                             </button>
                           ))}
@@ -208,7 +242,9 @@ export function ProjectOverview({
                   type="button"
                   className="btn btn-ghost guide-toggle"
                   onClick={() =>
-                    setVisibleCount((n) => (n < entries.length ? Math.min(entries.length, n + 24) : 12))
+                    setVisibleCount((n) =>
+                      n < entries.length ? Math.min(entries.length, n + 24) : 12
+                    )
                   }
                 >
                   {visibleCount < entries.length
@@ -225,7 +261,12 @@ export function ProjectOverview({
           <div className="guide-more-body">
             <FeatureLocator key={result.rootPath} tree={result.tree} onJump={onJump} />
             {gitInfo && (
-              <GitDoor gitInfo={gitInfo} rootPath={result.rootPath} onJump={onJump} onRefreshed={onRefreshed} />
+              <GitDoor
+                gitInfo={gitInfo}
+                rootPath={result.rootPath}
+                onJump={onJump}
+                onRefreshed={onRefreshed}
+              />
             )}
             <div className="two-col">
               <section className="sub-card">
@@ -235,7 +276,12 @@ export function ProjectOverview({
                 ))}
                 <h3 className="sub-card-gap">后缀分布</h3>
                 {extEntries.map(({ label, count }) => (
-                  <BarRow key={label || 'none'} label={label || '无后缀'} count={count} total={stats.fileCount || 1} />
+                  <BarRow
+                    key={label || 'none'}
+                    label={label || '无后缀'}
+                    count={count}
+                    total={stats.fileCount || 1}
+                  />
                 ))}
               </section>
 
@@ -260,8 +306,9 @@ export function ProjectOverview({
                 ))}
                 {graph && (
                   <p className="rec-footnote">
-                    {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 · 外部包引用{' '}
-                    {graph.stats.externalCount} 次 · 没连上 {graph.stats.unresolved.length} 条
+                    {graph.edges.length} 条引用关系 · 分析了 {graph.stats.analyzed} 个源码文件 ·
+                    外部包引用 {graph.stats.externalCount} 次 · 没连上{' '}
+                    {graph.stats.unresolved.length} 条
                   </p>
                 )}
                 {graphLoading && (
@@ -277,7 +324,9 @@ export function ProjectOverview({
             {(stats.ignoredCount > 0 || stats.skippedCount > 0) && (
               <div className="chips">
                 {stats.ignoredCount > 0 && (
-                  <span className="chip chip-muted">已绕开 {stats.ignoredCount} 项(node_modules 等)</span>
+                  <span className="chip chip-muted">
+                    已绕开 {stats.ignoredCount} 项(node_modules 等)
+                  </span>
                 )}
                 {stats.skippedCount > 0 && (
                   <span className="chip chip-muted">跳过 {stats.skippedCount} 项(无权限/链接)</span>

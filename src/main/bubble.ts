@@ -9,7 +9,13 @@ import type { Rectangle } from 'electron'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { placeBubbleBox, resizeBubbleBox, BUBBLE_WIDTH, BUBBLE_HEIGHT, type PlacementBox } from './bubblePlacement.ts'
+import {
+  placeBubbleBox,
+  resizeBubbleBox,
+  BUBBLE_WIDTH,
+  BUBBLE_HEIGHT,
+  type PlacementBox
+} from './bubblePlacement.ts'
 import { readBubbleSize, writeBubbleSize } from './bubbleState.ts'
 import type { BubbleResizeDir, BubbleResizeMsg } from '../shared/types.ts'
 
@@ -17,7 +23,8 @@ let bubbleWindow: BrowserWindow | null = null
 /** 尺寸存档的目录(气泡放大锤):registerBubbleIpc 时接线进来,userData */
 let bubbleStateDir = ''
 /** 拖拽缩放的在办件:begin 时立档(方向+起点窗框+起点光标),end 时销账 */
-let resizing: { dir: BubbleResizeDir; start: PlacementBox; from: { x: number; y: number } } | null = null
+let resizing: { dir: BubbleResizeDir; start: PlacementBox; from: { x: number; y: number } } | null =
+  null
 
 /** 用户调过的尺寸;没存档/垃圾存档都回默认(气泡放大锤) */
 function bubbleSize(): { width: number; height: number } {
@@ -25,9 +32,19 @@ function bubbleSize(): { width: number; height: number } {
 }
 
 /** 没拿到桌宠位置时的兜底落点:屏幕右下角(桌宠激活正常都带着 bounds 来) */
-function bubbleBounds(size: { width: number; height: number }): { x: number; y: number; width: number; height: number } {
+function bubbleBounds(size: { width: number; height: number }): {
+  x: number
+  y: number
+  width: number
+  height: number
+} {
   const wa = screen.getPrimaryDisplay().workArea
-  return { x: wa.x + wa.width - size.width - 24, y: wa.y + wa.height - size.height - 180, width: size.width, height: size.height }
+  return {
+    x: wa.x + wa.width - size.width - 24,
+    y: wa.y + wa.height - size.height - 180,
+    width: size.width,
+    height: size.height
+  }
 }
 
 /** 挪窝到 anchor 落点:同屏 setBounds 连尺寸钉死;跨显示器先死后生 ——
@@ -39,7 +56,11 @@ function reseatBubble(anchor: Rectangle): void {
   if (!win || win.isDestroyed()) return
   // 跟随保持用户调过的尺寸(气泡放大锤):挪窝只挪位,尺寸是用户的账
   const cur = win.getBounds()
-  const box = placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea), { width: cur.width, height: cur.height })
+  const box = placeBubbleBox(
+    anchor,
+    screen.getAllDisplays().map((d) => d.workArea),
+    { width: cur.width, height: cur.height }
+  )
   const [cx, cy] = win.getPosition()
   if (cx === box.x && cy === box.y) return
   const from = screen.getDisplayMatching(win.getBounds())
@@ -69,7 +90,11 @@ export function openBubble(anchor?: Rectangle): void {
   }
   const size = bubbleSize()
   const box = anchor
-    ? placeBubbleBox(anchor, screen.getAllDisplays().map((d) => d.workArea), size)
+    ? placeBubbleBox(
+        anchor,
+        screen.getAllDisplays().map((d) => d.workArea),
+        size
+      )
     : bubbleBounds(size)
   const win = new BrowserWindow({
     ...box,
@@ -144,7 +169,8 @@ export function registerBubbleIpc(deps: {
   ipcMain.on(CH.freechatMirror, (event, messages: unknown) => {
     if (BrowserWindow.fromWebContents(event.sender) !== deps.getMainWindow()) return
     latestMirror = messages
-    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.webContents.send(CH.freechatPush, messages)
+    if (bubbleWindow && !bubbleWindow.isDestroyed())
+      bubbleWindow.webContents.send(CH.freechatPush, messages)
   })
   // 气泡 → 主窗的输入:只认气泡窗发来的,转给主窗渲染层调 chat.send/cancel
   ipcMain.on(CH.freechatInput, (event, payload: unknown) => {
@@ -166,7 +192,14 @@ export function registerBubbleIpc(deps: {
   // 钉对侧边/夹最小值/不出屏的账全在 resizeBubbleBox 纯函数里,自测有量。
   // resizable 照旧不开:透明无边框窗的手柄是自己画的热区,不走系统那套
   const isDir = (v: unknown): v is BubbleResizeDir =>
-    v === 'n' || v === 'ne' || v === 'e' || v === 'se' || v === 's' || v === 'sw' || v === 'w' || v === 'nw'
+    v === 'n' ||
+    v === 'ne' ||
+    v === 'e' ||
+    v === 'se' ||
+    v === 's' ||
+    v === 'sw' ||
+    v === 'w' ||
+    v === 'nw'
   const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
   ipcMain.on(CH.bubbleResize, (event, msg: BubbleResizeMsg) => {
     if (BrowserWindow.fromWebContents(event.sender) !== bubbleWindow) return

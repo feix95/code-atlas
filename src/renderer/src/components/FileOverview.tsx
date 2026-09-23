@@ -80,9 +80,7 @@ export function FileOverview({
           ) : file.summary ? (
             <> —— {file.summary.text}</>
           ) : (
-            <>
-              是一个{file.language ? `${file.language.name}` : '类型没认出来'}的文件
-            </>
+            <>是一个{file.language ? `${file.language.name}` : '类型没认出来'}的文件</>
           )}
           {file.ext && <span className="chip chip-muted mono">{file.ext}</span>}
         </p>
@@ -111,8 +109,12 @@ export function FileOverview({
               正在解析结构骨架……
             </p>
           )}
-          {!analyzing && analyzeNote && analyzeNote.kind === 'error' && <Notice kind="error">{analyzeNote.text}</Notice>}
-          {!analyzing && analyzeNote && analyzeNote.kind === 'info' && <p className="card-waiting">{analyzeNote.text}</p>}
+          {!analyzing && analyzeNote && analyzeNote.kind === 'error' && (
+            <Notice kind="error">{analyzeNote.text}</Notice>
+          )}
+          {!analyzing && analyzeNote && analyzeNote.kind === 'info' && (
+            <p className="card-waiting">{analyzeNote.text}</p>
+          )}
           {!analyzing && structure && (
             <section className="card">
               <div className="metric-grid">

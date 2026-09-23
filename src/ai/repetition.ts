@@ -31,7 +31,8 @@ export function detectRepetitionTail(text: string): string | null {
     if (unit.length < n) break
     if (!hasRealChar(unit)) continue
     const window = text.slice(-n * REPETITION_REPEATS)
-    if (window.length === n * REPETITION_REPEATS && window === unit.repeat(REPETITION_REPEATS)) return unit
+    if (window.length === n * REPETITION_REPEATS && window === unit.repeat(REPETITION_REPEATS))
+      return unit
   }
   return null
 }
@@ -46,7 +47,8 @@ export function truncateAtRepetition(text: string): string | null {
     if (unit.length < n) break
     if (!hasRealChar(unit)) continue
     const window = text.slice(-n * REPETITION_REPEATS)
-    if (window.length !== n * REPETITION_REPEATS || window !== unit.repeat(REPETITION_REPEATS)) continue
+    if (window.length !== n * REPETITION_REPEATS || window !== unit.repeat(REPETITION_REPEATS))
+      continue
     let start = text.length - n * REPETITION_REPEATS
     while (start - n >= 0 && text.slice(start - n, start) === unit) start -= n
     return text.slice(0, start)

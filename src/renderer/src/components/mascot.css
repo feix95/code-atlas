@@ -31,7 +31,12 @@
   width: var(--mascot-body);
   height: var(--mascot-body);
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, var(--pet-hi), var(--pet-mid) 68%, var(--pet-deep));
+  background: radial-gradient(
+    circle at 34% 30%,
+    var(--pet-hi),
+    var(--pet-mid) 68%,
+    var(--pet-deep)
+  );
   cursor: grab;
   animation: mascot-breathe 3.2s ease-in-out infinite;
 }

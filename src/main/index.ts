@@ -1,4 +1,19 @@
-import { app, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, net, screen, shell, Tray, BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import {
+  app,
+  clipboard,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  net,
+  screen,
+  shell,
+  Tray,
+  BrowserWindow,
+  type IpcMainInvokeEvent,
+  type OpenDialogOptions
+} from 'electron'
 import { basename, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
@@ -39,9 +54,23 @@ import {
 } from '../ai/agent.ts'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import { asToolName, TOOL_NAMES } from '../shared/agentTools.ts'
-import { buildCompactMessages, sanitizeCompactHistory, sanitizeCompactSummary } from '../shared/compact.ts'
+import {
+  buildCompactMessages,
+  sanitizeCompactHistory,
+  sanitizeCompactSummary
+} from '../shared/compact.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
-import { createMascotWindow, getMascotWindow, hideMascot, isMascotHidden, registerMascotIpc, seatMascotAt, setMascotHiddenListener, showMascot, toggleMascot } from './mascot.ts'
+import {
+  createMascotWindow,
+  getMascotWindow,
+  hideMascot,
+  isMascotHidden,
+  registerMascotIpc,
+  seatMascotAt,
+  setMascotHiddenListener,
+  showMascot,
+  toggleMascot
+} from './mascot.ts'
 import { mainPanelMenuLabel, mascotMenuLabel } from './mascotState.ts'
 import { MainPanelController } from './mainPanel.ts'
 import { followBubble, hideBubble, openBubble, registerBubbleIpc, toggleBubble } from './bubble.ts'
@@ -49,7 +78,12 @@ import { DETACH_MARGIN_PX, isOutsideBounds } from './freechatHost.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
-import { collectGitChanges, collectRecentSubjects, getChangeDiff, gitChangesSignature } from '../git/index.ts'
+import {
+  collectGitChanges,
+  collectRecentSubjects,
+  getChangeDiff,
+  gitChangesSignature
+} from '../git/index.ts'
 import {
   codeRefsBudget,
   estimateTokens,
@@ -93,32 +127,107 @@ import {
   resolveContextSize
 } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
-import { webLookupDetailed, webLookup, webSearchDetailed, probeTavilyKey, HttpStatusError, sanitizeWebQuery, WEB_LOOKUP_TIMEOUT_MS, type LookupTransport, type LookupPostTransport, type LookupGetTransport } from '../ai/weblookup.ts'
+import {
+  webLookupDetailed,
+  webLookup,
+  webSearchDetailed,
+  probeTavilyKey,
+  HttpStatusError,
+  sanitizeWebQuery,
+  WEB_LOOKUP_TIMEOUT_MS,
+  type LookupTransport,
+  type LookupPostTransport,
+  type LookupGetTransport
+} from '../ai/weblookup.ts'
 import { loadAiConfig, saveAiConfig, resolveAiTarget, type BuiltinRuntime } from '../ai/config.ts'
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
-import { builtinContextDiffers, builtinNeedsRestart, builtinIdleStatus, ensureBuiltinServer, isBuiltinRunning, judgeModelFit, lastBuiltinStatus, queryMachineSpec, readModelShape, reapOrphanServer, setBuiltinStatusAnnouncer, setBuiltinWarmupDir, stopBuiltinServer } from '../ai/builtin.ts'
+import {
+  builtinContextDiffers,
+  builtinNeedsRestart,
+  builtinIdleStatus,
+  ensureBuiltinServer,
+  isBuiltinRunning,
+  judgeModelFit,
+  lastBuiltinStatus,
+  queryMachineSpec,
+  readModelShape,
+  reapOrphanServer,
+  setBuiltinStatusAnnouncer,
+  setBuiltinWarmupDir,
+  stopBuiltinServer
+} from '../ai/builtin.ts'
 import { BY_EXT } from '../shared/languages.ts'
 import { isBinaryFile } from '../shared/fileKinds.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { highlightSource } from '../highlight/index.ts'
-import { buildPersonalizationPrompt, sanitizePersonalization, withPersonalization, type TeachingLevel } from '../shared/personalization.ts'
-import { AGENT_FILES_ADDENDUM, buildChatSystem, buildExplainSystem, deepSourceChars, SLICE_NO_TOOLS, TEACHING_DEEP_MIN_CTX, TEACHING_DEGRADED_NOTE } from '../ai/prompts.ts'
+import {
+  buildPersonalizationPrompt,
+  sanitizePersonalization,
+  withPersonalization,
+  type TeachingLevel
+} from '../shared/personalization.ts'
+import {
+  AGENT_FILES_ADDENDUM,
+  buildChatSystem,
+  buildExplainSystem,
+  deepSourceChars,
+  SLICE_NO_TOOLS,
+  TEACHING_DEEP_MIN_CTX,
+  TEACHING_DEGRADED_NOTE
+} from '../ai/prompts.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
-import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, writeWindowState, type WindowBox } from './window-state.ts'
+import {
+  placeWindowBox,
+  readWindowState,
+  WINDOW_MIN_HEIGHT,
+  WINDOW_MIN_WIDTH,
+  writeWindowState,
+  type WindowBox
+} from './window-state.ts'
 import { armRevealWatchdog, loadView, pickPathDialog, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
-import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
+import {
+  CONTEXT_SIZE_MIN,
+  DEFAULT_LMSTUDIO_BASE_URL,
+  PROBE_LMSTUDIO_MS,
+  PROBE_MODELS_MS
+} from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { fetchWithTimeout, stripApiSuffix } from '../ai/http.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalDirectoryPath } from './agentAccess.ts'
+import {
+  AgentDirectoryAccess,
+  joinAuthorizedRoot,
+  sanitizeExternalDirectoryPath
+} from './agentAccess.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
-import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, FreechatHost, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+import type {
+  AgentSearchCard,
+  AgentSearchMatch,
+  AiChatLookupPayload,
+  AiChatResult,
+  AiConfig,
+  AiDeltaPayload,
+  AiExplainResult,
+  AiProviderKind,
+  AiStreamStats,
+  AiUsage,
+  ChatTarget,
+  DriveInfo,
+  FeatureLocateResult,
+  FilePreviewResult,
+  FreechatHost,
+  ModelContextInfo,
+  ModelFitVerdict,
+  ModelStatus,
+  ScanDirNode,
+  WebLookupMeta
+} from '../shared/types.ts'
 
 /** userData 目录一句缩写(P2-14):本文件十几处存档读写不用每处都写全名 */
 function userDataDir(): string {
@@ -160,7 +269,10 @@ const reportCache = new Map<string, AiExplainResult>()
  * 讲只会挤出半截答案。degraded = true 时,讲解结果正文顶上垫一行程序备注(逐字稿 M)。
  * 聊天/diff/报告不吃这套 —— 只有讲解主路(respondWithEvidence 这一路)降档。
  */
-function effectiveTeaching(resolved: { teaching: TeachingLevel; ctx: number }): { teaching: TeachingLevel; degraded: boolean } {
+function effectiveTeaching(resolved: { teaching: TeachingLevel; ctx: number }): {
+  teaching: TeachingLevel
+  degraded: boolean
+} {
   const degraded = resolved.teaching === 'deep' && resolved.ctx < TEACHING_DEEP_MIN_CTX
   return { teaching: degraded ? 'brief' : resolved.teaching, degraded }
 }
@@ -171,7 +283,15 @@ async function respondWithEvidence(
   question: unknown,
   evidence: string,
   system: string | undefined,
-  resolved: { target: ChatTarget; webLookup: boolean; budgets: { replyTokens: number }; style: string; ctx: number; teaching: TeachingLevel; tavilyKey?: string },
+  resolved: {
+    target: ChatTarget
+    webLookup: boolean
+    budgets: { replyTokens: number }
+    style: string
+    ctx: number
+    teaching: TeachingLevel
+    tavilyKey?: string
+  },
   lookupName?: string
 ): Promise<AiExplainResult> {
   const onDelta = makeDeltaSender(event, requestId)
@@ -179,10 +299,15 @@ async function respondWithEvidence(
   const { teaching, degraded } = effectiveTeaching(resolved)
   // 人设口径保持原样:给了就用给的(调用方已按同一个 effectiveTeaching 装配),
   // 没给就是文件讲解官那一套;个性化一律叠在最上面
-  const persona = withPersonalization(system ?? buildExplainSystem(teaching, 'file'), resolved.style)
+  const persona = withPersonalization(
+    system ?? buildExplainSystem(teaching, 'file'),
+    resolved.style
+  )
   // 降档灰字:只在真讲出来了( supported )的结果顶上垫 —— 报错/取消的文本不是讲解,垫上就成了假话
   const withDegradedNote = (res: AiExplainResult): AiExplainResult =>
-    degraded && res.status === 'supported' ? { ...res, text: `${TEACHING_DEGRADED_NOTE}\n\n${res.text}` } : res
+    degraded && res.status === 'supported'
+      ? { ...res, text: `${TEACHING_DEGRADED_NOTE}\n\n${res.text}` }
+      : res
   if (resolved.webLookup && lookupName && !hasQuestion) {
     // 联网那条老规矩没变:没人设时它本来就用导游那一套(和普通流不同,别一起改)
     return withDegradedNote(
@@ -201,9 +326,17 @@ async function respondWithEvidence(
   }
   return withDegradedNote(
     await explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, withQuestion(evidence, hasQuestion ? question : undefined), persona, onDelta, signal, resolved.budgets.replyTokens, {
-        onRestart: () => sendResetDelta(event, requestId)
-      })
+      explainWithModel(
+        resolved.target,
+        withQuestion(evidence, hasQuestion ? question : undefined),
+        persona,
+        onDelta,
+        signal,
+        resolved.budgets.replyTokens,
+        {
+          onRestart: () => sendResetDelta(event, requestId)
+        }
+      )
     )
   )
 }
@@ -224,19 +357,37 @@ async function explainWithWebLookup(
   tavilyKey?: string
 ): Promise<AiExplainResult> {
   const first = await explainWithCancel(requestId, (signal) =>
-    explainWithModel(target, evidence + WEB_SIGNAL_INSTRUCTION, system, undefined, signal, replyTokens)
+    explainWithModel(
+      target,
+      evidence + WEB_SIGNAL_INSTRUCTION,
+      system,
+      undefined,
+      signal,
+      replyTokens
+    )
   )
   if (first.status !== 'supported' || !hasWebLookupSignal(first.text)) return first
-  const material = await webLookup(lookupName, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey }).catch(() => '')
+  const material = await webLookup(lookupName, {
+    fetchText: electronFetchText,
+    postJson: electronPostJson,
+    tavilyKey
+  }).catch(() => '')
   if (!material) {
     // 查不到(没网/超时/太冷门):剥掉信号词,加上一句人话交代,回退本地推测
     const fallback = first.text.replace(/「?需要联网确认」?/g, '').trimEnd()
     return { ...first, text: `${fallback}\n\n(联网没查到这个,上面是本地推测。)` }
   }
   const refined = await explainWithCancel(requestId, (signal) =>
-    explainWithMessages(target, buildRefineMessages(system, evidence, first.text, material), onDelta, signal, replyTokens, {
-      onRestart: () => sendResetDelta(event, requestId)
-    })
+    explainWithMessages(
+      target,
+      buildRefineMessages(system, evidence, first.text, material),
+      onDelta,
+      signal,
+      replyTokens,
+      {
+        onRestart: () => sendResetDelta(event, requestId)
+      }
+    )
   )
   return refined.status === 'supported' ? refined : first
 }
@@ -268,7 +419,11 @@ async function explainWithCancel(
  * 文件夹/文件打不开时说人话:被 Windows 上锁的(EPERM/EACCES,常见于系统保护区)
  * 和真不存在的,必须分成两种说法 —— 谎报"不存在"会让用户以为自己删了什么东西
  */
-function accessDeniedMessage(err: NodeJS.ErrnoException, kind: '文件夹' | '文件', relPath: string): string {
+function accessDeniedMessage(
+  err: NodeJS.ErrnoException,
+  kind: '文件夹' | '文件',
+  relPath: string
+): string {
   if (err?.code === 'EPERM' || err?.code === 'EACCES') {
     return `「${relPath}」被 Windows 上了锁,软件没钥匙看不了 —— 这类多半是系统自管的内部文件夹,不是你的项目内容,不看也不影响`
   }
@@ -324,7 +479,11 @@ const electronFetchText: LookupTransport = async (url) => {
 const electronPostJson: LookupPostTransport = async (url, body, headers) => {
   const res = await net.fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1'
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
@@ -335,7 +494,10 @@ const electronPostJson: LookupPostTransport = async (url, body, headers) => {
 /** GET 版传输(Tavily 用量查询用):同一个 Chromium 网络栈,只带认证头,非 2xx 抛 HttpStatusError */
 const electronGetJson: LookupGetTransport = async (url, headers) => {
   const res = await net.fetch(url, {
-    headers: { ...headers, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1' },
+    headers: {
+      ...headers,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CodeAtlas/0.1'
+    },
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
   if (!res.ok) throw new HttpStatusError(res.status)
@@ -358,7 +520,16 @@ function formatSize(bytes: number): string {
  * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
  */
 async function resolveChatTargetOrError(): Promise<
-  { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number; teaching: TeachingLevel; tavilyKey?: string } | { error: string }
+  | {
+      target: ChatTarget
+      webLookup: boolean
+      budgets: { mapTokens: number; replyTokens: number }
+      style: string
+      ctx: number
+      teaching: TeachingLevel
+      tavilyKey?: string
+    }
+  | { error: string }
 > {
   const config = await loadAiConfig(userDataDir())
   let runtime: BuiltinRuntime | undefined
@@ -366,7 +537,11 @@ async function resolveChatTargetOrError(): Promise<
     try {
       // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话;
       // 是否手动填的也带过去 —— 引擎启动就死时,验尸话能点名「上下文填太大」
-      runtime = await ensureBuiltinServer(config.builtin, config.contextSize, config.contextSize ?? null)
+      runtime = await ensureBuiltinServer(
+        config.builtin,
+        config.contextSize,
+        config.contextSize ?? null
+      )
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
@@ -378,12 +553,24 @@ async function resolveChatTargetOrError(): Promise<
   announceActivityBusy(config.provider)
   // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的锅归它自己管,
   // 一律只信探测(存档里给内置填的旧数隐身不管事),探测不到按默认窗口兜底
-  const ctx = resolveContextSize(config.provider, config.contextSize, await probeContextSize(resolved.target, config.provider))
+  const ctx = resolveContextSize(
+    config.provider,
+    config.contextSize,
+    await probeContextSize(resolved.target, config.provider)
+  )
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))
   // 讲解深度(教学三档)也在这落定:讲解底座挂哪段教学切片、deep 要不要降档,各调用点照它装配
   const teaching = sanitizePersonalization(config.personalization).teaching
-  return { target: resolved.target, webLookup: config.webLookup === true, budgets: budgetsForContext(ctx), style, ctx, teaching, tavilyKey: config.tavilyKey }
+  return {
+    target: resolved.target,
+    webLookup: config.webLookup === true,
+    budgets: budgetsForContext(ctx),
+    style,
+    ctx,
+    teaching,
+    tavilyKey: config.tavilyKey
+  }
 }
 
 /**
@@ -400,11 +587,16 @@ function sendResetDelta(event: IpcMainInvokeEvent, requestId: unknown): void {
  * 流式增量推送:渲染进程带 requestId 过来,就按 id 对号入座往回推
  * 'atlas:ai-delta',边生成边显示;没带 id(老调用方)就走一次性返回。
  */
-function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text: string, stats?: AiStreamStats, reasoning?: string) => void) | undefined {
+function makeDeltaSender(
+  event: IpcMainInvokeEvent,
+  requestId: unknown
+): ((text: string, stats?: AiStreamStats, reasoning?: string) => void) | undefined {
   if (typeof requestId !== 'string' || requestId === '') return undefined
   return (text, stats, reasoning) => {
     if (event.sender.isDestroyed()) return
-    const payload: AiDeltaPayload = reasoning ? { id: requestId, text, reasoning } : { id: requestId, text }
+    const payload: AiDeltaPayload = reasoning
+      ? { id: requestId, text, reasoning }
+      : { id: requestId, text }
     if (stats) payload.stats = stats
     event.sender.send(CH.aiDelta, payload)
     // 引擎肯报账,状态栏的「忙」就跟着报数(第八十四锤)
@@ -413,10 +605,19 @@ function makeDeltaSender(event: IpcMainInvokeEvent, requestId: unknown): ((text:
 }
 
 /** 自由对话的联网状态播报:查着没查着都是程序说了算,按 requestId 对号推给界面挂标签 */
-function sendChatLookup(event: IpcMainInvokeEvent, requestId: unknown, state: AiChatLookupPayload['state'], sources: string[]): void {
+function sendChatLookup(
+  event: IpcMainInvokeEvent,
+  requestId: unknown,
+  state: AiChatLookupPayload['state'],
+  sources: string[]
+): void {
   if (typeof requestId !== 'string' || requestId === '') return
   if (!event.sender.isDestroyed()) {
-    event.sender.send(CH.aiChatLookup, { id: requestId, state, sources } satisfies AiChatLookupPayload)
+    event.sender.send(CH.aiChatLookup, {
+      id: requestId,
+      state,
+      sources
+    } satisfies AiChatLookupPayload)
   }
 }
 
@@ -437,7 +638,8 @@ async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
   const model = config.lmstudio.model.trim()
   const root = stripApiSuffix(config.lmstudio.baseUrl.trim() || DEFAULT_LMSTUDIO_BASE_URL)
   const base = { provider: 'lmstudio' as const, modelName: model, sizeBytes: null, progress: null }
-  if (!model) return { ...base, state: 'idle', message: '还没填模型名:去「AI 设置」连一下 LM Studio' }
+  if (!model)
+    return { ...base, state: 'idle', message: '还没填模型名:去「AI 设置」连一下 LM Studio' }
   try {
     const res = await fetchWithTimeout(`${root}/api/v0/models`, PROBE_LMSTUDIO_MS)
     if (res.ok) {
@@ -448,7 +650,11 @@ async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
     const legacy = await fetchWithTimeout(`${root}/v1/models`, PROBE_LMSTUDIO_MS)
     return { ...base, state: legacy.ok ? 'ready' : 'unreachable' }
   } catch {
-    return { ...base, state: 'unreachable', message: 'LM Studio 没连上:那边开了「开发者」本地服务,这边才看得到' }
+    return {
+      ...base,
+      state: 'unreachable',
+      message: 'LM Studio 没连上:那边开了「开发者」本地服务,这边才看得到'
+    }
   }
 }
 
@@ -563,7 +769,9 @@ function dockFreechat(): void {
 /** 托盘图标:开发模式读仓库里的 build/icon.ico;打包后从 resources/app.ico 认
  * (electron-builder.yml 的 extraResources 负责把它搬进去) */
 function trayIconPath(): string {
-  return app.isPackaged ? join(process.resourcesPath, 'app.ico') : join(app.getAppPath(), 'build/icon.ico')
+  return app.isPackaged
+    ? join(process.resourcesPath, 'app.ico')
+    : join(app.getAppPath(), 'build/icon.ico')
 }
 
 /** 托盘菜单按当时真实状态下菜:主面板在屏上给「藏起它」,不在给「叫它出来」;
@@ -588,7 +796,8 @@ function refreshTrayMenu(): void {
 
 function createTray(): void {
   const icon = nativeImage.createFromPath(trayIconPath())
-  if (icon.isEmpty()) addDevLog('system', '托盘图标没加载出来(文件缺失?),托盘会显示默认空白图 —— 不影响功能')
+  if (icon.isEmpty())
+    addDevLog('system', '托盘图标没加载出来(文件缺失?),托盘会显示默认空白图 —— 不影响功能')
   tray = new Tray(icon)
   tray.setToolTip('CodeAtlas')
   tray.setContextMenu(buildTrayMenu())
@@ -634,7 +843,10 @@ function createWindow(): void {
   // 也不把窗送出屏外)。记不住(读写失败)就当没这回事,走默认 —— 锦上添花不添乱。
   const savedWindowState = readWindowState(userDataDir())
   const placedBox = savedWindowState
-    ? placeWindowBox(savedWindowState.box, screen.getAllDisplays().map((d) => d.workArea))
+    ? placeWindowBox(
+        savedWindowState.box,
+        screen.getAllDisplays().map((d) => d.workArea)
+      )
     : null
   let normalBox: WindowBox | null = savedWindowState ? savedWindowState.box : null
   let stateSaveTimer: NodeJS.Timeout | null = null
@@ -642,7 +854,9 @@ function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: placedBox?.width ?? 1200,
     height: placedBox?.height ?? 800,
-    ...(placedBox && placedBox.x !== undefined && placedBox.y !== undefined ? { x: placedBox.x, y: placedBox.y } : {}),
+    ...(placedBox && placedBox.x !== undefined && placedBox.y !== undefined
+      ? { x: placedBox.x, y: placedBox.y }
+      : {}),
     minWidth: WINDOW_MIN_WIDTH,
     minHeight: WINDOW_MIN_HEIGHT,
     title: 'CodeAtlas',
@@ -748,7 +962,10 @@ function createWindow(): void {
   // GPU 进程打嗝:页面本身是活的(实测 CPU/内存/连接全正常),只是透明窗再也等不来新画面。
   // 催一帧 + 藏了再亮,逼 DWM 重开一块新画布,页面状态(聊天/扫描结果)一分不丢。
   // Electron 44 起 GPU 的事件只挂在 app 级(child-process-gone),按 processType 认出 GPU 再动手
-  const onGpuGone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails & { type: string }): void => {
+  const onGpuGone = (
+    _event: Electron.Event,
+    details: Electron.RenderProcessGoneDetails & { type: string }
+  ): void => {
     if (details.type !== 'GPU' || details.reason === 'clean-exit') return
     console.log(`[window] GPU 进程断了(${details.reason}),重开画布`)
     addDevLog('system', `画面断了一次(GPU 进程 ${details.reason}),已自动重接 —— 你正在看的内容没丢`)
@@ -789,7 +1006,8 @@ function createWindow(): void {
   // 只认主窗发的跳(日志窗共用同一个渲染入口,别让它替主窗保平安)。
   let lastFrameBeat = Date.now()
   const onFrameBeat = (event: Electron.IpcMainEvent): void => {
-    if (!mainWindow.isDestroyed() && event.sender === mainWindow.webContents) lastFrameBeat = Date.now()
+    if (!mainWindow.isDestroyed() && event.sender === mainWindow.webContents)
+      lastFrameBeat = Date.now()
   }
   ipcMain.on(CH.frameHeartbeat, onFrameBeat)
   const frameBeatWatchdog = setInterval(() => {
@@ -797,7 +1015,10 @@ function createWindow(): void {
     const gap = Date.now() - lastFrameBeat
     if (gap <= 10_000) return
     console.log(`[window] 画面心跳停了 ${gap}ms,自动整页重挂(救生圈2.0)`)
-    addDevLog('system', `画面管线停了约 ${Math.round(gap / 1000)} 秒,已自动重挂救回 —— 刚才没聊完的内容没能保住,抱歉`)
+    addDevLog(
+      'system',
+      `画面管线停了约 ${Math.round(gap / 1000)} 秒,已自动重挂救回 —— 刚才没聊完的内容没能保住,抱歉`
+    )
     revivePending = true
     lastFrameBeat = Date.now() // 重挂期间先续上账,免得看门狗连开两枪
     mainWindow.webContents.reload()
@@ -872,7 +1093,9 @@ function createWindow(): void {
   if (probeDir) {
     void (async () => {
       await new Promise((resolve) => setTimeout(resolve, 2500)) // 露窗后再稳两秒半,让画面完全落定
-      const scale = await mainWindow.webContents.executeJavaScript('String(window.devicePixelRatio)').catch(() => 'unknown')
+      const scale = await mainWindow.webContents
+        .executeJavaScript('String(window.devicePixelRatio)')
+        .catch(() => 'unknown')
       const image = await mainWindow.webContents.capturePage().catch(() => null)
       const png = image ? image.toPNG() : Buffer.alloc(0)
       const report = {
@@ -897,7 +1120,10 @@ function createWindow(): void {
 // 拒的话术当「工具结果」喂回给模型让它自己换路,循环绝不因为一次碰壁就断。
 
 /** list_files 的执行手:递归列文件/文件夹名单(只捡名字),条数和深度都有缰绳 */
-async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: boolean; text: string; hint?: string }> {
+async function agentListFiles(
+  rootPath: string,
+  relPath: string
+): Promise<{ ok: boolean; text: string; hint?: string }> {
   let abs: string
   try {
     abs = await joinAuthorizedRoot(rootPath, relPath)
@@ -907,7 +1133,9 @@ async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: 
   const lines: string[] = []
   let truncated = false
   let locked = 0 // 打不开的子目录数(权限/被占用),如实报给模型
-  const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
+  const queue: Array<{ abs: string; rel: string; depth: number }> = [
+    { abs, rel: relPath, depth: 0 }
+  ]
   while (queue.length > 0 && !truncated) {
     const item = queue.shift() as { abs: string; rel: string; depth: number }
     let dirents
@@ -941,7 +1169,8 @@ async function agentListFiles(rootPath: string, relPath: string): Promise<{ ok: 
     }
   }
   if (lines.length === 0) {
-    const why = locked > 0 ? `这个文件夹里什么都没列出来(${locked} 个子项打不开)` : '这个文件夹是空的'
+    const why =
+      locked > 0 ? `这个文件夹里什么都没列出来(${locked} 个子项打不开)` : '这个文件夹是空的'
     return { ok: true, text: why }
   }
   let text = lines.join('\n')
@@ -967,23 +1196,42 @@ async function agentSearchContent(
   rootPath: string,
   relPath: string,
   keyword: string
-): Promise<{ ok: boolean; text: string; hint?: string; matches: AgentSearchMatch[]; matchesTruncated: boolean }> {
+): Promise<{
+  ok: boolean
+  text: string
+  hint?: string
+  matches: AgentSearchMatch[]
+  matchesTruncated: boolean
+}> {
   let abs: string
   try {
     abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
-    return { ok: false, text: `路径越界了(不在项目内):${relPath}`, matches: [], matchesTruncated: false }
+    return {
+      ok: false,
+      text: `路径越界了(不在项目内):${relPath}`,
+      matches: [],
+      matchesTruncated: false
+    }
   }
   const stat = await fs.stat(abs).catch(() => null)
-  if (!stat) return { ok: false, text: `打不开或不存在:${relPath}`, matches: [], matchesTruncated: false }
+  if (!stat)
+    return { ok: false, text: `打不开或不存在:${relPath}`, matches: [], matchesTruncated: false }
   if (!stat.isDirectory()) {
-    return { ok: false, text: `${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它`, matches: [], matchesTruncated: false }
+    return {
+      ok: false,
+      text: `${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它`,
+      matches: [],
+      matchesTruncated: false
+    }
   }
   const needle = keyword.toLowerCase()
   const scopeLabel = relPath === '' ? '整个项目' : relPath
   const contentMatches: AgentSearchMatch[] = []
   const pathMatches: AgentSearchMatch[] = []
-  const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs, rel: relPath, depth: 0 }]
+  const queue: Array<{ abs: string; rel: string; depth: number }> = [
+    { abs, rel: relPath, depth: 0 }
+  ]
   let scanned = 0
   let locked = 0
   let filesTruncated = false
@@ -1004,7 +1252,8 @@ async function agentSearchContent(
       if (d.isSymbolicLink()) continue // 符号链接不跟进:既是安全边界也防绕环
       const childRel = item.rel ? `${item.rel}/${d.name}` : d.name
       if (d.isDirectory()) {
-        if (item.depth < AGENT_MAX_DEPTH) queue.push({ abs: join(item.abs, d.name), rel: childRel, depth: item.depth + 1 })
+        if (item.depth < AGENT_MAX_DEPTH)
+          queue.push({ abs: join(item.abs, d.name), rel: childRel, depth: item.depth + 1 })
         continue
       }
       if (!d.isFile()) continue
@@ -1018,7 +1267,12 @@ async function agentSearchContent(
         if (pathMatches.length >= AGENT_SEARCH_MAX_PATH_HITS) {
           pathHitsTruncated = true
         } else {
-          pathMatches.push({ relPath: childRel, line: 0, text: `路径里含「${keyword}」`, kind: 'path' })
+          pathMatches.push({
+            relPath: childRel,
+            line: 0,
+            text: `路径里含「${keyword}」`,
+            kind: 'path'
+          })
         }
       }
       if (isBinaryFile(childRel)) continue
@@ -1055,10 +1309,18 @@ async function agentSearchContent(
   }
   const sections: string[] = []
   if (pathMatches.length > 0) {
-    const head = pathHitsTruncated ? `路径对上的文件(只收前 ${AGENT_SEARCH_MAX_PATH_HITS} 个):` : '路径对上的文件:'
+    const head = pathHitsTruncated
+      ? `路径对上的文件(只收前 ${AGENT_SEARCH_MAX_PATH_HITS} 个):`
+      : '路径对上的文件:'
     sections.push([head, ...pathMatches.map((m) => m.relPath)].join('\n'))
   }
-  if (contentMatches.length > 0) sections.push(['内容对上的(文件:行号:原文):', ...contentMatches.map((m) => `${m.relPath}:${m.line}:${m.text}`)].join('\n'))
+  if (contentMatches.length > 0)
+    sections.push(
+      [
+        '内容对上的(文件:行号:原文):',
+        ...contentMatches.map((m) => `${m.relPath}:${m.line}:${m.text}`)
+      ].join('\n')
+    )
   let text = sections.join('\n')
   const tails: string[] = []
   if (matchesTruncated) tails.push(`内容命中太多,只显示前 ${AGENT_SEARCH_MAX_MATCHES} 条`)
@@ -1066,7 +1328,13 @@ async function agentSearchContent(
   if (filesTruncated) tails.push(`文件夹太大,只扫了前 ${AGENT_SEARCH_MAX_FILES} 个文件,没扫完`)
   if (locked > 0) tails.push(`${locked} 个文件打不开,跳过了`)
   if (tails.length > 0) text += `\n(${tails.join(';')})`
-  return { ok: true, text, hint: `${scopeLabel}命中 ${matches.length} 处`, matches, matchesTruncated }
+  return {
+    ok: true,
+    text,
+    hint: `${scopeLabel}命中 ${matches.length} 处`,
+    matches,
+    matchesTruncated
+  }
 }
 
 /** read_file 的执行手:读文本文件,超长只读开头一段并注明,绝不静默截断 */
@@ -1083,12 +1351,16 @@ async function agentReadFile(
   }
   const stat = await fs.stat(abs).catch(() => null)
   if (!stat) return { ok: false, text: `打不开或不存在:${relPath}` }
-  if (stat.isDirectory()) return { ok: false, text: `${relPath} 是个文件夹不是文件;要看里面有什么,用 list_files 列名单` }
+  if (stat.isDirectory())
+    return { ok: false, text: `${relPath} 是个文件夹不是文件;要看里面有什么,用 list_files 列名单` }
   if (isBinaryFile(relPath)) {
     return { ok: false, text: `${relPath} 是二进制文件,读不了文本内容;这类文件只能看名字猜用途` }
   }
   if (stat.size > AGENT_FILE_MAX_BYTES) {
-    return { ok: false, text: `${relPath} 太大了(超过 5MB),不适合整个读;建议让用户在预览里挑一段引用发过来` }
+    return {
+      ok: false,
+      text: `${relPath} 太大了(超过 5MB),不适合整个读;建议让用户在预览里挑一段引用发过来`
+    }
   }
   const raw = await fs.readFile(abs, 'utf8').catch(() => null)
   if (raw === null) return { ok: false, text: `读 ${relPath} 时出了岔子(权限或编码),读不了` }
@@ -1108,14 +1380,20 @@ async function agentRequestDirectoryAccess(
   rawPath: unknown
 ): Promise<{ ok: boolean; text: string; hint?: string; rootId?: string }> {
   const requested = sanitizeExternalDirectoryPath(rawPath)
-  if (requested === null) return { ok: false, text: '目录路径不合法:只能申请用户明确点名的绝对文件夹路径' }
+  if (requested === null)
+    return { ok: false, text: '目录路径不合法:只能申请用户明确点名的绝对文件夹路径' }
   const canonical = await fs.realpath(requested).catch(() => null)
   if (canonical === null) return { ok: false, text: `这个文件夹不存在或打不开:${requested}` }
   const stat = await fs.stat(canonical).catch(() => null)
   if (!stat?.isDirectory()) return { ok: false, text: `这不是文件夹:${requested}` }
   const existing = agentDirectoryAccess.find(canonical)
   if (existing) {
-    return { ok: true, text: `这个文件夹本次运行已经获准。rootId=${existing.rootId};后续只传根内相对路径。`, hint: '本次运行已允许', rootId: existing.rootId }
+    return {
+      ok: true,
+      text: `这个文件夹本次运行已经获准。rootId=${existing.rootId};后续只传根内相对路径。`,
+      hint: '本次运行已允许',
+      rootId: existing.rootId
+    }
   }
   const win = BrowserWindow.fromWebContents(event.sender)
   const options = {
@@ -1128,8 +1406,11 @@ async function agentRequestDirectoryAccess(
     cancelId: 1,
     noLink: true
   }
-  const choice = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
-  if (choice.response !== 0) return { ok: false, text: `用户没有允许读取这个文件夹:${canonical}`, hint: '用户拒绝了' }
+  const choice = win
+    ? await dialog.showMessageBox(win, options)
+    : await dialog.showMessageBox(options)
+  if (choice.response !== 0)
+    return { ok: false, text: `用户没有允许读取这个文件夹:${canonical}`, hint: '用户拒绝了' }
   const granted = agentDirectoryAccess.grant(canonical)
   if (granted === null) return { ok: false, text: '目录授权失败,没有读取任何项目外文件' }
   return {
@@ -1145,10 +1426,21 @@ async function agentRequestDirectoryAccess(
  * (Tavily 有 Key 打头 → DDG → 维基中 → 维基英),三道闸(搜索词安检/内网闸/防上当声明)
  * 也都扎在那边,这边只管跑和报。查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
  */
-async function agentWebSearch(query: string, tavilyKey: string | undefined): Promise<{ ok: boolean; text: string; hint?: string }> {
-  const found = await webSearchDetailed(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey })
+async function agentWebSearch(
+  query: string,
+  tavilyKey: string | undefined
+): Promise<{ ok: boolean; text: string; hint?: string }> {
+  const found = await webSearchDetailed(query, {
+    fetchText: electronFetchText,
+    postJson: electronPostJson,
+    tavilyKey
+  })
   if (found.material === '') {
-    return { ok: false, text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准', hint: '没查到' }
+    return {
+      ok: false,
+      text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准',
+      hint: '没查到'
+    }
   }
   return { ok: true, text: found.material, hint: found.sources.join('、') }
 }
@@ -1165,7 +1457,11 @@ function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text: strin
  * 每条「文件:行号:原文」原样到用户眼前、可点跳转 —— 不再让小模型当抄写员,
  * 一条不丢、行号一个不错。只走内存通道,零落盘。
  */
-function sendAgentMatches(event: IpcMainInvokeEvent, requestId: string, card: AgentSearchCard): void {
+function sendAgentMatches(
+  event: IpcMainInvokeEvent,
+  requestId: string,
+  card: AgentSearchCard
+): void {
   if (requestId === '' || event.sender.isDestroyed()) return
   const payload: AiDeltaPayload = { id: requestId, text: '', matches: card }
   event.sender.send(CH.aiDelta, payload)
@@ -1216,7 +1512,8 @@ async function runAgentChat(input: {
   /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 小葵定) */
   tavilyKey?: string
 }): Promise<AiChatResult> {
-  const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } = input
+  const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } =
+    input
   const messages: AgentChatMessage[] = [...baseMessages]
   // 本轮用户真正的问题 = 组装消息里最后一条 user(附件/摘要/历史都垫在它前面);
   // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下。
@@ -1278,7 +1575,10 @@ async function runAgentChat(input: {
   let repetitionRetried = false
   // 紧急瘦身也只许用一次:裁旧账重试还爆,就是这锅真装不下,照实报错
   let slimRetried = false
-  addDevLog('request', `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`)
+  addDevLog(
+    'request',
+    `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`
+  )
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, resultReasoning())
     // 锅快满了先腾地方(第一百三十八锤):早先翻看的大段原文提炼成占位纸条,
@@ -1290,12 +1590,20 @@ async function runAgentChat(input: {
         if (key) doneCalls.delete(key)
       }
       messages.splice(0, messages.length, ...compressed.messages)
-      sendAgentStep(event, requestId, `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位纸条 —— 要重温随时能再翻`)
-      addDevLog('request', `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了纸条,腾出约 ${compressed.freedCallIds.length} 处重读权`)
+      sendAgentStep(
+        event,
+        requestId,
+        `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位纸条 —— 要重温随时能再翻`
+      )
+      addDevLog(
+        'request',
+        `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了纸条,腾出约 ${compressed.freedCallIds.length} 处重读权`
+      )
     }
     const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
     // 逼卷令只在「真烧完了轮数」时发;引擎天生不支持工具或刚兜底降级的,发这话是驴唇不对马嘴
-    if (rounds >= AGENT_MAX_ROUNDS && !skipNudgeOnce) messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
+    if (rounds >= AGENT_MAX_ROUNDS && !skipNudgeOnce)
+      messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
     skipNudgeOnce = false
     rounds += 1
     const round = await agentRound(target, messages, {
@@ -1323,7 +1631,13 @@ async function runAgentChat(input: {
         }
         const text = (truncateAtRepetition(round.text) ?? round.text).trim()
         if (text === '') {
-          return agentResult(input, 'error', '模型连着两回都说到一半原地打转 —— 换个问法重新问问看', usage, resultReasoning())
+          return agentResult(
+            input,
+            'error',
+            '模型连着两回都说到一半原地打转 —— 换个问法重新问问看',
+            usage,
+            resultReasoning()
+          )
         }
         sendAgentStep(event, requestId, '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你')
         return agentResult(input, 'supported', text, usage, resultReasoning())
@@ -1331,18 +1645,28 @@ async function runAgentChat(input: {
       // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
       // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
       // 普通请求再出错照实报给用户
-      if (round.status === 'error' && round.toolsUnsupported === true && useTools && !engineNoTools) {
+      if (
+        round.status === 'error' &&
+        round.toolsUnsupported === true &&
+        useTools &&
+        !engineNoTools
+      ) {
         noToolEngines.add(engineKey)
         engineNoTools = true
         skipNudgeOnce = true
-        sendAgentStep(event, requestId, '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型')
+        sendAgentStep(
+          event,
+          requestId,
+          '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型'
+        )
         const sysIdx = messages.findIndex((m) => m.role === 'system')
         if (sysIdx >= 0) {
           let sysContent = (messages[sysIdx] as { content: string }).content
           if (sysContent.endsWith(addendum)) sysContent = sysContent.slice(0, -addendum.length)
           // 切片摘走后,人设里什么能力声明都没剩 —— 补一段「没手脚」切片,别让它空口吹翻过项目。
           // includes 保险:起手黑名单分支理论上和这里互斥,但万一已经垫过就不重复加
-          if (!sysContent.includes(SLICE_NO_TOOLS)) sysContent = `${sysContent}\n\n${SLICE_NO_TOOLS}`
+          if (!sysContent.includes(SLICE_NO_TOOLS))
+            sysContent = `${sysContent}\n\n${SLICE_NO_TOOLS}`
           messages[sysIdx] = { role: 'system', content: sysContent }
         }
         continue
@@ -1357,7 +1681,13 @@ async function runAgentChat(input: {
       ) {
         reminderFailsafe = true
         skipNudgeOnce = true
-        messages.splice(0, messages.length, ...messages.filter((m) => !(m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))))
+        messages.splice(
+          0,
+          messages.length,
+          ...messages.filter(
+            (m) => !(m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))
+          )
+        )
         sendAgentStep(event, requestId, '这个模型不太习惯多出来的小纸条,撤掉重答')
         continue
       }
@@ -1372,14 +1702,25 @@ async function runAgentChat(input: {
           doneCalls.clear()
           callIdToKey.clear()
           skipNudgeOnce = true
-          sendAgentStep(event, requestId, `对话把模型的脑容量撑爆了:把翻看前的旧账整段清掉(约 ${slimmed.dropped} 条),保住你最新的问题,重答一遍`)
+          sendAgentStep(
+            event,
+            requestId,
+            `对话把模型的脑容量撑爆了:把翻看前的旧账整段清掉(约 ${slimmed.dropped} 条),保住你最新的问题,重答一遍`
+          )
           continue
         }
       }
-      return agentResult(input, round.status === 'cancelled' ? 'cancelled' : 'error', round.text, usage, resultReasoning())
+      return agentResult(
+        input,
+        round.status === 'cancelled' ? 'cancelled' : 'error',
+        round.text,
+        usage,
+        resultReasoning()
+      )
     }
     usage = mergeUsage(usage, round.usage)
-    if (round.reasoning) reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
+    if (round.reasoning)
+      reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
     // 状态条的实时计数是流式增量顺手喂的,翻文件按轮非流式没增量可蹭 ——
     // 每轮收完账自己报一次,左下角不至于整场只挂「在干活……」
     if (usage) {
@@ -1395,7 +1736,13 @@ async function runAgentChat(input: {
     if (calls.length === 0 || !useTools) {
       const text = (raw.content ?? '').trim()
       if (text === '') {
-        return agentResult(input, 'error', '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试', usage, resultReasoning())
+        return agentResult(
+          input,
+          'error',
+          '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试',
+          usage,
+          resultReasoning()
+        )
       }
       // 质检闸(救敷衍):找位置题的答案交卷前过两道判据 —— 一次文件都没搜过(逼它先搜)、
       // 搜到了东西却一个具体文件都不引用(逼它把文件写进答案,答案里可点跳转的链接全靠这个)。
@@ -1403,7 +1750,12 @@ async function runAgentChat(input: {
       // 轮数已烧完的逼卷轮不拦 —— 那轮它没工具可调,拦了也白拦
       // 前置条件(提示词体系重写第二批):本场一个工具调用都没发生过就直接放行,连 no-search 也不拦 ——
       // 模型一口答出来的题(概念题、闲聊),质检闸没资格逼它先翻文件
-      if (useTools && toolCallsExecuted > 0 && salvageNudges < SALVAGE_NUDGE_MAX && rounds < AGENT_MAX_ROUNDS) {
+      if (
+        useTools &&
+        toolCallsExecuted > 0 &&
+        salvageNudges < SALVAGE_NUDGE_MAX &&
+        rounds < AGENT_MAX_ROUNDS
+      ) {
         const gap = findAnswerGap({
           isFindQuestion: isFindQuestion(currentQuestion),
           searchUsed,
@@ -1414,7 +1766,10 @@ async function runAgentChat(input: {
           salvageNudges += 1
           skipNudgeOnce = true
           messages.push(raw)
-          messages.push({ role: 'user', content: gap === 'no-search' ? SALVAGE_SEARCH_NUDGE : SALVAGE_CITE_NUDGE })
+          messages.push({
+            role: 'user',
+            content: gap === 'no-search' ? SALVAGE_SEARCH_NUDGE : SALVAGE_CITE_NUDGE
+          })
           sendResetDelta(event, requestId)
           sendAgentStep(
             event,
@@ -1435,20 +1790,33 @@ async function runAgentChat(input: {
     for (const call of calls) {
       if (signal.aborted) break
       const callName = asToolName(call.name)
-      const isFileTool = callName === TOOL_NAMES.readFile || callName === TOOL_NAMES.listFiles || callName === TOOL_NAMES.searchContent
-      const selectedRoot = isFileTool ? agentDirectoryAccess.resolve(rootPath, call.args?.rootId) : null
+      const isFileTool =
+        callName === TOOL_NAMES.readFile ||
+        callName === TOOL_NAMES.listFiles ||
+        callName === TOOL_NAMES.searchContent
+      const selectedRoot = isFileTool
+        ? agentDirectoryAccess.resolve(rootPath, call.args?.rootId)
+        : null
       const relPath =
         callName === TOOL_NAMES.webSearch || callName === TOOL_NAMES.requestDirectoryAccess
           ? ''
           : callName === TOOL_NAMES.searchContent && call.args?.relPath === undefined
             ? ''
             : sanitizeAgentRelPath(call.args?.relPath)
-      const keyword = callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string' ? call.args.keyword.trim().slice(0, 200) : ''
+      const keyword =
+        callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string'
+          ? call.args.keyword.trim().slice(0, 200)
+          : ''
       const rawQuery = call.args?.query
-      const requestedPath = callName === TOOL_NAMES.requestDirectoryAccess ? sanitizeExternalDirectoryPath(call.args?.path) : null
+      const requestedPath =
+        callName === TOOL_NAMES.requestDirectoryAccess
+          ? sanitizeExternalDirectoryPath(call.args?.path)
+          : null
       // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
       const query = callName === TOOL_NAMES.webSearch ? sanitizeWebQuery(rawQuery) : null
-      const queryMissing = callName === TOOL_NAMES.webSearch && (typeof rawQuery !== 'string' || rawQuery.trim() === '')
+      const queryMissing =
+        callName === TOOL_NAMES.webSearch &&
+        (typeof rawQuery !== 'string' || rawQuery.trim() === '')
       if (
         !callName ||
         relPath === null ||
@@ -1475,9 +1843,19 @@ async function runAgentChat(input: {
             ? String(rawQuery ?? '(没给搜索词)')
             : callName === TOOL_NAMES.requestDirectoryAccess
               ? String(call.args?.path ?? '(没给目录)')
-              : String(call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)')
-        sendAgentStep(event, requestId, agentStepText(callName ?? TOOL_NAMES.listFiles, badTarget, 'error', why))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: wrapToolResult(`参数不合法:${why}`) })
+              : String(
+                  call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)'
+                )
+        sendAgentStep(
+          event,
+          requestId,
+          agentStepText(callName ?? TOOL_NAMES.listFiles, badTarget, 'error', why)
+        )
+        toolResults.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: wrapToolResult(`参数不合法:${why}`)
+        })
         continue
       }
       // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
@@ -1504,14 +1882,25 @@ async function runAgentChat(input: {
                 : relPath
       if (doneCalls.has(key)) {
         sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
-        toolResults.push({ role: 'tool', tool_call_id: call.id, content: wrapToolResult(REPEAT_NUDGE) })
+        toolResults.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: wrapToolResult(REPEAT_NUDGE)
+        })
         continue
       }
       doneCalls.add(key)
       if (callName === TOOL_NAMES.searchContent) searchUsed = true // 质检闸的账:真发起过搜索才算搜过
       callIdToKey.set(call.id, key)
       // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
-      const exec: { ok: boolean; text: string; hint?: string; matches?: AgentSearchMatch[]; matchesTruncated?: boolean; rootId?: string } =
+      const exec: {
+        ok: boolean
+        text: string
+        hint?: string
+        matches?: AgentSearchMatch[]
+        matchesTruncated?: boolean
+        rootId?: string
+      } =
         callName === TOOL_NAMES.requestDirectoryAccess
           ? await agentRequestDirectoryAccess(event, requestedPath)
           : callName === TOOL_NAMES.listFiles
@@ -1521,16 +1910,31 @@ async function runAgentChat(input: {
               : callName === TOOL_NAMES.webSearch
                 ? await agentWebSearch(query ?? '', input.tavilyKey)
                 : await agentReadFile((selectedRoot as { path: string }).path, relPath, readChars)
-      if (exec.ok && selectedRoot?.external) exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
+      if (exec.ok && selectedRoot?.external)
+        exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
       // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
       // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
       exec.text = wrapToolResult(exec.text)
       if (exec.ok && callName !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
-      sendAgentStep(event, requestId, agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint))
+      sendAgentStep(
+        event,
+        requestId,
+        agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint)
+      )
       // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
-      if (callName === TOOL_NAMES.searchContent && !selectedRoot?.external && exec.ok && exec.matches && exec.matches.length > 0) {
-        sendAgentMatches(event, requestId, { keyword, items: exec.matches, truncated: exec.matchesTruncated === true })
+      if (
+        callName === TOOL_NAMES.searchContent &&
+        !selectedRoot?.external &&
+        exec.ok &&
+        exec.matches &&
+        exec.matches.length > 0
+      ) {
+        sendAgentMatches(event, requestId, {
+          keyword,
+          items: exec.matches,
+          truncated: exec.matchesTruncated === true
+        })
         // 质检闸的对账本:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
         for (const m of exec.matches) searchHitPaths.add(m.relPath)
       }
@@ -1583,7 +1987,10 @@ function registerIpc(): void {
     else win.maximize()
     return win.isMaximized()
   })
-  ipcMain.handle(CH.windowIsMaximized, (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+  ipcMain.handle(
+    CH.windowIsMaximized,
+    (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false
+  )
 
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
   // 第八十八锤:对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
@@ -1614,7 +2021,13 @@ function registerIpc(): void {
 
     const probeLetter = async (ch: string): Promise<DriveInfo | null> => {
       const root = `${ch}:\\`
-      const exists = await withTimeout(fs.stat(root).then(() => true, () => false), 2500)
+      const exists = await withTimeout(
+        fs.stat(root).then(
+          () => true,
+          () => false
+        ),
+        2500
+      )
       if (!exists) return null
       const info: DriveInfo = { letter: ch, root }
       const usage = await withTimeout(
@@ -1629,7 +2042,9 @@ function registerIpc(): void {
     }
 
     const letters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-    const drives = (await Promise.all(letters.map(probeLetter))).filter((d): d is DriveInfo => d !== null)
+    const drives = (await Promise.all(letters.map(probeLetter))).filter(
+      (d): d is DriveInfo => d !== null
+    )
     const kinds = await queryDriveKinds()
     if (kinds) {
       for (const d of drives) {
@@ -1662,7 +2077,9 @@ function registerIpc(): void {
     const stat = await fs.stat(root).catch((err: NodeJS.ErrnoException) => err)
     if (stat instanceof Error) {
       if (stat.code === 'ENOENT') {
-        throw new Error(`找不到这个文件夹:${root} —— 检查一下盘符、拼写和斜杠方向;不确定的话,用「选择文件夹」点一个最稳`)
+        throw new Error(
+          `找不到这个文件夹:${root} —— 检查一下盘符、拼写和斜杠方向;不确定的话,用「选择文件夹」点一个最稳`
+        )
       }
       throw new Error(accessDeniedMessage(stat, '文件夹', root))
     }
@@ -1693,69 +2110,96 @@ function registerIpc(): void {
 
   // AST 分析单个文件;不支持的语言/超大文件返回 null(诚实的能力边界,不是出错)
   // 路径契约:收 (rootPath, relPath),绝对路径只能由 joinRoot 在这儿解析
-  ipcMain.handle(CH.analyzeFile, async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
-    if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
-      throw new Error('参数不合法')
+  ipcMain.handle(
+    CH.analyzeFile,
+    async (_event, rootPath: unknown, relPath: unknown, languageId: unknown) => {
+      if (
+        typeof rootPath !== 'string' ||
+        typeof relPath !== 'string' ||
+        typeof languageId !== 'string'
+      ) {
+        throw new Error('参数不合法')
+      }
+      if (!isAnalysisSupported(languageId)) return null
+      const absPath = joinRoot(rootPath, relPath) // relPath 想越界(.. 上跳、盘符注入)会在这里被拦
+      const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+      if (stat instanceof Error) {
+        throw new Error(accessDeniedMessage(stat, '文件', relPath))
+      }
+      if (!stat.isFile()) {
+        throw new Error(`这个路径不是一个文件:${relPath}`)
+      }
+      if (stat.size > SOURCE_PARSE_MAX_BYTES) return null // 超过上限的源码不解析,避免卡顿
+      const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
+        throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+      })
+      return analyzeSource(code, languageId)
     }
-    if (!isAnalysisSupported(languageId)) return null
-    const absPath = joinRoot(rootPath, relPath) // relPath 想越界(.. 上跳、盘符注入)会在这里被拦
-    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
-    if (stat instanceof Error) {
-      throw new Error(accessDeniedMessage(stat, '文件', relPath))
-    }
-    if (!stat.isFile()) {
-      throw new Error(`这个路径不是一个文件:${relPath}`)
-    }
-    if (stat.size > SOURCE_PARSE_MAX_BYTES) return null // 超过上限的源码不解析,避免卡顿
-    const code = await fs.readFile(absPath, 'utf8').catch((err: NodeJS.ErrnoException) => {
-      throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
-    })
-    return analyzeSource(code, languageId)
-  })
+  )
 
   // 代码预览读文件(第一百一十锤):右键「预览文件」用的那条通道。
   // 路径契约同 analyze-file —— 收 (rootPath, relPath),绝对路径只经 joinRoot 解析,
   // relPath 越界(.. 上跳、盘符注入)在这儿被拦。守卫三道:二进制不受理、超大不受理、
   // 能读的也只给前一段(行数/字数双封顶),账目如实回给界面,绝不静默腰斩。
-  ipcMain.handle(CH.readPreview, async (_event, rootPath: unknown, relPath: unknown): Promise<FilePreviewResult> => {
-    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
-      throw new Error('参数不合法')
-    }
-    const absPath = joinRoot(rootPath, relPath)
-    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
-    if (stat instanceof Error) {
-      throw new Error(accessDeniedMessage(stat, '文件', relPath), { cause: stat })
-    }
-    if (!stat.isFile()) {
-      throw new Error(`这个路径不是一个文件:${relPath}`)
-    }
-    const name = relPath.split('/').pop() ?? relPath
-    // 后缀一看就是二进制/媒体的,连读都不用读
-    if (isBinaryFile(name)) {
-      return { status: 'binary', text: '', totalLines: 0, reason: '这是二进制或媒体文件,里面没有能当文本看的字;想了解它的话,右栏的小探针可以按类型给你讲' }
-    }
-    if (stat.size > PREVIEW_MAX_BYTES) {
+  ipcMain.handle(
+    CH.readPreview,
+    async (_event, rootPath: unknown, relPath: unknown): Promise<FilePreviewResult> => {
+      if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+        throw new Error('参数不合法')
+      }
+      const absPath = joinRoot(rootPath, relPath)
+      const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+      if (stat instanceof Error) {
+        throw new Error(accessDeniedMessage(stat, '文件', relPath), { cause: stat })
+      }
+      if (!stat.isFile()) {
+        throw new Error(`这个路径不是一个文件:${relPath}`)
+      }
+      const name = relPath.split('/').pop() ?? relPath
+      // 后缀一看就是二进制/媒体的,连读都不用读
+      if (isBinaryFile(name)) {
+        return {
+          status: 'binary',
+          text: '',
+          totalLines: 0,
+          reason:
+            '这是二进制或媒体文件,里面没有能当文本看的字;想了解它的话,右栏的小探针可以按类型给你讲'
+        }
+      }
+      if (stat.size > PREVIEW_MAX_BYTES) {
+        return {
+          status: 'too-big',
+          text: '',
+          totalLines: 0,
+          reason: `这个文件有 ${formatSize(stat.size)},太大了,预览只伺候 ${formatSize(PREVIEW_MAX_BYTES)} 以内的文本`
+        }
+      }
+      // 读内容也可能撞上独占/上锁(EBUSY/EPERM),走人话口径,不吐生面孔
+      const buf = await fs.readFile(absPath).catch((err: NodeJS.ErrnoException) => {
+        throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
+      })
+      // 后缀骗人的(改名的二进制)在这儿补一道:开头有 NUL 字节就不是文本
+      if (looksBinary(buf.subarray(0, 8192))) {
+        return {
+          status: 'binary',
+          text: '',
+          totalLines: 0,
+          reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了'
+        }
+      }
+      const clip = clipPreview(buf.toString('utf8'))
+      // 预览分色(这锤):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
+      // 解析出错都老实回 null —— 界面白字照常,分色永远不拖累预览本身。
+      const colors = await highlightSource(clip.text, name)
       return {
-        status: 'too-big',
-        text: '',
-        totalLines: 0,
-        reason: `这个文件有 ${formatSize(stat.size)},太大了,预览只伺候 ${formatSize(PREVIEW_MAX_BYTES)} 以内的文本`
+        status: 'ok',
+        text: clip.text,
+        totalLines: clip.totalLines,
+        colors: colors ?? undefined,
+        reason: ''
       }
     }
-    // 读内容也可能撞上独占/上锁(EBUSY/EPERM),走人话口径,不吐生面孔
-    const buf = await fs.readFile(absPath).catch((err: NodeJS.ErrnoException) => {
-      throw new Error(accessDeniedMessage(err, '文件', relPath), { cause: err })
-    })
-    // 后缀骗人的(改名的二进制)在这儿补一道:开头有 NUL 字节就不是文本
-    if (looksBinary(buf.subarray(0, 8192))) {
-      return { status: 'binary', text: '', totalLines: 0, reason: '这个文件的内容不是文本(开头就是二进制数据),预览不了' }
-    }
-    const clip = clipPreview(buf.toString('utf8'))
-    // 预览分色(这锤):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
-    // 解析出错都老实回 null —— 界面白字照常,分色永远不拖累预览本身。
-    const colors = await highlightSource(clip.text, name)
-    return { status: 'ok', text: clip.text, totalLines: clip.totalLines, colors: colors ?? undefined, reason: '' }
-  })
+  )
 
   // 项目关系图:全项目谁引用谁。路径契约同 analyze-file,读文件只走 joinRoot
   ipcMain.handle(CH.depGraph, (_event, rootPath: unknown) => {
@@ -1790,7 +2234,12 @@ function registerIpc(): void {
     const { repoId, filePath } = args as Record<string, unknown>
     if (typeof repoId !== 'string' || typeof filePath !== 'string') throw new Error('参数不合法')
     const win = BrowserWindow.getAllWindows()[0] ?? null
-    const finalPath = await startModelDownload({ win, userDataDir: userDataDir(), repoId, filePath })
+    const finalPath = await startModelDownload({
+      win,
+      userDataDir: userDataDir(),
+      repoId,
+      filePath
+    })
     await pointConfigAtModel(userDataDir(), finalPath)
     return finalPath
   })
@@ -1804,8 +2253,12 @@ function registerIpc(): void {
     const lm = c.lmstudio
     const bi = c.builtin
     if (
-      !lm || typeof lm.baseUrl !== 'string' || typeof lm.model !== 'string' ||
-      !bi || typeof bi.serverPath !== 'string' || typeof bi.modelPath !== 'string'
+      !lm ||
+      typeof lm.baseUrl !== 'string' ||
+      typeof lm.model !== 'string' ||
+      !bi ||
+      typeof bi.serverPath !== 'string' ||
+      typeof bi.modelPath !== 'string'
     ) {
       throw new Error('配置不合法:缺 lmstudio / builtin 设置')
     }
@@ -1820,7 +2273,10 @@ function registerIpc(): void {
       // 个性化(第一百一十三锤)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
       personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
-      contextSize: typeof c.contextSize === 'number' && c.contextSize >= CONTEXT_SIZE_MIN ? c.contextSize : undefined
+      contextSize:
+        typeof c.contextSize === 'number' && c.contextSize >= CONTEXT_SIZE_MIN
+          ? c.contextSize
+          : undefined
     })
     // 垃圾不白占:切走了内置模式,或换了模型/引擎设置,旧子进程就地解散,
     // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账
@@ -1828,7 +2284,11 @@ function registerIpc(): void {
       stopBuiltinServer()
       broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
-    if (saved.provider === 'builtin' && (builtinNeedsRestart(saved.builtin) || builtinContextDiffers(saved.contextSize ?? DEFAULT_CONTEXT_SIZE))) {
+    if (
+      saved.provider === 'builtin' &&
+      (builtinNeedsRestart(saved.builtin) ||
+        builtinContextDiffers(saved.contextSize ?? DEFAULT_CONTEXT_SIZE))
+    ) {
       stopBuiltinServer()
       broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
     }
@@ -1854,7 +2314,10 @@ function registerIpc(): void {
     const wasRunning = isBuiltinRunning()
     stopBuiltinServer()
     broadcastModelStatus(builtinIdleStatus(config.builtin.modelPath))
-    return { ok: true, message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑' }
+    return {
+      ok: true,
+      message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑'
+    }
   })
 
   // 量尺(第七十三锤):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
@@ -1867,29 +2330,46 @@ function registerIpc(): void {
       .then((s) => s.size)
       .catch(() => null)
     if (sizeBytes === null) {
-      return { level: 'missing', title: '文件不存在', detail: '这个路径找不到文件:检查一下盘符和文件名', sizeBytes: null }
+      return {
+        level: 'missing',
+        title: '文件不存在',
+        detail: '这个路径找不到文件:检查一下盘符和文件名',
+        sizeBytes: null
+      }
     }
     const spec = await queryMachineSpec()
     // 上下文缓存跟着配置走(第八十六锤):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
     const config = await loadAiConfig(userDataDir())
-    const ctx = typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN ? config.contextSize : DEFAULT_CONTEXT_SIZE
+    const ctx =
+      typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN
+        ? config.contextSize
+        : DEFAULT_CONTEXT_SIZE
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
 
   // 模型档案(上下文档位的账本):出厂上下文上限、层数头数、机器家底,一次端给设置页;
   // 档案翻不出来各条目就是 null,设置页自己退到粗估,不报错不拦人
-  ipcMain.handle(CH.modelContextInfo, async (_event, modelPath: unknown): Promise<ModelContextInfo | null> => {
-    if (typeof modelPath !== 'string' || !modelPath.trim()) return null
-    const p = modelPath.trim()
-    const sizeBytes = await fs
-      .stat(p)
-      .then((s) => s.size)
-      .catch(() => null)
-    const shape = await readModelShape(p)
-    if (sizeBytes === null && shape === null) return null
-    const spec = await queryMachineSpec()
-    return { sizeBytes, nativeContext: shape?.contextLength ?? null, shape, ramBytes: spec.ramBytes, vramBytes: spec.vramBytes }
-  })
+  ipcMain.handle(
+    CH.modelContextInfo,
+    async (_event, modelPath: unknown): Promise<ModelContextInfo | null> => {
+      if (typeof modelPath !== 'string' || !modelPath.trim()) return null
+      const p = modelPath.trim()
+      const sizeBytes = await fs
+        .stat(p)
+        .then((s) => s.size)
+        .catch(() => null)
+      const shape = await readModelShape(p)
+      if (sizeBytes === null && shape === null) return null
+      const spec = await queryMachineSpec()
+      return {
+        sizeBytes,
+        nativeContext: shape?.contextLength ?? null,
+        shape,
+        ramBytes: spec.ramBytes,
+        vramBytes: spec.vramBytes
+      }
+    }
+  )
 
   // 渲染层的报错小纸条:window.onerror / unhandledrejection 抓到的都送进后台账本 ——
   // 渲染层就算当场断气,主进程的账本还活着,下回排查有现场可看
@@ -1945,34 +2425,63 @@ function registerIpc(): void {
 
   // 人话讲解一个改动:diff 由主进程现场重取(不信任渲染进程传内容),再喂本地模型
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
-  ipcMain.handle(CH.gitExplainChange, async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
-    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
-      throw new Error('参数不合法')
+  ipcMain.handle(
+    CH.gitExplainChange,
+    async (event, rootPath: unknown, relPath: unknown, requestId?: unknown) => {
+      if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+        throw new Error('参数不合法')
+      }
+      const changes = await collectGitChanges(rootPath)
+      if (!changes.isGitRepo) {
+        return {
+          status: 'error',
+          text: '这个文件夹不在 git 仓库里,没有改动可讲',
+          model: '',
+          durationMs: 0
+        }
+      }
+      const change = changes.changes.find((c) => c.relPath === relPath)
+      if (!change) {
+        return { status: 'error', text: '这个文件当前没有改动', model: '', durationMs: 0 }
+      }
+      const changeDiff = await getChangeDiff(rootPath, change)
+      if (!changeDiff) {
+        return {
+          status: 'error',
+          text: change.binary ? '二进制文件没法逐行对比,讲不了' : '这个文件太大,讲不了(先拆小再试)',
+          model: '',
+          durationMs: 0
+        }
+      }
+      if (!changeDiff.diff.trim()) {
+        return {
+          status: 'error',
+          text: '这个文件没有可逐行对比的内容(可能只改了权限/编码)',
+          model: '',
+          durationMs: 0
+        }
+      }
+      const resolved = await resolveChatTargetOrError()
+      if ('error' in resolved) {
+        return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+      }
+      const prompt = buildDiffPrompt({
+        relPath: change.relPath,
+        kind: change.kind,
+        diff: changeDiff.diff
+      })
+      return explainWithCancel(requestId, (signal) =>
+        explainWithModel(
+          resolved.target,
+          prompt,
+          withPersonalization(DIFF_SYSTEM_PROMPT, resolved.style),
+          makeDeltaSender(event, requestId),
+          signal,
+          resolved.budgets.replyTokens
+        )
+      )
     }
-    const changes = await collectGitChanges(rootPath)
-    if (!changes.isGitRepo) {
-      return { status: 'error', text: '这个文件夹不在 git 仓库里,没有改动可讲', model: '', durationMs: 0 }
-    }
-    const change = changes.changes.find((c) => c.relPath === relPath)
-    if (!change) {
-      return { status: 'error', text: '这个文件当前没有改动', model: '', durationMs: 0 }
-    }
-    const changeDiff = await getChangeDiff(rootPath, change)
-    if (!changeDiff) {
-      return { status: 'error', text: change.binary ? '二进制文件没法逐行对比,讲不了' : '这个文件太大,讲不了(先拆小再试)', model: '', durationMs: 0 }
-    }
-    if (!changeDiff.diff.trim()) {
-      return { status: 'error', text: '这个文件没有可逐行对比的内容(可能只改了权限/编码)', model: '', durationMs: 0 }
-    }
-    const resolved = await resolveChatTargetOrError()
-    if ('error' in resolved) {
-      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
-    }
-    const prompt = buildDiffPrompt({ relPath: change.relPath, kind: change.kind, diff: changeDiff.diff })
-    return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, prompt, withPersonalization(DIFF_SYSTEM_PROMPT, resolved.style), makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
-    )
-  })
+  )
 
   // AI 干活报告(第六十三锤):整轮改动翻成大白话审计 —— 干了什么/账对不对/要不要细看。
   // 账本由主进程现场重取(渲染进程递不进假货);改动集没变就走签名缓存,不重复烧模型。
@@ -1983,10 +2492,20 @@ function registerIpc(): void {
     }
     const changes = await collectGitChanges(rootPath)
     if (!changes.isGitRepo) {
-      return { status: 'error', text: '这个文件夹不在 git 仓库里,没有账本可审', model: '', durationMs: 0 }
+      return {
+        status: 'error',
+        text: '这个文件夹不在 git 仓库里,没有账本可审',
+        model: '',
+        durationMs: 0
+      }
     }
     if (changes.changes.length === 0) {
-      return { status: 'error', text: '当前没有任何改动 —— 账本干干净净,不用审。', model: '', durationMs: 0 }
+      return {
+        status: 'error',
+        text: '当前没有任何改动 —— 账本干干净净,不用审。',
+        model: '',
+        durationMs: 0
+      }
     }
     const subjects = await collectRecentSubjects(rootPath)
     const signature = gitChangesSignature(changes, subjects)
@@ -2039,76 +2558,111 @@ function registerIpc(): void {
 
   // 功能定位(第六十七锤):「这个功能在哪」—— 渲染进程把扫描树递过来(不重扫不读文件),
   // 带路人照着地图指路;指回来的每个地址都对照真树点名,编造的一律拦下,全被拦就老实说指不了。
-  ipcMain.handle(CH.locateFeature, async (_event, tree: unknown, question: unknown, requestId?: unknown) => {
-    if (
-      !tree ||
-      typeof tree !== 'object' ||
-      (tree as ScanDirNode).type !== 'directory' ||
-      !Array.isArray((tree as ScanDirNode).children) ||
-      typeof question !== 'string' ||
-      question.trim() === ''
-    ) {
-      throw new Error('参数不合法')
-    }
-    const root = tree as ScanDirNode
-    // 这一路故意不吃个性化(第一百一十三锤):带路人要吐严格 JSON,
-    // 掺进语气/格式要求有把格式带歪的风险,而它本来也不该有「文风」
-    const resolved = await resolveChatTargetOrError()
-    if ('error' in resolved) {
-      return { status: 'error', hits: [], text: resolved.error, model: '', durationMs: 0 } satisfies FeatureLocateResult
-    }
-    const askTheGuide = (tokenBudget: number): Promise<AiExplainResult> =>
-      explainWithCancel(requestId, (signal) =>
-        explainWithMessages(
-          resolved.target,
-          [
-            { role: 'system', content: LOCATE_SYSTEM_PROMPT },            { role: 'user', content: buildLocatePrompt({ digest: buildTreeDigest(root, LOCATE_NODE_BUDGET, tokenBudget), question: question.trim() }) }
-          ],
-          undefined,
-          signal,
-          resolved.budgets.replyTokens
+  ipcMain.handle(
+    CH.locateFeature,
+    async (_event, tree: unknown, question: unknown, requestId?: unknown) => {
+      if (
+        !tree ||
+        typeof tree !== 'object' ||
+        (tree as ScanDirNode).type !== 'directory' ||
+        !Array.isArray((tree as ScanDirNode).children) ||
+        typeof question !== 'string' ||
+        question.trim() === ''
+      ) {
+        throw new Error('参数不合法')
+      }
+      const root = tree as ScanDirNode
+      // 这一路故意不吃个性化(第一百一十三锤):带路人要吐严格 JSON,
+      // 掺进语气/格式要求有把格式带歪的风险,而它本来也不该有「文风」
+      const resolved = await resolveChatTargetOrError()
+      if ('error' in resolved) {
+        return {
+          status: 'error',
+          hits: [],
+          text: resolved.error,
+          model: '',
+          durationMs: 0
+        } satisfies FeatureLocateResult
+      }
+      const askTheGuide = (tokenBudget: number): Promise<AiExplainResult> =>
+        explainWithCancel(requestId, (signal) =>
+          explainWithMessages(
+            resolved.target,
+            [
+              { role: 'system', content: LOCATE_SYSTEM_PROMPT },
+              {
+                role: 'user',
+                content: buildLocatePrompt({
+                  digest: buildTreeDigest(root, LOCATE_NODE_BUDGET, tokenBudget),
+                  question: question.trim()
+                })
+              }
+            ],
+            undefined,
+            signal,
+            resolved.budgets.replyTokens
+          )
         )
-      )
-    // 先按标准预算问;碰到小上下文装不下,把地图砍到三分之一再试最后一次
-    let reply = await askTheGuide(resolved.budgets.mapTokens)
-    if (reply.status === 'error' && isContextOverflow(reply.text)) {
-      reply = await askTheGuide(Math.floor(resolved.budgets.mapTokens / 3))
-    }
-    if (reply.status !== 'supported') {
-      const contextBlown = isContextOverflow(reply.text)
+      // 先按标准预算问;碰到小上下文装不下,把地图砍到三分之一再试最后一次
+      let reply = await askTheGuide(resolved.budgets.mapTokens)
+      if (reply.status === 'error' && isContextOverflow(reply.text)) {
+        reply = await askTheGuide(Math.floor(resolved.budgets.mapTokens / 3))
+      }
+      if (reply.status !== 'supported') {
+        const contextBlown = isContextOverflow(reply.text)
+        return {
+          status: 'error',
+          hits: [],
+          text: contextBlown
+            ? '模型的上下文装不下这张地图(已经自动精简重试过还是不行)—— 把模型服务的上下文调大些,再回来问一次。'
+            : reply.text,
+          model: reply.model,
+          durationMs: reply.durationMs
+        } satisfies FeatureLocateResult
+      }
+      const hits = filterLocateHits(root, parseLocateReply(reply.text))
+      if (hits.length === 0) {
+        return {
+          status: 'unsupported',
+          hits: [],
+          text: '带路人盯着地图,实在认不出这个功能住哪儿 —— 换个问法试试,或者先确认它真的在这个项目里。',
+          model: reply.model,
+          durationMs: reply.durationMs
+        } satisfies FeatureLocateResult
+      }
       return {
-        status: 'error',
-        hits: [],
-        text: contextBlown
-          ? '模型的上下文装不下这张地图(已经自动精简重试过还是不行)—— 把模型服务的上下文调大些,再回来问一次。'
-          : reply.text,
+        status: 'supported',
+        hits,
+        text: '',
         model: reply.model,
         durationMs: reply.durationMs
       } satisfies FeatureLocateResult
     }
-    const hits = filterLocateHits(root, parseLocateReply(reply.text))
-    if (hits.length === 0) {
-      return {
-        status: 'unsupported',
-        hits: [],
-        text: '带路人盯着地图,实在认不出这个功能住哪儿 —— 换个问法试试,或者先确认它真的在这个项目里。',
-        model: reply.model,
-        durationMs: reply.durationMs
-      } satisfies FeatureLocateResult
-    }
-    return { status: 'supported', hits, text: '', model: reply.model, durationMs: reply.durationMs } satisfies FeatureLocateResult
-  })
+  )
 
   // 人话解释一个文件:自动分流 —— AST 认识的语言摆结构(证据最硬);
   // 不认识的用名字 + 内容片段让模型猜(声明不确定);二进制直接本地人话,不劳烦模型
   // 路径契约同 analyze-file:收 (rootPath, relPath),绝对路径只经 joinRoot 解析
   ipcMain.handle(
     CH.aiExplainFile,
-    async (event, rootPath: unknown, relPath: unknown, languageId: unknown, requestId?: unknown, question?: unknown, note?: unknown) => {
-      if (typeof rootPath !== 'string' || typeof relPath !== 'string' || typeof languageId !== 'string') {
+    async (
+      event,
+      rootPath: unknown,
+      relPath: unknown,
+      languageId: unknown,
+      requestId?: unknown,
+      question?: unknown,
+      note?: unknown
+    ) => {
+      if (
+        typeof rootPath !== 'string' ||
+        typeof relPath !== 'string' ||
+        typeof languageId !== 'string'
+      ) {
         throw new Error('参数不合法')
       }
-      const ownerNote = typeof note === 'string' && note.trim() !== '' ? note.trim().slice(0, 100) : undefined
+      const ownerNote =
+        typeof note === 'string' && note.trim() !== '' ? note.trim().slice(0, 100) : undefined
       const resolved = await resolveChatTargetOrError()
       if ('error' in resolved) {
         return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
@@ -2135,12 +2689,23 @@ function registerIpc(): void {
           // 「详细」档喂源码(提示词体系重写第二批):锅够大才喂 —— 锅小 deep 已被降成 brief,
           // 那时节选照老规矩不垫;源码刚读过就在手边,截到 deepSourceChars(ctx) 字,读不到就静默不给
           const sourceExcerpt =
-            resolved.teaching === 'deep' && resolved.ctx >= TEACHING_DEEP_MIN_CTX ? code.slice(0, deepSourceChars(resolved.ctx)) : null
+            resolved.teaching === 'deep' && resolved.ctx >= TEACHING_DEEP_MIN_CTX
+              ? code.slice(0, deepSourceChars(resolved.ctx))
+              : null
           return respondWithEvidence(
             event,
             requestId,
             question,
-            buildExplainPrompt({ relPath, name, languageName: structure.languageId, structure, graph: null, note: ownerNote, headerComment: extractHeaderComment(code), sourceExcerpt }),
+            buildExplainPrompt({
+              relPath,
+              name,
+              languageName: structure.languageId,
+              structure,
+              graph: null,
+              note: ownerNote,
+              headerComment: extractHeaderComment(code),
+              sourceExcerpt
+            }),
             undefined,
             resolved
             // 结构流证据够硬(真代码结构),不掺联网查证
@@ -2192,69 +2757,78 @@ function registerIpc(): void {
   ipcMain.handle(
     CH.aiExplainFolder,
     async (event, rootPath: unknown, relPath: unknown, requestId?: unknown, question?: unknown) => {
-    if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
-      throw new Error('参数不合法')
-    }
-    const resolved = await resolveChatTargetOrError()
-    if ('error' in resolved) {
-      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
-    }
-    const absPath = joinRoot(rootPath, relPath)
-    const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
-    if (stat instanceof Error) {
-      throw new Error(accessDeniedMessage(stat, '文件夹', relPath || '(根目录)'))
-    }
-    if (!stat.isDirectory()) {
-      throw new Error(`这不是一个文件夹:${relPath || '(根目录)'}`)
-    }
-    let dirents
-    try {
-      dirents = await fs.readdir(absPath, { withFileTypes: true })
-    } catch (err) {
-      // stat 能过但 readdir 被拒:也是"锁着",不是空文件夹
-      throw new Error(accessDeniedMessage(err as NodeJS.ErrnoException, '文件夹', relPath || '(根目录)'), { cause: err })
-    }
-    if (dirents.length === 0) {
-      return { status: 'unsupported', text: '这是个空文件夹,啥也没装,就不用劳烦模型了', model: '', durationMs: 0 }
-    }
-    dirents.sort((a, b) => a.name.localeCompare(b.name))
-    const subdirs: string[] = []
-    const files: string[] = []
-    const languages = new Map<string, number>()
-    // 通用后缀分布:什么文件都数(.exe/.dll/.log 是认出系统文件夹的关键证据,编程语言认不出的也算)
-    const extCounts = new Map<string, number>()
-    for (const item of dirents) {
-      if (item.isDirectory()) {
-        subdirs.push(item.name)
-        continue
+      if (typeof rootPath !== 'string' || typeof relPath !== 'string') {
+        throw new Error('参数不合法')
       }
-      if (!item.isFile()) continue // 符号链接等不靠谱的,跳过
-      files.push(item.name)
-      const langName = BY_EXT.get(extOf(item.name))?.name ?? '没认出的文件'
-      languages.set(langName, (languages.get(langName) ?? 0) + 1)
-      const dot = item.name.lastIndexOf('.')
-      const ext = dot > 0 ? item.name.slice(dot).toLowerCase() : '(无后缀)'
-      extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1)
+      const resolved = await resolveChatTargetOrError()
+      if ('error' in resolved) {
+        return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+      }
+      const absPath = joinRoot(rootPath, relPath)
+      const stat = await fs.stat(absPath).catch((err: NodeJS.ErrnoException) => err)
+      if (stat instanceof Error) {
+        throw new Error(accessDeniedMessage(stat, '文件夹', relPath || '(根目录)'))
+      }
+      if (!stat.isDirectory()) {
+        throw new Error(`这不是一个文件夹:${relPath || '(根目录)'}`)
+      }
+      let dirents
+      try {
+        dirents = await fs.readdir(absPath, { withFileTypes: true })
+      } catch (err) {
+        // stat 能过但 readdir 被拒:也是"锁着",不是空文件夹
+        throw new Error(
+          accessDeniedMessage(err as NodeJS.ErrnoException, '文件夹', relPath || '(根目录)'),
+          { cause: err }
+        )
+      }
+      if (dirents.length === 0) {
+        return {
+          status: 'unsupported',
+          text: '这是个空文件夹,啥也没装,就不用劳烦模型了',
+          model: '',
+          durationMs: 0
+        }
+      }
+      dirents.sort((a, b) => a.name.localeCompare(b.name))
+      const subdirs: string[] = []
+      const files: string[] = []
+      const languages = new Map<string, number>()
+      // 通用后缀分布:什么文件都数(.exe/.dll/.log 是认出系统文件夹的关键证据,编程语言认不出的也算)
+      const extCounts = new Map<string, number>()
+      for (const item of dirents) {
+        if (item.isDirectory()) {
+          subdirs.push(item.name)
+          continue
+        }
+        if (!item.isFile()) continue // 符号链接等不靠谱的,跳过
+        files.push(item.name)
+        const langName = BY_EXT.get(extOf(item.name))?.name ?? '没认出的文件'
+        languages.set(langName, (languages.get(langName) ?? 0) + 1)
+        const dot = item.name.lastIndexOf('.')
+        const ext = dot > 0 ? item.name.slice(dot).toLowerCase() : '(无后缀)'
+        extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1)
+      }
+      const folderName = basename(absPath) || basename(rootPath)
+      return respondWithEvidence(
+        event,
+        requestId,
+        question,
+        buildFolderPrompt({
+          relPath,
+          name: folderName,
+          absPath,
+          subdirs,
+          files,
+          languages: Object.fromEntries(languages),
+          extCounts: Object.fromEntries(extCounts)
+        }),
+        buildExplainSystem(effectiveTeaching(resolved).teaching, 'folder'),
+        resolved,
+        folderName
+      )
     }
-    const folderName = basename(absPath) || basename(rootPath)
-    return respondWithEvidence(
-      event,
-      requestId,
-      question,
-      buildFolderPrompt({
-        relPath,
-        name: folderName,
-        absPath,
-        subdirs,
-        files,
-        languages: Object.fromEntries(languages),
-        extCounts: Object.fromEntries(extCounts)
-      }),
-      buildExplainSystem(effectiveTeaching(resolved).teaching, 'folder'),
-      resolved,
-      folderName
-    )
-  })
+  )
 
   // 自由对话:独立通道、独立人设(Atlas 小探针)。当前选中对象的资料以「附件」身份
   // 垫在最前面,仅供参考,不进历史 —— 换对象不带旧资料,旧对话也不污染新对象。
@@ -2262,7 +2836,13 @@ function registerIpc(): void {
   // 查询的每一步状态(查着了/没查到/没开开关)都以程序账本为准回传,模型说了不算。
   ipcMain.handle(CH.aiChat, async (event, req: unknown): Promise<AiChatResult> => {
     const startedAt = Date.now()
-    const notRequested: WebLookupMeta = { requested: false, enabled: false, attempted: false, state: 'not_requested', sources: [] }
+    const notRequested: WebLookupMeta = {
+      requested: false,
+      enabled: false,
+      attempted: false,
+      state: 'not_requested',
+      sources: []
+    }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const question = typeof body.question === 'string' ? body.question.trim() : ''
     // 带了引用就允许「只发代码不发问题」,这时给一句通用问法当题目 ——
@@ -2270,7 +2850,13 @@ function registerIpc(): void {
     // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs)
     const hasRefs = sanitizeCodeRefs(body.codeRefs).length > 0
     if (!question && !hasRefs) {
-      return { status: 'error', text: '先输入一句话再发送', model: '', durationMs: 0, webLookup: notRequested }
+      return {
+        status: 'error',
+        text: '先输入一句话再发送',
+        model: '',
+        durationMs: 0,
+        webLookup: notRequested
+      }
     }
     const questionText = question || '讲讲选中的这段代码'
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
@@ -2286,33 +2872,57 @@ function registerIpc(): void {
       const meta: WebLookupMeta = requested
         ? { requested: true, enabled: false, attempted: false, state: 'failed', sources: [] }
         : notRequested
-      return { status: 'error', text: resolved.error, model: '', durationMs: Date.now() - startedAt, webLookup: meta }
+      return {
+        status: 'error',
+        text: resolved.error,
+        model: '',
+        durationMs: Date.now() - startedAt,
+        webLookup: meta
+      }
     }
 
     // 联网查询先行:状态边查边播报(searching → completed/failed/empty),不等模型开金口
     const enabled = resolved.webLookup
-    let outcome: { kind: 'skipped' } | { kind: 'attempted'; material: string; sources: string[] } | { kind: 'error' } = { kind: 'skipped' }
+    let outcome:
+      | { kind: 'skipped' }
+      | { kind: 'attempted'; material: string; sources: string[] }
+      | { kind: 'error' } = { kind: 'skipped' }
     let webMaterial: { query: string; material: string } | null = null
     if (requested && enabled) {
       const query = pickWebLookupQuery(questionText, attachment)
       sendChatLookup(event, requestId, 'searching', [])
       try {
         // 源队列在纯函数层:Tavily 有 Key 打头,没 Key 走免费链(DDG → 维基)
-        const found = await webLookupDetailed(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey: resolved.tavilyKey })
+        const found = await webLookupDetailed(query, {
+          fetchText: electronFetchText,
+          postJson: electronPostJson,
+          tavilyKey: resolved.tavilyKey
+        })
         outcome = { kind: 'attempted', material: found.material, sources: found.sources }
         if (found.material) webMaterial = { query, material: found.material }
       } catch {
         outcome = { kind: 'error' }
       }
-      const finalState = outcome.kind === 'attempted' ? (outcome.material === '' ? 'empty' : 'completed') : 'failed'
-      sendChatLookup(event, requestId, finalState, outcome.kind === 'attempted' ? outcome.sources : [])
+      const finalState =
+        outcome.kind === 'attempted' ? (outcome.material === '' ? 'empty' : 'completed') : 'failed'
+      sendChatLookup(
+        event,
+        requestId,
+        finalState,
+        outcome.kind === 'attempted' ? outcome.sources : []
+      )
     }
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
     // 闲聊底座 = 内核 + 聊天切片;翻文件开着时无工具切片不挂(翻文件切片由 agent 路自己追加)
-    const systemPrompt = withPersonalization(buildChatSystem({ agent: body.agent === true }), resolved.style)
+    const systemPrompt = withPersonalization(
+      buildChatSystem({ agent: body.agent === true }),
+      resolved.style
+    )
     // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
-    const cap = thinking ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS : resolved.budgets.replyTokens
+    const cap = thinking
+      ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS
+      : resolved.budgets.replyTokens
     // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
     // 剩下的折成字符才是引用能带的量;穷保底、富封顶,额度跟着用户设的上下文走
     const otherTokens =
@@ -2321,16 +2931,30 @@ function registerIpc(): void {
       estimateTokens(history.map((h) => h.content).join('\n')) +
       estimateTokens(questionText) +
       estimateTokens(webMaterial ? webMaterial.material : '')
-    const refsBudget = codeRefsBudget({ contextTokens: resolved.ctx, otherTokens, replyTokens: cap })
+    const refsBudget = codeRefsBudget({
+      contextTokens: resolved.ctx,
+      otherTokens,
+      replyTokens: cap
+    })
     const codeRefs = sanitizeCodeRefs(body.codeRefs, refsBudget)
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
     // 手动压缩的早前对话摘要(第一百四十二锤):/compact 之后每次请求都带,垫在历史前面当背景记忆
     const summary = sanitizeCompactSummary(body.summary)
-    const messages = buildFreeChatMessages(systemPrompt, attachment, history, questionText2, webMaterial, codeRefs, resolved.teaching, summary)
+    const messages = buildFreeChatMessages(
+      systemPrompt,
+      attachment,
+      history,
+      questionText2,
+      webMaterial,
+      codeRefs,
+      resolved.teaching,
+      summary
+    )
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (body.agent === true) {
-      const agentRoot = typeof body.rootPath === 'string' && body.rootPath.trim() !== '' ? body.rootPath : ''
+      const agentRoot =
+        typeof body.rootPath === 'string' && body.rootPath.trim() !== '' ? body.rootPath : ''
       if (agentRoot === '') {
         return {
           status: 'error',
@@ -2371,13 +2995,36 @@ function registerIpc(): void {
         allowThinking: thinking,
         onRestart: () => sendResetDelta(event, requestId)
       }
-      let res = await explainWithMessages(resolved.target, messages, makeDeltaSender(event, requestId), aborter.signal, cap, streamOpts)
+      let res = await explainWithMessages(
+        resolved.target,
+        messages,
+        makeDeltaSender(event, requestId),
+        aborter.signal,
+        cap,
+        streamOpts
+      )
       // 上下文爆了的自动救援(自动压缩那案):服务拒收时模型一个字没吐,把旧聊天史砍到最近 2 条重试一轮;
       // 只兜一次,再爆就照实给指路话,不跟它无限耗
       if (res.status === 'error' && isContextOverflow(res.text)) {
         sendResetDelta(event, requestId)
-        const slimMessages = buildFreeChatMessages(systemPrompt, attachment, history.slice(-2), questionText2, webMaterial, codeRefs, resolved.teaching, summary)
-        res = await explainWithMessages(resolved.target, slimMessages, makeDeltaSender(event, requestId), aborter.signal, cap, streamOpts)
+        const slimMessages = buildFreeChatMessages(
+          systemPrompt,
+          attachment,
+          history.slice(-2),
+          questionText2,
+          webMaterial,
+          codeRefs,
+          resolved.teaching,
+          summary
+        )
+        res = await explainWithMessages(
+          resolved.target,
+          slimMessages,
+          makeDeltaSender(event, requestId),
+          aborter.signal,
+          cap,
+          streamOpts
+        )
         if (res.status === 'error' && isContextOverflow(res.text)) {
           res = {
             ...res,
@@ -2403,19 +3050,36 @@ function registerIpc(): void {
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const history = sanitizeCompactHistory(body.history)
     if (history.length === 0) {
-      return { status: 'error', text: '没有可压缩的对话:先聊几句再来', model: '', durationMs: Date.now() - startedAt }
+      return {
+        status: 'error',
+        text: '没有可压缩的对话:先聊几句再来',
+        model: '',
+        durationMs: Date.now() - startedAt
+      }
     }
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
-      return { status: 'error', text: resolved.error, model: '', durationMs: Date.now() - startedAt }
+      return {
+        status: 'error',
+        text: resolved.error,
+        model: '',
+        durationMs: Date.now() - startedAt
+      }
     }
     const aborter = new AbortController()
     if (requestId !== '') explainAborters.set(requestId, aborter)
     try {
-      return await explainWithMessages(resolved.target, buildCompactMessages(history), makeDeltaSender(event, requestId), aborter.signal, resolved.budgets.replyTokens, {
-        allowThinking: false,
-        onRestart: () => sendResetDelta(event, requestId)
-      })
+      return await explainWithMessages(
+        resolved.target,
+        buildCompactMessages(history),
+        makeDeltaSender(event, requestId),
+        aborter.signal,
+        resolved.budgets.replyTokens,
+        {
+          allowThinking: false,
+          onRestart: () => sendResetDelta(event, requestId)
+        }
+      )
     } finally {
       if (requestId !== '') explainAborters.delete(requestId)
       if (explainAborters.size === 0) announceActivityIdle()
@@ -2425,17 +3089,27 @@ function registerIpc(): void {
   // 试一句(第一百一十三锤):设置页改完说话方式,拿草稿当场念一段听效果。
   // 关键在「草稿」二字 —— 走的是传进来的那份个性化,不是存档里的那份,
   // 所以还没点「应用更改」也能试,试完不满意直接退回,不用先存再改。
-  ipcMain.handle(CH.aiStyleSample, async (event, personalization: unknown, requestId?: unknown): Promise<AiExplainResult> => {
-    const resolved = await resolveChatTargetOrError()
-    if ('error' in resolved) {
-      return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+  ipcMain.handle(
+    CH.aiStyleSample,
+    async (event, personalization: unknown, requestId?: unknown): Promise<AiExplainResult> => {
+      const resolved = await resolveChatTargetOrError()
+      if ('error' in resolved) {
+        return { status: 'error', text: resolved.error, model: '', durationMs: 0 }
+      }
+      const style = buildPersonalizationPrompt(sanitizePersonalization(personalization))
+      const system = withPersonalization(STYLE_SAMPLE_SYSTEM, style)
+      return explainWithCancel(requestId, (signal) =>
+        explainWithModel(
+          resolved.target,
+          STYLE_SAMPLE_QUESTION,
+          system,
+          makeDeltaSender(event, requestId),
+          signal,
+          resolved.budgets.replyTokens
+        )
+      )
     }
-    const style = buildPersonalizationPrompt(sanitizePersonalization(personalization))
-    const system = withPersonalization(STYLE_SAMPLE_SYSTEM, style)
-    return explainWithCancel(requestId, (signal) =>
-      explainWithModel(resolved.target, STYLE_SAMPLE_QUESTION, system, makeDeltaSender(event, requestId), signal, resolved.budgets.replyTokens)
-    )
-  })
+  )
 
   // 掐掉还在生成的讲解:渲染进程换了讲解目标/关掉卡片时喊一声,模型立刻空出来讲下一个
   ipcMain.handle(CH.aiCancel, (_event, requestId: unknown) => {
@@ -2456,7 +3130,12 @@ function registerIpc(): void {
   // 右键文件链接复制完整路径:只往剪贴板写一个字符串,不开文件不执行任何东西 ——
   // 找到真文件后「开不开、怎么开」完全留给用户自己决定。路径照契约走 joinRoot 解析
   ipcMain.handle(CH.copyFilePath, (_event, rootPath: unknown, relPath: unknown) => {
-    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
+    if (
+      typeof rootPath !== 'string' ||
+      rootPath === '' ||
+      typeof relPath !== 'string' ||
+      relPath === ''
+    ) {
       return { ok: false as const, message: '路径信息不完整,复制不了' }
     }
     try {
@@ -2471,12 +3150,18 @@ function registerIpc(): void {
   // 右键文件链接「在文件资源管理器中显示」:把资源管理器拉到文件面前、选中高亮,
   // 照样不开文件不执行任何东西 —— 到家门口为止,开不开门用户自己定
   ipcMain.handle(CH.revealFilePath, (_event, rootPath: unknown, relPath: unknown) => {
-    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string' || relPath === '') {
+    if (
+      typeof rootPath !== 'string' ||
+      rootPath === '' ||
+      typeof relPath !== 'string' ||
+      relPath === ''
+    ) {
       return { ok: false as const, message: '路径信息不完整,打不开' }
     }
     try {
       const abs = joinRoot(rootPath, relPath)
-      if (!existsSync(abs)) return { ok: false as const, message: '这个文件好像已经不在了,可能被移动或删除过' }
+      if (!existsSync(abs))
+        return { ok: false as const, message: '这个文件好像已经不在了,可能被移动或删除过' }
       shell.showItemInFolder(abs)
       return { ok: true as const }
     } catch (err) {

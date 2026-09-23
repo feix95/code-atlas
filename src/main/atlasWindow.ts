@@ -73,8 +73,13 @@ export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {})
 }
 
 /** 弹系统选择对话框:认准来叫它的那扇窗(抓不到就无主弹),取消/没选回 null,选中回第一条路径 */
-export async function pickPathDialog(win: BrowserWindow | null, options: Electron.OpenDialogOptions): Promise<string | null> {
-  const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+export async function pickPathDialog(
+  win: BrowserWindow | null,
+  options: Electron.OpenDialogOptions
+): Promise<string | null> {
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
+    : await dialog.showOpenDialog(options)
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }
 
@@ -89,6 +94,9 @@ export function loadView(win: BrowserWindow, view?: ViewName): void {
     url.searchParams.set('view', view)
     void win.loadURL(url.toString())
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), view === undefined ? undefined : { query: { view } })
+    void win.loadFile(
+      join(__dirname, '../renderer/index.html'),
+      view === undefined ? undefined : { query: { view } }
+    )
   }
 }

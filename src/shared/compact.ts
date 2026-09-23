@@ -54,14 +54,24 @@ export function sanitizeCompactHistory(history: unknown): AiHistoryMessage[] {
     if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') continue
     const text = content.trim()
     if (!text) continue
-    const cap = text.startsWith(COMPACT_SUMMARY_TAG) ? COMPACT_SUMMARY_CHARS : COMPACT_HISTORY_MSG_CHARS
-    cleaned.push({ role, content: text.length > cap ? `${text.slice(0, cap)}……${TAG.programNote.open}后半截省略${TAG.programNote.close}` : text })
+    const cap = text.startsWith(COMPACT_SUMMARY_TAG)
+      ? COMPACT_SUMMARY_CHARS
+      : COMPACT_HISTORY_MSG_CHARS
+    cleaned.push({
+      role,
+      content:
+        text.length > cap
+          ? `${text.slice(0, cap)}……${TAG.programNote.open}后半截省略${TAG.programNote.close}`
+          : text
+    })
   }
   return cleaned.slice(-COMPACT_HISTORY_MAX_MESSAGES)
 }
 
 /** 拼压缩请求的消息序列:压缩员人设 + 洗干净的对话记录 + 收尾指令 */
-export function buildCompactMessages(history: AiHistoryMessage[]): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+export function buildCompactMessages(
+  history: AiHistoryMessage[]
+): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   return [
     { role: 'system', content: COMPACT_SYSTEM_PROMPT },
     ...history,

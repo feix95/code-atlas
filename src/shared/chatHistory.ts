@@ -67,12 +67,21 @@ export function collectHistoryRounds(
     while (j >= 0 && messages[j].role === 'note') j -= 1
     const question = j >= 0 ? messages[j] : undefined
     const qText = question?.text?.trim() ?? ''
-    if (!question || question.role !== 'user' || question.state !== 'done' || !qText || seenQuestions.has(qText)) {
+    if (
+      !question ||
+      question.role !== 'user' ||
+      question.state !== 'done' ||
+      !qText ||
+      seenQuestions.has(qText)
+    ) {
       i -= 1
       continue
     }
     seenQuestions.add(qText)
-    rounds.push({ role: 'assistant', content: answer.text.trim() }, { role: 'user', content: qText })
+    rounds.push(
+      { role: 'assistant', content: answer.text.trim() },
+      { role: 'user', content: qText }
+    )
     i = j - 1
   }
   return rounds.reverse().slice(-maxMessages)

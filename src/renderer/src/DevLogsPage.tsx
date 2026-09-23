@@ -37,7 +37,8 @@ export function DevLogsPage(): React.JSX.Element {
       setEntries((prev) => {
         // 按 id 去重(拉旧账和订阅可能有重叠瞬间),超容量丢最旧的
         if (prev.length > 0 && prev[prev.length - 1].id >= entry.id) return prev
-        const next = prev.length >= DEVLOG_MAX ? [...prev.slice(-(DEVLOG_MAX - 1)), entry] : [...prev, entry]
+        const next =
+          prev.length >= DEVLOG_MAX ? [...prev.slice(-(DEVLOG_MAX - 1)), entry] : [...prev, entry]
         return next
       })
     })
@@ -76,7 +77,9 @@ export function DevLogsPage(): React.JSX.Element {
         })
 
   const asText = (): string =>
-    filtered.map((e) => `[${formatDevLogTime(e.ts)}] [${devLogSourceName(e.source)}] ${e.text}`).join('\n')
+    filtered
+      .map((e) => `[${formatDevLogTime(e.ts)}] [${devLogSourceName(e.source)}] ${e.text}`)
+      .join('\n')
 
   const copyAll = async (): Promise<void> => {
     try {
@@ -99,7 +102,11 @@ export function DevLogsPage(): React.JSX.Element {
           Developer 日志
           <small>引擎原话 · 请求报账 · 应用记账 —— 只记元数据,问题内容不进账</small>
         </span>
-        <span className="devlog-count mono">{filtered.length === entries.length ? `${entries.length} 条` : `${filtered.length} / ${entries.length} 条`}</span>
+        <span className="devlog-count mono">
+          {filtered.length === entries.length
+            ? `${entries.length} 条`
+            : `${filtered.length} / ${entries.length} 条`}
+        </span>
         <button
           type="button"
           className="devlog-close"
@@ -132,7 +139,11 @@ export function DevLogsPage(): React.JSX.Element {
           onChange={(e) => setFilterText(e.target.value)}
         />
         <label className="devlog-auto">
-          <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={autoScroll}
+            onChange={(e) => setAutoScroll(e.target.checked)}
+          />
           跟到底
         </label>
         <button type="button" className="devlog-tool" onClick={() => void copyAll()}>

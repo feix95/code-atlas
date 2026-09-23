@@ -1,7 +1,24 @@
 ﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChatCodeRef, DepGraphResult, DriveInfo, FileStructure, FreechatHost, GitChangesResult, ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
+import type {
+  ChatCodeRef,
+  DepGraphResult,
+  DriveInfo,
+  FileStructure,
+  FreechatHost,
+  GitChangesResult,
+  ScanDirNode,
+  ScanFileNode,
+  ScanResult,
+  ScanTreeNode
+} from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
-import { refreshNotesForScan, saveNotes, upsertNote, type NoteEntry, type NoteMap } from '@shared/notes'
+import {
+  refreshNotesForScan,
+  saveNotes,
+  upsertNote,
+  type NoteEntry,
+  type NoteMap
+} from '@shared/notes'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { planWholeFileRef } from '@shared/preview'
@@ -40,14 +57,34 @@ import {
 import { useAiAsk, type AiTurn } from './useAiAsk'
 import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
-import { DEFAULT_SIDEBAR_WIDTH, loadPaneSplit, loadSidebarWidth, savePaneSplit, saveSidebarWidth } from './layoutPrefs'
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  loadPaneSplit,
+  loadSidebarWidth,
+  savePaneSplit,
+  saveSidebarWidth
+} from './layoutPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
 import { useFlashFlag, useFlashValue } from './useFlashFlag'
 import { useWindowMaximized } from './useWindowMaximized'
-import { FOLLOW_KINDS, KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
+import {
+  FOLLOW_KINDS,
+  KIND_CAPS,
+  KIND_ICONS,
+  KIND_LABELS,
+  loadEnabledKinds,
+  saveEnabledKinds,
+  type PaneKind
+} from './paneKinds'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
-import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh, TreeIcon } from './components/Icons'
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconFolder,
+  IconRefresh,
+  TreeIcon
+} from './components/Icons'
 
 /** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
 const MIRROR_THROTTLE_MS = 100
@@ -101,7 +138,6 @@ function nextTabId(): string {
   return `tab:${tabSeq}`
 }
 
-
 function clampPaneSplit(v: number): number {
   return Math.min(0.8, Math.max(0.2, v))
 }
@@ -111,15 +147,29 @@ function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): Sc
   const parts = relPath === '' ? [] : relPath.split('/')
   if (parts.length === 0) {
     // 重探根:换内容,身份(rootPath 相关的字段)照旧;truncated 照实透传,子目录没探完不许装完整
-    return { ...root, children: sub.children, summary: sub.summary, lazy: undefined, truncated: sub.truncated }
+    return {
+      ...root,
+      children: sub.children,
+      summary: sub.summary,
+      lazy: undefined,
+      truncated: sub.truncated
+    }
   }
   const walk = (node: ScanDirNode, i: number): ScanDirNode => {
     if (i === parts.length) {
-      return { ...node, children: sub.children, summary: sub.summary, lazy: undefined, truncated: sub.truncated }
+      return {
+        ...node,
+        children: sub.children,
+        summary: sub.summary,
+        lazy: undefined,
+        truncated: sub.truncated
+      }
     }
     return {
       ...node,
-      children: node.children.map((c) => (c.type === 'directory' && c.name === parts[i] ? walk(c, i + 1) : c))
+      children: node.children.map((c) =>
+        c.type === 'directory' && c.name === parts[i] ? walk(c, i + 1) : c
+      )
     }
   }
   return walk(root, 0)
@@ -291,7 +341,10 @@ function App(): React.JSX.Element {
   const [previewJump, setPreviewJump] = useState<{ line: number; seq: number } | null>(null)
   const jumpSeqRef = useRef(0)
   // 文件链接索引:扫描树一变就重建,AI 提到的文件拿它查户口;查得到的才画成可点链接
-  const fileLinkIndex = useMemo(() => (result ? buildFileLinkIndex(collectRelPaths(result.tree)) : null), [result])
+  const fileLinkIndex = useMemo(
+    () => (result ? buildFileLinkIndex(collectRelPaths(result.tree)) : null),
+    [result]
+  )
   // 选中就只选中 —— AI 永远等用户自己点;本地结构分析(不耗模型)仍随选中自动跑
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
@@ -301,7 +354,9 @@ function App(): React.JSX.Element {
   const analyzeSeq = useRef(0)
   const requests = useRef(createRequestScope())
   // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
-  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
+  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(
+    null
+  )
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
@@ -309,7 +364,9 @@ function App(): React.JSX.Element {
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsSection, setSettingsSection] = useState<'appearance' | 'ai' | 'advanced'>('appearance')
+  const [settingsSection, setSettingsSection] = useState<'appearance' | 'ai' | 'advanced'>(
+    'appearance'
+  )
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   // 讲解深度(教学三档):跟着 AI 配置走;档位一换,讲解钩子就把按旧档讲的旧账清掉
   const [teaching, setTeaching] = useState<TeachingLevel>('brief')
@@ -332,7 +389,13 @@ function App(): React.JSX.Element {
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
   const visibleOfGroup = useCallback(
     (g: PaneGroup | null) =>
-      g ? g.tabs.filter((t) => enabledKinds.has(t.kind) && !(freechatHost === 'pet' && t.kind === 'chat' && !t.pinned)) : [],
+      g
+        ? g.tabs.filter(
+            (t) =>
+              enabledKinds.has(t.kind) &&
+              !(freechatHost === 'pet' && t.kind === 'chat' && !t.pinned)
+          )
+        : [],
     [enabledKinds, freechatHost]
   )
   const activeTabObj = activeGroup?.tabs.find((t) => t.id === activeGroup.activeId) ?? null
@@ -342,7 +405,8 @@ function App(): React.JSX.Element {
   const chatContext = useMemo(() => {
     if (!result) return null
     if (selectedFile) return buildFileAttachment(selectedFile, structure)
-    if (selectedFolder) return buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
+    if (selectedFolder)
+      return buildFolderAttachment(selectedFolder, selectedFolder.name || result.rootName)
     return buildFolderAttachment(result.tree, result.rootName)
   }, [result, selectedFile, selectedFolder, structure])
   // 翻文件模式(agent)的项目根从这儿递进去:沙盒只认这个目录,越界的活儿一律不接
@@ -357,7 +421,11 @@ function App(): React.JSX.Element {
   // 版本由尾推补 —— 补的必须是当下最新版(mirrorThrottle 记着的),旧实现补的是
   // 排闹钟那一刻的旧快照,「忙→完」翻牌被丢 = 气泡锁死案
   const mirrorNotify = useMemo(
-    () => createMirrorThrottle<ChatMessage[]>((m) => window.atlas.freechatMirror(m), MIRROR_THROTTLE_MS),
+    () =>
+      createMirrorThrottle<ChatMessage[]>(
+        (m) => window.atlas.freechatMirror(m),
+        MIRROR_THROTTLE_MS
+      ),
     []
   )
   useEffect(() => {
@@ -427,7 +495,9 @@ function App(): React.JSX.Element {
   // VSCode 式分割条:左栏宽度跟着鼠标走。存的是「100% 缩放下的基准值」,
   // 渲染宽度 = 基准值 × 缩放系数,面板和文字等比例一起变
   const sidebarBaseRef = useRef(loadSidebarWidth())
-  const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebar(loadSidebarWidth() * window.atlas.getUiScale()))
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    clampSidebar(loadSidebarWidth() * window.atlas.getUiScale())
+  )
   const sidebarWidthRef = useRef(sidebarWidth)
   const sashDraggingRef = useRef(false)
 
@@ -473,7 +543,8 @@ function App(): React.JSX.Element {
   function endSashDrag(e: React.PointerEvent<HTMLDivElement>): void {
     if (!sashDraggingRef.current) return
     sashDraggingRef.current = false
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      e.currentTarget.releasePointerCapture(e.pointerId)
     document.body.classList.remove('is-sash-dragging')
     persistSidebarWidth()
   }
@@ -523,7 +594,11 @@ function App(): React.JSX.Element {
     const group: PaneGroup = {
       id: `pane:${nextTabId()}`,
       tabs: [overview, probe],
-      activeId: enabledKinds.has('overview') ? overview.id : enabledKinds.has('chat') ? probe.id : null
+      activeId: enabledKinds.has('overview')
+        ? overview.id
+        : enabledKinds.has('chat')
+          ? probe.id
+          : null
     }
     setGroups([group])
     setActiveGroupId(group.id)
@@ -641,7 +716,10 @@ function App(): React.JSX.Element {
   // 地址栏回车/点「前往」:直接开输进来的路径;粘来的路径常带首尾引号,顺手剥掉
   async function goPath(): Promise<void> {
     if (scanning) return
-    const dir = pathDraft.trim().replace(/^"+|"+$/g, '').trim()
+    const dir = pathDraft
+      .trim()
+      .replace(/^"+|"+$/g, '')
+      .trim()
     if (dir === '') {
       setShakeAndHint()
       return
@@ -666,7 +744,8 @@ function App(): React.JSX.Element {
   function solidFace(kind: PaneKind, relPath: string): { name: string; icon: string } {
     const f = relPath === '' ? null : result ? findFile(result.tree, relPath) : null
     if (f) return { name: f.name, icon: f.summary?.icon ?? 'file' }
-    const d = relPath === '' ? (result?.tree ?? null) : result ? findDir(result.tree, relPath) : null
+    const d =
+      relPath === '' ? (result?.tree ?? null) : result ? findDir(result.tree, relPath) : null
     if (d) return { name: d.name || result?.rootName || KIND_LABELS[kind], icon: 'folder' }
     return { name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
   }
@@ -674,7 +753,11 @@ function App(): React.JSX.Element {
   // 让某品类的页签在激活组里亮起来装着 node:有跟随页签就确认内容到位,没有(被钉死/被关了/被藏了)
   // 就新开一张 —— 钉住的那张永远不碰,这正是「固定了,新内容额外新开一张」的来由。
   // auto = 入口撞上被关掉的品类,系统自动勾回来:顺带给页签一点轻强调
-  function ensureKindTab(kind: PaneKind, node: ScanFileNode | ScanDirNode | null, auto = false): void {
+  function ensureKindTab(
+    kind: PaneKind,
+    node: ScanFileNode | ScanDirNode | null,
+    auto = false
+  ): void {
     if (!enabledKinds.has(kind)) {
       const next = new Set(enabledKinds)
       next.add(kind)
@@ -719,7 +802,8 @@ function App(): React.JSX.Element {
       chat.note('探针正答着话,这句答完再点一次「去追问」,解释就搬得过来')
       return
     }
-    if (turn.state !== 'done' || turn.text.trim() === '' || adoptedTurnsRef.current.has(turn.key)) return
+    if (turn.state !== 'done' || turn.text.trim() === '' || adoptedTurnsRef.current.has(turn.key))
+      return
     adoptedTurnsRef.current.add(turn.key)
     // 问句没点名(通用解释)就替它把对象写上:对话里翻账本不用猜讲的是谁
     const fallback =
@@ -739,7 +823,9 @@ function App(): React.JSX.Element {
     const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
     patchGroup(activeGroup.id, (g) => ({
       ...g,
-      tabs: g.tabs.map((t) => (!t.pinned && caps.includes(t.kind) ? { ...t, relPath: node.relPath } : t))
+      tabs: g.tabs.map((t) =>
+        !t.pinned && caps.includes(t.kind) ? { ...t, relPath: node.relPath } : t
+      )
     }))
   }
 
@@ -751,16 +837,28 @@ function App(): React.JSX.Element {
     const gid = activeGroup.id
     const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
     // 「有没有」看全系统(小葵报的案):公用品类哪组有一张就不补第二张
-    const exists = (k: PaneKind): boolean => groups.some((gr) => gr.tabs.some((t) => t.kind === k && !t.pinned))
-    const missing = FOLLOW_KINDS.filter((k) => enabledKinds.has(k) && caps.includes(k) && !exists(k))
-    if (activateKind && !exists(activateKind) && !missing.includes(activateKind) && caps.includes(activateKind)) {
+    const exists = (k: PaneKind): boolean =>
+      groups.some((gr) => gr.tabs.some((t) => t.kind === k && !t.pinned))
+    const missing = FOLLOW_KINDS.filter(
+      (k) => enabledKinds.has(k) && caps.includes(k) && !exists(k)
+    )
+    if (
+      activateKind &&
+      !exists(activateKind) &&
+      !missing.includes(activateKind) &&
+      caps.includes(activateKind)
+    ) {
       missing.push(activateKind)
     }
     let focusId: string | null = null
     if (missing.length > 0) {
       const spawned = missing.map((k) => paneTabFor(k, node))
       focusId = (activateKind && spawned[missing.indexOf(activateKind)]?.id) || null
-      patchGroup(gid, (g) => ({ ...g, tabs: [...g.tabs, ...spawned], activeId: focusId ?? g.activeId }))
+      patchGroup(gid, (g) => ({
+        ...g,
+        tabs: [...g.tabs, ...spawned],
+        activeId: focusId ?? g.activeId
+      }))
     }
     // 点亮目标不是这轮新生的:它已站在激活组里(kind 取自激活页签),点亮即可
     if (activateKind && !focusId) {
@@ -834,7 +932,8 @@ function App(): React.JSX.Element {
       if (src.activeId === id) {
         src.activeId = src.tabs.length > 0 ? src.tabs[src.tabs.length - 1].id : null
       }
-      const at = atIndex === null || atIndex > dst.tabs.length ? dst.tabs.length : Math.max(0, atIndex)
+      const at =
+        atIndex === null || atIndex > dst.tabs.length ? dst.tabs.length : Math.max(0, atIndex)
       dst.tabs.splice(at, 0, moved)
       dst.activeId = moved.id
       // 搬空的组消亡(至少留一组当底板)
@@ -858,16 +957,21 @@ function App(): React.JSX.Element {
     setStructure(null)
     setAnalyzing(false)
     // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
-    if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath) chat.note(`参考资料换成了 ${file.name}`)
+    if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath)
+      chat.note(`参考资料换成了 ${file.name}`)
     retargetFollowTabs(file)
     // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览;
     // 补齐和点亮一把过,概览不会生两张
-    const kind = activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
+    const kind =
+      activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
     ensureFollowTabs(file, kind)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     if (!file.language) {
-      setAnalyzeNote({ text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。', kind: 'info' })
+      setAnalyzeNote({
+        text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。',
+        kind: 'info'
+      })
       return
     }
     setAnalyzing(true)
@@ -880,7 +984,10 @@ function App(): React.JSX.Element {
       if (fs) {
         setStructure(fs)
       } else {
-        setAnalyzeNote({ text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。', kind: 'info' })
+        setAnalyzeNote({
+          text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。',
+          kind: 'info'
+        })
       }
     } catch (err) {
       if (seq !== analyzeSeq.current) return
@@ -907,7 +1014,10 @@ function App(): React.JSX.Element {
     if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
       chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
     retargetFollowTabs(node)
-    const kind = activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
+    const kind =
+      activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind)
+        ? activeTabObj.kind
+        : 'overview'
     ensureFollowTabs(node, kind)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
@@ -1013,7 +1123,13 @@ function App(): React.JSX.Element {
     const node = selectedFile ?? selectedFolder
     const caps = node ? KIND_CAPS[node.type === 'file' ? 'file' : 'directory'] : null
     const relPath = node && caps && caps.includes(t.kind) ? node.relPath : t.relPath
-    flip((x) => ({ ...x, pinned: false, relPath, name: KIND_LABELS[t.kind], icon: KIND_ICONS[t.kind] }))
+    flip((x) => ({
+      ...x,
+      pinned: false,
+      relPath,
+      name: KIND_LABELS[t.kind],
+      icon: KIND_ICONS[t.kind]
+    }))
   }
 
   function closeTab(id: string): void {
@@ -1032,9 +1148,16 @@ function App(): React.JSX.Element {
     }
     // 关的是激活页签:右邻优先接力,左邻兜底,全空回底板(VS Code 同款)。
     // 钉住的对话页签关掉 = 那场对话跟着蒸发(纯内存,记录不落盘)
-    const nextActiveId = wasActive ? (nextVis[idx]?.id ?? nextVis[idx - 1]?.id ?? null) : owner.activeId
-    patchGroup(owner.id, (g) => ({ ...g, tabs: g.tabs.filter((t) => t.id !== id), activeId: nextActiveId }))
-    if (wasActive && nextActiveId && result) setRevealPaths(new Set(dirChainOf(result.tree, nextActiveId)))
+    const nextActiveId = wasActive
+      ? (nextVis[idx]?.id ?? nextVis[idx - 1]?.id ?? null)
+      : owner.activeId
+    patchGroup(owner.id, (g) => ({
+      ...g,
+      tabs: g.tabs.filter((t) => t.id !== id),
+      activeId: nextActiveId
+    }))
+    if (wasActive && nextActiveId && result)
+      setRevealPaths(new Set(dirChainOf(result.tree, nextActiveId)))
   }
 
   // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
@@ -1158,7 +1281,10 @@ function App(): React.JSX.Element {
     })
   }, [])
   const fileLinks: FileLinkTarget | null = useMemo(
-    () => (fileLinkIndex ? { index: fileLinkIndex, onOpen: openFileLink, onMenu: openFileLinkMenu } : null),
+    () =>
+      fileLinkIndex
+        ? { index: fileLinkIndex, onOpen: openFileLink, onMenu: openFileLinkMenu }
+        : null,
     [fileLinkIndex, openFileLink, openFileLinkMenu]
   )
 
@@ -1166,7 +1292,9 @@ function App(): React.JSX.Element {
   function addPreviewRef(ref: ChatCodeRef): void {
     setPreviewRefs((prev) => (prev.length >= CODE_REFS_MAX ? prev : [...prev, ref]))
     // 引用卡如今住在探针页签的输入框上(预览拆了伴聊):闪一下那张页签,告诉用户挂哪儿了
-    const probeGroup = groups.find((g) => g === activeGroup && g.tabs.some((t) => t.kind === 'chat' && !t.pinned)) ?? groups.find((g) => g.tabs.some((t) => t.kind === 'chat' && !t.pinned))
+    const probeGroup =
+      groups.find((g) => g === activeGroup && g.tabs.some((t) => t.kind === 'chat' && !t.pinned)) ??
+      groups.find((g) => g.tabs.some((t) => t.kind === 'chat' && !t.pinned))
     const probe = probeGroup?.tabs.find((t) => t.kind === 'chat' && !t.pinned)
     if (probe) markFlash(probe.id)
   }
@@ -1200,7 +1328,12 @@ function App(): React.JSX.Element {
         chat.note('这个文件是空的,挂了也没东西可讲')
         return
       }
-      addPreviewRef({ relPath: f.relPath, startLine: plan.startLine, endLine: plan.endLine, code: plan.code })
+      addPreviewRef({
+        relPath: f.relPath,
+        startLine: plan.startLine,
+        endLine: plan.endLine,
+        code: plan.code
+      })
     } catch {
       chat.note('这个文件读不了(可能被系统占用),挂不上引用')
     }
@@ -1286,7 +1419,11 @@ function App(): React.JSX.Element {
       if (!isCurrent()) return
       setResult((prev) =>
         prev && prev.rootPath === root
-          ? { ...prev, tree: spliceSubtree(prev.tree, relPath, sub.tree), stats: mergeStats(prev.stats, sub.stats) }
+          ? {
+              ...prev,
+              tree: spliceSubtree(prev.tree, relPath, sub.tree),
+              stats: mergeStats(prev.stats, sub.stats)
+            }
           : prev
       )
     } catch (err) {
@@ -1496,345 +1633,397 @@ function App(): React.JSX.Element {
 
   return (
     <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
-    <TeachingContext.Provider value={teaching}>
-      <div className="app">
-      {revived && (
-        <div className="revive-note" role="alert">
-          画面刚才断了一次,已经自动接上 —— 正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
-        </div>
-      )}
-      <TitleBar />
-      <header className="topbar">
-        <button
-          type="button"
-          className="brand"
-          onClick={goHome}
-          disabled={!folder || scanning}
-          title={folder ? '回到首页' : '已经在首页了'}
-          aria-label="回到首页"
-        >
-          <span className="brand-mark" aria-hidden="true">
-            ⌁
-          </span>
-          CodeAtlas
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => void handlePick()} disabled={scanning}>
-          <IconFolder size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} />
-          {scanning ? '扫描中……' : '打开项目'}
-        </button>
-        {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰;三颗全走 mono 单色 */}
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => void goNav(-1)}
-          disabled={scanning || nav.index <= 0}
-          title="后退"
-          aria-label="后退"
-        >
-          <IconArrowLeft size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => void goNav(1)}
-          disabled={scanning || nav.index >= nav.stack.length - 1}
-          title="前进"
-          aria-label="前进"
-        >
-          <IconArrowRight size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => void handleRefresh()}
-          disabled={scanning}
-          title={scanning ? '扫描中……' : '刷新'}
-          aria-label="刷新"
-        >
-          <IconRefresh size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-        </button>
-        <div className={`path-box${pathShaking ? ' is-shaking' : ''}`} onAnimationEnd={() => setPathShaking(false)}>
-          <input
-            ref={pathInputRef}
-            className="path-input mono"
-            type="text"
-            value={pathDraft}
-            placeholder="文件夹路径,回车直接打开"
-            disabled={scanning}
-            spellCheck={false}
-            aria-label="文件夹路径"
-            onChange={(e) => {
-              setPathDraft(e.target.value)
-              dismissPathHint()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void goPath()
-              if (e.key === 'Escape') setPathDraft(folder ?? '')
-            }}
-          />
-          <button type="button" className="btn path-go" onClick={() => void goPath()} disabled={scanning}>
-            {scanning ? '……' : '前往'}
-          </button>
-          {pathHint && <div className="path-hint" role="status">{pathHint}</div>}
-        </div>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => {
-            setSettingsSection('appearance')
-            setShowSettings(true)
-          }}
-          aria-label="打开设置"
-        >
-          <TreeIcon name="gear" size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-        </button>
-      </header>
-
-      {result && !scanning ? (
-        // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
-        <main className="workspace">
-          {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
-              不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
-          <aside className="sidebar" style={{ width: `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem` }}>
-            {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
-            <button type="button" className="workspace-home" onClick={showProjectGuide}>
-              <TreeIcon name="bulb" />
-              项目导览
+      <TeachingContext.Provider value={teaching}>
+        <div className="app">
+          {revived && (
+            <div className="revive-note" role="alert">
+              画面刚才断了一次,已经自动接上 ——
+              正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
+            </div>
+          )}
+          <TitleBar />
+          <header className="topbar">
+            <button
+              type="button"
+              className="brand"
+              onClick={goHome}
+              disabled={!folder || scanning}
+              title={folder ? '回到首页' : '已经在首页了'}
+              aria-label="回到首页"
+            >
+              <span className="brand-mark" aria-hidden="true">
+                ⌁
+              </span>
+              CodeAtlas
             </button>
-            <FileTree
-              root={result.tree}
-              rootPath={result.rootPath}
-              notes={notes}
-              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
-              expandingPath={expanding}
-              revealPaths={revealPaths}
-              onSelectFile={(_relPath, file) => followFile(file)}
-              onSelectFolder={followDir}
-              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-              onNoteEdit={editNoteFromTree}
-              onNoteRemove={(relPath) => saveNote(relPath, '')}
-              onPreviewFile={openPreview}
-            />
-            <footer className="sidebar-footer">
-              <span>
-                <i className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`} aria-hidden="true" />
-                {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
-              </span>
-              <span className="mono">
-                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
-              </span>
-            </footer>
-            {treeNote && <div className="tree-toast" role="alert">{treeNote}</div>}
-          </aside>
-          <div
-            className="sash"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="左右栏分割条:拖动调整左栏宽度,双击恢复默认"
-            aria-valuemin={MIN_SIDEBAR_WIDTH}
-            aria-valuenow={Math.round(sidebarWidth)}
-            tabIndex={0}
-            onPointerDown={onSashPointerDown}
-            onPointerMove={onSashPointerMove}
-            onPointerUp={endSashDrag}
-            onPointerCancel={endSashDrag}
-            onDoubleClick={onSashDoubleClick}
-            onKeyDown={onSashKeyDown}
-          />
-          <section className="detail">
-            {scanToast && <div className="scan-toast" role="status">{scanToast}</div>}
-            <div className="pane-groups">
-              {groups.map((g, gi) => {
-                const vis = visibleOfGroup(g)
-                // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
-                // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
-                const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
-                const act = actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' && !actRaw.pinned ? null : actRaw
-                return (
-                  <Fragment key={g.id}>
-                    {gi > 0 && (
-                      <div
-                        className="pane-sash"
-                        role="separator"
-                        aria-orientation="vertical"
-                        aria-label="两组分割条:拖动调比例,双击回对半"
-                        tabIndex={0}
-                        onPointerDown={onPaneSashDown}
-                        onDoubleClick={() => applyPaneSplit(0.5)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                            e.preventDefault()
-                            applyPaneSplit(paneSplit + (e.key === 'ArrowRight' ? 0.05 : -0.05))
-                          }
-                        }}
-                      />
-                    )}
-                    <div
-                      className="pane-group"
-                      /* 占比用 flex 缩写传:.pane-group 的 CSS 是 flex:1(basis 钉死 0%),
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void handlePick()}
+              disabled={scanning}
+            >
+              <IconFolder size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} />
+              {scanning ? '扫描中……' : '打开项目'}
+            </button>
+            {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰;三颗全走 mono 单色 */}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void goNav(-1)}
+              disabled={scanning || nav.index <= 0}
+              title="后退"
+              aria-label="后退"
+            >
+              <IconArrowLeft size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void goNav(1)}
+              disabled={scanning || nav.index >= nav.stack.length - 1}
+              title="前进"
+              aria-label="前进"
+            >
+              <IconArrowRight size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void handleRefresh()}
+              disabled={scanning}
+              title={scanning ? '扫描中……' : '刷新'}
+              aria-label="刷新"
+            >
+              <IconRefresh size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
+            </button>
+            <div
+              className={`path-box${pathShaking ? ' is-shaking' : ''}`}
+              onAnimationEnd={() => setPathShaking(false)}
+            >
+              <input
+                ref={pathInputRef}
+                className="path-input mono"
+                type="text"
+                value={pathDraft}
+                placeholder="文件夹路径,回车直接打开"
+                disabled={scanning}
+                spellCheck={false}
+                aria-label="文件夹路径"
+                onChange={(e) => {
+                  setPathDraft(e.target.value)
+                  dismissPathHint()
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void goPath()
+                  if (e.key === 'Escape') setPathDraft(folder ?? '')
+                }}
+              />
+              <button
+                type="button"
+                className="btn path-go"
+                onClick={() => void goPath()}
+                disabled={scanning}
+              >
+                {scanning ? '……' : '前往'}
+              </button>
+              {pathHint && (
+                <div className="path-hint" role="status">
+                  {pathHint}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => {
+                setSettingsSection('appearance')
+                setShowSettings(true)
+              }}
+              aria-label="打开设置"
+            >
+              <TreeIcon name="gear" size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
+            </button>
+          </header>
+
+          {result && !scanning ? (
+            // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
+            <main className="workspace">
+              {/* 宽度渲染成 rem 交给根字号缩放:rem 值 = 基准宽/16,根字号一动面板自动等比,
+              不再自己乘系数画像素 —— 坐标系只有一套,鼠标判定和视觉永远重合 */}
+              <aside
+                className="sidebar"
+                style={{ width: `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem` }}
+              >
+                {/* 页签地基后树常驻左栏:预览搬进右栏页签,左栏不再整扇换装(点绿字闪一下的老病根就地拔除) */}
+                <button type="button" className="workspace-home" onClick={showProjectGuide}>
+                  <TreeIcon name="bulb" />
+                  项目导览
+                </button>
+                <FileTree
+                  root={result.tree}
+                  rootPath={result.rootPath}
+                  notes={notes}
+                  selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+                  expandingPath={expanding}
+                  revealPaths={revealPaths}
+                  onSelectFile={(_relPath, file) => followFile(file)}
+                  onSelectFolder={followDir}
+                  onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+                  onNoteEdit={editNoteFromTree}
+                  onNoteRemove={(relPath) => saveNote(relPath, '')}
+                  onPreviewFile={openPreview}
+                />
+                <footer className="sidebar-footer">
+                  <span>
+                    <i
+                      className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`}
+                      aria-hidden="true"
+                    />
+                    {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
+                  </span>
+                  <span className="mono">
+                    {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
+                  </span>
+                </footer>
+                {treeNote && (
+                  <div className="tree-toast" role="alert">
+                    {treeNote}
+                  </div>
+                )}
+              </aside>
+              <div
+                className="sash"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="左右栏分割条:拖动调整左栏宽度,双击恢复默认"
+                aria-valuemin={MIN_SIDEBAR_WIDTH}
+                aria-valuenow={Math.round(sidebarWidth)}
+                tabIndex={0}
+                onPointerDown={onSashPointerDown}
+                onPointerMove={onSashPointerMove}
+                onPointerUp={endSashDrag}
+                onPointerCancel={endSashDrag}
+                onDoubleClick={onSashDoubleClick}
+                onKeyDown={onSashKeyDown}
+              />
+              <section className="detail">
+                {scanToast && (
+                  <div className="scan-toast" role="status">
+                    {scanToast}
+                  </div>
+                )}
+                <div className="pane-groups">
+                  {groups.map((g, gi) => {
+                    const vis = visibleOfGroup(g)
+                    // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
+                    // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
+                    const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
+                    const act =
+                      actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' && !actRaw.pinned
+                        ? null
+                        : actRaw
+                    return (
+                      <Fragment key={g.id}>
+                        {gi > 0 && (
+                          <div
+                            className="pane-sash"
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label="两组分割条:拖动调比例,双击回对半"
+                            tabIndex={0}
+                            onPointerDown={onPaneSashDown}
+                            onDoubleClick={() => applyPaneSplit(0.5)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                                e.preventDefault()
+                                applyPaneSplit(paneSplit + (e.key === 'ArrowRight' ? 0.05 : -0.05))
+                              }
+                            }}
+                          />
+                        )}
+                        <div
+                          className="pane-group"
+                          /* 占比用 flex 缩写传:.pane-group 的 CSS 是 flex:1(basis 钉死 0%),
                          内联 width 会被 flex 布局无视 —— 拖分割条账本在变、画面纹丝不动(小葵报的案)。
                          第一组 0 0 定死占比,第二组照旧 flex:1 吃剩余 */
-                      style={groups.length === 2 && gi === 0 ? { flex: `0 0 ${(paneSplit * 100).toFixed(2)}%` } : undefined}
-                      onPointerDown={() => setActiveGroupId(g.id)}
-                    >
-                      <TabBar
-                        tabs={vis}
-                        activeId={g.activeId}
-                        flashId={flashTabId}
-                        canMoveToSiblingGroup={groups.length > 1}
-                        onActivate={activateTab}
-                        onClose={closeTab}
-                        onPinToggle={pinToggleTab}
-                        onMoveTab={moveTab}
-                        onDragTab={setDraggingTab}
-                        onTabDragEnd={onTabDragEnd}
-                        onDetachTab={onDetachTab}
-                        enabledKinds={enabledKinds}
-                        onToggleKind={toggleKind}
-                      />
-                      <div
-                        className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
-                        onDragOver={(e) => {
-                          // 只认页签拖拽;树里拖文件挂引用走的是另一个 mime,不掺和
-                          if (!e.dataTransfer.types.includes(DRAG_MIME_TAB)) return
-                          e.preventDefault()
-                          e.dataTransfer.dropEffect = 'move'
-                          const host = e.currentTarget.getBoundingClientRect()
-                          // 中心判定(小葵拍的):横竖各取正中一半,松手在这儿才分屏
-                          const inCenter =
-                            e.clientX > host.left + host.width * 0.25 &&
-                            e.clientX < host.right - host.width * 0.25 &&
-                            e.clientY > host.top + host.height * 0.25 &&
-                            e.clientY < host.bottom - host.height * 0.25
-                          setDropMark((prev) => (prev?.groupId === g.id && prev.center === inCenter ? prev : { groupId: g.id, center: inCenter }))
-                        }}
-                        onDragLeave={(e) => {
-                          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropMark(null)
-                        }}
-                        onDrop={(e) => {
-                          const id = e.dataTransfer.getData(DRAG_MIME_TAB) || draggingTab
-                          const center = dropMark?.groupId === g.id && dropMark.center
-                          const fromG = id ? groups.find((grp) => grp.tabs.some((t) => t.id === id)) : null
-                          setDropMark(null)
-                          if (!id || !center || !fromG) return
-                          // 中心松手 = 分屏判定(小葵拍的):别组页签拖来 = 挪来这一组;
-                          // 自己组页签 + 只有单组 = 拆成两栏;两组还往自己组中心拖 = 什么也不发生
-                          if (fromG.id !== g.id || groups.length === 1) moveTab(id, 'sibling', null)
-                        }}
-                      >
-                        {act && !(act.kind === 'chat' && act.pinned) ? (
-                          // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
-                          renderTabBody(act)
-                        ) : !act ? (
-                          // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
-                          <PaneEmptyBoard />
-                        ) : null}
-                        {dropMark?.groupId === g.id && dropMark.center && showDropHint(g.id) && (
-                          <div className="pane-drop-hint" aria-hidden="true">
-                            {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
+                          style={
+                            groups.length === 2 && gi === 0
+                              ? { flex: `0 0 ${(paneSplit * 100).toFixed(2)}%` }
+                              : undefined
+                          }
+                          onPointerDown={() => setActiveGroupId(g.id)}
+                        >
+                          <TabBar
+                            tabs={vis}
+                            activeId={g.activeId}
+                            flashId={flashTabId}
+                            canMoveToSiblingGroup={groups.length > 1}
+                            onActivate={activateTab}
+                            onClose={closeTab}
+                            onPinToggle={pinToggleTab}
+                            onMoveTab={moveTab}
+                            onDragTab={setDraggingTab}
+                            onTabDragEnd={onTabDragEnd}
+                            onDetachTab={onDetachTab}
+                            enabledKinds={enabledKinds}
+                            onToggleKind={toggleKind}
+                          />
+                          <div
+                            className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
+                            onDragOver={(e) => {
+                              // 只认页签拖拽;树里拖文件挂引用走的是另一个 mime,不掺和
+                              if (!e.dataTransfer.types.includes(DRAG_MIME_TAB)) return
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = 'move'
+                              const host = e.currentTarget.getBoundingClientRect()
+                              // 中心判定(小葵拍的):横竖各取正中一半,松手在这儿才分屏
+                              const inCenter =
+                                e.clientX > host.left + host.width * 0.25 &&
+                                e.clientX < host.right - host.width * 0.25 &&
+                                e.clientY > host.top + host.height * 0.25 &&
+                                e.clientY < host.bottom - host.height * 0.25
+                              setDropMark((prev) =>
+                                prev?.groupId === g.id && prev.center === inCenter
+                                  ? prev
+                                  : { groupId: g.id, center: inCenter }
+                              )
+                            }}
+                            onDragLeave={(e) => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                                setDropMark(null)
+                            }}
+                            onDrop={(e) => {
+                              const id = e.dataTransfer.getData(DRAG_MIME_TAB) || draggingTab
+                              const center = dropMark?.groupId === g.id && dropMark.center
+                              const fromG = id
+                                ? groups.find((grp) => grp.tabs.some((t) => t.id === id))
+                                : null
+                              setDropMark(null)
+                              if (!id || !center || !fromG) return
+                              // 中心松手 = 分屏判定(小葵拍的):别组页签拖来 = 挪来这一组;
+                              // 自己组页签 + 只有单组 = 拆成两栏;两组还往自己组中心拖 = 什么也不发生
+                              if (fromG.id !== g.id || groups.length === 1)
+                                moveTab(id, 'sibling', null)
+                            }}
+                          >
+                            {act && !(act.kind === 'chat' && act.pinned) ? (
+                              // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
+                              renderTabBody(act)
+                            ) : !act ? (
+                              // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
+                              <PaneEmptyBoard />
+                            ) : null}
+                            {dropMark?.groupId === g.id &&
+                              dropMark.center &&
+                              showDropHint(g.id) && (
+                                <div className="pane-drop-hint" aria-hidden="true">
+                                  {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
+                                </div>
+                              )}
+                            {/* 钉住的对话保活层(跟着组走):账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
+                            {result &&
+                              g.tabs
+                                .filter((t) => t.kind === 'chat' && t.pinned)
+                                .map((t) => (
+                                  <div
+                                    key={t.id}
+                                    className={`pinned-chat-host${t.id === g.activeId ? '' : ' is-hidden'}`}
+                                  >
+                                    <PinnedChatPane
+                                      tab={t}
+                                      result={result}
+                                      refs={previewRefs}
+                                      onRemoveRef={removePreviewRef}
+                                      onDropNode={handleDropNode}
+                                      fileLinks={fileLinks}
+                                      suggestionsOn={chatSuggestionsOn}
+                                    />
+                                  </div>
+                                ))}
                           </div>
-                        )}
-                        {/* 钉住的对话保活层(跟着组走):账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
-                        {result &&
-                          g.tabs
-                            .filter((t) => t.kind === 'chat' && t.pinned)
-                            .map((t) => (
-                              <div key={t.id} className={`pinned-chat-host${t.id === g.activeId ? '' : ' is-hidden'}`}>
-                                <PinnedChatPane
-                                  tab={t}
-                                  result={result}
-                                  refs={previewRefs}
-                                  onRemoveRef={removePreviewRef}
-                                  onDropNode={handleDropNode}
-                                  fileLinks={fileLinks}
-                                  suggestionsOn={chatSuggestionsOn}
-                                />
-                              </div>
-                            ))}
-                      </div>
-                    </div>
-                  </Fragment>
-                )
-              })}
-            </div>
-          </section>
-        </main>
-      ) : (
-        <main className="content">
-          {scanning && (
-            <div className="state" role="status" aria-live="polite">
-              <h1>正在整理项目地图…</h1>
-              <ProgressDots />
-              <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
-              <button type="button" className="btn" onClick={goHome}>
-                返回首页
-              </button>
-            </div>
+                        </div>
+                      </Fragment>
+                    )
+                  })}
+                </div>
+              </section>
+            </main>
+          ) : (
+            <main className="content">
+              {scanning && (
+                <div className="state" role="status" aria-live="polite">
+                  <h1>正在整理项目地图…</h1>
+                  <ProgressDots />
+                  <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
+                  <button type="button" className="btn" onClick={goHome}>
+                    返回首页
+                  </button>
+                </div>
+              )}
+              {!scanning && error && (
+                <div className="state" role="alert">
+                  <h1>这个文件夹没能打开</h1>
+                  <Notice kind="error">{error}</Notice>
+                  <p>可以重试,或重新选择项目文件夹。</p>
+                  <div className="state-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        if (folder) void scanPath(folder)
+                        else void handlePick()
+                      }}
+                    >
+                      重试
+                    </button>
+                    <button type="button" className="btn" onClick={() => void handlePick()}>
+                      选择项目文件夹
+                    </button>
+                    <button type="button" className="btn btn-ghost" onClick={goHome}>
+                      返回首页
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!folder && !scanning && !error && (
+                <HomePage
+                  recents={recents}
+                  drives={drives}
+                  drivesNote={drivesNote}
+                  recentUndo={recentUndo}
+                  onPick={() => void handlePick()}
+                  onOpen={(path) => void scanPath(path)}
+                  onRemoveRecent={removeRecent}
+                  onUndoRecent={undoRecentRemove}
+                />
+              )}
+            </main>
           )}
-          {!scanning && error && (
-            <div className="state" role="alert">
-              <h1>这个文件夹没能打开</h1>
-              <Notice kind="error">{error}</Notice>
-              <p>可以重试,或重新选择项目文件夹。</p>
-              <div className="state-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    if (folder) void scanPath(folder)
-                    else void handlePick()
-                  }}
-                >
-                  重试
-                </button>
-                <button type="button" className="btn" onClick={() => void handlePick()}>
-                  选择项目文件夹
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={goHome}>
-                  返回首页
-                </button>
-              </div>
-            </div>
-          )}
-          {!folder && !scanning && !error && (
-            <HomePage
-              recents={recents}
-              drives={drives}
-              drivesNote={drivesNote}
-              recentUndo={recentUndo}
-              onPick={() => void handlePick()}
-              onOpen={(path) => void scanPath(path)}
-              onRemoveRecent={removeRecent}
-              onUndoRecent={undoRecentRemove}
+
+          {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见 */}
+          <ModelStatusBar />
+
+          {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
+          <FilePathMenu />
+
+          {showSettings && (
+            <SettingsDialog
+              workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+              initialSection={settingsSection}
+              onAiConfigSaved={(c) => {
+                setAiConfigured(isAiConfigured(c))
+                setTeaching(sanitizePersonalization(c.personalization).teaching)
+              }}
+              chatSuggestionsOn={chatSuggestionsOn}
+              onChatSuggestionsChange={(v) => {
+                setChatSuggestionsOn(v)
+                saveChatSuggestionsOn(v)
+              }}
+              onClose={() => setShowSettings(false)}
             />
           )}
-        </main>
-      )}
-
-      {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见 */}
-      <ModelStatusBar />
-
-      {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
-      <FilePathMenu />
-
-      {showSettings && (
-        <SettingsDialog
-          workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
-          initialSection={settingsSection}
-          onAiConfigSaved={(c) => {
-            setAiConfigured(isAiConfigured(c))
-            setTeaching(sanitizePersonalization(c.personalization).teaching)
-          }}
-          chatSuggestionsOn={chatSuggestionsOn}
-          onChatSuggestionsChange={(v) => {
-            setChatSuggestionsOn(v)
-            saveChatSuggestionsOn(v)
-          }}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
-      </div>
-    </TeachingContext.Provider>
+        </div>
+      </TeachingContext.Provider>
     </AiSetupContext.Provider>
   )
 }
@@ -1890,7 +2079,14 @@ function FileOverviewPage({
 }): React.JSX.Element {
   // AI 解释:概览卡,证据优先的单问单答,绝不自动开跑
   const ai = useAiAsk((requestId, question) =>
-    window.atlas.aiExplainFile(result.rootPath, file.relPath, file.language?.id ?? '', requestId, question ?? undefined, note?.text)
+    window.atlas.aiExplainFile(
+      result.rootPath,
+      file.relPath,
+      file.language?.id ?? '',
+      requestId,
+      question ?? undefined,
+      note?.text
+    )
   )
   // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动;总闸关了全歇
   const presets = usePresetQuestions({
@@ -1906,7 +2102,8 @@ function FileOverviewPage({
   const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
   if (file.language) badges.push({ label: file.language.name, tone: 'blue' })
   if (gitChange) {
-    const tone = gitChange.kind === 'deleted' ? 'red' : gitChange.kind === 'added' ? 'green' : 'blue'
+    const tone =
+      gitChange.kind === 'deleted' ? 'red' : gitChange.kind === 'added' ? 'green' : 'blue'
     const label: Record<string, string> = {
       added: 'git 新增',
       modified: 'git 修改',
@@ -1978,7 +2175,9 @@ function FolderOverviewPage({
   /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
   onGoChat: (turn: AiTurn | null) => void
 }): React.JSX.Element {
-  const ai = useAiAsk((requestId, question) => window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined))
+  const ai = useAiAsk((requestId, question) =>
+    window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined)
+  )
 
   const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
   if (dir.relPath === '') badges.push({ label: '项目根', tone: 'blue' })
@@ -2048,7 +2247,15 @@ function PinnedChatPane({
 
   return (
     <div className="preview-chat soft-in">
-      <FreeChatPanel chat={chat} context={context} refs={refs} onRemoveRef={onRemoveRef} onDropNode={onDropNode} fileLinks={fileLinks} suggestionsOn={suggestionsOn} />
+      <FreeChatPanel
+        chat={chat}
+        context={context}
+        refs={refs}
+        onRemoveRef={onRemoveRef}
+        onDropNode={onDropNode}
+        fileLinks={fileLinks}
+        suggestionsOn={suggestionsOn}
+      />
     </div>
   )
 }
@@ -2061,7 +2268,9 @@ function PaneEmptyBoard(): React.JSX.Element {
         ⌁
       </span>
       <p className="pane-empty-title">页签都关掉了</p>
-      <p className="pane-empty-hint">在左侧文件树点一个文件就能打开;想勾回功能页,在页签栏空白处右键</p>
+      <p className="pane-empty-hint">
+        在左侧文件树点一个文件就能打开;想勾回功能页,在页签栏空白处右键
+      </p>
     </div>
   )
 }

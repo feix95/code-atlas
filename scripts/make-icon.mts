@@ -23,7 +23,7 @@ const BIG_SIZES = [64, 128, 256]
 
 const ico = await pngToIco([
   ...SMALL_SIZES.map((s) => renderPng(`${VARIANT}-small.svg`, s)),
-  ...BIG_SIZES.map((s) => renderPng(`${VARIANT}.svg`, s)),
+  ...BIG_SIZES.map((s) => renderPng(`${VARIANT}.svg`, s))
 ])
 writeFileSync(join(ROOT, 'build', 'icon.ico'), ico)
 
@@ -33,4 +33,6 @@ for (const v of ['you-are-here', 'constellation']) {
   writeFileSync(join(OUT_PREVIEW, `${v}-1024.png`), renderPng(`${v}.svg`, 1024))
   writeFileSync(join(OUT_PREVIEW, `${v}-48.png`), renderPng(`${v}-small.svg`, 48))
 }
-console.log(`build/icon.ico 已生成(方案:${VARIANT},尺寸 ${[...SMALL_SIZES, ...BIG_SIZES].join('/')}),预览图在 dist/icon-preview/`)
+console.log(
+  `build/icon.ico 已生成(方案:${VARIANT},尺寸 ${[...SMALL_SIZES, ...BIG_SIZES].join('/')}),预览图在 dist/icon-preview/`
+)

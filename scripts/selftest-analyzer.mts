@@ -222,7 +222,11 @@ async function main(): Promise<void> {
   // ── 二、TypeScript React:组件识别 ──
   const tsx = await analyzeSource(TSX_SOURCE, 'typescript-react')
   assert.ok(tsx, 'TSX 应可分析')
-  assertContains(tsx!.reactComponents, ['TimerPanel', 'SmallButton'], 'TSX 组件(大写开头 + 文件含 JSX)')
+  assertContains(
+    tsx!.reactComponents,
+    ['TimerPanel', 'SmallButton'],
+    'TSX 组件(大写开头 + 文件含 JSX)'
+  )
   assert.ok(!tsx!.reactComponents.includes('notAComponent'), '小写箭头函数不算组件')
   assertContains(tsx!.imports, ['react'], 'TSX imports')
 
@@ -289,11 +293,17 @@ async function main(): Promise<void> {
   assert.ok(broken, '语法残缺也应返回结构')
 
   console.log('✅ AST 分析器自测全部通过')
-  console.log(`   TS: 函数${ts!.functions.length} 类${ts!.classes.length} 接口${ts!.interfaces.length}`)
+  console.log(
+    `   TS: 函数${ts!.functions.length} 类${ts!.classes.length} 接口${ts!.interfaces.length}`
+  )
   console.log(`   TSX: 组件 [${tsx!.reactComponents.join(', ')}]`)
   console.log(`   Py: 函数${py!.functions.length} 类${py!.classes.length}`)
-  console.log(`   Java: 函数${java!.functions.length} 类${java!.classes.length} · Go: 函数${go!.functions.length} · C: 函数${c!.functions.length}`)
-  console.log(`   C++: 函数${cpp!.functions.length} 类${cpp!.classes.length} · C#: 类${cs!.classes.length} · Rust: 函数${rust!.functions.length}`)
+  console.log(
+    `   Java: 函数${java!.functions.length} 类${java!.classes.length} · Go: 函数${go!.functions.length} · C: 函数${c!.functions.length}`
+  )
+  console.log(
+    `   C++: 函数${cpp!.functions.length} 类${cpp!.classes.length} · C#: 类${cs!.classes.length} · Rust: 函数${rust!.functions.length}`
+  )
 }
 
 main().catch((err) => {

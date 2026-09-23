@@ -6,7 +6,13 @@ export function TitleBar(): React.JSX.Element {
     <div className="titlebar">
       <span className="titlebar-text">CodeAtlas · AI 代码地图</span>
       <div className="traffic-lights">
-        <button type="button" className="light is-min" title="最小化" aria-label="最小化窗口" onClick={() => void window.atlas.windowMinimize()}>
+        <button
+          type="button"
+          className="light is-min"
+          title="最小化"
+          aria-label="最小化窗口"
+          onClick={() => void window.atlas.windowMinimize()}
+        >
           <i aria-hidden="true" />
         </button>
         <button
@@ -18,7 +24,13 @@ export function TitleBar(): React.JSX.Element {
         >
           <i aria-hidden="true" />
         </button>
-        <button type="button" className="light is-close" title="关闭" aria-label="关闭窗口" onClick={() => void window.atlas.windowClose()}>
+        <button
+          type="button"
+          className="light is-close"
+          title="关闭"
+          aria-label="关闭窗口"
+          onClick={() => void window.atlas.windowClose()}
+        >
           <i aria-hidden="true" />
         </button>
       </div>
