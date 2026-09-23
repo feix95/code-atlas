@@ -12,9 +12,15 @@ import { IconRefresh, TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
 import { AiSetupContext } from '../aiSetupContext'
+import { INPUT_CAP_LINES, INPUT_EXPAND_LINES, INPUT_TOGGLE_ICON_SIZE } from '../inputMetrics'
+import { useFlashFlag } from '../useFlashFlag'
 
 /** 输入栏右侧三颗圆钮(思考/翻文件/发送)图标旋钮:共享一个大小,跟别处分组互不相关 */
 const CHAT_ACTION_ICON_SIZE = 16
+/** 消息行内小动作钮(复制/重试)的图标尺寸 */
+const MSG_ACTION_ICON_SIZE = 13
+/** 聊天内嵌小图标(附件回形针/代码引用芯片这类跟着文字走的) */
+const INLINE_ICON_SIZE = 12
 
 /**
  * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
@@ -204,12 +210,9 @@ const AssistantBubble = memo(function AssistantBubble({
   const label = webLabel(msg.web)
   const probe: ProbeState = msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
   // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
-  const [copied, setCopied] = useState(false)
+  const [copied, flashCopied] = useFlashFlag(800)
   function copyAnswer(): void {
-    void navigator.clipboard.writeText(msg.text).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 800)
-    })
+    void navigator.clipboard.writeText(msg.text).then(flashCopied)
   }
   // 复制/重试这一小排:有 token 账时贴在账目右边同行,没账时自己在正文下面一行
   const showActions = (msg.state === 'done' || msg.state === 'cancelled') && msg.text !== ''
@@ -227,11 +230,11 @@ const AssistantBubble = memo(function AssistantBubble({
         aria-label={copied ? '已复制' : '复制这条回答'}
         title={copied ? '已复制' : '复制'}
       >
-        <TreeIcon name="copy" size={13} />
+        <TreeIcon name="copy" size={MSG_ACTION_ICON_SIZE} />
       </button>
       {canRetry && onRetry && (
         <button type="button" className="msg-action" onClick={() => onRetry(retryIndex)} aria-label="重试生成" title="重试">
-          <IconRefresh size={13} />
+          <IconRefresh size={MSG_ACTION_ICON_SIZE} />
         </button>
       )}
     </div>
@@ -537,11 +540,11 @@ export function FreeChatPanel({
     el.style.paddingRight = ''
     const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
     // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
-    el.style.height = `${expanded ? 10 * line : Math.min(shown * line, 5 * line)}px`
+    el.style.height = `${expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)}px`
     setLineCount(shown)
-    if (expanded && realLines < 5) setExpanded(false)
+    if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
   }, [draft, expanded, lineCount])
-  const capped = lineCount >= 5 || expanded
+  const capped = lineCount >= INPUT_CAP_LINES || expanded
 
   return (
     <div
@@ -592,7 +595,7 @@ export function FreeChatPanel({
               fileLinks.onMenu(context.relPath, e.clientX, e.clientY)
             }}
           >
-            <TreeIcon name="clip" size={12} />
+            <TreeIcon name="clip" size={INLINE_ICON_SIZE} />
             当前参考资料:<strong>{context.name}</strong>
             <span className="chat-attach-summary">{context.summary}</span>
           </summary>
@@ -689,7 +692,7 @@ export function FreeChatPanel({
             <span className="chat-refs-label">已引用</span>
             {draftRefs.map((r, i) => (
               <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="chat-ref">
-                <TreeIcon name="code" size={12} />
+                <TreeIcon name="code" size={INLINE_ICON_SIZE} />
                 <span className="chat-ref-text mono" title={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}>
                   {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
                 </span>
@@ -794,7 +797,7 @@ export function FreeChatPanel({
               aria-label={expanded ? '收合输入框' : '展开输入框'}
               title={expanded ? '收合' : '多撑五行'}
             >
-              <TreeIcon name={expanded ? 'collapse' : 'expand'} size={12} />
+              <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
             </button>
           )}
           <div className="composer-bar">

@@ -3,6 +3,8 @@
 // 存 localStorage(atlas.recent-projects)—— 界面的事每台机器自己一套,不进 AI 配置也不进仓库。
 // 老账本是垃圾怎么办:parseRecentProjects 只认干净的,垃圾整条扔、超长掐头,绝不炸首页。
 
+import { readPref, writePref } from '../../shared/localPrefs.ts'
+
 export const RECENTS_KEY = 'atlas.recent-projects'
 /** 只记最近 8 个:再多就是抽屉不是门厅了 */
 export const RECENTS_MAX = 8
@@ -49,37 +51,24 @@ export function recentNameFor(path: string): string {
   return tail === '' ? path : tail
 }
 
-function readRaw(): unknown {
-  try {
-    const text = localStorage.getItem(RECENTS_KEY)
-    return text ? JSON.parse(text) : null
-  } catch {
-    return null
-  }
-}
-
 export function readRecentProjects(): RecentProject[] {
-  return parseRecentProjects(readRaw())
+  return parseRecentProjects(readPref<unknown>(RECENTS_KEY, null))
 }
 
 export function writeRecentProjects(list: RecentProject[]): void {
-  try {
-    localStorage.setItem(RECENTS_KEY, JSON.stringify(list))
-  } catch {
-    // 写不进去就算了:最近列表是锦上添花,不该惊动任何人
-  }
+  writePref(RECENTS_KEY, list)
 }
 
 /** 在 App 里当一声「刚打开过」:读 → 记 → 写,三步合成一步给调用方省心 */
 export function rememberRecentProject(path: string): RecentProject[] {
-  const list = nextRecentProjects(readRaw(), path, recentNameFor(path), Date.now())
+  const list = nextRecentProjects(readPref<unknown>(RECENTS_KEY, null), path, recentNameFor(path), Date.now())
   writeRecentProjects(list)
   return list
 }
 
 /** 把某条从存档里抠掉(点 ✕ 用),返回新列表 */
 export function forgetRecentProject(path: string): RecentProject[] {
-  const list = removeRecentProject(readRaw(), path)
+  const list = removeRecentProject(readPref<unknown>(RECENTS_KEY, null), path)
   writeRecentProjects(list)
   return list
 }

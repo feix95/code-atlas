@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NoteEntry } from '@shared/notes'
+import { useFlashFlag } from '../useFlashFlag'
 import { NotePen, TreeIcon } from './Icons'
 
 export interface Crumb {
@@ -9,6 +10,13 @@ export interface Crumb {
 }
 
 export type BadgeTone = 'blue' | 'green' | 'amber' | 'red' | 'muted'
+
+/** 实体名旁边的品类大图标 */
+const ENTITY_ICON_SIZE = 18
+/** 备注气泡里的小笔(跟着文字走的行内图) */
+const NOTE_INLINE_ICON_SIZE = 11
+/** 「写备注」钮上的小笔 */
+const NOTE_ICON_SIZE = 15
 
 /**
  * 概览页签正文的轻头部:面包屑路径 + 实体名 + 副标题 + 徽章 + 备注钮。
@@ -42,7 +50,7 @@ export function DetailHeader({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   // 小笔写字动画(第一百零九锤补):保存/清删的瞬间磕一下
-  const [tapping, setTapping] = useState(false)
+  const [tapping, flashTapping] = useFlashFlag(350)
   // 右键菜单的「写/编辑备注」落到这里:置真就自动展开编辑框,每次挂载只应一次
   const autoOpenedRef = useRef(false)
   useEffect(() => {
@@ -61,8 +69,7 @@ export function DetailHeader({
   function save(): void {
     onNoteSave?.(draft)
     setEditing(false)
-    setTapping(true)
-    window.setTimeout(() => setTapping(false), 350)
+    flashTapping()
   }
 
   return (
@@ -79,13 +86,13 @@ export function DetailHeader({
       </nav>
       <div className="entity-line">
         <span className="entity-icon" aria-hidden="true">
-          <TreeIcon name={iconName} size={18} />
+          <TreeIcon name={iconName} size={ENTITY_ICON_SIZE} />
         </span>
         <div className="entity-title">
           <h1 title={title}>{title}</h1>
           {note ? (
             <p className="is-note" title="我的备注">
-              <NotePen size={11} /> {note.text}
+              <NotePen size={NOTE_INLINE_ICON_SIZE} /> {note.text}
             </p>
           ) : (
             subtitle && <p>{subtitle}</p>
@@ -104,7 +111,7 @@ export function DetailHeader({
             aria-label={note ? '编辑备注' : '写备注'}
             title={note ? '编辑备注' : '写一句话备注'}
           >
-            <NotePen size={15} tapping={tapping} />
+            <NotePen size={NOTE_ICON_SIZE} tapping={tapping} />
           </button>
         )}
       </div>

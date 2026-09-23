@@ -108,7 +108,7 @@ import { AGENT_FILES_ADDENDUM, buildChatSystem, buildExplainSystem, deepSourceCh
 import { formatStreamStats } from '../shared/aiText.ts'
 import { addDevLog, clearDevLogs, devLogSnapshot, setDevLogListener } from '../shared/devlog.ts'
 import { placeWindowBox, readWindowState, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, writeWindowState, type WindowBox } from './window-state.ts'
-import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
+import { armRevealWatchdog, loadView, pickPathDialog, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
@@ -119,6 +119,11 @@ import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
 import type { AgentSearchCard, AgentSearchMatch, AiChatLookupPayload, AiChatResult, AiConfig, AiDeltaPayload, AiExplainResult, AiProviderKind, AiStreamStats, AiUsage, ChatTarget, DriveInfo, FeatureLocateResult, FilePreviewResult, FreechatHost, ModelContextInfo, ModelFitVerdict, ModelStatus, ScanDirNode, WebLookupMeta } from '../shared/types.ts'
+
+/** userData 目录一句缩写(P2-14):本文件十几处存档读写不用每处都写全名 */
+function userDataDir(): string {
+  return app.getPath('userData')
+}
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -355,7 +360,7 @@ function formatSize(bytes: number): string {
 async function resolveChatTargetOrError(): Promise<
   { target: ChatTarget; webLookup: boolean; budgets: { mapTokens: number; replyTokens: number }; style: string; ctx: number; teaching: TeachingLevel; tavilyKey?: string } | { error: string }
 > {
-  const config = await loadAiConfig(app.getPath('userData'))
+  const config = await loadAiConfig(userDataDir())
   let runtime: BuiltinRuntime | undefined
   if (config.provider === 'builtin') {
     try {
@@ -449,7 +454,7 @@ async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus> {
 
 /** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权 */
 async function refreshModelStatus(): Promise<void> {
-  const config = await loadAiConfig(app.getPath('userData'))
+  const config = await loadAiConfig(userDataDir())
   if (config.provider === 'lmstudio') {
     const status = await probeLmStudioStatus(config)
     lastLmStudioStatus = status
@@ -521,7 +526,7 @@ function broadcastFreechatHost(): void {
 function ensureMascot(): BrowserWindow {
   const win = getMascotWindow()
   if (win) return win
-  return createMascotWindow(app.getPath('userData'))
+  return createMascotWindow(userDataDir())
 }
 
 /** 放出:页签拖出主窗松手 → 桌宠在松手点落座 + 自动弹一次气泡报「接到啦」。
@@ -627,7 +632,7 @@ function createWindow(): void {
   // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
   // 存档先过安检再落窗:垃圾存档走默认,旧存档对着现在的屏幕贴边夹紧(换屏/改分辨率
   // 也不把窗送出屏外)。记不住(读写失败)就当没这回事,走默认 —— 锦上添花不添乱。
-  const savedWindowState = readWindowState(app.getPath('userData'))
+  const savedWindowState = readWindowState(userDataDir())
   const placedBox = savedWindowState
     ? placeWindowBox(savedWindowState.box, screen.getAllDisplays().map((d) => d.workArea))
     : null
@@ -664,7 +669,7 @@ function createWindow(): void {
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
   const persistWindowState = (): void => {
     if (mainWindow.isDestroyed()) return
-    writeWindowState(app.getPath('userData'), {
+    writeWindowState(userDataDir(), {
       box: normalBox ?? mainWindow.getBounds(),
       maximized: mainWindow.isMaximized()
     })
@@ -1585,8 +1590,7 @@ function registerIpc(): void {
   ipcMain.handle(CH.pickFolder, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = { properties: ['openDirectory'] }
-    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
-    return result.canceled ? null : (result.filePaths[0] ?? null)
+    return pickPathDialog(win, options)
   })
 
   // 列盘符(第六十锤):只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
@@ -1765,11 +1769,11 @@ function registerIpc(): void {
   // localhost 端口分仓、端口一挤就出厂设置的存档方式退役)。同步读通道是给 preload
   // 首帧用的:页面脚本跑之前就得定外观,不然先按默认画一帧再换皮,界面会闪。
   ipcMain.on(CH.appearanceGetSync, (event) => {
-    event.returnValue = loadAppearanceFileSync(app.getPath('userData'))
+    event.returnValue = loadAppearanceFileSync(userDataDir())
   })
   ipcMain.handle(CH.appearanceSave, (_event, raw: unknown) => {
     const a = sanitizeAppearance(raw)
-    return saveAppearanceFile(app.getPath('userData'), a)
+    return saveAppearanceFile(userDataDir(), a)
   })
 
   // 模型货架:实时榜(只读抱抱脸公开 API,零落盘)+ 某仓库的文件清单。拉货手在 ai/modelShelf
@@ -1786,14 +1790,14 @@ function registerIpc(): void {
     const { repoId, filePath } = args as Record<string, unknown>
     if (typeof repoId !== 'string' || typeof filePath !== 'string') throw new Error('参数不合法')
     const win = BrowserWindow.getAllWindows()[0] ?? null
-    const finalPath = await startModelDownload({ win, userDataDir: app.getPath('userData'), repoId, filePath })
-    await pointConfigAtModel(app.getPath('userData'), finalPath)
+    const finalPath = await startModelDownload({ win, userDataDir: userDataDir(), repoId, filePath })
+    await pointConfigAtModel(userDataDir(), finalPath)
     return finalPath
   })
   ipcMain.handle(CH.modelDownloadCancel, () => cancelModelDownload())
 
   // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
-  ipcMain.handle(CH.aiConfigGet, () => loadAiConfig(app.getPath('userData')))
+  ipcMain.handle(CH.aiConfigGet, () => loadAiConfig(userDataDir()))
   ipcMain.handle(CH.aiConfigSave, async (_event, config: unknown) => {
     if (typeof config !== 'object' || config === null) throw new Error('配置不合法')
     const c = config as Partial<AiConfig>
@@ -1805,8 +1809,8 @@ function registerIpc(): void {
     ) {
       throw new Error('配置不合法:缺 lmstudio / builtin 设置')
     }
-    const previous = await loadAiConfig(app.getPath('userData'))
-    const saved = await saveAiConfig(app.getPath('userData'), {
+    const previous = await loadAiConfig(userDataDir())
+    const saved = await saveAiConfig(userDataDir(), {
       provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
@@ -1835,7 +1839,7 @@ function registerIpc(): void {
 
   // ── 模型状态栏(第七十锤):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
   ipcMain.handle(CH.modelStatusGet, async (): Promise<ModelStatus> => {
-    const config = await loadAiConfig(app.getPath('userData'))
+    const config = await loadAiConfig(userDataDir())
     if (config.provider === 'builtin') {
       // 引擎播报员有最新账就照账说;还没开播报过就拿配置兜底(上次用的模型 + 文件大小)
       return lastBuiltinStatus() ?? builtinIdleStatus(config.builtin.modelPath)
@@ -1843,7 +1847,7 @@ function registerIpc(): void {
     return probeLmStudioStatus(config)
   })
   ipcMain.handle(CH.modelEject, async (): Promise<{ ok: boolean; message?: string }> => {
-    const config = await loadAiConfig(app.getPath('userData'))
+    const config = await loadAiConfig(userDataDir())
     if (config.provider !== 'builtin') {
       return { ok: false, message: '外接模型的装卸归 LM Studio 管,这边只看状态' }
     }
@@ -1867,7 +1871,7 @@ function registerIpc(): void {
     }
     const spec = await queryMachineSpec()
     // 上下文缓存跟着配置走(第八十六锤):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
-    const config = await loadAiConfig(app.getPath('userData'))
+    const config = await loadAiConfig(userDataDir())
     const ctx = typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN ? config.contextSize : DEFAULT_CONTEXT_SIZE
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
@@ -1906,8 +1910,7 @@ function registerIpc(): void {
         { name: '所有文件', extensions: ['*'] }
       ]
     }
-    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
-    return result.canceled ? null : (result.filePaths[0] ?? null)
+    return pickPathDialog(win, options)
   })
 
   // 连接测试 + 列出本地模型:叫 LM Studio 报告它加载了哪些模型
@@ -2446,7 +2449,7 @@ function registerIpc(): void {
   // Key 跟着配置走:用户填了 Tavily,这条通道也吃同一把 Key(Tavily → DDG → 维基)
   ipcMain.handle(CH.webLookup, async (_event, query: unknown) => {
     if (typeof query !== 'string' || query.trim() === '') return ''
-    const { tavilyKey } = await loadAiConfig(app.getPath('userData'))
+    const { tavilyKey } = await loadAiConfig(userDataDir())
     return webLookup(query, { fetchText: electronFetchText, postJson: electronPostJson, tavilyKey })
   })
 
@@ -2552,7 +2555,7 @@ function startApp(): void {
   registerBubbleIpc({
     getMainWindow: () => mainWindowRef,
     dock: () => dockFreechat(),
-    stateDir: app.getPath('userData')
+    stateDir: userDataDir()
   })
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
@@ -2566,14 +2569,14 @@ function startApp(): void {
   // 内置引擎的状态播报员上岗:引擎一动(热身/进度/就绪/出岔子/被卸下)就广播给状态栏
   setBuiltinStatusAnnouncer(broadcastModelStatus)
   // 热身耗时小账本安家 userData:模型上次热身多久,下次估价进度就有据可依
-  setBuiltinWarmupDir(app.getPath('userData'))
+  setBuiltinWarmupDir(userDataDir())
   // 机器家底提前问一遍(显存走 nvidia-smi):引擎万一启动就死,验尸话张口就来,不现场等
   void queryMachineSpec().catch(() => {})
 
   // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
   // 旧的崩溃转储过期的清掉。都是后台安静干,失败也不打扰启动
   void reapOrphanServer().catch(() => {})
-  void cleanupOldCrashDumps(app.getPath('userData')).catch(() => {})
+  void cleanupOldCrashDumps(userDataDir()).catch(() => {})
 
   // macOS:点 Dock 图标时,没有窗口就重新建一个
   app.on('activate', () => {

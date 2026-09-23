@@ -5,6 +5,8 @@
  * 第一层 KIND_CAPS 按节点类型卡上限(文件有预览,文件夹/项目根没有);
  * 第二层 KINDS_KEY 的显示开关在上限里挑真正显示的 —— 以后加新节点类型只动第一层。
  */
+import { readPref, writePref } from '../../shared/localPrefs.ts'
+
 export type PaneKind = 'overview' | 'chat' | 'preview'
 
 /** 品类的固定展示顺序(页签栏右键菜单从上到下按这个排) */
@@ -40,19 +42,12 @@ export const FOLLOW_KINDS: PaneKind[] = ['overview', 'chat']
 const KINDS_KEY = 'atlas.pane-kinds'
 
 export function loadEnabledKinds(): Set<PaneKind> {
-  try {
-    const raw = localStorage.getItem(KINDS_KEY)
-    if (raw) {
-      const list = JSON.parse(raw) as string[]
-      const valid = KIND_ORDER.filter((k) => list.includes(k))
-      if (list.length > 0) return new Set(valid)
-    }
-  } catch {
-    // 存档坏了就当没存过,回到出厂全开
-  }
+  const list = readPref<string[] | null>(KINDS_KEY, null)
+  // 存档坏了/是空名单就当没存过,回到出厂全开
+  if (Array.isArray(list) && list.length > 0) return new Set(KIND_ORDER.filter((k) => list.includes(k)))
   return new Set(KIND_ORDER)
 }
 
 export function saveEnabledKinds(kinds: Set<PaneKind>): void {
-  localStorage.setItem(KINDS_KEY, JSON.stringify(KIND_ORDER.filter((k) => kinds.has(k))))
+  writePref(KINDS_KEY, KIND_ORDER.filter((k) => kinds.has(k)))
 }

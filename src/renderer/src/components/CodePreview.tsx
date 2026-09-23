@@ -11,6 +11,16 @@ import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuStore'
 
+/** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
+const COPIED_ALL_MS = 2000
+const ADDED_REF_MS = 1000
+/** 头部文件图标(和文件树 15px 同款岗,户口在 FileTree 的 TREE_ICON_SIZE) */
+const FILE_ICON_SIZE = 15
+/** 「整份引用」钮上的回形针小图标 */
+const CLIP_ICON_SIZE = 12
+/** 选区首尾角括号一对(markStart/markEnd)的尺寸 */
+const MARK_ICON_SIZE = 13
+
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
   startLine: number
@@ -362,7 +372,7 @@ export function CodePreview({
       .then(() => {
         patchUi({ copiedAll: true })
         if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-        copiedTimerRef.current = setTimeout(() => patchUi({ copiedAll: false }), 2000)
+        copiedTimerRef.current = setTimeout(() => patchUi({ copiedAll: false }), COPIED_ALL_MS)
       })
       .catch(() => {})
   }
@@ -382,7 +392,7 @@ export function CodePreview({
       code: wholeRef.code
     })
     patchUi({ added: true })
-    window.setTimeout(() => patchUi({ added: false }), 1000)
+    window.setTimeout(() => patchUi({ added: false }), ADDED_REF_MS)
   }
 
   const label = sel
@@ -400,7 +410,7 @@ export function CodePreview({
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
       <div className="code-pane-head">
         <span className="code-pane-icon" aria-hidden="true">
-          <TreeIcon name={file.summary?.icon ?? 'file'} size={15} />
+          <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
         </span>
         <span
           className="code-pane-name mono is-file-menu"
@@ -421,7 +431,7 @@ export function CodePreview({
             onClick={addWholeRef}
             title={wholeRef.title}
           >
-            <TreeIcon name="clip" size={12} />
+            <TreeIcon name="clip" size={CLIP_ICON_SIZE} />
             {added ? '已引用' : wholeRef.label}
           </button>
         )}
@@ -475,10 +485,10 @@ export function CodePreview({
         <>
           {/* 从哪开始、到哪结束:一正一反的角括号,贴在第一个字左边、最后一个字右边 */}
           <span className="code-mark is-start" style={{ left: `${sel.startX}px`, top: `${sel.startY}px` }} aria-hidden="true">
-            <TreeIcon name="markStart" size={13} />
+            <TreeIcon name="markStart" size={MARK_ICON_SIZE} />
           </span>
           <span className="code-mark is-end" style={{ left: `${sel.endX}px`, top: `${sel.endY}px` }} aria-hidden="true">
-            <TreeIcon name="markEnd" size={13} />
+            <TreeIcon name="markEnd" size={MARK_ICON_SIZE} />
           </span>
           {/* 左缘竖线:一眼看出这一段是一个整体 */}
           <span

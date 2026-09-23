@@ -40,7 +40,9 @@ import {
 import { useAiAsk, type AiTurn } from './useAiAsk'
 import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
+import { DEFAULT_SIDEBAR_WIDTH, loadPaneSplit, loadSidebarWidth, savePaneSplit, saveSidebarWidth } from './layoutPrefs'
 import { usePresetQuestions } from './usePresetQuestions'
+import { useFlashFlag, useFlashValue } from './useFlashFlag'
 import { useWindowMaximized } from './useWindowMaximized'
 import { FOLLOW_KINDS, KIND_CAPS, KIND_ICONS, KIND_LABELS, loadEnabledKinds, saveEnabledKinds, type PaneKind } from './paneKinds'
 import { Notice } from './components/Notice'
@@ -49,6 +51,13 @@ import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh, TreeIcon } from
 
 /** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
 const MIRROR_THROTTLE_MS = 100
+
+/** 轻提示各养各的体感时长(P2-6 具名):不共用一张表,但每个数都得有名有姓 */
+const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
+const SCAN_TOAST_MS = 4_000 // 扫描完成报个数
+const PATH_HINT_MS = 5_000 // 空路径点了「前往」的气泡提示
+const FLASH_TAB_MS = 1_200 // 系统自动勾回品类时页签闪一下指路
+const RECENT_UNDO_MS = 6_000 // 最近列表 ✕ 后的撤销窗(破坏性动作不裸奔)
 
 /** 顶栏图标旋钮:打开项目/后退/前进/刷新/设置 五颗共享一套规格,跟文件树等别处分组互不相关。
  *  描边数换算:图标是 24 栅格,18px 下想真看出 2px 粗,strokeWidth = 2×24/18 ≈ 2.7 */
@@ -92,12 +101,7 @@ function nextTabId(): string {
   return `tab:${tabSeq}`
 }
 
-// 两组的比例(左边占多少):记进本机,拖完下次还是自己调好的样子
-const PANE_SPLIT_KEY = 'atlas.pane-split'
-function readPaneSplit(): number {
-  const saved = Number(localStorage.getItem(PANE_SPLIT_KEY))
-  return Number.isFinite(saved) && saved > 0 ? saved : 0.5
-}
+
 function clampPaneSplit(v: number): number {
   return Math.min(0.8, Math.max(0.2, v))
 }
@@ -185,15 +189,8 @@ function buildCrumbs(rootName: string, rootPath: string, relPath: string): Crumb
   return crumbs
 }
 
-// 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值),下次打开还是自己调好的样子
-const DEFAULT_SIDEBAR_WIDTH = 340
+// 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值,户口在 layoutPrefs),下次打开还是自己调好的样子
 const MIN_SIDEBAR_WIDTH = 240
-const SIDEBAR_WIDTH_KEY = 'atlas.sidebar-width'
-
-function readSidebarBase(): number {
-  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
-  return saved > 0 ? saved : DEFAULT_SIDEBAR_WIDTH
-}
 
 // 树再宽也不能把右栏挤没:右栏保底 360px 看分析内容
 function clampSidebar(width: number): number {
@@ -244,24 +241,17 @@ function App(): React.JSX.Element {
   // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
   const [pathDraft, setPathDraft] = useState('')
   // 空路径点了「前往」:不禁用按钮,点了才提示缺什么(禁用灰在小白眼里像坏了)
-  const [pathHint, setPathHint] = useState<string | null>(null)
+  const [pathHint, flashPathHint, dismissPathHint] = useFlashValue<string | null>(null)
   const [pathShaking, setPathShaking] = useState(false)
   const pathInputRef = useRef<HTMLInputElement>(null)
-  const pathHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // 扫描完成的轻提示:报个数就自己退场,不挡路
-  const [scanToast, setScanToast] = useState<string | null>(null)
-  const scanToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [scanToast, flashScanToast] = useFlashValue<string | null>(null)
   // 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话,十几秒后自己退场
-  const [revived, setRevived] = useState(false)
+  const [revived, flashRevived] = useFlashFlag(REVIVED_MS)
   useEffect(() => {
-    const off = window.atlas.onRendererRevived(() => setRevived(true))
+    const off = window.atlas.onRendererRevived(() => flashRevived())
     return off
-  }, [])
-  useEffect(() => {
-    if (!revived) return
-    const t = setTimeout(() => setRevived(false), 15_000)
-    return () => clearTimeout(t)
-  }, [revived])
+  }, [flashRevived])
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -277,7 +267,7 @@ function App(): React.JSX.Element {
   const [freechatHost, setFreechatHost] = useState<FreechatHost>('panel')
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   // 左右两组的比例(左边占多少),分割条拖完记进本机
-  const [paneSplit, setPaneSplit] = useState(readPaneSplit)
+  const [paneSplit, setPaneSplit] = useState(loadPaneSplit)
   // 拖页签时的落点标记:正悬在哪个组的正文中心(中心松手=分屏/挪组,边缘松手=什么也不发生)
   const [dropMark, setDropMark] = useState<{ groupId: string; center: boolean } | null>(null)
   // 正被拖着的页签(dragOver 时浏览器不给读 dataTransfer,来源判断全靠它)
@@ -292,8 +282,7 @@ function App(): React.JSX.Element {
   }
   const [enabledKinds, setEnabledKinds] = useState<Set<PaneKind>>(loadEnabledKinds)
   // 系统自动勾回品类时刚点亮的那张页签:轻强调一下让用户察觉(小葵点的,别做得太静默)
-  const [flashTabId, setFlashTabId] = useState<string | null>(null)
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
   // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
   const [revealPaths, setRevealPaths] = useState<Set<string>>(new Set())
   // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;换预览文件即清
@@ -437,8 +426,8 @@ function App(): React.JSX.Element {
   const [uiScale, setUiScale] = useState(window.atlas.getUiScale)
   // VSCode 式分割条:左栏宽度跟着鼠标走。存的是「100% 缩放下的基准值」,
   // 渲染宽度 = 基准值 × 缩放系数,面板和文字等比例一起变
-  const sidebarBaseRef = useRef(readSidebarBase())
-  const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebar(readSidebarBase() * window.atlas.getUiScale()))
+  const sidebarBaseRef = useRef(loadSidebarWidth())
+  const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebar(loadSidebarWidth() * window.atlas.getUiScale()))
   const sidebarWidthRef = useRef(sidebarWidth)
   const sashDraggingRef = useRef(false)
 
@@ -450,7 +439,7 @@ function App(): React.JSX.Element {
   }
 
   function persistSidebarWidth(): void {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarBaseRef.current))
+    saveSidebarWidth(sidebarBaseRef.current)
   }
 
   // 设置页拖了缩放滑条:按基准值 × 新系数重算左栏宽度,重夹一遍边界
@@ -504,9 +493,7 @@ function App(): React.JSX.Element {
 
   // 扫描完成的轻提示:报个数就自己退场
   function flashToast(text: string): void {
-    setScanToast(text)
-    if (scanToastTimerRef.current) clearTimeout(scanToastTimerRef.current)
-    scanToastTimerRef.current = setTimeout(() => setScanToast(null), 4000)
+    flashScanToast(text, SCAN_TOAST_MS)
   }
 
   // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
@@ -554,8 +541,7 @@ function App(): React.JSX.Element {
     setGitLoading(false)
     setFolder(dir)
     setPathDraft(dir)
-    setPathHint(null)
-    if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
+    dismissPathHint()
     setScanning(true)
     setResult(null)
     setError(null)
@@ -648,9 +634,7 @@ function App(): React.JSX.Element {
   // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
   function setShakeAndHint(): void {
     setPathShaking(true)
-    setPathHint('先填个路径,或点「打开项目」选一个')
-    if (pathHintTimerRef.current) clearTimeout(pathHintTimerRef.current)
-    pathHintTimerRef.current = setTimeout(() => setPathHint(null), 5000)
+    flashPathHint('先填个路径,或点「打开项目」选一个', PATH_HINT_MS)
     pathInputRef.current?.focus()
   }
 
@@ -675,9 +659,7 @@ function App(): React.JSX.Element {
   // 系统自动勾回品类时给刚亮起的页签一点轻强调:让用户察觉「设置刚被自动改了」,
   // 过几天不会莫名其妙 —— 不弹窗、不出声,就是页签卡上闪一下(小葵点的细节)
   function markFlash(id: string): void {
-    setFlashTabId(id)
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
-    flashTimerRef.current = setTimeout(() => setFlashTabId(null), 1200)
+    flashTab(id, FLASH_TAB_MS)
   }
 
   // 钉住瞬间页签该固化的门面:换成具体节点的名和图标,分得清钉的是谁;节点没了退回品类名牌
@@ -1070,7 +1052,7 @@ function App(): React.JSX.Element {
     clearSelection()
     setGroups([])
     setActiveGroupId(null)
-    setFlashTabId(null)
+    dismissTabFlash()
     setRevealPaths(new Set())
     setPreviewRefs([])
     setFolder(null)
@@ -1081,7 +1063,7 @@ function App(): React.JSX.Element {
     setExpanding(null)
     setTreeNote(null)
     setGitInfo(null)
-    setPathHint(null)
+    dismissPathHint()
     setNotes({})
   }
 
@@ -1271,24 +1253,23 @@ function App(): React.JSX.Element {
   }
 
   // 最近列表点 ✕:只删记录,不碰文件夹本身(第八十一锤);给 6 秒撤销窗(第九十四锤,破坏性动作不裸奔)
-  const [recentUndo, setRecentUndo] = useState<{ snapshot: RecentProject[]; removed: RecentProject } | null>(null)
-  const recentUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [recentUndo, flashRecentUndo, dismissRecentUndo] = useFlashValue<{
+    snapshot: RecentProject[]
+    removed: RecentProject
+  } | null>(null)
 
   function removeRecent(path: string): void {
     const removed = recents.find((r) => r.p === path)
     if (!removed) return
     setRecents(forgetRecentProject(path))
-    setRecentUndo({ snapshot: recents, removed })
-    if (recentUndoTimerRef.current) clearTimeout(recentUndoTimerRef.current)
-    recentUndoTimerRef.current = setTimeout(() => setRecentUndo(null), 6000)
+    flashRecentUndo({ snapshot: recents, removed }, RECENT_UNDO_MS)
   }
 
   function undoRecentRemove(): void {
     if (!recentUndo) return
-    if (recentUndoTimerRef.current) clearTimeout(recentUndoTimerRef.current)
+    dismissRecentUndo()
     writeRecentProjects(recentUndo.snapshot)
     setRecents(recentUndo.snapshot)
-    setRecentUndo(null)
   }
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
@@ -1489,7 +1470,7 @@ function App(): React.JSX.Element {
   function applyPaneSplit(v: number): void {
     const next = clampPaneSplit(v)
     setPaneSplit(next)
-    localStorage.setItem(PANE_SPLIT_KEY, String(next))
+    savePaneSplit(next)
   }
 
   function onPaneSashDown(e: React.PointerEvent<HTMLDivElement>): void {
@@ -1584,7 +1565,7 @@ function App(): React.JSX.Element {
             aria-label="文件夹路径"
             onChange={(e) => {
               setPathDraft(e.target.value)
-              setPathHint(null)
+              dismissPathHint()
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void goPath()

@@ -5,6 +5,7 @@
 // 存储键按项目路径归一化,同一项目换大小写/斜杠方向不会裂成两份垃圾。
 
 import type { ScanDirNode } from './types.ts'
+import { readPref, writePref } from './localPrefs.ts'
 
 export const NOTES_MAX = 200
 /** 一句话备注的字数上限:超了截断,别让备注长成作文 */
@@ -84,25 +85,13 @@ export function pruneNotesAgainstTree(map: NoteMap, tree: ScanDirNode): NoteMap 
   return out
 }
 
-function readRaw(key: string): unknown {
-  try {
-    const text = localStorage.getItem(key)
-    return text ? JSON.parse(text) : null
-  } catch {
-    return null
-  }
-}
-
 export function loadNotes(rootPath: string): NoteMap {
-  return parseNotes(readRaw(notesStorageKey(rootPath)))
+  return parseNotes(readPref<unknown>(notesStorageKey(rootPath), null))
 }
 
 export function saveNotes(rootPath: string, map: NoteMap): void {
-  try {
-    localStorage.setItem(notesStorageKey(rootPath), JSON.stringify(map))
-  } catch {
-    // 写不进去就算了:备注是锦上添花,不该惊动任何人
-  }
+  // 写不进去就算了:备注是锦上添花,不该惊动任何人
+  writePref(notesStorageKey(rootPath), map)
 }
 
 /** 读 → 清孤儿 → 写回(垃圾不越攒越多),再回给界面。开项目扫完时喊这一声 */

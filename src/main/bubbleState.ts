@@ -3,8 +3,8 @@
 // 口径学 mascotState:存档是上辈子的记忆,垃圾内容回 null 走默认尺寸;
 // 比当前屏幕还大的存档不在这儿砍 —— 落点/缩放时对着现在的工作区夹(bubblePlacement)。
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
 import { BUBBLE_MIN_WIDTH, BUBBLE_MIN_HEIGHT } from './bubblePlacement.ts'
 
 /** 记事本里的一页:气泡窗的宽高(用户调的尺寸) */
@@ -35,20 +35,10 @@ function stateFilePath(dir: string): string {
 
 /** 读记事本;没记过/读不动/内容是垃圾,一律回 null(调用方走默认尺寸) */
 export function readBubbleSize(dir: string): BubbleSize | null {
-  const file = stateFilePath(dir)
-  if (!existsSync(file)) return null
-  try {
-    return parseBubbleSize(JSON.parse(readFileSync(file, 'utf8')))
-  } catch {
-    return null
-  }
+  return parseBubbleSize(readJsonFile(stateFilePath(dir)))
 }
 
 /** 写记事本;写不进去就算了 —— 记尺寸是锦上添花,不该惊动任何人 */
 export function writeBubbleSize(dir: string, size: BubbleSize): void {
-  try {
-    writeFileSync(stateFilePath(dir), JSON.stringify(size, null, 2), 'utf8')
-  } catch {
-    // 安静放过
-  }
+  writeJsonFile(stateFilePath(dir), size)
 }

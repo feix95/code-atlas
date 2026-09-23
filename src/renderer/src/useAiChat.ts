@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AiChatRequest, AiHistoryMessage, ChatCodeRef, ChatContextAttachment, ChatMessage } from '@shared/types'
 import { TAG } from '@shared/promptTags'
 import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
+import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
 // ChatMessage/ChatMsgState 户口在 shared/types.ts:它是主窗 → 主进程 → 气泡 的镜像快照契约,
@@ -47,10 +48,12 @@ function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
   return out
 }
 
-/** 思考开关存档的 localStorage 键(第一百一十五锤) */
+/** 思考开关存档的 localStorage 键(第一百一十五锤)。
+ *  键名是横杠系:全仓别的键走 'atlas.*' 点号系,这俩是早期定的老键,
+ *  改名会弄丢已存档的开关状态 —— 命名风格不统一是已知差异,为存档兼容刻意保留(P2-4 补注) */
 const THINKING_KEY = 'atlas-freechat-thinking'
 
-/** 翻文件(agent)开关的 localStorage 键(第一百二十八锤) */
+/** 翻文件(agent)开关的 localStorage 键(第一百二十八锤)。命名同上,刻意保留 */
 const AGENT_KEY = 'atlas-freechat-agent'
 
 /** 历史按「轮」成对收集(答旧题修复锤):只收一问一答都落地的完整轮,报错/取消/半截的
@@ -90,11 +93,11 @@ export function useAiChat(
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? [])
   const [busy, setBusy] = useState(false)
   // 思考开关记在本地:换文件、重启应用都记住用户的选择
-  const [thinking, setThinkingState] = useState(() => localStorage.getItem(THINKING_KEY) !== 'off')
+  const [thinking, setThinkingState] = useState(() => readFlagPref(THINKING_KEY, true))
   const thinkingRef = useRef(thinking)
   thinkingRef.current = thinking
   // 翻文件开关同样记在本地;默认关 —— 让模型自己动手是能力升级,但由用户点名才开。
-  const [agent, setAgentState] = useState(() => localStorage.getItem(AGENT_KEY) === 'on')
+  const [agent, setAgentState] = useState(() => readFlagPref(AGENT_KEY, false))
   const agentRef = useRef(agent)
   agentRef.current = agent
   const busyRef = useRef(false)
@@ -333,12 +336,12 @@ export function useAiChat(
 
   function setThinking(on: boolean): void {
     setThinkingState(on)
-    localStorage.setItem(THINKING_KEY, on ? 'on' : 'off')
+    writeFlagPref(THINKING_KEY, on)
   }
 
   function setAgent(on: boolean): void {
     setAgentState(on)
-    localStorage.setItem(AGENT_KEY, on ? 'on' : 'off')
+    writeFlagPref(AGENT_KEY, on)
   }
 
   function note(text: string): void {

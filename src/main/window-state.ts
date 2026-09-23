@@ -7,8 +7,8 @@
 // ② placeWindowBox 把窗贴着「现在接着的屏幕」夹紧 —— 挑交叠最大的那块工作区,
 //    露不出一条边就拽回屏内,块头超屏就夹到屏大。
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
 
 /** 一扇窗的位置和块头;x/y 在「还没接到屏幕」时可以缺(交给系统居中) */
 export interface WindowBox {
@@ -110,20 +110,10 @@ function stateFilePath(dir: string): string {
 
 /** 读记事本;没记过/读不动/内容是垃圾,一律回 null(调用方走默认尺寸) */
 export function readWindowState(dir: string): WindowState | null {
-  const file = stateFilePath(dir)
-  if (!existsSync(file)) return null
-  try {
-    return parseWindowState(JSON.parse(readFileSync(file, 'utf8')))
-  } catch {
-    return null
-  }
+  return parseWindowState(readJsonFile(stateFilePath(dir)))
 }
 
 /** 写记事本;写不进去就算了 —— 记尺寸是锦上添花,不该惊动任何人 */
 export function writeWindowState(dir: string, state: WindowState): void {
-  try {
-    writeFileSync(stateFilePath(dir), JSON.stringify(state, null, 2), 'utf8')
-  } catch {
-    // 安静放过
-  }
+  writeJsonFile(stateFilePath(dir), state)
 }

@@ -1,7 +1,10 @@
 /* ── 图标配色(图标册 v5 落地):一图一色,实线稿无填充。
  *  --ic  深底色(直接存)
  *  --ic-l 浅底色(同色相、明度 ×0.58,跟 v5 预览页同一公式换算)
- *  默认吃 --ic-l(浅色主题),:root[data-theme='dark'] 时切 --ic —— 规则在 main.css .ticon ── */
+ *  默认吃 --ic-l(浅色主题),:root[data-theme='dark'] 时切 --ic —— 规则在 main.css .ticon
+ *  设计决定(DRY 审计 P2-7):这套 pastel 调色板自成一局,不进 design token 体系 ——
+ *  彩色图标永远 pastel 是刻意的辨识度设计;mono 开关已让单色场景走 token。哪天要让
+ *  彩色跟主题走,再映射 token,现在别动。 ── */
 const ICON_COLORS: Record<string, string> = {
   file: '#8fa8cc', folder: '#eab75c', doc: '#63aef2', config: '#b28ef2', style: '#f2789f',
   terminal: '#5fd49a', image: '#a78bfa', audio: '#4fd0c0', video: '#f2807a', font: '#96a8f0',
@@ -100,8 +103,7 @@ export function IconArrowRight({ size = 14, mono = false, strokeWidth = 2 }: { s
 export function IconRefresh({ size = 14, mono = false, strokeWidth = 2 }: { size?: number; mono?: boolean; strokeWidth?: number }): React.JSX.Element {
   return (
     <svg className={mono ? 'top-icon' : 'top-icon ticon'} style={mono ? undefined : tint(ICON_COLORS.refresh)} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
+      {BOOK.refresh}
     </svg>
   )
 }
@@ -184,7 +186,30 @@ const BOOK: Record<string, React.ReactNode> = {
   // 翻文件(第一百二十八锤):文件夹上搁一枚放大镜 —— 自己动手翻项目
   folderSearch: <><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" /><circle cx="17" cy="17" r="3.5" /><path d="m19.8 19.8 2.2 2.2" /></>,
   // 钉住(页签改版):一枚图钉 —— 双击页签把它钉住,树里换文件它不动
-  pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>
+  pin: <><path d="M9 3h6" /><path d="M10 3v6l-2 3h8l-2-3V3" /><path d="M12 12v8" /></>,
+  // 刷新/重来(设置页原名 rotate,和顶栏 IconRefresh 同一支笔)
+  refresh: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>,
+  // ── 设置页收编(P2-8:第二本 ICON_PATHS 并册,全是 Lucide 线稿,走 mono 单色斑) ──
+  settings2: <><path d="M14 17H5" /><path d="M19 7h-9" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></>,
+  palette: <><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.6-1.7h2c3 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z" /></>,
+  gauge: <><path d="M12 15l3.5-3.5" /><path d="M20.2 15.5a8.5 8.5 0 1 0-16.4 0" /></>,
+  sliders: <><line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" /><line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" /><line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" /><line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="16" x2="16" y1="18" y2="22" /></>,
+  monitor: <><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></>,
+  x: <><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>,
+  minus: <path d="M5 12h14" />,
+  plus: <><path d="M5 12h14" /><path d="M12 5v14" /></>,
+  eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+  // 眯眼(小葵点的小眼睛,2026-09-17):睁眼看得见 Key,眯眼看不见
+  eyeOff: <><path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.1 3.9" /><path d="M6.1 6.1A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4-.9" /><path d="m2 2 20 20" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
+  cloud: <path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z" />,
+  drive: <><line x1="22" x2="2" y1="12" y2="12" /><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" /></>,
+  shield: <><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></>,
+  save: <><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /><path d="M7 3v4a1 1 0 0 0 1 1h7" /></>,
+  chevron: <path d="m6 9 6 6 6-6" />,
+  sparkles: <path d="M9.9 15.5a2 2 0 0 0-1.4-1.4l-6.1-1.6a.5.5 0 0 1 0-1L8.5 9.9A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />,
+  info: <><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></>,
+  // 裸对勾(不带圈):预设卡角上的「选中了」小标记
+  checkBare: <path d="M20 6 9 17l-5-5" />
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头);

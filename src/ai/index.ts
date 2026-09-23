@@ -71,9 +71,11 @@ ${TAG.rules.open}
 4. 不输出废话、不寒暄。用中文,短句,最多 3-4 句。
 ${TAG.rules.close}`
 
-/** 自由聊天历史窗口的上限:最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
- * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。 */
+/** 自由聊天历史窗口的上限(单位:消息条数):最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
+ * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。
+ * 对账:渲染层按 shared/chatHistory.ts 的 FREE_CHAT_HISTORY_MAX(8 条)发来,这里是真正的硬顶。 */
 const CHAT_HISTORY_MAX = 6
+/** 单条历史消息的内容字数上限(单位:字符,超出截断并打「不用续写」标注) */
 const CHAT_HISTORY_CONTENT_MAX = 500
 
 /** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆。

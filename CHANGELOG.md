@@ -314,3 +314,10 @@
 - refactor(ai): agent 工具名总账 shared/agentTools——五件工具名/ToolName/asToolName 认名闸/步骤播报词表一处登记,schema 定义与主进程分发链全引户口本;自测断言户口完整性
 
 - refactor(ui): 三层预测内核收口 predictedQuestions.ts——LRU 缓存/竞态闸/请求壳一份,概览与对话两钩只留点火条件;拖拽 MIME 与载荷契约收 shared/dragTypes,收发两方全引总账
+
+- refactor(ui): 设计令牌补课——字号档(--font-xxs/ml)/字重/行高/圆角/动效时长/层级/阴影/遮罩/窗控/switch/chip 全进 :root,45 处裸秒数与百余处裸字重行高清零;灰阶色板与外观种子色共源 shared/appearancePalette;桌宠绿配色收 --pet-* 一档
+
+- refactor(ui): 图标册并一——SettingsDialog 私养的 ICON_PATHS+本地 Icon 退役,19 个图标迁入 Icons.tsx 总册(bot/folder 两处画法从此统一);内联尺寸裸值具名,输入舱拨杆图标进 inputMetrics
+
+- refactor(core): 公共件收口——useFlashFlag「亮一下退场」与 useMenuDismiss「外点收摊」两钩收编七处抄板;输入舱 5/10 行阈值共 inputMetrics;存档读写两族出小件(渲染层 localPrefs/主进程 jsonFile+userDataDir);弹窗兜底 pickPathDialog 一处管;聊史双闸注释互指;气泡与桌宠的 px 尺寸按小葵拍板注为设计决定
+

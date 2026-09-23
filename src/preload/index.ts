@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import { ROOT_FONT_BASE_PX, clampUiScale } from '../shared/uiScale.ts'
+import { readNumPref, writeNumPref } from '../shared/localPrefs.ts'
 import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
@@ -49,7 +50,7 @@ function applyRootFont(factor: number): void {
 }
 
 function readUiScale(): number {
-  return clampUiScale(Number(localStorage.getItem(UI_SCALE_KEY)))
+  return clampUiScale(readNumPref(UI_SCALE_KEY, 0))
 }
 applyRootFont(readUiScale())
 
@@ -72,7 +73,7 @@ const atlasApi = {
   getUiScale: (): number => readUiScale(),
   setUiScale: (factor: number): void => {
     const f = clampUiScale(Number(factor))
-    localStorage.setItem(UI_SCALE_KEY, String(f))
+    writeNumPref(UI_SCALE_KEY, f)
     applyRootFont(f)
     // 喊一声界面:侧栏宽度这类「按比例跟缩放」的布局要实时跟着重算
     window.dispatchEvent(new CustomEvent(CH.uiScaleChanged, { detail: f }))

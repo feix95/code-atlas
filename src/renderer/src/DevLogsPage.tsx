@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DevLogEntry, DevLogSource } from '../../shared/types.ts'
 import { DEVLOG_MAX, devLogSourceName, formatDevLogTime } from '../../shared/devlog.ts'
+import { useFlashValue } from './useFlashFlag'
 
 type SourceFilter = 'all' | DevLogSource
 
@@ -20,7 +21,7 @@ export function DevLogsPage(): React.JSX.Element {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [filterText, setFilterText] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
-  const [copyNote, setCopyNote] = useState('')
+  const [copyNote, flashCopyNote] = useFlashValue('')
   const listRef = useRef<HTMLDivElement | null>(null)
   const autoRef = useRef(autoScroll)
 
@@ -80,11 +81,10 @@ export function DevLogsPage(): React.JSX.Element {
   const copyAll = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(asText())
-      setCopyNote('已复制')
+      flashCopyNote('已复制', 1500)
     } catch {
-      setCopyNote('复制失败')
+      flashCopyNote('复制失败', 1500)
     }
-    setTimeout(() => setCopyNote(''), 1500)
   }
 
   const clearAll = (): void => {

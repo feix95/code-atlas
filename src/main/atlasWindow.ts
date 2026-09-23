@@ -3,7 +3,7 @@
 // 露窗多路抢跑 + 3 秒看门狗、?view= 加载。以前每扇窗各抄一遍,安全开关改一处漏三处。
 // 这里只出「共有的底」;各窗自己的戏份(尺寸/落位/事件接线/救生圈)还在原文件。
 
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { CH } from '../shared/ipcChannels.ts'
 
@@ -70,6 +70,12 @@ export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {})
   // 3) 看门狗:唯一无条件的兜底。隐藏的透明窗此刻多半还没内容,
   //    用户看到「窗口浮现」的实际时刻仍是首帧画好之时
   setTimeout(() => showOnce(`watchdog-${Math.round(timeoutMs / 1000)}s`), timeoutMs)
+}
+
+/** 弹系统选择对话框:认准来叫它的那扇窗(抓不到就无主弹),取消/没选回 null,选中回第一条路径 */
+export async function pickPathDialog(win: BrowserWindow | null, options: Electron.OpenDialogOptions): Promise<string | null> {
+  const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
 }
 
 /** 开发模式加载 Vite 开发服务器,打包后加载本地文件;?view= 分诊认 VIEWS 户口(不传 = 主窗) */

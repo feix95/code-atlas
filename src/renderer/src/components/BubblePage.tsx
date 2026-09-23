@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { type ChatMessage } from '../useAiChat'
 import type { BubbleResizeDir } from '@shared/types'
 import { TreeIcon } from './Icons'
+import { INPUT_CAP_LINES, INPUT_EXPAND_LINES, INPUT_TOGGLE_ICON_SIZE } from '../inputMetrics'
 import './bubble.css'
 
 /**
@@ -25,11 +26,9 @@ function noteText(m: ChatMessage): string {
   return m.text
 }
 
-/** 输入舱行高量不出时的兜底(和 bubble.css 里 textarea 的 line-height 一口约定) */
+/** 输入舱行高量不出时的兜底(和 bubble.css 里 textarea 的 line-height 一口约定;
+ *  5/10 行封顶/撑开的户口在 renderer/inputMetrics,和主窗同一本账) */
 const LINE_FALLBACK = 20
-/** 自动长高封顶行数;拨杆撑开后给这么多行(口径照搬主窗输入舱) */
-const CAP_LINES = 5
-const EXPAND_LINES = 10
 
 /** 共享自由对话形态(桌宠气泡锤):主窗公用场的影子窗 ——
  * 看的是主进程镜像来的同一份消息流,输入经主进程转回主窗干活。
@@ -73,12 +72,12 @@ export function BubblePage(): React.JSX.Element {
     const borderV = (Number.parseFloat(st.borderTopWidth) || 0) + (Number.parseFloat(st.borderBottomWidth) || 0)
     el.style.height = 'auto'
     const realLines = Math.max(1, Math.round((el.scrollHeight - padV) / line))
-    const shown = Math.min(realLines, CAP_LINES)
-    el.style.height = `${(expanded ? EXPAND_LINES : shown) * line + padV + borderV}px`
+    const shown = Math.min(realLines, INPUT_CAP_LINES)
+    el.style.height = `${(expanded ? INPUT_EXPAND_LINES : shown) * line + padV + borderV}px`
     setLineCount(shown)
-    if (expanded && realLines < CAP_LINES) setExpanded(false)
+    if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
   }, [draft, expanded])
-  const capped = lineCount >= CAP_LINES || expanded
+  const capped = lineCount >= INPUT_CAP_LINES || expanded
 
   const busy = (messages ?? []).some((m) => m.role === 'assistant' && m.state === 'busy')
   const ready = messages !== null
@@ -173,7 +172,7 @@ export function BubblePage(): React.JSX.Element {
                 aria-label={expanded ? '收合输入框' : '展开输入框'}
                 title={expanded ? '收合' : '多撑五行'}
               >
-                <TreeIcon name={expanded ? 'collapse' : 'expand'} size={12} />
+                <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
               </button>
             )}
           </div>

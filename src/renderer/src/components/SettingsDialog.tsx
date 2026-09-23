@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
@@ -14,6 +14,7 @@ import {
 import { looksLikeTavilyKey, tavilyUsageText, type TavilyProbeResult } from '@shared/tavily'
 import { applyAppearance, COLOR_PRESETS, isDarkNow, loadAppearance, saveAppearance, type Appearance, type AppearanceMode, type AppearancePreset } from '../appearance'
 import { friendlyErr } from '../errText'
+import { TreeIcon } from './Icons'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 
 /** 「测一下」的结论文案(2026-09-17):Tavily 给的状态码翻成人话,别让用户对着码猜。
@@ -80,7 +81,7 @@ function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: stri
         <span>填了搜索更快更稳</span>
       </div>
       <div className="cfg-path-input">
-        <Icon name="globe" size={13} />
+        <TreeIcon name="globe" size={13} mono />
         <input
           id="cfg-tavily-key"
           type={visible ? 'text' : 'password'}
@@ -106,7 +107,7 @@ function TavilyKeyField({ value, onChange }: { value: string; onChange: (v: stri
           title={visible ? '隐藏' : '显示'}
           onClick={() => setVisible(!visible)}
         >
-          <Icon name={visible ? 'eyeOff' : 'eye'} size={13} />
+          <TreeIcon name={visible ? 'eyeOff' : 'eye'} size={13} mono />
         </button>
       </div>
       {shapeOdd && !line && !errLine && (
@@ -158,7 +159,7 @@ function OptionSelect<K extends string>({
         {current.label}
         {/* 箭头照抄本文件图标册的 chevron(和其他控件同一颗),钉到最右;小葵点名加粗放大 */}
         <span className="tone-select-caret">
-          <Icon name="chevron" size={14} strokeWidth={4} />
+          <TreeIcon name="chevron" size={14} strokeWidth={4} mono />
         </span>
       </button>
       {open && (
@@ -207,153 +208,6 @@ function clampContextSize(raw: string): number | undefined {
 
 type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
 type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
-
-/** 效果图同款线性小图标(lucide 线条),随字号一起缩放 */
-const ICON_PATHS: Record<string, ReactNode> = {
-  settings2: (
-    <>
-      <path d="M14 17H5" />
-      <path d="M19 7h-9" />
-      <circle cx="17" cy="17" r="3" />
-      <circle cx="7" cy="7" r="3" />
-    </>
-  ),
-  palette: (
-    <>
-      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.6-1.7h2c3 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z" />
-    </>
-  ),
-  bot: (
-    <>
-      <path d="M12 8V4H8" />
-      <rect width="16" height="12" x="4" y="8" rx="2" />
-      <path d="M2 14h2" />
-      <path d="M20 14h2" />
-      <path d="M15 13v2" />
-      <path d="M9 13v2" />
-    </>
-  ),
-  gauge: (
-    <>
-      <path d="M12 15l3.5-3.5" />
-      <path d="M20.2 15.5a8.5 8.5 0 1 0-16.4 0" />
-    </>
-  ),
-  sliders: (
-    <>
-      <line x1="21" x2="14" y1="4" y2="4" />
-      <line x1="10" x2="3" y1="4" y2="4" />
-      <line x1="21" x2="12" y1="12" y2="12" />
-      <line x1="8" x2="3" y1="12" y2="12" />
-      <line x1="21" x2="16" y1="20" y2="20" />
-      <line x1="12" x2="3" y1="20" y2="20" />
-      <line x1="14" x2="14" y1="2" y2="6" />
-      <line x1="8" x2="8" y1="10" y2="14" />
-      <line x1="16" x2="16" y1="18" y2="22" />
-    </>
-  ),
-  monitor: (
-    <>
-      <rect width="20" height="14" x="2" y="3" rx="2" />
-      <line x1="8" x2="16" y1="21" y2="21" />
-      <line x1="12" x2="12" y1="17" y2="21" />
-    </>
-  ),
-  question: (
-    <>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
-      <path d="M12 17h.01" />
-    </>
-  ),
-  check: <path d="M20 6 9 17l-5-5" />,
-  x: (
-    <>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </>
-  ),
-  minus: <path d="M5 12h14" />,
-  plus: (
-    <>
-      <path d="M5 12h14" />
-      <path d="M12 5v14" />
-    </>
-  ),
-  eye: (
-    <>
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </>
-  ),
-  cloud: <path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z" />,
-  drive: (
-    <>
-      <line x1="22" x2="2" y1="12" y2="12" />
-      <path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z" />
-      <line x1="6" x2="6.01" y1="16" y2="16" />
-      <line x1="10" x2="10.01" y1="16" y2="16" />
-    </>
-  ),
-  shield: (
-    <>
-      <path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z" />
-      <path d="m9 12 2 2 4-4" />
-    </>
-  ),
-  // 眯眼(小葵点的小眼睛,2026-09-17):配上面那只现有的 eye 用 —— 睁眼看得见 Key,眯眼看不见
-  eyeOff: (
-    <>
-      <path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.1 3.9" />
-      <path d="M6.1 6.1A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4-.9" />
-      <path d="m2 2 20 20" />
-      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-    </>
-  ),
-  rotate: (
-    <>
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-    </>
-  ),
-  save: (
-    <>
-      <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-      <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" />
-      <path d="M7 3v4a1 1 0 0 0 1 1h7" />
-    </>
-  ),
-  chevron: <path d="m6 9 6 6 6-6" />,
-  circleCheck: (
-    <>
-      <circle cx="12" cy="12" r="10" />
-      <path d="m9 12 2 2 4-4" />
-    </>
-  ),
-  sparkles: (
-    <path d="M9.9 15.5a2 2 0 0 0-1.4-1.4l-6.1-1.6a.5.5 0 0 1 0-1L8.5 9.9A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />
-  ),
-  info: (
-    <>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </>
-  ),
-  folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-}
-
-function Icon({ name, size = 15, strokeWidth = 2 }: { name: string; size?: number; strokeWidth?: number }): React.JSX.Element {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {ICON_PATHS[name]}
-    </svg>
-  )
-}
 
 /** 设置侧栏「工作区偏好」组导航图标旋钮:四颗条目共享一个大小,跟别处互不相关 */
 const NAV_ICON_SIZE = 18
@@ -730,7 +584,7 @@ export function SettingsDialog({
         <header className="cfg-head">
           <div className="cfg-head-title">
             <span className="cfg-head-icon">
-              <Icon name="settings2" size={17} />
+              <TreeIcon name="settings2" size={17} mono />
             </span>
             <div>
               <h1>设置</h1>
@@ -745,7 +599,7 @@ export function SettingsDialog({
               </span>
             )}
             <button type="button" className="cfg-close" onClick={requestClose} aria-label="关闭设置">
-              <Icon name="x" size={15} />
+              <TreeIcon name="x" size={15} mono />
             </button>
           </div>
         </header>
@@ -761,7 +615,7 @@ export function SettingsDialog({
                 onClick={() => gotoSection(item.key)}
               >
                 <span className="cfg-nav-icon">
-                  <Icon name={item.icon} size={NAV_ICON_SIZE} />
+                  <TreeIcon name={item.icon} size={NAV_ICON_SIZE} mono />
                 </span>
                 <span>
                   <strong>{item.name}</strong>
@@ -773,7 +627,7 @@ export function SettingsDialog({
             <div className="cfg-nav-rule" />
             <div className="cfg-nav-context">
               <span className="cfg-context-icon">
-                <Icon name="monitor" size={NAV_ICON_SIZE} />
+                <TreeIcon name="monitor" size={NAV_ICON_SIZE} mono />
               </span>
               <div>
                 <strong>当前工作区</strong>
@@ -781,7 +635,7 @@ export function SettingsDialog({
               </div>
             </div>
             <div className="cfg-nav-footnote">
-              <Icon name="question" size={12} />
+              <TreeIcon name="help" size={12} mono />
               设置会保存到本机
             </div>
           </aside>
@@ -853,7 +707,7 @@ export function SettingsDialog({
                           </span>
                           {draftAppearance.preset === p.key && (
                             <span className="cfg-theme-check">
-                              <Icon name="check" size={12} />
+                              <TreeIcon name="checkBare" size={12} mono />
                             </span>
                           )}
                         </button>
@@ -870,7 +724,7 @@ export function SettingsDialog({
                         </span>
                         {draftAppearance.preset === 'custom' && (
                           <span className="cfg-theme-check">
-                            <Icon name="check" size={12} />
+                            <TreeIcon name="checkBare" size={12} mono />
                           </span>
                         )}
                       </button>
@@ -930,7 +784,7 @@ export function SettingsDialog({
                     </div>
                     <div className="cfg-scale">
                       <button type="button" className="cfg-stepper" aria-label="调小界面" onClick={() => stepScale(-0.05)} disabled={draftScale <= SCALE_MIN + 0.001}>
-                        <Icon name="minus" size={13} />
+                        <TreeIcon name="minus" size={13} mono />
                       </button>
                       <div className="cfg-slider-wrap">
                         <input
@@ -955,7 +809,7 @@ export function SettingsDialog({
                         </div>
                       </div>
                       <button type="button" className="cfg-stepper" aria-label="调大界面" onClick={() => stepScale(0.05)} disabled={draftScale >= SCALE_MAX - 0.001}>
-                        <Icon name="plus" size={13} />
+                        <TreeIcon name="plus" size={13} mono />
                       </button>
                       <output className="cfg-scale-value">{Math.round(scaleShown * 100)}%</output>
                     </div>
@@ -1023,7 +877,7 @@ export function SettingsDialog({
                         />
                       </div>
                       <div className="cfg-privacy">
-                        <Icon name="shield" size={12} />
+                        <TreeIcon name="shield" size={12} mono />
                         <span>自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 —— 这几条铁律不跟着变。</span>
                       </div>
                       <div className="cfg-divider" />
@@ -1034,7 +888,7 @@ export function SettingsDialog({
                         </div>
                         <div className="cfg-sample-actions">
                           <button type="button" className="cfg-btn" onClick={() => void tryStyle()} disabled={sample?.kind === 'busy'}>
-                            <Icon name="sparkles" size={13} />
+                            <TreeIcon name="sparkles" size={13} mono />
                             {sample?.kind === 'busy' ? '正在念……' : '试一句'}
                           </button>
                           {sample?.kind === 'done' && (
@@ -1087,14 +941,14 @@ export function SettingsDialog({
                         </div>
                         <div className="cfg-segmented">
                           <button type="button" className={!isBuiltin ? 'is-selected' : ''} onClick={() => setDraftConfig({ ...draftConfig, provider: 'lmstudio' })}>
-                            <Icon name="cloud" size={14} />
+                            <TreeIcon name="cloud" size={14} mono />
                             <span>
                               <strong>LM Studio</strong>
                               <small>外部服务</small>
                             </span>
                           </button>
                           <button type="button" className={isBuiltin ? 'is-selected' : ''} onClick={() => setDraftConfig({ ...draftConfig, provider: 'builtin' })}>
-                            <Icon name="drive" size={14} />
+                            <TreeIcon name="drive" size={14} mono />
                             <span>
                               <strong>内置模型</strong>
                               <small>本机直跑</small>
@@ -1104,7 +958,7 @@ export function SettingsDialog({
                       </div>
                       <div className="cfg-callout">
                         <span className="cfg-callout-icon">
-                          <Icon name={isBuiltin ? 'drive' : 'cloud'} size={13} />
+                          <TreeIcon name={isBuiltin ? 'drive' : 'cloud'} size={13} mono />
                         </span>
                         <div>
                           <strong>{isBuiltin ? '使用内置模型(本机直跑)' : '使用 LM Studio(外部服务)'}</strong>
@@ -1115,7 +969,7 @@ export function SettingsDialog({
                           </p>
                         </div>
                         <span className={`cfg-callout-state${source.ok ? '' : ' is-warn'}`}>
-                          <Icon name={source.ok ? 'circleCheck' : 'question'} size={12} />
+                          <TreeIcon name={source.ok ? 'check' : 'help'} size={12} mono />
                           {source.text}
                         </span>
                       </div>
@@ -1168,11 +1022,11 @@ export function SettingsDialog({
                         </button>
                       </div>
                       <div className="cfg-privacy">
-                        <Icon name="shield" size={12} />
+                        <TreeIcon name="shield" size={12} mono />
                         <span>仅发送认不出的「名字」,绝不发送文件夹路径或文件内容;不开启则完全离线。</span>
                         <button type="button" onClick={() => setPrivacyOpen(!privacyOpen)}>
                           {privacyOpen ? '收起' : '查看数据范围'}
-                          <Icon name="chevron" size={11} />
+                          <TreeIcon name="chevron" size={11} mono />
                         </button>
                       </div>
                       {privacyOpen && (
@@ -1204,7 +1058,7 @@ export function SettingsDialog({
                 <div className="cfg-panel cfg-advanced">
                   <div className="cfg-advanced-head">
                     <span className="cfg-advanced-icon">
-                      <Icon name="sliders" size={13} />
+                      <TreeIcon name="sliders" size={13} mono />
                     </span>
                     <span>
                       <strong>本地模型连接</strong>
@@ -1220,7 +1074,7 @@ export function SettingsDialog({
                             <span>一个文件</span>
                           </div>
                           <div className="cfg-path-input">
-                            <Icon name="folder" size={13} />
+                            <TreeIcon name="folder" size={13} mono />
                             <input
                               id="cfg-model-path"
                               value={draftConfig.builtin.modelPath}
@@ -1237,7 +1091,7 @@ export function SettingsDialog({
                             <span>实时榜单</span>
                           </div>
                           <button type="button" className="cfg-shelf-toggle" onClick={() => setShelfOpen((v) => !v)}>
-                            <Icon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} />
+                            <TreeIcon name={shelfOpen ? 'chevron' : 'sparkles'} size={13} mono />
                             {shelfOpen ? '收起货架' : '逛逛模型货架——实时热门 AI 模型榜,按大小挑,点开就能下'}
                           </button>
                           {shelfOpen && (
@@ -1266,7 +1120,7 @@ export function SettingsDialog({
                             <span>LM Studio</span>
                           </div>
                           <div className="cfg-path-input">
-                            <Icon name="cloud" size={13} />
+                            <TreeIcon name="cloud" size={13} mono />
                             <input
                               id="cfg-baseurl"
                               value={draftConfig.lmstudio.baseUrl}
@@ -1279,7 +1133,7 @@ export function SettingsDialog({
                             <span>点「读取模型」自动填</span>
                           </div>
                           <div className="cfg-path-input">
-                            <Icon name="drive" size={13} />
+                            <TreeIcon name="drive" size={13} mono />
                             <input
                               id="cfg-model-name"
                               value={draftConfig.lmstudio.model}
@@ -1319,7 +1173,7 @@ export function SettingsDialog({
                             <span>tokens · 留空自动探测</span>
                           </div>
                           <div className="cfg-path-input">
-                            <Icon name="gauge" size={13} />
+                            <TreeIcon name="gauge" size={13} mono />
                             <input
                               id="cfg-context-size"
                               inputMode="numeric"
@@ -1393,7 +1247,7 @@ export function SettingsDialog({
                 {/* Developer 日志(第八十七锤):模型后台原话的常设入口,不用展开高级面板就够得着 */}
                 <div className="cfg-devlog-row">
                   <button type="button" className="cfg-devlog-btn" onClick={() => void window.atlas.devLogsOpen()}>
-                    <Icon name="monitor" size={13} />
+                    <TreeIcon name="monitor" size={13} mono />
                     打开后台日志
                   </button>
                   <p className="cfg-field-help">Developer 日志:引擎原话、每笔请求的报账、应用的记账,全在一本账里 —— 模型在干嘛、卡在哪,开窗就知道。</p>
@@ -1401,7 +1255,7 @@ export function SettingsDialog({
 
                 <div className="cfg-versions">
                   <span className="cfg-versions-label">
-                    <Icon name="info" size={12} />
+                    <TreeIcon name="info" size={12} mono />
                     版本
                   </span>
                   <span className="mono">
@@ -1412,7 +1266,7 @@ export function SettingsDialog({
 
                 <div className="cfg-summary">
                   <span className="cfg-summary-icon">
-                    <Icon name="sparkles" size={14} />
+                    <TreeIcon name="sparkles" size={14} mono />
                   </span>
                   <div>
                     <strong>当前配置</strong>
@@ -1422,7 +1276,7 @@ export function SettingsDialog({
                     </p>
                   </div>
                   <span className={`cfg-summary-state${dirty ? ' is-dirty' : ''}`}>
-                    <Icon name={dirty ? 'rotate' : 'circleCheck'} size={12} />
+                    <TreeIcon name={dirty ? 'refresh' : 'check'} size={12} mono />
                     {dirty ? '待应用' : '已同步'}
                   </span>
                 </div>
@@ -1433,16 +1287,16 @@ export function SettingsDialog({
 
         <footer className="cfg-foot">
           <div className={`cfg-foot-state is-${footerState.tone}`}>
-            <Icon name={footerState.tone === 'green' ? 'circleCheck' : 'rotate'} size={13} />
+            <TreeIcon name={footerState.tone === 'green' ? 'check' : 'refresh'} size={13} mono />
             {footerState.text}
           </div>
           <div className="cfg-foot-actions">
             <button type="button" className="cfg-btn-reset" onClick={revert} disabled={!dirty || applyState.kind === 'saving'}>
-              <Icon name="rotate" size={13} />
+              <TreeIcon name="refresh" size={13} mono />
               恢复默认
             </button>
             <button type="button" className="cfg-btn-apply" onClick={() => void apply()} disabled={!dirty || applyState.kind === 'saving'}>
-              <Icon name="save" size={13} />
+              <TreeIcon name="save" size={13} mono />
               {applyState.kind === 'saving' ? '应用中……' : '应用更改'}
             </button>
           </div>

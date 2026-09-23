@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useCallback, useState } from 'react'
 import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { TreeIcon } from './Icons'
 import { KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
+import { useMenuDismiss } from '../useMenuDismiss'
 
 /** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
 export interface TabBarTab {
@@ -63,24 +64,13 @@ export function TabBar({
   const [dropZone, setDropZone] = useState(false)
   // 拖动中的页签(本组还是别组,松手时要知道:拖回自己组的空白 = 挪到本组末尾,不是搬家)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const closeMenus = useCallback((): void => {
+    setMenu(null)
+    setTabMenu(null)
+  }, [])
 
-  // 点页面任何地方/按 Esc 都收菜单;菜单内部点选不算「外面」(mousedown 先拦住)
-  useEffect(() => {
-    if (!menu && !tabMenu) return
-    const close = (): void => {
-      setMenu(null)
-      setTabMenu(null)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') close()
-    }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menu, tabMenu])
+  // 点页面任何地方/滚轮/按 Esc 都收菜单;菜单内部点选不算「外面」
+  useMenuDismiss(menu !== null || tabMenu !== null, closeMenus, '.tabbar-kindmenu')
 
   function openKindMenu(e: React.MouseEvent): void {
     e.preventDefault()
@@ -222,7 +212,6 @@ export function TabBar({
           role="menu"
           aria-label="页签品类开关"
           style={{ left: menu.x, top: menu.y }}
-          onMouseDown={(e) => e.stopPropagation()}
         >
           <p className="kindmenu-title">勾选的功能页才显示</p>
           {KIND_ORDER.map((k) => {
@@ -256,7 +245,6 @@ export function TabBar({
           role="menu"
           aria-label="页签操作"
           style={{ left: tabMenu.x, top: tabMenu.y }}
-          onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"

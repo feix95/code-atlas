@@ -9,7 +9,9 @@
 import type { AiHistoryMessage } from './types.ts'
 import { TAG } from './promptTags.ts'
 
-/** 历史只带最近几条:本地模型上下文有限,主进程还会再洗一遍兜底 */
+/** 历史只带最近几条(单位:消息条数,不是问答对数):本地模型上下文有限。
+ *  对账:渲染层发上限 8 条,主进程 sanitizeHistory(ai/index.ts 的 CHAT_HISTORY_MAX)
+ *  还会再掐到 6 条兜底 —— 这里多带两条是给主进程的配对收拢留余量,别当成「实际进提示词」的量 */
 export const FREE_CHAT_HISTORY_MAX = 8
 
 /**

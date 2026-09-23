@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { closeFilePathMenu, currentFilePathMenu, subscribeFilePathMenu, type FilePathMenuRequest } from './filePathMenuStore'
+import { useMenuDismiss } from '../useMenuDismiss'
 
 /**
  * 文件路径右键菜单(全 app 就这一张:文件树 / 聊天绿字链接 / 预览器头部 / 参考资料,共用):
@@ -17,6 +18,9 @@ import { closeFilePathMenu, currentFilePathMenu, subscribeFilePathMenu, type Fil
 const MENU_W = 200
 const ROW_H = 34
 const EDGE = 8
+/** 「已复制」反馈在菜单上停一拍的时长:成功短停就关,报错多停一拍让人看清 */
+const COPY_LINGER_MS = 900
+const FAIL_LINGER_MS = 1600
 
 function clampedPosition(x: number, y: number, rows: number): { left: number; top: number } {
   return {
@@ -29,24 +33,7 @@ export function FilePathMenu(): React.JSX.Element | null {
   const request = useSyncExternalStore(subscribeFilePathMenu, currentFilePathMenu)
 
   // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,收摊
-  useEffect(() => {
-    if (!request) return
-    const onMouseDown = (e: MouseEvent): void => {
-      if (!(e.target instanceof Element) || !e.target.closest('.file-path-menu')) closeFilePathMenu()
-    }
-    const onWheel = (): void => closeFilePathMenu()
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') closeFilePathMenu()
-    }
-    document.addEventListener('mousedown', onMouseDown, true)
-    document.addEventListener('wheel', onWheel, true)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown, true)
-      document.removeEventListener('wheel', onWheel, true)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [request])
+  useMenuDismiss(request !== null, closeFilePathMenu, '.file-path-menu')
 
   if (!request) return null
   // key 带上位置:换个链接右键,菜单重挂一遍,「已复制」的旧状态不残留
@@ -67,7 +54,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
   function noteThenClose(text: string | null): void {
     if (text !== null) {
       setRevealFail(text)
-      timerRef.current = window.setTimeout(closeFilePathMenu, 1600)
+      timerRef.current = window.setTimeout(closeFilePathMenu, FAIL_LINGER_MS)
       return
     }
     // 显示成功不用菜单夸 —— 资源管理器窗口自己弹出来,就是最响亮的反馈
@@ -88,11 +75,11 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
           void request.copy().then((abs) => {
             setCopied(abs === null ? 'fail' : 'ok')
             if (abs === null) {
-              timerRef.current = window.setTimeout(closeFilePathMenu, 1600)
+              timerRef.current = window.setTimeout(closeFilePathMenu, FAIL_LINGER_MS)
               return
             }
             // 反馈停一拍再收摊,让用户亲眼看到「已复制」,不是菜单凭空消失
-            timerRef.current = window.setTimeout(closeFilePathMenu, 900)
+            timerRef.current = window.setTimeout(closeFilePathMenu, COPY_LINGER_MS)
           })
         }}
         title={request.relPath}

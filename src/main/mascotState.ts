@@ -3,8 +3,8 @@
 // 存档是上辈子的记忆,这辈子的屏幕未必还是那样 —— 落窗前必须对着现在的屏幕夹紧。
 // 纯逻辑都住这儿(不碰 electron),自测脚本拖得进来秒跑。
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
 
 /** 桌宠窗的边长(正方形),和 mascot.ts 的窗参数一口约定,改一处必改两处 */
 export const MASCOT_SIZE = 140
@@ -109,20 +109,10 @@ function stateFilePath(dir: string): string {
 
 /** 读记事本;没记过/读不动/内容是垃圾,一律回 null(调用方走默认落角) */
 export function readMascotState(dir: string): MascotState | null {
-  const file = stateFilePath(dir)
-  if (!existsSync(file)) return null
-  try {
-    return parseMascotState(JSON.parse(readFileSync(file, 'utf8')))
-  } catch {
-    return null
-  }
+  return parseMascotState(readJsonFile(stateFilePath(dir)))
 }
 
 /** 写记事本;写不进去就算了 —— 记位置是锦上添花,不该惊动任何人 */
 export function writeMascotState(dir: string, state: MascotState): void {
-  try {
-    writeFileSync(stateFilePath(dir), JSON.stringify(state, null, 2), 'utf8')
-  } catch {
-    // 安静放过
-  }
+  writeJsonFile(stateFilePath(dir), state)
 }

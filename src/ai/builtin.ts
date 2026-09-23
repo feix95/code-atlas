@@ -4,7 +4,7 @@
 // 生命周期:首次用到 AI 才启动(不拖慢 app 打包体积和启动速度);app 退出时杀掉。
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, statSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
@@ -15,6 +15,7 @@ import { estimateKvBytes, formatGB } from '../shared/contextBill.ts'
 import { MODEL_FIT_RAM_MAX_RATIO, MODEL_FIT_RAM_OK_RATIO, MODEL_FIT_VRAM_RATIO } from '../shared/modelShelf.ts'
 import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
+import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
 
 // 上下文缓存(KV)的估算搬去 shared/contextBill.ts 了(档位账本跟滑块共用一份);
 // 这里转一手,老朋友(量尺/自测)照旧从 builtin 进
@@ -150,24 +151,16 @@ function warmupFilePath(): string | null {
 /** 某模型的估价基准 = 最近样本的均值;没账/坏账回 null */
 function readWarmupMs(modelPath: string): number | null {
   const file = warmupFilePath()
-  if (!file || !existsSync(file)) return null
-  try {
-    const samples = parseWarmupSamples(JSON.parse(readFileSync(file, 'utf8')), modelPath)
-    return averageWarmup(samples ?? [])
-  } catch {
-    return null
-  }
+  if (!file) return null
+  const samples = parseWarmupSamples(readJsonFile(file), modelPath)
+  return averageWarmup(samples ?? [])
 }
 
 function recordWarmupMs(modelPath: string, ms: number): void {
   const file = warmupFilePath()
   if (!file) return
-  try {
-    const raw = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
-    writeFileSync(file, JSON.stringify(nextWarmupStore(raw, modelPath, ms), null, 2), 'utf8')
-  } catch {
-    // 账本写不进去就算了:估价是锦上添花,不该惊动任何人
-  }
+  const raw = readJsonFile(file) ?? {}
+  writeJsonFile(file, nextWarmupStore(raw, modelPath, ms))
 }
 
 // ── 提前量尺(第七十三锤)──
@@ -512,11 +505,7 @@ export function parseEnginePidFile(raw: unknown): number | null {
 function writeEnginePidFile(pid: number): void {
   const file = enginePidPath()
   if (!file) return
-  try {
-    writeFileSync(file, JSON.stringify({ pid }), 'utf8')
-  } catch {
-    // 档写不进就算了:收尸是保险绳,不该惊动加载本体
-  }
+  writeJsonFile(file, { pid })
 }
 
 function removePidFile(file: string): void {
@@ -532,24 +521,14 @@ function removePidFile(file: string): void {
 function clearEnginePidFileFor(pid: number | undefined): void {
   const file = enginePidPath()
   if (!file || pid === undefined || !existsSync(file)) return
-  try {
-    const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))
-    if (parseEnginePidFile(raw) === pid) removePidFile(file)
-  } catch {
-    // 读不动就安静放过
-  }
+  if (parseEnginePidFile(readJsonFile(file)) === pid) removePidFile(file)
 }
 
 /** 照 PID 档收尸:上次拉起没收场的引擎(含死在加载中没 listen 的) */
 async function reapOrphanByPidFile(): Promise<boolean> {
   const file = enginePidPath()
   if (!file || !existsSync(file)) return false
-  let pid: number | null
-  try {
-    pid = parseEnginePidFile(JSON.parse(readFileSync(file, 'utf8')))
-  } catch {
-    pid = null
-  }
+  const pid = parseEnginePidFile(readJsonFile(file))
   if (pid === null) {
     removePidFile(file)
     return false
