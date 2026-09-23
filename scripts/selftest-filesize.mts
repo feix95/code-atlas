@@ -12,7 +12,6 @@ const CODE_EXT = /\.(ts|tsx|mts|cts|js|jsx|css)$/
 const GIANTS: Record<string, number> = {
   'main/index.ts': 3299,
   'renderer/src/App.tsx': 2279,
-  'renderer/src/assets/main.css': 6508,
   'ai/index.ts': 1618,
   'renderer/src/components/SettingsDialog.tsx': 1588
 }

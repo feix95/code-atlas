@@ -1,0 +1,279 @@
+/* ── 第七十锤起:模型状态栏 —— 钉在窗口最底下,随时看模型热身到哪了 ──
+   第七十四锤改版(小葵 P 的稿):左状态右数据,进度条拉通全底栏当最大,端点小发光 */
+
+.model-dock {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  min-height: 1.875rem;
+  border-top: 1px solid var(--line-soft);
+  background: var(--window);
+}
+
+.model-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 0.1875rem var(--space-3) 0.25rem;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 左组:状态本体 + 取消/卸下;右组:模型名 + 大小;中间弹性空间留给提醒话 */
+.model-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.model-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* 状态点:灰=还没叫醒,琥珀=热身中,主色呼吸=忙,绿=就绪,红=出岔子/没连上 */
+.model-dot {
+  flex: none;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+
+.model-status.is-busy .model-dot {
+  background: var(--accent-bright);
+  animation: model-breathe 1.2s ease-in-out infinite;
+}
+
+.model-status.is-loading .model-dot {
+  background: var(--amber);
+  animation: model-breathe 1.2s ease-in-out infinite;
+}
+
+.model-status.is-ready .model-dot {
+  background: var(--green);
+}
+
+.model-status.is-error .model-dot,
+.model-status.is-unreachable .model-dot {
+  background: var(--danger);
+}
+
+@keyframes model-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.model-provider {
+  flex: none;
+  padding: 0 0.375rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.model-state {
+  flex: none;
+  color: var(--muted);
+}
+
+.model-status.is-error .model-state,
+.model-status.is-unreachable .model-state {
+  color: var(--danger);
+}
+
+/* 模型名:长名字掐头留尾,悬停看全名;右组地界宽,给到 24rem */
+.model-name {
+  min-width: 0;
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.model-size {
+  flex: none;
+  color: var(--muted-2);
+}
+
+/* 引导/出岔子的一句话:住中间弹性带,空间不够自动截断,悬停看全文 */
+.model-message {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.model-status.is-error .model-message {
+  color: var(--danger);
+}
+
+/* 取消/卸下:小号描边按钮,像底栏的一部分,不抢戏 */
+.model-act {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-xs);
+  padding: 0.0625rem 0.5rem;
+  cursor: pointer;
+}
+
+.model-act:hover {
+  border-color: var(--accent-line);
+  color: var(--accent-bright);
+}
+
+/* 热身进度条(第七十四锤):拉通整条底栏底下,按底栏全长当最大;
+   只在引擎报真进度时画(慢慢长),没真进度就一根都不画 —— 信号灯的呼吸
+   已经把"在忙"说清楚了,再来段来回扫的空车皮是两套动画说同一句话;
+   前进端点带个小发光(currentColor 跟着状态变色:热身主色、就绪变绿) */
+.model-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 0.125rem;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  color: var(--muted);
+  transition: width 0.6s var(--ease-smooth);
+}
+
+/* 车头微光:只驮真进度慢慢爬,不跑空车;就绪时跟条子一起变绿退场 */
+.model-bar::after {
+  content: '';
+  position: absolute;
+  right: -0.1875rem;
+  top: 50%;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: currentColor;
+  box-shadow: 0 0 0.5rem 0.125rem currentColor;
+  opacity: 0.85;
+}
+
+/* 就绪后进度条退场:满宽一条绿,1.5 秒后隐掉,别一直压着底栏(端点发光跟着变绿) */
+.model-status.is-ready .model-bar {
+  color: var(--green);
+  animation: model-bar-fade 1.5s ease forwards;
+}
+
+@keyframes model-bar-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-dot {
+    animation: none;
+  }
+}
+
+/* ── 第七十三锤:模型量尺灯 —— 选模型那一刻就告诉用户带不带得动 ── */
+
+.cfg-fit-note.is-ok {
+  color: var(--green);
+}
+
+.cfg-fit-note.is-tight {
+  color: var(--amber);
+}
+
+.cfg-fit-note.is-too-big,
+.cfg-fit-note.is-missing {
+  color: var(--danger);
+}
+
+.cfg-fit-note.is-unknown {
+  color: var(--muted-2);
+}
+
+/* ── 上下文档位滑块(2026-09-13):程序员档位 2 的幂,拖滑块或点刻度都行,和输入框互通 ── */
+
+.cfg-ctx-notch {
+  margin-top: 0.625rem;
+}
+
+.cfg-ctx-range input {
+  width: 100%;
+  display: block;
+  accent-color: var(--accent-bright);
+  cursor: pointer;
+}
+
+.cfg-ctx-ticks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.cfg-ctx-ticks button {
+  padding: 0.1875rem 0.5625rem;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: var(--font-xxs);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-ctx-ticks button:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+}
+
+.cfg-ctx-ticks button.is-active {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+/* ── 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话 ── */
+
+.revive-note {
+  position: fixed;
+  top: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-revive);
+  max-width: min(34rem, calc(100vw - 3rem));
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+  box-shadow: var(--shadow-menu);
+}

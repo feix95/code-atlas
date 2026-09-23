@@ -1,0 +1,449 @@
+/* ── 关系 Tab ── */
+
+.relation-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 900px) {
+  .relation-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.relation-box h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-strong);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-strong);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 关系模组的头(小葵拍板:做成和概览卡/小探针卡一样的独立模组,不留露天标签):
+ * 名字加粗,旁边缀一句灰色说明 */
+.relation-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: var(--text-strong);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-strong);
+}
+
+.relation-card-head span {
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+}
+
+/* 模组里的轻说明(没分析过/正在连线/一条连线都没有):一行灰字轻轻带过,不抢眼 */
+.relation-empty-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: var(--lh-160);
+}
+
+.relation-link {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 0.375rem 0;
+  color: var(--accent-bright);
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+  font-size: var(--font-sm);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.relation-link:last-child {
+  border-bottom: 0;
+}
+
+.relation-link:hover {
+  text-decoration: underline;
+}
+
+/* ── 结构卡(旧「结构」Tab 退役,清单搬进概览垫底,套关系卡同款壳) ── */
+
+.structure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+.structure-section {
+  min-width: 0;
+}
+
+.structure-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-bold);
+  margin-bottom: var(--space-2);
+}
+
+.structure-section-count {
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.structure-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.chip-sm {
+  font-size: var(--font-xs);
+  padding: 2px var(--space-2);
+  font-weight: var(--font-w-medium);
+}
+
+/* ── git 抽屉(沿用既有类名,重新配色)── */
+
+.git {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.git-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  /* 门行底下留呼吸缝(小葵红线):统计行不贴着门 */
+  margin-top: var(--space-2);
+}
+
+.git-branch {
+  font-size: var(--font-base);
+  font-weight: var(--font-w-bold);
+}
+
+/* AI 干活报告卡(第六十三锤):改动页顶层的整轮审计,报告和单文件讲解共用 explain-* 排版 */
+.git-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.git-report-hint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+/* git 门(第六十五锤):侧边栏退役,git 住进右栏 —— 门行收着(分支图标+数量徽章+文案),
+   点一下原地展开账本和 AI 干活报告;有未提交改动才亮,账结清自动退场 */
+.git-door {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.git-door:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+/* 分支图标 + 数量徽章:VS Code 源代码管理同款 —— 灰描边图标,右下角蓝底白字圆标 */
+.git-door-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--muted);
+}
+
+.git-door-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.git-door-badge {
+  position: absolute;
+  right: -0.4375rem;
+  bottom: -0.3125rem;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  padding: 0 0.1875rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
+  line-height: 0.875rem;
+  text-align: center;
+}
+
+.git-door:hover .git-door-icon {
+  color: var(--accent-bright);
+}
+
+.git-door-branch {
+  flex-shrink: 0;
+  font-weight: var(--font-w-bold);
+  color: var(--accent-bright);
+}
+
+.git-door-text {
+  flex: 1;
+  color: var(--muted);
+}
+
+.git-door-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .git-door-caret {
+    transition: transform var(--dur-2) var(--ease-smooth);
+  }
+}
+
+.git-door-caret.is-open {
+  transform: rotate(180deg);
+}
+
+/* 功能定位(第六十七锤):「功能在哪」卡 —— 输入一句想知道的事,带路人指路,文件卡一点直达 */
+.locator-form {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.locator-form input {
+  min-width: 0;
+  flex: 1;
+  height: 2rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-md);
+  font-family: inherit;
+}
+
+.locator-form input:focus {
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.locator-examples {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.locator-examples .chip {
+  text-align: center;
+}
+
+.locator-hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.locator-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.locator-hit:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.locator-hit-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.locator-hit-path {
+  color: var(--accent-bright);
+  font-weight: var(--font-w-bold);
+  overflow-wrap: anywhere;
+}
+
+.locator-hit-reason {
+  color: var(--muted);
+}
+
+.git-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.git-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-md);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.git-row:hover {
+  background: var(--hover);
+}
+
+.git-row.is-selected {
+  background: var(--selected-bg);
+  box-shadow: var(--edge-accent);
+}
+
+.git-badge {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  color: var(--muted);
+}
+
+.git-badge--added {
+  color: var(--git-add);
+  border-color: var(--git-add);
+}
+
+.git-badge--modified {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+}
+
+.git-badge--deleted {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.git-badge--renamed {
+  color: var(--git-rename);
+  border-color: var(--git-rename);
+}
+
+.git-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--font-sm);
+}
+
+.git-staged {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--git-add);
+  background: color-mix(in srgb, var(--git-add) 12%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 1px var(--space-2);
+}
+
+.git-numstat {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.git-numstat.is-binary {
+  color: var(--muted);
+}
+
+.git-add {
+  color: var(--git-add);
+  font-weight: var(--font-w-semi);
+}
+
+.git-del {
+  color: var(--danger);
+  font-weight: var(--font-w-semi);
+}
+
+.git-change-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.git-change-line .git-numstat {
+  margin-left: 0;
+}
+
+.chip-link {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chip-link:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+.chip-link.is-on {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}

@@ -1,0 +1,248 @@
+/* ============================================================
+   CodeAtlas — 工作台视觉系统(Obsidian 无色换皮)
+   灰阶 = 结构层级 · 白/黑 = 强调 · 琥珀 = 不完整/留心眼 · 红 = 只给真错误
+   ============================================================ */
+
+:root {
+  /* 亮暗由外观系统往 <html> 挂 data-theme 控制(自动模式跟着系统,也能手动钉死) */
+  color-scheme: light;
+  /* ── 布局 token ── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 3rem;
+  --radius-xxs: 0.25rem;
+  --radius-xs: 0.3125rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-pill: 999px;
+  /* 窗角 14px:物理像素例外(圆角要贴屏幕物理直角,不跟 rem 缩放),三处共用这一户 */
+  --radius-window: 14px;
+  --font-xxs: 0.625rem;
+  --font-xs: 0.6875rem;
+  --font-sm: 0.75rem;
+  --font-md: 0.8125rem;
+  --font-base: 0.875rem;
+  --font-ml: 0.9375rem;
+  --font-lg: 1rem;
+  --font-display: 1.625rem;
+  --font-title: 1.75rem;
+  --font-hero: clamp(1.75rem, 3vw, 2.5rem);
+  /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有户口才叫正经档 ── */
+  --font-w-regular: 400;
+  --font-w-medium: 500;
+  --font-w-semi: 600;
+  --font-w-strong: 650;
+  --font-w-bold: 700;
+  /* ── 行高梯度 ── */
+  --lh-100: 1;
+  --lh-125: 1.25;
+  --lh-130: 1.3;
+  --lh-150: 1.5;
+  --lh-155: 1.55;
+  --lh-160: 1.6;
+  --lh-165: 1.65;
+  --lh-170: 1.7;
+  --lh-175: 1.75;
+  --lh-190: 1.9;
+  --content-max: 70rem;
+  --control-height: 2.5rem;
+  /* ── 动效(Obsidian 节奏):70/150/300ms 三档 + 快进慢落的 smooth 曲线 ── */
+  --dur-1: 0.07s;
+  --dur-2: 0.15s;
+  --dur-3: 0.3s;
+  --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* ── 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /
+     通用浮层 30 / 下拉菜单 40 / 设置页 50 / 复活提示 90 / 文件菜单 95 ── */
+  --z-raise: 1;
+  --z-jump: 2;
+  --z-float: 5;
+  --z-pane-hint: 6;
+  --z-toast: 10;
+  --z-code-float: 28;
+  --z-code-mark: 29;
+  --z-popover: 30;
+  --z-dropdown: 40;
+  --z-dialog: 50;
+  --z-revive: 90;
+  --z-menu: 95;
+  /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
+  --focus-ring: 0 0 0 0.1875rem;
+  --shadow-menu: 0 8px 28px rgba(0, 0, 0, 0.22);
+  --shadow-modal: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --edge-accent: inset 2px 0 0 var(--accent-bright);
+  /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
+  --scrim: rgba(0, 0, 0, 0.36);
+  --scrim-deep: rgba(0, 0, 0, 0.45);
+  /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
+  --traffic-dot: #d1d3d4;
+  --traffic-ink: #5c6165;
+  --traffic-chip: #c5c9c8;
+  --traffic-idle: #cfd2d1;
+  --traffic-green: #28c840;
+  --traffic-yellow: #ffbd2e;
+  --traffic-red: #ff5f57;
+  /* 开关钮 / 选中 chip(2026-09-18 小葵设计稿):亮暗两套都成立的写真值,走户口不调色板 */
+  --switch-knob: #ffffff;
+  --chip-on-bg: #dde3e7;
+  --chip-on-ink: #1d2226;
+  --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
+  /* ── 色板(浅色,Obsidian 无色阶)──
+     灰阶真值户口在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
+     外观系统 achro 回落和石墨种子色都查那本 —— 这边是同款写真的首帧兜底,两边必须一致 */
+  --window: #f6f6f6;
+  /* 画布底色:内容白,框架层(--window)垫侧栏/顶栏/页签条 */
+  --canvas-tint: #ffffff;
+  --secondary: #6b6b6b; /* 辅助色:分布条/预设问题 chips 等的灰阶点缀 */
+  --secondary-deep: #4c4c4c; /* 辅助色的文字安全档 */
+  --surface: #ffffff;
+  --surface-soft: #f6f6f6;
+  --line: #e4e4e4;
+  --line-soft: #ededed;
+  --text: #222222;
+  --text-strong: #000000;
+  --muted: #5c5c5c;
+  --muted-2: #ababab;
+  --accent: #262626;
+  /* accent 的亮档:当字色/细线用(实心块上另有 accent-ink),浅色下即纯黑 */
+  --accent-bright: #000000;
+  --accent-hover: #000000;
+  /* 实心主题色件上的字色:第七十九锤起由 appearance 按派生主题色的对比度自动翻深浅,
+     亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(0, 0, 0, 0.06);
+  --accent-line: #d9d9d9;
+  --green: #38a169;
+  --green-soft: #effaf3;
+  --green-line: #c2e4d0;
+  --amber: #ba7b22;
+  --amber-soft: #fff8eb;
+  --amber-line: #ead7b7;
+  --danger: #d64545;
+  --danger-soft: #fdf0f0;
+  --danger-line: #f0c9c9;
+  --git-add: #1a7f37;
+  --git-rename: #9a6700;
+  --hover: rgba(0, 0, 0, 0.05);
+  --selected-bg: rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题 ── */
+  --tok-ctl: #af00db;
+  --tok-kw: #0000ff;
+  --tok-str: #a31515;
+  --tok-com: #008000;
+  --tok-num: #098658;
+  --tok-fn: #795e26;
+  --tok-type: #267f99;
+  --tok-var: #001080;
+  --tok-regex: #811f3f;
+  --tok-symbol: #800000;
+}
+
+/* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场
+   (灰阶真值户口同在 shared/appearancePalette.ts 的 dark 档,两边必须一致) */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --window: #282828;
+  --canvas-tint: #1c1c1c;
+  --secondary: #999999;
+  --secondary-deep: #bababa;
+  --surface: #282828;
+  --surface-soft: #232323;
+  --line: #333333;
+  --line-soft: #2e2e2e;
+  --text: #dadada;
+  --text-strong: #f0f0f0;
+  --muted: #b3b3b3;
+  --muted-2: #666666;
+  --accent: #484848;
+  /* accent 的亮档:当字色/细线用,暗色下近白 */
+  --accent-bright: #f0f0f0;
+  --accent-hover: #5a5a5a;
+  --accent-ink: #f0f0f0; /* 实心灰块上的字色:近白 */
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-line: #555555;
+  --green: #55c07e;
+  --green-soft: #1e3527;
+  --green-line: #2e5a3d;
+  --amber: #d29922;
+  --amber-soft: #33290f;
+  --amber-line: #57431a;
+  --danger: #ef6b6b;
+  --danger-soft: #3a2226;
+  --danger-line: #63393e;
+  --git-add: #3fb950;
+  --git-rename: #d29922;
+  --hover: rgba(255, 255, 255, 0.07);
+  --selected-bg: rgba(255, 255, 255, 0.13);
+  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
+  --switch-knob: #e5eaed;
+  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
+  --tok-ctl: #c586c0;
+  --tok-kw: #569cd6;
+  --tok-str: #ce9178;
+  --tok-com: #6a9955;
+  --tok-num: #b5cea8;
+  --tok-fn: #dcdcaa;
+  --tok-type: #4ec9b0;
+  --tok-var: #9cdcfe;
+  --tok-regex: #d16969;
+  --tok-symbol: #d7ba7d;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 界面缩放约定(第四十七锤起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
+   布局/字号/图标全挂 rem 跟着变,点击坐标和视觉永远 1:1 —— 不再借用浏览器缩放坐标系。
+   两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;②窗壳的圆角和描边是「窗」的装饰 */
+html,
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  height: 100%;
+  background: transparent;
+}
+
+/* 圆角贴满窗(第五十六锤,小葵拍板):界面卡片直接铺满整扇窗 —— 不留透明裙边、
+   不要外阴影,只有四个角用圆角裁掉透出真实桌面。Win10 没有系统圆角接口,
+   透明合成仍是唯一能出抗锯齿圆角的路,玻璃窗保留 */
+body {
+  padding: 0;
+}
+
+#root {
+  height: 100%;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--canvas-tint);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-window);
+}
+
+/* 最大化:贴满屏幕时圆角和描边收掉,四角不漏缝 */
+body.is-maximized .app {
+  border: none;
+  border-radius: 0;
+}

@@ -1,0 +1,311 @@
+/* ── 欢迎页 / 扫描中 ── */
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.state {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--font-base);
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+}
+
+.state .notice {
+  text-align: left;
+}
+
+/* ── 首页盘符列表(第六十锤):一开就是「这台电脑」,欢迎卡退役,版本号搬进设置 ── */
+
+.drives-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+/* ── 最近打开(第八十一锤):首页一排小卡,点一下回上次的项目;✕ 只删记录不动文件夹 ── */
+
+.recents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.recent-card {
+  position: relative;
+  min-width: 0;
+}
+
+.recent-open {
+  width: 100%;
+  min-height: var(--control-height);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
+}
+
+.recent-open:hover {
+  border-color: var(--accent-line);
+  background: var(--hover);
+}
+
+/* 长路径掐头留尾:卡片里只露项目名和上次时间,全路径悬停看 */
+.recent-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+}
+
+.recent-time {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.recent-remove {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
+}
+
+.recent-card:hover .recent-remove,
+.recent-remove:focus-visible {
+  opacity: 1;
+}
+
+.recent-remove:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* 键盘用户和触屏没有 hover:聚焦时 ✕ 也要在;系统声明无悬停设备时常显 */
+@media (hover: none) {
+  .recent-remove {
+    opacity: 1;
+  }
+}
+
+.drive-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
+}
+
+.drive-card:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--accent) 14%, transparent);
+  transform: translateY(-1px);
+}
+
+.drive-card:active {
+  transform: translateY(0);
+}
+
+.drive-letter {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  font-size: var(--font-md);
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.drive-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+/* 容量条(第八十一锤):像手机存储那样一眼看胖瘦;剩不到一成转琥珀提醒 */
+.drive-bar {
+  display: block;
+  height: 0.25rem;
+  margin-top: 0.1875rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+}
+
+.drive-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--secondary);
+}
+
+.drive-bar.is-low > i {
+  background: var(--amber);
+}
+
+.drive-info strong {
+  font-size: var(--font-sm);
+}
+
+.drive-info small {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+/* ── 统一等待语言:脉冲点 + 动词 ── */
+
+.progress-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: var(--space-2);
+  vertical-align: 1px;
+}
+
+.progress-dots i {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bright);
+  opacity: 0.3;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .progress-dots i {
+    animation: dot-pulse 1.2s ease-in-out infinite;
+  }
+
+  .progress-dots i:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .progress-dots i:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+}
+
+@keyframes dot-pulse {
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* ── 微动效:只做轻淡入;系统声明减少动效就全部关闭 ── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .detail-body > * {
+    animation: card-in 0.15s var(--ease-smooth);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.3125rem);
+  }
+}
+
+/* ── 预览进场的软着陆(小葵报「点绿字跳预览整窗闪一下」):跳转那一下左右两扇
+ *   同帧大换血 —— 目录树整棵拆掉换预览窗、聊天面板整扇重挂,透明窗在这种大重绘
+ *   帧上容易掉一帧底色,硬切观感也生硬;两扇挂载时各淡入一小拍,把闪摊成渐显。
+ *   预览内换文件两扇都不重挂(各有记账复位),不会反复闪动画 ── */
+@media (prefers-reduced-motion: no-preference) {
+  .soft-in {
+    animation: soft-in 0.16s ease-out;
+  }
+}
+
+@keyframes soft-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── 滚动条:细一圈,不抢内容 ── */
+
+::-webkit-scrollbar {
+  width: 0.5625rem;
+  height: 0.5625rem;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius-xl);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-2);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 两条滚动条交汇的角块:不点名上色就露系统默认的白,暗色主题下是个白疙瘩(小葵截图报) */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── 窄窗口:路径框让位,树保底宽度,详情内部滚动 ── */
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .path-box {
+    order: 10;
+    flex-basis: 100%;
+  }
+}

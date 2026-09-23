@@ -1,0 +1,591 @@
+/* ── 双栏工作区 ── */
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.sidebar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--window);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.sidebar-top {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.search {
+  height: 1.875rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 0.625rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  font-size: var(--font-sm);
+}
+
+.search:focus-within {
+  border-color: var(--accent-line);
+}
+
+.search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: var(--font-sm);
+  font-family: inherit;
+}
+
+.search input::placeholder {
+  color: var(--muted-2);
+}
+
+.tree-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-2) var(--space-2) var(--space-4);
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+
+.sidebar-footer .mono {
+  font-size: var(--font-xxs);
+}
+
+/* ── 代码预览(第一百一十锤):左栏的只读文本窗 ──
+   只摆纯文本 + 行号,不描语法色;等宽字、不折行,横向自己滚 */
+.code-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.code-pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.code-pane-icon {
+  display: inline-flex;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.code-pane-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+/* 预览器头部的文件名带了右键菜单(复制路径/在资源管理器中显示):染主题色示意,
+ * 左键不动作(已经在预览它了),右键才算数 */
+.code-pane-name.is-file-menu {
+  color: var(--accent-bright);
+  cursor: context-menu;
+}
+
+.code-pane-name.is-file-menu:hover {
+  text-decoration: underline;
+}
+
+.code-pane-exit,
+.code-pane-ref {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--font-xs);
+}
+
+.code-pane-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+
+/* 只载入了开头一段 / 读不了:琥珀色是「留个心眼」,不是出错 */
+.code-pane-note.is-warn {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* 正文区:行号钉在左边不跟横向滚动跑,纵横向都自己滚 */
+.code-view {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) 0 var(--space-4);
+  background: var(--canvas-tint);
+}
+
+/* 虚拟滚动(全文预览这锤):轨道撑出全文行程(高度由组件按 总行数×行高 算),
+   可视段(.code-row)整体平移到滚动位置 —— 元素永远只有一屏,滚动条是全文的 */
+.code-track {
+  position: relative;
+  min-width: max-content;
+}
+
+.code-row {
+  display: flex;
+  align-items: flex-start;
+  will-change: transform;
+}
+
+.code-gutter,
+.code-text {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--font-xs);
+  line-height: var(--lh-160);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-raise);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--muted-2);
+  text-align: right;
+  user-select: none;
+  background: var(--canvas-tint);
+  border-right: 1px solid var(--line);
+}
+
+.code-text {
+  padding: 0 var(--space-3);
+  color: var(--text);
+}
+
+/* ── 选区美术(第一百一十四锤)──
+   选中色跟辅助色走:系统默认那套蓝和别处长得一样,分不出「进了引用功能」。
+   只作用于代码正文,别的面板保持系统默认。 */
+.code-text::selection {
+  background: color-mix(in srgb, var(--accent-bright) 28%, transparent);
+  color: inherit;
+}
+
+/* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
+.tok-ctl {
+  color: var(--tok-ctl);
+}
+.tok-kw {
+  color: var(--tok-kw);
+}
+.tok-str {
+  color: var(--tok-str);
+}
+.tok-com {
+  color: var(--tok-com);
+}
+.tok-num {
+  color: var(--tok-num);
+}
+.tok-fn {
+  color: var(--tok-fn);
+}
+.tok-type {
+  color: var(--tok-type);
+}
+.tok-var {
+  color: var(--tok-var);
+}
+.tok-regex {
+  color: var(--tok-regex);
+}
+.tok-symbol {
+  color: var(--tok-symbol);
+}
+
+/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
+.code-mark {
+  position: fixed;
+  z-index: var(--z-code-mark);
+  display: inline-flex;
+  color: var(--accent-bright);
+  pointer-events: none;
+  user-select: none;
+}
+
+.code-mark.is-start {
+  transform: translate(calc(-100% - 3px), -50%);
+}
+
+.code-mark.is-end {
+  transform: translate(3px, -50%);
+}
+
+/* 选中范围的左缘竖线:一眼看出这一段是一个整体 */
+.code-sel-bar {
+  position: fixed;
+  z-index: var(--z-code-float);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent-bright);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* 选区浮钮(第一百一十一锤):以选区右上角为锚,居中浮在整块上方。
+   user-select:none 是保险 —— 浮层自己绝不能成为可选中的内容(被拖过时会被吞进选区) */
+.code-select-btn {
+  position: fixed;
+  z-index: var(--z-popover);
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 0.3125rem 0.625rem;
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  box-shadow: var(--shadow-pop);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+
+.code-select-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.code-select-btn:disabled {
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: not-allowed;
+}
+
+/* 引用卡排(第一百一十一锤):挂在输入框上方,一条一段代码,点 ✕ 摘掉 */
+.chat-refs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.chat-refs-label {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.chat-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  padding: 0.1875rem 0.375rem 0.1875rem 0.5rem;
+  color: var(--accent-bright);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--font-xs);
+}
+
+.chat-ref-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-ref-remove {
+  flex-shrink: 0;
+  padding: 0 0.125rem;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.chat-ref-remove:hover {
+  color: var(--danger);
+}
+
+/* 用户气泡里留下的引用痕迹:他说过什么、引的是哪一段,回看时对得上 */
+.msg-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.msg-ref {
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 18%);
+  font-size: var(--font-xxs);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-right: 0.3125rem;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* 还有没探完的目录:琥珀点,提醒但不是错 */
+.status-dot.is-amber {
+  background: var(--amber);
+}
+
+/* 探测失败等人话提示:贴在树栏底部 */
+.tree-toast {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px dashed var(--danger-line);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-md);
+  color: var(--danger);
+}
+
+/* ── 目录树:箭头管展开,名字管选中 ── */
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 1.6875rem;
+  margin: 1px 0;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-2) var(--ease-smooth);
+  /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
+     几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.6875rem;
+}
+
+.tree-row:hover {
+  background: var(--hover);
+}
+
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧亮灰细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
+.tree-row.is-selected {
+  background: var(--selected-bg);
+  box-shadow: var(--edge-accent);
+}
+
+.tree-caret {
+  flex: 0 0 1.125rem;
+  width: 1.125rem;
+  height: 1.25rem;
+  display: grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-ml);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.tree-caret:hover {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+
+/* 箭头一律 muted 灰(Obsidian 规矩):开没开交给旋转方向说,不靠色 */
+
+.tree-caret.is-lazy {
+  color: var(--amber);
+}
+
+/* 懒加载探测中的小圈圈 */
+.tree-spin {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border: 2px solid var(--accent-line);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tree-spin {
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tree-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 100%;
+  padding: 0 0.4375rem 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-md);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-row.is-selected .tree-main {
+  color: var(--accent-bright);
+}
+
+.tree-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  /* 图标跟随行字色(Obsidian 换皮):常规 muted、选中亮档,不再单独压暗 */
+  color: inherit;
+}
+
+.tree-icon svg {
+  display: block;
+}
+
+.tree-name {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 文件名不再单独染色(Obsidian 无色皮):树行字统一 muted,只有选中行整行提亮 */
+
+/* 一句大白话摘要:次要文字,挤了就省略 */
+.tree-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+
+/* 我的备注(第九十八锤):小葵自己的话压过引擎一句话,小笔帽章 + 字色亮一档 */
+.tree-summary.is-note {
+  color: var(--muted);
+}
+
+.tree-summary.is-note .note-pen {
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+  vertical-align: -0.125rem;
+}
+
+/* 详情页副标题位置的备注:亮一档,跟引擎话区分 */
+.entity-title p.is-note {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  color: var(--text);
+}
+
+.entity-title p.is-note .note-pen {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* 详情页的备注编辑行:挂在实体行下,Enter 存 / Esc 走 */
+.note-editor {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+}
+
+.note-editor input {
+  min-width: 0;
+  flex: 1;
+  height: 2rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-md);
+  font-family: inherit;
+}
+
+.note-editor input:focus {
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+/* 后缀小标:等宽、灰色,压到最低视觉权重 */
+.tree-tag {
+  flex: 0 0 auto;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: var(--font-xxs);
+  letter-spacing: 0.03em;
+}
+
+/* 文件夹直接子项数:灰色小胶囊 */
+.tree-count {
+  flex: 0 0 auto;
+  min-width: 1.125rem;
+  padding: 1px 0.3125rem;
+  color: var(--muted);
+  border-radius: var(--radius-pill);
+  background: var(--hover);
+  font-size: var(--font-xxs);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
+.tree-badge {
+  flex: 0 0 auto;
+  font-size: var(--font-xxs);
+  color: var(--amber);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-pill);
+  padding: 0 0.375rem;
+}

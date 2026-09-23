@@ -1,0 +1,393 @@
+/* ── 自绘标题栏:整条能拖动窗口;底下可点的东西必须 no-drag,不然只会拖窗点不到 ── */
+
+.titlebar {
+  position: relative;
+  flex: 0 0 2.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: drag;
+  background: var(--window);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+/* 三颗窗控按钮住右上角,顺序照 Windows 习惯(最小化 → 最大化 → 关闭) */
+.traffic-lights {
+  position: absolute;
+  right: 0.625rem;
+  display: flex;
+  gap: 2px;
+}
+
+/* 圆点本体 0.6875rem,按钮底座放大到 1.125rem:点着不费劲 */
+.traffic-lights .light {
+  position: relative;
+  width: 1.125rem;
+  height: 1.125rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.traffic-lights .light::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--traffic-dot);
+  transition:
+    filter var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth);
+}
+
+/* 圆点里的功能图标:横线=最小化,方框=最大化(最大化时变双框=还原),白叉=关闭;
+   图标跟圆点一样挂 rem 随缩放走,发丝粗细留物理像素。关闭的白叉压红底,不用 hover 也认得出 */
+.traffic-lights .light i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.traffic-lights .is-min i {
+  width: 0.4375rem;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--traffic-ink);
+}
+
+.traffic-lights .is-max i {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border: 1.5px solid var(--traffic-ink);
+  border-radius: 2px;
+}
+
+/* 贴满屏幕时方框变双框,示意「点这里还原」:i 当后面那块原位不动,
+   ::after 是底左的前块 —— 实心垫底把后块穿过来的线挡掉,双框才不会糊成同心框 */
+body.is-maximized .traffic-lights .is-max i::after {
+  content: '';
+  position: absolute;
+  top: 0.03125rem;
+  left: -0.09375rem;
+  width: 0.125rem;
+  height: 0.125rem;
+  border: 1.5px solid var(--traffic-ink);
+  border-radius: 1px;
+  background: var(--traffic-chip);
+}
+
+.traffic-lights .is-max:active i::after {
+  filter: brightness(0.82);
+}
+
+.traffic-lights .is-close i {
+  width: 0.4375rem;
+  height: 0.4375rem;
+}
+
+.traffic-lights .is-close i::before,
+.traffic-lights .is-close i::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.4375rem;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--traffic-ink);
+}
+
+.traffic-lights .is-close i::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.traffic-lights .is-close i::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* 三颗窗控平时统一中性灰(Obsidian 无色皮),悬停才露 mac 本色:绿=最小化 黄=最大化 红=关闭 */
+.traffic-lights .is-min::before,
+.traffic-lights .is-max::before,
+.traffic-lights .is-close::before {
+  background: var(--traffic-idle);
+}
+
+.traffic-lights .is-min:hover::before {
+  background: var(--traffic-green);
+}
+
+.traffic-lights .is-max:hover::before {
+  background: var(--traffic-yellow);
+}
+
+.traffic-lights .is-close:hover::before {
+  background: var(--traffic-red);
+}
+
+/* 最大化还原态的前块跟着圆点一起换色,别留灰补丁 */
+body.is-maximized .traffic-lights .is-max:hover i::after {
+  background: var(--traffic-yellow);
+}
+
+.traffic-lights .light:active::before {
+  filter: brightness(0.82);
+}
+
+/* 窗控钮不画焦点提示:全局 :focus-visible 的 outline 画在方盒上像个怪框,
+   挪成圆点光环又被误判成「圆点变大」—— Electron 失焦/重获焦会把鼠标点过的钮
+   误判成键盘焦点,任何焦点标记在这儿都是时隐时现的「渲染故障」。窗控钮是鼠标
+   领地,Tab 本来也很少走到,直接豁免干净 */
+.traffic-lights .light:focus-visible {
+  outline: none;
+}
+
+/* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
+:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 1px;
+}
+
+/* ── 顶栏:品牌 + 打开/刷新 + 路径 + 设置 ── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--window);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+/* logo(第六十锤起可点):开着项目时点了回项目总览,没开项目时变灰不可点 */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-base);
+  font-weight: var(--font-w-bold);
+  letter-spacing: -0.01em;
+  margin-right: var(--space-2);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--dur-2) var(--ease-smooth);
+}
+
+.brand:hover:not(:disabled) .brand-mark {
+  filter: brightness(1.12);
+}
+
+.brand:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.brand:disabled {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
+.brand-mark {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  font-size: var(--font-base);
+  border-radius: 0.4375rem;
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
+  transition: filter var(--dur-2) var(--ease-smooth);
+}
+
+/* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3125rem;
+  height: 1.875rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  /* 上缘一条受光线(Obsidian 招牌细节):控件像实体一样"凸"出来;浅色底下这条线隐形,无副作用 */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--accent-bright);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
+}
+
+.btn:hover {
+  background: var(--accent-soft);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* 忙碌时按钮文字自己就是进度(⏳ 全删了,干等就是「……」);灰但不装禁止符 */
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 实心按钮平涂、不叠阴影:受光线+厚度边那套只在近灰皮上成立,
+   彩色/近黑 accent 上要么隐形要么变味,索性全摘(2026-09-22 小葵拍板) */
+.btn-primary {
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+  background: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  color: var(--secondary-deep);
+  border-color: color-mix(in srgb, var(--secondary) 55%, transparent);
+  background: color-mix(in srgb, var(--secondary) 10%, transparent);
+}
+
+/* 图标按钮:热区放大到 2.25rem 兜住「双重缩放(系统 150% × 应用 zoom)下的小幅命中偏移」,
+   字形 1rem 视觉不变;line-height 锁 1 防字形基线漂移 */
+.icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--font-lg);
+  line-height: var(--lh-100);
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+/* 地址栏:可以直接输路径回车开图 */
+.path-box {
+  position: relative;
+  flex: 1;
+  min-width: 11.25rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 1.875rem;
+  padding: 0 2px 0 var(--space-2);
+  background: var(--canvas-tint);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-2) var(--ease-smooth);
+}
+
+.path-box:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.path-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-xs);
+  padding: var(--space-1) 0;
+  outline: none;
+}
+
+.path-input::placeholder {
+  color: var(--muted-2);
+}
+
+.path-go {
+  height: 1.5rem;
+  padding: 0 var(--space-2);
+}
+
+/* 空路径点了「前往」:气泡提示挂输入框正下方 */
+.path-hint {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0.625rem;
+  z-index: var(--z-popover);
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  box-shadow: var(--shadow-pop);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .path-box.is-shaking {
+    animation: path-shake 0.35s var(--ease-smooth);
+  }
+}
+
+@keyframes path-shake {
+  20% {
+    transform: translateX(-0.25rem);
+  }
+  40% {
+    transform: translateX(0.25rem);
+  }
+  60% {
+    transform: translateX(-0.1875rem);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}

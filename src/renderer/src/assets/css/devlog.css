@@ -1,0 +1,262 @@
+/* ── 第八十七锤:Developer 日志窗口 —— 独立小窗,引擎原话/请求报账/应用记账一本账 ──
+   复用主窗的圆角壳(透明窗 + 14px 圆角),里面是一条工具栏 + 滚动账本 */
+
+.devlog {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--canvas-tint);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-window);
+}
+
+.devlog-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft); /* 跟主题走:写死浅渐变会在暗色主题下把浅字糊掉(实测) */
+  -webkit-app-region: drag; /* 整条能拖窗;里面的按钮单独 no-drag */
+}
+
+.devlog-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  font-size: var(--font-md);
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+}
+
+.devlog-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+  color: var(--muted-2);
+}
+
+.devlog-count {
+  flex: none;
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.devlog-close {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-lg);
+  line-height: var(--lh-100);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.devlog-close:hover {
+  color: var(--danger);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.devlog-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: 0.4375rem 0.75rem;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-soft);
+}
+
+.devlog-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.devlog-filter {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.devlog-filter:focus {
+  outline: none;
+  border-color: var(--accent-line);
+}
+
+.devlog-auto {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.devlog-auto input {
+  accent-color: var(--accent-bright);
+}
+
+.devlog-tool {
+  flex: none;
+  height: 1.625rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.devlog-tool:hover {
+  color: var(--text);
+  border-color: var(--accent-line);
+}
+
+.devlog-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) 0.75rem;
+  font-size: var(--font-xs);
+  overscroll-behavior: contain;
+}
+
+.devlog-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0.0625rem 0;
+  line-height: var(--lh-155);
+}
+
+.devlog-row time {
+  flex: none;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.devlog-tag {
+  flex: none;
+  width: 2.125rem;
+  text-align: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-xxs);
+  padding: 0 0.25rem;
+}
+
+.devlog-row.is-engine .devlog-tag {
+  color: var(--secondary-deep);
+  background: var(--accent-soft);
+}
+
+.devlog-row.is-request .devlog-tag {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.devlog-row.is-system .devlog-tag {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* 引擎原话走等宽:那本来就是一台机器写给另一双眼睛看的字 */
+.devlog-row.is-engine .devlog-text {
+  font-family: var(--mono);
+  font-size: var(--font-xs);
+}
+
+.devlog-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--text);
+  user-select: text;
+}
+
+.devlog-empty {
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+}
+
+/* 设置弹窗里的常设入口(第八十七锤):高级选项页,不用展开面板就够得着 */
+.cfg-devlog-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.cfg-devlog-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.cfg-devlog-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+/* 状态栏右端的「日志」小口子:沿用取消/卸下那颗字的皮,不加新花样 */
+
+/* 最近列表删除的撤销条(第九十四锤):破坏性动作给 6 秒反悔窗 */
+.recent-undo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-md);
+}
+
+/* 树上右键菜单已并入全局文件菜单(file-path-menu):一份实现四处共用,这里的自绘款退役 */
+
+/* 顶栏线稿图标(第一百零三锤):跟备注小笔一家,不随文字换行挤变形 */
+.top-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+/* 图标一图一色(图标册 v5):svg 上挂 --ic(深底色)和 --ic-l(浅底色,同色相明度×0.58);
+   默认浅主题吃 --ic-l,html 挂 data-theme='dark' 时切 --ic */
+.ticon {
+  color: var(--ic-l, currentColor);
+}
+
+:root[data-theme='dark'] .ticon {
+  color: var(--ic, currentColor);
+}

@@ -1,0 +1,961 @@
+/* ── 个性化(第一百一十三锤):下拉 + 多行输入 + 试一句 ──
+   原生控件包一层皮:键盘和无障碍是白送的,皮全用设置页自家的 token,看着还是一家人 */
+.cfg-select {
+  flex: none;
+  min-width: 7.5rem;
+  height: 1.875rem;
+  padding: 0 0.5rem;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.cfg-select:hover {
+  border-color: var(--accent-line);
+}
+
+/* 语气下拉(第一百一十八锤补,照小葵的参考图):收起时和别的下拉一个皮 ——
+ * 只显档名+小箭头;点开了列表里才是「档名+介绍」两行,选中项带勾 */
+.tone-select {
+  position: relative;
+  flex: none;
+}
+
+.tone-select-btn {
+  display: flex;
+  align-items: center;
+  min-width: 7.5rem;
+  height: 1.875rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.tone-select-btn:hover {
+  border-color: var(--accent-line);
+}
+
+/* 箭头钉到最右,和原生下拉的箭头一个站位;大小颜色也对齐 */
+.tone-select-caret {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.tone-select-btn .tone-select-label {
+  font-size: var(--font-sm);
+}
+
+.tone-select-label {
+  font-size: var(--font-md);
+  line-height: var(--lh-130);
+}
+
+.tone-select-hint {
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: var(--lh-130);
+}
+
+.tone-select-list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.tone-select-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tone-select-item:hover {
+  background: var(--hover);
+}
+
+.tone-select-item.is-active {
+  background: var(--selected-bg);
+}
+
+.tone-select-item-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.tone-select-tick {
+  margin-left: auto;
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.cfg-select:focus-visible,
+.cfg-textarea:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 1px;
+}
+
+/* 分组小标题:特质那一组的门脸,和行内 label 拉开层级 */
+.cfg-group-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.875rem 1.0625rem 0.125rem;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-bold);
+}
+
+.cfg-group-note span {
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-regular);
+}
+
+/* 整行竖排(自订指令、试一句):控件占满宽度,不跟文案抢行 */
+.cfg-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.625rem;
+}
+
+.cfg-row-stack .cfg-copy p {
+  max-width: none;
+}
+
+.cfg-textarea {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: var(--lh-160);
+  resize: vertical;
+}
+
+/* 占位示例:写的是两行短句,行距给足,换行也整齐,不像甩了一整段在框里 */
+.cfg-textarea::placeholder {
+  color: var(--muted-2);
+  line-height: var(--lh-190);
+}
+
+.cfg-sample-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  color: var(--accent-bright);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.cfg-btn:hover:not(:disabled) {
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+  background: var(--accent);
+}
+
+.cfg-btn:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  background: var(--surface-soft);
+  cursor: not-allowed;
+}
+
+.cfg-btn.is-ghost {
+  color: var(--muted);
+  border-color: var(--line);
+  background: transparent;
+}
+
+.cfg-btn.is-ghost:hover {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+/* 试一句的结果:摆的就是模型原文,换行照原样,不做二次排版 */
+.cfg-sample {
+  max-height: 14rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  overflow: auto;
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: var(--lh-170);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cfg-sample.is-error {
+  color: var(--danger);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  white-space: normal;
+}
+
+.cfg-themes {
+  display: flex;
+  align-items: stretch;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.cfg-theme {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.4375rem 1.5rem 0.4375rem 0.5rem; /* 右侧统一预留对勾角标位,文字不顶到卡缘 */
+
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-theme:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-theme.is-selected {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  border-radius: var(--radius-xs);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.cfg-theme strong,
+.cfg-theme small {
+  display: block;
+}
+
+.cfg-theme strong {
+  color: var(--text);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-strong);
+}
+
+.cfg-theme small {
+  margin-top: 0.125rem;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+}
+
+.cfg-theme-check {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  color: var(--accent-bright);
+}
+
+.cfg-colors {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cfg-color {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+}
+
+.cfg-color input {
+  width: 2.25rem;
+  height: 1.625rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* 底板色一键归位(自定义档):选了底板色才出现 */
+.cfg-color-reset {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease-smooth);
+}
+.cfg-color-reset:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.1875rem;
+}
+
+.cfg-scale {
+  min-width: 22.1875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+}
+
+.cfg-stepper {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-stepper:hover:not(:disabled) {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-stepper:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cfg-slider-wrap {
+  width: 11.875rem;
+}
+
+.cfg-slider-wrap input {
+  width: 100%;
+  display: block;
+  accent-color: var(--accent-bright);
+  cursor: pointer;
+}
+
+.cfg-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.375rem;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: var(--font-xxs);
+}
+
+.cfg-scale-value {
+  min-width: 2.8125rem;
+  color: var(--text-strong);
+  font-family: var(--mono);
+  font-size: 1.0625rem;
+  font-weight: var(--font-w-bold);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cfg-segmented {
+  display: flex;
+  padding: 0.1875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.cfg-segmented button {
+  min-width: 9.0625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-segmented button:hover {
+  color: var(--text);
+}
+
+.cfg-segmented button.is-selected {
+  color: var(--accent-bright);
+  background: var(--surface);
+  box-shadow: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.14);
+}
+
+.cfg-segmented strong,
+.cfg-segmented small {
+  display: block;
+}
+
+.cfg-segmented strong {
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
+}
+
+.cfg-segmented small {
+  margin-top: 0.125rem;
+  font-size: var(--font-xxs);
+  color: var(--muted-2);
+}
+
+.cfg-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5625rem;
+  margin: 0 1.0625rem 0.875rem;
+  padding: 0.625rem 0.6875rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  /* 第七十七锤:底回中性面板,不再掺主题色(遮罩手法全面退场);识别靠这条色边 */
+  background: var(--surface-soft);
+}
+
+.cfg-callout-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent-bright);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-callout strong {
+  display: block;
+  color: var(--text);
+  font-size: var(--font-xxs);
+}
+
+.cfg-callout p {
+  max-width: 27.5rem;
+  margin: 0.1875rem 0 0;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-150);
+}
+
+.cfg-callout-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding-top: 0.1875rem;
+  color: var(--green);
+  white-space: nowrap;
+  font-size: var(--font-xxs);
+}
+
+.cfg-callout-state.is-warn {
+  color: var(--amber);
+}
+
+.cfg-flag {
+  margin-left: 0.25rem;
+  padding: 0.1875rem 0.3125rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xxs);
+  background: var(--surface-soft);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-semi);
+  vertical-align: 0.0625rem;
+}
+
+.cfg-flag.is-on {
+  color: var(--green);
+  border-color: var(--green-line);
+  background: var(--green-soft);
+}
+
+.cfg-switch {
+  width: 2.4375rem;
+  height: 1.375rem;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0.9375rem;
+  background: var(--muted-2);
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-switch span {
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--switch-knob);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-switch.is-on {
+  background: var(--green);
+}
+
+.cfg-switch.is-on span {
+  transform: translateX(1.0625rem);
+}
+
+.cfg-privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5625rem 1.0625rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--green) 4%, var(--surface));
+  font-size: var(--font-xxs);
+}
+
+.cfg-privacy > span {
+  flex: 1;
+}
+
+.cfg-privacy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  font-size: var(--font-xxs);
+  cursor: pointer;
+}
+
+.cfg-privacy button:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.cfg-privacy-more {
+  padding: 0.5625rem 1.0625rem 0.6875rem;
+  color: var(--muted);
+  border-top: 1px dashed var(--line-soft);
+  background: var(--surface-soft);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-160);
+}
+
+/* 高级面板常开(小葵定的板:换模型高频,折叠退役;防误改的保险在「保存」那一环) */
+.cfg-advanced {
+  border-color: var(--accent-line);
+}
+
+.cfg-advanced-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  padding: 0.8125rem 1rem;
+}
+
+.cfg-advanced-icon {
+  width: 1.5625rem;
+  height: 1.5625rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent-bright);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-advanced-head strong,
+.cfg-advanced-head small {
+  display: block;
+}
+
+.cfg-advanced-head strong {
+  font-size: var(--font-xxs);
+}
+
+.cfg-advanced-head small {
+  margin-top: 0.1875rem;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+}
+
+.cfg-advanced-body {
+  padding: 0 1rem 0.9375rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cfg-field-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.8125rem 0 0.375rem;
+}
+
+.cfg-field-head label {
+  color: var(--text);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-strong);
+}
+
+.cfg-field-head span {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: var(--font-xxs);
+}
+
+.cfg-path-input {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.125rem;
+  padding-left: 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.cfg-path-input:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.cfg-path-input input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: var(--font-xxs);
+}
+
+.cfg-path-input button {
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.3125rem;
+  padding: 0 0.5rem;
+  color: var(--accent-bright);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xs);
+  background: var(--accent-soft);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+}
+
+.cfg-path-input button:hover {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent-line);
+}
+
+/* Tavily Key 区块(2026-09-17 小葵验收):左右留白与上下 cfg-row 对齐,不再贴边 */
+.cfg-tavily-block {
+  padding: 0 1.0625rem 1.125rem;
+}
+
+/* Key 输入框里的小眼睛(小葵点的小眼睛):图标按钮不吃 .cfg-path-input button 的印章样,
+   跟「浏览…」那种实心按钮区分开,平时灰着,悬停才亮 */
+.cfg-path-input button.cfg-eye-btn {
+  width: 1.5rem;
+  justify-content: center;
+  padding: 0;
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.cfg-path-input button.cfg-eye-btn:hover {
+  color: var(--accent-bright);
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+
+.cfg-path-input button.cfg-eye-btn[aria-pressed='true'] {
+  color: var(--accent-bright);
+}
+
+/* 「测一下」这类实心小按钮的禁用态(2026-09-17):Key 空着 / 正在测的时候点不动,但也不隐身 */
+.cfg-path-input button:disabled {
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+/* Key 体检的结论行:绿 = 能用,黄 = 能用但有事(额度用完/被限流),红 = 认不了或连不上 */
+.cfg-field-help.is-ok {
+  color: var(--green);
+}
+
+.cfg-field-help.is-bad {
+  color: var(--danger);
+}
+
+.cfg-field-help {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin: 0.5rem 0 0;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+}
+
+.cfg-field-help.is-warn {
+  color: var(--amber);
+}
+
+.cfg-chip-row {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.cfg-chip-row button {
+  padding: 0.125rem 0.5rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+}
+
+.cfg-chip-row button.is-selected {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.cfg-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  margin-top: 0.6875rem;
+  padding: 0.6875rem 0.8125rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  /* 第七十七锤:底回中性面板,不再掺主题色 */
+  background: var(--surface-soft);
+}
+
+.cfg-summary-icon {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--accent-bright);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.cfg-summary strong {
+  color: var(--text);
+  font-size: var(--font-xxs);
+}
+
+.cfg-summary p {
+  margin: 0.1875rem 0 0;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+}
+
+.cfg-summary-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  color: var(--green);
+  white-space: nowrap;
+  font-size: var(--font-xxs);
+}
+
+.cfg-summary-state.is-dirty {
+  color: var(--amber);
+}
+
+.cfg-foot {
+  min-height: 3.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.875rem;
+  padding: 0 1.25rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.cfg-foot-state {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+}
+
+.cfg-foot-state.is-green {
+  color: var(--green);
+}
+
+.cfg-foot-state.is-amber {
+  color: var(--amber);
+}
+
+.cfg-foot-state.is-red {
+  color: var(--danger);
+}
+
+.cfg-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-btn-reset,
+.cfg-btn-apply {
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.6875rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xxs);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth);
+}
+
+.cfg-btn-reset {
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cfg-btn-reset:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted-2);
+  background: var(--surface-soft);
+}
+
+.cfg-btn-apply {
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-line);
+  background: var(--accent);
+  box-shadow: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.cfg-btn-apply:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.cfg-btn-reset:disabled,
+.cfg-btn-apply:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+/* 版本信息行(第六十锤):欢迎卡退役后,CodeAtlas/引擎版本搬进高级选项 */
+.cfg-versions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0 0.125rem;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+}
+
+.cfg-versions-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  color: var(--muted-2);
+}
+
+.cfg-versions .mono {
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+/* 第七十九锤:实心主题色件的字色统一走 --accent-ink 自适应,暗色硬编码 override 退场 */
+
+:root[data-theme='dark'] .cfg-switch span {
+  background: var(--switch-knob);
+}
