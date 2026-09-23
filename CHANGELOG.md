@@ -331,3 +331,4 @@
 
 - chore(test): 棘轮闸脚本术语对齐——'巨石'改'超限文件/单文件行数上限'
 - refactor(ui): main.css 6508 行拆为 assets/css/ 13 件,原文件改 @import 索引——纯搬家,分段空行在拼接处还原,按序 join 逐字节一致
+- refactor(ui): SettingsDialog 拆出 6 件——四分区(外观/个性化/智能辅助/高级)+OptionSelect/TavilyKeyField 归位 components/,主文件余 666 行只留壳与状态;JSX 逐字搬运零行为变化

@@ -12,8 +12,7 @@ const CODE_EXT = /\.(ts|tsx|mts|cts|js|jsx|css)$/
 const GIANTS: Record<string, number> = {
   'main/index.ts': 3299,
   'renderer/src/App.tsx': 2279,
-  'ai/index.ts': 1618,
-  'renderer/src/components/SettingsDialog.tsx': 1588
+  'ai/index.ts': 1618
 }
 
 function walk(dir: string, out: string[] = []): string[] {
