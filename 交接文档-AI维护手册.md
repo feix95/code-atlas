@@ -29,7 +29,7 @@
 - IPC 收发必须配对:`send/sendSync` 对应 `ipcMain.on`,`invoke` 对应 `ipcMain.handle`;配对错误导致消息静默丢弃且无报错。selftest-appearance 含通道对账校验。
 - 界面文案标准:高效、简洁、直白、清晰、专业;不出现用户看不懂的术语。
 - 向小葵汇报使用通俗语言;必须出现的技术概念配生活化类比。术语仅保留在代码注释与 commit 中。
-- 巨石渐进瘦身:超千行文件不搞专项重构,改动触及时把触及块拆成独立小文件、按职责归位(共享逻辑进 shared/、界面件进 components/ 等);向巨石追加代码前先想能否直接写新文件——只许瘦不许胖(selftest-filesize 棘轮把关)。
+- 单文件行数上限:src/ 内单文件不超过 1000 行,现存超限文件登记于 selftest-filesize 白名单、行数只降不升;向大文件追加代码前先评估另立小文件;拆分单独成锤——纯搬家不改行为、每锤全绿、拆出块按职责归位(共享逻辑进 shared/、界面件进 components/ 等)。
 - 发布流程:推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿,人工确认后正式发布;升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`;新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。
 - 模型列表只呈现客观事实:大小/时间/模态/下载量从 Hugging Face 原样拉取,筛选交用户;唯一允许的软件判断是"本机无法运行"的兜底标记。模型下载走双源(HF 直连 → hf-mirror 镜像),支持断点续传,完成后自动写入 AI 配置。
 - 自测不访问真实网络:联网场景一律 mock 注入——本地与 CI 网络可达性不同,依赖真实网络的测试无法在两边同时稳定通过。typecheck 仅覆盖 src/ 不覆盖 scripts/,自测脚本参数须跟随签名变更。

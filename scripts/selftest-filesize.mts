@@ -1,5 +1,5 @@
-// 巨石棘轮闸:src/ 内手写源码单文件行数红线——非白名单文件超 MAX_LINES 即红灯;
-// 白名单巨石按基线只许瘦不许胖,瘦回线内会提醒毕业除名
+// 单文件行数棘轮闸:src/ 内手写源码超 MAX_LINES 即红灯;
+// 白名单内现存超限文件按基线只降不升,瘦回线内提醒毕业除名
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ const SRC_DIR = join(import.meta.dirname, '..', 'src')
 const MAX_LINES = 1000
 const CODE_EXT = /\.(ts|tsx|mts|cts|js|jsx|css)$/
 
-// 现存巨石登记处:值 = 当前行数基线,只降不许升;瘦到 MAX_LINES 以内就该除名
+// 现存超限文件登记处:值 = 当前行数基线,只降不许升;瘦到 MAX_LINES 以内就该除名
 const GIANTS: Record<string, number> = {
   'main/index.ts': 3299,
   'renderer/src/App.tsx': 2279,
@@ -36,11 +36,12 @@ for (const file of walk(SRC_DIR)) {
   const baseline = GIANTS[rel]
   if (baseline !== undefined) {
     seen.add(rel)
-    if (lines > baseline) violations.push(`${rel} 长胖了:${baseline} → ${lines}(只许瘦不许胖)`)
-    else if (lines <= MAX_LINES) graduated.push(`${rel} 瘦回 ${lines} 行,可从白名单除名`)
+
+    if (lines > baseline) violations.push(`${rel} 超过基线:${baseline} → ${lines}(只降不升)`)
+    else if (lines <= MAX_LINES) graduated.push(`${rel} 已回落 ${lines} 行,可从白名单除名`)
     continue
   }
-  if (lines > MAX_LINES) violations.push(`${rel} 新巨石:${lines} 行 > ${MAX_LINES}`)
+  if (lines > MAX_LINES) violations.push(`${rel} 新增超限文件:${lines} 行 > ${MAX_LINES}`)
 }
 
 for (const rel of Object.keys(GIANTS)) {
