@@ -43,7 +43,7 @@
 
 ## 提交规范
 
-commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<type>(<scope>): <说明>`。CHANGELOG 定位为开发日志(供 AI 与小葵追溯修过什么),按时间顺序向文件末尾追加,与 commit 同步:feat/fix/refactor/perf 一律记录,chore 仅影响构建或运行的记录,docs 不记。已推送的 commit 保持原样,不重写历史。
+commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<type>(<scope>): <说明>`。CHANGELOG 定位为开发日志(供 AI 与小葵追溯项目全部变动),按时间顺序向文件末尾追加:每个 commit 一律同步记录一行,全类型覆盖(含 docs/chore),条目随该 commit 一起提交;纯补记 CHANGELOG 的 commit 除外。已推送的 commit 保持原样,不重写历史。
 
 | 序号 | 要求 | 说明 |
 |---|---|---|
@@ -84,6 +84,6 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<ty
 - 本文件由 AI 会话维护:AI 负责续写与保持全文自洽,小葵负责审定;文件随仓库进 git 分发。
 - 项目规矩发生变化时,在当次 commit 同步更新本手册,不留过时条款。
 - 面向 AI 阅读:措辞精确、信息密度优先;不写日期落款、立规人、历史案底等元信息。
-- 只保留当前有效的规则;失效内容直接删除——手册自身历史从 git 记录追溯,规则对应的产品事件从 CHANGELOG 追溯。
+- 只保留当前有效的规则;失效内容直接删除——手册自身历史从 git 记录追溯,规则对应的历史变动从 CHANGELOG 追溯。
 - AI 可增补新条款;修改或删除已有条款须经小葵确认。
 - 同一规则只定义一次,其他位置引用而非复述;本手册只收项目专属规则,通用工作习惯(临时文件位置、播报风格等)由全局记忆承载,不重复收录。

@@ -321,3 +321,7 @@
 
 - refactor(core): 公共件收口——useFlashFlag「亮一下退场」与 useMenuDismiss「外点收摊」两钩收编七处抄板;输入舱 5/10 行阈值共 inputMetrics;存档读写两族出小件(渲染层 localPrefs/主进程 jsonFile+userDataDir);弹窗兜底 pickPathDialog 一处管;聊史双闸注释互指;气泡与桌宠的 px 尺寸按小葵拍板注为设计决定
 
+- docs(handbook): AGENTS.md 更名交接文档-AI维护手册并全文重写为书面规范语——push 需小葵确认、攒条制废除、ZCode/CLAUDE 残留清理
+- docs(handbook): 补维护与提交条款——AI 维护归属、自测脚本挂 test 链、CHANGELOG 定位开发日志
+- docs(handbook): CHANGELOG 改全类型覆盖——docs/chore 随 commit 一律同步记,纯补记 commit 除外
+
