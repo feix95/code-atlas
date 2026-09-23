@@ -423,9 +423,17 @@ export function createWindow(): void {
   mainWindow.on('maximize', () => syncMaximized(true))
   mainWindow.on('unmaximize', () => syncMaximized(false))
 
-  // 外部链接交给系统浏览器打开,不在应用里开新窗口
+  // 外部链接交给系统浏览器打开,不在应用里开新窗口;只放行 http(s)/mailto ——
+  // file:// 这类进系统 handler 等于替页面拉起本地程序,畸形串直接当没听见
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const { protocol } = new URL(details.url)
+      if (protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:') {
+        void shell.openExternal(details.url)
+      }
+    } catch {
+      /* 畸形地址:拒开 */
+    }
     return { action: 'deny' }
   })
 

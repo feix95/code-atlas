@@ -335,3 +335,5 @@
 - refactor(ai): ai/index.ts 1618 行拆为 8 个子模块(chat/webPrompts/explainPrompt/gitPrompts/locate/contextProbe/guessPrompts/explain),index 只留出口全量转出;estimateTokens 归户 shared/aiText.ts,逐字搬运零行为变化
 - refactor(ui): App.tsx 2279 行拆为 10 件——scanTreeTools/paneTabs 纯工具 + useSidebarSash/usePaneTabs/useNavStack/usePreviewRefs 四域钩子 + AppTopBar/WorkspaceSidebar/PaneGroups/TabBody 四组件,主文件余 892 行只留状态接线与 JSX 壳;函数体逐字搬运,Provider 顺序照旧
 - refactor(core): main/index.ts 3299 行拆为 12 件——paths/modelStatus/aiEvidence/agentTools/agentChat/appShell 六域后厨 + ipcShell/ipcScan/ipcModel/ipcGit/ipcChat 五段 IPC 登记 + registerIpc 调度壳,index 余 138 行只留启动生命周期;跨模块写经 setActivityProvider/setQuitting/disposeTray 三个 setter,其余逐字搬运零行为变化
+
+- fix(shell): window.open 外链进系统浏览器前验协议——只放行 http/https/mailto,file:// 与畸形串一律拒开(项目体检黄灯 1)
