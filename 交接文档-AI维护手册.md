@@ -20,6 +20,7 @@
   - 小葵自行运行 dev 时不得重复启动;改动完成后主动重启 dev 实例。
 - 单次只开发一个模块;禁止假实现、TODO 占位、空函数。
 - 每个模块完成后自测全绿:`typecheck` / `lint` / `test` / `build`。
+- 排版归 prettier 独家管:commit 前跑 `npm run format` 归零;`format:check`(`prettier --check`)已挂 CI 硬闸,格式漂移即红灯;大扫除 commit 登记在 .git-blame-ignore-revs,blame 可忽略排版噪音。
 - push 权限:需求完成后按「提交规范」本地 commit;push 到 main 必须经小葵确认。worktree/分支上 commit 与 push 到该分支不受限;merge 回 main 及 push main 必须经小葵验证确认。
 - 小葵的本地改动(文档、规则、清单等)在 commit 时一并提交,无需逐次询问。
 - 同一功能的调试期不 commit:连续修改仅改代码与跑自测,待小葵确认无问题后一次性 commit + push(其确认即 push 许可),避免半成品逐次进入历史。

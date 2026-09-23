@@ -326,3 +326,4 @@
 - docs(handbook): CHANGELOG 改全类型覆盖——docs/chore 随 commit 一律同步记,纯补记 commit 除外
 - chore(test): 新增巨石棘轮闸 selftest-filesize——src/ 内单文件超千行红灯,登记巨石按基线只许瘦不许胖;手册 UI 文案与巨石条款同步修订
 - chore: 全仓 prettier 大扫除——112 个文件排版归零、行为未动;巨石行数基线按折行后实际重登记,CHANGELOG 一处 `*` 通配符被排版误吞已用反引号赎回
+- chore(ci): 新增 format:check 硬闸——CI 红灯拦格式漂移,commit 前跑 `npm run format`;大扫除 commit 登记 .git-blame-ignore-revs 抵消 blame 噪音

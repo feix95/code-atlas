@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test:scanner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-scanner.mts",
     "test:parser": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-parser.mts",
     "test:analyzer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-analyzer.mts",
