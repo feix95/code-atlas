@@ -36,7 +36,6 @@ for (const file of walk(SRC_DIR)) {
   const baseline = GIANTS[rel]
   if (baseline !== undefined) {
     seen.add(rel)
-
     if (lines > baseline) violations.push(`${rel} 超过基线:${baseline} → ${lines}(只降不升)`)
     else if (lines <= MAX_LINES) graduated.push(`${rel} 已回落 ${lines} 行,可从白名单除名`)
     continue
@@ -50,6 +49,6 @@ for (const rel of Object.keys(GIANTS)) {
 
 for (const v of violations) console.error(`✗ ${v}`)
 for (const g of graduated) console.log(`◎ ${g}`)
-assert.equal(violations.length, 0, '巨石棘轮闸有红灯')
+assert.equal(violations.length, 0, '单文件行数棘轮闸有红灯')
 
-console.log('✅ 巨石棘轮闸全绿')
+console.log('✅ 单文件行数棘轮闸全绿')

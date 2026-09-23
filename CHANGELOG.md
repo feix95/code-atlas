@@ -328,3 +328,5 @@
 - chore: 全仓 prettier 大扫除——112 个文件排版归零、行为未动;巨石行数基线按折行后实际重登记,CHANGELOG 一处 `*` 通配符被排版误吞已用反引号赎回
 - chore(ci): 新增 format:check 硬闸——CI 红灯拦格式漂移,commit 前跑 `npm run format`;大扫除 commit 登记 .git-blame-ignore-revs 抵消 blame 噪音
 - docs(handbook): 巨石条款改写——明确 src/ 千行上限,拆分单独成锤、纯搬家不改行为、每锤全绿
+
+- chore(test): 棘轮闸脚本术语对齐——'巨石'改'超限文件/单文件行数上限'
