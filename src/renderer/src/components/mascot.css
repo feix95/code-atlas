@@ -1,6 +1,15 @@
 /* 桌宠页样式(桌宠托管第二锤):临时形状动画,正式素材来了直接换。
    三态:待机(呼吸+偶尔眨眼)/ 思考中(摇摆+头顶三点轮闪)/ 说话(上下弹+嘴一张一合)。 */
 
+/* 小家伙的青绿皮(P2-5):角色皮肤不跟主题走,但色号只在这本账登记 ——
+   正式素材/换色都改这行,别去下面逐处摸 */
+:root {
+  --pet-hi: #7be3b0;
+  --pet-mid: #2fa874;
+  --pet-deep: #218b5e;
+  --pet-ink: #173f2e;
+}
+
 /* 整个窗全透明,小家伙居中;默认不做任何底色 —— 空白处就是桌面 */
 .mascot-root {
   width: 100vw;
@@ -22,7 +31,7 @@
   width: var(--mascot-body);
   height: var(--mascot-body);
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #7be3b0, #2fa874 68%, #218b5e);
+  background: radial-gradient(circle at 34% 30%, var(--pet-hi), var(--pet-mid) 68%, var(--pet-deep));
   cursor: grab;
   animation: mascot-breathe 3.2s ease-in-out infinite;
 }
@@ -44,8 +53,8 @@
   top: 38px;
   width: 10px;
   height: 16px;
-  border-radius: 5px;
-  background: #173f2e;
+  border-radius: 5px; /* 桌宠尺寸全篇钉死物理像素(96px 身体契约),圆角不跟 rem 缩放 */
+  background: var(--pet-ink);
   animation: mascot-blink 4.4s infinite;
 }
 .mascot-eye-left {
@@ -75,7 +84,7 @@
   width: 18px;
   height: 8px;
   border-radius: 0 0 12px 12px;
-  background: #173f2e;
+  background: var(--pet-ink);
 }
 
 /* 思考中:身体左右轻轻摇,嘴抿成一条线,头顶三个点轮闪 */
@@ -108,7 +117,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2fa874;
+  background: var(--pet-mid);
   opacity: 0.25;
 }
 .mascot-thinking .mascot-dots {

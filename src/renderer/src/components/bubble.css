@@ -1,6 +1,8 @@
 /* 气泡聊天窗(桌宠气泡锤):桌宠旁边的小聊天窗,透明底 + 圆角卡片。
  * 颜色全部吃全局 token(--surface/--line/--accent 一族),亮暗主题跟主窗自动翻,
- * 不写死色号 —— 桌宠气泡锤修过「--panel 不存在、永远米白」的色盲案。 */
+ * 不写死色号 —— 桌宠气泡锤修过「--panel 不存在、永远米白」的色盲案。
+ * 尺寸走 px 是设计决定(DRY 审计 P2-9,小葵拍板):气泡窗本体可以手动拉伸缩小
+ * (右下角手柄),px 是默认落脚的初始尺寸不是响应式契约,不随系统缩放换档。 */
 
 .bubble-root {
   width: 100vw;
@@ -21,7 +23,7 @@
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-window);
   /* 不画 box-shadow:透明窗首帧阴影来不及合成会闪一块白底,宁可不要 */
   overflow: hidden;
   /* 缩放手柄层的定位锚(气泡放大锤) */
@@ -41,7 +43,7 @@
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -54,7 +56,7 @@
   background: transparent;
   color: inherit;
   font-size: 16px;
-  line-height: 1;
+  line-height: var(--lh-100);
   cursor: pointer;
 }
 .bubble-close:hover {
@@ -68,7 +70,7 @@
   background: transparent;
   color: inherit;
   font-size: 12px;
-  line-height: 1;
+  line-height: var(--lh-100);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -130,7 +132,7 @@
   padding: 7px 10px;
   border-radius: 11px;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: var(--lh-155);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -194,7 +196,7 @@
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
-  line-height: 20px;
+  line-height: 20px; /* 和 BubblePage 的 LINE_FALLBACK 一口约定,改这边那边同步 */
   font-family: inherit;
   resize: none;
   overflow-y: hidden;
@@ -250,14 +252,14 @@
  * 卡片圆角外的透明像素是穿透桌面的,画在那儿接不住鼠标。 */
 .bubble-grip {
   position: absolute;
-  z-index: 5;
+  z-index: var(--z-float);
   touch-action: none;
 }
 .bubble-grip::after {
   content: '';
   position: absolute;
   opacity: 0;
-  transition: opacity 0.12s;
+  transition: opacity var(--dur-2);
 }
 .bubble-grip:hover::after {
   opacity: 0.85;

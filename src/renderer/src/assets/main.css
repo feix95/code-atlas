@@ -15,26 +15,87 @@
   --space-6: 1.5rem;
   --space-7: 2rem;
   --space-8: 3rem;
+  --radius-xxs: 0.25rem;
+  --radius-xs: 0.3125rem;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
+  --radius-xl: 0.625rem;
   --radius-lg: 0.75rem;
   --radius-pill: 999px;
+  /* 窗角 14px:物理像素例外(圆角要贴屏幕物理直角,不跟 rem 缩放),三处共用这一户 */
+  --radius-window: 14px;
+  --font-xxs: 0.625rem;
   --font-xs: 0.6875rem;
   --font-sm: 0.75rem;
   --font-md: 0.8125rem;
   --font-base: 0.875rem;
+  --font-ml: 0.9375rem;
   --font-lg: 1rem;
   --font-display: 1.625rem;
+  --font-title: 1.75rem;
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
+  /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有户口才叫正经档 ── */
+  --font-w-regular: 400;
+  --font-w-medium: 500;
+  --font-w-semi: 600;
+  --font-w-strong: 650;
+  --font-w-bold: 700;
+  /* ── 行高梯度 ── */
+  --lh-100: 1;
+  --lh-125: 1.25;
+  --lh-130: 1.3;
+  --lh-150: 1.5;
+  --lh-155: 1.55;
+  --lh-160: 1.6;
+  --lh-165: 1.65;
+  --lh-170: 1.7;
+  --lh-175: 1.75;
+  --lh-190: 1.9;
   --content-max: 70rem;
   --control-height: 2.5rem;
-  /* ── 动效(Obsidian 节奏):70/140/300ms 三档 + 快进慢落的 smooth 曲线 ── */
+  /* ── 动效(Obsidian 节奏):70/150/300ms 三档 + 快进慢落的 smooth 曲线 ── */
   --dur-1: 0.07s;
-  --dur-2: 0.14s;
+  --dur-2: 0.15s;
   --dur-3: 0.3s;
   --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* ── 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /
+     通用浮层 30 / 下拉菜单 40 / 设置页 50 / 复活提示 90 / 文件菜单 95 ── */
+  --z-raise: 1;
+  --z-jump: 2;
+  --z-float: 5;
+  --z-pane-hint: 6;
+  --z-toast: 10;
+  --z-code-float: 28;
+  --z-code-mark: 29;
+  --z-popover: 30;
+  --z-dropdown: 40;
+  --z-dialog: 50;
+  --z-revive: 90;
+  --z-menu: 95;
+  /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
+  --focus-ring: 0 0 0 0.1875rem;
+  --shadow-menu: 0 8px 28px rgba(0, 0, 0, 0.22);
+  --shadow-modal: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --edge-accent: inset 2px 0 0 var(--accent-bright);
+  /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
+  --scrim: rgba(0, 0, 0, 0.36);
+  --scrim-deep: rgba(0, 0, 0, 0.45);
+  /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
+  --traffic-dot: #d1d3d4;
+  --traffic-ink: #5c6165;
+  --traffic-chip: #c5c9c8;
+  --traffic-idle: #cfd2d1;
+  --traffic-green: #28c840;
+  --traffic-yellow: #ffbd2e;
+  --traffic-red: #ff5f57;
+  /* 开关钮 / 选中 chip(2026-09-18 小葵设计稿):亮暗两套都成立的写真值,走户口不调色板 */
+  --switch-knob: #ffffff;
+  --chip-on-bg: #dde3e7;
+  --chip-on-ink: #1d2226;
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
-  /* ── 色板(浅色,Obsidian 无色阶)── */
+  /* ── 色板(浅色,Obsidian 无色阶)──
+     灰阶真值户口在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
+     外观系统 achro 回落和石墨种子色都查那本 —— 这边是同款写真的首帧兜底,两边必须一致 */
   --window: #f6f6f6;
   /* 画布底色:内容白,框架层(--window)垫侧栏/顶栏/页签条 */
   --canvas-tint: #ffffff;
@@ -84,7 +145,8 @@
   --tok-symbol: #800000;
 }
 
-/* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场 */
+/* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场
+   (灰阶真值户口同在 shared/appearancePalette.ts 的 dark 档,两边必须一致) */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --window: #282828;
@@ -120,6 +182,8 @@
   --hover: rgba(255, 255, 255, 0.07);
   --selected-bg: rgba(255, 255, 255, 0.13);
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
+  --switch-knob: #e5eaed;
   /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
   --tok-ctl: #c586c0;
   --tok-kw: #569cd6;
@@ -173,7 +237,7 @@ body {
   overflow: hidden;
   background: var(--canvas-tint);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-window);
 }
 
 /* 最大化:贴满屏幕时圆角和描边收掉,四角不漏缝 */
@@ -194,7 +258,7 @@ body.is-maximized .app {
   background: var(--window);
   border-bottom: 1px solid var(--line);
   color: var(--muted-2);
-  font-size: 0.6875rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.03em;
   user-select: none;
 }
@@ -229,10 +293,10 @@ body.is-maximized .app {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  background: #d1d3d4;
+  background: var(--traffic-dot);
   transition:
-    filter 0.12s var(--ease-smooth),
-    box-shadow 0.12s var(--ease-smooth);
+    filter var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth);
 }
 
 /* 圆点里的功能图标:横线=最小化,方框=最大化(最大化时变双框=还原),白叉=关闭;
@@ -249,13 +313,13 @@ body.is-maximized .app {
   width: 0.4375rem;
   height: 1.5px;
   border-radius: 1px;
-  background: #5c6165;
+  background: var(--traffic-ink);
 }
 
 .traffic-lights .is-max i {
   width: 0.4375rem;
   height: 0.4375rem;
-  border: 1.5px solid #5c6165;
+  border: 1.5px solid var(--traffic-ink);
   border-radius: 2px;
 }
 
@@ -268,9 +332,9 @@ body.is-maximized .traffic-lights .is-max i::after {
   left: -0.09375rem;
   width: 0.125rem;
   height: 0.125rem;
-  border: 1.5px solid #5c6165;
+  border: 1.5px solid var(--traffic-ink);
   border-radius: 1px;
-  background: #c5c9c8;
+  background: var(--traffic-chip);
 }
 
 .traffic-lights .is-max:active i::after {
@@ -291,7 +355,7 @@ body.is-maximized .traffic-lights .is-max i::after {
   width: 0.4375rem;
   height: 1.5px;
   border-radius: 1px;
-  background: #5c6165;
+  background: var(--traffic-ink);
 }
 
 .traffic-lights .is-close i::before {
@@ -306,24 +370,24 @@ body.is-maximized .traffic-lights .is-max i::after {
 .traffic-lights .is-min::before,
 .traffic-lights .is-max::before,
 .traffic-lights .is-close::before {
-  background: #cfd2d1;
+  background: var(--traffic-idle);
 }
 
 .traffic-lights .is-min:hover::before {
-  background: #28c840;
+  background: var(--traffic-green);
 }
 
 .traffic-lights .is-max:hover::before {
-  background: #ffbd2e;
+  background: var(--traffic-yellow);
 }
 
 .traffic-lights .is-close:hover::before {
-  background: #ff5f57;
+  background: var(--traffic-red);
 }
 
 /* 最大化还原态的前块跟着圆点一起换色,别留灰补丁 */
 body.is-maximized .traffic-lights .is-max:hover i::after {
-  background: #ffbd2e;
+  background: var(--traffic-yellow);
 }
 
 .traffic-lights .light:active::before {
@@ -362,7 +426,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-base);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   letter-spacing: -0.01em;
   margin-right: var(--space-2);
   flex-shrink: 0;
@@ -373,7 +437,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   font-family: inherit;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  transition: opacity 0.15s var(--ease-smooth);
+  transition: opacity var(--dur-2) var(--ease-smooth);
 }
 
 .brand:hover:not(:disabled) .brand-mark {
@@ -400,11 +464,11 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   display: grid;
   place-items: center;
   color: var(--accent-ink);
-  font-size: 0.875rem;
+  font-size: var(--font-base);
   border-radius: 0.4375rem;
   background: linear-gradient(135deg, var(--accent), var(--secondary));
   box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: filter 0.15s var(--ease-smooth);
+  transition: filter var(--dur-2) var(--ease-smooth);
 }
 
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
@@ -423,15 +487,15 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--accent-bright);
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 0.15s var(--ease-smooth),
-    border-color 0.15s var(--ease-smooth),
-    color 0.15s var(--ease-smooth),
-    transform 0.1s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
 }
 
 .btn:hover {
@@ -485,8 +549,8 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   border-radius: var(--radius-sm);
   color: var(--muted);
   background: transparent;
-  font-size: 1rem;
-  line-height: 1;
+  font-size: var(--font-lg);
+  line-height: var(--lh-100);
   font-family: inherit;
   cursor: pointer;
   flex-shrink: 0;
@@ -511,12 +575,12 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   background: var(--canvas-tint);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s var(--ease-smooth);
+  transition: border-color var(--dur-2) var(--ease-smooth);
 }
 
 .path-box:focus-within {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .path-input {
@@ -544,7 +608,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   position: absolute;
   top: calc(100% + 0.375rem);
   left: 0.625rem;
-  z-index: 30;
+  z-index: var(--z-popover);
   white-space: nowrap;
   font-size: var(--font-sm);
   color: var(--text);
@@ -653,7 +717,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 }
 
 .sidebar-footer .mono {
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 /* ── 代码预览(第一百一十锤):左栏的只读文本窗 ──
@@ -750,7 +814,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   margin: 0;
   font-family: var(--mono);
   font-size: var(--font-xs);
-  line-height: 1.6;
+  line-height: var(--lh-160);
   white-space: pre;
   tab-size: 2;
 }
@@ -758,7 +822,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 .code-gutter {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: var(--z-raise);
   padding: 0 var(--space-2) 0 var(--space-3);
   color: var(--muted-2);
   text-align: right;
@@ -795,7 +859,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 /* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
 .code-mark {
   position: fixed;
-  z-index: 29;
+  z-index: var(--z-code-mark);
   display: inline-flex;
   color: var(--accent-bright);
   pointer-events: none;
@@ -813,7 +877,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 /* 选中范围的左缘竖线:一眼看出这一段是一个整体 */
 .code-sel-bar {
   position: fixed;
-  z-index: 28;
+  z-index: var(--z-code-float);
   width: 2px;
   border-radius: 1px;
   background: var(--accent-bright);
@@ -825,7 +889,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
    user-select:none 是保险 —— 浮层自己绝不能成为可选中的内容(被拖过时会被吞进选区) */
 .code-select-btn {
   position: fixed;
-  z-index: 30;
+  z-index: var(--z-popover);
   transform: translate(-50%, calc(-100% - 8px));
   padding: 0.3125rem 0.625rem;
   color: var(--accent-ink);
@@ -890,8 +954,8 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   color: var(--muted);
   border: 0;
   background: transparent;
-  font-size: 0.625rem;
-  line-height: 1;
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
   cursor: pointer;
 }
 
@@ -911,7 +975,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   padding: 0.125rem 0.375rem;
   border-radius: var(--radius-sm);
   background: rgb(255 255 255 / 18%);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .status-dot {
@@ -947,7 +1011,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   height: 1.6875rem;
   margin: 1px 0;
   border-radius: var(--radius-sm);
-  transition: background 0.13s var(--ease-smooth);
+  transition: background var(--dur-2) var(--ease-smooth);
   /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
@@ -961,7 +1025,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 /* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧亮灰细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
 .tree-row.is-selected {
   background: var(--selected-bg);
-  box-shadow: inset 2px 0 0 var(--accent-bright);
+  box-shadow: var(--edge-accent);
 }
 
 .tree-caret {
@@ -974,7 +1038,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   padding: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 0.9375rem;
+  font-size: var(--font-ml);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -1112,7 +1176,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 
 .note-editor input:focus {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 /* 后缀小标:等宽、灰色,压到最低视觉权重 */
@@ -1120,7 +1184,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   flex: 0 0 auto;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   letter-spacing: 0.03em;
 }
 
@@ -1132,7 +1196,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   color: var(--muted);
   border-radius: var(--radius-pill);
   background: var(--hover);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -1140,7 +1204,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 /* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
 .tree-badge {
   flex: 0 0 auto;
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   color: var(--amber);
   background: var(--amber-soft);
   border: 1px solid var(--amber-line);
@@ -1153,7 +1217,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 .sash {
   flex: 0 0 0.3125rem;
   position: relative;
-  z-index: 5;
+  z-index: var(--z-float);
   cursor: col-resize;
   background: transparent;
   border: none;
@@ -1172,8 +1236,8 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   transform: translateX(-50%);
   background: var(--line);
   transition:
-    background 0.15s var(--ease-smooth),
-    width 0.15s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    width var(--dur-2) var(--ease-smooth);
 }
 
 .sash:hover::after,
@@ -1206,7 +1270,7 @@ body.is-sash-dragging {
   position: absolute;
   top: 0.625rem;
   right: 0.875rem;
-  z-index: 10;
+  z-index: var(--z-toast);
   padding: var(--space-1) var(--space-3);
   color: var(--text);
   font-size: var(--font-sm);
@@ -1325,7 +1389,7 @@ body.is-sash-dragging {
    fixed 定位按视口坐标摆,不吃页签条横向滚动的裁剪 */
 .tabbar-kindmenu {
   position: fixed;
-  z-index: 40;
+  z-index: var(--z-dropdown);
   min-width: 11rem;
   padding: var(--space-2);
   background: var(--surface);
@@ -1367,7 +1431,7 @@ body.is-sash-dragging {
   width: 1rem;
   flex: none;
   color: var(--accent-bright);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
 }
 
 .kindmenu-note {
@@ -1388,7 +1452,7 @@ body.is-sash-dragging {
   background: transparent;
   color: inherit;
   font-size: var(--font-xs);
-  line-height: 1;
+  line-height: var(--lh-100);
   cursor: pointer;
 }
 
@@ -1444,8 +1508,8 @@ body.is-sash-dragging {
   transform: translateX(-50%);
   background: var(--line);
   transition:
-    background 0.15s var(--ease-smooth),
-    width 0.15s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    width var(--dur-2) var(--ease-smooth);
 }
 
 .pane-sash:hover::after,
@@ -1474,7 +1538,7 @@ body.is-sash-dragging .pane-sash::after {
 .pane-drop-hint {
   position: absolute;
   inset: 8%;
-  z-index: 6;
+  z-index: var(--z-pane-hint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1513,7 +1577,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .pane-empty-mark {
   font-size: 3rem;
-  line-height: 1;
+  line-height: var(--lh-100);
   color: var(--line);
 }
 
@@ -1584,7 +1648,7 @@ body.is-sash-dragging .pane-sash::after {
   overflow: hidden;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   white-space: nowrap;
 }
 
@@ -1617,7 +1681,7 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-md);
   color: var(--accent-bright);
   background: var(--accent-soft);
-  font-size: 0.9375rem;
+  font-size: var(--font-ml);
   flex-shrink: 0;
 }
 
@@ -1630,8 +1694,8 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0;
   overflow: hidden;
   color: var(--text-strong);
-  font-size: 0.9375rem;
-  font-weight: 650;
+  font-size: var(--font-ml);
+  font-weight: var(--font-w-strong);
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1653,7 +1717,7 @@ body.is-sash-dragging .pane-sash::after {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1707,7 +1771,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .tab.is-active {
   color: var(--accent-bright);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 
 .tab.is-active::after {
@@ -1739,16 +1803,16 @@ body.is-sash-dragging .pane-sash::after {
   gap: var(--space-2);
   margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .section-label span {
   color: var(--muted-2);
-  font-size: 0.625rem;
-  font-weight: 400;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-regular);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -1768,7 +1832,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0;
   color: var(--text);
   font-size: var(--font-md);
-  line-height: 1.75;
+  line-height: var(--lh-175);
 }
 
 .card-text strong {
@@ -1817,7 +1881,7 @@ body.is-sash-dragging .pane-sash::after {
   display: block;
   color: var(--text-strong);
   font-size: var(--font-lg);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1850,7 +1914,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0 0 var(--space-2);
   color: var(--text-strong);
   font-size: var(--font-md);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .sub-card h3.sub-card-gap {
@@ -1866,7 +1930,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: var(--space-2) 0;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .bar-label {
@@ -1892,7 +1956,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .bar-row b {
   color: var(--muted);
-  font-weight: 500;
+  font-weight: var(--font-w-medium);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -1929,8 +1993,8 @@ body.is-sash-dragging .pane-sash::after {
   color: var(--accent-bright);
   border-radius: 50%;
   background: var(--accent-soft);
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
   flex-shrink: 0;
 }
 
@@ -1944,7 +2008,7 @@ body.is-sash-dragging .pane-sash::after {
   overflow: hidden;
   color: var(--text-strong);
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1960,7 +2024,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: var(--space-3) 0 0;
   color: var(--muted-2);
   font-size: var(--font-xs);
-  line-height: 1.6;
+  line-height: var(--lh-160);
 }
 
 .chips {
@@ -1976,14 +2040,14 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent-bright);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 
 .chip-muted {
   background: transparent;
   border: 1px solid var(--line);
   color: var(--muted);
-  font-weight: 400;
+  font-weight: var(--font-w-regular);
 }
 
 /* ── 空状态:现状 + 原因 + 下一步 ── */
@@ -2000,7 +2064,7 @@ body.is-sash-dragging .pane-sash::after {
 .empty-title {
   color: var(--text-strong);
   font-size: var(--font-base);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .empty-hint {
@@ -2012,7 +2076,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .notice {
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   background: var(--surface-soft);
@@ -2061,7 +2125,7 @@ body.is-sash-dragging .pane-sash::after {
   gap: 0.375rem;
   color: var(--accent-bright);
   font-size: var(--font-md);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .ai-title .spark {
@@ -2077,7 +2141,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0 0 0.625rem;
   color: var(--muted);
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
 }
 
 .ai-card-actions {
@@ -2106,13 +2170,13 @@ body.is-sash-dragging .pane-sash::after {
   font-family: inherit;
   cursor: pointer;
   transition:
-    color 0.15s var(--ease-smooth),
-    border-color 0.15s var(--ease-smooth),
-    background 0.15s var(--ease-smooth);
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .prompt:hover {
-  color: #0d2f38;
+  color: var(--text-strong);
   border-color: var(--secondary);
   background: var(--secondary);
 }
@@ -2153,7 +2217,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .explain-title {
   font-size: var(--font-md);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
 }
 
 .explain-note {
@@ -2163,7 +2227,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .explain-text {
   font-size: var(--font-md);
-  line-height: 1.75;
+  line-height: var(--lh-175);
   background: var(--surface-soft);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
@@ -2201,7 +2265,7 @@ body.is-sash-dragging .pane-sash::after {
 .chat-intro {
   color: var(--muted);
   font-size: var(--font-md);
-  line-height: 1.7;
+  line-height: var(--lh-170);
 }
 
 .chat-intro .ai-card-actions {
@@ -2240,7 +2304,7 @@ body.is-sash-dragging .pane-sash::after {
   background: var(--surface);
   border: 1px solid var(--line);
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
@@ -2288,7 +2352,7 @@ body.is-sash-dragging .pane-sash::after {
   color: var(--accent-bright);
   cursor: pointer;
   box-shadow: var(--shadow-pop);
-  z-index: 2;
+  z-index: var(--z-jump);
 }
 
 .chat-jump:hover {
@@ -2356,7 +2420,7 @@ body.is-sash-dragging .pane-sash::after {
   color: var(--text);
   font-size: var(--font-md);
   font-family: inherit;
-  line-height: 1.5;
+  line-height: var(--lh-150);
   resize: none;
   overflow: hidden;
 }
@@ -2417,7 +2481,7 @@ body.is-sash-dragging .pane-sash::after {
   position: absolute;
   bottom: calc(100% + var(--space-2));
   left: 0;
-  z-index: 30;
+  z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2473,7 +2537,7 @@ body.is-sash-dragging .pane-sash::after {
   height: 2rem;
   padding: 0 0.6875rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font-size: var(--font-md);
@@ -2552,7 +2616,7 @@ body.is-sash-dragging .pane-sash::after {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: var(--font-sm);
-  line-height: 1.55;
+  line-height: var(--lh-155);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 12rem;
@@ -2601,7 +2665,7 @@ body.is-sash-dragging .pane-sash::after {
   border-top: 1px dashed var(--line);
   font-family: inherit;
   font-size: var(--font-sm);
-  line-height: 1.7;
+  line-height: var(--lh-170);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   max-height: 13.75rem;
@@ -2643,7 +2707,7 @@ body.is-sash-dragging .pane-sash::after {
   padding: 0.75rem 1rem;
   max-width: 85%;
   border: 1px solid var(--amber-line);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
   background: var(--amber-soft);
   color: var(--amber);
   font-size: var(--font-xs);
@@ -2652,7 +2716,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .err-boundary p {
   margin: 0 0 0.5rem;
-  line-height: 1.5;
+  line-height: var(--lh-150);
 }
 
 .err-boundary-actions {
@@ -2664,7 +2728,7 @@ body.is-sash-dragging .pane-sash::after {
 .err-boundary-actions button {
   padding: 0.3rem 0.9rem;
   border: 1px solid var(--amber-line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--amber);
   font-size: var(--font-xs);
@@ -2716,7 +2780,7 @@ body.is-sash-dragging .pane-sash::after {
   color: var(--muted-2);
   font-size: var(--font-xs);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -2730,7 +2794,7 @@ body.is-sash-dragging .pane-sash::after {
   border-top: 1px dashed var(--line);
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.6;
+  line-height: var(--lh-160);
 }
 
 /* 命中清单卡(LLM 优化锤):search_content 搜到的命中程序直接摆卡,模型不再当抄写员。
@@ -2743,7 +2807,7 @@ body.is-sash-dragging .pane-sash::after {
   text-align: left;
   font-size: var(--font-xs);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .chat-note.is-matches .chat-matches-head {
@@ -2775,7 +2839,7 @@ body.is-sash-dragging .pane-sash::after {
   white-space: nowrap;
   padding: 0 0.25em;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-xxs);
   background: var(--accent-soft);
   color: var(--accent-bright);
   font-family: var(--mono, 'Consolas', monospace);
@@ -2852,7 +2916,7 @@ body.is-sash-dragging .pane-sash::after {
 }
 
 .chat-intro-title {
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   color: var(--text);
 }
 
@@ -2977,7 +3041,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0 0 var(--space-2);
   color: var(--text-strong);
   font-size: var(--font-md);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -2992,13 +3056,13 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0 0 var(--space-3);
   color: var(--text-strong);
   font-size: var(--font-md);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .relation-card-head span {
   color: var(--muted);
   font-size: var(--font-xs);
-  font-weight: 400;
+  font-weight: var(--font-w-regular);
 }
 
 /* 模组里的轻说明(没分析过/正在连线/一条连线都没有):一行灰字轻轻带过,不抢眼 */
@@ -3010,7 +3074,7 @@ body.is-sash-dragging .pane-sash::after {
   margin: 0;
   color: var(--muted);
   font-size: var(--font-sm);
-  line-height: 1.6;
+  line-height: var(--lh-160);
 }
 
 .relation-link {
@@ -3054,13 +3118,13 @@ body.is-sash-dragging .pane-sash::after {
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-md);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   margin-bottom: var(--space-2);
 }
 
 .structure-section-count {
   font-size: var(--font-xs);
-  font-weight: 400;
+  font-weight: var(--font-w-regular);
   color: var(--muted);
   background: var(--surface-soft);
   border: 1px solid var(--line);
@@ -3078,7 +3142,7 @@ body.is-sash-dragging .pane-sash::after {
 .chip-sm {
   font-size: var(--font-xs);
   padding: 2px var(--space-2);
-  font-weight: 500;
+  font-weight: var(--font-w-medium);
 }
 
 /* ── git 抽屉(沿用既有类名,重新配色)── */
@@ -3100,7 +3164,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .git-branch {
   font-size: var(--font-base);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
 }
 
 /* AI 干活报告卡(第六十三锤):改动页顶层的整轮审计,报告和单文件讲解共用 explain-* 排版 */
@@ -3167,8 +3231,8 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
   line-height: 0.875rem;
   text-align: center;
 }
@@ -3179,7 +3243,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .git-door-branch {
   flex-shrink: 0;
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   color: var(--accent-bright);
 }
 
@@ -3195,7 +3259,7 @@ body.is-sash-dragging .pane-sash::after {
 
 @media (prefers-reduced-motion: no-preference) {
   .git-door-caret {
-    transition: transform 0.15s var(--ease-smooth);
+    transition: transform var(--dur-2) var(--ease-smooth);
   }
 }
 
@@ -3225,7 +3289,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .locator-form input:focus {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .locator-examples {
@@ -3273,7 +3337,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .locator-hit-path {
   color: var(--accent-bright);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   overflow-wrap: anywhere;
 }
 
@@ -3308,7 +3372,7 @@ body.is-sash-dragging .pane-sash::after {
 
 .git-row.is-selected {
   background: var(--selected-bg);
-  box-shadow: inset 2px 0 0 var(--accent-bright);
+  box-shadow: var(--edge-accent);
 }
 
 .git-badge {
@@ -3371,12 +3435,12 @@ body.is-sash-dragging .pane-sash::after {
 
 .git-add {
   color: var(--git-add);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 
 .git-del {
   color: var(--danger);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 
 .git-change-line {
@@ -3472,8 +3536,8 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition:
-    border-color 0.15s var(--ease-smooth),
-    background 0.15s var(--ease-smooth);
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .recent-open:hover {
@@ -3507,13 +3571,13 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
   opacity: 0;
   transition:
-    opacity 0.12s var(--ease-smooth),
-    color 0.12s var(--ease-smooth),
-    background 0.12s var(--ease-smooth);
+    opacity var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .recent-card:hover .recent-remove,
@@ -3545,9 +3609,9 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition:
-    border-color 0.15s var(--ease-smooth),
-    box-shadow 0.15s var(--ease-smooth),
-    transform 0.15s var(--ease-smooth);
+    border-color var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
 }
 
 .drive-card:hover {
@@ -3689,7 +3753,7 @@ body.is-sash-dragging .pane-sash::after {
   height: 0.5625rem;
 }::-webkit-scrollbar-thumb {
   background: var(--line);
-  border-radius: 0.625rem;
+  border-radius: var(--radius-xl);
   border: 2px solid transparent;
   background-clip: content-box;
 }
@@ -3727,12 +3791,12 @@ body.is-sash-dragging .pane-sash::after {
 .cfg-layer {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-dialog);
   display: grid;
   place-items: center;
   padding: 1.75rem;
   /* 跟界面卡片同框圆角裁切:遮罩不许糊到圆角外的透明角上 */
-  border-radius: 14px;
+  border-radius: var(--radius-window);
   overflow: hidden;
 }
 
@@ -3743,7 +3807,7 @@ body.is-maximized .cfg-layer {
 .cfg-dim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim-deep);
 }
 
 .cfg-window {
@@ -3783,14 +3847,14 @@ body.is-maximized .cfg-layer {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.36);
+  background: var(--scrim);
 }
 
 .cfg-confirm {
   width: min(21.25rem, calc(100% - 3.5rem));
   padding: 1.125rem 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 0.625rem;
+  border-radius: var(--radius-xl);
   background: var(--window);
   box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.32);
 }
@@ -3803,15 +3867,15 @@ body.is-maximized .cfg-layer {
 
 .cfg-confirm h2 {
   margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: var(--font-w-semi);
   color: var(--text);
 }
 
 .cfg-confirm p {
   margin: 0.375rem 0 0;
-  font-size: 0.6875rem;
-  line-height: 1.55;
+  font-size: var(--font-xs);
+  line-height: var(--lh-155);
   color: var(--muted);
 }
 
@@ -3846,22 +3910,22 @@ body.is-maximized .cfg-layer {
   place-items: center;
   color: var(--accent-bright);
   border: 1px solid var(--accent-line);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   background: var(--accent-soft);
 }
 
 .cfg-head-title h1 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: var(--font-lg);
+  font-weight: var(--font-w-bold);
   letter-spacing: 0;
 }
 
 .cfg-head-title p {
   margin: 0.1875rem 0 0;
   color: var(--muted);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-head-actions {
@@ -3875,7 +3939,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: 0.375rem;
   color: var(--amber);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-dirty-pill i {
@@ -3929,8 +3993,8 @@ body.is-maximized .cfg-layer {
 .cfg-nav-caption {
   padding: 0 0.625rem 0.5625rem;
   color: var(--muted-2);
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -3950,8 +4014,8 @@ body.is-maximized .cfg-layer {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.16s var(--ease-smooth),
-    color 0.16s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-nav-item:hover {
@@ -3980,14 +4044,14 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-nav-item strong {
-  font-size: 0.6875rem;
-  font-weight: 650;
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-strong);
 }
 
 .cfg-nav-item small {
   margin-top: 0.1875rem;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-nav-item.is-active small {
@@ -4046,7 +4110,7 @@ body.is-maximized .cfg-layer {
 /* 标题字号跟导航项一致(0.6875rem),不再小一号 */
 .cfg-nav-context strong {
   color: var(--text);
-  font-size: 0.6875rem;
+  font-size: var(--font-xs);
 }
 
 .cfg-nav-context span {
@@ -4057,7 +4121,7 @@ body.is-maximized .cfg-layer {
   white-space: nowrap;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-nav-footnote {
@@ -4066,7 +4130,7 @@ body.is-maximized .cfg-layer {
   gap: 0.375rem;
   margin: auto 0.5rem 0;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-content {
@@ -4092,7 +4156,7 @@ body.is-maximized .cfg-layer {
 .cfg-eyebrow {
   color: var(--accent-bright);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   letter-spacing: 0.1em;
 }
 
@@ -4100,15 +4164,15 @@ body.is-maximized .cfg-layer {
   margin: 0.4375rem 0 0.3125rem;
   color: var(--text-strong);
   font-size: 1.1875rem;
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   letter-spacing: 0;
 }
 
 .cfg-intro p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.6875rem;
-  line-height: 1.6;
+  font-size: var(--font-xs);
+  line-height: var(--lh-160);
 }
 
 .cfg-live-status {
@@ -4122,7 +4186,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--green-line);
   border-radius: var(--radius-sm);
   background: var(--green-soft);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-live-status i {
@@ -4130,7 +4194,7 @@ body.is-maximized .cfg-layer {
   height: 0.375rem;
   border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--green) 15%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--green) 15%, transparent);
 }
 
 .cfg-live-status.is-dirty {
@@ -4141,7 +4205,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-live-status.is-dirty i {
   background: var(--amber);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--amber) 15%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--amber) 15%, transparent);
 }
 
 .cfg-section {
@@ -4166,26 +4230,26 @@ body.is-maximized .cfg-layer {
 .cfg-section-head h3 {
   margin: 0;
   color: var(--text);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-bold);
 }
 
 .cfg-section-head > span {
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-step {
   min-width: 1.4375rem;
   color: var(--accent-bright);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-panel {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   background: var(--surface);
 }
 
@@ -4205,16 +4269,16 @@ body.is-maximized .cfg-layer {
 .cfg-copy label {
   display: block;
   color: var(--text);
-  font-size: 0.6875rem;
-  font-weight: 700;
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-bold);
 }
 
 .cfg-copy p {
   max-width: 17.5rem;
   margin: 0.3125rem 0 0;
   color: var(--muted);
-  font-size: 0.625rem;
-  line-height: 1.55;
+  font-size: var(--font-xxs);
+  line-height: var(--lh-155);
 }
 
 .cfg-divider {
@@ -4282,20 +4346,20 @@ body.is-maximized .cfg-layer {
 
 .tone-select-label {
   font-size: var(--font-md);
-  line-height: 1.3;
+  line-height: var(--lh-130);
 }
 
 .tone-select-hint {
   color: var(--muted);
   font-size: var(--font-xs);
-  line-height: 1.3;
+  line-height: var(--lh-130);
 }
 
 .tone-select-list {
   position: absolute;
   top: calc(100% + 0.25rem);
   right: 0;
-  z-index: 30;
+  z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4357,13 +4421,13 @@ body.is-maximized .cfg-layer {
   padding: 0.875rem 1.0625rem 0.125rem;
   color: var(--text);
   font-size: var(--font-sm);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
 }
 
 .cfg-group-note span {
   color: var(--muted);
-  font-size: 0.625rem;
-  font-weight: 400;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-regular);
 }
 
 /* 整行竖排(自订指令、试一句):控件占满宽度,不跟文案抢行 */
@@ -4386,14 +4450,14 @@ body.is-maximized .cfg-layer {
   background: var(--surface-soft);
   font-family: inherit;
   font-size: var(--font-sm);
-  line-height: 1.6;
+  line-height: var(--lh-160);
   resize: vertical;
 }
 
 /* 占位示例:写的是两行短句,行距给足,换行也整齐,不像甩了一整段在框里 */
 .cfg-textarea::placeholder {
   color: var(--muted-2);
-  line-height: 1.9;
+  line-height: var(--lh-190);
 }
 
 .cfg-sample-actions {
@@ -4453,7 +4517,7 @@ body.is-maximized .cfg-layer {
   background: var(--surface-soft);
   font-family: inherit;
   font-size: var(--font-sm);
-  line-height: 1.7;
+  line-height: var(--lh-170);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -4485,8 +4549,8 @@ body.is-maximized .cfg-layer {
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s var(--ease-smooth),
-    background 0.16s var(--ease-smooth);
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-theme:hover {
@@ -4503,7 +4567,7 @@ body.is-maximized .cfg-layer {
   width: 1.25rem;
   height: 1.25rem;
   flex: 0 0 auto;
-  border-radius: 0.3125rem;
+  border-radius: var(--radius-xs);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
@@ -4514,14 +4578,14 @@ body.is-maximized .cfg-layer {
 
 .cfg-theme strong {
   color: var(--text);
-  font-size: 0.625rem;
-  font-weight: 650;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-strong);
 }
 
 .cfg-theme small {
   margin-top: 0.125rem;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-theme-check {
@@ -4541,7 +4605,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: 0.5rem;
   color: var(--muted);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
 }
 
@@ -4562,7 +4626,7 @@ body.is-maximized .cfg-layer {
   border: 0;
   background: none;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
   transition: color var(--dur-2) var(--ease-smooth);
 }
@@ -4591,9 +4655,9 @@ body.is-maximized .cfg-layer {
   background: var(--surface);
   cursor: pointer;
   transition:
-    color 0.15s var(--ease-smooth),
-    border-color 0.15s var(--ease-smooth),
-    background 0.15s var(--ease-smooth);
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-stepper:hover:not(:disabled) {
@@ -4624,7 +4688,7 @@ body.is-maximized .cfg-layer {
   margin-top: 0.375rem;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-scale-value {
@@ -4632,7 +4696,7 @@ body.is-maximized .cfg-layer {
   color: var(--text-strong);
   font-family: var(--mono);
   font-size: 1.0625rem;
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -4653,15 +4717,15 @@ body.is-maximized .cfg-layer {
   gap: 0.5rem;
   padding: 0.5rem 0.625rem;
   border: 0;
-  border-radius: 0.3125rem;
+  border-radius: var(--radius-xs);
   color: var(--muted);
   background: transparent;
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.15s var(--ease-smooth),
-    color 0.15s var(--ease-smooth),
-    box-shadow 0.15s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    box-shadow var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-segmented button:hover {
@@ -4680,13 +4744,13 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-segmented strong {
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
 }
 
 .cfg-segmented small {
   margin-top: 0.125rem;
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   color: var(--muted-2);
 }
 
@@ -4716,15 +4780,15 @@ body.is-maximized .cfg-layer {
 .cfg-callout strong {
   display: block;
   color: var(--text);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-callout p {
   max-width: 27.5rem;
   margin: 0.1875rem 0 0;
   color: var(--muted);
-  font-size: 0.625rem;
-  line-height: 1.5;
+  font-size: var(--font-xxs);
+  line-height: var(--lh-150);
 }
 
 .cfg-callout-state {
@@ -4735,7 +4799,7 @@ body.is-maximized .cfg-layer {
   padding-top: 0.1875rem;
   color: var(--green);
   white-space: nowrap;
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-callout-state.is-warn {
@@ -4747,10 +4811,10 @@ body.is-maximized .cfg-layer {
   padding: 0.1875rem 0.3125rem;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-xxs);
   background: var(--surface-soft);
-  font-size: 0.625rem;
-  font-weight: 600;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-semi);
   vertical-align: 0.0625rem;
 }
 
@@ -4770,7 +4834,7 @@ body.is-maximized .cfg-layer {
   border-radius: 0.9375rem;
   background: var(--muted-2);
   cursor: pointer;
-  transition: background 0.18s var(--ease-smooth);
+  transition: background var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-switch span {
@@ -4780,9 +4844,9 @@ body.is-maximized .cfg-layer {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  background: #fff;
+  background: var(--switch-knob);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: transform 0.18s var(--ease-smooth);
+  transition: transform var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-switch.is-on {
@@ -4801,7 +4865,7 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border-top: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--green) 4%, var(--surface));
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-privacy > span {
@@ -4816,7 +4880,7 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border: 0;
   background: transparent;
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
 }
 
@@ -4830,8 +4894,8 @@ body.is-maximized .cfg-layer {
   color: var(--muted);
   border-top: 1px dashed var(--line-soft);
   background: var(--surface-soft);
-  font-size: 0.625rem;
-  line-height: 1.6;
+  font-size: var(--font-xxs);
+  line-height: var(--lh-160);
 }
 
 /* 高级面板常开(小葵定的板:换模型高频,折叠退役;防误改的保险在「保存」那一环) */
@@ -4863,13 +4927,13 @@ body.is-maximized .cfg-layer {
 }
 
 .cfg-advanced-head strong {
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-advanced-head small {
   margin-top: 0.1875rem;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-advanced-body {
@@ -4885,14 +4949,14 @@ body.is-maximized .cfg-layer {
 
 .cfg-field-head label {
   color: var(--text);
-  font-size: 0.625rem;
-  font-weight: 650;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-strong);
 }
 
 .cfg-field-head span {
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-path-input {
@@ -4909,7 +4973,7 @@ body.is-maximized .cfg-layer {
 
 .cfg-path-input:focus-within {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .cfg-path-input input {
@@ -4921,7 +4985,7 @@ body.is-maximized .cfg-layer {
   color: var(--text);
   background: transparent;
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-path-input button {
@@ -4932,9 +4996,9 @@ body.is-maximized .cfg-layer {
   padding: 0 0.5rem;
   color: var(--accent-bright);
   border: 1px solid var(--accent-line);
-  border-radius: 0.3125rem;
+  border-radius: var(--radius-xs);
   background: var(--accent-soft);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
 }
 
@@ -4993,7 +5057,7 @@ body.is-maximized .cfg-layer {
   gap: 0.3125rem;
   margin: 0.5rem 0 0;
   color: var(--muted-2);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-field-help.is-warn {
@@ -5013,7 +5077,7 @@ body.is-maximized .cfg-layer {
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
 }
 
@@ -5048,13 +5112,13 @@ body.is-maximized .cfg-layer {
 
 .cfg-summary strong {
   color: var(--text);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-summary p {
   margin: 0.1875rem 0 0;
   color: var(--muted);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-summary-state {
@@ -5064,7 +5128,7 @@ body.is-maximized .cfg-layer {
   margin-left: auto;
   color: var(--green);
   white-space: nowrap;
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-summary-state.is-dirty {
@@ -5088,7 +5152,7 @@ body.is-maximized .cfg-layer {
   align-items: center;
   gap: 0.375rem;
   color: var(--muted);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-foot-state.is-green {
@@ -5117,12 +5181,12 @@ body.is-maximized .cfg-layer {
   gap: 0.375rem;
   padding: 0 0.6875rem;
   border-radius: var(--radius-sm);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   cursor: pointer;
   transition:
-    background 0.16s var(--ease-smooth),
-    border-color 0.16s var(--ease-smooth),
-    color 0.16s var(--ease-smooth);
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-btn-reset {
@@ -5163,7 +5227,7 @@ body.is-maximized .cfg-layer {
   margin-top: 0.75rem;
   padding: 0 0.125rem;
   color: var(--muted);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
 }
 
 .cfg-versions-label {
@@ -5182,7 +5246,7 @@ body.is-maximized .cfg-layer {
 /* 第七十九锤:实心主题色件的字色统一走 --accent-ink 自适应,暗色硬编码 override 退场 */
 
 :root[data-theme='dark'] .cfg-switch span {
-  background: #e5eaed;
+  background: var(--switch-knob);
 }
 
 /* ── 第七十锤起:模型状态栏 —— 钉在窗口最底下,随时看模型热身到哪了 ──
@@ -5424,15 +5488,15 @@ body.is-maximized .cfg-layer {
   padding: 0.1875rem 0.5625rem;
   color: var(--muted-2);
   font-family: var(--mono);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   border: 1px solid var(--line-soft);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   cursor: pointer;
   transition:
-    color 0.15s var(--ease-smooth),
-    border-color 0.15s var(--ease-smooth),
-    background 0.15s var(--ease-smooth);
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    background var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-ctx-ticks button:hover {
@@ -5453,16 +5517,16 @@ body.is-maximized .cfg-layer {
   top: 3.5rem;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 90;
+  z-index: var(--z-revive);
   max-width: min(34rem, calc(100vw - 3rem));
   padding: 0.625rem 1rem;
   border: 1px solid var(--amber);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+  box-shadow: var(--shadow-menu);
 }
 
 /* ── 第八十七锤:Developer 日志窗口 —— 独立小窗,引擎原话/请求报账/应用记账一本账 ──
@@ -5475,7 +5539,7 @@ body.is-maximized .cfg-layer {
   overflow: hidden;
   background: var(--canvas-tint);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-window);
 }
 
 .devlog-head {
@@ -5495,7 +5559,7 @@ body.is-maximized .cfg-layer {
   gap: var(--space-3);
   min-width: 0;
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   color: var(--text-strong);
 }
 
@@ -5504,7 +5568,7 @@ body.is-maximized .cfg-layer {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-xs);
-  font-weight: 400;
+  font-weight: var(--font-w-regular);
   color: var(--muted-2);
 }
 
@@ -5523,8 +5587,8 @@ body.is-maximized .cfg-layer {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1;
+  font-size: var(--font-lg);
+  line-height: var(--lh-100);
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
@@ -5614,7 +5678,7 @@ body.is-maximized .cfg-layer {
   align-items: baseline;
   gap: var(--space-2);
   padding: 0.0625rem 0;
-  line-height: 1.55;
+  line-height: var(--lh-155);
 }
 
 .devlog-row time {
@@ -5628,7 +5692,7 @@ body.is-maximized .cfg-layer {
   width: 2.125rem;
   text-align: center;
   border-radius: var(--radius-pill);
-  font-size: 0.625rem;
+  font-size: var(--font-xxs);
   padding: 0 0.25rem;
 }
 
@@ -5650,7 +5714,7 @@ body.is-maximized .cfg-layer {
 /* 引擎原话走等宽:那本来就是一台机器写给另一双眼睛看的字 */
 .devlog-row.is-engine .devlog-text {
   font-family: var(--mono);
-  font-size: 0.6875rem;
+  font-size: var(--font-xs);
 }
 
 .devlog-text {
@@ -5731,7 +5795,7 @@ body.is-maximized .cfg-layer {
 /* ── 迷你 Markdown(第一百零七锤):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
 .md {
   white-space: normal;
-  line-height: 1.7;
+  line-height: var(--lh-170);
 }
 
 .md p {
@@ -5745,7 +5809,7 @@ body.is-maximized .cfg-layer {
 .md .md-h {
   margin: 0.6em 0 0.3em;
   color: var(--text-strong);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .md .md-h:first-child {
@@ -5757,7 +5821,7 @@ body.is-maximized .cfg-layer {
 }
 
 .md .md-h2 {
-  font-size: 0.9375rem;
+  font-size: var(--font-ml);
 }
 
 .md .md-h3 {
@@ -5766,7 +5830,7 @@ body.is-maximized .cfg-layer {
 
 .md .md-h4 {
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 
 .md ul,
@@ -5784,7 +5848,7 @@ body.is-maximized .cfg-layer {
   font-size: 0.9em;
   background: var(--hover);
   border: 1px solid var(--line-soft);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-xxs);
   padding: 0 0.25em;
 }
 
@@ -5820,7 +5884,7 @@ body.is-maximized .cfg-layer {
 .md-file-link {
   padding: 0 0.25em;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-xxs);
   background: var(--accent-soft);
   color: var(--accent-bright);
   font: inherit;
@@ -5844,13 +5908,13 @@ body.is-maximized .cfg-layer {
  *   开不开文件交给用户)── */
 .file-path-menu {
   position: fixed;
-  z-index: 95;
+  z-index: var(--z-menu);
   min-width: 12rem;
   padding: 0.25rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-modal);
 }
 
 .file-path-menu-item {
@@ -5858,12 +5922,12 @@ body.is-maximized .cfg-layer {
   width: 100%;
   padding: 0.375rem 0.625rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-xxs);
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  font-size: var(--font-md);
+  line-height: var(--lh-150);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
@@ -6013,7 +6077,7 @@ body.is-maximized .cfg-layer {
 .shelf-featured-tag {
   margin-right: var(--space-2);
   font-size: var(--font-xs);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   color: var(--accent-bright);
 }
 .shelf-featured-info {
@@ -6026,7 +6090,7 @@ body.is-maximized .cfg-layer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   font-size: var(--font-sm);
   color: var(--text);
 }
@@ -6041,7 +6105,7 @@ body.is-maximized .cfg-layer {
 .shelf-featured-btn {
   padding: 0.375rem 1rem;
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
 }
 .shelf-featured-progress {
   display: flex;
@@ -6087,9 +6151,9 @@ body.is-maximized .cfg-layer {
 /* 选中 chip(2026-09-18 小葵设计稿):亮灰实底 + 深字,明度反差一眼认出选中;
    这个浅灰在亮暗两套主题下都成立,写真值不走变量 */
 .shelf-chip.is-on {
-  background: #dde3e7;
-  color: #1d2226;
-  font-weight: 600;
+  background: var(--chip-on-bg);
+  color: var(--chip-on-ink);
+  font-weight: var(--font-w-semi);
 }
 .shelf-note {
   display: flex;
@@ -6143,7 +6207,7 @@ body.is-maximized .cfg-layer {
 .shelf-params {
   margin-left: var(--space-2);
   font-size: var(--font-xs);
-  font-weight: 400;
+  font-weight: var(--font-w-regular);
   color: var(--muted-2);
 }
 /* 榜单失败后的「再试一次」:错误不能是死路,给条出路(ux-writing 铁律) */
@@ -6212,7 +6276,7 @@ body.is-maximized .cfg-layer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   color: var(--text);
 }
 .shelf-sub {
@@ -6242,7 +6306,7 @@ body.is-maximized .cfg-layer {
   border-radius: var(--radius-pill);
   padding: 0.125rem 0.5rem;
   font-size: var(--font-xs);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   white-space: nowrap;
 }
 .shelf-verdict.is-no {
@@ -6269,7 +6333,7 @@ body.is-maximized .cfg-layer {
   border-right: 1.5px solid var(--muted);
   border-bottom: 1.5px solid var(--muted);
   transform: rotate(45deg) translate(-0.1rem, -0.1rem);
-  transition: transform 0.15s var(--ease-smooth);
+  transition: transform var(--dur-2) var(--ease-smooth);
 }
 .shelf-chevron.is-open {
   transform: rotate(-135deg) translate(-0.1rem, -0.1rem);
@@ -6281,7 +6345,7 @@ body.is-maximized .cfg-layer {
 .shelf-files {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s var(--ease-smooth);
+  transition: grid-template-rows var(--dur-3) var(--ease-smooth);
   background: var(--surface-soft);
 }
 .shelf-files.is-open {
@@ -6412,7 +6476,7 @@ body.is-maximized .cfg-layer {
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--muted);
-  transition: width 0.2s var(--ease-smooth);
+  transition: width var(--dur-2) var(--ease-smooth);
 }
 .shelf-dl-done {
   flex: none;

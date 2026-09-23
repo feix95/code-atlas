@@ -27,9 +27,9 @@
   margin: 0;
   color: var(--text-strong);
   font-size: var(--font-hero);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: var(--lh-125);
 }
 
 .welcome-lead {
@@ -37,7 +37,7 @@
   max-width: 34rem;
   color: var(--muted);
   font-size: var(--font-lg);
-  line-height: 1.7;
+  line-height: var(--lh-170);
 }
 
 .welcome-open {
@@ -51,7 +51,7 @@
   margin-top: var(--space-4);
   color: var(--muted);
   font-size: var(--font-sm);
-  line-height: 1.6;
+  line-height: var(--lh-160);
 }
 
 .welcome-route {
@@ -94,7 +94,7 @@
   background: var(--surface);
   color: var(--accent);
   font-size: var(--font-sm);
-  font-weight: 700;
+  font-weight: var(--font-w-bold);
 }
 
 .welcome-route h2 {
@@ -102,14 +102,14 @@
   padding-top: 0.1875rem;
   color: var(--text-strong);
   font-size: var(--font-base);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .welcome-route p {
   margin-top: 0.1875rem;
   color: var(--muted);
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
 }
 
 .welcome-recent {
@@ -122,14 +122,14 @@
   margin: 0;
   color: var(--text-strong);
   font-size: var(--font-lg);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .welcome-recent > p {
   margin-top: var(--space-2);
   color: var(--muted);
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
 }
 
 .welcome-recent .recent-undo {
@@ -144,7 +144,7 @@
   cursor: pointer;
   color: var(--secondary-deep);
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   border-radius: var(--radius-sm);
 }
 
@@ -156,7 +156,7 @@
   margin-top: var(--space-3);
   color: var(--muted);
   font-size: var(--font-md);
-  line-height: 1.65;
+  line-height: var(--lh-165);
 }
 
 .welcome-disks .state {
@@ -184,11 +184,11 @@
   color: var(--accent);
   font-family: inherit;
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color var(--dur-2) ease,
+    background var(--dur-2) ease;
 }
 
 .workspace-home:hover {
@@ -207,18 +207,18 @@
 }
 
 .project-guide .entity-title h1 {
-  font-size: 1.75rem;
+  font-size: var(--font-title);
 }
 
 .guide-body {
-  line-height: 1.65;
+  line-height: var(--lh-165);
 }
 
 .guide-body h2 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 1.05rem;
-  font-weight: 650;
+  font-size: var(--font-lg);
+  font-weight: var(--font-w-strong);
 }
 
 .guide-orientation h2 {
@@ -274,20 +274,20 @@
   font-family: inherit;
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color var(--dur-2) ease,
+    background var(--dur-2) ease;
 }
 
 .guide-start-link strong {
   color: var(--accent);
   font-size: var(--font-md);
-  font-weight: 650;
+  font-weight: var(--font-w-strong);
 }
 
 .guide-start-link > span {
   color: var(--muted);
   font-size: var(--font-sm);
-  line-height: 1.6;
+  line-height: var(--lh-160);
   overflow-wrap: anywhere;
 }
 
@@ -352,8 +352,8 @@
   font-family: inherit;
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color var(--dur-2) ease,
+    background var(--dur-2) ease;
 }
 
 .guide-node:hover {
@@ -387,14 +387,14 @@
 .guide-node-main strong {
   color: var(--text-strong);
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   overflow-wrap: anywhere;
 }
 
 .guide-node-main > span {
   color: var(--muted);
   font-size: var(--font-sm);
-  line-height: 1.5;
+  line-height: var(--lh-150);
   overflow-wrap: anywhere;
 }
 
@@ -469,7 +469,7 @@
   cursor: pointer;
   color: var(--secondary-deep);
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   border-radius: var(--radius-sm);
 }
 
@@ -539,7 +539,7 @@
   cursor: pointer;
   color: var(--secondary-deep);
   font-size: var(--font-md);
-  font-weight: 600;
+  font-weight: var(--font-w-semi);
   border-radius: var(--radius-sm);
 }
 
