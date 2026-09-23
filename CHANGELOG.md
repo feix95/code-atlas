@@ -324,4 +324,5 @@
 - docs(handbook): AGENTS.md 更名交接文档-AI维护手册并全文重写为书面规范语——push 需小葵确认、攒条制废除、ZCode/CLAUDE 残留清理
 - docs(handbook): 补维护与提交条款——AI 维护归属、自测脚本挂 test 链、CHANGELOG 定位开发日志
 - docs(handbook): CHANGELOG 改全类型覆盖——docs/chore 随 commit 一律同步记,纯补记 commit 除外
+- chore(test): 新增巨石棘轮闸 selftest-filesize——src/ 内单文件超千行红灯,登记巨石按基线只许瘦不许胖;手册 UI 文案与巨石条款同步修订
 
