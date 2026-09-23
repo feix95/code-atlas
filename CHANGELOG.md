@@ -338,3 +338,4 @@
 
 - fix(shell): window.open 外链进系统浏览器前验协议——只放行 http/https/mailto,file:// 与畸形串一律拒开(项目体检黄灯 1)
 - fix(core): 启动链挂 catch——startApp 在 ready 后早死时 console.error 留痕并 app.quit(),不再闷成无声僵尸进程(项目体检黄灯 2)
+- docs(handbook): 超限文件首批五块拆完、白名单清空——闸口转拦新增(8371e60 补记,项目体检黄灯 3)
