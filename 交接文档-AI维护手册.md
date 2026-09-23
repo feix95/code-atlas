@@ -32,6 +32,7 @@
 - 发布流程:推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿,人工确认后正式发布;升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`;新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。
 - 模型列表只呈现客观事实:大小/时间/模态/下载量从 Hugging Face 原样拉取,筛选交用户;唯一允许的软件判断是"本机无法运行"的兜底标记。模型下载走双源(HF 直连 → hf-mirror 镜像),支持断点续传,完成后自动写入 AI 配置。
 - 自测不访问真实网络:联网场景一律 mock 注入——本地与 CI 网络可达性不同,依赖真实网络的测试无法在两边同时稳定通过。typecheck 仅覆盖 src/ 不覆盖 scripts/,自测脚本参数须跟随签名变更。
+- 新增自测脚本必须登记进 package.json 的 `test` 命令链:本地 `npm test` 与 CI 都只执行链内脚本,漏挂即静默漏测。
 
 ## UI 改动自查清单(CSS/布局改动提交前执行)
 
@@ -42,7 +43,7 @@
 
 ## 提交规范
 
-commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<type>(<scope>): <说明>`。CHANGELOG 按时间顺序向文件末尾追加;已推送的 commit 保持原样,不重写历史。
+commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<type>(<scope>): <说明>`。CHANGELOG 定位为开发日志(供 AI 与小葵追溯修过什么),按时间顺序向文件末尾追加,与 commit 同步:feat/fix/refactor/perf 一律记录,chore 仅影响构建或运行的记录,docs 不记。已推送的 commit 保持原样,不重写历史。
 
 | 序号 | 要求 | 说明 |
 |---|---|---|
@@ -80,7 +81,9 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式:`<ty
 
 ## 文档维护
 
+- 本文件由 AI 会话维护:AI 负责续写与保持全文自洽,小葵负责审定;文件随仓库进 git 分发。
+- 项目规矩发生变化时,在当次 commit 同步更新本手册,不留过时条款。
 - 面向 AI 阅读:措辞精确、信息密度优先;不写日期落款、立规人、历史案底等元信息。
-- 只保留当前有效的规则;失效内容直接删除,历史可从 CHANGELOG 与 git 记录追溯。
+- 只保留当前有效的规则;失效内容直接删除——手册自身历史从 git 记录追溯,规则对应的产品事件从 CHANGELOG 追溯。
 - AI 可增补新条款;修改或删除已有条款须经小葵确认。
-- 同一规则只定义一次,其他位置引用而非复述。
+- 同一规则只定义一次,其他位置引用而非复述;本手册只收项目专属规则,通用工作习惯(临时文件位置、播报风格等)由全局记忆承载,不重复收录。
