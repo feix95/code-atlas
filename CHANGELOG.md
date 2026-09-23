@@ -337,3 +337,4 @@
 - refactor(core): main/index.ts 3299 行拆为 12 件——paths/modelStatus/aiEvidence/agentTools/agentChat/appShell 六域后厨 + ipcShell/ipcScan/ipcModel/ipcGit/ipcChat 五段 IPC 登记 + registerIpc 调度壳,index 余 138 行只留启动生命周期;跨模块写经 setActivityProvider/setQuitting/disposeTray 三个 setter,其余逐字搬运零行为变化
 
 - fix(shell): window.open 外链进系统浏览器前验协议——只放行 http/https/mailto,file:// 与畸形串一律拒开(项目体检黄灯 1)
+- fix(core): 启动链挂 catch——startApp 在 ready 后早死时 console.error 留痕并 app.quit(),不再闷成无声僵尸进程(项目体检黄灯 2)

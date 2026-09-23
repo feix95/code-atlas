@@ -137,7 +137,14 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
 } else {
-  app.whenReady().then(startApp)
+  app
+    .whenReady()
+    .then(startApp)
+    // 启动链断在 ready 后:一个窗都建不出,进程只会闷成无声僵尸——留日志再体面退场
+    .catch((err) => {
+      console.error('[boot] 启动失败:', err)
+      app.quit()
+    })
 }
 
 app.on('will-quit', () => {
