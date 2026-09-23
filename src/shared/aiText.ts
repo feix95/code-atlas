@@ -31,3 +31,15 @@ export function formatUsage(usage: AiUsage): string {
     tps !== undefined ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : ''
   return `${parts.join(' · ')} tokens${speed}`
 }
+
+/**
+ * 估算一段文本的 token 数(纯函数):只用来掐预算,所以刻意保守 ——
+ * CJK 一字记 1 token(常见分词器约 1~1.5 字/token),其余按 4 字符记 1 token。
+ */
+export function estimateTokens(text: string): number {
+  let tokens = 0
+  for (const ch of text) {
+    tokens += ch.charCodeAt(0) > 0x2e7f ? 1 : 0.25
+  }
+  return Math.ceil(tokens)
+}
