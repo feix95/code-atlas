@@ -1,6 +1,22 @@
 # UI 重构 — Obsidian 经典布局(Workspace Layout)需求定稿
 
 > 实施在 worktree 分支进行,不在 main 上直接做。
+> 本文档 = 本锤需求(第一~九节)+ 后续路线备忘(第十节,供后续模块参考,不属于本次交付)。
+
+## 〇、背景与决策由来
+
+这次重构由两条需求引出,2026-09-24 与小葵对话中定案:
+
+1. **UI 改 Obsidian 经典布局**:现有界面(标题栏 + 顶栏 + 左栏文件树)调整为 rail + 顶栏页签 + 文件树面板 + 内容区。顺带确立一组删改:撤首页改「启动恢复上次工作区」、撤底部 AI 状态栏、窗控与图标统一 lucide 线性风。
+2. **文件树加关系图谱(Graph View)**:把现有 depgraph 的引用关系变成可交互力导向图。图谱本体不在本锤,本锤只做侧边栏入口 + 占位页签;详见第十节备忘。
+
+**窗口底色之争(重要背景)**:曾计划把窗口从透明改实底,小葵在试验分支实测发现两个问题——桌宠被铺上底色方片、窗口外框出现消不掉的白边。调研结论(详查 Electron 社区案底):
+
+- 白边真凶是 Windows/DWM 沿 `WS_THICKFRAME` 窗框自绘的约 1px 系统描边,画在网页内容之外,CSS 够不着;Electron 41.3/42 起又给无边框窗加了外扩缩放热区(#50706),使 `getBounds` 与实际矩形错位(#51679),Win10 上描边更显眼——属上游翻修中的工地,非实现失误。
+- Obsidian 的做法是 `frame: false` + **保留 thickFrame** + 深色主题藏边,并没有消除那条边(用户把 Windows 主题色调黄,Obsidian 边框就跟着黄);Win10 上它也是直角——系统圆角 API 只有 Win11 有。
+- 透明窗一族的病(副屏失焦蒸发 #42635/#44967、GPU 打嗝蒸发、显卡加速被全局禁用)全是透明合成路径惹的祸;实底可断根,还能换回 GPU 加速——但代价是 Win10 直角 + 细边 + 桌宠仍透明需单独照顾。
+
+**因此定下的顺序**:先在本锤把 UI 重构做掉(壳层抽离为实底留路),实底迁移作为后续独立一锤再做评估。边框形态只保留「隐藏」一档(frame:false + 自绘窗控),不做 Obsidian 式/原生边框选项。
 
 ## 一、目标
 
@@ -98,9 +114,9 @@
 
 - 设置页页签化(追加设计,后续单独模块)。
 - Graph View 图谱本体(只做入口 + 占位页签)。
-- 实底窗口/窗框样式切换(后续单独一锤,配方已定:`transparent:false + frame:false + thickFrame 保留 + backgroundColor 同底色`)。
+- 实底窗口/窗框样式切换(后续单独一锤,见第十节)。
 - 分屏拖放、桌宠、气泡、页签拖出变桌宠逻辑不动。
-- 副屏失焦蒸发 bug(上游 Electron/Windows 病,实底化或创可贴另议)。
+- 副屏失焦蒸发 bug(上游 Electron/Windows 病,实底化或创可贴另议,见第十节)。
 
 ## 七、AI 状态落位(已定:方案 A)
 
@@ -137,3 +153,28 @@
 - 新:`components/IconRail.tsx`(rail + 状态图标 + 浮层)、`workspaceSession.ts`(会话存档)、图谱占位页签视图、搜索浮层
 - 改:`App.tsx`(组装)、`AppTopBar.tsx`(重组为顶栏)、`TitleBar.tsx`(并入顶栏退役)、`WorkspaceSidebar.tsx`(撤导览钮、底部切换区)、`FileTree.tsx`(撤搜索框)、`paneKinds.ts`/`paneTabs.ts`/`usePaneTabs.ts`(全局单例页签)、`HomePage.tsx`(撤除,recents 迁入空态页)、`ModelStatusBar.tsx`(撤除)、`layoutPrefs.ts`(折叠态)
 - 样式:`chrome.css`、`workspace.css`、`tokens.css`、`Icons.tsx`(新增 lucide 图标:search/view/minus/square/x/panel-left)
+
+## 十、后续路线备忘(本锤不做,给后续模块的前情提要)
+
+以下事项均已在 2026-09-24 对话中调研过,此处只留结论级备忘;开工各自模块时按 project-standards 阶段 1 重新过闸口。
+
+### 10.1 实底窗口迁移(建议优先做的下一锤)
+
+- **动机**:断掉透明窗整族病(副屏失焦蒸发、GPU 打嗝蒸发、渲染被迫走软件路径);换回 GPU 加速为图谱铺路。
+- **配方**(已调研):`transparent:false` + `frame:false` + **保留 thickFrame**(保拖边缩放/贴边分屏/阴影)+ `backgroundColor` 设界面底色(治缩放拖影白与启动闪白)。
+- **Win10 既定取舍**:直角(系统圆角 API 仅 Win11);约 1px 系统描边藏不掉,用深色底色吃掉(参考 Obsidian——它也没消,只是不显眼);`thickFrame:false` 代价过大不推荐。
+- **验证点**:副屏失焦蒸发是否断根;桌宠/气泡仍透明、换底后底色方片问题(上次试验踩过,共享样式要隔离);Electron 44 的 frameless insets 回归是否波及(#51679/#51789);显卡加速能否安全重开。
+- **退路**:实底不成立则维持透明,补「失焦自动重画」创可贴(blur 后 invalidate),把蒸发影响压到最小。
+
+### 10.2 关系图谱 Graph View(需求表见同目录《项目关系图谱（Graph View）.md》)
+
+- **数据源现成**:depgraph 输出 `DepGraphResult` 即 nodes+edges(relPath、入度/出度、unresolved 记账),直接喂可视化层,不重算关系。
+- **库选型(已初筛,正式引入前补查周下载量)**:首选 `react-force-graph-2d`(Canvas,拖拽物理感最像 Obsidian;单人维护、近 7 个月未发版是减分项);备选 `sigma` v3 + `graphology`(WebGL,性能上限最高,但需 GPU 加速恢复才有意义;拖拽物理感要自己做);第三 `cytoscape`(原生复合节点契合"目录折叠成聚合节点",但默认像流程图、包体最大)。
+- **必须先做 PoC**:500/2000/4000 节点实测流畅度再定库;与实底/显卡加速的决策联动——软件渲染下 WebGL 方案是瘸子。
+- **既有约束**:大项目 4000 节点预算思路沿用;懒加载、孤立节点收纳、目录聚合折叠见需求表;图谱走嵌入主窗页签,不开独立 BrowserWindow(透明/圆角坑不再引入)。
+
+### 10.3 其他挂账项
+
+- 副屏失焦蒸发:上游 bug(electron#42635/#44967),实底化可断根;不退实底就留「blur 重画」创可贴候选。
+- 设置页页签化:追加设计,SettingsDialog → 页签品类,继承页签属性。
+- 桌宠/气泡保持透明窗,任何「换实底/开 GPU」动作都要回归验证它们。
