@@ -29,6 +29,8 @@ import { hideBubble, openBubble } from './bubble.ts'
 import { DETACH_MARGIN_PX, isOutsideBounds } from './freechatHost.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import {
+  baseWindowBox,
+  physicalWindowBox,
   placeWindowBox,
   readWindowState,
   WINDOW_MIN_HEIGHT,
@@ -54,6 +56,16 @@ let tray: Tray | null = null
 // 真退出旗:托盘「退出」先立旗再 quit,close 事件看见旗才放行销毁 ——
 // 不立旗的话关窗=收起,窗口永远走不到销毁那一步
 let quitting = false
+
+// 界面缩放系数的主进程账本(UI 重构 v3·§2.2):窗口记事本记「100% 基准值」,
+// 落盘/落窗都要拿它换算。渲染层 setUiScale 落盘后走 atlas:ui-scale-sync 报进来;
+// 初值取上次存档里记的 scale —— 应用关着的时候缩放不可能变,这个值就是准的
+let currentUiScale = 1
+
+/** 渲染层报缩放(ipcShell 的 uiScaleSync 监听调):记账系数跟着换 */
+export function setUiScaleFactor(v: number): void {
+  currentUiScale = v
+}
 
 /** 把主窗带回前台:托盘「显示主面板」、左键点托盘、第二个实例敲门,都走这条 */
 export function showMainWindow(): void {
@@ -186,14 +198,18 @@ export function createWindow(): void {
   // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
   // 存档先过安检再落窗:垃圾存档走默认,旧存档对着现在的屏幕贴边夹紧(换屏/改分辨率
   // 也不把窗送出屏外)。记不住(读写失败)就当没这回事,走默认 —— 锦上添花不添乱。
+  // 存档记的是 100% 基准值(UI 重构 v3):乘回 scale 得物理框再贴屏落位;
+  // 老存档没有 scale 字段 = 当年按物理像素记的,physicalWindowBox 原样奉还
   const savedWindowState = readWindowState(userDataDir())
-  const placedBox = savedWindowState
+  if (savedWindowState?.scale) currentUiScale = savedWindowState.scale
+  const savedBox = savedWindowState ? physicalWindowBox(savedWindowState) : null
+  const placedBox = savedBox
     ? placeWindowBox(
-        savedWindowState.box,
+        savedBox,
         screen.getAllDisplays().map((d) => d.workArea)
       )
     : null
-  let normalBox: WindowBox | null = savedWindowState ? savedWindowState.box : null
+  let normalBox: WindowBox | null = savedBox
   let stateSaveTimer: NodeJS.Timeout | null = null
 
   const mainWindow = new BrowserWindow({
@@ -228,9 +244,12 @@ export function createWindow(): void {
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
   const persistWindowState = (): void => {
     if (mainWindow.isDestroyed()) return
+    // 落盘一律折回 100% 基准值 + 记下当时系数(规格 §2.2:140% 时物理尺寸也 ×1.4,
+    // 换档重开,窗口相对 UI 的比例恒定);x/y 是屏幕物理坐标,不折
     writeWindowState(userDataDir(), {
-      box: normalBox ?? mainWindow.getBounds(),
-      maximized: mainWindow.isMaximized()
+      box: baseWindowBox(normalBox ?? mainWindow.getBounds(), currentUiScale),
+      maximized: mainWindow.isMaximized(),
+      scale: currentUiScale
     })
   }
   const scheduleWindowStateSave = (): void => {

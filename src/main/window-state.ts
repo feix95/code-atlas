@@ -9,6 +9,7 @@
 
 import { join } from 'node:path'
 import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
+import { clampUiScale } from '../shared/uiScale.ts'
 
 /** 一扇窗的位置和块头;x/y 在「还没接到屏幕」时可以缺(交给系统居中) */
 export interface WindowBox {
@@ -18,10 +19,14 @@ export interface WindowBox {
   height: number
 }
 
-/** 记事本里的一页:正常状态下的窗框 + 当时是不是最大化 */
+/** 记事本里的一页:正常状态下的窗框 + 当时是不是最大化。
+ *  scale(UI 重构 v3·§2.2)= 存档时界面缩放系数;有它,box 的宽高就是「100% 基准值」,
+ *  落窗前乘回 scale 得物理尺寸 —— 缩放档怎么换,窗口比例恒等。
+ *  老存档没这字段:box 当年就是按物理像素记的,直接当物理框用,下回落盘自动转成基准值 */
 export interface WindowState {
   box: WindowBox
   maximized: boolean
+  scale?: number
 }
 
 /** 窗口最小尺寸:存档安检的下限、createWindow 的窗框下限,同认这一份 */
@@ -41,6 +46,8 @@ function isFiniteNumber(v: unknown): v is number {
 
 /** 记事本原文 → 干净的窗框;垃圾内容回 null(纯函数,自测覆盖)。
  * x/y 允许负数(多屏时主屏左边的屏是负坐标);宽高就地夹到下限,上限交给贴屏那步。
+ * scale 只在「有限且 >0」时认账;认了 scale 的存档,box 是基准值,
+ * 下限要按系数折回基准口径再夹(基准下限 = 物理下限 ÷ scale)。
  */
 export function parseWindowState(raw: unknown): WindowState | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -49,14 +56,41 @@ export function parseWindowState(raw: unknown): WindowState | null {
   const b = boxRaw as Record<string, unknown>
   if (!isFiniteNumber(b['width']) || !isFiniteNumber(b['height'])) return null
   if (!isFiniteNumber(b['x']) || !isFiniteNumber(b['y'])) return null
+  const scaleRaw = (raw as Record<string, unknown>)['scale']
+  const scale = isFiniteNumber(scaleRaw) && scaleRaw > 0 ? clampUiScale(scaleRaw) : undefined
+  const s = scale ?? 1
   return {
     box: {
       x: Math.round(b['x']),
       y: Math.round(b['y']),
-      width: Math.max(WINDOW_MIN_WIDTH, Math.round(b['width'])),
-      height: Math.max(WINDOW_MIN_HEIGHT, Math.round(b['height']))
+      width: Math.max(WINDOW_MIN_WIDTH / s, Math.round(b['width'])),
+      height: Math.max(WINDOW_MIN_HEIGHT / s, Math.round(b['height']))
     },
-    maximized: (raw as Record<string, unknown>)['maximized'] === true
+    maximized: (raw as Record<string, unknown>)['maximized'] === true,
+    // scale 没认下就不带这个键 —— 「老存档」和「没这字段」在对象上要长一个样
+    ...(scale === undefined ? {} : { scale })
+  }
+}
+
+/** 存档框 → 物理框:宽高乘回 scale;坐标是屏幕物理值,不乘(纯函数,自测覆盖) */
+export function physicalWindowBox(state: WindowState): WindowBox {
+  const s = state.scale ?? 1
+  return {
+    x: state.box.x,
+    y: state.box.y,
+    width: Math.round(state.box.width * s),
+    height: Math.round(state.box.height * s)
+  }
+}
+
+/** 物理框 → 存档基准框:宽高折回 100% 口径;x/y 照抄(纯函数,自测覆盖) */
+export function baseWindowBox(physical: WindowBox, scale: number): WindowBox {
+  const s = isFiniteNumber(scale) && scale > 0 ? scale : 1
+  return {
+    x: physical.x,
+    y: physical.y,
+    width: Math.round(physical.width / s),
+    height: Math.round(physical.height / s)
   }
 }
 

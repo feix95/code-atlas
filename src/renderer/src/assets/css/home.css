@@ -296,16 +296,3 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
-
-/* ── 窄窗口:路径框让位,树保底宽度,详情内部滚动 ── */
-
-@media (max-width: 760px) {
-  .topbar {
-    flex-wrap: wrap;
-  }
-
-  .path-box {
-    order: 10;
-    flex-basis: 100%;
-  }
-}

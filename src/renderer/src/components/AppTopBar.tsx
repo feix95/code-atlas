@@ -1,151 +1,142 @@
-// 顶栏:logo 回家 / 打开项目 / 后退前进 / 刷新 / 路径框 / 设置,一整排共享一套图标规格。
+// v3 顶栏(第 1 层 · 整行盖头):收起钮 | 搜索框 | 导航组 | 页签区 | 窗控三键。
+// 左段盖住 rail + 侧栏的正上方,右缘细线就是「侧栏 | 内容」分界线的上行段;
+// 侧栏收起/无项目时左段收成 1u,只剩收起钮。页签区(B3)进来前,整条都是拖拽面。
 import type { NavLocation } from '../navHistory'
-import { IconArrowLeft, IconArrowRight, IconFolder, IconRefresh, TreeIcon } from './Icons'
+import { IconArrowLeft, IconArrowRight, IconRefresh, TreeIcon } from './Icons'
+import { useWindowMaximized } from '../useWindowMaximized'
 
-/** 顶栏图标旋钮:打开项目/后退/前进/刷新/设置 五颗共享一套规格,跟文件树等别处分组互不相关。
- *  描边数换算:图标是 24 栅格,18px 下想真看出 2px 粗,strokeWidth = 2×24/18 ≈ 2.7 */
-const TOPBAR_ICON_SIZE = 18
-const TOPBAR_ICON_STROKE = 2.7
+/** 顶栏图标本体 0.5u ≈ 32px@100%;24 栅格放到 32px,描边降一档才不闷(有效粗 ≈2px) */
+const TOP_ICON = 32
+const TOP_ICON_STROKE = 1.5
 
 export function AppTopBar({
   scanning,
-  folder,
+  hasWorkspace,
+  sidebarShown,
+  sidebarCollapsed,
+  onToggleSidebar,
   nav,
-  pathDraft,
-  pathHint,
-  pathShaking,
-  pathInputRef,
-  goHome,
-  handlePick,
   goNav,
   handleRefresh,
-  setPathDraft,
-  dismissPathHint,
-  goPath,
-  setPathShaking,
-  setSettingsSection,
-  setShowSettings
+  filter,
+  onFilterChange
 }: {
   scanning: boolean
-  folder: string | null
+  /** 已开一张图(工作区在台面上) */
+  hasWorkspace: boolean
+  /** 侧栏这一列此刻露着 = 搜索框/导航组才营业(收起时整组消失,规格 §4.3) */
+  sidebarShown: boolean
+  sidebarCollapsed: boolean
+  onToggleSidebar: () => void
   nav: { stack: NavLocation[]; index: number }
-  pathDraft: string
-  pathHint: string | null
-  pathShaking: boolean
-  pathInputRef: React.RefObject<HTMLInputElement | null>
-  goHome: () => void
-  handlePick: () => Promise<void>
   goNav: (delta: number) => Promise<void>
   handleRefresh: () => Promise<void>
-  setPathDraft: React.Dispatch<React.SetStateAction<string>>
-  dismissPathHint: () => void
-  goPath: () => Promise<void>
-  setPathShaking: React.Dispatch<React.SetStateAction<boolean>>
-  setSettingsSection: React.Dispatch<React.SetStateAction<'appearance' | 'ai' | 'advanced'>>
-  setShowSettings: React.Dispatch<React.SetStateAction<boolean>>
+  filter: string
+  onFilterChange: (v: string) => void
 }): React.JSX.Element {
+  const maximized = useWindowMaximized()
   return (
     <header className="topbar">
-      <button
-        type="button"
-        className="brand"
-        onClick={goHome}
-        disabled={!folder || scanning}
-        title={folder ? '回到首页' : '已经在首页了'}
-        aria-label="回到首页"
-      >
-        <span className="brand-mark" aria-hidden="true">
-          ⌁
-        </span>
-        CodeAtlas
-      </button>
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={() => void handlePick()}
-        disabled={scanning}
-      >
-        <IconFolder size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} />
-        {scanning ? '扫描中……' : '打开项目'}
-      </button>
-      {/* 后退/前进(第八十三锤,小葵点名跟刷新放一起):在线的两端自己变灰;三颗全走 mono 单色 */}
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={() => void goNav(-1)}
-        disabled={scanning || nav.index <= 0}
-        title="后退"
-        aria-label="后退"
-      >
-        <IconArrowLeft size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={() => void goNav(1)}
-        disabled={scanning || nav.index >= nav.stack.length - 1}
-        title="前进"
-        aria-label="前进"
-      >
-        <IconArrowRight size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={() => void handleRefresh()}
-        disabled={scanning}
-        title={scanning ? '扫描中……' : '刷新'}
-        aria-label="刷新"
-      >
-        <IconRefresh size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-      </button>
-      <div
-        className={`path-box${pathShaking ? ' is-shaking' : ''}`}
-        onAnimationEnd={() => setPathShaking(false)}
-      >
-        <input
-          ref={pathInputRef}
-          className="path-input mono"
-          type="text"
-          value={pathDraft}
-          placeholder="文件夹路径,回车直接打开"
-          disabled={scanning}
-          spellCheck={false}
-          aria-label="文件夹路径"
-          onChange={(e) => {
-            setPathDraft(e.target.value)
-            dismissPathHint()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void goPath()
-            if (e.key === 'Escape') setPathDraft(folder ?? '')
-          }}
-        />
-        <button
-          type="button"
-          className="btn path-go"
-          onClick={() => void goPath()}
-          disabled={scanning}
-        >
-          {scanning ? '……' : '前往'}
-        </button>
-        {pathHint && (
-          <div className="path-hint" role="status">
-            {pathHint}
-          </div>
+      <div className={`topbar-side${sidebarShown ? '' : ' is-bare'}`}>
+        {/* 收起侧栏:顶栏最左端,独占 1u 列,图标骑 rail 中线(x=0.5u) */}
+        <div className="tb-collapse">
+          <button
+            type="button"
+            className="tb-btn"
+            onClick={onToggleSidebar}
+            disabled={!hasWorkspace || scanning}
+            title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+            aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+            aria-pressed={sidebarCollapsed}
+          >
+            <TreeIcon name="panelLeft" size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
+          </button>
+        </div>
+        {sidebarShown && (
+          <>
+            {/* 工作区文件名搜索:B1 先接旧的树内过滤,深搜升级在 B7 */}
+            <label className="tb-search">
+              <TreeIcon name="search" size={18} mono />
+              <input
+                type="search"
+                value={filter}
+                placeholder="搜索文件"
+                aria-label="搜索文件"
+                spellCheck={false}
+                onChange={(e) => onFilterChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') onFilterChange('')
+                }}
+              />
+            </label>
+            {/* 导航组 ← → ↻:贴左段右缘(分隔线左侧),可用态沿用旧逻辑 */}
+            <div className="tb-nav">
+              <button
+                type="button"
+                className="tb-btn"
+                onClick={() => void goNav(-1)}
+                disabled={scanning || nav.index <= 0}
+                title="后退"
+                aria-label="后退"
+              >
+                <IconArrowLeft size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
+              </button>
+              <button
+                type="button"
+                className="tb-btn"
+                onClick={() => void goNav(1)}
+                disabled={scanning || nav.index >= nav.stack.length - 1}
+                title="前进"
+                aria-label="前进"
+              >
+                <IconArrowRight size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
+              </button>
+              <button
+                type="button"
+                className="tb-btn"
+                onClick={() => void handleRefresh()}
+                disabled={scanning}
+                title={scanning ? '扫描中……' : '刷新'}
+                aria-label="刷新"
+              >
+                <IconRefresh size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
+              </button>
+            </div>
+          </>
         )}
       </div>
-      <button
-        type="button"
-        className="icon-btn"
-        onClick={() => {
-          setSettingsSection('appearance')
-          setShowSettings(true)
-        }}
-        aria-label="打开设置"
-      >
-        <TreeIcon name="gear" size={TOPBAR_ICON_SIZE} strokeWidth={TOPBAR_ICON_STROKE} mono />
-      </button>
+      {/* 页签区:B3 的 Chrome 页签搬进来之前,这就是可拖拽的空白面 */}
+      <div className="topbar-tabs" />
+      {/* 窗控三键:整高块并排;— ▢ 悬停灰底,× 悬停红底白叉(Windows 惯例) */}
+      <div className="win-ctl">
+        <button
+          type="button"
+          className="win-btn win-min"
+          onClick={() => void window.atlas.windowMinimize()}
+          title="最小化"
+          aria-label="最小化"
+        >
+          <i aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={`win-btn win-max${maximized ? ' is-restore' : ''}`}
+          onClick={() => void window.atlas.windowMaximizeToggle()}
+          title={maximized ? '还原' : '最大化'}
+          aria-label={maximized ? '还原' : '最大化'}
+        >
+          <i aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="win-btn win-close"
+          onClick={() => void window.atlas.windowClose()}
+          title="关闭"
+          aria-label="关闭"
+        >
+          <i aria-hidden="true" />
+        </button>
+      </div>
     </header>
   )
 }

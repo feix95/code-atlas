@@ -124,7 +124,9 @@ try {
   }
   const home = () => page.getByRole('heading', { name: /先看懂项目/ }).waitFor()
   const overview = async () => {
-    await page.getByRole('button', { name: '项目导览', exact: true }).click()
+    // UI v3:「项目导览」钮已摘除(规格 §7.0)。回项目导览 = 点树根行 ——
+    // 根节点 relPath='',选中它走概览零状态,也就是老导览页
+    await page.locator('.tree > .tree-branch > .tree-row.is-dir > .tree-main').click()
     await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
   }
   const selectMain = async () => {

@@ -1,7 +1,14 @@
-// 左栏宽度 + VSCode 式分割条:宽度存「100% 缩放下的基准值」,渲染时乘缩放系数。
+// 左栏宽度 + VSCode 式分割条 + 收起旗:宽度存「100% 缩放下的基准值」,渲染时乘缩放系数。
 import { useEffect, useRef, useState } from 'react'
 import { CH } from '@shared/ipcChannels'
-import { DEFAULT_SIDEBAR_WIDTH, loadSidebarWidth, saveSidebarWidth } from './layoutPrefs'
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  loadSidebarCollapsed,
+  loadSidebarWidth,
+  saveSidebarCollapsed,
+  saveSidebarWidth
+} from './layoutPrefs'
 
 // 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值,户口在 layoutPrefs),下次打开还是自己调好的样子
 export const MIN_SIDEBAR_WIDTH = 240
@@ -22,6 +29,16 @@ export function useSidebarSash() {
   )
   const sidebarWidthRef = useRef(sidebarWidth)
   const sashDraggingRef = useRef(false)
+  // 侧栏收起(UI v3):顶栏最左端那颗钮折叠/放出行中间整列;状态记本机
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
+
+  function toggleSidebarCollapsed(): void {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      saveSidebarCollapsed(next)
+      return next
+    })
+  }
 
   function applySidebarWidth(next: number): void {
     const clamped = clampSidebar(next)
@@ -58,8 +75,9 @@ export function useSidebarSash() {
 
   function onSashPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
     if (!sashDraggingRef.current) return
-    // 树栏贴着窗口左缘,分割条的横向位置就是左栏该有的宽度
-    applySidebarWidth(e.clientX)
+    // v3 起侧栏左边多了一列 rail(宽 1u = 4rem):分割条的横向位置先扣掉 rail,
+    // 剩下的才是左栏该有的宽度
+    applySidebarWidth(e.clientX - 4 * ROOT_FONT_BASE_PX * uiScale)
   }
 
   function endSashDrag(e: React.PointerEvent<HTMLDivElement>): void {
@@ -87,6 +105,8 @@ export function useSidebarSash() {
   return {
     uiScale,
     sidebarWidth,
+    sidebarCollapsed,
+    toggleSidebarCollapsed,
     onSashPointerDown,
     onSashPointerMove,
     endSashDrag,

@@ -46,8 +46,8 @@ body.is-sash-dragging {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* 卡片下方的画布:固定中性调(第七十七锤起不再跟主题色),内容卡片仍是无染的白底,文字对比度不让步 */
-  background: var(--canvas-tint);
+  /* v3 内容面 = 激活页签同一白面(--chrome-surface);内容卡片仍是无染的白底,文字对比度不让步 */
+  background: var(--chrome-surface);
   position: relative;
 }
 

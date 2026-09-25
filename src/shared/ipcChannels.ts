@@ -22,6 +22,8 @@ export const CH = {
   appearanceSave: 'atlas:appearance-save',
   /** 窗口内 DOM CustomEvent 名(非 IPC):缩放变了,预览字号跟着量尺 */
   uiScaleChanged: 'atlas:ui-scale',
+  /** 缩放落盘后报主进程(send 配 on):窗口尺寸记事本按「100% 基准值 × 系数」记账要用 */
+  uiScaleSync: 'atlas:ui-scale-sync',
   // ── 系统与项目 ──
   pickFolder: 'atlas:pick-folder',
   listDrives: 'atlas:list-drives',

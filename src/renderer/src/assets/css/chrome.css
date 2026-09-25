@@ -1,226 +1,269 @@
-/* ── 自绘标题栏:整条能拖动窗口;底下可点的东西必须 no-drag,不然只会拖窗点不到 ── */
+/* ── UI v3 顶栏(第 1 层 · 整行盖头)────────────────────────
+   规格户口:docs/to-do list/UI重构-v3-比例布局;1u = var(--u) = 顶栏高 = rail 宽。
+   顶栏整条是拖拽面;凡是可点的东西必须 no-drag,不然只会拖窗点不到 */
 
-.titlebar {
-  position: relative;
-  flex: 0 0 2.375rem;
+.topbar {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  height: var(--u);
+  flex-shrink: 0;
+  background: var(--chrome-topbar);
   -webkit-app-region: drag;
-  background: var(--window);
-  border-bottom: 1px solid var(--line);
-  color: var(--muted-2);
-  font-size: var(--font-xs);
-  letter-spacing: 0.03em;
   user-select: none;
 }
 
-/* 三颗窗控按钮住右上角,顺序照 Windows 习惯(最小化 → 最大化 → 关闭) */
-.traffic-lights {
-  position: absolute;
-  right: 0.625rem;
+/* 左段盖住 rail + 侧栏的正上方:宽 = rail 1u + 侧栏宽(--sidebar-w,App 挂在 .app 上)
+   + sash 半宽(0.3125rem 的一半)—— 右缘这条 1px 落在 sash 中线上,
+   「侧栏 | 内容」分界线顺着它一路接上顶栏 */
+.topbar-side {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+  width: calc(var(--u) + var(--sidebar-w, 0rem) + 0.15625rem);
+  border-right: 1px solid var(--line);
 }
 
-/* 圆点本体 0.6875rem,按钮底座放大到 1.125rem:点着不费劲 */
-.traffic-lights .light {
-  position: relative;
-  width: 1.125rem;
-  height: 1.125rem;
-  padding: 0;
+/* 侧栏收起 / 没开项目:左段只剩收起钮那一列,分界线贴 rail 右缘 */
+.topbar-side.is-bare {
+  width: var(--u);
+}
+
+/* 顶栏小件统一制式(规格 §3.1):点击区 0.6u、图标本体 0.5u、hover 浅底框 */
+.tb-btn {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
   border: 0;
+  border-radius: var(--radius-xxs); /* 控件档 */
   background: transparent;
+  color: var(--chrome-ink);
+  font-family: inherit;
   cursor: pointer;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
-.traffic-lights .light::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0.6875rem;
-  height: 0.6875rem;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: var(--traffic-dot);
-  transition:
-    filter var(--dur-2) var(--ease-smooth),
-    box-shadow var(--dur-2) var(--ease-smooth);
+.tb-btn:hover:not(:disabled) {
+  background: var(--chrome-hover);
 }
 
-/* 圆点里的功能图标:横线=最小化,方框=最大化(最大化时变双框=还原),白叉=关闭;
-   图标跟圆点一样挂 rem 随缩放走,发丝粗细留物理像素。关闭的白叉压红底,不用 hover 也认得出 */
-.traffic-lights .light i {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.tb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 收起钮独占顶栏第一列(列宽 1u):图标水平骑 rail 中线(x=0.5u) */
+.tb-collapse {
+  width: var(--u);
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+/* 搜索框:高 0.65u、交互灰底、左放大镜;左缘 ≈ rail 右缘 + 0.15u,
+   和侧栏 workspace 卡的左缘同一条线(规格 §3.1) */
+.tb-search {
+  flex: 1;
+  min-width: 3rem;
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.6rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: var(--chrome-hover);
+  color: var(--chrome-ink);
+  -webkit-app-region: no-drag;
+}
+
+.tb-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--chrome-ink);
+  font-size: var(--font-ui-medium);
+  font-family: inherit;
+}
+
+.tb-search input::placeholder {
+  color: var(--chrome-muted);
+}
+
+/* 导航组 ← → ↻:贴左段右缘(分隔线左侧) */
+.tb-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin: 0 0.375rem;
+}
+
+/* 页签区:B3 的 Chrome 页签进场前,这里就是可拖窗的空白面 */
+.topbar-tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 窗控三键(规格 §5.2):整高块并排成方格,— ▢ 悬停灰底,× 悬停红底白叉 */
+.win-ctl {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  width: 3rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.win-btn:hover {
+  background: var(--chrome-hover);
+}
+
+.win-btn.win-close:hover {
+  background: #e81123; /* 关窗红取 Windows 惯例一档(规格给定方向) */
+  color: #ffffff;
+}
+
+/* 窗控钮不画焦点提示:沿用旧案判决 —— Electron 失焦/重获焦会把鼠标点过的钮
+   误判成键盘焦点,焦点框在这儿是时隐时现的「渲染故障」。窗控钮是鼠标领地 */
+.win-btn:focus-visible {
+  outline: none;
+}
+
+/* 三颗字形用 CSS 画:横线 = 最小化,方框 = 最大化,贴屏态前后双框 = 还原,叉 = 关闭 */
+.win-btn i {
+  position: relative;
+  display: block;
+  width: 1rem;
+  height: 1rem;
   pointer-events: none;
 }
 
-.traffic-lights .is-min i {
-  width: 0.4375rem;
-  height: 1.5px;
-  border-radius: 1px;
-  background: var(--traffic-ink);
-}
-
-.traffic-lights .is-max i {
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border: 1.5px solid var(--traffic-ink);
-  border-radius: 2px;
-}
-
-/* 贴满屏幕时方框变双框,示意「点这里还原」:i 当后面那块原位不动,
-   ::after 是底左的前块 —— 实心垫底把后块穿过来的线挡掉,双框才不会糊成同心框 */
-body.is-maximized .traffic-lights .is-max i::after {
+.win-min i::before {
   content: '';
   position: absolute;
-  top: 0.03125rem;
-  left: -0.09375rem;
-  width: 0.125rem;
-  height: 0.125rem;
-  border: 1.5px solid var(--traffic-ink);
-  border-radius: 1px;
-  background: var(--traffic-chip);
-}
-
-.traffic-lights .is-max:active i::after {
-  filter: brightness(0.82);
-}
-
-.traffic-lights .is-close i {
-  width: 0.4375rem;
-  height: 0.4375rem;
-}
-
-.traffic-lights .is-close i::before,
-.traffic-lights .is-close i::after {
-  content: '';
-  position: absolute;
-  top: 50%;
   left: 50%;
-  width: 0.4375rem;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.625rem;
   height: 1.5px;
-  border-radius: 1px;
-  background: var(--traffic-ink);
+  background: currentColor;
 }
 
-.traffic-lights .is-close i::before {
+.win-max i::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+}
+
+/* 还原态:后块偏右上(先画),前块偏左下带实底盖掉交叠 —— 双框不糊成同心框 */
+.win-max.is-restore i::before {
+  transform: translate(-28%, -72%);
+}
+
+.win-max.is-restore i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-68%, -32%);
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+  background: var(--chrome-topbar);
+}
+
+.win-btn:hover .win-max.is-restore i::after {
+  background: var(--chrome-hover);
+}
+
+.win-close i::before,
+.win-close i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.625rem;
+  height: 1.5px;
+  background: currentColor;
+}
+
+.win-close i::before {
   transform: translate(-50%, -50%) rotate(45deg);
 }
 
-.traffic-lights .is-close i::after {
+.win-close i::after {
   transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-/* 三颗窗控平时统一中性灰(Obsidian 无色皮),悬停才露 mac 本色:绿=最小化 黄=最大化 红=关闭 */
-.traffic-lights .is-min::before,
-.traffic-lights .is-max::before,
-.traffic-lights .is-close::before {
-  background: var(--traffic-idle);
+/* ── rail(第 2 层最左列):图谱/概览/对话/设置 + 底端 AI 状态 ── */
+
+.rail {
+  width: var(--u);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--chrome-topbar); /* 与顶栏同底同色(规格给定) */
+  border-right: 1px solid var(--line);
 }
 
-.traffic-lights .is-min:hover::before {
-  background: var(--traffic-green);
+/* rail 钮:点击区 ~0.75u 见方、图标居中;纵向中心距 ~1.1u(钮高 + 上缘间距合计) */
+.rail-btn {
+  width: 3rem;
+  height: 3rem;
+  margin-top: 1.4rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.traffic-lights .is-max:hover::before {
-  background: var(--traffic-yellow);
+.rail-btn:hover:not(:disabled) {
+  background: var(--chrome-hover);
 }
 
-.traffic-lights .is-close:hover::before {
-  background: var(--traffic-red);
+.rail-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
-/* 最大化还原态的前块跟着圆点一起换色,别留灰补丁 */
-body.is-maximized .traffic-lights .is-max:hover i::after {
-  background: var(--traffic-yellow);
-}
-
-.traffic-lights .light:active::before {
-  filter: brightness(0.82);
-}
-
-/* 窗控钮不画焦点提示:全局 :focus-visible 的 outline 画在方盒上像个怪框,
-   挪成圆点光环又被误判成「圆点变大」—— Electron 失焦/重获焦会把鼠标点过的钮
-   误判成键盘焦点,任何焦点标记在这儿都是时隐时现的「渲染故障」。窗控钮是鼠标
-   领地,Tab 本来也很少走到,直接豁免干净 */
-.traffic-lights .light:focus-visible {
-  outline: none;
+/* AI 状态钮压底 */
+.rail-ai {
+  margin-top: auto;
+  margin-bottom: 0.7rem;
 }
 
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
 :focus-visible {
   outline: 2px solid var(--muted);
   outline-offset: 1px;
-}
-
-/* ── 顶栏:品牌 + 打开/刷新 + 路径 + 设置 ── */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--window);
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-
-/* logo(第六十锤起可点):开着项目时点了回项目总览,没开项目时变灰不可点 */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-base);
-  font-weight: var(--font-w-bold);
-  letter-spacing: -0.01em;
-  margin-right: var(--space-2);
-  flex-shrink: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-family: inherit;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: opacity var(--dur-2) var(--ease-smooth);
-}
-
-.brand:hover:not(:disabled) .brand-mark {
-  filter: brightness(1.12);
-}
-
-.brand:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.brand:disabled {
-  cursor: default;
-  opacity: 0.9;
-}
-
-.brand:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 2px;
-}
-
-.brand-mark {
-  width: 1.5rem;
-  height: 1.5rem;
-  display: grid;
-  place-items: center;
-  color: var(--accent-ink);
-  font-size: var(--font-base);
-  border-radius: 0.4375rem;
-  background: linear-gradient(135deg, var(--accent), var(--secondary));
-  box-shadow: 0 0.25rem 0.5625rem color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: filter var(--dur-2) var(--ease-smooth);
 }
 
 /* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
@@ -314,48 +357,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
   border-color: var(--accent-line);
 }
 
-/* 地址栏:可以直接输路径回车开图 */
-.path-box {
-  position: relative;
-  flex: 1;
-  min-width: 11.25rem;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 1.875rem;
-  padding: 0 2px 0 var(--space-2);
-  background: var(--canvas-tint);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  transition: border-color var(--dur-2) var(--ease-smooth);
-}
-
-.path-box:focus-within {
-  border-color: var(--accent-line);
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
-}
-
-.path-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--font-xs);
-  padding: var(--space-1) 0;
-  outline: none;
-}
-
-.path-input::placeholder {
-  color: var(--muted-2);
-}
-
-.path-go {
-  height: 1.5rem;
-  padding: 0 var(--space-2);
-}
-
-/* 空路径点了「前往」:气泡提示挂输入框正下方 */
+/* 空路径点了「前往」:气泡提示挂输入框正下方(现宿主 = 侧栏 workspace 卡) */
 .path-hint {
   position: absolute;
   top: calc(100% + 0.375rem);
@@ -372,7 +374,7 @@ body.is-maximized .traffic-lights .is-max:hover i::after {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .path-box.is-shaking {
+  .ws-card.is-shaking {
     animation: path-shake 0.35s var(--ease-smooth);
   }
 }

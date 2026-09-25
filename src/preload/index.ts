@@ -77,6 +77,8 @@ const atlasApi = {
     applyRootFont(f)
     // 喊一声界面:侧栏宽度这类「按比例跟缩放」的布局要实时跟着重算
     window.dispatchEvent(new CustomEvent(CH.uiScaleChanged, { detail: f }))
+    // 落盘的系数同步给主进程:窗口记事本存的是 100% 基准值,应用时乘它还原物理尺寸
+    ipcRenderer.send(CH.uiScaleSync, f)
   },
   // 设置弹窗的暂存预览:根字号跟着草稿走,但不写 localStorage —— 点「应用更改」才真正 setUiScale 落盘
   previewUiScale: (factor: number): void => {

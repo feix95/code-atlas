@@ -15,14 +15,15 @@ import { sanitizePersonalization, type TeachingLevel } from '@shared/personaliza
 import { createMirrorThrottle } from '@shared/mirrorThrottle'
 import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { HomePage } from './components/HomePage'
 import { ModelStatusBar } from './components/ModelStatusBar'
 import { SettingsDialog } from './components/SettingsDialog'
-import { TitleBar } from './components/TitleBar'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
+import { Rail } from './components/Rail'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { PaneGroups } from './components/PaneGroups'
 import { TabBody } from './components/TabBody'
@@ -139,6 +140,8 @@ function App(): React.JSX.Element {
   const [expanding, setExpanding] = useState<string | null>(null)
   const expandingRef = useRef(false)
   const [treeNote, setTreeNote] = useState<string | null>(null)
+  // 顶栏搜索框的过滤词(UI v3 上移:B1 仍走旧的树内过滤,B7 换主进程深搜)
+  const [treeFilter, setTreeFilter] = useState('')
 
   // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
   // —— 预览页签改版后不再自带聊天,聊天上下文只认树里选中的对象,这个派生退役了
@@ -212,7 +215,7 @@ function App(): React.JSX.Element {
         }
       })
       .catch(() => {
-        if (alive) setDrivesNote('盘符列不出来,用上方「打开项目」选文件夹一样能用')
+        if (alive) setDrivesNote('盘符列不出来,在上方输入文件夹路径一样能开')
       })
     return () => {
       alive = false
@@ -253,6 +256,7 @@ function App(): React.JSX.Element {
     setTreeNote(null)
     setGitInfo(null)
     setNotes({})
+    setTreeFilter('')
     try {
       const scanned = await window.atlas.scanFolder(dir)
       if (!isCurrent()) return null
@@ -503,6 +507,7 @@ function App(): React.JSX.Element {
     setGitInfo(null)
     dismissPathHint()
     setNotes({})
+    setTreeFilter('')
   }
 
   // 存一条手动备注(第九十八锤):空串 = 删除;上限和淘汰在 shared/notes 里管
@@ -602,6 +607,8 @@ function App(): React.JSX.Element {
   const {
     uiScale,
     sidebarWidth,
+    sidebarCollapsed,
+    toggleSidebarCollapsed,
     onSashPointerDown,
     onSashPointerMove,
     endSashDrag,
@@ -682,37 +689,52 @@ function App(): React.JSX.Element {
   return (
     <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
       <TeachingContext.Provider value={teaching}>
-        <div className="app">
+        <div
+          className="app"
+          // 侧栏宽挂 CSS 变量:侧栏本体和顶栏左段(分界线的上行段)同认这一份,
+          // 拖 sash 时两边永远对齐;rem 值 = 基准宽 ÷ (16 × uiScale)
+          style={
+            {
+              '--sidebar-w': `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem`
+            } as React.CSSProperties
+          }
+        >
           {revived && (
             <div className="revive-note" role="alert">
               画面刚才断了一次,已经自动接上 ——
               正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
             </div>
           )}
-          <TitleBar />
           <AppTopBar
             scanning={scanning}
-            folder={folder}
+            hasWorkspace={result !== null}
+            sidebarShown={!sidebarCollapsed}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebarCollapsed}
             nav={nav}
-            pathDraft={pathDraft}
-            pathHint={pathHint}
-            pathShaking={pathShaking}
-            pathInputRef={pathInputRef}
-            goHome={goHome}
-            handlePick={handlePick}
             goNav={goNav}
             handleRefresh={handleRefresh}
-            setPathDraft={setPathDraft}
-            dismissPathHint={dismissPathHint}
-            goPath={goPath}
-            setPathShaking={setPathShaking}
-            setSettingsSection={setSettingsSection}
-            setShowSettings={setShowSettings}
+            filter={treeFilter}
+            onFilterChange={setTreeFilter}
           />
 
-          {result && !scanning ? (
-            // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
-            <main className="workspace">
+          {/* 第 2 层:rail | 侧栏 | 内容区,全在顶栏之下。
+              侧栏常驻(§7.1 不存在空侧栏):没开工作区时树区 = 「这台电脑」盘符列表 */}
+          <div className="app-body">
+            <Rail
+              hasWorkspace={result !== null && !scanning}
+              onOverview={() => ensureKindTab('overview', selectedFile ?? selectedFolder)}
+              onChat={() => {
+                if (freechatHost === 'pet') window.atlas.openMainPanel()
+                ensureKindTab('chat', null)
+              }}
+              onSettings={() => {
+                setSettingsSection('appearance')
+                setShowSettings(true)
+              }}
+              onAiStatus={openAiSettings}
+            />
+            {!sidebarCollapsed && (
               <WorkspaceSidebar
                 result={result}
                 notes={notes}
@@ -726,141 +748,160 @@ function App(): React.JSX.Element {
                 editNoteFromTree={editNoteFromTree}
                 saveNote={saveNote}
                 openPreview={openPreview}
-                showProjectGuide={showProjectGuide}
                 treeNote={treeNote}
+                filter={treeFilter}
+                folder={folder}
+                scanning={scanning}
+                pathDraft={pathDraft}
+                pathHint={pathHint}
+                pathShaking={pathShaking}
+                pathInputRef={pathInputRef}
+                setPathDraft={setPathDraft}
+                dismissPathHint={dismissPathHint}
+                goPath={goPath}
+                setPathShaking={setPathShaking}
+                goHome={goHome}
                 sidebarWidth={sidebarWidth}
-                uiScale={uiScale}
                 onSashPointerDown={onSashPointerDown}
                 onSashPointerMove={onSashPointerMove}
                 endSashDrag={endSashDrag}
                 onSashDoubleClick={onSashDoubleClick}
                 onSashKeyDown={onSashKeyDown}
+                drives={drives}
+                drivesNote={drivesNote}
+                onOpenDrive={(path) => void scanPath(path)}
               />
-              <section className="detail">
-                {scanToast && (
-                  <div className="scan-toast" role="status">
-                    {scanToast}
-                  </div>
-                )}
-                <PaneGroups
-                  groups={groups}
-                  visibleOfGroup={visibleOfGroup}
-                  freechatHost={freechatHost}
-                  flashTabId={flashTabId}
-                  activateTab={activateTab}
-                  closeTab={closeTab}
-                  pinToggleTab={pinToggleTab}
-                  moveTab={moveTab}
-                  setDraggingTab={setDraggingTab}
-                  onTabDragEnd={onTabDragEnd}
-                  onDetachTab={onDetachTab}
-                  enabledKinds={enabledKinds}
-                  toggleKind={toggleKind}
-                  setActiveGroupId={setActiveGroupId}
-                  dropMark={dropMark}
-                  setDropMark={setDropMark}
-                  draggingTab={draggingTab}
-                  onPaneSashDown={onPaneSashDown}
-                  applyPaneSplit={applyPaneSplit}
-                  paneSplit={paneSplit}
-                  showDropHint={showDropHint}
-                  result={result}
-                  previewRefs={previewRefs}
-                  removePreviewRef={removePreviewRef}
-                  handleDropNode={handleDropNode}
-                  fileLinks={fileLinks}
-                  chatSuggestionsOn={chatSuggestionsOn}
-                  renderTabBody={(t) => (
-                    <TabBody
-                      tab={t}
-                      result={result}
-                      notes={notes}
-                      noteEditRequest={noteEditRequest}
-                      previewRefs={previewRefs}
-                      previewJump={previewJump}
-                      selectedFile={selectedFile}
-                      selectedFolder={selectedFolder}
-                      structure={structure}
-                      analyzing={analyzing}
-                      analyzeNote={analyzeNote}
-                      graph={graph}
-                      graphLoading={graphLoading}
-                      graphNote={graphNote}
-                      gitInfo={gitInfo}
-                      setGitInfo={setGitInfo}
-                      gitLoading={gitLoading}
-                      chatSuggestionsOn={chatSuggestionsOn}
-                      chat={chat}
-                      chatContext={chatContext}
-                      fileLinks={fileLinks}
-                      goAskInChat={goAskInChat}
-                      handleLoadGraph={handleLoadGraph}
-                      jumpTo={jumpTo}
-                      saveNote={saveNote}
-                      editNoteFromTree={editNoteFromTree}
-                      openPreview={openPreview}
-                      closeTab={closeTab}
-                      addPreviewRef={addPreviewRef}
-                      removePreviewRef={removePreviewRef}
-                      handleDropNode={handleDropNode}
-                    />
+            )}
+            {result && !scanning ? (
+              // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
+              <main className="workspace">
+                <section className="detail">
+                  {scanToast && (
+                    <div className="scan-toast" role="status">
+                      {scanToast}
+                    </div>
                   )}
-                />
-              </section>
-            </main>
-          ) : (
-            <main className="content">
-              {scanning && (
-                <div className="state" role="status" aria-live="polite">
-                  <h1>正在整理项目地图…</h1>
-                  <ProgressDots />
-                  <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
-                  <button type="button" className="btn" onClick={goHome}>
-                    返回首页
-                  </button>
-                </div>
-              )}
-              {!scanning && error && (
-                <div className="state" role="alert">
-                  <h1>这个文件夹没能打开</h1>
-                  <Notice kind="error">{error}</Notice>
-                  <p>可以重试,或重新选择项目文件夹。</p>
-                  <div className="state-actions">
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        if (folder) void scanPath(folder)
-                        else void handlePick()
-                      }}
-                    >
-                      重试
-                    </button>
-                    <button type="button" className="btn" onClick={() => void handlePick()}>
-                      选择项目文件夹
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={goHome}>
+                  <PaneGroups
+                    groups={groups}
+                    visibleOfGroup={visibleOfGroup}
+                    freechatHost={freechatHost}
+                    flashTabId={flashTabId}
+                    activateTab={activateTab}
+                    closeTab={closeTab}
+                    pinToggleTab={pinToggleTab}
+                    moveTab={moveTab}
+                    setDraggingTab={setDraggingTab}
+                    onTabDragEnd={onTabDragEnd}
+                    onDetachTab={onDetachTab}
+                    enabledKinds={enabledKinds}
+                    toggleKind={toggleKind}
+                    setActiveGroupId={setActiveGroupId}
+                    dropMark={dropMark}
+                    setDropMark={setDropMark}
+                    draggingTab={draggingTab}
+                    onPaneSashDown={onPaneSashDown}
+                    applyPaneSplit={applyPaneSplit}
+                    paneSplit={paneSplit}
+                    showDropHint={showDropHint}
+                    result={result}
+                    previewRefs={previewRefs}
+                    removePreviewRef={removePreviewRef}
+                    handleDropNode={handleDropNode}
+                    fileLinks={fileLinks}
+                    chatSuggestionsOn={chatSuggestionsOn}
+                    renderTabBody={(t) => (
+                      <TabBody
+                        tab={t}
+                        result={result}
+                        notes={notes}
+                        noteEditRequest={noteEditRequest}
+                        previewRefs={previewRefs}
+                        previewJump={previewJump}
+                        selectedFile={selectedFile}
+                        selectedFolder={selectedFolder}
+                        structure={structure}
+                        analyzing={analyzing}
+                        analyzeNote={analyzeNote}
+                        graph={graph}
+                        graphLoading={graphLoading}
+                        graphNote={graphNote}
+                        gitInfo={gitInfo}
+                        setGitInfo={setGitInfo}
+                        gitLoading={gitLoading}
+                        chatSuggestionsOn={chatSuggestionsOn}
+                        chat={chat}
+                        chatContext={chatContext}
+                        fileLinks={fileLinks}
+                        goAskInChat={goAskInChat}
+                        handleLoadGraph={handleLoadGraph}
+                        jumpTo={jumpTo}
+                        saveNote={saveNote}
+                        editNoteFromTree={editNoteFromTree}
+                        openPreview={openPreview}
+                        closeTab={closeTab}
+                        addPreviewRef={addPreviewRef}
+                        removePreviewRef={removePreviewRef}
+                        handleDropNode={handleDropNode}
+                      />
+                    )}
+                  />
+                </section>
+              </main>
+            ) : (
+              <main className="content">
+                {scanning && (
+                  <div className="state" role="status" aria-live="polite">
+                    <h1>正在整理项目地图…</h1>
+                    <ProgressDots />
+                    <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
+                    <button type="button" className="btn" onClick={goHome}>
                       返回首页
                     </button>
                   </div>
-                </div>
-              )}
-              {!folder && !scanning && !error && (
-                <HomePage
-                  recents={recents}
-                  drives={drives}
-                  drivesNote={drivesNote}
-                  recentUndo={recentUndo}
-                  onPick={() => void handlePick()}
-                  onOpen={(path) => void scanPath(path)}
-                  onRemoveRecent={removeRecent}
-                  onUndoRecent={undoRecentRemove}
-                />
-              )}
-            </main>
-          )}
+                )}
+                {!scanning && error && (
+                  <div className="state" role="alert">
+                    <h1>这个文件夹没能打开</h1>
+                    <Notice kind="error">{error}</Notice>
+                    <p>可以重试,或重新选择项目文件夹。</p>
+                    <div className="state-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          if (folder) void scanPath(folder)
+                          else void handlePick()
+                        }}
+                      >
+                        重试
+                      </button>
+                      <button type="button" className="btn" onClick={() => void handlePick()}>
+                        选择项目文件夹
+                      </button>
+                      <button type="button" className="btn btn-ghost" onClick={goHome}>
+                        返回首页
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!folder && !scanning && !error && (
+                  <HomePage
+                    recents={recents}
+                    drives={drives}
+                    drivesNote={drivesNote}
+                    recentUndo={recentUndo}
+                    onPick={() => void handlePick()}
+                    onOpen={(path) => void scanPath(path)}
+                    onRemoveRecent={removeRecent}
+                    onUndoRecent={undoRecentRemove}
+                  />
+                )}
+              </main>
+            )}
+          </div>
 
-          {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见 */}
+          {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见。
+              UI v3 里它要退役进 rail 底的 AI 状态钮(B4),本块先留岗 */}
           <ModelStatusBar />
 
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}

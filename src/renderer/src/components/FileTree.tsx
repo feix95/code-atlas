@@ -253,6 +253,8 @@ interface FileTreeProps {
   onNoteRemove?: (relPath: string) => void
   /** 右键「预览文件」的原料(第一百一十锤):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
+  /** 顶栏搜索框的过滤词(UI v3:搜索框上移到顶栏,词从 App 层递进来) */
+  filter: string
 }
 
 export function FileTree({
@@ -267,9 +269,9 @@ export function FileTree({
   onExpandLazy,
   onNoteEdit,
   onNoteRemove,
-  onPreviewFile
+  onPreviewFile,
+  filter
 }: FileTreeProps): React.JSX.Element {
-  const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -306,18 +308,6 @@ export function FileTree({
 
   return (
     <>
-      <div className="sidebar-top">
-        <label className="search">
-          <span aria-hidden="true">⌕</span>
-          <input
-            type="search"
-            value={filter}
-            placeholder="搜索已加载的文件"
-            aria-label="搜索文件(在已扫描的范围里找)"
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </label>
-      </div>
       <div className="tree-scroll" ref={scrollRef}>
         <div className="tree">
           {shown ? (
@@ -338,7 +328,7 @@ export function FileTree({
           ) : (
             <div className="empty-state">
               <p className="empty-title">没找到叫「{filter.trim()}」的文件</p>
-              <p className="empty-hint">只搜已扫描的部分;没展开的文件夹,先点箭头展开</p>
+              <p className="empty-hint">只搜已扫描的部分;没展开的文件夹,先点开它</p>
             </div>
           )}
         </div>

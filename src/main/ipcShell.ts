@@ -1,9 +1,10 @@
-import { openDevLogWindow } from './appShell.ts'
+import { openDevLogWindow, setUiScaleFactor } from './appShell.ts'
 import { app, ipcMain, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { promises as fs } from 'node:fs'
 import { clearDevLogs, devLogSnapshot } from '../shared/devlog.ts'
 import { pickPathDialog } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
+import { clampUiScale } from '../shared/uiScale.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import type { DriveInfo } from '../shared/types.ts'
 
@@ -92,6 +93,11 @@ export function registerShellIpc(): void {
 
   // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)
   ipcMain.handle(CH.appVersion, () => app.getVersion())
+
+  // 渲染层改了整体缩放并落盘 → 报给主进程:窗口记事本按「基准值 × 系数」记账要用它换算
+  ipcMain.on(CH.uiScaleSync, (_event, v: unknown) => {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) setUiScaleFactor(clampUiScale(v))
+  })
 
   // ── Developer 日志(第八十七锤):拉全量 / 清账 / 开窗 ──
   ipcMain.handle(CH.devLogPull, () => devLogSnapshot())

@@ -34,6 +34,23 @@
   --font-display: 1.625rem;
   --font-title: 1.75rem;
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
+  /* ── UI v3 比例布局(规格:docs/to-do list/UI重构-v3-比例布局)──
+     1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
+  --u: 4rem;
+  /* 字号四档(Obsidian 体系):前三档与既有 --font-sm/md/ml 同值,别名挂着不另立;
+     ui-large 是新档(页内标题) */
+  --font-ui-smaller: var(--font-sm);
+  --font-ui-small: var(--font-md);
+  --font-ui-medium: var(--font-ml);
+  --font-ui-large: 1.25rem;
+  /* 框架色槽(浅色,小葵吸管色号;铁律:不透明实色,禁透明度叠色) */
+  --chrome-topbar: #ededed; /* 顶栏整行 + rail 底,同色 */
+  --chrome-panel: #f6f6f6; /* 侧栏/文件树/workspace 卡填充 */
+  --chrome-hover: #d7d7d7; /* 悬停件/搜索框底 */
+  --chrome-ink: #424242; /* 框架图标与正文深灰 */
+  --chrome-ink-strong: #141414; /* 激活页签标题 */
+  --chrome-surface: #ffffff; /* 激活页签/内容面 */
+  --chrome-muted: #8a8a8a; /* 占位灰字(搜索框/路径框 hint) */
   /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有户口才叫正经档 ── */
   --font-w-regular: 400;
   --font-w-medium: 500;
@@ -184,6 +201,14 @@
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
   /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
   --switch-knob: #e5eaed;
+  /* v3 框架色槽暗色:暂定映射(往现有暗色板就近贴),§9.2 深浅对照表给小葵过目后再定稿 */
+  --chrome-topbar: #2e2e2e;
+  --chrome-panel: #282828;
+  --chrome-hover: #3d3d3d;
+  --chrome-ink: #dadada;
+  --chrome-ink-strong: #f0f0f0;
+  --chrome-surface: #1c1c1c;
+  --chrome-muted: #9a9a9a;
   /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
   --tok-ctl: #c586c0;
   --tok-kw: #569cd6;

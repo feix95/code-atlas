@@ -8,7 +8,9 @@ import type { BrowserWindow } from 'electron'
 import {
   WINDOW_MIN_HEIGHT,
   WINDOW_MIN_WIDTH,
+  baseWindowBox,
   parseWindowState,
+  physicalWindowBox,
   placeWindowBox,
   readWindowState,
   writeWindowState
@@ -79,6 +81,53 @@ check('parseWindowState:块头小于窗口下限就夹到下限;maximized 缺省
   assert.equal(saved!.box.width, WINDOW_MIN_WIDTH)
   assert.equal(saved!.box.height, WINDOW_MIN_HEIGHT)
   assert.equal(saved!.maximized, false)
+})
+
+// ── UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale ──
+
+check('parseWindowState:scale 合法才认账;认了 scale,宽高下限按系数折回基准口径', () => {
+  const saved = parseWindowState({
+    box: { x: 0, y: 0, width: 500, height: 400 },
+    scale: 1.5
+  })
+  assert.equal(saved!.scale, 1.5)
+  // 基准下限 = 物理下限 ÷ 1.5(960/1.5 = 640):500 比它小,夹到 640
+  assert.equal(saved!.box.width, 640)
+  // 垃圾 scale 不认:字段丢、box 当物理框
+  for (const junk of [0, -1, NaN, 'x', Infinity]) {
+    const s = parseWindowState({ box: { x: 0, y: 0, width: 1000, height: 700 }, scale: junk })
+    assert.equal(s!.scale, undefined, `scale=${junk} 应被丢弃`)
+  }
+})
+
+check('physicalWindowBox:基准 × scale 回物理;老存档没 scale 原样奉还', () => {
+  assert.deepEqual(
+    physicalWindowBox({
+      box: { x: -100, y: 20, width: 800, height: 600 },
+      maximized: false,
+      scale: 1.4
+    }),
+    { x: -100, y: 20, width: 1120, height: 840 } // 坐标不乘,宽高 ×1.4
+  )
+  assert.deepEqual(
+    physicalWindowBox({ box: { x: 5, y: 6, width: 1200, height: 800 }, maximized: true }),
+    { x: 5, y: 6, width: 1200, height: 800 }
+  )
+})
+
+check('baseWindowBox:物理 ÷ scale 回基准;垃圾系数按 100% 记账', () => {
+  assert.deepEqual(baseWindowBox({ x: -100, y: 20, width: 1120, height: 840 }, 1.4), {
+    x: -100,
+    y: 20,
+    width: 800,
+    height: 600
+  })
+  assert.deepEqual(baseWindowBox({ x: 0, y: 0, width: 999, height: 500 }, 0), {
+    x: 0,
+    y: 0,
+    width: 999,
+    height: 500
+  })
 })
 
 check('placeWindowBox:完好存档原样落位', () => {
@@ -333,6 +382,17 @@ async function main(): Promise<void> {
       })
       const raw = JSON.parse(readFileSync(join(dir, 'window-state.json'), 'utf8'))
       assert.equal(raw.box.width, 1100)
+    })
+
+    check('基准存档回环:基准框 + scale 写读一致,物理换算用得上', () => {
+      writeWindowState(dir, {
+        box: { x: 40, y: 50, width: 800, height: 600 },
+        maximized: false,
+        scale: 1.5
+      })
+      const back = readWindowState(dir)!
+      assert.equal(back.scale, 1.5)
+      assert.deepEqual(physicalWindowBox(back), { x: 40, y: 50, width: 1200, height: 900 })
     })
 
     check('readWindowState:文件内容是垃圾回 null,不抛', () => {
