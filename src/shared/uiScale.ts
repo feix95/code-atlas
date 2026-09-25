@@ -10,6 +10,9 @@ export const SCALE_MAX = 1.8
 /** 根字号基准(px):html 的 font-size = 它 × 系数;像素 → rem 的换算也认这个数 */
 export const ROOT_FONT_BASE_PX = 16
 
+/** chrome 比例基准(rem):顶栏高/rail 宽 = 1u;tokens.css 的 --u 必须等于它 */
+export const CHROME_U_REM = 2.5
+
 /**
  * 缩放系数夹紧(纯函数):非法值(不是数/零/负)回 1,合法值贴边。
  * 超出范围的旧存档不静默跳回 100% —— 用户调过 180% 就给他 180%。

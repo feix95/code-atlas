@@ -6,7 +6,7 @@ import { IconArrowLeft, IconArrowRight, IconRefresh, TreeIcon } from './Icons'
 import { useWindowMaximized } from '../useWindowMaximized'
 
 /** 顶栏图标本体 0.5u ≈ 32px@100%;24 栅格放到 32px,描边降一档才不闷(有效粗 ≈2px) */
-const TOP_ICON = 32
+const TOP_ICON = 25
 const TOP_ICON_STROKE = 1.5
 
 export function AppTopBar({

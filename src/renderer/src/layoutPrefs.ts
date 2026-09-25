@@ -9,7 +9,7 @@ const SIDEBAR_WIDTH_KEY = 'atlas.sidebar-width'
 const SIDEBAR_COLLAPSED_KEY = 'atlas.sidebar-collapsed'
 const PANE_SPLIT_KEY = 'atlas.pane-split'
 
-/** 左栏默认宽(px,100% 缩放基准):UI v3 规格 6u = 24rem = 384px */
+/** 左栏默认宽(px,100% 缩放基准):24rem = 384px(当前 u=3.2rem,即 7.5u) */
 export const DEFAULT_SIDEBAR_WIDTH = 384
 
 /** 侧栏收起旗:记进本机,下回打开还是自己收好的样子 */

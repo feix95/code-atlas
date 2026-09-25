@@ -20,7 +20,7 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-xl: 0.625rem;
-  --radius-chrome-field: 0.6rem; /* workspace 地址卡与顶栏搜索框 */
+  --radius-chrome-field: 0.6rem; /* workspace 地址卡 */
   --radius-lg: 0.75rem;
   --radius-pill: 999px;
   /* 窗角 14px:物理像素例外(圆角要贴屏幕物理直角,不跟 rem 缩放),三处共用这一户 */
@@ -37,10 +37,10 @@
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
   /* ── UI v3 比例布局(规格:docs/to-do list/UI重构-v3-比例布局)──
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
-  --u: 3.2rem;
+  --u: 2.5rem; /* chrome 比例基准;JS 侧同值在 shared/uiScale.ts CHROME_U_REM */
   /* 树行层级缩进/级(小葵实测:原 1.125rem 减半定稿) */
   --tree-indent: 0.5625rem;
-  --chrome-search-row-height: 2.08rem; /* 顶栏搜索行高与收起态方形底块边长 */
+  --chrome-search-row-height: calc(var(--u) * 0.65); /* 顶栏搜索行高;收起态方块与导航钮底块的边长 */
   /* 字号四档(Obsidian 体系):前三档与既有 --font-sm/md/ml 同值,别名挂着不另立;
      ui-large 是新档(页内标题) */
   --font-ui-smaller: var(--font-sm);

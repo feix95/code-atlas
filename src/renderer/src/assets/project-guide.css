@@ -255,11 +255,6 @@
   background: var(--accent-soft);
 }
 
-.guide-start-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .guide-map > * + * {
   margin-top: var(--space-2);
 }
@@ -318,11 +313,6 @@
 .guide-node:hover {
   border-color: var(--line);
   background: var(--surface);
-}
-
-.guide-node:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .guide-node-icon {
@@ -409,11 +399,6 @@
   background: var(--accent-soft);
 }
 
-.guide-child:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .guide-toggle {
   min-height: var(--control-height);
   margin-top: var(--space-3);
@@ -438,8 +423,7 @@
 
 .welcome-disks summary:focus-visible,
 .guide-more summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: none;
 }
 
 .guide-more-body {
@@ -507,8 +491,7 @@
 }
 
 .file-details summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: none;
 }
 
 .file-details-body {

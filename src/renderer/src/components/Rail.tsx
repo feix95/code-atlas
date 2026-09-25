@@ -6,7 +6,7 @@ import { TreeIcon } from './Icons'
 import { RailAiStatus } from './RailAiStatus'
 
 /** rail 图标本体 ≈0.425u ≈ 27px@100%(顶栏图标 ×0.85,规格给定) */
-const RAIL_ICON = 27
+const RAIL_ICON = 25.3125
 
 export function Rail({
   hasWorkspace,

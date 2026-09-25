@@ -25,7 +25,7 @@
 
 /* workspace 栏(§7.0):顶缘留白减半,卡片上移 */
 .sidebar-top {
-  padding: 0.6rem 0.6rem 0.9rem;
+  padding: calc(var(--u) * 0.1875) calc(var(--u) * 0.1875) calc(var(--u) * 0.28125);
   flex-shrink: 0;
 }
 
@@ -62,8 +62,8 @@
 }
 
 .ws-menu-btn {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: calc(var(--u) * 0.6875);
+  height: calc(var(--u) * 0.6875);
 }
 
 /* 菜单开关钮不挂全局焦点环(点击后持焦会留一圈深色描边,小葵拍板常灭) */

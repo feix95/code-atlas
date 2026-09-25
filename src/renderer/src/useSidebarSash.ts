@@ -1,7 +1,7 @@
 // 左栏宽度 + VSCode 式分割条 + 收起旗:宽度存「100% 缩放下的基准值」,渲染时乘缩放系数。
 import { useEffect, useRef, useState } from 'react'
 import { CH } from '@shared/ipcChannels'
-import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
+import { CHROME_U_REM, ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import {
   DEFAULT_SIDEBAR_WIDTH,
   loadSidebarCollapsed,
@@ -75,9 +75,9 @@ export function useSidebarSash() {
 
   function onSashPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
     if (!sashDraggingRef.current) return
-    // v3 起侧栏左边多了一列 rail(宽 1u = 4rem):分割条的横向位置先扣掉 rail,
+    // v3 起侧栏左边多了一列 rail(宽 1u):分割条的横向位置先扣掉 rail,
     // 剩下的才是左栏该有的宽度
-    applySidebarWidth(e.clientX - 4 * ROOT_FONT_BASE_PX * uiScale)
+    applySidebarWidth(e.clientX - CHROME_U_REM * ROOT_FONT_BASE_PX * uiScale)
   }
 
   function endSashDrag(e: React.PointerEvent<HTMLDivElement>): void {

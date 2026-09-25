@@ -209,8 +209,8 @@ export function WorkspaceSidebar({
               {/* 两条 chevron 分挂类名,悬停各自动画(lucide 线稿,TreeIcon 同款笔触) */}
               <svg
                 className="wsm-chev"
-                width="27"
-                height="27"
+                width="21.1"
+                height="21.1"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

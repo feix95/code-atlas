@@ -801,11 +801,6 @@
   text-decoration: underline;
 }
 
-.chat-note.is-matches .chat-match-loc:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 1px;
-}
-
 .chat-note.is-matches .chat-match-text {
   min-width: 0;
   overflow: hidden;

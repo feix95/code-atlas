@@ -105,11 +105,6 @@
   text-decoration: underline;
 }
 
-.md-file-link:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 1px;
-}
-
 /* ── 文件路径右键菜单:绿字链接右键弹出,复制完整路径进剪贴板(只复制不打开,
  *   开不开文件交给用户)── */
 .file-path-menu {

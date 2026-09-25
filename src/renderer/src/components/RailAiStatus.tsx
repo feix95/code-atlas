@@ -10,7 +10,7 @@ import { TreeIcon } from './Icons'
 import { useMenuDismiss } from '../useMenuDismiss'
 
 /** rail 图标本体 ≈0.425u ≈ 27px@100%(与 Rail.tsx 同档) */
-const RAIL_ICON = 27
+const RAIL_ICON = 25.3125
 
 /** 状态脸:三态外的第四态 = 红插头(§6.1:出错 = 红 unplug) */
 type AiFace = 'ready' | 'loading' | 'idle' | 'error'

@@ -117,12 +117,6 @@
   font-size: var(--font-sm);
 }
 
-.cfg-select:focus-visible,
-.cfg-textarea:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 1px;
-}
-
 /* 分组小标题:特质那一组的门脸,和行内 label 拉开层级 */
 .cfg-group-note {
   display: flex;
