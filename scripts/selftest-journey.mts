@@ -135,7 +135,11 @@ try {
     await page.getByRole('button', { name: '查看文件内容', exact: true }).waitFor()
   }
   await home()
-  await page.getByText('AI 讲解尚未设置', { exact: true }).waitFor()
+  // UI v3(B4):AI 状态收进 rail 底槽浮层,未配置引导要点开状态钮才现身
+  await page.getByRole('button', { name: /AI 状态/ }).click()
+  await page.locator('.ai-status-pop').getByText('AI 讲解尚未设置', { exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
   await control({ holdGit: true })

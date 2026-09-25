@@ -517,6 +517,148 @@
   margin-bottom: 0.7rem;
 }
 
+/* ── rail 底槽 AI 状态(§6.1,全项目唯一保色图标):就绪绿勾 / 加载中蓝弧转 /
+   未加载或没配置灰插头(默认色) / 出错或没连上红插头 ── */
+.rail-ai.is-ready {
+  color: var(--green);
+}
+
+.rail-ai.is-loading {
+  color: var(--blue);
+}
+
+.rail-ai.is-error {
+  color: var(--danger);
+}
+
+.rail-ai.is-loading svg {
+  animation: ai-status-spin 1s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes ai-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-ai.is-loading svg {
+    animation: none;
+  }
+}
+
+/* AI 状态浮层(§6.1 锚位):贴 rail 底钮上方往右弹进内容区,
+   Windows 系统托盘/Discord 左下角同款;Esc/点外/滚轮收起 */
+.ai-status-pop {
+  position: fixed;
+  left: calc(var(--u) + 0.5rem);
+  /* rail-ai 顶沿 ≈ 距窗底 3.7rem(margin 0.7 + 钮高 3),浮层底缘再让一条缝 */
+  bottom: 4.3rem;
+  z-index: var(--z-popover);
+  width: 21rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+
+.ai-pop-title {
+  margin: 0;
+  color: var(--text-strong);
+  font-weight: var(--font-w-semi);
+}
+
+.ai-pop-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ai-pop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ai-pop-provider {
+  flex: none;
+  padding: 0 0.375rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.ai-pop-state {
+  color: var(--muted);
+}
+
+.ai-pop-state.is-error {
+  color: var(--danger);
+}
+
+.ai-pop-message {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.ai-pop-message.is-error {
+  color: var(--danger);
+}
+
+.ai-pop-meta {
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.ai-pop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.ai-pop-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 浮层小动作钮:小号描边件,贴着状态文案不抢戏 */
+.ai-pop-act {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-xs);
+  font-family: inherit;
+  padding: 0.25rem 0.625rem;
+  cursor: pointer;
+}
+
+.ai-pop-act:hover {
+  border-color: var(--accent-line);
+  color: var(--accent-bright);
+}
+
+.ai-pop-act.is-primary {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
 /* 键盘焦点:Tab 走到哪儿,环就跟到哪儿 */
 :focus-visible {
   outline: 2px solid var(--muted);

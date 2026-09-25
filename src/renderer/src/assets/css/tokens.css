@@ -144,6 +144,8 @@
   --danger: #d64545;
   --danger-soft: #fdf0f0;
   --danger-line: #f0c9c9;
+  /* AI 状态弧(UI v3 §6.1 给定的「蓝色弧段」):只伺候 rail 状态钮旋转环,不当链接/信息色用 */
+  --blue: #0078d4;
   --git-add: #1a7f37;
   --git-rename: #9a6700;
   --hover: rgba(0, 0, 0, 0.05);
@@ -194,6 +196,7 @@
   --danger: #ef6b6b;
   --danger-soft: #3a2226;
   --danger-line: #63393e;
+  --blue: #55a8e8; /* §6.1 AI 状态弧的暗色真值 */
   --git-add: #3fb950;
   --git-rename: #d29922;
   --hover: rgba(255, 255, 255, 0.07);

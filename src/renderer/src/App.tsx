@@ -18,7 +18,6 @@ import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { HomePage } from './components/HomePage'
-import { ModelStatusBar } from './components/ModelStatusBar'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
@@ -744,6 +743,7 @@ function App(): React.JSX.Element {
           <div className="app-body">
             <Rail
               hasWorkspace={result !== null && !scanning}
+              onGraph={() => ensureKindTab('graph', null)}
               onOverview={() => ensureKindTab('overview', selectedFile ?? selectedFolder)}
               onChat={() => {
                 if (freechatHost === 'pet') window.atlas.openMainPanel()
@@ -753,7 +753,6 @@ function App(): React.JSX.Element {
                 setSettingsSection('appearance')
                 setShowSettings(true)
               }}
-              onAiStatus={openAiSettings}
             />
             {!sidebarCollapsed && (
               <WorkspaceSidebar
@@ -910,10 +909,6 @@ function App(): React.JSX.Element {
               </main>
             )}
           </div>
-
-          {/* 模型状态栏(第七十锤):钉在窗口最底下,首页/项目页都常驻,模型热身到哪了随时看得见。
-              UI v3 里它要退役进 rail 底的 AI 状态钮(B4),本块先留岗 */}
-          <ModelStatusBar />
 
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />

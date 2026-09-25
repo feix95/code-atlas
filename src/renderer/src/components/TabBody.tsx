@@ -26,6 +26,7 @@ import { FolderOverview } from './FolderOverview'
 import { FreeChatPanel } from './FreeChatPanel'
 import { CodePreview } from './CodePreview'
 import { ProjectOverview } from './ProjectOverview'
+import { TreeIcon } from './Icons'
 
 export function TabBody({
   tab,
@@ -93,6 +94,8 @@ export function TabBody({
   handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
 }): React.JSX.Element | null {
   if (!result) return null
+  // 关系图谱(rail 单例签):本体还没造,占位页照实说 —— 规格在《项目结构图谱(Graph View).md》
+  if (tab.kind === 'graph') return <GraphPlaceholder />
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'overview') {
     if (tab.pinned) {
@@ -485,6 +488,23 @@ export function PinnedChatPane({
         fileLinks={fileLinks}
         suggestionsOn={suggestionsOn}
       />
+    </div>
+  )
+}
+
+/** 关系图谱占位页签正文(rail 图谱钮 → 单例签):本体还在画图板上,先占座说实话,
+ *  顺手指路去概览页签的关系卡 —— 等《项目结构图谱(Graph View).md》落地再换真身 */
+export function GraphPlaceholder(): React.JSX.Element {
+  return (
+    <div className="pane-empty">
+      <span className="pane-empty-mark" aria-hidden="true">
+        <TreeIcon name="view" size={40} mono />
+      </span>
+      <p className="pane-empty-title">关系图谱</p>
+      <p className="pane-empty-hint">
+        这张图还在画图板上:以后这里会把项目里的文件关系摊成一张图。
+        现在想看谁跟谁有关系,去概览页签翻「关系卡」
+      </p>
     </div>
   )
 }

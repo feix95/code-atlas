@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { FreechatHost, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import {
   FOLLOW_KINDS,
+  isMenuKind,
   KIND_CAPS,
   KIND_ICONS,
   KIND_LABELS,
@@ -62,7 +63,8 @@ export function usePaneTabs(deps: {
       g
         ? g.tabs.filter(
             (t) =>
-              enabledKinds.has(t.kind) &&
+              // 菜单外品类(图谱等单例签)不归勾选管,永远可见
+              (isMenuKind(t.kind) ? enabledKinds.has(t.kind) : true) &&
               !(freechatHost === 'pet' && t.kind === 'chat' && !t.pinned)
           )
         : [],
@@ -146,7 +148,8 @@ export function usePaneTabs(deps: {
     node: ScanFileNode | ScanDirNode | null,
     auto = false
   ): void {
-    if (!enabledKinds.has(kind)) {
+    // 只有菜单品类才有「入口撞上被关掉的品类就自动勾回」;菜单外的单例签不用过这道闸
+    if (isMenuKind(kind) && !enabledKinds.has(kind)) {
       const next = new Set(enabledKinds)
       next.add(kind)
       setEnabledKinds(next)
