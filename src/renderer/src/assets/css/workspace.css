@@ -90,16 +90,16 @@
 }
 
 .ws-menu-btn:hover:not([aria-expanded='true']) .wsm-chev-t {
-  transform: translateY(-4.5px);
+  transform: translateY(-0.28125rem);
 }
 .ws-menu-btn:hover:not([aria-expanded='true']) .wsm-chev-b {
-  transform: translateY(4.5px);
+  transform: translateY(0.28125rem);
 }
 .ws-menu-btn[aria-expanded='true']:hover .wsm-chev-t {
-  transform: translateY(4.5px);
+  transform: translateY(0.28125rem);
 }
 .ws-menu-btn[aria-expanded='true']:hover .wsm-chev-b {
-  transform: translateY(-4.5px);
+  transform: translateY(-0.28125rem);
 }
 
 /* ── 工作区菜单(§7.1):浮层盖在文件树上,宽与卡同宽、卡下留小缝;

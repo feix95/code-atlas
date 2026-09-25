@@ -1,3 +1,8 @@
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
+
+/** size 的语义:100% 缩放下的 px;落 svg 时换算成 rem,图标(含线宽)随界面缩放档一起涨缩 */
+const iconRem = (px: number): string => `${(px / ROOT_FONT_BASE_PX).toFixed(4)}rem`
+
 /* ── 文件树图标配色(图标册 v5):文件/文件夹辨识色只用于文件树与盘符下钻;
  *  其他界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。 ── */
 const ICON_COLORS: Record<string, string> = {
@@ -106,8 +111,8 @@ export function NotePen({
     <svg
       className={`note-pen ticon${tapping ? ' is-tapping' : ''}`}
       style={mono ? undefined : tint(ICON_COLORS.notepen)}
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -137,8 +142,8 @@ export function IconArrowLeft({
     <svg
       className={mono ? 'top-icon' : 'top-icon ticon'}
       style={mono ? undefined : tint(ICON_COLORS.arrowLeft)}
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -166,8 +171,8 @@ export function IconArrowRight({
     <svg
       className={mono ? 'top-icon' : 'top-icon ticon'}
       style={mono ? undefined : tint(ICON_COLORS.arrowRight)}
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -195,8 +200,8 @@ export function IconRefresh({
     <svg
       className={mono ? 'top-icon' : 'top-icon ticon'}
       style={mono ? undefined : tint(ICON_COLORS.refresh)}
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -221,8 +226,8 @@ export function IconFolder({
   return (
     <svg
       className="top-icon"
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -253,8 +258,8 @@ function Line({
     <svg
       className={color ? 'ticon' : undefined}
       style={color ? tint(color) : undefined}
-      width={size}
-      height={size}
+      width={iconRem(size)}
+      height={iconRem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -658,6 +663,16 @@ const BOOK: Record<string, React.ReactNode> = {
     <>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </>
+  ),
+  // 窗控(lucide 原版稿,小葵给定):未全屏圆角方框 / 已全屏四角回收
+  maximize: <rect width="18" height="18" x="3" y="3" rx="2" />,
+  minimize: (
+    <>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
     </>
   ),
   minus: <path d="M5 12h14" />,

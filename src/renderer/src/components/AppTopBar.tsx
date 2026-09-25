@@ -7,7 +7,9 @@ import { useWindowMaximized } from '../useWindowMaximized'
 
 /** 顶栏图标本体 0.5u ≈ 32px@100%;24 栅格放到 32px,描边降一档才不闷(有效粗 ≈2px) */
 const TOP_ICON = 25
-const TOP_ICON_STROKE = 1.5
+const TOP_ICON_STROKE = 2
+const REFRESH_ICON = 22
+const WIN_ICON = 18
 
 export function AppTopBar({
   scanning,
@@ -105,7 +107,7 @@ export function AppTopBar({
                 data-tip={scanning ? '扫描中……' : '刷新'}
                 aria-label="刷新"
               >
-                <IconRefresh size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
+                <IconRefresh size={REFRESH_ICON} strokeWidth={TOP_ICON_STROKE} mono />
               </button>
             </div>
           </>
@@ -117,21 +119,21 @@ export function AppTopBar({
       <div className="win-ctl">
         <button
           type="button"
-          className="win-btn win-min"
+          className="win-btn"
           onClick={() => void window.atlas.windowMinimize()}
           data-tip="最小化"
           aria-label="最小化"
         >
-          <i aria-hidden="true" />
+          <TreeIcon name="minus" size={WIN_ICON} mono />
         </button>
         <button
           type="button"
-          className={`win-btn win-max${maximized ? ' is-restore' : ''}`}
+          className="win-btn"
           onClick={() => void window.atlas.windowMaximizeToggle()}
           data-tip={maximized ? '还原' : '最大化'}
           aria-label={maximized ? '还原' : '最大化'}
         >
-          <i aria-hidden="true" />
+          <TreeIcon name={maximized ? 'minimize' : 'maximize'} size={WIN_ICON} mono />
         </button>
         <button
           type="button"
@@ -140,7 +142,7 @@ export function AppTopBar({
           data-tip="关闭"
           aria-label="关闭"
         >
-          <i aria-hidden="true" />
+          <TreeIcon name="x" size={WIN_ICON} mono />
         </button>
       </div>
     </header>

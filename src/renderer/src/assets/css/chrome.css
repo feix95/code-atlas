@@ -432,7 +432,7 @@
   background: var(--chrome-hover);
 }
 
-/* 窗控三键(规格 §5.2):整高块并排成方格,— ▢ 悬停灰底,× 悬停红底白叉 */
+/* 窗控三键(规格 §5.2):1u 方格顶天立地并排(宽=高撑满整行),— ▢ 悬停灰底,× 悬停红底白叉 */
 .win-ctl {
   display: flex;
   align-items: stretch;
@@ -441,7 +441,7 @@
 }
 
 .win-btn {
-  width: calc(var(--u) * 0.9375);
+  width: var(--u);
   display: grid;
   place-items: center;
   border: 0;
@@ -465,79 +465,6 @@
    误判成键盘焦点,焦点框在这儿是时隐时现的「渲染故障」。窗控钮是鼠标领地 */
 .win-btn:focus-visible {
   outline: none;
-}
-
-/* 三颗字形用 CSS 画:横线 = 最小化,方框 = 最大化,贴屏态前后双框 = 还原,叉 = 关闭 */
-.win-btn i {
-  position: relative;
-  display: block;
-  width: 1rem;
-  height: 1rem;
-  pointer-events: none;
-}
-
-.win-min i::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 0.625rem;
-  height: 1.5px;
-  background: currentColor;
-}
-
-.win-max i::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 0.5625rem;
-  height: 0.5625rem;
-  border: 1.5px solid currentColor;
-  border-radius: 1px;
-}
-
-/* 还原态:后块偏右上(先画),前块偏左下带实底盖掉交叠 —— 双框不糊成同心框 */
-.win-max.is-restore i::before {
-  transform: translate(-28%, -72%);
-}
-
-.win-max.is-restore i::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-68%, -32%);
-  width: 0.5625rem;
-  height: 0.5625rem;
-  border: 1.5px solid currentColor;
-  border-radius: 1px;
-  background: var(--chrome-topbar);
-}
-
-.win-btn:hover .win-max.is-restore i::after {
-  background: var(--chrome-hover);
-}
-
-.win-close i::before,
-.win-close i::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0.625rem;
-  height: 1.5px;
-  background: currentColor;
-}
-
-.win-close i::before {
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.win-close i::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 /* ── rail(第 2 层最左列):图谱/概览/对话/设置 + 底端 AI 状态 ── */
