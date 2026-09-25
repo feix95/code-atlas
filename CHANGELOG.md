@@ -356,3 +356,4 @@
 - feat(ui): 盘符下钻空态按 v3 §7.1 落地——「这台电脑」树区可逐层浏览:单击文件夹原地展开(browseDir 懒加载,渲染层不碰 fs),单击文件开「瞄一眼」预览签(新 peek 品类、scopeRoot 记盘根,不进工作区账本),双击文件夹/盘根开为工作区
 - feat(ui): v3 深色对照定稿(§9.2)——chrome 七槽暗色值按 VS Code Dark+ 惯例转正(框架比内容亮一档);彩色主题下 topbar/panel/surface 三槽并入底板染色机关(paintSurfaces 同族泛色),无彩色回落样式表石墨值
 - feat(ui): 锚值 --u 4rem→3.2rem(0.8 档)——顶栏高/rail 宽/收起钮列/AI 浮层锚位同缩,等式「顶栏高=rail 宽」继续成立
+- feat(ui): 树行高改挂 calc(var(--u)*0.75)(=2.4rem,比原来 3rem 缩一档)——虚拟化占位同步,行距跟锚值自动走
