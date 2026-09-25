@@ -89,7 +89,10 @@ function BrowseDirRow({
   const isDriveRoot = root.relPath === ''
   return (
     <div className="tree-branch">
-      <div className="tree-row is-dir" style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}>
+      <div
+        className="tree-row is-dir"
+        style={{ paddingLeft: `calc(${depth} * var(--tree-indent))` }}
+      >
         <button
           type="button"
           className="tree-main"
@@ -123,7 +126,7 @@ function BrowseDirRow({
         (root.children.length === 0 ? (
           <p
             className="drive-browser-note"
-            style={{ paddingLeft: `${((depth + 1) * 1.125).toFixed(4)}rem` }}
+            style={{ paddingLeft: `calc(${depth + 1} * var(--tree-indent))` }}
           >
             这层是空的
           </p>
@@ -161,7 +164,10 @@ function BrowseChildRow({
 }): React.JSX.Element {
   if (node.type === 'file') {
     return (
-      <div className="tree-row is-file" style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}>
+      <div
+        className="tree-row is-file"
+        style={{ paddingLeft: `calc(${depth} * var(--tree-indent))` }}
+      >
         <button
           type="button"
           className="tree-main"

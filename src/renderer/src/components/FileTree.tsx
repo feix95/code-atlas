@@ -61,11 +61,11 @@ function TreeRow({
     const tip = [note ? `我的备注:${note.text}` : '', node.summary?.text ?? '']
       .filter(Boolean)
       .join('\n')
-    // 缩进挂 rem(每层 18px 基准 = 1.125rem),跟着根字号一起缩放
+    // 缩进吃 --tree-indent token(rem 记账),跟着根字号一起缩放
     return (
       <div
         className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`}
-        style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}
+        style={{ paddingLeft: `calc(${depth} * var(--tree-indent))` }}
       >
         <button
           type="button"
@@ -136,7 +136,7 @@ function TreeRow({
     <div className="tree-branch">
       <div
         className={`tree-row is-dir${selectedPath === dir.relPath ? ' is-selected' : ''}`}
-        style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}
+        style={{ paddingLeft: `calc(${depth} * var(--tree-indent))` }}
         onKeyDown={onRowKeyDown}
       >
         <button

@@ -37,6 +37,8 @@
   /* ── UI v3 比例布局(规格:docs/to-do list/UI重构-v3-比例布局)──
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
   --u: 3.2rem;
+  /* 树行层级缩进/级(小葵实测:原 1.125rem 减半定稿) */
+  --tree-indent: 0.5625rem;
   /* 字号四档(Obsidian 体系):前三档与既有 --font-sm/md/ml 同值,别名挂着不另立;
      ui-large 是新档(页内标题) */
   --font-ui-smaller: var(--font-sm);
