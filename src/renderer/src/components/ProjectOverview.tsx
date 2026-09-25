@@ -124,7 +124,7 @@ export function ProjectOverview({
     <div className="detail-page project-guide">
       <header className="detail-header">
         <nav className="crumbs" aria-label="所在位置">
-          <span className="crumb is-current" title={result.rootPath}>
+          <span className="crumb is-current" data-tip={result.rootPath}>
             {result.rootName}
           </span>
         </nav>
@@ -293,7 +293,7 @@ export function ProjectOverview({
                     type="button"
                     className="rec-row"
                     onClick={rec.onClick}
-                    title={rec.path}
+                    data-tip={rec.path}
                   >
                     <span className="rec-number" aria-hidden="true">
                       ›

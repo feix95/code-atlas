@@ -45,7 +45,9 @@ export function SearchResults({
                 <button
                   type="button"
                   className="tree-main"
-                  title={hit.relPath}
+                  data-tip={hit.relPath}
+                  data-tip-side="right"
+                  data-tip-anchor=".tree-name"
                   onClick={() => (hit.kind === 'directory' ? onOpenDir(hit) : onOpenFile(hit))}
                 >
                   <span className="tree-icon" aria-hidden="true">

@@ -32,7 +32,7 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
           e.preventDefault()
           links.onMenu(s.relPath, e.clientX, e.clientY)
         }}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
+        data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}
@@ -73,7 +73,7 @@ function inline(text: string, links?: FileLinkTarget): ReactNode[] {
       if (pm[1] !== undefined) out.push(<strong key={kc.n++}>{fileNodes(pm[1], links, kc)}</strong>)
       else
         out.push(
-          <span key={kc.n++} className="md-link" title={pm[3]}>
+          <span key={kc.n++} className="md-link" data-tip={pm[3]}>
             {pm[2]}
           </span>
         )

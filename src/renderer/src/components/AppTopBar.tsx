@@ -50,7 +50,7 @@ export function AppTopBar({
             onClick={onToggleSidebar}
             /* 侧栏常驻(v3:首页就是「这台电脑」),有没有项目都能收起;只在扫描期禁动 */
             disabled={scanning}
-            title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+            data-tip={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
             aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
             aria-pressed={sidebarCollapsed}
           >
@@ -82,7 +82,7 @@ export function AppTopBar({
                 className="tb-btn"
                 onClick={() => void goNav(-1)}
                 disabled={scanning || nav.index <= 0}
-                title="后退"
+                data-tip="后退"
                 aria-label="后退"
               >
                 <IconArrowLeft size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
@@ -92,7 +92,7 @@ export function AppTopBar({
                 className="tb-btn"
                 onClick={() => void goNav(1)}
                 disabled={scanning || nav.index >= nav.stack.length - 1}
-                title="前进"
+                data-tip="前进"
                 aria-label="前进"
               >
                 <IconArrowRight size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
@@ -102,7 +102,7 @@ export function AppTopBar({
                 className="tb-btn"
                 onClick={() => void handleRefresh()}
                 disabled={scanning}
-                title={scanning ? '扫描中……' : '刷新'}
+                data-tip={scanning ? '扫描中……' : '刷新'}
                 aria-label="刷新"
               >
                 <IconRefresh size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
@@ -119,7 +119,7 @@ export function AppTopBar({
           type="button"
           className="win-btn win-min"
           onClick={() => void window.atlas.windowMinimize()}
-          title="最小化"
+          data-tip="最小化"
           aria-label="最小化"
         >
           <i aria-hidden="true" />
@@ -128,7 +128,7 @@ export function AppTopBar({
           type="button"
           className={`win-btn win-max${maximized ? ' is-restore' : ''}`}
           onClick={() => void window.atlas.windowMaximizeToggle()}
-          title={maximized ? '还原' : '最大化'}
+          data-tip={maximized ? '还原' : '最大化'}
           aria-label={maximized ? '还原' : '最大化'}
         >
           <i aria-hidden="true" />
@@ -137,7 +137,7 @@ export function AppTopBar({
           type="button"
           className="win-btn win-close"
           onClick={() => void window.atlas.windowClose()}
-          title="关闭"
+          data-tip="关闭"
           aria-label="关闭"
         >
           <i aria-hidden="true" />

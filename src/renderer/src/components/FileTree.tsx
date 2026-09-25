@@ -57,6 +57,10 @@ function TreeRow({
 
   if (node.type === 'file') {
     const note = notes?.[node.relPath]
+    // 注释小灰字退役:行内只留「有备注」的笔帽小标,话本身挪进悬停提示(右侧出)
+    const tip = [note ? `我的备注:${note.text}` : '', node.summary?.text ?? '']
+      .filter(Boolean)
+      .join('\n')
     // 缩进挂 rem(每层 18px 基准 = 1.125rem),跟着根字号一起缩放
     return (
       <div
@@ -79,21 +83,19 @@ function TreeRow({
           onClick={() => onSelectFile(node.relPath, node)}
           onDoubleClick={() => onPreviewFile?.(node.relPath)}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
-          title={node.summary?.text}
+          data-tip={tip || undefined}
+          data-tip-side="right"
+          data-tip-anchor=".tree-name"
         >
           <span className="tree-icon" aria-hidden="true">
             {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} />}
           </span>
           <span className="tree-name">{node.name}</span>
-          {note ? (
-            <span className="tree-summary is-note" title={`我的备注:${note.text}`}>
+          {note && (
+            <span className="tree-note-mark" aria-hidden="true">
               <NotePen />
-              {note.text}
             </span>
-          ) : (
-            node.summary && <span className="tree-summary">{node.summary.text}</span>
           )}
-          {node.ext && <span className="tree-tag">{node.ext.slice(1).toUpperCase()}</span>}
         </button>
       </div>
     )
@@ -101,6 +103,14 @@ function TreeRow({
 
   const dir = node
   const dirNote = notes?.[dir.relPath]
+  // 注释小灰字退役:摘要/备注/子项数都挪进悬停提示;琥珀警示徽章仍常亮(留个心眼不藏进悬停)
+  const dirTip = [
+    dirNote ? `我的备注:${dirNote.text}` : '',
+    dir.summary?.text ?? '',
+    !dir.lazy && dir.children.length > 0 ? `${dir.children.length} 个子项` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   // 展开/收起(UI v3 §7 摘三角:单击文件夹行 = 选中+展开一体,行首不再摆箭头);
   // 没探过的目录,点行才是触发扫描的唯一入口
@@ -156,7 +166,9 @@ function TreeRow({
             toggleExpand()
           }}
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, dir) : undefined}
-          title={dir.summary?.text}
+          data-tip={dirTip || undefined}
+          data-tip-side="right"
+          data-tip-anchor=".tree-name"
         >
           <span className="tree-icon" aria-hidden="true">
             {/* 探层中的转圈挪进图标位(UI v3 摘三角后没有箭头坑位了) */}
@@ -167,20 +179,14 @@ function TreeRow({
             )}
           </span>
           <span className="tree-name">{dir.name}</span>
-          {dirNote ? (
-            <span className="tree-summary is-note" title={`我的备注:${dirNote.text}`}>
+          {dirNote && (
+            <span className="tree-note-mark" aria-hidden="true">
               <NotePen />
-              {dirNote.text}
             </span>
-          ) : (
-            dir.summary && <span className="tree-summary">{dir.summary.text}</span>
           )}
           {/* 未扫描/不完整都是琥珀色:是「留个心眼」不是「出事了」,红色只留给真失败 */}
           {dir.lazy && <span className="tree-badge is-warn">未扫描</span>}
           {dir.truncated && !dir.lazy && <span className="tree-badge is-warn">不完整</span>}
-          {!dir.lazy && dir.children.length > 0 && (
-            <span className="tree-count">{dir.children.length}</span>
-          )}
         </button>
       </div>
       {expanded &&

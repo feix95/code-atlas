@@ -40,7 +40,8 @@ export function WorkspaceMenu({
           type="button"
           className="wsm-pin"
           aria-label={isPinned ? `取消固定 ${r.p}` : `固定 ${r.p} 到列表顶部`}
-          title={isPinned ? '取消固定' : '固定到列表顶部'}
+          data-tip={isPinned ? '取消固定' : '固定到列表顶部'}
+          data-tip-side="right"
           onClick={() => onTogglePin(r.p)}
         >
           <span className="wsm-pin-on" aria-hidden="true">
@@ -50,7 +51,13 @@ export function WorkspaceMenu({
             <TreeIcon name="pinOff" size={13} mono />
           </span>
         </button>
-        <button type="button" className="wsm-open" onClick={() => onOpen(r.p)} title={r.p}>
+        <button
+          type="button"
+          className="wsm-open"
+          onClick={() => onOpen(r.p)}
+          data-tip={r.p}
+          data-tip-side="right"
+        >
           <span className="wsm-path">{r.p}</span>
         </button>
         {/* 行尾 × 即删(§7.1 拍板:删了就是删了,无撤销) */}
@@ -58,7 +65,8 @@ export function WorkspaceMenu({
           type="button"
           className="wsm-del"
           aria-label={`从列表删掉 ${r.p}`}
-          title="从列表删掉,不动磁盘上的文件夹"
+          data-tip="从列表删掉,不动磁盘上的文件夹"
+          data-tip-side="right"
           onClick={() => onRemove(r.p)}
         >
           ×

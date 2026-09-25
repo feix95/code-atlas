@@ -55,7 +55,7 @@ export function FileRelations({
                 key={path}
                 type="button"
                 className="relation-link mono"
-                title={path}
+                data-tip={path}
                 onClick={() => onJump(path)}
               >
                 {path}
@@ -73,7 +73,7 @@ export function FileRelations({
                 key={path}
                 type="button"
                 className="relation-link mono"
-                title={path}
+                data-tip={path}
                 onClick={() => onJump(path)}
               >
                 {path}

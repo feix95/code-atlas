@@ -1,4 +1,4 @@
-﻿import {
+import {
   memo,
   useCallback,
   useContext,
@@ -65,7 +65,7 @@ const FileNoteText = memo(function FileNoteText({
           e.preventDefault()
           fileLinks.onMenu(s.relPath, e.clientX, e.clientY)
         }}
-        title={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
+        data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >
         {s.relPath}
         {s.line !== undefined ? `:${s.line}` : ''}
@@ -180,13 +180,13 @@ const MatchListCard = memo(function MatchListCard({
                 e.preventDefault()
                 fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
               }}
-              title={
+              data-tip={
                 fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath
               }
             >
               {it.kind === 'path' ? it.relPath : `${it.relPath}:${it.line}`}
             </button>
-            <span className="chat-match-text" title={it.text}>
+            <span className="chat-match-text" data-tip={it.text}>
               {it.text}
             </span>
           </li>
@@ -274,7 +274,7 @@ const AssistantBubble = memo(function AssistantBubble({
         className="msg-action"
         onClick={copyAnswer}
         aria-label={copied ? '已复制' : '复制这条回答'}
-        title={copied ? '已复制' : '复制'}
+        data-tip={copied ? '已复制' : '复制'}
       >
         <TreeIcon name="copy" size={MSG_ACTION_ICON_SIZE} />
       </button>
@@ -284,7 +284,7 @@ const AssistantBubble = memo(function AssistantBubble({
           className="msg-action"
           onClick={() => onRetry(retryIndex)}
           aria-label="重试生成"
-          title="重试"
+          data-tip="重试"
         >
           <IconRefresh size={MSG_ACTION_ICON_SIZE} />
         </button>
@@ -662,7 +662,7 @@ export function FreeChatPanel({
       {context && (
         <details className="chat-attach">
           <summary
-            title={`${context.relPath || '(项目根目录)'};右键:复制路径 / 在资源管理器中显示 / 备注`}
+            data-tip={`${context.relPath || '(项目根目录)'};右键:复制路径 / 在资源管理器中显示 / 备注`}
             onContextMenu={(e) => {
               // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
               if (!fileLinks?.onMenu) return
@@ -771,7 +771,7 @@ export function FreeChatPanel({
             className="chat-jump"
             onClick={jumpToLatest}
             aria-label="跳到最新消息"
-            title="跳到最新消息"
+            data-tip="跳到最新消息"
           >
             <i aria-hidden="true" />
           </button>
@@ -786,7 +786,7 @@ export function FreeChatPanel({
                 <TreeIcon name="code" size={INLINE_ICON_SIZE} />
                 <span
                   className="chat-ref-text mono"
-                  title={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
+                  data-tip={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
                 >
                   {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
                 </span>
@@ -795,7 +795,7 @@ export function FreeChatPanel({
                   className="chat-ref-remove"
                   onClick={() => onRemoveRef?.(i)}
                   aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-                  title="移除这段引用"
+                  data-tip="移除这段引用"
                 >
                   ✕
                 </button>
@@ -821,7 +821,7 @@ export function FreeChatPanel({
             type="button"
             className="prompt"
             onClick={chat.newChat}
-            title="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
+            data-tip="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
           >
             新对话
           </button>
@@ -894,7 +894,7 @@ export function FreeChatPanel({
               className="composer-expand"
               onClick={() => setExpanded(!expanded)}
               aria-label={expanded ? '收合输入框' : '展开输入框'}
-              title={expanded ? '收合' : '多撑五行'}
+              data-tip={expanded ? '收合' : '多撑五行'}
             >
               <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
             </button>
@@ -913,7 +913,7 @@ export function FreeChatPanel({
               aria-pressed={chat.thinking}
               aria-label="思考模式开关"
               onMouseEnter={refreshEngineOnHover}
-              title={
+              data-tip={
                 chat.thinking
                   ? isExternalEngine
                     ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉。不过外接 LM Studio 时这个开关管不着思考 —— 想关,去 LM Studio 那边的模型设置里调'
@@ -932,7 +932,7 @@ export function FreeChatPanel({
               onClick={() => chat.setAgent(!chat.agent)}
               aria-pressed={chat.agent}
               aria-label="翻文件模式开关"
-              title={
+              data-tip={
                 chat.agent
                   ? '翻文件模式开着:小探针能自己翻项目里的文件名单、读文件内容,「哪里有 xx」它自己去找。点一下关掉'
                   : '翻文件模式关着:小探针只看你当前给它的资料。点一下打开,它就能自己翻项目里的文件'
@@ -945,7 +945,7 @@ export function FreeChatPanel({
               className="chat-send"
               disabled={chat.busy}
               aria-label={chat.busy ? '回答中' : '发送'}
-              title={chat.busy ? '回答中……' : '发送'}
+              data-tip={chat.busy ? '回答中……' : '发送'}
             >
               <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
             </button>

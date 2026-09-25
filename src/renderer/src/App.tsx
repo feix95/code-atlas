@@ -26,6 +26,7 @@ import { AppTopBar } from './components/AppTopBar'
 import { Rail } from './components/Rail'
 import { TopBarTabs } from './components/TopBarTabs'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
+import { TooltipHost } from './components/Tooltip'
 import { PaneGroups } from './components/PaneGroups'
 import { TabBody } from './components/TabBody'
 import { cleanErrMsg } from './errText'
@@ -983,6 +984,8 @@ function App(): React.JSX.Element {
               {scanToast}
             </div>
           )}
+          {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
+          <TooltipHost />
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
         </div>

@@ -715,15 +715,12 @@
   color: var(--muted-2);
 }
 
-/* 我的备注(第九十八锤):小葵自己的话压过引擎一句话,小笔帽章 + 字色亮一档 */
-.tree-summary.is-note {
-  color: var(--muted);
-}
-
-.tree-summary.is-note .note-pen {
-  flex-shrink: 0;
-  margin-right: 0.25rem;
-  vertical-align: -0.125rem;
+/* 备注标(注释小灰字退役后):行内只留小笔帽做「有备注」记号,话本体在悬停提示里 */
+.tree-note-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-2);
 }
 
 /* ── 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
@@ -770,28 +767,6 @@
 .note-editor input:focus {
   border-color: var(--accent-line);
   box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
-}
-
-/* 后缀小标:等宽、灰色,压到最低视觉权重 */
-.tree-tag {
-  flex: 0 0 auto;
-  color: var(--muted-2);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-  letter-spacing: 0.03em;
-}
-
-/* 文件夹直接子项数:灰色小胶囊 */
-.tree-count {
-  flex: 0 0 auto;
-  min-width: 1.125rem;
-  padding: 1px 0.3125rem;
-  color: var(--muted);
-  border-radius: var(--radius-pill);
-  background: var(--hover);
-  font-size: var(--font-xxs);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
 }
 
 /* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */

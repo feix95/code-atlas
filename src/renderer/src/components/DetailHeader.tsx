@@ -79,7 +79,7 @@ export function DetailHeader({
           <span key={`${c.label}-${i}`} className="crumb-group">
             <span
               className={i === crumbs.length - 1 ? 'crumb is-current' : 'crumb'}
-              title={c.title ?? c.label}
+              data-tip={c.title ?? c.label}
             >
               {c.label}
             </span>
@@ -92,9 +92,9 @@ export function DetailHeader({
           <TreeIcon name={iconName} size={ENTITY_ICON_SIZE} />
         </span>
         <div className="entity-title">
-          <h1 title={title}>{title}</h1>
+          <h1 data-tip={title}>{title}</h1>
           {note ? (
-            <p className="is-note" title="我的备注">
+            <p className="is-note" data-tip="我的备注">
               <NotePen size={NOTE_INLINE_ICON_SIZE} /> {note.text}
             </p>
           ) : (
@@ -112,7 +112,7 @@ export function DetailHeader({
             className="icon-btn"
             onClick={() => (editing ? setEditing(false) : openEditor())}
             aria-label={note ? '编辑备注' : '写备注'}
-            title={note ? '编辑备注' : '写一句话备注'}
+            data-tip={note ? '编辑备注' : '写一句话备注'}
           >
             <NotePen size={NOTE_ICON_SIZE} tapping={tapping} />
           </button>

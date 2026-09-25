@@ -452,7 +452,7 @@ export function ModelShelfPanel({
                     aria-expanded={isOpen}
                   >
                     <span className="shelf-main">
-                      <span className="shelf-name" title={entry.id}>
+                      <span className="shelf-name" data-tip={entry.id}>
                         {entry.id}
                         {entry.paramScale !== null && (
                           <span className="shelf-params">{entry.paramScale}</span>
@@ -464,7 +464,7 @@ export function ModelShelfPanel({
                       {verdict !== 'yes' && (
                         <span
                           className={`shelf-verdict is-${verdict}`}
-                          title={VERDICT_TIPS[verdict]}
+                          data-tip={VERDICT_TIPS[verdict]}
                         >
                           {runVerdictLabel(verdict)}
                         </span>
@@ -482,7 +482,7 @@ export function ModelShelfPanel({
                           {entry.baseModel !== null && (
                             <div className="shelf-profile-item">
                               <dt className="shelf-profile-label">底座模型</dt>
-                              <dd className="shelf-profile-value" title={entry.baseModel}>
+                              <dd className="shelf-profile-value" data-tip={entry.baseModel}>
                                 {entry.baseModel}
                               </dd>
                             </div>
@@ -532,7 +532,7 @@ export function ModelShelfPanel({
                               : null
                           return (
                             <div key={f.path} className="shelf-file-row">
-                              <span className="shelf-file-path" title={f.path}>
+                              <span className="shelf-file-path" data-tip={f.path}>
                                 {f.path}
                               </span>
                               {f.quantNote !== null && (

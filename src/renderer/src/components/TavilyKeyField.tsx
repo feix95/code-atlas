@@ -99,7 +99,7 @@ export function TavilyKeyField({
         />
         <button
           type="button"
-          title="拿这把 Key 查一次官方用量:验证 Key 有没有效,顺手报本月还剩多少次 —— 不花搜索额度"
+          data-tip="拿这把 Key 查一次官方用量:验证 Key 有没有效,顺手报本月还剩多少次 —— 不花搜索额度"
           disabled={probe.busy || draft === ''}
           onClick={() => void test()}
         >
@@ -110,7 +110,7 @@ export function TavilyKeyField({
           className="cfg-eye-btn"
           aria-label={visible ? '隐藏 Key' : '显示 Key'}
           aria-pressed={visible}
-          title={visible ? '隐藏' : '显示'}
+          data-tip={visible ? '隐藏' : '显示'}
           onClick={() => setVisible(!visible)}
         >
           <TreeIcon name={visible ? 'eyeOff' : 'eye'} size={13} mono />

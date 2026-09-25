@@ -110,7 +110,7 @@ export function DevLogsPage(): React.JSX.Element {
         <button
           type="button"
           className="devlog-close"
-          title="关闭"
+          data-tip="关闭"
           aria-label="关闭日志窗口"
           onClick={() => void window.atlas.windowClose()}
         >

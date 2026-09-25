@@ -252,7 +252,7 @@ export function SettingsAdvanced({
                           key={n}
                           type="button"
                           className={i === ctxNotchIndex ? 'is-active' : ''}
-                          title={`${n.toLocaleString('en-US')} tokens`}
+                          data-tip={`${n.toLocaleString('en-US')} tokens`}
                           onClick={() => commitContextValue(n)}
                         >
                           {n / 1024}k

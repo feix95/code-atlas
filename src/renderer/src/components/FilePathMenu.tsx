@@ -91,7 +91,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
             timerRef.current = window.setTimeout(closeFilePathMenu, COPY_LINGER_MS)
           })
         }}
-        title={request.relPath}
+        data-tip={request.relPath}
       >
         {copied === 'ok'
           ? '已复制 ✓'
@@ -107,7 +107,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
           if (revealFail !== null) return
           void request.reveal().then(noteThenClose)
         }}
-        title={request.relPath}
+        data-tip={request.relPath}
       >
         {revealFail ?? '在文件资源管理器中显示'}
       </button>
@@ -120,7 +120,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
             request.preview?.()
             closeFilePathMenu()
           }}
-          title={request.relPath}
+          data-tip={request.relPath}
         >
           预览文件
         </button>
@@ -134,7 +134,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
             note.onEdit()
             closeFilePathMenu()
           }}
-          title={request.relPath}
+          data-tip={request.relPath}
         >
           {note.hasNote ? '编辑备注' : '写备注'}
         </button>
@@ -148,7 +148,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
             note.onRemove?.()
             closeFilePathMenu()
           }}
-          title={request.relPath}
+          data-tip={request.relPath}
         >
           清除备注
         </button>

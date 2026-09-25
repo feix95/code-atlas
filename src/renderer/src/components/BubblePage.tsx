@@ -124,14 +124,14 @@ export function BubblePage(): React.JSX.Element {
     <div className="bubble-root">
       <div className="bubble-card">
         <div className="bubble-head">
-          <span className="bubble-title" title="和主面板里的是同一场对话">
+          <span className="bubble-title" data-tip="和主面板里的是同一场对话">
             Atlas 小探针
           </span>
           <button
             type="button"
             className="bubble-tool"
             onClick={() => window.atlas.openMainPanel()}
-            title="打开主面板接着聊"
+            data-tip="打开主面板接着聊"
           >
             回主面板
           </button>
@@ -182,7 +182,7 @@ export function BubblePage(): React.JSX.Element {
                 className="bubble-expand"
                 onClick={() => setExpanded(!expanded)}
                 aria-label={expanded ? '收合输入框' : '展开输入框'}
-                title={expanded ? '收合' : '多撑五行'}
+                data-tip={expanded ? '收合' : '多撑五行'}
               >
                 <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
               </button>

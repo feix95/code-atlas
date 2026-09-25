@@ -89,6 +89,7 @@
   --z-dialog: 50;
   --z-revive: 90;
   --z-menu: 95;
+  --z-tip: 100;
   /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
   --focus-ring: 0 0 0 0.1875rem;
   --shadow-menu: 0 8px 28px rgba(0, 0, 0, 0.22);
@@ -97,6 +98,9 @@
   /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
   --scrim: rgba(0, 0, 0, 0.36);
   --scrim-deep: rgba(0, 0, 0, 0.45);
+  /* 悬停轻提示(tooltip):黑底白字圆角,明暗主题同款 —— 小葵给定真值,不吃主题泛色 */
+  --tip-bg: #2c2c2c;
+  --tip-ink: #f0f0f0;
   /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
   --traffic-dot: #d1d3d4;
   --traffic-ink: #5c6165;
@@ -278,4 +282,46 @@ body {
 body.is-maximized .app {
   border: none;
   border-radius: 0;
+}
+
+/* ── 全局轻提示(TooltipHost,全场唯一户口):黑底白字圆角小尾巴。
+   fixed 挂 body 不受任何容器 overflow 裁剪;pointer-events 永不吃鼠标;
+   data-side 由 JS 写,小尾巴转 45° 方块贴在朝目标那一侧 --arrow 位上 ── */
+.tip-bubble {
+  position: fixed;
+  z-index: var(--z-tip);
+  max-width: 22rem;
+  padding: 0.375rem 0.625rem;
+  background: var(--tip-bg);
+  color: var(--tip-ink);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.tip-bubble::before {
+  content: '';
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--tip-bg);
+  transform: rotate(45deg);
+}
+.tip-bubble[data-side='right']::before {
+  left: -0.21875rem;
+  top: calc(var(--arrow) - 0.25rem);
+}
+.tip-bubble[data-side='left']::before {
+  right: -0.21875rem;
+  top: calc(var(--arrow) - 0.25rem);
+}
+.tip-bubble[data-side='bottom']::before {
+  top: -0.21875rem;
+  left: calc(var(--arrow) - 0.25rem);
+}
+.tip-bubble[data-side='top']::before {
+  bottom: -0.21875rem;
+  left: calc(var(--arrow) - 0.25rem);
 }

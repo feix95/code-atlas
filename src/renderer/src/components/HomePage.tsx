@@ -77,7 +77,7 @@ export function HomePage({
                   type="button"
                   className="recent-open"
                   onClick={() => onOpen(r.p)}
-                  title={r.p}
+                  data-tip={r.p}
                 >
                   <strong className="recent-name">{r.n}</strong>
                   <small className="recent-time">{formatRecentTime(r.t)}</small>
@@ -87,7 +87,7 @@ export function HomePage({
                   className="recent-remove"
                   onClick={() => onRemoveRecent(r.p)}
                   aria-label={`从最近列表删掉 ${r.n}`}
-                  title="只删这条记录,不动文件夹本身"
+                  data-tip="只删这条记录,不动文件夹本身"
                 >
                   ✕
                 </button>

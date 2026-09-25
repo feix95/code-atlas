@@ -29,7 +29,8 @@ export function Rail({
         className="rail-btn"
         disabled={!hasWorkspace}
         onClick={onGraph}
-        title="关系图谱"
+        data-tip="关系图谱"
+        data-tip-side="right"
         aria-label="关系图谱"
       >
         <TreeIcon name="view" size={RAIL_ICON} mono />
@@ -39,7 +40,8 @@ export function Rail({
         className="rail-btn"
         disabled={!hasWorkspace}
         onClick={onOverview}
-        title="概览"
+        data-tip="概览"
+        data-tip-side="right"
         aria-label="概览"
       >
         <TreeIcon name="navigation" size={RAIL_ICON} mono />
@@ -49,7 +51,8 @@ export function Rail({
         className="rail-btn"
         disabled={!hasWorkspace}
         onClick={onChat}
-        title="自由对话"
+        data-tip="自由对话"
+        data-tip-side="right"
         aria-label="自由对话"
       >
         <TreeIcon name="bot" size={RAIL_ICON} mono />
@@ -58,7 +61,8 @@ export function Rail({
         type="button"
         className="rail-btn"
         onClick={onSettings}
-        title="设置"
+        data-tip="设置"
+        data-tip-side="right"
         aria-label="设置"
       >
         <TreeIcon name="gear" size={RAIL_ICON} mono />

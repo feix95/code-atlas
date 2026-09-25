@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { TreeIcon } from './Icons'
 import { isMenuKind, KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
@@ -124,7 +124,7 @@ export function TabBar({
             className={`tabbar-tab${t.id === activeId ? ' is-active' : ''}${t.pinned ? ' is-pinned' : ' is-follow'}${
               t.id === flashId ? ' is-flash' : ''
             }${dropBefore === t.id ? ' is-drop-before' : ''}`}
-            title={title}
+            data-tip={title}
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData(DRAG_MIME_TAB, t.id)
@@ -183,7 +183,7 @@ export function TabBar({
               type="button"
               className="tabbar-close"
               aria-label={`关闭 ${t.name}`}
-              title="关闭"
+              data-tip="关闭"
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(t.id)

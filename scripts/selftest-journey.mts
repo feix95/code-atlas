@@ -214,6 +214,28 @@ try {
   await control({ holdGit: true })
   await open(project)
   await shot('guide')
+  // 悬停轻提示(全场唯一户口):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
+  // 锚文件名末端往右出,不压上下行的字;鼠标一走气泡收摊
+  const tipRow = page.locator('.tree:not(.search-results) .tree-main[data-tip]').first()
+  await tipRow.hover()
+  const bubble = page.locator('.tip-bubble')
+  await bubble.waitFor()
+  assert.ok((await bubble.textContent())?.trim(), 'tooltip must carry the annotation text')
+  const bubbleBox = await bubble.boundingBox()
+  const nameBox = await tipRow.locator('.tree-name').boundingBox()
+  assert.ok(bubbleBox && nameBox, 'tooltip and name must have boxes')
+  assert.ok(
+    bubbleBox.x >= nameBox.x + nameBox.width - 2,
+    'tooltip must open to the right of the name text'
+  )
+  await shot('tree-tip')
+  await page.mouse.move(12, 320)
+  await bubble.waitFor({ state: 'detached' })
+  assert.equal(
+    await page.locator('.tree:not(.search-results) .tree-summary').count(),
+    0,
+    'tree rows must not render gray annotation text'
+  )
   // UI v3(B5):workspace 卡 ⇅ 菜单——浮层成行、↓ 键盘高亮、行首 pin 两态、Esc 收摊
   await page.getByRole('button', { name: '展开工作区菜单', exact: true }).click()
   await page.locator('.ws-menu').waitFor()

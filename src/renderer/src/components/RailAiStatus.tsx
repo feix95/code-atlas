@@ -76,7 +76,8 @@ export function RailAiStatus(): React.JSX.Element {
         type="button"
         className={`rail-btn rail-ai is-${face}`}
         onClick={() => setOpen((o) => !o)}
-        title={`AI 状态:${stateLabel}`}
+        data-tip={`AI 状态:${stateLabel}`}
+        data-tip-side="right"
         aria-label={`AI 状态:${stateLabel}`}
         aria-expanded={open}
       >
@@ -131,7 +132,7 @@ function AiStatusPanel({
           {status.message && (
             <p
               className={`ai-pop-message${status.state === 'error' ? ' is-error' : ''}`}
-              title={status.message}
+              data-tip={status.message}
             >
               {status.message}
             </p>
@@ -139,7 +140,7 @@ function AiStatusPanel({
           {(status.modelName || formatBytes(status.sizeBytes) !== '') && (
             <div className="ai-pop-row ai-pop-meta">
               {status.modelName && (
-                <span className="ai-pop-name mono" title={status.modelName}>
+                <span className="ai-pop-name mono" data-tip={status.modelName}>
                   {status.modelName}
                 </span>
               )}
@@ -168,7 +169,7 @@ function AiStatusPanel({
         <button
           type="button"
           className="ai-pop-act"
-          title="Developer 日志:看模型后台原话、请求报账"
+          data-tip="Developer 日志:看模型后台原话、请求报账"
           onClick={() => {
             void window.atlas.devLogsOpen()
             onClose()
@@ -205,7 +206,9 @@ function StatusRows({ status }: { status: ModelStatus }): React.JSX.Element {
       <span className="ai-pop-provider">{providerName}</span>
       <span
         className={`ai-pop-state${broken ? ' is-error' : ''}`}
-        title={status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined}
+        data-tip={
+          status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined
+        }
       >
         {stateText}
       </span>

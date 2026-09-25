@@ -197,7 +197,7 @@ export function WorkspaceSidebar({
               type="button"
               className="tb-btn ws-menu-btn"
               disabled={scanning}
-              title={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
+              data-tip={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
               aria-label={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
               aria-expanded={menuOpen}
               onClick={(e) => {

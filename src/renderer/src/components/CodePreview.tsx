@@ -439,7 +439,7 @@ export function CodePreview({
         </span>
         <span
           className="code-pane-name mono is-file-menu"
-          title={`${file.relPath};右键:复制路径 / 在资源管理器中显示 / 备注`}
+          data-tip={`${file.relPath};右键:复制路径 / 在资源管理器中显示 / 备注`}
           onContextMenu={(e) => {
             // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
             e.preventDefault()
@@ -460,7 +460,7 @@ export function CodePreview({
             className="btn btn-ghost code-pane-ref"
             disabled={!wholeRef.canAdd}
             onClick={addWholeRef}
-            title={wholeRef.title}
+            data-tip={wholeRef.title}
           >
             <TreeIcon name="clip" size={CLIP_ICON_SIZE} />
             {added ? '已引用' : wholeRef.label}
@@ -549,7 +549,7 @@ export function CodePreview({
           className="code-select-btn"
           style={{ left: `${Math.round(sel.buttonX)}px`, top: `${Math.round(sel.buttonY)}px` }}
           disabled={!canAddRef}
-          title={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
+          data-tip={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
           // 按下时别让浏览器动选区:一按就折叠的话,这个按钮会先被卸载,click 就丢了
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {

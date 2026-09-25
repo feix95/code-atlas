@@ -207,7 +207,7 @@ export function GitChanges({
           className="btn btn-ghost"
           onClick={() => void handleRefresh()}
           aria-label="刷新"
-          title="刷新"
+          data-tip="刷新"
         >
           <IconRefresh />
         </button>
@@ -278,7 +278,7 @@ export function GitChanges({
                 setStreamText('')
               }
             }}
-            title={change.relPath}
+            data-tip={change.relPath}
           >
             <span className={`git-badge git-badge--${change.kind}`}>{KIND_LABEL[change.kind]}</span>
             <span className="git-path">{change.relPath}</span>
