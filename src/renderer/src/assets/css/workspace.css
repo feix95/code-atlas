@@ -673,7 +673,9 @@
   font-size: 0.95rem;
   font-family: inherit;
   text-align: left;
-  cursor: pointer;
+  /* 树行悬停不出小手(小葵实测):行内容就是「文本」,鼠标保持箭头;
+     可点与否由 hover 底色表达,不靠光标形状 */
+  cursor: default;
 }
 
 .tree-row.is-selected .tree-main {
