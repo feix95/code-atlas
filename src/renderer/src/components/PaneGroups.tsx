@@ -1,27 +1,16 @@
-// 页签组区:一到两组页签栏 + 正文,中间分割条调比例;页签拖到正文中心 = 分屏/挪组。
+// 页签组区(UI v3):页签带已上顶栏(TopBarTabs),这里只剩正文分屏 ——
+// 一到两组正文,中间分割条调比例;页签拖到正文中心 = 分屏/挪组。
 import { Fragment } from 'react'
 import type { ChatCodeRef, FreechatHost, ScanResult } from '@shared/types'
 import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import type { PaneGroup, PaneTab } from '../paneTabs'
-import type { PaneKind } from '../paneKinds'
-import { TabBar } from './TabBar'
 import { PaneEmptyBoard, PinnedChatPane } from './TabBody'
 
 export function PaneGroups({
   groups,
-  visibleOfGroup,
   freechatHost,
-  flashTabId,
-  activateTab,
-  closeTab,
-  pinToggleTab,
   moveTab,
-  setDraggingTab,
-  onTabDragEnd,
-  onDetachTab,
-  enabledKinds,
-  toggleKind,
   setActiveGroupId,
   dropMark,
   setDropMark,
@@ -39,18 +28,9 @@ export function PaneGroups({
   renderTabBody
 }: {
   groups: PaneGroup[]
-  visibleOfGroup: (g: PaneGroup | null) => PaneTab[]
   freechatHost: FreechatHost
-  flashTabId: string | null
-  activateTab: (id: string) => void
-  closeTab: (id: string) => void
-  pinToggleTab: (id: string) => void
+  /** 页签拖到正文中心松手 = 分屏/挪组(顶栏页签带过来的拖,落点在正文) */
   moveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
-  setDraggingTab: React.Dispatch<React.SetStateAction<string | null>>
-  onTabDragEnd: (id: string) => void
-  onDetachTab: (id: string) => void
-  enabledKinds: Set<PaneKind>
-  toggleKind: (kind: PaneKind, on: boolean) => void
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
   dropMark: { groupId: string; center: boolean } | null
   setDropMark: React.Dispatch<React.SetStateAction<{ groupId: string; center: boolean } | null>>
@@ -70,7 +50,6 @@ export function PaneGroups({
   return (
     <div className="pane-groups">
       {groups.map((g, gi) => {
-        const vis = visibleOfGroup(g)
         // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
         // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
         const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
@@ -109,21 +88,6 @@ export function PaneGroups({
               }
               onPointerDown={() => setActiveGroupId(g.id)}
             >
-              <TabBar
-                tabs={vis}
-                activeId={g.activeId}
-                flashId={flashTabId}
-                canMoveToSiblingGroup={groups.length > 1}
-                onActivate={activateTab}
-                onClose={closeTab}
-                onPinToggle={pinToggleTab}
-                onMoveTab={moveTab}
-                onDragTab={setDraggingTab}
-                onTabDragEnd={onTabDragEnd}
-                onDetachTab={onDetachTab}
-                enabledKinds={enabledKinds}
-                onToggleKind={toggleKind}
-              />
               <div
                 className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
                 onDragOver={(e) => {

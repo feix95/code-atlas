@@ -19,10 +19,11 @@ export function AppTopBar({
   goNav,
   handleRefresh,
   filter,
-  onFilterChange
+  onFilterChange,
+  tabs
 }: {
   scanning: boolean
-  /** 已开一张图(工作区在台面上) */
+  /** 工作区在台面上;没开项目时搜索框置灰(深搜要有工作区根,规格默认项) */
   hasWorkspace: boolean
   /** 侧栏这一列此刻露着 = 搜索框/导航组才营业(收起时整组消失,规格 §4.3) */
   sidebarShown: boolean
@@ -33,6 +34,9 @@ export function AppTopBar({
   handleRefresh: () => Promise<void>
   filter: string
   onFilterChange: (v: string) => void
+  /** Chrome 页签带(B3):App 按页签组算好条带宽度递进来;
+      空/没项目时不递,页签区就是一条可拖窗的空白面 */
+  tabs?: React.ReactNode
 }): React.JSX.Element {
   const maximized = useWindowMaximized()
   return (
@@ -44,7 +48,8 @@ export function AppTopBar({
             type="button"
             className="tb-btn"
             onClick={onToggleSidebar}
-            disabled={!hasWorkspace || scanning}
+            /* 侧栏常驻(v3:首页就是「这台电脑」),有没有项目都能收起;只在扫描期禁动 */
+            disabled={scanning}
             title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
             aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
             aria-pressed={sidebarCollapsed}
@@ -60,9 +65,10 @@ export function AppTopBar({
               <input
                 type="search"
                 value={filter}
-                placeholder="搜索文件"
+                placeholder={hasWorkspace ? '搜索文件' : '先打开一个文件夹'}
                 aria-label="搜索文件"
                 spellCheck={false}
+                disabled={!hasWorkspace}
                 onChange={(e) => onFilterChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') onFilterChange('')
@@ -105,8 +111,8 @@ export function AppTopBar({
           </>
         )}
       </div>
-      {/* 页签区:B3 的 Chrome 页签搬进来之前,这就是可拖拽的空白面 */}
-      <div className="topbar-tabs" />
+      {/* 页签区(§5.1):各分屏组的胶囊页签带;缝隙与尾部空白仍是拖窗面 */}
+      <div className="topbar-tabs">{tabs}</div>
       {/* 窗控三键:整高块并排;— ▢ 悬停灰底,× 悬停红底白叉(Windows 惯例) */}
       <div className="win-ctl">
         <button

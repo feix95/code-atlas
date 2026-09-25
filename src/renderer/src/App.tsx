@@ -24,6 +24,7 @@ import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
 import { Rail } from './components/Rail'
+import { TopBarTabs } from './components/TopBarTabs'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { PaneGroups } from './components/PaneGroups'
 import { TabBody } from './components/TabBody'
@@ -690,7 +691,7 @@ function App(): React.JSX.Element {
     <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
       <TeachingContext.Provider value={teaching}>
         <div
-          className="app"
+          className={`app${sidebarCollapsed ? ' is-side-collapsed' : ''}`}
           // 侧栏宽挂 CSS 变量:侧栏本体和顶栏左段(分界线的上行段)同认这一份,
           // 拖 sash 时两边永远对齐;rem 值 = 基准宽 ÷ (16 × uiScale)
           style={
@@ -716,6 +717,26 @@ function App(): React.JSX.Element {
             handleRefresh={handleRefresh}
             filter={treeFilter}
             onFilterChange={setTreeFilter}
+            tabs={
+              result && !scanning ? (
+                <TopBarTabs
+                  groups={groups}
+                  visibleOfGroup={visibleOfGroup}
+                  flashTabId={flashTabId}
+                  activateTab={activateTab}
+                  closeTab={closeTab}
+                  pinToggleTab={pinToggleTab}
+                  moveTab={moveTab}
+                  setDraggingTab={setDraggingTab}
+                  onTabDragEnd={onTabDragEnd}
+                  onDetachTab={onDetachTab}
+                  enabledKinds={enabledKinds}
+                  toggleKind={toggleKind}
+                  paneSplit={paneSplit}
+                  sidebarCollapsed={sidebarCollapsed}
+                />
+              ) : null
+            }
           />
 
           {/* 第 2 层:rail | 侧栏 | 内容区,全在顶栏之下。
@@ -783,18 +804,8 @@ function App(): React.JSX.Element {
                   )}
                   <PaneGroups
                     groups={groups}
-                    visibleOfGroup={visibleOfGroup}
                     freechatHost={freechatHost}
-                    flashTabId={flashTabId}
-                    activateTab={activateTab}
-                    closeTab={closeTab}
-                    pinToggleTab={pinToggleTab}
                     moveTab={moveTab}
-                    setDraggingTab={setDraggingTab}
-                    onTabDragEnd={onTabDragEnd}
-                    onDetachTab={onDetachTab}
-                    enabledKinds={enabledKinds}
-                    toggleKind={toggleKind}
                     setActiveGroupId={setActiveGroupId}
                     dropMark={dropMark}
                     setDropMark={setDropMark}

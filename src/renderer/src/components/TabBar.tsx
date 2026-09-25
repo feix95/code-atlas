@@ -174,7 +174,7 @@ export function TabBar({
             }}
           >
             <span className="tabbar-icon" aria-hidden="true">
-              <TreeIcon name={t.pinned ? 'pin' : t.icon} />
+              <TreeIcon name={t.pinned ? 'pin' : t.icon} mono />
             </span>
             <span className="tabbar-name">{t.name}</span>
             <button
