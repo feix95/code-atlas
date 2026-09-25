@@ -36,7 +36,7 @@
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
   /* ── UI v3 比例布局(规格:docs/to-do list/UI重构-v3-比例布局)──
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
-  --u: 4rem;
+  --u: 3.2rem;
   /* 字号四档(Obsidian 体系):前三档与既有 --font-sm/md/ml 同值,别名挂着不另立;
      ui-large 是新档(页内标题) */
   --font-ui-smaller: var(--font-sm);
