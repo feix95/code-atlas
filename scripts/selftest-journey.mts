@@ -215,18 +215,21 @@ try {
   await open(project)
   await shot('guide')
   // 悬停轻提示(全场唯一户口):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
-  // 锚文件名末端往右出,不压上下行的字;鼠标一走气泡收摊
+  // 统一从树区右缘(sash 拖杆线)弹出,不压上下行的字;鼠标一走气泡收摊
   const tipRow = page.locator('.tree:not(.search-results) .tree-main[data-tip]').first()
+  // 窗口拉宽保证右侧摆得下:窄窗翻面是正当行为,这里要锁的是「右缘(sash 线)出」
+  await page.setViewportSize({ width: 1280, height: 800 })
   await tipRow.hover()
   const bubble = page.locator('.tip-bubble')
   await bubble.waitFor()
   assert.ok((await bubble.textContent())?.trim(), 'tooltip must carry the annotation text')
+  assert.equal(await bubble.getAttribute('data-side'), 'right', 'tree tooltip must open right')
   const bubbleBox = await bubble.boundingBox()
-  const nameBox = await tipRow.locator('.tree-name').boundingBox()
-  assert.ok(bubbleBox && nameBox, 'tooltip and name must have boxes')
+  const rowBox = await tipRow.boundingBox()
+  assert.ok(bubbleBox && rowBox, 'tooltip and row must have boxes')
   assert.ok(
-    bubbleBox.x >= nameBox.x + nameBox.width - 2,
-    'tooltip must open to the right of the name text'
+    Math.abs(bubbleBox.x - (rowBox.x + rowBox.width + 10)) <= 4,
+    'tooltip must open right at the tree right edge (sash line)'
   )
   await shot('tree-tip')
   await page.mouse.move(12, 320)

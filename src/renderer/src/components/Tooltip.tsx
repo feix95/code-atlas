@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 /**
  * 全局轻提示(全局规矩「只定义一次」):全场悬停提示的唯一户口。
  * 元素挂 data-tip="文案" 即得(多行用 \n);data-tip-side 指方位,默认 bottom;
- * data-tip-anchor="选择器" 可改锚到内部元素(文件树锚到文件名末端,不贴行尾)。
- * 气泡 fixed 挂 body,不受侧栏 overflow 裁剪;pointer-events 永不吃鼠标。
- * 原生 title 已全场退役:样式不可控、位置不可控、还不能预览。
+ * data-tip-anchor="选择器" 可改锚到内部元素(如文件名末端,不贴行尾)。
+ * 气泡 position:absolute 渲染在 .app 内(JSX 原位)——这扇窗是透明玻璃窗,
+ * Chromium 会把「不在不透明面内」的根层 fixed 件裁掉不画(命中测试活着、像素为零),
+ * 浮层一律走 absolute+锚 .app(与 ws-menu 等浮层同一条已验证的路);
+ * .app overflow:hidden 正好把气泡裁在窗框圆角内,坐标换算补 offsetParent 原点差。
+ * pointer-events 永不吃鼠标。原生 title 已全场退役:样式不可控、不能预览。
  */
 
 type TipSide = 'right' | 'left' | 'bottom' | 'top'
@@ -108,7 +110,16 @@ export function TooltipHost(): React.JSX.Element | null {
       setPos(null)
       return
     }
-    setPos(placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side))
+    const p = placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side)
+    // absolute 的定位基准是 .app 内缘(offsetParent 内容盒),视口坐标减它
+    const host = b.offsetParent as HTMLElement | null
+    if (host) {
+      const hr = host.getBoundingClientRect()
+      const hs = getComputedStyle(host)
+      p.x -= hr.left + (parseFloat(hs.borderLeftWidth) || 0)
+      p.y -= hr.top + (parseFloat(hs.borderTopWidth) || 0)
+    }
+    setPos(p)
   }, [])
 
   useEffect(() => {
@@ -187,7 +198,7 @@ export function TooltipHost(): React.JSX.Element | null {
   }, [])
 
   if (!tip) return null
-  return createPortal(
+  return (
     <div
       key={tip.id}
       ref={bubbleCb}
@@ -202,7 +213,6 @@ export function TooltipHost(): React.JSX.Element | null {
       }}
     >
       {tip.text}
-    </div>,
-    document.body
+    </div>
   )
 }

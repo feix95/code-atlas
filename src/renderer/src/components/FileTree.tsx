@@ -85,7 +85,6 @@ function TreeRow({
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, node) : undefined}
           data-tip={tip || undefined}
           data-tip-side="right"
-          data-tip-anchor=".tree-name"
         >
           <span className="tree-icon" aria-hidden="true">
             {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} />}
@@ -168,7 +167,6 @@ function TreeRow({
           onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, dir) : undefined}
           data-tip={dirTip || undefined}
           data-tip-side="right"
-          data-tip-anchor=".tree-name"
         >
           <span className="tree-icon" aria-hidden="true">
             {/* 探层中的转圈挪进图标位(UI v3 摘三角后没有箭头坑位了) */}

@@ -100,7 +100,6 @@ function BrowseDirRow({
               : `${root.absPath} —— 双击打开为工作区`
           }
           data-tip-side="right"
-          data-tip-anchor=".tree-name"
           onClick={() => void toggleDir(drive, root.relPath)}
           onDoubleClick={() => onOpenWorkspace(root.absPath)}
         >
@@ -168,7 +167,6 @@ function BrowseChildRow({
           className="tree-main"
           data-tip={node.absPath}
           data-tip-side="right"
-          data-tip-anchor=".tree-name"
           onClick={() => onOpenFile(drive.root, { name: node.name, relPath: node.relPath })}
         >
           <span className="tree-icon" aria-hidden="true">
