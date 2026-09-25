@@ -110,7 +110,11 @@ function BrowseDirRow({
             {root.loading ? (
               <span className="tree-spin" aria-hidden="true" />
             ) : (
-              <TreeIcon name={isDriveRoot ? 'drive' : 'folder'} size={BROWSE_ICON_SIZE} />
+              <TreeIcon
+                name={isDriveRoot ? 'drive' : 'folder'}
+                size={BROWSE_ICON_SIZE}
+                mono={false}
+              />
             )}
           </span>
           <span className="tree-name">{root.name}</span>
@@ -176,7 +180,7 @@ function BrowseChildRow({
           onClick={() => onOpenFile(drive.root, { name: node.name, relPath: node.relPath })}
         >
           <span className="tree-icon" aria-hidden="true">
-            <TreeIcon name="file" size={BROWSE_ICON_SIZE} />
+            <TreeIcon name="file" size={BROWSE_ICON_SIZE} mono={false} />
           </span>
           <span className="tree-name">{node.name}</span>
         </button>

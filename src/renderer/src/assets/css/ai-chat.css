@@ -869,26 +869,26 @@
 }
 
 /* 小探针本体:待命 = 呼吸 + 钟摆慢摇;思考 = 摆大摆快 + 轻浮动 + 眼睛左右看;
-   出错 = 天线铃铛和壳线变琥珀色。动画只在 CSS,系统要求减少动态就全静止 */
+   所有部件用主题文字色,状态由图形动画和文案传达。动画只在 CSS,系统要求减少动态就全静止 */
 .atlas-probe .probe-shell {
   fill: var(--surface);
-  stroke: var(--accent-line);
+  stroke: var(--text);
   stroke-width: 1.5;
 }
 
 .atlas-probe .probe-eye {
-  fill: var(--accent-bright);
+  fill: var(--text);
   transform-origin: center;
 }
 
 .atlas-probe .probe-antenna line {
-  stroke: var(--accent-line);
+  stroke: var(--text);
   stroke-width: 1.5;
   stroke-linecap: round;
 }
 
 .atlas-probe .probe-bell {
-  fill: var(--secondary);
+  fill: var(--text);
 }
 
 .atlas-probe .probe-antenna {
@@ -913,14 +913,6 @@
 
 .atlas-probe.is-thinking .probe-eye {
   animation: probe-look 1.8s ease-in-out infinite;
-}
-
-.atlas-probe.is-error .probe-shell {
-  stroke: var(--amber);
-}
-
-.atlas-probe.is-error .probe-bell {
-  fill: var(--amber);
 }
 
 @keyframes probe-sway {

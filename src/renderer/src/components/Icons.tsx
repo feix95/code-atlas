@@ -1,10 +1,5 @@
-/* ── 图标配色(图标册 v5 落地):一图一色,实线稿无填充。
- *  --ic  深底色(直接存)
- *  --ic-l 浅底色(同色相、明度 ×0.58,跟 v5 预览页同一公式换算)
- *  默认吃 --ic-l(浅色主题),:root[data-theme='dark'] 时切 --ic —— 规则在 main.css .ticon
- *  设计决定(DRY 审计 P2-7):这套 pastel 调色板自成一局,不进 design token 体系 ——
- *  彩色图标永远 pastel 是刻意的辨识度设计;mono 开关已让单色场景走 token。哪天要让
- *  彩色跟主题走,再映射 token,现在别动。 ── */
+/* ── 文件树图标配色(图标册 v5):文件/文件夹辨识色只用于文件树与盘符下钻;
+ *  其他界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。 ── */
 const ICON_COLORS: Record<string, string> = {
   file: '#8fa8cc',
   folder: '#eab75c',
@@ -100,15 +95,17 @@ function tint(hex: string): React.CSSProperties {
  *  「is-tapping」时以笔尖为轴轻磕一下并从笔尖划出一道笔迹淡出 */
 export function NotePen({
   size = 12,
-  tapping = false
+  tapping = false,
+  mono = true
 }: {
   size?: number
   tapping?: boolean
+  mono?: boolean
 }): React.JSX.Element {
   return (
     <svg
       className={`note-pen ticon${tapping ? ' is-tapping' : ''}`}
-      style={tint(ICON_COLORS.notepen)}
+      style={mono ? undefined : tint(ICON_COLORS.notepen)}
       width={size}
       height={size}
       viewBox="0 0 24 24"
@@ -126,11 +123,10 @@ export function NotePen({
   )
 }
 
-/** 顶栏线稿图标家族(第一百零三锤;v5 上色:跟文件树一套令牌;
- *  mono=true 时去色吃 currentColor —— 顶栏那组走单色,聊天/Git 面板的同款照旧彩色) */
+/** 顶栏线稿图标家族(第一百零三锤);默认去色吃 currentColor,按需可选彩色稿 */
 export function IconArrowLeft({
   size = 14,
-  mono = false,
+  mono = true,
   strokeWidth = 2
 }: {
   size?: number
@@ -159,7 +155,7 @@ export function IconArrowLeft({
 
 export function IconArrowRight({
   size = 14,
-  mono = false,
+  mono = true,
   strokeWidth = 2
 }: {
   size?: number
@@ -188,7 +184,7 @@ export function IconArrowRight({
 
 export function IconRefresh({
   size = 14,
-  mono = false,
+  mono = true,
   strokeWidth = 2
 }: {
   size?: number
@@ -775,12 +771,12 @@ const BOOK: Record<string, React.ReactNode> = {
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头);
- *  mono=true 去色吃 currentColor(顶栏那种单色岗用),不传照旧一图一色 */
+ *  默认去色吃 currentColor;仅文件树/盘符浏览明确传 mono=false 保留类型辨识色 */
 export function TreeIcon({
   name,
   size = 13,
   strokeWidth,
-  mono = false
+  mono = true
 }: {
   name: string
   size?: number

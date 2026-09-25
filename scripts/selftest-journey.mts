@@ -213,6 +213,15 @@ try {
   )
   await control({ holdGit: true })
   await open(project)
+  const treeIconStyle = await page.locator('.tree-icon svg').first().getAttribute('style')
+  assert.match(treeIconStyle ?? '', /--ic:/, 'file-tree icons must retain their type colors')
+  const railIcon = page.locator('.rail-btn svg').first()
+  assert.equal(await railIcon.getAttribute('style'), null, 'rail icons must inherit theme color')
+  assert.equal(
+    await railIcon.getAttribute('class'),
+    null,
+    'non-tree icons must not use the colored tint class'
+  )
   await shot('guide')
   // 悬停轻提示(全场唯一户口):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
   // 统一从树区右缘(sash 拖杆线)弹出,不压上下行的字;鼠标一走气泡收摊

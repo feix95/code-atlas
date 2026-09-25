@@ -516,20 +516,7 @@
   margin-bottom: 0.7rem;
 }
 
-/* ── rail 底槽 AI 状态(§6.1,全项目唯一保色图标):就绪绿勾 / 加载中蓝弧转 /
-   未加载或没配置灰插头(默认色) / 出错或没连上红插头 ── */
-.rail-ai.is-ready {
-  color: var(--green);
-}
-
-.rail-ai.is-loading {
-  color: var(--blue);
-}
-
-.rail-ai.is-error {
-  color: var(--danger);
-}
-
+/* ── rail 底槽 AI 状态(§6.1):用图形形状和状态文案区分,图标颜色随主题 ── */
 .rail-ai.is-loading svg {
   animation: ai-status-spin 1s linear infinite;
   transform-origin: center;

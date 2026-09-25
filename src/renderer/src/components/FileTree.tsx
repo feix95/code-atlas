@@ -87,12 +87,12 @@ function TreeRow({
           data-tip-side="right"
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} />}
+            {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} mono={false} />}
           </span>
           <span className="tree-name">{node.name}</span>
           {note && (
             <span className="tree-note-mark" aria-hidden="true">
-              <NotePen />
+              <NotePen mono={false} />
             </span>
           )}
         </button>
@@ -173,13 +173,13 @@ function TreeRow({
             {expandingPath === dir.relPath ? (
               <span className="tree-spin" aria-hidden="true" />
             ) : (
-              <TreeIcon name="folder" size={TREE_ICON_SIZE} />
+              <TreeIcon name="folder" size={TREE_ICON_SIZE} mono={false} />
             )}
           </span>
           <span className="tree-name">{dir.name}</span>
           {dirNote && (
             <span className="tree-note-mark" aria-hidden="true">
-              <NotePen />
+              <NotePen mono={false} />
             </span>
           )}
           {/* 未扫描/不完整都是琥珀色:是「留个心眼」不是「出事了」,红色只留给真失败 */}
