@@ -16,22 +16,18 @@ interface HomePageProps {
   recents: RecentProject[]
   drives: DriveInfo[] | null
   drivesNote: string | null
-  recentUndo: { snapshot: RecentProject[]; removed: RecentProject } | null
   onPick: () => void
   onOpen: (path: string) => void
   onRemoveRecent: (path: string) => void
-  onUndoRecent: () => void
 }
 
 export function HomePage({
   recents,
   drives,
   drivesNote,
-  recentUndo,
   onPick,
   onOpen,
-  onRemoveRecent,
-  onUndoRecent
+  onRemoveRecent
 }: HomePageProps): React.JSX.Element {
   return (
     <div className="welcome-page">
@@ -100,14 +96,6 @@ export function HomePage({
           </div>
         ) : (
           <p>打开过的项目会留在这里。第一次使用?点击上方「选择项目文件夹」。</p>
-        )}
-        {recentUndo && (
-          <div className="recent-undo" role="status">
-            已删除「{recentUndo.removed.n}」
-            <button type="button" className="btn btn-ghost" onClick={onUndoRecent}>
-              撤销
-            </button>
-          </div>
         )}
       </section>
       <details className="welcome-disks">

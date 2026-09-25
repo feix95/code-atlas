@@ -67,9 +67,160 @@
   color: var(--chrome-muted);
 }
 
-.ws-home {
+.ws-menu-btn {
   width: 2.2rem;
   height: 2.2rem;
+}
+
+/* ── 工作区菜单(§7.1):浮层盖在文件树上,宽与卡同宽、卡下留小缝;
+    可视 5 条(3.4rem/条 + 上下余量),超出内部滚动 ── */
+.ws-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: -1px;
+  right: -1px;
+  z-index: var(--z-dropdown);
+  max-height: calc(5 * 3.4rem + 2.4rem);
+  overflow-y: auto;
+  padding: 1.2rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-menu);
+}
+
+.wsm-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 3.4rem;
+  border-radius: var(--radius-sm);
+}
+
+.wsm-row:hover,
+.wsm-row.is-active {
+  background: var(--chrome-hover);
+}
+
+/* 行首 pin 钮:未 pin 条目悬停/聚焦/键盘高亮才显形;已 pin 条目常驻 */
+.wsm-pin {
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-smooth);
+}
+
+.wsm-row:hover .wsm-pin,
+.wsm-row:focus-within .wsm-pin,
+.wsm-row.is-active .wsm-pin,
+.wsm-row.is-pinned .wsm-pin {
+  opacity: 1;
+}
+
+.wsm-pin:hover {
+  color: var(--chrome-ink);
+}
+
+.wsm-pin-off {
+  display: none;
+}
+
+/* 已 pin 条目悬停:pin 换成 pin-off,预告单击 = 解 pin */
+.wsm-row.is-pinned:hover .wsm-pin-on,
+.wsm-row.is-pinned:focus-within .wsm-pin-on {
+  display: none;
+}
+
+.wsm-row.is-pinned:hover .wsm-pin-off,
+.wsm-row.is-pinned:focus-within .wsm-pin-off {
+  display: grid;
+}
+
+.wsm-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  min-height: 3.4rem;
+  padding: 0 1.9rem 0 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: var(--mono);
+  font-size: var(--font-ui-small);
+  text-align: left;
+  cursor: pointer;
+  transition: padding-left var(--dur-2) var(--ease-smooth);
+}
+
+/* 已 pin 条目的 pin 占着行首,路径恒右移;未 pin 悬停/高亮时滑入让位 */
+.wsm-row.is-pinned .wsm-open,
+.wsm-row:hover .wsm-open,
+.wsm-row:focus-within .wsm-open,
+.wsm-row.is-active .wsm-open {
+  padding-left: 2.2rem;
+}
+
+.wsm-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行尾 × 即删:悬停/聚焦才显形,不预留空槽 */
+.wsm-del {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: transparent;
+  color: var(--chrome-muted);
+  font-size: var(--font-ml);
+  line-height: var(--lh-100);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-smooth);
+}
+
+.wsm-row:hover .wsm-del,
+.wsm-row:focus-within .wsm-del,
+.wsm-row.is-active .wsm-del {
+  opacity: 1;
+}
+
+.wsm-del:hover {
+  color: var(--danger);
+}
+
+.wsm-sep {
+  height: 1px;
+  margin: 0.3rem 0.7rem;
+  background: var(--line);
+}
+
+.wsm-empty {
+  margin: 0;
+  padding: 0 0.7rem;
+  color: var(--chrome-muted);
+  font-size: var(--font-ui-small);
 }
 
 /* 「这台电脑」空态(§7.1):盘符行,B8 升级成可下钻的树行 */
@@ -465,14 +616,15 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 1.6875rem;
+  /* 行高 0.75u ≈ 3rem(§7 给定+实测):比旧实现的 1.6875rem 明显疏朗 */
+  height: 3rem;
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background var(--dur-2) var(--ease-smooth);
   /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
-  contain-intrinsic-size: auto 1.6875rem;
+  contain-intrinsic-size: auto 3rem;
 }
 
 .tree-row:hover {
@@ -485,33 +637,7 @@
   box-shadow: var(--edge-accent);
 }
 
-.tree-caret {
-  flex: 0 0 1.125rem;
-  width: 1.125rem;
-  height: 1.25rem;
-  display: grid;
-  place-items: center;
-  border: none;
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--font-ml);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.tree-caret:hover {
-  color: var(--accent-bright);
-  background: var(--accent-soft);
-}
-
-/* 箭头一律 muted 灰(Obsidian 规矩):开没开交给旋转方向说,不靠色 */
-
-.tree-caret.is-lazy {
-  color: var(--amber);
-}
-
-/* 懒加载探测中的小圈圈 */
+/* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
 .tree-spin {
   width: 0.5625rem;
   height: 0.5625rem;
@@ -543,7 +669,8 @@
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: var(--font-md);
+  /* 文件名 ≈0.95rem(§7 按图推算):比 UI 中档字大一档 */
+  font-size: 0.95rem;
   font-family: inherit;
   text-align: left;
   cursor: pointer;

@@ -576,6 +576,37 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M12 12v8" />
     </>
   ),
+  // ── 工作区卡/菜单供稿(UI v3 §7.3 小葵原样收录,lucide 线稿)──
+  // 菜单收起态指示:lucide chevrons-up-down
+  chevronsUpDown: (
+    <>
+      <path d="m7 15 5 5 5-5" />
+      <path d="m7 9 5-5 5 5" />
+    </>
+  ),
+  // 菜单展开态指示:lucide chevrons-down-up
+  chevronsDownUp: (
+    <>
+      <path d="m7 20 5-5 5 5" />
+      <path d="m7 4 5 5 5-5" />
+    </>
+  ),
+  // 已 pin 条目:lucide pin(斜头图钉,和页签那枚直钉是两支笔)
+  pinTack: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
+  // 悬停已 pin 条目预告可取消:lucide pin-off
+  pinOff: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89" />
+      <path d="m2 2 20 20" />
+      <path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" />
+    </>
+  ),
   // 刷新/重来(设置页原名 rotate,和顶栏 IconRefresh 同一支笔)
   refresh: (
     <>

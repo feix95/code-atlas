@@ -16,6 +16,25 @@ export interface RecentProject {
   n: string
   /** 上次打开的时刻(ms) */
   t: number
+  /** 钉住时刻(ms,UI v3 §7.1):有值 = 常驻 pin 区,不占历史名额、不被时间淘汰 */
+  pin?: number
+}
+
+/** 账本封顶:未 pin 条目只留最近 RECENTS_MAX 条;pin 条目不淘汰(仅手动 unpin 回流)。
+ *  垃圾防御另上一道总闸:整本账最多 40 条,再多掐尾 */
+const LEDGER_HARD_CAP = 40
+function capLedger(list: RecentProject[]): RecentProject[] {
+  const out: RecentProject[] = []
+  let plain = 0
+  for (const r of list) {
+    if (r.pin === undefined) {
+      if (plain >= RECENTS_MAX) continue
+      plain += 1
+    }
+    out.push(r)
+    if (out.length >= LEDGER_HARD_CAP) break
+  }
+  return out
 }
 
 /** 原文 → 干净的最近列表(纯函数,自测覆盖);没记过/垃圾一律回 [] */
@@ -28,21 +47,55 @@ export function parseRecentProjects(raw: unknown): RecentProject[] {
     if (typeof r['p'] !== 'string' || r['p'].trim() === '') continue
     if (typeof r['n'] !== 'string' || r['n'].trim() === '') continue
     if (typeof r['t'] !== 'number' || !Number.isFinite(r['t']) || r['t'] <= 0) continue
-    out.push({ p: r['p'], n: r['n'], t: r['t'] })
+    const pin = r['pin']
+    out.push(
+      typeof pin === 'number' && Number.isFinite(pin) && pin > 0
+        ? { p: r['p'], n: r['n'], t: r['t'], pin }
+        : { p: r['p'], n: r['n'], t: r['t'] }
+    )
   }
-  return out.slice(0, RECENTS_MAX)
+  return capLedger(out)
 }
 
-/** 某项目刚打开过:同名路径(Windows 路径不分大小写)挤掉旧账顶到最前,超长从队尾滚出去
- *  (纯函数,自测覆盖) */
+/** 某项目刚打开过:同名路径(Windows 路径不分大小写)挤掉旧账顶到最前,超长从队尾滚出去。
+ *  pin 跟着路径走:重新打开不丢钉(纯函数,自测覆盖) */
 export function nextRecentProjects(
   raw: unknown,
   path: string,
   name: string,
   ts: number
 ): RecentProject[] {
-  const rest = parseRecentProjects(raw).filter((r) => r.p.toLowerCase() !== path.toLowerCase())
-  return [{ p: path, n: name, t: ts }, ...rest].slice(0, RECENTS_MAX)
+  const prev = parseRecentProjects(raw)
+  const kept = prev.find((r) => r.p.toLowerCase() === path.toLowerCase())
+  const rest = prev.filter((r) => r.p.toLowerCase() !== path.toLowerCase())
+  const head: RecentProject =
+    kept?.pin !== undefined
+      ? { p: path, n: name, t: ts, pin: kept.pin }
+      : { p: path, n: name, t: ts }
+  return capLedger([head, ...rest])
+}
+
+/** pin/unpin 切换(纯函数):pin 记当下时刻(菜单按 pin 时间倒序);unpin 摘掉字段回流历史,
+ *  在历史流里的位置仍看最近打开时间 */
+export function nextPinToggle(raw: unknown, path: string, ts: number): RecentProject[] {
+  const key = path.toLowerCase()
+  const next = parseRecentProjects(raw).map((r): RecentProject => {
+    if (r.p.toLowerCase() !== key) return r
+    if (r.pin === undefined) return { ...r, pin: ts }
+    return { p: r.p, n: r.n, t: r.t }
+  })
+  return capLedger(next)
+}
+
+/** 工作区菜单的分区视图(纯函数,§7.1):pin 区按 pin 时刻倒序置顶,
+ *  历史区 = 最近未 pin 的前 5 条;两区天然去重(一条账只在一区) */
+export function menuWorkspaceRows(list: RecentProject[]): {
+  pinned: RecentProject[]
+  history: RecentProject[]
+} {
+  const pinned = list.filter((r) => r.pin !== undefined).sort((a, b) => (b.pin ?? 0) - (a.pin ?? 0))
+  const history = list.filter((r) => r.pin === undefined).slice(0, 5)
+  return { pinned, history }
 }
 
 /** 手动删一条(纯函数,自测覆盖);删不存在的就当删过,列表原样 */
@@ -79,6 +132,13 @@ export function rememberRecentProject(path: string): RecentProject[] {
 /** 把某条从存档里抠掉(点 ✕ 用),返回新列表 */
 export function forgetRecentProject(path: string): RecentProject[] {
   const list = removeRecentProject(readPref<unknown>(RECENTS_KEY, null), path)
+  writeRecentProjects(list)
+  return list
+}
+
+/** pin/unpin 切换并写回(工作区菜单行首 pin 钮),返回新列表 */
+export function toggleRecentPin(path: string): RecentProject[] {
+  const list = nextPinToggle(readPref<unknown>(RECENTS_KEY, null), path, Date.now())
   writeRecentProjects(list)
   return list
 }

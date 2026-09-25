@@ -29,8 +29,8 @@
 .sash:hover::after,
 .sash:focus-visible::after,
 body.is-sash-dragging .sash::after {
-  width: 2px;
-  background: var(--accent-bright);
+  width: 4px;
+  background: var(--sash-hi);
 }
 
 body.is-sash-dragging {
@@ -90,7 +90,7 @@ body.is-sash-dragging {
   border-left: 1px solid var(--line);
 }
 
-/* 分割条:跟左栏分割条一家 —— 平时一根细线,悬停/拖动时变主题色加粗 */
+/* 分割条:跟左栏分割条一家 —— 平时一根细线,悬停/拖动时 4px 粗蓝条(§7 给定) */
 .pane-sash {
   flex: none;
   width: 5px;
@@ -117,8 +117,8 @@ body.is-sash-dragging {
 .pane-sash:hover::after,
 .pane-sash:focus-visible::after,
 body.is-sash-dragging .pane-sash::after {
-  width: 2px;
-  background: var(--accent-bright);
+  width: 4px;
+  background: var(--sash-hi);
 }
 
 .pane-sash:focus-visible {

@@ -1,8 +1,11 @@
 // 最近打开的项目自测(第八十一锤):垃圾账不炸、同路径挤旧顶新、超长滚动、删账干净、时间话术
+// UI v3 §7.1 pin 账:pin 跟着路径走、不占历史名额、菜单分区(pin 倒序 + 历史 5 条)
 import assert from 'node:assert/strict'
 import {
   RECENTS_MAX,
   formatRecentTime,
+  menuWorkspaceRows,
+  nextPinToggle,
   nextRecentProjects,
   parseRecentProjects,
   recentNameFor,
@@ -63,6 +66,68 @@ check('removeRecentProject:删谁没谁,不存在的删了也不报错', () => {
   const gone = removeRecentProject(list, 'c:\\A')
   assert.deepEqual(gone, [{ p: 'C:\\b', n: 'b', t: 2 }])
   assert.deepEqual(removeRecentProject(list, 'C:\\none'), list)
+})
+
+check('parseRecentProjects:pin 字段认得认回,垃圾 pin 当没写', () => {
+  const withPin = [{ p: 'C:\\a', n: 'a', t: 1, pin: 50 }]
+  assert.deepEqual(parseRecentProjects(withPin), withPin)
+  const badPin = [{ p: 'C:\\a', n: 'a', t: 1, pin: 'x' }]
+  assert.deepEqual(parseRecentProjects(badPin), [{ p: 'C:\\a', n: 'a', t: 1 }])
+  // pin 条目不占历史 8 条名额,不被时间淘汰
+  const mixed = [
+    ...Array.from({ length: 20 }, (_, i) => ({ p: `C:\\h${i}`, n: `h${i}`, t: i + 1 })),
+    { p: 'C:\\pin', n: 'pin', t: 0.5, pin: 7 }
+  ]
+  const parsed = parseRecentProjects(mixed)
+  assert.equal(parsed.filter((r) => r.pin !== undefined).length, 1)
+  assert.equal(parsed.filter((r) => r.pin === undefined).length, RECENTS_MAX)
+  assert.ok(
+    parsed.some((r) => r.p === 'C:\\pin'),
+    '最老的 pin 账也活着'
+  )
+})
+
+check('nextRecentProjects:重开已 pin 路径,pin 跟着路径走不丢', () => {
+  const old = [
+    { p: 'C:\\keep', n: 'keep', t: 100, pin: 50 },
+    { p: 'C:\\other', n: 'other', t: 90 }
+  ]
+  const next = nextRecentProjects(old, 'c:\\KEEP', 'keep', 200)
+  assert.deepEqual(next[0], { p: 'c:\\KEEP', n: 'keep', t: 200, pin: 50 })
+})
+
+check('nextPinToggle:pin 记时刻、unpin 摘字段回流历史', () => {
+  const old = [
+    { p: 'C:\\a', n: 'a', t: 100 },
+    { p: 'C:\\b', n: 'b', t: 90 }
+  ]
+  const pinned = nextPinToggle(old, 'C:\\a', 500)
+  assert.deepEqual(pinned[0], { p: 'C:\\a', n: 'a', t: 100, pin: 500 })
+  const back = nextPinToggle(pinned, 'C:\\a', 600)
+  assert.deepEqual(back[0], { p: 'C:\\a', n: 'a', t: 100 })
+})
+
+check('menuWorkspaceRows:pin 区按 pin 时刻倒序,历史区最多 5 条最近未 pin', () => {
+  const list = [
+    { p: 'C:\\h1', n: 'h1', t: 300 },
+    { p: 'C:\\p1', n: 'p1', t: 10, pin: 100 },
+    { p: 'C:\\h2', n: 'h2', t: 200 },
+    { p: 'C:\\p2', n: 'p2', t: 5, pin: 400 },
+    { p: 'C:\\h3', n: 'h3', t: 100 },
+    { p: 'C:\\h4', n: 'h4', t: 90 },
+    { p: 'C:\\h5', n: 'h5', t: 80 },
+    { p: 'C:\\h6', n: 'h6', t: 70 },
+    { p: 'C:\\h7', n: 'h7', t: 60 }
+  ]
+  const { pinned, history } = menuWorkspaceRows(list)
+  assert.deepEqual(
+    pinned.map((r) => r.p),
+    ['C:\\p2', 'C:\\p1'],
+    'pin 新的在前'
+  )
+  assert.equal(history.length, 5)
+  assert.deepEqual(history.map((r) => r.p).slice(0, 3), ['C:\\h1', 'C:\\h2', 'C:\\h3'])
+  assert.ok(!history.some((r) => r.pin !== undefined), '历史区不许夹 pin(两区去重)')
 })
 
 check('recentNameFor:取路径末段;盘根末段是空的,照实写回全路径', () => {

@@ -132,10 +132,6 @@
   line-height: var(--lh-165);
 }
 
-.welcome-recent .recent-undo {
-  justify-content: flex-start;
-}
-
 .welcome-disks {
   margin-top: var(--space-7);
 }

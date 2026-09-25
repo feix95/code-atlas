@@ -33,7 +33,7 @@ import {
   forgetRecentProject,
   readRecentProjects,
   rememberRecentProject,
-  writeRecentProjects,
+  toggleRecentPin,
   type RecentProject
 } from './recents'
 import { useAiChat, type ChatMessage } from './useAiChat'
@@ -54,8 +54,6 @@ const MIRROR_THROTTLE_MS = 100
 const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
 const SCAN_TOAST_MS = 4_000 // 扫描完成报个数
 const PATH_HINT_MS = 5_000 // 空路径点了「前往」的气泡提示
-const RECENT_UNDO_MS = 6_000 // 最近列表 ✕ 后的撤销窗(破坏性动作不裸奔)
-
 function App(): React.JSX.Element {
   // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
   // 树活着心跳才跳;哪天渲染期异常把整棵树卸了(2026-09-13 的 MiniMD 隐身案就是),
@@ -333,7 +331,7 @@ function App(): React.JSX.Element {
   // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
   function setShakeAndHint(): void {
     setPathShaking(true)
-    flashPathHint('先填个路径,或点「打开项目」选一个', PATH_HINT_MS)
+    flashPathHint('先填个路径,或点右边 ⇅ 挑最近打开过的', PATH_HINT_MS)
     pathInputRef.current?.focus()
   }
 
@@ -551,23 +549,13 @@ function App(): React.JSX.Element {
 
   // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
-  const [recentUndo, flashRecentUndo, dismissRecentUndo] = useFlashValue<{
-    snapshot: RecentProject[]
-    removed: RecentProject
-  } | null>(null)
-
+  // 最近列表 ✕ 即删(UI v3 §7.1:删了就是删了,旧撤销横幅链路退役),pin 钮同理即写账
   function removeRecent(path: string): void {
-    const removed = recents.find((r) => r.p === path)
-    if (!removed) return
     setRecents(forgetRecentProject(path))
-    flashRecentUndo({ snapshot: recents, removed }, RECENT_UNDO_MS)
   }
 
-  function undoRecentRemove(): void {
-    if (!recentUndo) return
-    dismissRecentUndo()
-    writeRecentProjects(recentUndo.snapshot)
-    setRecents(recentUndo.snapshot)
+  function togglePinRecent(path: string): void {
+    setRecents(toggleRecentPin(path))
   }
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
@@ -780,7 +768,10 @@ function App(): React.JSX.Element {
                 dismissPathHint={dismissPathHint}
                 goPath={goPath}
                 setPathShaking={setPathShaking}
-                goHome={goHome}
+                recents={recents}
+                onOpenWorkspace={(path) => void scanPath(path)}
+                onTogglePin={togglePinRecent}
+                onRemoveRecent={removeRecent}
                 sidebarWidth={sidebarWidth}
                 onSashPointerDown={onSashPointerDown}
                 onSashPointerMove={onSashPointerMove}
@@ -899,11 +890,9 @@ function App(): React.JSX.Element {
                     recents={recents}
                     drives={drives}
                     drivesNote={drivesNote}
-                    recentUndo={recentUndo}
                     onPick={() => void handlePick()}
                     onOpen={(path) => void scanPath(path)}
                     onRemoveRecent={removeRecent}
-                    onUndoRecent={undoRecentRemove}
                   />
                 )}
               </main>

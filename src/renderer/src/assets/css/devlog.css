@@ -232,17 +232,6 @@
 
 /* 状态栏右端的「日志」小口子:沿用取消/卸下那颗字的皮,不加新花样 */
 
-/* 最近列表删除的撤销条(第九十四锤):破坏性动作给 6 秒反悔窗 */
-.recent-undo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-  color: var(--muted);
-  font-size: var(--font-md);
-}
-
 /* 树上右键菜单已并入全局文件菜单(file-path-menu):一份实现四处共用,这里的自绘款退役 */
 
 /* 顶栏线稿图标(第一百零三锤):跟备注小笔一家,不随文字换行挤变形 */

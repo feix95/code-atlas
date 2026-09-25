@@ -1,15 +1,19 @@
-// 资源管理器式左栏(UI v3 第 2 层 · 常驻):workspace 栏(路径输入,未来的地址栏卡槽位)
+// 资源管理器式左栏(UI v3 第 2 层 · 常驻):workspace 栏(地址栏式卡 + ⇅ 菜单)
 // + 文件树 + 扫描状态脚栏,右缘一条可拖分割条。
 // 规格 §7.1「不存在空侧栏」:没开工作区时树区 = 「这台电脑」盘符列表;
 // 现在的盘符行单击即开,B8 换成资源管理器语义(单击原地展开、双击开为工作区)。
 // 「项目导览」钮按规格摘除:导览内容 = 概览页签的零状态,入口挪进 rail。
+import { useEffect, useState } from 'react'
 import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
 import { isTreePartial } from '@shared/scanCoverage'
 import { driveCapacity, driveKindName } from '../driveMeta'
+import { menuWorkspaceRows, type RecentProject } from '../recents'
+import { useMenuDismiss } from '../useMenuDismiss'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
 import { FileTree } from './FileTree'
 import { TreeIcon } from './Icons'
+import { WorkspaceMenu } from './WorkspaceMenu'
 
 export function WorkspaceSidebar({
   result,
@@ -36,7 +40,10 @@ export function WorkspaceSidebar({
   dismissPathHint,
   goPath,
   setPathShaking,
-  goHome,
+  recents,
+  onOpenWorkspace,
+  onTogglePin,
+  onRemoveRecent,
   sidebarWidth,
   onSashPointerDown,
   onSashPointerMove,
@@ -73,7 +80,14 @@ export function WorkspaceSidebar({
   dismissPathHint: () => void
   goPath: () => Promise<void>
   setPathShaking: React.Dispatch<React.SetStateAction<boolean>>
-  goHome: () => void
+  /** 工作区菜单(§7.1):recents 账本原样进,菜单内部分 pin/历史两区 */
+  recents: RecentProject[]
+  /** 菜单里点条目:直接进入该工作区(= 输路径回车的同一动作) */
+  onOpenWorkspace: (path: string) => void
+  /** 行首 pin 钮:pin ↔ unpin,账本在 App 层写 */
+  onTogglePin: (path: string) => void
+  /** 行尾 × 即删(无撤销) */
+  onRemoveRecent: (path: string) => void
   sidebarWidth: number
   onSashPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
   onSashPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void
@@ -85,17 +99,68 @@ export function WorkspaceSidebar({
   drivesNote: string | null
   onOpenDrive: (path: string) => void
 }): React.JSX.Element {
+  // ── workspace 卡 = 浏览器地址栏(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
+  //    ⇅ 钮开/收;Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
+  const [menuOpen, setMenuOpen] = useState(false)
+  // 键盘高亮行号:-1 = 还没动过方向键,Enter 还按「输入的路径」走;按下箭头才开始挑条目
+  const [menuHi, setMenuHi] = useState(-1)
+  const sections = menuWorkspaceRows(recents)
+  const flatRows = [...sections.pinned, ...sections.history]
+  useMenuDismiss(menuOpen, () => setMenuOpen(false), '.sidebar-top')
+
+  // 键盘高亮的行滚进视野(菜单超 5 条内部滚动,高亮行可能躲在视口外)
+  useEffect(() => {
+    if (!menuOpen || menuHi < 0) return
+    document.querySelector('.ws-menu .wsm-row.is-active')?.scrollIntoView({ block: 'nearest' })
+  }, [menuOpen, menuHi])
+
+  function openMenu(): void {
+    setMenuHi(-1)
+    setMenuOpen(true)
+  }
+
+  function enterMenuRow(i: number): void {
+    const row = flatRows[i]
+    if (!row) return
+    setMenuOpen(false)
+    setMenuHi(-1)
+    onOpenWorkspace(row.p)
+  }
+
+  // 路径输入框里的菜单按键:↑↓ 移动高亮,Enter 进高亮条目(没高亮就照旧开路径)
+  function onCardKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (menuOpen && e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (flatRows.length > 0) setMenuHi((hi) => (hi + 1) % flatRows.length)
+      return
+    }
+    if (menuOpen && e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (flatRows.length > 0) setMenuHi((hi) => (hi <= 0 ? flatRows.length - 1 : hi - 1))
+      return
+    }
+    if (e.key === 'Enter') {
+      if (menuOpen && menuHi >= 0 && menuHi < flatRows.length) enterMenuRow(menuHi)
+      else void goPath()
+      return
+    }
+    if (e.key === 'Escape') setPathDraft(folder ?? '')
+  }
   return (
     <>
       {/* 宽度吃 .app 上的 --sidebar-w(顶栏左段同认它,分界线上行段才对得齐);
           rem 值由 App 按 基准宽/(16×uiScale) 算好挂进 CSS 变量,坐标系只有一套 */}
       <aside className="sidebar" style={{ width: 'var(--sidebar-w)' }}>
-        {/* workspace 栏 = 路径输入栏(§7.0):回车开路径;右端 ⌂ 回「这台电脑」
-            是 B1 过渡件,B5 换成地址栏式卡 + ⇅ 菜单 */}
+        {/* workspace 栏 = 地址栏式卡(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
+            ⇅ 钮开/收两态,菜单浮层盖在文件树上(不推挤布局、宽与卡同宽) */}
         <div className="sidebar-top">
           <div
-            className={`ws-card${pathShaking ? ' is-shaking' : ''}`}
+            className={`ws-card${pathShaking ? ' is-shaking' : ''}${menuOpen ? ' is-menu-open' : ''}`}
             onAnimationEnd={() => setPathShaking(false)}
+            onClick={() => {
+              pathInputRef.current?.focus()
+              openMenu()
+            }}
           >
             <input
               ref={pathInputRef}
@@ -110,25 +175,42 @@ export function WorkspaceSidebar({
                 setPathDraft(e.target.value)
                 dismissPathHint()
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void goPath()
-                if (e.key === 'Escape') setPathDraft(folder ?? '')
-              }}
+              onKeyDown={onCardKeyDown}
             />
             <button
               type="button"
-              className="tb-btn ws-home"
-              onClick={goHome}
-              disabled={!folder || scanning}
-              title="回到「这台电脑」"
-              aria-label="回到「这台电脑」"
+              className="tb-btn ws-menu-btn"
+              disabled={scanning}
+              title={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
+              aria-label={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
+              aria-expanded={menuOpen}
+              onClick={(e) => {
+                // 点卡 = 开菜单的地址栏手感,⇅ 是明确的开关 —— 阻止冒泡别让卡的开抢戏
+                e.stopPropagation()
+                if (menuOpen) setMenuOpen(false)
+                else openMenu()
+              }}
             >
-              <TreeIcon name="home" size={18} mono />
+              <TreeIcon name={menuOpen ? 'chevronsDownUp' : 'chevronsUpDown'} size={15} mono />
             </button>
-            {pathHint && (
+            {pathHint && !menuOpen && (
               <div className="path-hint" role="status">
                 {pathHint}
               </div>
+            )}
+            {menuOpen && (
+              <WorkspaceMenu
+                pinned={sections.pinned}
+                history={sections.history}
+                highlight={menuHi}
+                onOpen={(p) => {
+                  setMenuOpen(false)
+                  setMenuHi(-1)
+                  onOpenWorkspace(p)
+                }}
+                onTogglePin={onTogglePin}
+                onRemove={onRemoveRecent}
+              />
             )}
           </div>
         </div>

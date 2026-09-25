@@ -6,8 +6,8 @@ import { NotePen, TreeIcon } from './Icons'
 import { openFilePathMenuFor } from './filePathMenuStore'
 
 /** 文件树图标总控:本树内所有 icon(文件/文件夹)共享这一个尺寸,改这里全场生效;
- *  只管这棵树,跟其他区域的图标尺寸互不相干 */
-const TREE_ICON_SIZE = 15
+ *  只管这棵树,跟其他区域的图标尺寸互不相干。UI v3 §7 ≈1.1rem = 18px@100% */
+const TREE_ICON_SIZE = 18
 
 interface TreeRowProps {
   node: ScanTreeNode
@@ -66,7 +66,6 @@ function TreeRow({
         className={`tree-row is-file${selectedPath === node.relPath ? ' is-selected' : ''}`}
         style={{ paddingLeft: `${(depth * 1.125).toFixed(4)}rem` }}
       >
-        <span className="tree-caret" aria-hidden="true" />
         <button
           type="button"
           className="tree-main"
@@ -106,7 +105,8 @@ function TreeRow({
   const dir = node
   const dirNote = notes?.[dir.relPath]
 
-  // 箭头只管展开/收起;没探过的目录,箭头才是触发扫描的唯一入口(点名字不扫)
+  // 展开/收起(UI v3 §7 摘三角:单击文件夹行 = 选中+展开一体,行首不再摆箭头);
+  // 没探过的目录,点行才是触发扫描的唯一入口
   function toggleExpand(): void {
     if (dir.lazy) {
       if (expandingPath !== dir.relPath) onExpandLazy(dir.relPath)
@@ -135,22 +135,8 @@ function TreeRow({
       >
         <button
           type="button"
-          className={`tree-caret${dir.lazy ? ' is-lazy' : ''}${expanded && !dir.lazy ? ' is-open' : ''}`}
-          aria-label={
-            dir.lazy ? `展开并扫描 ${dir.name}` : expanded ? `收起 ${dir.name}` : `展开 ${dir.name}`
-          }
-          aria-expanded={dir.lazy ? undefined : expanded}
-          onClick={toggleExpand}
-        >
-          {expandingPath === dir.relPath ? (
-            <span className="tree-spin" aria-hidden="true" />
-          ) : (
-            <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-          )}
-        </button>
-        <button
-          type="button"
           className="tree-main"
+          aria-expanded={dir.lazy ? undefined : expanded}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.setData(
@@ -163,7 +149,7 @@ function TreeRow({
             // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描。
             // 主文件夹例外(第一百三十五锤):点根 = 选中 + 保证展开,永不收起 ——
             // 收起根节点整棵树缩成光杆,没有使用价值,点它的人只想要项目概况;
-            // 真想收根节点,箭头那条路还在
+            // 真想收根节点,键盘左箭头那条路还在
             onSelectFolder(dir)
             if (dir.relPath === '') {
               if (!expanded && dir.lazy) onExpandLazy(dir.relPath)
@@ -176,7 +162,12 @@ function TreeRow({
           title={dir.summary?.text}
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name="folder" size={TREE_ICON_SIZE} />}
+            {/* 探层中的转圈挪进图标位(UI v3 摘三角后没有箭头坑位了) */}
+            {expandingPath === dir.relPath ? (
+              <span className="tree-spin" aria-hidden="true" />
+            ) : (
+              <TreeIcon name="folder" size={TREE_ICON_SIZE} />
+            )}
           </span>
           <span className="tree-name">{dir.name}</span>
           {dirNote ? (
