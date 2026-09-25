@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
-import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { TreeIcon } from './Icons'
 import { isMenuKind, KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
 import { useMenuDismiss } from '../useMenuDismiss'
+import { startWindowDrag } from '../windowDrag'
 
 /** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
 export interface TabBarTab {
@@ -18,50 +18,11 @@ export interface TabBarTab {
  * 钉住的页签最左换成图钉小图标(她图的「左上角 pin icon」),树里换文件它不动;
  * 没钉的页签跟着左侧树走,点谁显示谁。页签卡之间的空白区域右键,
  * 弹品类菜单:勾选 = 显示这个品类的页签,不选 = 藏起来(全局开关,记进本机)。
- * 页签可以拖:拖到别的页签上换位置,拖到另一组的页签栏/正文里就是搬家(积木式拼装)。
- * 中键点页签 = 关闭。页签多了横向滚。
+ * 拖拽走 TopBarTabs 的 pointer 引擎:这里只上报 pointerdown 和画让位缝 ——
+ * 被拖的签原地塌缩成空位,缝用 margin 过渡撑开(VS Code 式让位手感)。
+ * 中键点页签 = 关闭。页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
+ * (顶栏死空间/日志窗头条共用同一套)。
  */
-/** 页签尾空白的左键拖窗:这块地铺不了 app-region:drag(右键菜单+拖放落点会被吞),
- *  改手动搬窗 —— 位移攒够 4px 阈值才算拖(免得最大化下点一下就把窗还原),
- *  之后把屏幕坐标增量报给主进程 setPosition;指针捕获让光标甩出窗也能继续跟手 */
-function startWindowDrag(e: React.PointerEvent<HTMLDivElement>): void {
-  if (e.button !== 0) return
-  const el = e.currentTarget
-  el.setPointerCapture(e.pointerId)
-  const startX = e.screenX
-  const startY = e.screenY
-  let lastX = startX
-  let lastY = startY
-  let accX = 0
-  let accY = 0
-  let dragging = false
-  const move = (ev: PointerEvent): void => {
-    const dx = ev.screenX - lastX
-    const dy = ev.screenY - lastY
-    lastX = ev.screenX
-    lastY = ev.screenY
-    if (!dragging) {
-      accX += dx
-      accY += dy
-      if (Math.abs(accX) + Math.abs(accY) < 4) return
-      dragging = true
-      window.atlas.windowDragStart(startX, startY)
-      window.atlas.windowDragMove(accX, accY)
-      accX = 0
-      accY = 0
-      return
-    }
-    if (dx !== 0 || dy !== 0) window.atlas.windowDragMove(dx, dy)
-  }
-  const done = (): void => {
-    el.removeEventListener('pointermove', move)
-    el.removeEventListener('pointerup', done)
-    el.removeEventListener('pointercancel', done)
-  }
-  el.addEventListener('pointermove', move)
-  el.addEventListener('pointerup', done)
-  el.addEventListener('pointercancel', done)
-}
 
 export function TabBar({
   tabs,
@@ -72,11 +33,14 @@ export function TabBar({
   onClose,
   onPinToggle,
   onMoveTab,
-  onDragTab,
-  onTabDragEnd,
   onDetachTab,
   enabledKinds,
-  onToggleKind
+  onToggleKind,
+  dragSourceId,
+  gapIndex,
+  gapWidth,
+  insertX,
+  onTabPointerDown
 }: {
   tabs: TabBarTab[]
   activeId: string | null
@@ -87,25 +51,25 @@ export function TabBar({
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onPinToggle: (id: string) => void
-  /** 挪页签:toGroup 空 = 另一组(单组时=往右拆新组); atIndex 空 = 放到那组末尾 */
+  /** 挪页签(右键菜单走这条路;拖拽的落点账在 TopBarTabs 引擎里算) */
   onMoveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
-  /** 拖动开始/结束喊一声(App 要知道谁在拖,好判定「中心分屏」该不该许诺) */
-  onDragTab: (id: string | null) => void
-  /** 拖动落定喊一声是哪张(走出面板锤:拖出主窗松手 = 放出小探针,App 拿它判品类) */
-  onTabDragEnd?: (id: string) => void
   /** 右键菜单「放到桌面」:不拖也放(走出面板锤补,小葵点的名),只对小探针页签显示 */
   onDetachTab?: (id: string) => void
   enabledKinds: Set<PaneKind>
   onToggleKind: (kind: PaneKind, on: boolean) => void
+  /** 正被 pointer 引擎拎着的页签 id:它在这条带里原地塌缩成空位 */
+  dragSourceId: string | null
+  /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开 */
+  gapIndex: number | null
+  gapWidth: number
+  /** 蓝色插入线的带内 x(px):钉在缝口上告诉用户「会插到这」 */
+  insertX: number | null
+  /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
+  onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   // 页签上的右键菜单:挪组 / 关闭(记下是哪张页签)
   const [tabMenu, setTabMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
-  // 拖拽悬停的目标页签:画一条左边线提示「会插到它前面」
-  const [dropBefore, setDropBefore] = useState<string | null>(null)
-  const [dropZone, setDropZone] = useState(false)
-  // 拖动中的页签(本组还是别组,松手时要知道:拖回自己组的空白 = 挪到本组末尾,不是搬家)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
   const closeMenus = useCallback((): void => {
     setMenu(null)
     setTabMenu(null)
@@ -135,28 +99,21 @@ export function TabBar({
     })
   }
 
+  // 落点缝的落法:缝序号按「剔除被拖签」的可见序 —— 缝前那张签吃 margin-left,
+  // 缝在末尾时最后一张吃 margin-right(空白带本来就是空地,但划道缝更明确)
+  const effTabs = dragSourceId ? tabs.filter((t) => t.id !== dragSourceId) : tabs
+  const gapAnchor = gapIndex !== null ? effTabs[gapIndex] : undefined
+  const gapTail = gapIndex !== null && !gapAnchor ? effTabs[effTabs.length - 1] : undefined
+  // 右键菜单里点名的那张签:钉住/取消钉住、放到桌面这些「对谁动手」的项都按它判
+  const menuTab = tabMenu ? (tabs.find((x) => x.id === tabMenu.tabId) ?? null) : null
+
   return (
     <div
-      className={`tabbar${dropZone ? ' is-drop-zone' : ''}`}
+      className={`tabbar${dragSourceId ? ' is-dnd-live' : ''}`}
       role="tablist"
       aria-label="已打开的页签"
-      onDragOver={(e) => {
-        // 拖着页签扫过整条页签栏(含空白):按住入场券,松手落到这组末尾
-        if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          setDropBefore(null)
-        }
-      }}
     >
       {tabs.map((t) => {
-        const title = !isMenuKind(t.kind)
-          ? `${t.name} —— 单例功能签,全系统只此一张`
-          : t.pinned
-            ? t.kind === 'chat'
-              ? `${t.name} —— 这页对话钉住了,树里换文件它不动;对话没了就是没了,关页签前想好`
-              : `${t.name} —— 已钉住,树里换文件它不动;双击可以取消钉住`
-            : `${t.name} —— 跟着左侧树走,点谁它显示谁;双击钉住`
         return (
           <div
             key={t.id}
@@ -165,42 +122,16 @@ export function TabBar({
             aria-selected={t.id === activeId}
             className={`tabbar-tab${t.id === activeId ? ' is-active' : ''}${t.pinned ? ' is-pinned' : ' is-follow'}${
               t.id === flashId ? ' is-flash' : ''
-            }${dropBefore === t.id ? ' is-drop-before' : ''}`}
-            data-tip={title}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData(DRAG_MIME_TAB, t.id)
-              e.dataTransfer.effectAllowed = 'move'
-              setDraggingId(t.id)
-              onDragTab(t.id)
-            }}
-            onDragOver={(e) => {
-              if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
-                e.preventDefault()
-                e.stopPropagation()
-                e.dataTransfer.dropEffect = 'move'
-                setDropBefore(t.id)
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              const id = e.dataTransfer.getData(DRAG_MIME_TAB)
-              setDropBefore(null)
-              setDropZone(false)
-              if (id && id !== t.id) {
-                const at = tabs.findIndex((x) => x.id === t.id)
-                onMoveTab(id, null, at === -1 ? null : at)
-              }
-            }}
-            onDragEnd={() => {
-              setDropBefore(null)
-              setDropZone(false)
-              setDraggingId(null)
-              onDragTab(null)
-              // 落定上报:拖出主窗放出小探针这类「落点语义」由 App 判,这里只报是谁
-              onTabDragEnd?.(t.id)
-            }}
+            }${t.id === dragSourceId ? ' is-drag-source' : ''}`}
+            data-tab-id={t.id}
+            style={
+              t.id === gapAnchor?.id
+                ? { marginLeft: gapWidth }
+                : t.id === gapTail?.id
+                  ? { marginRight: gapWidth }
+                  : undefined
+            }
+            onPointerDown={(e) => onTabPointerDown(e, t)}
             onClick={() => onActivate(t.id)}
             onDoubleClick={() => onPinToggle(t.id)}
             onContextMenu={(e) => openTabMenu(e, t.id)}
@@ -236,30 +167,20 @@ export function TabBar({
           </div>
         )
       })}
-      {/* 页签卡之间的空白:右键弹品类菜单(小葵图里的「空白区域」);也是拖页签搬家的落点。
-          自己组的页签拖回来 = 挪到本组末尾;别组的页签 = 搬家。
+      {/* 页签卡之间的空白:右键弹品类菜单(小葵图里的「空白区域」);
+          拖页签扫到这 = 落本组末尾(引擎按中线序判,空白不用自己接);
           左键按住拖 = 手动搬窗(等价原生 drag 面),双击 = 最大化/还原 */}
       <div
         className="tabbar-blank"
         onContextMenu={openKindMenu}
         onPointerDown={startWindowDrag}
         onDoubleClick={() => void window.atlas.windowMaximizeToggle()}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'move'
-            setDropZone(true)
-            setDropBefore(null)
-          }
-        }}
-        onDrop={(e) => {
-          const id = e.dataTransfer.getData(DRAG_MIME_TAB)
-          setDropZone(false)
-          if (id) onMoveTab(id, draggingId === id ? null : 'sibling', null)
-        }}
-        onDragLeave={() => setDropZone(false)}
         aria-hidden="true"
       />
+      {/* 插入线:钉在落点缝口上的主题色竖线,光标一动跟缝一起滑(Edge 式提示) */}
+      {insertX !== null && (
+        <div className="tabbar-insert" style={{ left: insertX }} aria-hidden="true" />
+      )}
       {menu && (
         <div
           className="tabbar-kindmenu"
@@ -300,6 +221,21 @@ export function TabBar({
           aria-label="页签操作"
           style={{ left: tabMenu.x, top: tabMenu.y }}
         >
+          {menuTab && isMenuKind(menuTab.kind) && (
+            // 钉住/取消钉住的明门:双击是暗门,菜单给条能发现的路;
+            // 钉住的对话签点了走 pinToggleTab 的拒绝路 —— 浮条会说为什么不行
+            <button
+              type="button"
+              role="menuitem"
+              className="kindmenu-item"
+              onClick={() => {
+                onPinToggle(menuTab.id)
+                setTabMenu(null)
+              }}
+            >
+              {menuTab.pinned ? '取消钉住' : '钉住页签'}
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -311,22 +247,19 @@ export function TabBar({
           >
             {canMoveToSiblingGroup ? '挪去另一组' : '挪去右边,拆成两组'}
           </button>
-          {(() => {
-            const t = tabs.find((x) => x.id === tabMenu.tabId)
-            return t?.kind === 'chat' && !t.pinned ? (
-              <button
-                type="button"
-                role="menuitem"
-                className="kindmenu-item"
-                onClick={() => {
-                  onDetachTab?.(t.id)
-                  setTabMenu(null)
-                }}
-              >
-                把小探针放到桌面上
-              </button>
-            ) : null
-          })()}
+          {menuTab?.kind === 'chat' && !menuTab.pinned && (
+            <button
+              type="button"
+              role="menuitem"
+              className="kindmenu-item"
+              onClick={() => {
+                onDetachTab?.(menuTab.id)
+                setTabMenu(null)
+              }}
+            >
+              把小探针放到桌面上
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"

@@ -147,12 +147,12 @@ try {
   await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
-  // Ctrl+滚轮缩放(网页惯例):向上滚放大一档(105%),Ctrl+0 归 100%;落盘走 setUiScale 原路
+  // Ctrl+滚轮缩放(网页惯例):向上滚放大一档(105%),Ctrl+0 归 100%;落盘走 setUiScale 原路。
+  // (扫完报数的 .scan-toast 机制已随页签打磨批摘除 —— 断言落在功能本体:根字号真变大)
   await page.mouse.move(800, 500)
   await page.keyboard.down('Control')
   await page.mouse.wheel(0, -240)
   await page.keyboard.up('Control')
-  await page.locator('.scan-toast').filter({ hasText: '界面大小' }).waitFor()
   const zoomedPx = await page.evaluate(() => parseFloat(document.documentElement.style.fontSize))
   assert.ok(zoomedPx > 16, 'ctrl+wheel up must raise root font size')
   await page.keyboard.down('Control')
@@ -270,6 +270,8 @@ try {
   // UI v3(B7):顶栏深搜——词一进,树区整体换成结果清单;文件命中补探父链后开预览页签;
   // 空账照实说;文件夹命中打开为工作区(地址栏同一条路);清空词文件树原样回来
   const searchBox = page.getByRole('searchbox', { name: '搜索文件', exact: true })
+  // 顶栏搜索是默认收起的放大镜:输入框 max-width:0+opacity:0,悬停才展开 —— 先悬停再填
+  await page.locator('.tb-search').hover()
   await searchBox.fill('guide')
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
@@ -340,7 +342,14 @@ try {
   await control({ holdGraph: false, configured: true })
   assert.ok(!(await page.locator('.guide-body').innerText()).includes('old-project-only.ts'))
   await page.reload()
-  await home()
+  // 会话复现(Obsidian 式):重开不回首页,还原关门前的工作区+页签 —— 应停在 second 的导览
+  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  assert.ok(
+    (await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()).endsWith(
+      'second'
+    ),
+    'reload must restore the last workspace (session replay)'
+  )
   await open(project)
   await selectMain()
   await page.locator('.ai-card').getByRole('button', { name: '解释这个文件', exact: true }).click()

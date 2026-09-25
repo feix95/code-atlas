@@ -19,7 +19,7 @@
   padding: 0.5rem 0.75rem 0.5rem 1rem;
   border-bottom: 1px solid var(--line);
   background: var(--surface-soft); /* 跟主题走:写死浅渐变会在暗色主题下把浅字糊掉(实测) */
-  -webkit-app-region: drag; /* 整条能拖窗;里面的按钮单独 no-drag */
+  /* 拖窗走手动引擎(windowDrag.ts 挂在 JSX 上):不铺 app-region:drag,免吃 Aero Shake */
 }
 
 .devlog-title {

@@ -44,6 +44,7 @@ import { useSidebarSash } from './useSidebarSash'
 import { useWheelZoom } from './useWheelZoom'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
+import { useSessionRestore } from './useSessionRestore'
 import { useNavStack } from './useNavStack'
 import { usePreviewRefs } from './usePreviewRefs'
 import { useFlashFlag, useFlashValue } from './useFlashFlag'
@@ -57,6 +58,7 @@ const MIRROR_THROTTLE_MS = 100
 /** 轻提示各养各的体感时长(P2-6 具名):不共用一张表,但每个数都得有名有姓 */
 const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
 const PATH_HINT_MS = 5_000 // 空路径点了「前往」的气泡提示
+
 function App(): React.JSX.Element {
   // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
   // 树活着心跳才跳;哪天渲染期异常把整棵树卸了(2026-09-13 的 MiniMD 隐身案就是),
@@ -657,16 +659,16 @@ function App(): React.JSX.Element {
   const {
     groups,
     setGroups,
+    activeGroupId,
     setActiveGroupId,
     activeGroup,
     activeTabObj,
     visibleOfGroup,
     enabledKinds,
     flashTabId,
+    paneNote,
     dismissTabFlash,
     paneSplit,
-    draggingTab,
-    setDraggingTab,
     dropMark,
     setDropMark,
     resetPaneTabs,
@@ -683,8 +685,7 @@ function App(): React.JSX.Element {
     applyPaneSplit,
     onPaneSashDown,
     onTabDragEnd,
-    onDetachTab,
-    showDropHint
+    onDetachTab
   } = usePaneTabs({
     result,
     selectedFile,
@@ -725,21 +726,32 @@ function App(): React.JSX.Element {
     saveNote
   })
 
-  // 分屏正文区(工作区/无工作区共用一份):无工作区时只有单例签(设置/图谱)能立组,
+  // 会话复现(Obsidian 式):开机还原上次的工作区+页签布局,账目变动防抖落账 ——
+  // 生命周期接线收在 useSessionRestore(存档本体在 sessionState.ts)
+  useSessionRestore({
+    folder,
+    groups,
+    activeGroupId,
+    selectedFile,
+    selectedFolder,
+    setGroups,
+    setActiveGroupId,
+    setSelectedFile,
+    setSelectedFolder,
+    setRevealPaths,
+    scanPath
+  })
+
   // 顶栏页签带照常对齐,正文就是那张签
   const paneGroupsEl = (
     <PaneGroups
       groups={groups}
       freechatHost={freechatHost}
-      moveTab={moveTab}
       setActiveGroupId={setActiveGroupId}
       dropMark={dropMark}
-      setDropMark={setDropMark}
-      draggingTab={draggingTab}
       onPaneSashDown={onPaneSashDown}
       applyPaneSplit={applyPaneSplit}
       paneSplit={paneSplit}
-      showDropHint={showDropHint}
       result={result}
       previewRefs={previewRefs}
       removePreviewRef={removePreviewRef}
@@ -813,6 +825,13 @@ function App(): React.JSX.Element {
               正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
             </div>
           )}
+          {paneNote && (
+            // 「不能这么干」浮条:页签层的拒绝(钉住的对话不拆钉这类)得摆在眼前 ——
+            // 复用 revive-note 的浮动位,琥珀=「留个心眼」档,不是报错
+            <div className="revive-note" role="status">
+              {paneNote}
+            </div>
+          )}
           <AppTopBar
             scanning={scanning}
             hasWorkspace={result !== null}
@@ -835,7 +854,7 @@ function App(): React.JSX.Element {
                   closeTab={closeTab}
                   pinToggleTab={pinToggleTab}
                   moveTab={moveTab}
-                  setDraggingTab={setDraggingTab}
+                  setDropMark={setDropMark}
                   onTabDragEnd={onTabDragEnd}
                   onDetachTab={onDetachTab}
                   enabledKinds={enabledKinds}

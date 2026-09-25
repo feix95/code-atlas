@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DevLogEntry, DevLogSource } from '../../shared/types.ts'
 import { DEVLOG_MAX, devLogSourceName, formatDevLogTime } from '../../shared/devlog.ts'
 import { useFlashValue } from './useFlashFlag'
+import { isDeadSpace, startWindowDrag } from './windowDrag'
 
 type SourceFilter = 'all' | DevLogSource
 
@@ -97,7 +98,13 @@ export function DevLogsPage(): React.JSX.Element {
 
   return (
     <div className="devlog">
-      <header className="devlog-head">
+      {/* 头条拖窗走手动引擎:原生 drag 会吃 Aero Shake;按钮/文字不接管 */}
+      <header
+        className="devlog-head"
+        onPointerDown={(e) => {
+          if (isDeadSpace(e.target)) startWindowDrag(e)
+        }}
+      >
         <span className="devlog-title">
           Developer 日志
           <small>引擎原话 · 请求报账 · 应用记账 —— 只记元数据,问题内容不进账</small>

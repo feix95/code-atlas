@@ -127,6 +127,8 @@ export function TooltipHost(): React.JSX.Element | null {
     let cur: HTMLElement | null = null
 
     const show = (t: TipTarget): void => {
+      // 亮相前最后查一次岗:预约时没拖,开火时拖起来了也拦得住(预约在阈值前、开火在拖拽中)
+      if (document.body.classList.contains('is-tab-dragging')) return
       t.id = ++tipSeq
       tipRef.current = t
       setTip(t)
@@ -139,6 +141,9 @@ export function TooltipHost(): React.JSX.Element | null {
     }
 
     const plan = (el: HTMLElement): void => {
+      // 页签拖拽中禁亮:指针捕获把 mouseover 全路由给源签,
+      // 不拦的话按住拖一会儿提示又冒出来(小葵截图里的悬浮气泡)
+      if (document.body.classList.contains('is-tab-dragging')) return
       const t = readTip(el)
       if (!t) return
       // 已亮着 → 相邻提示源之间游走即时接力,不用每次等延迟
@@ -178,6 +183,9 @@ export function TooltipHost(): React.JSX.Element | null {
     document.addEventListener('scroll', hide, true)
     document.addEventListener('mousedown', hide)
     document.addEventListener('wheel', hide, true)
+    // 页签拖拽开工清场:按住页签熬满延迟刚亮、紧跟着拖起来的那颗提示靠它收
+    // (捕获期 mouseout 全被拐回源签,常规收摊链路在拖拽里是聋的)
+    document.addEventListener('atlas:tab-drag-start', hide)
     window.addEventListener('blur', hide)
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') hide()
@@ -192,6 +200,7 @@ export function TooltipHost(): React.JSX.Element | null {
       document.removeEventListener('scroll', hide, true)
       document.removeEventListener('mousedown', hide)
       document.removeEventListener('wheel', hide, true)
+      document.removeEventListener('atlas:tab-drag-start', hide)
       window.removeEventListener('blur', hide)
       document.removeEventListener('keydown', onKey)
     }

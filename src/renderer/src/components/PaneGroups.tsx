@@ -1,8 +1,8 @@
 // 页签组区(UI v3):页签带已上顶栏(TopBarTabs),这里只剩正文分屏 ——
-// 一到两组正文,中间分割条调比例;页签拖到正文中心 = 分屏/挪组。
+// 一到两组正文,中间分割条调比例;页签拖拽的落点判定在 TopBarTabs 引擎,
+// 这里只管照 dropMark 亮提示:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏。
 import { Fragment } from 'react'
 import type { ChatCodeRef, FreechatHost, ScanResult } from '@shared/types'
-import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { PaneEmptyBoard, PinnedChatPane } from './TabBody'
@@ -10,15 +10,11 @@ import { PaneEmptyBoard, PinnedChatPane } from './TabBody'
 export function PaneGroups({
   groups,
   freechatHost,
-  moveTab,
   setActiveGroupId,
   dropMark,
-  setDropMark,
-  draggingTab,
   onPaneSashDown,
   applyPaneSplit,
   paneSplit,
-  showDropHint,
   result,
   previewRefs,
   removePreviewRef,
@@ -29,16 +25,12 @@ export function PaneGroups({
 }: {
   groups: PaneGroup[]
   freechatHost: FreechatHost
-  /** 页签拖到正文中心松手 = 分屏/挪组(顶栏页签带过来的拖,落点在正文) */
-  moveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
-  dropMark: { groupId: string; center: boolean } | null
-  setDropMark: React.Dispatch<React.SetStateAction<{ groupId: string; center: boolean } | null>>
-  draggingTab: string | null
+  /** 引擎只在「松手有动作」的落点上设它:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏 */
+  dropMark: { groupId: string; zone: 'center' | 'left' | 'right' } | null
   onPaneSashDown: (e: React.PointerEvent<HTMLDivElement>) => void
   applyPaneSplit: (v: number) => void
   paneSplit: number
-  showDropHint: (groupId: string) => boolean
   /** 扫描结果(可空):无工作区时这里也能渲染 —— 单例签(设置/图谱)不吃工作区 */
   result: ScanResult | null
   previewRefs: ChatCodeRef[]
@@ -89,40 +81,7 @@ export function PaneGroups({
               }
               onPointerDown={() => setActiveGroupId(g.id)}
             >
-              <div
-                className={`pane-body${dropMark?.groupId === g.id && dropMark.center ? ' is-drop-center' : ''}`}
-                onDragOver={(e) => {
-                  // 只认页签拖拽;树里拖文件挂引用走的是另一个 mime,不掺和
-                  if (!e.dataTransfer.types.includes(DRAG_MIME_TAB)) return
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  const host = e.currentTarget.getBoundingClientRect()
-                  // 中心判定(小葵拍的):横竖各取正中一半,松手在这儿才分屏
-                  const inCenter =
-                    e.clientX > host.left + host.width * 0.25 &&
-                    e.clientX < host.right - host.width * 0.25 &&
-                    e.clientY > host.top + host.height * 0.25 &&
-                    e.clientY < host.bottom - host.height * 0.25
-                  setDropMark((prev) =>
-                    prev?.groupId === g.id && prev.center === inCenter
-                      ? prev
-                      : { groupId: g.id, center: inCenter }
-                  )
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropMark(null)
-                }}
-                onDrop={(e) => {
-                  const id = e.dataTransfer.getData(DRAG_MIME_TAB) || draggingTab
-                  const center = dropMark?.groupId === g.id && dropMark.center
-                  const fromG = id ? groups.find((grp) => grp.tabs.some((t) => t.id === id)) : null
-                  setDropMark(null)
-                  if (!id || !center || !fromG) return
-                  // 中心松手 = 分屏判定(小葵拍的):别组页签拖来 = 挪来这一组;
-                  // 自己组页签 + 只有单组 = 拆成两栏;两组还往自己组中心拖 = 什么也不发生
-                  if (fromG.id !== g.id || groups.length === 1) moveTab(id, 'sibling', null)
-                }}
-              >
+              <div className="pane-body" data-group-id={g.id}>
                 {act && !(act.kind === 'chat' && act.pinned) && act.kind !== 'settings' ? (
                   // 每组正房只住一个房间(VS Code 的克制);钉住的对话和设置签走下面的保活层
                   renderTabBody(act)
@@ -130,11 +89,18 @@ export function PaneGroups({
                   // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
                   <PaneEmptyBoard />
                 ) : null}
-                {dropMark?.groupId === g.id && dropMark.center && showDropHint(g.id) && (
+                {dropMark?.groupId === g.id && dropMark.zone === 'center' && (
                   <div className="pane-drop-hint" aria-hidden="true">
                     {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
                   </div>
                 )}
+                {/* 边缘分屏许诺:亮贴近的那半边(分组只长横排,只许左右缘 —— 小葵的二期手势) */}
+                {dropMark?.groupId === g.id &&
+                  (dropMark.zone === 'left' || dropMark.zone === 'right') && (
+                    <div className={`pane-drop-edge is-${dropMark.zone}`} aria-hidden="true">
+                      {dropMark.zone === 'left' ? '松手,拆到左半屏' : '松手,拆到右半屏'}
+                    </div>
+                  )}
                 {/* 设置签保活层:切去别的页签只藏不拆 —— 改到一半的草稿(配色/缩放/AI 配置)
                     还得在;关掉页签才卸载,卸载清理把预览退回存档(SettingsPage 里兜底) */}
                 {g.tabs

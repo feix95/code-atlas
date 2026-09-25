@@ -141,6 +141,35 @@ body.is-sash-dragging .pane-sash::after {
   pointer-events: none;
 }
 
+/* 拖到正文左右缘:贴近的那半边亮定向分屏许诺(「拆到左/右半屏」),
+   半边取 pane-drop-hint 同款的内缩+虚线,别跟中心框的画法分家 */
+.pane-drop-edge {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  z-index: var(--z-pane-hint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent-bright);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent-bright);
+  font-size: var(--font-md);
+  pointer-events: none;
+}
+
+.pane-drop-edge.is-left {
+  left: 2%;
+  right: 50%;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.pane-drop-edge.is-right {
+  right: 2%;
+  left: 50%;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
 /* 预览品类还没装文件(空槽)/文件没了:一句指路,不装死 */
 .pane-hint {
   flex: 1;

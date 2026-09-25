@@ -32,36 +32,55 @@ export function registerShellIpc(): void {
   )
 
   // 页签尾空白的手动搬窗:那块地是右键菜单+拖放落点的地盘,铺不了 app-region:drag
-  // (drag 区不吃 contextmenu/dragover),渲染层改报屏幕坐标,主进程 setPosition。
-  // start 只在最大化时有活:先还原,窗顶回工作区顶,光标保持它在条上的水平比例位
+  // (drag 区不吃 contextmenu/dragover),渲染层改报光标的绝对屏幕坐标,主进程挪窗。
+  // ⚠ 雷区档案②(第九十锤实证):150% 缩放下每写一次 bounds 窗体偷长 1px
+  // (DIP↔物理像素取整偏差,黑匣子 1432x969→1700x1250 连涨 380 次)——
+  // 治法:拖窗起点锁一份基准矩形,尺寸恒写它(偷长收敛于一处不回读),
+  // 位置按「基准 + 总位移」绝对回放,不攒增量不喂回声。
+  // start 只在最大化时有额外活:先还原,窗顶回工作区顶,光标保持它在条上的水平比例位
+  let dragBase: {
+    bx: number
+    by: number
+    w: number
+    h: number
+    cx: number
+    cy: number
+    lx: number
+    ly: number
+  } | null = null
+  const isXY = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
   ipcMain.on(CH.windowDragStart, (event, x: unknown, y: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win || win.isDestroyed() || !win.isMaximized()) return
-    if (
-      typeof x !== 'number' ||
-      typeof y !== 'number' ||
-      !Number.isFinite(x) ||
-      !Number.isFinite(y)
-    )
+    if (!win || win.isDestroyed() || !isXY(x) || !isXY(y)) return
+    if (win.isMaximized()) {
+      const before = win.getBounds()
+      win.unmaximize()
+      const restored = win.getBounds()
+      const ratio = before.width > 0 ? Math.min(1, Math.max(0, (x - before.x) / before.width)) : 0.5
+      const bx = Math.round(x - restored.width * ratio)
+      const by = before.y
+      win.setBounds({ x: bx, y: by, width: restored.width, height: restored.height })
+      dragBase = { bx, by, w: restored.width, h: restored.height, cx: x, cy: y, lx: bx, ly: by }
       return
-    const before = win.getBounds()
-    win.unmaximize()
-    const w = win.getBounds().width
-    const ratio = before.width > 0 ? Math.min(1, Math.max(0, (x - before.x) / before.width)) : 0.5
-    win.setPosition(Math.round(x - w * ratio), before.y)
+    }
+    const b = win.getBounds()
+    dragBase = { bx: b.x, by: b.y, w: b.width, h: b.height, cx: x, cy: y, lx: b.x, ly: b.y }
   })
-  ipcMain.on(CH.windowDragMove, (event, dx: unknown, dy: unknown) => {
+  ipcMain.on(CH.windowDragMove, (event, x: unknown, y: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win || win.isDestroyed() || win.isMaximized()) return
-    if (
-      typeof dx !== 'number' ||
-      typeof dy !== 'number' ||
-      !Number.isFinite(dx) ||
-      !Number.isFinite(dy)
-    )
+    if (!win || win.isDestroyed() || win.isMaximized() || !isXY(x) || !isXY(y)) return
+    if (!dragBase) {
+      // 漏了 start(不该发生,兜底):以当下为基线,这一帧不挪
+      const b = win.getBounds()
+      dragBase = { bx: b.x, by: b.y, w: b.width, h: b.height, cx: x, cy: y, lx: b.x, ly: b.y }
       return
-    const [x, y] = win.getPosition()
-    win.setPosition(Math.round(x + dx), Math.round(y + dy))
+    }
+    const nx = Math.round(dragBase.bx + (x - dragBase.cx))
+    const ny = Math.round(dragBase.by + (y - dragBase.cy))
+    if (nx === dragBase.lx && ny === dragBase.ly) return // 原地不写(雷区①回声)
+    win.setBounds({ x: nx, y: ny, width: dragBase.w, height: dragBase.h })
+    dragBase.lx = nx
+    dragBase.ly = ny
   })
 
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null

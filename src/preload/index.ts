@@ -109,12 +109,14 @@ const atlasApi = {
   windowMinimize: (): Promise<void> => ipcRenderer.invoke(CH.windowMinimize),
   windowMaximizeToggle: (): Promise<boolean> => ipcRenderer.invoke(CH.windowMaximizeToggle),
   windowIsMaximized: (): Promise<boolean> => ipcRenderer.invoke(CH.windowIsMaximized),
-  /** 页签尾空白的手动搬窗(send 配 on):start=按下的屏幕坐标(最大化会先还原),move=位移增量 */
+  /** 手动搬窗(send 配 on,顶栏死空间/页签尾空白/日志窗头条共用):
+      start=按下点的屏幕坐标(最大化会先还原落位),move=光标的绝对屏幕坐标 —
+      不报增量:主进程按「基线矩形+总位移」回放,躲开 150% 缩放下 bounds 逐写逐长 */
   windowDragStart: (x: number, y: number): void => {
     ipcRenderer.send(CH.windowDragStart, x, y)
   },
-  windowDragMove: (dx: number, dy: number): void => {
-    ipcRenderer.send(CH.windowDragMove, dx, dy)
+  windowDragMove: (x: number, y: number): void => {
+    ipcRenderer.send(CH.windowDragMove, x, y)
   },
   /** 订阅最大化/还原状态变化;返回退订函数,组件卸载时调用 */
   onWindowMaximized: (callback: (maximized: boolean) => void): (() => void) => {

@@ -20,6 +20,7 @@ import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
 
 const FLASH_TAB_MS = 1_200 // 系统自动勾回品类时页签闪一下指路
+const PANE_NOTE_MS = 4_500 // 「不能这么干」浮条:比闪签久一点,够把一行话读完
 
 export function usePaneTabs(deps: {
   result: ScanResult | null
@@ -38,21 +39,18 @@ export function usePaneTabs(deps: {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   // 左右两组的比例(左边占多少),分割条拖完记进本机
   const [paneSplit, setPaneSplit] = useState(loadPaneSplit)
-  // 拖页签时的落点标记:正悬在哪个组的正文中心(中心松手=分屏/挪组,边缘松手=什么也不发生)
-  const [dropMark, setDropMark] = useState<{ groupId: string; center: boolean } | null>(null)
-  // 正被拖着的页签(dragOver 时浏览器不给读 dataTransfer,来源判断全靠它)
-  const [draggingTab, setDraggingTab] = useState<string | null>(null)
-
-  // 正文中心的分屏提示只在该有动作的时候亮:单组拆两栏,或拖的是别组页签;
-  // 两组还拖自己组的页签在自己组中心晃,松手也没动作,就不许诺空头支票
-  function showDropHint(groupId: string): boolean {
-    if (!draggingTab) return false
-    if (groups.length === 1) return true
-    return groups.some((g) => g.id !== groupId && g.tabs.some((t) => t.id === draggingTab))
-  }
+  // 拖页签时的落点标记:正悬在哪个组正文的哪个区 —— 中心(拆两栏/挪组)或左右缘(定向拆半屏)。
+  // 指针拖拽引擎(TopBarTabs)只在松手有动作时才设它,PaneGroups 见标记就亮提示,不用二次判
+  const [dropMark, setDropMark] = useState<{
+    groupId: string
+    zone: 'center' | 'left' | 'right'
+  } | null>(null)
   const [enabledKinds, setEnabledKinds] = useState<Set<PaneKind>>(loadEnabledKinds)
   // 系统自动勾回品类时刚点亮的那张页签:轻强调一下让用户察觉(小葵点的,别做得太静默)
   const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
+  // 「不能这么干」的浮条:页签层的拒绝(chat.note 丢进公用场看不见 —— 钉住的对话签
+  // 装着自己的对话实例)。拒绝必须摆在眼前,不然体感就是「功能坏了」
+  const [paneNote, flashPaneNote] = useFlashValue<string | null>(null)
 
   // 自由对话的公用场(第一百二十四锤的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
   // 换文件、换文件夹、切页签,聊天记录都活着;钉住对话页签时才把记录分家给新页签
@@ -316,9 +314,15 @@ export function usePaneTabs(deps: {
     }
   }
 
-  // 挪页签(拖拽/页签右键「挪组」):toGroup='sibling' 去另一组(单组时=往右拆一组),
-  // atIndex 空 = 落到那组末尾;搬空的组自己消亡,聚焦跟到目标组
-  function moveTab(id: string, toGroup: 'sibling' | null, atIndex: number | null): void {
+  // 挪页签(拖拽/页签右键「挪组」):toGroup='sibling' 去另一组(单组时=拆一组,默认落右,
+  // splitSide='left' 时新组立左 —— 页签拖到左缘就是奔那边去的),atIndex 空 = 落到那组末尾;
+  // 搬空的组自己消亡,聚焦跟到目标组
+  function moveTab(
+    id: string,
+    toGroup: 'sibling' | null,
+    atIndex: number | null,
+    splitSide: 'left' | 'right' = 'right'
+  ): void {
     const from = groups.find((g) => g.tabs.some((t) => t.id === id))
     if (!from) return
     let dstId = from.id
@@ -328,7 +332,7 @@ export function usePaneTabs(deps: {
         dstId = other.id
       } else if (groups.length === 1 && from.tabs.length > 1) {
         const spawned: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [], activeId: null }
-        setGroups((prev) => [...prev, spawned])
+        setGroups((prev) => (splitSide === 'left' ? [spawned, ...prev] : [...prev, spawned]))
         dstId = spawned.id
       } else {
         return // 就这一张页签,拆不出第二组
@@ -376,9 +380,17 @@ export function usePaneTabs(deps: {
     const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
     const t = owner?.tabs.find((x) => x.id === id)
     if (!owner || !t) return
+    // 拒绝页签层操作的统一口径:页签闪一下(听见了)+ 浮条把「为什么不行」摆在眼前
+    const refuse = (msg: string): void => {
+      markFlash(id)
+      flashPaneNote(msg, PANE_NOTE_MS)
+    }
     // 单例签(设置/图谱)不能钉:钉住会脱离「全系统没钉的同类只此一张」的去重账本,
     // 入口再开就生第二张,单例名存实亡
-    if (!isMenuKind(t.kind)) return
+    if (!isMenuKind(t.kind)) {
+      refuse(`${t.name}全应用只此一张,不用钉`)
+      return
+    }
     const flip = (patch: (x: PaneTab) => PaneTab): void => {
       patchGroup(owner.id, (g) => ({ ...g, tabs: g.tabs.map((x) => (x.id === id ? patch(x) : x)) }))
     }
@@ -388,7 +400,7 @@ export function usePaneTabs(deps: {
       if (t.kind === 'chat') {
         // 探针正说着话就先别钉:分家会把半截回答留在公用场,钉出去的页签缺尾巴
         if (chat.busy) {
-          chat.note('探针正说着话,等这句答完再钉')
+          refuse('探针正说着话,等这句答完再钉')
           return
         }
         if (chat.messages.length > 0) {
@@ -404,8 +416,10 @@ export function usePaneTabs(deps: {
       return
     }
     if (t.kind === 'chat') {
-      // 对话页签不拆钉:拆了它的记录没地方挂,会害用户丢对话
-      chat.note('钉住的对话不拆钉:想聊新的,点聊天面板里的「新对话」,或者关掉这张页签再开')
+      // 对话页签不拆钉:钉住时这场对话已分家住进这张签,拆钉变回跟随签,记录就无家可归
+      refuse(
+        '钉住的对话不拆钉:这场对话住在这张签里,拆了就散了 —— 想聊新的点面板里的「新对话」,不要了就关掉这张签'
+      )
       return
     }
     // 拆钉 = 变回跟随页签:挂回品类名牌,立刻转向当前选中的对象(类型对得上才转),别端着旧内容
@@ -494,10 +508,9 @@ export function usePaneTabs(deps: {
     visibleOfGroup,
     enabledKinds,
     flashTabId,
+    paneNote,
     dismissTabFlash,
     paneSplit,
-    draggingTab,
-    setDraggingTab,
     dropMark,
     setDropMark,
     paneTabFor,
@@ -515,7 +528,6 @@ export function usePaneTabs(deps: {
     applyPaneSplit,
     onPaneSashDown,
     onTabDragEnd,
-    onDetachTab,
-    showDropHint
+    onDetachTab
   }
 }

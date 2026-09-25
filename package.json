@@ -30,6 +30,7 @@
     "test:window": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-window.mts",
     "test:appearance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-appearance.mts",
     "test:recents": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-recents.mts",
+    "test:session": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-session.mts",
     "test:nav": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-nav.mts",
     "test:git": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-git.mts",
     "test:summaries": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-summaries.mts",
@@ -43,7 +44,7 @@
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-workspace.mts",
     "test:filesize": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-filesize.mts",
     "test:journey": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-journey.mts",
-    "test": "npm run test:scanner && npm run test:search && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization && npm run test:bubble && npm run test:filesize && npm run test:workspace"
+    "test": "npm run test:scanner && npm run test:search && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:ai && npm run test:agent && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:session && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:filelinks && npm run test:contextbill && npm run test:personalization && npm run test:bubble && npm run test:filesize && npm run test:workspace"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

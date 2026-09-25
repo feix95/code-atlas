@@ -284,13 +284,12 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--canvas-tint);
-  border: 1px solid var(--line);
+  /* 窗缘不画描边(小葵拍板):边界只靠圆角裁边和底差色立住,窗贴同色桌面更干净 */
   border-radius: var(--radius-window);
 }
 
-/* 最大化:贴满屏幕时圆角和描边收掉,四角不漏缝 */
+/* 最大化:贴满屏幕时圆角收掉,四角不漏缝 */
 body.is-maximized .app {
-  border: none;
   border-radius: 0;
 }
 

@@ -4,6 +4,7 @@
 import type { NavLocation } from '../navHistory'
 import { IconArrowLeft, IconArrowRight, IconRefresh, TreeIcon } from './Icons'
 import { useWindowMaximized } from '../useWindowMaximized'
+import { isDeadSpace, startWindowDrag } from '../windowDrag'
 
 /** 顶栏图标本体 0.5u ≈ 32px@100%;24 栅格放到 32px,描边降一档才不闷(有效粗 ≈2px) */
 const TOP_ICON = 25
@@ -42,7 +43,18 @@ export function AppTopBar({
 }): React.JSX.Element {
   const maximized = useWindowMaximized()
   return (
-    <header className="topbar">
+    // 顶栏死空间拖窗/双击最大化走手动引擎:原生 app-region:drag 会吃 Windows
+    // Aero Shake(摇窗最小化其它窗,小葵点名要哑火);可交互件(按钮/输入框/
+    // 页签带)一律不接管,各自的点击与页签拖拽照常
+    <header
+      className="topbar"
+      onPointerDown={(e) => {
+        if (isDeadSpace(e.target)) startWindowDrag(e)
+      }}
+      onDoubleClick={(e) => {
+        if (isDeadSpace(e.target)) void window.atlas.windowMaximizeToggle()
+      }}
+    >
       <div className={`topbar-side${sidebarShown ? '' : ' is-bare'}`}>
         {/* 收起侧栏:顶栏最左端,独占 1u 列,图标骑 rail 中线(x=0.5u) */}
         <div className="tb-collapse">

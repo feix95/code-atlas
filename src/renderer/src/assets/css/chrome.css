@@ -1,6 +1,7 @@
 /* ── UI v3 顶栏(第 1 层 · 整行盖头)────────────────────────
    规格户口:docs/to-do list/UI重构-v3-比例布局;1u = var(--u) = 顶栏高 = rail 宽。
-   顶栏整条是拖拽面;凡是可点的东西必须 no-drag,不然只会拖窗点不到 */
+   顶栏死空间可拖窗,但走手动搬窗引擎(windowDrag.ts),不铺 app-region:drag ——
+   原生拖拽面会被 Windows Aero Shake 盯上(摇窗最小化其它窗),程序级挪窗天然免疫 */
 
 .topbar {
   display: flex;
@@ -10,7 +11,6 @@
   background: var(--chrome-topbar);
   /* 底缘一条细线 = 顶栏与第二层的分界;激活页签压在线上断开它(§5.1) */
   border-bottom: 1px solid var(--line);
-  -webkit-app-region: drag;
   user-select: none;
 }
 
@@ -227,6 +227,7 @@
   align-items: flex-end;
   gap: 2px;
   overflow: hidden;
+  position: relative; /* 插入线的定位锚 */
 }
 
 .tabbar-tab {
@@ -308,7 +309,7 @@
   text-overflow: ellipsis;
 }
 
-/* 页签之后的带尾空白:右键弹品类菜单的地盘,也是拖页签搬家的落点 */
+/* 页签之后的带尾空白:右键弹品类菜单的地盘 */
 .tabbar-blank {
   flex: 1;
   min-width: 4rem;
@@ -316,15 +317,121 @@
   -webkit-app-region: no-drag; /* drag 区不派发 contextmenu,菜单要在这开 */
 }
 
-/* 拖页签搬家时的落点提示:扫过整条页签带 = 落到这组末尾 */
-.tabbar.is-drop-zone {
-  box-shadow: inset 0 0 0 1px var(--accent-bright);
+/* ── 页签 pointer 拖拽(TopBarTabs 引擎):拖拽中整条带开几何过渡 ——
+   margin 撑落点缝、width/padding 收源签空位,过渡才有「邻居滑开让位」的连续感;
+   平时不挂,免得窗口/分屏改宽时页签尺寸拖尾 ── */
+.tabbar.is-dnd-live .tabbar-tab {
+  transition:
+    margin-left var(--dur-2) var(--ease-smooth),
+    margin-right var(--dur-2) var(--ease-smooth),
+    width var(--dur-2) var(--ease-smooth),
+    min-width var(--dur-2) var(--ease-smooth),
+    padding var(--dur-2) var(--ease-smooth),
+    gap var(--dur-2) var(--ease-smooth),
+    opacity var(--dur-2) var(--ease-smooth);
 }
 
-/* 拖到某张页签上 = 插到它前面:左缘一条主题色细线(inset 影不跟伪元素抢位,
-   激活签的底角反弧用的正是 ::before) */
-.tabbar-tab.is-drop-before {
-  box-shadow: inset 0.125rem 0 0 var(--accent-bright);
+/* 被拎着的页签:原地塌缩成零宽空位(替身芯片跟光标跑,真身不占座);
+   松手提交后类名摘下,签在新序号上展开回来 ≈ 沉降动画 */
+.tabbar-tab.is-drag-source {
+  flex: none;
+  width: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 蓝色插入线:钉在落点缝口的主题色竖线 —— 跟缝一起滑(left 过渡),
+   Edge/Chrome 页签拖拽的「会插到这里」记号 */
+.tabbar-insert {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: calc(var(--u) * 0.55);
+  border-radius: var(--radius-pill);
+  background: var(--accent-bright);
+  box-shadow: 0 0 0.25rem color-mix(in srgb, var(--accent-bright) 60%, transparent);
+  pointer-events: none;
+  z-index: var(--z-jump);
+  transition: left var(--dur-2) var(--ease-smooth);
+}
+
+/* 拖拽替身芯片:fixed 浮层跟光标(页签带 overflow:hidden 裁得掉行内位移)。
+   Edge 式紧凑小胶囊:深色底、图标+名贴内容收、四角圆角,不再背整页签的壳 */
+.tabbar-tab.is-chip {
+  position: fixed;
+  z-index: var(--z-menu);
+  flex: none;
+  width: auto;
+  min-width: 0;
+  /* 胶囊封顶 10rem:名字再长也收成小签,超出省略号(born 量宽时已被这封顶截过) */
+  max-width: 10rem;
+  height: auto;
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  background: var(--chrome-ink);
+  color: #ffffff;
+  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.22);
+  opacity: 0.97;
+  transition: opacity 0.12s ease-out;
+}
+
+/* is-morph(跟手相):只过渡「形」——宽高/内边距/圆角/底字色/阴影;
+   left/top 绝不进清单,不然芯片跟手会拖尾。enter→drag 的胶囊收缩就靠它放出来 */
+.tabbar-tab.is-chip.is-morph {
+  transition:
+    width 0.17s var(--ease-smooth),
+    height 0.17s var(--ease-smooth),
+    padding 0.17s var(--ease-smooth),
+    border-radius 0.17s var(--ease-smooth),
+    background 0.17s var(--ease-smooth),
+    color 0.17s var(--ease-smooth),
+    box-shadow 0.17s var(--ease-smooth),
+    opacity 0.12s ease-out;
+}
+
+/* is-settle(沉降相):连 left/top 一起过渡 —— 芯片飞进落点缝长成页签;
+   落地帧 React 换上真身无缝接力(矩形按缝口快照算的) */
+.tabbar-tab.is-chip.is-settle {
+  transition:
+    left 0.21s var(--ease-smooth),
+    top 0.21s var(--ease-smooth),
+    width 0.21s var(--ease-smooth),
+    height 0.21s var(--ease-smooth),
+    padding 0.21s var(--ease-smooth),
+    border-radius 0.21s var(--ease-smooth),
+    background 0.21s var(--ease-smooth),
+    color 0.21s var(--ease-smooth),
+    box-shadow 0.21s var(--ease-smooth),
+    opacity 0.12s ease-out;
+}
+
+/* is-tablook(enter/settle):克隆页签模样 —— 页面色底、最深字色、
+   只开上角的签形圆角、页签内边距;抓起收拢/松手长成才有对照的形 */
+.tabbar-tab.is-chip.is-tablook {
+  padding: 0 0.375rem 0 0.75rem;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--chrome-surface);
+  color: var(--chrome-ink-strong);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.tabbar-tab.is-chip.is-leaving {
+  opacity: 0;
+}
+
+/* 拖拽中全窗光标改抓握:芯片底下不管什么件,手型都要像「拎着东西」 */
+body.is-tab-dragging,
+body.is-tab-dragging * {
+  cursor: grabbing !important;
 }
 
 /* 系统自动勾回品类时,刚亮起的页签轻强调一下(小葵点的:别做得太静默):
