@@ -40,6 +40,7 @@ import {
 import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
+import { useWheelZoom } from './useWheelZoom'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
 import { useNavStack } from './useNavStack'
@@ -662,6 +663,8 @@ function App(): React.JSX.Element {
     onSashDoubleClick,
     onSashKeyDown
   } = useSidebarSash()
+  // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路,完成后报个百分比
+  useWheelZoom((f) => flashToast(`界面大小 ${Math.round(f * 100)}%`))
   const {
     groups,
     setGroups,
@@ -914,14 +917,7 @@ function App(): React.JSX.Element {
             {result && !scanning ? (
               // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
               <main className="workspace">
-                <section className="detail">
-                  {scanToast && (
-                    <div className="scan-toast" role="status">
-                      {scanToast}
-                    </div>
-                  )}
-                  {paneGroupsEl}
-                </section>
+                <section className="detail">{paneGroupsEl}</section>
               </main>
             ) : scanning || error || groups.length === 0 ? (
               // 扫描中/失败/回家:这些状态优先于页签房 —— 扫描失败时 resetPaneTabs 留下的
@@ -981,6 +977,12 @@ function App(): React.JSX.Element {
             )}
           </div>
 
+          {/* 全局轻提示挪到 .app 层:扫描报数/Ctrl+滚轮缩放报百分比,首页和设置页也要浮得出来 */}
+          {scanToast && (
+            <div className="scan-toast" role="status">
+              {scanToast}
+            </div>
+          )}
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
         </div>

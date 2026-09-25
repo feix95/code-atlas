@@ -147,6 +147,18 @@ try {
   await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
+  // Ctrl+滚轮缩放(网页惯例):向上滚放大一档(105%),Ctrl+0 归 100%;落盘走 setUiScale 原路
+  await page.mouse.move(800, 500)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -240)
+  await page.keyboard.up('Control')
+  await page.locator('.scan-toast').filter({ hasText: '界面大小' }).waitFor()
+  const zoomedPx = await page.evaluate(() => parseFloat(document.documentElement.style.fontSize))
+  assert.ok(zoomedPx > 16, 'ctrl+wheel up must raise root font size')
+  await page.keyboard.down('Control')
+  await page.keyboard.press('0')
+  await page.keyboard.up('Control')
+  await page.waitForFunction(() => document.documentElement.style.fontSize === '16px')
   // UI v3(B8):侧栏「这台电脑」可下钻——单击盘符/目录原地展开(懒加载纯浏览),
   // 单击文件开「瞄一眼」预览签(scopeRoot=盘根,不进工作区账本),双击盘根开为工作区
   const firstDrive = page.locator('.tree > .tree-branch > .tree-row.is-dir .tree-main').first()

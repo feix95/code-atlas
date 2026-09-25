@@ -264,6 +264,7 @@ body {
 }
 
 .app {
+  position: relative; /* 全局轻提示(scan-toast)的锚点 */
   height: 100%;
   display: flex;
   flex-direction: column;
