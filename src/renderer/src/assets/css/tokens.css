@@ -206,7 +206,9 @@
   --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
   /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
   --switch-knob: #e5eaed;
-  /* v3 框架色槽暗色:暂定映射(往现有暗色板就近贴),§9.2 深浅对照表给小葵过目后再定稿 */
+  /* v3 框架色槽暗色(B9 定稿,VS Code Dark+ 惯例):框架比内容亮一档、悬停再亮一档、
+     字色同 --text/--text-strong;彩色主题下 topbar/panel/surface 三槽被外观系统
+     染色覆盖(appearance.ts paintSurfaces),这里写的是石墨中性兜底 */
   --chrome-topbar: #2e2e2e;
   --chrome-panel: #282828;
   --chrome-hover: #3d3d3d;

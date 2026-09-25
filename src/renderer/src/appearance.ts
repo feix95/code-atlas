@@ -78,7 +78,11 @@ const TOKEN_KEYS = [
   '--canvas-tint',
   '--surface',
   '--surface-soft',
-  '--line-soft'
+  '--line-soft',
+  // v3 框架槽三件套(B9):染色档跟着底板泛色,回落时摘内联让 tokens.css 的石墨真值兜底
+  '--chrome-topbar',
+  '--chrome-panel',
+  '--chrome-surface'
 ] as const
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -172,6 +176,17 @@ function paintSurfaces(root: CSSStyleDeclaration, dark: boolean, h: number, s: n
     root.setProperty('--surface', achro ? pal.surface : hslCss(h, surfSat, 14))
     root.setProperty('--surface-soft', achro ? pal.surfaceSoft : hslCss(h, surfSat, 12))
     root.setProperty('--line-soft', achro ? pal.lineSoft : hslCss(h, Math.min(s, 14), 16))
+    // v3 框架槽(B9,VS Code 彩色主题惯例:框架跟底板同族泛色):顶栏比面板亮一档,
+    // 面板=window 档,内容面=canvasTint 档;无彩色摘内联,样式表石墨值兜底不重复记账
+    if (achro) {
+      root.removeProperty('--chrome-topbar')
+      root.removeProperty('--chrome-panel')
+      root.removeProperty('--chrome-surface')
+    } else {
+      root.setProperty('--chrome-topbar', hslCss(h, surfSat, 17))
+      root.setProperty('--chrome-panel', hslCss(h, surfSat, 14))
+      root.setProperty('--chrome-surface', hslCss(h, Math.min(s * 0.35, 15), 9))
+    }
   } else {
     const surfSat = Math.min(s * 0.4, 18)
     root.setProperty('--window', achro ? pal.window : hslCss(h, surfSat, 96))
@@ -179,6 +194,16 @@ function paintSurfaces(root: CSSStyleDeclaration, dark: boolean, h: number, s: n
     root.setProperty('--surface', achro ? pal.surface : hslCss(h, surfSat, 99))
     root.setProperty('--surface-soft', achro ? pal.surfaceSoft : hslCss(h, surfSat, 96))
     root.setProperty('--line-soft', achro ? pal.lineSoft : hslCss(h, Math.min(s, 16), 92))
+    // 同上:顶栏比面板压一档(93≈#ededed),面板=window 档,内容面=canvasTint 档
+    if (achro) {
+      root.removeProperty('--chrome-topbar')
+      root.removeProperty('--chrome-panel')
+      root.removeProperty('--chrome-surface')
+    } else {
+      root.setProperty('--chrome-topbar', hslCss(h, surfSat, 93))
+      root.setProperty('--chrome-panel', hslCss(h, surfSat, 96))
+      root.setProperty('--chrome-surface', hslCss(h, surfSat, 99))
+    }
   }
 }
 
