@@ -357,3 +357,4 @@
 - feat(ui): v3 深色对照定稿(§9.2)——chrome 七槽暗色值按 VS Code Dark+ 惯例转正(框架比内容亮一档);彩色主题下 topbar/panel/surface 三槽并入底板染色机关(paintSurfaces 同族泛色),无彩色回落样式表石墨值
 - feat(ui): 锚值 --u 4rem→3.2rem(0.8 档)——顶栏高/rail 宽/收起钮列/AI 浮层锚位同缩,等式「顶栏高=rail 宽」继续成立
 - feat(ui): 树行高改挂 calc(var(--u)*0.75)(=2.4rem,比原来 3rem 缩一档)——虚拟化占位同步,行距跟锚值自动走
+- feat(ui): 树行高再压一档至 0.6u(=1.92rem,小葵实测两连缩定稿)

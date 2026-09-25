@@ -616,15 +616,15 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  /* 行高 0.75u(§7 给定+实测):比旧实现的 1.6875rem 明显疏朗 */
-  height: calc(var(--u) * 0.75);
+  /* 行高 0.6u(§7 的 0.75u 实测偏疏,小葵连压两档定稿):紧凑档,图标字仍从容 */
+  height: calc(var(--u) * 0.6);
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background var(--dur-2) var(--ease-smooth);
   /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
-  contain-intrinsic-size: auto calc(var(--u) * 0.75);
+  contain-intrinsic-size: auto calc(var(--u) * 0.6);
 }
 
 .tree-row:hover {
