@@ -277,8 +277,13 @@
   width: 0.5625rem;
   height: 0.5625rem;
 }
+
+/* 自定义滚动条会唤醒 Chromium 的 legacy 端点按钮(上下三角),显式关掉 */
+::-webkit-scrollbar-button {
+  display: none;
+}
 ::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--scrollbar-thumb);
   border-radius: var(--radius-xl);
   border: 2px solid transparent;
   background-clip: content-box;

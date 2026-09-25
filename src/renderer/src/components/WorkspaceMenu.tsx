@@ -1,14 +1,17 @@
-// 工作区菜单(UI v3 §7.1):浮层挂在 workspace 卡下沿,pin 区置顶 + 历史区(最多 5 条),
-// 两区去重、条目单行路径文本。点条目 = 开为工作区;行首 pin 图标悬停显形(pin↔pin-off
-// 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动高亮 + Enter 进入(按键由 workspace
-// 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感)。
-// 菜单为纯工作区列表,无功能行(「打开项目」入口整体移除)。
+// 工作区菜单(UI v3 §7.1):浮层挂在 workspace 卡下沿 —— 上区 pin 置顶 + 历史区(最多 5 条),
+// 分隔线下固定盘根区(C:\ D:\ …);条目单行路径文本,点开为工作区;行首 pin 图标悬停显形
+// (pin↔pin-off 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动高亮 + Enter 进入
+// (按键由 workspace 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感;键盘高亮只记
+// 工作区条目,盘根区走点击)。
 import type { RecentProject } from '../recents'
+import type { DriveInfo } from '@shared/types'
 import { TreeIcon } from './Icons'
 
 interface WorkspaceMenuProps {
   pinned: RecentProject[]
   history: RecentProject[]
+  /** 盘根清单(C:\ D:\ …),点在分隔线下的固定区;null = 还没探到 */
+  drives: DriveInfo[] | null
   /** 键盘高亮的行号(-1 = 还没按过方向键;鼠标悬停高亮交给 CSS) */
   highlight: number
   onOpen: (path: string) => void
@@ -19,6 +22,7 @@ interface WorkspaceMenuProps {
 export function WorkspaceMenu({
   pinned,
   history,
+  drives,
   highlight,
   onOpen,
   onTogglePin,
@@ -87,12 +91,33 @@ export function WorkspaceMenu({
       {pinned.length === 0 && history.length === 0 ? (
         <p className="wsm-empty">打开过的项目会列在这里。</p>
       ) : (
-        <>
+        <div className="wsm-list">
           {pinned.map((r, i) => renderRow(r, i))}
           {pinned.length > 0 && history.length > 0 && (
             <div className="wsm-sep" aria-hidden="true" />
           )}
           {history.map((r, i) => renderRow(r, pinned.length + i))}
+        </div>
+      )}
+      {drives && drives.length > 0 && (
+        <>
+          <div className="wsm-sep" aria-hidden="true" />
+          {/* 盘根固定区(§7.1):C:\ D:\ … 点开为工作区;不归键盘高亮账,鼠标点 */}
+          <div className="wsm-drives">
+            {drives.map((d) => (
+              <button
+                key={d.root}
+                type="button"
+                className="wsm-drive"
+                onClick={() => onOpen(d.root)}
+                data-tip={`打开 ${d.root}`}
+                data-tip-side="right"
+              >
+                <TreeIcon name="drive" size={13} mono />
+                <span className="wsm-path">{d.root}</span>
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>

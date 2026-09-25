@@ -13,7 +13,6 @@ import { useMenuDismiss } from '../useMenuDismiss'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
 import { DriveBrowser } from './DriveBrowser'
 import { FileTree } from './FileTree'
-import { TreeIcon } from './Icons'
 import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
 
@@ -207,7 +206,22 @@ export function WorkspaceSidebar({
                 else openMenu()
               }}
             >
-              <TreeIcon name={menuOpen ? 'chevronsDownUp' : 'chevronsUpDown'} size={15} mono />
+              {/* 两条 chevron 分挂类名,悬停各自动画(lucide 线稿,TreeIcon 同款笔触) */}
+              <svg
+                className="wsm-chev"
+                width="27"
+                height="27"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path className="wsm-chev-t" d={menuOpen ? 'm7 1 5 5 5-5' : 'm7 5.5 5-5 5 5'} />
+                <path className="wsm-chev-b" d={menuOpen ? 'm7 23 5-5 5 5' : 'm7 18.5 5 5 5-5'} />
+              </svg>
             </button>
             {pathHint && !menuOpen && (
               <div className="path-hint" role="status">
@@ -218,6 +232,7 @@ export function WorkspaceSidebar({
               <WorkspaceMenu
                 pinned={sections.pinned}
                 history={sections.history}
+                drives={drives}
                 highlight={menuHi}
                 onOpen={(p) => {
                   setMenuOpen(false)

@@ -14,14 +14,13 @@
   user-select: none;
 }
 
-/* 左段盖住 rail + 侧栏的正上方:宽 = rail 1u + 侧栏宽(--sidebar-w,App 挂在 .app 上)
-   + sash 半宽(0.3125rem 的一半)—— 右缘这条 1px 落在 sash 中线上,
-   「侧栏 | 内容」分界线顺着它一路接上顶栏 */
+/* 左段盖住 rail + 侧栏的正上方:宽 = rail 1u + 侧栏宽(--sidebar-w,App 挂在 .app 上)。
+   sash 已改零占位骑缝,分界线就是侧栏右缘本身,右缘 1px 正好落在缝上 */
 .topbar-side {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  width: calc(var(--u) + var(--sidebar-w, 0rem) + 0.15625rem);
+  width: calc(var(--u) + var(--sidebar-w, 0rem));
   border-right: 1px solid var(--line);
 }
 

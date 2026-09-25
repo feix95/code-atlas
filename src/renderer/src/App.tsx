@@ -853,7 +853,6 @@ function App(): React.JSX.Element {
                   enabledKinds={enabledKinds}
                   toggleKind={toggleKind}
                   paneSplit={paneSplit}
-                  sidebarCollapsed={sidebarCollapsed}
                 />
               ) : null
             }

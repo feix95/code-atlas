@@ -49,6 +49,8 @@
   --chrome-topbar: #ededed; /* 顶栏整行 + rail 底,同色 */
   --chrome-panel: #f6f6f6; /* 侧栏/文件树/workspace 卡填充 */
   --chrome-hover: #d7d7d7; /* 悬停件/搜索框底 */
+  --chrome-float: #e3e3e3; /* workspace 卡/下拉菜单浮层底 */
+  --scrollbar-thumb: #c1c1c1; /* 树区与菜单滚动条柄 */
   --chrome-ink: #424242; /* 框架图标与正文深灰 */
   --chrome-ink-strong: #141414; /* 激活页签标题 */
   --chrome-surface: #ffffff; /* 激活页签/内容面 */
@@ -77,6 +79,7 @@
   --dur-2: 0.15s;
   --dur-3: 0.3s;
   --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 回弹感:过冲后归位 */
   /* ── 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /
      通用浮层 30 / 下拉菜单 40 / 设置页 50 / 复活提示 90 / 文件菜单 95 ── */
   --z-raise: 1;
@@ -126,8 +129,10 @@
   --secondary-deep: #4c4c4c; /* 辅助色的文字安全档 */
   --surface: #ffffff;
   --surface-soft: #f6f6f6;
-  --line: #e4e4e4;
-  --line-soft: #ededed;
+  /* 边缘线统一档(小葵定稿):所有边线/分隔线/框线一个色,line-soft 同值合并,
+     兼当浅底用的几处(settings 分组底)随之一档深 */
+  --line: #d0d0d0;
+  --line-soft: #d0d0d0;
   --text: #222222;
   --text-strong: #000000;
   --muted: #5c5c5c;
@@ -182,8 +187,9 @@
   --secondary-deep: #bababa;
   --surface: #282828;
   --surface-soft: #232323;
-  --line: #333333;
-  --line-soft: #2e2e2e;
+  /* 深色的统一边缘线 = VS Code 面板边线惯例 #3c3c3c,线族同值一档 */
+  --line: #3c3c3c;
+  --line-soft: #3c3c3c;
   --text: #dadada;
   --text-strong: #f0f0f0;
   --muted: #b3b3b3;
@@ -218,6 +224,8 @@
   --chrome-topbar: #2e2e2e;
   --chrome-panel: #282828;
   --chrome-hover: #3d3d3d;
+  --chrome-float: #3d3d3d;
+  --scrollbar-thumb: #5a5a5a; /* VS Code 滑块惯例:40% 灰压深底的有效色 */
   --chrome-ink: #dadada;
   --chrome-ink-strong: #f0f0f0;
   --chrome-surface: #1c1c1c;

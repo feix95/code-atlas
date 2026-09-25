@@ -29,23 +29,17 @@
   flex-shrink: 0;
 }
 
-/* workspace 卡:高 0.8u、容器档圆角、卡缘细边线取交互灰档(§3.4 按图推算)。
-   B1 先当纯路径输入框用,B5 再补 ⇅ 菜单 */
+/* workspace 卡(§3.4 按图推算+小葵实测定稿):高 0.8u、底吃浮层灰 chrome-float、
+   无描边、圆角 0.6rem——浏览器地址栏式填充块。B1 先当纯路径输入框用,B5 再补 ⇅ 菜单 */
 .ws-card {
   position: relative;
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  height: 3.2rem;
+  height: calc(var(--u) * 0.8);
   padding: 0 0.375rem 0 0.75rem;
-  background: var(--chrome-panel); /* 与侧栏同底,靠细边线区分 */
-  border: 1px solid var(--chrome-hover);
-  border-radius: var(--radius-md);
-}
-
-.ws-card:focus-within {
-  border-color: var(--accent-line);
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 9%, transparent);
+  background: var(--chrome-float);
+  border-radius: 0.6rem;
 }
 
 .ws-path {
@@ -72,34 +66,90 @@
   height: 2.2rem;
 }
 
+/* 菜单开关钮不挂全局焦点环(点击后持焦会留一圈深色描边,小葵拍板常灭) */
+.ws-menu-btn:focus,
+.ws-menu-btn:focus-visible {
+  outline: none;
+}
+
+/* 悬停反馈不额外做色——底色就是输入条的本色;
+   两条 chevron 各自动画:收起态往外弹、展开态往里缩,回弹缓动 */
+.ws-card .ws-menu-btn:hover:not(:disabled) {
+  background: var(--chrome-float);
+}
+
+.wsm-chev {
+  /* chevron 弹到最远端时尖端越过 viewBox 边,放行画进按钮留白 */
+  overflow: visible;
+}
+
+.wsm-chev,
+.wsm-chev-t,
+.wsm-chev-b {
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+
+.ws-menu-btn:hover:not([aria-expanded='true']) .wsm-chev-t {
+  transform: translateY(-4.5px);
+}
+.ws-menu-btn:hover:not([aria-expanded='true']) .wsm-chev-b {
+  transform: translateY(4.5px);
+}
+.ws-menu-btn[aria-expanded='true']:hover .wsm-chev-t {
+  transform: translateY(4.5px);
+}
+.ws-menu-btn[aria-expanded='true']:hover .wsm-chev-b {
+  transform: translateY(-4.5px);
+}
+
 /* ── 工作区菜单(§7.1):浮层盖在文件树上,宽与卡同宽、卡下留小缝;
-    可视 5 条(3.4rem/条 + 上下余量),超出内部滚动 ── */
+    上区 pin+历史(可视 5 条内部滚动),分隔线下固定盘根区 ── */
 .ws-menu {
   position: absolute;
   top: calc(100% + 0.3rem);
-  left: -1px;
-  right: -1px;
+  left: 0;
+  right: 0;
   z-index: var(--z-dropdown);
-  max-height: calc(5 * 3.4rem + 2.4rem);
-  overflow-y: auto;
-  padding: 1.2rem 0.5rem;
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  /* 最小空态 5rem;上下对称 0.5、右 0.25(树底垫 1rem 挪进浮层会读成行尾死空) */
+  min-height: 5rem;
+  padding: var(--space-2) var(--space-1) var(--space-2);
+  /* 与 ws-card 同底(浏览器地址栏下拉同款);滚动条走全局 webkit 路
+     (标准 scrollbar-* 会切到 Fluent 滚条,自带端点三角且无视伪元素) */
+  background: var(--chrome-float);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-menu);
+}
+
+/* 工作区条目区:可视 5 条内部滚动;盘根区同宽同风格,超出也内部滚动(滚动条走全局 webkit 路) */
+.wsm-list,
+.wsm-drives {
+  overflow-y: auto;
+  max-height: calc(5 * var(--u) * 0.6);
+}
+
+.wsm-list {
+  flex: 0 1 auto;
+}
+
+.wsm-drives {
+  flex: none;
 }
 
 .wsm-row {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 3.4rem;
+  /* 行高与文件树行同款(0.6u) */
+  min-height: calc(var(--u) * 0.6);
   border-radius: var(--radius-sm);
 }
 
 .wsm-row:hover,
 .wsm-row.is-active {
-  background: var(--chrome-hover);
+  /* 菜单底已是 chrome-hover,行态改用墨色轻压一档(明暗主题都成立) */
+  background: color-mix(in srgb, var(--chrome-ink) 9%, transparent);
 }
 
 /* 行首 pin 钮:未 pin 条目悬停/聚焦/键盘高亮才显形;已 pin 条目常驻 */
@@ -110,8 +160,8 @@
   transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.1rem;
+  height: 1.1rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -152,7 +202,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  min-height: 3.4rem;
+  min-height: calc(var(--u) * 0.6);
   padding: 0 1.9rem 0 0.7rem;
   border: 0;
   background: transparent;
@@ -186,8 +236,8 @@
   transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.1rem;
+  height: 1.1rem;
   padding: 0;
   border: 0;
   border-radius: var(--radius-xxs);
@@ -214,6 +264,29 @@
   height: 1px;
   margin: 0.3rem 0.7rem;
   background: var(--line);
+  flex: none;
+}
+
+/* 盘根行(C:\ D:\ …):单行路径点开为工作区,行级无 pin/× 槽 */
+.wsm-drive {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  min-height: calc(var(--u) * 0.6);
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: var(--mono);
+  font-size: var(--font-ui-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wsm-drive:hover {
+  background: color-mix(in srgb, var(--chrome-ink) 9%, transparent);
 }
 
 .wsm-empty {
@@ -287,7 +360,10 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--space-2) var(--space-2) var(--space-4);
+  /* 滚动条走全局 webkit 路(home.css):薄柄+透明轨道,侧栏灰一直贴到分界缝;
+     不用标准 scrollbar-*(会切 Fluent 滚条,端点三角关不掉) */
+  /* 右垫收到 space-1:名字贴 sash 线走,左垫保留 space-2 对齐顶上 workspace 卡 */
+  padding: var(--space-2) var(--space-1) var(--space-4) var(--space-2);
 }
 
 /* 底部扫描状态条(§3):高 0.6u,只属于侧栏,收起时随侧栏一起消失 */
@@ -665,7 +741,7 @@
   align-items: center;
   gap: 0.375rem;
   height: 100%;
-  padding: 0 0.4375rem 0 2px;
+  padding: 0 0.125rem 0 2px;
   border: none;
   background: transparent;
   color: var(--muted);

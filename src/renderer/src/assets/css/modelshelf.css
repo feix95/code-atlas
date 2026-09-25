@@ -149,18 +149,16 @@
   margin: 0;
   padding-right: 0.625rem;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted) transparent;
 }
 .shelf-scroll::-webkit-scrollbar {
   width: 8px;
 }
 .shelf-scroll::-webkit-scrollbar-thumb {
   border-radius: var(--radius-pill);
-  background: var(--muted);
+  background: var(--scrollbar-thumb);
 }
 .shelf-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
+  background: var(--muted-2);
 }
 .shelf-scroll::-webkit-scrollbar-track {
   background: none;

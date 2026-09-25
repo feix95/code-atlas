@@ -2,6 +2,9 @@
 
 .sash {
   flex: 0 0 0.3125rem;
+  /* 零占位骑缝(VS Code 同款):负边距抵掉自身宽,中线正压侧栏|内容分界缝,
+     两侧底板严丝合缝贴到线上,拖杆命中区照旧 5px */
+  margin: 0 -0.15625rem;
   position: relative;
   z-index: var(--z-float);
   cursor: col-resize;
