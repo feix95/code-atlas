@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
 import { DRAG_MIME_NODE } from '@shared/dragTypes'
 import type { NoteMap } from '@shared/notes'
@@ -19,8 +19,6 @@ interface TreeRowProps {
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
   expandingPath: string | null
-  /** 搜索过滤词;空串 = 不过滤(过滤时全树按名字匹配,目录自动全展开) */
-  filter: string
   /** reveal 联动:这条链上的目录强制展开(页签/绿字跳过来的文件,树里可能还收着) */
   forceExpand?: boolean
   onSelectFile: (relPath: string, file: ScanFileNode) => void
@@ -38,7 +36,6 @@ function TreeRow({
   onRowContextMenu,
   selectedPath,
   expandingPath,
-  filter,
   forceExpand,
   onSelectFile,
   onSelectFolder,
@@ -55,8 +52,8 @@ function TreeRow({
     wasLazy.current = lazy
   }, [node])
 
-  // 过滤态下目录一律摊开,不看你之前的展开手癖;reveal 链上的目录同等待遇
-  const expanded = filter !== '' || open || !!forceExpand
+  // reveal 链上的目录一律摊开,不看你之前的展开手癖
+  const expanded = open || !!forceExpand
 
   if (node.type === 'file') {
     const note = notes?.[node.relPath]
@@ -196,7 +193,6 @@ function TreeRow({
             onRowContextMenu={onRowContextMenu}
             selectedPath={selectedPath}
             expandingPath={expandingPath}
-            filter={filter}
             forceExpand={forceExpand}
             onSelectFile={onSelectFile}
             onSelectFolder={onSelectFolder}
@@ -206,23 +202,6 @@ function TreeRow({
         ))}
     </div>
   )
-}
-
-/** 过滤:名字含关键字(不分大小写)的文件留下;目录自己命中或还有命中的后代就留下 */
-function filterTree(node: ScanDirNode, q: string): ScanDirNode | null {
-  const selfMatch = node.name.toLowerCase().includes(q)
-  if (node.lazy) return selfMatch ? node : null // 没探开的目录无从看内容,只按名字匹配
-  const children: ScanTreeNode[] = []
-  for (const child of node.children) {
-    if (child.type === 'file') {
-      if (child.name.toLowerCase().includes(q)) children.push(child)
-    } else {
-      const kept = filterTree(child, q)
-      if (kept) children.push(kept)
-    }
-  }
-  if (!selfMatch && children.length === 0) return null
-  return { ...node, children }
 }
 
 interface FileTreeProps {
@@ -244,8 +223,6 @@ interface FileTreeProps {
   onNoteRemove?: (relPath: string) => void
   /** 右键「预览文件」的原料(第一百一十锤):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
-  /** 顶栏搜索框的过滤词(UI v3:搜索框上移到顶栏,词从 App 层递进来) */
-  filter: string
 }
 
 export function FileTree({
@@ -260,10 +237,8 @@ export function FileTree({
   onExpandLazy,
   onNoteEdit,
   onNoteRemove,
-  onPreviewFile,
-  filter
+  onPreviewFile
 }: FileTreeProps): React.JSX.Element {
-  const q = filter.trim().toLowerCase()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // reveal 联动的后半程:展开靠 forceExpand 已由渲染接管,这里只负责把目标行滚进视野。
@@ -292,36 +267,23 @@ export function FileTree({
     })
   }
 
-  const shown = useMemo(() => {
-    if (q === '') return root
-    return filterTree(root, q)
-  }, [root, q])
-
   return (
     <>
       <div className="tree-scroll" ref={scrollRef}>
         <div className="tree">
-          {shown ? (
-            <TreeRow
-              node={shown}
-              depth={0}
-              notes={notes}
-              onRowContextMenu={handleRowContextMenu}
-              selectedPath={selectedPath}
-              expandingPath={expandingPath}
-              filter={q}
-              forceExpand={revealPaths?.has(shown.relPath)}
-              onSelectFile={onSelectFile}
-              onSelectFolder={onSelectFolder}
-              onExpandLazy={onExpandLazy}
-              onPreviewFile={onPreviewFile}
-            />
-          ) : (
-            <div className="empty-state">
-              <p className="empty-title">没找到叫「{filter.trim()}」的文件</p>
-              <p className="empty-hint">只搜已扫描的部分;没展开的文件夹,先点开它</p>
-            </div>
-          )}
+          <TreeRow
+            node={root}
+            depth={0}
+            notes={notes}
+            onRowContextMenu={handleRowContextMenu}
+            selectedPath={selectedPath}
+            expandingPath={expandingPath}
+            forceExpand={revealPaths?.has(root.relPath)}
+            onSelectFile={onSelectFile}
+            onSelectFolder={onSelectFolder}
+            onExpandLazy={onExpandLazy}
+            onPreviewFile={onPreviewFile}
+          />
         </div>
       </div>
     </>

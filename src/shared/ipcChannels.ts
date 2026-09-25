@@ -30,6 +30,8 @@ export const CH = {
   appVersion: 'atlas:app-version',
   scanFolder: 'atlas:scan-folder',
   scanSubdir: 'atlas:scan-subdir',
+  // 工作区文件名深搜(UI v3 §7.2,唯一功能变更):invoke 配 handle,最新有效制顶掉旧一轮
+  searchNames: 'atlas:search-names',
   analyzeFile: 'atlas:analyze-file',
   readPreview: 'atlas:read-preview',
   depGraph: 'atlas:dep-graph',

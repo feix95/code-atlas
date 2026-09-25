@@ -2,6 +2,7 @@ import { accessDeniedMessage, formatSize } from './aiEvidence.ts'
 import { ipcMain } from 'electron'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'
+import { searchNames } from '../scanner/searchNames.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
@@ -40,6 +41,21 @@ export function registerScanIpc(): void {
       annotateSummaries(r.tree)
       return r
     })
+  })
+
+  // 工作区文件名深搜(UI v3 §7.2):根下深扫磁盘,文件/文件夹名含关键字即命中。
+  // 最新有效制:新一轮起身后旧一轮就地收工回 cancelled(渲染层也按自己的 seq 扔旧账)
+  let searchSeq = 0
+  ipcMain.handle(CH.searchNames, (_event, rootPath: unknown, query: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath.trim() === '' || typeof query !== 'string') {
+      throw new Error('参数不合法')
+    }
+    const q = query.trim()
+    if (q === '') {
+      return { hits: [], truncated: false, stoppedEarly: false, cancelled: false }
+    }
+    const seq = ++searchSeq
+    return searchNames(rootPath.trim(), q, () => seq !== searchSeq)
   })
 
   // 分级扫描:点开某个还没探的子文件夹,只探这一层(预算内收工),返回子树 + 这一份统计

@@ -38,15 +38,16 @@ export const IGNORED_NAMES = new Set([
   'System Volume Information'
 ])
 
-/** 目录深度上限:防止超深目录把机器拖死 */
-const MAX_DEPTH = 20
+/** 目录深度上限:防止超深目录把机器拖死(文件名深搜也认这同一道闸) */
+export const MAX_DEPTH = 20
 
 /**
  * 单次扫描的节点预算:小项目一次画完整张图(和从前一个体验);
  * 遇到整个 C 盘这种巨无霸,到量就收 —— 没探到的目录挂 lazy 占位,
- * 界面上点哪个再探哪一层,扫描耗时从此与盘的大小无关
+ * 界面上点哪个再探哪一层,扫描耗时从此与盘的大小无关。
+ * 深搜遍历认的也是这道预算(§7.2:沿用扫描器保护闸)
  */
-const MAX_NODES = 4000
+export const MAX_NODES = 4000
 
 /** 全项目同时嗅探文件的并发上限:大目录不再所有文件同时开抢,内存/磁盘句柄都有界 */
 const MAX_CONCURRENT_SNIFFS = 32

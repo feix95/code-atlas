@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
+import type { SearchNameHit } from '@shared/searchNames'
 import { isTreePartial } from '@shared/scanCoverage'
 import { driveCapacity, driveKindName } from '../driveMeta'
 import { menuWorkspaceRows, type RecentProject } from '../recents'
@@ -13,6 +14,7 @@ import { useMenuDismiss } from '../useMenuDismiss'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
 import { FileTree } from './FileTree'
 import { TreeIcon } from './Icons'
+import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
 
 export function WorkspaceSidebar({
@@ -29,7 +31,9 @@ export function WorkspaceSidebar({
   saveNote,
   openPreview,
   treeNote,
-  filter,
+  search,
+  onOpenSearchFile,
+  onOpenSearchDir,
   folder,
   scanning,
   pathDraft,
@@ -63,13 +67,24 @@ export function WorkspaceSidebar({
   revealPaths: Set<string>
   followFile: (file: ScanFileNode) => Promise<void>
   followDir: (node: ScanDirNode) => void
-  handleExpandLazy: (relPath: string) => Promise<void>
+  handleExpandLazy: (relPath: string) => Promise<ScanDirNode | null>
   editNoteFromTree: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
   treeNote: string | null
-  /** 顶栏搜索框的过滤词(B1 先走旧的树内过滤,深搜在 B7) */
-  filter: string
+  /** 顶栏搜索词的深搜账本(UI v3 §7.2):非 null = 树区整体换成结果清单;
+      null = 没词/没工作区,文件树原样站岗 */
+  search: {
+    q: string
+    hits: SearchNameHit[]
+    searching: boolean
+    truncated: boolean
+    stoppedEarly: boolean
+  } | null
+  /** 文件命中:探开父链再开预览页签(App 的 openSearchFile) */
+  onOpenSearchFile: (hit: SearchNameHit) => void
+  /** 文件夹命中:打开为工作区(§7.2 给定) */
+  onOpenSearchDir: (hit: SearchNameHit) => void
   folder: string | null
   scanning: boolean
   pathDraft: string
@@ -215,21 +230,33 @@ export function WorkspaceSidebar({
           </div>
         </div>
         {result ? (
-          <FileTree
-            root={result.tree}
-            rootPath={result.rootPath}
-            notes={notes}
-            selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
-            expandingPath={expanding}
-            revealPaths={revealPaths}
-            filter={filter}
-            onSelectFile={(_relPath, file) => followFile(file)}
-            onSelectFolder={followDir}
-            onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-            onNoteEdit={editNoteFromTree}
-            onNoteRemove={(relPath) => saveNote(relPath, '')}
-            onPreviewFile={openPreview}
-          />
+          // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
+          search ? (
+            <SearchResults
+              query={search.q}
+              hits={search.hits}
+              searching={search.searching}
+              truncated={search.truncated}
+              stoppedEarly={search.stoppedEarly}
+              onOpenFile={onOpenSearchFile}
+              onOpenDir={onOpenSearchDir}
+            />
+          ) : (
+            <FileTree
+              root={result.tree}
+              rootPath={result.rootPath}
+              notes={notes}
+              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+              expandingPath={expanding}
+              revealPaths={revealPaths}
+              onSelectFile={(_relPath, file) => followFile(file)}
+              onSelectFolder={followDir}
+              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+              onNoteEdit={editNoteFromTree}
+              onNoteRemove={(relPath) => saveNote(relPath, '')}
+              onPreviewFile={openPreview}
+            />
+          )
         ) : (
           /* 「这台电脑」空态(§7.1):盘符列表,B8 升级成可下钻的树 */
           <div className="drive-browser">

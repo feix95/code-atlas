@@ -10,6 +10,7 @@ import type {
   ScanResult
 } from '@shared/types'
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteMap } from '@shared/notes'
+import type { SearchNameHit } from '@shared/searchNames'
 import { isAiConfigured } from '@shared/aiSetup'
 import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
 import { createMirrorThrottle } from '@shared/mirrorThrottle'
@@ -39,6 +40,7 @@ import {
 import { useAiChat, type ChatMessage } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
+import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
 import { useNavStack } from './useNavStack'
 import { usePreviewRefs } from './usePreviewRefs'
@@ -139,8 +141,13 @@ function App(): React.JSX.Element {
   const [expanding, setExpanding] = useState<string | null>(null)
   const expandingRef = useRef(false)
   const [treeNote, setTreeNote] = useState<string | null>(null)
-  // 顶栏搜索框的过滤词(UI v3 上移:B1 仍走旧的树内过滤,B7 换主进程深搜)
-  const [treeFilter, setTreeFilter] = useState('')
+  // 顶栏搜索词 ↔ 深搜账(UI v3 §7.2):防抖/seq/按词对齐全在钩子里,App 只拿词和清单面板
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    panel: searchPanel,
+    clear: clearSearch
+  } = useWorkspaceSearch(result?.rootPath ?? null)
 
   // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
   // —— 预览页签改版后不再自带聊天,聊天上下文只认树里选中的对象,这个派生退役了
@@ -255,7 +262,8 @@ function App(): React.JSX.Element {
     setTreeNote(null)
     setGitInfo(null)
     setNotes({})
-    setTreeFilter('')
+    // 新工作区 = 新的浏览上下文:搜索词和清单一起清空(§7.2:词一清树就回来)
+    clearSearch()
     try {
       const scanned = await window.atlas.scanFolder(dir)
       if (!isCurrent()) return null
@@ -511,7 +519,7 @@ function App(): React.JSX.Element {
     setGitInfo(null)
     dismissPathHint()
     setNotes({})
-    setTreeFilter('')
+    clearSearch()
   }
 
   // 存一条手动备注(第九十八锤):空串 = 删除;上限和淘汰在 shared/notes 里管
@@ -564,9 +572,35 @@ function App(): React.JSX.Element {
     setRecents(toggleRecentPin(path))
   }
 
-  // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图
-  async function handleExpandLazy(relPath: string): Promise<void> {
-    if (!result || expandingRef.current) return
+  // ── 深搜结果的打开动作(UI v3 §7.2,本次重构唯一功能变更)──
+  // 文件夹命中 = 打开为工作区(§7.2 给定):走地址栏同一条扫描路
+  function openSearchDir(hit: SearchNameHit): void {
+    void scanPath(hit.absPath)
+  }
+
+  // 文件命中 = 开预览页签(走现有逻辑)。深搜到的可能住在「还没探」的目录里:
+  // 沿父链逐层探开(handleExpandLazy 返回新子树,本地账本手动接,不等 React 回合),
+  // 链探完节点就进树了;链上有探不开的也只是预览兜底说句实话,不装死
+  async function openSearchFile(hit: SearchNameHit): Promise<void> {
+    if (!result) return
+    let tree = result.tree
+    const parts = hit.relPath.split('/')
+    for (let i = 0; i < parts.length - 1; i++) {
+      const dirRel = parts.slice(0, i + 1).join('/')
+      const node = findDir(tree, dirRel)
+      if (!node) break // 父链在账本上断了:探不动了,剩下的交给预览兜底说实话
+      if (!node.lazy) continue
+      const sub = await handleExpandLazy(dirRel)
+      if (!sub) return // 探这一层失败了:treeNote 已挂实话,不再往下硬闯
+      tree = spliceSubtree(tree, dirRel, sub)
+    }
+    openPreview(hit.relPath)
+  }
+
+  // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图。
+  // 返回探到的子树 —— 深搜结果点开文件时,父链逐层探开要靠这个账本走下一步
+  async function handleExpandLazy(relPath: string): Promise<ScanDirNode | null> {
+    if (!result || expandingRef.current) return null
     expandingRef.current = true
     const isCurrent = requests.current.begin('expand')
     const root = result.rootPath
@@ -575,7 +609,7 @@ function App(): React.JSX.Element {
     try {
       // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径只能由主进程 joinRoot 解析
       const sub = await window.atlas.scanSubdir(root, relPath)
-      if (!isCurrent()) return
+      if (!isCurrent()) return null
       setResult((prev) =>
         prev && prev.rootPath === root
           ? {
@@ -585,8 +619,10 @@ function App(): React.JSX.Element {
             }
           : prev
       )
+      return sub.tree
     } catch (err) {
       if (isCurrent()) setTreeNote(cleanErrMsg(err))
+      return null
     } finally {
       if (isCurrent()) {
         setExpanding(null)
@@ -777,8 +813,8 @@ function App(): React.JSX.Element {
             nav={nav}
             goNav={goNav}
             handleRefresh={handleRefresh}
-            filter={treeFilter}
-            onFilterChange={setTreeFilter}
+            filter={searchQuery}
+            onFilterChange={setSearchQuery}
             tabs={
               // 页签带跟着组的账本走,不看工作区:首页开的单例签(设置)也要能点能 ×
               groups.length > 0 ? (
@@ -830,7 +866,9 @@ function App(): React.JSX.Element {
                 saveNote={saveNote}
                 openPreview={openPreview}
                 treeNote={treeNote}
-                filter={treeFilter}
+                search={searchPanel}
+                onOpenSearchFile={(hit) => void openSearchFile(hit)}
+                onOpenSearchDir={openSearchDir}
                 folder={folder}
                 scanning={scanning}
                 pathDraft={pathDraft}

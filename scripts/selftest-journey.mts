@@ -135,6 +135,11 @@ try {
     await page.getByRole('button', { name: '查看文件内容', exact: true }).waitFor()
   }
   await home()
+  // UI v3(B7):没工作区时顶栏搜索框置灰(深搜要有工作区根)
+  assert.ok(
+    await page.getByRole('searchbox', { name: '搜索文件', exact: true }).isDisabled(),
+    'top-bar search must be disabled without a workspace'
+  )
   // UI v3(B4):AI 状态收进 rail 底槽浮层,未配置引导要点开状态钮才现身
   await page.getByRole('button', { name: /AI 状态/ }).click()
   await page.locator('.ai-status-pop').getByText('AI 讲解尚未设置', { exact: true }).waitFor()
@@ -186,6 +191,31 @@ try {
   assert.equal(await calls('atlas:ai-explain-file'), 0)
   await release()
   await control({ holdGit: false })
+  // UI v3(B7):顶栏深搜——词一进,树区整体换成结果清单;文件命中补探父链后开预览页签;
+  // 空账照实说;文件夹命中打开为工作区(地址栏同一条路);清空词文件树原样回来
+  const searchBox = page.getByRole('searchbox', { name: '搜索文件', exact: true })
+  await searchBox.fill('guide')
+  await page.locator('.search-results .tree-row').waitFor()
+  await shot('search-results')
+  await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
+  await page.locator('.code-text').filter({ hasText: 'Getting started' }).waitFor()
+  await searchBox.fill('绝没有这个词zzz')
+  await page
+    .locator('.search-results')
+    .getByText(/没找到叫/)
+    .waitFor()
+  await searchBox.fill('src')
+  await page.locator('.search-results .tree-row.is-dir').waitFor()
+  await page.locator('.search-results .tree-row.is-dir').click()
+  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  assert.ok(
+    (await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()).endsWith(
+      'src'
+    ),
+    'directory hit must open itself as the workspace'
+  )
+  assert.equal(await searchBox.inputValue(), '', 'search box must clear when the workspace changes')
+  await open(project)
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page
     .locator('.code-text')

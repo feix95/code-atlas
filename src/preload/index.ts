@@ -5,6 +5,7 @@ import { readNumPref, writeNumPref } from '../shared/localPrefs.ts'
 import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
+import type { SearchNamesResult } from '../shared/searchNames.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -116,6 +117,9 @@ const atlasApi = {
     ipcRenderer.invoke(CH.scanFolder, folderPath),
   scanSubdir: (rootPath: string, relPath: string): Promise<ScanResult> =>
     ipcRenderer.invoke(CH.scanSubdir, rootPath, relPath),
+  /** 工作区文件名深搜(UI v3 §7.2):主进程真扫磁盘,新词顶掉在跑的旧一轮 */
+  searchNames: (rootPath: string, query: string): Promise<SearchNamesResult> =>
+    ipcRenderer.invoke(CH.searchNames, rootPath, query),
   analyzeFile: (
     rootPath: string,
     relPath: string,

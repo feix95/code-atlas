@@ -724,6 +724,13 @@
   vertical-align: -0.125rem;
 }
 
+/* ── 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
+.search-results .sr-state {
+  margin: var(--space-2) var(--space-1);
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+}
+
 /* 详情页副标题位置的备注:亮一档,跟引擎话区分 */
 .entity-title p.is-note {
   display: flex;
