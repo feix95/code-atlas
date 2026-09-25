@@ -56,7 +56,6 @@ const MIRROR_THROTTLE_MS = 100
 
 /** 轻提示各养各的体感时长(P2-6 具名):不共用一张表,但每个数都得有名有姓 */
 const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
-const SCAN_TOAST_MS = 4_000 // 扫描完成报个数
 const PATH_HINT_MS = 5_000 // 空路径点了「前往」的气泡提示
 function App(): React.JSX.Element {
   // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
@@ -88,8 +87,6 @@ function App(): React.JSX.Element {
   const [pathHint, flashPathHint, dismissPathHint] = useFlashValue<string | null>(null)
   const [pathShaking, setPathShaking] = useState(false)
   const pathInputRef = useRef<HTMLInputElement>(null)
-  // 扫描完成的轻提示:报个数就自己退场,不挡路
-  const [scanToast, flashScanToast] = useFlashValue<string | null>(null)
   // 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话,十几秒后自己退场
   const [revived, flashRevived] = useFlashFlag(REVIVED_MS)
   useEffect(() => {
@@ -230,11 +227,6 @@ function App(): React.JSX.Element {
     }
   }, [folder])
 
-  // 扫描完成的轻提示:报个数就自己退场
-  function flashToast(text: string): void {
-    flashScanToast(text, SCAN_TOAST_MS)
-  }
-
   // 统一的开图入口:清掉上一张图的旧账,再扫新路径;对话框选的和手输的都走这条。
   // 扫成的图递还给调用方(后退/前进恢复选中要在新树上找人);扫砸了回 null
   async function scanPath(dir: string): Promise<ScanResult | null> {
@@ -279,7 +271,6 @@ function App(): React.JSX.Element {
       setRecents(rememberRecentProject(root))
       // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
       if (root !== folder) pushNav({ folder: root, file: null, dir: null })
-      flashToast(`扫描完成:${scanned.stats.fileCount} 个文件`)
       // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
       setScanning(false)
       setGitLoading(true)
@@ -335,12 +326,9 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  // 刷新 = 把当前项目重扫一遍;没开项目就点了,告诉他缺什么,按钮不装哑巴
+  // 刷新 = 把当前项目重扫一遍;没开项目就点了,什么也不做
   async function handleRefresh(): Promise<void> {
-    if (!folder) {
-      flashToast('先打开一个项目,再刷新')
-      return
-    }
+    if (!folder) return
     if (!scanning) await scanPath(folder)
   }
 
@@ -664,8 +652,8 @@ function App(): React.JSX.Element {
     onSashDoubleClick,
     onSashKeyDown
   } = useSidebarSash()
-  // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路,完成后报个百分比
-  useWheelZoom((f) => flashToast(`界面大小 ${Math.round(f * 100)}%`))
+  // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路
+  useWheelZoom(() => {})
   const {
     groups,
     setGroups,
@@ -871,49 +859,49 @@ function App(): React.JSX.Element {
               }}
               onSettings={() => openSettings()}
             />
-            {!sidebarCollapsed && (
-              <WorkspaceSidebar
-                result={result}
-                notes={notes}
-                selectedFile={selectedFile}
-                selectedFolder={selectedFolder}
-                expanding={expanding}
-                revealPaths={revealPaths}
-                followFile={followFile}
-                followDir={followDir}
-                handleExpandLazy={handleExpandLazy}
-                editNoteFromTree={editNoteFromTree}
-                saveNote={saveNote}
-                openPreview={openPreview}
-                treeNote={treeNote}
-                search={searchPanel}
-                onOpenSearchFile={(hit) => void openSearchFile(hit)}
-                onOpenSearchDir={openSearchDir}
-                folder={folder}
-                scanning={scanning}
-                pathDraft={pathDraft}
-                pathHint={pathHint}
-                pathShaking={pathShaking}
-                pathInputRef={pathInputRef}
-                setPathDraft={setPathDraft}
-                dismissPathHint={dismissPathHint}
-                goPath={goPath}
-                setPathShaking={setPathShaking}
-                recents={recents}
-                onOpenWorkspace={(path) => void scanPath(path)}
-                onTogglePin={togglePinRecent}
-                onRemoveRecent={removeRecent}
-                sidebarWidth={sidebarWidth}
-                onSashPointerDown={onSashPointerDown}
-                onSashPointerMove={onSashPointerMove}
-                endSashDrag={endSashDrag}
-                onSashDoubleClick={onSashDoubleClick}
-                onSashKeyDown={onSashKeyDown}
-                drives={drives}
-                drivesNote={drivesNote}
-                onOpenBrowseFile={openBrowseFile}
-              />
-            )}
+            {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
+                不是卸载 —— 展开态的滚动/勾选都留得住 */}
+            <WorkspaceSidebar
+              result={result}
+              notes={notes}
+              selectedFile={selectedFile}
+              selectedFolder={selectedFolder}
+              expanding={expanding}
+              revealPaths={revealPaths}
+              followFile={followFile}
+              followDir={followDir}
+              handleExpandLazy={handleExpandLazy}
+              editNoteFromTree={editNoteFromTree}
+              saveNote={saveNote}
+              openPreview={openPreview}
+              treeNote={treeNote}
+              search={searchPanel}
+              onOpenSearchFile={(hit) => void openSearchFile(hit)}
+              onOpenSearchDir={openSearchDir}
+              folder={folder}
+              scanning={scanning}
+              pathDraft={pathDraft}
+              pathHint={pathHint}
+              pathShaking={pathShaking}
+              pathInputRef={pathInputRef}
+              setPathDraft={setPathDraft}
+              dismissPathHint={dismissPathHint}
+              goPath={goPath}
+              setPathShaking={setPathShaking}
+              recents={recents}
+              onOpenWorkspace={(path) => void scanPath(path)}
+              onTogglePin={togglePinRecent}
+              onRemoveRecent={removeRecent}
+              sidebarWidth={sidebarWidth}
+              onSashPointerDown={onSashPointerDown}
+              onSashPointerMove={onSashPointerMove}
+              endSashDrag={endSashDrag}
+              onSashDoubleClick={onSashDoubleClick}
+              onSashKeyDown={onSashKeyDown}
+              drives={drives}
+              drivesNote={drivesNote}
+              onOpenBrowseFile={openBrowseFile}
+            />
             {result && !scanning ? (
               // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
               <main className="workspace">
@@ -977,12 +965,6 @@ function App(): React.JSX.Element {
             )}
           </div>
 
-          {/* 全局轻提示挪到 .app 层:扫描报数/Ctrl+滚轮缩放报百分比,首页和设置页也要浮得出来 */}
-          {scanToast && (
-            <div className="scan-toast" role="status">
-              {scanToast}
-            </div>
-          )}
           {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
           <TooltipHost />
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}

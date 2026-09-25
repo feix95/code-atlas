@@ -30,7 +30,7 @@ export const KIND_LABELS: Record<PaneKind, string> = {
 
 /** 跟随页签的门面:页签栏挂品类名牌(装着谁看正文头部),图标从图标册领 */
 export const KIND_ICONS: Record<PaneKind, string> = {
-  overview: 'bulb',
+  overview: 'navigation',
   chat: 'bot',
   preview: 'code',
   graph: 'view',

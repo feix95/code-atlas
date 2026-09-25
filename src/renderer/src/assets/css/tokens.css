@@ -20,7 +20,6 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-xl: 0.625rem;
-  --radius-chrome-field: 0.6rem; /* workspace 地址卡 */
   --radius-lg: 0.75rem;
   --radius-pill: 999px;
   /* 窗角 14px:物理像素例外(圆角要贴屏幕物理直角,不跟 rem 缩放),三处共用这一户 */
@@ -88,7 +87,6 @@
   --z-jump: 2;
   --z-float: 5;
   --z-pane-hint: 6;
-  --z-toast: 10;
   --z-code-float: 28;
   --z-code-mark: 29;
   --z-popover: 30;
@@ -280,7 +278,7 @@ body {
 }
 
 .app {
-  position: relative; /* 全局轻提示(scan-toast)的锚点 */
+  position: relative; /* 后代绝对定位件的锚点 */
   height: 100%;
   display: flex;
   flex-direction: column;

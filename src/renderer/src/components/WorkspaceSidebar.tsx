@@ -163,9 +163,9 @@ export function WorkspaceSidebar({
   }
   return (
     <>
-      {/* 宽度吃 .app 上的 --sidebar-w(顶栏左段同认它,分界线上行段才对得齐);
-          rem 值由 App 按 基准宽/(16×uiScale) 算好挂进 CSS 变量,坐标系只有一套 */}
-      <aside className="sidebar" style={{ width: 'var(--sidebar-w)' }}>
+      {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
+          内联样式会压住类规则,所以宽度不挂行内 */}
+      <aside className="sidebar">
         {/* workspace 栏 = 地址栏式卡(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
             ⇅ 钮开/收两态,菜单浮层盖在文件树上(不推挤布局、宽与卡同宽) */}
         <div className="sidebar-top">
@@ -209,8 +209,8 @@ export function WorkspaceSidebar({
               {/* 两条 chevron 分挂类名,悬停各自动画(lucide 线稿,TreeIcon 同款笔触) */}
               <svg
                 className="wsm-chev"
-                width="1.31875rem"
-                height="1.31875rem"
+                width="1rem"
+                height="1rem"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

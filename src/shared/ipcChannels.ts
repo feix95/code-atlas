@@ -12,6 +12,8 @@ export const CH = {
   windowMaximizeToggle: 'atlas:window-maximize-toggle',
   windowIsMaximized: 'atlas:window-is-maximized',
   windowMaximized: 'atlas:window-maximized',
+  windowDragStart: 'atlas:window-drag-start',
+  windowDragMove: 'atlas:window-drag-move',
   // ── 露窗保险与救生圈 ──
   firstFrame: 'atlas:first-frame',
   frameHeartbeat: 'atlas:frame-heartbeat',

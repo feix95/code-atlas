@@ -21,6 +21,48 @@ export interface TabBarTab {
  * 页签可以拖:拖到别的页签上换位置,拖到另一组的页签栏/正文里就是搬家(积木式拼装)。
  * 中键点页签 = 关闭。页签多了横向滚。
  */
+/** 页签尾空白的左键拖窗:这块地铺不了 app-region:drag(右键菜单+拖放落点会被吞),
+ *  改手动搬窗 —— 位移攒够 4px 阈值才算拖(免得最大化下点一下就把窗还原),
+ *  之后把屏幕坐标增量报给主进程 setPosition;指针捕获让光标甩出窗也能继续跟手 */
+function startWindowDrag(e: React.PointerEvent<HTMLDivElement>): void {
+  if (e.button !== 0) return
+  const el = e.currentTarget
+  el.setPointerCapture(e.pointerId)
+  const startX = e.screenX
+  const startY = e.screenY
+  let lastX = startX
+  let lastY = startY
+  let accX = 0
+  let accY = 0
+  let dragging = false
+  const move = (ev: PointerEvent): void => {
+    const dx = ev.screenX - lastX
+    const dy = ev.screenY - lastY
+    lastX = ev.screenX
+    lastY = ev.screenY
+    if (!dragging) {
+      accX += dx
+      accY += dy
+      if (Math.abs(accX) + Math.abs(accY) < 4) return
+      dragging = true
+      window.atlas.windowDragStart(startX, startY)
+      window.atlas.windowDragMove(accX, accY)
+      accX = 0
+      accY = 0
+      return
+    }
+    if (dx !== 0 || dy !== 0) window.atlas.windowDragMove(dx, dy)
+  }
+  const done = (): void => {
+    el.removeEventListener('pointermove', move)
+    el.removeEventListener('pointerup', done)
+    el.removeEventListener('pointercancel', done)
+  }
+  el.addEventListener('pointermove', move)
+  el.addEventListener('pointerup', done)
+  el.addEventListener('pointercancel', done)
+}
+
 export function TabBar({
   tabs,
   activeId,
@@ -195,10 +237,13 @@ export function TabBar({
         )
       })}
       {/* 页签卡之间的空白:右键弹品类菜单(小葵图里的「空白区域」);也是拖页签搬家的落点。
-          自己组的页签拖回来 = 挪到本组末尾;别组的页签 = 搬家 */}
+          自己组的页签拖回来 = 挪到本组末尾;别组的页签 = 搬家。
+          左键按住拖 = 手动搬窗(等价原生 drag 面),双击 = 最大化/还原 */}
       <div
         className="tabbar-blank"
         onContextMenu={openKindMenu}
+        onPointerDown={startWindowDrag}
+        onDoubleClick={() => void window.atlas.windowMaximizeToggle()}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(DRAG_MIME_TAB)) {
             e.preventDefault()

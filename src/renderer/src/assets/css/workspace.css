@@ -16,11 +16,33 @@
 
 .sidebar {
   flex-shrink: 0;
+  /* 宽度吃 .app 上的 --sidebar-w(顶栏左段同认它,分界线上行段才对得齐);
+     rem 值由 App 按 基准宽/(16×uiScale) 算好挂进 CSS 变量,坐标系只有一套 */
+  width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--chrome-panel); /* v3 面板底 #f6f6f6 */
   overflow: hidden; /* 右缘分界线由 sash 中线画,侧栏自己不再描边 */
+  /* 收起/展开:宽收到 0 滑出;visibility 0s = 展开瞬间显形,
+     收起时的延后在下面 .is-side-collapsed 规则里写 */
+  transition:
+    width var(--dur-3) var(--ease-smooth),
+    visibility 0s;
+}
+
+/* 收起态:宽动画收到 0,visibility 等动画走完再隐 —— 不然收起瞬间整条直接跳没 */
+.app.is-side-collapsed .sidebar {
+  width: 0;
+  visibility: hidden;
+  transition:
+    width var(--dur-3) var(--ease-smooth),
+    visibility 0s var(--dur-3);
+}
+
+/* 收放动画里子层冻结原宽被 overflow 裁掉 —— 不冻结的话树行边收边重排,像被挤扁 */
+.sidebar > * {
+  width: var(--sidebar-w);
 }
 
 /* workspace 栏(§7.0):顶缘留白减半,卡片上移 */
@@ -39,7 +61,7 @@
   height: calc(var(--u) * 0.8);
   padding: 0 0.375rem 0 0.75rem;
   background: var(--chrome-float);
-  border-radius: var(--radius-chrome-field);
+  border-radius: var(--radius-xxs); /* 与顶栏搜索框同档圆角 */
 }
 
 .ws-path {
@@ -118,8 +140,7 @@
   /* 与 ws-card 同底(浏览器地址栏下拉同款);滚动条走全局 webkit 路
      (标准 scrollbar-* 会切到 Fluent 滚条,自带端点三角且无视伪元素) */
   background: var(--chrome-float);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xxs); /* 与上面输入卡同档圆角 */
 }
 
 /* 工作区条目区:可视 5 条内部滚动;盘根区同宽同风格,超出也内部滚动(滚动条走全局 webkit 路) */

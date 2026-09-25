@@ -31,6 +31,39 @@ export function registerShellIpc(): void {
     (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false
   )
 
+  // 页签尾空白的手动搬窗:那块地是右键菜单+拖放落点的地盘,铺不了 app-region:drag
+  // (drag 区不吃 contextmenu/dragover),渲染层改报屏幕坐标,主进程 setPosition。
+  // start 只在最大化时有活:先还原,窗顶回工作区顶,光标保持它在条上的水平比例位
+  ipcMain.on(CH.windowDragStart, (event, x: unknown, y: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed() || !win.isMaximized()) return
+    if (
+      typeof x !== 'number' ||
+      typeof y !== 'number' ||
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    )
+      return
+    const before = win.getBounds()
+    win.unmaximize()
+    const w = win.getBounds().width
+    const ratio = before.width > 0 ? Math.min(1, Math.max(0, (x - before.x) / before.width)) : 0.5
+    win.setPosition(Math.round(x - w * ratio), before.y)
+  })
+  ipcMain.on(CH.windowDragMove, (event, dx: unknown, dy: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed() || win.isMaximized()) return
+    if (
+      typeof dx !== 'number' ||
+      typeof dy !== 'number' ||
+      !Number.isFinite(dx) ||
+      !Number.isFinite(dy)
+    )
+      return
+    const [x, y] = win.getPosition()
+    win.setPosition(Math.round(x + dx), Math.round(y + dy))
+  })
+
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
   // 第八十八锤:对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
   ipcMain.handle(CH.pickFolder, async (event) => {

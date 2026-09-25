@@ -1,15 +1,15 @@
 // 顶栏页签区(UI v3 · §5.1 Chrome 式):每个页签组一条胶囊带,
 // 条带与下方分屏列一一对齐 —— 第一组按 paneSplit 占宽,
 // 两组之间的细柱 = 下方分割条中线的上延。
-// 几何账:顶栏页签区比内容列窄一个窗控块(9rem);sash 零占位骑缝后页签区与内容列同起点,
-// 折成 「组宽% + 9×占比 rem」 的纯加减式,calc 不碰乘法。
+// 几何账:顶栏页签区比内容列窄一个窗控块(3×1u);页签区与内容列同起点,
+// 折成 「组宽% + 占比×3u」 的纯加减式,窗控宽挂 --u 跟着缩放,不写死 rem。
 import { Fragment } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import type { PaneKind } from '../paneKinds'
 import { TabBar } from './TabBar'
 
-/** 窗控三键总宽 9rem:页签区右端比内容列右端短这么一截,对齐账里要补回来 */
-const WIN_CTL_REM = 9
+/** 窗控三键总宽 3u(每钮 1u):页签区右端比内容列右端短这么一截,对齐账里要补回来 */
+const WIN_CTL_U = 3
 
 export function TopBarTabs({
   groups,
@@ -43,7 +43,7 @@ export function TopBarTabs({
 }): React.JSX.Element {
   // 第一组条带宽 = paneSplit × 内容列宽。用页签区宽当分母折回:
   //   条带宽 = 占比 × (页签区宽 + 窗控宽)
-  const firstBasis = `calc(${(paneSplit * 100).toFixed(3)}% + ${(WIN_CTL_REM * paneSplit).toFixed(4)}rem)`
+  const firstBasis = `calc(${(paneSplit * 100).toFixed(3)}% + var(--u) * ${(WIN_CTL_U * paneSplit).toFixed(4)})`
   return (
     <>
       {groups.map((g, gi) => (

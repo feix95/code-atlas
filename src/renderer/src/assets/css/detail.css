@@ -13,6 +13,13 @@
   padding: 0;
   outline: none;
   touch-action: none;
+  /* 跟随侧栏收放:动画中骑在滑动的分界线上,走完随侧栏一起隐 */
+  transition: visibility 0s;
+}
+
+.app.is-side-collapsed .sash {
+  visibility: hidden;
+  transition: visibility 0s var(--dur-3);
 }
 
 .sash::after {
@@ -52,22 +59,6 @@ body.is-sash-dragging {
   /* v3 内容面 = 激活页签同一白面(--chrome-surface);内容卡片仍是无染的白底,文字对比度不让步 */
   background: var(--chrome-surface);
   position: relative;
-}
-
-/* 扫描完成的轻提示:浮在详情右上角,报个数就走 */
-.scan-toast {
-  position: absolute;
-  top: 0.625rem;
-  right: 0.875rem;
-  z-index: var(--z-toast);
-  padding: var(--space-1) var(--space-3);
-  color: var(--text);
-  font-size: var(--font-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-pop);
-  pointer-events: none;
 }
 
 /* ── 左右分组(积木式拼装):页签带已上顶栏(UI v3,样式在 chrome.css),

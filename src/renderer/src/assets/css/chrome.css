@@ -22,6 +22,9 @@
   flex-shrink: 0;
   width: calc(var(--u) + var(--sidebar-w, 0rem));
   border-right: 1px solid var(--line);
+  /* 收起动画:is-bare 把宽折回 1u,过渡跟着走;展开时搜索组从裁切里滑出 */
+  overflow: hidden;
+  transition: width var(--dur-3) var(--ease-smooth);
 }
 
 /* 侧栏收起 / 没开项目:左段只剩收起钮那一列,分界线贴 rail 右缘 */
@@ -237,7 +240,7 @@
   gap: var(--space-2);
   padding: 0 0.375rem 0 0.75rem;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--chrome-hover); /* 非激活签:同档更灰(§5.1) */
+  background: transparent; /* 闲置签不铺底:透出顶栏本色,只留文字和 icon */
   color: var(--chrome-ink);
   font-size: var(--font-ui-small);
   font-family: inherit;
@@ -248,7 +251,7 @@
 }
 
 .tabbar-tab:hover {
-  background: var(--chrome-panel);
+  background: var(--chrome-hover); /* 未激活签悬停 #d7d7d7(深色档自动落 #3d3d3d) */
 }
 
 /* 激活签 = 页面面色的胶囊,字用最深档;底缘下探 1px 压住顶栏底线 ——
@@ -299,6 +302,8 @@
 }
 
 .tabbar-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -403,10 +408,11 @@
   font-size: var(--font-xs);
 }
 
-/* 关闭钮:悬停页签才现身;点击热区就是它自己的 padding box,不玩视觉藏猫猫 */
+/* 关闭钮:钉在页签右端(名字 flex 把它顶到边)。激活签/悬停签常驻;
+   两头都不沾的签彻底藏起来不占位 —— 那种签只显示页标题 */
 .tabbar-close {
   flex: none;
-  opacity: 0;
+  display: none;
   padding: 0.125rem var(--space-1);
   border: 0;
   border-radius: var(--radius-sm);
@@ -418,8 +424,9 @@
 }
 
 .tabbar-tab:hover .tabbar-close,
-.tabbar-close:focus-visible {
-  opacity: 1;
+.tabbar-tab.is-active .tabbar-close {
+  display: inline-flex;
+  align-items: center;
 }
 
 .tabbar-close:hover {
