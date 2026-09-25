@@ -61,7 +61,7 @@ export function AppTopBar({
           <>
             {/* 工作区文件名搜索:B1 先接旧的树内过滤,深搜升级在 B7 */}
             <label className="tb-search">
-              <TreeIcon name="search" size={18} mono />
+              <TreeIcon name="search" size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
               <input
                 type="search"
                 value={filter}

@@ -23,14 +23,14 @@
   overflow: hidden; /* 右缘分界线由 sash 中线画,侧栏自己不再描边 */
 }
 
-/* workspace 栏(§7.0):卡片上下各留 ~0.3u 空隙 */
+/* workspace 栏(§7.0):顶缘留白减半,卡片上移 */
 .sidebar-top {
-  padding: 1.2rem 0.6rem 0.9rem;
+  padding: 0.6rem 0.6rem 0.9rem;
   flex-shrink: 0;
 }
 
 /* workspace 卡(§3.4 按图推算+小葵实测定稿):高 0.8u、底吃浮层灰 chrome-float、
-   无描边、圆角 0.6rem——浏览器地址栏式填充块。B1 先当纯路径输入框用,B5 再补 ⇅ 菜单 */
+   无描边、圆角吃地址栏组 token——浏览器地址栏式填充块。B1 先当纯路径输入框用,B5 再补 ⇅ 菜单 */
 .ws-card {
   position: relative;
   display: flex;
@@ -39,7 +39,7 @@
   height: calc(var(--u) * 0.8);
   padding: 0 0.375rem 0 0.75rem;
   background: var(--chrome-float);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-chrome-field);
 }
 
 .ws-path {

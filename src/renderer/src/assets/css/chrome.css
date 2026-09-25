@@ -63,33 +63,98 @@
   flex-shrink: 0;
 }
 
-/* 搜索框:高 0.65u、交互灰底、左放大镜;左缘 ≈ rail 右缘 + 0.15u,
-   和侧栏 workspace 卡的左缘同一条线(规格 §3.1) */
+/* 搜索框:空闲时灰底方块边长等于行高,hover/focus 后向右展开;左缘与 workspace 卡对齐 */
 .tb-search {
-  flex: 1;
+  position: relative;
+  isolation: isolate;
+  flex: 0 1 3rem;
   min-width: 3rem;
-  height: 2.6rem;
+  height: var(--chrome-search-row-height);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0;
   margin-left: 0.6rem;
-  padding: 0 0.75rem;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-xxs);
-  background: var(--chrome-hover);
+  border-radius: var(--radius-chrome-field);
+  background: transparent;
   color: var(--chrome-ink);
   -webkit-app-region: no-drag;
+}
+
+.tb-search::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 50%;
+  width: var(--chrome-search-row-height);
+  height: var(--chrome-search-row-height);
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-chrome-field);
+  background: var(--chrome-hover);
+  pointer-events: none;
+}
+
+.tb-search > svg,
+.tb-search input {
+  position: relative;
+  z-index: 1;
+}
+
+.tb-search:hover,
+.tb-search:focus-within {
+  flex-grow: 1;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  background: var(--chrome-hover);
+}
+
+.tb-search:hover::before,
+.tb-search:focus-within::before {
+  opacity: 0;
 }
 
 .tb-search input {
   flex: 1;
   min-width: 0;
+  max-width: 0;
+  padding: 0;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--chrome-ink);
   font-size: var(--font-ui-medium);
   font-family: inherit;
+  opacity: 0;
+}
+
+.tb-search:hover input,
+.tb-search:focus-within input {
+  max-width: 100%;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tb-search {
+    transition:
+      flex-grow var(--dur-3) var(--ease-smooth),
+      gap var(--dur-3) var(--ease-smooth),
+      padding var(--dur-3) var(--ease-smooth),
+      background-color var(--dur-2) var(--ease-smooth);
+  }
+
+  .tb-search::before {
+    transition: opacity var(--dur-2) var(--ease-smooth);
+  }
+
+  .tb-search input {
+    transition:
+      max-width var(--dur-3) var(--ease-smooth),
+      opacity var(--dur-2) var(--ease-smooth);
+  }
 }
 
 .tb-search input::placeholder {
@@ -501,7 +566,39 @@
   flex-shrink: 0;
 }
 
-.rail-btn:hover:not(:disabled) {
+.rail > .rail-btn:not(.rail-ai) {
+  position: relative;
+  isolation: isolate;
+  padding: 0;
+  clip-path: inset(0.5rem round var(--radius-xxs));
+}
+
+.rail > .rail-btn:not(.rail-ai)::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0.5rem;
+  border-radius: var(--radius-xxs);
+  background: var(--chrome-hover);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rail > .rail-btn:not(.rail-ai) > svg {
+  position: relative;
+  z-index: 1;
+}
+
+.rail > .rail-btn:not(.rail-ai):hover:not(:disabled) {
+  background: transparent;
+}
+
+.rail > .rail-btn:not(.rail-ai):hover:not(:disabled)::before,
+.rail > .rail-btn:not(.rail-ai):focus-visible::before {
+  opacity: 1;
+}
+
+.rail-ai:hover:not(:disabled) {
   background: var(--chrome-hover);
 }
 
@@ -512,6 +609,9 @@
 
 /* AI 状态钮压底 */
 .rail-ai {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   margin-top: auto;
   margin-bottom: 0.7rem;
 }
