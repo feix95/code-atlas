@@ -7,11 +7,11 @@
  */
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 
-export type PaneKind = 'overview' | 'chat' | 'preview' | 'graph'
+export type PaneKind = 'overview' | 'chat' | 'preview' | 'graph' | 'settings'
 
 /** 品类的固定展示顺序(页签栏右键菜单从上到下按这个排)。
- *  注意:graph 这类单例功能签不在菜单里 —— 它没有「勾显/隐藏」的说法,
- *  由 rail 入口直接开/聚焦(图谱本体还没造,先挂占位签) */
+ *  注意:graph/settings 这类单例功能签不在菜单里 —— 它没有「勾显/隐藏」的说法,
+ *  由 rail 入口直接开/聚焦(图谱本体还没造,先挂占位签;设置原弹窗退役改页签) */
 export const KIND_ORDER: PaneKind[] = ['overview', 'chat', 'preview']
 
 /** 品类菜单管不管得着它:菜单里的品类才有勾选开关;菜单外的(图谱等单例签)永远可见 */
@@ -23,7 +23,8 @@ export const KIND_LABELS: Record<PaneKind, string> = {
   overview: '概览',
   chat: 'Atlas 小探针',
   preview: '文件预览',
-  graph: '关系图谱'
+  graph: '关系图谱',
+  settings: '设置'
 }
 
 /** 跟随页签的门面:页签栏挂品类名牌(装着谁看正文头部),图标从图标册领 */
@@ -31,7 +32,8 @@ export const KIND_ICONS: Record<PaneKind, string> = {
   overview: 'bulb',
   chat: 'bot',
   preview: 'code',
-  graph: 'view'
+  graph: 'view',
+  settings: 'settings2'
 }
 
 /** 第一层过滤:节点类型 → 可用品类上限 */

@@ -18,7 +18,7 @@ import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { HomePage } from './components/HomePage'
-import { SettingsDialog } from './components/SettingsDialog'
+import type { SectionKey } from './components/SettingsPage'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
@@ -125,9 +125,10 @@ function App(): React.JSX.Element {
   // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和右栏 git 门共用
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [settingsSection, setSettingsSection] = useState<'appearance' | 'ai' | 'advanced'>(
-    'appearance'
+  // 「AI 设置」直达的翻页请求:每点一次入口 seq +1,设置页签照着翻到指定节
+  // (设置是单例页签,不是弹窗 —— 开在页签区里,没开工作区也能用)
+  const [settingsReq, setSettingsReq] = useState<{ section: SectionKey; seq: number } | undefined>(
+    undefined
   )
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   // 讲解深度(教学三档):跟着 AI 配置走;档位一换,讲解钩子就把按旧档讲的旧账清掉
@@ -297,9 +298,14 @@ function App(): React.JSX.Element {
     if (dir) await scanPath(dir)
   }
 
+  // 设置单例签:rail 齿轮开外观节;AI 状态浮层「AI 设置」直达高级节(seq 触发页内翻节)
+  function openSettings(section: SectionKey = 'appearance'): void {
+    ensureKindTab('settings', null)
+    setSettingsReq((prev) => ({ section, seq: (prev?.seq ?? 0) + 1 }))
+  }
+
   function openAiSettings(): void {
-    setSettingsSection('advanced')
-    setShowSettings(true)
+    openSettings('advanced')
   }
 
   useEffect(() => {
@@ -674,6 +680,75 @@ function App(): React.JSX.Element {
     saveNote
   })
 
+  // 分屏正文区(工作区/无工作区共用一份):无工作区时只有单例签(设置/图谱)能立组,
+  // 顶栏页签带照常对齐,正文就是那张签
+  const paneGroupsEl = (
+    <PaneGroups
+      groups={groups}
+      freechatHost={freechatHost}
+      moveTab={moveTab}
+      setActiveGroupId={setActiveGroupId}
+      dropMark={dropMark}
+      setDropMark={setDropMark}
+      draggingTab={draggingTab}
+      onPaneSashDown={onPaneSashDown}
+      applyPaneSplit={applyPaneSplit}
+      paneSplit={paneSplit}
+      showDropHint={showDropHint}
+      result={result}
+      previewRefs={previewRefs}
+      removePreviewRef={removePreviewRef}
+      handleDropNode={handleDropNode}
+      fileLinks={fileLinks}
+      chatSuggestionsOn={chatSuggestionsOn}
+      renderTabBody={(t) => (
+        <TabBody
+          tab={t}
+          result={result}
+          notes={notes}
+          noteEditRequest={noteEditRequest}
+          previewRefs={previewRefs}
+          previewJump={previewJump}
+          selectedFile={selectedFile}
+          selectedFolder={selectedFolder}
+          structure={structure}
+          analyzing={analyzing}
+          analyzeNote={analyzeNote}
+          graph={graph}
+          graphLoading={graphLoading}
+          graphNote={graphNote}
+          gitInfo={gitInfo}
+          setGitInfo={setGitInfo}
+          gitLoading={gitLoading}
+          chatSuggestionsOn={chatSuggestionsOn}
+          chat={chat}
+          chatContext={chatContext}
+          fileLinks={fileLinks}
+          goAskInChat={goAskInChat}
+          handleLoadGraph={handleLoadGraph}
+          jumpTo={jumpTo}
+          saveNote={saveNote}
+          editNoteFromTree={editNoteFromTree}
+          openPreview={openPreview}
+          closeTab={closeTab}
+          addPreviewRef={addPreviewRef}
+          removePreviewRef={removePreviewRef}
+          handleDropNode={handleDropNode}
+          settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+          settingsSectionReq={settingsReq}
+          onAiConfigSaved={(c) => {
+            setAiConfigured(isAiConfigured(c))
+            setTeaching(sanitizePersonalization(c.personalization).teaching)
+          }}
+          onChatSuggestionsChange={(v) => {
+            setChatSuggestionsOn(v)
+            saveChatSuggestionsOn(v)
+          }}
+        />
+      )}
+    />
+  )
+
   return (
     <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
       <TeachingContext.Provider value={teaching}>
@@ -705,7 +780,8 @@ function App(): React.JSX.Element {
             filter={treeFilter}
             onFilterChange={setTreeFilter}
             tabs={
-              result && !scanning ? (
+              // 页签带跟着组的账本走,不看工作区:首页开的单例签(设置)也要能点能 ×
+              groups.length > 0 ? (
                 <TopBarTabs
                   groups={groups}
                   visibleOfGroup={visibleOfGroup}
@@ -737,10 +813,7 @@ function App(): React.JSX.Element {
                 if (freechatHost === 'pet') window.atlas.openMainPanel()
                 ensureKindTab('chat', null)
               }}
-              onSettings={() => {
-                setSettingsSection('appearance')
-                setShowSettings(true)
-              }}
+              onSettings={() => openSettings()}
             />
             {!sidebarCollapsed && (
               <WorkspaceSidebar
@@ -792,63 +865,12 @@ function App(): React.JSX.Element {
                       {scanToast}
                     </div>
                   )}
-                  <PaneGroups
-                    groups={groups}
-                    freechatHost={freechatHost}
-                    moveTab={moveTab}
-                    setActiveGroupId={setActiveGroupId}
-                    dropMark={dropMark}
-                    setDropMark={setDropMark}
-                    draggingTab={draggingTab}
-                    onPaneSashDown={onPaneSashDown}
-                    applyPaneSplit={applyPaneSplit}
-                    paneSplit={paneSplit}
-                    showDropHint={showDropHint}
-                    result={result}
-                    previewRefs={previewRefs}
-                    removePreviewRef={removePreviewRef}
-                    handleDropNode={handleDropNode}
-                    fileLinks={fileLinks}
-                    chatSuggestionsOn={chatSuggestionsOn}
-                    renderTabBody={(t) => (
-                      <TabBody
-                        tab={t}
-                        result={result}
-                        notes={notes}
-                        noteEditRequest={noteEditRequest}
-                        previewRefs={previewRefs}
-                        previewJump={previewJump}
-                        selectedFile={selectedFile}
-                        selectedFolder={selectedFolder}
-                        structure={structure}
-                        analyzing={analyzing}
-                        analyzeNote={analyzeNote}
-                        graph={graph}
-                        graphLoading={graphLoading}
-                        graphNote={graphNote}
-                        gitInfo={gitInfo}
-                        setGitInfo={setGitInfo}
-                        gitLoading={gitLoading}
-                        chatSuggestionsOn={chatSuggestionsOn}
-                        chat={chat}
-                        chatContext={chatContext}
-                        fileLinks={fileLinks}
-                        goAskInChat={goAskInChat}
-                        handleLoadGraph={handleLoadGraph}
-                        jumpTo={jumpTo}
-                        saveNote={saveNote}
-                        editNoteFromTree={editNoteFromTree}
-                        openPreview={openPreview}
-                        closeTab={closeTab}
-                        addPreviewRef={addPreviewRef}
-                        removePreviewRef={removePreviewRef}
-                        handleDropNode={handleDropNode}
-                      />
-                    )}
-                  />
+                  {paneGroupsEl}
                 </section>
               </main>
-            ) : (
+            ) : scanning || error || groups.length === 0 ? (
+              // 扫描中/失败/回家:这些状态优先于页签房 —— 扫描失败时 resetPaneTabs 留下的
+              // 空跟随签组不许顶掉错误页
               <main className="content">
                 {scanning && (
                   <div className="state" role="status" aria-live="polite">
@@ -896,28 +918,16 @@ function App(): React.JSX.Element {
                   />
                 )}
               </main>
+            ) : (
+              // 没开工作区也能有房:单例签(设置/图谱)孤零零一张签也要正文区
+              <main className="workspace">
+                <section className="detail">{paneGroupsEl}</section>
+              </main>
             )}
           </div>
 
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
-
-          {showSettings && (
-            <SettingsDialog
-              workspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
-              initialSection={settingsSection}
-              onAiConfigSaved={(c) => {
-                setAiConfigured(isAiConfigured(c))
-                setTeaching(sanitizePersonalization(c.personalization).teaching)
-              }}
-              chatSuggestionsOn={chatSuggestionsOn}
-              onChatSuggestionsChange={(v) => {
-                setChatSuggestionsOn(v)
-                saveChatSuggestionsOn(v)
-              }}
-              onClose={() => setShowSettings(false)}
-            />
-          )}
         </div>
       </TeachingContext.Provider>
     </AiSetupContext.Provider>

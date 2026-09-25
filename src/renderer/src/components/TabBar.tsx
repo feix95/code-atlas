@@ -1,7 +1,7 @@
 ﻿import { useCallback, useState } from 'react'
 import { DRAG_MIME_TAB } from '@shared/dragTypes'
 import { TreeIcon } from './Icons'
-import { KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
+import { isMenuKind, KIND_LABELS, KIND_ORDER, type PaneKind } from '../paneKinds'
 import { useMenuDismiss } from '../useMenuDismiss'
 
 /** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
@@ -108,11 +108,13 @@ export function TabBar({
       }}
     >
       {tabs.map((t) => {
-        const title = t.pinned
-          ? t.kind === 'chat'
-            ? `${t.name} —— 这页对话钉住了,树里换文件它不动;对话没了就是没了,关页签前想好`
-            : `${t.name} —— 已钉住,树里换文件它不动;双击可以取消钉住`
-          : `${t.name} —— 跟着左侧树走,点谁它显示谁;双击钉住`
+        const title = !isMenuKind(t.kind)
+          ? `${t.name} —— 单例功能签,全系统只此一张`
+          : t.pinned
+            ? t.kind === 'chat'
+              ? `${t.name} —— 这页对话钉住了,树里换文件它不动;对话没了就是没了,关页签前想好`
+              : `${t.name} —— 已钉住,树里换文件它不动;双击可以取消钉住`
+            : `${t.name} —— 跟着左侧树走,点谁它显示谁;双击钉住`
         return (
           <div
             key={t.id}

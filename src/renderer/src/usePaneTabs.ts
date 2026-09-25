@@ -100,7 +100,8 @@ export function usePaneTabs(deps: {
   }
 
   // 开一张新图/回家时页签重置:单组,概览+探针两张跟随页签就位(勾着的品类才可见),
-  // 激活可见的第一张;预览不预开 —— 双击文件才开
+  // 激活可见的第一张;预览不预开 —— 双击文件才开。
+  // 菜单外的单例签(设置/图谱)是 app 级房间,换工作区不带走 —— 挪进新组继续开着
   function resetPaneTabs(): void {
     const overview = paneTabFor('overview', null)
     const probe = paneTabFor('chat', null)
@@ -113,7 +114,10 @@ export function usePaneTabs(deps: {
           ? probe.id
           : null
     }
-    setGroups([group])
+    setGroups((prev) => {
+      const keep = prev.flatMap((g) => g.tabs).filter((t) => !isMenuKind(t.kind))
+      return [{ ...group, tabs: [...group.tabs, ...keep] }]
+    })
     setActiveGroupId(group.id)
   }
 
@@ -172,7 +176,17 @@ export function usePaneTabs(deps: {
       }
     }
     const group = activeGroup
-    if (!group) return
+    if (!group) {
+      // 单例签(设置/图谱)没组也能立 —— 首页点开设置,孤零零一张签;
+      // 跟随品类必须有工作区才有组,这儿照旧不吭声
+      if (isMenuKind(kind)) return
+      const tab = paneTabFor(kind, node)
+      const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [tab], activeId: tab.id }
+      setGroups([fresh])
+      setActiveGroupId(fresh.id)
+      if (auto) markFlash(tab.id)
+      return
+    }
     const tab = paneTabFor(kind, node)
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
     if (auto) markFlash(tab.id)
@@ -353,6 +367,9 @@ export function usePaneTabs(deps: {
     const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
     const t = owner?.tabs.find((x) => x.id === id)
     if (!owner || !t) return
+    // 单例签(设置/图谱)不能钉:钉住会脱离「全系统没钉的同类只此一张」的去重账本,
+    // 入口再开就生第二张,单例名存实亡
+    if (!isMenuKind(t.kind)) return
     const flip = (patch: (x: PaneTab) => PaneTab): void => {
       patchGroup(owner.id, (g) => ({ ...g, tabs: g.tabs.map((x) => (x.id === id ? patch(x) : x)) }))
     }
@@ -398,6 +415,13 @@ export function usePaneTabs(deps: {
   function closeTab(id: string): void {
     const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
     if (!owner) return
+    // 无工作区的孤组关空(首页上开的设置/图谱签):组一起清场,首页回前台 ——
+    // 「页签都关掉了」的空底板是给工作区留的,家里没树可点,留它就是个死胡同
+    if (owner.tabs.length === 1 && groups.length === 1 && !result) {
+      setGroups([])
+      setActiveGroupId(null)
+      return
+    }
     const vis = visibleOfGroup(owner)
     const idx = vis.findIndex((t) => t.id === id)
     const nextVis = vis.filter((t) => t.id !== id)

@@ -39,7 +39,8 @@ export function PaneGroups({
   applyPaneSplit: (v: number) => void
   paneSplit: number
   showDropHint: (groupId: string) => boolean
-  result: ScanResult
+  /** 扫描结果(可空):无工作区时这里也能渲染 —— 单例签(设置/图谱)不吃工作区 */
+  result: ScanResult | null
   previewRefs: ChatCodeRef[]
   removePreviewRef: (index: number) => void
   handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
@@ -122,8 +123,8 @@ export function PaneGroups({
                   if (fromG.id !== g.id || groups.length === 1) moveTab(id, 'sibling', null)
                 }}
               >
-                {act && !(act.kind === 'chat' && act.pinned) ? (
-                  // 每组正房只住一个房间(VS Code 的克制);钉住的对话走下面的保活层
+                {act && !(act.kind === 'chat' && act.pinned) && act.kind !== 'settings' ? (
+                  // 每组正房只住一个房间(VS Code 的克制);钉住的对话和设置签走下面的保活层
                   renderTabBody(act)
                 ) : !act ? (
                   // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
@@ -134,6 +135,18 @@ export function PaneGroups({
                     {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
                   </div>
                 )}
+                {/* 设置签保活层:切去别的页签只藏不拆 —— 改到一半的草稿(配色/缩放/AI 配置)
+                    还得在;关掉页签才卸载,卸载清理把预览退回存档(SettingsPage 里兜底) */}
+                {g.tabs
+                  .filter((t) => t.kind === 'settings')
+                  .map((t) => (
+                    <div
+                      key={t.id}
+                      className={`pane-keep-alive${t.id === g.activeId ? '' : ' is-hidden'}`}
+                    >
+                      {renderTabBody(t)}
+                    </div>
+                  ))}
                 {/* 钉住的对话保活层(跟着组走):账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
                 {result &&
                   g.tabs

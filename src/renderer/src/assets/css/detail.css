@@ -212,6 +212,22 @@ body.is-sash-dragging .pane-sash::after {
   display: none;
 }
 
+/* 设置签保活层(同一套只藏不拆):切页签草稿还在,关签才卸载退预览 */
+.pane-keep-alive {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pane-keep-alive > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.pane-keep-alive.is-hidden {
+  display: none;
+}
+
 /* (走出面板锤:占位卡设计被小葵验收砍掉 —— 页签就是桌宠,飞走了不留分身) */
 
 /* 代码预览的合并布局(preview-split)已随「预览拆伴聊」退役:预览是纯源码窗,

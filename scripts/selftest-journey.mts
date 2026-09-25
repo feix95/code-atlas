@@ -142,6 +142,28 @@ try {
   await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
+  // UI v3(B6):设置退役弹窗改单例页签——首页无工作区也能开;再点入口只聚焦不生第二张;
+  // 左目录翻节;页签 × 收掉后孤组清场,首页回前台
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await page.locator('.cfg-page').waitFor()
+  assert.equal(
+    await page.locator('.tabbar-tab').filter({ hasText: '设置' }).count(),
+    1,
+    'settings must open as a singleton tab'
+  )
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  assert.equal(
+    await page.locator('.tabbar-tab').filter({ hasText: '设置' }).count(),
+    1,
+    'reopening settings must focus the same tab'
+  )
+  await page.locator('.cfg-nav-item').filter({ hasText: '高级选项' }).click()
+  await page.locator('.cfg-nav-item.is-active').filter({ hasText: '高级选项' }).waitFor()
+  await page.locator('#cfg-model-path').waitFor()
+  await shot('settings-page')
+  await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
+  await page.locator('.cfg-page').waitFor({ state: 'hidden' })
+  await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
   await control({ holdGit: true })
   await open(project)
   await shot('guide')
@@ -174,7 +196,8 @@ try {
   assert.equal(await calls('atlas:ai-explain-file'), 0, 'Browsing must not start AI predictions')
   await shot('file-unconfigured')
   await page.locator('.ai-card').getByRole('button', { name: '设置 AI', exact: true }).click()
-  await page.getByRole('dialog', { name: '设置', exact: true }).waitFor()
+  // UI v3(B6):「设置 AI」直达开设置页签并翻到高级节(不是弹窗了)
+  await page.locator('.cfg-page').waitFor()
   await page.locator('#cfg-model-path').waitFor()
   await page.waitForTimeout(200)
   const picker = await page.locator('#cfg-model-path').boundingBox()
@@ -183,8 +206,11 @@ try {
     'AI setup must scroll to model selection'
   )
   await shot('setup')
-  await page.keyboard.press('Escape')
-  await page.getByRole('dialog', { name: '设置', exact: true }).waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
+  await page.locator('.cfg-page').waitFor({ state: 'hidden' })
+  // 关签接力到左邻签(页签模型规矩):点回概览签(点签名不点签心,免得误中尾部的 ×),
+  // 文件讲解卡照旧在
+  await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
   await page.getByRole('button', { name: '查看文件内容', exact: true }).click()
   await page.locator('.code-text').filter({ hasText: 'export const start' }).waitFor()
   await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(join(run, 'missing'))

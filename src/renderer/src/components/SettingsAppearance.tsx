@@ -20,7 +20,7 @@ const THEME_SUB: Record<AppearancePreset, string> = {
   custom: '手动调整'
 }
 
-/** 设置分区「01 外观与阅读」:亮暗 / 配色主题 / 自定义三色 / 界面大小滑杆(纯展示,状态全在 SettingsDialog) */
+/** 设置分区「01 外观与阅读」:亮暗 / 配色主题 / 自定义三色 / 界面大小滑杆(纯展示,状态全在 SettingsPage) */
 export function SettingsAppearance({
   appearanceRef,
   draftAppearance,

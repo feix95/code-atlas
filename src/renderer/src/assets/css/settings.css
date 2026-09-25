@@ -1,58 +1,16 @@
-/* ── 设置弹窗(第五十七锤,按小葵的效果图重构)──
+/* ── 设置页(UI v3 §6:弹窗退役改页签)──
    暂存 + 预览 + 应用:改动先进草稿即时预览,点「应用更改」才落盘;
-   恢复默认/关弹窗退回上次保存的样子。颜色全走语义 token,亮暗自动换装 */
+   恢复默认/卸载退回上次保存的样子。颜色全走语义 token,亮暗自动换装 */
 
-.cfg-layer {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-dialog);
-  display: grid;
-  place-items: center;
-  padding: 1.75rem;
-  /* 跟界面卡片同框圆角裁切:遮罩不许糊到圆角外的透明角上 */
-  border-radius: var(--radius-window);
-  overflow: hidden;
-}
-
-body.is-maximized .cfg-layer {
-  border-radius: 0;
-}
-
-.cfg-dim {
-  position: absolute;
-  inset: 0;
-  background: var(--scrim-deep);
-}
-
-.cfg-window {
-  position: relative;
-  width: min(65rem, 100%);
-  /* 高度帽子必须永远赢:界面缩放是改根字号(第四十七锤),rem 写的 min-height 会随缩放
-     一同长大、反过头盖过这顶帽子 —— 缩放≈130% + 默认窗 1200×800 时页脚按钮就被截半截
-     (探针 B 场景抓过现行)。所以不许有任何 min-height;矮窗下内容交给 .cfg-scroll 内滚 */
-  height: min(47.25rem, 100%);
+/* 页签正文房间:填满整个 pane-body,左目录右内容在 .cfg-body 里分栏 */
+.cfg-page {
+  position: relative; /* 确认丢弃浮层(absolute)锚在这儿 */
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 0.8125rem;
   background: var(--window);
-  box-shadow:
-    0 1.75rem 4.375rem rgba(0, 0, 0, 0.36),
-    0 0.375rem 1.0625rem rgba(0, 0, 0, 0.2);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .cfg-window {
-    animation: cfg-in 0.2s var(--ease-smooth);
-  }
-}
-
-@keyframes cfg-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.99);
-  }
 }
 
 /* 关弹窗确认(第五十八锤):有未应用的更改时,遮罩/×/Esc 先弹确认再丢弃 */
@@ -75,7 +33,14 @@ body.is-maximized .cfg-layer {
 
 @media (prefers-reduced-motion: no-preference) {
   .cfg-confirm {
-    animation: cfg-in 0.18s var(--ease-smooth);
+    animation: cfg-confirm-in 0.18s var(--ease-smooth);
+  }
+}
+
+@keyframes cfg-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
   }
 }
 
@@ -100,83 +65,19 @@ body.is-maximized .cfg-layer {
   margin-top: 1rem;
 }
 
-.cfg-head {
-  min-height: 4.125rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1.25rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
-  flex-shrink: 0;
-}
-
-.cfg-head-title {
-  display: flex;
-  align-items: center;
-  gap: 0.6875rem;
-}
-
-.cfg-head-icon {
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  color: var(--accent-bright);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-}
-
-.cfg-head-title h1 {
-  margin: 0;
-  color: var(--text-strong);
-  font-size: var(--font-lg);
-  font-weight: var(--font-w-bold);
-  letter-spacing: 0;
-}
-
-.cfg-head-title p {
-  margin: 0.1875rem 0 0;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-}
-
-.cfg-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.cfg-dirty-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--amber);
-  font-size: var(--font-xxs);
-}
-
-.cfg-dirty-pill i {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--amber);
-}
-
-.cfg-close {
-  width: 1.875rem;
-  height: 1.875rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
+/* 页尾「关闭设置」:不抢戏的次级钮,关掉这张页签(有未应用更改先确认) */
+.cfg-btn-close {
+  padding: 0.4375rem 0.875rem;
   color: var(--muted);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
+  font-family: inherit;
+  font-size: var(--font-md);
   cursor: pointer;
 }
 
-.cfg-close:hover {
+.cfg-btn-close:hover {
   color: var(--text-strong);
   border-color: var(--line);
   background: var(--surface-soft);

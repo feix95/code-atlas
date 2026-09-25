@@ -2,6 +2,7 @@
 // 钉住的概览定死在节点上,跟随的概览跟树里选中走;钉住的对话自带账本,只藏不拆。
 import { useMemo } from 'react'
 import type {
+  AiConfig,
   ChatCodeRef,
   ChatContextAttachment,
   DepGraphResult,
@@ -26,6 +27,7 @@ import { FolderOverview } from './FolderOverview'
 import { FreeChatPanel } from './FreeChatPanel'
 import { CodePreview } from './CodePreview'
 import { ProjectOverview } from './ProjectOverview'
+import { SettingsPage, type SectionKey } from './SettingsPage'
 import { TreeIcon } from './Icons'
 
 export function TabBody({
@@ -59,10 +61,14 @@ export function TabBody({
   closeTab,
   addPreviewRef,
   removePreviewRef,
-  handleDropNode
+  handleDropNode,
+  settingsWorkspaceName,
+  settingsSectionReq,
+  onAiConfigSaved,
+  onChatSuggestionsChange
 }: {
   tab: PaneTab
-  result: ScanResult
+  result: ScanResult | null
   notes: NoteMap
   noteEditRequest: string | null
   previewRefs: ChatCodeRef[]
@@ -92,10 +98,29 @@ export function TabBody({
   addPreviewRef: (ref: ChatCodeRef) => void
   removePreviewRef: (index: number) => void
   handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
+  // 设置页签的口粮(app 级,不吃工作区):rail 齿轮/AI 状态浮层都能开,没开项目也能用
+  settingsWorkspaceName: string | null
+  settingsSectionReq: { section: SectionKey; seq: number } | undefined
+  onAiConfigSaved: (config: AiConfig) => void
+  onChatSuggestionsChange: (v: boolean) => void
 }): React.JSX.Element | null {
-  if (!result) return null
-  // 关系图谱(rail 单例签):本体还没造,占位页照实说 —— 规格在《项目结构图谱(Graph View).md》
+  // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
+  // 关系图谱:本体还没造,占位页照实说 —— 规格在《项目结构图谱(Graph View).md》
   if (tab.kind === 'graph') return <GraphPlaceholder />
+  // 设置页:UI v3 §6 弹窗退役改页签;关掉页签 = onClose 收回这张签
+  if (tab.kind === 'settings') {
+    return (
+      <SettingsPage
+        workspaceName={settingsWorkspaceName}
+        chatSuggestionsOn={chatSuggestionsOn}
+        onChatSuggestionsChange={onChatSuggestionsChange}
+        sectionReq={settingsSectionReq}
+        onAiConfigSaved={onAiConfigSaved}
+        onClose={() => closeTab(tab.id)}
+      />
+    )
+  }
+  if (!result) return null
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'overview') {
     if (tab.pinned) {

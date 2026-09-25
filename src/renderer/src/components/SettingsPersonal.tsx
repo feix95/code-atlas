@@ -8,11 +8,11 @@ import type { AiConfig } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { OptionSelect } from './OptionSelect.tsx'
 
-/** 「试一句」的结果账本(SettingsDialog 持有状态,这里只照单渲染) */
+/** 「试一句」的结果账本(SettingsPage 持有状态,这里只照单渲染) */
 export type SampleState =
   { kind: 'busy' } | { kind: 'done'; text: string } | { kind: 'error'; text: string } | null
 
-/** 设置分区「02 个性化」:语气 / 讲解深度 / 自订指令 / 试一句(纯展示,状态全在 SettingsDialog) */
+/** 设置分区「02 个性化」:语气 / 讲解深度 / 自订指令 / 试一句(纯展示,状态全在 SettingsPage) */
 export function SettingsPersonal({
   personalRef,
   draftConfig,

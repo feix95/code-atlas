@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
 import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
@@ -32,7 +31,7 @@ function clampContextSize(raw: string): number | undefined {
   return Math.max(CONTEXT_SIZE_MIN, Math.min(CONTEXT_SIZE_MAX, Number(digits)))
 }
 
-type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
+export type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
 type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
 
 /** 设置侧栏「工作区偏好」组导航图标旋钮:四颗条目共享一个大小,跟别处互不相关 */
@@ -46,24 +45,29 @@ const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: strin
 ]
 
 /**
- * 设置弹窗(按小葵的效果图重构):居中卡片 + 左侧导航 + 分区内容。
+ * 设置页(UI v3 §6:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
+ * 左侧导航 + 分区内容,原四节组件原样复用。
  * 逻辑是「暂存 + 预览 + 应用」:所有改动先进草稿、界面即时预览,
- * 点「应用更改」才落盘;恢复默认直接退回;关弹窗(×、Esc、点遮罩)在有未应用的更改时先弹确认,确认丢弃才退回。
+ * 点「应用更改」才落盘;恢复默认直接退回;页尾「关闭设置」在有未应用的更改时先弹确认,
+ * 页签被 × 掉/切走时组件卸载,卸载清理也把预览退回存档 —— 草稿色/缩放不会滞留全局。
+ * 页签本体由 PaneGroups 保活层托管(只藏不拆):切走再回来,改到一半的草稿还在。
  */
-export function SettingsDialog({
+export function SettingsPage({
   workspaceName,
   chatSuggestionsOn,
   onChatSuggestionsChange,
   onClose,
-  initialSection = 'appearance',
+  sectionReq,
   onAiConfigSaved
 }: {
   workspaceName: string | null
   /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
   chatSuggestionsOn: boolean
   onChatSuggestionsChange: (v: boolean) => void
+  /** 关闭入口 = 关掉这张页签(页尾「关闭设置」走未应用确认后才到这儿) */
   onClose: () => void
-  initialSection?: SectionKey
+  /** 「AI 设置」直达:入口每点一次 seq +1,页内跟着翻到指定节(首屏也有用) */
+  sectionReq?: { section: SectionKey; seq: number }
   onAiConfigSaved?: (config: AiConfig) => void
 }): React.JSX.Element {
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
@@ -73,7 +77,7 @@ export function SettingsDialog({
   const [savedScale, setSavedScale] = useState(() => window.atlas.getUiScale())
   const [draftScale, setDraftScale] = useState(() => window.atlas.getUiScale())
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
-  const [activeSection, setActiveSection] = useState<SectionKey>(initialSection)
+  const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
@@ -116,14 +120,17 @@ export function SettingsDialog({
       .catch(() => {})
   }, [])
 
-  const initialScrollRef = useRef(false)
+  // 「AI 设置」直达:入口每点一次 req.seq +1,页内翻到指定节(VS Code 式单例签,
+  // 签早开着也能再领到这节)
+  const lastSectionReq = useRef(0)
   useEffect(() => {
-    if (initialScrollRef.current || !draftConfig) return
-    initialScrollRef.current = true
+    if (!sectionReq || sectionReq.seq === lastSectionReq.current || !draftConfig) return
+    lastSectionReq.current = sectionReq.seq
+    setActiveSection(sectionReq.section)
     requestAnimationFrame(() => {
-      sectionEl(initialSection)?.scrollIntoView({ block: 'start', behavior: 'auto' })
+      sectionEl(sectionReq.section)?.scrollIntoView({ block: 'start', behavior: 'auto' })
     })
-  }, [draftConfig, initialSection])
+  }, [draftConfig, sectionReq])
 
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
@@ -279,7 +286,7 @@ export function SettingsDialog({
     onAiConfigSaved
   ])
 
-  /** 关弹窗入口(遮罩/×/Esc 同路):保存中不响应;有草稿先弹确认,确认丢弃才真关 */
+  /** 页尾「关闭设置」入口:保存中不响应;有未应用的草稿先弹确认,确认丢弃才真关签 */
   const requestClose = useCallback((): void => {
     if (applyState.kind === 'saving') return
     if (dirty) {
@@ -296,19 +303,28 @@ export function SettingsDialog({
     onClose()
   }, [savedAppearance, savedScale, onClose])
 
+  // 页签化后 Esc 不再收设置页(页不是弹窗);只用来把「确认丢弃」收回继续编辑
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (e.key !== 'Escape') return
-      // 确认框开着时 Esc 等于「继续编辑」,别连着把设置也关了
-      if (confirmDiscard) {
-        setConfirmDiscard(false)
-        return
-      }
-      requestClose()
+      if (e.key !== 'Escape' || !confirmDiscard) return
+      setConfirmDiscard(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [requestClose, confirmDiscard])
+  }, [confirmDiscard])
+
+  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局。
+  // 常规退出(丢弃并关闭)也走这条路 —— 那时存档本就是退回目标,两边同路不打架
+  const savedRef = useRef({ appearance: savedAppearance, scale: savedScale })
+  useEffect(() => {
+    savedRef.current = { appearance: savedAppearance, scale: savedScale }
+  })
+  useEffect(() => {
+    return () => {
+      applyAppearance(savedRef.current.appearance)
+      window.atlas.setUiScale(savedRef.current.scale)
+    }
+  }, [])
 
   function sectionEl(key: SectionKey): HTMLElement | null {
     if (key === 'appearance') return appearanceRef.current
@@ -447,189 +463,159 @@ export function SettingsDialog({
     return { tone: 'green' as const, text: '所有设置已同步' }
   })()
 
-  return createPortal(
-    <div className="cfg-layer">
-      <div className="cfg-dim" onClick={requestClose} aria-hidden="true" />
-      <main className="cfg-window" role="dialog" aria-modal="true" aria-label="设置">
-        <header className="cfg-head">
-          <div className="cfg-head-title">
-            <span className="cfg-head-icon">
-              <TreeIcon name="settings2" size={17} mono />
+  return (
+    <main className="cfg-page" aria-label="设置">
+      <div className="cfg-body">
+        <aside className="cfg-nav">
+          <div className="cfg-nav-caption">工作区偏好</div>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`cfg-nav-item${activeSection === item.key ? ' is-active' : ''}`}
+              onClick={() => gotoSection(item.key)}
+            >
+              <span className="cfg-nav-icon">
+                <TreeIcon name={item.icon} size={NAV_ICON_SIZE} mono />
+              </span>
+              <span>
+                <strong>{item.name}</strong>
+                <small>{item.sub}</small>
+              </span>
+              {activeSection === item.key && <span className="cfg-nav-marker" aria-hidden="true" />}
+            </button>
+          ))}
+          <div className="cfg-nav-rule" />
+          <div className="cfg-nav-context">
+            <span className="cfg-context-icon">
+              <TreeIcon name="monitor" size={NAV_ICON_SIZE} mono />
             </span>
             <div>
-              <h1>设置</h1>
-              <p>调整 CodeAtlas 的工作方式</p>
+              <strong>当前工作区</strong>
+              <span>{workspaceName ?? '未打开项目'}</span>
             </div>
           </div>
-          <div className="cfg-head-actions">
-            {dirty && (
-              <span className="cfg-dirty-pill">
-                <i aria-hidden="true" />
-                有未保存的更改
-              </span>
-            )}
-            <button
-              type="button"
-              className="cfg-close"
-              onClick={requestClose}
-              aria-label="关闭设置"
-            >
-              <TreeIcon name="x" size={15} mono />
-            </button>
+          <div className="cfg-nav-footnote">
+            <TreeIcon name="help" size={12} mono />
+            设置会保存到本机
           </div>
-        </header>
+        </aside>
 
-        <div className="cfg-body">
-          <aside className="cfg-nav">
-            <div className="cfg-nav-caption">工作区偏好</div>
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={`cfg-nav-item${activeSection === item.key ? ' is-active' : ''}`}
-                onClick={() => gotoSection(item.key)}
-              >
-                <span className="cfg-nav-icon">
-                  <TreeIcon name={item.icon} size={NAV_ICON_SIZE} mono />
-                </span>
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>{item.sub}</small>
-                </span>
-                {activeSection === item.key && (
-                  <span className="cfg-nav-marker" aria-hidden="true" />
-                )}
-              </button>
-            ))}
-            <div className="cfg-nav-rule" />
-            <div className="cfg-nav-context">
-              <span className="cfg-context-icon">
-                <TreeIcon name="monitor" size={NAV_ICON_SIZE} mono />
-              </span>
+        <section className="cfg-content">
+          <div className="cfg-scroll" ref={scrollRef} onScroll={onNavScroll}>
+            <div className="cfg-intro">
               <div>
-                <strong>当前工作区</strong>
-                <span>{workspaceName ?? '未打开项目'}</span>
+                <div className="cfg-eyebrow">WORKSPACE CONFIGURATION</div>
+                <h2>让阅读代码更像你的节奏</h2>
+                <p>配色、界面大小到 AI 辅助来源,改动立即预览,点「应用更改」后才真正生效。</p>
               </div>
+              <span className={`cfg-live-status${dirty ? ' is-dirty' : ''}`}>
+                <i aria-hidden="true" />
+                {dirty ? '预览中 · 待应用' : '配置预览中'}
+              </span>
             </div>
-            <div className="cfg-nav-footnote">
-              <TreeIcon name="help" size={12} mono />
-              设置会保存到本机
-            </div>
-          </aside>
 
-          <section className="cfg-content">
-            <div className="cfg-scroll" ref={scrollRef} onScroll={onNavScroll}>
-              <div className="cfg-intro">
-                <div>
-                  <div className="cfg-eyebrow">WORKSPACE CONFIGURATION</div>
-                  <h2>让阅读代码更像你的节奏</h2>
-                  <p>配色、界面大小到 AI 辅助来源,改动立即预览,点「应用更改」后才真正生效。</p>
-                </div>
-                <span className={`cfg-live-status${dirty ? ' is-dirty' : ''}`}>
-                  <i aria-hidden="true" />
-                  {dirty ? '预览中 · 待应用' : '配置预览中'}
-                </span>
-              </div>
+            {/* ── 01 外观与阅读 ── */}
+            <SettingsAppearance
+              appearanceRef={appearanceRef}
+              draftAppearance={draftAppearance}
+              updateAppearance={updateAppearance}
+              enterCustom={enterCustom}
+              previewAccent={previewAccent}
+              defaultPreset={defaultPreset}
+              draftScale={draftScale}
+              scaleShown={scaleShown}
+              setDragValue={setDragValue}
+              commitDrag={commitDrag}
+              stepScale={stepScale}
+            />
 
-              {/* ── 01 外观与阅读 ── */}
-              <SettingsAppearance
-                appearanceRef={appearanceRef}
-                draftAppearance={draftAppearance}
-                updateAppearance={updateAppearance}
-                enterCustom={enterCustom}
-                previewAccent={previewAccent}
-                defaultPreset={defaultPreset}
-                draftScale={draftScale}
-                scaleShown={scaleShown}
-                setDragValue={setDragValue}
-                commitDrag={commitDrag}
-                stepScale={stepScale}
-              />
+            {/* ── 02 个性化(小葵定的版式:挪到外观与阅读下面,智能辅助和高级选项这对 AI 配置连成一片) ── */}
+            <SettingsPersonal
+              personalRef={personalRef}
+              draftConfig={draftConfig}
+              personal={personal}
+              updatePersonal={updatePersonal}
+              sample={sample}
+              setSample={setSample}
+              tryStyle={tryStyle}
+            />
 
-              {/* ── 02 个性化(小葵定的版式:挪到外观与阅读下面,智能辅助和高级选项这对 AI 配置连成一片) ── */}
-              <SettingsPersonal
-                personalRef={personalRef}
-                draftConfig={draftConfig}
-                personal={personal}
-                updatePersonal={updatePersonal}
-                sample={sample}
-                setSample={setSample}
-                tryStyle={tryStyle}
-              />
+            {/* ── 03 智能辅助 ── */}
+            <SettingsAi
+              aiRef={aiRef}
+              draftConfig={draftConfig}
+              setDraftConfig={setDraftConfig}
+              isBuiltin={isBuiltin}
+              source={source}
+              chatSuggestionsOn={chatSuggestionsOn}
+              onChatSuggestionsChange={onChatSuggestionsChange}
+              privacyOpen={privacyOpen}
+              setPrivacyOpen={setPrivacyOpen}
+            />
 
-              {/* ── 03 智能辅助 ── */}
-              <SettingsAi
-                aiRef={aiRef}
-                draftConfig={draftConfig}
-                setDraftConfig={setDraftConfig}
-                isBuiltin={isBuiltin}
-                source={source}
-                chatSuggestionsOn={chatSuggestionsOn}
-                onChatSuggestionsChange={onChatSuggestionsChange}
-                privacyOpen={privacyOpen}
-                setPrivacyOpen={setPrivacyOpen}
-              />
+            {/* ── 04 高级选项 ── */}
+            <SettingsAdvanced
+              advancedRef={advancedRef}
+              draftConfig={draftConfig}
+              setDraftConfig={setDraftConfig}
+              isBuiltin={isBuiltin}
+              pickModel={pickModel}
+              shelfOpen={shelfOpen}
+              setShelfOpen={setShelfOpen}
+              onShelfModelReady={onShelfModelReady}
+              modelPathDraft={modelPathDraft}
+              fitNote={fitNote}
+              models={models}
+              modelsBusy={modelsBusy}
+              modelsNote={modelsNote}
+              listModels={listModels}
+              contextRaw={contextRaw}
+              setContextRaw={setContextRaw}
+              onContextBlur={onContextBlur}
+              contextNotches={contextNotches}
+              ctxNotchIndex={ctxNotchIndex}
+              commitContextValue={commitContextValue}
+              ctxInfo={ctxInfo}
+              ctxBill={ctxBill}
+              appVersion={appVersion}
+              themeName={themeName}
+              draftScale={draftScale}
+              dirty={dirty}
+            />
+          </div>
+        </section>
+      </div>
 
-              {/* ── 04 高级选项 ── */}
-              <SettingsAdvanced
-                advancedRef={advancedRef}
-                draftConfig={draftConfig}
-                setDraftConfig={setDraftConfig}
-                isBuiltin={isBuiltin}
-                pickModel={pickModel}
-                shelfOpen={shelfOpen}
-                setShelfOpen={setShelfOpen}
-                onShelfModelReady={onShelfModelReady}
-                modelPathDraft={modelPathDraft}
-                fitNote={fitNote}
-                models={models}
-                modelsBusy={modelsBusy}
-                modelsNote={modelsNote}
-                listModels={listModels}
-                contextRaw={contextRaw}
-                setContextRaw={setContextRaw}
-                onContextBlur={onContextBlur}
-                contextNotches={contextNotches}
-                ctxNotchIndex={ctxNotchIndex}
-                commitContextValue={commitContextValue}
-                ctxInfo={ctxInfo}
-                ctxBill={ctxBill}
-                appVersion={appVersion}
-                themeName={themeName}
-                draftScale={draftScale}
-                dirty={dirty}
-              />
-            </div>
-          </section>
+      <footer className="cfg-foot">
+        <div className={`cfg-foot-state is-${footerState.tone}`}>
+          <TreeIcon name={footerState.tone === 'green' ? 'check' : 'refresh'} size={13} mono />
+          {footerState.text}
         </div>
-
-        <footer className="cfg-foot">
-          <div className={`cfg-foot-state is-${footerState.tone}`}>
-            <TreeIcon name={footerState.tone === 'green' ? 'check' : 'refresh'} size={13} mono />
-            {footerState.text}
-          </div>
-          <div className="cfg-foot-actions">
-            <button
-              type="button"
-              className="cfg-btn-reset"
-              onClick={revert}
-              disabled={!dirty || applyState.kind === 'saving'}
-            >
-              <TreeIcon name="refresh" size={13} mono />
-              恢复默认
-            </button>
-            <button
-              type="button"
-              className="cfg-btn-apply"
-              onClick={() => void apply()}
-              disabled={!dirty || applyState.kind === 'saving'}
-            >
-              <TreeIcon name="save" size={13} mono />
-              {applyState.kind === 'saving' ? '应用中……' : '应用更改'}
-            </button>
-          </div>
-        </footer>
-      </main>
+        <div className="cfg-foot-actions">
+          <button type="button" className="cfg-btn-close" onClick={requestClose}>
+            关闭设置
+          </button>
+          <button
+            type="button"
+            className="cfg-btn-reset"
+            onClick={revert}
+            disabled={!dirty || applyState.kind === 'saving'}
+          >
+            <TreeIcon name="refresh" size={13} mono />
+            恢复默认
+          </button>
+          <button
+            type="button"
+            className="cfg-btn-apply"
+            onClick={() => void apply()}
+            disabled={!dirty || applyState.kind === 'saving'}
+          >
+            <TreeIcon name="save" size={13} mono />
+            {applyState.kind === 'saving' ? '应用中……' : '应用更改'}
+          </button>
+        </div>
+      </footer>
 
       {confirmDiscard && (
         <div className="cfg-confirm-dim" onClick={() => setConfirmDiscard(false)}>
@@ -659,7 +645,6 @@ export function SettingsDialog({
           </div>
         </div>
       )}
-    </div>,
-    document.body
+    </main>
   )
 }
