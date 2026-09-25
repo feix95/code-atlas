@@ -695,8 +695,9 @@
 }
 
 .tree-name {
-  flex-shrink: 0;
-  max-width: 60%;
+  /* 60% 上限随小灰字退役:名字吃到行右缘为止,只给徽章/笔帽标让座(flex 0 0 auto 先占),其余空间全归名字 */
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
