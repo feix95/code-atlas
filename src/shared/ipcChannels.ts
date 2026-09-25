@@ -27,6 +27,7 @@ export const CH = {
   // ── 系统与项目 ──
   pickFolder: 'atlas:pick-folder',
   listDrives: 'atlas:list-drives',
+  browseDir: 'atlas:browse-dir',
   appVersion: 'atlas:app-version',
   scanFolder: 'atlas:scan-folder',
   scanSubdir: 'atlas:scan-subdir',

@@ -20,6 +20,9 @@ export interface PaneTab {
   pinned: boolean
   /** 对话页签钉住分家时的初始记录(保活面板挂载时吃掉,之后各长各的) */
   seed?: ChatMessage[]
+  /** 「瞄一眼」预览(peek 品类)的读根:盘符下钻不是工作区,
+   *  CodePreview 读文件走 joinRoot(scopeRoot, relPath);工作区预览页签不填(用 result.rootPath) */
+  scopeRoot?: string
 }
 
 /**

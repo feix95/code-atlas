@@ -14,6 +14,7 @@ import type {
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
+  BrowseEntry,
   BubbleResizeMsg,
   ChatMessage,
   DepGraphResult,
@@ -100,6 +101,8 @@ const atlasApi = {
   },
   // 列盘符(只问有哪些盘,不翻文件内容);app 版本号(设置里的版本信息行用)
   listDrives: (): Promise<DriveInfo[]> => ipcRenderer.invoke(CH.listDrives),
+  /** 「这台电脑」下钻:列某目录的直属一层(不递归),忽略名单/符号链接与扫描同口径 */
+  browseDir: (absPath: string): Promise<BrowseEntry[]> => ipcRenderer.invoke(CH.browseDir, absPath),
   appVersion: (): Promise<string> => ipcRenderer.invoke(CH.appVersion),
   // 自绘窗口壳:三颗灰点背后的真动作 + 最大化状态同步,渲染进程不许直接碰 BrowserWindow
   windowClose: (): Promise<void> => ipcRenderer.invoke(CH.windowClose),

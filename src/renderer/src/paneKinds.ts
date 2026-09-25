@@ -7,7 +7,7 @@
  */
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 
-export type PaneKind = 'overview' | 'chat' | 'preview' | 'graph' | 'settings'
+export type PaneKind = 'overview' | 'chat' | 'preview' | 'graph' | 'settings' | 'peek'
 
 /** 品类的固定展示顺序(页签栏右键菜单从上到下按这个排)。
  *  注意:graph/settings 这类单例功能签不在菜单里 —— 它没有「勾显/隐藏」的说法,
@@ -24,7 +24,8 @@ export const KIND_LABELS: Record<PaneKind, string> = {
   chat: 'Atlas 小探针',
   preview: '文件预览',
   graph: '关系图谱',
-  settings: '设置'
+  settings: '设置',
+  peek: '预览'
 }
 
 /** 跟随页签的门面:页签栏挂品类名牌(装着谁看正文头部),图标从图标册领 */
@@ -33,7 +34,8 @@ export const KIND_ICONS: Record<PaneKind, string> = {
   chat: 'bot',
   preview: 'code',
   graph: 'view',
-  settings: 'settings2'
+  settings: 'settings2',
+  peek: 'code'
 }
 
 /** 第一层过滤:节点类型 → 可用品类上限 */

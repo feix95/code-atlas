@@ -597,6 +597,23 @@ function App(): React.JSX.Element {
     openPreview(hit.relPath)
   }
 
+  // 「这台电脑」下钻单击文件 = 「瞄一眼」预览页签(peek 品类,§7.1):
+  // 读根记在页签的 scopeRoot 上(浏览树的盘根),文件节点是浏览账现捏的最小件
+  function openBrowseFile(scopeRoot: string, file: { name: string; relPath: string }): void {
+    const dot = file.name.lastIndexOf('.')
+    ensureKindTab(
+      'peek',
+      {
+        type: 'file',
+        name: file.name,
+        relPath: file.relPath,
+        ext: dot > 0 ? file.name.slice(dot).toLowerCase() : ''
+      },
+      false,
+      scopeRoot
+    )
+  }
+
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图。
   // 返回探到的子树 —— 深搜结果点开文件时,父链逐层探开要靠这个账本走下一步
   async function handleExpandLazy(relPath: string): Promise<ScanDirNode | null> {
@@ -891,7 +908,7 @@ function App(): React.JSX.Element {
                 onSashKeyDown={onSashKeyDown}
                 drives={drives}
                 drivesNote={drivesNote}
-                onOpenDrive={(path) => void scanPath(path)}
+                onOpenBrowseFile={openBrowseFile}
               />
             )}
             {result && !scanning ? (

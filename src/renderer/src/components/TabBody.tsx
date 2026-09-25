@@ -105,6 +105,30 @@ export function TabBody({
   onChatSuggestionsChange: (v: boolean) => void
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
+  // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
+  // 文件节点是浏览账上现捏的最小件 —— CodePreview 照旧走 joinRoot 路径契约读盘
+  if (tab.kind === 'peek') {
+    if (!tab.scopeRoot) return null
+    const name = tab.relPath.split('/').pop() ?? tab.relPath
+    const dot = name.lastIndexOf('.')
+    const file: ScanFileNode = {
+      type: 'file',
+      name,
+      relPath: tab.relPath,
+      ext: dot > 0 ? name.slice(dot).toLowerCase() : ''
+    }
+    return (
+      <CodePreview
+        key={tab.id}
+        rootPath={tab.scopeRoot}
+        file={file}
+        canAddRef={false}
+        refLimit={0}
+        onAddRef={() => {}}
+        onClose={() => closeTab(tab.id)}
+      />
+    )
+  }
   // 关系图谱:本体还没造,占位页照实说 —— 规格在《项目结构图谱(Graph View).md》
   if (tab.kind === 'graph') return <GraphPlaceholder />
   // 设置页:UI v3 §6 弹窗退役改页签;关掉页签 = onClose 收回这张签

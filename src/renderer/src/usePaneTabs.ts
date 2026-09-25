@@ -87,15 +87,21 @@ export function usePaneTabs(deps: {
   }, [])
 
   // 按品类造一张页签:跟随页签挂品类名牌(装着谁看正文头部,页签栏才分得清品类);
-  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装)
-  function paneTabFor(kind: PaneKind, node: ScanFileNode | ScanDirNode | null): PaneTab {
+  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装);
+  // scopeRoot 只给 peek 这类「读根不是当前工作区」的品类(peek = 盘符下钻瞄一眼)
+  function paneTabFor(
+    kind: PaneKind,
+    node: ScanFileNode | ScanDirNode | null,
+    scopeRoot?: string
+  ): PaneTab {
     return {
       id: nextTabId(),
       kind,
       relPath: node?.relPath ?? '',
       name: KIND_LABELS[kind],
       icon: KIND_ICONS[kind],
-      pinned: false
+      pinned: false,
+      scopeRoot
     }
   }
 
@@ -150,7 +156,8 @@ export function usePaneTabs(deps: {
   function ensureKindTab(
     kind: PaneKind,
     node: ScanFileNode | ScanDirNode | null,
-    auto = false
+    auto = false,
+    scopeRoot?: string
   ): void {
     // 只有菜单品类才有「入口撞上被关掉的品类就自动勾回」;菜单外的单例签不用过这道闸
     if (isMenuKind(kind) && !enabledKinds.has(kind)) {
@@ -168,7 +175,9 @@ export function usePaneTabs(deps: {
         setActiveGroupId(owner.id)
         patchGroup(owner.id, (g) => ({
           ...g,
-          tabs: g.tabs.map((t) => (t.id === slot.id ? { ...t, relPath: node?.relPath ?? '' } : t)),
+          tabs: g.tabs.map((t) =>
+            t.id === slot.id ? { ...t, relPath: node?.relPath ?? '', scopeRoot } : t
+          ),
           activeId: slot.id
         }))
         if (auto) markFlash(slot.id)
@@ -177,17 +186,17 @@ export function usePaneTabs(deps: {
     }
     const group = activeGroup
     if (!group) {
-      // 单例签(设置/图谱)没组也能立 —— 首页点开设置,孤零零一张签;
+      // 单例签(设置/图谱/peek)没组也能立 —— 首页点开设置,孤零零一张签;
       // 跟随品类必须有工作区才有组,这儿照旧不吭声
       if (isMenuKind(kind)) return
-      const tab = paneTabFor(kind, node)
+      const tab = paneTabFor(kind, node, scopeRoot)
       const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [tab], activeId: tab.id }
       setGroups([fresh])
       setActiveGroupId(fresh.id)
       if (auto) markFlash(tab.id)
       return
     }
-    const tab = paneTabFor(kind, node)
+    const tab = paneTabFor(kind, node, scopeRoot)
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
     if (auto) markFlash(tab.id)
   }

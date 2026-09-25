@@ -1,12 +1,15 @@
 import { openDevLogWindow, setUiScaleFactor } from './appShell.ts'
+import { accessDeniedMessage } from './aiEvidence.ts'
 import { app, ipcMain, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
 import { clearDevLogs, devLogSnapshot } from '../shared/devlog.ts'
 import { pickPathDialog } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { clampUiScale } from '../shared/uiScale.ts'
 import { queryDriveKinds } from './drive-meta.ts'
-import type { DriveInfo } from '../shared/types.ts'
+import { IGNORED_NAMES } from '../scanner/index.ts'
+import type { BrowseEntry, DriveInfo } from '../shared/types.ts'
 
 export function registerShellIpc(): void {
   // 自绘窗口壳的三颗灰点:关 / 最小化 / 最大化切换。渲染进程不许直接碰 BrowserWindow,一律走这儿
@@ -89,6 +92,27 @@ export function registerShellIpc(): void {
       }
     }
     return drives
+  })
+
+  // 「这台电脑」下钻(UI v3 §7.1):列某目录的直属一层,不递归 —— 侧栏懒加载浏览的口粮。
+  // 忽略名单/符号链接的口径与目录扫描一致;打不开的层抛人话错,界面在原地照实说
+  ipcMain.handle(CH.browseDir, async (_event, absPath: unknown): Promise<BrowseEntry[]> => {
+    if (typeof absPath !== 'string' || absPath.trim() === '') throw new Error('参数不合法')
+    const dir = absPath.trim()
+    const stat = await fs.stat(dir).catch((err: NodeJS.ErrnoException) => err)
+    if (stat instanceof Error) throw new Error(accessDeniedMessage(stat, '文件夹', dir))
+    if (!stat.isDirectory()) throw new Error(`这个路径不是一个文件夹:${dir}`)
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch((err) => {
+      throw new Error(accessDeniedMessage(err, '文件夹', dir))
+    })
+    const out: BrowseEntry[] = []
+    for (const e of entries) {
+      if (IGNORED_NAMES.has(e.name)) continue
+      if (e.isSymbolicLink()) continue
+      out.push({ name: e.name, dir: e.isDirectory(), absPath: join(dir, e.name) })
+    }
+    out.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name, 'zh') : a.dir ? -1 : 1))
+    return out
   })
 
   // 渲染层拿不到 app 版本,给个小通道(设置里的版本信息行用)

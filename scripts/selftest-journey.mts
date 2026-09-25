@@ -147,6 +147,26 @@ try {
   await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
+  // UI v3(B8):侧栏「这台电脑」可下钻——单击盘符/目录原地展开(懒加载纯浏览),
+  // 单击文件开「瞄一眼」预览签(scopeRoot=盘根,不进工作区账本),双击盘根开为工作区
+  const firstDrive = page.locator('.tree > .tree-branch > .tree-row.is-dir .tree-main').first()
+  await firstDrive.click()
+  const winBranch = page
+    .locator('.tree > .tree-branch > .tree-branch')
+    .filter({ has: page.locator('.tree-name').getByText('Windows', { exact: true }) })
+  await winBranch.locator('> .tree-row .tree-main').click()
+  const anyFile = winBranch.locator('> .tree-row.is-file .tree-main').first()
+  await anyFile.waitFor()
+  await anyFile.click()
+  await page.locator('.tabbar-tab').filter({ hasText: '预览' }).waitFor()
+  assert.equal(
+    await page.locator('.tabbar-tab').filter({ hasText: '预览' }).count(),
+    1,
+    'browse file must open a peek preview tab'
+  )
+  await shot('browse-peek')
+  await page.getByRole('button', { name: '关闭 预览', exact: true }).click()
+  await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
   // UI v3(B6):设置退役弹窗改单例页签——首页无工作区也能开;再点入口只聚焦不生第二张;
   // 左目录翻节;页签 × 收掉后孤组清场,首页回前台
   await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -169,6 +189,16 @@ try {
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
   await page.locator('.cfg-page').waitFor({ state: 'hidden' })
   await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
+  // UI v3(B8)续:双击盘根 = 开为工作区(§7.1)——挪到设置测试后跑:
+  // 开了工作区就有跟随签守在页签栏,上面「页签全收光」的断言只在空态下成立
+  await firstDrive.dblclick()
+  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  assert.ok(
+    /^[A-Z]:\\?$/.test(
+      await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()
+    ),
+    'double-clicked drive must become the workspace root'
+  )
   await control({ holdGit: true })
   await open(project)
   await shot('guide')

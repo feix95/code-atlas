@@ -8,10 +8,10 @@ import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/t
 import type { NoteMap } from '@shared/notes'
 import type { SearchNameHit } from '@shared/searchNames'
 import { isTreePartial } from '@shared/scanCoverage'
-import { driveCapacity, driveKindName } from '../driveMeta'
 import { menuWorkspaceRows, type RecentProject } from '../recents'
 import { useMenuDismiss } from '../useMenuDismiss'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
+import { DriveBrowser } from './DriveBrowser'
 import { FileTree } from './FileTree'
 import { TreeIcon } from './Icons'
 import { SearchResults } from './SearchResults'
@@ -56,7 +56,7 @@ export function WorkspaceSidebar({
   onSashKeyDown,
   drives,
   drivesNote,
-  onOpenDrive
+  onOpenBrowseFile
 }: {
   /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
   result: ScanResult | null
@@ -112,7 +112,8 @@ export function WorkspaceSidebar({
   /** 「这台电脑」空态:盘符列表与加载/失败消息(App 首页同款数据源) */
   drives: DriveInfo[] | null
   drivesNote: string | null
-  onOpenDrive: (path: string) => void
+  /** 浏览态单击文件:开「瞄一眼」预览页签(scopeRoot = 浏览树的盘根) */
+  onOpenBrowseFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
 }): React.JSX.Element {
   // ── workspace 卡 = 浏览器地址栏(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
   //    ⇅ 钮开/收;Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
@@ -258,33 +259,14 @@ export function WorkspaceSidebar({
             />
           )
         ) : (
-          /* 「这台电脑」空态(§7.1):盘符列表,B8 升级成可下钻的树 */
-          <div className="drive-browser">
-            {drives === null && !drivesNote ? (
-              <p className="drive-browser-note">正在列盘符……</p>
-            ) : drivesNote ? (
-              <p className="drive-browser-note">{drivesNote}</p>
-            ) : (
-              <ul>
-                {(drives ?? []).map((d) => (
-                  <li key={d.letter}>
-                    <button
-                      type="button"
-                      className="drive-row"
-                      disabled={scanning}
-                      onClick={() => onOpenDrive(d.letter)}
-                    >
-                      <TreeIcon name="drive" size={16} mono />
-                      <span className="drive-row-letter">{d.letter}:\</span>
-                      <span className="drive-row-meta">
-                        {driveKindName(d)} · {driveCapacity(d)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          /* 「这台电脑」空态(§7.1):盘符列表可下钻 —— 单击原地展开,
+             双击开为工作区,单击文件开预览页签 */
+          <DriveBrowser
+            drives={drives}
+            drivesNote={drivesNote}
+            onOpenWorkspace={onOpenWorkspace}
+            onOpenFile={onOpenBrowseFile}
+          />
         )}
         {result && (
           <footer className="sidebar-footer">
