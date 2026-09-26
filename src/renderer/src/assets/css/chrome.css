@@ -198,8 +198,8 @@
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  /* 首枚页签落在分界线后 0.375u */
-  padding-left: calc(var(--u) * 0.375);
+  /* 首枚页签落在分界线后 0.375u:此处出 0.375u−r,.tabbar 左内边距补 r,落点不变 */
+  padding-left: calc(var(--u) * 0.375 - var(--radius-md));
 }
 
 .topbar-split {
@@ -219,13 +219,22 @@
   background: var(--line);
 }
 
-/* 页签带:胶囊等比收窄(flex 收缩 + min-width 截底),多了不出横向滚动条 */
+/* 页签带:胶囊等比收窄(flex 收缩 + min-width 截底),多了不出横向滚动条。
+   左内边距 r = 首签底角反弧的带内画布:overflow 裁在 padding box,悬出签体的
+   ::before(-r..0) 正好落进来;不出这 r,首签左角整条被裁掉(右角有 blank 垫着)。
+   margin-bottom:-1px 把裁剪盒底缘推过顶栏底线 —— 签身和两底角反弧的底行
+   才能真的画到线上;不然它们被裁在带底缘,线从签底整段漏出来。
+   padding-top:1px 对称抬开裁剪天花板:激活签顶缘那道 box-shadow 描边线
+   在签体上缘外 1px,裁剪盒顶不垫这 1px 会被一起裁掉 */
 .tabbar {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: flex-end;
   gap: 2px;
+  padding-top: 1px;
+  padding-left: var(--radius-md);
+  margin-bottom: -1px;
   overflow: hidden;
   position: relative; /* 插入线的定位锚 */
 }
@@ -255,8 +264,10 @@
   background: var(--chrome-hover); /* 未激活签悬停 #d7d7d7(深色档自动落 #3d3d3d) */
 }
 
-/* 激活签 = 页面面色的胶囊,字用最深档;底缘下探 1px 压住顶栏底线 ——
-   线到签身断开,签面与正文连成一片(§5.1) */
+/* 激活签 = 页面面色的胶囊,字用最深档;签身底缘靠 .tabbar 下探的裁剪盒盖到
+   顶栏底线上 —— 线到签身断开,签面与正文连成一片(§5.1)。
+   box-shadow 描外轮廓:上缘+左右缘贴外边各 1px(顺顶角圆角走、不占布局),
+   底部两角弧线在 ::before/::after 里接着这条线绕上去 */
 .tabbar-tab.is-active,
 .tabbar-tab.is-active:hover {
   background: var(--chrome-surface);
@@ -264,7 +275,10 @@
 }
 
 .tabbar-tab.is-active {
-  margin-bottom: -1px;
+  box-shadow:
+    -1px 0 0 var(--line),
+    1px 0 0 var(--line),
+    0 -1px 0 var(--line);
 }
 
 .tabbar-tab.is-active::before,
@@ -278,13 +292,16 @@
 }
 
 /* 底角反向外扩(§5.1):伪元素是块签色板,朝签身那侧挖出半径同顶角的四分之一圆 ——
-   圆内透明(露出顶栏底与底线),圆外签色,签身与页面连成一片 */
+   圆界上压一圈 --line 环带 = 外轮廓线在弧上的接续,圆外整块铺签色:
+   弧尖在底缘与顶栏底线相切收口,镂空底行也不会透出顶栏底线 */
 .tabbar-tab.is-active::before {
   left: calc(-1 * var(--radius-md));
   background: radial-gradient(
     circle at top left,
-    transparent var(--radius-md),
-    var(--chrome-surface) calc(var(--radius-md) + 0.5px)
+    transparent calc(var(--radius-md) - 1px),
+    var(--line) calc(var(--radius-md) - 0.5px),
+    var(--line) calc(var(--radius-md) + 0.5px),
+    var(--chrome-surface) calc(var(--radius-md) + 1px)
   );
 }
 
@@ -292,8 +309,10 @@
   right: calc(-1 * var(--radius-md));
   background: radial-gradient(
     circle at top right,
-    transparent var(--radius-md),
-    var(--chrome-surface) calc(var(--radius-md) + 0.5px)
+    transparent calc(var(--radius-md) - 1px),
+    var(--line) calc(var(--radius-md) - 0.5px),
+    var(--line) calc(var(--radius-md) + 0.5px),
+    var(--chrome-surface) calc(var(--radius-md) + 1px)
   );
 }
 

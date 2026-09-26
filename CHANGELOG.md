@@ -375,3 +375,4 @@
 - chore(ref): 参考素材入库——icon参考/ui概念/ui风格参考/v3稿约20MB,ref/ 摘 .gitignore 忽略改受跟踪
 - feat(ui): 关系图谱页签替换占位页——资源管理器的图形视图(逐层进入,d3-force 力导向 + Canvas 2D 自绘),引用边归并到当前层子项、层外端点显示为虚线外部节点,悬停高亮/拖拽回弹/滚轮缩放/标签随缩放淡出,配色跟随亮暗主题,节点按钮清单支持键盘操作。新增 shared/graphView 纯函数与 selftest-graphview,journey 加图谱步骤,方案见 docs/to-do list《关系图谱-实施方案.md》
 - docs: 关系图谱-全景模式方案入库(层级模式后续扩展方向,待实施);chore(ref): ui概念素材调整——摘psd补gif
+- fix(ui): 激活页签补 Chrome 式外轮廓描边——顶/侧缘与双底角反弧同色 1px --line,顶栏底线在签身与镂空下断开并接弧尖;.tabbar 裁剪盒三向让位(overflow 裁在 padding 盒,首签左角反弧与签底线行原被切掉)
