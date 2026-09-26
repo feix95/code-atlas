@@ -39,7 +39,6 @@ export function TabBar({
   dragSourceId,
   gapIndex,
   gapWidth,
-  insertX,
   onTabPointerDown
 }: {
   tabs: TabBarTab[]
@@ -62,8 +61,6 @@ export function TabBar({
   /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开 */
   gapIndex: number | null
   gapWidth: number
-  /** 蓝色插入线的带内 x(px):钉在缝口上告诉用户「会插到这」 */
-  insertX: number | null
   /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
   onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
@@ -104,6 +101,11 @@ export function TabBar({
   const effTabs = dragSourceId ? tabs.filter((t) => t.id !== dragSourceId) : tabs
   const gapAnchor = gapIndex !== null ? effTabs[gapIndex] : undefined
   const gapTail = gapIndex !== null && !gapAnchor ? effTabs[effTabs.length - 1] : undefined
+  // 插入线宿主(Obsidian 式):钉在「它要跟在后面的那张签」的尾巴缘上,签被 flex
+  // 挤着换位置线跟着走 —— 全局坐标在 margin 动画下会漂,寄生签身上视觉=真实恒成立;
+  // 缝在队首时寄生首签的前缘
+  const markHost = gapIndex !== null ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
+  const markBefore = gapIndex === 0
   // 右键菜单里点名的那张签:钉住/取消钉住、放到桌面这些「对谁动手」的项都按它判
   const menuTab = tabMenu ? (tabs.find((x) => x.id === tabMenu.tabId) ?? null) : null
 
@@ -156,7 +158,6 @@ export function TabBar({
               type="button"
               className="tabbar-close"
               aria-label={`关闭 ${t.name}`}
-              data-tip="关闭"
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(t.id)
@@ -164,6 +165,10 @@ export function TabBar({
             >
               ✕
             </button>
+            {/* 插入线寄生宿主签:后缘宿主钉右缘,队首缝钉首签左缘 */}
+            {markHost?.id === t.id && (
+              <i className={`tabbar-insert${markBefore ? ' is-before' : ''}`} aria-hidden="true" />
+            )}
           </div>
         )
       })}
@@ -177,10 +182,7 @@ export function TabBar({
         onDoubleClick={() => void window.atlas.windowMaximizeToggle()}
         aria-hidden="true"
       />
-      {/* 插入线:钉在落点缝口上的主题色竖线,光标一动跟缝一起滑(Edge 式提示) */}
-      {insertX !== null && (
-        <div className="tabbar-insert" style={{ left: insertX }} aria-hidden="true" />
-      )}
+
       {menu && (
         <div
           className="tabbar-kindmenu"

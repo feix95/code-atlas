@@ -228,6 +228,8 @@ const atlasApi = {
   // ── 模型状态栏(第七十锤):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
   modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke(CH.modelStatusGet),
   modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke(CH.modelEject),
+  /** 主动装载内置模型(叫醒引擎热身);外接模型的装载归 LM Studio 管 */
+  modelLoad: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke(CH.modelLoad),
   /** 右键文件链接复制完整路径:主进程 joinRoot 拼绝对路径写进剪贴板,只复制不打开 */
   copyFilePath: (
     rootPath: string,

@@ -12,6 +12,7 @@ import {
   builtinContextDiffers,
   builtinNeedsRestart,
   builtinIdleStatus,
+  ensureBuiltinServer,
   isBuiltinRunning,
   judgeModelFit,
   lastBuiltinStatus,
@@ -139,6 +140,20 @@ export function registerModelIpc(): void {
     return {
       ok: true,
       message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑'
+    }
+  })
+  // 「装载」= 主动叫醒内置引擎:和首次提问走的是同一条单飞闸门(连点不双生),
+  // 热身进度照旧走状态播报;外接模型的装载归 LM Studio 管
+  ipcMain.handle(CH.modelLoad, async (): Promise<{ ok: boolean; message?: string }> => {
+    const config = await loadAiConfig(userDataDir())
+    if (config.provider !== 'builtin') {
+      return { ok: false, message: '外接模型的装载归 LM Studio 管,这边只看状态' }
+    }
+    try {
+      await ensureBuiltinServer(config.builtin, config.contextSize, config.contextSize ?? null)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) }
     }
   })
 

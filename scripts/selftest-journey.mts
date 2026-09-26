@@ -30,6 +30,8 @@ await writeFile(
 await writeFile(join(project, 'src/main.ts'), 'export const start = () => 1\n')
 await writeFile(join(project, 'docs/guide.md'), '# Getting started\n')
 await writeFile(join(project, 'package.json'), '{"name":"sample-project","private":true}')
+// 超宽单行文件:预览装上后 min-content 极宽,回归分屏/内容区被顶出视口的 bug
+await writeFile(join(project, 'wide.ts'), `export const wide = '${'x'.repeat(2400)}'\n`)
 await writeFile(join(run, 'second/README.md'), '# Second project\n')
 const main = join(root, 'out/main/index.js')
 assert.ok(existsSync(main), 'Run npm run build before test:journey')
@@ -321,6 +323,15 @@ try {
   await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
   await page.getByRole('button', { name: '查看文件内容', exact: true }).click()
   await page.locator('.code-text').filter({ hasText: 'export const start' }).waitFor()
+  // 回归:预览带超长单行的文件不得把内容区顶出视口 —— 超宽内容靠 min-content 传染链
+  // 顶穿 .workspace/.detail,右组分屏曾被挤出屏幕;.workspace/.content 已补 min-width:0 断链
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'wide.ts' }).dblclick()
+  await page.locator('.code-view').waitFor()
+  const detailBox = await page.locator('.detail').boundingBox()
+  assert.ok(
+    detailBox && detailBox.width <= (await page.evaluate(() => innerWidth)),
+    'previewing a file with a very long line must not push .detail beyond the viewport'
+  )
   await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(join(run, 'missing'))
   await page.getByRole('textbox', { name: '文件夹路径', exact: true }).press('Enter')
   await page.getByRole('heading', { name: '这个文件夹没能打开' }).waitFor()

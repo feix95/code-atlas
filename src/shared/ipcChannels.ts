@@ -54,6 +54,7 @@ export const CH = {
   modelStatusGet: 'atlas:model-status-get',
   modelStatus: 'atlas:model-status',
   modelEject: 'atlas:model-eject',
+  modelLoad: 'atlas:model-load',
   modelFitCheck: 'atlas:model-fit-check',
   modelContextInfo: 'atlas:model-context-info',
   // ── AI 请求与流 ──

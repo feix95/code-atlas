@@ -439,7 +439,6 @@ export function CodePreview({
         </span>
         <span
           className="code-pane-name mono is-file-menu"
-          data-tip={`${file.relPath};右键:复制路径 / 在资源管理器中显示 / 备注`}
           onContextMenu={(e) => {
             // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
             e.preventDefault()

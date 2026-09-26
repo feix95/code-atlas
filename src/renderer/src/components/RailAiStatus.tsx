@@ -1,16 +1,13 @@
 // rail 底槽的 AI 状态钮(UI v3 §6.1):图形形状区分就绪/加载/未连接等状态,图标颜色随主题。
 // 点击弹浮层(锚位:贴钮上方往右弹,Windows 系统托盘/Discord 同款),Esc/点外/滚轮收起。
 // 浮层内容沿用旧文档第七节全套:供应商+状态文案、热身进度(纯文字)、模型名+大小、
-// 热身中「取消」/就绪「卸下」、「AI 设置」「日志」入口、status.message 截断悬停看全文、
+// 热身中「取消」/就绪「卸下」/未醒与异常态「装载」、内置「换模型」文件快捷道、
+// 「AI 设置」「日志」入口、status.message 截断悬停看全文、
 // 未配置「设置 AI」引导 —— 旧底部状态栏(ModelStatusBar)随它上岗退役。
 import { useContext, useEffect, useState } from 'react'
 import type { ModelStatus } from '../../../shared/types.ts'
 import { AiSetupContext } from '../aiSetupContext'
-import { TreeIcon } from './Icons'
 import { useMenuDismiss } from '../useMenuDismiss'
-
-/** rail 图标本体 ≈0.425u ≈ 27px@100%(与 Rail.tsx 同档) */
-const RAIL_ICON = 25.3125
 
 /** 状态脸:三态外的第四态 = 红插头(§6.1:出错 = 红 unplug) */
 type AiFace = 'ready' | 'loading' | 'idle' | 'error'
@@ -30,6 +27,18 @@ function formatBytes(bytes: number | null): string {
   const mb = bytes / 1024 ** 2
   if (mb >= 1) return `${Math.round(mb)} MB`
   return `${bytes} 字节`
+}
+
+/** 浮层「换模型」快捷道:弹 GGUF 文件框 → 读配置改路径 → 存档
+    (存档 handler 自带「换模型就地解散旧引擎」逻辑,状态播报自动刷) */
+async function switchModelFile(): Promise<void> {
+  const picked = await window.atlas.aiPickFile().catch(() => null)
+  if (!picked) return
+  const config = await window.atlas.aiConfigGet().catch(() => null)
+  if (!config) return
+  await window.atlas
+    .aiConfigSave({ ...config, builtin: { ...config.builtin, modelPath: picked } })
+    .catch(() => {})
 }
 
 export function RailAiStatus(): React.JSX.Element {
@@ -59,7 +68,7 @@ export function RailAiStatus(): React.JSX.Element {
   useMenuDismiss(open, () => setOpen(false), '.ai-status-pop, .rail-ai')
 
   const face = faceOf(setup?.configured, status)
-  const icon = face === 'ready' ? 'circleCheck' : face === 'loading' ? 'loaderCircle' : 'unplug'
+  // 三张脸都手绘:热身=CSS 彗星尾环,就绪/没叫醒=拆层 SVG(登场动画要动零件)
   const stateLabel =
     face === 'ready'
       ? 'AI 已就绪'
@@ -80,7 +89,52 @@ export function RailAiStatus(): React.JSX.Element {
         aria-label={`AI 状态:${stateLabel}`}
         aria-expanded={open}
       >
-        <TreeIcon name={icon} size={RAIL_ICON} mono />
+        {face === 'loading' ? (
+          <span className="ai-load-spin" aria-hidden="true" />
+        ) : face === 'ready' ? (
+          // 就绪脸手绘:外圈(.ai-ready-ring)与对勾(.ai-ready-tick)拆层,各跑各的登场动画
+          <svg
+            className="ai-ready-icon"
+            width="1.375rem"
+            height="1.375rem"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle className="ai-ready-ring" cx="12" cy="12" r="10" />
+            <path className="ai-ready-tick" d="m16 9-5.5 5.5L8 12" />
+          </svg>
+        ) : (
+          // 没叫醒/出岔子 = unplug:左下插头(带插脚)与右上插座拆层,
+          // is-idle 态两半从「插着」的位置拔开(出岔子不跑动画,借同一张脸)
+          <svg
+            className="ai-idle-icon"
+            width="1.375rem"
+            height="1.375rem"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <g className="ai-unplug-plug">
+              <path d="m2 22 3-3" />
+              <path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z" />
+              <path d="M7.5 13.5 10 11" />
+              <path d="M10.5 16.5 13 14" />
+            </g>
+            <g className="ai-unplug-socket">
+              <path d="m19 5 3-3" />
+              <path d="m12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z" />
+            </g>
+          </svg>
+        )}
       </button>
       {open && <AiStatusPanel status={status} onClose={() => setOpen(false)} />}
     </>
@@ -153,6 +207,16 @@ function AiStatusPanel({
         <p className="ai-pop-note">模型状态还没回话,引擎那边可能在热身</p>
       )}
       <div className="ai-pop-actions">
+        {status?.provider === 'builtin' && (
+          <button
+            type="button"
+            className="ai-pop-act"
+            data-tip="换一个 GGUF 模型文件:选完写进 AI 设置,引擎自动按新模型重载"
+            onClick={() => void switchModelFile()}
+          >
+            换模型
+          </button>
+        )}
         {setup && (
           <button
             type="button"
@@ -200,6 +264,19 @@ function StatusRows({ status }: { status: ModelStatus }): React.JSX.Element {
               : '出岔子了'
   const broken = status.state === 'error' || status.state === 'unreachable'
 
+  // 内置模型的装卸动作:热身中=取消,就绪=卸下,没叫醒/出岔子/连不上=装载主动热身;
+  // 外接的装卸归 LM Studio 管,这里不出钮
+  const act =
+    status.provider !== 'builtin'
+      ? null
+      : status.state === 'loading'
+        ? { label: '取消', run: () => void window.atlas.modelEject() }
+        : status.state === 'ready'
+          ? { label: '卸下', run: () => void window.atlas.modelEject() }
+          : status.state === 'busy'
+            ? null
+            : { label: '装载', run: () => void window.atlas.modelLoad() }
+
   return (
     <div className="ai-pop-row">
       <span className="ai-pop-provider">{providerName}</span>
@@ -211,17 +288,11 @@ function StatusRows({ status }: { status: ModelStatus }): React.JSX.Element {
       >
         {stateText}
       </span>
-      {/* 取消/卸下只对内置模型生效:热身中按=取消,就绪后按=卸下腾内存;外接的装卸归 LM Studio */}
-      {status.provider === 'builtin' &&
-        (status.state === 'loading' || status.state === 'ready') && (
-          <button
-            type="button"
-            className="ai-pop-act"
-            onClick={() => void window.atlas.modelEject()}
-          >
-            {status.state === 'loading' ? '取消' : '卸下'}
-          </button>
-        )}
+      {act && (
+        <button type="button" className="ai-pop-act" onClick={act.run}>
+          {act.label}
+        </button>
+      )}
     </div>
   )
 }

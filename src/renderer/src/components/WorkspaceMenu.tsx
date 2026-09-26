@@ -1,32 +1,31 @@
 // 工作区菜单(UI v3 §7.1):浮层挂在 workspace 卡下沿 —— 上区 pin 置顶 + 历史区(最多 5 条),
-// 分隔线下固定盘根区(C:\ D:\ …);条目单行路径文本,点开为工作区;行首 pin 图标悬停显形
-// (pin↔pin-off 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动高亮 + Enter 进入
-// (按键由 workspace 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感;键盘高亮只记
-// 工作区条目,盘根区走点击)。
+// 分隔线下常驻一条「我的电脑」,点了回这台电脑、文件树给盘符列;条目单行路径文本,点开为工作区;
+// 行首 pin 图标悬停显形(pin↔pin-off 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动
+// 高亮 + Enter 进入(按键由 workspace 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感;
+// 键盘高亮只记工作区条目,「我的电脑」走点击)。
 import type { RecentProject } from '../recents'
-import type { DriveInfo } from '@shared/types'
 import { TreeIcon } from './Icons'
 
 interface WorkspaceMenuProps {
   pinned: RecentProject[]
   history: RecentProject[]
-  /** 盘根清单(C:\ D:\ …),点在分隔线下的固定区;null = 还没探到 */
-  drives: DriveInfo[] | null
   /** 键盘高亮的行号(-1 = 还没按过方向键;鼠标悬停高亮交给 CSS) */
   highlight: number
   onOpen: (path: string) => void
   onTogglePin: (path: string) => void
   onRemove: (path: string) => void
+  /** 「我的电脑」常驻入口:回家,树区交给「这台电脑」盘符列 */
+  onHome: () => void
 }
 
 export function WorkspaceMenu({
   pinned,
   history,
-  drives,
   highlight,
   onOpen,
   onTogglePin,
-  onRemove
+  onRemove,
+  onHome
 }: WorkspaceMenuProps): React.JSX.Element {
   // 行号 = 平铺顺序(pin 区在前、历史区接后)的下标,和调用方 ↑↓ 记账的 flatRows 一致
   function renderRow(r: RecentProject, idx: number): React.JSX.Element {
@@ -99,27 +98,21 @@ export function WorkspaceMenu({
           {history.map((r, i) => renderRow(r, pinned.length + i))}
         </div>
       )}
-      {drives && drives.length > 0 && (
-        <>
-          <div className="wsm-sep" aria-hidden="true" />
-          {/* 盘根固定区(§7.1):C:\ D:\ … 点开为工作区;不归键盘高亮账,鼠标点 */}
-          <div className="wsm-drives">
-            {drives.map((d) => (
-              <button
-                key={d.root}
-                type="button"
-                className="wsm-drive"
-                onClick={() => onOpen(d.root)}
-                data-tip={`打开 ${d.root}`}
-                data-tip-side="right"
-              >
-                <TreeIcon name="drive" size={13} mono />
-                <span className="wsm-path">{d.root}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {/* 常驻「我的电脑」(§7.1 拍板):分隔线下固定一条,点了回家、树区给盘符列;
+          不归键盘高亮账,鼠标点 */}
+      <div className="wsm-sep" aria-hidden="true" />
+      <div className="wsm-drives">
+        <button
+          type="button"
+          className="wsm-drive"
+          onClick={onHome}
+          data-tip="回到这台电脑,文件树给 C:\ D:\ 盘符列"
+          data-tip-side="right"
+        >
+          <TreeIcon name="home" size={13} mono />
+          <span className="wsm-path">我的电脑</span>
+        </button>
+      </div>
     </div>
   )
 }

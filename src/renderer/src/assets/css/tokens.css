@@ -103,6 +103,8 @@
   /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
   --scrim: rgba(0, 0, 0, 0.36);
   --scrim-deep: rgba(0, 0, 0, 0.45);
+  /* 拖拽落点记号统一的一抹(页签缝蓝线 + 正文分屏虚线):sash 拖条同款蓝、30% 透明 */
+  --drop-mark: color-mix(in srgb, var(--sash-hi) 30%, transparent);
   /* 悬停轻提示(tooltip):黑底白字圆角,明暗主题同款 —— 小葵给定真值,不吃主题泛色 */
   --tip-bg: #2c2c2c;
   --tip-ink: #f0f0f0;

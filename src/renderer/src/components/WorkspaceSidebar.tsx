@@ -55,6 +55,7 @@ export function WorkspaceSidebar({
   onSashKeyDown,
   drives,
   drivesNote,
+  onGoHome,
   onOpenBrowseFile
 }: {
   /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
@@ -111,6 +112,8 @@ export function WorkspaceSidebar({
   /** 「这台电脑」空态:盘符列表与加载/失败消息(App 首页同款数据源) */
   drives: DriveInfo[] | null
   drivesNote: string | null
+  /** 菜单常驻「我的电脑」:回家,树区交给盘符列 */
+  onGoHome: () => void
   /** 浏览态单击文件:开「瞄一眼」预览页签(scopeRoot = 浏览树的盘根) */
   onOpenBrowseFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
 }): React.JSX.Element {
@@ -232,7 +235,6 @@ export function WorkspaceSidebar({
               <WorkspaceMenu
                 pinned={sections.pinned}
                 history={sections.history}
-                drives={drives}
                 highlight={menuHi}
                 onOpen={(p) => {
                   setMenuOpen(false)
@@ -241,6 +243,11 @@ export function WorkspaceSidebar({
                 }}
                 onTogglePin={onTogglePin}
                 onRemove={onRemoveRecent}
+                onHome={() => {
+                  setMenuOpen(false)
+                  setMenuHi(-1)
+                  onGoHome()
+                }}
               />
             )}
           </div>

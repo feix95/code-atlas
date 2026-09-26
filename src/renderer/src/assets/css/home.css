@@ -2,6 +2,8 @@
 
 .content {
   flex: 1;
+  /* flex 子项默认 min-width:auto——不写 0 会被内容的 min-content(如预览超长行)顶出视口 */
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-5);

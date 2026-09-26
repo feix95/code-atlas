@@ -345,20 +345,26 @@
   pointer-events: none;
 }
 
-/* 蓝色插入线:钉在落点缝口的主题色竖线 —— 跟缝一起滑(left 过渡),
-   Edge/Chrome 页签拖拽的「会插到这里」记号 */
+/* 落点记号:一条小竖线寄生在宿主签的缘上 —— Obsidian 式钉在「要跟在后面的那张
+   签」的尾巴缘;签被 flex/margin 挤着挪位线跟着走,视觉位置=真实落点 */
 .tabbar-insert {
   position: absolute;
   top: 50%;
-  transform: translate(-50%, -50%);
+  right: 0;
+  transform: translate(50%, -50%);
   width: 3px;
   height: calc(var(--u) * 0.55);
   border-radius: var(--radius-pill);
-  background: var(--accent-bright);
-  box-shadow: 0 0 0.25rem color-mix(in srgb, var(--accent-bright) 60%, transparent);
+  background: var(--drop-mark);
   pointer-events: none;
   z-index: var(--z-jump);
-  transition: left var(--dur-2) var(--ease-smooth);
+}
+
+/* 队首缝:宿主换成第一张签的前缘 */
+.tabbar-insert.is-before {
+  right: auto;
+  left: 0;
+  transform: translate(-50%, -50%);
 }
 
 /* 拖拽替身芯片:fixed 浮层跟光标(页签带 overflow:hidden 裁得掉行内位移)。
@@ -657,25 +663,6 @@ body.is-tab-dragging * {
   padding: 0;
   margin-top: auto;
   margin-bottom: calc(var(--u) * 0.21875);
-}
-
-/* ── rail 底槽 AI 状态(§6.1):用图形形状和状态文案区分,图标颜色随主题 ── */
-.rail-ai.is-loading svg {
-  animation: ai-status-spin 1s linear infinite;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
-@keyframes ai-status-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail-ai.is-loading svg {
-    animation: none;
-  }
 }
 
 /* AI 状态浮层(§6.1 锚位):贴 rail 底钮上方往右弹进内容区,

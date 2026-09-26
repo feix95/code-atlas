@@ -919,6 +919,7 @@ function App(): React.JSX.Element {
               onSashKeyDown={onSashKeyDown}
               drives={drives}
               drivesNote={drivesNote}
+              onGoHome={goHome}
               onOpenBrowseFile={openBrowseFile}
             />
             {result && !scanning ? (

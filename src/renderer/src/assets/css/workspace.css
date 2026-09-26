@@ -10,6 +10,8 @@
 
 .workspace {
   flex: 1;
+  /* 同上:不断传染链的话,预览长行会把 min-content 顶穿 .app-body,右组分屏被挤出屏 */
+  min-width: 0;
   min-height: 0;
   display: flex;
 }

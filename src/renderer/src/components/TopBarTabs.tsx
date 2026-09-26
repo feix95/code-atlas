@@ -138,8 +138,7 @@ export function TopBarTabs({
 
   const [drag, setDrag] = useState<TabDragState | null>(null)
   // 落点缝开在哪条带、第几个空位(index 按「剔除被拖签」后的可见序数);
-  // insertX = 蓝色插入线在带内的 x 偏移(Edge 式「插到这里」的确定感)
-  const [gap, setGap] = useState<{ groupId: string; index: number; insertX: number } | null>(null)
+  const [gap, setGap] = useState<{ groupId: string; index: number } | null>(null)
   const chipRef = useRef<HTMLDivElement>(null)
 
   // born:芯片以紧凑胶囊态隐形上墙,量出内容宽高 → enter 把矩形改成源页签大小
@@ -362,21 +361,11 @@ export function TopBarTabs({
           const mids = s.groupId === srcGroupId ? s.mids.filter((m) => m.id !== t.id) : s.mids
           let index = mids.findIndex((m) => m.mid > cx)
           if (index < 0) index = mids.length
-          // 插入线的落点 = 相邻两签之间的缝口:前签右缘与后签左缘的中点;
-          // 队首贴带左缘、队尾贴末签右缘,空带就贴带起点
-          const insertX =
-            mids.length === 0
-              ? 10
-              : index === 0
-                ? mids[0].left - s.barLeft
-                : index === mids.length
-                  ? mids[mids.length - 1].right - s.barLeft
-                  : (mids[index - 1].right + mids[index].left) / 2 - s.barLeft
           zone = { type: 'strip', groupId: s.groupId, index }
           setGap((prev) =>
             prev && prev.groupId === s.groupId && prev.index === index
               ? prev
-              : { groupId: s.groupId, index, insertX }
+              : { groupId: s.groupId, index }
           )
           setDropMark(null)
           hit = true
@@ -493,7 +482,7 @@ export function TopBarTabs({
               dragSourceId={drag?.id ?? null}
               gapIndex={gap?.groupId === g.id ? gap.index : null}
               gapWidth={drag?.width ?? 0}
-              insertX={gap?.groupId === g.id ? gap.insertX : null}
+
               onTabPointerDown={beginTabDrag}
             />
           </div>

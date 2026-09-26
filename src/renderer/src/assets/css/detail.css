@@ -40,7 +40,7 @@
 .sash:focus-visible::after,
 body.is-sash-dragging .sash::after {
   width: 4px;
-  background: var(--sash-hi);
+  background: var(--drop-mark);
 }
 
 body.is-sash-dragging {
@@ -112,7 +112,7 @@ body.is-sash-dragging {
 .pane-sash:focus-visible::after,
 body.is-sash-dragging .pane-sash::after {
   width: 4px;
-  background: var(--sash-hi);
+  background: var(--drop-mark);
 }
 
 /* ── 页签正文容器:顶栏页签带下面的一次一个房间 ── */
@@ -133,10 +133,10 @@ body.is-sash-dragging .pane-sash::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed var(--accent-bright);
+  border: 2px dashed var(--drop-mark);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent-bright);
+  background: color-mix(in srgb, var(--sash-hi) 6%, transparent);
+  color: var(--sash-hi);
   font-size: var(--font-md);
   pointer-events: none;
 }
@@ -151,9 +151,9 @@ body.is-sash-dragging .pane-sash::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed var(--accent-bright);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent-bright);
+  border: 2px dashed var(--drop-mark);
+  background: color-mix(in srgb, var(--sash-hi) 6%, transparent);
+  color: var(--sash-hi);
   font-size: var(--font-md);
   pointer-events: none;
 }
