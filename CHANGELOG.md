@@ -374,3 +374,4 @@
 - fix(ui): 分屏预览超宽行顶穿容器(.workspace/.content补min-width:0断min-content传染),journey加宽行回归;feat(ui): workspace菜单常驻「我的电脑」回盘符列;feat(ui): AI状态卡加装载/换模型快捷道(modelLoad IPC),状态脸动效(彗星尾转圈/就绪勾弹晃+圈末尾淡入/卸下拔插头)绿系配色缩22px,样式独立ai-status.css;fix(ui): 页签插入线改寄生宿主签尾缘(Obsidian式治flex挤压坐标漂移),--drop-mark=sash蓝30%统一插入线/分屏虚线/sash悬停条;页签与预览头悬停提示摘除
 - chore(ref): 参考素材入库——icon参考/ui概念/ui风格参考/v3稿约20MB,ref/ 摘 .gitignore 忽略改受跟踪
 - feat(ui): 关系图谱页签替换占位页——资源管理器的图形视图(逐层进入,d3-force 力导向 + Canvas 2D 自绘),引用边归并到当前层子项、层外端点显示为虚线外部节点,悬停高亮/拖拽回弹/滚轮缩放/标签随缩放淡出,配色跟随亮暗主题,节点按钮清单支持键盘操作。新增 shared/graphView 纯函数与 selftest-graphview,journey 加图谱步骤,方案见 docs/to-do list《关系图谱-实施方案.md》
+- docs: 关系图谱-全景模式方案入库(层级模式后续扩展方向,待实施);chore(ref): ui概念素材调整——摘psd补gif
