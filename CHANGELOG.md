@@ -372,3 +372,5 @@
 - feat(ui): 页签带空白可左键拖窗(IPC 增量搬窗,右键菜单与拖放落点照旧)并双击切最大化;概览页签换纸飞机,关闭钮改激活/悬停常驻钉右端、闲置签只留标题;分屏分界与正文共线(条带窗控补偿死值 9rem 改 3×--u);闲置页签透明、悬停吃 --chrome-hover;workspace 卡/菜单圆角归 --radius-xxs、菜单摘描边、双箭头收 1rem;收起侧栏改常驻挂载宽动画收 0,扫描完成右上浮层摘除
 - feat(ui): 页签拖拽成系统(芯片态/让位缝/插入线/沉降/跨组/拖出放探针),拖拽期悬停提示压制+页签悬停提示摘除;顶栏/页签空白/日志头条统一手动搬窗(锁基线矩形治150%缩放下窗框偷长1px膨胀,摘app-region断根AeroShake);会话复现(atlas.session记工作区+选中节点+页签分组/顺序/激活/钉住/分屏比,开机重扫水合,死签丢弃孤组清场);钉住改可见拒绝(浮条+闪签)+右键菜单钉住明门;.app窗缘描边摘除
 - fix(ui): 分屏预览超宽行顶穿容器(.workspace/.content补min-width:0断min-content传染),journey加宽行回归;feat(ui): workspace菜单常驻「我的电脑」回盘符列;feat(ui): AI状态卡加装载/换模型快捷道(modelLoad IPC),状态脸动效(彗星尾转圈/就绪勾弹晃+圈末尾淡入/卸下拔插头)绿系配色缩22px,样式独立ai-status.css;fix(ui): 页签插入线改寄生宿主签尾缘(Obsidian式治flex挤压坐标漂移),--drop-mark=sash蓝30%统一插入线/分屏虚线/sash悬停条;页签与预览头悬停提示摘除
+- chore(ref): 参考素材入库——icon参考/ui概念/ui风格参考/v3稿约20MB,ref/ 摘 .gitignore 忽略改受跟踪
+- feat(ui): 关系图谱页签替换占位页——资源管理器的图形视图(逐层进入,d3-force 力导向 + Canvas 2D 自绘),引用边归并到当前层子项、层外端点显示为虚线外部节点,悬停高亮/拖拽回弹/滚轮缩放/标签随缩放淡出,配色跟随亮暗主题,节点按钮清单支持键盘操作。新增 shared/graphView 纯函数与 selftest-graphview,journey 加图谱步骤,方案见 docs/to-do list《关系图谱-实施方案.md》

@@ -28,7 +28,7 @@ import { FreeChatPanel } from './FreeChatPanel'
 import { CodePreview } from './CodePreview'
 import { ProjectOverview } from './ProjectOverview'
 import { SettingsPage, type SectionKey } from './SettingsPage'
-import { TreeIcon } from './Icons'
+import { GraphView } from './GraphView'
 
 export function TabBody({
   tab,
@@ -54,6 +54,7 @@ export function TabBody({
   fileLinks,
   goAskInChat,
   handleLoadGraph,
+  expandLazy,
   jumpTo,
   saveNote,
   editNoteFromTree,
@@ -90,6 +91,8 @@ export function TabBody({
   fileLinks: FileLinkTarget | null
   goAskInChat: (node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null) => void
   handleLoadGraph: () => Promise<void>
+  /** 按需扫描 lazy 目录(App 的 handleExpandLazy),关系图谱进入未扫描目录时用 */
+  expandLazy: (relPath: string) => Promise<ScanDirNode | null>
   jumpTo: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
   editNoteFromTree: (relPath: string) => void
@@ -129,8 +132,20 @@ export function TabBody({
       />
     )
   }
-  // 关系图谱:本体还没造,占位页照实说 —— 规格在《项目结构图谱(Graph View).md》
-  if (tab.kind === 'graph') return <GraphPlaceholder />
+  // 关系图谱:资源管理器的图形视图,规格见 docs/to-do list《关系图谱-实施方案.md》
+  if (tab.kind === 'graph') {
+    return (
+      <GraphView
+        result={result}
+        graph={graph}
+        graphLoading={graphLoading}
+        graphNote={graphNote}
+        onLoadGraph={() => void handleLoadGraph()}
+        expandLazy={expandLazy}
+        onOpenFile={openPreview}
+      />
+    )
+  }
   // 设置页:UI v3 §6 弹窗退役改页签;关掉页签 = onClose 收回这张签
   if (tab.kind === 'settings') {
     return (
@@ -537,23 +552,6 @@ export function PinnedChatPane({
         fileLinks={fileLinks}
         suggestionsOn={suggestionsOn}
       />
-    </div>
-  )
-}
-
-/** 关系图谱占位页签正文(rail 图谱钮 → 单例签):本体还在画图板上,先占座说实话,
- *  顺手指路去概览页签的关系卡 —— 等《项目结构图谱(Graph View).md》落地再换真身 */
-export function GraphPlaceholder(): React.JSX.Element {
-  return (
-    <div className="pane-empty">
-      <span className="pane-empty-mark" aria-hidden="true">
-        <TreeIcon name="view" size={40} mono />
-      </span>
-      <p className="pane-empty-title">关系图谱</p>
-      <p className="pane-empty-hint">
-        这张图还在画图板上:以后这里会把项目里的文件关系摊成一张图。
-        现在想看谁跟谁有关系,去概览页签翻「关系卡」
-      </p>
     </div>
   )
 }

@@ -296,6 +296,57 @@ try {
   )
   assert.equal(await searchBox.inputValue(), '', 'search box must clear when the workspace changes')
   await open(project)
+  // 关系图谱(drill-down):rail 钮开单例签 → 画布有内容 → 自动跑关系分析 →
+  // 键盘进入 src(节点按钮清单)→ 面包屑更新 → Backspace 返回 → 键盘打开文件预览
+  const graphCallsBefore = await calls('atlas:dep-graph')
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
+  await page.waitForFunction(() => {
+    const c = document.querySelector<HTMLCanvasElement>('.graph-canvas')
+    const d = c?.getContext('2d')?.getImageData(0, 0, c.width, c.height).data
+    if (!d) return false
+    for (let i = 4; i < d.length; i += 4) {
+      if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2]) return true
+    }
+    return false
+  })
+  await page.waitForFunction(() => !document.querySelector('.graph-status'))
+  assert.ok((await calls('atlas:dep-graph')) > graphCallsBefore, 'graph tab must load relations')
+  await page.waitForTimeout(1500)
+  await shot('graph-root')
+  await page.getByRole('button', { name: /^文件夹 src/ }).focus()
+  await page.keyboard.press('Enter')
+  await page.locator('.graph-canvas[data-graph-dir="src"]').waitFor()
+  assert.equal(
+    await page.locator('.graph-crumb button[aria-current="location"]').innerText(),
+    'src',
+    'breadcrumb must show the current folder'
+  )
+  await page.locator('.graph-view').focus()
+  await page.keyboard.press('Backspace')
+  await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
+  await page.getByRole('button', { name: /^文件 README\.md/ }).focus()
+  await page.keyboard.press('Enter')
+  await page
+    .locator('.code-text')
+    .filter({ hasText: 'This application helps organize tasks.' })
+    .waitFor()
+  await page.locator('.tabbar-tab').filter({ hasText: '关系图谱' }).locator('.tabbar-name').click()
+  const themeBefore = await page.evaluate(() => {
+    const prev = document.documentElement.dataset.theme ?? null
+    document.documentElement.dataset.theme = 'dark'
+    return prev
+  })
+  await page.waitForTimeout(400)
+  await shot('graph-root-dark')
+  await page.evaluate((prev) => {
+    if (prev === null) delete document.documentElement.dataset.theme
+    else document.documentElement.dataset.theme = prev
+  }, themeBefore)
+  await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor({ state: 'detached' })
+  await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
+  await overview()
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page
     .locator('.code-text')

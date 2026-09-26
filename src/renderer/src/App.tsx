@@ -783,6 +783,7 @@ function App(): React.JSX.Element {
           fileLinks={fileLinks}
           goAskInChat={goAskInChat}
           handleLoadGraph={handleLoadGraph}
+          expandLazy={handleExpandLazy}
           jumpTo={jumpTo}
           saveNote={saveNote}
           editNoteFromTree={editNoteFromTree}

@@ -16,7 +16,7 @@ export function Rail({
   onSettings
 }: {
   hasWorkspace: boolean
-  /** 关系图谱:开/聚焦单例占位页签(本体未造,rail 入口先通) */
+  /** 关系图谱:开/聚焦单例页签 */
   onGraph: () => void
   onOverview: () => void
   onChat: () => void

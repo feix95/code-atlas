@@ -1,0 +1,195 @@
+/* ── 关系图谱(Graph View):画布铺满页签,面包屑与工具按钮浮在画布上层 ──
+   --graph-* token 由 renderer/src/graph/drawGraph.ts 的 readGraphColors 读取;
+   背景与高亮色借用 --canvas-tint / --accent-bright,跟随主题色 */
+
+:root {
+  --graph-bg: var(--canvas-tint);
+  --graph-node: #9a9a9a;
+  --graph-folder: #7d95b5;
+  --graph-edge: #cfcfcf;
+  --graph-label: #4a4a4a;
+  --graph-focus: var(--accent-bright);
+  --graph-muted: #b5b5b5;
+  /* 节点标签字号(rem,drawGraph 按根字号换算成像素) */
+  --graph-label-size: 0.6875;
+}
+
+:root[data-theme='dark'] {
+  --graph-node: #b4b4b4;
+  --graph-folder: #8da4c4;
+  --graph-edge: #4d4d4d;
+  --graph-label: #cfcfcf;
+  --graph-muted: #6e6e6e;
+}
+
+.graph-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--graph-bg);
+  outline: none;
+}
+
+.graph-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* 节点按钮清单:视觉隐藏(键盘与读屏可达),焦点反馈由画布高亮承担 */
+.graph-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  list-style: none;
+}
+
+.graph-bar {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.graph-bar > * {
+  pointer-events: auto;
+}
+
+.graph-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.graph-crumb {
+  display: inline-flex;
+  align-items: center;
+}
+
+.graph-crumb-sep {
+  margin: 0 var(--space-1);
+  color: var(--muted-2);
+}
+
+.graph-crumb button {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.graph-crumb button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.graph-crumb button:disabled {
+  color: var(--text);
+  cursor: default;
+}
+
+.graph-crumb button:focus-visible,
+.graph-tool:focus-visible,
+.graph-retry:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
+}
+
+.graph-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.graph-status {
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+
+.graph-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--chrome-search-row-height);
+  height: var(--chrome-search-row-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.graph-tool:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.graph-notices {
+  position: absolute;
+  top: calc(var(--space-2) + var(--chrome-search-row-height) + var(--space-2));
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: var(--z-float);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  pointer-events: none;
+}
+
+.graph-notices > * {
+  pointer-events: auto;
+}
+
+.graph-retry {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.graph-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  font-size: var(--font-md);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.graph-foot {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-2);
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+  pointer-events: none;
+}
