@@ -79,7 +79,6 @@ export function SettingsPage({
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
   const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
   const [privacyOpen, setPrivacyOpen] = useState(false)
-  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [modelsNote, setModelsNote] = useState<string | null>(null)
@@ -286,35 +285,13 @@ export function SettingsPage({
     onAiConfigSaved
   ])
 
-  /** 页尾「关闭设置」入口:保存中不响应;有未应用的草稿先弹确认,确认丢弃才真关签 */
+  /** 页尾「关闭设置」入口:保存中不响应;有未应用的草稿不拦 —— 卸载兜底会退回存档 */
   const requestClose = useCallback((): void => {
     if (applyState.kind === 'saving') return
-    if (dirty) {
-      setConfirmDiscard(true)
-      return
-    }
     onClose()
-  }, [applyState.kind, dirty, onClose])
+  }, [applyState.kind, onClose])
 
-  /** 确认丢弃:预览退回上次保存的样子,没应用的草稿当没改过 */
-  const discardAndClose = useCallback((): void => {
-    applyAppearance(savedAppearance)
-    window.atlas.setUiScale(savedScale)
-    onClose()
-  }, [savedAppearance, savedScale, onClose])
-
-  // 页签化后 Esc 不再收设置页(页不是弹窗);只用来把「确认丢弃」收回继续编辑
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key !== 'Escape' || !confirmDiscard) return
-      setConfirmDiscard(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [confirmDiscard])
-
-  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局。
-  // 常规退出(丢弃并关闭)也走这条路 —— 那时存档本就是退回目标,两边同路不打架
+  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局
   const savedRef = useRef({ appearance: savedAppearance, scale: savedScale })
   useEffect(() => {
     savedRef.current = { appearance: savedAppearance, scale: savedScale }
@@ -616,35 +593,6 @@ export function SettingsPage({
           </button>
         </div>
       </footer>
-
-      {confirmDiscard && (
-        <div className="cfg-confirm-dim" onClick={() => setConfirmDiscard(false)}>
-          <div
-            className="cfg-confirm"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="cfg-confirm-title"
-            aria-describedby="cfg-confirm-desc"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="cfg-confirm-title">未应用的更改</h2>
-            <p id="cfg-confirm-desc">关闭设置将丢弃这些更改,并恢复为上次保存的状态。</p>
-            <div className="cfg-confirm-actions">
-              <button type="button" className="cfg-btn-reset" onClick={discardAndClose}>
-                丢弃并关闭
-              </button>
-              <button
-                type="button"
-                className="cfg-btn-apply"
-                autoFocus
-                onClick={() => setConfirmDiscard(false)}
-              >
-                继续编辑
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

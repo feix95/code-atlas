@@ -126,7 +126,6 @@ export function TabBody({
         canAddRef={false}
         refLimit={0}
         onAddRef={() => {}}
-        onClose={() => closeTab(tab.id)}
       />
     )
   }
@@ -244,7 +243,6 @@ export function TabBody({
         canAddRef={previewRefs.length < CODE_REFS_MAX}
         refLimit={CODE_REFS_MAX}
         onAddRef={addPreviewRef}
-        onClose={() => closeTab(tab.id)}
         jump={previewJump}
         noteMenu={{
           hasNote: notes[file.relPath] !== undefined,

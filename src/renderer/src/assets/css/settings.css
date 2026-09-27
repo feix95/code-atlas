@@ -13,59 +13,7 @@
   background: var(--window);
 }
 
-/* 关弹窗确认(第五十八锤):有未应用的更改时,遮罩/×/Esc 先弹确认再丢弃 */
-.cfg-confirm-dim {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: var(--scrim);
-}
-
-.cfg-confirm {
-  width: min(21.25rem, calc(100% - 3.5rem));
-  padding: 1.125rem 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  background: var(--window);
-  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.32);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .cfg-confirm {
-    animation: cfg-confirm-in 0.18s var(--ease-smooth);
-  }
-}
-
-@keyframes cfg-confirm-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.99);
-  }
-}
-
-.cfg-confirm h2 {
-  margin: 0;
-  font-size: var(--font-md);
-  font-weight: var(--font-w-semi);
-  color: var(--text);
-}
-
-.cfg-confirm p {
-  margin: 0.375rem 0 0;
-  font-size: var(--font-xs);
-  line-height: var(--lh-155);
-  color: var(--muted);
-}
-
-.cfg-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-/* 页尾「关闭设置」:不抢戏的次级钮,关掉这张页签(有未应用更改先确认) */
+/* 页尾「关闭设置」:不抢戏的次级钮,关掉这张页签(草稿由卸载兜底退回存档) */
 .cfg-btn-close {
   padding: 0.4375rem 0.875rem;
   color: var(--muted);

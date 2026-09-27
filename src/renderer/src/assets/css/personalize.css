@@ -273,7 +273,7 @@
   height: 1.25rem;
   flex: 0 0 auto;
   border-radius: var(--radius-xs);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-inset-line);
 }
 
 .cfg-theme strong,
@@ -440,7 +440,7 @@
 .cfg-segmented button.is-selected {
   color: var(--accent-bright);
   background: var(--surface);
-  box-shadow: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-sm);
 }
 
 .cfg-segmented strong,
@@ -550,7 +550,7 @@
   height: 1rem;
   border-radius: 50%;
   background: var(--switch-knob);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-sm);
   transition: transform var(--dur-2) var(--ease-smooth);
 }
 
@@ -910,7 +910,7 @@
   color: var(--accent-ink);
   border: 1px solid var(--accent-line);
   background: var(--accent);
-  box-shadow: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: var(--shadow-accent);
 }
 
 .cfg-btn-apply:hover:not(:disabled) {

@@ -378,3 +378,4 @@
 - fix(ui): 激活页签补 Chrome 式外轮廓描边——顶/侧缘与双底角反弧同色 1px --line,顶栏底线在签身与镂空下断开并接弧尖;.tabbar 裁剪盒三向让位(overflow 裁在 padding 盒,首签左角反弧与签底线行原被切掉)
 - feat(ui): 页签改版摘钉住——文件签绑死文件:树里点文件开预览签(一文件一签/重开激活旧签/文件夹只选中不开签/开项目空栏),概览/小探针/图谱/设置收为 rail 单例签;跟随换芯、钉住对话分家、品类勾选菜单与钉住保活层全摘,会话存档弃 pinned 字段(旧档钉签落成正常文件签)
 - feat(ui): 页签撕窗 M1——页签拖出窗外/右键「移到新窗口」撕成无边框独立子窗(自绘标题栏+完整页签带+分屏正文,拖边缩放),同进程子窗+React Portal 活 DOM 整体搬家(对话流/滚动位不断),桌宠/气泡窗/freechatHost 全链退役,realm 铁律(ownerDocument.defaultView)落地
+- fix(ui): 页签拖拽收口——源签拖拽全程原样不塌缩,失焦/切窗/松手丢 pointerup 自动取消(blur/visibilitychange/lostpointercapture/buttons 补票),正文中心「拆成两栏」落点撤除只留边缘定向拆;预览头「引用全文/退出预览」双钮与设置确认弹窗退役;全仓阴影收编 tokens(--shadow-menu/modal 并入 --shadow-pop 销户),拖拽芯片半透明无影

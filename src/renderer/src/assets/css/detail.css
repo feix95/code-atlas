@@ -125,7 +125,7 @@ body.is-sash-dragging .pane-sash::after {
   position: relative;
 }
 
-/* 拖页签悬在正文中心:虚线框亮起,许诺「松手拆成两栏/挪到这一组」(边缘松手可不算数) */
+/* 拖页签悬在别组正文中心:虚线框亮起,许诺「松手挪到这一组」(拆半屏只走左右缘) */
 .pane-drop-hint {
   position: absolute;
   inset: 8%;

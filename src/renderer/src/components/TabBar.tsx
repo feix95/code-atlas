@@ -15,7 +15,7 @@ export interface TabBarTab {
 /**
  * 页签条(小葵的页签模型·文件签版):一张页签 = 图标 + 名字 + 悬停才出现的 ×。
  * 文件签脸就是文件名;单例签挂品类名牌。拖拽走 TopBarTabs 的 pointer 引擎:
- * 这里只上报 pointerdown 和画让位缝 —— 被拖的签原地塌缩成空位,
+ * 这里只上报 pointerdown 和画让位缝 —— 被拖的签全程保持原样(小葵拍板),
  * 缝用 margin 过渡撑开(VS Code 式让位手感)。
  * 中键点页签 = 关闭。页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
  * (顶栏死空间/日志窗头条共用同一套)。
@@ -110,7 +110,7 @@ export function TabBar({
             aria-selected={t.id === activeId}
             className={`tabbar-tab${t.id === activeId ? ' is-active' : ''}${
               t.id === flashId ? ' is-flash' : ''
-            }${t.id === dragSourceId ? ' is-drag-source' : ''}`}
+            }`}
             data-tab-id={t.id}
             style={
               t.id === gapAnchor?.id

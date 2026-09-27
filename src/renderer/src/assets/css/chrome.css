@@ -337,8 +337,8 @@
 }
 
 /* ── 页签 pointer 拖拽(TopBarTabs 引擎):拖拽中整条带开几何过渡 ——
-   margin 撑落点缝、width/padding 收源签空位,过渡才有「邻居滑开让位」的连续感;
-   平时不挂,免得窗口/分屏改宽时页签尺寸拖尾 ── */
+   margin 撑落点缝,过渡才有「邻居滑开让位」的连续感;源签全程原样不塌缩;
+   平时不挂过渡,免得窗口/分屏改宽时页签尺寸拖尾 ── */
 .tabbar.is-dnd-live .tabbar-tab {
   transition:
     margin-left var(--dur-2) var(--ease-smooth),
@@ -350,19 +350,8 @@
     opacity var(--dur-2) var(--ease-smooth);
 }
 
-/* 被拎着的页签:原地塌缩成零宽空位(替身芯片跟光标跑,真身不占座);
-   松手提交后类名摘下,签在新序号上展开回来 ≈ 沉降动画 */
-.tabbar-tab.is-drag-source {
-  flex: none;
-  width: 0;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  gap: 0;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
+/* 被拎着的页签:原地保持原样(小葵拍板)——替身芯片跟光标跑,真身不动,
+   松手提交才挪窝;不塌缩成空位(塌空让签头凭空消失,看不出是谁在拖) */
 
 /* 落点记号:一条小竖线寄生在宿主签的缘上 —— Obsidian 式钉在「要跟在后面的那张
    签」的尾巴缘;签被 flex/margin 挤着挪位线跟着走,视觉位置=真实落点 */
@@ -403,8 +392,8 @@
   pointer-events: none;
   background: var(--chrome-ink);
   color: #ffffff;
-  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.22);
-  opacity: 0.97;
+  /* 不投阴影 + 半透明:芯片是「飘着的代用品」不是真控件,轻一点更拎得清(小葵拍板) */
+  opacity: 0.5;
   transition: opacity 0.12s ease-out;
 }
 
@@ -418,7 +407,6 @@
     border-radius 0.17s var(--ease-smooth),
     background 0.17s var(--ease-smooth),
     color 0.17s var(--ease-smooth),
-    box-shadow 0.17s var(--ease-smooth),
     opacity 0.12s ease-out;
 }
 
@@ -434,7 +422,6 @@
     border-radius 0.21s var(--ease-smooth),
     background 0.21s var(--ease-smooth),
     color 0.21s var(--ease-smooth),
-    box-shadow 0.21s var(--ease-smooth),
     opacity 0.12s ease-out;
 }
 
@@ -789,7 +776,7 @@ body.is-tab-dragging * {
   border-radius: var(--radius-sm);
   background: var(--surface);
   /* 上缘一条受光线(Obsidian 招牌细节):控件像实体一样"凸"出来;浅色底下这条线隐形,无副作用 */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-inset-hi);
   color: var(--accent-bright);
   font-size: var(--font-sm);
   font-weight: var(--font-w-semi);

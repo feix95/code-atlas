@@ -452,13 +452,6 @@
   text-decoration: underline;
 }
 
-.code-pane-exit,
-.code-pane-ref {
-  flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
-  font-size: var(--font-xs);
-}
-
 .code-pane-note {
   margin: 0;
   padding: var(--space-2) var(--space-3);

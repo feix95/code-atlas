@@ -1,6 +1,6 @@
 // 页签组区(UI v3):页签带已上顶栏(TopBarTabs),这里只剩正文分屏 ——
 // 一到两组正文,中间分割条调比例;页签拖拽的落点判定在 TopBarTabs 引擎,
-// 这里只管照 dropMark 亮提示:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏。
+// 这里只管照 dropMark 亮提示:中心 = 挪进别组,左右缘 = 定向拆半屏(单组才许)。
 import { Fragment } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { PaneEmptyBoard } from './TabBody'
@@ -16,7 +16,7 @@ export function PaneGroups({
 }: {
   groups: PaneGroup[]
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
-  /** 引擎只在「松手有动作」的落点上设它:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏 */
+  /** 引擎只在「松手有动作」的落点上设它:中心 = 挪进别组,左右缘 = 定向拆半屏 */
   dropMark: { groupId: string; zone: 'center' | 'left' | 'right' } | null
   onPaneSashDown: (e: React.PointerEvent<HTMLDivElement>) => void
   applyPaneSplit: (v: number) => void
@@ -77,7 +77,7 @@ export function PaneGroups({
                 ) : null}
                 {dropMark?.groupId === g.id && dropMark.zone === 'center' && (
                   <div className="pane-drop-hint" aria-hidden="true">
-                    {groups.length === 1 ? '松手,拆成两栏' : '松手,挪到这一组'}
+                    松手,挪到这一组
                   </div>
                 )}
                 {/* 边缘分屏许诺:亮贴近的那半边(分组只长横排,只许左右缘 —— 小葵的二期手势) */}

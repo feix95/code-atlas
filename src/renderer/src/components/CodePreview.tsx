@@ -3,7 +3,7 @@ import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types
 import { HL_KINDS } from '@shared/highlight'
 import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
 import { CH } from '@shared/ipcChannels'
-import { planWholeFileRef, visibleLineRange } from '@shared/preview'
+import { visibleLineRange } from '@shared/preview'
 import { friendlyErr } from '../errText'
 import {
   clampButtonX,
@@ -18,11 +18,8 @@ import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuSto
 
 /** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
 const COPIED_ALL_MS = 2000
-const ADDED_REF_MS = 1000
 /** 头部文件图标(和文件树 15px 同款岗,户口在 FileTree 的 TREE_ICON_SIZE) */
 const FILE_ICON_SIZE = 15
-/** 「整份引用」钮上的回形针小图标 */
-const CLIP_ICON_SIZE = 12
 /** 选区首尾角括号一对(markStart/markEnd)的尺寸 */
 const MARK_ICON_SIZE = 13
 
@@ -104,7 +101,6 @@ export function CodePreview({
   canAddRef,
   refLimit,
   onAddRef,
-  onClose,
   jump,
   noteMenu
 }: {
@@ -115,7 +111,6 @@ export function CodePreview({
   /** 一轮最多引几段(跟主进程同一个数) */
   refLimit: number
   onAddRef: (ref: ChatCodeRef) => void
-  onClose: () => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
   /** 备注三件套(菜单统一大锤):头部文件名右键菜单带上写/清备注,跟树里、聊天里一个规格 */
@@ -143,25 +138,22 @@ export function CodePreview({
     sel: null
   })
   const sel = selAt.file === file.relPath ? selAt.sel : null
-  /** 三个一闪而过的小开关(浮钮/已引用/已复制)共用一本账 */
+  /** 两个一闪而过的小开关(浮钮/已复制)共用一本账 */
   const [uiAt, setUiAt] = useState<{
     file: string
     showButton: boolean
-    added: boolean
     copiedAll: boolean
   }>({
     file: '',
     showButton: false,
-    added: false,
     copiedAll: false
   })
   // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
   const showButton = uiAt.file === file.relPath && uiAt.showButton
-  const added = uiAt.file === file.relPath && uiAt.added
   const copiedAll = uiAt.file === file.relPath && uiAt.copiedAll
   /** 改小开关:只动当前文件的账;换了文件才姗姗来迟的开关(迟到定时器),当没看见 */
   const patchUi = useCallback(
-    (patch: Partial<{ showButton: boolean; added: boolean; copiedAll: boolean }>): void => {
+    (patch: Partial<{ showButton: boolean; copiedAll: boolean }>): void => {
       setUiAt((prev) => (prev.file === file.relPath ? { ...prev, ...patch } : prev))
     },
     [file.relPath]
@@ -402,24 +394,6 @@ export function CodePreview({
       .catch(() => {})
   }
 
-  /** 整份引用:把这份代码整个挂到右栏输入框上(按一轮的引用额度裁,正文是全文) */
-  const wholeRef = useMemo(
-    () => planWholeFileRef({ text, refLimit, canAddRef }),
-    [text, refLimit, canAddRef]
-  )
-
-  function addWholeRef(): void {
-    if (!wholeRef.canAdd || wholeRef.code.trim() === '') return
-    onAddRef({
-      relPath: file.relPath,
-      startLine: wholeRef.startLine,
-      endLine: wholeRef.endLine,
-      code: wholeRef.code
-    })
-    patchUi({ added: true })
-    window.setTimeout(() => patchUi({ added: false }), ADDED_REF_MS)
-  }
-
   const label = sel
     ? refButtonLabel({
         canAddRef,
@@ -454,21 +428,6 @@ export function CodePreview({
         >
           {file.relPath}
         </span>
-        {result?.status === 'ok' && text !== '' && (
-          <button
-            type="button"
-            className="btn btn-ghost code-pane-ref"
-            disabled={!wholeRef.canAdd}
-            onClick={addWholeRef}
-            data-tip={wholeRef.title}
-          >
-            <TreeIcon name="clip" size={CLIP_ICON_SIZE} />
-            {added ? '已引用' : wholeRef.label}
-          </button>
-        )}
-        <button type="button" className="btn btn-ghost code-pane-exit" onClick={onClose}>
-          退出预览
-        </button>
       </div>
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (

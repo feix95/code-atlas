@@ -82,5 +82,5 @@
   color: var(--text);
   font-size: var(--font-sm);
   line-height: var(--lh-150);
-  box-shadow: var(--shadow-menu);
+  box-shadow: var(--shadow-pop);
 }

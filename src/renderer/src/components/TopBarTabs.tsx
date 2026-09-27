@@ -186,6 +186,11 @@ export function TopBarTabs({
       view.removeEventListener('pointerup', up)
       view.removeEventListener('pointercancel', cancel)
       view.removeEventListener('keydown', onKey)
+      view.removeEventListener('blur', cancel)
+      doc.removeEventListener('visibilitychange', onVisChange)
+      // 先摘再放:releasePointerCapture 会异步补发 lostpointercapture,
+      // 监听还活着的话 cancel 会二次进场误杀下一趟拖拽会话
+      el.removeEventListener('lostpointercapture', cancel)
       if (captured && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       doc.body.classList.remove('is-tab-dragging')
     }
@@ -211,8 +216,8 @@ export function TopBarTabs({
       }
       if (z.type === 'pane') {
         if (z.zone === 'center') {
-          // 中心松手(老规矩):别组页签拖来 = 挪来这组;单组 = 拆两栏(落右)
-          if (srcGroupId !== z.groupId || groups.length === 1) moveTab(t.id, 'sibling', null)
+          // 中心松手:只认「别组页签挪来并组」;单组中心不动作(拆分走左右缘 —— 小葵拍板)
+          if (srcGroupId !== z.groupId) moveTab(t.id, 'sibling', null)
         } else {
           moveTab(t.id, 'sibling', null, z.zone)
         }
@@ -240,13 +245,13 @@ export function TopBarTabs({
         const b = bodies.find((x) => x.groupId === z.groupId)
         if (!b) return null
         const stripTop = s ? s.bottom - rect.height : rect.top
-        if (z.zone === 'center' && groups.length > 1 && s) {
+        if (z.zone === 'center' && s) {
           // 挪去现成的另一组:落那条带的末尾
           const endX = s.mids.length > 0 ? s.mids[s.mids.length - 1].right + 2 : s.barLeft + 10
           return { left: endX, top: stripTop, width: rect.width, height: rect.height }
         }
-        // 单组拆栏:新组还没长出来,用正文矩形 + paneSplit 推新条带在顶栏的落点 —
-        // 左缘拆 = 新组在左,中心/右缘 = 新组在右
+        // 单组拆栏(左右缘):新组还没长出来,用正文矩形 + paneSplit 推新条带在顶栏的落点 —
+        // 左缘拆 = 新组在左,右缘 = 新组在右
         const bw = b.right - b.left
         const landX = z.zone === 'left' ? b.left + 10 : b.left + bw * paneSplit + 10
         return { left: landX, top: stripTop, width: rect.width, height: rect.height }
@@ -272,6 +277,12 @@ export function TopBarTabs({
     }
 
     const move = (ev: PointerEvent): void => {
+      // 失焦期间窗外松手会吃掉 pointerup(事件转给别家窗):按键早没了
+      // 却还在收 move = 松手被吞了,按取消收摊 —— Alt+Tab 切走/截图工具抢焦点同病
+      if ((ev.buttons & 1) === 0) {
+        cancel()
+        return
+      }
       const cx = ev.clientX
       const cy = ev.clientY
       if (!started) {
@@ -375,8 +386,8 @@ export function TopBarTabs({
           const relY = (cy - b.top) / (b.bottom - b.top)
           const srcGroup = groups.find((g) => g.id === srcGroupId)
           if (relX > 0.25 && relX < 0.75 && relY > 0.25 && relY < 0.75) {
-            // 中心许诺(老规矩原文):别组页签 = 挪组,单组 = 拆两栏;自己组中心不画饼
-            if (srcGroupId !== b.groupId || groups.length === 1) {
+            // 中心许诺:只对别组画「挪到这一组」;自家组中心不画饼(拆分归左右缘管)
+            if (srcGroupId !== b.groupId) {
               zone = { type: 'pane', groupId: b.groupId, zone: 'center' }
               setDropMark((prev) =>
                 prev?.groupId === b.groupId && prev.zone === 'center'
@@ -449,9 +460,19 @@ export function TopBarTabs({
       if (ev.key === 'Escape') cancel()
     }
 
+    // 窗被切走/藏起 = 这趟拖拽作废(小葵拍板:只有本窗点着才算在拖):
+    // blur/藏起走 cancel 飞回;还没过拖拽阈值的按下同样收摊(cancel 内部按 started 分流)
+    const onVisChange = (): void => {
+      if (doc.visibilityState === 'hidden') cancel()
+    }
+
     view.addEventListener('pointermove', move)
     view.addEventListener('pointerup', up)
     view.addEventListener('pointercancel', cancel)
+    view.addEventListener('blur', cancel)
+    doc.addEventListener('visibilitychange', onVisChange)
+    // 浏览器侧主动收回捕获(失焦常见):捕获一丢 move/up 路由全断,也只能取消
+    el.addEventListener('lostpointercapture', cancel)
   }
 
   return (

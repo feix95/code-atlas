@@ -97,8 +97,16 @@
   --z-tip: 100;
   /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
   --focus-ring: 0 0 0 0.1875rem;
-  --shadow-menu: 0 8px 28px rgba(0, 0, 0, 0.22);
-  --shadow-modal: 0 8px 28px rgba(0, 0, 0, 0.28);
+  /* 阴影阶(小葵定:全仓投影唯一出处,升档 = 浮得越高):
+     sm = 贴地小件(开关钮/选中段/卡片架);tip = 悬停气泡(小面积高浓度);
+     pop = 浮层菜单弹层,亮暗双档,户口在主题色区;accent 系 = 主题色染的强调投影;
+     inset 系 = 内阴影(受光线/发丝线),不是投影 */
+  --shadow-sm: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.14);
+  --shadow-tip: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.18);
+  --shadow-accent: 0 0.125rem 0.3125rem color-mix(in srgb, var(--accent) 22%, transparent);
+  --shadow-accent-lg: 0 0.25rem 0.75rem color-mix(in srgb, var(--accent) 14%, transparent);
+  --shadow-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-inset-line: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   --edge-accent: inset 2px 0 0 var(--accent-bright);
   /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
   --scrim: rgba(0, 0, 0, 0.36);
@@ -165,7 +173,7 @@
   --git-rename: #9a6700;
   --hover: rgba(0, 0, 0, 0.05);
   --selected-bg: rgba(0, 0, 0, 0.08);
-  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+  --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.18);
   /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题 ── */
   --tok-ctl: #af00db;
   --tok-kw: #0000ff;
@@ -217,7 +225,7 @@
   --git-rename: #d29922;
   --hover: rgba(255, 255, 255, 0.07);
   --selected-bg: rgba(255, 255, 255, 0.13);
-  --shadow-pop: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.45);
   /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
   --switch-knob: #e5eaed;
   /* v3 框架色槽暗色(B9 定稿,VS Code Dark+ 惯例):框架比内容亮一档、悬停再亮一档、
@@ -311,7 +319,7 @@ body.is-maximized .app {
   line-height: var(--lh-150);
   white-space: pre-line;
   pointer-events: none;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-tip);
 }
 .tip-bubble::before {
   content: '';
