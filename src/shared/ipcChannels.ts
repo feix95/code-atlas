@@ -75,22 +75,11 @@ export const CH = {
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
   // ── 桌宠 ──
-  mascotVisibleGet: 'atlas:mascot-visible-get',
-  mascotVisible: 'atlas:mascot-visible',
-  mascotDragStart: 'atlas:mascot-drag-start',
-  mascotDragMove: 'atlas:mascot-drag-move',
-  mascotDragEnd: 'atlas:mascot-drag-end',
-  mascotActivate: 'atlas:mascot-activate',
-  mascotMenu: 'atlas:mascot-menu',
+  // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
+  // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗
+  auxWindowOp: 'atlas:aux-window-op',
   // ── 共享自由对话与气泡 ──
-  freechatMirror: 'atlas:freechat-mirror',
-  freechatInput: 'atlas:freechat-input',
-  freechatPull: 'atlas:freechat-pull',
-  freechatPush: 'atlas:freechat-push',
-  freechatDetach: 'atlas:freechat-detach',
-  freechatHost: 'atlas:freechat-host',
-  openMain: 'atlas:open-main',
-  bubbleResize: 'atlas:bubble-resize',
+
   // ── Developer 日志 ──
   devLogPull: 'atlas:dev-log-pull',
   devLogClear: 'atlas:dev-log-clear',

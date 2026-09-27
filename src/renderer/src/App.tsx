@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   DepGraphResult,
   DriveInfo,
   FileStructure,
-  FreechatHost,
   GitChangesResult,
   ScanDirNode,
   ScanFileNode,
@@ -13,7 +13,6 @@ import { refreshNotesForScan, saveNotes, upsertNote, type NoteMap } from '@share
 import type { SearchNameHit } from '@shared/searchNames'
 import { isAiConfigured } from '@shared/aiSetup'
 import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
-import { createMirrorThrottle } from '@shared/mirrorThrottle'
 import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
@@ -25,6 +24,7 @@ import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
 import { Rail } from './components/Rail'
 import { TopBarTabs } from './components/TopBarTabs'
+import { AuxWindowShell, type TabAreaProps } from './components/AuxWindowShell'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { TooltipHost } from './components/Tooltip'
 import { PaneGroups } from './components/PaneGroups'
@@ -38,21 +38,20 @@ import {
   toggleRecentPin,
   type RecentProject
 } from './recents'
-import { useAiChat, type ChatMessage } from './useAiChat'
+import { useAiChat } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
 import { useWheelZoom } from './useWheelZoom'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
+import { useAuxWindows } from './useAuxWindows'
+import { groupsForHost, MAIN_HOST } from './paneTabs'
 import { useSessionRestore } from './useSessionRestore'
 import { useNavStack } from './useNavStack'
 import { usePreviewRefs } from './usePreviewRefs'
 import { useFlashFlag, useFlashValue } from './useFlashFlag'
 import { useWindowMaximized } from './useWindowMaximized'
 import { findDir, findFile, mergeStats, spliceSubtree, dirChainOf } from './scanTreeTools'
-
-/** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
-const MIRROR_THROTTLE_MS = 100
 
 /** 轻提示各养各的体感时长(P2-6 具名):不共用一张表,但每个数都得有名有姓 */
 const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
@@ -101,10 +100,6 @@ function App(): React.JSX.Element {
   const [notes, setNotes] = useState<NoteMap>({})
   // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
   const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
-
-  // 小探针寄居形态(走出面板锤):panel = 页签里;pet = 变身桌宠趴桌面。
-  // pet 时那张公用场页签连卡带正房一起隐去 —— 页签就是桌宠,飞走了不留分身
-  const [freechatHost, setFreechatHost] = useState<FreechatHost>('panel')
 
   // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
   const [revealPaths, setRevealPaths] = useState<Set<string>>(new Set())
@@ -166,34 +161,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     chatRef.current = chat
   })
-
-  // 共享自由对话(桌宠气泡锤):公用场的消息流镜像给气泡窗 —— 全 app 一场对话,
-  // 气泡只是它的另一扇门。快照节流 100ms:流式刷屏不逐 token 糊 IPC,间隔内的
-  // 版本由尾推补 —— 补的必须是当下最新版(mirrorThrottle 记着的),旧实现补的是
-  // 排闹钟那一刻的旧快照,「忙→完」翻牌被丢 = 气泡锁死案
-  const mirrorNotify = useMemo(
-    () =>
-      createMirrorThrottle<ChatMessage[]>(
-        (m) => window.atlas.freechatMirror(m),
-        MIRROR_THROTTLE_MS
-      ),
-    []
-  )
-  useEffect(() => {
-    mirrorNotify(chat.messages)
-  }, [chat.messages, mirrorNotify])
-  // 气泡代发的输入:正主永远是这边的公用场,气泡只是传话的
-  useEffect(
-    () =>
-      window.atlas.onFreechatInput((payload) => {
-        if (payload.op === 'send') chatRef.current.send(payload.text)
-        else chatRef.current.cancel()
-      }),
-    []
-  )
-  // 小探针寄居形态(走出面板锤):panel = 页签里;pet = 变身桌宠。
-  // 事实源在主进程,这边只听广播换装 —— pet 时页签栏和正房都不留分身,公用场账本照活
-  useEffect(() => window.atlas.onFreechatHost(setFreechatHost), [])
 
   const folderRef = useRef(folder)
   useEffect(() => {
@@ -643,6 +610,9 @@ function App(): React.JSX.Element {
   } = useSidebarSash()
   // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路
   useWheelZoom(() => {})
+  // 撕窗子窗户口(页签撕窗锤):window.open 同进程子窗 + Portal 渲染坑位。
+  // 死在页签账本上头 —— 撕签要它能开窗,窗死了要它名下的组销户
+  const { auxWins, openAuxWindow, closeAuxWindow, onAuxGone } = useAuxWindows()
   const {
     groups,
     setGroups,
@@ -666,13 +636,20 @@ function App(): React.JSX.Element {
     applyPaneSplit,
     onPaneSashDown,
     onTabDragEnd,
-    onDetachTab
+    onDetachTab,
+    closeHostGroups
   } = usePaneTabs({
     result,
     chat,
-    freechatHost,
+    openAuxWindow: () => openAuxWindow()?.id ?? null,
     setRevealPaths
   })
+  // 子窗死讯 → 它名下的签连组销户(Chrome 语义:关窗即关签)
+  useEffect(() => {
+    onAuxGone(closeHostGroups)
+  }, [onAuxGone, closeHostGroups])
+  // 主窗名下的组 vs 各子窗名下的组:两边各画各的页签带和分屏
+  const mainGroups = groupsForHost(groups, MAIN_HOST)
   const { nav, pushNav, goNav } = useNavStack({
     folder,
     result,
@@ -721,62 +698,79 @@ function App(): React.JSX.Element {
     scanPath
   })
 
-  // 顶栏页签带照常对齐,正文就是那张签
+  // 页签区通用接线包:主窗和每扇子窗吃的是同一副药(户口过滤后各自的组)
+  const tabArea: TabAreaProps = {
+    visibleOfGroup,
+    flashTabId,
+    activateTab,
+    closeTab,
+    moveTab,
+    setDropMark,
+    onTabDragEnd,
+    onDetachTab,
+    paneSplit,
+    setActiveGroupId,
+    dropMark,
+    onPaneSashDown,
+    applyPaneSplit,
+    renderTabBody: (t) => (
+      <TabBody
+        tab={t}
+        result={result}
+        notes={notes}
+        noteEditRequest={noteEditRequest}
+        previewRefs={previewRefs}
+        previewJump={previewJump}
+        selectedFile={selectedFile}
+        selectedFolder={selectedFolder}
+        structure={structure}
+        analyzing={analyzing}
+        analyzeNote={analyzeNote}
+        graph={graph}
+        graphLoading={graphLoading}
+        graphNote={graphNote}
+        gitInfo={gitInfo}
+        setGitInfo={setGitInfo}
+        gitLoading={gitLoading}
+        chatSuggestionsOn={chatSuggestionsOn}
+        chat={chat}
+        chatContext={chatContext}
+        fileLinks={fileLinks}
+        goAskInChat={goAskInChat}
+        handleLoadGraph={handleLoadGraph}
+        expandLazy={handleExpandLazy}
+        jumpTo={jumpTo}
+        saveNote={saveNote}
+        editNoteFromTree={editNoteFromTree}
+        openPreview={openPreview}
+        closeTab={closeTab}
+        addPreviewRef={addPreviewRef}
+        removePreviewRef={removePreviewRef}
+        handleDropNode={handleDropNode}
+        settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
+        settingsSectionReq={settingsReq}
+        onAiConfigSaved={(c) => {
+          setAiConfigured(isAiConfigured(c))
+          setTeaching(sanitizePersonalization(c.personalization).teaching)
+        }}
+        onChatSuggestionsChange={(v) => {
+          setChatSuggestionsOn(v)
+          saveChatSuggestionsOn(v)
+        }}
+      />
+    )
+  }
+
+  // 顶栏页签带照常对齐,正文就是那张签(只画主窗名下的组)
   const paneGroupsEl = (
     <PaneGroups
-      groups={groups}
-      freechatHost={freechatHost}
+      groups={mainGroups}
       setActiveGroupId={setActiveGroupId}
       dropMark={dropMark}
       onPaneSashDown={onPaneSashDown}
       applyPaneSplit={applyPaneSplit}
       paneSplit={paneSplit}
-      renderTabBody={(t) => (
-        <TabBody
-          tab={t}
-          result={result}
-          notes={notes}
-          noteEditRequest={noteEditRequest}
-          previewRefs={previewRefs}
-          previewJump={previewJump}
-          selectedFile={selectedFile}
-          selectedFolder={selectedFolder}
-          structure={structure}
-          analyzing={analyzing}
-          analyzeNote={analyzeNote}
-          graph={graph}
-          graphLoading={graphLoading}
-          graphNote={graphNote}
-          gitInfo={gitInfo}
-          setGitInfo={setGitInfo}
-          gitLoading={gitLoading}
-          chatSuggestionsOn={chatSuggestionsOn}
-          chat={chat}
-          chatContext={chatContext}
-          fileLinks={fileLinks}
-          goAskInChat={goAskInChat}
-          handleLoadGraph={handleLoadGraph}
-          expandLazy={handleExpandLazy}
-          jumpTo={jumpTo}
-          saveNote={saveNote}
-          editNoteFromTree={editNoteFromTree}
-          openPreview={openPreview}
-          closeTab={closeTab}
-          addPreviewRef={addPreviewRef}
-          removePreviewRef={removePreviewRef}
-          handleDropNode={handleDropNode}
-          settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
-          settingsSectionReq={settingsReq}
-          onAiConfigSaved={(c) => {
-            setAiConfigured(isAiConfigured(c))
-            setTeaching(sanitizePersonalization(c.personalization).teaching)
-          }}
-          onChatSuggestionsChange={(v) => {
-            setChatSuggestionsOn(v)
-            saveChatSuggestionsOn(v)
-          }}
-        />
-      )}
+      renderTabBody={tabArea.renderTabBody}
     />
   )
 
@@ -811,10 +805,11 @@ function App(): React.JSX.Element {
             filter={searchQuery}
             onFilterChange={setSearchQuery}
             tabs={
-              // 页签带跟着组的账本走,不看工作区:首页开的单例签(设置)也要能点能 ×
-              groups.length > 0 ? (
+              // 页签带跟着主窗名下的组走(子窗的签在子窗自己带里),不看工作区:
+              // 首页开的单例签(设置)也要能点能 ×
+              mainGroups.length > 0 ? (
                 <TopBarTabs
-                  groups={groups}
+                  groups={mainGroups}
                   visibleOfGroup={visibleOfGroup}
                   flashTabId={flashTabId}
                   activateTab={activateTab}
@@ -836,10 +831,7 @@ function App(): React.JSX.Element {
               hasWorkspace={result !== null && !scanning}
               onGraph={() => openSingletonTab('graph')}
               onOverview={() => openSingletonTab('overview')}
-              onChat={() => {
-                if (freechatHost === 'pet') window.atlas.openMainPanel()
-                openSingletonTab('chat')
-              }}
+              onChat={() => openSingletonTab('chat')}
               onSettings={() => openSettings()}
             />
             {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
@@ -954,6 +946,21 @@ function App(): React.JSX.Element {
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
         </div>
+
+        {/* 撕窗子窗(页签撕窗锤):每扇子窗一份壳(标题栏+页签带+分屏正文),
+            Portal 渲染进子窗 document —— 同一棵 React 树,活的签的正房整体搬家 */}
+        {auxWins.map((a) =>
+          createPortal(
+            <AuxWindowShell
+              key={a.id}
+              aux={a}
+              groups={groupsForHost(groups, a.id)}
+              tabArea={tabArea}
+              onRequestClose={() => closeAuxWindow(a.id)}
+            />,
+            a.container
+          )
+        )}
       </TeachingContext.Provider>
     </AiSetupContext.Provider>
   )

@@ -1,5 +1,11 @@
 import type { BrowserWindow } from 'electron'
 
+/** 右键菜单「主面板」项的文案(纯函数):主面板在屏上就给「藏起它」,
+ * 不在就给「叫它出来」—— 在屏上还显示「显示主面板」是句废话 */
+export function mainPanelMenuLabel(mainVisible: boolean): string {
+  return mainVisible ? '隐藏主面板' : '显示主面板'
+}
+
 export class MainPanelController {
   private shown: boolean
   private readonly win: BrowserWindow

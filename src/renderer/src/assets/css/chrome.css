@@ -903,3 +903,68 @@ body.is-tab-dragging * {
     transform: translateX(2px);
   }
 }
+
+/* ── 撕窗子窗壳(页签撕窗锤)─────────────────────────────
+   子窗是无边框正常窗:页签带兼标题栏(浏览器同款,一页不两层皮),窗控三键钉带尾。
+   拖窗走手动搬窗引擎(windowDrag.ts)—— 它按 payload 的 frameName 认目标窗,
+   主窗子窗同一套;不铺 app-region:drag,系统拖窗通道不吃 Aero Shake。
+   缩放靠 Windows 无边框隐藏缩放边(M0 实测),不画自绘热区;窗控三键 no-drag ── */
+
+.aux-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-surface);
+  overflow: hidden;
+}
+
+.aux-winbtns {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  -webkit-app-region: no-drag;
+}
+
+.aux-winbtn {
+  width: calc(var(--u) * 0.9);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.aux-winbtn:hover {
+  background: var(--chrome-hover);
+}
+
+.aux-winbtn.is-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+/* 页签带:壳里独占一行且兼标题栏(窗控三键钉尾),样式沿用主窗 .topbar-strip 全家 */
+.aux-strip {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  background: var(--chrome-topbar);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 带顶垫一口呼吸:页签带兼了标题栏,签别再贴窗沿(主窗顶栏自带这个间隙) */
+.is-aux .topbar-strip {
+  padding-top: 2px;
+}
+
+/* 正文:分屏组照旧吃 flex 链 */
+.aux-panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

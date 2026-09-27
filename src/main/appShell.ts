@@ -7,26 +7,13 @@ import {
   Menu,
   nativeImage,
   screen,
-  shell,
   Tray,
   BrowserWindow
 } from 'electron'
 import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
-import {
-  createMascotWindow,
-  getMascotWindow,
-  hideMascot,
-  isMascotHidden,
-  seatMascotAt,
-  setMascotHiddenListener,
-  showMascot,
-  toggleMascot
-} from './mascot.ts'
-import { mainPanelMenuLabel, mascotMenuLabel } from './mascotState.ts'
-import { MainPanelController } from './mainPanel.ts'
-import { hideBubble, openBubble } from './bubble.ts'
-import { DETACH_MARGIN_PX, isOutsideBounds } from './freechatHost.ts'
+import { mainPanelMenuLabel, MainPanelController } from './mainPanel.ts'
+import { installAuxWindowBridge } from './auxWindows.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import {
   baseWindowBox,
@@ -40,7 +27,6 @@ import {
 } from './window-state.ts'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
-import type { FreechatHost } from '../shared/types.ts'
 
 // ── Developer 日志窗口(第八十七锤):模型后台原话亮出来看 ──
 // 独立小窗(frameless,和主窗一个壳),渲染层用 ?view=devlogs 分支画日志页。
@@ -72,57 +58,6 @@ export function showMainWindow(): void {
   mainPanelController?.show()
 }
 
-// ── 小探针形态机(走出面板锤,2026-09-19 小葵拍板)──
-// 自由对话一份内容两种形态:panel = 住在主面板页签(原始形态);pet = 变身桌宠趴桌面。
-// 互斥铁律:同一时刻只显示一份。状态唯一事实源在这儿,广播出去各窗只管画自己。
-// 桌宠不再是常驻宠物:对话住进桌宠时它才上岗,收回主面板它就下班。
-
-let freechatHost: FreechatHost = 'panel'
-
-/** 形态变了喊一声:主窗页签 ↔ 占位卡跟着换装(目前只有主窗订阅) */
-function broadcastFreechatHost(): void {
-  const win = mainWindowRef
-  if (win && !win.isDestroyed()) win.webContents.send(CH.freechatHost, freechatHost)
-}
-
-/** 桌宠 lazy 上岗:没窗现建,有窗直接用(回收时只藏不销,再放出秒到位) */
-function ensureMascot(): BrowserWindow {
-  const win = getMascotWindow()
-  if (win) return win
-  return createMascotWindow(userDataDir())
-}
-
-/** 放出:页签拖出主窗松手 → 桌宠在松手点落座 + 自动弹一次气泡报「接到啦」。
- * force = 页签右键菜单点的「放到桌面」:不判窗外,桌宠落记忆位(没记忆按默认角),
- * 主面板顺手藏起来 —— 菜单点这句就是「人不要面板了」,拖放那条路不动。
- * 主窗渲染层已筛过「chat 品类且没钉住」,这里只做最后一步几何判定 */
-export function detachFreechat(force = false): void {
-  const win = mainWindowRef
-  if (!win || win.isDestroyed() || freechatHost === 'pet') return
-  const cursor = screen.getCursorScreenPoint()
-  if (!force && !isOutsideBounds(win.getBounds(), cursor.x, cursor.y, DETACH_MARGIN_PX)) return
-  freechatHost = 'pet'
-  broadcastFreechatHost()
-  if (force) mainPanelController?.hide()
-  const pet = ensureMascot()
-  if (!force) seatMascotAt(cursor.x, cursor.y)
-  showMascot() // 假藏叫回:页面画回身体+穿透归轮询,不真 hide 那套(第五案)
-  openBubble(pet.getBounds())
-  addDevLog('system', '小探针走出面板,变身桌宠')
-}
-
-/** 收回:气泡头钮 / 占位卡 / 桌宠右键菜单三条路汇这一条 ——
- * 主窗亮 + 页签复活 + 气泡收 + 桌宠下班 */
-export function dockFreechat(): void {
-  if (freechatHost !== 'panel') {
-    freechatHost = 'panel'
-    broadcastFreechatHost()
-  }
-  hideBubble()
-  hideMascot()
-  showMainWindow()
-}
-
 /** 托盘图标:开发模式读仓库里的 build/icon.ico;打包后从 resources/app.ico 认
  * (electron-builder.yml 的 extraResources 负责把它搬进去) */
 function trayIconPath(): string {
@@ -131,8 +66,7 @@ function trayIconPath(): string {
     : join(app.getAppPath(), 'build/icon.ico')
 }
 
-/** 托盘菜单按当时真实状态下菜:主面板在屏上给「藏起它」,不在给「叫它出来」;
- * 桌宠同理(假藏后 isVisible 会说谎,问 mascotHidden 旗) */
+/** 托盘菜单按当时真实状态下菜:主面板在屏上给「藏起它」,不在给「叫它出来」 */
 function buildTrayMenu(): Menu {
   const mainShown = mainPanelController?.isShown() ?? false
   return Menu.buildFromTemplate([
@@ -140,13 +74,12 @@ function buildTrayMenu(): Menu {
       label: mainPanelMenuLabel(mainShown),
       click: () => (mainShown ? mainPanelController?.hide() : showMainWindow())
     },
-    { label: mascotMenuLabel(isMascotHidden()), click: () => toggleMascot() },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }
   ])
 }
 
-/** 主面板/桌宠露面状态一翻账就重摆菜单:别让人对着过期文案点菜 */
+/** 主面板露面状态一翻账就重摆菜单:别让人对着过期文案点菜 */
 function refreshTrayMenu(): void {
   if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu())
 }
@@ -158,7 +91,6 @@ export function createTray(): void {
   tray = new Tray(icon)
   tray.setToolTip('CodeAtlas')
   tray.setContextMenu(buildTrayMenu())
-  setMascotHiddenListener(refreshTrayMenu)
   // Windows 惯例:左键点托盘 = 唤回主面板
   tray.on('click', () => showMainWindow())
 }
@@ -239,6 +171,9 @@ export function createWindow(): void {
   mainWindowRef = mainWindow
   mainPanelController = new MainPanelController(mainWindow)
   mainPanelController.onShownChange = refreshTrayMenu
+  // 撕窗子窗桥(页签撕窗锤):渲染层 window.open 开同进程子窗 ——
+  // 白名单放行 + 无边框定形 + frameName 注册表(供 auxWindowOp 代发窗口操作)
+  installAuxWindowBridge(mainWindow)
 
   // 记事本落盘:平常拖大拖小/挪地方都是 debounce 攒 0.5 秒写一回,关窗那一刻清表补写;
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
@@ -442,19 +377,8 @@ export function createWindow(): void {
   mainWindow.on('maximize', () => syncMaximized(true))
   mainWindow.on('unmaximize', () => syncMaximized(false))
 
-  // 外部链接交给系统浏览器打开,不在应用里开新窗口;只放行 http(s)/mailto ——
-  // file:// 这类进系统 handler 等于替页面拉起本地程序,畸形串直接当没听见
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    try {
-      const { protocol } = new URL(details.url)
-      if (protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:') {
-        void shell.openExternal(details.url)
-      }
-    } catch {
-      /* 畸形地址:拒开 */
-    }
-    return { action: 'deny' }
-  })
+  // 外部链接转系统浏览器 + window.open 白名单,统一进子窗桥那道总闸
+  // (installAuxWindowBridge 里,175 行处已上弦;setWindowOpenHandler 只有一席,不能两头装)
 
   // 开发模式加载 Vite 开发服务器,打包后加载本地文件(工厂代跑;主窗不带 ?view=,默认页就是它)
   loadView(mainWindow)

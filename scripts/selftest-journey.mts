@@ -272,6 +272,40 @@ try {
     3,
     'clicking a folder must not open a tab'
   )
+  // 页签撕窗(M1):右键「移到新窗口」= 签撕去同进程子窗 —— 子窗带自绘标题栏和
+  // 自己的页签带,主窗名下签数减一;关子窗连签销户(Chrome 语义),窗数回原
+  const tearTab = page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText('package.json', { exact: true }) })
+  await tearTab.click({ button: 'right' })
+  const [auxPage] = await Promise.all([
+    electron.waitForEvent('window', { timeout: 8_000 }),
+    page.getByRole('menuitem', { name: '移到新窗口', exact: true }).click()
+  ])
+  assert.equal(electron.windows().length, 2, 'tearing a tab must open an aux window')
+  // 页签带兼标题栏(浏览器同款):带里有签,带尾钉着窗控三键
+  await auxPage.locator('.aux-strip .aux-winbtns').waitFor()
+  await auxPage
+    .locator('.tabbar-tab')
+    .filter({ has: auxPage.locator('.tabbar-name').getByText('package.json', { exact: true }) })
+    .waitFor()
+  assert.equal(await page.locator('.tabbar-tab').count(), 2, 'torn tab must leave the main strip')
+  // realm 探针:子窗里点一张签要能激活 —— React 合成事件必须够得着外文书(forein document)
+  // 里渲染的 Portal 子树;这条断了,子窗里所有交互都是死的
+  await auxPage.locator('.tabbar-tab').first().click()
+  await auxPage.locator('.tabbar-tab.is-active').waitFor({ timeout: 5_000 })
+  // 关子窗(标题栏 × 经主 realm 代发 IPC):连签销户,窗数回原。
+  // close 事件要先挂上再点 —— 窗关得快,点后挂监听会扑空
+  await Promise.all([
+    auxPage.waitForEvent('close', { timeout: 8_000 }),
+    auxPage.locator('.aux-winbtn.is-close').click()
+  ])
+  assert.equal(electron.windows().length, 1, 'closing aux window must leave only the main window')
+  assert.equal(
+    await page.locator('.tabbar-tab').count(),
+    2,
+    'closed aux window must take its tabs with it'
+  )
   const treeIconStyle = await page.locator('.tree-icon svg').first().getAttribute('style')
   assert.match(treeIconStyle ?? '', /--ic:/, 'file-tree icons must retain their type colors')
   const railIcon = page.locator('.rail-btn svg').first()

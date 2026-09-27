@@ -13,9 +13,20 @@
  * 黑匣子实测 1432x969→1700x1250);主进程按「基线矩形 + 总位移」回放,尺寸恒写收敛。
  * 指针捕获让光标甩出窗也能继续跟手。
  */
+/**
+ * 事件发生在哪扇窗(页签撕窗锤):元素的 ownerDocument 户口 ——
+ * 子窗的 window.name 就是 frameName('aux-N'),主窗是空串。
+ * 手动搬窗引擎在子窗里照常跑:报坐标时捎上这户口,主进程才挪得对窗。
+ */
+export function hostNameOf(el: HTMLElement): string | undefined {
+  const name = el.ownerDocument.defaultView?.name ?? ''
+  return name.startsWith('aux-') ? name : undefined
+}
+
 export function startWindowDrag(e: React.PointerEvent<HTMLElement>): void {
   if (e.button !== 0) return
   const el = e.currentTarget
+  const host = hostNameOf(el)
   el.setPointerCapture(e.pointerId)
   const startX = e.screenX
   const startY = e.screenY
@@ -24,9 +35,9 @@ export function startWindowDrag(e: React.PointerEvent<HTMLElement>): void {
     if (!dragging) {
       if (Math.abs(ev.screenX - startX) + Math.abs(ev.screenY - startY) < 4) return
       dragging = true
-      window.atlas.windowDragStart(startX, startY)
+      window.atlas.windowDragStart(startX, startY, host)
     }
-    window.atlas.windowDragMove(ev.screenX, ev.screenY)
+    window.atlas.windowDragMove(ev.screenX, ev.screenY, host)
   }
   const done = (): void => {
     el.removeEventListener('pointermove', move)

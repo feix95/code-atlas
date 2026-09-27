@@ -30,7 +30,7 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
         onContextMenu={(e) => {
           if (!links.onMenu) return
           e.preventDefault()
-          links.onMenu(s.relPath, e.clientX, e.clientY)
+          links.onMenu(s.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
         }}
         data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >

@@ -7,7 +7,12 @@ import { useEffect } from 'react'
  * (菜单自己可滚的工作区菜单就指着这条活);
  * 用捕获期监听,比菜单自己的 stopPropagation 更扛得住嵌套场景。
  */
-export function useMenuDismiss(open: boolean, close: () => void, insideSelector?: string): void {
+export function useMenuDismiss(
+  open: boolean,
+  close: () => void,
+  insideSelector?: string,
+  doc: Document = document // realm 铁律:菜单开在哪个 document,监听就挂哪个
+): void {
   useEffect(() => {
     if (!open) return
     const isInside = (e: Event): boolean =>
@@ -25,13 +30,13 @@ export function useMenuDismiss(open: boolean, close: () => void, insideSelector?
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') close()
     }
-    document.addEventListener('mousedown', onMouseDown, true)
-    document.addEventListener('wheel', onWheel, true)
-    document.addEventListener('keydown', onKeyDown, true)
+    doc.addEventListener('mousedown', onMouseDown, true)
+    doc.addEventListener('wheel', onWheel, true)
+    doc.addEventListener('keydown', onKeyDown, true)
     return () => {
-      document.removeEventListener('mousedown', onMouseDown, true)
-      document.removeEventListener('wheel', onWheel, true)
-      document.removeEventListener('keydown', onKeyDown, true)
+      doc.removeEventListener('mousedown', onMouseDown, true)
+      doc.removeEventListener('wheel', onWheel, true)
+      doc.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [open, close, insideSelector])
+  }, [open, close, insideSelector, doc])
 }

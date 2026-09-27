@@ -18,6 +18,8 @@ export interface FilePathMenuRequest {
   x: number
   y: number
   relPath: string
+  /** 菜单开在哪个 document(realm 铁律):主窗和每个子窗各挂一台菜单,各认各的请求 */
+  doc: Document
   /** 复制完整路径:成功返回绝对路径;失败返回 null(菜单里说人话,不弹错误框) */
   copy: () => Promise<string | null>
   /** 在文件资源管理器中显示:成功返回 null(资源管理器弹出本身就是反馈);
@@ -48,12 +50,14 @@ export function openFilePathMenuFor(
   relPath: string,
   x: number,
   y: number,
+  doc: Document,
   extras?: { preview?: () => void; note?: FilePathNoteActions }
 ): void {
   openFilePathMenu({
     x,
     y,
     relPath,
+    doc,
     copy: async () => {
       const r = await window.atlas.copyFilePath(rootPath, relPath)
       return r.ok && r.path !== undefined ? r.path : null

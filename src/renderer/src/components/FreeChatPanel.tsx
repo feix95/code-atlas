@@ -63,7 +63,7 @@ const FileNoteText = memo(function FileNoteText({
         onContextMenu={(e) => {
           if (!fileLinks.onMenu) return
           e.preventDefault()
-          fileLinks.onMenu(s.relPath, e.clientX, e.clientY)
+          fileLinks.onMenu(s.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
         }}
         data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
       >
@@ -178,7 +178,7 @@ const MatchListCard = memo(function MatchListCard({
               onContextMenu={(e) => {
                 if (!fileLinks?.onMenu) return
                 e.preventDefault()
-                fileLinks.onMenu(it.relPath, e.clientX, e.clientY)
+                fileLinks.onMenu(it.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
               }}
               data-tip={
                 fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath
@@ -667,7 +667,7 @@ export function FreeChatPanel({
               // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
               if (!fileLinks?.onMenu) return
               e.preventDefault()
-              fileLinks.onMenu(context.relPath, e.clientX, e.clientY)
+              fileLinks.onMenu(context.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
             }}
           >
             <TreeIcon name="clip" size={INLINE_ICON_SIZE} />

@@ -6,7 +6,7 @@
 //
 // 页签拖拽是手搓 pointer 引擎(不吃 HTML5 DnD —— 原生幻影带黑框、没有让位动画):
 // 按住位移超阈值开拖 → 原页签塌缩成空位,替身芯片浮起跟光标;扫过页签带时
-// 邻居 margin 过渡撑开落点缝;悬到正文区按中心/边缘判分屏许诺;窗外松手放小探针。
+// 邻居 margin 过渡撑开落点缝;悬到正文区按中心/边缘判分屏许诺;窗外松手撕新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { TreeIcon } from './Icons'
@@ -23,7 +23,7 @@ const STRIP_BLEED_BOTTOM = 8
 /** 正文区边缘分屏带的横向占比(封顶 120px):贴到亮半边提示 —— VS Code 同款手势 */
 const EDGE_BAND_RATIO = 0.14
 const EDGE_BAND_MAX_PX = 120
-/** 芯片松手后的淡出时长(拖出窗放小探针那条路) */
+/** 芯片松手后的淡出时长(拖出窗撕新子窗那条路) */
 const CHIP_FADE_MS = 140
 /** 沉降飞行时长:芯片飞回落点长成页签(与 CSS is-settle 的过渡时长对齐) */
 const CHIP_SETTLE_MS = 210
@@ -83,7 +83,7 @@ interface BodySnap {
   bottom: number
 }
 
-/** 当前落点:页签带插队 / 正文分屏(中心或左右缘) / 窗外(放小探针) / 无处(松手不动作) */
+/** 当前落点:页签带插队 / 正文分屏(中心或左右缘) / 窗外(撕新子窗) / 无处(松手不动作) */
 type DragZone =
   | { type: 'strip'; groupId: string; index: number }
   | { type: 'pane'; groupId: string; zone: 'center' | 'left' | 'right' }
@@ -117,9 +117,9 @@ export function TopBarTabs({
   setDropMark: React.Dispatch<
     React.SetStateAction<{ groupId: string; zone: 'center' | 'left' | 'right' } | null>
   >
-  /** 拖出主窗松手(走出面板锤:放出小探针的落点语义由 App/主进程判,这里只报是谁) */
+  /** 拖出本窗松手(页签撕窗锤:撕去新子窗,语义由 App 定,这里只报是谁) */
   onTabDragEnd: (id: string) => void
-  /** 右键菜单「放到桌面」:不拖也放,只对小探针页签显示 */
+  /** 右键菜单「移到新窗口」:不拖也撕,所有签一视同仁 */
   onDetachTab?: (id: string) => void
   /** 第一组分屏列占内容宽的比例(usePaneTabs 的账本,顶部条带认同一份) */
   paneSplit: number
@@ -153,10 +153,14 @@ export function TopBarTabs({
 
   /** 页签 pointerdown 入场:先记起点,位移够阈值才升级成拖拽会话。
       监听挂 window(不捕获也收得到全部指针事件)—— 捕获得等确认开拖才上,
-      不然 click 会被路由回页签,页签里的 × 钮整个失灵(亲历坑,别往回改) */
+      不然 click 会被路由回页签,页签里的 × 钮整个失灵(亲历坑,别往回改)。
+      realm 铁律(页签撕窗锤):Portal 渲染进子窗的页签住在另一个 document,
+      监听/查询/视口量一律走 el.ownerDocument —— 挂全局 window 上子窗的拖拽全聋 */
   function beginTabDrag(e: React.PointerEvent<HTMLDivElement>, t: TabBarTab): void {
     if (e.button !== 0 || drag) return
     const el = e.currentTarget
+    const doc = el.ownerDocument
+    const view = doc.defaultView ?? window
     const rect = el.getBoundingClientRect()
     const grabDx = e.clientX - rect.left
     const grabDy = e.clientY - rect.top
@@ -178,12 +182,12 @@ export function TopBarTabs({
     }
 
     const removeListeners = (): void => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', cancel)
-      window.removeEventListener('keydown', onKey)
+      view.removeEventListener('pointermove', move)
+      view.removeEventListener('pointerup', up)
+      view.removeEventListener('pointercancel', cancel)
+      view.removeEventListener('keydown', onKey)
       if (captured && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-      document.body.classList.remove('is-tab-dragging')
+      doc.body.classList.remove('is-tab-dragging')
     }
 
     const endSession = (): void => {
@@ -261,7 +265,7 @@ export function TopBarTabs({
       }
       setDrag((d) => (d ? { ...d, phase: 'settle', settle: target } : d))
       setDropMark(null) // 正文提示可以撤了,沉降本身就是反馈;页签缝留着接芯片落地
-      window.setTimeout(() => {
+      view.setTimeout(() => {
         if (doCommit) commitZone(z)
         endSession()
       }, CHIP_SETTLE_MS)
@@ -273,17 +277,18 @@ export function TopBarTabs({
       if (!started) {
         if (Math.abs(cx - e.clientX) + Math.abs(cy - e.clientY) < DRAG_START_PX) return
         started = true
-        // 此刻才捕获:窗外坐标还能继续报(拖出窗放小探针指望它),
+        // 此刻才捕获:窗外坐标还能继续报(拖出窗撕新窗指望它),
         // 而此前 × 钮/右键的 click 走正常派发,不受影响
         el.setPointerCapture(ev.pointerId)
         captured = true
-        document.body.classList.add('is-tab-dragging')
+        doc.body.classList.add('is-tab-dragging')
         // 主动收摊:按住没动的那 300ms 里提示可能已经合法亮过,捕获一上 mouseout 全拐回源签
         // (relatedTarget 还在宿内→tooltip 永远收不到「离开」),不喊一声它就冻在屏上陪完整个拖拽
-        document.dispatchEvent(new CustomEvent('atlas:tab-drag-start'))
-        window.addEventListener('keydown', onKey)
-        // 几何快照只量一次:让位动画一开,DOM 坐标逐帧在变,问它要账会被晃点
-        snaps = Array.from(document.querySelectorAll<HTMLElement>('.topbar-strip')).map((s, i) => {
+        doc.dispatchEvent(new CustomEvent('atlas:tab-drag-start'))
+        view.addEventListener('keydown', onKey)
+        // 几何快照只量一次:让位动画一开,DOM 坐标逐帧在变,问它要账会被晃点;
+        // 只量本窗(doc)里的带和正文 —— 别家窗的条带不归这次拖拽管
+        snaps = Array.from(doc.querySelectorAll<HTMLElement>('.topbar-strip')).map((s, i) => {
           const r = s.getBoundingClientRect()
           return {
             groupId: groups[i]?.id ?? '',
@@ -304,7 +309,7 @@ export function TopBarTabs({
             })
           }
         })
-        bodies = Array.from(document.querySelectorAll<HTMLElement>('.pane-body')).map((b) => {
+        bodies = Array.from(doc.querySelectorAll<HTMLElement>('.pane-body')).map((b) => {
           const r = b.getBoundingClientRect()
           return {
             groupId: b.dataset.groupId ?? '',
@@ -335,7 +340,7 @@ export function TopBarTabs({
       }
       setDrag((d) => (d ? { ...d, x: cx, y: cy } : d))
       // ── 落点判定:窗外 → 页签带 → 正文区 → 无处 ──
-      if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) {
+      if (cx < 0 || cy < 0 || cx >= view.innerWidth || cy >= view.innerHeight) {
         zone = { type: 'outside' }
         setGap(null)
         setDropMark(null)
@@ -415,13 +420,13 @@ export function TopBarTabs({
       swallowClick()
       const z = zone
       if (z.type === 'outside') {
-        // 拖出窗放小探针:不走沉降(窗外没落点),原地淡出交账
+        // 拖出窗撕新窗:不走沉降(窗外没落点),原地淡出交账
         onTabDragEnd(t.id)
         setGap(null)
         setDropMark(null)
         setDrag((d) => (d ? { ...d, leaving: true } : d))
         // 淡出计时按 id 守卫:淡出内开新拖,别误杀新会话的芯片
-        window.setTimeout(
+        view.setTimeout(
           () => setDrag((d) => (d && d.id === t.id && d.leaving ? null : d)),
           CHIP_FADE_MS
         )
@@ -444,9 +449,9 @@ export function TopBarTabs({
       if (ev.key === 'Escape') cancel()
     }
 
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', cancel)
+    view.addEventListener('pointermove', move)
+    view.addEventListener('pointerup', up)
+    view.addEventListener('pointercancel', cancel)
   }
 
   return (
@@ -470,7 +475,6 @@ export function TopBarTabs({
               dragSourceId={drag?.id ?? null}
               gapIndex={gap?.groupId === g.id ? gap.index : null}
               gapWidth={drag?.width ?? 0}
-
               onTabPointerDown={beginTabDrag}
             />
           </div>

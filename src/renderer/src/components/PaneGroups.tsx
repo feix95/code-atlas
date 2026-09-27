@@ -2,13 +2,11 @@
 // 一到两组正文,中间分割条调比例;页签拖拽的落点判定在 TopBarTabs 引擎,
 // 这里只管照 dropMark 亮提示:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏。
 import { Fragment } from 'react'
-import type { FreechatHost } from '@shared/types'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { PaneEmptyBoard } from './TabBody'
 
 export function PaneGroups({
   groups,
-  freechatHost,
   setActiveGroupId,
   dropMark,
   onPaneSashDown,
@@ -17,7 +15,6 @@ export function PaneGroups({
   renderTabBody
 }: {
   groups: PaneGroup[]
-  freechatHost: FreechatHost
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
   /** 引擎只在「松手有动作」的落点上设它:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏 */
   dropMark: { groupId: string; zone: 'center' | 'left' | 'right' } | null
@@ -26,13 +23,19 @@ export function PaneGroups({
   paneSplit: number
   renderTabBody: (tab: PaneTab) => React.ReactNode
 }): React.JSX.Element {
+  // 一扇窗名下一张签都没了(全挪去别窗/全关光):大 logo 底板顶班,
+  // 主窗拖空留空板、子窗拖空由壳层自裁,两边都不露死白
+  if (groups.length === 0) {
+    return (
+      <div className="pane-groups">
+        <PaneEmptyBoard />
+      </div>
+    )
+  }
   return (
     <div className="pane-groups">
       {groups.map((g, gi) => {
-        // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
-        // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
-        const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
-        const act = actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' ? null : actRaw
+        const act = g.tabs.find((t) => t.id === g.activeId) ?? null
         return (
           <Fragment key={g.id}>
             {gi > 0 && (

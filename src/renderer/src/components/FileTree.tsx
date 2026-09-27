@@ -259,16 +259,23 @@ export function FileTree({
     if (!rootPath) return
     e.preventDefault()
     const isFile = node.type === 'file'
-    openFilePathMenuFor(rootPath, node.relPath, e.clientX, e.clientY, {
-      preview: isFile && onPreviewFile ? () => onPreviewFile(node.relPath) : undefined,
-      note: onNoteEdit
-        ? {
-            hasNote: notes?.[node.relPath] !== undefined,
-            onEdit: () => onNoteEdit(node.relPath),
-            onRemove: onNoteRemove ? () => onNoteRemove(node.relPath) : undefined
-          }
-        : undefined
-    })
+    openFilePathMenuFor(
+      rootPath,
+      node.relPath,
+      e.clientX,
+      e.clientY,
+      e.currentTarget.ownerDocument,
+      {
+        preview: isFile && onPreviewFile ? () => onPreviewFile(node.relPath) : undefined,
+        note: onNoteEdit
+          ? {
+              hasNote: notes?.[node.relPath] !== undefined,
+              onEdit: () => onNoteEdit(node.relPath),
+              onRemove: onNoteRemove ? () => onNoteRemove(node.relPath) : undefined
+            }
+          : undefined
+      }
+    )
   }
 
   return (

@@ -94,18 +94,21 @@ export function usePreviewRefs(deps: {
       onRemove: (relPath) => saveNote(relPath, '')
     }
   })
-  const openFileLinkMenu = useCallback((relPath: string, x: number, y: number): void => {
-    const cur = resultRef.current
-    if (!cur) return
-    const nm = noteMenuRef.current
-    openFilePathMenuFor(cur.rootPath, relPath, x, y, {
-      note: {
-        hasNote: nm.hasNote(relPath),
-        onEdit: () => nm.onEdit(relPath),
-        onRemove: () => nm.onRemove(relPath)
-      }
-    })
-  }, [])
+  const openFileLinkMenu = useCallback(
+    (relPath: string, x: number, y: number, doc: Document): void => {
+      const cur = resultRef.current
+      if (!cur) return
+      const nm = noteMenuRef.current
+      openFilePathMenuFor(cur.rootPath, relPath, x, y, doc, {
+        note: {
+          hasNote: nm.hasNote(relPath),
+          onEdit: () => nm.onEdit(relPath),
+          onRemove: () => nm.onRemove(relPath)
+        }
+      })
+    },
+    []
+  )
   const fileLinks: FileLinkTarget | null = useMemo(
     () =>
       fileLinkIndex

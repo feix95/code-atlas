@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { TreeIcon } from './Icons'
 import type { PaneKind } from '../paneKinds'
 import { useMenuDismiss } from '../useMenuDismiss'
-import { startWindowDrag } from '../windowDrag'
+import { hostNameOf, startWindowDrag } from '../windowDrag'
 
 /** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
 export interface TabBarTab {
@@ -44,7 +44,7 @@ export function TabBar({
   onClose: (id: string) => void
   /** 挪页签(右键菜单走这条路;拖拽的落点账在 TopBarTabs 引擎里算) */
   onMoveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
-  /** 右键菜单「放到桌面」:不拖也放(走出面板锤补,小葵点的名),只对小探针页签显示 */
+  /** 右键菜单「移到新窗口」:不拖也撕(页签撕窗锤),所有页签一视同仁 */
   onDetachTab?: (id: string) => void
   /** 正被 pointer 引擎拎着的页签 id:它在这条带里原地塌缩成空位 */
   dragSourceId: string | null
@@ -54,22 +54,31 @@ export function TabBar({
   /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
   onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
-  // 页签上的右键菜单:挪组 / 放到桌面 / 关闭(记下是哪张页签)
-  const [tabMenu, setTabMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
+  // 页签上的右键菜单:挪组 / 移到新窗口 / 关闭(记下是哪张页签、哪个 document ——
+  // realm 铁律:子窗里的菜单要在子窗的 document 里收摊和夹边)
+  const [tabMenu, setTabMenu] = useState<{
+    x: number
+    y: number
+    tabId: string
+    doc: Document
+  } | null>(null)
   const closeMenus = useCallback((): void => {
     setTabMenu(null)
   }, [])
 
   // 点页面任何地方/滚轮/按 Esc 都收菜单;菜单内部点选不算「外面」
-  useMenuDismiss(tabMenu !== null, closeMenus, '.tabbar-kindmenu')
+  useMenuDismiss(tabMenu !== null, closeMenus, '.tabbar-kindmenu', tabMenu?.doc)
 
   function openTabMenu(e: React.MouseEvent, tabId: string): void {
     e.preventDefault()
     e.stopPropagation()
+    // realm 铁律:子窗里的页签菜单要对着子窗的视口夹,不拿主窗的尺寸算账
+    const view = (e.currentTarget as HTMLElement).ownerDocument.defaultView ?? window
     setTabMenu({
-      x: Math.min(e.clientX, window.innerWidth - 190),
-      y: Math.min(e.clientY, window.innerHeight - 130),
-      tabId
+      x: Math.min(e.clientX, view.innerWidth - 190),
+      y: Math.min(e.clientY, view.innerHeight - 130),
+      tabId,
+      doc: (e.currentTarget as HTMLElement).ownerDocument
     })
   }
 
@@ -83,7 +92,7 @@ export function TabBar({
   // 缝在队首时寄生首签的前缘
   const markHost = gapIndex !== null ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
   const markBefore = gapIndex === 0
-  // 右键菜单里点名的那张签:挪组/放到桌面这些「对谁动手」的项都按它判
+  // 右键菜单里点名的那张签:挪组/移到新窗口这些「对谁动手」的项都按它判
   const menuTab = tabMenu ? (tabs.find((x) => x.id === tabMenu.tabId) ?? null) : null
 
   return (
@@ -149,11 +158,12 @@ export function TabBar({
         )
       })}
       {/* 页签卡之间的空白:拖页签扫到这 = 落本组末尾(引擎按中线序判,空白不用自己接);
-          左键按住拖 = 手动搬窗(等价原生 drag 面),双击 = 最大化/还原 */}
+          左键按住拖 = 手动搬窗(等价原生 drag 面,主窗子窗都吃这套 —— 引擎报户口),
+          双击 = 最大化/还原 */}
       <div
         className="tabbar-blank"
         onPointerDown={startWindowDrag}
-        onDoubleClick={() => void window.atlas.windowMaximizeToggle()}
+        onDoubleClick={(e) => void window.atlas.windowMaximizeToggle(hostNameOf(e.currentTarget))}
         aria-hidden="true"
       />
 
@@ -175,17 +185,17 @@ export function TabBar({
           >
             {canMoveToSiblingGroup ? '挪去另一组' : '挪去右边,拆成两组'}
           </button>
-          {menuTab?.kind === 'chat' && (
+          {menuTab && onDetachTab && (
             <button
               type="button"
               role="menuitem"
               className="kindmenu-item"
               onClick={() => {
-                onDetachTab?.(menuTab.id)
+                onDetachTab(menuTab.id)
                 setTabMenu(null)
               }}
             >
-              把小探针放到桌面上
+              移到新窗口
             </button>
           )}
           <button

@@ -1,5 +1,5 @@
 // ── 开窗工厂(DRY 收口)──
-// 四扇窗(主窗/日志窗/桌宠/气泡)同吃一副壳药:安全 webPreferences、透明无边框底、
+// 两扇窗(主窗/日志窗)同吃一副壳药:安全 webPreferences、透明无边框底、
 // 露窗多路抢跑 + 3 秒看门狗、?view= 加载。以前每扇窗各抄一遍,安全开关改一处漏三处。
 // 这里只出「共有的底」;各窗自己的戏份(尺寸/落位/事件接线/救生圈)还在原文件。
 
@@ -9,9 +9,7 @@ import { CH } from '../shared/ipcChannels.ts'
 
 /** 视图名户口:?view= 参数和渲染入口(main.tsx)的分诊表对账 —— 主窗不带参,默认页就是它 */
 export const VIEWS = {
-  devlogs: 'devlogs',
-  mascot: 'mascot',
-  bubble: 'bubble'
+  devlogs: 'devlogs'
 } as const
 export type ViewName = (typeof VIEWS)[keyof typeof VIEWS]
 

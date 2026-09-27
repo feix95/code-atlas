@@ -11,8 +11,7 @@ import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
-// ChatMessage/ChatMsgState 户口在 shared/types.ts:它是主窗 → 主进程 → 气泡 的镜像快照契约,
-// 不只是本钩子的 UI 状态 —— 转一手,老朋友(App/BubblePage)照旧从这里进
+// ChatMessage/ChatMsgState 户口在 shared/types.ts —— 转一手,老朋友照旧从这里进
 export type { ChatMessage, ChatMsgState } from '@shared/types'
 
 /**

@@ -14,16 +14,13 @@ import type {
   AiConfig,
   AiDeltaPayload,
   AiExplainResult,
+  AuxWindowOp,
   BrowseEntry,
-  BubbleResizeMsg,
-  ChatMessage,
   DepGraphResult,
   DriveInfo,
   FeatureLocateResult,
   FileStructure,
   FilePreviewResult,
-  FreechatHost,
-  FreechatInput,
   GitChangesResult,
   ModelContextInfo,
   ModelFitVerdict,
@@ -107,16 +104,19 @@ const atlasApi = {
   // 自绘窗口壳:三颗灰点背后的真动作 + 最大化状态同步,渲染进程不许直接碰 BrowserWindow
   windowClose: (): Promise<void> => ipcRenderer.invoke(CH.windowClose),
   windowMinimize: (): Promise<void> => ipcRenderer.invoke(CH.windowMinimize),
-  windowMaximizeToggle: (): Promise<boolean> => ipcRenderer.invoke(CH.windowMaximizeToggle),
+  windowMaximizeToggle: (host?: string): Promise<boolean> =>
+    ipcRenderer.invoke(CH.windowMaximizeToggle, host),
   windowIsMaximized: (): Promise<boolean> => ipcRenderer.invoke(CH.windowIsMaximized),
   /** 手动搬窗(send 配 on,顶栏死空间/页签尾空白/日志窗头条共用):
       start=按下点的屏幕坐标(最大化会先还原落位),move=光标的绝对屏幕坐标 —
-      不报增量:主进程按「基线矩形+总位移」回放,躲开 150% 缩放下 bounds 逐写逐长 */
-  windowDragStart: (x: number, y: number): void => {
-    ipcRenderer.send(CH.windowDragStart, x, y)
+      不报增量:主进程按「基线矩形+总位移」回放,躲开 150% 缩放下 bounds 逐写逐长。
+      host = 目标窗户口(frameName):子窗里的事件经主窗渲染层代发,sender 恒是主窗,
+      不传它主进程会错挪主窗 */
+  windowDragStart: (x: number, y: number, host?: string): void => {
+    ipcRenderer.send(CH.windowDragStart, x, y, host)
   },
-  windowDragMove: (x: number, y: number): void => {
-    ipcRenderer.send(CH.windowDragMove, x, y)
+  windowDragMove: (x: number, y: number, host?: string): void => {
+    ipcRenderer.send(CH.windowDragMove, x, y, host)
   },
   /** 订阅最大化/还原状态变化;返回退订函数,组件卸载时调用 */
   onWindowMaximized: (callback: (maximized: boolean) => void): (() => void) => {
@@ -266,77 +266,11 @@ const atlasApi = {
   frameHeartbeat: (): void => {
     ipcRenderer.send(CH.frameHeartbeat)
   },
-  // ── 桌宠(桌宠托管第二锤):拖动三连 + 点击激活 + 右键菜单,全是单向 send(配主进程 ipcMain.on);
-  //    穿透判定全在主进程轮询,渲染层不上报(「又拖不动」第三案的治法,主仓趟平版移植) ──
-  /** 页面挂载时拉一次露面状态:藏起期间页面重载,别让它变「看得见点不着的幽灵」(invoke 配 handle) */
-  mascotVisibilityGet: (): Promise<boolean> => ipcRenderer.invoke(CH.mascotVisibleGet),
-  /** 订主进程的藏/露推送:藏起 = 不画身体(假藏,第六案);返回退订函数 */
-  onMascotVisibility: (fn: (visible: boolean) => void): (() => void) => {
-    const h = (_e: Electron.IpcRendererEvent, v: unknown): void => fn(v === true)
-    ipcRenderer.on(CH.mascotVisible, h)
-    return () => ipcRenderer.removeListener(CH.mascotVisible, h)
-  },
-  mascotDragStart: (): void => {
-    ipcRenderer.send(CH.mascotDragStart)
-  },
-  mascotDragMove: (): void => {
-    ipcRenderer.send(CH.mascotDragMove)
-  },
-  mascotDragEnd: (): void => {
-    ipcRenderer.send(CH.mascotDragEnd)
-  },
-  mascotActivate: (): void => {
-    ipcRenderer.send(CH.mascotActivate)
-  },
-  /** 右键本体 = 快捷菜单(走出面板锤) */
-  mascotMenu: (): void => {
-    ipcRenderer.send(CH.mascotMenu)
-  },
-  // ── 共享自由对话(桌宠气泡锤):气泡是主窗公用场的影子窗 ——
-  // 主窗推快照(mirror/send 配 on),气泡拉最新(pull/invoke 配 handle)并订阅增量(push),
-  // 气泡的输入经主进程转回主窗(input/send 配 on,两头同通道名:气泡发、主窗收)
-  /** 主窗公用场 → 主进程:消息流快照镜像(ChatMessage[];节流后推送) */
-  freechatMirror: (messages: ChatMessage[]): void => {
-    ipcRenderer.send(CH.freechatMirror, messages)
-  },
-  /** 气泡 → 主窗:代发输入(send/cancel);主进程中转,只认气泡窗来的 */
-  freechatInput: (payload: FreechatInput): void => {
-    ipcRenderer.send(CH.freechatInput, payload)
-  },
-  /** 主窗 ← 气泡:订阅气泡转来的输入;返回退订函数 */
-  onFreechatInput: (callback: (payload: FreechatInput) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: FreechatInput): void =>
-      callback(payload)
-    ipcRenderer.on(CH.freechatInput, listener)
-    return () => ipcRenderer.removeListener(CH.freechatInput, listener)
-  },
-  /** 气泡开窗先拉最新快照(没有 = 主窗还没醒);invoke 配 handle */
-  freechatPull: (): Promise<ChatMessage[] | null> => ipcRenderer.invoke(CH.freechatPull),
-  /** 气泡订阅会话快照增量(主窗每变一次推一次);返回退订函数 */
-  onFreechatPush: (callback: (messages: ChatMessage[]) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, messages: ChatMessage[]): void =>
-      callback(messages)
-    ipcRenderer.on(CH.freechatPush, listener)
-    return () => ipcRenderer.removeListener(CH.freechatPush, listener)
-  },
-  /** 收回小探针(走出面板锤):气泡头部钮和主窗占位卡同走这条路 —— 主窗亮+页签复活+气泡收+桌宠下班 */
-  openMainPanel: (): void => {
-    ipcRenderer.send(CH.openMain)
-  },
-  /** 气泡拖拽缩放三连(气泡放大锤):begin/move/end,光标屏幕坐标 DIP;send 配 on */
-  bubbleResize: (msg: BubbleResizeMsg): void => {
-    ipcRenderer.send(CH.bubbleResize, msg)
-  },
-  /** 放出小探针(走出面板锤):页签被拖出主窗松手 → 主进程判窗外 → 变身桌宠;
-   * force = 页签右键菜单点的「放到桌面」,不判窗外,桌宠落记忆位。send 配 on */
-  freechatDetach: (force?: boolean): void => {
-    ipcRenderer.send(CH.freechatDetach, force === true)
-  },
-  /** 订阅小探针寄居形态变化(panel/pet):页签 ↔ 占位卡跟着换装;返回退订函数 */
-  onFreechatHost: (callback: (host: FreechatHost) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, host: FreechatHost): void => callback(host)
-    ipcRenderer.on(CH.freechatHost, listener)
-    return () => ipcRenderer.removeListener(CH.freechatHost, listener)
+  // ── 撕窗子窗(页签撕窗锤):子窗 document 是 about:blank 白窗没有 preload,
+  // 窗口操作由主窗渲染层代发 —— 渲染进子窗的 Portal 组件跑的还是主 realm,
+  // 按钮回调里拿到的 window.atlas 就是这桥。主进程按 frameName 认窗 ──
+  auxWindowOp: (frameName: string, op: AuxWindowOp): void => {
+    ipcRenderer.send(CH.auxWindowOp, { frameName, op })
   },
   // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke(CH.devLogPull),

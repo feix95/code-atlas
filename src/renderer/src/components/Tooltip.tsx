@@ -58,9 +58,9 @@ function anchorRect(el: HTMLElement): DOMRect {
 }
 
 /** 按愿望方位摆,摆不下沿「对面→bottom→top」翻;实在全挤就硬压 bottom 加夹子 */
-function placeTip(r: DOMRect, b: DOMRect, want: TipSide): TipPos {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
+function placeTip(r: DOMRect, b: DOMRect, want: TipSide, view: Window): TipPos {
+  const vw = view.innerWidth
+  const vh = view.innerHeight
   const cy = r.top + r.height / 2
   const cx = r.left + r.width / 2
 
@@ -96,31 +96,40 @@ function placeTip(r: DOMRect, b: DOMRect, want: TipSide): TipPos {
 
 let tipSeq = 0
 
-export function TooltipHost(): React.JSX.Element | null {
+/**
+ * 一台提示台只管一个 document(页签撕窗锤·realm 铁律):主窗一台,每扇子窗
+ * 在自己的 .app 里再挂一台 —— Portal 渲染的组件跑的还是主 realm,监听挂全局
+ * document 会只听见主窗的动静,子窗里的悬停提示就聋了。
+ */
+export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.Element | null {
   const [tip, setTip] = useState<TipTarget | null>(null)
   const [pos, setPos] = useState<TipPos | null>(null)
   /** 当前目标的事件通路镜像:渲染期不碰 ref,只在监听回调里读写 */
   const tipRef = useRef<TipTarget | null>(null)
+  const view = doc.defaultView ?? window
 
   // 气泡挂载时量尺寸算落位(setState 在 ref 回调里写是官方认可的测量姿势)。
   // key=tip.id → 换目标就重挂载重测量;卸载回调也走这里,归 null。
-  const bubbleCb = useCallback((b: HTMLDivElement | null) => {
-    const t = tipRef.current
-    if (!b || !t) {
-      setPos(null)
-      return
-    }
-    const p = placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side)
-    // absolute 的定位基准是 .app 内缘(offsetParent 内容盒),视口坐标减它
-    const host = b.offsetParent as HTMLElement | null
-    if (host) {
-      const hr = host.getBoundingClientRect()
-      const hs = getComputedStyle(host)
-      p.x -= hr.left + (parseFloat(hs.borderLeftWidth) || 0)
-      p.y -= hr.top + (parseFloat(hs.borderTopWidth) || 0)
-    }
-    setPos(p)
-  }, [])
+  const bubbleCb = useCallback(
+    (b: HTMLDivElement | null) => {
+      const t = tipRef.current
+      if (!b || !t) {
+        setPos(null)
+        return
+      }
+      const p = placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side, view)
+      // absolute 的定位基准是 .app 内缘(offsetParent 内容盒),视口坐标减它
+      const host = b.offsetParent as HTMLElement | null
+      if (host) {
+        const hr = host.getBoundingClientRect()
+        const hs = getComputedStyle(host)
+        p.x -= hr.left + (parseFloat(hs.borderLeftWidth) || 0)
+        p.y -= hr.top + (parseFloat(hs.borderTopWidth) || 0)
+      }
+      setPos(p)
+    },
+    [view]
+  )
 
   useEffect(() => {
     let timer = 0
@@ -128,13 +137,13 @@ export function TooltipHost(): React.JSX.Element | null {
 
     const show = (t: TipTarget): void => {
       // 亮相前最后查一次岗:预约时没拖,开火时拖起来了也拦得住(预约在阈值前、开火在拖拽中)
-      if (document.body.classList.contains('is-tab-dragging')) return
+      if (doc.body.classList.contains('is-tab-dragging')) return
       t.id = ++tipSeq
       tipRef.current = t
       setTip(t)
     }
     const hide = (): void => {
-      window.clearTimeout(timer)
+      view.clearTimeout(timer)
       cur = null
       tipRef.current = null
       setTip(null)
@@ -143,19 +152,19 @@ export function TooltipHost(): React.JSX.Element | null {
     const plan = (el: HTMLElement): void => {
       // 页签拖拽中禁亮:指针捕获把 mouseover 全路由给源签,
       // 不拦的话按住拖一会儿提示又冒出来(小葵截图里的悬浮气泡)
-      if (document.body.classList.contains('is-tab-dragging')) return
+      if (doc.body.classList.contains('is-tab-dragging')) return
       const t = readTip(el)
       if (!t) return
       // 已亮着 → 相邻提示源之间游走即时接力,不用每次等延迟
       if (tipRef.current) show(t)
-      else timer = window.setTimeout(() => show(t), SHOW_DELAY)
+      else timer = view.setTimeout(() => show(t), SHOW_DELAY)
     }
 
     const onOver = (e: MouseEvent): void => {
       const host = (e.target as Element | null)?.closest?.('[data-tip]')
       const el = host instanceof HTMLElement ? host : null
       if (el === cur) return
-      window.clearTimeout(timer)
+      view.clearTimeout(timer)
       cur = el
       if (el) plan(el)
       else if (!tipRef.current) setTip(null)
@@ -169,42 +178,42 @@ export function TooltipHost(): React.JSX.Element | null {
       const host = e.target instanceof HTMLElement ? e.target.closest('[data-tip]') : null
       const el = host instanceof HTMLElement ? host : null
       if (el === cur) return
-      window.clearTimeout(timer)
+      view.clearTimeout(timer)
       cur = el
       if (el) plan(el)
       else if (!tipRef.current) setTip(null)
     }
 
     // 滚动/点按/按键/切窗都收摊:目标一旦位移或交互,悬着的提示就是陈账
-    document.addEventListener('mouseover', onOver)
-    document.addEventListener('mouseout', onOut)
-    document.addEventListener('focusin', onFocus)
-    document.addEventListener('focusout', hide)
-    document.addEventListener('scroll', hide, true)
-    document.addEventListener('mousedown', hide)
-    document.addEventListener('wheel', hide, true)
+    doc.addEventListener('mouseover', onOver)
+    doc.addEventListener('mouseout', onOut)
+    doc.addEventListener('focusin', onFocus)
+    doc.addEventListener('focusout', hide)
+    doc.addEventListener('scroll', hide, true)
+    doc.addEventListener('mousedown', hide)
+    doc.addEventListener('wheel', hide, true)
     // 页签拖拽开工清场:按住页签熬满延迟刚亮、紧跟着拖起来的那颗提示靠它收
     // (捕获期 mouseout 全被拐回源签,常规收摊链路在拖拽里是聋的)
-    document.addEventListener('atlas:tab-drag-start', hide)
-    window.addEventListener('blur', hide)
+    doc.addEventListener('atlas:tab-drag-start', hide)
+    view.addEventListener('blur', hide)
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') hide()
     }
-    document.addEventListener('keydown', onKey)
+    doc.addEventListener('keydown', onKey)
     return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('mouseover', onOver)
-      document.removeEventListener('mouseout', onOut)
-      document.removeEventListener('focusin', onFocus)
-      document.removeEventListener('focusout', hide)
-      document.removeEventListener('scroll', hide, true)
-      document.removeEventListener('mousedown', hide)
-      document.removeEventListener('wheel', hide, true)
-      document.removeEventListener('atlas:tab-drag-start', hide)
-      window.removeEventListener('blur', hide)
-      document.removeEventListener('keydown', onKey)
+      view.clearTimeout(timer)
+      doc.removeEventListener('mouseover', onOver)
+      doc.removeEventListener('mouseout', onOut)
+      doc.removeEventListener('focusin', onFocus)
+      doc.removeEventListener('focusout', hide)
+      doc.removeEventListener('scroll', hide, true)
+      doc.removeEventListener('mousedown', hide)
+      doc.removeEventListener('wheel', hide, true)
+      doc.removeEventListener('atlas:tab-drag-start', hide)
+      view.removeEventListener('blur', hide)
+      doc.removeEventListener('keydown', onKey)
     }
-  }, [])
+  }, [doc, view])
 
   if (!tip) return null
   return (

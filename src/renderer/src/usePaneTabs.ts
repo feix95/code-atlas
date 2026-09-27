@@ -1,12 +1,21 @@
 // 页签系统(小葵的页签模型·文件签版):文件签绑死文件、单例签绑死品类,
 // 分组/拖放分屏/关闭接力照旧。选中的文件、扫描结果、公用对话场这些外来户由调用方递进来。
 import { useCallback, useRef, useState } from 'react'
-import type { FreechatHost, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
+import type { ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import { isFileKind, isSingletonKind, KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds'
 import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
 import { dirChainOf } from './scanTreeTools'
-import { clampPaneSplit, nextTabId, type PaneGroup, type PaneTab } from './paneTabs'
+import {
+  clampPaneSplit,
+  dropHostGroups,
+  groupHost,
+  MAIN_HOST,
+  moveTabToHost,
+  nextTabId,
+  type PaneGroup,
+  type PaneTab
+} from './paneTabs'
 import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
 
@@ -15,10 +24,11 @@ const FLASH_TAB_MS = 1_200 // 需要指路时页签闪一下(比如挂引用时�
 export function usePaneTabs(deps: {
   result: ScanResult | null
   chat: AiChatApi
-  freechatHost: FreechatHost
+  /** 开一扇撕窗子窗(页签撕窗锤):返回 frameName 户口;null = 窗口开不出,签别挪 */
+  openAuxWindow: () => string | null
   setRevealPaths: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
-  const { result, chat, freechatHost, setRevealPaths } = deps
+  const { result, chat, openAuxWindow, setRevealPaths } = deps
 
   // 右栏页签(小葵的页签模型·文件签版):文件签 = 绑死某个文件的预览,同一文件只此一张;
   // 单例签 = 概览/小探针/图谱/设置,每品类全应用只此一张。树里点文件只开签不换签
@@ -40,24 +50,30 @@ export function usePaneTabs(deps: {
   // 换文件、换文件夹、切页签,聊天记录都活着
   // 激活组 = 用户最后点的那组:新签开在这组,另一组不被打扰
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
-  // 可见清单:小探针飞出去当桌宠时,面板里这张签连签带正房一起隐去(互斥铁律两边都不留分身)
-  const visibleOfGroup = useCallback(
-    (g: PaneGroup | null) =>
-      g ? g.tabs.filter((t) => !(freechatHost === 'pet' && t.kind === 'chat')) : [],
-    [freechatHost]
-  )
-  // 页签拖出主窗松手 = 放出小探针(只有探针签能走;窗外判定在主进程)
-  const onTabDragEnd = useCallback(
-    (id: string) => {
-      const t = groups.flatMap((g) => g.tabs).find((x) => x.id === id)
-      if (t?.kind === 'chat') window.atlas.freechatDetach()
+  // 可见清单:页签栏照全量画(桌宠藏签那套已随形态机一起拆)
+  const visibleOfGroup = useCallback((g: PaneGroup | null) => g?.tabs ?? [], [])
+
+  // 撕窗(Obsidian 式):页签挪进新开的同进程子窗 —— 组挂 host 户口,
+  // 签的正房由 Portal 渲染进子窗 document,流式回答/滚动位/草稿全活着搬家
+  const detachTabToWindow = useCallback(
+    (id: string): void => {
+      const hostId = openAuxWindow()
+      if (!hostId) return // 窗开不出,签原地不动
+      const moved = moveTabToHost(groups, id, hostId)
+      if (!moved) return
+      setGroups(moved.groups)
+      setActiveGroupId(moved.activeGroupId)
     },
-    [groups]
+    [openAuxWindow, groups]
   )
-  // 页签右键「放到桌面」= 不拖也放(force:主进程跳过窗外判定,桌宠落记忆位;
-  // 菜单项只对小探针页签露脸,不用再看是谁)
-  const onDetachTab = useCallback((_id: string) => {
-    window.atlas.freechatDetach(true)
+  // 页签拖出窗外松手 = 撕去新窗;子窗里的签拖出子窗同样再开一扇(Chrome 语义)
+  const onTabDragEnd = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
+  // 页签右键「移到新窗口」= 不拖也撕,所有签一视同仁
+  const onDetachTab = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
+
+  // 子窗死了(pagehide 上报):它名下的签连组一起销户 —— Chrome 语义,关窗即关签
+  const closeHostGroups = useCallback((hostId: string): void => {
+    setGroups((prev) => dropHostGroups(prev, hostId))
   }, [])
 
   // 单例签造牌:名和图标从品类户口领
@@ -78,14 +94,31 @@ export function usePaneTabs(deps: {
   }
 
   // 开一张新图/回家时页签重置:换一个空组,等文件签上岗。
-  // 工作区外的账不带走 —— 单例签与盘符下钻的瞄签挪进新组继续开着
+  // 工作区外的账不带走 —— 单例签与盘符下钻的瞄签挪进新组继续开着;
+  // 撕去子窗的签按户口分窝还原,别把子窗的签卷回主窗
   function resetPaneTabs(): void {
-    const gid = `pane:${nextTabId()}`
     setGroups((prev) => {
-      const keep = prev.flatMap((g) => g.tabs).filter((t) => t.kind !== 'preview')
-      return [{ id: gid, tabs: keep, activeId: keep.length > 0 ? keep[keep.length - 1].id : null }]
+      const byHost = new Map<string, PaneTab[]>()
+      for (const g of prev) {
+        const keep = g.tabs.filter((t) => t.kind !== 'preview')
+        if (keep.length > 0)
+          byHost.set(groupHost(g), [...(byHost.get(groupHost(g)) ?? []), ...keep])
+      }
+      const next: PaneGroup[] = [...byHost.entries()].map(([host, tabs]) => ({
+        id: `pane:${nextTabId()}`,
+        tabs,
+        activeId: tabs[tabs.length - 1].id,
+        host: host === MAIN_HOST ? undefined : host
+      }))
+      const mainGroup: PaneGroup = next.find((g) => groupHost(g) === MAIN_HOST) ?? {
+        id: `pane:${nextTabId()}`,
+        tabs: [],
+        activeId: null
+      }
+      if (!next.some((g) => groupHost(g) === MAIN_HOST)) next.unshift(mainGroup)
+      setActiveGroupId(mainGroup.id)
+      return next
     })
-    setActiveGroupId(gid)
   }
 
   // ── 页签层(小葵的页签模型·文件签版:文件签 + 单例签 + 左右分组) ──
@@ -95,7 +128,8 @@ export function usePaneTabs(deps: {
     setGroups((prev) => prev.map((g) => (g.id === groupId ? patch(g) : g)))
   }
 
-  // 一张组都没有时立个空组:首页点开设置、盘符下钻瞄文件,孤零零一张签也立得起来
+  // 一张组都没有时立个空组:首页点开设置、盘符下钻瞄文件,孤零零一张签也立得起来。
+  // 新组立主窗:子窗的组只由撕窗一条道出生(moveTabToHost 现立)
   function ensureGroup(): PaneGroup {
     if (activeGroup) return activeGroup
     const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [], activeId: null }
@@ -188,14 +222,26 @@ export function usePaneTabs(deps: {
   ): void {
     const from = groups.find((g) => g.tabs.some((t) => t.id === id))
     if (!from) return
+    const fromHost = groupHost(from)
+    const sameHost = groups.filter((g) => groupHost(g) === fromHost)
     let dstId = from.id
     if (toGroup === 'sibling') {
-      const other = groups.find((g) => g.id !== from.id) ?? null
+      // 「另一组」只认同一扇窗名下的:跨窗换户口是撕窗的事(moveTabToHost)
+      const other = sameHost.find((g) => g.id !== from.id) ?? null
       if (other) {
         dstId = other.id
-      } else if (groups.length === 1 && from.tabs.length > 1) {
-        const spawned: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [], activeId: null }
-        setGroups((prev) => (splitSide === 'left' ? [spawned, ...prev] : [...prev, spawned]))
+      } else if (sameHost.length === 1 && from.tabs.length > 1) {
+        const spawned: PaneGroup = {
+          id: `pane:${nextTabId()}`,
+          tabs: [],
+          activeId: null,
+          host: fromHost === MAIN_HOST ? undefined : fromHost
+        }
+        setGroups((prev) => {
+          const idx = prev.findIndex((g) => g.id === from.id)
+          const at = splitSide === 'left' ? idx : idx + 1
+          return [...prev.slice(0, at), spawned, ...prev.slice(at)]
+        })
         dstId = spawned.id
       } else {
         return // 就这一张页签,拆不出第二组
@@ -285,8 +331,9 @@ export function usePaneTabs(deps: {
     if (e.button !== 0) return
     e.preventDefault()
     const bar = e.currentTarget
+    const body = bar.ownerDocument.body // realm 铁律:子窗里的分割条挂子窗 body
     bar.setPointerCapture(e.pointerId)
-    document.body.classList.add('is-sash-dragging')
+    body.classList.add('is-sash-dragging')
     const move = (ev: PointerEvent): void => {
       const host = bar.parentElement
       if (!host) return
@@ -296,7 +343,7 @@ export function usePaneTabs(deps: {
     const up = (): void => {
       bar.removeEventListener('pointermove', move)
       bar.removeEventListener('pointerup', up)
-      document.body.classList.remove('is-sash-dragging')
+      body.classList.remove('is-sash-dragging')
     }
     bar.addEventListener('pointermove', move)
     bar.addEventListener('pointerup', up)
@@ -325,6 +372,8 @@ export function usePaneTabs(deps: {
     applyPaneSplit,
     onPaneSashDown,
     onTabDragEnd,
-    onDetachTab
+    onDetachTab,
+    detachTabToWindow,
+    closeHostGroups
   }
 }

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { clearDevLogs, devLogSnapshot } from '../shared/devlog.ts'
 import { pickPathDialog } from './atlasWindow.ts'
 import { CH } from '../shared/ipcChannels.ts'
+import { auxWindowByName } from './auxWindows.ts'
 import { clampUiScale } from '../shared/uiScale.ts'
 import { queryDriveKinds } from './drive-meta.ts'
 import { IGNORED_NAMES } from '../scanner/index.ts'
@@ -19,8 +20,9 @@ export function registerShellIpc(): void {
   ipcMain.handle(CH.windowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })
-  ipcMain.handle(CH.windowMaximizeToggle, (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
+  ipcMain.handle(CH.windowMaximizeToggle, (event, host?: unknown) => {
+    const aux = typeof host === 'string' ? auxWindowByName(host) : null
+    const win = aux ?? BrowserWindow.fromWebContents(event.sender)
     if (!win) return false
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
@@ -37,7 +39,9 @@ export function registerShellIpc(): void {
   // (DIP↔物理像素取整偏差,黑匣子 1432x969→1700x1250 连涨 380 次)——
   // 治法:拖窗起点锁一份基准矩形,尺寸恒写它(偷长收敛于一处不回读),
   // 位置按「基准 + 总位移」绝对回放,不攒增量不喂回声。
-  // start 只在最大化时有额外活:先还原,窗顶回工作区顶,光标保持它在条上的水平比例位
+  // start 只在最大化时有额外活:先还原,窗顶回工作区顶,光标保持它在条上的水平比例位。
+  // 撕窗子窗同吃这套(页签撕窗锤):sender 恒是主窗渲染层,真目标窗靠 payload 的
+  // frameName(子窗 window.name)认户口 —— 子窗里拖窗挪的是子窗,别拖到主窗去
   let dragBase: {
     bx: number
     by: number
@@ -49,8 +53,12 @@ export function registerShellIpc(): void {
     ly: number
   } | null = null
   const isXY = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-  ipcMain.on(CH.windowDragStart, (event, x: unknown, y: unknown) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
+  const dragTarget = (event: Electron.IpcMainEvent, host: unknown): BrowserWindow | null => {
+    const aux = typeof host === 'string' ? auxWindowByName(host) : null
+    return aux ?? BrowserWindow.fromWebContents(event.sender)
+  }
+  ipcMain.on(CH.windowDragStart, (event, x: unknown, y: unknown, host?: unknown) => {
+    const win = dragTarget(event, host)
     if (!win || win.isDestroyed() || !isXY(x) || !isXY(y)) return
     if (win.isMaximized()) {
       const before = win.getBounds()
@@ -66,8 +74,8 @@ export function registerShellIpc(): void {
     const b = win.getBounds()
     dragBase = { bx: b.x, by: b.y, w: b.width, h: b.height, cx: x, cy: y, lx: b.x, ly: b.y }
   })
-  ipcMain.on(CH.windowDragMove, (event, x: unknown, y: unknown) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
+  ipcMain.on(CH.windowDragMove, (event, x: unknown, y: unknown, host?: unknown) => {
+    const win = dragTarget(event, host)
     if (!win || win.isDestroyed() || win.isMaximized() || !isXY(x) || !isXY(y)) return
     if (!dragBase) {
       // 漏了 start(不该发生,兜底):以当下为基线,这一帧不挪

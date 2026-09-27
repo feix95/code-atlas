@@ -447,6 +447,7 @@ export function CodePreview({
               file.relPath,
               e.clientX,
               e.clientY,
+              e.currentTarget.ownerDocument,
               noteMenu ? { note: noteMenu } : undefined
             )
           }}

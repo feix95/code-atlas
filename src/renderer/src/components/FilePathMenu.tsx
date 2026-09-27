@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   closeFilePathMenu,
   currentFilePathMenu,
@@ -27,25 +27,54 @@ const EDGE = 8
 const COPY_LINGER_MS = 900
 const FAIL_LINGER_MS = 1600
 
-function clampedPosition(x: number, y: number, rows: number): { left: number; top: number } {
+function clampedPosition(
+  x: number,
+  y: number,
+  rows: number,
+  view: Window
+): { left: number; top: number } {
   return {
-    left: Math.max(EDGE, Math.min(x, window.innerWidth - MENU_W - EDGE)),
-    top: Math.max(EDGE, Math.min(y, window.innerHeight - (rows * ROW_H + 10) - EDGE))
+    left: Math.max(EDGE, Math.min(x, view.innerWidth - MENU_W - EDGE)),
+    top: Math.max(EDGE, Math.min(y, view.innerHeight - (rows * ROW_H + 10) - EDGE))
   }
 }
 
 export function FilePathMenu(): React.JSX.Element | null {
   const request = useSyncExternalStore(subscribeFilePathMenu, currentFilePathMenu)
+  // realm 铁律:主窗和每个子窗各挂一台本组件 —— 挂载后从锚点元素认领自家 document,
+  // 只画「在本 document 里被右键叫出来」的那张菜单
+  const anchorRef = useRef<HTMLSpanElement | null>(null)
+  const [doc, setDoc] = useState<Document | null>(null)
+  useLayoutEffect(() => {
+    setDoc(anchorRef.current?.ownerDocument ?? document)
+  }, [])
+  const mine = request !== null && doc !== null && request.doc === doc
 
   // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,收摊
-  useMenuDismiss(request !== null, closeFilePathMenu, '.file-path-menu')
+  useMenuDismiss(mine, closeFilePathMenu, '.file-path-menu', doc ?? undefined)
 
-  if (!request) return null
-  // key 带上位置:换个链接右键,菜单重挂一遍,「已复制」的旧状态不残留
-  return <FilePathMenuCard key={`${request.x}:${request.y}:${request.relPath}`} request={request} />
+  return (
+    <>
+      <span ref={anchorRef} hidden aria-hidden="true" />
+      {mine && doc !== null && (
+        // key 带上位置:换个链接右键,菜单重挂一遍,「已复制」的旧状态不残留
+        <FilePathMenuCard
+          key={`${request.x}:${request.y}:${request.relPath}`}
+          request={request}
+          doc={doc}
+        />
+      )}
+    </>
+  )
 }
 
-function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.JSX.Element {
+function FilePathMenuCard({
+  request,
+  doc
+}: {
+  request: FilePathMenuRequest
+  doc: Document
+}): React.JSX.Element {
   const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle')
   const [revealFail, setRevealFail] = useState<string | null>(null)
   const timerRef = useRef<number | null>(null)
@@ -72,7 +101,7 @@ function FilePathMenuCard({ request }: { request: FilePathMenuRequest }): React.
     (request.preview ? 1 : 0) +
     (note ? 1 : 0) +
     (note !== null && note.hasNote && note.onRemove ? 1 : 0)
-  const pos = clampedPosition(request.x, request.y, rows)
+  const pos = clampedPosition(request.x, request.y, rows, doc.defaultView ?? window)
   return (
     <div className="file-path-menu" style={{ left: pos.left, top: pos.top }} role="menu">
       <button

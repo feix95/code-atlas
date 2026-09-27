@@ -3,20 +3,16 @@ import { broadcastModelStatus } from './modelStatus.ts'
 import {
   createTray,
   createWindow,
-  detachFreechat,
   disposeTray,
-  dockFreechat,
-  mainPanelController,
   mainWindowRef,
   setQuitting,
   showMainWindow
 } from './appShell.ts'
 import { registerIpc } from './registerIpc.ts'
-import { app, globalShortcut, ipcMain, BrowserWindow } from 'electron'
+import { registerAuxWindowIpc } from './auxWindows.ts'
+import { app, globalShortcut, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
-import { registerMascotIpc } from './mascot.ts'
-import { followBubble, registerBubbleIpc, toggleBubble } from './bubble.ts'
 import {
   queryMachineSpec,
   reapOrphanServer,
@@ -71,31 +67,9 @@ function startApp(): void {
   createWindow()
   registerIpc()
   createTray()
-  // 桌宠通道(走出面板锤):窗改 lazy —— 对话住进桌宠时 ensureMascot 现建,
-  // 平时桌面干干净净;点它 = 对话气泡开/关;拖拽落定那刻气泡按落点归位一次
-  // (跟随降频:不每帧都追,透明窗高频挪窗是雷区,一次挪窗攒不出膨胀)
-  registerMascotIpc({
-    onActivate: (anchor) => toggleBubble(anchor),
-    onDragEnd: (anchor) => followBubble(anchor),
-    onDock: () => dockFreechat(),
-    onShowMain: () => showMainWindow(),
-    // 主面板的显示/隐藏/最小化/恢复都由控制器记账:在不在屏上问它,收回托盘也让它动手
-    isMainVisible: () => mainPanelController?.isShown() ?? false,
-    onHideMain: () => mainPanelController?.hide()
-  })
-  // 页签拖出主窗 / 页签右键「放到桌面」= 放出小探针(只认主窗渲染层发来的;
-  // force=true 是右键菜单点的,跳过窗外判定,桌宠落记忆位)
-  ipcMain.on(CH.freechatDetach, (event, force: unknown) => {
-    if (BrowserWindow.fromWebContents(event.sender) !== mainWindowRef) return
-    detachFreechat(force === true)
-  })
-  // 气泡通道(桌宠气泡):共享对话要够得着主窗;
-  // 「回主面板」走 dock 收回链路(气泡+主窗占位卡同路)
-  registerBubbleIpc({
-    getMainWindow: () => mainWindowRef,
-    dock: () => dockFreechat(),
-    stateDir: userDataDir()
-  })
+  // 撕窗子窗通道(页签撕窗锤):子窗是 window.open 的同进程白窗,
+  // 窗口操作由主窗渲染层按 frameName 代发,桥在 installAuxWindowBridge(createWindow 里上弦)
+  registerAuxWindowIpc(() => mainWindowRef)
 
   // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {

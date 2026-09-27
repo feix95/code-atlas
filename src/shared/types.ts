@@ -500,24 +500,9 @@ export interface AiChatResult extends AiExplainResult {
   webLookup: WebLookupMeta
 }
 
-/** 共享自由对话(桌宠气泡锤):气泡窗 → 主窗的输入转发载荷。
- * send = 代用户发一句话;cancel = 掐掉正在生成的回答。 */
-export type FreechatInput = { op: 'send'; text: string } | { op: 'cancel' }
-
-/** 小探针寄居形态(走出面板锤):panel = 住在主面板页签(原始形态);
- * pet = 变身桌宠趴桌面(气泡看对话)。互斥铁律:同一时刻只显示一份。
- * 状态唯一事实源在主进程,窗口们只听 atlas:freechat-host 广播画自己。 */
-export type FreechatHost = 'panel' | 'pet'
-
-/** 气泡窗缩放手柄的方向(气泡放大锤):n/s/e/w 四条边中段,ne/nw/se/sw 四个角 */
-export type BubbleResizeDir = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
-
-/** 气泡 → 主进程:拖拽缩放三连。begin 记起点(方向+按下时光标位),
- * move 报光标当前屏幕坐标(DIP),end 收尾记账。主进程只认气泡窗发来的。 */
-export type BubbleResizeMsg =
-  | { phase: 'begin'; dir: BubbleResizeDir; x: number; y: number }
-  | { phase: 'move'; x: number; y: number }
-  | { phase: 'end' }
+/** 撕窗子窗的窗口操作(页签撕窗锤):主窗渲染层替子窗按 frameName 代发 ——
+ * 子窗 document 是 about:blank 白窗,没有 preload 也没有 window.atlas。 */
+export type AuxWindowOp = 'minimize' | 'toggleMaximize' | 'close' | 'focus'
 
 /** 自由对话一条消息的出险状态:busy 生成中 / done 完工 / error 出错 / cancelled 被掐 */
 export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'

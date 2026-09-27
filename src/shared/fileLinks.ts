@@ -34,7 +34,7 @@ export interface FileLinkTarget {
   onOpen: (relPath: string, line?: number) => void
   /** 右键链接:把菜单开在鼠标处(x/y 是视口坐标),菜单里能复制文件的完整路径;
    *  没传就不拦右键(保留浏览器默认菜单) */
-  onMenu?: (relPath: string, x: number, y: number) => void
+  onMenu?: (relPath: string, x: number, y: number, doc: Document) => void
 }
 
 /** relPath 归一:反斜杠收成正斜杠,掐头去尾的 ./、/ ,重复斜杠并成一个 */
