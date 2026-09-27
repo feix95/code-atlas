@@ -1,6 +1,5 @@
-// 页签正文的房间分配:概览(文件/文件夹/项目)/小探针对话/代码预览,按页签品类各就各位。
-// 钉住的概览定死在节点上,跟随的概览跟树里选中走;钉住的对话自带账本,只藏不拆。
-import { useMemo } from 'react'
+// 页签正文的房间分配:概览(文件/文件夹/项目,跟树里选中走)/小探针对话/代码预览/图谱/设置,
+// 按页签品类各就各位。文件签天生钉在自己的文件上,关掉签就是它的终点。
 import type {
   AiConfig,
   ChatCodeRef,
@@ -15,11 +14,10 @@ import type {
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import type { NoteEntry, NoteMap } from '@shared/notes'
-import { buildFileAttachment, buildFolderAttachment } from '../chatContext'
-import { buildCrumbs, findDir, findFile } from '../scanTreeTools'
+import { buildCrumbs, findFile } from '../scanTreeTools'
 import type { PaneTab } from '../paneTabs'
 import { useAiAsk, type AiTurn } from '../useAiAsk'
-import { useAiChat, type AiChatApi } from '../useAiChat'
+import type { AiChatApi } from '../useAiChat'
 import { usePresetQuestions } from '../usePresetQuestions'
 import { DetailHeader } from './DetailHeader'
 import { FileOverview } from './FileOverview'
@@ -162,66 +160,7 @@ export function TabBody({
   if (!result) return null
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'overview') {
-    if (tab.pinned) {
-      // 钉住的概览:定在 pin 时的那个节点上(空槽 = 项目主页也照钉);节点没了退回主页,不装死
-      if (tab.relPath !== '' && file) {
-        return (
-          <FileOverviewPage
-            key={tab.id}
-            file={file}
-            result={result}
-            structure={tab.relPath === selectedFile?.relPath ? structure : null}
-            analyzing={tab.relPath === selectedFile?.relPath && analyzing}
-            analyzeNote={tab.relPath === selectedFile?.relPath ? analyzeNote : null}
-            graph={graph}
-            graphLoading={graphLoading}
-            graphNote={graphNote}
-            onLoadGraph={() => void handleLoadGraph()}
-            onJump={jumpTo}
-            gitInfo={gitInfo}
-            gitLoading={gitLoading}
-            note={notes[file.relPath] ?? null}
-            onNoteSave={saveNote}
-            autoOpenNote={noteEditRequest === file.relPath}
-            suggestionsOn={chatSuggestionsOn}
-            onGoChat={(turn) => goAskInChat(file, turn)}
-            onPreview={() => openPreview(file.relPath)}
-          />
-        )
-      }
-      const dir = tab.relPath !== '' && result ? findDir(result.tree, tab.relPath) : null
-      if (dir) {
-        return (
-          <FolderOverviewPage
-            key={tab.id}
-            dir={dir}
-            result={result}
-            gitInfo={gitInfo}
-            onJump={jumpTo}
-            onRefreshed={setGitInfo}
-            note={notes[dir.relPath] ?? null}
-            onNoteSave={saveNote}
-            autoOpenNote={noteEditRequest === dir.relPath}
-            onGoChat={(turn) => goAskInChat(dir, turn)}
-          />
-        )
-      }
-      return (
-        <ProjectOverview
-          key={tab.id}
-          result={result}
-          graph={graph}
-          graphLoading={graphLoading}
-          graphNote={graphNote}
-          onLoadGraph={() => void handleLoadGraph()}
-          onJump={jumpTo}
-          onReadFile={openPreview}
-          gitInfo={gitInfo}
-          onRefreshed={setGitInfo}
-        />
-      )
-    }
-    // 跟随概览:左侧树选中谁就显示谁的概览;什么都没选 = 项目主页(概览页签的零状态)
+    // 概览单例签:左侧树选中谁就显示谁的概览;什么都没选 = 项目导览(概览页签的零状态)
     if (selectedFolder) {
       return (
         <FolderOverviewPage
@@ -318,8 +257,8 @@ export function TabBody({
   return (
     <div className="pane-hint">
       {tab.relPath === ''
-        ? '在左侧文件树双击一个文件,代码就在这儿看'
-        : '这个文件不在树里了(可能被删了或改名了),双击树里的文件换一个看'}
+        ? '在左侧文件树点一个文件,代码就在这儿看'
+        : '这个文件不在树里了(可能被删了或改名了),点树里的文件换一个看'}
     </div>
   )
 }
@@ -509,63 +448,16 @@ export function FolderOverviewPage({
   )
 }
 
-/**
- * 钉住的对话页签正文:pin 那一刻从公用场分家出来的独立账本(出生自带当时的记录),
- * 上下文也定死在 pin 时的节点上 —— 树里换文件,这页对话纹丝不动。
- * 它住在保活层里(只藏不拆),关掉页签才是这场对话的终点。
- */
-export function PinnedChatPane({
-  tab,
-  result,
-  refs,
-  onRemoveRef,
-  onDropNode,
-  fileLinks,
-  suggestionsOn
-}: {
-  tab: PaneTab
-  result: ScanResult
-  refs: ChatCodeRef[]
-  onRemoveRef: (index: number) => void
-  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
-  fileLinks?: FileLinkTarget | null
-  suggestionsOn: boolean
-}): React.JSX.Element {
-  // 上下文定死在 pin 时的节点:文件在就是文件附件,文件夹/项目根就是文件夹附件,没了就空着
-  const context = useMemo(() => {
-    const f = tab.relPath === '' ? null : findFile(result.tree, tab.relPath)
-    if (f) return buildFileAttachment(f, null)
-    const d = tab.relPath === '' ? result.tree : findDir(result.tree, tab.relPath)
-    if (d) return buildFolderAttachment(d, d.name || result.rootName)
-    return null
-  }, [result, tab.relPath])
-  const chat = useAiChat(context, result.rootPath, tab.seed)
-
-  return (
-    <div className="preview-chat soft-in">
-      <FreeChatPanel
-        chat={chat}
-        context={context}
-        refs={refs}
-        onRemoveRef={onRemoveRef}
-        onDropNode={onDropNode}
-        fileLinks={fileLinks}
-        suggestionsOn={suggestionsOn}
-      />
-    </div>
-  )
-}
-
-/** 页签全关光时的底板:大 logo + 一句指路(页签栏还在,右键空白处能勾回来) */
+/** 还没有亮着的页签时的底板:大 logo + 一句指路 */
 export function PaneEmptyBoard(): React.JSX.Element {
   return (
     <div className="pane-empty">
       <span className="pane-empty-mark" aria-hidden="true">
         ⌁
       </span>
-      <p className="pane-empty-title">页签都关掉了</p>
+      <p className="pane-empty-title">还没有打开的页签</p>
       <p className="pane-empty-hint">
-        在左侧文件树点一个文件就能打开;想勾回功能页,在页签栏空白处右键
+        在左侧文件树点一个文件就开预览;功能页(概览/小探针/图谱/设置)在左侧图标栏开
       </p>
     </div>
   )

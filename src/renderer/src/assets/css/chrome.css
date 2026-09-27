@@ -328,7 +328,7 @@
   text-overflow: ellipsis;
 }
 
-/* 页签之后的带尾空白:右键弹品类菜单的地盘 */
+/* 页签之后的带尾空白:按住拖 = 搬窗,双击 = 最大化/还原 */
 .tabbar-blank {
   flex: 1;
   min-width: 4rem;
@@ -459,8 +459,8 @@ body.is-tab-dragging * {
   cursor: grabbing !important;
 }
 
-/* 系统自动勾回品类时,刚亮起的页签轻强调一下(小葵点的:别做得太静默):
-   一抹主题色淡进页签再散掉,不弹窗、不出声,让用户察觉「设置刚被自动改了」 */
+/* 需要给某张页签指路时的轻强调(小葵点的:别做得太静默):
+   一抹主题色淡进页签再散掉,不弹窗、不出声 —— 比如挂了引用,闪一下探针签告诉用户挂哪了 */
 @keyframes tab-flash {
   0% {
     background: color-mix(in srgb, var(--accent) 25%, var(--chrome-surface));
@@ -474,7 +474,7 @@ body.is-tab-dragging * {
   animation: tab-flash 1.1s ease-out 1;
 }
 
-/* 品类菜单:从页签带空白处右键弹出;fixed 定位按视口坐标摆,
+/* 页签右键菜单:fixed 定位按视口坐标摆,
    不吃页签带 overflow:hidden 的裁剪 */
 .tabbar-kindmenu {
   position: fixed;
@@ -485,13 +485,6 @@ body.is-tab-dragging * {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-pop);
-}
-
-.kindmenu-title {
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-2);
-  color: var(--muted);
-  font-size: var(--font-xs);
 }
 
 .kindmenu-item {
@@ -520,24 +513,6 @@ body.is-tab-dragging * {
 
 .kindmenu-item-danger:hover {
   background: var(--danger-soft);
-}
-
-.kindmenu-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  flex: none;
-  color: var(--accent-bright);
-  font-weight: var(--font-w-bold);
-}
-
-.kindmenu-note {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-2) var(--space-2) 0;
-  border-top: 1px solid var(--line-soft);
-  color: var(--muted-2);
-  font-size: var(--font-xs);
 }
 
 /* 关闭钮:钉在页签右端(名字 flex 把它顶到边)。激活签/悬停签常驻;

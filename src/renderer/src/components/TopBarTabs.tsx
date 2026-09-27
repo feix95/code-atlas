@@ -9,7 +9,6 @@
 // 邻居 margin 过渡撑开落点缝;悬到正文区按中心/边缘判分屏许诺;窗外松手放小探针。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
-import type { PaneKind } from '../paneKinds'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -46,7 +45,6 @@ interface TabDragState {
   id: string
   icon: string
   name: string
-  pinned: boolean
   /** 源页签的出生矩形(视口坐标):enter 阶段照它克隆,取消时飞回 */
   srcLeft: number
   srcTop: number
@@ -98,13 +96,10 @@ export function TopBarTabs({
   flashTabId,
   activateTab,
   closeTab,
-  pinToggleTab,
   moveTab,
   setDropMark,
   onTabDragEnd,
   onDetachTab,
-  enabledKinds,
-  toggleKind,
   paneSplit
 }: {
   groups: PaneGroup[]
@@ -112,7 +107,6 @@ export function TopBarTabs({
   flashTabId: string | null
   activateTab: (id: string) => void
   closeTab: (id: string) => void
-  pinToggleTab: (id: string) => void
   /** 挪页签:toGroup 空 = 同组重排,'sibling' = 另一组(单组按 splitSide 拆新组) */
   moveTab: (
     id: string,
@@ -127,8 +121,6 @@ export function TopBarTabs({
   onTabDragEnd: (id: string) => void
   /** 右键菜单「放到桌面」:不拖也放,只对小探针页签显示 */
   onDetachTab?: (id: string) => void
-  enabledKinds: Set<PaneKind>
-  toggleKind: (kind: PaneKind, on: boolean) => void
   /** 第一组分屏列占内容宽的比例(usePaneTabs 的账本,顶部条带认同一份) */
   paneSplit: number
 }): React.JSX.Element {
@@ -326,7 +318,6 @@ export function TopBarTabs({
           id: t.id,
           icon: t.icon,
           name: t.name,
-          pinned: t.pinned,
           srcLeft: rect.left,
           srcTop: rect.top,
           width: rect.width,
@@ -474,11 +465,8 @@ export function TopBarTabs({
               canMoveToSiblingGroup={groups.length > 1}
               onActivate={activateTab}
               onClose={closeTab}
-              onPinToggle={pinToggleTab}
               onMoveTab={moveTab}
               onDetachTab={onDetachTab}
-              enabledKinds={enabledKinds}
-              onToggleKind={toggleKind}
               dragSourceId={drag?.id ?? null}
               gapIndex={gap?.groupId === g.id ? gap.index : null}
               gapWidth={drag?.width ?? 0}
@@ -526,7 +514,7 @@ export function TopBarTabs({
           aria-hidden="true"
         >
           <span className="tabbar-icon" aria-hidden="true">
-            <TreeIcon name={drag.pinned ? 'pin' : drag.icon} mono />
+            <TreeIcon name={drag.icon} mono />
           </span>
           <span className="tabbar-name">{drag.name}</span>
         </div>

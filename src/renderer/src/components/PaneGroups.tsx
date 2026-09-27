@@ -2,10 +2,9 @@
 // 一到两组正文,中间分割条调比例;页签拖拽的落点判定在 TopBarTabs 引擎,
 // 这里只管照 dropMark 亮提示:中心 = 拆两栏/挪组,左右缘 = 定向拆半屏。
 import { Fragment } from 'react'
-import type { ChatCodeRef, FreechatHost, ScanResult } from '@shared/types'
-import type { FileLinkTarget } from '@shared/fileLinks'
+import type { FreechatHost } from '@shared/types'
 import type { PaneGroup, PaneTab } from '../paneTabs'
-import { PaneEmptyBoard, PinnedChatPane } from './TabBody'
+import { PaneEmptyBoard } from './TabBody'
 
 export function PaneGroups({
   groups,
@@ -15,12 +14,6 @@ export function PaneGroups({
   onPaneSashDown,
   applyPaneSplit,
   paneSplit,
-  result,
-  previewRefs,
-  removePreviewRef,
-  handleDropNode,
-  fileLinks,
-  chatSuggestionsOn,
   renderTabBody
 }: {
   groups: PaneGroup[]
@@ -31,13 +24,6 @@ export function PaneGroups({
   onPaneSashDown: (e: React.PointerEvent<HTMLDivElement>) => void
   applyPaneSplit: (v: number) => void
   paneSplit: number
-  /** 扫描结果(可空):无工作区时这里也能渲染 —— 单例签(设置/图谱)不吃工作区 */
-  result: ScanResult | null
-  previewRefs: ChatCodeRef[]
-  removePreviewRef: (index: number) => void
-  handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
-  fileLinks: FileLinkTarget | null
-  chatSuggestionsOn: boolean
   renderTabBody: (tab: PaneTab) => React.ReactNode
 }): React.JSX.Element {
   return (
@@ -46,10 +32,7 @@ export function PaneGroups({
         // 激活页签要是刚飞出去的那张小探针:正房也算空的,底板顶班
         // (act 从全量 tabs 找,页签栏藏掉还不够,互斥铁律两边都不留分身)
         const actRaw = g.tabs.find((t) => t.id === g.activeId) ?? null
-        const act =
-          actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' && !actRaw.pinned
-            ? null
-            : actRaw
+        const act = actRaw && freechatHost === 'pet' && actRaw.kind === 'chat' ? null : actRaw
         return (
           <Fragment key={g.id}>
             {gi > 0 && (
@@ -82,11 +65,11 @@ export function PaneGroups({
               onPointerDown={() => setActiveGroupId(g.id)}
             >
               <div className="pane-body" data-group-id={g.id}>
-                {act && !(act.kind === 'chat' && act.pinned) && act.kind !== 'settings' ? (
-                  // 每组正房只住一个房间(VS Code 的克制);钉住的对话和设置签走下面的保活层
+                {act && act.kind !== 'settings' ? (
+                  // 每组正房只住一个房间(VS Code 的克制);设置签走下面的保活层
                   renderTabBody(act)
                 ) : !act ? (
-                  // 这组没有亮着的页签(品类全被取消勾选):大 logo 底板,右键空白处能勾回来
+                  // 这组没有亮着的页签(还没开签/全关光):大 logo 底板
                   <PaneEmptyBoard />
                 ) : null}
                 {dropMark?.groupId === g.id && dropMark.zone === 'center' && (
@@ -113,26 +96,6 @@ export function PaneGroups({
                       {renderTabBody(t)}
                     </div>
                   ))}
-                {/* 钉住的对话保活层(跟着组走):账本各自长,切页签只藏不拆 —— 一拆,那场对话就真没了 */}
-                {result &&
-                  g.tabs
-                    .filter((t) => t.kind === 'chat' && t.pinned)
-                    .map((t) => (
-                      <div
-                        key={t.id}
-                        className={`pinned-chat-host${t.id === g.activeId ? '' : ' is-hidden'}`}
-                      >
-                        <PinnedChatPane
-                          tab={t}
-                          result={result}
-                          refs={previewRefs}
-                          onRemoveRef={removePreviewRef}
-                          onDropNode={handleDropNode}
-                          fileLinks={fileLinks}
-                          suggestionsOn={chatSuggestionsOn}
-                        />
-                      </div>
-                    ))}
               </div>
             </div>
           </Fragment>

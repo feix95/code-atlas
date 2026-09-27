@@ -170,7 +170,7 @@ body.is-sash-dragging .pane-sash::after {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
-/* 预览品类还没装文件(空槽)/文件没了:一句指路,不装死 */
+/* 文件签的文件从树里没了(被删/改名):一句指路,不装死 */
 .pane-hint {
   flex: 1;
   display: flex;
@@ -182,7 +182,7 @@ body.is-sash-dragging .pane-sash::after {
   text-align: center;
 }
 
-/* 品类全关光的底板:大 logo 居中,页签栏还在 —— 右键空白处能勾回来(VS Code 关光编辑器同款) */
+/* 页签全关光/还没开签的底板:大 logo 居中 + 一句指路(VS Code 关光编辑器同款) */
 .pane-empty {
   flex: 1;
   min-height: 0;
@@ -214,23 +214,7 @@ body.is-sash-dragging .pane-sash::after {
   font-size: var(--font-sm);
 }
 
-/* 钉住的对话保活层:常驻渲染树只藏不拆(拆了那场对话就真没了);藏非激活的 */
-.pinned-chat-host {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.pinned-chat-host > * {
-  flex: 1;
-  min-width: 0;
-}
-
-.pinned-chat-host.is-hidden {
-  display: none;
-}
-
-/* 设置签保活层(同一套只藏不拆):切页签草稿还在,关签才卸载退预览 */
+/* 设置签保活层(只藏不拆):切页签草稿还在,关签才卸载退预览 */
 .pane-keep-alive {
   flex: 1;
   min-height: 0;

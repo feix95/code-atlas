@@ -1,7 +1,8 @@
-// 会话复现(Obsidian 式):关机前的工作区 + 页签布局(组分屏/激活签/钉住脸)记进本机,
+// 会话复现(Obsidian 式):关机前的工作区 + 页签布局(组分屏/激活签/文件签脸)记进本机,
 // 下次开 app 原样摆回。存 localStorage —— 和 recents/layoutPrefs 一个户口。
 // 序列化/解析/水合全是纯函数(自测好喂);存档垃圾整条扔,绝不炸启动。
-// 不存的:对话内容(纯内存账,钉住的探针签复活成空场)、settingsReq 这类一次性请求。
+// 不存的:对话内容(纯内存账)、settingsReq 这类一次性请求。
+// 旧存档里的 pinned 字段直接忽略:文件签天生绑文件,老钉签落成正常文件签。
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 import type { ScanDirNode } from '@shared/types'
 import { findDir, findFile } from './scanTreeTools.ts'
@@ -25,7 +26,6 @@ export interface SessionTab {
   relPath: string
   name: string
   icon: string
-  pinned: boolean
   scopeRoot?: string
   on?: boolean
 }
@@ -64,7 +64,6 @@ export function serializeSession(
         relPath: t.relPath,
         name: t.name,
         icon: t.icon,
-        pinned: t.pinned,
         scopeRoot: t.scopeRoot,
         on: t.id === g.activeId ? true : undefined
       }))
@@ -80,7 +79,7 @@ function parseTab(raw: unknown): SessionTab | null {
   if (typeof t['kind'] !== 'string' || !(KNOWN_KINDS as string[]).includes(t['kind'])) return null
   const kind = t['kind'] as PaneKind
   const relPath = typeof t['relPath'] === 'string' ? t['relPath'] : ''
-  // 钉住的签存固化门面;跟随签存的是品类名牌,坏了也能回名牌兜底
+  // 文件签存文件名/图标;单例签存品类名牌,坏了也能回名牌兜底
   const name = typeof t['name'] === 'string' && t['name'] !== '' ? t['name'] : KIND_LABELS[kind]
   const icon = typeof t['icon'] === 'string' && t['icon'] !== '' ? t['icon'] : KIND_ICONS[kind]
   return {
@@ -88,7 +87,6 @@ function parseTab(raw: unknown): SessionTab | null {
     relPath,
     name,
     icon,
-    pinned: t['pinned'] === true,
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
     on: t['on'] === true ? true : undefined
@@ -152,7 +150,6 @@ export function hydrateSession(
       relPath: t.relPath,
       name: t.name,
       icon: t.icon,
-      pinned: t.pinned,
       scopeRoot: t.scopeRoot
     }))
     const onIdx = live.findIndex((t) => t.on)

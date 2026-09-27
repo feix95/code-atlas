@@ -120,20 +120,36 @@ try {
     }, channel)
   const shot = (name: string) => page.screenshot({ path: join(run, 'shots', `${name}.png`) })
   const open = async (folder: string) => {
+    const leaf =
+      folder
+        .replace(/[\\/]+$/, '')
+        .split(/[\\/]/)
+        .pop() ?? ''
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(folder)
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).press('Enter')
+    // 页签改版:开工作区不再自动开签。地址栏落到新路径 = 扫描已起跑(旧工作区同帧卸载),
+    // 此后 main.workspace 只会在扫完才回来 —— 两个等待排队用,别指望第一个等扫描
+    await page.waitForFunction((expected) => {
+      const el = document.querySelector('input[aria-label="文件夹路径"]')
+      return el instanceof HTMLInputElement && el.value.endsWith(expected)
+    }, leaf)
+    await page.locator('main.workspace').waitFor()
+    // 概览签是手动开的单例(rail 钮在扫描期间禁用,click 自动等到能点)
+    await page.getByRole('button', { name: '概览', exact: true }).click()
     await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
   }
   const home = () => page.getByRole('heading', { name: /先看懂项目/ }).waitFor()
   const overview = async () => {
-    // UI v3:「项目导览」钮已摘除(规格 §7.0)。回项目导览 = 点树根行 ——
-    // 根节点 relPath='',选中它走概览零状态,也就是老导览页
+    // 回项目导览 = 树根行清选中(概览签的零状态就是导览页)+ rail 开/聚焦概览签
     await page.locator('.tree > .tree-branch > .tree-row.is-dir > .tree-main').click()
+    await page.getByRole('button', { name: '概览', exact: true }).click()
     await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
   }
   const selectMain = async () => {
     await overview()
     await page.locator('.guide-child').filter({ hasText: 'main.ts' }).click()
+    // 点文件 = 开/激活它的文件签;概览签的选中已换成 main.ts —— 切回概览签看文件概览
+    await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
     await page.getByRole('button', { name: '查看文件内容', exact: true }).waitFor()
   }
   await home()
@@ -171,15 +187,18 @@ try {
   await winBranch.locator('> .tree-row .tree-main').click()
   const anyFile = winBranch.locator('> .tree-row.is-file .tree-main').first()
   await anyFile.waitFor()
+  // 名字走 textContent(innerText 认渲染态,懒加载刷新途中会读成空串)
+  const peekName = ((await anyFile.locator('.tree-name').textContent()) ?? '').trim()
+  assert.notEqual(peekName, '', 'browse file row must carry a name')
   await anyFile.click()
-  await page.locator('.tabbar-tab').filter({ hasText: '预览' }).waitFor()
-  assert.equal(
-    await page.locator('.tabbar-tab').filter({ hasText: '预览' }).count(),
-    1,
-    'browse file must open a peek preview tab'
-  )
+  // 页签改版:瞄签脸 = 文件名(品类名牌退役)——按文件名认签
+  const peekTab = page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText(peekName, { exact: true }) })
+  await peekTab.waitFor()
+  assert.equal(await peekTab.count(), 1, 'browse file must open a peek preview tab')
   await shot('browse-peek')
-  await page.getByRole('button', { name: '关闭 预览', exact: true }).click()
+  await page.getByRole('button', { name: `关闭 ${peekName}`, exact: true }).click()
   await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
   // UI v3(B6):设置退役弹窗改单例页签——首页无工作区也能开;再点入口只聚焦不生第二张;
   // 左目录翻节;页签 × 收掉后孤组清场,首页回前台
@@ -204,9 +223,15 @@ try {
   await page.locator('.cfg-page').waitFor({ state: 'hidden' })
   await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
   // UI v3(B8)续:双击盘根 = 开为工作区(§7.1)——挪到设置测试后跑:
-  // 开了工作区就有跟随签守在页签栏,上面「页签全收光」的断言只在空态下成立
+  // 页签改版后开工作区栏仍是空的(签只在点文件/单例入口时开)
   await firstDrive.dblclick()
-  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  await page.locator('main.workspace').waitFor()
+  // 页签改版(钉住退役):开工作区栏是空的 —— 签只在点文件/点单例入口时才长出来
+  assert.equal(
+    await page.locator('.tabbar-tab').count(),
+    0,
+    'opening a workspace must not spawn any tab'
+  )
   assert.ok(
     /^[A-Z]:\\?$/.test(
       await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()
@@ -215,6 +240,38 @@ try {
   )
   await control({ holdGit: true })
   await open(project)
+  // 页签改版(小葵拍板):树里点文件 = 开绑死它的文件签 —— 一文件一张,
+  // 重开同一文件只激活不生第二张;点文件夹只选中不开签;已有页签一概不动
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
+  await page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText('README.md', { exact: true }) })
+    .waitFor()
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'package.json' }).click()
+  await page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText('package.json', { exact: true }) })
+    .waitFor()
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
+  assert.equal(
+    await page.locator('.tabbar-tab').count(),
+    3,
+    're-clicking an open file must not spawn a duplicate tab'
+  )
+  assert.equal(
+    await page
+      .locator('.tabbar-tab.is-active')
+      .filter({ has: page.locator('.tabbar-name').getByText('README.md', { exact: true }) })
+      .count(),
+    1,
+    're-clicked file must activate its existing tab'
+  )
+  await page.locator('.tree-row.is-dir .tree-main').filter({ hasText: 'src' }).first().click()
+  assert.equal(
+    await page.locator('.tabbar-tab').count(),
+    3,
+    'clicking a folder must not open a tab'
+  )
   const treeIconStyle = await page.locator('.tree-icon svg').first().getAttribute('style')
   assert.match(treeIconStyle ?? '', /--ic:/, 'file-tree icons must retain their type colors')
   const railIcon = page.locator('.rail-btn svg').first()
@@ -345,7 +402,6 @@ try {
   }, themeBefore)
   await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
   await page.locator('.graph-view').waitFor({ state: 'detached' })
-  await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
   await overview()
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page

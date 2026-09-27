@@ -50,25 +50,21 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
           kind: 'overview',
           relPath: '',
           name: '概览',
-          icon: 'navigation',
-          pinned: false
+          icon: 'navigation'
         },
         {
           id: 'tab:2',
           kind: 'preview',
           relPath: 'src/b.ts',
           name: 'b.ts',
-          icon: 'ts',
-          pinned: true
+          icon: 'ts'
         }
       ]
     },
     {
       id: 'pane:2',
       activeId: 'tab:3',
-      tabs: [
-        { id: 'tab:3', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot', pinned: false }
-      ]
+      tabs: [{ id: 'tab:3', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot' }]
     }
   ]
   const s = serializeSession('C:\\work\\demo', groups, 'pane:2', 'src/b.ts')
@@ -91,19 +87,18 @@ check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', (
       {
         on: true,
         tabs: [
-          { kind: 'preview', relPath: 'gone.ts', name: 'gone.ts', icon: 'ts', pinned: true }, // 文件没了
-          { kind: 'overview', relPath: '', name: '概览', icon: 'navigation', pinned: false },
+          { kind: 'preview', relPath: 'gone.ts', name: 'gone.ts', icon: 'ts' }, // 文件没了
+          { kind: 'overview', relPath: '', name: '概览', icon: 'navigation' },
           {
             kind: 'preview',
             relPath: 'src/b.ts',
             name: 'b.ts',
             icon: 'ts',
-            pinned: true,
             on: true
           }
         ]
       },
-      { tabs: [{ kind: 'preview', relPath: 'gone2.ts', name: 'x', icon: 'x', pinned: true }] } // 整组死光
+      { tabs: [{ kind: 'preview', relPath: 'gone2.ts', name: 'x', icon: 'x' }] } // 整组死光
     ]
   }
   const h = hydrateSession(s, tree)
@@ -112,8 +107,7 @@ check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', (
   const g = h.groups[0]
   assert.equal(g.tabs.length, 2, '死签不入账')
   assert.equal(g.activeId, g.tabs[1].id, '激活标记跟签不跟序号')
-  assert.equal(g.tabs[1].pinned, true)
-  assert.equal(g.tabs[1].name, 'b.ts', '钉住签的固化门面原样回')
+  assert.equal(g.tabs[1].name, 'b.ts', '文件签的门面原样回')
   assert.equal(h.activeGroupId, g.id, '激活组标记跟组不跟序号')
 })
 
@@ -125,14 +119,13 @@ check('hydrateSession:无工作区只有 app 级房间能活;全死回 null', ()
     groups: [
       {
         tabs: [
-          { kind: 'settings', relPath: '', name: '设置', icon: 'settings2', pinned: false },
-          { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts', pinned: true },
+          { kind: 'settings', relPath: '', name: '设置', icon: 'settings2' },
+          { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts' },
           {
             kind: 'peek',
             relPath: 'Windows/x.dll',
             name: 'x.dll',
             icon: 'file',
-            pinned: true,
             scopeRoot: 'C:\\'
           }
         ]
@@ -153,9 +146,7 @@ check('serializeSession:激活指针没指到任何签时,on 不落、还原兜�
     {
       id: 'pane:1',
       activeId: null,
-      tabs: [
-        { id: 'tab:1', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot', pinned: false }
-      ]
+      tabs: [{ id: 'tab:1', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot' }]
     }
   ]
   const s = serializeSession(null, groups, null, null)

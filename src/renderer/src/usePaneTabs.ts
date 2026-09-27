@@ -1,39 +1,27 @@
-// 页签系统(小葵的页签模型):品类/跟随/钉住/分组/拖放分屏,全在这一个钩子里。
-// 选中的文件、扫描结果、公用对话场(chat)这些外来户由调用方递进来。
+// 页签系统(小葵的页签模型·文件签版):文件签绑死文件、单例签绑死品类,
+// 分组/拖放分屏/关闭接力照旧。选中的文件、扫描结果、公用对话场这些外来户由调用方递进来。
 import { useCallback, useRef, useState } from 'react'
 import type { FreechatHost, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
-import {
-  FOLLOW_KINDS,
-  isMenuKind,
-  KIND_CAPS,
-  KIND_ICONS,
-  KIND_LABELS,
-  loadEnabledKinds,
-  saveEnabledKinds,
-  type PaneKind
-} from './paneKinds'
+import { isFileKind, isSingletonKind, KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds'
 import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
-import { dirChainOf, findDir, findFile } from './scanTreeTools'
+import { dirChainOf } from './scanTreeTools'
 import { clampPaneSplit, nextTabId, type PaneGroup, type PaneTab } from './paneTabs'
 import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
 
-const FLASH_TAB_MS = 1_200 // 系统自动勾回品类时页签闪一下指路
-const PANE_NOTE_MS = 4_500 // 「不能这么干」浮条:比闪签久一点,够把一行话读完
+const FLASH_TAB_MS = 1_200 // 需要指路时页签闪一下(比如挂引用时提示探针签在哪)
 
 export function usePaneTabs(deps: {
   result: ScanResult | null
-  selectedFile: ScanFileNode | null
-  selectedFolder: ScanDirNode | null
   chat: AiChatApi
   freechatHost: FreechatHost
   setRevealPaths: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
-  const { result, selectedFile, selectedFolder, chat, freechatHost, setRevealPaths } = deps
+  const { result, chat, freechatHost, setRevealPaths } = deps
 
-  // 右栏页签(小葵的页签模型):页签分品类住进页签组,没钉的跟着树走,钉住的定在原地;
-  // 品类显示开关记进本机,页签实例留着(取消勾选只是藏起来,再勾上连钉住状态都回来)
+  // 右栏页签(小葵的页签模型·文件签版):文件签 = 绑死某个文件的预览,同一文件只此一张;
+  // 单例签 = 概览/小探针/图谱/设置,每品类全应用只此一张。树里点文件只开签不换签
   const [groups, setGroups] = useState<PaneGroup[]>([])
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
@@ -45,36 +33,24 @@ export function usePaneTabs(deps: {
     groupId: string
     zone: 'center' | 'left' | 'right'
   } | null>(null)
-  const [enabledKinds, setEnabledKinds] = useState<Set<PaneKind>>(loadEnabledKinds)
-  // 系统自动勾回品类时刚点亮的那张页签:轻强调一下让用户察觉(小葵点的,别做得太静默)
+  // 刚被点名的页签(比如挂了引用要指给用户看探针签在哪):轻强调一下,不弹窗不出声
   const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
-  // 「不能这么干」的浮条:页签层的拒绝(chat.note 丢进公用场看不见 —— 钉住的对话签
-  // 装着自己的对话实例)。拒绝必须摆在眼前,不然体感就是「功能坏了」
-  const [paneNote, flashPaneNote] = useFlashValue<string | null>(null)
 
   // 自由对话的公用场(第一百二十四锤的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
-  // 换文件、换文件夹、切页签,聊天记录都活着;钉住对话页签时才把记录分家给新页签
-  // 激活组 = 用户最后点的那组:树里点东西,跟随页签只在激活组里转向,另一组不被打扰
+  // 换文件、换文件夹、切页签,聊天记录都活着
+  // 激活组 = 用户最后点的那组:新签开在这组,另一组不被打扰
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
+  // 可见清单:小探针飞出去当桌宠时,面板里这张签连签带正房一起隐去(互斥铁律两边都不留分身)
   const visibleOfGroup = useCallback(
     (g: PaneGroup | null) =>
-      g
-        ? g.tabs.filter(
-            (t) =>
-              // 菜单外品类(图谱等单例签)不归勾选管,永远可见
-              (isMenuKind(t.kind) ? enabledKinds.has(t.kind) : true) &&
-              !(freechatHost === 'pet' && t.kind === 'chat' && !t.pinned)
-          )
-        : [],
-    [enabledKinds, freechatHost]
+      g ? g.tabs.filter((t) => !(freechatHost === 'pet' && t.kind === 'chat')) : [],
+    [freechatHost]
   )
-  const activeTabObj = activeGroup?.tabs.find((t) => t.id === activeGroup.activeId) ?? null
-
-  // 页签拖出主窗松手 = 放出小探针(只有没钉住的公用场页签能走;窗外判定在主进程)
+  // 页签拖出主窗松手 = 放出小探针(只有探针签能走;窗外判定在主进程)
   const onTabDragEnd = useCallback(
     (id: string) => {
       const t = groups.flatMap((g) => g.tabs).find((x) => x.id === id)
-      if (t?.kind === 'chat' && !t.pinned) window.atlas.freechatDetach()
+      if (t?.kind === 'chat') window.atlas.freechatDetach()
     },
     [groups]
   )
@@ -84,119 +60,93 @@ export function usePaneTabs(deps: {
     window.atlas.freechatDetach(true)
   }, [])
 
-  // 按品类造一张页签:跟随页签挂品类名牌(装着谁看正文头部,页签栏才分得清品类);
-  // node 只提供 relPath(空 = 空槽,等双击文件/点树再装);
-  // scopeRoot 只给 peek 这类「读根不是当前工作区」的品类(peek = 盘符下钻瞄一眼)
-  function paneTabFor(
-    kind: PaneKind,
-    node: ScanFileNode | ScanDirNode | null,
-    scopeRoot?: string
-  ): PaneTab {
+  // 单例签造牌:名和图标从品类户口领
+  function singletonTab(kind: PaneKind): PaneTab {
+    return { id: nextTabId(), kind, relPath: '', name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
+  }
+
+  // 文件签造牌:签脸 = 文件名 + 文件图标;scopeRoot 只在盘符下钻时填(读根不是工作区)
+  function fileTab(file: ScanFileNode, scopeRoot?: string): PaneTab {
     return {
       id: nextTabId(),
-      kind,
-      relPath: node?.relPath ?? '',
-      name: KIND_LABELS[kind],
-      icon: KIND_ICONS[kind],
-      pinned: false,
+      kind: scopeRoot ? 'peek' : 'preview',
+      relPath: file.relPath,
+      name: file.name,
+      icon: file.summary?.icon ?? 'file',
       scopeRoot
     }
   }
 
-  // 开一张新图/回家时页签重置:单组,概览+探针两张跟随页签就位(勾着的品类才可见),
-  // 激活可见的第一张;预览不预开 —— 双击文件才开。
-  // 菜单外的单例签(设置/图谱)是 app 级房间,换工作区不带走 —— 挪进新组继续开着
+  // 开一张新图/回家时页签重置:换一个空组,等文件签上岗。
+  // 工作区外的账不带走 —— 单例签与盘符下钻的瞄签挪进新组继续开着
   function resetPaneTabs(): void {
-    const overview = paneTabFor('overview', null)
-    const probe = paneTabFor('chat', null)
-    const group: PaneGroup = {
-      id: `pane:${nextTabId()}`,
-      tabs: [overview, probe],
-      activeId: enabledKinds.has('overview')
-        ? overview.id
-        : enabledKinds.has('chat')
-          ? probe.id
-          : null
-    }
+    const gid = `pane:${nextTabId()}`
     setGroups((prev) => {
-      const keep = prev.flatMap((g) => g.tabs).filter((t) => !isMenuKind(t.kind))
-      return [{ ...group, tabs: [...group.tabs, ...keep] }]
+      const keep = prev.flatMap((g) => g.tabs).filter((t) => t.kind !== 'preview')
+      return [{ id: gid, tabs: keep, activeId: keep.length > 0 ? keep[keep.length - 1].id : null }]
     })
-    setActiveGroupId(group.id)
+    setActiveGroupId(gid)
   }
 
-  // ── 页签层(小葵的页签模型:品类页签 + 双击钉住 + 空白右键品类菜单 + 左右分组) ──
+  // ── 页签层(小葵的页签模型·文件签版:文件签 + 单例签 + 左右分组) ──
 
   // 只改某一组的账,别的组一个手指都不碰
   function patchGroup(groupId: string, patch: (g: PaneGroup) => PaneGroup): void {
     setGroups((prev) => prev.map((g) => (g.id === groupId ? patch(g) : g)))
   }
 
-  // 系统自动勾回品类时给刚亮起的页签一点轻强调:让用户察觉「设置刚被自动改了」,
-  // 过几天不会莫名其妙 —— 不弹窗、不出声,就是页签卡上闪一下(小葵点的细节)
+  // 一张组都没有时立个空组:首页点开设置、盘符下钻瞄文件,孤零零一张签也立得起来
+  function ensureGroup(): PaneGroup {
+    if (activeGroup) return activeGroup
+    const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [], activeId: null }
+    setGroups((prev) => [...prev, fresh])
+    setActiveGroupId(fresh.id)
+    return fresh
+  }
+
+  // 需要指路时给页签一点轻强调(小葵点的,别做得太静默):不弹窗、不出声,签卡上闪一下
   function markFlash(id: string): void {
     flashTab(id, FLASH_TAB_MS)
   }
 
-  // 钉住瞬间页签该固化的门面:换成具体节点的名和图标,分得清钉的是谁;节点没了退回品类名牌
-  function solidFace(kind: PaneKind, relPath: string): { name: string; icon: string } {
-    const f = relPath === '' ? null : result ? findFile(result.tree, relPath) : null
-    if (f) return { name: f.name, icon: f.summary?.icon ?? 'file' }
-    const d =
-      relPath === '' ? (result?.tree ?? null) : result ? findDir(result.tree, relPath) : null
-    if (d) return { name: d.name || result?.rootName || KIND_LABELS[kind], icon: 'folder' }
-    return { name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
+  // 页签指向工作区文件时,树里顺势照过来:父目录链展开+滚到可见
+  function revealTab(t: PaneTab): void {
+    if (t.kind === 'preview' && t.relPath !== '' && result) {
+      setRevealPaths(new Set(dirChainOf(result.tree, t.relPath)))
+    }
   }
 
-  // 让某品类的页签在激活组里亮起来装着 node:有跟随页签就确认内容到位,没有(被钉死/被关了/被藏了)
-  // 就新开一张 —— 钉住的那张永远不碰,这正是「固定了,新内容额外新开一张」的来由。
-  // auto = 入口撞上被关掉的品类,系统自动勾回来:顺带给页签一点轻强调
-  function ensureKindTab(
-    kind: PaneKind,
-    node: ScanFileNode | ScanDirNode | null,
-    auto = false,
-    scopeRoot?: string
-  ): void {
-    // 只有菜单品类才有「入口撞上被关掉的品类就自动勾回」;菜单外的单例签不用过这道闸
-    if (isMenuKind(kind) && !enabledKinds.has(kind)) {
-      const next = new Set(enabledKinds)
-      next.add(kind)
-      setEnabledKinds(next)
-      saveEnabledKinds(next)
-    }
-    // 公用品类全系统只此一张(小葵拍的):先满屋子找没钉的同类页签,在哪组就把哪组点亮领过去;
-    // 哪组都没有才在激活组新开一张。钉住的不算数 —— 那是分家的独立对话
-    const owner = groups.find((g) => g.tabs.some((t) => t.kind === kind && !t.pinned))
-    if (owner) {
-      const slot = owner.tabs.find((t) => t.kind === kind && !t.pinned)
-      if (slot) {
-        setActiveGroupId(owner.id)
-        patchGroup(owner.id, (g) => ({
-          ...g,
-          tabs: g.tabs.map((t) =>
-            t.id === slot.id ? { ...t, relPath: node?.relPath ?? '', scopeRoot } : t
-          ),
-          activeId: slot.id
-        }))
-        if (auto) markFlash(slot.id)
-        return
-      }
-    }
-    const group = activeGroup
-    if (!group) {
-      // 单例签(设置/图谱/peek)没组也能立 —— 首页点开设置,孤零零一张签;
-      // 跟随品类必须有工作区才有组,这儿照旧不吭声
-      if (isMenuKind(kind)) return
-      const tab = paneTabFor(kind, node, scopeRoot)
-      const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [tab], activeId: tab.id }
-      setGroups([fresh])
-      setActiveGroupId(fresh.id)
-      if (auto) markFlash(tab.id)
+  // 文件签(小葵拍板):树里点文件就开它。同一文件全应用只此一张 ——
+  // 已开就领过去点亮(在哪组点亮哪组),没开就在激活组末尾新开;已有页签一概不动。
+  // scopeRoot 只给盘符下钻(读根不是工作区,品类记 peek)
+  function openFileTab(file: ScanFileNode, scopeRoot?: string): void {
+    const mine = (t: PaneTab): boolean =>
+      isFileKind(t.kind) && t.relPath === file.relPath && (t.scopeRoot ?? '') === (scopeRoot ?? '')
+    const owner = groups.find((g) => g.tabs.some(mine))
+    const slot = owner?.tabs.find(mine)
+    if (owner && slot) {
+      setActiveGroupId(owner.id)
+      patchGroup(owner.id, (g) => ({ ...g, activeId: slot.id }))
       return
     }
-    const tab = paneTabFor(kind, node, scopeRoot)
+    const tab = fileTab(file, scopeRoot)
+    const group = ensureGroup()
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
-    if (auto) markFlash(tab.id)
+  }
+
+  // 单例签(rail/菜单入口):全应用每品类只此一张 —— 已开就领过去点亮,没开在激活组新开
+  function openSingletonTab(kind: PaneKind): void {
+    if (!isSingletonKind(kind)) return
+    const owner = groups.find((g) => g.tabs.some((t) => t.kind === kind))
+    const slot = owner?.tabs.find((t) => t.kind === kind)
+    if (owner && slot) {
+      setActiveGroupId(owner.id)
+      patchGroup(owner.id, (g) => ({ ...g, activeId: slot.id }))
+      return
+    }
+    const tab = singletonTab(kind)
+    const group = ensureGroup()
+    patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
   }
 
   // 概览 AI 卡的「去追问」(小葵拍的):不是跳过去重问一遍,是把卡里解释好的一轮原样搬进
@@ -204,7 +154,7 @@ export function usePaneTabs(deps: {
   // 等消停了再点一次;还没解释过就光跳页签 —— 那边带着文件资料,想问啥直接问
   const adoptedTurnsRef = useRef<Set<string>>(new Set())
   function goAskInChat(node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null): void {
-    ensureKindTab('chat', node)
+    openSingletonTab('chat')
     if (!turn) return
     if (turn.state === 'busy') {
       chat.note('概览的解释还在写,等它写完再点一次「去追问」,整段搬过来')
@@ -225,93 +175,6 @@ export function usePaneTabs(deps: {
           ? `解释一下 ${node.name}`
           : `用大白话讲讲 ${node.name || '项目根目录'} 这个文件夹`
     chat.adopt(turn.question ?? fallback, turn.text)
-  }
-
-  // 激活组里的跟随页签全员转向:没钉的页签都是「当前选中的镜子」,树里点谁它们的 relPath
-  // 一起换过去(名字图标不动 —— 页签栏挂的是品类名牌);钉住的不碰,另一组也不被波及。
-  // 节点类型用不上的品类(preview 撞上文件夹)不跟,安分守己
-  function retargetFollowTabs(node: ScanFileNode | ScanDirNode): void {
-    if (!activeGroup) return
-    const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
-    patchGroup(activeGroup.id, (g) => ({
-      ...g,
-      tabs: g.tabs.map((t) =>
-        !t.pinned && caps.includes(t.kind) ? { ...t, relPath: node.relPath } : t
-      )
-    }))
-  }
-
-  // 跟随型品类(概览/探针)的页签被 × 掉了:树里一动就自动补回来,装着当前的对象 ——
-  // 勾着显示的品类,跟随页签就该在栏上(小葵拍板);预览是按需品类,不在此列。
-  // 补齐和点亮要点亮目标必须一把成:分两次 setState 各读各的旧账本,同一张概览会生两张
-  function ensureFollowTabs(node: ScanFileNode | ScanDirNode, activateKind?: PaneKind): void {
-    if (!activeGroup) return
-    const gid = activeGroup.id
-    const caps = KIND_CAPS[node.type === 'file' ? 'file' : 'directory']
-    // 「有没有」看全系统(小葵报的案):公用品类哪组有一张就不补第二张
-    const exists = (k: PaneKind): boolean =>
-      groups.some((gr) => gr.tabs.some((t) => t.kind === k && !t.pinned))
-    const missing = FOLLOW_KINDS.filter(
-      (k) => enabledKinds.has(k) && caps.includes(k) && !exists(k)
-    )
-    if (
-      activateKind &&
-      !exists(activateKind) &&
-      !missing.includes(activateKind) &&
-      caps.includes(activateKind)
-    ) {
-      missing.push(activateKind)
-    }
-    let focusId: string | null = null
-    if (missing.length > 0) {
-      const spawned = missing.map((k) => paneTabFor(k, node))
-      focusId = (activateKind && spawned[missing.indexOf(activateKind)]?.id) || null
-      patchGroup(gid, (g) => ({
-        ...g,
-        tabs: [...g.tabs, ...spawned],
-        activeId: focusId ?? g.activeId
-      }))
-    }
-    // 点亮目标不是这轮新生的:它已站在激活组里(kind 取自激活页签),点亮即可
-    if (activateKind && !focusId) {
-      const slot = activeGroup.tabs.find((t) => t.kind === activateKind && !t.pinned)
-      if (slot && slot.id !== activeGroup.activeId) {
-        patchGroup(gid, (g) => ({ ...g, activeId: slot.id }))
-      }
-    }
-  }
-
-  // 品类开关(页签栏空白右键的菜单):勾 = 显示这个品类,不勾 = 藏起来。
-  // 藏只是藏,页签实例连着钉住状态一起留着,再勾上原样回来
-  function toggleKind(kind: PaneKind, on: boolean): void {
-    if (on) {
-      if (!enabledKinds.has(kind)) {
-        const next = new Set(enabledKinds)
-        next.add(kind)
-        setEnabledKinds(next)
-        saveEnabledKinds(next)
-      }
-      ensureKindTab(kind, selectedFile ?? selectedFolder, true)
-      return
-    }
-    const next = new Set(enabledKinds)
-    next.delete(kind)
-    setEnabledKinds(next)
-    saveEnabledKinds(next)
-    // 藏的正好是激活组正亮着的品类:就近挪到组里剩下的可见页签;
-    // 这组的页签因此全被藏了就删组(至少留一组当底板)
-    if (activeTabObj?.kind === kind && activeGroup) {
-      const rest = visibleOfGroup(activeGroup).filter((t) => t.kind !== kind)
-      if (rest.length > 0) {
-        patchGroup(activeGroup.id, (g) => ({ ...g, activeId: rest[rest.length - 1].id }))
-      } else if (groups.length > 1) {
-        const survivors = groups.filter((g) => g.id !== activeGroup.id)
-        setGroups(survivors)
-        setActiveGroupId(survivors[0]?.id ?? null)
-      } else {
-        patchGroup(activeGroup.id, (g) => ({ ...g, activeId: null }))
-      }
-    }
   }
 
   // 挪页签(拖拽/页签右键「挪组」):toGroup='sibling' 去另一组(单组时=拆一组,默认落右,
@@ -360,11 +223,10 @@ export function usePaneTabs(deps: {
     })
     setActiveGroupId(dstId)
     const moved = from.tabs.find((t) => t.id === id)
-    if (moved?.relPath && result) setRevealPaths(new Set(dirChainOf(result.tree, moved.relPath)))
+    if (moved) revealTab(moved)
   }
 
-  // 页签操作:激活(点亮所在组,树里顺势照过来)、双击钉住/拆钉(对话分家规矩在里面)、
-  // 关闭(组内接力,组搬空自己消亡)
+  // 页签操作:激活(点亮所在组,树里顺势照过来)、关闭(组内接力,组搬空自己消亡)
   function activateTab(id: string): void {
     const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
     if (!owner) return
@@ -372,67 +234,8 @@ export function usePaneTabs(deps: {
     if (!t) return
     setActiveGroupId(owner.id)
     patchGroup(owner.id, (g) => ({ ...g, activeId: id }))
-    // 点亮页签时树里顺势照过来:父目录链展开+滚到可见 —— 点钉住的旧文件也能在树里找到家
-    if (t.relPath && result) setRevealPaths(new Set(dirChainOf(result.tree, t.relPath)))
-  }
-
-  function pinToggleTab(id: string): void {
-    const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
-    const t = owner?.tabs.find((x) => x.id === id)
-    if (!owner || !t) return
-    // 拒绝页签层操作的统一口径:页签闪一下(听见了)+ 浮条把「为什么不行」摆在眼前
-    const refuse = (msg: string): void => {
-      markFlash(id)
-      flashPaneNote(msg, PANE_NOTE_MS)
-    }
-    // 单例签(设置/图谱)不能钉:钉住会脱离「全系统没钉的同类只此一张」的去重账本,
-    // 入口再开就生第二张,单例名存实亡
-    if (!isMenuKind(t.kind)) {
-      refuse(`${t.name}全应用只此一张,不用钉`)
-      return
-    }
-    const flip = (patch: (x: PaneTab) => PaneTab): void => {
-      patchGroup(owner.id, (g) => ({ ...g, tabs: g.tabs.map((x) => (x.id === id ? patch(x) : x)) }))
-    }
-    if (!t.pinned) {
-      // 钉住 = 固化门面:页签名换成具体节点,树里再怎么换它都是这张脸
-      const face = solidFace(t.kind, t.relPath)
-      if (t.kind === 'chat') {
-        // 探针正说着话就先别钉:分家会把半截回答留在公用场,钉出去的页签缺尾巴
-        if (chat.busy) {
-          refuse('探针正说着话,等这句答完再钉')
-          return
-        }
-        if (chat.messages.length > 0) {
-          // 钉住 = 这场对话分家单过:记录搬给这张页签,公用场清空从头聊 ——
-          // 之后树里点新文件,新开的探针页签就是新对话(小葵拍的规定死)
-          const seed = chat.messages.slice()
-          flip((x) => ({ ...x, pinned: true, seed, ...face }))
-          chat.newChat()
-          return
-        }
-      }
-      flip((x) => ({ ...x, pinned: true, ...face }))
-      return
-    }
-    if (t.kind === 'chat') {
-      // 对话页签不拆钉:钉住时这场对话已分家住进这张签,拆钉变回跟随签,记录就无家可归
-      refuse(
-        '钉住的对话不拆钉:这场对话住在这张签里,拆了就散了 —— 想聊新的点面板里的「新对话」,不要了就关掉这张签'
-      )
-      return
-    }
-    // 拆钉 = 变回跟随页签:挂回品类名牌,立刻转向当前选中的对象(类型对得上才转),别端着旧内容
-    const node = selectedFile ?? selectedFolder
-    const caps = node ? KIND_CAPS[node.type === 'file' ? 'file' : 'directory'] : null
-    const relPath = node && caps && caps.includes(t.kind) ? node.relPath : t.relPath
-    flip((x) => ({
-      ...x,
-      pinned: false,
-      relPath,
-      name: KIND_LABELS[t.kind],
-      icon: KIND_ICONS[t.kind]
-    }))
+    // 点亮文件签时树里顺势照过来:父目录链展开+滚到可见
+    revealTab(t)
   }
 
   function closeTab(id: string): void {
@@ -456,8 +259,7 @@ export function usePaneTabs(deps: {
       setActiveGroupId(survivors[0]?.id ?? null)
       return
     }
-    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底板(VS Code 同款)。
-    // 钉住的对话页签关掉 = 那场对话跟着蒸发(纯内存,记录不落盘)
+    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底板(VS Code 同款)
     const nextActiveId = wasActive
       ? (nextVis[idx]?.id ?? nextVis[idx - 1]?.id ?? null)
       : owner.activeId
@@ -466,8 +268,10 @@ export function usePaneTabs(deps: {
       tabs: g.tabs.filter((t) => t.id !== id),
       activeId: nextActiveId
     }))
-    if (wasActive && nextActiveId && result)
-      setRevealPaths(new Set(dirChainOf(result.tree, nextActiveId)))
+    if (wasActive && nextActiveId) {
+      const next = owner.tabs.find((t) => t.id === nextActiveId)
+      if (next) revealTab(next)
+    }
   }
 
   // 两组分割条:拖动调左右比例(左边占比记进本机),双击回对半
@@ -504,25 +308,18 @@ export function usePaneTabs(deps: {
     activeGroupId,
     setActiveGroupId,
     activeGroup,
-    activeTabObj,
     visibleOfGroup,
-    enabledKinds,
     flashTabId,
-    paneNote,
     dismissTabFlash,
     paneSplit,
     dropMark,
     setDropMark,
-    paneTabFor,
     resetPaneTabs,
-    ensureKindTab,
+    openFileTab,
+    openSingletonTab,
     goAskInChat,
-    retargetFollowTabs,
-    ensureFollowTabs,
-    toggleKind,
     moveTab,
     activateTab,
-    pinToggleTab,
     closeTab,
     markFlash,
     applyPaneSplit,

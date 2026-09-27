@@ -119,9 +119,9 @@ export function usePreviewRefs(deps: {
     setPreviewRefs((prev) => (prev.length >= CODE_REFS_MAX ? prev : [...prev, ref]))
     // 引用卡如今住在探针页签的输入框上(预览拆了伴聊):闪一下那张页签,告诉用户挂哪儿了
     const probeGroup =
-      groups.find((g) => g === activeGroup && g.tabs.some((t) => t.kind === 'chat' && !t.pinned)) ??
-      groups.find((g) => g.tabs.some((t) => t.kind === 'chat' && !t.pinned))
-    const probe = probeGroup?.tabs.find((t) => t.kind === 'chat' && !t.pinned)
+      groups.find((g) => g === activeGroup && g.tabs.some((t) => t.kind === 'chat')) ??
+      groups.find((g) => g.tabs.some((t) => t.kind === 'chat'))
+    const probe = probeGroup?.tabs.find((t) => t.kind === 'chat')
     if (probe) markFlash(probe.id)
   }
 

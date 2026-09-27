@@ -23,8 +23,8 @@ export function WorkspaceSidebar({
   selectedFolder,
   expanding,
   revealPaths,
-  followFile,
-  followDir,
+  onOpenFile,
+  onSelectDir,
   handleExpandLazy,
   editNoteFromTree,
   saveNote,
@@ -65,8 +65,10 @@ export function WorkspaceSidebar({
   selectedFolder: ScanDirNode | null
   expanding: string | null
   revealPaths: Set<string>
-  followFile: (file: ScanFileNode) => Promise<void>
-  followDir: (node: ScanDirNode) => void
+  /** 点文件:选中 + 开文件预览签(App 的 openFile) */
+  onOpenFile: (file: ScanFileNode) => Promise<void>
+  /** 点文件夹:只选中,不开签(App 的 selectDir) */
+  onSelectDir: (node: ScanDirNode) => void
   handleExpandLazy: (relPath: string) => Promise<ScanDirNode | null>
   editNoteFromTree: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
@@ -272,8 +274,8 @@ export function WorkspaceSidebar({
               selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
               expandingPath={expanding}
               revealPaths={revealPaths}
-              onSelectFile={(_relPath, file) => followFile(file)}
-              onSelectFolder={followDir}
+              onSelectFile={(_relPath, file) => void onOpenFile(file)}
+              onSelectFolder={onSelectDir}
               onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
               onNoteEdit={editNoteFromTree}
               onNoteRemove={(relPath) => saveNote(relPath, '')}

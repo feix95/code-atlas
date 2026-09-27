@@ -11,11 +11,13 @@ export function useNavStack(deps: {
   scanning: boolean
   scanPath: (dir: string) => Promise<ScanResult | null>
   goHome: () => void
-  followFile: (file: ScanFileNode) => Promise<void>
-  followDir: (node: ScanDirNode) => void
+  /** 文件站:选中 + 开文件签(App 的 openFile) */
+  openFile: (file: ScanFileNode) => Promise<void>
+  /** 文件夹站:只选中(App 的 selectDir) */
+  selectDir: (node: ScanDirNode) => void
   clearSelection: () => void
 }) {
-  const { folder, result, scanning, scanPath, goHome, followFile, followDir, clearSelection } = deps
+  const { folder, result, scanning, scanPath, goHome, openFile, selectDir, clearSelection } = deps
 
   // 后退/前进(第八十三锤):浏览过的位置(首页/项目/选中的文件文件夹)串成一条线,按钮挪游标
   const [nav, setNav] = useState<{ stack: NavLocation[]; index: number }>(() => ({
@@ -58,14 +60,14 @@ export function useNavStack(deps: {
     if (loc.file) {
       const f = findFile(scanned.tree, loc.file)
       if (f) {
-        followFile(f)
+        void openFile(f)
         return
       }
     }
     if (loc.dir) {
       const d = findDir(scanned.tree, loc.dir)
       if (d) {
-        followDir(d)
+        selectDir(d)
         return
       }
     }

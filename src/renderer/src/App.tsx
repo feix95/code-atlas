@@ -49,7 +49,6 @@ import { useNavStack } from './useNavStack'
 import { usePreviewRefs } from './usePreviewRefs'
 import { useFlashFlag, useFlashValue } from './useFlashFlag'
 import { useWindowMaximized } from './useWindowMaximized'
-import { KIND_CAPS } from './paneKinds'
 import { findDir, findFile, mergeStats, spliceSubtree, dirChainOf } from './scanTreeTools'
 
 /** 共享对话快照的推送间隔(桌宠气泡锤):流式时每 100ms 最多糊一次 IPC */
@@ -303,7 +302,7 @@ function App(): React.JSX.Element {
 
   // 设置单例签:rail 齿轮开外观节;AI 状态浮层「AI 设置」直达高级节(seq 触发页内翻节)
   function openSettings(section: SectionKey = 'appearance'): void {
-    ensureKindTab('settings', null)
+    openSingletonTab('settings')
     setSettingsReq((prev) => ({ section, seq: (prev?.seq ?? 0) + 1 }))
   }
 
@@ -356,10 +355,11 @@ function App(): React.JSX.Element {
   }
 
   /**
-   * 树里单击文件(小葵拍的规矩:单击就是换内容):选中它,右栏跟随页签全体转向它;
-   * 激活的页签要是钉着,新内容就额外开一张新页签。本地结构分析照旧自动跑(不耗模型)。
+   * 树里点文件(小葵拍的规矩·页签改版):选中它 + 开一张绑死它的文件预览签
+   * (同一文件只此一张,已开就点亮领过去);已有页签一概不动。
+   * 本地结构分析照旧自动跑(不耗模型)。
    */
-  async function followFile(file: ScanFileNode): Promise<void> {
+  async function openFile(file: ScanFileNode): Promise<void> {
     const seq = ++analyzeSeq.current
     pushNav({ folder, file: file.relPath, dir: null })
     setSelectedFile(file)
@@ -369,12 +369,7 @@ function App(): React.JSX.Element {
     // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
     if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath)
       chat.note(`参考资料换成了 ${file.name}`)
-    retargetFollowTabs(file)
-    // 激活页签的品类这个文件用得上就保持,用不上(如钉着的预览)落回概览;
-    // 补齐和点亮一把过,概览不会生两张
-    const kind =
-      activeTabObj && KIND_CAPS.file.includes(activeTabObj.kind) ? activeTabObj.kind : 'overview'
-    ensureFollowTabs(file, kind)
+    openFileTab(file)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     if (!file.language) {
@@ -407,8 +402,9 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 树里点文件夹:选中出概览,页签规矩同文件;箭头管展开,点名字不触发扫描
-  function followDir(node: ScanDirNode): void {
+  // 树里点文件夹(小葵拍板·页签改版):只选中,不开页签 —— 箭头管展开,点名字不触发扫描;
+  // 聊天中点文件夹照旧只换资料不抢台(公用场垫句灰字)
+  function selectDir(node: ScanDirNode): void {
     analyzeSeq.current += 1
     setAnalyzing(false)
     if (node.relPath === '') {
@@ -423,12 +419,6 @@ function App(): React.JSX.Element {
     // 聊天中点文件夹(第一百二十四锤老规矩):只换资料不抢台 —— 探针页签本来就没动,垫字即可
     if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
       chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
-    retargetFollowTabs(node)
-    const kind =
-      activeTabObj && KIND_CAPS.directory.includes(activeTabObj.kind)
-        ? activeTabObj.kind
-        : 'overview'
-    ensureFollowTabs(node, kind)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
 
@@ -450,23 +440,23 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,走同一条跟随链路;
+  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,走同一条开签链路;
   // 文件找不到再找目录:功能定位指中「整个功能住在这个文件夹」时也能跳
   function jumpTo(relPath: string): void {
     if (!result) return
     const found = findFile(result.tree, relPath)
     if (found) {
-      followFile(found)
+      void openFile(found)
       return
     }
     const dir = findDir(result.tree, relPath)
-    if (dir) followDir(dir)
+    if (dir) selectDir(dir)
   }
 
-  // 点文件夹名称:只选中,出静态概览;展开/收起是箭头的活,扫描只由展开触发。
-  // (followDir 在上面,和文件共用一套页签规矩)
+  // 点文件夹名称:只选中;展开/收起是箭头的活,扫描只由展开触发。
+  // (selectDir 在上面)
 
-  // 后退/前进回到「没选中」的一站:选中清空,概览页签回项目主页(它的零状态)
+  // 后退/前进回到「没选中」的一站:选中清空;开着的话概览签自动回项目导览(它的零状态)
   function clearSelection(): void {
     analyzeSeq.current += 1
     setAnalyzing(false)
@@ -474,7 +464,6 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
-    ensureKindTab('overview', null)
   }
 
   function showProjectGuide(): void {
@@ -524,34 +513,34 @@ function App(): React.JSX.Element {
     })
   }
 
-  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点让概览页签出来,再弹编辑框
+  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点、开概览签(备注编辑框住在概览头部),
+  // 再点名要弹编辑框的 relPath
   function editNoteFromTree(relPath: string): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
     if (f) {
-      followFile(f)
+      void openFile(f)
+      openSingletonTab('overview')
       setNoteEditRequest(relPath)
       return
     }
     const d = findDir(result.tree, relPath)
     if (d) {
-      followDir(d)
+      selectDir(d)
+      openSingletonTab('overview')
       setNoteEditRequest(relPath)
     }
   }
 
-  // 树上双击/右键「预览文件」:让「文件预览」页签亮起来装着它(预览被藏了就自动勾回)。
-  // 文件还不是当前选中才走跟随链路 —— 双击总伴着单击,别把导航账记重了
+  // 「预览文件」入口(文件行右键/概览「查看文件内容」/图谱打开):选中 + 开文件签。
+  // 文件已选中就只点亮签 —— 双击总伴着单击,别把导航账记重了
   function openPreview(relPath: string): void {
     if (!result) return
     const f = findFile(result.tree, relPath)
     if (!f) return
-    if (selectedFile?.relPath !== relPath) followFile(f)
-    ensureKindTab('preview', f)
+    if (selectedFile?.relPath !== relPath) void openFile(f)
+    else openFileTab(f)
   }
-
-  // 退出预览的老函数已退役(页签地基);树上双击钉住也退役了(小葵的页签模型:
-  // 钉不钉只看页签上的双击,树的双击专职开预览)
 
   // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
@@ -589,19 +578,17 @@ function App(): React.JSX.Element {
     openPreview(hit.relPath)
   }
 
-  // 「这台电脑」下钻单击文件 = 「瞄一眼」预览页签(peek 品类,§7.1):
+  // 「这台电脑」下钻单击文件 = 「瞄一眼」文件签(peek 品类,§7.1):
   // 读根记在页签的 scopeRoot 上(浏览树的盘根),文件节点是浏览账现捏的最小件
   function openBrowseFile(scopeRoot: string, file: { name: string; relPath: string }): void {
     const dot = file.name.lastIndexOf('.')
-    ensureKindTab(
-      'peek',
+    openFileTab(
       {
         type: 'file',
         name: file.name,
         relPath: file.relPath,
         ext: dot > 0 ? file.name.slice(dot).toLowerCase() : ''
       },
-      false,
       scopeRoot
     )
   }
@@ -662,24 +649,18 @@ function App(): React.JSX.Element {
     activeGroupId,
     setActiveGroupId,
     activeGroup,
-    activeTabObj,
     visibleOfGroup,
-    enabledKinds,
     flashTabId,
-    paneNote,
     dismissTabFlash,
     paneSplit,
     dropMark,
     setDropMark,
     resetPaneTabs,
-    ensureKindTab,
+    openFileTab,
+    openSingletonTab,
     goAskInChat,
-    retargetFollowTabs,
-    ensureFollowTabs,
-    toggleKind,
     moveTab,
     activateTab,
-    pinToggleTab,
     closeTab,
     markFlash,
     applyPaneSplit,
@@ -688,8 +669,6 @@ function App(): React.JSX.Element {
     onDetachTab
   } = usePaneTabs({
     result,
-    selectedFile,
-    selectedFolder,
     chat,
     freechatHost,
     setRevealPaths
@@ -700,8 +679,8 @@ function App(): React.JSX.Element {
     scanning,
     scanPath,
     goHome,
-    followFile,
-    followDir,
+    openFile,
+    selectDir,
     clearSelection
   })
   const {
@@ -752,12 +731,6 @@ function App(): React.JSX.Element {
       onPaneSashDown={onPaneSashDown}
       applyPaneSplit={applyPaneSplit}
       paneSplit={paneSplit}
-      result={result}
-      previewRefs={previewRefs}
-      removePreviewRef={removePreviewRef}
-      handleDropNode={handleDropNode}
-      fileLinks={fileLinks}
-      chatSuggestionsOn={chatSuggestionsOn}
       renderTabBody={(t) => (
         <TabBody
           tab={t}
@@ -826,13 +799,6 @@ function App(): React.JSX.Element {
               正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
             </div>
           )}
-          {paneNote && (
-            // 「不能这么干」浮条:页签层的拒绝(钉住的对话不拆钉这类)得摆在眼前 ——
-            // 复用 revive-note 的浮动位,琥珀=「留个心眼」档,不是报错
-            <div className="revive-note" role="status">
-              {paneNote}
-            </div>
-          )}
           <AppTopBar
             scanning={scanning}
             hasWorkspace={result !== null}
@@ -853,13 +819,10 @@ function App(): React.JSX.Element {
                   flashTabId={flashTabId}
                   activateTab={activateTab}
                   closeTab={closeTab}
-                  pinToggleTab={pinToggleTab}
                   moveTab={moveTab}
                   setDropMark={setDropMark}
                   onTabDragEnd={onTabDragEnd}
                   onDetachTab={onDetachTab}
-                  enabledKinds={enabledKinds}
-                  toggleKind={toggleKind}
                   paneSplit={paneSplit}
                 />
               ) : null
@@ -871,11 +834,11 @@ function App(): React.JSX.Element {
           <div className="app-body">
             <Rail
               hasWorkspace={result !== null && !scanning}
-              onGraph={() => ensureKindTab('graph', null)}
-              onOverview={() => ensureKindTab('overview', selectedFile ?? selectedFolder)}
+              onGraph={() => openSingletonTab('graph')}
+              onOverview={() => openSingletonTab('overview')}
               onChat={() => {
                 if (freechatHost === 'pet') window.atlas.openMainPanel()
-                ensureKindTab('chat', null)
+                openSingletonTab('chat')
               }}
               onSettings={() => openSettings()}
             />
@@ -888,8 +851,8 @@ function App(): React.JSX.Element {
               selectedFolder={selectedFolder}
               expanding={expanding}
               revealPaths={revealPaths}
-              followFile={followFile}
-              followDir={followDir}
+              onOpenFile={openFile}
+              onSelectDir={selectDir}
               handleExpandLazy={handleExpandLazy}
               editNoteFromTree={editNoteFromTree}
               saveNote={saveNote}
@@ -930,7 +893,7 @@ function App(): React.JSX.Element {
               </main>
             ) : scanning || error || groups.length === 0 ? (
               // 扫描中/失败/回家:这些状态优先于页签房 —— 扫描失败时 resetPaneTabs 留下的
-              // 空跟随签组不许顶掉错误页
+              // 空签组不许顶掉错误页
               <main className="content">
                 {scanning && (
                   <div className="state" role="status" aria-live="polite">

@@ -569,14 +569,6 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="m19.8 19.8 2.2 2.2" />
     </>
   ),
-  // 钉住(页签改版):一枚图钉 —— 双击页签把它钉住,树里换文件它不动
-  pin: (
-    <>
-      <path d="M9 3h6" />
-      <path d="M10 3v6l-2 3h8l-2-3V3" />
-      <path d="M12 12v8" />
-    </>
-  ),
   // ── 工作区卡/菜单供稿(UI v3 §7.3 小葵原样收录,lucide 线稿)──
   // 菜单收起态指示:lucide chevrons-up-down
   chevronsUpDown: (
