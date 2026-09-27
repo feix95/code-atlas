@@ -10,6 +10,7 @@ import {
 } from 'react'
 import type {
   AgentSearchCard,
+  AiConfig,
   ChatCodeRef,
   ChatContextAttachment,
   WebLookupMeta
@@ -21,7 +22,6 @@ import { DRAG_MIME_NODE, type DragNodePayload } from '@shared/dragTypes'
 import { Badge } from './DetailHeader'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Notice } from './Notice'
-import { AtlasProbe, type ProbeState } from './AtlasProbe'
 import { IconRefresh, TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import type { AiChatApi, ChatMessage } from '../useAiChat'
@@ -78,11 +78,14 @@ const FileNoteText = memo(function FileNoteText({
 })
 
 /**
- * 自由对话面板:和 Atlas 小探针开放式聊天,问题不限于当前文件。
- * 资料附件卡常驻顶部(默认收起,展开能看机器扫到的原始资料);
- * 助手消息带小探针头像,本轮动过联网就在消息下方挂程序记账的状态标签。
+ * 自由对话面板(对话页改版定稿):开放式聊天,问题不限于当前文件,页签叫「自由对话」。
+ * 顶行薄条:左参考资料 chip(点开看机器扫到的原始资料)、右「新对话」小幽灵钮;
+ * 空场 = 衬线问候 + 居中胶囊舱 + 建议 chips;聊开了舱沉底栏,回答不装框不带头像。
+ * 输入舱 = 一行胶囊:「+」能力菜单(思考/翻文件拨钮)| 内嵌引用原子+文字 | 发送/停一停圆钮。
+ * 思考行 = 脑图标 + 流光「正在思考」+弹跳点,想完收成「想了 Xs ▸」可点开看过程。
+ * 本轮动过联网就在消息下方挂程序记账的状态标签。
  * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
- * 第一百一十一锤:预览模式下左栏选中的代码以引用卡挂在这儿,和问题一起发出去。
+ * 第一百一十一锤:预览模式下左栏选中的代码以引用原子躺在舱内文字流里,和问题一起发出去。
  */
 
 const CHAT_EXAMPLES = [
@@ -206,7 +209,9 @@ const MatchListCard = memo(function MatchListCard({
   )
 })
 
-/** 思考过程折叠块(第一百一十五锤):边想边展开,答完自动收起,想看随时点开。
+/** 思考行(对话页改版):脑图标 + 「正在思考」流光字+弹跳点(活着),想完就地收成「想了 Xs ▸」,
+ * 点开看过程、箭头顺时针转 90° 朝下。耗时在组件里自己量:忙起来记账、闲下来结账;
+ * 中途重挂(滚动记忆那套)没有起点的,就不说秒数,只叫「思考过程」。
  * 用户亲手点过就以用户为准(null = 还没点过,默认「忙着就开,答完就收」) */
 function ThinkingBlock({
   reasoning,
@@ -216,6 +221,16 @@ function ThinkingBlock({
   busy: boolean
 }): React.JSX.Element | null {
   const [toggled, setToggled] = useState<boolean | null>(null)
+  const [secs, setSecs] = useState<number | null>(null)
+  const startRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (busy) {
+      if (startRef.current === undefined) startRef.current = performance.now()
+      return
+    }
+    if (startRef.current !== undefined)
+      setSecs(Math.max(1, Math.round((performance.now() - startRef.current) / 1000)))
+  }, [busy])
   const open = toggled ?? busy
   if (reasoning.trim() === '') return null
   return (
@@ -226,9 +241,24 @@ function ThinkingBlock({
         onClick={() => setToggled(!open)}
         aria-expanded={open}
       >
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
-        思考过程
-        <span className="chat-thinking-len">{reasoning.length.toLocaleString('en-US')} 字</span>
+        <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
+        {busy ? (
+          <>
+            <span className="fc-shim">正在思考</span>
+            <span className="fc-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          </>
+        ) : (
+          <>
+            {secs !== null ? `想了 ${secs}s` : '思考过程'}
+            <span className="cv" aria-hidden="true">
+              <TreeIcon name="chevron" size={11} mono />
+            </span>
+          </>
+        )}
       </button>
       {open && <div className="chat-thinking-body">{reasoning}</div>}
     </div>
@@ -253,8 +283,6 @@ const AssistantBubble = memo(function AssistantBubble({
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const label = webLabel(msg.web)
-  const probe: ProbeState =
-    msg.state === 'busy' ? 'thinking' : msg.state === 'error' ? 'error' : 'idle'
   // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
   const [copied, flashCopied] = useFlashFlag(800)
   function copyAnswer(): void {
@@ -293,47 +321,50 @@ const AssistantBubble = memo(function AssistantBubble({
   )
   return (
     <div className="chat-turn">
-      <div className="chat-answer-row">
-        <AtlasProbe state={probe} className="chat-avatar" />
-        <div className="message answer">
-          {msg.state === 'busy' && !msg.text && !msg.reasoning && (
-            <span className="chat-typing">小探针正在思考……</span>
-          )}
-          {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
-          {msg.text && (
-            <MiniMD
-              text={msg.text}
-              caret={msg.state === 'busy'}
-              fileLinks={fileLinks ?? undefined}
-            />
-          )}
-          {msg.state === 'done' && !msg.text && msg.reasoning && (
-            <span className="chat-typing chat-muted">
-              想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。
+      <div className="message answer">
+        {msg.state === 'busy' && !msg.text && !msg.reasoning && (
+          <div className="chat-thinking" role="status">
+            <span className="chat-thinking-toggle is-live">
+              <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
+              <span className="fc-shim">正在思考</span>
+              <span className="fc-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
             </span>
-          )}
-          {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
-          {msg.state === 'cancelled' && msg.text && (
-            <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
-          )}
-          {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
-          {/* 实时 token 账(第八十四锤):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
-          {msg.state === 'busy' && (msg.stats || msg.text) && (
-            <div className="chat-stats">
-              {msg.stats
-                ? formatStreamStats(msg.stats)
-                : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}
-            </div>
-          )}
-          {/* 复制/重试:有 token 账时和账同一行、贴在右边(小葵点的红框位置) */}
-          {showActions && !msg.usage && actions}
-          {msg.state !== 'busy' && msg.usage && (
-            <div className="chat-stats chat-usage">
-              <span>本次 · {formatUsage(msg.usage)}</span>
-              {actions}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+        {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
+        {msg.text && (
+          <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />
+        )}
+        {msg.state === 'done' && !msg.text && msg.reasoning && (
+          <span className="chat-typing chat-muted">
+            想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。
+          </span>
+        )}
+        {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
+        {msg.state === 'cancelled' && msg.text && (
+          <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
+        )}
+        {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
+        {/* 实时 token 账(第八十四锤):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
+        {msg.state === 'busy' && (msg.stats || msg.text) && (
+          <div className="chat-stats">
+            {msg.stats
+              ? formatStreamStats(msg.stats)
+              : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}
+          </div>
+        )}
+        {/* 复制/重试:有 token 账时和账同一行、贴在右边;悬停本条回答才露脸 */}
+        {showActions && !msg.usage && actions}
+        {msg.state !== 'busy' && msg.usage && (
+          <div className="chat-stats chat-usage">
+            <span>本次 · {formatUsage(msg.usage)}</span>
+            {actions}
+          </div>
+        )}
       </div>
       {label && (
         <div className="chat-webstatus">
@@ -375,27 +406,50 @@ export function FreeChatPanel({
   const [dragOver, setDragOver] = useState(false)
   // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
   const [expanded, setExpanded] = useState(false)
-  // 外接引擎标记:思考开关的悬停提示按它分家 —— 思考暗号只有内置引擎听得懂,
-  // 外接 LM Studio 时开关管不着思考,提示里得指路去 LM Studio 的模型设置调
-  const [isExternalEngine, setIsExternalEngine] = useState(false)
+  // 「+」能力菜单:思考/翻文件两个开关收进这颗钮里;点舱外任何地方收摊
+  const [menuOpen, setMenuOpen] = useState(false)
+  // 顶行参考 chip 的展开:点一下看机器扫到的原始资料,再点收
+  const [ctxOpen, setCtxOpen] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const doc = formRef.current?.ownerDocument ?? document
+    function onPointerDown(e: MouseEvent): void {
+      if (!formRef.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    doc.addEventListener('mousedown', onPointerDown)
+    return () => doc.removeEventListener('mousedown', onPointerDown)
+  }, [menuOpen])
+  // 「+」菜单里的联网开关 = 设置页「联网查证」总闸的快捷位:读一份当前配置存 ref,
+  // 拨一下就把整份配置 + webLookup 翻转存回去,返回什么就以什么为准
+  const [webOn, setWebOn] = useState(false)
+  const cfgRef = useRef<AiConfig | null>(null)
   useEffect(() => {
     let alive = true
     void window.atlas
       .aiConfigGet()
       .then((c) => {
-        if (alive) setIsExternalEngine(c.provider === 'lmstudio')
+        if (!alive) return
+        cfgRef.current = c
+        setWebOn(c.webLookup === true)
       })
       .catch(() => {})
     return () => {
       alive = false
     }
   }, [])
-  // 悬停时顺手刷新一遍:设置里换了引擎,回来悬停就能看到对的说法,不用重启
-  function refreshEngineOnHover(): void {
+  function toggleWeb(): void {
+    const cur = cfgRef.current
+    if (!cur) return
+    const next = !webOn
+    setWebOn(next)
     void window.atlas
-      .aiConfigGet()
-      .then((c) => setIsExternalEngine(c.provider === 'lmstudio'))
-      .catch(() => {})
+      .aiConfigSave({ ...cur, webLookup: next })
+      .then((c) => {
+        cfgRef.current = c
+        setWebOn(c.webLookup === true)
+      })
+      .catch(() => setWebOn(!next))
   }
   // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
   const [lineCount, setLineCount] = useState(1)
@@ -556,6 +610,20 @@ export function FreeChatPanel({
   /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补);
    *  斜杠补全开着时,键盘先伺候面板:上下挑、回车/Tab 选定(不是发消息)、Esc 只收面板 */
   function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key === 'Escape' && menuOpen) {
+      e.preventDefault()
+      setMenuOpen(false)
+      return
+    }
+    // 内嵌引用原子:光标顶在文字最前头时再敲退格,删掉最后挂上的那颗
+    if (e.key === 'Backspace' && draftRefs.length > 0) {
+      const el = e.currentTarget
+      if (el.selectionStart === 0 && el.selectionEnd === 0) {
+        e.preventDefault()
+        onRemoveRef?.(draftRefs.length - 1)
+        return
+      }
+    }
     if (slashOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
@@ -621,6 +689,187 @@ export function FreeChatPanel({
   }, [draft, expanded, lineCount])
   const capped = lineCount >= INPUT_CAP_LINES || expanded
 
+  /** 推荐问题 chips:空场吃开场示例,预览模式吃随对话演进的推荐;总闸关了谁都不出 */
+  const chipList = suggestionsOn
+    ? chat.messages.length === 0
+      ? (suggestions ?? CHAT_EXAMPLES)
+      : !chat.busy && suggestions
+        ? suggestions
+        : []
+    : []
+
+  /** 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/停一停;
+   *  写到两行起往上长,控件自然落到第二行;满五行封顶出拨杆,拨上去多撑五行。
+   *  空场时整颗舱挂在 hero 居中,聊开了沉到底栏 —— 同一颗舱两处坐席。 */
+  const composerEl = (
+    <form
+      ref={formRef}
+      className={`chat-input${lineCount >= 2 ? ' is-multiline' : ''}${capped ? ' is-capped' : ''}`}
+      onSubmit={submit}
+    >
+      {/* 斜杠命令补全:打 / 浮在输入舱上方,上下键挑、回车/Tab 选定、Esc 收掉、鼠标点也算数 */}
+      {slashOpen && (
+        <div className="slash-palette" id="slash-palette" role="listbox" aria-label="斜杠命令">
+          {slashMatches.map((c, i) => (
+            <button
+              key={c.name}
+              type="button"
+              role="option"
+              id={`slash-opt-${c.name.slice(1)}`}
+              aria-selected={i === slashActive}
+              className={`slash-item${i === slashActive ? ' is-active' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setSlashIndex(i)}
+              onClick={() => pickSlash(c.name)}
+            >
+              <span className="slash-name">{c.name}</span>
+              <span className="slash-desc">{c.desc}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {/* 「+」能力菜单:思考/翻文件两个开关,iOS 拨钮式;点舱外或 Esc 收 */}
+      {menuOpen && (
+        <div className="fc-menu" role="menu" aria-label="能力开关">
+          <button
+            type="button"
+            className={`fc-mrow${chat.thinking ? ' is-on' : ''}`}
+            onClick={() => chat.setThinking(!chat.thinking)}
+            aria-pressed={chat.thinking}
+          >
+            <span className="fc-mi">
+              <TreeIcon name="brain" size={14} mono />
+            </span>
+            思考模式
+            <span className="fc-sw" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={`fc-mrow${chat.agent ? ' is-on' : ''}`}
+            onClick={() => chat.setAgent(!chat.agent)}
+            aria-pressed={chat.agent}
+          >
+            <span className="fc-mi">
+              <TreeIcon name="folderSearch" size={14} mono />
+            </span>
+            自己翻文件
+            <span className="fc-sw" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={`fc-mrow${webOn ? ' is-on' : ''}`}
+            onClick={toggleWeb}
+            aria-pressed={webOn}
+          >
+            <span className="fc-mi">
+              <TreeIcon name="globe" size={14} mono />
+            </span>
+            联网查询
+            <span className="fc-sw" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      <div className="fc-line">
+        <button
+          type="button"
+          className={`fc-plus${menuOpen ? ' is-open' : ''}`}
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="能力开关"
+          aria-expanded={menuOpen}
+          data-tip="思考 / 翻文件开关"
+        >
+          <TreeIcon name="plus" size={CHAT_ACTION_ICON_SIZE} mono />
+        </button>
+        <div className="fc-field">
+          {/* 内嵌引用原子(小葵拍板,Devin 式):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
+          {draftRefs.map((r, i) => (
+            <span
+              key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
+              className="fc-ref"
+              data-tip={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
+            >
+              <svg
+                className="fc-ref-ic"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
+                <path d="m10 8-3 3 3 3" />
+                <path d="m14 14 3-3-3-3" />
+              </svg>
+              <span className="fc-ref-text mono">
+                {r.relPath.split('/').pop()}:{r.startLine}-{r.endLine}
+              </span>
+              <button
+                type="button"
+                className="fc-ref-x"
+                onClick={() => onRemoveRef?.(i)}
+                aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
+                data-tip="移除这段引用"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <textarea
+            ref={inputRef}
+            value={draft}
+            placeholder={chat.busy ? '正在回答上一个问题……' : '问项目的事,或者随便聊聊……'}
+            aria-label="输入自由对话"
+            aria-expanded={slashOpen}
+            aria-controls="slash-palette"
+            aria-activedescendant={
+              slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined
+            }
+            rows={1}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              // 内容一变,补全重新能冒头(Esc 的「先别出」只管当下这句)
+              setSlashDismissed(false)
+              setSlashIndex(0)
+            }}
+            onKeyDown={onDraftKeyDown}
+            // 点输入区 = 要打字了,「+」菜单顺手收摊(点在舱内的外点判定管不到这层)
+            onFocus={() => setMenuOpen(false)}
+          />
+        </div>
+        {chat.busy ? (
+          <button
+            type="button"
+            className="fc-send is-stop"
+            onClick={chat.cancel}
+            aria-label="停一停"
+            data-tip="停一停"
+          >
+            <span className="fc-sq" aria-hidden="true" />
+          </button>
+        ) : (
+          <button type="submit" className="fc-send" aria-label="发送" data-tip="发送">
+            <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
+          </button>
+        )}
+      </div>
+      {capped && (
+        <button
+          type="button"
+          className="composer-expand"
+          onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? '收合输入框' : '展开输入框'}
+          data-tip={expanded ? '收合' : '多撑五行'}
+        >
+          <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
+        </button>
+      )}
+    </form>
+  )
+
   return (
     <div
       className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
@@ -659,10 +908,14 @@ export function FreeChatPanel({
           : undefined
       }
     >
-      {context && (
-        <details className="chat-attach">
-          <summary
-            data-tip={`${context.relPath || '(项目根目录)'};右键:复制路径 / 在资源管理器中显示 / 备注`}
+      {/* 顶行:薄得几乎不存在 —— 左参考资料 chip(点开看原始资料),右新对话 */}
+      <div className="fc-topline">
+        {context && (
+          <button
+            type="button"
+            className={`fc-ctx${ctxOpen ? ' is-open' : ''}`}
+            onClick={() => setCtxOpen((v) => !v)}
+            aria-expanded={ctxOpen}
             onContextMenu={(e) => {
               // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
               if (!fileLinks?.onMenu) return
@@ -671,97 +924,116 @@ export function FreeChatPanel({
             }}
           >
             <TreeIcon name="clip" size={INLINE_ICON_SIZE} />
-            当前参考资料:<strong>{context.name}</strong>
-            <span className="chat-attach-summary">{context.summary}</span>
-          </summary>
-          <pre className="chat-attach-details">{context.details}</pre>
-        </details>
-      )}
-      {/* 开场白和聊起来的气泡共用同一个消息区骨架:开场白也撑满中段,输入栏两种状态钉在同一个底 */}
+            <strong>{context.name}</strong>
+            <span className="fc-ctx-sep">·</span>作为参考
+          </button>
+        )}
+        <button
+          type="button"
+          className="fc-newchat"
+          onClick={chat.newChat}
+          data-tip="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
+        >
+          <IconRefresh size={INLINE_ICON_SIZE} />
+          新对话
+        </button>
+      </div>
+      {context && ctxOpen && <pre className="fc-ctx-pop">{context.details}</pre>}
       <div className="chat-messages-wrap">
         <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
           {chat.messages.length === 0 ? (
-            <div className="chat-intro">
-              <AtlasProbe state="idle" className="chat-probe" />
-              <p className="chat-intro-title">我是 Atlas 小探针。</p>
-              <p>
-                你可以问我当前项目,也可以聊点完全无关的事情。
-                {context
-                  ? '当前选中的资料会作为可选参考附在消息旁。'
-                  : '没有选中任何文件,就纯聊天。'}
-              </p>
+            /* 空场:衬线大问候 + 舱居中当主角 + 建议 chips(Claude 首页式) */
+            <div className="fc-hero">
+              <h1 className="fc-hello">想聊点什么？</h1>
+              {composerEl}
+              {chipList.length > 0 && (
+                <div className="fc-chips">
+                  {chipList.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      className="fc-chip"
+                      onClick={() => sendExample(q)}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
-            chat.messages.map((m, idx) => {
-              if (m.role === 'note') {
-                // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话。
-                // 探针干活的步骤(第一百四十一锤)走时间线小样:左对齐带点,和居中的通知灰字分开
-                if (m.kind === 'step') {
+            <div className="fc-col">
+              {chat.messages.map((m, idx) => {
+                if (m.role === 'note') {
+                  // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话。
+                  // 探针干活的步骤(第一百四十一锤)走时间线小样:左对齐带点,和居中的通知灰字分开
+                  if (m.kind === 'step') {
+                    return (
+                      <div key={m.key} className="chat-note is-step" role="status">
+                        <FileNoteText text={m.text} fileLinks={fileLinks} />
+                      </div>
+                    )
+                  }
+                  // 命中清单卡(LLM 优化锤):搜索的完整命中程序直接摆卡,可点跳行
+                  if (m.kind === 'matches' && m.matches) {
+                    return <MatchListCard key={m.key} card={m.matches} fileLinks={fileLinks} />
+                  }
+                  // 压缩摘要卡(第一百四十二锤):旧对话的提炼成果,点开看全文,不用的时候收着不占地
+                  if (m.kind === 'summary') {
+                    return (
+                      <details key={m.key} className="chat-note is-summary" role="status">
+                        <summary>旧对话已压缩成摘要(点开看)</summary>
+                        <p>
+                          <FileNoteText text={m.text} fileLinks={fileLinks} />
+                        </p>
+                      </details>
+                    )
+                  }
                   return (
-                    <div key={m.key} className="chat-note is-step" role="status">
+                    <div key={m.key} className="chat-note" role="status">
                       <FileNoteText text={m.text} fileLinks={fileLinks} />
                     </div>
                   )
                 }
-                // 命中清单卡(LLM 优化锤):搜索的完整命中程序直接摆卡,可点跳行
-                if (m.kind === 'matches' && m.matches) {
-                  return <MatchListCard key={m.key} card={m.matches} fileLinks={fileLinks} />
-                }
-                // 压缩摘要卡(第一百四十二锤):旧对话的提炼成果,点开看全文,不用的时候收着不占地
-                if (m.kind === 'summary') {
+                if (m.role === 'user') {
                   return (
-                    <details key={m.key} className="chat-note is-summary" role="status">
-                      <summary>旧对话已压缩成摘要(点开看)</summary>
-                      <p>
-                        <FileNoteText text={m.text} fileLinks={fileLinks} />
-                      </p>
-                    </details>
+                    <div key={m.key} className="message user">
+                      {m.text}
+                      {/* 这轮引用过哪几段:自己发的话里留下痕迹,回看时知道当时给的是什么 */}
+                      {m.refs && m.refs.length > 0 && (
+                        <div className="msg-refs">
+                          {m.refs.map((r, i) => (
+                            <span
+                              key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
+                              className="msg-ref mono"
+                            >
+                              {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )
                 }
                 return (
-                  <div key={m.key} className="chat-note" role="status">
-                    <FileNoteText text={m.text} fileLinks={fileLinks} />
-                  </div>
+                  // 消息级兜底网(2026-09-13 隐身案):一条回答画崩了只挂这一条,
+                  // 提示+就地重试;以前会掀桌炸掉整棵树,窗直接隐身
+                  <ErrorBoundary
+                    key={m.key}
+                    note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。"
+                    retryLabel="再试一次"
+                  >
+                    <AssistantBubble
+                      msg={m}
+                      canRetry={m.key === lastAssistantKey && !chat.busy}
+                      retryIndex={idx}
+                      onRetry={retryFrom}
+                      fileLinks={fileLinks}
+                    />
+                  </ErrorBoundary>
                 )
-              }
-              if (m.role === 'user') {
-                return (
-                  <div key={m.key} className="message user">
-                    {m.text}
-                    {/* 这轮引用过哪几段:自己发的话里留下痕迹,回看时知道当时给的是什么 */}
-                    {m.refs && m.refs.length > 0 && (
-                      <div className="msg-refs">
-                        {m.refs.map((r, i) => (
-                          <span
-                            key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
-                            className="msg-ref mono"
-                          >
-                            {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              }
-              return (
-                // 消息级兜底网(2026-09-13 隐身案):一条回答画崩了只挂这一条,
-                // 提示+就地重试;以前会掀桌炸掉整棵树,窗直接隐身
-                <ErrorBoundary
-                  key={m.key}
-                  note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。"
-                  retryLabel="再试一次"
-                >
-                  <AssistantBubble
-                    msg={m}
-                    canRetry={m.key === lastAssistantKey && !chat.busy}
-                    retryIndex={idx}
-                    onRetry={retryFrom}
-                    fileLinks={fileLinks}
-                  />
-                </ErrorBoundary>
-              )
-            })
+              })}
+            </div>
           )}
         </div>
         {showJump && (
@@ -778,31 +1050,6 @@ export function FreeChatPanel({
         )}
       </div>
       <div className="chat-bottom">
-        {draftRefs.length > 0 && (
-          <div className="chat-refs" aria-label="已引用的代码">
-            <span className="chat-refs-label">已引用</span>
-            {draftRefs.map((r, i) => (
-              <span key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`} className="chat-ref">
-                <TreeIcon name="code" size={INLINE_ICON_SIZE} />
-                <span
-                  className="chat-ref-text mono"
-                  data-tip={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-                >
-                  {r.relPath.split('/').pop()} 第 {r.startLine}-{r.endLine} 行
-                </span>
-                <button
-                  type="button"
-                  className="chat-ref-remove"
-                  onClick={() => onRemoveRef?.(i)}
-                  aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-                  data-tip="移除这段引用"
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
         {setup && setup.configured !== true && (
           <p className="chat-setup-hint" role="status">
             {setup.configured === null
@@ -815,142 +1062,17 @@ export function FreeChatPanel({
             )}
           </p>
         )}
-        <div className="prompt-row">
-          {/* 新对话(第一百二十七锤补):常驻第一格 —— 聊没聊过都在,想翻篇随时点得着 */}
-          <button
-            type="button"
-            className="prompt"
-            onClick={chat.newChat}
-            data-tip="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
-          >
-            新对话
-          </button>
-          {suggestionsOn
-            ? suggestions
-              ? // 预览模式:推荐问题随对话演进 —— 每答完一轮就换成下一轮该问的;忙着答题时先让位
-                !chat.busy &&
-                suggestions.map((q) => (
-                  <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                    {q}
-                  </button>
-                ))
-              : chat.messages.length === 0 &&
-                CHAT_EXAMPLES.map((q) => (
-                  <button key={q} type="button" className="prompt" onClick={() => sendExample(q)}>
-                    {q}
-                  </button>
-                ))
-            : null}
-        </div>
-        {/* 一体化输入舱(小葵给的参考图):空时一条单行胶囊、按钮在右侧齐肩;
-            写到五行封顶,右上角出现拨杆,拨上去多撑五行,再拨回来 */}
-        <form
-          className={`chat-input${lineCount >= 2 ? ' is-multiline' : ''}${capped ? ' is-capped' : ''}`}
-          onSubmit={submit}
-        >
-          {/* 斜杠命令补全:打 / 浮在输入舱上方,上下键挑、回车/Tab 选定、Esc 收掉、鼠标点也算数 */}
-          {slashOpen && (
-            <div className="slash-palette" id="slash-palette" role="listbox" aria-label="斜杠命令">
-              {slashMatches.map((c, i) => (
-                <button
-                  key={c.name}
-                  type="button"
-                  role="option"
-                  id={`slash-opt-${c.name.slice(1)}`}
-                  aria-selected={i === slashActive}
-                  className={`slash-item${i === slashActive ? ' is-active' : ''}`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onMouseEnter={() => setSlashIndex(i)}
-                  onClick={() => pickSlash(c.name)}
-                >
-                  <span className="slash-name">{c.name}</span>
-                  <span className="slash-desc">{c.desc}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            ref={inputRef}
-            value={draft}
-            placeholder={chat.busy ? '小探针正在回答上一个问题……' : '随便聊点什么……'}
-            aria-label="输入自由对话"
-            aria-expanded={slashOpen}
-            aria-controls="slash-palette"
-            aria-activedescendant={
-              slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined
-            }
-            rows={1}
-            onChange={(e) => {
-              setDraft(e.target.value)
-              // 内容一变,补全重新能冒头(Esc 的「先别出」只管当下这句)
-              setSlashDismissed(false)
-              setSlashIndex(0)
-            }}
-            onKeyDown={onDraftKeyDown}
-          />
-          {capped && (
-            <button
-              type="button"
-              className="composer-expand"
-              onClick={() => setExpanded(!expanded)}
-              aria-label={expanded ? '收合输入框' : '展开输入框'}
-              data-tip={expanded ? '收合' : '多撑五行'}
-            >
-              <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
-            </button>
-          )}
-          <div className="composer-bar">
-            {chat.busy && (
-              <button type="button" className="btn btn-ghost composer-stop" onClick={chat.cancel}>
-                停一停
+        {chat.messages.length > 0 && chipList.length > 0 && (
+          <div className="fc-chips">
+            {chipList.map((q) => (
+              <button key={q} type="button" className="fc-chip" onClick={() => sendExample(q)}>
+                {q}
               </button>
-            )}
-            {/* 思考开关(小葵拍的板:纯图标胶囊,是啥靠悬停提示说) */}
-            <button
-              type="button"
-              className={`chat-think-toggle${chat.thinking ? ' is-on' : ''}`}
-              onClick={() => chat.setThinking(!chat.thinking)}
-              aria-pressed={chat.thinking}
-              aria-label="思考模式开关"
-              onMouseEnter={refreshEngineOnHover}
-              data-tip={
-                chat.thinking
-                  ? isExternalEngine
-                    ? '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉。不过外接 LM Studio 时这个开关管不着思考 —— 想关,去 LM Studio 那边的模型设置里调'
-                    : '思考模式开着:小探针会先想一遍再回答,思考过程折叠在答案上方,复杂问题更靠谱,但更慢。点一下关掉'
-                  : isExternalEngine
-                    ? '思考模式关着:回答快,复杂问题可能想不周全。点一下打开。不过外接 LM Studio 时这个开关不控制思考 —— 想开关它,去 LM Studio 那边的模型设置里调'
-                    : '思考模式关着:回答快,复杂问题可能想不周全。点一下打开'
-              }
-            >
-              <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
-            </button>
-            {/* 翻文件开关(第一百二十八锤;小葵拍的板:纯图标胶囊):开着小探针就能自己翻项目的文件名单和文件内容(只读) */}
-            <button
-              type="button"
-              className={`chat-think-toggle chat-agent-toggle${chat.agent ? ' is-on' : ''}`}
-              onClick={() => chat.setAgent(!chat.agent)}
-              aria-pressed={chat.agent}
-              aria-label="翻文件模式开关"
-              data-tip={
-                chat.agent
-                  ? '翻文件模式开着:小探针能自己翻项目里的文件名单、读文件内容,「哪里有 xx」它自己去找。点一下关掉'
-                  : '翻文件模式关着:小探针只看你当前给它的资料。点一下打开,它就能自己翻项目里的文件'
-              }
-            >
-              <TreeIcon name="folderSearch" size={CHAT_ACTION_ICON_SIZE} mono />
-            </button>
-            <button
-              type="submit"
-              className="chat-send"
-              disabled={chat.busy}
-              aria-label={chat.busy ? '回答中' : '发送'}
-              data-tip={chat.busy ? '回答中……' : '发送'}
-            >
-              <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
-            </button>
+            ))}
           </div>
-        </form>
+        )}
+        {chat.messages.length > 0 && composerEl}
+        <p className="fc-tip">回车发送 · Shift+回车换行{onDropNode ? ' · 拖文件进来挂引用' : ''}</p>
       </div>
     </div>
   )

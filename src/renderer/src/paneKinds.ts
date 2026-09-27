@@ -9,7 +9,7 @@ export type PaneKind = 'overview' | 'chat' | 'preview' | 'graph' | 'settings' | 
 /** 单例签的名牌户口(文件签的名/图标来自文件自己,不从这里领) */
 export const KIND_LABELS: Record<PaneKind, string> = {
   overview: '概览',
-  chat: 'Atlas 小探针',
+  chat: '自由对话',
   preview: '文件预览',
   graph: '关系图谱',
   settings: '设置',

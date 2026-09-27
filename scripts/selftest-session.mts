@@ -64,7 +64,7 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
     {
       id: 'pane:2',
       activeId: 'tab:3',
-      tabs: [{ id: 'tab:3', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot' }]
+      tabs: [{ id: 'tab:3', kind: 'chat', relPath: '', name: '自由对话', icon: 'bot' }]
     }
   ]
   const s = serializeSession('C:\\work\\demo', groups, 'pane:2', 'src/b.ts')
@@ -146,7 +146,7 @@ check('serializeSession:激活指针没指到任何签时,on 不落、还原兜�
     {
       id: 'pane:1',
       activeId: null,
-      tabs: [{ id: 'tab:1', kind: 'chat', relPath: '', name: 'Atlas 小探针', icon: 'bot' }]
+      tabs: [{ id: 'tab:1', kind: 'chat', relPath: '', name: '自由对话', icon: 'bot' }]
     }
   ]
   const s = serializeSession(null, groups, null, null)

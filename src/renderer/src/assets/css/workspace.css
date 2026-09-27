@@ -615,55 +615,8 @@
   cursor: not-allowed;
 }
 
-/* 引用卡排(第一百一十一锤):挂在输入框上方,一条一段代码,点 ✕ 摘掉 */
-.chat-refs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3) var(--space-2);
-}
-
-.chat-refs-label {
-  color: var(--muted);
-  font-size: var(--font-xs);
-}
-
-.chat-ref {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  max-width: 100%;
-  padding: 0.1875rem 0.375rem 0.1875rem 0.5rem;
-  color: var(--accent-bright);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  font-size: var(--font-xs);
-}
-
-.chat-ref-text {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.chat-ref-remove {
-  flex-shrink: 0;
-  padding: 0 0.125rem;
-  color: var(--muted);
-  border: 0;
-  background: transparent;
-  font-size: var(--font-xxs);
-  line-height: var(--lh-100);
-  cursor: pointer;
-}
-
-.chat-ref-remove:hover {
-  color: var(--danger);
-}
-
-/* 用户气泡里留下的引用痕迹:他说过什么、引的是哪一段,回看时对得上 */
+/* 用户气泡里留下的引用痕迹:他说过什么、引的是哪一段,回看时对得上。
+   新皮囊的灰胶囊底不配白膜了,引用痕走中性灰调 */
 .msg-refs {
   display: flex;
   flex-wrap: wrap;
@@ -674,7 +627,8 @@
 .msg-ref {
   padding: 0.125rem 0.375rem;
   border-radius: var(--radius-sm);
-  background: rgb(255 255 255 / 18%);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
   font-size: var(--font-xxs);
 }
 
