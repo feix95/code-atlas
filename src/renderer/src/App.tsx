@@ -17,6 +17,7 @@ import { AiSetupContext, TeachingContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
+import { ContextMenu } from './components/ContextMenu'
 import { HomePage } from './components/HomePage'
 import type { SectionKey } from './components/SettingsPage'
 import { Notice } from './components/Notice'
@@ -667,7 +668,8 @@ function App(): React.JSX.Element {
     fileLinks,
     addPreviewRef,
     removePreviewRef,
-    handleDropNode
+    handleDropNode,
+    handleDropRef
   } = usePreviewRefs({
     result,
     folder,
@@ -747,6 +749,7 @@ function App(): React.JSX.Element {
         addPreviewRef={addPreviewRef}
         removePreviewRef={removePreviewRef}
         handleDropNode={handleDropNode}
+        handleDropRef={handleDropRef}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
         onAiConfigSaved={(c) => {
@@ -945,6 +948,8 @@ function App(): React.JSX.Element {
           <TooltipHost />
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
+          {/* 通用右键菜单(全局单例,第二台):选区「引用到对话」这类不对着文件的右键走这儿 */}
+          <ContextMenu />
         </div>
 
         {/* 撕窗子窗(页签撕窗锤):每扇子窗一份壳(标题栏+页签带+分屏正文),

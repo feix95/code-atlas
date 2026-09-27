@@ -4,7 +4,7 @@
 // 偏好本体存主进程的 appearance.json(userData 下,跟 ai-config.json 做邻居);
 // localStorage 里的旧存档由首启迁移收编,收编完就清掉 —— 从此外观不再按端口分仓。
 
-import { NEUTRAL_PALETTE } from './appearancePalette.ts'
+import { hexToHsl, hslCss, NEUTRAL_PALETTE, neutralFor } from './appearancePalette.ts'
 
 export type AppearanceMode = 'auto' | 'light' | 'dark'
 /** preset 和自定义色互斥:选了预设就清空自定义色,点「自定义」才进 custom 档 */
@@ -87,4 +87,24 @@ export function resolveAppearanceStartup(opts: {
     }
   }
   return { value: defaultAppearance(), migrate: false }
+}
+
+/** 窗口实底色的同源户口(全窗实底化):外观 + 当前亮暗 → 此刻 --canvas-tint 该是什么色。
+ *  渲染层刷画布、主进程定 BrowserWindow.backgroundColor,两边共用这一本账 ——
+ *  公式必须和渲染层 appearance.ts 里 paintSurfaces 的 canvas-tint 行逐字一致。 */
+export function canvasColorOf(a: Appearance, dark: boolean): string {
+  const pal = neutralFor(dark)
+  // 原装石墨 + 零自定义色:画布就是中性档真值(同 applyAppearance 的早退分支)
+  if (a.preset === 'default' && !a.accent && !a.secondary) return pal.canvasTint
+  // 染色方向:自定义档听底板色(没选就 0/0 走无彩色回落,同渲染层的缺省账),预设档听辅助色
+  let h = 0
+  let s = 0
+  if (a.preset === 'custom') {
+    if (a.base) [h, s] = hexToHsl(a.base)
+  } else {
+    const preset = COLOR_PRESETS.find((p) => p.key === a.preset) ?? COLOR_PRESETS[0]
+    ;[h, s] = hexToHsl(a.secondary ?? preset.secondary)
+  }
+  if (s < 8) return pal.canvasTint
+  return dark ? hslCss(h, Math.min(s * 0.35, 15), 9) : hslCss(h, Math.min(s * 0.4, 18), 99)
 }

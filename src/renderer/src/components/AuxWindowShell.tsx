@@ -9,6 +9,7 @@ import { TopBarTabs } from './TopBarTabs'
 import { PaneGroups } from './PaneGroups'
 import { TooltipHost } from './Tooltip'
 import { FilePathMenu } from './FilePathMenu'
+import { ContextMenu } from './ContextMenu'
 
 /** 页签区那套接线的主窗/子窗通用包:两边吃的 props 一模一样,打包传不重抄 */
 export interface TabAreaProps {
@@ -127,9 +128,10 @@ export function AuxWindowShell({
           renderTabBody={tabArea.renderTabBody}
         />
       </div>
-      {/* 这扇窗自己的提示台 + 文件菜单:听的是子窗 document 的动静,主窗那台够不着 */}
+      {/* 这扇窗自己的提示台 + 两台右键菜单:听的是子窗 document 的动静,主窗那台够不着 */}
       <TooltipHost doc={doc} />
       <FilePathMenu />
+      <ContextMenu />
     </div>
   )
 }

@@ -516,12 +516,72 @@
   color: var(--text);
 }
 
-/* ── 选区美术(第一百一十四锤)──
-   选中色跟辅助色走:系统默认那套蓝和别处长得一样,分不出「进了引用功能」。
+/* ── 选区美术(第一百一十四锤;折行版换户口)──
+   选中色改吃分屏拖边那套 token:底色/竖线走 --drop-mark(30% 透明 sash-hi),
+   首尾角括号走 --sash-hi 实色 —— 「进了引用功能」的蓝和拖分屏的蓝是同一条血。
    只作用于代码正文,别的面板保持系统默认。 */
 .code-text::selection {
-  background: color-mix(in srgb, var(--accent-bright) 28%, transparent);
+  background: var(--drop-mark);
   color: inherit;
+}
+
+/* ── 折行模式(折行版这锤)──
+   行块化 + 自然折行;行号是行块左槽的 ::before —— CSS 生成内容进不了 DOM 文本,
+   选区、复制、引用全文都沾不到数字。--gc 是行号位数(组件按总行数喂,ch 单位一位一格)。 */
+.code-text.is-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-left: 0;
+}
+
+.code-text.is-wrap .code-line {
+  display: block;
+  position: relative;
+  min-height: calc(1em * var(--lh-160));
+  padding-left: calc(var(--gc, 4ch) + 2rem);
+}
+
+.code-text.is-wrap .code-line::before {
+  content: attr(data-line);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: calc(var(--gc, 4ch) + 1.25rem);
+  padding-right: 0.5rem;
+  text-align: right;
+  color: var(--muted-2);
+  border-right: 1px solid var(--line);
+}
+
+/* 预览头折行开关:幽灵小钮,开着的档染主题色 */
+.code-wrap-btn {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.code-wrap-btn:hover:not(:disabled) {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
+.code-wrap-btn.is-on {
+  color: var(--accent-bright);
+}
+
+.code-wrap-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
@@ -556,63 +616,34 @@
   color: var(--tok-symbol);
 }
 
-/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」 */
+/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」;走 sash-hi 实色(分屏拖边同一条血) */
 .code-mark {
   position: fixed;
   z-index: var(--z-code-mark);
   display: inline-flex;
-  color: var(--accent-bright);
+  color: var(--sash-hi);
   pointer-events: none;
   user-select: none;
 }
 
+/* Lucide brackets 拆半后括号臂短(只伸到 x=8/x=16)、靠文字侧内白占图标 15/24,
+   平移按图标尺寸等比收(16px → 10px)正好吃掉——括号笔画贴着选区边缘,再收压字 */
 .code-mark.is-start {
-  transform: translate(calc(-100% - 3px), -50%);
+  transform: translate(calc(-100% + 10px), -50%);
 }
 
 .code-mark.is-end {
-  transform: translate(3px, -50%);
+  transform: translate(-10px, -50%);
 }
 
-/* 选中范围的左缘竖线:一眼看出这一段是一个整体 */
+/* 选中范围的左缘竖线:一眼看出这一段是一个整体;与选中底色同喝 --drop-mark 这碗透明度 */
 .code-sel-bar {
   position: fixed;
   z-index: var(--z-code-float);
   width: 2px;
   border-radius: 1px;
-  background: var(--accent-bright);
-  opacity: 0.7;
+  background: var(--drop-mark);
   pointer-events: none;
-}
-
-/* 选区浮钮(第一百一十一锤):以选区右上角为锚,居中浮在整块上方。
-   user-select:none 是保险 —— 浮层自己绝不能成为可选中的内容(被拖过时会被吞进选区) */
-.code-select-btn {
-  position: fixed;
-  z-index: var(--z-popover);
-  transform: translate(-50%, calc(-100% - 8px));
-  padding: 0.3125rem 0.625rem;
-  color: var(--accent-ink);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  box-shadow: var(--shadow-pop);
-  font-family: inherit;
-  font-size: var(--font-xs);
-  white-space: nowrap;
-  user-select: none;
-  cursor: pointer;
-}
-
-.code-select-btn:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
-
-.code-select-btn:disabled {
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  cursor: not-allowed;
 }
 
 /* 用户气泡里留下的引用痕迹:他说过什么、引的是哪一段,回看时对得上。

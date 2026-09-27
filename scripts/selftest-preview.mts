@@ -9,11 +9,7 @@ import {
   PREVIEW_MAX_BYTES,
   visibleLineRange
 } from '../src/shared/preview.ts'
-import {
-  clampButtonX,
-  refButtonLabel,
-  selectionGeometry
-} from '../src/renderer/src/selectionMarks.ts'
+import { refButtonLabel, selectionGeometry } from '../src/renderer/src/selectionMarks.ts'
 
 function main(): void {
   // ── 1. clipPreview:只归一换行 + 数行数,一个字不裁 ──
@@ -140,12 +136,6 @@ function main(): void {
     '引用到对话(第 1-20 行)',
     '刚好到上限不算太长'
   )
-
-  // ── 9. 浮钮横向夹紧(第一百一十四锤):贴着栏边的选区,别让钮跨到隔壁去 ──
-  assert.equal(clampButtonX(500, 0, 600), 500, '在中间就照原样')
-  assert.equal(clampButtonX(20, 0, 600), 90, '太靠左拉回来')
-  assert.equal(clampButtonX(590, 0, 600), 510, '太靠右拉回来')
-  assert.equal(clampButtonX(10, 0, 100), 50, '栏太窄就居中,别把钮挤没')
 
   // ── 10. 整份引用(第一百一十四锤补2):钮上的话和真要送出去的东西,必须是同一件事 ──
   const whole = { text: 'a\nb\nc', refLimit: 6, canAddRef: true, charCap: 2000 }

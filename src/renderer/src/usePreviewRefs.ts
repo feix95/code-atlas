@@ -132,6 +132,15 @@ export function usePreviewRefs(deps: {
     setPreviewRefs((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // 选中的代码段拖进聊天挂引用(选中直拖锤):ref 正文自包含,不用读盘;额度满了垫灰字照实说
+  function handleDropRef(ref: ChatCodeRef): void {
+    if (previewRefs.length >= CODE_REFS_MAX) {
+      chat.note(`一轮最多引用 ${CODE_REFS_MAX} 段,想换新的先摘一段`)
+      return
+    }
+    addPreviewRef(ref)
+  }
+
   // 拖文件进聊天挂引用(第一百二十五锤):读一份 → 按「整份引用」的账裁好 → 挂卡;
   // 文件夹和读不了的垫灰字指路,不装死。引用额度满了也照实说
   async function handleDropNode(kind: 'file' | 'folder', relPath: string): Promise<void> {
@@ -175,6 +184,7 @@ export function usePreviewRefs(deps: {
     fileLinks,
     addPreviewRef,
     removePreviewRef,
-    handleDropNode
+    handleDropNode,
+    handleDropRef
   }
 }

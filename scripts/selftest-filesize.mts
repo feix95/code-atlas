@@ -9,11 +9,7 @@ const MAX_LINES = 1000
 const CODE_EXT = /\.(ts|tsx|mts|cts|js|jsx|css)$/
 
 // 现存超限文件登记处:值 = 当前行数基线,只降不许升;瘦到 MAX_LINES 以内就该除名
-const GIANTS: Record<string, number> = {
-  // 自由对话改版喂胖的两只,登记定基线,后续拆分时瘦回线内除名
-  'renderer/src/assets/css/ai-chat.css': 1162,
-  'renderer/src/components/FreeChatPanel.tsx': 1080
-}
+const GIANTS: Record<string, number> = {}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

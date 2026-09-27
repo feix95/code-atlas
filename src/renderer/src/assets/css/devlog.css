@@ -1,5 +1,5 @@
 /* ── 第八十七锤:Developer 日志窗口 —— 独立小窗,引擎原话/请求报账/应用记账一本账 ──
-   复用主窗的圆角壳(透明窗 + 14px 圆角),里面是一条工具栏 + 滚动账本 */
+   和主窗一个实底壳(frameless + 画布同色底),里面是一条工具栏 + 滚动账本 */
 
 .devlog {
   height: 100%;
@@ -8,7 +8,6 @@
   overflow: hidden;
   background: var(--canvas-tint);
   border: 1px solid var(--line);
-  border-radius: var(--radius-window);
 }
 
 .devlog-head {

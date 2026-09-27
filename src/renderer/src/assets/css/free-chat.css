@@ -1,0 +1,931 @@
+/* 自由对话页样式:整页网页式布局(顶行/hero空场/内容栏/一行胶囊舱/+菜单/思考行/扁平回答)。
+   从 ai-chat.css 拆出,纯搬家不改行为;AI 共用件(空态/通知卡/讲解卡/兜底网)仍在 ai-chat.css。 */
+
+/* ── AI 对话 Tab ── */
+
+.chat-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 拖文件悬停的亮框(第一百二十五锤):松手就挂上,不用文案教 */
+.chat-shell.free-chat.is-dragover {
+  outline: 2px dashed var(--secondary);
+  outline-offset: -0.375rem;
+  border-radius: var(--radius-md);
+}
+
+/* 空场 hero(对话页改版定稿,Claude 首页式):衬线问候居中,输入舱跟着问候走,
+ * 建议问题收成发丝线胶囊排在舱下。聊开了 hero 撤场,舱沉到底栏 */
+.fc-hero {
+  margin: auto;
+  width: 100%;
+  max-width: 38rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--space-5);
+}
+
+.fc-hello {
+  margin: 0 0 1.5rem;
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-weight: 400;
+  font-size: 1.625rem;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+/* 建议 chips:发丝线描边小胶囊,悬停才上墨色 */
+.fc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  width: min(38rem, 100%);
+}
+
+.fc-hero .fc-chips {
+  margin-top: 1.125rem;
+}
+
+.fc-chip {
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition:
+    color var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth);
+}
+
+.fc-chip:hover {
+  color: var(--text);
+  border-color: var(--muted-2);
+}
+
+.chat-messages-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+/* 内容栏(对话页改版):限宽居中、两侧大留白,页签再宽也不拉成扁担 */
+.fc-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(38rem, 100%);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) 0.25rem;
+}
+
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+/* 小动作排悬停才露脸(对话页改版):复制/重试平时隐身,不抢正文戏 */
+.chat-turn .msg-actions {
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-smooth);
+}
+
+.chat-turn:hover .msg-actions,
+.chat-turn:focus-within .msg-actions {
+  opacity: 1;
+}
+
+.message {
+  color: var(--text);
+  font-size: var(--font-md);
+  line-height: var(--lh-165);
+  overflow-wrap: break-word;
+}
+
+/* 用户消息:瘦胶囊右对齐,右下角收小(利落手势) */
+.message.user {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 0.4375rem 0.8125rem;
+  border-radius: 1rem 1rem 0.375rem 1rem;
+  background: var(--surface-soft);
+  color: var(--text-strong);
+  white-space: pre-wrap;
+}
+
+/* 回答不装框:头像列都没有,纯排版躺在画布上 */
+.message.answer {
+  align-self: stretch;
+}
+
+.message.answer .notice {
+  margin: 0;
+}
+
+/* 对话底部(对话页改版):建议 chips + 输入舱,跟内容栏同款限宽居中 */
+.chat-bottom {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem var(--space-3) var(--space-3);
+}
+
+/* 舱底提示行:发送规矩一句话,浅得几乎看不见 */
+.fc-tip {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: var(--font-xxs);
+}
+
+/* 跳到最新(第六十一锤):不在底部时浮出;新内容到了按钮重挂一次,蹦一下报信 */
+.chat-jump {
+  position: absolute;
+  bottom: 0.625rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--accent-bright);
+  cursor: pointer;
+  box-shadow: var(--shadow-pop);
+  z-index: var(--z-jump);
+}
+
+.chat-jump:hover {
+  background: var(--accent-soft);
+}
+
+.chat-jump i {
+  width: 0;
+  height: 0;
+  border-left: 0.3125rem solid transparent;
+  border-right: 0.3125rem solid transparent;
+  border-top: 0.4375rem solid currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chat-jump {
+    animation: chat-jump-pop 0.45s var(--ease-smooth);
+  }
+}
+
+@keyframes chat-jump-pop {
+  0% {
+    transform: translateX(-50%) translateY(0.25rem);
+    opacity: 0.35;
+  }
+  60% {
+    transform: translateX(-50%) translateY(-0.125rem);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 一体化输入舱(对话页改版定稿,Claude 式细胶囊):
+ * 一行坐齐 —— 「+」能力菜单 | 引用原子+文字区 | 发送/停一停圆钮;
+ * 写到两行起往上长:文字区铺满整行,「+」和发送落到舱内第二行两端;
+ * 满五行封顶,右上角出拨杆,拨上去多撑五行(共十行),舱内自己滚 */
+.chat-input {
+  position: relative;
+  width: min(38rem, 100%);
+  border: 1px solid var(--line);
+  border-radius: 1.375rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-2) var(--ease-smooth);
+}
+
+.chat-input:focus-within {
+  border-color: color-mix(in srgb, var(--text) 30%, var(--line));
+}
+
+.fc-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  min-height: 2.875rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* 文字区:flex 容器,引用原子是其中的普通成员 —— 躺在文字流左端,不够宽就折行 */
+.fc-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.chat-input textarea {
+  flex: 1 1 9rem;
+  min-width: 9rem;
+  height: 1.5rem;
+  padding: 0.3125rem 0.125rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-md);
+  font-family: inherit;
+  line-height: var(--lh-150);
+  resize: none;
+  overflow: hidden;
+}
+
+/* 占位字收进 token:浏览器默认 darkGray 跟主题不亲,统一吃 muted-2 */
+.chat-input textarea::placeholder {
+  color: var(--muted-2);
+}
+
+/* 拖着引用/文件悬在舱上时,占位字先隐身 —— 东西还没放下就别跟它抢戏 */
+.free-chat.is-dragover .chat-input textarea::placeholder {
+  color: transparent;
+}
+
+/* 两行起:文字区上到第一行整行,「+」和发送落第二行两端(space-between 自动分管) */
+.chat-input.is-multiline .fc-line {
+  flex-wrap: wrap;
+}
+
+.chat-input.is-multiline .fc-field {
+  order: -1;
+  flex-basis: 100%;
+}
+
+/* 拨杆只在这时才渲染(满五行),右上角给它留一角,别压着文字 */
+.chat-input.is-capped textarea {
+  padding-right: 2.125rem;
+  overflow-y: auto;
+}
+
+/* 「+」钮:圆形幽灵,开着时染个浅底表示菜单挂着 */
+.fc-plus {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.fc-plus:hover,
+.fc-plus.is-open {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* 菜单开着,「+」顺时针转 45° 变成「×」;收摊逆时针转回去 */
+.fc-plus svg {
+  transition: transform var(--dur-2) var(--ease-smooth);
+}
+
+.fc-plus.is-open svg {
+  transform: rotate(45deg);
+}
+
+/* 「+」能力菜单:浮在舱口左上、底边微压舱上沿,每行 = 单色图标 + 名字 + iOS 拨钮 */
+.fc-menu {
+  position: absolute;
+  left: 0.375rem;
+  bottom: calc(100% - 0.5rem);
+  z-index: var(--z-popover);
+  min-width: 14.375rem;
+  padding: 0.375rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.fc-mrow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fc-mrow:hover {
+  background: var(--hover);
+}
+
+.fc-mi {
+  width: 0.9375rem;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+/* iOS 拨钮:灰底白珠,开了染深、珠滑右边 */
+.fc-sw {
+  margin-left: auto;
+  flex: none;
+  width: 2rem;
+  height: 1.125rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--muted) 35%, var(--surface));
+  position: relative;
+  transition: background var(--dur-2) var(--ease-smooth);
+}
+
+.fc-sw::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.125rem - 4px);
+  height: calc(1.125rem - 4px);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: left var(--dur-2) var(--ease-smooth);
+}
+
+/* 开态染 sash-hi:功能开关统一吃分屏拖边那条蓝(小葵定的规矩:功能性的都走这 token) */
+.fc-mrow.is-on .fc-sw {
+  background: var(--sash-hi);
+}
+
+.fc-mrow.is-on .fc-sw::after {
+  left: 1rem;
+}
+
+/* 内嵌引用原子(Devin 式):图标+底色小块,躺在文字流里,光标顶头退格删整颗 */
+.fc-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  max-width: 100%;
+  padding: 0.0625rem 0.25rem 0.0625rem 0.3125rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--muted) 10%, var(--surface));
+  color: var(--text);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+.fc-ref-ic {
+  flex: none;
+  color: var(--muted);
+}
+
+.fc-ref-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-xs);
+}
+
+.fc-ref-x {
+  flex: none;
+  padding: 0 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.fc-ref-x:hover {
+  color: var(--danger);
+}
+
+/* 发送/停一停:同一座位换岗 —— 平时实心墨圆白箭头,忙着换成同款墨圆白方块 */
+.fc-send {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text-strong);
+  color: var(--surface);
+  cursor: pointer;
+}
+
+.fc-send:hover {
+  background: var(--text);
+}
+
+.fc-send:disabled {
+  background: color-mix(in srgb, var(--muted) 28%, var(--surface));
+  color: var(--muted);
+  cursor: default;
+}
+
+.fc-sq {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 2px;
+  background: var(--surface);
+}
+
+/* 展开/收合的拨杆:钉在容器右上角;满五行才渲染,这里只管摆位 */
+.composer-expand {
+  position: absolute;
+  top: 0.4375rem;
+  right: 0.4375rem;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.composer-expand:hover {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--text);
+}
+
+/* 斜杠命令补全(打 / 浮出的命令清单):钉在输入舱正上方,和舱口留出一段固定空隙;
+ * 每行 = 等宽命令名 + 一句说明。皮相照设置页下拉那一套(圆角/边线/浮影/选中底) */
+.slash-palette {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 16rem;
+  max-width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0.375rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slash-item:hover {
+  background: var(--hover);
+}
+
+.slash-item.is-active {
+  background: var(--selected-bg);
+}
+
+.slash-name {
+  flex: none;
+  font-family: var(--mono);
+}
+
+.slash-desc {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+/* 思考行(对话页改版,Devin 式):脑图标 + 流光「正在思考」+弹跳点(活着),
+ * 想完收成「想了 Xs ▸」;点开箭头顺时针转 90° 朝下,过程灰字带左竖轨 */
+.chat-thinking {
+  margin-bottom: 0.375rem;
+}
+
+.chat-thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: none;
+  padding: 0.125rem 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chat-thinking-toggle:hover {
+  color: var(--text);
+}
+
+/* 流光占位态(还没吐字/没吐思考):同一张脸,只是不能点 */
+.chat-thinking-toggle.is-live {
+  cursor: default;
+}
+
+.chat-thinking-toggle .cv {
+  display: grid;
+  place-items: center;
+  color: var(--muted-2);
+}
+
+/* 收起时点 → (chevron 图标本身是朝下的,先立起来),点开转回 ↓ */
+.chat-thinking-toggle .cv svg {
+  transform: rotate(-90deg);
+  transition: transform var(--dur-2) var(--ease-smooth);
+}
+
+.chat-thinking.is-open .chat-thinking-toggle .cv svg {
+  transform: rotate(0);
+}
+
+.chat-thinking-body {
+  margin: 0.125rem 0 0.625rem 0.1875rem;
+  padding: 0.125rem 0 0.125rem 0.625rem;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: var(--lh-160);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+/* 流光字:灰底上一道亮扫过去,思考中活着的信号 */
+.fc-shim {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 30%,
+    color-mix(in srgb, var(--muted) 40%, var(--surface)) 50%,
+    var(--muted) 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fc-shim 1.8s linear infinite;
+}
+
+@keyframes fc-shim {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* 思考中的弹跳点:三颗实心小点贴着字错落弹起 */
+.fc-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+}
+
+.fc-dots i {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  animation: fc-dotb 1.2s ease-in-out infinite;
+}
+
+.fc-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.fc-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes fc-dotb {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  30% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-shim {
+    animation: none;
+    background: none;
+    color: var(--muted);
+  }
+
+  .fc-dots i {
+    animation: none;
+  }
+}
+
+/* ── 自由对话页:顶行(参考 chip + 新对话)/ 参考资料弹层 / 联网状态标签 ── */
+
+/* 顶行:薄得几乎不存在 —— 一行透明横条,左参考、右新对话 */
+.fc-topline {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.375rem var(--space-3);
+}
+
+/* 参考资料 chip:小回形针 + 文件名,点开看机器扫到的原始资料 */
+.fc-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  max-width: 60%;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.fc-ctx:hover,
+.fc-ctx.is-open {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.fc-ctx strong {
+  color: var(--text);
+  font-weight: var(--font-w-semi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-ctx-sep {
+  color: var(--muted-2);
+}
+
+/* 参考资料的展开层:浮在顶行下面,仍是 pre 白字原文 */
+.fc-ctx-pop {
+  position: absolute;
+  top: 2.125rem;
+  left: var(--space-3);
+  z-index: var(--z-popover);
+  max-width: min(34rem, calc(100% - var(--space-3) * 2));
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  line-height: var(--lh-170);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* 新对话:顶行右上角的小幽灵钮,毁档动作待在角落 */
+.fc-newchat {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.5625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.fc-newchat:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* 程序垫的灰字条(第一百二十四锤):「参考资料换成了 xxx」,居中小字,不像谁说的话 */
+.chat-note {
+  margin: var(--space-2) auto;
+  padding: 0 0.75rem;
+  max-width: 85%;
+  text-align: center;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+/* 探针干活的步骤条(第一百四十一锤):左对齐 + 行首小圆点,连翻几样时像一条
+   时间线;在居中内容栏里顶格排,跟前后的消息对齐 */
+.chat-note.is-step {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  text-align: left;
+}
+
+.chat-note.is-step::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  transform: translateY(-2px);
+}
+
+/* 压缩摘要卡(第一百四十二锤):/compact 压出来的旧对话摘要,默认收着一行小字,
+   点开看全文;细边框圆角让它像一张「档案卡」,和纯文字的灰字条区分开(间距显式设置) */
+.chat-note.is-summary {
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  max-width: none;
+  text-align: left;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.chat-note.is-summary summary {
+  user-select: none;
+}
+
+.chat-note.is-summary p {
+  margin: 0.375rem 0 0.125rem;
+  padding-top: 0.375rem;
+  border-top: 1px dashed var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--lh-160);
+}
+
+/* 命中清单卡(LLM 优化锤):search_content 搜到的命中程序直接摆卡,模型不再当抄写员。
+   和摘要卡同一张「档案卡」脸:细边框圆角、左对齐;「文件:行号」可点跳预览那一行,
+   行原文单行省略(数据本身截过 120 字,悬停 title 看全貌)。间距全部显式设置。 */
+.chat-note.is-matches {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  max-width: none;
+  text-align: left;
+  font-size: var(--font-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.chat-note.is-matches .chat-matches-head {
+  margin: 0 0 0.375rem;
+  color: var(--muted-2);
+}
+
+.chat-note.is-matches .chat-matches-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chat-note.is-matches .chat-matches-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chat-note.is-matches .chat-match-loc {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.25em;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-family: var(--mono, 'Consolas', monospace);
+  font-size: 1.05em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-note.is-matches .chat-match-loc:hover {
+  background: var(--accent-line);
+  text-decoration: underline;
+}
+
+.chat-note.is-matches .chat-match-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-2);
+}
+
+.chat-note.is-matches .chat-matches-toggle {
+  margin: 0.375rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-bright);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.chat-note.is-matches .chat-matches-toggle:hover {
+  text-decoration: underline;
+}
+
+.chat-webstatus {
+  margin-top: 0.125rem;
+}
+
+/* 实时 token 账(第八十四锤):流式时贴在气泡左下的小灰字;收尾换一行「本次 · 读 x 吐 y」 */
+.chat-stats {
+  margin-top: 0.375rem;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  font-family: var(--mono);
+  user-select: text;
+}
+
+.chat-usage {
+  color: var(--muted-2);
+}
+
+.chat-typing {
+  color: var(--muted);
+}
+
+.chat-muted {
+  font-size: var(--font-sm);
+  margin-top: 0.25rem;
+}

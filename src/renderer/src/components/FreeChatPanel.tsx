@@ -1,91 +1,32 @@
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import type { ChatCodeRef, ChatContextAttachment } from '@shared/types'
+import type { FileLinkTarget } from '@shared/fileLinks'
 import {
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent
-} from 'react'
-import type {
-  AgentSearchCard,
-  AiConfig,
-  ChatCodeRef,
-  ChatContextAttachment,
-  WebLookupMeta
-} from '@shared/types'
-import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
-import { formatStreamStats, formatUsage } from '@shared/aiText'
-import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
-import { DRAG_MIME_NODE, type DragNodePayload } from '@shared/dragTypes'
-import { Badge } from './DetailHeader'
+  DRAG_MIME_NODE,
+  DRAG_MIME_REF,
+  type DragNodePayload,
+  type DragRefPayload
+} from '@shared/dragTypes'
 import { ErrorBoundary } from './ErrorBoundary'
-import { Notice } from './Notice'
 import { IconRefresh, TreeIcon } from './Icons'
-import { MiniMD } from './MiniMD'
-import type { AiChatApi, ChatMessage } from '../useAiChat'
+import { FreeChatComposer } from './FreeChatComposer'
+import { AssistantBubble } from './FreeChatBubble'
+import { FileNoteText, MatchListCard } from './FreeChatNotes'
+import { REF_ONLY_QUESTION, type AiChatApi, type ChatMessage } from '../useAiChat'
 import { AiSetupContext } from '../aiSetupContext'
-import { INPUT_CAP_LINES, INPUT_EXPAND_LINES, INPUT_TOGGLE_ICON_SIZE } from '../inputMetrics'
-import { useFlashFlag } from '../useFlashFlag'
-
-/** 输入栏右侧三颗圆钮(思考/翻文件/发送)图标旋钮:共享一个大小,跟别处分组互不相关 */
-const CHAT_ACTION_ICON_SIZE = 16
-/** 消息行内小动作钮(复制/重试)的图标尺寸 */
-const MSG_ACTION_ICON_SIZE = 13
-/** 聊天内嵌小图标(附件回形针/代码引用芯片这类跟着文字走的) */
-const INLINE_ICON_SIZE = 12
-
-/**
- * 程序垫的灰字(轨迹行/摘要/通知)里的文件链接:这些文字是 app 自己记的,
- * 路径百分百真实,同一套检测顺手让它们也可点。没传 fileLinks 就原样纯文字。
- */
-const FileNoteText = memo(function FileNoteText({
-  text,
-  fileLinks
-}: {
-  text: string
-  fileLinks?: FileLinkTarget | null
-}): React.JSX.Element {
-  if (!fileLinks) return <>{text}</>
-  const spans = findFileLinks(text, fileLinks.index)
-  if (spans.length === 0) return <>{text}</>
-  const nodes: React.ReactNode[] = []
-  let last = 0
-  spans.forEach((s, i) => {
-    if (s.start > last) nodes.push(text.slice(last, s.start))
-    nodes.push(
-      <button
-        key={i}
-        type="button"
-        className="md-file-link"
-        onClick={() => fileLinks.onOpen(s.relPath, s.line)}
-        onContextMenu={(e) => {
-          if (!fileLinks.onMenu) return
-          e.preventDefault()
-          fileLinks.onMenu(s.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
-        }}
-        data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
-      >
-        {s.relPath}
-        {s.line !== undefined ? `:${s.line}` : ''}
-      </button>
-    )
-    last = s.end
-  })
-  if (last < text.length) nodes.push(text.slice(last))
-  return <>{nodes}</>
-})
+import { INLINE_ICON_SIZE } from '../inputMetrics'
 
 /**
  * 自由对话面板(对话页改版定稿):开放式聊天,问题不限于当前文件,页签叫「自由对话」。
  * 顶行薄条:左参考资料 chip(点开看机器扫到的原始资料)、右「新对话」小幽灵钮;
  * 空场 = 衬线问候 + 居中胶囊舱 + 建议 chips;聊开了舱沉底栏,回答不装框不带头像。
- * 输入舱 = 一行胶囊:「+」能力菜单(思考/翻文件拨钮)| 内嵌引用原子+文字 | 发送/停一停圆钮。
+ * 输入舱 = 一行胶囊:「+」能力菜单(思考/翻文件/联网拨钮)| 内嵌引用原子+文字 | 发送/停一停圆钮。
  * 思考行 = 脑图标 + 流光「正在思考」+弹跳点,想完收成「想了 Xs ▸」可点开看过程。
  * 本轮动过联网就在消息下方挂程序记账的状态标签。
  * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
  * 第一百一十一锤:预览模式下左栏选中的代码以引用原子躺在舱内文字流里,和问题一起发出去。
+ * 拆分户口:胶囊舱 → FreeChatComposer;回答气泡+思考行 → FreeChatBubble;
+ * 程序递话/命中卡 → FreeChatNotes(纯搬家不改行为)。
  */
 
 const CHAT_EXAMPLES = [
@@ -93,14 +34,6 @@ const CHAT_EXAMPLES = [
   '我想找一个功能，应该看哪里？',
   '这个文件和其他部分有什么关系？'
 ]
-
-/** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
-const SLASH_COMMANDS: Array<{ name: string; desc: string }> = [
-  { name: COMPACT_COMMAND, desc: '把前面聊过的压成摘要，省出上下文' }
-]
-
-/** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
-const REF_ONLY_QUESTION = '讲讲选中的这段代码'
 
 /**
  * 聊天面板的滚动记忆(按对话指纹记名):点聊天里的绿字跳预览时,聊天面板会从另一个
@@ -121,260 +54,6 @@ function messagesFingerprint(messages: ChatMessage[]): string {
   return `${messages.length}:${first}:${last}`
 }
 
-/** 联网账本 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
-function webLabel(
-  meta: WebLookupMeta | null
-): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
-  if (!meta || !meta.requested) return null
-  switch (meta.state) {
-    case 'not_requested':
-      return null
-    case 'disabled':
-      return { text: '联网开关未开启,本轮没有查询', tone: 'muted' }
-    case 'searching':
-      return { text: '正在联网查询…', tone: 'blue' }
-    case 'completed':
-      return {
-        text: `已联网查询:${meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'}`,
-        tone: 'green'
-      }
-    case 'failed':
-      return { text: '联网查询失败,以下内容不是联网结论', tone: 'amber' }
-    case 'empty':
-      return { text: '已查询,但没有找到可用资料', tone: 'amber' }
-  }
-}
-
-/** 命中清单卡默认收几条:命中一多全铺开会把消息区顶到天上去,多的点开再看 */
-const MATCH_PREVIEW_COUNT = 8
-
-/**
- * 命中清单卡(LLM 优化锤):search_content 搜到的结构化命中,程序摆卡直说,
- * 不劳模型转手抄写 —— 一条不丢、行号一个不错。「文件:行号」整块可点,
- * 点了左边开预览直达那一行(和聊天里 AI 提到文件的可点链接同一去处)。
- * 数据是主进程程序自己产的真货,路径不用再过 findFileLinks 的户口检查。
- */
-const MatchListCard = memo(function MatchListCard({
-  card,
-  fileLinks
-}: {
-  card: AgentSearchCard
-  fileLinks?: FileLinkTarget | null
-}): React.JSX.Element {
-  const [expanded, setExpanded] = useState(false)
-  const shown = expanded ? card.items : card.items.slice(0, MATCH_PREVIEW_COUNT)
-  return (
-    <div className="chat-note is-matches" role="status">
-      <p className="chat-matches-head">
-        搜「{card.keyword}」命中 {card.items.length} 处
-        {card.truncated ? '(命中太多,只收了前 50 条)' : ''}
-      </p>
-      <ul className="chat-matches-list">
-        {shown.map((it, i) => (
-          <li key={`${it.relPath}:${it.line}:${i}`}>
-            <button
-              type="button"
-              className="chat-match-loc"
-              onClick={() =>
-                fileLinks?.onOpen(it.relPath, it.kind === 'path' ? undefined : it.line)
-              }
-              onContextMenu={(e) => {
-                if (!fileLinks?.onMenu) return
-                e.preventDefault()
-                fileLinks.onMenu(it.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
-              }}
-              data-tip={
-                fileLinks ? `打开预览:${it.relPath};右键:复制路径 / 在资源管理器中显示` : it.relPath
-              }
-            >
-              {it.kind === 'path' ? it.relPath : `${it.relPath}:${it.line}`}
-            </button>
-            <span className="chat-match-text" data-tip={it.text}>
-              {it.text}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {card.items.length > MATCH_PREVIEW_COUNT && (
-        <button
-          type="button"
-          className="chat-matches-toggle"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-        >
-          {expanded ? '收起' : `展开全部 ${card.items.length} 条`}
-        </button>
-      )}
-    </div>
-  )
-})
-
-/** 思考行(对话页改版):脑图标 + 「正在思考」流光字+弹跳点(活着),想完就地收成「想了 Xs ▸」,
- * 点开看过程、箭头顺时针转 90° 朝下。耗时在组件里自己量:忙起来记账、闲下来结账;
- * 中途重挂(滚动记忆那套)没有起点的,就不说秒数,只叫「思考过程」。
- * 用户亲手点过就以用户为准(null = 还没点过,默认「忙着就开,答完就收」) */
-function ThinkingBlock({
-  reasoning,
-  busy
-}: {
-  reasoning: string
-  busy: boolean
-}): React.JSX.Element | null {
-  const [toggled, setToggled] = useState<boolean | null>(null)
-  const [secs, setSecs] = useState<number | null>(null)
-  const startRef = useRef<number | undefined>(undefined)
-  useEffect(() => {
-    if (busy) {
-      if (startRef.current === undefined) startRef.current = performance.now()
-      return
-    }
-    if (startRef.current !== undefined)
-      setSecs(Math.max(1, Math.round((performance.now() - startRef.current) / 1000)))
-  }, [busy])
-  const open = toggled ?? busy
-  if (reasoning.trim() === '') return null
-  return (
-    <div className={`chat-thinking${open ? ' is-open' : ''}`}>
-      <button
-        type="button"
-        className="chat-thinking-toggle"
-        onClick={() => setToggled(!open)}
-        aria-expanded={open}
-      >
-        <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
-        {busy ? (
-          <>
-            <span className="fc-shim">正在思考</span>
-            <span className="fc-dots" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-          </>
-        ) : (
-          <>
-            {secs !== null ? `想了 ${secs}s` : '思考过程'}
-            <span className="cv" aria-hidden="true">
-              <TreeIcon name="chevron" size={11} mono />
-            </span>
-          </>
-        )}
-      </button>
-      {open && <div className="chat-thinking-body">{reasoning}</div>}
-    </div>
-  )
-}
-
-// 回答气泡上 memo(隐身案这锤):流式输出每补一段字,消息区就重画一次;气泡不 memo,
-// 旧消息全量陪跑,聊得越久越沉。memo 生效的前提是 props 身份稳定 —— msg 是消息对象
-// 本身(流式只换正在写的那条,旧的不动)、onRetry 由父层用 ref 稳住、fileLinks 同理。
-const AssistantBubble = memo(function AssistantBubble({
-  msg,
-  canRetry,
-  retryIndex,
-  onRetry,
-  fileLinks
-}: {
-  msg: ChatMessage
-  canRetry?: boolean
-  /** 重试按钮回传自己在消息列表里的座位号,回调本体在父层一个身份用到底 */
-  retryIndex: number
-  onRetry?: (idx: number) => void
-  fileLinks?: FileLinkTarget | null
-}): React.JSX.Element {
-  const label = webLabel(msg.web)
-  // 已复制提示(第一百零七锤补):按小提示走,1 秒自己退场
-  const [copied, flashCopied] = useFlashFlag(800)
-  function copyAnswer(): void {
-    void navigator.clipboard.writeText(msg.text).then(flashCopied)
-  }
-  // 复制/重试这一小排:有 token 账时贴在账目右边同行,没账时自己在正文下面一行
-  const showActions = (msg.state === 'done' || msg.state === 'cancelled') && msg.text !== ''
-  const actions = showActions && (
-    <div className="msg-actions">
-      {copied && (
-        <span className="msg-copied" role="status">
-          已复制
-        </span>
-      )}
-      <button
-        type="button"
-        className="msg-action"
-        onClick={copyAnswer}
-        aria-label={copied ? '已复制' : '复制这条回答'}
-        data-tip={copied ? '已复制' : '复制'}
-      >
-        <TreeIcon name="copy" size={MSG_ACTION_ICON_SIZE} />
-      </button>
-      {canRetry && onRetry && (
-        <button
-          type="button"
-          className="msg-action"
-          onClick={() => onRetry(retryIndex)}
-          aria-label="重试生成"
-          data-tip="重试"
-        >
-          <IconRefresh size={MSG_ACTION_ICON_SIZE} />
-        </button>
-      )}
-    </div>
-  )
-  return (
-    <div className="chat-turn">
-      <div className="message answer">
-        {msg.state === 'busy' && !msg.text && !msg.reasoning && (
-          <div className="chat-thinking" role="status">
-            <span className="chat-thinking-toggle is-live">
-              <TreeIcon name="brain" size={CHAT_ACTION_ICON_SIZE} mono />
-              <span className="fc-shim">正在思考</span>
-              <span className="fc-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-            </span>
-          </div>
-        )}
-        {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
-        {msg.text && (
-          <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />
-        )}
-        {msg.state === 'done' && !msg.text && msg.reasoning && (
-          <span className="chat-typing chat-muted">
-            想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。
-          </span>
-        )}
-        {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
-        {msg.state === 'cancelled' && msg.text && (
-          <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
-        )}
-        {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
-        {/* 实时 token 账(第八十四锤):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
-        {msg.state === 'busy' && (msg.stats || msg.text) && (
-          <div className="chat-stats">
-            {msg.stats
-              ? formatStreamStats(msg.stats)
-              : `已吐 ${msg.text.length.toLocaleString('en-US')} 字`}
-          </div>
-        )}
-        {/* 复制/重试:有 token 账时和账同一行、贴在右边;悬停本条回答才露脸 */}
-        {showActions && !msg.usage && actions}
-        {msg.state !== 'busy' && msg.usage && (
-          <div className="chat-stats chat-usage">
-            <span>本次 · {formatUsage(msg.usage)}</span>
-            {actions}
-          </div>
-        )}
-      </div>
-      {label && (
-        <div className="chat-webstatus">
-          <Badge label={label.text} tone={label.tone} />
-        </div>
-      )}
-    </div>
-  )
-})
-
 export function FreeChatPanel({
   chat,
   context,
@@ -382,6 +61,7 @@ export function FreeChatPanel({
   onRemoveRef,
   suggestions,
   onDropNode,
+  onDropRef,
   fileLinks,
   suggestionsOn
 }: {
@@ -394,6 +74,8 @@ export function FreeChatPanel({
   suggestions?: string[]
   /** 拖文件进聊天挂引用(第一百二十五锤):传了才接拖拽;文件夹/读不了的由 App 端垫灰字指路 */
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+  /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
+  onDropRef?: (ref: ChatCodeRef) => void
   /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
   fileLinks?: FileLinkTarget | null
   /** 推荐问题总闸(聊天偏好):关了推荐和开场示例都不出,只剩「新对话」按钮 */
@@ -401,70 +83,10 @@ export function FreeChatPanel({
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const draftRefs = refs ?? []
-  const [draft, setDraft] = useState('')
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
-  // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
-  const [expanded, setExpanded] = useState(false)
-  // 「+」能力菜单:思考/翻文件两个开关收进这颗钮里;点舱外任何地方收摊
-  const [menuOpen, setMenuOpen] = useState(false)
   // 顶行参考 chip 的展开:点一下看机器扫到的原始资料,再点收
   const [ctxOpen, setCtxOpen] = useState(false)
-  const formRef = useRef<HTMLFormElement>(null)
-  useEffect(() => {
-    if (!menuOpen) return
-    const doc = formRef.current?.ownerDocument ?? document
-    function onPointerDown(e: MouseEvent): void {
-      if (!formRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    doc.addEventListener('mousedown', onPointerDown)
-    return () => doc.removeEventListener('mousedown', onPointerDown)
-  }, [menuOpen])
-  // 「+」菜单里的联网开关 = 设置页「联网查证」总闸的快捷位:读一份当前配置存 ref,
-  // 拨一下就把整份配置 + webLookup 翻转存回去,返回什么就以什么为准
-  const [webOn, setWebOn] = useState(false)
-  const cfgRef = useRef<AiConfig | null>(null)
-  useEffect(() => {
-    let alive = true
-    void window.atlas
-      .aiConfigGet()
-      .then((c) => {
-        if (!alive) return
-        cfgRef.current = c
-        setWebOn(c.webLookup === true)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [])
-  function toggleWeb(): void {
-    const cur = cfgRef.current
-    if (!cur) return
-    const next = !webOn
-    setWebOn(next)
-    void window.atlas
-      .aiConfigSave({ ...cur, webLookup: next })
-      .then((c) => {
-        cfgRef.current = c
-        setWebOn(c.webLookup === true)
-      })
-      .catch(() => setWebOn(!next))
-  }
-  // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
-  const [lineCount, setLineCount] = useState(1)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  // 斜杠命令补全(打 / 浮出的命令清单):Esc 关面板只是藏起来,输入框内容不动;
-  // 内容一变(draft 易手)就重新能冒头 —— 关掉后接着打字照样过滤
-  const [slashDismissed, setSlashDismissed] = useState(false)
-  const [slashIndex, setSlashIndex] = useState(0)
-  // 只在「以 / 开头且还没敲空格」时出面,继续打字按前缀过滤;一条不匹配就整个不开
-  const slashMatches =
-    draft.startsWith('/') && !/\s/.test(draft)
-      ? SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase()))
-      : []
-  const slashOpen = !slashDismissed && slashMatches.length > 0
-  const slashActive = Math.min(slashIndex, slashMatches.length - 1)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
@@ -562,92 +184,6 @@ export function FreeChatPanel({
     else setNewBeat((c) => c + 1)
   }, [chat.messages])
 
-  function submit(e: FormEvent): void {
-    e.preventDefault()
-    sendDraft()
-  }
-
-  function sendDraft(): void {
-    if (setup && setup.configured !== true) {
-      if (setup.configured === false) setup.openSettings()
-      return
-    }
-    const q = draft.trim()
-    // /compact 手动压缩命令(第一百四十二锤):不当问题发,拦下来直接压缩;
-    // 忙着回答时不接,跟发消息一个规矩
-    if (isCompactCommand(q)) {
-      if (chat.busy) return
-      forceBottom()
-      chat.compact()
-      setDraft('')
-      if (expanded) setExpanded(false)
-      return
-    }
-    // 挂了引用就允许空着发:这时替他说一句「讲讲选中的这段代码」,不让他对着空气发呆
-    const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
-    if (!text || chat.busy) return
-    forceBottom()
-    chat.send(text, draftRefs)
-    setDraft('')
-    if (expanded) setExpanded(false)
-  }
-
-  /** 选中一条斜杠命令:填成「/xxx 」带一个尾空格,光标落在尾空格后面接着写参数
-   *  (React 重画时会按旧选区还原光标,可能把光标留回半截命令上 —— 重画完手动把它摁到末尾) */
-  function pickSlash(name: string): void {
-    const next = `${name} `
-    setDraft(next)
-    setSlashIndex(0)
-    const el = inputRef.current
-    if (el) {
-      el.focus()
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = next.length
-      })
-    }
-  }
-
-  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补);
-   *  斜杠补全开着时,键盘先伺候面板:上下挑、回车/Tab 选定(不是发消息)、Esc 只收面板 */
-  function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    if (e.key === 'Escape' && menuOpen) {
-      e.preventDefault()
-      setMenuOpen(false)
-      return
-    }
-    // 内嵌引用原子:光标顶在文字最前头时再敲退格,删掉最后挂上的那颗
-    if (e.key === 'Backspace' && draftRefs.length > 0) {
-      const el = e.currentTarget
-      if (el.selectionStart === 0 && el.selectionEnd === 0) {
-        e.preventDefault()
-        onRemoveRef?.(draftRefs.length - 1)
-        return
-      }
-    }
-    if (slashOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault()
-        const dir = e.key === 'ArrowDown' ? 1 : -1
-        setSlashIndex((slashActive + dir + slashMatches.length) % slashMatches.length)
-        return
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        pickSlash(slashMatches[slashActive].name)
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setSlashDismissed(true)
-        return
-      }
-    }
-    if (e.key !== 'Enter' || e.shiftKey) return
-    if (e.nativeEvent.isComposing) return
-    e.preventDefault()
-    sendDraft()
-  }
-
   /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
   function sendExample(q: string): void {
     if (chat.busy) return
@@ -659,36 +195,6 @@ export function FreeChatPanel({
     chat.send(q, draftRefs)
   }
 
-  // 弹性长高的账(小葵点名):空 = 一行;有一到四行长到几行;五行封顶,
-  // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位。
-  // 防抖(小葵报的病):文字卡在换行临界点时,打一个字涨两行、删一个字缩一行,舱来回蹦。
-  // 治法是「涨快缩慢」:涨按实际行数,缩要富余 —— 量行宽时右侧多留一截,
-  // 文字连这一截都省出来才准缩回一行。另外单行/多行两种布局的行宽不一样
-  // (单行舱文字让着按钮排,多行舱铺满),量行数时给多行舱补上按钮排的地盘,
-  // 两种布局按同一个尺度量,免得「多行里量着放得下、缩回单行立刻又放不下」来回打架。
-  const BAR_RESERVE = '13rem' // 单行舱右侧按钮排的地盘(俩图标胶囊+发送钮,忙时还有「停一停」,往宽了备)
-  const COLLAPSE_SLACK = '4rem' // 缩回一行的富余:比按钮排还宽出这么多才缩
-  useEffect(() => {
-    const el = inputRef.current
-    if (!el) return
-    const line = Number.parseFloat(getComputedStyle(el).lineHeight) || 24
-    const multi = lineCount >= 2
-    el.style.height = 'auto'
-    // 统一量尺:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
-    el.style.paddingRight = multi ? BAR_RESERVE : ''
-    const realLines = Math.max(1, Math.round(el.scrollHeight / line))
-    // 收缩判定:在统一量尺上再加一截富余,连富余都省出来还是一行,才真缩
-    el.style.paddingRight = multi ? `calc(${BAR_RESERVE} + ${COLLAPSE_SLACK})` : COLLAPSE_SLACK
-    const slackLines = Math.max(1, Math.round(el.scrollHeight / line))
-    el.style.paddingRight = ''
-    const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
-    // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
-    el.style.height = `${expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)}px`
-    setLineCount(shown)
-    if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
-  }, [draft, expanded, lineCount])
-  const capped = lineCount >= INPUT_CAP_LINES || expanded
-
   /** 推荐问题 chips:空场吃开场示例,预览模式吃随对话演进的推荐;总闸关了谁都不出 */
   const chipList = suggestionsOn
     ? chat.messages.length === 0
@@ -698,185 +204,26 @@ export function FreeChatPanel({
         : []
     : []
 
-  /** 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/停一停;
-   *  写到两行起往上长,控件自然落到第二行;满五行封顶出拨杆,拨上去多撑五行。
-   *  空场时整颗舱挂在 hero 居中,聊开了沉到底栏 —— 同一颗舱两处坐席。 */
   const composerEl = (
-    <form
-      ref={formRef}
-      className={`chat-input${lineCount >= 2 ? ' is-multiline' : ''}${capped ? ' is-capped' : ''}`}
-      onSubmit={submit}
-    >
-      {/* 斜杠命令补全:打 / 浮在输入舱上方,上下键挑、回车/Tab 选定、Esc 收掉、鼠标点也算数 */}
-      {slashOpen && (
-        <div className="slash-palette" id="slash-palette" role="listbox" aria-label="斜杠命令">
-          {slashMatches.map((c, i) => (
-            <button
-              key={c.name}
-              type="button"
-              role="option"
-              id={`slash-opt-${c.name.slice(1)}`}
-              aria-selected={i === slashActive}
-              className={`slash-item${i === slashActive ? ' is-active' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onMouseEnter={() => setSlashIndex(i)}
-              onClick={() => pickSlash(c.name)}
-            >
-              <span className="slash-name">{c.name}</span>
-              <span className="slash-desc">{c.desc}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {/* 「+」能力菜单:思考/翻文件两个开关,iOS 拨钮式;点舱外或 Esc 收 */}
-      {menuOpen && (
-        <div className="fc-menu" role="menu" aria-label="能力开关">
-          <button
-            type="button"
-            className={`fc-mrow${chat.thinking ? ' is-on' : ''}`}
-            onClick={() => chat.setThinking(!chat.thinking)}
-            aria-pressed={chat.thinking}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="brain" size={14} mono />
-            </span>
-            思考模式
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`fc-mrow${chat.agent ? ' is-on' : ''}`}
-            onClick={() => chat.setAgent(!chat.agent)}
-            aria-pressed={chat.agent}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="folderSearch" size={14} mono />
-            </span>
-            自己翻文件
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`fc-mrow${webOn ? ' is-on' : ''}`}
-            onClick={toggleWeb}
-            aria-pressed={webOn}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="globe" size={14} mono />
-            </span>
-            联网查询
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-        </div>
-      )}
-      <div className="fc-line">
-        <button
-          type="button"
-          className={`fc-plus${menuOpen ? ' is-open' : ''}`}
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="能力开关"
-          aria-expanded={menuOpen}
-          data-tip="思考 / 翻文件开关"
-        >
-          <TreeIcon name="plus" size={CHAT_ACTION_ICON_SIZE} mono />
-        </button>
-        <div className="fc-field">
-          {/* 内嵌引用原子(小葵拍板,Devin 式):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
-          {draftRefs.map((r, i) => (
-            <span
-              key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
-              className="fc-ref"
-              data-tip={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-            >
-              <svg
-                className="fc-ref-ic"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
-                <path d="m10 8-3 3 3 3" />
-                <path d="m14 14 3-3-3-3" />
-              </svg>
-              <span className="fc-ref-text mono">
-                {r.relPath.split('/').pop()}:{r.startLine}-{r.endLine}
-              </span>
-              <button
-                type="button"
-                className="fc-ref-x"
-                onClick={() => onRemoveRef?.(i)}
-                aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-                data-tip="移除这段引用"
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-          <textarea
-            ref={inputRef}
-            value={draft}
-            placeholder={chat.busy ? '正在回答上一个问题……' : '问项目的事,或者随便聊聊……'}
-            aria-label="输入自由对话"
-            aria-expanded={slashOpen}
-            aria-controls="slash-palette"
-            aria-activedescendant={
-              slashOpen ? `slash-opt-${slashMatches[slashActive].name.slice(1)}` : undefined
-            }
-            rows={1}
-            onChange={(e) => {
-              setDraft(e.target.value)
-              // 内容一变,补全重新能冒头(Esc 的「先别出」只管当下这句)
-              setSlashDismissed(false)
-              setSlashIndex(0)
-            }}
-            onKeyDown={onDraftKeyDown}
-            // 点输入区 = 要打字了,「+」菜单顺手收摊(点在舱内的外点判定管不到这层)
-            onFocus={() => setMenuOpen(false)}
-          />
-        </div>
-        {chat.busy ? (
-          <button
-            type="button"
-            className="fc-send is-stop"
-            onClick={chat.cancel}
-            aria-label="停一停"
-            data-tip="停一停"
-          >
-            <span className="fc-sq" aria-hidden="true" />
-          </button>
-        ) : (
-          <button type="submit" className="fc-send" aria-label="发送" data-tip="发送">
-            <TreeIcon name="arrowUp" size={CHAT_ACTION_ICON_SIZE} strokeWidth={4} mono />
-          </button>
-        )}
-      </div>
-      {capped && (
-        <button
-          type="button"
-          className="composer-expand"
-          onClick={() => setExpanded(!expanded)}
-          aria-label={expanded ? '收合输入框' : '展开输入框'}
-          data-tip={expanded ? '收合' : '多撑五行'}
-        >
-          <TreeIcon name={expanded ? 'collapse' : 'expand'} size={INPUT_TOGGLE_ICON_SIZE} />
-        </button>
-      )}
-    </form>
+    <FreeChatComposer
+      chat={chat}
+      refs={draftRefs}
+      onRemoveRef={onRemoveRef}
+      onWillSend={forceBottom}
+    />
   )
 
   return (
     <div
       className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
       onDragOver={
-        onDropNode
+        onDropNode || onDropRef
           ? (e) => {
-              if (!e.dataTransfer.types.includes(DRAG_MIME_NODE)) return
+              const types = e.dataTransfer.types
+              const accept =
+                (onDropNode !== undefined && types.includes(DRAG_MIME_NODE)) ||
+                (onDropRef !== undefined && types.includes(DRAG_MIME_REF))
+              if (!accept) return
               e.preventDefault()
               e.dataTransfer.dropEffect = 'copy'
               setDragOver(true)
@@ -884,7 +231,7 @@ export function FreeChatPanel({
           : undefined
       }
       onDragLeave={
-        onDropNode
+        onDropNode || onDropRef
           ? (e) => {
               if (e.currentTarget.contains(e.relatedTarget as Node)) return
               setDragOver(false)
@@ -892,11 +239,23 @@ export function FreeChatPanel({
           : undefined
       }
       onDrop={
-        onDropNode
+        onDropNode || onDropRef
           ? (e) => {
               setDragOver(false)
+              // 先认选段(自带正文):预览里选中一段拖过来的,直接挂引用不用读盘
+              const rawRef = e.dataTransfer.getData(DRAG_MIME_REF)
+              if (rawRef && onDropRef) {
+                e.preventDefault()
+                try {
+                  const ref = JSON.parse(rawRef) as DragRefPayload
+                  if (ref.relPath && ref.code) onDropRef(ref)
+                } catch {
+                  // 不是咱家的货,不接
+                }
+                return
+              }
               const raw = e.dataTransfer.getData(DRAG_MIME_NODE)
-              if (!raw) return
+              if (!raw || !onDropNode) return
               e.preventDefault()
               try {
                 const node = JSON.parse(raw) as DragNodePayload
@@ -1072,7 +431,10 @@ export function FreeChatPanel({
           </div>
         )}
         {chat.messages.length > 0 && composerEl}
-        <p className="fc-tip">回车发送 · Shift+回车换行{onDropNode ? ' · 拖文件进来挂引用' : ''}</p>
+        <p className="fc-tip">
+          回车发送 · Shift+回车换行
+          {onDropNode || onDropRef ? ' · 拖文件或选中的代码进来挂引用' : ''}
+        </p>
       </div>
     </div>
   )

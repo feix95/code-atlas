@@ -25,6 +25,9 @@ export type { ChatMessage, ChatMsgState } from '@shared/types'
 /** /compact 压缩完保留最近几条原文(第一百四十二锤):摘要垫底 + 这几条原文,衔接不断片 */
 const COMPACT_KEEP_RECENT = 4
 
+/** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
+export const REF_ONLY_QUESTION = '讲讲选中的这段代码'
+
 /** 找最新一张摘要卡(从后往前找):压缩过就有,每次发请求都当背景记忆带上 */
 function findSummary(messages: ChatMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {

@@ -13,3 +13,14 @@ export interface DragNodePayload {
   kind: 'file' | 'folder'
   relPath: string
 }
+
+/** 预览里选中的一段代码,拖进聊天面板当引用 */
+export const DRAG_MIME_REF = 'application/x-atlas-ref'
+
+/** 选段载荷:正文自包含,接收方不用回头读盘(跨窗拖也带得过去) */
+export interface DragRefPayload {
+  relPath: string
+  startLine: number
+  endLine: number
+  code: string
+}

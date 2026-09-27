@@ -1,0 +1,59 @@
+/**
+ * 通用右键菜单的状态仓(和 ContextMenu.tsx 分居:react-refresh 要求组件文件
+ * 只导出组件)。模块级单例:全 app 同时最多一张菜单,谁要开只管报坐标和行项。
+ * 文件路径专用那套在 filePathMenuStore,这里收「不是对着文件」的右键菜单(选区引用等)。
+ */
+
+/** 菜单里的一行:run 返回字符串的话,该行短暂亮出这句反馈再收摊(「已复制」那一挂) */
+export interface ContextMenuItem {
+  label: string
+  /** 不可用的行摆着但点不动(比如引用额度满了,把原因写进 label) */
+  disabled?: boolean
+  /** 悬停轻提示(data-tip) */
+  tip?: string
+  /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它 */
+  run: () => void | string | Promise<string | null | void>
+}
+
+export interface ContextMenuRequest {
+  x: number
+  y: number
+  /** 菜单开在哪个 document(realm 铁律):主窗和每个子窗各挂一台菜单,各认各的请求 */
+  doc: Document
+  items: ContextMenuItem[]
+  /** 窄身档:行项少的菜单(两三行)别按通用宽度撑开,贴着字宽摆 */
+  compact?: boolean
+  /** 生在光标正右侧(垂直居中对光标、左缘隔空一个汉字):贴着输入区的小菜单顺手位 */
+  preferRight?: boolean
+}
+
+let menuRequest: ContextMenuRequest | null = null
+const listeners = new Set<() => void>()
+
+/** 开菜单(在另一处再右键就挪到新位置) */
+export function openContextMenu(request: ContextMenuRequest): void {
+  menuRequest = request
+  emit()
+}
+
+/** 收摊(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
+export function closeContextMenu(): void {
+  menuRequest = null
+  emit()
+}
+
+/** 给组件的订阅口:配 useSyncExternalStore 用 */
+export function subscribeContextMenu(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+export function currentContextMenu(): ContextMenuRequest | null {
+  return menuRequest
+}
+
+function emit(): void {
+  listeners.forEach((l) => l())
+}

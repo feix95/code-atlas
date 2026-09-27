@@ -524,9 +524,9 @@ const BOOK: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
-  // 选区首尾的一对角括号(第一百一十四锤):一正一反,读作「从这里开始 / 到这里结束」
-  markStart: <path d="M15 3H8v18h7" />,
-  markEnd: <path d="M9 3h7v18H9" />,
+  // 选区首尾的一对角括号(Lucide brackets 拆半):一正一反,读作「从这里开始 / 到这里结束」
+  markStart: <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />,
+  markEnd: <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />,
   // 思考模式(第一百一十八锤):小葵给的参考图是颗脑子,线稿照脑回的双瓣画
   brain: (
     <>
@@ -655,6 +655,15 @@ const BOOK: Record<string, React.ReactNode> = {
     <>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </>
+  ),
+  // 预览折行开关(lucide wrap-text):长行在右缘折回,不用横滚
+  wrapText: (
+    <>
+      <line x1="3" x2="21" y1="6" y2="6" />
+      <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
+      <polyline points="16 16 14 18 16 20" />
+      <line x1="3" x2="10" y1="18" y2="18" />
     </>
   ),
   // 窗控(lucide 原版稿,小葵给定):未全屏圆角方框 / 已全屏四角回收

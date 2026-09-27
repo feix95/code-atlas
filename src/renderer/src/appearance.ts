@@ -12,11 +12,13 @@ import {
   resolveAppearanceStartup,
   sanitizeAppearance
 } from '../../shared/appearancePrefs.ts'
-import { neutralFor } from '../../shared/appearancePalette.ts'
+import { hexToHsl, hslCss, neutralFor } from '../../shared/appearancePalette.ts'
 
 // 类型与预设表对外照旧从这里出(既有 import 不用动),本体住在 shared
 export type { Appearance, AppearanceMode, AppearancePreset }
 export { COLOR_PRESETS }
+// 色算真值户口已挪 shared/appearancePalette(主进程定窗底色也要用);自测的老 import 面不动
+export { hexToHsl, hslCss }
 
 export const APPEARANCE_KEY = 'atlas.appearance'
 
@@ -87,36 +89,6 @@ const TOKEN_KEYS = [
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(Math.max(v, lo), hi)
-}
-
-/** #rgb / #rrggbb → HSL(h∈[0,360), s/l∈[0,100]);自测要拿真实 hex 走同一条路,导出 */
-export function hexToHsl(hex: string): [number, number, number] {
-  let m = hex.replace('#', '')
-  if (m.length === 3)
-    m = m
-      .split('')
-      .map((c) => c + c)
-      .join('')
-  const r = parseInt(m.slice(0, 2), 16) / 255
-  const g = parseInt(m.slice(2, 4), 16) / 255
-  const b = parseInt(m.slice(4, 6), 16) / 255
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const l = (max + min) / 2
-  let h = 0
-  let s = 0
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60
-    else if (max === g) h = ((b - r) / d + 2) * 60
-    else h = ((r - g) / d + 4) * 60
-  }
-  return [h, s * 100, l * 100]
-}
-
-function hslCss(h: number, s: number, l: number): string {
-  return `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%)`
 }
 
 /** 实心主题色上两个字色的候选:深墨(暗色主题历来压按钮的深字)/ 纯白 */

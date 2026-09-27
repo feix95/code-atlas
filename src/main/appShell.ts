@@ -26,10 +26,11 @@ import {
   type WindowBox
 } from './window-state.ts'
 import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
+import { trackWindowBackground, windowCanvasColor } from './windowTheme.ts'
 import { CH } from '../shared/ipcChannels.ts'
 
 // ── Developer 日志窗口(第八十七锤):模型后台原话亮出来看 ──
-// 独立小窗(frameless,和主窗一个壳),渲染层用 ?view=devlogs 分支画日志页。
+// 独立小窗(frameless,和主窗一个实底壳),渲染层用 ?view=devlogs 分支画日志页。
 // 引擎的每一行原话、每笔请求报账,广播员推给所有窗口,这窗常驻收听。
 
 let devLogWindow: BrowserWindow | null = null
@@ -108,13 +109,13 @@ export function openDevLogWindow(): void {
     title: 'Developer 日志 · CodeAtlas',
     autoHideMenuBar: true,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false,
+    // 实底壳(全窗实底化):底色跟画布同色,建窗一刻就不闪异色
+    backgroundColor: windowCanvasColor(),
     show: false,
     webPreferences: WEB_PREFS
   })
   devLogWindow = win
+  trackWindowBackground(win)
   win.on('closed', () => {
     if (devLogWindow === win) devLogWindow = null
   })
@@ -153,20 +154,17 @@ export function createWindow(): void {
     minWidth: WINDOW_MIN_WIDTH,
     minHeight: WINDOW_MIN_HEIGHT,
     title: 'CodeAtlas',
-    // 圆角悬浮壳回归(模块四):frame:false 摘系统框,transparent 让四角露出真实桌面,
-    // 14px 圆角 + 悬浮阴影全由 CSS 画。系统级圆角(DWM roundedCorners)只有 Windows 11
-    // (build 22000+)认,本机 Win10 19045 不认 —— 所以抗锯齿圆角只有透明合成这一条路。
-    // 上次「窗隐身」的病根已查明:不是透明本身,而是 show:false 时 ready-to-show 在
-    // 4K + 150% 缩放屏上永不触发(实底窗同样隐身,第三十六锤补实测)。这次 show:false
-    // 只是为了等首帧防白闪,但绝不指望 ready-to-show —— 露窗走下面的三保险链。
+    // 实底壳(全窗实底化,小葵拍板):frame:false 摘系统框,底色钉成画布同色 —
+    // 透明合成那套圆角悬浮壳退役,窗缘就是实色直角,影子交回系统描。
+    // 「窗隐身」的老病根还在档案里:show:false 时 ready-to-show 在 4K + 150% 缩放屏上
+    // 可能永不触发 —— 露窗不指望它,走下面的三保险链(first-frame + 看门狗)。
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false, // 系统影子跟着方框走,会描出一圈直角细线;悬浮阴影改由 CSS 画圆角的
+    backgroundColor: windowCanvasColor(),
     autoHideMenuBar: true,
     show: false,
     webPreferences: WEB_PREFS
   })
+  trackWindowBackground(mainWindow)
   // 主窗引用上提(桌宠托管第一锤):托盘、second-instance 都要够得着它
   mainWindowRef = mainWindow
   mainPanelController = new MainPanelController(mainWindow)

@@ -9,6 +9,7 @@ import { ipcMain, screen, shell, BrowserWindow } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import type { AuxWindowOp } from '../shared/types.ts'
 import { addDevLog } from '../shared/devlog.ts'
+import { trackWindowBackground, windowCanvasColor } from './windowTheme.ts'
 
 /** frameName 白名单前缀:渲染层 useAuxWindows 发号(aux-1/aux-2/...),主进程只认它 */
 const AUX_PREFIX = 'aux-'
@@ -58,6 +59,8 @@ export function installAuxWindowBridge(mainWindow: BrowserWindow): void {
           frame: false,
           autoHideMenuBar: true,
           title: 'CodeAtlas',
+          // 实底壳(全窗实底化):底色钉画布同色,建窗一刻不闪异色
+          backgroundColor: windowCanvasColor(),
           show: true
           // webPreferences 不给:about:blank 白窗只当画布,preload/Node 一概不要
         }
@@ -79,6 +82,7 @@ export function installAuxWindowBridge(mainWindow: BrowserWindow): void {
     if (!isAuxFrame(details.frameName)) return
     const name = details.frameName
     auxRegistry.set(name, child)
+    trackWindowBackground(child)
     child.on('closed', () => {
       if (auxRegistry.get(name) === child) auxRegistry.delete(name)
     })

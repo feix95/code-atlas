@@ -118,6 +118,19 @@
   box-shadow: var(--shadow-pop);
 }
 
+/* 窄身档:行项少的菜单(输入框复制/粘贴那挂)贴着字宽摆,不按 12rem 撑开;
+   字号吃 --font-md,和输入框文字同一个 token(尺寸小葵逐数定的) */
+.file-path-menu.is-compact {
+  min-width: 3.75rem;
+  padding: 0.125rem;
+}
+
+.file-path-menu.is-compact .file-path-menu-item {
+  padding: 0.25rem;
+  font-size: var(--font-md);
+  line-height: 1.2;
+}
+
 .file-path-menu-item {
   display: block;
   width: 100%;
@@ -137,6 +150,11 @@
 .file-path-menu-item:hover {
   background: var(--accent-soft);
   color: var(--accent-bright);
+}
+
+.file-path-menu-item:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 .file-path-menu-item.is-ok {

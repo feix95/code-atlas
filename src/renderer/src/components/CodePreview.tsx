@@ -3,25 +3,38 @@ import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types
 import { HL_KINDS } from '@shared/highlight'
 import { CODE_REF_CHARS_MAX } from '@shared/aiDefaults'
 import { CH } from '@shared/ipcChannels'
+import { DRAG_MIME_REF, type DragRefPayload } from '@shared/dragTypes'
 import { visibleLineRange } from '@shared/preview'
 import { friendlyErr } from '../errText'
-import {
-  clampButtonX,
-  refButtonLabel,
-  selectionGeometry,
-  type SelectionGeometry
-} from '../selectionMarks'
+import { refButtonLabel, selectionGeometry, type SelectionGeometry } from '../selectionMarks'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuStore'
+import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 
 /** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
 const COPIED_ALL_MS = 2000
 /** 头部文件图标(和文件树 15px 同款岗,户口在 FileTree 的 TREE_ICON_SIZE) */
 const FILE_ICON_SIZE = 15
+/** 头部折行开关图标 */
+const WRAP_ICON_SIZE = 14
 /** 选区首尾角括号一对(markStart/markEnd)的尺寸 */
-const MARK_ICON_SIZE = 13
+const MARK_ICON_SIZE = 16
+/** 折行默认开给文档型后缀(折行版这锤):这类文件就是拿来读的;代码文件默认横滚,手动可切 */
+const WRAP_DEFAULT_EXT = new Set(['md', 'markdown', 'mdx', 'txt', 'log'])
+/**
+ * 折行模式的行数闸:折行要放弃虚拟滚动、全量上 DOM(行高不一,轨道没法再按行数乘出来),
+ * 超过这个行数开关直接歇着,继续不折行那套。
+ */
+const WRAP_MAX_LINES = 5000
+
+/** 文件名后缀(全小写);点必须落在最后一段路径上才算数(dir.name/file 这类不能误认),没有回空串 */
+function extOf(relPath: string): string {
+  const i = relPath.lastIndexOf('.')
+  const lastSep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'))
+  return i > lastSep ? relPath.slice(i + 1).toLowerCase() : ''
+}
 
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
@@ -30,28 +43,65 @@ interface Selection extends SelectionGeometry {
   code: string
 }
 
-/** 数一段文本里有几个换行 —— 行号就是这么算出来的 */
-function countNewlines(text: string): number {
-  let n = 0
-  for (let i = 0; i < text.length; i++) {
-    if (text.charCodeAt(i) === 10) n++
-  }
-  return n
+// realm 铁律:预览签被拖进子窗后,选区/事件都活在子窗 document 里 ——
+// 一律经元素的 ownerDocument 这族取,别摸全局 window(那是主窗的,子窗里选不中、监不到)
+function viewOf(el: HTMLElement | null): Window | null {
+  return el?.ownerDocument.defaultView ?? null
+}
+
+function docOf(el: HTMLElement | null): Document {
+  return el?.ownerDocument ?? document
 }
 
 /**
- * 一个光标位置在整份文本里的字符偏移:从正文第一个字起数,走到那个节点加上节点内偏移。
- * 分色后正文里多了上色的小 span,「相对父节点的偏移」数出来的行号会错位 ——
- * 改用 TreeWalker 数全文偏移,跟 DOM 怎么分包没有半点关系,选区行号的老语义原样保留。
+ * 折叠版选区拿光标位置的矩形:端点压行首/行块边界时,rects 数组两头会混进
+ * 零宽碎块(上一行的尾巴),首尾标记认真实光标位比认数组头尾稳。拿不到就回 null 走老路。
  */
-function textOffsetIn(el: HTMLElement, node: Node, offset: number): number {
-  let total = 0
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-  for (let cur = walker.nextNode(); cur; cur = walker.nextNode()) {
-    if (cur === node) return total + offset
-    total += cur.textContent?.length ?? 0
+function caretRect(range: Range, atStart: boolean): DOMRect | null {
+  const c = range.cloneRange()
+  c.collapse(atStart)
+  return c.getClientRects()[0] ?? null
+}
+
+/**
+ * 选区端点落在第几行:顺着 DOM 往上找最近的 .code-line,读它身上的 data-line 就是真行号
+ * (折行版这锤)—— 不再数换行偏移,跟 DOM 怎么分包、折不折行都没有关系。
+ * isEnd=true 时多一道「压行首」判定:收尾正好顶在下一行行首、一个它的字都没选中,
+ * 那一行不算进来(老换行数账的口径,原样保留)。
+ */
+function lineNoAt(el: HTMLElement, node: Node, offset: number, isEnd: boolean): number | null {
+  if (!el.contains(node)) return null
+  const ownerLine = (lineEl: Element, atStart: boolean): number | null => {
+    const n = Number((lineEl as HTMLElement).dataset.line)
+    if (!Number.isFinite(n)) return null
+    return isEnd && atStart && n > 1 ? n - 1 : n
   }
-  return -1
+  if (node === el) {
+    // 端点落在正文容器自己身上(拖选收尾常见):offset 是孩子序号,位置落在第 offset 个行块之前
+    const kids = el.children
+    if (kids.length === 0) return null
+    const kid = kids[Math.max(0, Math.min(isEnd ? offset - 1 : offset, kids.length - 1))]
+    return kid && kid.nodeType === 1 ? ownerLine(kid, false) : null
+  }
+  // 不用 instanceof HTMLElement:子窗 DOM 的户口在子窗 realm,主窗构造器认不出 —— 看 nodeType 数值最稳
+  for (let cur: Node | null = node; cur && cur !== el; cur = cur.parentNode) {
+    if (cur.nodeType !== 1) continue
+    const ce = cur as HTMLElement
+    if (!ce.classList.contains('code-line')) continue
+    let atStart = false
+    if (isEnd && offset === 0) {
+      if (cur === node) {
+        atStart = true // 端点是行元素本身,offset0 = 行首
+      } else {
+        // 端点是文本节点:它是这一行的第一个文本子孙才算压行首
+        let probe: Node | null = ce.firstChild
+        while (probe && probe.nodeType !== 3) probe = probe.firstChild ?? probe.nextSibling
+        atStart = probe === node
+      }
+    }
+    return ownerLine(ce, atStart)
+  }
+  return null
 }
 
 /**
@@ -86,14 +136,19 @@ function renderColoredLine(lineText: string, segs: number[][] | undefined): Reac
  * 只摆纯文本 + 行号 —— 不描语法色(那是另一锤的事),看得清、选得中就行。
  * 正文只活在这个组件的 state 里:退出预览组件一卸,内容跟着就走,不留垃圾。
  * 不可预览的情况(二进制/超大/读不了)老实说明白,绝不硬塞一屏乱码。
- * 第一百一十一锤:选中一段代码,选区上方冒出「引用到对话」,点了挂到右栏的输入框上。
+ * 第一百一十一锤:选中一段代码可以挂进对话当引用 —— 两个出口:右键菜单
+ * 「引用到对话」、选中直拖进对话面板;挂上就是输入舱里的引用原子
+ * (选区浮钮在折行版退役:太隐蔽,定位还跟折行行块打架)。
  * 第一百一十四锤:选区美术 —— 选中色跟辅助色走,首尾各一枚角括号,左缘一条竖线;
  * 顶栏给一颗钮,把整份代码挂到右栏对话(第一百一十四锤补2)。
  * 全文预览(2026-09-13):虚拟滚动 —— 全文在手,轨道撑出全文行程,画面只画可视区一截;
  * 行数/字数两道闸退役,Ctrl+A 改成复制全文。
  * 预览分色(2026-09-14):主进程拿 tree-sitter 解析出「哪几个字是什么角色」,每行一个
  * span 按段落账上色(tok-*,色号抄 VS Code 官方 Dark+/Light+,跟界面深浅色联动);
- * 行高一点没动;选中引用的行号改用 TreeWalker 数全文偏移,跟 DOM 分包无关。
+ * 行高一点没动;选中引用的行号曾用 TreeWalker 数全文偏移(折行版后已换成读 data-line)。
+ * 折行版:头部折行开关,文档型后缀(md/txt 等)默认开 —— 行块化、自然折行、行号走
+ * CSS 生成内容(进不了选区);行数超闸的文件不让折行,继续虚拟滚动横滚;
+ * 选区行号从「数换行偏移」换成「读行块 data-line」,两种模式同一套。
  */
 export function CodePreview({
   rootPath,
@@ -138,22 +193,18 @@ export function CodePreview({
     sel: null
   })
   const sel = selAt.file === file.relPath ? selAt.sel : null
-  /** 两个一闪而过的小开关(浮钮/已复制)共用一本账 */
+  /** 「已复制」一闪而过小开关的账(浮钮已随折行版退役,引用入口只剩右键菜单与直拖) */
   const [uiAt, setUiAt] = useState<{
     file: string
-    showButton: boolean
     copiedAll: boolean
   }>({
     file: '',
-    showButton: false,
     copiedAll: false
   })
-  // 浮钮露不露脸(第一百一十四锤补):拖动中不露,手松开/键盘选完才露
-  const showButton = uiAt.file === file.relPath && uiAt.showButton
   const copiedAll = uiAt.file === file.relPath && uiAt.copiedAll
   /** 改小开关:只动当前文件的账;换了文件才姗姗来迟的开关(迟到定时器),当没看见 */
   const patchUi = useCallback(
-    (patch: Partial<{ showButton: boolean; copiedAll: boolean }>): void => {
+    (patch: Partial<{ copiedAll: boolean }>): void => {
       setUiAt((prev) => (prev.file === file.relPath ? { ...prev, ...patch } : prev))
     },
     [file.relPath]
@@ -166,8 +217,11 @@ export function CodePreview({
   const [viewportHeight, setViewportHeight] = useState(0)
   const scrollRafRef = useRef(0)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // 可视区第一行的行号:选区行号 = 这一行 + 选区里的换行数(划中的行号报真号)
-  const chunkBaseRef = useRef(1)
+  /**
+   * 折行开关(折行版这锤):on=null 表示没动过,按文件后缀吃默认;动过就记在这份文件名下。
+   * 折行放弃虚拟滚动,全量行块上 DOM —— 所以过长的文件闸死,开关摁不动。
+   */
+  const [wrapAt, setWrapAt] = useState<{ file: string; on: boolean | null }>({ file: '', on: null })
 
   // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事。
   // 账记在文件名下:新文件还没回话时,旧文件的内容一秒都不冒名顶替
@@ -190,22 +244,31 @@ export function CodePreview({
   /** 分色账(预览分色这锤):主进程按行给好的段落;没有 = 这份不上色,白字照常 */
   const colors = result?.status === 'ok' ? result.colors : undefined
 
-  // 全文在手:按行切一份备用(纯字符串,不占画面);画面永远只画 range 那一截
+  // 全文在手:按行切一份备用(纯字符串,不占画面);折行时全量上屏,不折行只画 range 那一截
   const lines = useMemo(() => (text === '' ? [] : text.split('\n')), [text])
   const total = lines.length
+  // 折行(折行版这锤):默认按后缀定文档/代码,用户动过开关就听用户的;超过行数闸一律摁死
+  const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
+  const wrap =
+    wrapAllowed &&
+    (wrapAt.file === file.relPath && wrapAt.on !== null
+      ? wrapAt.on
+      : WRAP_DEFAULT_EXT.has(extOf(file.relPath)))
 
   // 行高只量一次:等宽字体行行等高,量准一次,全文的滚动高度就是它乘出来的。
   // 界面缩放改了根字号,行高跟着变,重量一遍。
   useLayoutEffect(() => {
+    const pre = codeTextRef.current
+    const win = viewOf(pre) ?? window
     const measure = (): void => {
-      const pre = codeTextRef.current
-      if (!pre) return
-      const lh = Number.parseFloat(window.getComputedStyle(pre).lineHeight)
+      const el = codeTextRef.current
+      if (!el) return
+      const lh = Number.parseFloat(win.getComputedStyle(el).lineHeight)
       if (Number.isFinite(lh) && lh > 0) setLineHeight(lh)
     }
     measure()
-    window.addEventListener(CH.uiScaleChanged, measure)
-    return () => window.removeEventListener(CH.uiScaleChanged, measure)
+    win.addEventListener(CH.uiScaleChanged, measure)
+    return () => win.removeEventListener(CH.uiScaleChanged, measure)
   }, [result])
 
   // 视口高度:可视行数靠它;窗口/分栏改尺寸跟着重算
@@ -245,17 +308,24 @@ export function CodePreview({
       const el = codeViewRef.current
       if (!el) return
       const target = Math.min(Math.max(jump.line, 1), total)
+      // 折行模式行高不一,乘法失效 —— 直接找到那一行的行块量真实位置
+      if (wrap) {
+        const lineEl = codeTextRef.current?.querySelector(`[data-line="${target}"]`)
+        if (lineEl) {
+          el.scrollTop +=
+            lineEl.getBoundingClientRect().top -
+            el.getBoundingClientRect().top -
+            el.clientHeight / 3
+        }
+        return
+      }
       el.scrollTop = Math.max(0, (target - 1) * lineHeight - el.clientHeight / 3)
     })
     return () => cancelAnimationFrame(raf)
-  }, [jump, result, total, lineHeight])
+  }, [jump, result, total, lineHeight, wrap])
 
   // 该画哪几行(纯函数) + 这一段的正文和行号格子;轨道总高 = 总行数 × 行高,滚动条行程是全文的
   const range = visibleLineRange({ scrollTop, viewportHeight, lineHeight, totalLines: total })
-  // 可视区第一行的行号给选区计算当基准(effect 落定,不在渲染途中改 ref)
-  useEffect(() => {
-    chunkBaseRef.current = range.start
-  }, [range.start])
   const offsetY = (range.start - 1) * lineHeight
   const chunkLines = useMemo(
     () => (total === 0 ? [] : lines.slice(range.start - 1, range.end)),
@@ -271,7 +341,7 @@ export function CodePreview({
   /** 从当前选区算一遍完整信息;没选东西、或选的是别处的字,回 null */
   const computeSelection = useCallback((): Selection | null => {
     const el = codeTextRef.current
-    const s = window.getSelection()
+    const s = viewOf(el)?.getSelection()
     if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return null
     const anchorNode = s.anchorNode
     const focusNode = s.focusNode
@@ -279,95 +349,75 @@ export function CodePreview({
       return null
     const code = s.toString()
     if (code.trim() === '') return null
-    const rects = Array.from(s.getRangeAt(0).getClientRects())
+    const r = s.getRangeAt(0)
+    const rects = Array.from(r.getClientRects())
     const geom = selectionGeometry(rects)
     if (!geom) return null
-    const view = codeViewRef.current?.getBoundingClientRect()
-    // 全文偏移(分色后正文里有上色的 span,只有 TreeWalker 数出来的偏移跟 DOM 结构无关)
-    const a = textOffsetIn(el, anchorNode, s.anchorOffset)
-    const f = textOffsetIn(el, focusNode, s.focusOffset)
-    if (a < 0 || f < 0) return null
-    const start = Math.min(a, f)
-    const end = Math.max(a, f)
+    // 行号读行块身上的 data-line:两端各自认门,反向选、跨行选、端点压元素边界都对
+    const startLine = lineNoAt(el, r.startContainer, r.startOffset, false)
+    const endLine = lineNoAt(el, r.endContainer, r.endOffset, true)
+    if (startLine === null || endLine === null) return null
+    // 首尾标记与竖线顶边改认折叠光标位:行首起选时 rects[0] 是上一行末尾的碎块,
+    // 认它首标记就画错行;光标位拿不到时回退矩形账
+    const startC = caretRect(r, true)
+    const endC = caretRect(r, false)
+    const lastRect = rects[rects.length - 1]
+    const barTop = startC?.top ?? geom.barTop
+    const barBottom = lastRect?.bottom ?? barTop
+    // 末标记同理,但收在下一行行首的光标不算数(那儿一个字没选)——钉回末行尾巴
+    const endByCaret = endC !== null && lastRect !== undefined && endC.top < lastRect.bottom
     return {
       ...geom,
-      // 以选区右上角为锚、居中浮着;夹紧留出钮的一半身位,贴着栏边选的也不越出栏外
-      buttonX: view ? clampButtonX(geom.buttonX, view.left, view.right, 100) : geom.buttonX,
-      startLine: chunkBaseRef.current + countNewlines((el.textContent ?? '').slice(0, start)),
-      // 收尾用 end-1:选区末尾正好压在下一行的行首时,别把没选的那一行算进来
-      endLine:
-        chunkBaseRef.current +
-        countNewlines((el.textContent ?? '').slice(0, Math.max(start, end - 1))),
+      startX: startC?.left ?? geom.startX,
+      startY: startC ? (startC.top + startC.bottom) / 2 : geom.startY,
+      endX: endByCaret ? endC.right : geom.endX,
+      endY: endByCaret ? (endC.top + endC.bottom) / 2 : geom.endY,
+      barTop,
+      barHeight: Math.max(barBottom - barTop, 2),
+      startLine,
+      endLine,
       code
     }
   }, [])
 
-  /**
-   * 记号跟着选区走(拖到哪儿标到哪儿),返回算好的这一份。
-   * 浮钮的露脸状态不归它管,那是调用方的事:拖动中一律不露,
-   * 手松开(pointerup)或键盘选完(keyup)才请出来。
-   * 第一百一十四锤补:从前一按下就露,按钮跟着鼠标跑,你会从它身上拖过去,
-   * 它的标签还会被一起吞进选区 —— 看着就像选区坏了。
-   */
+  /** 记号跟着选区走(拖到哪儿标到哪儿),返回算好的这一份 */
   const followSelection = useCallback((): Selection | null => {
     const next = computeSelection()
     setSelAt({ file: file.relPath, sel: next })
     return next
   }, [computeSelection, file.relPath])
 
-  // 选区一变就重画记号;选区没了,浮钮也跟着收
+  // 选区一变就重画记号;选区没了,记号跟着收
   useEffect(() => {
     if (result?.status !== 'ok') return
     const onSelectionChange = (): void => {
-      if (followSelection() === null) patchUi({ showButton: false })
+      followSelection()
     }
-    document.addEventListener('selectionchange', onSelectionChange)
-    return () => document.removeEventListener('selectionchange', onSelectionChange)
-  }, [result, followSelection, patchUi])
+    const doc = docOf(codeTextRef.current)
+    doc.addEventListener('selectionchange', onSelectionChange)
+    return () => doc.removeEventListener('selectionchange', onSelectionChange)
+  }, [result, followSelection])
 
-  // 滚动/改窗口大小会让视口坐标失效:重算落点,只在整个选区滚出视野时才收起来。
-  // (只挪记号,不动浮钮的露脸状态 —— 滚一下不该把它收了。)
+  // 滚动/改窗口大小会让视口坐标失效:重算落点,整个选区滚出视野时记号自然收起来。
   useEffect(() => {
     const view = codeViewRef.current
     let frame = 0
     const reposition = (): void => {
       frame = 0
-      if (followSelection() === null) patchUi({ showButton: false })
+      followSelection()
     }
     const schedule = (): void => {
       if (frame === 0) frame = requestAnimationFrame(reposition)
     }
-    window.addEventListener('resize', schedule)
+    const win = viewOf(view) ?? window
+    win.addEventListener('resize', schedule)
     view?.addEventListener('scroll', schedule, { passive: true })
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame)
-      window.removeEventListener('resize', schedule)
+      win.removeEventListener('resize', schedule)
       view?.removeEventListener('scroll', schedule)
     }
-  }, [result, followSelection, patchUi])
-
-  // 选完才算数:鼠标松开、或键盘选完(shift+方向键抬手),这时才把浮钮请出来。
-  // 捕获阶段听:鼠标在哪儿松开都收得到(拖到隔壁聊天区放手,也算选完了)。
-  useEffect(() => {
-    if (result?.status !== 'ok') return
-    const onPointerDown = (e: PointerEvent): void => {
-      // 点在浮钮自己身上不算「开始新选区」—— 否则它会在 click 之前先消失,点了没反应
-      const target = e.target as HTMLElement | null
-      if (target?.closest?.('.code-select-btn')) return
-      patchUi({ showButton: false })
-    }
-    const onDone = (): void => {
-      if (followSelection() !== null) patchUi({ showButton: true })
-    }
-    window.addEventListener('pointerdown', onPointerDown, true)
-    window.addEventListener('pointerup', onDone, true)
-    window.addEventListener('keyup', onDone, true)
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown, true)
-      window.removeEventListener('pointerup', onDone, true)
-      window.removeEventListener('keyup', onDone, true)
-    }
-  }, [result, followSelection, patchUi])
+  }, [result, followSelection])
 
   /**
    * Ctrl+A 复制全文(全文预览这锤):虚拟滚动后元素里只有一屏,浏览器的「全选」最多
@@ -375,10 +425,7 @@ export function CodePreview({
    * 只在这一栏拦:事件来自输入框(比如右栏聊天框)时一律放行,让它们用原生那套。
    */
   function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
-    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') {
-      patchUi({ showButton: false }) // 键盘一动手先把旧浮钮收起来,选完(keyup)再重新露脸
-      return
-    }
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       return
@@ -394,16 +441,69 @@ export function CodePreview({
       .catch(() => {})
   }
 
-  const label = sel
-    ? refButtonLabel({
-        canAddRef,
-        refLimit,
-        charCap: CODE_REF_CHARS_MAX,
-        startLine: sel.startLine,
-        endLine: sel.endLine,
-        charCount: sel.code.length
+  /**
+   * 把选区挂成对话引用(浮钮和右键菜单同走这一条):挂上 → 清选区 → 收浮钮。
+   * 落到哪个页签、闪不闪它,是 onAddRef(App 侧 addPreviewRef)的事。
+   */
+  const quoteSelection = useCallback(
+    (s: Selection): void => {
+      onAddRef({
+        relPath: file.relPath,
+        startLine: s.startLine,
+        endLine: s.endLine,
+        code: s.code
       })
-    : ''
+      viewOf(codeTextRef.current)?.getSelection()?.removeAllRanges()
+      setSelAt({ file: file.relPath, sel: null })
+    },
+    [file.relPath, onAddRef]
+  )
+
+  /** 选区上右键(选中引用右键入口):引用了就挂,「复制选中段」顺带补上原生菜单缺的那口 */
+  function onCodeContextMenu(e: React.MouseEvent<HTMLDivElement>): void {
+    const s = computeSelection()
+    if (!s) return // 右键没点在选区上:不拦、不摆空菜单
+    e.preventDefault()
+    const items: ContextMenuItem[] = []
+    if (refLimit > 0) {
+      items.push({
+        label: refButtonLabel({
+          canAddRef,
+          refLimit,
+          charCap: CODE_REF_CHARS_MAX,
+          startLine: s.startLine,
+          endLine: s.endLine,
+          charCount: s.code.length
+        }),
+        disabled: !canAddRef,
+        run: () => quoteSelection(s)
+      })
+    }
+    items.push({
+      label: '复制选中段',
+      run: () =>
+        navigator.clipboard
+          .writeText(s.code)
+          .then(() => '已复制 ✓')
+          .catch(() => '没复制成,剪贴板被顶住了')
+    })
+    openContextMenu({ x: e.clientX, y: e.clientY, doc: e.currentTarget.ownerDocument, items })
+  }
+
+  /** 选中一段直接拖去对话挂引用:正文自包含(dataTransfer 里连字带行号),松手那头不用读盘 */
+  function onCodeDragStart(e: React.DragEvent<HTMLDivElement>): void {
+    const s = computeSelection()
+    if (!s || refLimit === 0) return
+    const ref: DragRefPayload = {
+      relPath: file.relPath,
+      startLine: s.startLine,
+      endLine: s.endLine,
+      code: s.code
+    }
+    e.dataTransfer.setData(DRAG_MIME_REF, JSON.stringify(ref))
+    e.dataTransfer.setData('text/plain', s.code)
+    e.dataTransfer.effectAllowed = 'copy'
+  }
 
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
@@ -428,6 +528,24 @@ export function CodePreview({
         >
           {file.relPath}
         </span>
+        {result?.status === 'ok' && (
+          <button
+            type="button"
+            className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
+            disabled={!wrapAllowed}
+            aria-pressed={wrap}
+            data-tip={
+              !wrapAllowed
+                ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行要全量上屏会卡,先歇着`
+                : wrap
+                  ? '关掉自动换行,长行横向滚动'
+                  : '自动换行:长行在右缘折回,不用横滚'
+            }
+            onClick={() => setWrapAt({ file: file.relPath, on: !wrap })}
+          >
+            <TreeIcon name="wrapText" size={WRAP_ICON_SIZE} />
+          </button>
+        )}
       </div>
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
@@ -446,30 +564,48 @@ export function CodePreview({
             className="code-view"
             ref={codeViewRef}
             tabIndex={0}
-            aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用给小探针;按 Ctrl+A 复制全文`}
+            aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用到对话;按 Ctrl+A 复制全文`}
             onScroll={onScroll}
+            onContextMenu={onCodeContextMenu}
+            onDragStart={onCodeDragStart}
           >
-            {/* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏。
-                分色(预览分色这锤):每行一个 span、行内按段落账上色;行高一点没动,
-                虚拟滚动「量一次行高」的老地基本字不摇 */}
-            <div className="code-track" style={{ height: total * lineHeight }}>
-              <div className="code-row" style={{ transform: `translateY(${offsetY}px)` }}>
-                <pre className="code-gutter" aria-hidden="true">
-                  {gutter}
-                </pre>
-                <pre className="code-text" ref={codeTextRef}>
-                  {chunkLines.map((lineText, i) => {
-                    const lineNo = range.start + i
-                    return (
-                      <span key={lineNo} className="code-line" data-line={lineNo}>
-                        {renderColoredLine(lineText, colors?.[lineNo - 1])}
-                        {'\n'}
-                      </span>
-                    )
-                  })}
-                </pre>
+            {wrap ? (
+              /* 折行模式(折行版这锤):行高不一,虚拟滚动让位 —— 行块全量上屏、自然折行;
+                 行号是行块左槽的 ::before(CSS 生成内容,进不了 DOM 文本,选区/引用都不会沾到数字) */
+              <pre
+                className="code-text is-wrap"
+                ref={codeTextRef}
+                style={{ '--gc': `${String(total).length}ch` } as React.CSSProperties}
+              >
+                {lines.map((lineText, i) => (
+                  <span key={i + 1} className="code-line" data-line={i + 1}>
+                    {renderColoredLine(lineText, colors?.[i])}
+                  </span>
+                ))}
+              </pre>
+            ) : (
+              /* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏。
+                 分色(预览分色这锤):每行一个 span、行内按段落账上色;行高一点没动,
+                 虚拟滚动「量一次行高」的老地基本字不摇 */
+              <div className="code-track" style={{ height: total * lineHeight }}>
+                <div className="code-row" style={{ transform: `translateY(${offsetY}px)` }}>
+                  <pre className="code-gutter" aria-hidden="true">
+                    {gutter}
+                  </pre>
+                  <pre className="code-text" ref={codeTextRef}>
+                    {chunkLines.map((lineText, i) => {
+                      const lineNo = range.start + i
+                      return (
+                        <span key={lineNo} className="code-line" data-line={lineNo}>
+                          {renderColoredLine(lineText, colors?.[lineNo - 1])}
+                          {'\n'}
+                        </span>
+                      )
+                    })}
+                  </pre>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </>
       )}
@@ -501,30 +637,6 @@ export function CodePreview({
             aria-hidden="true"
           />
         </>
-      )}
-      {sel && showButton && (
-        <button
-          type="button"
-          className="code-select-btn"
-          style={{ left: `${Math.round(sel.buttonX)}px`, top: `${Math.round(sel.buttonY)}px` }}
-          disabled={!canAddRef}
-          data-tip={canAddRef ? '把选中的代码引用给小探针' : `一轮最多引用 ${refLimit} 段`}
-          // 按下时别让浏览器动选区:一按就折叠的话,这个按钮会先被卸载,click 就丢了
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onAddRef({
-              relPath: file.relPath,
-              startLine: sel.startLine,
-              endLine: sel.endLine,
-              code: sel.code
-            })
-            window.getSelection()?.removeAllRanges()
-            setSelAt({ file: file.relPath, sel: null })
-            patchUi({ showButton: false })
-          }}
-        >
-          {label}
-        </button>
       )}
     </div>
   )

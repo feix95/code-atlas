@@ -27,6 +27,7 @@ import { CONTEXT_SIZE_MIN, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { fetchWithTimeout } from '../ai/http.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
+import { refreshWindowBackgrounds } from './windowTheme.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict, ModelStatus } from '../shared/types.ts'
@@ -38,9 +39,11 @@ export function registerModelIpc(): void {
   ipcMain.on(CH.appearanceGetSync, (event) => {
     event.returnValue = loadAppearanceFileSync(userDataDir())
   })
-  ipcMain.handle(CH.appearanceSave, (_event, raw: unknown) => {
+  ipcMain.handle(CH.appearanceSave, async (_event, raw: unknown) => {
     const a = sanitizeAppearance(raw)
-    return saveAppearanceFile(userDataDir(), a)
+    await saveAppearanceFile(userDataDir(), a)
+    // 实底窗(全窗实底化):外观换了皮,在册窗的底色跟着换
+    refreshWindowBackgrounds()
   })
 
   // 模型货架:实时榜(只读抱抱脸公开 API,零落盘)+ 某仓库的文件清单。拉货手在 ai/modelShelf

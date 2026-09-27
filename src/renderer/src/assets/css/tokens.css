@@ -22,8 +22,6 @@
   --radius-xl: 0.625rem;
   --radius-lg: 0.75rem;
   --radius-pill: 999px;
-  /* 窗角 14px:物理像素例外(圆角要贴屏幕物理直角,不跟 rem 缩放),三处共用这一户 */
-  --radius-window: 14px;
   --font-xxs: 0.625rem;
   --font-xs: 0.6875rem;
   --font-sm: 0.75rem;
@@ -269,12 +267,11 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   height: 100%;
-  background: transparent;
+  /* 实底窗(全窗实底化):body 直接铺画布色 —— 窗户口 backgroundColor 只兜首帧,
+     之后的每一像素都由这里拍板;自定义染色档也跟得动,不留色差缝 */
+  background: var(--canvas-tint);
 }
 
-/* 圆角贴满窗(第五十六锤,小葵拍板):界面卡片直接铺满整扇窗 —— 不留透明裙边、
-   不要外阴影,只有四个角用圆角裁掉透出真实桌面。Win10 没有系统圆角接口,
-   透明合成仍是唯一能出抗锯齿圆角的路,玻璃窗保留 */
 body {
   padding: 0;
 }
@@ -294,13 +291,6 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--canvas-tint);
-  /* 窗缘不画描边(小葵拍板):边界只靠圆角裁边和底差色立住,窗贴同色桌面更干净 */
-  border-radius: var(--radius-window);
-}
-
-/* 最大化:贴满屏幕时圆角收掉,四角不漏缝 */
-body.is-maximized .app {
-  border-radius: 0;
 }
 
 /* ── 全局轻提示(TooltipHost,全场唯一户口):黑底白字圆角小尾巴。
