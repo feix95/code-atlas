@@ -10,8 +10,11 @@ import { refButtonLabel, selectionGeometry, type SelectionGeometry } from '../se
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
+import { MiniMD } from './MiniMD'
 import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuStore'
 import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
+import type { FileLinkTarget } from '@shared/fileLinks'
+import { canReadingMode, type PaneViewMode } from '../paneTabs'
 
 /** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
 const COPIED_ALL_MS = 2000
@@ -157,7 +160,9 @@ export function CodePreview({
   refLimit,
   onAddRef,
   jump,
-  noteMenu
+  noteMenu,
+  viewMode,
+  fileLinks
 }: {
   rootPath: string
   file: ScanFileNode
@@ -170,6 +175,10 @@ export function CodePreview({
   jump?: { line: number; seq: number } | null
   /** 备注三件套(菜单统一大锤):头部文件名右键菜单带上写/清备注,跟树里、聊天里一个规格 */
   noteMenu?: FilePathNoteActions
+  /** 看片档位(阅读模式这锤):undefined/'source' = 源码;'reading' = md 渲染态(只对 md 系生效) */
+  viewMode?: PaneViewMode
+  /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
+  fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const codeTextRef = useRef<HTMLPreElement>(null)
   const codeViewRef = useRef<HTMLDivElement>(null)
@@ -254,6 +263,8 @@ export function CodePreview({
     (wrapAt.file === file.relPath && wrapAt.on !== null
       ? wrapAt.on
       : WRAP_DEFAULT_EXT.has(extOf(file.relPath)))
+  // 阅读模式(这锤的新档):md 系签才生效 —— MiniMD 渲染态,行号/分色/选区引用是源码档的家务
+  const reading = viewMode === 'reading' && canReadingMode(file.relPath)
 
   // 行高只量一次:等宽字体行行等高,量准一次,全文的滚动高度就是它乘出来的。
   // 界面缩放改了根字号,行高跟着变,重量一遍。
@@ -303,7 +314,8 @@ export function CodePreview({
   // 下一帧再动身:换文件头一帧新轨道还没立稳,当场写滚动位会被旧高度夹住、落点差一截;
   // 等浏览器把新文件的布局铺好再滚,一步到位(外援建议,这锤采纳)
   useEffect(() => {
-    if (!jump || result?.status !== 'ok' || total === 0) return
+    // 阅读模式不跳行:行号地图是源码档的账(渲染态的「行」是排版后的事)
+    if (!jump || result?.status !== 'ok' || total === 0 || reading) return
     const raf = requestAnimationFrame(() => {
       const el = codeViewRef.current
       if (!el) return
@@ -322,7 +334,7 @@ export function CodePreview({
       el.scrollTop = Math.max(0, (target - 1) * lineHeight - el.clientHeight / 3)
     })
     return () => cancelAnimationFrame(raf)
-  }, [jump, result, total, lineHeight, wrap])
+  }, [jump, result, total, lineHeight, wrap, reading])
 
   // 该画哪几行(纯函数) + 这一段的正文和行号格子;轨道总高 = 总行数 × 行高,滚动条行程是全文的
   const range = visibleLineRange({ scrollTop, viewportHeight, lineHeight, totalLines: total })
@@ -490,6 +502,32 @@ export function CodePreview({
     openContextMenu({ x: e.clientX, y: e.clientY, doc: e.currentTarget.ownerDocument, items })
   }
 
+  /** 阅读模式的右键:渲染态里没有行号账,选中了就给「复制选中段」一口 */
+  function onReadContextMenu(e: React.MouseEvent<HTMLDivElement>): void {
+    const el = codeViewRef.current
+    const s = viewOf(el)?.getSelection()
+    if (!el || !s || s.isCollapsed || s.rangeCount === 0 || !el.contains(s.anchorNode)) return
+    const picked = s.toString()
+    if (picked.trim() === '') return
+    e.preventDefault()
+    openContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      doc: el.ownerDocument,
+      items: [
+        {
+          label: '复制选中段',
+          icon: 'copy',
+          run: () =>
+            navigator.clipboard
+              .writeText(picked)
+              .then(() => '已复制 ✓')
+              .catch(() => '没复制成,剪贴板被顶住了')
+        }
+      ]
+    })
+  }
+
   /** 选中一段直接拖去对话挂引用:正文自包含(dataTransfer 里连字带行号),松手那头不用读盘 */
   function onCodeDragStart(e: React.DragEvent<HTMLDivElement>): void {
     const s = computeSelection()
@@ -528,7 +566,7 @@ export function CodePreview({
         >
           {file.relPath}
         </span>
-        {result?.status === 'ok' && (
+        {result?.status === 'ok' && !reading && (
           <button
             type="button"
             className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
@@ -560,53 +598,70 @@ export function CodePreview({
       {!err && result?.status === 'ok' && (
         <>
           {copiedAll && <p className="code-pane-note">全文已复制到剪贴板</p>}
-          <div
-            className="code-view"
-            ref={codeViewRef}
-            tabIndex={0}
-            aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用到对话;按 Ctrl+A 复制全文`}
-            onScroll={onScroll}
-            onContextMenu={onCodeContextMenu}
-            onDragStart={onCodeDragStart}
-          >
-            {wrap ? (
-              /* 折行模式(折行版这锤):行高不一,虚拟滚动让位 —— 行块全量上屏、自然折行;
+          {reading ? (
+            /* 阅读模式(这锤的新档):md 系签的渲染态 —— MiniMD 排版进可读栏,
+               行号/分色/选区引用是源码档的家务,这边只管「读」 */
+            <div
+              className="code-view is-reading"
+              ref={codeViewRef}
+              tabIndex={0}
+              aria-label={`${file.relPath} 的阅读模式,全文可滚;按 Ctrl+A 复制全文`}
+              onScroll={onScroll}
+              onContextMenu={onReadContextMenu}
+            >
+              <article className="code-reading">
+                <MiniMD text={text} fileLinks={fileLinks ?? undefined} />
+              </article>
+            </div>
+          ) : (
+            <div
+              className="code-view"
+              ref={codeViewRef}
+              tabIndex={0}
+              aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用到对话;按 Ctrl+A 复制全文`}
+              onScroll={onScroll}
+              onContextMenu={onCodeContextMenu}
+              onDragStart={onCodeDragStart}
+            >
+              {wrap ? (
+                /* 折行模式(折行版这锤):行高不一,虚拟滚动让位 —— 行块全量上屏、自然折行;
                  行号是行块左槽的 ::before(CSS 生成内容,进不了 DOM 文本,选区/引用都不会沾到数字) */
-              <pre
-                className="code-text is-wrap"
-                ref={codeTextRef}
-                style={{ '--gc': `${String(total).length}ch` } as React.CSSProperties}
-              >
-                {lines.map((lineText, i) => (
-                  <span key={i + 1} className="code-line" data-line={i + 1}>
-                    {renderColoredLine(lineText, colors?.[i])}
-                  </span>
-                ))}
-              </pre>
-            ) : (
-              /* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏。
+                <pre
+                  className="code-text is-wrap"
+                  ref={codeTextRef}
+                  style={{ '--gc': `${String(total).length}ch` } as React.CSSProperties}
+                >
+                  {lines.map((lineText, i) => (
+                    <span key={i + 1} className="code-line" data-line={i + 1}>
+                      {renderColoredLine(lineText, colors?.[i])}
+                    </span>
+                  ))}
+                </pre>
+              ) : (
+                /* 虚拟滚动:轨道撑出全文的行程,可视段整体平移到当前位置 —— 全文随便滚,元素只有一屏。
                  分色(预览分色这锤):每行一个 span、行内按段落账上色;行高一点没动,
                  虚拟滚动「量一次行高」的老地基本字不摇 */
-              <div className="code-track" style={{ height: total * lineHeight }}>
-                <div className="code-row" style={{ transform: `translateY(${offsetY}px)` }}>
-                  <pre className="code-gutter" aria-hidden="true">
-                    {gutter}
-                  </pre>
-                  <pre className="code-text" ref={codeTextRef}>
-                    {chunkLines.map((lineText, i) => {
-                      const lineNo = range.start + i
-                      return (
-                        <span key={lineNo} className="code-line" data-line={lineNo}>
-                          {renderColoredLine(lineText, colors?.[lineNo - 1])}
-                          {'\n'}
-                        </span>
-                      )
-                    })}
-                  </pre>
+                <div className="code-track" style={{ height: total * lineHeight }}>
+                  <div className="code-row" style={{ transform: `translateY(${offsetY}px)` }}>
+                    <pre className="code-gutter" aria-hidden="true">
+                      {gutter}
+                    </pre>
+                    <pre className="code-text" ref={codeTextRef}>
+                      {chunkLines.map((lineText, i) => {
+                        const lineNo = range.start + i
+                        return (
+                          <span key={lineNo} className="code-line" data-line={lineNo}>
+                            {renderColoredLine(lineText, colors?.[lineNo - 1])}
+                            {'\n'}
+                          </span>
+                        )
+                      })}
+                    </pre>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </>
       )}
       {sel && (

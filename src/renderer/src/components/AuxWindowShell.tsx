@@ -3,13 +3,15 @@
 // 完整页签带 + 分屏正文(主窗同款组件,户口过滤后递进来)、本窗自己的 TooltipHost。
 // 空壳即死:名下签全挪走/关光那刻,这扇窗自己收摊(Chrome 语义;主窗不在此列,它是工作台)。
 import { useEffect } from 'react'
-import type { PaneGroup, PaneTab } from '../paneTabs'
+import type { PaneGroup, PaneTab, PaneViewMode } from '../paneTabs'
 import { syncAuxChrome, type AuxWindowHandle } from '../useAuxWindows'
 import { TopBarTabs } from './TopBarTabs'
 import { PaneGroups } from './PaneGroups'
 import { TooltipHost } from './Tooltip'
 import { FilePathMenu } from './FilePathMenu'
 import { ContextMenu } from './ContextMenu'
+import { TreeIcon } from './Icons'
+import { WIN_ICON_SIZE } from '../inputMetrics'
 
 /** 页签区那套接线的主窗/子窗通用包:两边吃的 props 一模一样,打包传不重抄 */
 export interface TabAreaProps {
@@ -28,6 +30,12 @@ export interface TabAreaProps {
   >
   onTabDragEnd: (id: string) => void
   onDetachTab: (id: string) => void
+  /** 页签右键「阅读/源码模式」(阅读模式这锤):切文件签的看片档位 */
+  setTabViewMode: (id: string, mode: PaneViewMode) => void
+  /** 页签右键「在文件列表中显示当前文件」:回主窗侧栏树里指出来 */
+  revealTabInTree: (id: string) => void
+  /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
+  workspaceRoot: string | null
   paneSplit: number
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
   dropMark: { groupId: string; zone: 'center' | 'left' | 'right' } | null
@@ -71,7 +79,7 @@ export function AuxWindowShell({
         className="aux-strip"
         onDoubleClick={(e) => {
           // .tabbar-blank 自己有双击最大化的户口(hostNameOf 报窗),别重复 toggle
-          if ((e.target as HTMLElement).closest('.tabbar-tab, .aux-winbtn, .tabbar-blank')) return
+          if ((e.target as HTMLElement).closest('.tabbar-tab, .win-btn, .tabbar-blank')) return
           window.atlas.auxWindowOp(aux.id, 'toggleMaximize')
         }}
       >
@@ -85,35 +93,39 @@ export function AuxWindowShell({
           setDropMark={tabArea.setDropMark}
           onTabDragEnd={tabArea.onTabDragEnd}
           onDetachTab={tabArea.onDetachTab}
+          onSetViewMode={tabArea.setTabViewMode}
+          onRevealInTree={tabArea.revealTabInTree}
+          workspaceRoot={tabArea.workspaceRoot}
           paneSplit={tabArea.paneSplit}
         />
-        <div className="aux-winbtns">
+        {/* 窗控三键吃主窗 .win-ctl/.win-btn 全家:同款 1u 方格 + 同款 TreeIcon */}
+        <div className="win-ctl">
           <button
             type="button"
-            className="aux-winbtn"
+            className="win-btn"
             aria-label="最小化"
             data-tip="最小化"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'minimize')}
           >
-            –
+            <TreeIcon name="minus" size={WIN_ICON_SIZE} mono />
           </button>
           <button
             type="button"
-            className="aux-winbtn"
+            className="win-btn"
             aria-label="最大化/还原"
             data-tip="最大化/还原"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'toggleMaximize')}
           >
-            □
+            <TreeIcon name="maximize" size={WIN_ICON_SIZE} mono />
           </button>
           <button
             type="button"
-            className="aux-winbtn is-close"
+            className="win-btn win-close"
             aria-label="关闭窗口"
             data-tip="关闭窗口(连签一起关)"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'close')}
           >
-            ×
+            <TreeIcon name="x" size={WIN_ICON_SIZE} mono />
           </button>
         </div>
       </div>

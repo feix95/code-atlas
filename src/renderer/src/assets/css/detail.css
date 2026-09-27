@@ -125,49 +125,36 @@ body.is-sash-dragging .pane-sash::after {
   position: relative;
 }
 
-/* 拖页签悬在别组正文中心:虚线框亮起,许诺「松手挪到这一组」(拆半屏只走左右缘) */
+/* 拖页签悬在别组正文中心:许诺「松手挪到这一组」(拆半屏只走左右缘)。
+   Obsidian 式画法:整片 drop-mark 半透明蓝铺底,无描边无字 */
 .pane-drop-hint {
   position: absolute;
   inset: 8%;
   z-index: var(--z-pane-hint);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--drop-mark);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--sash-hi) 6%, transparent);
-  color: var(--sash-hi);
-  font-size: var(--font-md);
+  background: var(--drop-mark);
   pointer-events: none;
 }
 
-/* 拖到正文左右缘:贴近的那半边亮定向分屏许诺(「拆到左/右半屏」),
-   半边取 pane-drop-hint 同款的内缩+虚线,别跟中心框的画法分家 */
+/* 拖到正文左右三分之一带:贴近的那半边亮定向分屏许诺(「拆到左/右半屏」),
+   同款整片透明蓝、贴齐屏缘,跟中心框不分家 */
 .pane-drop-edge {
   position: absolute;
-  top: 8%;
-  bottom: 8%;
+  top: 0;
+  bottom: 0;
   z-index: var(--z-pane-hint);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--drop-mark);
-  background: color-mix(in srgb, var(--sash-hi) 6%, transparent);
-  color: var(--sash-hi);
-  font-size: var(--font-md);
+  background: var(--drop-mark);
   pointer-events: none;
 }
 
 .pane-drop-edge.is-left {
-  left: 2%;
+  left: 0;
   right: 50%;
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
 .pane-drop-edge.is-right {
-  right: 2%;
+  right: 0;
   left: 50%;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 /* 文件签的文件从树里没了(被删/改名):一句指路,不装死 */

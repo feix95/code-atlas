@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react'
 import { TreeIcon } from './Icons'
-import type { PaneKind } from '../paneKinds'
-import { useMenuDismiss } from '../useMenuDismiss'
+import { isFileKind, type PaneKind } from '../paneKinds'
+import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 import { hostNameOf, startWindowDrag } from '../windowDrag'
 
 /** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
@@ -10,6 +10,12 @@ export interface TabBarTab {
   kind: PaneKind
   name: string
   icon: string
+  /** 文件签的文件 relPath(右键菜单的文件动作要它):单例签为空串 */
+  relPath: string
+  /** peek 签的读根(盘符下钻):复制路径/资源管理器按它拼绝对路径 */
+  scopeRoot?: string
+  /** 文件签的看片档位(阅读模式这锤):菜单里给当前档打勾 */
+  viewMode?: PaneViewMode
 }
 
 /**
@@ -17,7 +23,8 @@ export interface TabBarTab {
  * 文件签脸就是文件名;单例签挂品类名牌。拖拽走 TopBarTabs 的 pointer 引擎:
  * 这里只上报 pointerdown 和画让位缝 —— 被拖的签全程保持原样(小葵拍板),
  * 缝用 margin 过渡撑开(VS Code 式让位手感)。
- * 中键点页签 = 关闭。页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
+ * 中键点页签 = 关闭。右键菜单走全局通用 ContextMenu(Obsidian 式分组,组间细线)。
+ * 页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
  * (顶栏死空间/日志窗头条共用同一套)。
  */
 export function TabBar({
@@ -29,6 +36,9 @@ export function TabBar({
   onClose,
   onMoveTab,
   onDetachTab,
+  onSetViewMode,
+  onRevealInTree,
+  workspaceRoot,
   dragSourceId,
   gapIndex,
   gapWidth,
@@ -38,14 +48,25 @@ export function TabBar({
   activeId: string | null
   /** 需要指路时刚点名的那张页签:轻强调一下,让用户察觉它在那 */
   flashId: string | null
-  /** 拖拽/右键「挪组」时有没有另一组可去(单组时提供「往右拆一组」的路) */
+  /** 拖拽/右键「挪组」时有没有另一组可去(单组时提供「往左/右拆一组」的路) */
   canMoveToSiblingGroup: boolean
   onActivate: (id: string) => void
   onClose: (id: string) => void
   /** 挪页签(右键菜单走这条路;拖拽的落点账在 TopBarTabs 引擎里算) */
-  onMoveTab: (id: string, toGroup: 'sibling' | null, atIndex: number | null) => void
+  onMoveTab: (
+    id: string,
+    toGroup: 'sibling' | null,
+    atIndex: number | null,
+    splitSide?: 'left' | 'right'
+  ) => void
   /** 右键菜单「移到新窗口」:不拖也撕(页签撕窗锤),所有页签一视同仁 */
   onDetachTab?: (id: string) => void
+  /** 右键菜单「阅读/源码模式」:切文件签的看片档位 */
+  onSetViewMode?: (id: string, mode: PaneViewMode) => void
+  /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
+  onRevealInTree?: (id: string) => void
+  /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
+  workspaceRoot?: string | null
   /** 正被 pointer 引擎拎着的页签 id:它在这条带里原地塌缩成空位 */
   dragSourceId: string | null
   /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开 */
@@ -54,32 +75,107 @@ export function TabBar({
   /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
   onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
-  // 页签上的右键菜单:挪组 / 移到新窗口 / 关闭(记下是哪张页签、哪个 document ——
-  // realm 铁律:子窗里的菜单要在子窗的 document 里收摊和夹边)
-  const [tabMenu, setTabMenu] = useState<{
-    x: number
-    y: number
-    tabId: string
-    doc: Document
-  } | null>(null)
-  const closeMenus = useCallback((): void => {
-    setTabMenu(null)
-  }, [])
-
-  // 点页面任何地方/滚轮/按 Esc 都收菜单;菜单内部点选不算「外面」
-  useMenuDismiss(tabMenu !== null, closeMenus, '.tabbar-kindmenu', tabMenu?.doc)
-
-  function openTabMenu(e: React.MouseEvent, tabId: string): void {
+  /**
+   * 页签右键菜单(Obsidian 式分组,阅读模式这锤):走全局通用菜单,
+   * 组间一道细线;行内图标 + 「当前档」行尾勾。菜单行按签品类现拼:
+   * 单例签没有文件动作和看片档;非 md 文件签没有看片档;peek 签没有树定位。
+   * realm 铁律:doc 记进请求,菜单开在子窗时它自己窗内那台接活。
+   */
+  function openTabMenu(e: React.MouseEvent, t: TabBarTab): void {
     e.preventDefault()
     e.stopPropagation()
-    // realm 铁律:子窗里的页签菜单要对着子窗的视口夹,不拿主窗的尺寸算账
-    const view = (e.currentTarget as HTMLElement).ownerDocument.defaultView ?? window
-    setTabMenu({
-      x: Math.min(e.clientX, view.innerWidth - 190),
-      y: Math.min(e.clientY, view.innerHeight - 130),
-      tabId,
-      doc: (e.currentTarget as HTMLElement).ownerDocument
-    })
+    const doc = (e.currentTarget as HTMLElement).ownerDocument
+    const isFile = isFileKind(t.kind)
+    const root = t.scopeRoot ?? workspaceRoot ?? null
+    const items: ContextMenuEntry[] = []
+
+    items.push({ label: '关闭页签', icon: 'x', run: () => onClose(t.id) })
+
+    // 看片档(md 系文件签才摆):当前档行尾打勾,点另一档切过去
+    if (isFile && canReadingMode(t.relPath)) {
+      const mode = t.viewMode ?? 'source'
+      items.push(
+        MENU_SEP,
+        {
+          label: '阅读模式',
+          icon: 'bookOpen',
+          checked: mode === 'reading',
+          run: () => onSetViewMode?.(t.id, 'reading')
+        },
+        {
+          label: '源码模式',
+          icon: 'code',
+          checked: mode !== 'reading',
+          run: () => onSetViewMode?.(t.id, 'source')
+        }
+      )
+    }
+
+    if (onDetachTab)
+      items.push(MENU_SEP, {
+        label: '移到新窗口',
+        icon: 'appWindow',
+        run: () => onDetachTab(t.id)
+      })
+
+    // 分组组:已有另一组就「挪过去」;单组才分向拆(独签一组拆不出第二组,灰着)
+    if (canMoveToSiblingGroup)
+      items.push(MENU_SEP, {
+        label: '移到另一组',
+        icon: 'arrows',
+        run: () => onMoveTab(t.id, 'sibling', null)
+      })
+    else {
+      const lonely = tabs.length < 2
+      items.push(
+        MENU_SEP,
+        {
+          label: '向左拆分',
+          icon: 'panelLeft',
+          disabled: lonely,
+          run: () => onMoveTab(t.id, 'sibling', null, 'left')
+        },
+        {
+          label: '向右拆分',
+          icon: 'panelRight',
+          disabled: lonely,
+          run: () => onMoveTab(t.id, 'sibling', null, 'right')
+        }
+      )
+    }
+
+    // 文件动作组:复制路径自成一组,资源管理器/树定位一组(沿用截图的分组)
+    if (isFile && root !== null) {
+      items.push(
+        MENU_SEP,
+        {
+          label: '复制路径',
+          icon: 'copy',
+          run: async () => {
+            const r = await window.atlas.copyFilePath(root, t.relPath)
+            return r.ok ? '已复制 ✓' : (r.message ?? '没复制成')
+          }
+        },
+        MENU_SEP,
+        {
+          label: '在文件资源管理器中显示',
+          icon: 'folder',
+          run: async () => {
+            const r = await window.atlas.revealFilePath(root, t.relPath)
+            return r.ok ? undefined : (r.message ?? '没打开成')
+          }
+        }
+      )
+      // peek 签的文件不归工作区树管,树定位不摆
+      if (t.kind === 'preview' && onRevealInTree)
+        items.push({
+          label: '在文件列表中显示当前文件',
+          icon: 'crosshair',
+          run: () => onRevealInTree(t.id)
+        })
+    }
+
+    openContextMenu({ x: e.clientX, y: e.clientY, doc, items })
   }
 
   // 落点缝的落法:缝序号按「剔除被拖签」的可见序 —— 缝前那张签吃 margin-left,
@@ -92,8 +188,6 @@ export function TabBar({
   // 缝在队首时寄生首签的前缘
   const markHost = gapIndex !== null ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
   const markBefore = gapIndex === 0
-  // 右键菜单里点名的那张签:挪组/移到新窗口这些「对谁动手」的项都按它判
-  const menuTab = tabMenu ? (tabs.find((x) => x.id === tabMenu.tabId) ?? null) : null
 
   return (
     <div
@@ -121,7 +215,7 @@ export function TabBar({
             }
             onPointerDown={(e) => onTabPointerDown(e, t)}
             onClick={() => onActivate(t.id)}
-            onContextMenu={(e) => openTabMenu(e, t.id)}
+            onContextMenu={(e) => openTabMenu(e, t)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
@@ -166,51 +260,6 @@ export function TabBar({
         onDoubleClick={(e) => void window.atlas.windowMaximizeToggle(hostNameOf(e.currentTarget))}
         aria-hidden="true"
       />
-
-      {tabMenu && (
-        <div
-          className="tabbar-kindmenu"
-          role="menu"
-          aria-label="页签操作"
-          style={{ left: tabMenu.x, top: tabMenu.y }}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className="kindmenu-item"
-            onClick={() => {
-              onMoveTab(tabMenu.tabId, 'sibling', null)
-              setTabMenu(null)
-            }}
-          >
-            {canMoveToSiblingGroup ? '挪去另一组' : '挪去右边,拆成两组'}
-          </button>
-          {menuTab && onDetachTab && (
-            <button
-              type="button"
-              role="menuitem"
-              className="kindmenu-item"
-              onClick={() => {
-                onDetachTab(menuTab.id)
-                setTabMenu(null)
-              }}
-            >
-              移到新窗口
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className="kindmenu-item kindmenu-item-danger"
-            onClick={() => {
-              onClose(tabMenu.tabId)
-              setTabMenu(null)
-            }}
-          >
-            关闭页签
-          </button>
-        </div>
-      )}
     </div>
   )
 }

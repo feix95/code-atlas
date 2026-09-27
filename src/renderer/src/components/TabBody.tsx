@@ -129,6 +129,7 @@ export function TabBody({
         canAddRef={false}
         refLimit={0}
         onAddRef={() => {}}
+        viewMode={tab.viewMode}
       />
     )
   }
@@ -248,6 +249,8 @@ export function TabBody({
         refLimit={CODE_REFS_MAX}
         onAddRef={addPreviewRef}
         jump={previewJump}
+        viewMode={tab.viewMode}
+        fileLinks={fileLinks}
         noteMenu={{
           hasNote: notes[file.relPath] !== undefined,
           onEdit: () => editNoteFromTree(file.relPath),

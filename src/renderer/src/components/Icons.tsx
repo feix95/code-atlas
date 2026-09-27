@@ -748,6 +748,39 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M9 3v18" />
     </>
   ),
+  // 页签菜单「向右拆分」(lucide panel-right,panelLeft 的镜像岗)
+  panelRight: (
+    <>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M15 3v18" />
+    </>
+  ),
+  // 页签菜单「移到新窗口」(lucide app-window)
+  appWindow: (
+    <>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M10 4v4" />
+      <path d="M2 8h20" />
+      <path d="M6 4v4" />
+    </>
+  ),
+  // 阅读模式(页签菜单档位,lucide book-open):md 签的渲染态
+  bookOpen: (
+    <>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </>
+  ),
+  // 「在文件列表中显示」(lucide crosshair):回树里把这张签的文件指出来
+  crosshair: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="22" x2="18" y1="12" y2="12" />
+      <line x1="6" x2="2" y1="12" y2="12" />
+      <line x1="12" x2="12" y1="6" y2="2" />
+      <line x1="12" x2="12" y1="22" y2="18" />
+    </>
+  ),
   // 关系图谱(lucide view,规格 §6 槽位1)
   view: (
     <>

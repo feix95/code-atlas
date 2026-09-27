@@ -283,8 +283,8 @@ try {
     page.getByRole('menuitem', { name: '移到新窗口', exact: true }).click()
   ])
   assert.equal(electron.windows().length, 2, 'tearing a tab must open an aux window')
-  // 页签带兼标题栏(浏览器同款):带里有签,带尾钉着窗控三键
-  await auxPage.locator('.aux-strip .aux-winbtns').waitFor()
+  // 页签带兼标题栏(浏览器同款):带里有签,带尾钉着窗控三键(主窗同款 win-ctl)
+  await auxPage.locator('.aux-strip .win-ctl').waitFor()
   await auxPage
     .locator('.tabbar-tab')
     .filter({ has: auxPage.locator('.tabbar-name').getByText('package.json', { exact: true }) })
@@ -298,7 +298,7 @@ try {
   // close 事件要先挂上再点 —— 窗关得快,点后挂监听会扑空
   await Promise.all([
     auxPage.waitForEvent('close', { timeout: 8_000 }),
-    auxPage.locator('.aux-winbtn.is-close').click()
+    auxPage.locator('.win-btn.win-close').click()
   ])
   assert.equal(electron.windows().length, 1, 'closing aux window must leave only the main window')
   assert.equal(

@@ -6,7 +6,7 @@
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 import type { ScanDirNode } from '@shared/types'
 import { findDir, findFile } from './scanTreeTools.ts'
-import { nextTabId, type PaneGroup, type PaneTab } from './paneTabs.ts'
+import { nextTabId, type PaneGroup, type PaneTab, type PaneViewMode } from './paneTabs.ts'
 import { KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds.ts'
 
 const SESSION_KEY = 'atlas.session'
@@ -27,6 +27,8 @@ export interface SessionTab {
   name: string
   icon: string
   scopeRoot?: string
+  /** 文件签的看片档位(阅读模式这锤):源码档不落账(默认),阅读档记 'reading' */
+  viewMode?: PaneViewMode
   on?: boolean
 }
 
@@ -65,6 +67,7 @@ export function serializeSession(
         name: t.name,
         icon: t.icon,
         scopeRoot: t.scopeRoot,
+        viewMode: t.viewMode,
         on: t.id === g.activeId ? true : undefined
       }))
     }))
@@ -89,6 +92,8 @@ function parseTab(raw: unknown): SessionTab | null {
     icon,
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
+    // 看片档位只认两个合法户口;写坏了的当没存过(回默认源码档)
+    viewMode: t['viewMode'] === 'reading' || t['viewMode'] === 'source' ? t['viewMode'] : undefined,
     on: t['on'] === true ? true : undefined
   }
 }
@@ -150,7 +155,8 @@ export function hydrateSession(
       relPath: t.relPath,
       name: t.name,
       icon: t.icon,
-      scopeRoot: t.scopeRoot
+      scopeRoot: t.scopeRoot,
+      viewMode: t.viewMode
     }))
     const onIdx = live.findIndex((t) => t.on)
     const group: PaneGroup = {

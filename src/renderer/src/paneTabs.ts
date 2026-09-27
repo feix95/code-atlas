@@ -7,6 +7,19 @@ import type { PaneKind } from './paneKinds'
  * 概览/小探针/图谱/设置是单例签,每品类全应用只此一张,rail/菜单入口开合。
  * 没有跟随、没有钉住:页签代表的就是它自己那份内容。
  */
+/** 文件签的看片档位(阅读模式这锤):source=源码(行号/分色/选区引用),reading=md 渲染态 */
+export type PaneViewMode = 'source' | 'reading'
+
+/** 能进阅读模式的后缀(md 系):别的文件没有「渲染态」,菜单里连选项都不摆 */
+const READING_EXTS = new Set(['md', 'markdown', 'mdx'])
+
+/** 这个文件能不能切阅读模式(纯函数):按后缀认,点在路径段上的点才算(目录名里的点不搅局) */
+export function canReadingMode(relPath: string): boolean {
+  const i = relPath.lastIndexOf('.')
+  const sep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'))
+  return i > sep && READING_EXTS.has(relPath.slice(i + 1).toLowerCase())
+}
+
 export interface PaneTab {
   id: string
   kind: PaneKind
@@ -17,6 +30,8 @@ export interface PaneTab {
   /** 「瞄一眼」文件签(peek)的读根:盘符下钻不归工作区,
    *  CodePreview 读文件走 joinRoot(scopeRoot, relPath);工作区文件签不填 */
   scopeRoot?: string
+  /** 文件签的看片档位(阅读模式这锤):undefined = 源码;记在签身上,拖窗/存档都跟着走 */
+  viewMode?: PaneViewMode
 }
 
 /**

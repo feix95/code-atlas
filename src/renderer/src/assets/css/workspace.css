@@ -584,6 +584,43 @@
   cursor: default;
 }
 
+/* ── 阅读模式(阅读模式这锤):md 系签的渲染态 —— MiniMD 排版进「可读栏」:
+   宽窗时栏有上限居中、两边留呼吸;窄窗时栏跟着缩、四周固定留白不贴边。
+   正文比聊天气泡里的 .md 放大一档 —— 这儿是整页阅读,不是塞进气泡里扫一眼 ── */
+.code-view.is-reading {
+  padding: var(--space-4) var(--space-6) 30vh;
+}
+
+.code-reading {
+  max-width: 46rem;
+  margin-inline: auto;
+  font-size: var(--font-base);
+  color: var(--text);
+}
+
+/* 渲染态的标题档比气泡里的 .md 放一档;围栏代码块字略收,密度对齐阅读页 */
+.code-reading .md-h1 {
+  font-size: var(--font-lg);
+}
+
+.code-reading .md-h2 {
+  font-size: var(--font-ml);
+}
+
+.code-reading .md-h3,
+.code-reading .md-h4 {
+  font-size: var(--font-base);
+}
+
+.code-reading .md-pre {
+  font-size: var(--font-sm);
+}
+
+/* 选中底色跟代码正文喝同一碗 --drop-mark:引用那套蓝,阅读档里也一样 */
+.code-reading ::selection {
+  background: var(--drop-mark);
+}
+
 /* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
 .tok-ctl {
   color: var(--tok-ctl);

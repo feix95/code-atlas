@@ -8,7 +8,7 @@
 // 按住位移超阈值开拖 → 原页签塌缩成空位,替身芯片浮起跟光标;扫过页签带时
 // 邻居 margin 过渡撑开落点缝;悬到正文区按中心/边缘判分屏许诺;窗外松手撕新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { PaneGroup, PaneTab } from '../paneTabs'
+import type { PaneGroup, PaneTab, PaneViewMode } from '../paneTabs'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -21,8 +21,8 @@ const STRIP_BLEED_X = 6
 const STRIP_BLEED_TOP = 4
 const STRIP_BLEED_BOTTOM = 8
 /** 正文区边缘分屏带的横向占比(封顶 120px):贴到亮半边提示 —— VS Code 同款手势 */
-const EDGE_BAND_RATIO = 0.14
-const EDGE_BAND_MAX_PX = 120
+/** 定向拆半屏的判定带:正文左右各 1/3 宽、全高都算数(小葵定的手感:拖到三分之一就亮蓝) */
+const SPLIT_EDGE_THIRD = 1 / 3
 /** 芯片松手后的淡出时长(拖出窗撕新子窗那条路) */
 const CHIP_FADE_MS = 140
 /** 沉降飞行时长:芯片飞回落点长成页签(与 CSS is-settle 的过渡时长对齐) */
@@ -100,6 +100,9 @@ export function TopBarTabs({
   setDropMark,
   onTabDragEnd,
   onDetachTab,
+  onSetViewMode,
+  onRevealInTree,
+  workspaceRoot,
   paneSplit
 }: {
   groups: PaneGroup[]
@@ -121,6 +124,12 @@ export function TopBarTabs({
   onTabDragEnd: (id: string) => void
   /** 右键菜单「移到新窗口」:不拖也撕,所有签一视同仁 */
   onDetachTab?: (id: string) => void
+  /** 右键菜单「阅读/源码模式」:切文件签的看片档位(阅读模式这锤) */
+  onSetViewMode?: (id: string, mode: PaneViewMode) => void
+  /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里指出来(App 的活) */
+  onRevealInTree?: (id: string) => void
+  /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
+  workspaceRoot?: string | null
   /** 第一组分屏列占内容宽的比例(usePaneTabs 的账本,顶部条带认同一份) */
   paneSplit: number
 }): React.JSX.Element {
@@ -383,33 +392,26 @@ export function TopBarTabs({
         for (const b of bodies) {
           if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) continue
           const relX = (cx - b.left) / (b.right - b.left)
-          const relY = (cy - b.top) / (b.bottom - b.top)
           const srcGroup = groups.find((g) => g.id === srcGroupId)
-          if (relX > 0.25 && relX < 0.75 && relY > 0.25 && relY < 0.75) {
-            // 中心许诺:只对别组画「挪到这一组」;自家组中心不画饼(拆分归左右缘管)
-            if (srcGroupId !== b.groupId) {
-              zone = { type: 'pane', groupId: b.groupId, zone: 'center' }
+          if (relX <= SPLIT_EDGE_THIRD || relX >= 1 - SPLIT_EDGE_THIRD) {
+            // 左右三分之一带 = 定向拆半屏(全高都算):单组且拆了不空才许诺,免得画空头支票
+            if (groups.length === 1 && srcGroup && srcGroup.tabs.length > 1) {
+              const side = relX < 0.5 ? 'left' : 'right'
+              zone = { type: 'pane', groupId: b.groupId, zone: side }
               setDropMark((prev) =>
-                prev?.groupId === b.groupId && prev.zone === 'center'
+                prev?.groupId === b.groupId && prev.zone === side
                   ? prev
-                  : { groupId: b.groupId, zone: 'center' }
+                  : { groupId: b.groupId, zone: side }
               )
               hit = true
             }
-          } else if (
-            // 边缘带 = min(14% 宽, 120px):单组且拆了不空才许诺,免得画空头支票
-            (cx - b.left <= Math.min(EDGE_BAND_RATIO * (b.right - b.left), EDGE_BAND_MAX_PX) ||
-              b.right - cx <= Math.min(EDGE_BAND_RATIO * (b.right - b.left), EDGE_BAND_MAX_PX)) &&
-            groups.length === 1 &&
-            srcGroup &&
-            srcGroup.tabs.length > 1
-          ) {
-            const side = relX < 0.5 ? 'left' : 'right'
-            zone = { type: 'pane', groupId: b.groupId, zone: side }
+          } else if (srcGroupId !== b.groupId) {
+            // 中段三分之一 = 中心许诺:只对别组画「挪到这一组」;自家组中心不画饼
+            zone = { type: 'pane', groupId: b.groupId, zone: 'center' }
             setDropMark((prev) =>
-              prev?.groupId === b.groupId && prev.zone === side
+              prev?.groupId === b.groupId && prev.zone === 'center'
                 ? prev
-                : { groupId: b.groupId, zone: side }
+                : { groupId: b.groupId, zone: 'center' }
             )
             hit = true
           }
@@ -493,6 +495,9 @@ export function TopBarTabs({
               onClose={closeTab}
               onMoveTab={moveTab}
               onDetachTab={onDetachTab}
+              onSetViewMode={onSetViewMode}
+              onRevealInTree={onRevealInTree}
+              workspaceRoot={workspaceRoot}
               dragSourceId={drag?.id ?? null}
               gapIndex={gap?.groupId === g.id ? gap.index : null}
               gapWidth={drag?.width ?? 0}

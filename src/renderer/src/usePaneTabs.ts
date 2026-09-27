@@ -14,7 +14,8 @@ import {
   moveTabToHost,
   nextTabId,
   type PaneGroup,
-  type PaneTab
+  type PaneTab,
+  type PaneViewMode
 } from './paneTabs'
 import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
@@ -320,6 +321,17 @@ export function usePaneTabs(deps: {
     }
   }
 
+  // 页签看片档位(阅读模式这锤):源码/阅读记在签身上 —— 拖去子窗、会话存档都跟着签走
+  function setTabViewMode(id: string, mode: PaneViewMode): void {
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.tabs.some((t) => t.id === id)
+          ? { ...g, tabs: g.tabs.map((t) => (t.id === id ? { ...t, viewMode: mode } : t)) }
+          : g
+      )
+    )
+  }
+
   // 两组分割条:拖动调左右比例(左边占比记进本机),双击回对半
   function applyPaneSplit(v: number): void {
     const next = clampPaneSplit(v)
@@ -368,6 +380,7 @@ export function usePaneTabs(deps: {
     moveTab,
     activateTab,
     closeTab,
+    setTabViewMode,
     markFlash,
     applyPaneSplit,
     onPaneSashDown,

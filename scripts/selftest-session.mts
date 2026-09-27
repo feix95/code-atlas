@@ -57,7 +57,8 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
           kind: 'preview',
           relPath: 'src/b.ts',
           name: 'b.ts',
-          icon: 'ts'
+          icon: 'ts',
+          viewMode: 'reading'
         }
       ]
     },
@@ -76,6 +77,27 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
   assert.equal(back.sel, 'src/b.ts')
   assert.equal(back.groups.length, 2)
   assert.equal(back.groups[0].tabs[1].on, true)
+  assert.equal(back.groups[0].tabs[1].viewMode, 'reading', '看片档位跟着签走')
+})
+
+check('parseSession:写坏的 viewMode 不连累签,直接当没存过;水合后档还在', () => {
+  const s = parseSession({
+    v: 1,
+    folder: 'C:\\a',
+    groups: [
+      {
+        tabs: [
+          { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts', viewMode: 'reading' },
+          { kind: 'preview', relPath: 'src/b.ts', name: 'b.ts', icon: 'ts', viewMode: 'nonsense' }
+        ]
+      }
+    ]
+  })
+  assert.equal(s?.groups[0].tabs[0].viewMode, 'reading', '合法档认账')
+  assert.equal(s?.groups[0].tabs[1].viewMode, undefined, '野档扔掉回默认')
+  const h = hydrateSession(s!, tree)
+  assert.equal(h?.groups[0].tabs[0].viewMode, 'reading', '水合后档还在签身上')
+  assert.equal(h?.groups[0].tabs[1].viewMode, undefined)
 })
 
 check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', () => {

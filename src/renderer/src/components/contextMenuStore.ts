@@ -11,16 +11,24 @@ export interface ContextMenuItem {
   disabled?: boolean
   /** 悬停轻提示(data-tip) */
   tip?: string
+  /** 行内图标(TreeIcon 户口名):带图标档的菜单(Obsidian 式页签菜单)才摆,窄身档不带 */
+  icon?: string
+  /** 行尾状态勾:一组互斥档位里「当前在哪档」亮灯(阅读/源码模式这类) */
+  checked?: boolean
   /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它 */
   run: () => void | string | Promise<string | null | void>
 }
+
+/** 组间细线记号:行项清单里插一条 = 两组之间画道分隔线(Obsidian 菜单分组) */
+export const MENU_SEP = 'sep' as const
+export type ContextMenuEntry = ContextMenuItem | typeof MENU_SEP
 
 export interface ContextMenuRequest {
   x: number
   y: number
   /** 菜单开在哪个 document(realm 铁律):主窗和每个子窗各挂一台菜单,各认各的请求 */
   doc: Document
-  items: ContextMenuItem[]
+  items: ContextMenuEntry[]
   /** 窄身档:行项少的菜单(两三行)别按通用宽度撑开,贴着字宽摆 */
   compact?: boolean
   /** 生在光标正右侧(垂直居中对光标、左缘隔空一个汉字):贴着输入区的小菜单顺手位 */

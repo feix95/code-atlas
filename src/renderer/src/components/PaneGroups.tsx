@@ -76,16 +76,12 @@ export function PaneGroups({
                   <PaneEmptyBoard />
                 ) : null}
                 {dropMark?.groupId === g.id && dropMark.zone === 'center' && (
-                  <div className="pane-drop-hint" aria-hidden="true">
-                    松手,挪到这一组
-                  </div>
+                  <div className="pane-drop-hint" aria-hidden="true" />
                 )}
                 {/* 边缘分屏许诺:亮贴近的那半边(分组只长横排,只许左右缘 —— 小葵的二期手势) */}
                 {dropMark?.groupId === g.id &&
                   (dropMark.zone === 'left' || dropMark.zone === 'right') && (
-                    <div className={`pane-drop-edge is-${dropMark.zone}`} aria-hidden="true">
-                      {dropMark.zone === 'left' ? '松手,拆到左半屏' : '松手,拆到右半屏'}
-                    </div>
+                    <div className={`pane-drop-edge is-${dropMark.zone}`} aria-hidden="true" />
                   )}
                 {/* 设置签保活层:切去别的页签只藏不拆 —— 改到一半的草稿(配色/缩放/AI 配置)
                     还得在;关掉页签才卸载,卸载清理把预览退回存档(SettingsPage 里兜底) */}

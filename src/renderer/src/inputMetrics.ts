@@ -13,3 +13,8 @@ export const CHAT_ACTION_ICON_SIZE = 16
 export const MSG_ACTION_ICON_SIZE = 13
 /** 聊天内嵌小图标(附件回形针/代码引用芯片这类跟着文字走的) */
 export const INLINE_ICON_SIZE = 12
+/** 右键菜单行内图标的尺寸(通用 ContextMenu 一档):比行字略大、不占行高 */
+export const MENU_ICON_SIZE = 14
+
+/** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和撕窗子窗同一颗钮,同一本账 */
+export const WIN_ICON_SIZE = 18

@@ -510,6 +510,21 @@ function App(): React.JSX.Element {
     else openFileTab(f)
   }
 
+  // 页签右键「在文件列表中显示当前文件」(阅读模式这锤):回侧栏树里选中它 +
+  // 展开父链滚过去;侧栏收着就先掀开 —— 定位的反馈只有看得见才算数。
+  // 子窗里的签点这项,动的是主窗侧栏(树只有那儿有)
+  function revealTabInTree(id: string): void {
+    if (!result) return
+    const t = groups.flatMap((g) => g.tabs).find((x) => x.id === id)
+    if (!t || t.kind !== 'preview' || t.relPath === '') return
+    const f = findFile(result.tree, t.relPath)
+    if (!f) return
+    if (sidebarCollapsed) toggleSidebarCollapsed()
+    setSelectedFile(f)
+    setSelectedFolder(null)
+    setRevealPaths(new Set(dirChainOf(result.tree, t.relPath)))
+  }
+
   // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
   // 最近列表 ✕ 即删(UI v3 §7.1:删了就是删了,旧撤销横幅链路退役),pin 钮同理即写账
@@ -633,6 +648,7 @@ function App(): React.JSX.Element {
     moveTab,
     activateTab,
     closeTab,
+    setTabViewMode,
     markFlash,
     applyPaneSplit,
     onPaneSashDown,
@@ -710,6 +726,9 @@ function App(): React.JSX.Element {
     setDropMark,
     onTabDragEnd,
     onDetachTab,
+    setTabViewMode,
+    revealTabInTree,
+    workspaceRoot: result?.rootPath ?? null,
     paneSplit,
     setActiveGroupId,
     dropMark,
@@ -821,6 +840,9 @@ function App(): React.JSX.Element {
                   setDropMark={setDropMark}
                   onTabDragEnd={onTabDragEnd}
                   onDetachTab={onDetachTab}
+                  onSetViewMode={setTabViewMode}
+                  onRevealInTree={revealTabInTree}
+                  workspaceRoot={result?.rootPath ?? null}
                   paneSplit={paneSplit}
                 />
               ) : null

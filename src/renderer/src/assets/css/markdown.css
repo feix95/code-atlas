@@ -132,7 +132,9 @@
 }
 
 .file-path-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
   padding: 0.375rem 0.625rem;
   border: 0;
@@ -145,6 +147,40 @@
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* 行内图标槽(带图标档的菜单,页签右键那套):定宽槽,字对齐;窄身档不带图标不吃这套 */
+.fpm-ic {
+  display: inline-flex;
+  width: 1rem;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--muted-2);
+}
+
+.file-path-menu-item:hover .fpm-ic {
+  color: inherit;
+}
+
+/* 行尾状态勾(互斥档位的「当前档」亮灯,阅读/源码模式) */
+.fpm-check {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--sash-hi);
+}
+
+.fpm-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 组间细线(Obsidian 式分组):1px 线 + 上下透气,菜单内分组全靠它 */
+.file-path-menu-sep {
+  height: 1px;
+  margin: 0.1875rem 0.375rem;
+  background: var(--line);
 }
 
 .file-path-menu-item:hover {
