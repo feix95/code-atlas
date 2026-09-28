@@ -44,7 +44,9 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
   return out
 }
 
-/** 行内 token → 元素;text/bold/em 的内文仍过文件链接对账(与旧行为持平) */
+/** 行内 token → 元素;text/bold/em 的内文仍过文件链接对账(与旧行为持平)。
+ * 行内代码不分段染色(染色退役案):尖括号/括号等一律普通字,整段同色;
+ * 围栏块同理,语法高亮只在有明确语言标注时才允许做(现在没做,原样输出) */
 function renderInline(
   nodes: MdInline[],
   links: FileLinkTarget | undefined,

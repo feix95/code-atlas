@@ -1,3 +1,14 @@
+/* ── 阅读档疏密户口:排版间距变量集中在这,微调改一处,不散落硬编码 ── */
+:root {
+  --md-reading-lh: 1.75; /* 正文行高(中文长文舒适档 1.7–1.8) */
+  --md-li-gap: 0.4em; /* 列表条目之间的缝 */
+  --md-sublist-gap: 0.25em; /* 嵌套列表第一项上方的缝 */
+  --md-para-gap: 0.9em; /* 段落间距 */
+  --md-h-gap-top: 1.6em; /* 标题上留白(大于下方,章节分得开) */
+  --md-h-gap-bottom: 0.6em; /* 标题下留白 */
+  --md-cell-pad-y: 0.5em; /* 表格单元格上下内边距 */
+}
+
 /* ── 迷你 Markdown(第一百零七锤):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
 .md {
   white-space: normal;
@@ -41,24 +52,29 @@
   font-weight: var(--font-w-semi);
 }
 
-/* 阅读档标题量级:em 级差对齐 Obsidian 默认主题(--h1~h4-size 真值)。
+/* 阅读档标题量级:对齐 Obsidian 默认主题真值(--h1~h4-size/--h*-line-height,
+   app.css 扒出的官方档)。h4 与正文同号只靠字重分家 —— 这是正版语义,不是漏。
    铁规矩:必须写在本文件、排在上面 .md .md-hN 后面 —— 两边特异性平级(双类),
    谁后写谁赢;workspace.css 导入顺序比本文件靠前,写那边会被这里盖死(隐形案)。
    em 跟着可读栏基字号走,Ctrl+滚轮文档缩放天然全场同步 */
 .code-reading .md-h1 {
-  font-size: 1.8em;
+  font-size: 2.25em;
+  line-height: 1.111;
 }
 
 .code-reading .md-h2 {
-  font-size: 1.6em;
+  font-size: 1.5em;
+  line-height: 1.333;
 }
 
 .code-reading .md-h3 {
-  font-size: 1.37em;
+  font-size: 1.25em;
+  line-height: 1.6;
 }
 
 .code-reading .md-h4 {
-  font-size: 1.25em;
+  font-size: 1em;
+  line-height: 1.5;
 }
 
 .md ul,
@@ -71,13 +87,24 @@
   margin: 0.15em 0;
 }
 
+/* 行内代码(GitHub/Claude 款药丸):淡底 + 哑灰字 + 等宽,单色不染色 ——
+   <xxx> 这类尖括号串也是普通字,红色只留给错误/警告/删除等真状态。
+   上下 padding 趋零 + clone 折行:长代码换行后,上下两截灰底之间露出
+   行高空隙,不会贴成一整块 */
 .md code {
   font-family: var(--mono);
   font-size: 0.9em;
+  line-height: inherit;
   background: var(--hover);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-xxs);
-  padding: 0 0.25em;
+  padding: 0.05em 0.3em;
+  box-decoration-break: clone;
+  color: var(--muted);
+}
+
+/* 标题里的行内代码不许比标题小 */
+.md .md-h code {
+  font-size: inherit;
 }
 
 .md-pre {
@@ -93,6 +120,9 @@
   background: transparent;
   border: 0;
   padding: 0;
+  /* 块内字号 100%:不叠 .md code 的 0.9em 二次缩水;色跟 pre 走不吃哑灰 */
+  font-size: 1em;
+  color: inherit;
 }
 
 .md blockquote {
@@ -142,10 +172,37 @@
   vertical-align: -0.08em;
 }
 
-/* 嵌套列表:子表贴紧父项,别按段落那么透气 */
-.md li > ul,
-.md li > ol {
-  margin: 0.1em 0;
+/* ── 阅读档疏密排版(数值户口在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动) ── */
+
+.code-reading .md {
+  line-height: var(--md-reading-lh);
+}
+
+.code-reading .md p {
+  margin-block: var(--md-para-gap);
+}
+
+.code-reading .md li + li {
+  margin-top: var(--md-li-gap);
+}
+
+/* 嵌套列表:子表贴紧父项,只留条小缝 */
+.code-reading .md li > ul,
+.code-reading .md li > ol {
+  margin: var(--md-sublist-gap) 0 0;
+}
+
+.code-reading .md .md-h {
+  margin: var(--md-h-gap-top) 0 var(--md-h-gap-bottom);
+}
+
+.code-reading .md .md-h:first-child {
+  margin-top: 0;
+}
+
+.code-reading .md-table th,
+.code-reading .md-table td {
+  padding: var(--md-cell-pad-y) 0.65em;
 }
 
 /* callout(Obsidian 招牌):> [!type] 升级成彩条提示块 */
@@ -204,13 +261,14 @@
   color: var(--muted);
 }
 
-/* 内联标题(Obsidian 的 inline title):阅读模式顶上摆文件名 */
+/* 内联标题(Obsidian 的 inline title):阅读模式顶上摆文件名。
+   --inline-title-size 真值 2.25em,与 h1 同号 */
 .md-title {
   margin: 0 0 0.6em;
   color: var(--text-strong);
-  font-size: 1.9em;
+  font-size: 2.25em;
   font-weight: var(--font-w-strong);
-  line-height: 1.25;
+  line-height: 1.111;
   text-align: center;
 }
 
