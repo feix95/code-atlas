@@ -243,6 +243,8 @@
 
 .cfg-theme {
   position: relative;
+  /* 宽不够时整卡换行;不设下限会把卡里的字压成竖排(150% 缩放抓过现行) */
+  min-width: 9rem;
   display: flex;
   align-items: center;
   gap: 0.4375rem;
@@ -383,7 +385,8 @@
 .cfg-slider-wrap input {
   width: 100%;
   display: block;
-  accent-color: var(--accent-bright);
+  /* 滑杆是功能控件:走分屏拖边那条功能蓝,不跟主题色变 */
+  accent-color: var(--sash-hi);
   cursor: pointer;
 }
 
@@ -409,6 +412,8 @@
 
 .cfg-segmented {
   display: flex;
+  /* 150% 缩放下面板变窄:让按钮整枚换行,不许挤出卡缘 */
+  flex-wrap: wrap;
   padding: 0.1875rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -438,7 +443,7 @@
 }
 
 .cfg-segmented button.is-selected {
-  color: var(--accent-bright);
+  color: var(--sash-hi); /* 选中态是功能语义,吃功能蓝不随主题色 */
   background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -555,7 +560,9 @@
 }
 
 .cfg-switch.is-on {
-  background: var(--green);
+  /* 功能性开关开态吃分屏拖边那条功能蓝(自查清单:功能强调统一走 --sash-hi);
+     绿色只留给「已同步」这类状态语义 */
+  background: var(--sash-hi);
 }
 
 .cfg-switch.is-on span {
@@ -841,7 +848,7 @@
 }
 
 .cfg-foot {
-  min-height: 3.75rem;
+  min-height: 2.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;

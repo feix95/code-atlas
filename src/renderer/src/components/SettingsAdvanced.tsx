@@ -4,7 +4,7 @@ import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 
-/** 设置分区「04 高级选项」:本地模型路径 / 模型货架 / LM Studio 连接 / 上下文档位 / 后台日志与版本(纯展示) */
+/** 设置分区「高级选项」:本地模型路径 / 模型货架 / LM Studio 连接 / 上下文档位 / 后台日志与版本(纯展示) */
 export function SettingsAdvanced({
   advancedRef,
   draftConfig,
@@ -67,13 +67,7 @@ export function SettingsAdvanced({
         advancedRef.current = el
       }}
     >
-      <div className="cfg-section-head">
-        <div>
-          <span className="cfg-step">04</span>
-          <h3>高级选项</h3>
-        </div>
-        <span>本地模型与连接详情(常开:换模型是常干活,不再折着藏)</span>
-      </div>
+      <h3 className="cfg-group-title">高级选项</h3>
       {/* 常开面板(小葵定的板:换模型是高频活,折叠的那一下点击纯属过路费;
                     防误改的保险在「保存」那一环 —— 不点保存,改了也白改) */}
       <div className="cfg-panel cfg-advanced">
@@ -114,7 +108,7 @@ export function SettingsAdvanced({
                   </button>
                 </div>
                 <p className="cfg-field-help">
-                  模型是 AI 的大脑,一个独立文件;以后想换更强的 AI,换个模型文件就行。
+                  模型是 AI 的大脑,一个独立文件;想换更强的换个文件就行。
                 </p>
                 <div className="cfg-field-head">
                   <label>模型货架</label>
@@ -228,9 +222,7 @@ export function SettingsAdvanced({
                   />
                 </div>
                 <p className="cfg-field-help">
-                  模型一次能读多少字。功能定位的地图、干活报告、回复长度的预算都按它按比例算 ——
-                  换大模型自动多喂,换小模型自动省着用。 范围 512 ~
-                  1048576;打错了不用怕,点到别处或保存时自动归到最近的合法数;清空 = 交回自动探测。
+                  模型一次能读多少字,范围 512 ~ 1048576;留空自动探测,点到别处自动归到最近的合法数。
                 </p>
                 {/* 档位滑块(2026-09-13):程序员档位一拨就填好,刻度也能直接点;拖动 = 切到手动档 */}
                 {contextNotches.length > 0 && (
@@ -291,8 +283,7 @@ export function SettingsAdvanced({
           打开后台日志
         </button>
         <p className="cfg-field-help">
-          Developer 日志:引擎原话、每笔请求的报账、应用的记账,全在一本账里 ——
-          模型在干嘛、卡在哪,开窗就知道。
+          Developer 日志:引擎原话、每笔请求的报账全在一本账里,模型在干嘛开窗就知道。
         </p>
       </div>
 

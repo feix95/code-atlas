@@ -29,7 +29,7 @@
 .cfg-ctx-range input {
   width: 100%;
   display: block;
-  accent-color: var(--accent-bright);
+  accent-color: var(--sash-hi); /* 功能控件统一走 --sash-hi */
   cursor: pointer;
 }
 

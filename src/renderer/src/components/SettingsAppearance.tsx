@@ -7,6 +7,7 @@ import {
   type AppearancePreset
 } from '../appearance'
 import { TreeIcon } from './Icons'
+import { CfgRow } from './CfgRow'
 
 const MODES: Array<{ key: AppearanceMode; name: string }> = [
   { key: 'auto', name: '跟随系统' },
@@ -20,7 +21,7 @@ const THEME_SUB: Record<AppearancePreset, string> = {
   custom: '手动调整'
 }
 
-/** 设置分区「01 外观与阅读」:亮暗 / 配色主题 / 自定义三色 / 界面大小滑杆(纯展示,状态全在 SettingsPage) */
+/** 设置分区「外观」:亮暗 / 配色主题 / 自定义三色 / 界面大小滑杆(纯展示,状态全在 SettingsPage) */
 export function SettingsAppearance({
   appearanceRef,
   draftAppearance,
@@ -53,18 +54,9 @@ export function SettingsAppearance({
         appearanceRef.current = el
       }}
     >
-      <div className="cfg-section-head">
-        <div>
-          <span className="cfg-step">01</span>
-          <h3>外观与阅读</h3>
-        </div>
-        <span>影响整个工作区的显示方式</span>
-      </div>
+      <h3 className="cfg-group-title">外观</h3>
       <div className="cfg-panel">
-        <div className="cfg-row">
-          <div className="cfg-copy">
-            <label>亮还是暗</label>
-          </div>
+        <CfgRow label="亮还是暗">
           <div className="cfg-segmented">
             {MODES.map((m) => (
               <button
@@ -77,15 +69,9 @@ export function SettingsAppearance({
               </button>
             ))}
           </div>
-        </div>
+        </CfgRow>
         <div className="cfg-divider" />
-        <div className="cfg-row">
-          <div className="cfg-copy">
-            <label>配色主题</label>
-            <p>
-              选择一组在文件树、详情面板和状态信息中使用的颜色。换回任何预设会扔掉自定义色,两边不打架。
-            </p>
-          </div>
+        <CfgRow label="配色主题" hint="用在文件树、详情和状态信息上的一套颜色。">
           <div className="cfg-themes">
             {COLOR_PRESETS.map((p) => (
               <button
@@ -133,17 +119,14 @@ export function SettingsAppearance({
               )}
             </button>
           </div>
-        </div>
+        </CfgRow>
         {draftAppearance.preset === 'custom' && (
           <>
             <div className="cfg-divider" />
-            <div className="cfg-row">
-              <div className="cfg-copy">
-                <label>自定义颜色</label>
-                <p>
-                  主题色管按钮、选中这些主角色;辅助色管边框线、图标这些配角色;底板色管画布、面板染什么色调——只取颜色倾向,亮暗自动跟白天/黑夜走,选什么都不会翻车。
-                </p>
-              </div>
+            <CfgRow
+              label="自定义颜色"
+              hint="主题色管按钮和选中项,辅助色管线框图标,底板色管画布底色。"
+            >
               <div className="cfg-colors">
                 <label className="cfg-color">
                   主题色
@@ -183,15 +166,11 @@ export function SettingsAppearance({
                   </button>
                 )}
               </div>
-            </div>
+            </CfgRow>
           </>
         )}
         <div className="cfg-divider" />
-        <div className="cfg-row">
-          <div className="cfg-copy">
-            <label>界面大小</label>
-            <p>调整文件树、标签和辅助文字的整体缩放。当前仅影响本机显示。</p>
-          </div>
+        <CfgRow label="界面大小" hint="调整文件树、标签和文字的整体缩放,只影响本机。">
           <div className="cfg-scale">
             <button
               type="button"
@@ -235,7 +214,7 @@ export function SettingsAppearance({
             </button>
             <output className="cfg-scale-value">{Math.round(scaleShown * 100)}%</output>
           </div>
-        </div>
+        </CfgRow>
       </div>
     </section>
   )

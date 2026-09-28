@@ -52,13 +52,19 @@
   font-weight: var(--font-w-semi);
 }
 
-/* 阅读档标题量级:对齐 Obsidian 默认主题真值(--h1~h4-size/--h*-line-height,
-   app.css 扒出的官方档)。h4 与正文同号只靠字重分家 —— 这是正版语义,不是漏。
+.md .md-h5,
+.md .md-h6 {
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-semi);
+}
+
+/* 阅读档标题量级:h1~h6 走业内常用档(2 / 1.5 / 1.25 / 1 / 0.875 / 0.85em),
+   行高跟 Obsidian 官方档;h4 起与正文同号靠字重分家 —— 这是正版语义,不是漏。
    铁规矩:必须写在本文件、排在上面 .md .md-hN 后面 —— 两边特异性平级(双类),
    谁后写谁赢;workspace.css 导入顺序比本文件靠前,写那边会被这里盖死(隐形案)。
    em 跟着可读栏基字号走,Ctrl+滚轮文档缩放天然全场同步 */
 .code-reading .md-h1 {
-  font-size: 2.25em;
+  font-size: 2em;
   line-height: 1.111;
 }
 
@@ -74,6 +80,16 @@
 
 .code-reading .md-h4 {
   font-size: 1em;
+  line-height: 1.5;
+}
+
+.code-reading .md-h5 {
+  font-size: 0.875em;
+  line-height: 1.5;
+}
+
+.code-reading .md-h6 {
+  font-size: 0.85em;
   line-height: 1.5;
 }
 
@@ -93,7 +109,7 @@
    行高空隙,不会贴成一整块 */
 .md code {
   font-family: var(--mono);
-  font-size: 0.9em;
+  font-size: 0.85em; /* GitHub 惯例:行内代码吃正文 85% */
   line-height: inherit;
   background: var(--hover);
   border-radius: var(--radius-xxs);
@@ -120,7 +136,7 @@
   background: transparent;
   border: 0;
   padding: 0;
-  /* 块内字号 100%:不叠 .md code 的 0.9em 二次缩水;色跟 pre 走不吃哑灰 */
+  /* 块内字号 100%:不叠 .md code 的 0.85em 二次缩水;色跟 pre 走不吃哑灰 */
   font-size: 1em;
   color: inherit;
 }
@@ -143,7 +159,7 @@
 .md-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95em;
+  font-size: 1em;
 }
 
 .md-table th,
@@ -262,14 +278,13 @@
 }
 
 /* 内联标题(Obsidian 的 inline title):阅读模式顶上摆文件名。
-   --inline-title-size 真值 2.25em,与 h1 同号 */
+   2em = 14px 基字号下的 28px,比文内 h1(24px)大一号拉开层级 */
 .md-title {
   margin: 0 0 0.6em;
   color: var(--text-strong);
-  font-size: 2.25em;
+  font-size: 2em;
   font-weight: var(--font-w-strong);
   line-height: 1.111;
-  text-align: center;
 }
 
 .md .md-link {

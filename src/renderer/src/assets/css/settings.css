@@ -1,5 +1,7 @@
-/* ── 设置页(UI v3 §6:弹窗退役改页签)──
-   暂存 + 预览 + 应用:改动先进草稿即时预览,点「应用更改」才落盘;
+/* ── 设置页(UI v3 §6:弹窗退役改页签;第二步 Obsidian 式)──
+   左侧栏换脸成设置导航(WorkspaceSidebar),右侧一张连续滚动长页:
+   分组 = 粗体小标题 + 浅灰大卡,卡内行与行只有发丝分隔线。
+   暂存 + 预览 + 应用机制不动:改动先进草稿即时预览,点「应用更改」才落盘;
    恢复默认/卸载退回上次保存的样子。颜色全走语义 token,亮暗自动换装 */
 
 /* 页签正文房间:填满整个 pane-body,左目录右内容在 .cfg-body 里分栏 */
@@ -34,42 +36,43 @@
 .cfg-body {
   min-height: 0;
   flex: 1;
-  display: grid;
-  grid-template-columns: 12.125rem minmax(0, 1fr);
-  /* 行高锁死在可用空间:内容再高也只在 .cfg-scroll 里滚,
+  /* 导航搬去侧栏后剩单列:内容再高也只在 .cfg-scroll 里滚,
      不然分区会把弹窗体撑高、整块压在页脚按钮上(探针抓过现行) */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
-.cfg-content {
-  min-height: 0;
+/* ── 设置模式下的侧栏换脸件(第二步):「设置」标题行 + 分类导航 ── */
+.cfg-snav-head {
+  display: flex;
+  align-items: center;
 }
 
-.cfg-nav {
+.cfg-snav-title {
+  padding: 0 0.375rem;
+  color: var(--text-strong);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-bold);
+}
+
+.cfg-snav {
   display: flex;
   flex-direction: column;
-  padding: 1.3125rem 0.6875rem 0.875rem;
-  border-right: 1px solid var(--line);
-  background: var(--surface-soft);
+  gap: 0.125rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0.6875rem 0.875rem;
 }
 
-.cfg-nav-caption {
-  padding: 0 0.625rem 0.5625rem;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-bold);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.cfg-nav-item {
-  position: relative;
+.cfg-snav-item {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
   width: 100%;
-  min-height: 3.25rem;
-  padding: 0.5rem 0.625rem;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.625rem;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -81,124 +84,40 @@
     color var(--dur-2) var(--ease-smooth);
 }
 
-.cfg-nav-item:hover {
+.cfg-snav-item:hover {
   color: var(--text);
   background: var(--hover);
 }
 
-.cfg-nav-item.is-active {
-  color: var(--accent-bright);
-  background: var(--accent-soft);
+/* Obsidian 式选中:灰底药丸,不画强调色条 —— 颜色只留给功能性控件 */
+.cfg-snav-item.is-active {
+  color: var(--text);
+  background: var(--hover);
 }
 
-.cfg-nav-icon {
-  width: 1.6875rem;
-  height: 1.6875rem;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
-}
-
-.cfg-nav-item strong,
-.cfg-nav-item small {
-  display: block;
-}
-
-.cfg-nav-item strong {
+.cfg-snav-item strong {
   font-size: var(--font-xs);
   font-weight: var(--font-w-strong);
 }
 
-.cfg-nav-item small {
-  margin-top: 0.1875rem;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
-}
-
-.cfg-nav-item.is-active small {
-  color: var(--accent-bright);
-  opacity: 0.75;
-}
-
-.cfg-nav-marker {
-  position: absolute;
-  top: 0.8125rem;
-  right: 0;
-  width: 0.1875rem;
-  height: 1.6875rem;
-  border-radius: 0.25rem 0 0 0.25rem;
-  background: var(--accent-bright);
-}
-
-.cfg-nav-rule {
-  height: 1px;
-  margin: 1.0625rem 0.625rem;
-  background: var(--line-soft);
-}
-
-/* 卡框左右缘对齐导航项盒子(margin 0 + 侧栏 padding 0.6875),
-   chip 落在 0.6875+0.625=1.3125rem —— 跟导航 chip 一条竖线 */
-.cfg-nav-context {
+/* 设置模式下装着文件树/搜索结果的保活壳:display:none 只藏不拆,
+   树里每个目录的展开态和滚动位都是节点自己的 state,卸了就清零 */
+.sidebar-mid {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0.625rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
-/* chip 跟导航项同款(27px 方盒 + radius-sm),图标在方框里居中;accent 色保留身份 */
-.cfg-context-icon {
-  width: 1.6875rem;
-  height: 1.6875rem;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  color: var(--accent-bright);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-/* 只给文字行的 span 立 block;图标 chip(cfg-context-icon 也是 span)不能被误伤,
-   不然 display:grid 被顶掉、图标就贴到 chip 左上角去了 —— 之前「小电脑蹲左上」的病根 */
-.cfg-nav-context strong,
-.cfg-nav-context div span {
-  display: block;
-}
-
-/* 标题字号跟导航项一致(0.6875rem),不再小一号 */
-.cfg-nav-context strong {
-  color: var(--text);
-  font-size: var(--font-xs);
-}
-
-.cfg-nav-context span {
-  margin-top: 0.1875rem;
-  max-width: 7.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-2);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-}
-
-.cfg-nav-footnote {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin: auto 0.5rem 0;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
+.sidebar-mid[hidden] {
+  display: none;
 }
 
 .cfg-content {
   min-width: 0;
-  background: var(--window);
+  min-height: 0;
+  /* Obsidian 式:页面白、分块灰 —— 跟旧「页面灰、卡片白」反着来 */
+  background: var(--surface);
 }
 
 .cfg-scroll {
@@ -208,112 +127,25 @@
   padding: 1.5625rem 2rem 1.875rem;
 }
 
-.cfg-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.4375rem;
-}
-
-.cfg-eyebrow {
-  color: var(--accent-bright);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-  letter-spacing: 0.1em;
-}
-
-.cfg-intro h2 {
-  margin: 0.4375rem 0 0.3125rem;
+/* 组标题 = 纯粗体小标题,无框无底(Obsidian「帐户」「高级」同款层级) */
+.cfg-group-title {
+  margin: 0 0 0.5625rem;
+  padding: 0 0.25rem;
   color: var(--text-strong);
-  font-size: 1.1875rem;
-  font-weight: var(--font-w-bold);
-  letter-spacing: 0;
-}
-
-.cfg-intro p {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--font-xs);
-  line-height: var(--lh-160);
-}
-
-.cfg-live-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex: 0 0 auto;
-  margin-top: 0.25rem;
-  padding: 0.375rem 0.5rem;
-  color: var(--green);
-  border: 1px solid var(--green-line);
-  border-radius: var(--radius-sm);
-  background: var(--green-soft);
-  font-size: var(--font-xxs);
-}
-
-.cfg-live-status i {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--green) 15%, transparent);
-}
-
-.cfg-live-status.is-dirty {
-  color: var(--amber);
-  border-color: var(--amber-line);
-  background: var(--amber-soft);
-}
-
-.cfg-live-status.is-dirty i {
-  background: var(--amber);
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--amber) 15%, transparent);
-}
-
-.cfg-section {
-  scroll-margin-top: 1.25rem;
-  margin-bottom: 1.375rem;
-}
-
-.cfg-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.5625rem;
-}
-
-.cfg-section-head > div {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.cfg-section-head h3 {
-  margin: 0;
-  color: var(--text);
   font-size: var(--font-sm);
   font-weight: var(--font-w-bold);
 }
 
-.cfg-section-head > span {
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
+.cfg-section {
+  margin-bottom: 1.625rem;
 }
 
-.cfg-step {
-  min-width: 1.4375rem;
-  color: var(--accent-bright);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-}
-
+/* 组卡 = 浅灰大块:无描边,行内控件不再各自画框 */
 .cfg-panel {
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-soft);
 }
 
 .cfg-row {
@@ -337,7 +169,7 @@
 }
 
 .cfg-copy p {
-  max-width: 17.5rem;
+  max-width: 30rem; /* 单栏变宽后说明可以写长行,不用再早早折行 */
   margin: 0.3125rem 0 0;
   color: var(--muted);
   font-size: var(--font-xxs);

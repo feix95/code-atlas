@@ -246,8 +246,9 @@ try {
     1,
     'reopening settings must focus the same tab'
   )
-  await page.locator('.cfg-nav-item').filter({ hasText: '高级选项' }).click()
-  await page.locator('.cfg-nav-item.is-active').filter({ hasText: '高级选项' }).waitFor()
+  // 第二步:导航搬进侧栏(.cfg-snav-item),点击 = 跳到对应节(scroll-spy 回写高亮)
+  await page.locator('.cfg-snav-item').filter({ hasText: '高级选项' }).click()
+  await page.locator('.cfg-snav-item.is-active').filter({ hasText: '高级选项' }).waitFor()
   await page.locator('#cfg-model-path').waitFor()
   await shot('settings-page')
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()

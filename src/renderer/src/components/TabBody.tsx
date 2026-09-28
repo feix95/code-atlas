@@ -65,7 +65,8 @@ export function TabBody({
   settingsWorkspaceName,
   settingsSectionReq,
   onAiConfigSaved,
-  onChatSuggestionsChange
+  onChatSuggestionsChange,
+  onSettingsSection
 }: {
   tab: PaneTab
   result: ScanResult | null
@@ -107,6 +108,8 @@ export function TabBody({
   settingsSectionReq: { section: SectionKey; seq: number } | undefined
   onAiConfigSaved: (config: AiConfig) => void
   onChatSuggestionsChange: (v: boolean) => void
+  /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
+  onSettingsSection: (key: SectionKey) => void
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
   // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
@@ -156,6 +159,7 @@ export function TabBody({
         onChatSuggestionsChange={onChatSuggestionsChange}
         sectionReq={settingsSectionReq}
         onAiConfigSaved={onAiConfigSaved}
+        onSettingsSection={onSettingsSection}
         onClose={() => closeTab(tab.id)}
       />
     )

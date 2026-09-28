@@ -15,6 +15,8 @@ import { DriveBrowser } from './DriveBrowser'
 import { FileTree } from './FileTree'
 import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
+import { TreeIcon } from './Icons'
+import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 
 export function WorkspaceSidebar({
   result,
@@ -56,7 +58,10 @@ export function WorkspaceSidebar({
   drives,
   drivesNote,
   onGoHome,
-  onOpenBrowseFile
+  onOpenBrowseFile,
+  settingsMode,
+  settingsSection,
+  onSettingsSection
 }: {
   /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
   result: ScanResult | null
@@ -118,6 +123,12 @@ export function WorkspaceSidebar({
   onGoHome: () => void
   /** 浏览态单击文件:开「瞄一眼」预览页签(scopeRoot = 浏览树的盘根) */
   onOpenBrowseFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
+  /** 设置模式(第二步):当前激活签是设置页时,侧栏换脸成设置导航;文件树保活藏着,不丢展开/滚动 */
+  settingsMode: boolean
+  /** 设置导航高亮项(App 的 settingsSection 账,滚动间谍喂的) */
+  settingsSection: SectionKey
+  /** 点导航 = 发一次跳转请求(走 sectionReq 同一条道,seq 记账) */
+  onSettingsSection: (key: SectionKey) => void
 }): React.JSX.Element {
   // ── workspace 卡 = 浏览器地址栏(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
   //    ⇅ 钮开/收;Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
@@ -171,141 +182,165 @@ export function WorkspaceSidebar({
       {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
           内联样式会压住类规则,所以宽度不挂行内 */}
       <aside className="sidebar">
-        {/* workspace 栏 = 地址栏式卡(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
-            ⇅ 钮开/收两态,菜单浮层盖在文件树上(不推挤布局、宽与卡同宽) */}
-        <div className="sidebar-top">
-          <div
-            className={`ws-card${pathShaking ? ' is-shaking' : ''}${menuOpen ? ' is-menu-open' : ''}`}
-            onAnimationEnd={() => setPathShaking(false)}
-            onClick={() => {
-              pathInputRef.current?.focus()
-              openMenu()
-            }}
-          >
-            <input
-              ref={pathInputRef}
-              className="ws-path"
-              type="text"
-              value={pathDraft}
-              placeholder={folder ? '文件夹路径,回车直接打开' : '这台电脑'}
-              disabled={scanning}
-              spellCheck={false}
-              aria-label="文件夹路径"
-              onChange={(e) => {
-                setPathDraft(e.target.value)
-                dismissPathHint()
-              }}
-              onKeyDown={onCardKeyDown}
-            />
-            <button
-              type="button"
-              className="tb-btn ws-menu-btn"
-              disabled={scanning}
-              data-tip={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
-              aria-label={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
-              aria-expanded={menuOpen}
-              onClick={(e) => {
-                // 点卡 = 开菜单的地址栏手感,⇅ 是明确的开关 —— 阻止冒泡别让卡的开抢戏
-                e.stopPropagation()
-                if (menuOpen) setMenuOpen(false)
-                else openMenu()
+        {/* 设置模式:顶卡换「设置」标题行,中段换分类导航;
+            文件树/搜索结果整棵藏进 .sidebar-mid(display:none 保活不卸载),
+            展开态和滚动位都长在节点自己身上,换回来原样还在 */}
+        {settingsMode ? (
+          <div className="sidebar-top cfg-snav-head">
+            <span className="cfg-snav-title">设置</span>
+          </div>
+        ) : (
+          <div className="sidebar-top">
+            <div
+              className={`ws-card${pathShaking ? ' is-shaking' : ''}${menuOpen ? ' is-menu-open' : ''}`}
+              onAnimationEnd={() => setPathShaking(false)}
+              onClick={() => {
+                pathInputRef.current?.focus()
+                openMenu()
               }}
             >
-              {/* 两条 chevron 分挂类名,悬停各自动画(lucide 线稿,TreeIcon 同款笔触) */}
-              <svg
-                className="wsm-chev"
-                width="1rem"
-                height="1rem"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+              <input
+                ref={pathInputRef}
+                className="ws-path"
+                type="text"
+                value={pathDraft}
+                placeholder={folder ? '文件夹路径,回车直接打开' : '这台电脑'}
+                disabled={scanning}
+                spellCheck={false}
+                aria-label="文件夹路径"
+                onChange={(e) => {
+                  setPathDraft(e.target.value)
+                  dismissPathHint()
+                }}
+                onKeyDown={onCardKeyDown}
+              />
+              <button
+                type="button"
+                className="tb-btn ws-menu-btn"
+                disabled={scanning}
+                data-tip={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
+                aria-label={menuOpen ? '收起工作区菜单' : '展开工作区菜单'}
+                aria-expanded={menuOpen}
+                onClick={(e) => {
+                  // 点卡 = 开菜单的地址栏手感,⇅ 是明确的开关 —— 阻止冒泡别让卡的开抢戏
+                  e.stopPropagation()
+                  if (menuOpen) setMenuOpen(false)
+                  else openMenu()
+                }}
               >
-                <path className="wsm-chev-t" d={menuOpen ? 'm7 1 5 5 5-5' : 'm7 5.5 5-5 5 5'} />
-                <path className="wsm-chev-b" d={menuOpen ? 'm7 23 5-5 5 5' : 'm7 18.5 5 5 5-5'} />
-              </svg>
-            </button>
-            {pathHint && !menuOpen && (
-              <div className="path-hint" role="status">
-                {pathHint}
-              </div>
-            )}
-            {menuOpen && (
-              <WorkspaceMenu
-                pinned={sections.pinned}
-                history={sections.history}
-                highlight={menuHi}
-                onOpen={(p) => {
-                  setMenuOpen(false)
-                  setMenuHi(-1)
-                  onOpenWorkspace(p)
-                }}
-                onTogglePin={onTogglePin}
-                onRemove={onRemoveRecent}
-                onHome={() => {
-                  setMenuOpen(false)
-                  setMenuHi(-1)
-                  onGoHome()
-                }}
-              />
-            )}
+                {/* 两条 chevron 分挂类名,悬停各自动画(lucide 线稿,TreeIcon 同款笔触) */}
+                <svg
+                  className="wsm-chev"
+                  width="1rem"
+                  height="1rem"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path className="wsm-chev-t" d={menuOpen ? 'm7 1 5 5 5-5' : 'm7 5.5 5-5 5 5'} />
+                  <path className="wsm-chev-b" d={menuOpen ? 'm7 23 5-5 5 5' : 'm7 18.5 5 5 5-5'} />
+                </svg>
+              </button>
+              {pathHint && !menuOpen && (
+                <div className="path-hint" role="status">
+                  {pathHint}
+                </div>
+              )}
+              {menuOpen && (
+                <WorkspaceMenu
+                  pinned={sections.pinned}
+                  history={sections.history}
+                  highlight={menuHi}
+                  onOpen={(p) => {
+                    setMenuOpen(false)
+                    setMenuHi(-1)
+                    onOpenWorkspace(p)
+                  }}
+                  onTogglePin={onTogglePin}
+                  onRemove={onRemoveRecent}
+                  onHome={() => {
+                    setMenuOpen(false)
+                    setMenuHi(-1)
+                    onGoHome()
+                  }}
+                />
+              )}
+            </div>
           </div>
-        </div>
-        {result ? (
-          // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
-          search ? (
-            <SearchResults
-              query={search.q}
-              hits={search.hits}
-              searching={search.searching}
-              truncated={search.truncated}
-              stoppedEarly={search.stoppedEarly}
-              onOpenFile={onOpenSearchFile}
-              onOpenDir={onOpenSearchDir}
-            />
-          ) : (
-            <FileTree
-              root={result.tree}
-              rootPath={result.rootPath}
-              notes={notes}
-              selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
-              expandingPath={expanding}
-              revealPaths={revealPaths}
-              onSelectFile={(_relPath, file) => void onOpenFile(file)}
-              onSelectFolder={onSelectDir}
-              onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-              onNoteEdit={editNoteFromTree}
-              onNoteRemove={(relPath) => saveNote(relPath, '')}
-              onPreviewFile={openPreview}
-            />
-          )
-        ) : (
-          /* 「这台电脑」空态(§7.1):盘符列表可下钻 —— 单击原地展开,
-             双击开为工作区,单击文件开预览页签 */
-          <DriveBrowser
-            drives={drives}
-            drivesNote={drivesNote}
-            onOpenWorkspace={onOpenWorkspace}
-            onOpenFile={onOpenBrowseFile}
-          />
         )}
-        {result && (
-          <footer className="sidebar-footer">
-            <span>
-              <i
-                className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`}
-                aria-hidden="true"
+        {settingsMode && (
+          <nav className="cfg-snav" aria-label="设置导航">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`cfg-snav-item${settingsSection === item.key ? ' is-active' : ''}`}
+                onClick={() => onSettingsSection(item.key)}
+              >
+                <TreeIcon name={item.icon} size={NAV_ICON_SIZE} mono />
+                <strong>{item.name}</strong>
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="sidebar-mid" hidden={settingsMode}>
+          {result ? (
+            // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
+            search ? (
+              <SearchResults
+                query={search.q}
+                hits={search.hits}
+                searching={search.searching}
+                truncated={search.truncated}
+                stoppedEarly={search.stoppedEarly}
+                onOpenFile={onOpenSearchFile}
+                onOpenDir={onOpenSearchDir}
               />
-              {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
-            </span>
-            <span className="mono">
-              {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
-            </span>
-          </footer>
-        )}
+            ) : (
+              <FileTree
+                root={result.tree}
+                rootPath={result.rootPath}
+                notes={notes}
+                selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
+                expandingPath={expanding}
+                revealPaths={revealPaths}
+                onSelectFile={(_relPath, file) => void onOpenFile(file)}
+                onSelectFolder={onSelectDir}
+                onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
+                onNoteEdit={editNoteFromTree}
+                onNoteRemove={(relPath) => saveNote(relPath, '')}
+                onPreviewFile={openPreview}
+              />
+            )
+          ) : (
+            /* 「这台电脑」空态(§7.1):盘符列表可下钻 —— 单击原地展开,
+             双击开为工作区,单击文件开预览页签 */
+            <DriveBrowser
+              drives={drives}
+              drivesNote={drivesNote}
+              onOpenWorkspace={onOpenWorkspace}
+              onOpenFile={onOpenBrowseFile}
+            />
+          )}
+          {result && (
+            <footer className="sidebar-footer">
+              <span>
+                <i
+                  className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`}
+                  aria-hidden="true"
+                />
+                {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
+              </span>
+              <span className="mono">
+                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
+              </span>
+            </footer>
+          )}
+        </div>
         {treeNote && (
           <div className="tree-toast" role="alert">
             {treeNote}

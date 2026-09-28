@@ -7,12 +7,13 @@ import {
 import type { AiConfig } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { OptionSelect } from './OptionSelect.tsx'
+import { CfgRow } from './CfgRow'
 
 /** 「试一句」的结果账本(SettingsPage 持有状态,这里只照单渲染) */
 export type SampleState =
   { kind: 'busy' } | { kind: 'done'; text: string } | { kind: 'error'; text: string } | null
 
-/** 设置分区「02 个性化」:语气 / 讲解深度 / 自订指令 / 试一句(纯展示,状态全在 SettingsPage) */
+/** 设置分区「个性化」:语气 / 讲解深度 / 自订指令 / 试一句(纯展示,状态全在 SettingsPage) */
 export function SettingsPersonal({
   personalRef,
   draftConfig,
@@ -37,59 +38,46 @@ export function SettingsPersonal({
         personalRef.current = el
       }}
     >
-      <div className="cfg-section-head">
-        <div>
-          <span className="cfg-step">02</span>
-          <h3>个性化</h3>
-        </div>
-        <span>决定 AI 怎么跟你说话</span>
-      </div>
+      <h3 className="cfg-group-title">个性化</h3>
       <div className="cfg-panel">
         {!draftConfig ? (
-          <div className="cfg-row">
-            <div className="cfg-copy">
-              <label>说话方式</label>
-              <p>读取配置中……</p>
-            </div>
-          </div>
+          <CfgRow label="说话方式" hint="读取配置中……">
+            <span />
+          </CfgRow>
         ) : (
           <>
-            <div className="cfg-row">
-              <div className="cfg-copy">
-                <label>基本风格和语气</label>
-              </div>
+            <CfgRow label="基本风格和语气">
               <OptionSelect
                 options={TONE_OPTIONS}
                 value={personal.tone}
                 onChange={(tone) => updatePersonal({ tone })}
                 ariaLabel="基本风格和语气"
               />
-            </div>
+            </CfgRow>
             <div className="cfg-divider" />
-            <div className="cfg-row">
-              <div className="cfg-copy">
-                <label>讲解深度</label>
-                <p>
-                  讲代码和文件时讲多细。「简洁」只说这东西是干什么的；「精简」先讲骨架、带几条名词小课堂；「详细」还会讲这门语言用到了哪些写法，并挑关键处展开（更耗算力，模型上下文太小时会自动退回精简，届时会明说）。
-                </p>
-              </div>
+            <CfgRow
+              label="讲解深度"
+              hint="「简洁」只说是什么;「精简」讲骨架带名词小课堂;「详细」会展开关键写法,更耗算力,上下文太小时自动退回精简。"
+            >
               <OptionSelect
                 options={TEACHING_OPTIONS}
                 value={personal.teaching}
                 onChange={(teaching) => updatePersonal({ teaching })}
                 ariaLabel="讲解深度"
               />
-            </div>
+            </CfgRow>
             <div className="cfg-divider" />
-            <div className="cfg-row cfg-row-stack">
-              <div className="cfg-copy">
-                <label>
+            <CfgRow
+              stacked
+              label={
+                <>
                   自订指令
                   <span className="cfg-flag">
                     {personal.custom.length}/{CUSTOM_MAX}
                   </span>
-                </label>
-              </div>
+                </>
+              }
+            >
               <textarea
                 className="cfg-textarea"
                 rows={5}
@@ -102,23 +90,17 @@ export function SettingsPersonal({
                 }
                 onChange={(e) => updatePersonal({ custom: e.target.value })}
               />
-            </div>
+            </CfgRow>
             <div className="cfg-privacy">
               <TreeIcon name="shield" size={12} mono />
-              <span>
-                自订指令只改说法,不改事实:不许编造、必须点名真实函数、看不出来的要明说 ——
-                这几条铁律不跟着变。
-              </span>
+              <span>自订指令只改说法不改事实:不许编造、点名真实函数、看不出来要明说。</span>
             </div>
             <div className="cfg-divider" />
-            <div className="cfg-row cfg-row-stack">
-              <div className="cfg-copy">
-                <label>试一句</label>
-                <p>
-                  拿上面这套说法,让当前模型当场念一段小代码 ——
-                  光看文字描述听不出语气,听一遍最准。用的是还没保存的草稿。
-                </p>
-              </div>
+            <CfgRow
+              stacked
+              label="试一句"
+              hint="拿上面这套说法让模型当场念一段——用的是还没保存的草稿。"
+            >
               <div className="cfg-sample-actions">
                 <button
                   type="button"
@@ -146,7 +128,7 @@ export function SettingsPersonal({
               )}
               {sample?.kind === 'done' && <pre className="cfg-sample">{sample.text}</pre>}
               {sample?.kind === 'error' && <p className="cfg-sample is-error">{sample.text}</p>}
-            </div>
+            </CfgRow>
           </>
         )}
       </div>

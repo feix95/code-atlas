@@ -19,7 +19,6 @@ import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { ContextMenu } from './components/ContextMenu'
 import { HomePage } from './components/HomePage'
-import type { SectionKey } from './components/SettingsPage'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
@@ -45,6 +44,7 @@ import { useSidebarSash } from './useSidebarSash'
 import { useZoomKeys } from './useZoomKeys'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
+import { useSettingsNav } from './useSettingsNav'
 import { useAuxWindows } from './useAuxWindows'
 import { groupsForHost, MAIN_HOST } from './paneTabs'
 import { useSessionRestore } from './useSessionRestore'
@@ -123,11 +123,6 @@ function App(): React.JSX.Element {
   // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和右栏 git 门共用
   const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
   const [gitLoading, setGitLoading] = useState(false)
-  // 「AI 设置」直达的翻页请求:每点一次入口 seq +1,设置页签照着翻到指定节
-  // (设置是单例页签,不是弹窗 —— 开在页签区里,没开工作区也能用)
-  const [settingsReq, setSettingsReq] = useState<{ section: SectionKey; seq: number } | undefined>(
-    undefined
-  )
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   // 讲解深度(教学三档):跟着 AI 配置走;档位一换,讲解钩子就把按旧档讲的旧账清掉
   const [teaching, setTeaching] = useState<TeachingLevel>('brief')
@@ -266,16 +261,6 @@ function App(): React.JSX.Element {
   async function handlePick(): Promise<void> {
     const dir = await window.atlas.pickFolder().catch(() => null)
     if (dir) await scanPath(dir)
-  }
-
-  // 设置单例签:rail 齿轮开外观节;AI 状态浮层「AI 设置」直达高级节(seq 触发页内翻节)
-  function openSettings(section: SectionKey = 'appearance'): void {
-    openSingletonTab('settings')
-    setSettingsReq((prev) => ({ section, seq: (prev?.seq ?? 0) + 1 }))
-  }
-
-  function openAiSettings(): void {
-    openSettings('advanced')
   }
 
   useEffect(() => {
@@ -667,6 +652,15 @@ function App(): React.JSX.Element {
   }, [onAuxGone, closeHostGroups])
   // 主窗名下的组 vs 各子窗名下的组:两边各画各的页签带和分屏
   const mainGroups = groupsForHost(groups, MAIN_HOST)
+  // 设置导航中枢:模式判定、侧栏收起态进出账、分类跳转请求都收在钩里(useSettingsNav)
+  const {
+    settingsMode,
+    settingsSection,
+    setSettingsSection,
+    settingsReq,
+    openSettings,
+    openAiSettings
+  } = useSettingsNav({ activeGroup, openSingletonTab, sidebarCollapsed, toggleSidebarCollapsed })
   const { nav, pushNav, goNav } = useNavStack({
     folder,
     result,
@@ -771,6 +765,7 @@ function App(): React.JSX.Element {
         handleDropRef={handleDropRef}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
+        onSettingsSection={setSettingsSection}
         onAiConfigSaved={(c) => {
           setAiConfigured(isAiConfigured(c))
           setTeaching(sanitizePersonalization(c.personalization).teaching)
@@ -818,6 +813,7 @@ function App(): React.JSX.Element {
           <AppTopBar
             scanning={scanning}
             hasWorkspace={result !== null}
+            settingsMode={settingsMode}
             sidebarShown={!sidebarCollapsed}
             sidebarCollapsed={sidebarCollapsed}
             onToggleSidebar={toggleSidebarCollapsed}
@@ -901,6 +897,9 @@ function App(): React.JSX.Element {
               drives={drives}
               drivesNote={drivesNote}
               onGoHome={goHome}
+              settingsMode={settingsMode}
+              settingsSection={settingsSection}
+              onSettingsSection={openSettings}
               onOpenBrowseFile={openBrowseFile}
             />
             {result && !scanning ? (

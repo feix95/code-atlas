@@ -4,6 +4,8 @@ import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@share
 import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import { SCALE_MAX, SCALE_MIN } from '@shared/uiScale'
 import { DEFAULT_PERSONALIZATION, type PersonalizationConfig } from '@shared/personalization'
+import { CH } from '@shared/ipcChannels'
+import type { SectionKey } from '../settingsNav'
 import {
   applyAppearance,
   COLOR_PRESETS,
@@ -31,18 +33,8 @@ function clampContextSize(raw: string): number | undefined {
   return Math.max(CONTEXT_SIZE_MIN, Math.min(CONTEXT_SIZE_MAX, Number(digits)))
 }
 
-export type SectionKey = 'appearance' | 'ai' | 'personal' | 'advanced'
+export type { SectionKey }
 type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
-
-/** 设置侧栏「工作区偏好」组导航图标旋钮:四颗条目共享一个大小,跟别处互不相关 */
-const NAV_ICON_SIZE = 18
-
-const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: string }> = [
-  { key: 'appearance', icon: 'palette', name: '外观与阅读', sub: '配色与界面大小' },
-  { key: 'personal', icon: 'sparkles', name: '个性化', sub: '语气与说话方式' },
-  { key: 'ai', icon: 'bot', name: '智能辅助', sub: '模型与在线验证' },
-  { key: 'advanced', icon: 'sliders', name: '高级选项', sub: '本地模型与连接详情' }
-]
 
 /**
  * 设置页(UI v3 §6:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
@@ -53,12 +45,13 @@ const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string; sub: strin
  * 页签本体由 PaneGroups 保活层托管(只藏不拆):切走再回来,改到一半的草稿还在。
  */
 export function SettingsPage({
-  workspaceName,
+  workspaceName: _workspaceName, // 侧栏卡片摘除后暂无人读;props 户口保留,侧栏导航要用
   chatSuggestionsOn,
   onChatSuggestionsChange,
   onClose,
   sectionReq,
-  onAiConfigSaved
+  onAiConfigSaved,
+  onSettingsSection
 }: {
   workspaceName: string | null
   /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
@@ -66,9 +59,11 @@ export function SettingsPage({
   onChatSuggestionsChange: (v: boolean) => void
   /** 关闭入口 = 关掉这张页签(页尾「关闭设置」走未应用确认后才到这儿) */
   onClose: () => void
-  /** 「AI 设置」直达:入口每点一次 seq +1,页内跟着翻到指定节(首屏也有用) */
+  /** 「AI 设置」直达/侧栏导航点击:入口每点一次 seq +1,页内滚到指定节(首屏也有用) */
   sectionReq?: { section: SectionKey; seq: number }
   onAiConfigSaved?: (config: AiConfig) => void
+  /** 滚动间谍回报口:滚到哪节就喊一声,侧栏导航跟着亮(App 持有那本账) */
+  onSettingsSection?: (key: SectionKey) => void
 }): React.JSX.Element {
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
   const [draftAppearance, setDraftAppearance] = useState<Appearance>(loadAppearance)
@@ -77,7 +72,8 @@ export function SettingsPage({
   const [savedScale, setSavedScale] = useState(() => window.atlas.getUiScale())
   const [draftScale, setDraftScale] = useState(() => window.atlas.getUiScale())
   const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
-  const [activeSection, setActiveSection] = useState<SectionKey>('appearance')
+  // 当前分类的户口已上交 App(settingsSection):本页只当「滚动间谍」回报位置、
+  // 领 sectionReq 跳转命令,自己不养导航账本
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [models, setModels] = useState<string[]>([])
@@ -119,17 +115,54 @@ export function SettingsPage({
       .catch(() => {})
   }, [])
 
-  // 「AI 设置」直达:入口每点一次 req.seq +1,页内翻到指定节(VS Code 式单例签,
+  /** 滚动间谍(Obsidian 式):右侧滚到哪节,就回报哪节 —— 侧栏导航的高亮跟着滚轮走 */
+  const onCfgScroll = useCallback((): void => {
+    const host = scrollRef.current
+    if (!host) return
+    const hostTop = host.getBoundingClientRect().top
+    const probes: Array<[SectionKey, HTMLElement | null]> = [
+      ['appearance', appearanceRef.current],
+      ['personal', personalRef.current],
+      ['ai', aiRef.current],
+      ['advanced', advancedRef.current]
+    ]
+    // 到底强制末节:scrollTop 封顶时末节标题可能还差着线(滚不到顶),不兜底会亮错行
+    let current: SectionKey =
+      host.scrollTop + host.clientHeight >= host.scrollHeight - 4 ? 'advanced' : 'appearance'
+    if (current === 'appearance') {
+      for (const [key, el] of probes) {
+        if (el && el.getBoundingClientRect().top - hostTop <= 48) current = key
+      }
+    }
+    onSettingsSection?.(current)
+  }, [onSettingsSection])
+
+  // 「AI 设置」直达/侧栏导航点击:入口每点一次 req.seq +1,页内滚到指定节(单例签,
   // 签早开着也能再领到这节)
   const lastSectionReq = useRef(0)
   useEffect(() => {
+    // 等配置落账再跳:分区在存档到齐前是空壳矮条,先滚的话内容一撑高目标就沉下去、
+    // 滚动停在半路(journey 抓过现行:scrollTop 88、目标沉到 1341)。seq 不吃就不丢,
+    // draftConfig 落地时本 effect 重跑照样兑现。
     if (!sectionReq || sectionReq.seq === lastSectionReq.current || !draftConfig) return
     lastSectionReq.current = sectionReq.seq
-    setActiveSection(sectionReq.section)
+    onSettingsSection?.(sectionReq.section)
     requestAnimationFrame(() => {
-      sectionEl(sectionReq.section)?.scrollIntoView({ block: 'start', behavior: 'auto' })
+      // 整节滚到顶:节内第一项就是目标控件(高级选项的 #cfg-model-path 在第一位),
+      // 滚动间谍也按「节顶过线」认节 —— 滚控件会造成节没过线、导航亮错行
+      const key = sectionReq.section
+      const sec =
+        key === 'appearance'
+          ? appearanceRef.current
+          : key === 'ai'
+            ? aiRef.current
+            : key === 'personal'
+              ? personalRef.current
+              : advancedRef.current
+      sec?.scrollIntoView({ block: 'start', behavior: 'auto' })
+      onCfgScroll()
     })
-  }, [draftConfig, sectionReq])
+  }, [draftConfig, sectionReq, onSettingsSection, onCfgScroll])
 
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
@@ -218,6 +251,27 @@ export function SettingsPage({
     window.atlas.previewUiScale(draftScale)
   }, [draftScale])
 
+  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局
+  // (先声明:下面的缩放监听要读这本账,lint 不许「先用后同步」)
+  const savedRef = useRef({ appearance: savedAppearance, scale: savedScale })
+  useEffect(() => {
+    savedRef.current = { appearance: savedAppearance, scale: savedScale }
+  })
+
+  // 界面缩放失联修复:Ctrl +/-/0 走全局 setUiScale 广播,设置页原来只读一次快照,
+  // 滑杆停在旧值不动。订阅广播后:存档账永远跟着真实值走(previewUiScale 不落盘,
+  // getUiScale 读出的仍是旧存档 → 自动滤掉预览回声),草稿账只在干净时跟 ——
+  // 改到一半被快捷键隔空抢走滑杆,那才叫打架
+  useEffect(() => {
+    function onUiScale(): void {
+      const persisted = window.atlas.getUiScale()
+      setSavedScale(persisted)
+      setDraftScale((prev) => (prev === savedRef.current.scale ? persisted : prev))
+    }
+    window.addEventListener(CH.uiScaleChanged, onUiScale)
+    return () => window.removeEventListener(CH.uiScaleChanged, onUiScale)
+  }, [])
+
   const appearanceDirty = JSON.stringify(draftAppearance) !== JSON.stringify(savedAppearance)
   const scaleDirty = draftScale !== savedScale
   const configDirty =
@@ -291,42 +345,12 @@ export function SettingsPage({
     onClose()
   }, [applyState.kind, onClose])
 
-  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局
-  const savedRef = useRef({ appearance: savedAppearance, scale: savedScale })
-  useEffect(() => {
-    savedRef.current = { appearance: savedAppearance, scale: savedScale }
-  })
   useEffect(() => {
     return () => {
       applyAppearance(savedRef.current.appearance)
       window.atlas.setUiScale(savedRef.current.scale)
     }
   }, [])
-
-  function sectionEl(key: SectionKey): HTMLElement | null {
-    if (key === 'appearance') return appearanceRef.current
-    if (key === 'ai') return aiRef.current
-    if (key === 'personal') return personalRef.current
-    return advancedRef.current
-  }
-
-  /** 导航点击:滚到对应分区;滚动时反查当前该点亮哪一项 */
-  function gotoSection(key: SectionKey): void {
-    setActiveSection(key)
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    sectionEl(key)?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
-  }
-
-  function onNavScroll(): void {
-    const el = scrollRef.current
-    if (!el) return
-    let current: SectionKey = 'appearance'
-    for (const item of NAV_ITEMS) {
-      const node = sectionEl(item.key)
-      if (node && node.offsetTop - el.scrollTop <= 72) current = item.key
-    }
-    setActiveSection(current)
-  }
 
   /** 滑条:拖动只挪滑条和读数(预览),松手才把数值写进草稿 */
   function commitDrag(): void {
@@ -443,56 +467,9 @@ export function SettingsPage({
   return (
     <main className="cfg-page" aria-label="设置">
       <div className="cfg-body">
-        <aside className="cfg-nav">
-          <div className="cfg-nav-caption">工作区偏好</div>
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`cfg-nav-item${activeSection === item.key ? ' is-active' : ''}`}
-              onClick={() => gotoSection(item.key)}
-            >
-              <span className="cfg-nav-icon">
-                <TreeIcon name={item.icon} size={NAV_ICON_SIZE} mono />
-              </span>
-              <span>
-                <strong>{item.name}</strong>
-                <small>{item.sub}</small>
-              </span>
-              {activeSection === item.key && <span className="cfg-nav-marker" aria-hidden="true" />}
-            </button>
-          ))}
-          <div className="cfg-nav-rule" />
-          <div className="cfg-nav-context">
-            <span className="cfg-context-icon">
-              <TreeIcon name="monitor" size={NAV_ICON_SIZE} mono />
-            </span>
-            <div>
-              <strong>当前工作区</strong>
-              <span>{workspaceName ?? '未打开项目'}</span>
-            </div>
-          </div>
-          <div className="cfg-nav-footnote">
-            <TreeIcon name="help" size={12} mono />
-            设置会保存到本机
-          </div>
-        </aside>
-
         <section className="cfg-content">
-          <div className="cfg-scroll" ref={scrollRef} onScroll={onNavScroll}>
-            <div className="cfg-intro">
-              <div>
-                <div className="cfg-eyebrow">WORKSPACE CONFIGURATION</div>
-                <h2>让阅读代码更像你的节奏</h2>
-                <p>配色、界面大小到 AI 辅助来源,改动立即预览,点「应用更改」后才真正生效。</p>
-              </div>
-              <span className={`cfg-live-status${dirty ? ' is-dirty' : ''}`}>
-                <i aria-hidden="true" />
-                {dirty ? '预览中 · 待应用' : '配置预览中'}
-              </span>
-            </div>
-
-            {/* ── 01 外观与阅读 ── */}
+          {/* Obsidian 式连续滚动页:四节依次铺开,导航搬进侧栏;滚动间谍把当前节喊回 App */}
+          <div className="cfg-scroll" ref={scrollRef} onScroll={onCfgScroll}>
             <SettingsAppearance
               appearanceRef={appearanceRef}
               draftAppearance={draftAppearance}
@@ -506,8 +483,6 @@ export function SettingsPage({
               commitDrag={commitDrag}
               stepScale={stepScale}
             />
-
-            {/* ── 02 个性化(小葵定的版式:挪到外观与阅读下面,智能辅助和高级选项这对 AI 配置连成一片) ── */}
             <SettingsPersonal
               personalRef={personalRef}
               draftConfig={draftConfig}
@@ -517,8 +492,6 @@ export function SettingsPage({
               setSample={setSample}
               tryStyle={tryStyle}
             />
-
-            {/* ── 03 智能辅助 ── */}
             <SettingsAi
               aiRef={aiRef}
               draftConfig={draftConfig}
@@ -530,8 +503,6 @@ export function SettingsPage({
               privacyOpen={privacyOpen}
               setPrivacyOpen={setPrivacyOpen}
             />
-
-            {/* ── 04 高级选项 ── */}
             <SettingsAdvanced
               advancedRef={advancedRef}
               draftConfig={draftConfig}
