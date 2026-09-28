@@ -118,7 +118,7 @@ function useWheel(deps: ViewportDeps, transformRef: React.RefObject<Transform>):
     const canvas = canvasRef.current
     if (!canvas) return
     const onWheel = (e: WheelEvent): void => {
-      if (e.ctrlKey || e.metaKey) return // Ctrl+滚轮归界面缩放(useWheelZoom)
+      // Ctrl+滚轮不再归界面缩放(改键盘 +/-/0):落在画布上的捏合/Ctrl+滚轮就是缩画布
       e.preventDefault()
       const [sx, sy] = localPoint(canvas, e)
       const tf = transformRef.current

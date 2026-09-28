@@ -183,12 +183,13 @@
   background: var(--line);
 }
 
-.file-path-menu-item:hover {
+.file-path-menu-item:hover:not([aria-disabled='true']) {
   background: var(--accent-soft);
   color: var(--accent-bright);
 }
 
-.file-path-menu-item:disabled {
+/* aria-disabled(菜单行):保留悬停读 data-tip 的能力,所以不吃原生 :disabled */
+.file-path-menu-item[aria-disabled='true'] {
   color: var(--muted);
   cursor: default;
 }

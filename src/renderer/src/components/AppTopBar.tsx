@@ -145,7 +145,7 @@ export function AppTopBar({
           data-tip={maximized ? '还原' : '最大化'}
           aria-label={maximized ? '还原' : '最大化'}
         >
-          <TreeIcon name={maximized ? 'minimize' : 'maximize'} size={WIN_ICON_SIZE} mono />
+          <TreeIcon name={maximized ? 'restore' : 'maximize'} size={WIN_ICON_SIZE} mono />
         </button>
         <button
           type="button"

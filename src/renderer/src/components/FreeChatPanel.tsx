@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useMenuDismiss } from '../useMenuDismiss'
 import type { ChatCodeRef, ChatContextAttachment } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import {
@@ -85,13 +86,20 @@ export function FreeChatPanel({
   const draftRefs = refs ?? []
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
-  // 顶行参考 chip 的展开:点一下看机器扫到的原始资料,再点收
+  // 顶行参考 chip 的展开:点一下看机器扫到的原始资料,再点收;
+  // ctxDoc 记卡片生在哪个 document(realm 铁律)——开卡那刻从 chip 上取,
+  // 卡片重挂载(撕窗搬家)时用回调 ref 对账
   const [ctxOpen, setCtxOpen] = useState(false)
+  const [ctxDoc, setCtxDoc] = useState<Document>(document)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
   const [newBeat, setNewBeat] = useState(0)
+
+  // 资料卡的三条退路(小葵加的「点空白也收」):chip 和卡片本身算「里面」,Esc 同钩子里送
+  const closeCtx = useCallback(() => setCtxOpen(false), [])
+  useMenuDismiss(ctxOpen, closeCtx, '.fc-ctx, .fc-ctx-pop', ctxDoc)
 
   function onMessagesScroll(): void {
     const el = scrollRef.current
@@ -273,7 +281,10 @@ export function FreeChatPanel({
           <button
             type="button"
             className={`fc-ctx${ctxOpen ? ' is-open' : ''}`}
-            onClick={() => setCtxOpen((v) => !v)}
+            onClick={(e) => {
+              setCtxDoc(e.currentTarget.ownerDocument)
+              setCtxOpen((v) => !v)
+            }}
             aria-expanded={ctxOpen}
             onContextMenu={(e) => {
               // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
@@ -297,7 +308,17 @@ export function FreeChatPanel({
           新对话
         </button>
       </div>
-      {context && ctxOpen && <pre className="fc-ctx-pop">{context.details}</pre>}
+      {context && ctxOpen && (
+        <pre
+          className="fc-ctx-pop"
+          ref={(el) => {
+            const d = el?.ownerDocument
+            if (d && d !== ctxDoc) setCtxDoc(d)
+          }}
+        >
+          {context.details}
+        </pre>
+      )}
       <div className="chat-messages-wrap">
         <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
           {chat.messages.length === 0 ? (

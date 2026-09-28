@@ -489,11 +489,13 @@
   will-change: transform;
 }
 
+/* --doc-zoom:Ctrl+滚轮的文档字号系数,挂在 .code-view 上继承进来;
+   字号吃它不进 getComputedStyle 缺的账 —— 量出来的行高天然是真值,虚拟滚动不用打补丁 */
 .code-gutter,
 .code-text {
   margin: 0;
   font-family: var(--mono);
-  font-size: var(--font-xs);
+  font-size: calc(var(--font-xs) * var(--doc-zoom, 1));
   line-height: var(--lh-160);
   white-space: pre;
   tab-size: 2;
@@ -594,26 +596,27 @@
 .code-reading {
   max-width: 46rem;
   margin-inline: auto;
-  font-size: var(--font-base);
+  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
   color: var(--text);
 }
 
-/* 渲染态的标题档比气泡里的 .md 放一档;围栏代码块字略收,密度对齐阅读页 */
+/* 渲染态的标题档比气泡里的 .md 放一档;围栏代码块字略收,密度对齐阅读页;
+   各级字号都乘 --doc-zoom,Ctrl+滚轮时标题正文同比例缩放 */
 .code-reading .md-h1 {
-  font-size: var(--font-lg);
+  font-size: calc(var(--font-lg) * var(--doc-zoom, 1));
 }
 
 .code-reading .md-h2 {
-  font-size: var(--font-ml);
+  font-size: calc(var(--font-ml) * var(--doc-zoom, 1));
 }
 
 .code-reading .md-h3,
 .code-reading .md-h4 {
-  font-size: var(--font-base);
+  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
 }
 
 .code-reading .md-pre {
-  font-size: var(--font-sm);
+  font-size: calc(var(--font-sm) * var(--doc-zoom, 1));
 }
 
 /* 选中底色跟代码正文喝同一碗 --drop-mark:引用那套蓝,阅读档里也一样 */

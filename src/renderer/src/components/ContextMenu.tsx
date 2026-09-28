@@ -117,7 +117,10 @@ function ContextMenuCard({
             type="button"
             role="menuitem"
             className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
-            disabled={item.disabled}
+            /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
+               data-tip 会白挂;aria-disabled 是 ARIA 菜单模式的推荐写法,行仍可悬停读提示,
+               点击由下方 item.disabled 闸手动拦(键盘 Enter 也走同一闸) */
+            aria-disabled={item.disabled || undefined}
             data-tip={item.tip}
             onClick={() => {
               if (item.disabled) return

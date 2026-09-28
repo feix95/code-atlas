@@ -165,14 +165,13 @@ try {
   await page.locator('.ai-status-pop').waitFor({ state: 'hidden' })
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
-  // Ctrl+滚轮缩放(网页惯例):向上滚放大一档(105%),Ctrl+0 归 100%;落盘走 setUiScale 原路。
-  // (扫完报数的 .scan-toast 机制已随页签打磨批摘除 —— 断言落在功能本体:根字号真变大)
-  await page.mouse.move(800, 500)
+  // 界面缩放键盘档(网页惯例,文档缩放改版):Ctrl+= 放大一档(105%),Ctrl+0 归 100%;
+  // 落盘走 setUiScale 原路。Ctrl+滚轮的户口已让给文档字号(docZoom),预览处实测见后文。
   await page.keyboard.down('Control')
-  await page.mouse.wheel(0, -240)
+  await page.keyboard.press('=')
   await page.keyboard.up('Control')
   const zoomedPx = await page.evaluate(() => parseFloat(document.documentElement.style.fontSize))
-  assert.ok(zoomedPx > 16, 'ctrl+wheel up must raise root font size')
+  assert.ok(zoomedPx > 16, 'ctrl+= must raise root font size')
   await page.keyboard.down('Control')
   await page.keyboard.press('0')
   await page.keyboard.up('Control')
@@ -197,6 +196,38 @@ try {
     .filter({ has: page.locator('.tabbar-name').getByText(peekName, { exact: true }) })
   await peekTab.waitFor()
   assert.equal(await peekTab.count(), 1, 'browse file must open a peek preview tab')
+  // 文档缩放(文档字号这锤):Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
+  // 量 .code-text 的 computed font-size —— --doc-zoom 乘进去的就是它,真账不量 CSS 变量
+  const codeView = page.locator('.code-view').first()
+  const codeText = codeView.locator('.code-text').first()
+  // attached 而非 visible:空文件的 <pre> 零尺寸不可见,但 font-size 照样量得出
+  await codeText.waitFor({ state: 'attached' })
+  const docFontBefore = await codeText.evaluate(
+    (el) => parseFloat(getComputedStyle(el).fontSize) || 0
+  )
+  const viewBox = await codeView.boundingBox()
+  assert.ok(viewBox, 'preview body must have a box')
+  await page.mouse.move(viewBox.x + viewBox.width / 2, viewBox.y + viewBox.height / 2)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -240)
+  await page.keyboard.up('Control')
+  const docFontAfter = await codeText.evaluate(
+    (el) => parseFloat(getComputedStyle(el).fontSize) || 0
+  )
+  assert.ok(docFontAfter > docFontBefore, 'ctrl+wheel on preview must enlarge doc font')
+  assert.equal(
+    await page.evaluate(() => parseFloat(document.documentElement.style.fontSize)),
+    16,
+    'doc zoom must not touch the root font size'
+  )
+  // 归位:滚回去把 docZoom 退回 1,别把放大带进后续断言 —— 字号回到原值才算账平
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, 240)
+  await page.keyboard.up('Control')
+  await page.waitForFunction((target) => {
+    const el = document.querySelector('.code-view .code-text')
+    return el !== null && Math.abs(parseFloat(getComputedStyle(el).fontSize) - target) < 0.01
+  }, docFontBefore)
   await shot('browse-peek')
   await page.getByRole('button', { name: `关闭 ${peekName}`, exact: true }).click()
   await page.locator('.tabbar-tab').waitFor({ state: 'detached' })

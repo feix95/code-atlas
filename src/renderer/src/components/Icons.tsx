@@ -666,14 +666,13 @@ const BOOK: Record<string, React.ReactNode> = {
       <line x1="3" x2="10" y1="18" y2="18" />
     </>
   ),
-  // 窗控(lucide 原版稿,小葵给定):未全屏圆角方框 / 已全屏四角回收
+  // 窗控(lucide 稿,小葵给定):未全屏圆角方框 / 已全屏双窗叠放(lucide copy 水平翻转,
+  // x → 24−x 镜像 —— 前窗压左下、后窗露右上,Windows 还原图标的经典朝向)
   maximize: <rect width="18" height="18" x="3" y="3" rx="2" />,
-  minimize: (
+  restore: (
     <>
-      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+      <rect width="14" height="14" x="2" y="8" rx="2" ry="2" />
+      <path d="M20 16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2h-10c-1.1 0-2 .9-2 2" />
     </>
   ),
   minus: <path d="M5 12h14" />,

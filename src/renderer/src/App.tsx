@@ -42,7 +42,7 @@ import {
 import { useAiChat } from './useAiChat'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
-import { useWheelZoom } from './useWheelZoom'
+import { useZoomKeys } from './useZoomKeys'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
 import { useAuxWindows } from './useAuxWindows'
@@ -625,7 +625,7 @@ function App(): React.JSX.Element {
     onSashKeyDown
   } = useSidebarSash()
   // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路
-  useWheelZoom(() => {})
+  useZoomKeys(() => {})
   // 撕窗子窗户口(页签撕窗锤):window.open 同进程子窗 + Portal 渲染坑位。
   // 死在页签账本上头 —— 撕签要它能开窗,窗死了要它名下的组销户
   const { auxWins, openAuxWindow, closeAuxWindow, onAuxGone } = useAuxWindows()

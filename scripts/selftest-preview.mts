@@ -10,6 +10,7 @@ import {
   visibleLineRange
 } from '../src/shared/preview.ts'
 import { refButtonLabel, selectionGeometry } from '../src/renderer/src/selectionMarks.ts'
+import { clampDocZoom, DOC_ZOOM_MAX, DOC_ZOOM_MIN } from '../src/shared/docZoom.ts'
 
 function main(): void {
   // ── 1. clipPreview:只归一换行 + 数行数,一个字不裁 ──
@@ -166,6 +167,13 @@ function main(): void {
   assert.equal(full6.canAdd, false, '额度满了就是不可点')
   assert.equal(full6.label, '引用已满', '钮上直说满了,不装作没反应')
   assert.ok(full6.title.includes('6'), '悬停说明报出额度数')
+
+  // ── 12. 文档缩放夹紧(Ctrl+滚轮这锤):系数不许飞出档外,脏值回 100% ──
+  assert.equal(clampDocZoom(1.5), 1.5, '档内原样')
+  assert.equal(clampDocZoom(0), 1, '零/负/NaN 回 100%')
+  assert.equal(clampDocZoom(NaN), 1, 'NaN 也回 100%')
+  assert.equal(clampDocZoom(99), DOC_ZOOM_MAX, '超上限贴边')
+  assert.equal(clampDocZoom(0.01), DOC_ZOOM_MIN, '破下限贴边')
 
   console.log('✅ 代码预览自测全部通过')
   console.log(

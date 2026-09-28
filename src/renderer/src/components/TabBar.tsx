@@ -78,7 +78,8 @@ export function TabBar({
   /**
    * 页签右键菜单(Obsidian 式分组,阅读模式这锤):走全局通用菜单,
    * 组间一道细线;行内图标 + 「当前档」行尾勾。菜单行按签品类现拼:
-   * 单例签没有文件动作和看片档;非 md 文件签没有看片档;peek 签没有树定位。
+   * 单例签没有文件动作和看片档;非 md 文件签的「阅读模式」灰挂 tip(禁用优于隐藏,
+   * 菜单形状稳定+功能可发现);peek 签没有树定位。
    * realm 铁律:doc 记进请求,菜单开在子窗时它自己窗内那台接活。
    */
   function openTabMenu(e: React.MouseEvent, t: TabBarTab): void {
@@ -91,21 +92,25 @@ export function TabBar({
 
     items.push({ label: '关闭页签', icon: 'x', run: () => onClose(t.id) })
 
-    // 看片档(md 系文件签才摆):当前档行尾打勾,点另一档切过去
-    if (isFile && canReadingMode(t.relPath)) {
-      const mode = t.viewMode ?? 'source'
+    // 看片档(文件签常驻):当前档行尾打勾,点另一档切过去;
+    // 非 md 文件签的「阅读模式」灰挂「Markdown 文件专属」tip —— 勾钉源码档,系统状态不说谎
+    if (isFile) {
+      const readable = canReadingMode(t.relPath)
+      const readingOn = readable && (t.viewMode ?? 'source') === 'reading'
       items.push(
         MENU_SEP,
         {
           label: '阅读模式',
           icon: 'bookOpen',
-          checked: mode === 'reading',
+          checked: readingOn,
+          disabled: !readable,
+          tip: readable ? undefined : 'Markdown 文件专属',
           run: () => onSetViewMode?.(t.id, 'reading')
         },
         {
           label: '源码模式',
           icon: 'code',
-          checked: mode !== 'reading',
+          checked: !readingOn,
           run: () => onSetViewMode?.(t.id, 'source')
         }
       )

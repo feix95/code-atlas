@@ -12,6 +12,7 @@ import { FilePathMenu } from './FilePathMenu'
 import { ContextMenu } from './ContextMenu'
 import { TreeIcon } from './Icons'
 import { WIN_ICON_SIZE } from '../inputMetrics'
+import { installZoomKeys } from '../useZoomKeys'
 
 /** 页签区那套接线的主窗/子窗通用包:两边吃的 props 一模一样,打包传不重抄 */
 export interface TabAreaProps {
@@ -64,6 +65,9 @@ export function AuxWindowShell({
   useEffect(() => {
     syncAuxChrome(doc)
   })
+
+  // 缩放键按窗装:keydown 不跨 realm —— 子窗里按 Ctrl +/-/0 也得灵(落账还是同一本 uiScale)
+  useEffect(() => installZoomKeys(aux.win, () => {}), [aux.win])
 
   // 空壳即死:这扇窗名下一张签都不剩了(挪光/关光),自裁交还桌面。
   // 挂载即空的情形不存在 —— 开窗和挪签同一笔账,壳立起来时名下必有签

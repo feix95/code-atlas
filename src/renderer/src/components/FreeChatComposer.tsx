@@ -243,7 +243,11 @@ export function FreeChatComposer({
   useEffect(() => {
     const el = inputRef.current
     if (!el) return
-    const line = Number.parseFloat(getComputedStyle(el).lineHeight) || 24
+    const cs = getComputedStyle(el)
+    const line = Number.parseFloat(cs.lineHeight) || 24
+    // border-box 账:style.height 写的是含内边距的总高 —— 漏加 padding 的话
+    // 文字盒被 padding 吃掉一截,overflow:hidden 上下裁字(UI 放得越大裁得越狠)
+    const padY = Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom)
     const multi = lineCount >= 2
     el.style.height = 'auto'
     // 统一量尺:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
@@ -255,7 +259,9 @@ export function FreeChatComposer({
     el.style.paddingRight = ''
     const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
     // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
-    el.style.height = `${expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)}px`
+    el.style.height = `${
+      (expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)) + padY
+    }px`
     setLineCount(shown)
     if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
   }, [draft, expanded, lineCount])
