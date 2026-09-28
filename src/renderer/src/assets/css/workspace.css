@@ -602,21 +602,34 @@
 
 /* 渲染态的标题档比气泡里的 .md 放一档;围栏代码块字略收,密度对齐阅读页;
    各级字号都乘 --doc-zoom,Ctrl+滚轮时标题正文同比例缩放 */
+/* 标题四级用 em 级差撑开(Obsidian 式层级):em 跟着可读栏基字号走,
+   文档缩放 Ctrl+滚轮天然全场同步,不必逐级再乘 --doc-zoom */
 .code-reading .md-h1 {
-  font-size: calc(var(--font-lg) * var(--doc-zoom, 1));
+  font-size: 1.55em;
 }
 
 .code-reading .md-h2 {
-  font-size: calc(var(--font-ml) * var(--doc-zoom, 1));
+  font-size: 1.35em;
 }
 
-.code-reading .md-h3,
+.code-reading .md-h3 {
+  font-size: 1.18em;
+}
+
 .code-reading .md-h4 {
-  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
+  font-size: 1.05em;
 }
 
 .code-reading .md-pre {
-  font-size: calc(var(--font-sm) * var(--doc-zoom, 1));
+  font-size: 0.9em;
+}
+
+/* 阅读档行内代码换 Obsidian 风味:主题色红字、不加盒子 */
+.code-reading code:not(.md-pre code) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
 }
 
 /* 选中底色跟代码正文喝同一碗 --drop-mark:引用那套蓝,阅读档里也一样 */

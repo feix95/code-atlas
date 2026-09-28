@@ -2,6 +2,8 @@
 .md {
   white-space: normal;
   line-height: var(--lh-170);
+  /* 无空格长串(表格分隔行、超长 URL、长路径)就地断行,不许横着戳出去 */
+  overflow-wrap: break-word;
 }
 
 .md p {
@@ -78,6 +80,118 @@
   padding-left: 0.625rem;
   border-left: 2px solid var(--line);
   color: var(--muted);
+}
+
+/* ── 阅读模式锤补齐:表格 / 待办 / callout / 高亮 / 内联标题 ── */
+
+/* 管道表格(GFM):栏宽吃满可读列,塞不下时表内横滚,绝不撑爆栏 */
+.md-table-wrap {
+  margin: 0 0 0.5em;
+  overflow-x: auto;
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.md-table th,
+.md-table td {
+  padding: 0.3em 0.65em;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  background: var(--surface-soft);
+  color: var(--text-strong);
+  font-weight: var(--font-w-strong);
+}
+
+/* 待办项:摘掉圆点换真复选框,自己贴回记号位 */
+.md li.md-task {
+  list-style: none;
+  margin-left: -1.25em;
+}
+
+.md-task input[type='checkbox'] {
+  margin: 0 0.4em 0 0;
+  accent-color: var(--sash-hi);
+  vertical-align: -0.08em;
+}
+
+/* 嵌套列表:子表贴紧父项,别按段落那么透气 */
+.md li > ul,
+.md li > ol {
+  margin: 0.1em 0;
+}
+
+/* callout(Obsidian 招牌):> [!type] 升级成彩条提示块 */
+.md-callout {
+  margin: 0 0 0.5em;
+  padding: 0.45rem 0.75rem;
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.md-callout-title {
+  margin-bottom: 0.15em;
+  color: var(--accent-bright);
+  font-weight: var(--font-w-strong);
+}
+
+.md-callout.is-tip {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.md-callout.is-tip .md-callout-title {
+  color: var(--green);
+}
+.md-callout.is-warn {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+.md-callout.is-warn .md-callout-title {
+  color: var(--amber);
+}
+.md-callout.is-danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+.md-callout.is-danger .md-callout-title {
+  color: var(--danger);
+}
+.md-callout.is-quote {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+.md-callout.is-quote .md-callout-title {
+  color: var(--muted);
+}
+
+/* ==高亮==:Obsidian 的荧光笔,琥珀底不晃眼 */
+.md-mark {
+  padding: 0 0.15em;
+  border-radius: var(--radius-xxs);
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  color: inherit;
+}
+
+.md del {
+  color: var(--muted);
+}
+
+/* 内联标题(Obsidian 的 inline title):阅读模式顶上摆文件名 */
+.md-title {
+  margin: 0 0 0.6em;
+  color: var(--text-strong);
+  font-size: 1.9em;
+  font-weight: var(--font-w-strong);
+  line-height: 1.25;
+  text-align: center;
 }
 
 .md .md-link {

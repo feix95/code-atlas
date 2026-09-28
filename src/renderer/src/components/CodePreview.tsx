@@ -644,7 +644,15 @@ export function CodePreview({
               onContextMenu={onReadContextMenu}
             >
               <article className="code-reading">
-                <MiniMD text={text} fileLinks={fileLinks ?? undefined} />
+                {/* 内联标题(Obsidian 同款):文件名掐尾去扩展名,摆正文顶上居中 */}
+                <MiniMD
+                  text={text}
+                  fileLinks={fileLinks ?? undefined}
+                  title={file.relPath
+                    .split(/[\\/]/)
+                    .pop()
+                    ?.replace(/\.[^.]+$/, '')}
+                />
               </article>
             </div>
           ) : (

@@ -1,18 +1,18 @@
 import { memo, type ReactNode } from 'react'
 import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
+import { parseMarkdown, type MdBlock, type MdInline, type MdList } from '@shared/markdown'
 
 /**
- * 迷你 Markdown 渲染(第一百零七锤):AI 爱用 # 标题、**加粗**、- 列表、``` 代码块说话,
- * 这里把这一小撮语法翻成真正的排版,不再整段甩原文。
- * 刻意手写小解析器而不是上重型库:支持的语法就这几样,渲染成 React 元素,
- * 不碰 dangerouslySetInnerHTML,模型吐什么都不会变成可执行内容。
+ * 迷你 Markdown 渲染(第一百零七锤起;阅读模式锤拆成 解析/描画 两层):
+ * 语法拆解在 src/shared/markdown.ts(纯数据 AST,能进自测),这里只把 AST 画成 React 元素。
+ * 刻意手写小解析器而不是上重型库:渲染成 React 元素,不碰 dangerouslySetInnerHTML,
+ * 模型/文件吐什么都不会变成可执行内容。
  *
- * 文件链接:传了 fileLinks(目录树索引 + 点击去处)时,普通文字里凡是对上户口的
- * 文件引用就画成可点的链接;围栏代码块和行内代码里的字一律不动 ——
- * 那是在展示代码,不是在递文件。
+ * 文件链接:传了 fileLinks 时,普通文字里对上户口的文件引用画成可点的链接;
+ * 围栏代码块和行内代码里的字一律不动 —— 那是在展示代码,不是在递文件。
  */
 
-/** 文件链接拆出来的节点;key 走共享计数器,谁先算完谁先领号 */
+/** 一段纯文本里对上户口的文件引用画成可点链接;key 走共享计数器,谁先算完谁先领号 */
 function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number }): ReactNode[] {
   if (!links) return [t]
   const spans = findFileLinks(t, links.index)
@@ -44,144 +44,158 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
   return out
 }
 
-/** 行内语法:`代码`、**加粗**、[文字](链接);链接只标注不跳转,防止窗口被带跑 */
-function inline(text: string, links?: FileLinkTarget): ReactNode[] {
-  const out: ReactNode[] = []
-  const kc = { n: 0 }
-  // 第一刀:行内代码 `...` 先摘走,里面的字一个不动
-  const codeRe = /`([^`]+)`/g
-  let codeLast = 0
-  let m: RegExpExecArray | null
-  while ((m = codeRe.exec(text)) !== null) {
-    if (m.index > codeLast) pushMd(text.slice(codeLast, m.index))
-    out.push(<code key={kc.n++}>{m[1]}</code>)
-    codeLast = m.index + m[0].length
-  }
-  if (codeLast < text.length) pushMd(text.slice(codeLast))
-  return out
-
-  // 第二刀:**加粗** 和 [文字](链接);两样都不碰的普通字才轮到文件检测。
-  // 铁律:这里必须用自己的匹配变量(pm)—— 外层 codeRe 的 while 手里正握着 m,
-  // pushMd 一旦复用,自己循环结束会把 m 置成 null,外层下一条 m[1] 当场读 null 炸整棵树
-  // (2026-09-13 隐身案真凶:「先文字后行内代码」的回答必炸,React 树卸载=透明窗白屏=整窗隐身)
-  function pushMd(t: string): void {
-    const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g
-    let pm: RegExpExecArray | null
-    let last = 0
-    while ((pm = re.exec(t)) !== null) {
-      if (pm.index > last) out.push(...fileNodes(t.slice(last, pm.index), links, kc))
-      if (pm[1] !== undefined) out.push(<strong key={kc.n++}>{fileNodes(pm[1], links, kc)}</strong>)
-      else
-        out.push(
-          <span key={kc.n++} className="md-link" data-tip={pm[3]}>
-            {pm[2]}
+/** 行内 token → 元素;text/bold/em 的内文仍过文件链接对账(与旧行为持平) */
+function renderInline(
+  nodes: MdInline[],
+  links: FileLinkTarget | undefined,
+  kc: { n: number }
+): ReactNode[] {
+  return nodes.map((n) => {
+    switch (n.t) {
+      case 'code':
+        return <code key={kc.n++}>{n.text}</code>
+      case 'bold':
+        return <strong key={kc.n++}>{fileNodes(n.text, links, kc)}</strong>
+      case 'em':
+        return <em key={kc.n++}>{fileNodes(n.text, links, kc)}</em>
+      case 'del':
+        return <del key={kc.n++}>{n.text}</del>
+      case 'mark':
+        return (
+          <mark key={kc.n++} className="md-mark">
+            {n.text}
+          </mark>
+        )
+      case 'link':
+        return (
+          <span key={kc.n++} className="md-link" data-tip={n.href}>
+            {n.label}
           </span>
         )
-      last = pm.index + pm[0].length
+      default:
+        // text 叶子:整片文件链接对账后包一个 span 领号(切片们是裸字符串,没自己 key)
+        return <span key={kc.n++}>{fileNodes(n.text, links, kc)}</span>
     }
-    if (last < t.length) out.push(...fileNodes(t.slice(last), links, kc))
-  }
+  })
 }
 
-function parseBlocks(text: string, links?: FileLinkTarget): ReactNode[] {
-  const lines = text.split('\n')
-  const out: ReactNode[] = []
-  let i = 0
-  let k = 0
-  while (i < lines.length) {
-    const t = lines[i].trim()
-    if (t === '') {
-      i++
-      continue
-    }
-    // 围栏代码块:原样进 pre,一个字不动(文件检测也不进来)
-    if (t.startsWith('```')) {
-      const buf: string[] = []
-      i++
-      while (i < lines.length && !lines[i].trim().startsWith('```')) {
-        buf.push(lines[i])
-        i++
-      }
-      i++
-      out.push(
-        <pre key={k++} className="md-pre">
-          <code>{buf.join('\n')}</code>
+function renderListNode(
+  list: MdList,
+  links: FileLinkTarget | undefined,
+  kc: { n: number }
+): ReactNode {
+  const Tag = list.ordered ? 'ol' : 'ul'
+  return (
+    <Tag key={kc.n++}>
+      {list.items.map((it) => {
+        const sub = it.sub ? renderListNode(it.sub, links, kc) : null
+        if (it.done === undefined) {
+          return (
+            <li key={kc.n++}>
+              {renderInline(it.content, links, kc)}
+              {sub}
+            </li>
+          )
+        }
+        return (
+          <li key={kc.n++} className="md-task">
+            <input type="checkbox" disabled checked={it.done} readOnly />
+            <span>{renderInline(it.content, links, kc)}</span>
+            {sub}
+          </li>
+        )
+      })}
+    </Tag>
+  )
+}
+
+function renderBlock(b: MdBlock, links: FileLinkTarget | undefined, kc: { n: number }): ReactNode {
+  switch (b.t) {
+    case 'code':
+      return (
+        <pre key={kc.n++} className="md-pre">
+          <code>{b.text}</code>
         </pre>
       )
-      continue
-    }
-    const h = /^(#{1,4})\s+(.*)$/.exec(t)
-    if (h) {
-      const level = h[1].length
-      out.push(
-        <div key={k++} className={`md-h md-h${level}`}>
-          {inline(h[2], links)}
+    case 'heading':
+      return (
+        <div key={kc.n++} className={`md-h md-h${b.level}`}>
+          {renderInline(b.content, links, kc)}
         </div>
       )
-      i++
-      continue
-    }
-    if (/^(-{3,}|\*{3,})$/.test(t)) {
-      out.push(<hr key={k++} className="md-hr" />)
-      i++
-      continue
-    }
-    if (/^[-*•]\s+/.test(t)) {
-      const items: string[] = []
-      while (i < lines.length && /^\s*[-*•]\s+/.test(lines[i])) {
-        items.push(lines[i].trim().replace(/^[-*•]\s+/, ''))
-        i++
-      }
-      out.push(
-        <ul key={k++}>
-          {items.map((it, j) => (
-            <li key={j}>{inline(it, links)}</li>
-          ))}
-        </ul>
+    case 'hr':
+      return <hr key={kc.n++} className="md-hr" />
+    case 'table':
+      return (
+        <div key={kc.n++} className="md-table-wrap">
+          <table className="md-table">
+            <thead>
+              <tr>
+                {b.head.map((c, j) => (
+                  <th key={j} style={{ textAlign: b.aligns[j] ?? 'left' }}>
+                    {renderInline(c, links, kc)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {b.body.map((row, r) => (
+                <tr key={r}>
+                  {row.map((c, j) => (
+                    <td key={j} style={{ textAlign: b.aligns[j] ?? 'left' }}>
+                      {renderInline(c, links, kc)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )
-      continue
-    }
-    if (/^\d+[.、)]\s+/.test(t)) {
-      const items: string[] = []
-      while (i < lines.length && /^\s*\d+[.、)]\s+/.test(lines[i])) {
-        items.push(lines[i].trim().replace(/^\d+[.、)]\s+/, ''))
-        i++
-      }
-      out.push(
-        <ol key={k++}>
-          {items.map((it, j) => (
-            <li key={j}>{inline(it, links)}</li>
-          ))}
-        </ol>
+    case 'list':
+      return renderListNode(b, links, kc)
+    case 'quote':
+      return <blockquote key={kc.n++}>{renderBlocks(b.children, links, kc)}</blockquote>
+    case 'callout':
+      return (
+        <div key={kc.n++} className={`md-callout is-${b.kind}`}>
+          <div className="md-callout-title">{b.title}</div>
+          <div className="md-callout-body">{renderBlocks(b.children, links, kc)}</div>
+        </div>
       )
-      continue
-    }
-    if (t.startsWith('>')) {
-      out.push(<blockquote key={k++}>{inline(t.replace(/^>\s?/, ''), links)}</blockquote>)
-      i++
-      continue
-    }
-    out.push(<p key={k++}>{inline(lines[i].trimEnd(), links)}</p>)
-    i++
+    default:
+      return <p key={kc.n++}>{renderInline(b.content, links, kc)}</p>
   }
-  return out
 }
 
-/** 用法:<MiniMD text={回答} />;流式生成中传 caret 在末尾挂光标;传 fileLinks 让文件名变可点。
- * memo(2026-09-13):聊天里每条消息的正文不变就不重画 —— 流式吐字时只有 busy 那条动,
+function renderBlocks(
+  blocks: MdBlock[],
+  links: FileLinkTarget | undefined,
+  kc: { n: number }
+): ReactNode[] {
+  return blocks.map((b) => renderBlock(b, links, kc))
+}
+
+/** 用法:<MiniMD text={回答} />;流式生成中传 caret 在末尾挂光标;传 fileLinks 让文件名变可点;
+ * 传 title 会在正文顶上摆文档内联标题(Obsidian 式:阅读模式显示文件名)。
+ * memo(2026-09-13):每条消息的正文不变就不重画 —— 流式吐字时只有 busy 那条动,
  * 旧消息的解析一遍都不跑;聊得再多,画面上的工作量也只跟「这一屏」挂钩 */
 export const MiniMD = memo(function MiniMD({
   text,
   caret,
-  fileLinks
+  fileLinks,
+  title
 }: {
   text: string
   caret?: boolean
   fileLinks?: FileLinkTarget
+  /** 文档内联标题(阅读模式喂文件名);不传不摆 */
+  title?: string
 }): React.JSX.Element {
   return (
     <div className="md">
-      {parseBlocks(text, fileLinks)}
+      {title !== undefined && title !== '' && <div className="md-title">{title}</div>}
+      {renderBlocks(parseMarkdown(text), fileLinks, { n: 0 })}
       {caret && <span className="stream-caret">▌</span>}
     </div>
   )
