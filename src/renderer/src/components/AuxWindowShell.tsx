@@ -20,6 +20,8 @@ export interface TabAreaProps {
   flashTabId: string | null
   activateTab: (id: string) => void
   closeTab: (id: string) => void
+  /** 批量关签(页签右键「关其他/关右侧/关全部」) */
+  closeTabsInGroup: (groupId: string, ids: readonly string[]) => void
   moveTab: (
     id: string,
     toGroup: 'sibling' | null,
@@ -93,6 +95,7 @@ export function AuxWindowShell({
           flashTabId={tabArea.flashTabId}
           activateTab={tabArea.activateTab}
           closeTab={tabArea.closeTab}
+          closeTabsInGroup={tabArea.closeTabsInGroup}
           moveTab={tabArea.moveTab}
           setDropMark={tabArea.setDropMark}
           onTabDragEnd={tabArea.onTabDragEnd}

@@ -86,6 +86,8 @@
 }
 
 .ws-menu-btn {
+  /* 悬停提示放慢到 1s(token 驱动,跟折行钮同档) */
+  --tip-delay: 1s;
   width: calc(var(--u) * 0.6875);
   height: calc(var(--u) * 0.6875);
 }
@@ -421,7 +423,6 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
-  border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 
@@ -495,7 +496,7 @@
 .code-text {
   margin: 0;
   font-family: var(--mono);
-  font-size: calc(var(--font-xs) * var(--doc-zoom, 1));
+  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
   line-height: var(--lh-160);
   white-space: pre;
   tab-size: 2;
@@ -540,7 +541,10 @@
   display: block;
   position: relative;
   min-height: calc(1em * var(--lh-160));
-  padding-left: calc(var(--gc, 4ch) + 2rem);
+  /* 悬挂缩进:续行比行首再多缩进 2ch —— 首段 text-indent 拉回行号旁的旧起点,
+     折下来的续行落在 +2ch 处,一眼认出「这是同一行折下来的」 */
+  padding-left: calc(var(--gc, 4ch) + 2rem + 2ch);
+  text-indent: -2ch;
 }
 
 .code-text.is-wrap .code-line::before {
@@ -557,31 +561,37 @@
   border-right: 1px solid var(--line);
 }
 
-/* 预览头折行开关:幽灵小钮,开着的档染主题色 */
-.code-wrap-btn {
+/* 预览头折行开关 + 阅读/代码快速开关:同款纯图标小方钮,开/关靠图标换脸
+   (不靠底色,小葵拍板);悬停提示按 --tip-delay 走,这俩都要 1s 稳悬停才亮 */
+.code-wrap-btn,
+.code-mode-btn {
+  --tip-delay: 1s;
   flex-shrink: 0;
   width: 1.5rem;
   height: 1.5rem;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted-2);
+  font-family: inherit;
+  font-size: var(--font-xs);
   cursor: pointer;
 }
 
-.code-wrap-btn:hover:not(:disabled) {
+.code-wrap-btn:hover:not(:disabled),
+.code-mode-btn:hover:not(:disabled) {
   color: var(--accent-bright);
   background: var(--hover);
 }
 
-.code-wrap-btn.is-on {
-  color: var(--accent-bright);
-}
+/* 开态没有专属底色(图标换脸已标态):is-on 类留着做状态标记,样式不挂 */
 
-.code-wrap-btn:disabled {
+.code-wrap-btn:disabled,
+.code-mode-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }

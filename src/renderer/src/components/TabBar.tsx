@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
@@ -34,6 +35,7 @@ export function TabBar({
   canMoveToSiblingGroup,
   onActivate,
   onClose,
+  onCloseMany,
   onMoveTab,
   onDetachTab,
   onSetViewMode,
@@ -52,6 +54,8 @@ export function TabBar({
   canMoveToSiblingGroup: boolean
   onActivate: (id: string) => void
   onClose: (id: string) => void
+  /** 批量关签(右键「关其他/关右侧/关全部」):报本带内要被清掉的签 id 清单 */
+  onCloseMany?: (ids: string[]) => void
   /** 挪页签(右键菜单走这条路;拖拽的落点账在 TopBarTabs 引擎里算) */
   onMoveTab: (
     id: string,
@@ -76,6 +80,59 @@ export function TabBar({
   onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
   /**
+   * 连点关签的冻结宽(Chrome/Edge 同款手感):签是 flex 平分宽,关一张剩下就变宽,
+   * × 跟着右漂,原地连点就点空。关签前把当前渲染宽锁成固定值,后面的签顶上来
+   * × 还在原地;鼠标离开页签带才解冻,宽度回到 flex 分摊。
+   * 锁的是关闭前一刻的实测宽(getBoundingClientRect),不是 CSS 理论值。
+   */
+  const [frozenW, setFrozenW] = useState<number | null>(null)
+  // 解冻回弹动画的户口:进行中的补帧在再关签/重进带时先取消,别让旧动画顶着新冻结跑
+  const releaseAnims = useRef<Animation[]>([])
+
+  function freezeAndClose(id: string, tabEl: HTMLElement): void {
+    releaseAnims.current.forEach((a) => a.cancel())
+    releaseAnims.current = []
+    const w = tabEl.getBoundingClientRect().width
+    if (w > 0) setFrozenW(w)
+    onClose(id)
+  }
+
+  /**
+   * 解冻回弹(FLIP + 弹性 ease):mouseleave 时先记下每签冻结宽存进 ref,
+   * 解冻后的 layout effect(DOM 已落账、还没上屏)量出 flex 分摊的真实终点,
+   * 再用 WAAPI 从「旧宽 + 不生长」补帧到「basis 0 + 生长」——动画第 0 帧
+   * 就是冻结宽,全程无跳变;easing 尾部过冲让宽度带一点弹簧感。
+   * (不在 CSS 挂过渡,也不能 rAF 量:flex 项终点宽是布局算的;rAF 会抢在
+   *  React 提交前量,拿到旧值直接跳过 —— 实测踩过,勿改回)
+   */
+  const pendingRelease = useRef<{ els: HTMLElement[]; before: number[] } | null>(null)
+  function releaseFreeze(e: React.MouseEvent<HTMLDivElement>): void {
+    if (frozenW === null) return
+    const els = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('.tabbar-tab'))
+    pendingRelease.current = { els, before: els.map((el) => el.getBoundingClientRect().width) }
+    setFrozenW(null)
+  }
+  useLayoutEffect(() => {
+    if (frozenW !== null || !pendingRelease.current) return
+    const { els, before } = pendingRelease.current
+    pendingRelease.current = null
+    els.forEach((el, i) => {
+      if (!el.isConnected) return
+      const after = el.getBoundingClientRect().width
+      if (Math.abs(after - before[i]) < 1) return
+      releaseAnims.current.push(
+        el.animate(
+          [
+            { flexGrow: '0', flexBasis: `${before[i]}px` },
+            { flexGrow: '1', flexBasis: '0px' }
+          ],
+          { duration: 320, easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)' }
+        )
+      )
+    })
+  }, [frozenW])
+
+  /**
    * 页签右键菜单(Obsidian 式分组,阅读模式这锤):走全局通用菜单,
    * 组间一道细线;行内图标 + 「当前档」行尾勾。菜单行按签品类现拼:
    * 单例签没有文件动作和看片档;非 md 文件签的「阅读模式」灰挂 tip(禁用优于隐藏,
@@ -91,6 +148,25 @@ export function TabBar({
     const items: ContextMenuEntry[] = []
 
     items.push({ label: '关闭页签', icon: 'x', run: () => onClose(t.id) })
+
+    // 批量关签(和关单签同组):只剩这一张时「其他」灰挂,菜单形状稳定
+    if (onCloseMany) {
+      const otherIds = tabs.filter((x) => x.id !== t.id).map((x) => x.id)
+      items.push(
+        {
+          label: '关闭其他页签',
+          icon: 'sidesX',
+          disabled: otherIds.length === 0,
+          run: () => onCloseMany(otherIds)
+        },
+        {
+          label: '关闭全部页签',
+          icon: 'xSquare',
+          disabled: tabs.length === 0,
+          run: () => onCloseMany(tabs.map((x) => x.id))
+        }
+      )
+    }
 
     // 看片档(文件签常驻):当前档行尾打勾,点另一档切过去;
     // 非 md 文件签的「阅读模式」灰挂「Markdown 文件专属」tip —— 勾钉源码档,系统状态不说谎
@@ -199,6 +275,7 @@ export function TabBar({
       className={`tabbar${dragSourceId ? ' is-dnd-live' : ''}`}
       role="tablist"
       aria-label="已打开的页签"
+      onMouseLeave={releaseFreeze}
     >
       {tabs.map((t) => {
         return (
@@ -211,13 +288,13 @@ export function TabBar({
               t.id === flashId ? ' is-flash' : ''
             }`}
             data-tab-id={t.id}
-            style={
-              t.id === gapAnchor?.id
-                ? { marginLeft: gapWidth }
-                : t.id === gapTail?.id
-                  ? { marginRight: gapWidth }
-                  : undefined
-            }
+            style={{
+              // 冻结态:签宽锁成关签前实测值(flex-basis 定死,不再分摊),
+              // 空白全推给 .tabbar-blank 吃 —— × 原地不动,连点不漂
+              ...(frozenW !== null ? { flex: `0 0 ${frozenW}px` } : {}),
+              ...(t.id === gapAnchor?.id ? { marginLeft: gapWidth } : {}),
+              ...(t.id === gapTail?.id ? { marginRight: gapWidth } : {})
+            }}
             onPointerDown={(e) => onTabPointerDown(e, t)}
             onClick={() => onActivate(t.id)}
             onContextMenu={(e) => openTabMenu(e, t)}
@@ -230,7 +307,7 @@ export function TabBar({
             onMouseDown={(e) => {
               if (e.button === 1) {
                 e.preventDefault()
-                onClose(t.id)
+                freezeAndClose(t.id, e.currentTarget)
               }
             }}
           >
@@ -244,7 +321,9 @@ export function TabBar({
               aria-label={`关闭 ${t.name}`}
               onClick={(e) => {
                 e.stopPropagation()
-                onClose(t.id)
+                const tabEl = e.currentTarget.closest('.tabbar-tab')
+                if (tabEl instanceof HTMLElement) freezeAndClose(t.id, tabEl)
+                else onClose(t.id)
               }}
             >
               ✕

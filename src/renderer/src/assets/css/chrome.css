@@ -260,6 +260,8 @@
   -webkit-app-region: no-drag;
   /* 给悬停小板(::after z:-1)立个独立舱:板垫在签内文字底下,又不会被顶栏底色吞掉 */
   isolation: isolate;
+  /* 连点关签的冻结宽解冻不走 CSS 过渡:回弹补帧在 TabBar 里用 WAAPI 做(FLIP 量终点),
+     CSS 过渡量不出 flex 分摊的终点宽,会「先跳一截再滑尾巴」(小葵实测反馈) */
 }
 
 /* 悬停小板(Obsidian 式):签身保持透明只管热区,灰板画在 ::after —— 四边内缩、

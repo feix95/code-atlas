@@ -342,7 +342,7 @@ export function FreeChatComposer({
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="能力开关"
           aria-expanded={menuOpen}
-          data-tip="思考 / 翻文件开关"
+          data-tip="能力开关"
         >
           <TreeIcon name="plus" size={CHAT_ACTION_ICON_SIZE} mono />
         </button>

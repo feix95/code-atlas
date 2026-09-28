@@ -29,8 +29,17 @@ interface TipPos {
   arrow: number
 }
 
-/** 悬停多久才亮提示:VS Code 的悬停件约 300ms,取同档 */
-const SHOW_DELAY = 300
+/** 悬停多久才亮提示:读元素的 --tip-delay token(tokens.css 给默认 0.3s,
+ *  VS Code 悬停件同档);某个钮要更慢的亮相,在它自己的 CSS 里局部改这变量。
+ *  变量读不出来/写坏了回 300ms 兜底 */
+const FALLBACK_DELAY_MS = 300
+
+function tipDelayOf(el: HTMLElement, view: Window): number {
+  const raw = view.getComputedStyle(el).getPropertyValue('--tip-delay').trim()
+  const v = Number.parseFloat(raw)
+  if (!Number.isFinite(v) || v < 0) return FALLBACK_DELAY_MS
+  return raw.endsWith('ms') ? v : v * 1000
+}
 /** 气泡与目标之间的缝(小尾巴占掉约 6px,视觉缝 ~4px) */
 const GAP = 10
 /** 距窗口边缘的最小留白 */
@@ -155,9 +164,16 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
       if (doc.body.classList.contains('is-tab-dragging')) return
       const t = readTip(el)
       if (!t) return
-      // 已亮着 → 相邻提示源之间游走即时接力,不用每次等延迟
-      if (tipRef.current) show(t)
-      else timer = view.setTimeout(() => show(t), SHOW_DELAY)
+      const delay = tipDelayOf(el, view)
+      // 已亮着 → 相邻提示源之间游走即时接力(只对默认档);
+      // 元素自己调大了 --tip-delay(如折行钮的 1s)= 声明「我要慢」,
+      // 接力对它失效:先把亮着的收掉,老老实实等满它的延迟
+      if (tipRef.current && delay <= FALLBACK_DELAY_MS) show(t)
+      else if (tipRef.current) {
+        hide()
+        cur = el
+        timer = view.setTimeout(() => show(t), delay)
+      } else timer = view.setTimeout(() => show(t), delay)
     }
 
     const onOver = (e: MouseEvent): void => {

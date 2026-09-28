@@ -15,7 +15,7 @@ import type { FileLinkTarget } from '@shared/fileLinks'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import type { NoteEntry, NoteMap } from '@shared/notes'
 import { buildCrumbs, findFile } from '../scanTreeTools'
-import type { PaneTab } from '../paneTabs'
+import type { PaneTab, PaneViewMode } from '../paneTabs'
 import { useAiAsk, type AiTurn } from '../useAiAsk'
 import type { AiChatApi } from '../useAiChat'
 import { usePresetQuestions } from '../usePresetQuestions'
@@ -66,7 +66,8 @@ export function TabBody({
   settingsSectionReq,
   onAiConfigSaved,
   onChatSuggestionsChange,
-  onSettingsSection
+  onSettingsSection,
+  onSetViewMode
 }: {
   tab: PaneTab
   result: ScanResult | null
@@ -110,6 +111,8 @@ export function TabBody({
   onChatSuggestionsChange: (v: boolean) => void
   /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
   onSettingsSection: (key: SectionKey) => void
+  /** 预览头「阅读/代码」快速开关:切本签的看片档(账挂在签身上,跟右键菜单同一份) */
+  onSetViewMode?: (id: string, mode: PaneViewMode) => void
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
   // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
@@ -133,6 +136,7 @@ export function TabBody({
         refLimit={0}
         onAddRef={() => {}}
         viewMode={tab.viewMode}
+        onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
       />
     )
   }
@@ -254,6 +258,7 @@ export function TabBody({
         onAddRef={addPreviewRef}
         jump={previewJump}
         viewMode={tab.viewMode}
+        onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
         fileLinks={fileLinks}
         noteMenu={{
           hasNote: notes[file.relPath] !== undefined,

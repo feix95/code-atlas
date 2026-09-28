@@ -96,6 +96,7 @@ export function TopBarTabs({
   flashTabId,
   activateTab,
   closeTab,
+  closeTabsInGroup,
   moveTab,
   setDropMark,
   onTabDragEnd,
@@ -110,6 +111,8 @@ export function TopBarTabs({
   flashTabId: string | null
   activateTab: (id: string) => void
   closeTab: (id: string) => void
+  /** 批量关签(右键「关其他/关右侧/关全部」):一次算清再落账,不循环单关 */
+  closeTabsInGroup: (groupId: string, ids: readonly string[]) => void
   /** 挪页签:toGroup 空 = 同组重排,'sibling' = 另一组(单组按 splitSide 拆新组) */
   moveTab: (
     id: string,
@@ -493,6 +496,7 @@ export function TopBarTabs({
               canMoveToSiblingGroup={groups.length > 1}
               onActivate={activateTab}
               onClose={closeTab}
+              onCloseMany={(ids) => closeTabsInGroup(g.id, ids)}
               onMoveTab={moveTab}
               onDetachTab={onDetachTab}
               onSetViewMode={onSetViewMode}

@@ -323,6 +323,47 @@ export function usePaneTabs(deps: {
     }
   }
 
+  /**
+   * 批量关签(右键菜单「关其他/关右侧/关全部」):一单算清再落账 ——
+   * 不能循环调 closeTab:同一批里每个调用读的都是同一份渲染前快照,
+   * 关到激活签时后到的调用会把 activeId 写回已被关掉的死签。
+   */
+  function closeTabsInGroup(groupId: string, ids: readonly string[]): void {
+    const owner = groups.find((g) => g.id === groupId)
+    if (!owner || ids.length === 0) return
+    const kill = new Set(ids)
+    const nextTabs = owner.tabs.filter((t) => !kill.has(t.id))
+    // 整组关空:口径同 closeTab —— 独组且无工作区时清场回首页;
+    // 多组时组消亡、焦点挪给头组;独组但有工作区留张空底板
+    if (nextTabs.length === 0) {
+      if (groups.length === 1 && !result) {
+        setGroups([])
+        setActiveGroupId(null)
+        return
+      }
+      const survivors = groups.filter((g) => g.id !== owner.id)
+      if (survivors.length > 0) {
+        setGroups(survivors)
+        setActiveGroupId(survivors[0].id)
+        return
+      }
+      patchGroup(owner.id, (g) => ({ ...g, tabs: [], activeId: null }))
+      return
+    }
+    // 激活签被杀:可见序右邻优先接力,右侧全灭收最末(与 closeTab 同款接力规矩)
+    const actIdx = owner.tabs.findIndex((t) => t.id === owner.activeId)
+    const killedActive = owner.activeId !== null && kill.has(owner.activeId)
+    const rightNeighbor = owner.tabs.slice(actIdx + 1).find((t) => !kill.has(t.id))
+    const nextActiveId = killedActive
+      ? (rightNeighbor?.id ?? nextTabs[nextTabs.length - 1].id)
+      : owner.activeId
+    patchGroup(owner.id, (g) => ({ ...g, tabs: nextTabs, activeId: nextActiveId }))
+    if (killedActive && nextActiveId) {
+      const next = nextTabs.find((t) => t.id === nextActiveId)
+      if (next) revealTab(next)
+    }
+  }
+
   // 页签看片档位(阅读模式这锤):源码/阅读记在签身上 —— 拖去子窗、会话存档都跟着签走
   function setTabViewMode(id: string, mode: PaneViewMode): void {
     setGroups((prev) =>
@@ -382,6 +423,7 @@ export function usePaneTabs(deps: {
     moveTab,
     activateTab,
     closeTab,
+    closeTabsInGroup,
     setTabViewMode,
     markFlash,
     applyPaneSplit,

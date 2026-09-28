@@ -114,6 +114,9 @@
   /* 悬停轻提示(tooltip):黑底白字圆角,明暗主题同款 —— 小葵给定真值,不吃主题泛色 */
   --tip-bg: #2c2c2c;
   --tip-ink: #f0f0f0;
+  /* 悬停多久才亮提示(TooltipHost 读这个):默认 0.3s(VS Code 悬停件同档);
+     某个钮要更慢,在它自己的 CSS 里局部改写本变量(如 code-wrap-btn 用 1s) */
+  --tip-delay: 0.3s;
   /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
   --traffic-dot: #d1d3d4;
   --traffic-ink: #5c6165;

@@ -767,7 +767,7 @@
   background: var(--hover);
 }
 
-/* 程序垫的灰字条(第一百二十四锤):「参考资料换成了 xxx」,居中小字,不像谁说的话 */
+/* 程序垫的灰字条(第一百二十四锤):「探针正答着话」这类提示,居中小字,不像谁说的话 */
 .chat-note {
   margin: var(--space-2) auto;
   padding: 0 0.75rem;

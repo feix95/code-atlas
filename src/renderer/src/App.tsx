@@ -319,9 +319,6 @@ function App(): React.JSX.Element {
     setSelectedFolder(null)
     setStructure(null)
     setAnalyzing(false)
-    // 公用场垫字(第一百二十四锤老规矩):聊着东西换资料,垫一句「换成了」;点同一个文件不垫
-    if (chat.messages.length > 0 && selectedFile?.relPath !== file.relPath)
-      chat.note(`参考资料换成了 ${file.name}`)
     openFileTab(file)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
@@ -369,9 +366,6 @@ function App(): React.JSX.Element {
     setSelectedFile(null)
     setStructure(null)
     setAnalyzeNote(null)
-    // 聊天中点文件夹(第一百二十四锤老规矩):只换资料不抢台 —— 探针页签本来就没动,垫字即可
-    if (chat.messages.length > 0 && selectedFolder?.relPath !== node.relPath)
-      chat.note(`参考资料换成了 ${node.name || result?.rootName || '这个文件夹'}`)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
 
@@ -633,6 +627,7 @@ function App(): React.JSX.Element {
     moveTab,
     activateTab,
     closeTab,
+    closeTabsInGroup,
     setTabViewMode,
     markFlash,
     applyPaneSplit,
@@ -716,6 +711,7 @@ function App(): React.JSX.Element {
     flashTabId,
     activateTab,
     closeTab,
+    closeTabsInGroup,
     moveTab,
     setDropMark,
     onTabDragEnd,
@@ -763,6 +759,7 @@ function App(): React.JSX.Element {
         removePreviewRef={removePreviewRef}
         handleDropNode={handleDropNode}
         handleDropRef={handleDropRef}
+        onSetViewMode={setTabViewMode}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
         onSettingsSection={setSettingsSection}
@@ -832,6 +829,7 @@ function App(): React.JSX.Element {
                   flashTabId={flashTabId}
                   activateTab={activateTab}
                   closeTab={closeTab}
+                  closeTabsInGroup={closeTabsInGroup}
                   moveTab={moveTab}
                   setDropMark={setDropMark}
                   onTabDragEnd={onTabDragEnd}

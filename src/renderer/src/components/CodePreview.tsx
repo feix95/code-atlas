@@ -15,6 +15,7 @@ import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuSto
 import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import { loadCodeWrapOn, saveCodeWrapOn } from '../codePrefs'
 import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
 import { DOC_ZOOM_STEP } from '@shared/docZoom'
 
@@ -23,26 +24,19 @@ const COPIED_ALL_MS = 2000
 /** 头部文件图标(和文件树 15px 同款岗,户口在 FileTree 的 TREE_ICON_SIZE) */
 const FILE_ICON_SIZE = 15
 /** 头部折行开关图标 */
-const WRAP_ICON_SIZE = 14
+const WRAP_ICON_SIZE = 16
 /** 选区首尾角括号一对(markStart/markEnd)的尺寸 */
 const MARK_ICON_SIZE = 16
-/** 折行默认开给文档型后缀(折行版这锤):这类文件就是拿来读的;代码文件默认横滚,手动可切 */
-const WRAP_DEFAULT_EXT = new Set(['md', 'markdown', 'mdx', 'txt', 'log'])
 /**
  * 折行模式的行数闸:折行要放弃虚拟滚动、全量上 DOM(行高不一,轨道没法再按行数乘出来),
  * 超过这个行数开关直接歇着,继续不折行那套。
  */
 const WRAP_MAX_LINES = 5000
+/** 单行字数闸:超过就只跳语法着色(超长行多是打包产物/单行 JSON,上色纯属白烧) */
+const LINE_HL_MAX_CHARS = 5000
 /** 滚轮一格的像素门槛 / 碎步账的保鲜期(Ctrl+滚轮文档缩放用,和界面缩放滚轮同脾气) */
 const WHEEL_NOTCH = 100
 const WHEEL_ACC_TTL_MS = 400
-
-/** 文件名后缀(全小写);点必须落在最后一段路径上才算数(dir.name/file 这类不能误认),没有回空串 */
-function extOf(relPath: string): string {
-  const i = relPath.lastIndexOf('.')
-  const lastSep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'))
-  return i > lastSep ? relPath.slice(i + 1).toLowerCase() : ''
-}
 
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
@@ -118,7 +112,9 @@ function lineNoAt(el: HTMLElement, node: Node, offset: number, isEnd: boolean): 
  * 化妆只许锦上添花,不许把字吃掉。
  */
 function renderColoredLine(lineText: string, segs: number[][] | undefined): React.ReactNode[] {
-  if (lineText === '' || !segs || segs.length === 0) return [<span key="w">{lineText}</span>]
+  // 超闸长行跳过着色:单行几千字多是压缩产物,切小段纯属白烧 DOM
+  if (lineText === '' || lineText.length > LINE_HL_MAX_CHARS || !segs || segs.length === 0)
+    return [<span key="w">{lineText}</span>]
   const parts: React.ReactNode[] = []
   let pos = 0
   segs.forEach((seg, i) => {
@@ -167,6 +163,7 @@ export function CodePreview({
   jump,
   noteMenu,
   viewMode,
+  onSetViewMode,
   fileLinks
 }: {
   rootPath: string
@@ -182,6 +179,8 @@ export function CodePreview({
   noteMenu?: FilePathNoteActions
   /** 看片档位(阅读模式这锤):undefined/'source' = 源码;'reading' = md 渲染态(只对 md 系生效) */
   viewMode?: PaneViewMode
+  /** 头部「阅读/代码」快速开关:切本签的看片档(账在页签身上,和右键菜单同一份) */
+  onSetViewMode?: (mode: PaneViewMode) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
@@ -232,10 +231,10 @@ export function CodePreview({
   const scrollRafRef = useRef(0)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /**
-   * 折行开关(折行版这锤):on=null 表示没动过,按文件后缀吃默认;动过就记在这份文件名下。
-   * 折行放弃虚拟滚动,全量行块上 DOM —— 所以过长的文件闸死,开关摁不动。
+   * 折行开关(全局默认开这锤):一个开关管所有文件,存 localStorage 重启不失忆;
+   * 折行放弃虚拟滚动、全量行块上 DOM —— 所以过行数闸的文件开关摁不动。
    */
-  const [wrapAt, setWrapAt] = useState<{ file: string; on: boolean | null }>({ file: '', on: null })
+  const [wrapOn, setWrapOn] = useState(loadCodeWrapOn)
 
   // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事。
   // 账记在文件名下:新文件还没回话时,旧文件的内容一秒都不冒名顶替
@@ -261,13 +260,9 @@ export function CodePreview({
   // 全文在手:按行切一份备用(纯字符串,不占画面);折行时全量上屏,不折行只画 range 那一截
   const lines = useMemo(() => (text === '' ? [] : text.split('\n')), [text])
   const total = lines.length
-  // 折行(折行版这锤):默认按后缀定文档/代码,用户动过开关就听用户的;超过行数闸一律摁死
+  // 折行(全局默认开这锤):偏好一档管所有文件;超过行数闸一律摁死(回退横滚)
   const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
-  const wrap =
-    wrapAllowed &&
-    (wrapAt.file === file.relPath && wrapAt.on !== null
-      ? wrapAt.on
-      : WRAP_DEFAULT_EXT.has(extOf(file.relPath)))
+  const wrap = wrapAllowed && wrapOn
   // 阅读模式(这锤的新档):md 系签才生效 —— MiniMD 渲染态,行号/分色/选区引用是源码档的家务
   const reading = viewMode === 'reading' && canReadingMode(file.relPath)
   // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
@@ -469,11 +464,26 @@ export function CodePreview({
    * 选到眼前这段,那就别装 —— 直接把全文送进剪贴板,弹一句人话。
    * 只在这一栏拦:事件来自输入框(比如右栏聊天框)时一律放行,让它们用原生那套。
    */
+  /** 折行开关一个口:按钮和 Alt+Z 都走这里,偏好当场落盘 */
+  const toggleWrap = useCallback((): void => {
+    if (!wrapAllowed) return
+    setWrapOn((prev) => {
+      saveCodeWrapOn(!prev)
+      return !prev
+    })
+  }, [wrapAllowed])
+
   function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
-    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       return
+    // Alt+Z 切自动换行(VS Code 同款键位):只在预览焦点下生效,别拦别处的快捷键
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault()
+      toggleWrap()
+      return
+    }
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
     e.preventDefault()
     if (text === '') return
     void navigator.clipboard
@@ -576,51 +586,73 @@ export function CodePreview({
     e.dataTransfer.effectAllowed = 'copy'
   }
 
+  /**
+   * 阅读/代码快速开关(和页签右键菜单同一份 viewMode 账):图标换脸标态 ——
+   * bookOpen = 正读渲染稿,code = 正看源码;非 md 文件常驻置灰(菜单同款口径)。
+   * 页头栏两档共用同一排钮,位置样式一模一样(小葵拍板:这俩是预览页公用功能)
+   */
+  const canRead = canReadingMode(file.relPath)
+  const modeBtn: React.JSX.Element = (
+    <button
+      type="button"
+      className="code-mode-btn"
+      disabled={!canRead}
+      aria-pressed={reading}
+      aria-label={reading ? '切到代码模式' : '切到阅读模式'}
+      data-tip={!canRead ? 'Markdown 文件专属' : reading ? '当前:阅读模式' : '当前:代码模式'}
+      onClick={() => onSetViewMode?.(reading ? 'source' : 'reading')}
+    >
+      <TreeIcon name={reading ? 'bookOpen' : 'code'} size={WRAP_ICON_SIZE} />
+    </button>
+  )
+
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
-      {/* 页头栏:源码档才有(文件名+折行钮);阅读档交给 MiniMD 内联标题,不重复报名 */}
-      {!reading && (
-        <div className="code-pane-head">
-          <span className="code-pane-icon" aria-hidden="true">
-            <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
-          </span>
-          <span
-            className="code-pane-name mono is-file-menu"
-            onContextMenu={(e) => {
-              // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
-              e.preventDefault()
-              openFilePathMenuFor(
-                rootPath,
-                file.relPath,
-                e.clientX,
-                e.clientY,
-                e.currentTarget.ownerDocument,
-                noteMenu ? { note: noteMenu } : undefined
-              )
-            }}
+      {/* 页头栏:两档共用一排(文件名 + 模式开关 + 换行钮),阅读档的内联标题
+          是文档正文的title,跟页头 chrome 不冲突 */}
+      <div className="code-pane-head">
+        <span className="code-pane-icon" aria-hidden="true">
+          <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
+        </span>
+        <span
+          className="code-pane-name mono is-file-menu"
+          onContextMenu={(e) => {
+            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
+            e.preventDefault()
+            openFilePathMenuFor(
+              rootPath,
+              file.relPath,
+              e.clientX,
+              e.clientY,
+              e.currentTarget.ownerDocument,
+              noteMenu ? { note: noteMenu } : undefined
+            )
+          }}
+        >
+          {file.relPath}
+        </span>
+        {result?.status === 'ok' && onSetViewMode && modeBtn}
+        {result?.status === 'ok' && (
+          <button
+            type="button"
+            className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
+            disabled={!wrapAllowed}
+            aria-pressed={wrap}
+            aria-label="自动换行(Alt+Z)"
+            data-tip={
+              !wrapAllowed
+                ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行要全量上屏会卡,先歇着`
+                : wrap
+                  ? '当前:自动换行'
+                  : '当前:不换行'
+            }
+            onClick={toggleWrap}
           >
-            {file.relPath}
-          </span>
-          {result?.status === 'ok' && !reading && (
-            <button
-              type="button"
-              className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
-              disabled={!wrapAllowed}
-              aria-pressed={wrap}
-              data-tip={
-                !wrapAllowed
-                  ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行要全量上屏会卡,先歇着`
-                  : wrap
-                    ? '关掉自动换行,长行横向滚动'
-                    : '自动换行:长行在右缘折回,不用横滚'
-              }
-              onClick={() => setWrapAt({ file: file.relPath, on: !wrap })}
-            >
-              <TreeIcon name="wrapText" size={WRAP_ICON_SIZE} />
-            </button>
-          )}
-        </div>
-      )}
+            {/* 状态走图标换脸(小葵拍板,不靠底色):折回箭头 = 开着,参差行尾 = 关着 */}
+            <TreeIcon name={wrap ? 'wrapText' : 'textAlignStart'} size={WRAP_ICON_SIZE} />
+          </button>
+        )}
+      </div>
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">

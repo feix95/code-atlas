@@ -657,6 +657,31 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="m6 6 12 12" />
     </>
   ),
+  // 页签菜单「关闭全部页签」:方框收一个 x = 整条带清空
+  xSquare: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="m9 9 6 6" />
+      <path d="m15 9-6 6" />
+    </>
+  ),
+  // 页签菜单「关闭其他页签」:两侧括弧夹一个 x = 只留这张,两边清场
+  sidesX: (
+    <>
+      <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />
+      <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />
+      <path d="m10 10 4 4" />
+      <path d="m14 10-4 4" />
+    </>
+  ),
+  // 预览折行开关·关态脸(lucide text-align-start,小葵给定):行尾参差不齐 = 长行横滚不折
+  textAlignStart: (
+    <>
+      <path d="M21 5H3" />
+      <path d="M15 12H3" />
+      <path d="M17 19H3" />
+    </>
+  ),
   // 预览折行开关(lucide wrap-text):长行在右缘折回,不用横滚
   wrapText: (
     <>
