@@ -400,7 +400,8 @@ try {
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
   await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
-  await page.locator('.code-text').filter({ hasText: 'Getting started' }).waitFor()
+  // md 系文件签默认阅读档:渲染容器是 .code-reading,不是源码档的 .code-text
+  await page.locator('.code-reading').filter({ hasText: 'Getting started' }).waitFor()
   await searchBox.fill('绝没有这个词zzz')
   await page
     .locator('.search-results')
@@ -450,7 +451,7 @@ try {
   await page.getByRole('button', { name: /^文件 README\.md/ }).focus()
   await page.keyboard.press('Enter')
   await page
-    .locator('.code-text')
+    .locator('.code-reading')
     .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
   await page.locator('.tabbar-tab').filter({ hasText: '关系图谱' }).locator('.tabbar-name').click()
@@ -470,7 +471,7 @@ try {
   await overview()
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page
-    .locator('.code-text')
+    .locator('.code-reading')
     .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
   await selectMain()

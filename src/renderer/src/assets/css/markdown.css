@@ -277,24 +277,28 @@
   text-decoration: underline;
 }
 
-/* 聊天里的文件链接:AI 提到查过户口的文件名变可点,比正文略大、主题色、悬停手型;
- * 点了左边开预览,带行号的直达那一行。代码块和行内代码里的同名文件不变链接 */
+/* 聊天里的文件链接:对上户口的文件引用变可点,与行内代码同款药丸皮
+ * (字号/内边距/圆角/底色一套量),只靠强调色字+点状下划线示可点;
+ * 点了左边开预览,带行号的直达那一行。围栏代码块里的路径不变链接 */
 .md-file-link {
-  padding: 0 0.25em;
+  padding: 0.05em 0.3em;
   border: 0;
   border-radius: var(--radius-xxs);
-  background: var(--accent-soft);
+  background: var(--hover);
   color: var(--accent-bright);
-  font: inherit;
-  font-size: 1.05em;
-  font-family: var(--mono, 'Consolas', monospace);
+  font-family: var(--mono);
+  font-size: 0.9em;
+  line-height: inherit;
+  box-decoration-break: clone;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
   cursor: pointer;
   text-align: left;
 }
 
 .md-file-link:hover {
   background: var(--accent-line);
-  text-decoration: underline;
+  text-decoration-style: solid;
 }
 
 /* ── 文件路径右键菜单:绿字链接右键弹出,复制完整路径进剪贴板(只复制不打开,

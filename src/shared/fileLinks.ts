@@ -8,6 +8,9 @@
  * 2. 文件名带后缀(package.json)—— 全项目查无重名才认,重名的一律不画(点了不知道开哪个);
  * 3. 没后缀的裸词(main)—— 一律不认,八成在说别的,不凑热闹。
  *
+ * 行内代码整段恰是一个文件引用时(阅读模式的 `CHANGELOG.md`),走 resolveFileRef
+ * 整段判定,同样画成链接;含其他内容的(`import a from './a.ts'`)保持普通代码。
+ *
  * 纯函数零副作用,自测覆盖(scripts/selftest-filelinks.mts)。
  */
 
@@ -84,8 +87,8 @@ const FILE_TOKEN_RE =
   /(?<![A-Za-z0-9_.\-/\\])([A-Za-z0-9_.\-/\\]+)(?:[:：](\d{1,7}))?(?:[:：]\d{1,7})?/g
 
 /**
- * 在一段文字里找全部认得下的文件引用。调用方保证这段文字不含行内代码
- * (`...` 里的字是"展示代码",不是"递文件"),围栏代码块由更外层挡住。
+ * 在一段文字里找全部认得下的文件引用。调用方保证这段文字是行内代码切片之外的
+ * 普通文字(代码切片整段走 resolveFileRef),围栏代码块由更外层挡住。
  */
 export function findFileLinks(text: string, index: FileLinkIndex): FileLinkSpan[] {
   const spans: FileLinkSpan[] = []
@@ -118,4 +121,27 @@ export function findFileLinks(text: string, index: FileLinkIndex): FileLinkSpan[
     })
   }
   return spans
+}
+
+/**
+ * 行内代码的整段判定:整段文字掐头去尾后恰好是一个文件引用才认 ——
+ * 不做子串扫描(`import a from './a.ts'` 这种带着别的字的不凑热闹)。
+ * 归一化、按名/按路径户口、:行号 解析与 findFileLinks 同一套规矩。
+ */
+export function resolveFileRef(
+  text: string,
+  index: FileLinkIndex
+): { relPath: string; line?: number } | null {
+  let s = text.trim()
+  if (s === '') return null
+  const lineMatch = s.match(/[:：](\d{1,7})(?:[:：]\d{1,7})?$/)
+  const line = lineMatch !== null ? Number(lineMatch[1]) : undefined
+  if (lineMatch) s = s.slice(0, lineMatch.index)
+  const norm = normalizeRelPath(s.replace(/[./]+$/, ''))
+  if (norm === '') return null
+  const relPath = norm.includes('/')
+    ? index.byPath.get(norm.toLowerCase())
+    : (index.byPath.get(norm.toLowerCase()) ?? index.byName.get(norm.toLowerCase()))
+  if (!relPath) return null
+  return line !== undefined && line >= 1 ? { relPath, line } : { relPath }
 }

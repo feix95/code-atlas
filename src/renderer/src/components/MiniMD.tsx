@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from 'react'
-import { findFileLinks, type FileLinkTarget } from '@shared/fileLinks'
+import { findFileLinks, resolveFileRef, type FileLinkTarget } from '@shared/fileLinks'
 import { parseMarkdown, type MdBlock, type MdInline, type MdList } from '@shared/markdown'
 
 /**
@@ -9,8 +9,34 @@ import { parseMarkdown, type MdBlock, type MdInline, type MdList } from '@shared
  * 模型/文件吐什么都不会变成可执行内容。
  *
  * 文件链接:传了 fileLinks 时,普通文字里对上户口的文件引用画成可点的链接;
- * 围栏代码块和行内代码里的字一律不动 —— 那是在展示代码,不是在递文件。
+ * 行内代码整段恰是一个文件引用也画成链接(整段判定,不扫子串);
+ * 围栏代码块里的字一律不动 —— 那是在展示代码,不是在递文件。
  */
+
+/** 文件链接按钮:正文对账与行内代码整段共用一张脸,点击/右键一套逻辑 */
+function fileLinkBtn(
+  relPath: string,
+  line: number | undefined,
+  label: ReactNode,
+  links: FileLinkTarget,
+  kc: { n: number }
+): ReactNode {
+  return (
+    <button
+      key={kc.n++}
+      type="button"
+      className="md-file-link"
+      onClick={() => links.onOpen(relPath, line)}
+      onContextMenu={(e) => {
+        if (!links.onMenu) return
+        e.preventDefault()
+        links.onMenu(relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
+      }}
+    >
+      {label}
+    </button>
+  )
+}
 
 /** 一段纯文本里对上户口的文件引用画成可点链接;key 走共享计数器,谁先算完谁先领号 */
 function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number }): ReactNode[] {
@@ -22,21 +48,13 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
   for (const s of spans) {
     if (s.start > last) out.push(t.slice(last, s.start))
     out.push(
-      <button
-        key={kc.n++}
-        type="button"
-        className="md-file-link"
-        onClick={() => links.onOpen(s.relPath, s.line)}
-        onContextMenu={(e) => {
-          if (!links.onMenu) return
-          e.preventDefault()
-          links.onMenu(s.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
-        }}
-        data-tip={`打开预览:${s.relPath}${s.line !== undefined ? ` 第 ${s.line} 行` : ''};右键:复制路径 / 在资源管理器中显示`}
-      >
-        {s.relPath}
-        {s.line !== undefined ? `:${s.line}` : ''}
-      </button>
+      fileLinkBtn(
+        s.relPath,
+        s.line,
+        `${s.relPath}${s.line !== undefined ? `:${s.line}` : ''}`,
+        links,
+        kc
+      )
     )
     last = s.end
   }
@@ -46,6 +64,7 @@ function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number
 
 /** 行内 token → 元素;text/bold/em 的内文仍过文件链接对账(与旧行为持平)。
  * 行内代码不分段染色(染色退役案):尖括号/括号等一律普通字,整段同色;
+ * 但整段恰是文件引用时画成链接(同 fileNodes 一张脸)。
  * 围栏块同理,语法高亮只在有明确语言标注时才允许做(现在没做,原样输出) */
 function renderInline(
   nodes: MdInline[],
@@ -54,8 +73,13 @@ function renderInline(
 ): ReactNode[] {
   return nodes.map((n) => {
     switch (n.t) {
-      case 'code':
-        return <code key={kc.n++}>{n.text}</code>
+      case 'code': {
+        // 整段恰是一个文件引用(`CHANGELOG.md`/`src/a.ts:12`)就当文件递,画成链接;
+        // 否则原样代码 —— 含空格/其他字的不凑热闹
+        const ref = links ? resolveFileRef(n.text, links.index) : null
+        if (!links || !ref) return <code key={kc.n++}>{n.text}</code>
+        return fileLinkBtn(ref.relPath, ref.line, n.text, links, kc)
+      }
       case 'bold':
         return <strong key={kc.n++}>{fileNodes(n.text, links, kc)}</strong>
       case 'em':

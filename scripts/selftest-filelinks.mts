@@ -2,7 +2,7 @@
 // 行号剥离、标点收尾、大小写斜杠跑偏,一条条过 —— 检测器画错一个,界面上就多一个死链接。
 // 纯函数,不碰任何系统东西。
 import assert from 'node:assert/strict'
-import { buildFileLinkIndex, findFileLinks } from '../src/shared/fileLinks.ts'
+import { buildFileLinkIndex, findFileLinks, resolveFileRef } from '../src/shared/fileLinks.ts'
 
 function main(): void {
   const paths = [
@@ -102,6 +102,30 @@ function main(): void {
   // ── 15. 空输入和空索引不出事 ──
   assert.equal(findFileLinks('', index).length, 0)
   assert.equal(findFileLinks('src/ai/index.ts:1', buildFileLinkIndex([])).length, 0)
+
+  // ── 16. resolveFileRef:行内代码整段判定,对上户口才认 ──
+  const ref = resolveFileRef('src/ai/index.ts:291', index)
+  assert.equal(ref?.relPath, 'src/ai/index.ts')
+  assert.equal(ref?.line, 291)
+  assert.equal(resolveFileRef('  package.json  ', index)?.relPath, 'package.json', '首尾空白掐掉')
+  assert.equal(
+    resolveFileRef('docs/a/README.md', index)?.relPath,
+    'docs/a/README.md',
+    '重名写全路径认'
+  )
+  assert.equal(resolveFileRef('README.md', index), null, '重名裸名不认')
+  assert.equal(resolveFileRef("import a from './a.ts'", index), null, '带其他字的整段不认')
+  assert.equal(resolveFileRef('KERNEL_CORE', index), null, '无后缀裸词不认')
+  assert.equal(resolveFileRef('vendor/', index), null, '目录不认')
+  assert.equal(resolveFileRef('ai-config.json', index), null, '不在树里的不认')
+  assert.equal(resolveFileRef('src/ai/index.ts#L12', index), null, '#行号写法整段不认')
+  assert.equal(
+    resolveFileRef('SRC\\AI\\INDEX.TS', index)?.relPath,
+    'src/ai/index.ts',
+    '大小写反斜杠跑偏也认'
+  )
+  assert.equal(resolveFileRef('src/ai/index.ts：50', index)?.line, 50, '中文冒号行号')
+  assert.equal(resolveFileRef('', index), null)
 
   console.log('fileLinks 自测全绿')
 }

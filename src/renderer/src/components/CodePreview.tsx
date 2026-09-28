@@ -578,46 +578,49 @@ export function CodePreview({
 
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
-      <div className="code-pane-head">
-        <span className="code-pane-icon" aria-hidden="true">
-          <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
-        </span>
-        <span
-          className="code-pane-name mono is-file-menu"
-          onContextMenu={(e) => {
-            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
-            e.preventDefault()
-            openFilePathMenuFor(
-              rootPath,
-              file.relPath,
-              e.clientX,
-              e.clientY,
-              e.currentTarget.ownerDocument,
-              noteMenu ? { note: noteMenu } : undefined
-            )
-          }}
-        >
-          {file.relPath}
-        </span>
-        {result?.status === 'ok' && !reading && (
-          <button
-            type="button"
-            className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
-            disabled={!wrapAllowed}
-            aria-pressed={wrap}
-            data-tip={
-              !wrapAllowed
-                ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行要全量上屏会卡,先歇着`
-                : wrap
-                  ? '关掉自动换行,长行横向滚动'
-                  : '自动换行:长行在右缘折回,不用横滚'
-            }
-            onClick={() => setWrapAt({ file: file.relPath, on: !wrap })}
+      {/* 页头栏:源码档才有(文件名+折行钮);阅读档交给 MiniMD 内联标题,不重复报名 */}
+      {!reading && (
+        <div className="code-pane-head">
+          <span className="code-pane-icon" aria-hidden="true">
+            <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
+          </span>
+          <span
+            className="code-pane-name mono is-file-menu"
+            onContextMenu={(e) => {
+              // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
+              e.preventDefault()
+              openFilePathMenuFor(
+                rootPath,
+                file.relPath,
+                e.clientX,
+                e.clientY,
+                e.currentTarget.ownerDocument,
+                noteMenu ? { note: noteMenu } : undefined
+              )
+            }}
           >
-            <TreeIcon name="wrapText" size={WRAP_ICON_SIZE} />
-          </button>
-        )}
-      </div>
+            {file.relPath}
+          </span>
+          {result?.status === 'ok' && !reading && (
+            <button
+              type="button"
+              className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
+              disabled={!wrapAllowed}
+              aria-pressed={wrap}
+              data-tip={
+                !wrapAllowed
+                  ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行要全量上屏会卡,先歇着`
+                  : wrap
+                    ? '关掉自动换行,长行横向滚动'
+                    : '自动换行:长行在右缘折回,不用横滚'
+              }
+              onClick={() => setWrapAt({ file: file.relPath, on: !wrap })}
+            >
+              <TreeIcon name="wrapText" size={WRAP_ICON_SIZE} />
+            </button>
+          )}
+        </div>
+      )}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">

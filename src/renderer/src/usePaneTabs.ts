@@ -7,6 +7,7 @@ import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
 import { dirChainOf } from './scanTreeTools'
 import {
+  canReadingMode,
   clampPaneSplit,
   dropHostGroups,
   groupHost,
@@ -90,7 +91,8 @@ export function usePaneTabs(deps: {
       relPath: file.relPath,
       name: file.name,
       icon: file.summary?.icon ?? 'file',
-      scopeRoot
+      scopeRoot,
+      viewMode: canReadingMode(file.relPath) ? 'reading' : undefined
     }
   }
 
