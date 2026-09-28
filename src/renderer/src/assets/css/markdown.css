@@ -41,6 +41,26 @@
   font-weight: var(--font-w-semi);
 }
 
+/* 阅读档标题量级:em 级差对齐 Obsidian 默认主题(--h1~h4-size 真值)。
+   铁规矩:必须写在本文件、排在上面 .md .md-hN 后面 —— 两边特异性平级(双类),
+   谁后写谁赢;workspace.css 导入顺序比本文件靠前,写那边会被这里盖死(隐形案)。
+   em 跟着可读栏基字号走,Ctrl+滚轮文档缩放天然全场同步 */
+.code-reading .md-h1 {
+  font-size: 1.8em;
+}
+
+.code-reading .md-h2 {
+  font-size: 1.6em;
+}
+
+.code-reading .md-h3 {
+  font-size: 1.37em;
+}
+
+.code-reading .md-h4 {
+  font-size: 1.25em;
+}
+
 .md ul,
 .md ol {
   margin: 0 0 0.4em;
