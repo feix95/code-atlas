@@ -18,7 +18,6 @@ import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { ContextMenu } from './components/ContextMenu'
-import { HomePage } from './components/HomePage'
 import { Notice } from './components/Notice'
 import { ProgressDots } from './components/ProgressDots'
 import { AppTopBar } from './components/AppTopBar'
@@ -904,9 +903,9 @@ function App(): React.JSX.Element {
               <main className="workspace">
                 <section className="detail">{paneGroupsEl}</section>
               </main>
-            ) : scanning || error || groups.length === 0 ? (
-              // 扫描中/失败/回家:这些状态优先于页签房 —— 扫描失败时 resetPaneTabs 留下的
-              // 空签组不许顶掉错误页
+            ) : scanning || error ? (
+              // 扫描中/失败:这两种状态优先于页签房;其余情况(含没开项目)一律进签区,
+              // 空签组自然落 PaneEmptyBoard 空板
               <main className="content">
                 {scanning && (
                   <div className="state" role="status" aria-live="polite">
@@ -942,16 +941,6 @@ function App(): React.JSX.Element {
                       </button>
                     </div>
                   </div>
-                )}
-                {!folder && !scanning && !error && (
-                  <HomePage
-                    recents={recents}
-                    drives={drives}
-                    drivesNote={drivesNote}
-                    onPick={() => void handlePick()}
-                    onOpen={(path) => void scanPath(path)}
-                    onRemoveRecent={removeRecent}
-                  />
                 )}
               </main>
             ) : (

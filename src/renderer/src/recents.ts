@@ -142,15 +142,3 @@ export function toggleRecentPin(path: string): RecentProject[] {
   writeRecentProjects(list)
   return list
 }
-
-/** 上次时间的展示话术(纯函数,自测覆盖):今天报时刻,昨天说昨天,再往前报日期 */
-export function formatRecentTime(ts: number, now: number = Date.now()): string {
-  const d = new Date(ts)
-  const startOfDay = (x: Date): number =>
-    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const days = Math.round((startOfDay(new Date(now)) - startOfDay(d)) / 86_400_000)
-  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  if (days <= 0) return `今天 ${hm}`
-  if (days === 1) return '昨天'
-  return `${d.getMonth() + 1}月${d.getDate()}日`
-}

@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict'
 import {
   RECENTS_MAX,
-  formatRecentTime,
   menuWorkspaceRows,
   nextPinToggle,
   nextRecentProjects,
@@ -134,16 +133,6 @@ check('recentNameFor:取路径末段;盘根末段是空的,照实写回全路径
   assert.equal(recentNameFor('C:\\work\\demo'), 'demo')
   assert.equal(recentNameFor('C:/work/demo'), 'demo')
   assert.equal(recentNameFor('C:\\'), 'C:\\')
-})
-
-check('formatRecentTime:今天报时刻,昨天说昨天,再往前报日期(跨天按自然日算)', () => {
-  const now = new Date(2026, 8, 8, 18, 0).getTime() // 2026-09-08 18:00
-  const sameDay = new Date(2026, 8, 8, 9, 5).getTime()
-  assert.equal(formatRecentTime(sameDay, now), '今天 09:05')
-  assert.equal(formatRecentTime(new Date(2026, 8, 7, 23, 59).getTime(), now), '昨天')
-  assert.equal(formatRecentTime(new Date(2026, 8, 1, 12, 0).getTime(), now), '9月1日')
-  // 钟慢了(时间倒流)也当今天,不显示负数怪话
-  assert.equal(formatRecentTime(now + 60_000, now), '今天 18:01')
 })
 
 console.log('✅ 最近打开项目自测全绿')

@@ -86,8 +86,8 @@
 }
 
 .ws-menu-btn {
-  /* 悬停提示放慢到 1s(token 驱动,跟折行钮同档) */
-  --tip-delay: 1s;
+  /* 悬停提示走慢档(token 户口,跟折行钮/文件树同档) */
+  --tip-delay: var(--tip-delay-slow);
   width: calc(var(--u) * 0.6875);
   height: calc(var(--u) * 0.6875);
 }
@@ -536,10 +536,10 @@
 }
 
 /* 预览头折行开关 + 阅读/代码快速开关:同款纯图标小方钮,开/关靠图标换脸
-   (不靠底色,小葵拍板);悬停提示按 --tip-delay 走,这俩都要 1s 稳悬停才亮 */
+   (不靠底色,小葵拍板);悬停提示走慢档,稳悬停才亮 */
 .code-wrap-btn,
 .code-mode-btn {
-  --tip-delay: 1s;
+  --tip-delay: var(--tip-delay-slow);
   flex-shrink: 0;
   width: 1.6rem;
   height: 1.6rem;
@@ -724,10 +724,9 @@
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:中性底亮一档 + 左侧亮灰细条(第七十六锤摘遮罩:底色不再染色,强调交给这根条) */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六锤摘遮罩,底色不再染色) */
 .tree-row.is-selected {
   background: var(--selected-bg);
-  box-shadow: var(--edge-accent);
 }
 
 /* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
@@ -773,6 +772,12 @@
 
 .tree-row.is-selected .tree-main {
   color: var(--accent-bright);
+}
+
+/* 文件树提示算一个整体(组内接力):行提示走慢档,首颗 1s 亮,行间串门即时换手。
+   只圈挂了 data-tip-group 的树 —— 盘符浏览/搜索结果同穿 .tree-main 但不在组里,不吃这档 */
+.tree[data-tip-group] .tree-main {
+  --tip-delay: var(--tip-delay-slow);
 }
 
 .tree-icon {

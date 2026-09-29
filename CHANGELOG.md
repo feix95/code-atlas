@@ -391,3 +391,4 @@
 - feat(ui): 页签关签体验+预览头开关组——连点关签冻结宽度(Chrome 同款:关签锁实测渲染宽,mouseleave 解冻,WAAPI FLIP 弹性回弹,320ms 过冲 ease),右键菜单新增「关闭其他页签/关闭全部页签」(usePaneTabs.closeTabsInGroup 一单算清,防循环单关的过期快照互踩);预览头新增「阅读/代码」快速开关钮(图标换脸 bookOpen/code,与右键菜单同一份 viewMode 账,页头两档共用一排,非 md 常驻置灰);换行钮改图标换脸标态(wrapText/textAlignStart,弃底色)+文字去掉;Tooltip 延迟改走 --tip-delay token(默认 0.3s,元素可局部改写,自定义慢档不走相邻接力),折行钮与工作区菜单钮挂 1s;代码预览字号 --font-xs 升 --font-base(与阅读模式同号 14px),预览头下沿发丝线摘除,「+」钮提示文案改「能力开关」;摘除聊天页「参考资料换成了」灰字垫条(顶行参考 chip 保留,chat.note 本体保留给真功能提示)
 - feat(ui): 预览页头摘除文件名与文件图标——两档页头只留阅读/代码+折行钮右对齐,文件名右键菜单(复制路径/资源管理器/备注)随之退役,CodePreview noteMenu 与 TabBody editNoteFromTree 死链一并收编
 - feat(ui): 预览页头钮组调尺寸——图标本体 1→1.2rem,可视底块/点击区 1.5→1.6rem(阅读/代码开关与折行钮共用)
+- feat(ui): 树选中行摘竖条+树提示组接力+欢迎主页退役——选中态只留亮底与亮字(Git 改动行仍用 --edge-accent);树行提示走 --tip-delay-slow 1s 慢档,同组(data-tip-group=filetree)游走即时接力、组内缝隙不收摊,菜单钮/预览头钮的写死 1s 一并收编该 token;HomePage 销户,首开与回家直落 PaneEmptyBoard 空板,formatRecentTime 及自测断言、welcome 样式连带摘除,journey home() 改等空板

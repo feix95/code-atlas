@@ -281,7 +281,8 @@ export function FileTree({
   return (
     <>
       <div className="tree-scroll" ref={scrollRef}>
-        <div className="tree">
+        {/* 悬停提示组户口(文件树算一个整体):行间游走即时接力不收摊,进组第一颗按慢档亮 */}
+        <div className="tree" data-tip-group="filetree">
           <TreeRow
             node={root}
             depth={0}

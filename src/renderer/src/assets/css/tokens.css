@@ -115,8 +115,11 @@
   --tip-bg: #2c2c2c;
   --tip-ink: #f0f0f0;
   /* 悬停多久才亮提示(TooltipHost 读这个):默认 0.3s(VS Code 悬停件同档);
-     某个钮要更慢,在它自己的 CSS 里局部改写本变量(如 code-wrap-btn 用 1s) */
+     某个钮要更慢,在它自己的 CSS 里局部改写本变量(慢档见下,别写死数值) */
   --tip-delay: 0.3s;
+  /* 慢档延迟户口(1s):要放慢亮相的元素写 --tip-delay: var(--tip-delay-slow) ——
+     菜单钮/预览头钮/文件树行同档,数值只在这儿登记 */
+  --tip-delay-slow: 1s;
   /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
   --traffic-dot: #d1d3d4;
   --traffic-ink: #5c6165;

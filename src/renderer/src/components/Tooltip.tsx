@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * 全局轻提示(全局规矩「只定义一次」):全场悬停提示的唯一户口。
  * 元素挂 data-tip="文案" 即得(多行用 \n);data-tip-side 指方位,默认 bottom;
  * data-tip-anchor="选择器" 可改锚到内部元素(如文件名末端,不贴行尾)。
+ * data-tip-group="组名" 挂在元素或祖先上 = 圈成「提示组」:组是一片区域不是一个点,
+ * 成员间游走即时接力(自定义大延迟也吃),行间缝/组内空白不收摊;进组第一颗才按自己的延迟亮。
  * 气泡 position:absolute 渲染在 .app 内(JSX 原位)——这扇窗是透明玻璃窗,
  * Chromium 会把「不在不透明面内」的根层 fixed 件裁掉不画(命中测试活着、像素为零),
  * 浮层一律走 absolute+锚 .app(与 ws-menu 等浮层同一条已验证的路);
@@ -19,6 +21,8 @@ interface TipTarget {
   el: HTMLElement
   text: string
   side: TipSide
+  /** 提示组户口(元素或祖先的 data-tip-group);空串/没挂 = null 散兵 */
+  group: string | null
 }
 
 interface TipPos {
@@ -47,6 +51,12 @@ const EDGE = 8
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi)
 
+/** 元素归哪个提示组:自己或最近祖先身上的 data-tip-group;空串/没挂 = 散兵(null) */
+function groupOf(el: Element | null): string | null {
+  const g = el?.closest('[data-tip-group]')?.getAttribute('data-tip-group')
+  return g || null
+}
+
 function readTip(el: HTMLElement): TipTarget | null {
   const text = el.dataset.tip
   if (!text) return null
@@ -55,7 +65,8 @@ function readTip(el: HTMLElement): TipTarget | null {
     id: 0,
     el,
     text,
-    side: side === 'right' || side === 'left' || side === 'top' ? side : 'bottom'
+    side: side === 'right' || side === 'left' || side === 'top' ? side : 'bottom',
+    group: groupOf(el)
   }
 }
 
@@ -165,11 +176,13 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
       const t = readTip(el)
       if (!t) return
       const delay = tipDelayOf(el, view)
-      // 已亮着 → 相邻提示源之间游走即时接力(只对默认档);
-      // 元素自己调大了 --tip-delay(如折行钮的 1s)= 声明「我要慢」,
-      // 接力对它失效:先把亮着的收掉,老老实实等满它的延迟
-      if (tipRef.current && delay <= FALLBACK_DELAY_MS) show(t)
-      else if (tipRef.current) {
+      const lit = tipRef.current
+      // 已亮着 → 接力两条:默认档(≤0.3s)散兵互接照旧;同组游走也即时换手 ——
+      // 组的慢档延迟只管「进组第一颗」,组内串门不收不等。
+      // 组外散兵调大 --tip-delay = 声明「我要慢」:先收摊,老实等满它的延迟
+      const sameGroup = lit !== null && t.group !== null && t.group === lit.group
+      if (lit !== null && (delay <= FALLBACK_DELAY_MS || sameGroup)) show(t)
+      else if (lit !== null) {
         hide()
         cur = el
         timer = view.setTimeout(() => show(t), delay)
@@ -180,6 +193,11 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
       const host = (e.target as Element | null)?.closest?.('[data-tip]')
       const el = host instanceof HTMLElement ? host : null
       if (el === cur) return
+      // 指针掠过同组区域里没有 data-tip 的缝(行间 margin/组内空白):不算离开 ——
+      // 保持旧目标与热账,等下一颗接力;出了组区域才算真走
+      const overEl = e.target instanceof Element ? e.target : null
+      if (el === null && tipRef.current?.group != null && groupOf(overEl) === tipRef.current.group)
+        return
       view.clearTimeout(timer)
       cur = el
       if (el) plan(el)
@@ -188,6 +206,14 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
     const onOut = (e: MouseEvent): void => {
       // 在宿主内部移动(child→child)不算离开;relatedTarget 出了宿主才收
       if (cur && e.relatedTarget instanceof Node && cur.contains(e.relatedTarget)) return
+      // 出了宿主还在同组区域内(行间缝):不收摊,留给下一颗接力
+      const rt = e.relatedTarget
+      if (
+        tipRef.current?.group != null &&
+        rt instanceof Element &&
+        groupOf(rt) === tipRef.current.group
+      )
+        return
       hide()
     }
     const onFocus = (e: FocusEvent): void => {

@@ -138,7 +138,8 @@ try {
     await page.getByRole('button', { name: '概览', exact: true }).click()
     await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
   }
-  const home = () => page.getByRole('heading', { name: /先看懂项目/ }).waitFor()
+  // 欢迎主页已退役:没开工作区的起始态 = 空签板(大 logo +「还没有打开的页签」)
+  const home = () => page.getByText('还没有打开的页签', { exact: true }).waitFor()
   const overview = async () => {
     // 回项目导览 = 树根行清选中(概览签的零状态就是导览页)+ rail 开/聚焦概览签
     await page.locator('.tree > .tree-branch > .tree-row.is-dir > .tree-main').click()
