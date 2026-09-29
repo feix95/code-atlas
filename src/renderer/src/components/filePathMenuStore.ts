@@ -4,7 +4,7 @@
  */
 
 /** 备注系列动作(菜单统一大锤,小葵拍的:对着文件右键 = 复制路径/资源管理器/写备注三件套):
- *  树菜单、聊天绿字链接、预览器头部文件名,一处规格三家共用 */
+ *  树菜单、聊天绿字链接,一处规格两家共用 */
 export interface FilePathNoteActions {
   hasNote: boolean
   /** 写/编辑备注:App 侧负责选中节点 + 弹详情页的编辑框 */
@@ -25,7 +25,7 @@ export interface FilePathMenuRequest {
   /** 在文件资源管理器中显示:成功返回 null(资源管理器弹出本身就是反馈);
    *  失败返回要显示的人话(比如文件已经不在了) */
   reveal: () => Promise<string | null>
-  /** 可选:预览动作(文件树给;聊天/预览器头部不给就不摆这一项) */
+  /** 可选:预览动作(文件树给;聊天链接不给就不摆这一项) */
   preview?: () => void
   /** 备注系列,可选:不传就只有两件带路的老两项 */
   note?: FilePathNoteActions
@@ -41,7 +41,7 @@ export function openFilePathMenu(request: FilePathMenuRequest): void {
 }
 
 /**
- * 一站式开菜单:知道扫描根的调用方(树/聊天链接/预览器头部/参考资料)传 (rootPath, relPath)
+ * 一站式开菜单:知道扫描根的调用方(树/聊天链接/参考资料)传 (rootPath, relPath)
  * 加鼠标坐标就行,复制/显现两个动作都在这儿接好,不用每处自己拼闭包;
  * extras 里想要预览、备注系列就带上 —— 全 app 就这一张文件右键菜单,一份实现四处共用
  */

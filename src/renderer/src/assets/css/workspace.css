@@ -421,36 +421,10 @@
 .code-pane-head {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
   padding: var(--space-3);
   flex-shrink: 0;
-}
-
-.code-pane-icon {
-  display: inline-flex;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-
-.code-pane-name {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--text);
-  font-size: var(--font-sm);
-}
-
-/* 预览器头部的文件名带了右键菜单(复制路径/在资源管理器中显示):染主题色示意,
- * 左键不动作(已经在预览它了),右键才算数 */
-.code-pane-name.is-file-menu {
-  color: var(--accent-bright);
-  cursor: context-menu;
-}
-
-.code-pane-name.is-file-menu:hover {
-  text-decoration: underline;
 }
 
 .code-pane-note {
@@ -567,8 +541,8 @@
 .code-mode-btn {
   --tip-delay: 1s;
   flex-shrink: 0;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.6rem;
+  height: 1.6rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;

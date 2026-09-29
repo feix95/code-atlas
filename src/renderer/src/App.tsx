@@ -752,7 +752,6 @@ function App(): React.JSX.Element {
         expandLazy={handleExpandLazy}
         jumpTo={jumpTo}
         saveNote={saveNote}
-        editNoteFromTree={editNoteFromTree}
         openPreview={openPreview}
         closeTab={closeTab}
         addPreviewRef={addPreviewRef}

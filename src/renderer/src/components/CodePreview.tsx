@@ -11,7 +11,6 @@ import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
-import { openFilePathMenuFor, type FilePathNoteActions } from './filePathMenuStore'
 import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
@@ -21,10 +20,8 @@ import { DOC_ZOOM_STEP } from '@shared/docZoom'
 
 /** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
 const COPIED_ALL_MS = 2000
-/** 头部文件图标(和文件树 15px 同款岗,户口在 FileTree 的 TREE_ICON_SIZE) */
-const FILE_ICON_SIZE = 15
-/** 头部折行开关图标 */
-const WRAP_ICON_SIZE = 16
+/** 头部折行/模式开关图标(19.2px = 1.2rem) */
+const WRAP_ICON_SIZE = 19.2
 /** 选区首尾角括号一对(markStart/markEnd)的尺寸 */
 const MARK_ICON_SIZE = 16
 /**
@@ -161,7 +158,6 @@ export function CodePreview({
   refLimit,
   onAddRef,
   jump,
-  noteMenu,
   viewMode,
   onSetViewMode,
   fileLinks
@@ -175,8 +171,6 @@ export function CodePreview({
   onAddRef: (ref: ChatCodeRef) => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
-  /** 备注三件套(菜单统一大锤):头部文件名右键菜单带上写/清备注,跟树里、聊天里一个规格 */
-  noteMenu?: FilePathNoteActions
   /** 看片档位(阅读模式这锤):undefined/'source' = 源码;'reading' = md 渲染态(只对 md 系生效) */
   viewMode?: PaneViewMode
   /** 头部「阅读/代码」快速开关:切本签的看片档(账在页签身上,和右键菜单同一份) */
@@ -608,31 +602,11 @@ export function CodePreview({
 
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
-      {/* 页头栏:两档共用一排(文件名 + 模式开关 + 换行钮),阅读档的内联标题
-          是文档正文的title,跟页头 chrome 不冲突 */}
-      <div className="code-pane-head">
-        <span className="code-pane-icon" aria-hidden="true">
-          <TreeIcon name={file.summary?.icon ?? 'file'} size={FILE_ICON_SIZE} />
-        </span>
-        <span
-          className="code-pane-name mono is-file-menu"
-          onContextMenu={(e) => {
-            // 已经在预览它了,左键就不折腾;右键把菜单开在鼠标处,带路两件 + 备注系列
-            e.preventDefault()
-            openFilePathMenuFor(
-              rootPath,
-              file.relPath,
-              e.clientX,
-              e.clientY,
-              e.currentTarget.ownerDocument,
-              noteMenu ? { note: noteMenu } : undefined
-            )
-          }}
-        >
-          {file.relPath}
-        </span>
-        {result?.status === 'ok' && onSetViewMode && modeBtn}
-        {result?.status === 'ok' && (
+      {/* 页头栏:两档共用一排功能钮(模式开关 + 换行钮),右对齐;文件名不摆 ——
+          签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突 */}
+      {result?.status === 'ok' && (
+        <div className="code-pane-head">
+          {onSetViewMode && modeBtn}
           <button
             type="button"
             className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
@@ -651,8 +625,8 @@ export function CodePreview({
             {/* 状态走图标换脸(小葵拍板,不靠底色):折回箭头 = 开着,参差行尾 = 关着 */}
             <TreeIcon name={wrap ? 'wrapText' : 'textAlignStart'} size={WRAP_ICON_SIZE} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">

@@ -55,7 +55,6 @@ export function TabBody({
   expandLazy,
   jumpTo,
   saveNote,
-  editNoteFromTree,
   openPreview,
   closeTab,
   addPreviewRef,
@@ -96,7 +95,6 @@ export function TabBody({
   expandLazy: (relPath: string) => Promise<ScanDirNode | null>
   jumpTo: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
-  editNoteFromTree: (relPath: string) => void
   openPreview: (relPath: string) => void
   closeTab: (id: string) => void
   addPreviewRef: (ref: ChatCodeRef) => void
@@ -260,11 +258,6 @@ export function TabBody({
         viewMode={tab.viewMode}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
         fileLinks={fileLinks}
-        noteMenu={{
-          hasNote: notes[file.relPath] !== undefined,
-          onEdit: () => editNoteFromTree(file.relPath),
-          onRemove: () => saveNote(file.relPath, '')
-        }}
       />
     )
   }
