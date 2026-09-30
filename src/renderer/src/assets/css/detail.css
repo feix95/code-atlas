@@ -17,6 +17,12 @@
   transition: visibility 0s;
 }
 
+.sash.is-static {
+  /* 设置模式:栏宽钉死在稿值,条只剩视觉分隔线(悬停态/拖拽手势全关) */
+  pointer-events: none;
+  cursor: default;
+}
+
 .app.is-side-collapsed .sash {
   visibility: hidden;
   transition: visibility 0s var(--dur-3);

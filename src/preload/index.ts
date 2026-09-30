@@ -79,12 +79,6 @@ const atlasApi = {
     // 落盘的系数同步给主进程:窗口记事本存的是 100% 基准值,应用时乘它还原物理尺寸
     ipcRenderer.send(CH.uiScaleSync, f)
   },
-  // 设置弹窗的暂存预览:根字号跟着草稿走,但不写 localStorage —— 点「应用更改」才真正 setUiScale 落盘
-  previewUiScale: (factor: number): void => {
-    const f = clampUiScale(Number(factor))
-    applyRootFont(f)
-    window.dispatchEvent(new CustomEvent(CH.uiScaleChanged, { detail: f }))
-  },
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke(CH.pickFolder),
   // 外观偏好(2026-09-16 起存主进程 appearance.json,不再用 localStorage):
   // getSync 是同步通道(sendSync 配 ipcMain.on),页面脚本跑之前把外观定下来,首帧不闪默认皮;

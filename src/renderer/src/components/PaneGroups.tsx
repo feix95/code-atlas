@@ -83,8 +83,8 @@ export function PaneGroups({
                   (dropMark.zone === 'left' || dropMark.zone === 'right') && (
                     <div className={`pane-drop-edge is-${dropMark.zone}`} aria-hidden="true" />
                   )}
-                {/* 设置签保活层:切去别的页签只藏不拆 —— 改到一半的草稿(配色/缩放/AI 配置)
-                    还得在;关掉页签才卸载,卸载清理把预览退回存档(SettingsPage 里兜底) */}
+                {/* 设置签保活层:切去别的页签只藏不拆 —— 页面状态(翻到的页/展开的详情)
+                    还得在;关掉页签才卸载,卸载前把没跑完的防抖落盘冲线(SettingsPage 里兜底) */}
                 {g.tabs
                   .filter((t) => t.kind === 'settings')
                   .map((t) => (

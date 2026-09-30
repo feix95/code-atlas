@@ -347,20 +347,22 @@ export function WorkspaceSidebar({
           </div>
         )}
       </aside>
+      {/* 设置模式导航栏固定宽(稿值 220px),sash 退成静态分隔线 ——
+          拖了会改文件树户口但画面不动,那是假控件 */}
       <div
-        className="sash"
+        className={`sash${settingsMode ? ' is-static' : ''}`}
         role="separator"
         aria-orientation="vertical"
         aria-label="左右栏分割条:拖动调整左栏宽度,双击恢复默认"
         aria-valuemin={MIN_SIDEBAR_WIDTH}
         aria-valuenow={Math.round(sidebarWidth)}
-        tabIndex={0}
-        onPointerDown={onSashPointerDown}
-        onPointerMove={onSashPointerMove}
-        onPointerUp={endSashDrag}
-        onPointerCancel={endSashDrag}
-        onDoubleClick={onSashDoubleClick}
-        onKeyDown={onSashKeyDown}
+        tabIndex={settingsMode ? -1 : 0}
+        onPointerDown={settingsMode ? undefined : onSashPointerDown}
+        onPointerMove={settingsMode ? undefined : onSashPointerMove}
+        onPointerUp={settingsMode ? undefined : endSashDrag}
+        onPointerCancel={settingsMode ? undefined : endSashDrag}
+        onDoubleClick={settingsMode ? undefined : onSashDoubleClick}
+        onKeyDown={settingsMode ? undefined : onSashKeyDown}
       />
     </>
   )

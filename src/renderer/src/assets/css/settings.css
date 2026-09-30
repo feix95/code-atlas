@@ -1,12 +1,12 @@
-/* ── 设置页(UI v3 §6:弹窗退役改页签;第二步 Obsidian 式)──
-   左侧栏换脸成设置导航(WorkspaceSidebar),右侧一张连续滚动长页:
-   分组 = 粗体小标题 + 浅灰大卡,卡内行与行只有发丝分隔线。
-   暂存 + 预览 + 应用机制不动:改动先进草稿即时预览,点「应用更改」才落盘;
-   恢复默认/卸载退回上次保存的样子。颜色全走语义 token,亮暗自动换装 */
+/* ── 设置页(Obsidian 风格稿定版):左侧栏一项 = 右侧一整页;
+   版式语言:扁平底、分组灰卡外露小标题、卡内行发丝线、左文右控一条轴。
+   说明灰字走 --chrome-muted(= 稿子 --faint 的亮暗真值);控件样式户口在 personalize.css。
+   即改即存:控件一拨当场生效并落盘,没有草稿账本也没有页脚 —— Obsidian/VS Code 同款。
+   颜色全走语义 token,亮暗自动换装 */
 
 /* 页签正文房间:填满整个 pane-body,左目录右内容在 .cfg-body 里分栏 */
 .cfg-page {
-  position: relative; /* 确认丢弃浮层(absolute)锚在这儿 */
+  position: relative; /* 落盘告警浮层(absolute)锚在这儿 */
   height: 100%;
   min-height: 0;
   display: flex;
@@ -15,22 +15,18 @@
   background: var(--window);
 }
 
-/* 页尾「关闭设置」:不抢戏的次级钮,关掉这张页签(草稿由卸载兜底退回存档) */
-.cfg-btn-close {
-  padding: 0.4375rem 0.875rem;
-  color: var(--muted);
-  border: 1px solid transparent;
+/* 落盘失败告警:右下角一条红字,不挡操作,下一笔写成功自动消 */
+.cfg-save-toast {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1rem;
+  padding: 0.375rem 0.75rem;
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
   border-radius: var(--radius-sm);
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--font-md);
-  cursor: pointer;
-}
-
-.cfg-btn-close:hover {
-  color: var(--text-strong);
-  border-color: var(--line);
-  background: var(--surface-soft);
+  background: var(--canvas-tint);
+  font-size: var(--font-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .cfg-body {
@@ -43,7 +39,7 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-/* ── 设置模式下的侧栏换脸件(第二步):「设置」标题行 + 分类导航 ── */
+/* ── 设置模式下的侧栏换脸件:「设置」小字标 + 分类导航 ── */
 .cfg-snav-head {
   display: flex;
   align-items: center;
@@ -51,9 +47,9 @@
 
 .cfg-snav-title {
   padding: 0 0.375rem;
-  color: var(--text-strong);
-  font-size: var(--font-sm);
-  font-weight: var(--font-w-bold);
+  color: var(--chrome-muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
 }
 
 .cfg-snav {
@@ -63,7 +59,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 0.6875rem 0.875rem;
+  padding: 0.25rem 0.625rem 1rem;
 }
 
 .cfg-snav-item {
@@ -71,12 +67,12 @@
   align-items: center;
   gap: 0.5625rem;
   width: 100%;
-  min-height: 2.25rem;
-  padding: 0.375rem 0.625rem;
+  min-height: 2rem;
+  padding: 0.375rem 0.5rem;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
   transition:
@@ -84,20 +80,27 @@
     color var(--dur-2) var(--ease-smooth);
 }
 
+.cfg-snav-item svg {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
 .cfg-snav-item:hover {
-  color: var(--text);
   background: var(--hover);
 }
 
-/* Obsidian 式选中:灰底药丸,不画强调色条 —— 颜色只留给功能性控件 */
+/* Obsidian 式选中:灰底药丸(--selected-bg),不画强调色条 —— 颜色只留给功能性控件 */
 .cfg-snav-item.is-active {
+  background: var(--selected-bg);
+}
+
+.cfg-snav-item.is-active svg {
   color: var(--text);
-  background: var(--hover);
 }
 
 .cfg-snav-item strong {
-  font-size: var(--font-xs);
-  font-weight: var(--font-w-strong);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-regular);
 }
 
 /* 设置模式下装着文件树/搜索结果的保活壳:display:none 只藏不拆,
@@ -113,71 +116,470 @@
   display: none;
 }
 
-.cfg-content {
-  min-width: 0;
-  min-height: 0;
-  /* Obsidian 式:页面白、分块灰 —— 跟旧「页面灰、卡片白」反着来 */
-  background: var(--surface);
-}
-
+/* 右区滚动列:Obsidian 白单列,内容列宽封顶 720px 居中 */
 .cfg-scroll {
   position: relative;
   height: 100%;
   overflow-y: auto;
-  padding: 1.5625rem 2rem 1.875rem;
+  padding: 1.75rem 2.75rem 5rem;
+  background: var(--canvas-tint);
 }
 
-/* 组标题 = 纯粗体小标题,无框无底(Obsidian「帐户」「高级」同款层级) */
-.cfg-group-title {
-  margin: 0 0 0.5625rem;
-  padding: 0 0.25rem;
-  color: var(--text-strong);
-  font-size: var(--font-sm);
-  font-weight: var(--font-w-bold);
+/* ── 一页一导航:左侧栏选中项即页名,右区只渲染当前页,换页微淡入 ── */
+.cfg-pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 45rem;
+  margin: 0 auto;
+  animation: cfg-pane-in var(--dur-2) var(--ease-smooth);
 }
 
-.cfg-section {
-  margin-bottom: 1.625rem;
+@keyframes cfg-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-/* 组卡 = 浅灰大块:无描边,行内控件不再各自画框 */
+/* 模块小标题(「模型」「回复风格」):外露在卡外,左轴对齐卡内文字(卡垫 .875 + 行垫 .125) */
+.cfg-subhead {
+  margin: 2.125rem 0 1.25rem;
+  padding-left: 1rem;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  font-weight: var(--font-w-semi);
+}
+
+.cfg-pane > .cfg-subhead:first-child {
+  margin-top: 0.5rem;
+}
+
+/* 分组灰卡:整组装浅灰板(--surface-soft)圆角 10px,卡垫 4/14;控件白底浮在灰板上;
+   不描边 —— 灰块自身的明度差已经分出边界,再描边就重了 */
 .cfg-panel {
   overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
+  padding: 0.25rem 0.875rem;
   background: var(--surface-soft);
 }
 
+/* 设置行:左文右控一条轴,行间发丝线(.cfg-divider 落卡垫内侧) */
 .cfg-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem 1.375rem;
-  padding: 1rem 1.0625rem;
+  gap: 0.5rem 1.75rem;
+  padding: 1.125rem 0.125rem;
 }
 
 .cfg-copy {
-  min-width: 10rem;
+  flex: 1;
+  min-width: 0;
 }
 
+/* 行名:14.5px 半粗 —— 设置页的信息主轴 */
 .cfg-copy label {
   display: block;
   color: var(--text);
-  font-size: var(--font-xs);
-  font-weight: var(--font-w-bold);
+  font-size: 0.90625rem;
+  font-weight: var(--font-w-semi);
 }
 
+/* 行说明:12.5px,一句话定义,长行上限 34em;与行名留 6px 呼吸缝 */
 .cfg-copy p {
-  max-width: 30rem; /* 单栏变宽后说明可以写长行,不用再早早折行 */
-  margin: 0.3125rem 0 0;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-  line-height: var(--lh-155);
+  max-width: 34em;
+  margin: 0.375rem 0 0;
+  color: var(--chrome-muted);
+  font-size: 0.78125rem;
+  line-height: var(--lh-150);
+}
+
+/* 版本串:一长串等宽字不折行(这行右侧没控件,空间够),说明框的 34em 上限对它放开 */
+.cfg-version {
+  white-space: nowrap;
+}
+.cfg-copy p:has(.cfg-version) {
+  max-width: none;
 }
 
 .cfg-divider {
   height: 1px;
-  margin: 0 1.0625rem;
-  background: var(--line-soft);
+  background: var(--line);
+}
+
+/* 行名旁的 ? 渐进披露钮:次要解释收进悬停气泡(data-tip 全场统一出口),不抢行内版面 */
+.cfg-q {
+  display: inline-grid;
+  place-items: center;
+  width: 0.9375rem;
+  height: 0.9375rem;
+  margin-left: 0.375rem;
+  padding: 0;
+  color: var(--chrome-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--canvas-tint);
+  font-family: inherit;
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-semi);
+  vertical-align: 0.0625rem;
+  cursor: default;
+}
+
+/* 右栏通用控件簇(色珠+下拉这类同排小件):右文右控一条轴上的最小组合单位 */
+.cfg-ctl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 右栏控件栈:叠了两行以上的复合行(上下文/Key/带告警的文件行)顶对齐,
+   标题中点对准首行控件;单行控件栈照常居中 —— :nth-child(2) 当场数人头 */
+.cfg-ctlcol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4375rem;
+}
+
+.cfg-row:has(.cfg-ctlcol > :nth-child(2)) {
+  align-items: flex-start;
+}
+
+.cfg-row:has(.cfg-ctlcol > :nth-child(2)) .cfg-copy {
+  padding-top: 0.3125rem;
+}
+
+/* 紧凑文本框(地址/Key/上下文数):等宽字体,和下拉同高 */
+.cfg-input {
+  height: 1.875rem;
+  width: 12.5rem;
+  padding: 0 0.625rem;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  font-family: var(--mono);
+  font-size: var(--font-sm);
+  outline: none;
+}
+
+.cfg-input:focus {
+  border-color: var(--sash-hi);
+}
+
+.cfg-input::placeholder {
+  color: var(--chrome-muted);
+}
+
+/* 上下文窗口:110px 右对齐数字框 + 预设档下拉(自动/4k…128k) */
+.cfg-ctx {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.cfg-ctx-input {
+  width: 6.875rem;
+  text-align: right;
+}
+
+.cfg-ctx .cfg-select {
+  min-width: 6.5rem;
+}
+
+/* 服务地址比常规框宽一档 */
+.cfg-url-input {
+  width: 14.375rem;
+}
+
+/* 文件选择行:当前文件名(灰字等宽,全路径进 data-tip)+ 唤起系统选择器的按钮 */
+.cfg-file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cfg-file-name {
+  max-width: 11.875rem;
+  overflow: hidden;
+  color: var(--chrome-muted);
+  font-family: var(--mono);
+  font-size: 0.71875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 控件下方的即时回执(账单/警告/测试结果):小字右对齐 */
+.cfg-note {
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+  text-align: right;
+}
+
+.cfg-note.is-ok {
+  color: var(--green);
+}
+
+.cfg-note.is-warn,
+.cfg-note.is-tight {
+  color: var(--amber);
+}
+
+.cfg-note.is-bad,
+.cfg-note.is-too-big,
+.cfg-note.is-missing {
+  color: var(--danger);
+}
+
+/* Tavily Key 行:密码框内嵌眼睛 + 测试钮,下面挂链接/状态行 */
+.cfg-keyrow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.cfg-key-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 13.125rem;
+}
+
+.cfg-key-wrap input {
+  width: 100%;
+  height: 1.875rem;
+  padding: 0 1.75rem 0 0.625rem;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  font-family: var(--mono);
+  font-size: var(--font-sm);
+  outline: none;
+}
+
+.cfg-key-wrap input:focus {
+  border-color: var(--sash-hi);
+}
+
+.cfg-key-wrap input::placeholder {
+  color: var(--chrome-muted);
+}
+
+/* 「请先输入 Key」借占位符催:橙字橙边,敲字即消,不占版面 */
+.cfg-key-wrap.is-warn input {
+  border-color: var(--amber);
+}
+
+.cfg-key-wrap.is-warn input::placeholder {
+  color: var(--amber);
+}
+
+/* 密码框内嵌眼睛:框内右端幽灵钮 */
+.cfg-eye-btn {
+  position: absolute;
+  right: 0.3125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--chrome-muted);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cfg-eye-btn:hover {
+  color: var(--text);
+}
+
+.cfg-key-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 1.0625rem;
+}
+
+/* 灰文字链(领取 Key/数据范围):功能蓝只给功能性控件,链接一律灰 */
+.cfg-linklike {
+  padding: 0;
+  color: var(--chrome-muted);
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cfg-linklike:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.1875rem;
+}
+
+/* ── 模型货架弹层:遮罩 + 居中卡(Obsidian 社区插件浏览器式),真货架面板装在里面 ── */
+.shelf-mask {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.shelf-modal {
+  width: 35rem;
+  max-width: calc(100vw - 4rem);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas-tint);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+
+.shelf-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.shelf-modal-head b {
+  color: var(--text);
+  font-size: 0.90625rem;
+  font-weight: var(--font-w-semi);
+}
+
+.shelf-close {
+  width: 1.625rem;
+  height: 1.625rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--chrome-muted);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  cursor: pointer;
+}
+
+.shelf-close:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* 面板装进弹层:它自己的滚动窗接管高度,弹层只提供外框;
+   原内嵌版面的 margin(顶距/右侧让位)在弹层里全部归零、四周对称留气 */
+.shelf-modal .shelf {
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+}
+
+/* 推荐位 = 灰底内嵌卡:压在榜单最上,12/16 外边距 + 12/14 内边距;不描边,灰块自带边界 */
+.shelf-modal .shelf-featured {
+  margin: 0.75rem 1rem 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.625rem;
+  background: var(--surface-soft);
+}
+
+/* 推荐标签按稿退成灰字小标,型号走等宽 —— 蓝字标签是内嵌时代的身份色,稿子里已删 */
+.shelf-modal .shelf-featured-tag {
+  font-size: 0.6875rem;
+  font-weight: var(--font-w-regular);
+  letter-spacing: 0.03125rem;
+  color: var(--chrome-muted);
+}
+
+.shelf-modal .shelf-featured-name,
+.shelf-modal .shelf-name {
+  font-family: var(--mono);
+  font-size: 0.78125rem;
+}
+
+.shelf-modal .shelf-featured-sub,
+.shelf-modal .shelf-sub {
+  font-size: 0.71875rem;
+  color: var(--chrome-muted);
+}
+
+/* 内嵌模式的圆角大内框在弹层里归零:筛选栏/列表直接坐弹层底,发丝线归位 */
+.shelf-modal .shelf-frame {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.shelf-modal .shelf-toolbar {
+  font-size: 0.75rem;
+}
+
+/* 稿子的列表盒(.modal-list):横向 16px 内缩,行间发丝线不通到弹层边;
+   行垫 12/2 = 稿子 .mrow 的呼吸 */
+.shelf-modal .shelf-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 0.25rem 1rem;
+}
+
+.shelf-modal .shelf-row {
+  padding: 0.75rem 0.125rem;
+}
+
+/* 弹层里的下载/选中钮回中性白底描边(稿子的 .btn);「使用中」类绿章保色 */
+.shelf-modal .shelf-dl-btn,
+.shelf-modal .shelf-featured-btn {
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.375rem;
+  background: var(--canvas-tint);
+  color: var(--text);
+  font-size: 0.78125rem;
+}
+
+.shelf-modal .shelf-dl-btn:hover,
+.shelf-modal .shelf-featured-btn:hover {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
+.shelf-modal .shelf-dl-done {
+  border: 1px solid var(--green-line);
+  border-radius: 0.375rem;
+  padding: 0 0.75rem;
+  height: 1.875rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 底脚一行灰字稿注:榜单排序以外的选型提醒 */
+.shelf-modal-foot {
+  padding: 0.625rem 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.71875rem;
+  color: var(--chrome-muted);
 }

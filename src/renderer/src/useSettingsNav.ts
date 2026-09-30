@@ -17,7 +17,7 @@ export function useSettingsNav({
   toggleSidebarCollapsed: () => void
 }): {
   settingsMode: boolean
-  /** 侧栏导航高亮哪节:页内滚动间谍往里写 */
+  /** 侧栏导航高亮哪页:openSettings 直接落账,设置页切页时也回报同一本 */
   settingsSection: SectionKey
   setSettingsSection: (key: SectionKey) => void
   /** 跳转请求:seq 每 +1 页内就滚一次到目标节(同节重复点也灵) */
@@ -31,15 +31,16 @@ export function useSettingsNav({
   // 侧栏导航亮哪节 = 这本;滚动间谍写它,侧栏点击走 settingsReq 发命令,两本账各管一头
   const [settingsSection, setSettingsSection] = useState<SectionKey>('appearance')
 
-  // 「AI 设置」直达的翻页请求:每点一次入口 seq +1,设置页签照着滚到指定节
+  // 「AI 设置」直达的翻页请求:每点一次入口 seq +1,设置页签照着切到指定页
   // (设置是单例页签,不是弹窗 —— 开在页签区里,没开工作区也能用)
   function openSettings(section: SectionKey = 'appearance'): void {
     openSingletonTab('settings')
+    setSettingsSection(section)
     setSettingsReq((prev) => ({ section, seq: (prev?.seq ?? 0) + 1 }))
   }
 
   function openAiSettings(): void {
-    openSettings('advanced')
+    openSettings('ai')
   }
 
   // 设置模式:全局激活组落在主窗、且它的激活签是设置页 → 侧栏换脸成设置导航。

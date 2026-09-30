@@ -56,7 +56,6 @@ export function TabBody({
   jumpTo,
   saveNote,
   openPreview,
-  closeTab,
   addPreviewRef,
   removePreviewRef,
   handleDropNode,
@@ -96,7 +95,6 @@ export function TabBody({
   jumpTo: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
-  closeTab: (id: string) => void
   addPreviewRef: (ref: ChatCodeRef) => void
   removePreviewRef: (index: number) => void
   handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
@@ -152,7 +150,7 @@ export function TabBody({
       />
     )
   }
-  // 设置页:UI v3 §6 弹窗退役改页签;关掉页签 = onClose 收回这张签
+  // 设置页:UI v3 §6 弹窗退役改页签;关签 = 页签带的 ×(页内无页脚,即改即存无账要结)
   if (tab.kind === 'settings') {
     return (
       <SettingsPage
@@ -162,7 +160,6 @@ export function TabBody({
         sectionReq={settingsSectionReq}
         onAiConfigSaved={onAiConfigSaved}
         onSettingsSection={onSettingsSection}
-        onClose={() => closeTab(tab.id)}
       />
     )
   }

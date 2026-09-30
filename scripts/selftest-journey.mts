@@ -247,9 +247,9 @@ try {
     1,
     'reopening settings must focus the same tab'
   )
-  // 第二步:导航搬进侧栏(.cfg-snav-item),点击 = 跳到对应节(scroll-spy 回写高亮)
-  await page.locator('.cfg-snav-item').filter({ hasText: '高级选项' }).click()
-  await page.locator('.cfg-snav-item.is-active').filter({ hasText: '高级选项' }).waitFor()
+  // 第二步:导航搬进侧栏(.cfg-snav-item),点击 = 切到对应页(一项一页)
+  await page.locator('.cfg-snav-item').filter({ hasText: 'AI 设置' }).click()
+  await page.locator('.cfg-snav-item.is-active').filter({ hasText: 'AI 设置' }).waitFor()
   await page.locator('#cfg-model-path').waitFor()
   await shot('settings-page')
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
@@ -481,7 +481,7 @@ try {
   assert.equal(await calls('atlas:ai-explain-file'), 0, 'Browsing must not start AI predictions')
   await shot('file-unconfigured')
   await page.locator('.ai-card').getByRole('button', { name: '设置 AI', exact: true }).click()
-  // UI v3(B6):「设置 AI」直达开设置页签并翻到高级节(不是弹窗了)
+  // UI v3(B6):「设置 AI」直达开设置页签并切到「AI 设置」页(不是弹窗了)
   await page.locator('.cfg-page').waitFor()
   await page.locator('#cfg-model-path').waitFor()
   await page.waitForTimeout(200)

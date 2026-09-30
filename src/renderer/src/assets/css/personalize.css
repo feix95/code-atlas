@@ -1,141 +1,31 @@
-/* ── 个性化(第一百一十三锤):下拉 + 多行输入 + 试一句 ──
-   原生控件包一层皮:键盘和无障碍是白送的,皮全用设置页自家的 token,看着还是一家人 */
+/* ── 设置页控件层(Obsidian 风格稿定版):一种语义一张脸 ——
+   离散选择=定制箭头下拉,布尔=药丸开关,连续值=染色轨滑杆,
+   自由文本=等宽紧凑框,文件=当前值+浏览钮,颜色=圆色珠,动作=白底描边钮;
+   控件一律白底(--canvas-tint)浮在灰卡(--surface-soft)上 ── */
+
+/* 下拉:剥掉原生箭头,自绘小三角钉在右侧 10px 位 */
 .cfg-select {
   flex: none;
-  min-width: 7.5rem;
+  appearance: none;
+  min-width: 8rem;
   height: 1.875rem;
-  padding: 0 0.5rem;
+  padding: 0 1.75rem 0 0.625rem;
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  background: var(--canvas-tint)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 0.625rem center;
   font-family: inherit;
-  font-size: var(--font-sm);
+  font-size: 0.78125rem;
   cursor: pointer;
 }
 
 .cfg-select:hover {
-  border-color: var(--accent-line);
+  border-color: var(--chrome-muted);
 }
 
-/* 语气下拉(第一百一十八锤补,照小葵的参考图):收起时和别的下拉一个皮 ——
- * 只显档名+小箭头;点开了列表里才是「档名+介绍」两行,选中项带勾 */
-.tone-select {
-  position: relative;
-  flex: none;
-}
-
-.tone-select-btn {
-  display: flex;
-  align-items: center;
-  min-width: 7.5rem;
-  height: 1.875rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  color: var(--text);
-  font-family: inherit;
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.tone-select-btn:hover {
-  border-color: var(--accent-line);
-}
-
-/* 箭头钉到最右,和原生下拉的箭头一个站位;大小颜色也对齐 */
-.tone-select-caret {
-  flex: none;
-  margin-left: auto;
-  color: var(--muted);
-}
-
-.tone-select-btn .tone-select-label {
-  font-size: var(--font-sm);
-}
-
-.tone-select-label {
-  font-size: var(--font-md);
-  line-height: var(--lh-130);
-}
-
-.tone-select-hint {
-  color: var(--muted);
-  font-size: var(--font-xs);
-  line-height: var(--lh-130);
-}
-
-.tone-select-list {
-  position: absolute;
-  top: calc(100% + 0.25rem);
-  right: 0;
-  z-index: var(--z-popover);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 11rem;
-  padding: 0.25rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-}
-
-.tone-select-item {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0.625rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.tone-select-item:hover {
-  background: var(--hover);
-}
-
-.tone-select-item.is-active {
-  background: var(--selected-bg);
-}
-
-.tone-select-item-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-}
-
-.tone-select-tick {
-  margin-left: auto;
-  color: var(--text);
-  font-size: var(--font-sm);
-}
-
-/* 分组小标题:特质那一组的门脸,和行内 label 拉开层级 */
-.cfg-group-note {
-  display: flex;
-  align-items: baseline;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0.875rem 1.0625rem 0.125rem;
-  color: var(--text);
-  font-size: var(--font-sm);
-  font-weight: var(--font-w-bold);
-}
-
-.cfg-group-note span {
-  color: var(--muted);
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-regular);
-}
-
-/* 整行竖排(自订指令、试一句):控件占满宽度,不跟文案抢行 */
+/* 整行竖排(自定义指令):控件占满宽度,不跟文案抢行 */
 .cfg-row-stack {
   flex-direction: column;
   align-items: stretch;
@@ -148,401 +38,239 @@
 
 .cfg-textarea {
   width: 100%;
+  min-height: 5.25rem;
   padding: 0.5rem 0.625rem;
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  background: var(--canvas-tint);
   font-family: inherit;
-  font-size: var(--font-sm);
+  font-size: 0.78125rem;
   line-height: var(--lh-160);
   resize: vertical;
+  outline: none;
 }
 
-/* 占位示例:写的是两行短句,行距给足,换行也整齐,不像甩了一整段在框里 */
+/* 字数计数:贴在输入框右下角(小灰字,不吃点击);底垫加高,末行不被盖住 */
+.cfg-ta-wrap {
+  position: relative;
+}
+.cfg-ta-wrap .cfg-textarea {
+  padding-bottom: 1.5rem;
+}
+.cfg-ta-count {
+  position: absolute;
+  right: 0.625rem;
+  bottom: 0.5rem;
+  color: var(--chrome-muted);
+  font-size: 0.6875rem;
+  pointer-events: none;
+}
+
+.cfg-textarea:focus {
+  border-color: var(--sash-hi);
+}
+
 .cfg-textarea::placeholder {
-  color: var(--muted-2);
-  line-height: var(--lh-190);
+  color: var(--chrome-muted);
 }
 
-.cfg-sample-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
+/* 动作钮:白底描边(浏览…/读取模型/测试/打开货架),悬停亮灰底 */
 .cfg-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  height: 1.75rem;
+  gap: 0.375rem;
+  height: 1.875rem;
   padding: 0 0.75rem;
-  color: var(--accent-bright);
-  border: 1px solid var(--accent-line);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: var(--accent-soft);
+  background: var(--canvas-tint);
   font-family: inherit;
-  font-size: var(--font-xs);
+  font-size: 0.78125rem;
   cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth);
 }
 
 .cfg-btn:hover:not(:disabled) {
-  color: var(--accent-ink);
-  border-color: var(--accent-line);
-  background: var(--accent);
+  background: var(--hover);
 }
 
 .cfg-btn:disabled {
-  color: var(--muted);
-  border-color: var(--line);
-  background: var(--surface-soft);
-  cursor: not-allowed;
+  opacity: 0.48;
+  cursor: default;
 }
 
 .cfg-btn.is-ghost {
   color: var(--muted);
-  border-color: var(--line);
+  border-color: transparent;
   background: transparent;
 }
 
-.cfg-btn.is-ghost:hover {
+.cfg-btn.is-ghost:hover:not(:disabled) {
   color: var(--text);
-  background: var(--surface-soft);
+  background: var(--hover);
 }
 
-/* 试一句的结果:摆的就是模型原文,换行照原样,不做二次排版 */
-.cfg-sample {
-  max-height: 14rem;
-  margin: 0;
-  padding: 0.625rem 0.75rem;
-  overflow: auto;
-  color: var(--text);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  font-family: inherit;
-  font-size: var(--font-sm);
-  line-height: var(--lh-170);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.cfg-sample.is-error {
-  color: var(--danger);
-  border-color: var(--danger-line);
-  background: var(--danger-soft);
-  white-space: normal;
-}
-
-.cfg-themes {
-  display: flex;
-  align-items: stretch;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-}
-
-.cfg-theme {
-  position: relative;
-  /* 宽不够时整卡换行;不设下限会把卡里的字压成竖排(150% 缩放抓过现行) */
-  min-width: 9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4375rem;
-  padding: 0.4375rem 1.5rem 0.4375rem 0.5rem; /* 右侧统一预留对勾角标位,文字不顶到卡缘 */
-
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-2) var(--ease-smooth),
-    background var(--dur-2) var(--ease-smooth);
-}
-
-.cfg-theme:hover {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-
-.cfg-theme.is-selected {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-
-.cfg-swatch {
-  width: 1.25rem;
-  height: 1.25rem;
+/* 配色主题行头的预览色珠(主题色→辅助色渐变) */
+.cfg-dot-preview {
+  width: 1.375rem;
+  height: 1.375rem;
   flex: 0 0 auto;
-  border-radius: var(--radius-xs);
-  box-shadow: var(--shadow-inset-line);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
 }
 
-.cfg-theme strong,
-.cfg-theme small {
-  display: block;
-}
-
-.cfg-theme strong {
-  color: var(--text);
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-strong);
-}
-
-.cfg-theme small {
-  margin-top: 0.125rem;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
-}
-
-.cfg-theme-check {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
-  color: var(--accent-bright);
-}
-
+/* 自定义颜色:「名字 + 圆色珠」三件一组,珠子即取色器入口 */
 .cfg-colors {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .cfg-color {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--muted);
-  font-size: var(--font-xxs);
+  gap: 0.375rem;
+  color: var(--chrome-muted);
+  font-size: var(--font-sm);
   cursor: pointer;
 }
 
 .cfg-color input {
-  width: 2.25rem;
-  height: 1.625rem;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  cursor: pointer;
-}
-
-/* 底板色一键归位(自定义档):选了底板色才出现 */
-.cfg-color-reset {
-  align-self: center;
+  width: 1.375rem;
+  height: 1.375rem;
   padding: 0;
   border: 0;
-  background: none;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
-  transition: color var(--dur-2) var(--ease-smooth);
-}
-.cfg-color-reset:hover {
-  color: var(--text);
-  text-decoration: underline;
-  text-underline-offset: 0.1875rem;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.cfg-scale {
-  min-width: 22.1875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5625rem;
+.cfg-color input::-webkit-color-swatch-wrapper {
+  padding: 0;
 }
 
-.cfg-stepper {
-  width: 1.75rem;
-  height: 1.75rem;
+.cfg-color input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+/* 复位/辅助动作:纯图标幽灵钮,悬停才亮底(缩放复位、色珠复位) */
+.cfg-icon-btn {
+  width: 1.625rem;
+  height: 1.625rem;
   display: grid;
   place-items: center;
   padding: 0;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  color: var(--chrome-muted);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
   cursor: pointer;
   transition:
     color var(--dur-2) var(--ease-smooth),
-    border-color var(--dur-2) var(--ease-smooth),
     background var(--dur-2) var(--ease-smooth);
 }
 
-.cfg-stepper:hover:not(:disabled) {
-  color: var(--accent-bright);
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
+.cfg-icon-btn:hover {
+  color: var(--text);
+  background: var(--hover);
 }
 
-.cfg-stepper:disabled {
-  opacity: 0.45;
-  cursor: default;
+/* 界面缩放:[↺复位] [百分比] [染色轨滑杆] */
+.cfg-scale {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
 }
 
 .cfg-slider-wrap {
-  width: 11.875rem;
+  width: 10.625rem;
 }
 
-.cfg-slider-wrap input {
-  width: 100%;
+/* 滑杆:浅色细轨 + 白圆柄,已走段染功能蓝(--p 由组件按值写入) */
+.cfg-slider-wrap input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
   display: block;
-  /* 滑杆是功能控件:走分屏拖边那条功能蓝,不跟主题色变 */
-  accent-color: var(--sash-hi);
+  width: 100%;
+  height: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: linear-gradient(to right, var(--sash-hi) var(--p, 50%), var(--line) var(--p, 50%))
+    center / 100% 5px no-repeat;
   cursor: pointer;
 }
 
-.cfg-ticks {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.375rem;
-  color: var(--muted-2);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
+.cfg-slider-wrap input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 0.9375rem;
+  height: 0.9375rem;
+  border-radius: 50%;
+  background: var(--switch-knob);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.cfg-slider-wrap input[type='range']:hover::-webkit-slider-thumb {
+  border-color: var(--sash-hi);
+}
+
+.cfg-slider-wrap input[type='range']::-moz-range-track {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+
+.cfg-slider-wrap input[type='range']::-moz-range-progress {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--sash-hi);
+}
+
+.cfg-slider-wrap input[type='range']::-moz-range-thumb {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  background: var(--switch-knob);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .cfg-scale-value {
-  min-width: 2.8125rem;
-  color: var(--text-strong);
-  font-family: var(--mono);
-  font-size: 1.0625rem;
-  font-weight: var(--font-w-bold);
-  letter-spacing: 0;
+  min-width: 2.75rem;
+  color: var(--text);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-semi);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.cfg-segmented {
-  display: flex;
-  /* 150% 缩放下面板变窄:让按钮整枚换行,不许挤出卡缘 */
-  flex-wrap: wrap;
-  padding: 0.1875rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+/* 行名尾巴上的轻量标(「可选」、字数计):无框灰字,不是徽章 */
+.cfg-tag {
+  margin-left: 0.3125rem;
+  color: var(--chrome-muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+  font-style: normal;
 }
 
-.cfg-segmented button {
-  min-width: 9.0625rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.625rem;
-  border: 0;
-  border-radius: var(--radius-xs);
-  color: var(--muted);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--dur-2) var(--ease-smooth),
-    color var(--dur-2) var(--ease-smooth),
-    box-shadow var(--dur-2) var(--ease-smooth);
-}
-
-.cfg-segmented button:hover {
-  color: var(--text);
-}
-
-.cfg-segmented button.is-selected {
-  color: var(--sash-hi); /* 选中态是功能语义,吃功能蓝不随主题色 */
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.cfg-segmented strong,
-.cfg-segmented small {
-  display: block;
-}
-
-.cfg-segmented strong {
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-bold);
-}
-
-.cfg-segmented small {
-  margin-top: 0.125rem;
-  font-size: var(--font-xxs);
-  color: var(--muted-2);
-}
-
-.cfg-callout {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5625rem;
-  margin: 0 1.0625rem 0.875rem;
-  padding: 0.625rem 0.6875rem;
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-sm);
-  /* 第七十七锤:底回中性面板,不再掺主题色(遮罩手法全面退场);识别靠这条色边 */
-  background: var(--surface-soft);
-}
-
-.cfg-callout-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  color: var(--accent-bright);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-.cfg-callout strong {
-  display: block;
-  color: var(--text);
-  font-size: var(--font-xxs);
-}
-
-.cfg-callout p {
-  max-width: 27.5rem;
-  margin: 0.1875rem 0 0;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-  line-height: var(--lh-150);
-}
-
-.cfg-callout-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-  padding-top: 0.1875rem;
-  color: var(--green);
-  white-space: nowrap;
-  font-size: var(--font-xxs);
-}
-
-.cfg-callout-state.is-warn {
-  color: var(--amber);
-}
-
-.cfg-flag {
-  margin-left: 0.25rem;
-  padding: 0.1875rem 0.3125rem;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xxs);
-  background: var(--surface-soft);
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-semi);
-  vertical-align: 0.0625rem;
-}
-
-.cfg-flag.is-on {
-  color: var(--green);
-  border-color: var(--green-line);
-  background: var(--green-soft);
-}
-
+/* 药丸开关:40×22,开态染功能蓝(--sash-hi),关态走发丝线同档灰 */
 .cfg-switch {
-  width: 2.4375rem;
+  width: 2.5rem;
   height: 1.375rem;
   position: relative;
   flex: 0 0 auto;
   padding: 0;
   border: 0;
-  border-radius: 0.9375rem;
-  background: var(--muted-2);
+  border-radius: var(--radius-pill);
+  background: var(--line);
   cursor: pointer;
   transition: background var(--dur-2) var(--ease-smooth);
 }
@@ -560,403 +288,27 @@
 }
 
 .cfg-switch.is-on {
-  /* 功能性开关开态吃分屏拖边那条功能蓝(自查清单:功能强调统一走 --sash-hi);
-     绿色只留给「已同步」这类状态语义 */
   background: var(--sash-hi);
 }
 
 .cfg-switch.is-on span {
-  transform: translateX(1.0625rem);
+  transform: translateX(1.125rem);
 }
 
+/* 隐私条(Obsidian 式:不染色,卡内纯文字行 + 文字链开详情) */
 .cfg-privacy {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.5625rem 1.0625rem;
-  color: var(--muted);
-  border-top: 1px solid var(--line-soft);
-  background: color-mix(in srgb, var(--green) 4%, var(--surface));
-  font-size: var(--font-xxs);
-}
-
-.cfg-privacy > span {
-  flex: 1;
-}
-
-.cfg-privacy button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1875rem;
-  padding: 0;
-  color: var(--muted);
-  border: 0;
-  background: transparent;
-  font-size: var(--font-xxs);
-  cursor: pointer;
-}
-
-.cfg-privacy button:hover {
-  color: var(--text);
-  text-decoration: underline;
+  padding: 0.625rem 0.125rem;
+  color: var(--chrome-muted);
+  border-top: 1px solid var(--line);
+  font-size: var(--font-sm);
 }
 
 .cfg-privacy-more {
-  padding: 0.5625rem 1.0625rem 0.6875rem;
-  color: var(--muted);
-  border-top: 1px dashed var(--line-soft);
-  background: var(--surface-soft);
-  font-size: var(--font-xxs);
+  padding: 0 0.125rem 0.75rem;
+  color: var(--chrome-muted);
+  font-size: var(--font-sm);
   line-height: var(--lh-160);
-}
-
-/* 高级面板常开(小葵定的板:换模型高频,折叠退役;防误改的保险在「保存」那一环) */
-.cfg-advanced {
-  border-color: var(--accent-line);
-}
-
-.cfg-advanced-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5625rem;
-  padding: 0.8125rem 1rem;
-}
-
-.cfg-advanced-icon {
-  width: 1.5625rem;
-  height: 1.5625rem;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  color: var(--accent-bright);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-.cfg-advanced-head strong,
-.cfg-advanced-head small {
-  display: block;
-}
-
-.cfg-advanced-head strong {
-  font-size: var(--font-xxs);
-}
-
-.cfg-advanced-head small {
-  margin-top: 0.1875rem;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
-}
-
-.cfg-advanced-body {
-  padding: 0 1rem 0.9375rem;
-  border-top: 1px solid var(--line-soft);
-}
-
-.cfg-field-head {
-  display: flex;
-  justify-content: space-between;
-  margin: 0.8125rem 0 0.375rem;
-}
-
-.cfg-field-head label {
-  color: var(--text);
-  font-size: var(--font-xxs);
-  font-weight: var(--font-w-strong);
-}
-
-.cfg-field-head span {
-  color: var(--muted-2);
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-}
-
-.cfg-path-input {
-  display: flex;
-  align-items: center;
-  gap: 0.4375rem;
-  height: 2.125rem;
-  padding-left: 0.625rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  color: var(--muted);
-}
-
-.cfg-path-input:focus-within {
-  border-color: var(--accent-line);
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
-.cfg-path-input input {
-  min-width: 0;
-  flex: 1;
-  height: 100%;
-  border: 0;
-  outline: 0;
-  color: var(--text);
-  background: transparent;
-  font-family: var(--mono);
-  font-size: var(--font-xxs);
-}
-
-.cfg-path-input button {
-  height: 1.5rem;
-  display: inline-flex;
-  align-items: center;
-  margin-right: 0.3125rem;
-  padding: 0 0.5rem;
-  color: var(--accent-bright);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-xs);
-  background: var(--accent-soft);
-  font-size: var(--font-xxs);
-  cursor: pointer;
-}
-
-.cfg-path-input button:hover {
-  color: var(--accent-ink);
-  background: var(--accent);
-  border-color: var(--accent-line);
-}
-
-/* Tavily Key 区块(2026-09-17 小葵验收):左右留白与上下 cfg-row 对齐,不再贴边 */
-.cfg-tavily-block {
-  padding: 0 1.0625rem 1.125rem;
-}
-
-/* Key 输入框里的小眼睛(小葵点的小眼睛):图标按钮不吃 .cfg-path-input button 的印章样,
-   跟「浏览…」那种实心按钮区分开,平时灰着,悬停才亮 */
-.cfg-path-input button.cfg-eye-btn {
-  width: 1.5rem;
-  justify-content: center;
-  padding: 0;
-  color: var(--muted);
-  border-color: transparent;
-  background: transparent;
-}
-
-.cfg-path-input button.cfg-eye-btn:hover {
-  color: var(--accent-bright);
-  border-color: transparent;
-  background: var(--accent-soft);
-}
-
-.cfg-path-input button.cfg-eye-btn[aria-pressed='true'] {
-  color: var(--accent-bright);
-}
-
-/* 「测一下」这类实心小按钮的禁用态(2026-09-17):Key 空着 / 正在测的时候点不动,但也不隐身 */
-.cfg-path-input button:disabled {
-  color: var(--muted);
-  border-color: transparent;
-  background: transparent;
-  cursor: default;
-}
-
-/* Key 体检的结论行:绿 = 能用,黄 = 能用但有事(额度用完/被限流),红 = 认不了或连不上 */
-.cfg-field-help.is-ok {
-  color: var(--green);
-}
-
-.cfg-field-help.is-bad {
-  color: var(--danger);
-}
-
-.cfg-field-help {
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-  margin: 0.5rem 0 0;
-  color: var(--muted-2);
-  font-size: var(--font-xxs);
-}
-
-.cfg-field-help.is-warn {
-  color: var(--amber);
-}
-
-.cfg-chip-row {
-  display: flex;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-
-.cfg-chip-row button {
-  padding: 0.125rem 0.5rem;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  font-size: var(--font-xxs);
-  cursor: pointer;
-}
-
-.cfg-chip-row button.is-selected {
-  color: var(--accent-bright);
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-
-.cfg-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.5625rem;
-  margin-top: 0.6875rem;
-  padding: 0.6875rem 0.8125rem;
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-sm);
-  /* 第七十七锤:底回中性面板,不再掺主题色 */
-  background: var(--surface-soft);
-}
-
-.cfg-summary-icon {
-  width: 1.625rem;
-  height: 1.625rem;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  color: var(--accent-bright);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-.cfg-summary strong {
-  color: var(--text);
-  font-size: var(--font-xxs);
-}
-
-.cfg-summary p {
-  margin: 0.1875rem 0 0;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-}
-
-.cfg-summary-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-  color: var(--green);
-  white-space: nowrap;
-  font-size: var(--font-xxs);
-}
-
-.cfg-summary-state.is-dirty {
-  color: var(--amber);
-}
-
-.cfg-foot {
-  min-height: 2.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.875rem;
-  padding: 0 1.25rem;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-  flex-shrink: 0;
-}
-
-.cfg-foot-state {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-}
-
-.cfg-foot-state.is-green {
-  color: var(--green);
-}
-
-.cfg-foot-state.is-amber {
-  color: var(--amber);
-}
-
-.cfg-foot-state.is-red {
-  color: var(--danger);
-}
-
-.cfg-foot-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.cfg-btn-reset,
-.cfg-btn-apply {
-  height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0 0.6875rem;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-xxs);
-  cursor: pointer;
-  transition:
-    background var(--dur-2) var(--ease-smooth),
-    border-color var(--dur-2) var(--ease-smooth),
-    color var(--dur-2) var(--ease-smooth);
-}
-
-.cfg-btn-reset {
-  color: var(--muted);
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.cfg-btn-reset:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--muted-2);
-  background: var(--surface-soft);
-}
-
-.cfg-btn-apply {
-  color: var(--accent-ink);
-  border: 1px solid var(--accent-line);
-  background: var(--accent);
-  box-shadow: var(--shadow-accent);
-}
-
-.cfg-btn-apply:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-.cfg-btn-reset:disabled,
-.cfg-btn-apply:disabled {
-  opacity: 0.48;
-  cursor: default;
-}
-
-/* 版本信息行(第六十锤):欢迎卡退役后,CodeAtlas/引擎版本搬进高级选项 */
-.cfg-versions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding: 0 0.125rem;
-  color: var(--muted);
-  font-size: var(--font-xxs);
-}
-
-.cfg-versions-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex-shrink: 0;
-  color: var(--muted-2);
-}
-
-.cfg-versions .mono {
-  color: var(--muted);
-  letter-spacing: 0;
-}
-
-/* 第七十九锤:实心主题色件的字色统一走 --accent-ink 自适应,暗色硬编码 override 退场 */
-
-:root[data-theme='dark'] .cfg-switch span {
-  background: var(--switch-knob);
 }

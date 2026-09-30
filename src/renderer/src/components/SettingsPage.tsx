@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
-import { CONTEXT_NOTCHES, FALLBACK_CONTEXT_CAP, formatContextBill } from '@shared/contextBill'
+import {
+  CONTEXT_NOTCHES,
+  FALLBACK_CONTEXT_CAP,
+  formatContextBill,
+  formatGB,
+  type ContextBill
+} from '@shared/contextBill'
 import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
-import { SCALE_MAX, SCALE_MIN } from '@shared/uiScale'
 import { DEFAULT_PERSONALIZATION, type PersonalizationConfig } from '@shared/personalization'
 import { CH } from '@shared/ipcChannels'
 import type { SectionKey } from '../settingsNav'
@@ -14,16 +19,15 @@ import {
   type Appearance
 } from '../appearance'
 import { friendlyErr } from '../errText'
-import { TreeIcon } from './Icons'
-import { SettingsAdvanced } from './SettingsAdvanced.tsx'
+import { SettingsAbout } from './SettingsAbout.tsx'
 import { SettingsAi } from './SettingsAi.tsx'
 import { SettingsAppearance } from './SettingsAppearance.tsx'
-import { SettingsPersonal, type SampleState } from './SettingsPersonal.tsx'
+import { SettingsNet } from './SettingsNet.tsx'
 
 // 界面大小范围/上下文合法范围的户口在 shared(uiScale.ts / aiDefaults.ts):
 // 滑块档位、preload 根字号引擎、引擎 -c 归一化,三面同认一份
 
-// 第八十九锤:模型上下文的合法范围。夹紧只发生在失焦/保存那一刻 —— 以前每敲一个键就夹,
+// 第八十九锤:模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
 // 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
 
 /** 上下文输入框的落账规则:空串 = 交回自动探测(undefined);数字夹进合法范围 */
@@ -34,21 +38,19 @@ function clampContextSize(raw: string): number | undefined {
 }
 
 export type { SectionKey }
-type ApplyState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; text: string }
 
 /**
  * 设置页(UI v3 §6:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
- * 左侧导航 + 分区内容,原四节组件原样复用。
- * 逻辑是「暂存 + 预览 + 应用」:所有改动先进草稿、界面即时预览,
- * 点「应用更改」才落盘;恢复默认直接退回;页尾「关闭设置」在有未应用的更改时先弹确认,
- * 页签被 × 掉/切走时组件卸载,卸载清理也把预览退回存档 —— 草稿色/缩放不会滞留全局。
- * 页签本体由 PaneGroups 保活层托管(只藏不拆):切走再回来,改到一半的草稿还在。
+ * 左侧栏一项 = 右侧一整页(Obsidian 式,滚动翻节已退役),页键与导航共用 SectionKey。
+ * 即改即存 —— Obsidian/VS Code 同款:控件每拨一下当场生效并落盘,
+ * 文本输入的连击走 300ms 防抖聚成一笔;没有草稿账本、没有页脚确认。
+ * 页签被 × 掉/切走时组件卸载,没跑完的防抖落盘在卸载前冲线。
+ * 页签本体由 PaneGroups 保活层托管(只藏不拆):切走再回来,页面状态原样还在。
  */
 export function SettingsPage({
   workspaceName: _workspaceName, // 侧栏卡片摘除后暂无人读;props 户口保留,侧栏导航要用
   chatSuggestionsOn,
   onChatSuggestionsChange,
-  onClose,
   sectionReq,
   onAiConfigSaved,
   onSettingsSection
@@ -57,23 +59,17 @@ export function SettingsPage({
   /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
   chatSuggestionsOn: boolean
   onChatSuggestionsChange: (v: boolean) => void
-  /** 关闭入口 = 关掉这张页签(页尾「关闭设置」走未应用确认后才到这儿) */
-  onClose: () => void
-  /** 「AI 设置」直达/侧栏导航点击:入口每点一次 seq +1,页内滚到指定节(首屏也有用) */
+  /** 「AI 设置」直达/侧栏导航点击:入口每点一次 seq +1,页内切到指定页(首屏也有用) */
   sectionReq?: { section: SectionKey; seq: number }
   onAiConfigSaved?: (config: AiConfig) => void
-  /** 滚动间谍回报口:滚到哪节就喊一声,侧栏导航跟着亮(App 持有那本账) */
+  /** 切页回报口:切到哪页就喊一声,侧栏导航跟着亮(App 持有那本账) */
   onSettingsSection?: (key: SectionKey) => void
 }): React.JSX.Element {
-  const [savedAppearance, setSavedAppearance] = useState<Appearance>(loadAppearance)
-  const [draftAppearance, setDraftAppearance] = useState<Appearance>(loadAppearance)
-  const [savedConfig, setSavedConfig] = useState<AiConfig | null>(null)
-  const [draftConfig, setDraftConfig] = useState<AiConfig | null>(null)
-  const [savedScale, setSavedScale] = useState(() => window.atlas.getUiScale())
-  const [draftScale, setDraftScale] = useState(() => window.atlas.getUiScale())
-  const [applyState, setApplyState] = useState<ApplyState>({ kind: 'idle' })
-  // 当前分类的户口已上交 App(settingsSection):本页只当「滚动间谍」回报位置、
-  // 领 sectionReq 跳转命令,自己不养导航账本
+  const [appearance, setAppearance] = useState<Appearance>(loadAppearance)
+  const [config, setConfig] = useState<AiConfig | null>(null)
+  const [scale, setScale] = useState(() => window.atlas.getUiScale())
+  const [saveError, setSaveError] = useState<string | null>(null)
+  // 当前分类的户口已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航账本
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [models, setModels] = useState<string[]>([])
@@ -92,77 +88,47 @@ export function SettingsPage({
     path: string
     info: ModelContextInfo | null
   }>({ path: '', info: null })
-  // 第八十九锤:上下文框的打字草稿(纯字符串,和存档里的数字分开管)
+  // 第八十九锤:上下文框的打字串(纯字符串,和存档里的数字分开管,失焦才归账)
   const [contextRaw, setContextRaw] = useState<string>('')
-  // 试一句的结果(第一百一十三锤):拿草稿试,没应用更改也能听
-  const [sample, setSample] = useState<SampleState>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const appearanceRef = useRef<HTMLElement | null>(null)
-  const aiRef = useRef<HTMLElement | null>(null)
-  const personalRef = useRef<HTMLElement | null>(null)
-  const advancedRef = useRef<HTMLElement | null>(null)
+  // 当前页户口:侧栏导航发 sectionReq 翻页,这里只认 seq 切页
+  const [page, setPage] = useState<SectionKey>('appearance')
 
-  // AI 配置只读一次存档;之后界面上的每一下都是草稿,应用更改才落盘
+  // ── 即改即存:防抖聚笔的落盘账本 ──
+  // configRef 永远装最新配置;pendingSave 记「还有没写完的笔」;
+  // 连击 300ms 聚成一笔写盘,卸载时冲线 —— 下笔即生效,磁盘不挨打。
+  const configRef = useRef<AiConfig | null>(config)
+  const pendingSave = useRef(false)
+  const saveTimer = useRef<number | null>(null)
+  const appearanceRef = useRef(appearance)
+  const scaleRef = useRef(scale)
+  // 卸载冲线那一笔也要把存档回喊给 App:回调本身可能换过届,走 ref 拿最新一届
+  const onSavedRef = useRef(onAiConfigSaved)
+  useEffect(() => {
+    onSavedRef.current = onAiConfigSaved
+  }, [onAiConfigSaved])
+
+  // AI 配置只读一次存档;之后每一次改动都即改即存(commitConfig)
   useEffect(() => {
     void window.atlas
       .aiConfigGet()
       .then((c) => {
-        setSavedConfig(c)
-        setDraftConfig(c)
-        // 第八十九锤:读档落定上下文框的初始字(打字草稿和存档数字分开管)
+        configRef.current = c
+        setConfig(c)
+        // 第八十九锤:读档落定上下文框的初始字(打字串和存档数字分开管)
         setContextRaw(c.contextSize === undefined ? '' : String(c.contextSize))
       })
       .catch(() => {})
   }, [])
 
-  /** 滚动间谍(Obsidian 式):右侧滚到哪节,就回报哪节 —— 侧栏导航的高亮跟着滚轮走 */
-  const onCfgScroll = useCallback((): void => {
-    const host = scrollRef.current
-    if (!host) return
-    const hostTop = host.getBoundingClientRect().top
-    const probes: Array<[SectionKey, HTMLElement | null]> = [
-      ['appearance', appearanceRef.current],
-      ['personal', personalRef.current],
-      ['ai', aiRef.current],
-      ['advanced', advancedRef.current]
-    ]
-    // 到底强制末节:scrollTop 封顶时末节标题可能还差着线(滚不到顶),不兜底会亮错行
-    let current: SectionKey =
-      host.scrollTop + host.clientHeight >= host.scrollHeight - 4 ? 'advanced' : 'appearance'
-    if (current === 'appearance') {
-      for (const [key, el] of probes) {
-        if (el && el.getBoundingClientRect().top - hostTop <= 48) current = key
-      }
-    }
-    onSettingsSection?.(current)
-  }, [onSettingsSection])
-
-  // 「AI 设置」直达/侧栏导航点击:入口每点一次 req.seq +1,页内滚到指定节(单例签,
-  // 签早开着也能再领到这节)
+  // 「AI 设置」直达/侧栏导航点击:入口每点一次 req.seq +1,页内切到指定页(单例签,
+  // 签早开着也能再领到这页)
   const lastSectionReq = useRef(0)
   useEffect(() => {
-    // 等配置落账再跳:分区在存档到齐前是空壳矮条,先滚的话内容一撑高目标就沉下去、
-    // 滚动停在半路(journey 抓过现行:scrollTop 88、目标沉到 1341)。seq 不吃就不丢,
-    // draftConfig 落地时本 effect 重跑照样兑现。
-    if (!sectionReq || sectionReq.seq === lastSectionReq.current || !draftConfig) return
+    if (!sectionReq || sectionReq.seq === lastSectionReq.current) return
     lastSectionReq.current = sectionReq.seq
+    setPage(sectionReq.section)
     onSettingsSection?.(sectionReq.section)
-    requestAnimationFrame(() => {
-      // 整节滚到顶:节内第一项就是目标控件(高级选项的 #cfg-model-path 在第一位),
-      // 滚动间谍也按「节顶过线」认节 —— 滚控件会造成节没过线、导航亮错行
-      const key = sectionReq.section
-      const sec =
-        key === 'appearance'
-          ? appearanceRef.current
-          : key === 'ai'
-            ? aiRef.current
-            : key === 'personal'
-              ? personalRef.current
-              : advancedRef.current
-      sec?.scrollIntoView({ block: 'start', behavior: 'auto' })
-      onCfgScroll()
-    })
-  }, [draftConfig, sectionReq, onSettingsSection, onCfgScroll])
+  }, [sectionReq, onSettingsSection])
 
   // 版本信息行:CodeAtlas 版本号走 IPC,引擎三件套同步读 process.versions
   useEffect(() => {
@@ -174,45 +140,101 @@ export function SettingsPage({
 
   // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
   // 结果带着路径入库,显示时按「取数路径 === 当前路径」对号,换人/清空自动失效
-  const modelPathDraft = draftConfig?.builtin.modelPath ?? ''
+  const modelPath = config?.builtin.modelPath ?? ''
   useEffect(() => {
-    if (!modelPathDraft.trim()) return
+    if (!modelPath.trim()) return
     let alive = true
     void window.atlas
-      .modelFitCheck(modelPathDraft)
+      .modelFitCheck(modelPath)
       .then((v) => {
-        if (alive) setFitCheck({ path: modelPathDraft, verdict: v })
+        if (alive) setFitCheck({ path: modelPath, verdict: v })
       })
       .catch(() => {})
     void window.atlas
-      .modelContextInfo(modelPathDraft)
+      .modelContextInfo(modelPath)
       .then((v) => {
-        if (alive) setCtxInfoFetched({ path: modelPathDraft, info: v })
+        if (alive) setCtxInfoFetched({ path: modelPath, info: v })
       })
       .catch(() => {})
     return () => {
       alive = false
     }
-  }, [modelPathDraft])
-  const fitNote = fitCheck.path === modelPathDraft ? fitCheck.verdict : null
-  const ctxInfo = ctxInfoFetched.path === modelPathDraft ? ctxInfoFetched.info : null
+  }, [modelPath])
+  const fitNote = fitCheck.path === modelPath ? fitCheck.verdict : null
+  const ctxInfo = ctxInfoFetched.path === modelPath ? ctxInfoFetched.info : null
 
-  // ── 上下文档位滑块 + 黑板账单(2026-09-13 小葵拍的板)──
-  // 滑块走程序员老规矩 2 的幂(4k/8k/16k/…);最大档照模型出厂上限封顶,翻不出档案按 64k 兜底;
+  const flushConfigSave = useCallback(async (): Promise<void> => {
+    if (!pendingSave.current || !configRef.current) return
+    pendingSave.current = false
+    try {
+      const saved = await window.atlas.aiConfigSave(configRef.current)
+      onAiConfigSaved?.(saved)
+      setSaveError(null)
+    } catch (err) {
+      setSaveError(friendlyErr(err))
+    }
+  }, [onAiConfigSaved])
+
+  /** 控件唯一改账口:新配置立刻进界面,落盘走防抖 */
+  const commitConfig = useCallback(
+    (next: AiConfig): void => {
+      configRef.current = next
+      setConfig(next)
+      pendingSave.current = true
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+      saveTimer.current = window.setTimeout(() => void flushConfigSave(), 300)
+    },
+    [flushConfigSave]
+  )
+
+  // 外观同理:拨一下就 applyAppearance(界面)+ saveAppearance(落盘),没有草稿账
+  const updateAppearance = useCallback((patch: Partial<Appearance>): void => {
+    const next = { ...appearanceRef.current, ...patch }
+    appearanceRef.current = next
+    setAppearance(next)
+    applyAppearance(next)
+    saveAppearance(next)
+  }, [])
+
+  // 界面缩放:拖动只挪滑头和 % 读数,界面本身纹丝不动;松手 commitDrag 才
+  // setUiScale 一次性应用 + 落盘 + 广播 —— 滑杆拖着界面不重排,眼睛不吃晃
+  useEffect(() => {
+    scaleRef.current = scale
+  }, [scale])
+
+  // Ctrl +/-/0 走全局 setUiScale 广播:订阅后滑杆永远跟真值走(即改即存下没有草稿要护)
+  useEffect(() => {
+    function onUiScale(): void {
+      setScale(window.atlas.getUiScale())
+      setDragValue(null)
+    }
+    window.addEventListener(CH.uiScaleChanged, onUiScale)
+    return () => window.removeEventListener(CH.uiScaleChanged, onUiScale)
+  }, [])
+
+  // 卸载冲线:没跑完的防抖落盘补写;缩放补一发幂等 setUiScale,防万一中途断在半档上
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+      if (pendingSave.current && configRef.current) {
+        pendingSave.current = false
+        void window.atlas
+          .aiConfigSave(configRef.current)
+          .then((saved) => onSavedRef.current?.(saved))
+          .catch(() => {})
+      }
+      window.atlas.setUiScale(scaleRef.current)
+    }
+  }, [])
+
+  // ── 上下文档位 + 黑板账单(2026-09-13 小葵拍的板)──
+  // 档位走程序员老规矩 2 的幂(4k/8k/16k/…);最大档照模型出厂上限封顶,翻不出档案按 64k 兜底;
   // 输入框自由填写照旧,两边随时互通;账单跟着框里现在的数实时算,扛不住当场喊。
   const contextNotches = useMemo(
     () => CONTEXT_NOTCHES.filter((n) => n <= (ctxInfo?.nativeContext ?? FALLBACK_CONTEXT_CAP)),
     [ctxInfo]
   )
   const committedCtx = clampContextSize(contextRaw)
-  const ctxNotchIndex = useMemo(() => {
-    const target = committedCtx ?? DEFAULT_CONTEXT_SIZE
-    let best = 0
-    for (let i = 1; i < contextNotches.length; i++) {
-      if (Math.abs(contextNotches[i] - target) < Math.abs(contextNotches[best] - target)) best = i
-    }
-    return best
-  }, [committedCtx, contextNotches])
   const ctxBill = useMemo(
     () =>
       ctxInfo
@@ -227,10 +249,27 @@ export function SettingsPage({
         : null,
     [ctxInfo, committedCtx]
   )
+  // 黑板账的展示口径照稿子短句式(「✓ 16k 可运行(模型 3.2 GB,内存充足)」):
+  // 判定照旧走 ctxBill 精算,行上只摆档名 + 结论 + 括号真家底,不摊流水账
+  const ctxLine = useMemo((): ContextBill | null => {
+    if (!ctxBill || !ctxInfo) return ctxBill
+    const label = committedCtx === undefined ? '自动' : `${committedCtx / 1024}k`
+    const model = ctxInfo.sizeBytes !== null ? formatGB(ctxInfo.sizeBytes) : '?'
+    switch (ctxBill.level) {
+      case 'ok':
+        return { level: 'ok', text: `✓ ${label} 可运行(模型 ${model}，内存充足)` }
+      case 'tight':
+        return { level: 'tight', text: `! ${label} 偏紧(模型 ${model}，贴近内存上限)` }
+      case 'too-big':
+        return { level: 'too-big', text: `✕ ${label} 带不动(模型 ${model}，超出内存上限)` }
+      default:
+        return { level: 'unknown', text: `… 读不到模型档案，${label} 的黑板账算不了` }
+    }
+  }, [ctxBill, ctxInfo, committedCtx])
   function commitContextValue(v: number): void {
     setContextRaw(String(v))
-    if (draftConfig && draftConfig.contextSize !== v) {
-      setDraftConfig({ ...draftConfig, contextSize: v })
+    if (config && config.contextSize !== v) {
+      commitConfig({ ...config, contextSize: v })
     }
   }
 
@@ -238,131 +277,24 @@ export function SettingsPage({
   function onContextBlur(): void {
     const committed = clampContextSize(contextRaw)
     setContextRaw(committed === undefined ? '' : String(committed))
-    if (draftConfig && draftConfig.contextSize !== committed) {
-      setDraftConfig({ ...draftConfig, contextSize: committed })
+    if (config && config.contextSize !== committed) {
+      commitConfig({ ...config, contextSize: committed })
     }
   }
 
-  // 视觉预览:草稿一变,界面当场变(还没落盘,撤销/关弹窗就退回)
-  useEffect(() => {
-    applyAppearance(draftAppearance)
-  }, [draftAppearance])
-  useEffect(() => {
-    window.atlas.previewUiScale(draftScale)
-  }, [draftScale])
-
-  // 页签 ×/切走/工作区换人的卸载兜底:预览退回存档,草稿色和缩放不许滞留全局
-  // (先声明:下面的缩放监听要读这本账,lint 不许「先用后同步」)
-  const savedRef = useRef({ appearance: savedAppearance, scale: savedScale })
-  useEffect(() => {
-    savedRef.current = { appearance: savedAppearance, scale: savedScale }
-  })
-
-  // 界面缩放失联修复:Ctrl +/-/0 走全局 setUiScale 广播,设置页原来只读一次快照,
-  // 滑杆停在旧值不动。订阅广播后:存档账永远跟着真实值走(previewUiScale 不落盘,
-  // getUiScale 读出的仍是旧存档 → 自动滤掉预览回声),草稿账只在干净时跟 ——
-  // 改到一半被快捷键隔空抢走滑杆,那才叫打架
-  useEffect(() => {
-    function onUiScale(): void {
-      const persisted = window.atlas.getUiScale()
-      setSavedScale(persisted)
-      setDraftScale((prev) => (prev === savedRef.current.scale ? persisted : prev))
-    }
-    window.addEventListener(CH.uiScaleChanged, onUiScale)
-    return () => window.removeEventListener(CH.uiScaleChanged, onUiScale)
-  }, [])
-
-  const appearanceDirty = JSON.stringify(draftAppearance) !== JSON.stringify(savedAppearance)
-  const scaleDirty = draftScale !== savedScale
-  const configDirty =
-    savedConfig !== null &&
-    draftConfig !== null &&
-    JSON.stringify(draftConfig) !== JSON.stringify(savedConfig)
-  // 第八十九锤:上下文框里没失焦的字也算草稿 —— 打了数还没点别处就关窗,照样弹「确认丢弃」
-  const contextDirty =
-    savedConfig !== null && clampContextSize(contextRaw) !== savedConfig.contextSize
-  const dirty = appearanceDirty || scaleDirty || configDirty || contextDirty
-
-  const updateAppearance = useCallback((patch: Partial<Appearance>): void => {
-    setDraftAppearance((prev) => ({ ...prev, ...patch }))
-  }, [])
-
-  /** 恢复默认 = 撤销未应用的更改,回到上次保存的样子(不碰已保存的存档) */
-  const revert = useCallback((): void => {
-    setDraftAppearance(savedAppearance)
-    setDraftConfig(savedConfig)
-    setDraftScale(savedScale)
-    // 上下文框里没失焦的字也一并退回(存档没换人时上面那个回填不触发,这里手动退)
-    setContextRaw(savedConfig?.contextSize === undefined ? '' : String(savedConfig.contextSize))
-    setDragValue(null)
-    setApplyState({ kind: 'idle' })
-  }, [savedAppearance, savedConfig, savedScale])
-
-  const apply = useCallback(async (): Promise<void> => {
-    if (!dirty || applyState.kind === 'saving') return
-    setApplyState({ kind: 'saving' })
-    saveAppearance(draftAppearance)
-    setSavedAppearance(draftAppearance)
-    let errText: string | null = null
-    if (draftConfig) {
-      try {
-        // 第八十九锤:兜键盘流的底 —— 点「应用更改」前如果框里还有没失焦的字,保存这一刻也夹进合法范围
-        const committed = clampContextSize(contextRaw)
-        const toSave =
-          committed === draftConfig.contextSize
-            ? draftConfig
-            : { ...draftConfig, contextSize: committed }
-        const saved = await window.atlas.aiConfigSave(toSave)
-        setSavedConfig(saved)
-        setDraftConfig(saved)
-        onAiConfigSaved?.(saved)
-        // 保存回写后框里照存档摆字(第八十九锤:存档换人的四个时刻之一)
-        setContextRaw(saved.contextSize === undefined ? '' : String(saved.contextSize))
-      } catch (err) {
-        errText = friendlyErr(err)
-      }
-    }
-    if (errText) {
-      setApplyState({ kind: 'error', text: `外观已保存,但 AI 设置没存上:${errText}` })
-      return
-    }
-    window.atlas.setUiScale(draftScale)
-    setSavedScale(draftScale)
-    setApplyState({ kind: 'idle' })
-  }, [
-    dirty,
-    applyState.kind,
-    draftAppearance,
-    draftConfig,
-    draftScale,
-    contextRaw,
-    onAiConfigSaved
-  ])
-
-  /** 页尾「关闭设置」入口:保存中不响应;有未应用的草稿不拦 —— 卸载兜底会退回存档 */
-  const requestClose = useCallback((): void => {
-    if (applyState.kind === 'saving') return
-    onClose()
-  }, [applyState.kind, onClose])
-
-  useEffect(() => {
-    return () => {
-      applyAppearance(savedRef.current.appearance)
-      window.atlas.setUiScale(savedRef.current.scale)
-    }
-  }, [])
-
-  /** 滑条:拖动只挪滑条和读数(预览),松手才把数值写进草稿 */
+  /** 滑条松手落账:预览值 → setUiScale 落盘 + 广播,滑杆读数指回真值 */
   function commitDrag(): void {
     if (dragValue === null) return
-    setDraftScale(dragValue)
+    window.atlas.setUiScale(dragValue)
+    setScale(dragValue)
     setDragValue(null)
   }
 
-  function stepScale(dir: number): void {
-    setDraftScale(
-      (prev) => Math.round(Math.min(Math.max(prev + dir, SCALE_MIN), SCALE_MAX) * 100) / 100
-    )
+  /** 复位钮:回到 100%,即改即存 */
+  function resetScale(): void {
+    setDragValue(null)
+    window.atlas.setUiScale(1)
+    setScale(1)
   }
 
   function enterCustom(): void {
@@ -370,149 +302,83 @@ export function SettingsPage({
     const base = COLOR_PRESETS[0]
     updateAppearance({
       preset: 'custom',
-      accent: draftAppearance.accent ?? base.accent,
-      secondary: draftAppearance.secondary ?? base.secondary
+      accent: appearance.accent ?? base.accent,
+      secondary: appearance.secondary ?? base.secondary
     })
   }
 
   async function listModels(): Promise<void> {
-    if (!draftConfig) return
+    if (!config) return
     setModelsBusy(true)
     setModelsNote(null)
     setModels([])
     try {
-      const ids = await window.atlas.aiListModels(draftConfig.lmstudio.baseUrl)
+      const ids = await window.atlas.aiListModels(config.lmstudio.baseUrl)
       setModels(ids)
-      if (ids.length === 0) setModelsNote('服务通了,但没列出模型 —— 先在 LM Studio 里加载一个。')
+      if (ids.length === 0) setModelsNote('服务通了，但没列出模型 —— 先在 LM Studio 里加载一个。')
     } catch {
-      setModelsNote('连不上这个地址,检查 LM Studio 是否已启动。')
+      setModelsNote('连不上这个地址，检查 LM Studio 是否已启动。')
     } finally {
       setModelsBusy(false)
     }
   }
 
   async function pickModel(): Promise<void> {
-    if (!draftConfig) return
+    if (!config) return
     const picked = await window.atlas.aiPickFile().catch(() => null)
-    if (picked)
-      setDraftConfig({ ...draftConfig, builtin: { ...draftConfig.builtin, modelPath: picked } })
+    if (picked) commitConfig({ ...config, builtin: { ...config.builtin, modelPath: picked } })
   }
 
   /** 货架下载完主进程已把配置写盘(Provider 切内置 + 模型路径指向新文件);
-   *  这儿重读一遍,让草稿和已存档都对着新现实,用户点「应用更改」也不会覆盖掉 */
+   *  这儿重读一遍,让界面账对着新现实 */
   function onShelfModelReady(): void {
     void window.atlas.aiConfigGet().then((c) => {
-      setSavedConfig(c)
-      setDraftConfig(c)
+      configRef.current = c
+      setConfig(c)
       onAiConfigSaved?.(c)
     })
   }
 
-  const presetDef = COLOR_PRESETS.find((p) => p.key === draftAppearance.preset) ?? COLOR_PRESETS[0]
-  // 自定义卡(色点/pickers)的兜底永远是默认档,不跟当前预设跑 —— 自定义是「石墨底上自己调色」
+  // 自定义色板的兜底永远是默认档,不跟当前预设跑 —— 自定义是「石墨底上自己调色」
   const defaultPreset = COLOR_PRESETS[0]
-  const themeName = draftAppearance.preset === 'custom' ? '自定义' : presetDef.name
-  const previewAccent = draftAppearance.accent ?? defaultPreset.accent
-  const isBuiltin = draftConfig?.provider !== 'lmstudio'
+  const isBuiltin = config?.provider !== 'lmstudio'
 
-  function sourceState(): { ok: boolean; text: string } {
-    if (!draftConfig) return { ok: false, text: '读取中……' }
-    if (draftConfig.provider === 'builtin') {
-      return draftConfig.builtin.modelPath.trim()
-        ? { ok: true, text: '已选择模型' }
-        : { ok: false, text: '还没选模型' }
-    }
-    return draftConfig.lmstudio.baseUrl.trim() && draftConfig.lmstudio.model.trim()
-      ? { ok: true, text: '已配置' }
-      : { ok: false, text: '请填写地址并选择模型' }
-  }
-  const source = sourceState()
-  const scaleShown = dragValue ?? draftScale
+  const scaleShown = dragValue ?? scale
 
-  // 说话方式(第一百一十三锤):草稿里没有就是全默认 —— 界面照默认摆
-  const personal = draftConfig?.personalization ?? DEFAULT_PERSONALIZATION
+  // 说话方式(第一百一十三锤):存档里没有就是全默认 —— 界面照默认摆
+  const personal = config?.personalization ?? DEFAULT_PERSONALIZATION
   function updatePersonal(patch: Partial<PersonalizationConfig>): void {
-    if (!draftConfig) return
-    setDraftConfig({ ...draftConfig, personalization: { ...personal, ...patch } })
+    if (!config) return
+    commitConfig({ ...config, personalization: { ...personal, ...patch } })
   }
-
-  /**
-   * 试一句(第一百一十三锤):拿当前草稿念一段,当场听说话方式的效果。
-   * 故意走草稿而不是存档 —— 还没点「应用更改」就能试,不满意直接退回,不用先存再改。
-   * 答完上一句之前再点不接(和别处的按钮一个规矩)。
-   */
-  async function tryStyle(): Promise<void> {
-    if (!draftConfig || sample?.kind === 'busy') return
-    setSample({ kind: 'busy' })
-    try {
-      const res = await window.atlas.aiStyleSample(personal)
-      setSample(
-        res.status === 'error'
-          ? { kind: 'error', text: res.text }
-          : { kind: 'done', text: res.text }
-      )
-    } catch (err) {
-      setSample({ kind: 'error', text: friendlyErr(err) })
-    }
-  }
-
-  const footerState = (() => {
-    if (applyState.kind === 'saving') return { tone: 'amber' as const, text: '正在保存……' }
-    if (applyState.kind === 'error') return { tone: 'red' as const, text: applyState.text }
-    if (dirty)
-      return { tone: 'amber' as const, text: '有未应用的更改 —— 应用后生效,关闭前会先确认' }
-    return { tone: 'green' as const, text: '所有设置已同步' }
-  })()
 
   return (
     <main className="cfg-page" aria-label="设置">
       <div className="cfg-body">
-        <section className="cfg-content">
-          {/* Obsidian 式连续滚动页:四节依次铺开,导航搬进侧栏;滚动间谍把当前节喊回 App */}
-          <div className="cfg-scroll" ref={scrollRef} onScroll={onCfgScroll}>
+        {/* 一页一导航:左侧栏选中项即页名,右侧只渲染当前页;换页带微淡入 */}
+        <div className="cfg-scroll" key={page}>
+          {page === 'appearance' && (
             <SettingsAppearance
-              appearanceRef={appearanceRef}
-              draftAppearance={draftAppearance}
+              appearance={appearance}
               updateAppearance={updateAppearance}
               enterCustom={enterCustom}
-              previewAccent={previewAccent}
               defaultPreset={defaultPreset}
-              draftScale={draftScale}
               scaleShown={scaleShown}
               setDragValue={setDragValue}
               commitDrag={commitDrag}
-              stepScale={stepScale}
+              resetScale={resetScale}
             />
-            <SettingsPersonal
-              personalRef={personalRef}
-              draftConfig={draftConfig}
-              personal={personal}
-              updatePersonal={updatePersonal}
-              sample={sample}
-              setSample={setSample}
-              tryStyle={tryStyle}
-            />
+          )}
+          {page === 'ai' && (
             <SettingsAi
-              aiRef={aiRef}
-              draftConfig={draftConfig}
-              setDraftConfig={setDraftConfig}
-              isBuiltin={isBuiltin}
-              source={source}
-              chatSuggestionsOn={chatSuggestionsOn}
-              onChatSuggestionsChange={onChatSuggestionsChange}
-              privacyOpen={privacyOpen}
-              setPrivacyOpen={setPrivacyOpen}
-            />
-            <SettingsAdvanced
-              advancedRef={advancedRef}
-              draftConfig={draftConfig}
-              setDraftConfig={setDraftConfig}
+              config={config}
+              onConfigChange={commitConfig}
               isBuiltin={isBuiltin}
               pickModel={pickModel}
               shelfOpen={shelfOpen}
               setShelfOpen={setShelfOpen}
               onShelfModelReady={onShelfModelReady}
-              modelPathDraft={modelPathDraft}
+              modelPath={modelPath}
               fitNote={fitNote}
               models={models}
               modelsBusy={modelsBusy}
@@ -522,48 +388,31 @@ export function SettingsPage({
               setContextRaw={setContextRaw}
               onContextBlur={onContextBlur}
               contextNotches={contextNotches}
-              ctxNotchIndex={ctxNotchIndex}
               commitContextValue={commitContextValue}
-              ctxInfo={ctxInfo}
-              ctxBill={ctxBill}
-              appVersion={appVersion}
-              themeName={themeName}
-              draftScale={draftScale}
-              dirty={dirty}
+              ctxBill={ctxLine}
+              personal={personal}
+              updatePersonal={updatePersonal}
+              chatSuggestionsOn={chatSuggestionsOn}
+              onChatSuggestionsChange={onChatSuggestionsChange}
             />
-          </div>
-        </section>
+          )}
+          {page === 'net' && (
+            <SettingsNet
+              config={config}
+              onConfigChange={commitConfig}
+              privacyOpen={privacyOpen}
+              setPrivacyOpen={setPrivacyOpen}
+            />
+          )}
+          {page === 'about' && <SettingsAbout appVersion={appVersion} />}
+        </div>
       </div>
-
-      <footer className="cfg-foot">
-        <div className={`cfg-foot-state is-${footerState.tone}`}>
-          <TreeIcon name={footerState.tone === 'green' ? 'check' : 'refresh'} size={13} mono />
-          {footerState.text}
+      {/* 落盘失败不装没事:右下角一条红字告警,下一笔写成功自动消 */}
+      {saveError && (
+        <div className="cfg-save-toast" role="alert">
+          设置没存上：{saveError}
         </div>
-        <div className="cfg-foot-actions">
-          <button type="button" className="cfg-btn-close" onClick={requestClose}>
-            关闭设置
-          </button>
-          <button
-            type="button"
-            className="cfg-btn-reset"
-            onClick={revert}
-            disabled={!dirty || applyState.kind === 'saving'}
-          >
-            <TreeIcon name="refresh" size={13} mono />
-            恢复默认
-          </button>
-          <button
-            type="button"
-            className="cfg-btn-apply"
-            onClick={() => void apply()}
-            disabled={!dirty || applyState.kind === 'saving'}
-          >
-            <TreeIcon name="save" size={13} mono />
-            {applyState.kind === 'saving' ? '应用中……' : '应用更改'}
-          </button>
-        </div>
-      </footer>
+      )}
     </main>
   )
 }

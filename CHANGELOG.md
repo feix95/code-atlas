@@ -392,3 +392,4 @@
 - feat(ui): 预览页头摘除文件名与文件图标——两档页头只留阅读/代码+折行钮右对齐,文件名右键菜单(复制路径/资源管理器/备注)随之退役,CodePreview noteMenu 与 TabBody editNoteFromTree 死链一并收编
 - feat(ui): 预览页头钮组调尺寸——图标本体 1→1.2rem,可视底块/点击区 1.5→1.6rem(阅读/代码开关与折行钮共用)
 - feat(ui): 树选中行摘竖条+树提示组接力+欢迎主页退役——选中态只留亮底与亮字(Git 改动行仍用 --edge-accent);树行提示走 --tip-delay-slow 1s 慢档,同组(data-tip-group=filetree)游走即时接力、组内缝隙不收摊,菜单钮/预览头钮的写死 1s 一并收编该 token;HomePage 销户,首开与回家直落 PaneEmptyBoard 空板,formatRecentTime 及自测断言、welcome 样式连带摘除,journey home() 改等空板
+- feat(ui): 设置页 Obsidian 化定稿——侧栏四项改一页一导航(外观/AI 设置/联网与隐私/关于,滚动翻节与间谍退役),控件全家换稿定脸(下拉自绘箭头白底/中性描边钮/开关滑杆染色轨/圆形色珠+↻复位/?气泡钮/输入框统一等宽);草稿-应用账本整个摘除改即改即存(离散控件直落盘/文本 300ms 防抖聚合/上下文失焦归账/缩放滑杆松手才应用落盘/卸载冲线补写),页脚「应用更改」栏销户;设置模式侧栏钉 220px(sash 转静态),内容列 720px 居中,灰卡摘描边,行名/说明间距照稿,界面文案全角标点统一并逐句对齐定稿 mockup;模型货架收遮罩弹层(Esc/外点关,推荐位灰卡/筛选药丸换下拉/底脚稿注),OptionSelect/SettingsPersonal/SettingsAdvanced 销户,journey 导航断言跟进

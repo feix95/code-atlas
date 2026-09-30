@@ -147,6 +147,8 @@
      兼当浅底用的几处(settings 分组底)随之一档深 */
   --line: #d0d0d0;
   --line-soft: #d0d0d0;
+  /* 控件描边档(设置稿):只给下拉/输入/按钮的边界用,与发丝线分两档 —— 深色下需要更亮 */
+  --line-strong: #d0d0d0;
   --text: #222222;
   --text-strong: #000000;
   --muted: #5c5c5c;
@@ -204,6 +206,8 @@
   /* 深色的统一边缘线 = VS Code 面板边线惯例 #3c3c3c,线族同值一档 */
   --line: #3c3c3c;
   --line-soft: #3c3c3c;
+  /* 控件描边档:深色下控件描边亮一档(设置稿 --line-strong #484848),框线仍用 --line */
+  --line-strong: #484848;
   --text: #dadada;
   --text-strong: #f0f0f0;
   --muted: #b3b3b3;

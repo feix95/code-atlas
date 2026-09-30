@@ -45,8 +45,8 @@ const FEATURED_MODEL = {
 /** 状态章的悬停大白话:专业词上章,人话兜底 —— 判定口径(内存 × 系数预算)在这儿说清,
  *  系数跟判定函数同一份户口(shared/modelShelf 的 MODEL_FIT_*),调了不会文案对不上账 */
 const VERDICT_TIPS: Record<'no' | 'tight', string> = {
-  no: `模型体积超出这台机器的可用内存预算(总内存 × ${MODEL_FIT_RAM_MAX_RATIO},给系统留活路),下载了也加载不起来`,
-  tight: '接近内存预算上限,能跑但可能偏慢'
+  no: `模型体积超出这台机器的可用内存预算(总内存 × ${MODEL_FIT_RAM_MAX_RATIO}，给系统留活路)，下载了也加载不起来`,
+  tight: '接近内存预算上限，能跑但可能偏慢'
 }
 
 /** 副行小字(名字下方那行):下载量 + 收藏 + 更新时间(2026-09-18 起收藏也上 —— 数据早拉了,别浪费) */
@@ -162,7 +162,7 @@ export function ModelShelfPanel({
       })
       .catch(() => {
         if (mountedRef.current && seq === shelfSeqRef.current) {
-          setError('榜单没拉下来,可能是网络不通。检查网络后再试一次。')
+          setError('榜单没拉下来，可能是网络不通。检查网络后再试一次。')
         }
       })
       .finally(() => {
@@ -226,7 +226,7 @@ export function ModelShelfPanel({
         setShelf({ entries: r.entries, ramBytes: r.spec.ramBytes })
       })
       .catch(() => {
-        if (alive) setError('货架没拉下来:网络不通,或者两个数据源都在打盹。检查一下网络再重试。')
+        if (alive) setError('货架没拉下来：网络不通，或者两个数据源都在打盹。检查一下网络再重试。')
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -333,11 +333,11 @@ export function ModelShelfPanel({
               Ornith-1.5-9B-uncensored(Q8_0)
             </span>
             <span className="shelf-featured-sub">
-              {FEATURED_MODEL.sizeLabel} · 下载完自动配置好,即下即用
+              {FEATURED_MODEL.sizeLabel} · 下载完自动配置好，即下即用
             </span>
           </div>
           {featuredDone !== null ? (
-            <span className="shelf-dl-done">✓ 已就位,配置已自动指向它</span>
+            <span className="shelf-dl-done">✓ 已下载，配置已自动指向它</span>
           ) : featuredActive !== null ? (
             <div className="shelf-featured-progress">
               {featuredPct !== null ? (
@@ -367,55 +367,54 @@ export function ModelShelfPanel({
       {/* 超大圆角内框(小葵设计稿):筛选栏+列表+状态提示装进同一个框,框内一个底色 */}
       <div className="shelf-frame">
         <div className="shelf-toolbar">
-          <div className="shelf-filter-group" role="group" aria-label="大小筛选">
+          <div className="shelf-filter-group">
             <span className="shelf-filter-label">大小</span>
-            {([null, 4, 8, 16, 32] as const).map((gb) => (
-              <button
-                key={String(gb)}
-                type="button"
-                className={`shelf-chip${maxGb === gb ? ' is-on' : ''}`}
-                onClick={() => applyPrefs({ maxGb: gb, sortBy, desc })}
-              >
-                {gb === null ? '不限' : `≤ ${gb} GB`}
-              </button>
-            ))}
+            <select
+              className="cfg-select shelf-sel"
+              aria-label="大小筛选"
+              value={maxGb === null ? '' : String(maxGb)}
+              onChange={(e) =>
+                applyPrefs({
+                  maxGb: e.target.value === '' ? null : Number(e.target.value),
+                  sortBy,
+                  desc
+                })
+              }
+            >
+              <option value="">不限</option>
+              {[4, 8, 16, 32].map((gb) => (
+                <option key={gb} value={gb}>
+                  ≤ {gb} GB
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="shelf-filter-group" role="group" aria-label="排序">
+          <div className="shelf-filter-group">
             <span className="shelf-filter-label">排序</span>
-            <button
-              type="button"
-              className={`shelf-chip${sortBy === 'downloads' && desc ? ' is-on' : ''}`}
-              onClick={() => applyPrefs({ maxGb, sortBy: 'downloads', desc: true })}
+            <select
+              className="cfg-select shelf-sel"
+              aria-label="排序"
+              value={`${sortBy}:${desc ? 'desc' : 'asc'}`}
+              onChange={(e) => {
+                const [s, d] = e.target.value.split(':')
+                applyPrefs({
+                  maxGb,
+                  sortBy: s as ShelfQuery['sortBy'],
+                  desc: d === 'desc'
+                })
+              }}
             >
-              最热门
-            </button>
-            <button
-              type="button"
-              className={`shelf-chip${sortBy === 'downloads' && !desc ? ' is-on' : ''}`}
-              onClick={() => applyPrefs({ maxGb, sortBy: 'downloads', desc: false })}
-            >
-              最冷门
-            </button>
-            <button
-              type="button"
-              className={`shelf-chip${sortBy === 'lastModified' && desc ? ' is-on' : ''}`}
-              onClick={() => applyPrefs({ maxGb, sortBy: 'lastModified', desc: true })}
-            >
-              最新
-            </button>
-            <button
-              type="button"
-              className={`shelf-chip${sortBy === 'lastModified' && !desc ? ' is-on' : ''}`}
-              onClick={() => applyPrefs({ maxGb, sortBy: 'lastModified', desc: false })}
-            >
-              最旧
-            </button>
+              <option value="downloads:desc">最热门</option>
+              <option value="downloads:asc">最冷门</option>
+              <option value="lastModified:desc">最新</option>
+              <option value="lastModified:asc">最旧</option>
+            </select>
           </div>
         </div>
 
         {loading && (
           <p className="shelf-note">
-            <ProgressDots /> 正在拉实时榜单,几秒钟的事……
+            <ProgressDots /> 正在拉实时榜单，几秒钟的事……
           </p>
         )}
         {error && (
@@ -428,7 +427,7 @@ export function ModelShelfPanel({
         )}
 
         {shelf && visibleAll.length === 0 && !loading && (
-          <p className="shelf-note is-soft">这个大小上限下没有模型,放宽一点试试。</p>
+          <p className="shelf-note is-soft">这个大小上限下没有模型，放宽一点试试。</p>
         )}
 
         {/* 列表连同「加载更多」一起放进滚动窗口:货架再长也不超一屏,筛选栏和推荐卡永远在场 */}
@@ -540,7 +539,7 @@ export function ModelShelfPanel({
                               )}
                               <span className="shelf-meta">{formatGgufSize(f.sizeBytes)}</span>
                               {donePath !== null ? (
-                                <span className="shelf-dl-done">✓ 已就位,配置已自动指向它</span>
+                                <span className="shelf-dl-done">✓ 已下载，配置已自动指向它</span>
                               ) : active !== null ? (
                                 <>
                                   {pct !== null ? (
@@ -584,7 +583,7 @@ export function ModelShelfPanel({
           {hiddenCount > 0 && (
             <div className="shelf-more">
               <button type="button" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
-                还有 {hiddenCount} 个模型没显示,加载更多
+                还有 {hiddenCount} 个模型没显示，加载更多
               </button>
             </div>
           )}
