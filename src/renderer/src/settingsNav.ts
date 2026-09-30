@@ -11,5 +11,6 @@ export const NAV_ITEMS: Array<{ key: SectionKey; icon: string; name: string }> =
   { key: 'about', icon: 'info', name: '关于' }
 ]
 
-/** 侧栏设置导航的图标旋钮:条目共享一个大小,跟别处互不相关 */
-export const NAV_ICON_SIZE = 15
+/** 侧栏设置导航的图标旋钮:条目共享一个大小,跟别处互不相关。
+    20 = 1.25rem,与导航项字号(--font-ui-large)同高 */
+export const NAV_ICON_SIZE = 20

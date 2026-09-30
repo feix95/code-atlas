@@ -794,11 +794,7 @@ function App(): React.JSX.Element {
           // 拖 sash 时两边永远对齐;rem 值 = 基准宽 ÷ (16 × uiScale)
           style={
             {
-              // 设置模式左栏是分类导航:固定 220px 稿值(13.75rem 随缩放走),
-              // 不读文件树宽度户口 —— 侧栏和顶栏左段同吃这一个变量,自动对齐
-              '--sidebar-w': settingsMode
-                ? '13.75rem'
-                : `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem`
+              '--sidebar-w': `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem`
             } as React.CSSProperties
           }
         >

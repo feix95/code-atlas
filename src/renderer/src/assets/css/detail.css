@@ -17,12 +17,6 @@
   transition: visibility 0s;
 }
 
-.sash.is-static {
-  /* 设置模式:栏宽钉死在稿值,条只剩视觉分隔线(悬停态/拖拽手势全关) */
-  pointer-events: none;
-  cursor: default;
-}
-
 .app.is-side-collapsed .sash {
   visibility: hidden;
   transition: visibility 0s var(--dur-3);
@@ -52,6 +46,13 @@ body.is-sash-dragging .sash::after {
 body.is-sash-dragging {
   cursor: col-resize;
   user-select: none;
+}
+
+/* 拖拽期摘侧栏/顶栏左段的宽过渡:过渡是给收起/展开那一瞬用的,
+   不摘的话每帧 pointermove 都重启一段追赶动画,栏宽永远追不上鼠标(橡皮筋卡感) */
+body.is-sash-dragging .sidebar,
+body.is-sash-dragging .topbar-side {
+  transition: none;
 }
 
 /* ── 右侧详情区 ── */

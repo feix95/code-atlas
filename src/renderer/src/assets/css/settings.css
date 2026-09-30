@@ -75,6 +75,7 @@
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  font-size: var(--font-ui-large); /* 1.25rem */
   transition:
     background var(--dur-2) var(--ease-smooth),
     color var(--dur-2) var(--ease-smooth);
@@ -99,7 +100,7 @@
 }
 
 .cfg-snav-item strong {
-  font-size: var(--font-md);
+  /* 字号不另立,继承 .cfg-snav-item;字重回常规档 */
   font-weight: var(--font-w-regular);
 }
 
