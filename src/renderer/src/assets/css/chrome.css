@@ -343,7 +343,9 @@
 }
 
 .tabbar-tab.is-active + .tabbar-tab:not(.is-active)::before,
-.tabbar.is-dnd-live .tabbar-tab::before {
+.tabbar.is-dnd-live .tabbar-tab + .tabbar-tab:not(.is-active):not(.is-chip)::before {
+  /* 灭口只限缝线本体(idle 签之间的 1px 竖线)——
+     别写成 .tabbar-tab::before 全家桶:激活签的左底角反弧也画在 ::before 上,会被一并灭掉 */
   content: none;
 }
 
@@ -368,8 +370,8 @@
 }
 
 /* ── 页签 pointer 拖拽(TopBarTabs 引擎):拖拽中整条带开几何过渡 ——
-   margin 撑落点缝,过渡才有「邻居滑开让位」的连续感;源签全程原样不塌缩;
-   平时不挂过渡,免得窗口/分屏改宽时页签尺寸拖尾 ── */
+   margin 撑落点缝(别家条带)、transform 滑位补位(本组活序),过渡才有
+   「邻居滑开让位」的连续感;平时不挂过渡,免得窗口/分屏改宽时页签尺寸拖尾 ── */
 .tabbar.is-dnd-live .tabbar-tab {
   transition:
     margin-left var(--dur-2) var(--ease-smooth),
@@ -378,11 +380,21 @@
     min-width var(--dur-2) var(--ease-smooth),
     padding var(--dur-2) var(--ease-smooth),
     gap var(--dur-2) var(--ease-smooth),
-    opacity var(--dur-2) var(--ease-smooth);
+    opacity var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
 }
 
-/* 被拎着的页签:原地保持原样(小葵拍板)——替身芯片跟光标跑,真身不动,
-   松手提交才挪窝;不塌缩成空位(塌空让签头凭空消失,看不出是谁在拖) */
+/* 活序滑动里被拎的真身(Chromium 模型):translateX 跟指针零延迟,
+   挂了过渡就永远追不上手;抬一层压在滑动补位的邻居上 —
+   同级 transform 也算 stacking context,DOM 序在后的邻居照样会盖住它 */
+.tabbar-tab.is-drag-src {
+  position: relative;
+  z-index: 1;
+}
+
+.tabbar.is-dnd-live .tabbar-tab.is-drag-src {
+  transition: none;
+}
 
 /* 落点记号:一条小竖线寄生在宿主签的缘上 —— Obsidian 式钉在「要跟在后面的那张
    签」的尾巴缘;签被 flex/margin 挤着挪位线跟着走,视觉位置=真实落点 */

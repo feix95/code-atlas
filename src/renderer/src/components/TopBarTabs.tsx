@@ -5,8 +5,10 @@
 // 折成 「组宽% + 占比×3u」 的纯加减式,窗控宽挂 --u 跟着缩放,不写死 rem。
 //
 // 页签拖拽是手搓 pointer 引擎(不吃 HTML5 DnD —— 原生幻影带黑框、没有让位动画):
-// 按住位移超阈值开拖 → 原页签塌缩成空位,替身芯片浮起跟光标;扫过页签带时
-// 邻居 margin 过渡撑开落点缝;悬到正文区按中心/边缘判分屏许诺;窗外松手撕新子窗。
+// 按住位移超阈值开拖 → 本组条带内走 Chromium 活序模型(源签真身 translateX
+// 跟指针滑,邻居按落点序号滑动补位,条带全程满编);指针离开本带/悬到别家条带
+// 则替身胶囊现身跟光标,别家条带用 margin 缝+插入线预告落点;悬到正文区按
+// 中心/边缘判分屏许诺;窗外松手撕新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab, PaneViewMode } from '../paneTabs'
 import { TreeIcon } from './Icons'
@@ -57,6 +59,9 @@ interface TabDragState {
   grabDy: number
   x: number
   y: number
+  /** 本组活序滑动的夹持边界(开拖时按本带快照记):首签左缘 ~ 末签右缘 */
+  slideMinL: number
+  slideMaxR: number
   phase: ChipPhase
   settle?: SettleRect
   leaving: boolean
@@ -274,6 +279,13 @@ export function TopBarTabs({
 
     // 松手/取消的统一收尾:芯片沉降飞矩形,落地后才交账 + 收场
     const finishWithSettle = (z: DragZone, doCommit: boolean): void => {
+      // 本组条带内松手:活序滑动里真身已经滑到落点跟前,不等沉降直接交账 —
+      // 签就是跟着指针站位的,再飞一段是纯多余(Chromium 同款:就地落下)
+      if (z.type === 'strip' && z.groupId === srcGroupId) {
+        if (doCommit) commitZone(z)
+        endSession()
+        return
+      }
       const target = settleRectFor(z)
       if (!target) {
         if (doCommit) commitZone(z)
@@ -342,6 +354,7 @@ export function TopBarTabs({
             bottom: r.bottom
           }
         })
+        const ownSnap = snaps.find((s) => s.groupId === srcGroupId)
         setDrag({
           id: t.id,
           icon: t.icon,
@@ -356,6 +369,8 @@ export function TopBarTabs({
           grabDy,
           x: cx,
           y: cy,
+          slideMinL: ownSnap?.mids[0]?.left ?? rect.left,
+          slideMaxR: ownSnap?.mids[ownSnap.mids.length - 1]?.right ?? rect.right,
           phase: 'born',
           leaving: false
         })
@@ -480,6 +495,14 @@ export function TopBarTabs({
     el.addEventListener('lostpointercapture', cancel)
   }
 
+  // 被拖签的家在哪条带:本组递活序滑动账,别家条带照常递 margin 缝
+  const dragSrcGroupId = drag
+    ? (groups.find((g) => g.tabs.some((t) => t.id === drag.id))?.id ?? null)
+    : null
+  // 芯片隐身条件:活序滑动中真身亲自跟指针,替身胶囊退场(opacity 渐隐,带内带外换手不闪)
+  const chipHidden =
+    drag !== null && drag.phase === 'drag' && gap !== null && gap.groupId === dragSrcGroupId
+
   return (
     <>
       {groups.map((g, gi) => (
@@ -503,8 +526,24 @@ export function TopBarTabs({
               onRevealInTree={onRevealInTree}
               workspaceRoot={workspaceRoot}
               dragSourceId={drag?.id ?? null}
-              gapIndex={gap?.groupId === g.id ? gap.index : null}
+              gapIndex={
+                gap !== null && gap.groupId === g.id && g.id !== dragSrcGroupId ? gap.index : null
+              }
               gapWidth={drag?.width ?? 0}
+              slide={
+                drag !== null && drag.phase === 'drag' && g.id === dragSrcGroupId
+                  ? {
+                      srcId: drag.id,
+                      slotLeft: drag.srcLeft,
+                      srcW: drag.width,
+                      grabDx: drag.grabDx,
+                      x: drag.x,
+                      idx: gap?.groupId === g.id ? gap.index : null,
+                      minL: drag.slideMinL,
+                      maxR: drag.slideMaxR
+                    }
+                  : null
+              }
               onTabPointerDown={beginTabDrag}
             />
           </div>
@@ -542,7 +581,8 @@ export function TopBarTabs({
                       left: drag.x - drag.grabDx,
                       top: drag.y - drag.grabDy,
                       width: drag.compactW,
-                      height: drag.compactH
+                      height: drag.compactH,
+                      ...(chipHidden ? { opacity: 0 } : {})
                     }
           }
           aria-hidden="true"

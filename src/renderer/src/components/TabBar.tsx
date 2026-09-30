@@ -28,6 +28,26 @@ export interface TabBarTab {
  * 页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
  * (顶栏死空间/日志窗头条共用同一套)。
  */
+/** 本组条带内的活序滑动账(Chromium 桌面模型):被拖签真身 translateX 跟指针滑,
+   邻居在落点序号变化时 translateX 滑进腾出的格子 —— 条带全程满编,没有缝没有线;
+   别家条带拿不到它(那边仍走 margin 缝+插入线预览) */
+export interface TabSlide {
+  /** 被拖签 id(本组必有) */
+  srcId: string
+  /** 源签原位的左缘(视口 x):translateX 的基准 */
+  slotLeft: number
+  /** 源签宽:空槽穿身而过,补位邻居一律横移这个量(与自身宽窄无关) */
+  srcW: number
+  grabDx: number
+  /** 指针当前 x(视口) */
+  x: number
+  /** 落点序号(剔除源签后的可见序);null = 指针不在本带 → 全员滑回家位 */
+  idx: number | null
+  /** 滑动夹持边界:本带首签左缘 ~ 末签右缘 */
+  minL: number
+  maxR: number
+}
+
 export function TabBar({
   tabs,
   activeId,
@@ -44,6 +64,7 @@ export function TabBar({
   dragSourceId,
   gapIndex,
   gapWidth,
+  slide,
   onTabPointerDown
 }: {
   tabs: TabBarTab[]
@@ -71,11 +92,14 @@ export function TabBar({
   onRevealInTree?: (id: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
   workspaceRoot?: string | null
-  /** 正被 pointer 引擎拎着的页签 id:它在这条带里原地塌缩成空位 */
+  /** 正被 pointer 引擎拎着的页签 id:本组走活序滑动、别家条带拿它判缝归属 */
   dragSourceId: string | null
-  /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开 */
+  /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开;
+      只递别家条带,本组滑动模型不撑缝 */
   gapIndex: number | null
   gapWidth: number
+  /** 本组活序滑动账(只在被拖签的家这条带递):null = 不走滑动模型 */
+  slide: TabSlide | null
   /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
   onTabPointerDown: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
 }): React.JSX.Element {
@@ -260,15 +284,20 @@ export function TabBar({
   }
 
   // 落点缝的落法:缝序号按「剔除被拖签」的可见序 —— 缝前那张签吃 margin-left,
-  // 缝在末尾时最后一张吃 margin-right(空白带本来就是空地,但划道缝更明确)
+  // 缝在末尾时最后一张吃 margin-right(空白带本来就是空地,但划道缝更明确)。
+  // margin 缝只在别家条带唱戏:本组走活序滑动,源签真身自己就是占位的那个
   const effTabs = dragSourceId ? tabs.filter((t) => t.id !== dragSourceId) : tabs
-  const gapAnchor = gapIndex !== null ? effTabs[gapIndex] : undefined
-  const gapTail = gapIndex !== null && !gapAnchor ? effTabs[effTabs.length - 1] : undefined
+  const srcIdx = dragSourceId ? tabs.findIndex((t) => t.id === dragSourceId) : -1
+  const gapOn = gapIndex !== null && srcIdx === -1
+  const gapAnchor = gapOn ? effTabs[gapIndex] : undefined
+  const gapTail = gapOn && !gapAnchor ? effTabs[effTabs.length - 1] : undefined
   // 插入线宿主(Obsidian 式):钉在「它要跟在后面的那张签」的尾巴缘上,签被 flex
   // 挤着换位置线跟着走 —— 全局坐标在 margin 动画下会漂,寄生签身上视觉=真实恒成立;
   // 缝在队首时寄生首签的前缘
-  const markHost = gapIndex !== null ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
+  const markHost = gapOn ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
   const markBefore = gapIndex === 0
+  // 活序滑动的落点序号:指针不在本带(slide.idx=null)视为回家 —— 邻居全滑回原位
+  const landIdx = slide?.idx ?? srcIdx
 
   return (
     <div
@@ -277,7 +306,26 @@ export function TabBar({
       aria-label="已打开的页签"
       onMouseLeave={releaseFreeze}
     >
-      {tabs.map((t) => {
+      {tabs.map((t, k) => {
+        // 活序滑动几何:源签跟指针横移(夹在本带首尾内),邻居按落点序号滑动补位 —
+        // 空槽(一个源签宽)穿身而过,与自身宽窄无关;序号==家位时全员 delta=0
+        const isSlideSrc = slide !== null && t.id === slide.srcId
+        let tx = 0
+        if (slide) {
+          if (isSlideSrc) {
+            if (slide.idx !== null) {
+              const left = Math.min(
+                Math.max(slide.x - slide.grabDx, slide.minL),
+                slide.maxR - slide.srcW
+              )
+              tx = left - slide.slotLeft
+            }
+          } else {
+            const p = k < srcIdx ? k : k - 1
+            const dest = p < landIdx ? p : p + 1
+            tx = (dest - k) * slide.srcW
+          }
+        }
         return (
           <div
             key={t.id}
@@ -286,14 +334,15 @@ export function TabBar({
             aria-selected={t.id === activeId}
             className={`tabbar-tab${t.id === activeId ? ' is-active' : ''}${
               t.id === flashId ? ' is-flash' : ''
-            }`}
+            }${isSlideSrc ? ' is-drag-src' : ''}`}
             data-tab-id={t.id}
             style={{
               // 冻结态:签宽锁成关签前实测值(flex-basis 定死,不再分摊),
               // 空白全推给 .tabbar-blank 吃 —— × 原地不动,连点不漂
               ...(frozenW !== null ? { flex: `0 0 ${frozenW}px` } : {}),
               ...(t.id === gapAnchor?.id ? { marginLeft: gapWidth } : {}),
-              ...(t.id === gapTail?.id ? { marginRight: gapWidth } : {})
+              ...(t.id === gapTail?.id ? { marginRight: gapWidth } : {}),
+              ...(tx !== 0 ? { transform: `translateX(${tx}px)` } : {})
             }}
             onPointerDown={(e) => onTabPointerDown(e, t)}
             onClick={() => onActivate(t.id)}
