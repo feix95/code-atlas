@@ -1,11 +1,18 @@
 import { userDataDir } from './paths.ts'
-import { broadcastModelStatus, probeLmStudioStatus, refreshModelStatus } from './modelStatus.ts'
+import {
+  broadcastModelStatus,
+  cloudStatus,
+  probeLmStudioStatus,
+  refreshModelStatus
+} from './modelStatus.ts'
+import { installSafeStorageCodec } from './safeStorageCodec.ts'
+import { listRemoteModels } from '../ai/remoteModels.ts'
 import { electronGetJson } from './aiEvidence.ts'
 import { ipcMain, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { promises as fs } from 'node:fs'
 import { DEFAULT_CONTEXT_SIZE } from '../ai/index.ts'
 import { probeTavilyKey } from '../ai/weblookup.ts'
-import { loadAiConfig, saveAiConfig } from '../ai/config.ts'
+import { loadAiConfig, sanitizeProviderKind, saveAiConfig } from '../ai/config.ts'
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
 import {
@@ -23,16 +30,30 @@ import {
 import { sanitizePersonalization } from '../shared/personalization.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { pickPathDialog } from './atlasWindow.ts'
-import { CONTEXT_SIZE_MIN, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
+import { CONTEXT_SIZE_MIN } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
-import { fetchWithTimeout } from '../ai/http.ts'
 import { loadAppearanceFileSync, saveAppearanceFile } from './appearanceStore.ts'
 import { refreshWindowBackgrounds } from './windowTheme.ts'
 import { sanitizeAppearance } from '../shared/appearancePrefs.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
-import type { AiConfig, ModelContextInfo, ModelFitVerdict, ModelStatus } from '../shared/types.ts'
+import type {
+  AiConfig,
+  AiProviderKind,
+  ModelContextInfo,
+  ModelFitVerdict,
+  ModelStatus
+} from '../shared/types.ts'
+
+/** 外接来源点「装载/卸下」时的说明 */
+function externalLoadNote(provider: AiProviderKind): string {
+  return provider === 'cloud'
+    ? '在线 API 不需要装载或卸下,这边只看状态'
+    : '外接模型的装卸归 LM Studio 管,这边只看状态'
+}
 
 export function registerModelIpc(): void {
+  // 在线 API Key 落盘加密:配置读写之前装好 safeStorage 加解密器
+  installSafeStorageCodec()
   // 外观偏好:读 / 存(2026-09-16 起从 localStorage 搬进 appearance.json —— 那份按
   // localhost 端口分仓、端口一挤就出厂设置的存档方式退役)。同步读通道是给 preload
   // 首帧用的:页面脚本跑之前就得定外观,不然先按默认画一帧再换皮,界面会闪。
@@ -71,28 +92,35 @@ export function registerModelIpc(): void {
   })
   ipcMain.handle(CH.modelDownloadCancel, () => cancelModelDownload())
 
-  // AI 配置:读 / 存(双 Provider:lmstudio 与 builtin 两个分支都收)
+  // AI 配置:读 / 存(三 Provider:lmstudio / builtin / cloud 三个分支都收)
   ipcMain.handle(CH.aiConfigGet, () => loadAiConfig(userDataDir()))
   ipcMain.handle(CH.aiConfigSave, async (_event, config: unknown) => {
     if (typeof config !== 'object' || config === null) throw new Error('配置不合法')
     const c = config as Partial<AiConfig>
     const lm = c.lmstudio
     const bi = c.builtin
+    const cl = c.cloud
     if (
       !lm ||
       typeof lm.baseUrl !== 'string' ||
       typeof lm.model !== 'string' ||
       !bi ||
       typeof bi.serverPath !== 'string' ||
-      typeof bi.modelPath !== 'string'
+      typeof bi.modelPath !== 'string' ||
+      !cl ||
+      typeof cl.baseUrl !== 'string' ||
+      typeof cl.model !== 'string' ||
+      typeof cl.apiKey !== 'string'
     ) {
-      throw new Error('配置不合法:缺 lmstudio / builtin 设置')
+      throw new Error('配置不合法:缺 lmstudio / builtin / cloud 设置')
     }
     const previous = await loadAiConfig(userDataDir())
     const saved = await saveAiConfig(userDataDir(), {
-      provider: c.provider === 'builtin' ? 'builtin' : 'lmstudio',
+      provider: sanitizeProviderKind(c.provider),
       lmstudio: { baseUrl: lm.baseUrl, model: lm.model, apiKey: lm.apiKey ?? '' },
       builtin: { serverPath: bi.serverPath, modelPath: bi.modelPath },
+      // vendor / contextSize / consented 由 saveAiConfig 统一清洗
+      cloud: cl,
       webLookup: c.webLookup === true,
       // Tavily Key(可选,2026-09-17):设置页填了才进档;saveAiConfig 里会洗(trim,空白当没填)
       tavilyKey: typeof c.tavilyKey === 'string' ? c.tavilyKey : undefined,
@@ -130,12 +158,12 @@ export function registerModelIpc(): void {
       // 引擎播报员有最新账就照账说;还没开播报过就拿配置兜底(上次用的模型 + 文件大小)
       return lastBuiltinStatus() ?? builtinIdleStatus(config.builtin.modelPath)
     }
-    return probeLmStudioStatus(config)
+    return config.provider === 'cloud' ? cloudStatus(config) : probeLmStudioStatus(config)
   })
   ipcMain.handle(CH.modelEject, async (): Promise<{ ok: boolean; message?: string }> => {
     const config = await loadAiConfig(userDataDir())
     if (config.provider !== 'builtin') {
-      return { ok: false, message: '外接模型的装卸归 LM Studio 管,这边只看状态' }
+      return { ok: false, message: externalLoadNote(config.provider) }
     }
     const wasRunning = isBuiltinRunning()
     stopBuiltinServer()
@@ -150,7 +178,7 @@ export function registerModelIpc(): void {
   ipcMain.handle(CH.modelLoad, async (): Promise<{ ok: boolean; message?: string }> => {
     const config = await loadAiConfig(userDataDir())
     if (config.provider !== 'builtin') {
-      return { ok: false, message: '外接模型的装载归 LM Studio 管,这边只看状态' }
+      return { ok: false, message: externalLoadNote(config.provider) }
     }
     try {
       await ensureBuiltinServer(config.builtin, config.contextSize, config.contextSize ?? null)
@@ -233,17 +261,17 @@ export function registerModelIpc(): void {
     return pickPathDialog(win, options)
   })
 
-  // 连接测试 + 列出本地模型:叫 LM Studio 报告它加载了哪些模型
-  ipcMain.handle(CH.aiListModels, async (_event, baseUrl: unknown) => {
+  // 连接测试 + 列出模型:LM Studio 与在线 API 共用 OpenAI 兼容的 /models;
+  // 在线 API 带 Key,401/402 等翻成人话 —— 「读取模型」兼任 Key 测试
+  ipcMain.handle(CH.aiListModels, (_event, args: unknown) => {
+    if (typeof args !== 'object' || args === null) throw new Error('参数不合法')
+    const { baseUrl, apiKey, provider } = args as Record<string, unknown>
     if (typeof baseUrl !== 'string' || baseUrl.trim() === '') throw new Error('地址不能为空')
-    const url = `${baseUrl.replace(/\/+$/, '')}/models`
-    // 没应答就当没通(耐心档位在 shared/aiDefaults 的 PROBE_MODELS_MS):卡死时别让界面跟着无限转圈
-    const res = await fetchWithTimeout(url, PROBE_MODELS_MS).catch(() => null)
-    if (!res || !res.ok) {
-      throw new Error(`连不上模型服务,检查 LM Studio 是否已启动(${baseUrl})`)
-    }
-    const data = (await res.json()) as { data?: Array<{ id: string }> }
-    return (data.data ?? []).map((m) => m.id)
+    return listRemoteModels({
+      baseUrl,
+      apiKey: typeof apiKey === 'string' ? apiKey : '',
+      provider: sanitizeProviderKind(provider)
+    })
   })
 
   // Tavily Key 体检(2026-09-17):设置里点「测一下」→ 拿框里那把 Key 查一次官方用量。

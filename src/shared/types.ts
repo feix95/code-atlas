@@ -1,6 +1,7 @@
 // 主进程与渲染进程共用的数据契约,两边都从这里导入,防止口径不一
 
 import type { PersonalizationConfig } from './personalization.ts'
+import type { CloudVendorId } from './cloudVendors.ts'
 
 /** 全树速览给节点配的一句大白话标签(规则引擎现场算,不劳烦 AI) */
 export interface NodeSummary {
@@ -192,10 +193,22 @@ export interface GitChangesResult {
 }
 
 /**
- * AI 服务的两种来源:LM Studio(外部)与内置模型(llama-server 子进程)。
+ * AI 服务的三种来源:LM Studio(外部)、内置模型(llama-server 子进程)、在线 API(付费云服务)。
  * 对上层业务它们是同一种服务 —— 都收敛成 ChatTarget(baseURL + 模型名)。
  */
-export type AiProviderKind = 'lmstudio' | 'builtin'
+export type AiProviderKind = 'lmstudio' | 'builtin' | 'cloud'
+
+/** 在线 API(OpenAI 兼容的云端服务)的设置;apiKey 在内存里是明文,落盘时由 config.ts 加密 */
+export interface AiCloudSettings {
+  vendor: CloudVendorId
+  baseUrl: string
+  model: string
+  apiKey: string
+  /** 上下文窗口(tokens);云端无法探测,取 CLOUD_CONTEXT_CHOICES 中的一档 */
+  contextSize: number
+  /** 用户已确认「代码片段会发送到服务商服务器」;未确认前不允许切到在线 API */
+  consented: boolean
+}
 
 /** LM Studio 这类外部 OpenAI 兼容服务的设置 */
 export interface AiLmstudioSettings {
@@ -215,11 +228,12 @@ export interface AiBuiltinSettings {
   modelPath: string
 }
 
-/** AI 配置(存 userData,含两个 Provider 的全部设置 + 当前选用谁) */
+/** AI 配置(存 userData,含三个 Provider 的全部设置 + 当前选用谁) */
 export interface AiConfig {
   provider: AiProviderKind
   lmstudio: AiLmstudioSettings
   builtin: AiBuiltinSettings
+  cloud: AiCloudSettings
   /**
    * 模型上下文大小(tokens),整个 AI 层按它按比例算预算(地图/回复长度等)。
    * 留空 = 自动向模型服务探测(LM Studio /api/v0/models、llama-server /props);
@@ -258,7 +272,7 @@ export interface ChatTarget {
    * 引擎名号(resolveAiTarget 盖章):报错话术按它分家 —— 上下文装不下时,
    * 内置指去设置调「模型上下文」,外接指去 LM Studio 调大再重载模型
    */
-  engine?: 'builtin' | 'lmstudio'
+  engine?: AiProviderKind
 }
 
 /**
@@ -266,7 +280,7 @@ export interface ChatTarget {
  * 渲染层常驻底栏展示。progress 只在服务真报了数时给值,拿不到就是 null —— 绝不编进度。
  */
 export interface ModelStatus {
-  provider: 'builtin' | 'lmstudio'
+  provider: AiProviderKind
   /** idle=还没叫醒(懒加载,没提问不启动) loading=热身中 ready=就绪 error=出岔子 unreachable=外接服务没连上 */
   state: 'idle' | 'loading' | 'ready' | 'busy' | 'error' | 'unreachable'
   /** 模型名:内置 = 文件名/引擎报的 id;外接 = 配置里填的模型名 */

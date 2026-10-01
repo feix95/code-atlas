@@ -154,7 +154,15 @@ function cfg(
   return {
     provider,
     builtin: { serverPath: '', modelPath },
-    lmstudio: { baseUrl, model, apiKey: '' }
+    lmstudio: { baseUrl, model, apiKey: '' },
+    cloud: {
+      vendor: 'deepseek',
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      contextSize: 32768,
+      consented: false
+    }
   }
 }
 

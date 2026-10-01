@@ -39,6 +39,9 @@ export const PROBE_LMSTUDIO_MS = 3_000
 /** 向已就绪服务要模型清单的耐心(毫秒):LM Studio 连接测试和内置引擎 fetchModelId 同一口径 */
 export const PROBE_MODELS_MS = 5_000
 
+/** 向在线 API 要模型清单的耐心(毫秒):走公网、可能经代理,比本地服务宽松 */
+export const PROBE_CLOUD_MODELS_MS = 15_000
+
 /** 内置引擎 /health 轮询一格的耐心(毫秒):循环等就绪里每跳问一次 */
 export const PROBE_HEALTH_MS = 2_000
 

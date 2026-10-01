@@ -358,7 +358,7 @@ export async function resolveChatTargetOrError(): Promise<
   // 一律只信探测(存档里给内置填的旧数隐身不管事),探测不到按默认窗口兜底
   const ctx = resolveContextSize(
     config.provider,
-    config.contextSize,
+    config.provider === 'cloud' ? config.cloud.contextSize : config.contextSize,
     await probeContextSize(resolved.target, config.provider)
   )
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加

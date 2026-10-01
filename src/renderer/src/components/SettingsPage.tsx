@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AiConfig, ModelContextInfo, ModelFitVerdict } from '@shared/types'
+import type { AiConfig, AiProviderKind, ModelContextInfo, ModelFitVerdict } from '@shared/types'
 import {
   CONTEXT_NOTCHES,
   FALLBACK_CONTEXT_CAP,
@@ -72,7 +72,11 @@ export function SettingsPage({
   // 当前分类的户口已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航账本
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
-  const [models, setModels] = useState<string[]>([])
+  // 模型清单带着来源户口:LM Studio 与在线 API 各读各的,切来源后旧清单不串台
+  const [models, setModels] = useState<{ provider: AiProviderKind; ids: string[] }>({
+    provider: 'lmstudio',
+    ids: []
+  })
   const [modelsNote, setModelsNote] = useState<string | null>(null)
   const [modelsBusy, setModelsBusy] = useState(false)
   const [shelfOpen, setShelfOpen] = useState(false)
@@ -309,15 +313,27 @@ export function SettingsPage({
 
   async function listModels(): Promise<void> {
     if (!config) return
+    const provider = config.provider
+    const isCloud = provider === 'cloud'
     setModelsBusy(true)
     setModelsNote(null)
-    setModels([])
+    setModels({ provider, ids: [] })
     try {
-      const ids = await window.atlas.aiListModels(config.lmstudio.baseUrl)
-      setModels(ids)
-      if (ids.length === 0) setModelsNote('服务通了，但没列出模型 —— 先在 LM Studio 里加载一个。')
-    } catch {
-      setModelsNote('连不上这个地址，检查 LM Studio 是否已启动。')
+      const ids = await window.atlas.aiListModels(
+        isCloud
+          ? { baseUrl: config.cloud.baseUrl, apiKey: config.cloud.apiKey, provider }
+          : { baseUrl: config.lmstudio.baseUrl, apiKey: config.lmstudio.apiKey, provider }
+      )
+      setModels({ provider, ids })
+      if (ids.length === 0) {
+        setModelsNote(
+          isCloud
+            ? '连接成功，但服务商没有返回模型列表，请手动填写模型名。'
+            : '服务通了，但没列出模型 —— 先在 LM Studio 里加载一个。'
+        )
+      }
+    } catch (err) {
+      setModelsNote(isCloud ? friendlyErr(err) : '连不上这个地址，检查 LM Studio 是否已启动。')
     } finally {
       setModelsBusy(false)
     }
@@ -341,7 +357,8 @@ export function SettingsPage({
 
   // 自定义色板的兜底永远是默认档,不跟当前预设跑 —— 自定义是「石墨底上自己调色」
   const defaultPreset = COLOR_PRESETS[0]
-  const isBuiltin = config?.provider !== 'lmstudio'
+  const isBuiltin = config?.provider === 'builtin'
+  const modelsShown = models.provider === config?.provider ? models.ids : []
 
   const scaleShown = dragValue ?? scale
 
@@ -380,9 +397,9 @@ export function SettingsPage({
               onShelfModelReady={onShelfModelReady}
               modelPath={modelPath}
               fitNote={fitNote}
-              models={models}
+              models={modelsShown}
               modelsBusy={modelsBusy}
-              modelsNote={modelsNote}
+              modelsNote={models.provider === config?.provider ? modelsNote : null}
               listModels={listModels}
               contextRaw={contextRaw}
               setContextRaw={setContextRaw}

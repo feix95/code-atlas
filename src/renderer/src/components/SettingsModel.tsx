@@ -1,10 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { DEFAULT_LMSTUDIO_BASE_URL } from '@shared/aiDefaults'
+import { PROVIDER_OPTIONS } from '@shared/aiSetup'
 import type { ContextBill } from '@shared/contextBill'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { CfgQ, CfgRow } from './CfgRow'
+import { CloudConsent } from './CloudConsent.tsx'
+import { ModelNameRow } from './ModelNameRow.tsx'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
+import { SettingsCloud } from './SettingsCloud.tsx'
 
 /** 模型文件名的展示口径:全路径留在 data-tip 悬停里,行内只摆文件名 */
 function fileBasename(p: string): string {
@@ -13,7 +17,7 @@ function fileBasename(p: string): string {
 
 /**
  * 「AI 设置」页的「模型」卡:AI 来源 + 随来源切换的连接配置
- * (内置:模型文件/模型货架/上下文窗口;LM Studio:服务地址/模型名)。
+ * (内置:模型文件/模型货架/上下文窗口;LM Studio:服务地址/模型名;在线 API:见 SettingsCloud)。
  * 货架做成遮罩弹层,收进卡内不再把整页顶长。
  */
 export function SettingsModel({
@@ -57,6 +61,8 @@ export function SettingsModel({
   commitContextValue: (v: number) => void
   ctxBill: ContextBill | null
 }): React.JSX.Element {
+  // 首次选「在线 API」时的隐私确认态:确认前配置不动,下拉暂显「在线 API」
+  const [consentPending, setConsentPending] = useState(false)
   // Esc 收货架(遮罩点击在 JSX 里管)
   useEffect(() => {
     if (!shelfOpen) return
@@ -86,19 +92,48 @@ export function SettingsModel({
             <select
               className="cfg-select"
               aria-label="AI 来源"
-              value={isBuiltin ? 'builtin' : 'lmstudio'}
-              onChange={(e) =>
-                onConfigChange({
-                  ...config,
-                  provider: e.target.value === 'builtin' ? 'builtin' : 'lmstudio'
-                })
-              }
+              value={consentPending ? 'cloud' : config.provider}
+              onChange={(e) => {
+                const next = PROVIDER_OPTIONS.find((o) => o.id === e.target.value)?.id
+                if (!next) return
+                // 首次切到在线 API 先过隐私确认,确认前不改配置
+                if (next === 'cloud' && !config.cloud.consented) {
+                  setConsentPending(true)
+                  return
+                }
+                setConsentPending(false)
+                onConfigChange({ ...config, provider: next })
+              }}
             >
-              <option value="builtin">内置模型</option>
-              <option value="lmstudio">LM Studio</option>
+              {PROVIDER_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </CfgRow>
-          {isBuiltin ? (
+          {consentPending ? (
+            <CloudConsent
+              onAccept={() => {
+                setConsentPending(false)
+                onConfigChange({
+                  ...config,
+                  provider: 'cloud',
+                  cloud: { ...config.cloud, consented: true }
+                })
+              }}
+              onCancel={() => setConsentPending(false)}
+            />
+          ) : config.provider === 'cloud' ? (
+            <SettingsCloud
+              cloud={config.cloud}
+              onCloudChange={(cloud) => onConfigChange({ ...config, cloud })}
+              models={models}
+              modelsBusy={modelsBusy}
+              modelsNote={modelsNote}
+              listModels={listModels}
+            />
+          ) : isBuiltin ? (
             <>
               <div className="cfg-divider" />
               <CfgRow label="模型文件" hint="本地推理使用的 GGUF 模型文件。">
@@ -206,57 +241,16 @@ export function SettingsModel({
                 />
               </CfgRow>
               <div className="cfg-divider" />
-              <CfgRow label="模型名" hint="从服务读取的模型列表中选择。">
-                <div className="cfg-ctlcol">
-                  <div className="cfg-file">
-                    {models.length > 0 ? (
-                      <select
-                        className="cfg-select"
-                        aria-label="模型名"
-                        value={config.lmstudio.model}
-                        onChange={(e) =>
-                          onConfigChange({
-                            ...config,
-                            lmstudio: { ...config.lmstudio, model: e.target.value }
-                          })
-                        }
-                      >
-                        {models.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                        {!models.includes(config.lmstudio.model) && (
-                          <option value={config.lmstudio.model} hidden />
-                        )}
-                      </select>
-                    ) : (
-                      <input
-                        className="cfg-input"
-                        value={config.lmstudio.model}
-                        placeholder="点「读取模型」自动填充"
-                        spellCheck={false}
-                        aria-label="模型名"
-                        onChange={(e) =>
-                          onConfigChange({
-                            ...config,
-                            lmstudio: { ...config.lmstudio, model: e.target.value }
-                          })
-                        }
-                      />
-                    )}
-                    <button
-                      type="button"
-                      className="cfg-btn"
-                      onClick={() => void listModels()}
-                      disabled={modelsBusy}
-                    >
-                      {modelsBusy ? '连接中……' : '读取模型'}
-                    </button>
-                  </div>
-                  {modelsNote && <p className="cfg-note is-warn">{modelsNote}</p>}
-                </div>
-              </CfgRow>
+              <ModelNameRow
+                value={config.lmstudio.model}
+                onChange={(model) =>
+                  onConfigChange({ ...config, lmstudio: { ...config.lmstudio, model } })
+                }
+                models={models}
+                modelsBusy={modelsBusy}
+                modelsNote={modelsNote}
+                listModels={listModels}
+              />
             </>
           )}
         </>

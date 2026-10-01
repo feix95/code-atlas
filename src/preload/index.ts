@@ -12,6 +12,7 @@ import type {
   AiChatResult,
   AiCompactRequest,
   AiConfig,
+  AiProviderKind,
   AiDeltaPayload,
   AiExplainResult,
   AuxWindowOp,
@@ -153,8 +154,12 @@ const atlasApi = {
   aiConfigGet: (): Promise<AiConfig> => ipcRenderer.invoke(CH.aiConfigGet),
   aiConfigSave: (config: AiConfig): Promise<AiConfig> =>
     ipcRenderer.invoke(CH.aiConfigSave, config),
-  aiListModels: (baseUrl: string): Promise<string[]> =>
-    ipcRenderer.invoke(CH.aiListModels, baseUrl),
+  /** 读取模型清单(兼任连接/Key 测试):在线 API 带 Key,报错已翻成人话 */
+  aiListModels: (args: {
+    baseUrl: string
+    apiKey: string
+    provider: AiProviderKind
+  }): Promise<string[]> => ipcRenderer.invoke(CH.aiListModels, args),
   /** Tavily Key 体检(2026-09-17):拿框里这把 Key 真打一次官方接口,只回结论,不回显 Key */
   aiTestTavily: (key: string): Promise<TavilyProbeResult> =>
     ipcRenderer.invoke(CH.aiTestTavily, key),

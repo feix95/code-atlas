@@ -1,5 +1,5 @@
 /* ── 模型上下文自适应(第六十九锤):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
-import type { ChatTarget } from '../shared/types.ts'
+import type { AiProviderKind, ChatTarget } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
 import { fetchWithTimeout, stripApiSuffix } from './http.ts'
@@ -69,11 +69,13 @@ const CTX_PROBE_TTL_MS = 5 * 60 * 1000
 /**
  * 向模型服务探测上下文大小(LM Studio 走 /api/v0/models,llama-server 走 /props)。
  * 探测失败(接口没开/版本太老/认不出)安静回 null,由调用层退回手动档或保守默认。
+ * 在线 API 没有统一的上下文查询口,不发请求直接回 null(用设置里选的档)。
  */
 export async function probeContextSize(
   target: ChatTarget,
-  kind: 'lmstudio' | 'builtin'
+  kind: AiProviderKind
 ): Promise<number | null> {
+  if (kind === 'cloud') return null
   const key = `${target.baseUrl}|${target.model}`
   const cached = ctxProbeCache.get(key)
   if (cached && Date.now() - cached.at < CTX_PROBE_TTL_MS) return cached.value
@@ -107,12 +109,13 @@ export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens
  * 上下文认主:手动填的「模型上下文」只属于内置引擎 —— 它是真参数,
  * 直接喂给引擎的 -c;LM Studio 的锅归 LM Studio 管,App 一律只信探测,存档里的手填数不看
  * (不然设置页藏了字段,旧数还隐身管事)。探测失败(接口没开全/版本老)按默认窗口兜底。
+ * 在线 API 探测不到,调用方传入的是设置里选的档(cloud.contextSize),同样按手动数当真。
  */
 export function resolveContextSize(
-  provider: 'builtin' | 'lmstudio',
+  provider: AiProviderKind,
   manual: number | undefined,
   probed: number | null
 ): number {
-  if (provider === 'builtin' && manual !== undefined && manual >= CONTEXT_SIZE_MIN) return manual
+  if (provider !== 'lmstudio' && manual !== undefined && manual >= CONTEXT_SIZE_MIN) return manual
   return probed !== null && probed >= CONTEXT_SIZE_MIN ? probed : DEFAULT_CONTEXT_SIZE
 }

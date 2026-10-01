@@ -1,7 +1,7 @@
 import { userDataDir } from './paths.ts'
 import { BrowserWindow } from 'electron'
 import { parseLmStudioModelState } from '../ai/index.ts'
-import { loadAiConfig } from '../ai/config.ts'
+import { loadAiConfig, resolveAiTarget } from '../ai/config.ts'
 import { lastBuiltinStatus } from '../ai/builtin.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
@@ -46,26 +46,52 @@ export async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus
   }
 }
 
-/** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权 */
+/** 在线 API 的状态:不发网络请求(按次计费的服务不做轮询),配置齐全即「就绪」,缺项说清缺什么 */
+export function cloudStatus(config: AiConfig): ModelStatus {
+  const resolved = resolveAiTarget(config)
+  const base = {
+    provider: 'cloud' as const,
+    modelName: config.cloud.model.trim(),
+    sizeBytes: null,
+    progress: null
+  }
+  return resolved.ok
+    ? { ...base, state: 'ready' }
+    : { ...base, state: 'idle', message: resolved.message }
+}
+
+function sameStatus(a: ModelStatus | null, b: ModelStatus): boolean {
+  return (
+    a !== null &&
+    a.provider === b.provider &&
+    a.state === b.state &&
+    a.modelName === b.modelName &&
+    a.message === b.message
+  )
+}
+
+/** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权。
+ *  在线 API 状态没变就不广播:否则 10 秒轮询会把干活中的「忙」盖回「就绪」 */
 export async function refreshModelStatus(): Promise<void> {
   const config = await loadAiConfig(userDataDir())
-  if (config.provider === 'lmstudio') {
-    const status = await probeLmStudioStatus(config)
-    lastLmStudioStatus = status
-    broadcastModelStatus(status)
-  }
+  if (config.provider === 'builtin') return
+  const status =
+    config.provider === 'cloud' ? cloudStatus(config) : await probeLmStudioStatus(config)
+  if (config.provider === 'cloud' && sameStatus(lastExternalStatus, status)) return
+  lastExternalStatus = status
+  broadcastModelStatus(status)
 }
 
 // ── 「忙」播报(第八十四锤):就绪 ≠ 闲着 —— 模型请求从发出到收工,状态栏全程在场 ──
 // 起点在 resolveChatTargetOrError(每个模型请求的必经口),终点在 explainWithCancel /
 // 自由对话的 finally(explainAborters 清空才收工,嵌套的讲解不会中途闪「就绪」)。
-let lastLmStudioStatus: ModelStatus | null = null
+let lastExternalStatus: ModelStatus | null = null
 export let lastActivityProvider: AiProviderKind = 'builtin'
 
-/** 当前该拿谁的身份说「忙」:内置用播报员手里的真身,外接用最近一轮探测 */
+/** 当前该拿谁的身份说「忙」:内置用播报员手里的真身,外接(LM Studio/在线 API)用最近一轮状态 */
 export function announceActivityBusy(provider: AiProviderKind, stats?: AiStreamStats): void {
   lastActivityProvider = provider
-  const base = provider === 'builtin' ? lastBuiltinStatus() : lastLmStudioStatus
+  const base = provider === 'builtin' ? lastBuiltinStatus() : lastExternalStatus
   if (!base) return
   // 引擎还在热身时,加载播报员 owns 这个频道,「忙」不许抢话
   if (base.state === 'loading' || base.state === 'idle') return
@@ -76,7 +102,7 @@ export function announceActivityBusy(provider: AiProviderKind, stats?: AiStreamS
 /** 一轮活干完(或干砸了):回到「就绪」,别让「忙」挂在那里变成谎话 */
 export function announceActivityIdle(): void {
   const provider = lastActivityProvider
-  const base = provider === 'builtin' ? lastBuiltinStatus() : lastLmStudioStatus
+  const base = provider === 'builtin' ? lastBuiltinStatus() : lastExternalStatus
   if (!base) return
   if (base.state !== 'loading' && base.state !== 'idle') {
     broadcastModelStatus({ ...base, state: 'ready', progress: null, estimated: undefined })

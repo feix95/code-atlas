@@ -4,8 +4,17 @@
 // 探测服务的 fetch+AbortSignal.timeout 更是在 main/ai/builtin/modelShelf 散写近十处。
 // 现在壳子全在这:要换超时策略、加请求字段、改探测口径,只动这一处。
 
-import type { ChatTarget } from '../shared/types.ts'
+import type { AiProviderKind, ChatTarget } from '../shared/types.ts'
 import { AI_HEADERS_TIMEOUT_MS } from '../shared/aiDefaults.ts'
+
+/** 在线 API 的常见状态码 → 人话(配置表);本地两路不走这张表,原文透传行为不变 */
+const CLOUD_STATUS_TEXT: Record<number, string> = {
+  401: 'API Key 不对或已失效:去「AI 设置」检查 Key',
+  402: '服务商账户余额不足:去服务商官网充值后再试',
+  403: '服务商拒绝了这次请求:检查 Key 的权限,或这个模型是否已开通',
+  404: '服务商找不到这个地址或模型:检查服务地址和模型名',
+  429: '请求太频繁或额度用完了:稍等一会儿再试,或去服务商官网查看用量'
+}
 
 /** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
 export function isContextOverflow(text: string): boolean {
@@ -31,18 +40,23 @@ export function fetchWithTimeout(
 
 /** HTTP 错误的人话翻译(纯函数,自测覆盖):上下文塞满单独说;翻不动回 null(调用方透传原文)。
  * 上下文的指路话术按引擎分家:内置指回设置里的「模型上下文」,
- * 外接 LM Studio 的上下文设置不归 App 管,指去 LM Studio 调大再重载模型 */
+ * 外接 LM Studio 的上下文设置不归 App 管,指去 LM Studio 调大再重载模型;
+ * 在线 API 额外翻译 401/402/403/404/429/5xx(CLOUD_STATUS_TEXT) */
 export function friendlyHttpError(
   status: number,
   detail: string,
-  engine?: 'builtin' | 'lmstudio'
+  engine?: AiProviderKind
 ): string | null {
   if (isContextOverflow(`${status} ${detail}`)) {
     return engine === 'lmstudio'
       ? '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去 LM Studio 把上下文调大,再重新加载模型'
-      : '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
+      : engine === 'cloud'
+        ? '材料超出了上下文窗口:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「上下文窗口」'
+        : '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
   }
-  return null
+  if (engine !== 'cloud') return null
+  if (status >= 500) return `服务商那边出了问题(${status}):稍后再试`
+  return CLOUD_STATUS_TEXT[status] ?? null
 }
 
 /** chat/completions 一次的出账结果:成功 = res + 控制器 + 收狗令;

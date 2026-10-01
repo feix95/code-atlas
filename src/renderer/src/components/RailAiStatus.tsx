@@ -6,6 +6,7 @@
 // 未配置「设置 AI」引导 —— 旧底部状态栏(ModelStatusBar)随它上岗退役。
 import { useContext, useEffect, useState } from 'react'
 import type { ModelStatus } from '../../../shared/types.ts'
+import { PROVIDER_SHORT_LABEL } from '../../../shared/aiSetup.ts'
 import { AiSetupContext } from '../aiSetupContext'
 import { useMenuDismiss } from '../useMenuDismiss'
 
@@ -247,7 +248,7 @@ function AiStatusPanel({
 
 /** 第一行:供应商 pill + 状态文案(含热身进度,只写字不画条)+ 取消/卸下动作 */
 function StatusRows({ status }: { status: ModelStatus }): React.JSX.Element {
-  const providerName = status.provider === 'builtin' ? '内置' : 'LM Studio'
+  const providerName = PROVIDER_SHORT_LABEL[status.provider]
   const stateText =
     status.state === 'loading'
       ? status.progress === null
