@@ -397,3 +397,4 @@
 - feat(ui): 页签拖拽换 Chromium 活序滑动模型——本组条带内源签真身 translateX 跟指针零延迟滑(夹持在本带首尾,z-index 压在补位邻居上),邻居在落点序号变化时 translateX±srcW 滑进腾出的格子,条带全程满编没有空位没有插入线;本带松手就地提交不飞沉降;指针出带/悬别家条带时胶囊芯片渐出跟手,别家仍走 margin 缝+插入线预览;滑位快照边界(slideMinL/MaxR)开拖时一记。.tabbar.is-dnd-live 过渡清单补 transform;源签 .is-drag-src transition:none 保跟手。fix(ui): 灭缝线规则误杀激活签左底角反弧——.is-dnd-live 的 ::before 灭口收窄回缝线本体选择器,激活签双弧拖拽中不再缺角
 - refactor(ui): 自由对话顶行参考 chip 退役——资料附件照旧随选中项喂模型,只摘报幕牌(展开弹层/状态/右键口/prop 链一并收);「新对话」悬停提示换规范句式「清空当前对话记录,无法找回」,并入 --tip-delay-slow 1s 慢档
 - feat(ai): AI 来源新增「在线 API」(OpenAI 兼容,预设 DeepSeek/Kimi/智谱/通义/硅基流动/OpenRouter/OpenAI/自定义),首次启用须隐私确认,Key 经 safeStorage 加密落盘,「读取模型」带 Key 兼任连接测试,401/402/429/5xx 翻成人话,上下文按选定档位(默认 32k)。本地两路请求与报错行为不变,新增 test:cloud 自测
+- feat(ai): 在线 API 上下文档位放宽至 16k~1M 且可自由填写(默认 128k);服务商新增 Claude/Grok/Gemini、撤下通义千问与硅基流动,名单统一「产品名(公司名)」口径并按「国内→国际→聚合→自定义」排序

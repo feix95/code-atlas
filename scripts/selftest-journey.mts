@@ -59,7 +59,7 @@ ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...
   if (channel === 'atlas:ai-config-get' && state.configured) return {
     provider:'lmstudio', builtin:{serverPath:'',modelPath:''},
     lmstudio:{baseUrl:'http://127.0.0.1:1/v1',model:'test-only',apiKey:''},
-    cloud:{vendor:'deepseek',baseUrl:'https://api.deepseek.com',model:'',apiKey:'',contextSize:32768,consented:false}, webLookup:false
+    cloud:{vendor:'deepseek',baseUrl:'https://api.deepseek.com',model:'',apiKey:'',contextSize:131072,consented:false}, webLookup:false
   }
   if (channel === 'atlas:ai-explain-file') {
     if (!state.configured) throw new Error('Unexpected AI request while browsing')

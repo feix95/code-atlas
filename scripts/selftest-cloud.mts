@@ -62,8 +62,12 @@ function cloudConfig(patch: Partial<AiCloudSettings> = {}): AiConfig {
     else assert.match(v.baseUrl, /^https:\/\//, `${v.label} 地址必须是 https`)
   }
   assert.equal(sanitizeCloudVendorId('不存在'), 'deepseek', '认不出的服务商回默认')
-  assert.equal(sanitizeCloudContext(12345), CLOUD_DEFAULT_CONTEXT, '非档位上下文回默认')
-  assert.equal(sanitizeCloudContext(65536), 65536, '档位内的上下文原样保留')
+  assert.equal(sanitizeCloudContext(12345), 12345, '任意合法值原样保留(在线 API 可自由填写)')
+  assert.equal(sanitizeCloudContext(524288), 524288, '1M 以内的档位可用')
+  assert.equal(sanitizeCloudContext(1048576), 1048576, '1M 封顶值可用')
+  assert.equal(sanitizeCloudContext(9999999), CLOUD_DEFAULT_CONTEXT, '超 1M 回默认')
+  assert.equal(sanitizeCloudContext(100), CLOUD_DEFAULT_CONTEXT, '低于下限回默认')
+  assert.equal(sanitizeCloudContext('128k'), CLOUD_DEFAULT_CONTEXT, '非数字回默认')
   assert.equal(sanitizeProviderKind('cloud'), 'cloud')
   assert.equal(sanitizeProviderKind(undefined), 'lmstudio', '缺字段沿用历史兜底 lmstudio')
 }
@@ -137,6 +141,7 @@ try {
 // ── 4. 上下文:在线 API 不探测,用设置里选的档 ──
 {
   assert.equal(resolveContextSize('cloud', 65536, null), 65536, '在线 API 用选定档位')
+  assert.equal(resolveContextSize('cloud', 1048576, null), 1048576, '在线 API 可到 1M')
   let fetched = false
   const realFetch = globalThis.fetch
   globalThis.fetch = (async () => {

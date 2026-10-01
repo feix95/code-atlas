@@ -6,6 +6,7 @@ import {
   findCloudVendor,
   sanitizeCloudVendorId
 } from '@shared/cloudVendors'
+import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN } from '@shared/aiDefaults'
 import type { AiCloudSettings } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { CfgRow } from './CfgRow'
@@ -28,8 +29,25 @@ export function SettingsCloud({
   listModels: () => Promise<void>
 }): React.JSX.Element {
   const [keyVisible, setKeyVisible] = useState(false)
+  // 上下文框的打字串:数字之外拦在门外,夹紧挪到失焦/选档那一刻(与内置上下文同一口径)。
+  // 组件只在 provider=cloud 时挂载,contextSize 的唯一改账口是本组件,不存在外部改数要同步的场景
+  const [ctxRaw, setCtxRaw] = useState(String(cloud.contextSize))
   const vendor = findCloudVendor(cloud.vendor)
   const patch = (p: Partial<AiCloudSettings>): void => onCloudChange({ ...cloud, ...p })
+
+  function commitContext(raw: string): void {
+    const digits = raw.replace(/[^0-9]/g, '')
+    const v =
+      digits === ''
+        ? CLOUD_DEFAULT_CONTEXT
+        : Math.max(CONTEXT_SIZE_MIN, Math.min(CONTEXT_SIZE_MAX, Number(digits)))
+    setCtxRaw(String(v))
+    if (v !== cloud.contextSize) patch({ contextSize: v })
+  }
+
+  const ctxSelectValue = CLOUD_CONTEXT_CHOICES.includes(cloud.contextSize)
+    ? String(cloud.contextSize)
+    : '__custom'
 
   return (
     <>
@@ -112,19 +130,39 @@ export function SettingsCloud({
         listModels={listModels}
       />
       <div className="cfg-divider" />
-      <CfgRow label="上下文窗口" hint="越大可带的参考材料越多，每次提问消耗的 token 也越多。">
-        <select
-          className="cfg-select"
-          aria-label="上下文窗口"
-          value={cloud.contextSize}
-          onChange={(e) => patch({ contextSize: Number(e.target.value) })}
-        >
-          {CLOUD_CONTEXT_CHOICES.map((n) => (
-            <option key={n} value={n}>
-              {n / 1024}k{n === CLOUD_DEFAULT_CONTEXT ? '(默认)' : ''}
-            </option>
-          ))}
-        </select>
+      <CfgRow
+        label="上下文窗口"
+        hint="按服务商文档填写；越大可带的参考材料越多，每次提问消耗的 token 也越多。"
+      >
+        <div className="cfg-ctx">
+          <input
+            className="cfg-input cfg-ctx-input"
+            autoComplete="off"
+            inputMode="numeric"
+            value={ctxRaw}
+            placeholder="tokens"
+            aria-label="上下文窗口"
+            onChange={(e) => setCtxRaw(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={(e) => commitContext(e.target.value)}
+          />
+          <select
+            className="cfg-select"
+            aria-label="上下文预设"
+            value={ctxSelectValue}
+            onChange={(e) => {
+              if (e.target.value !== '__custom') commitContext(e.target.value)
+            }}
+          >
+            {CLOUD_CONTEXT_CHOICES.map((n) => (
+              <option key={n} value={n}>
+                {n >= 1048576 ? '1M' : `${n / 1024}k`}
+                {n === CLOUD_DEFAULT_CONTEXT ? '(默认)' : ''}
+              </option>
+            ))}
+            {/* 手填的非档位值:下拉显示空白,不占选项位 */}
+            <option value="__custom" hidden />
+          </select>
+        </div>
       </CfgRow>
       <div className="cfg-privacy">
         <TreeIcon name="shield" size={12} mono />
