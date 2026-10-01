@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useMenuDismiss } from '../useMenuDismiss'
-import type { ChatCodeRef, ChatContextAttachment } from '@shared/types'
+import type { ChatCodeRef } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import {
   DRAG_MIME_NODE,
@@ -9,7 +8,7 @@ import {
   type DragRefPayload
 } from '@shared/dragTypes'
 import { ErrorBoundary } from './ErrorBoundary'
-import { IconRefresh, TreeIcon } from './Icons'
+import { IconRefresh } from './Icons'
 import { FreeChatComposer } from './FreeChatComposer'
 import { AssistantBubble } from './FreeChatBubble'
 import { FileNoteText, MatchListCard } from './FreeChatNotes'
@@ -19,7 +18,8 @@ import { INLINE_ICON_SIZE } from '../inputMetrics'
 
 /**
  * 自由对话面板(对话页改版定稿):开放式聊天,问题不限于当前文件,页签叫「自由对话」。
- * 顶行薄条:左参考资料 chip(点开看机器扫到的原始资料)、右「新对话」小幽灵钮;
+ * 顶行薄条:右「新对话」小幽灵钮(参考资料 chip 已摘——资料跟着选中项走,树里看得见,
+ * 不再单独立牌;附件照旧随每轮请求喂给模型,只是不再报幕)。
  * 空场 = 衬线问候 + 居中胶囊舱 + 建议 chips;聊开了舱沉底栏,回答不装框不带头像。
  * 输入舱 = 一行胶囊:「+」能力菜单(思考/翻文件/联网拨钮)| 内嵌引用原子+文字 | 发送/停一停圆钮。
  * 思考行 = 脑图标 + 流光「正在思考」+弹跳点,想完收成「想了 Xs ▸」可点开看过程。
@@ -57,7 +57,6 @@ function messagesFingerprint(messages: ChatMessage[]): string {
 
 export function FreeChatPanel({
   chat,
-  context,
   refs,
   onRemoveRef,
   suggestions,
@@ -67,7 +66,6 @@ export function FreeChatPanel({
   suggestionsOn
 }: {
   chat: AiChatApi
-  context: ChatContextAttachment | null
   /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
   refs?: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
@@ -86,20 +84,11 @@ export function FreeChatPanel({
   const draftRefs = refs ?? []
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
-  // 顶行参考 chip 的展开:点一下看机器扫到的原始资料,再点收;
-  // ctxDoc 记卡片生在哪个 document(realm 铁律)——开卡那刻从 chip 上取,
-  // 卡片重挂载(撕窗搬家)时用回调 ref 对账
-  const [ctxOpen, setCtxOpen] = useState(false)
-  const [ctxDoc, setCtxDoc] = useState<Document>(document)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
   const [newBeat, setNewBeat] = useState(0)
-
-  // 资料卡的三条退路(小葵加的「点空白也收」):chip 和卡片本身算「里面」,Esc 同钩子里送
-  const closeCtx = useCallback(() => setCtxOpen(false), [])
-  useMenuDismiss(ctxOpen, closeCtx, '.fc-ctx, .fc-ctx-pop', ctxDoc)
 
   function onMessagesScroll(): void {
     const el = scrollRef.current
@@ -275,50 +264,18 @@ export function FreeChatPanel({
           : undefined
       }
     >
-      {/* 顶行:薄得几乎不存在 —— 左参考资料 chip(点开看原始资料),右新对话 */}
+      {/* 顶行:薄得几乎不存在 —— 只留新对话(参考 chip 摘了,资料跟着选中项走树里看得见) */}
       <div className="fc-topline">
-        {context && (
-          <button
-            type="button"
-            className={`fc-ctx${ctxOpen ? ' is-open' : ''}`}
-            onClick={(e) => {
-              setCtxDoc(e.currentTarget.ownerDocument)
-              setCtxOpen((v) => !v)
-            }}
-            aria-expanded={ctxOpen}
-            onContextMenu={(e) => {
-              // 参考资料也是「对着文件右键」(菜单统一大锤):同款三件套,走链接菜单那条路
-              if (!fileLinks?.onMenu) return
-              e.preventDefault()
-              fileLinks.onMenu(context.relPath, e.clientX, e.clientY, e.currentTarget.ownerDocument)
-            }}
-          >
-            <TreeIcon name="clip" size={INLINE_ICON_SIZE} />
-            <strong>{context.name}</strong>
-            <span className="fc-ctx-sep">·</span>作为参考
-          </button>
-        )}
         <button
           type="button"
           className="fc-newchat"
           onClick={chat.newChat}
-          data-tip="清空当前对话,从头再聊(对话只存在内存里,清了就是真没了)"
+          data-tip="清空当前对话记录,无法找回"
         >
           <IconRefresh size={INLINE_ICON_SIZE} />
           新对话
         </button>
       </div>
-      {context && ctxOpen && (
-        <pre
-          className="fc-ctx-pop"
-          ref={(el) => {
-            const d = el?.ownerDocument
-            if (d && d !== ctxDoc) setCtxDoc(d)
-          }}
-        >
-          {context.details}
-        </pre>
-      )}
       <div className="chat-messages-wrap">
         <div className="chat-messages" ref={scrollRef} onScroll={onMessagesScroll}>
           {chat.messages.length === 0 ? (

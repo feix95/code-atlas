@@ -3,7 +3,6 @@
 import type {
   AiConfig,
   ChatCodeRef,
-  ChatContextAttachment,
   DepGraphResult,
   FileStructure,
   GitChangesResult,
@@ -48,7 +47,6 @@ export function TabBody({
   gitLoading,
   chatSuggestionsOn,
   chat,
-  chatContext,
   fileLinks,
   goAskInChat,
   handleLoadGraph,
@@ -86,7 +84,6 @@ export function TabBody({
   gitLoading: boolean
   chatSuggestionsOn: boolean
   chat: AiChatApi
-  chatContext: ChatContextAttachment | null
   fileLinks: FileLinkTarget | null
   goAskInChat: (node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null) => void
   handleLoadGraph: () => Promise<void>
@@ -230,7 +227,6 @@ export function TabBody({
       <div className="preview-chat soft-in">
         <FreeChatPanel
           chat={chat}
-          context={chatContext}
           refs={previewRefs}
           onRemoveRef={removePreviewRef}
           onDropNode={handleDropNode}

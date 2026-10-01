@@ -676,9 +676,9 @@
   }
 }
 
-/* ── 自由对话页:顶行(参考 chip + 新对话)/ 参考资料弹层 / 联网状态标签 ── */
+/* ── 自由对话页:顶行(新对话)/ 联网状态标签 ── */
 
-/* 顶行:薄得几乎不存在 —— 一行透明横条,左参考、右新对话 */
+/* 顶行:薄得几乎不存在 —— 一行透明横条,新对话居右 */
 .fc-topline {
   flex: none;
   display: flex;
@@ -687,66 +687,9 @@
   padding: 0.375rem var(--space-3);
 }
 
-/* 参考资料 chip:小回形针 + 文件名,点开看机器扫到的原始资料 */
-.fc-ctx {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-width: 0;
-  max-width: 60%;
-  padding: 0.25rem 0.5rem;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-family: inherit;
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.fc-ctx:hover,
-.fc-ctx.is-open {
-  background: var(--hover);
-  color: var(--text);
-}
-
-.fc-ctx strong {
-  color: var(--text);
-  font-weight: var(--font-w-semi);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fc-ctx-sep {
-  color: var(--muted-2);
-}
-
-/* 参考资料的展开层:浮在顶行下面,仍是 pre 白字原文 */
-.fc-ctx-pop {
-  position: absolute;
-  top: 2.125rem;
-  left: var(--space-3);
-  z-index: var(--z-popover);
-  max-width: min(34rem, calc(100% - var(--space-3) * 2));
-  max-height: 14rem;
-  overflow: auto;
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-  font-family: inherit;
-  font-size: var(--font-sm);
-  line-height: var(--lh-170);
-  color: var(--muted);
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
-
-/* 新对话:顶行右上角的小幽灵钮,毁档动作待在角落 */
+/* 新对话:顶行右上角的小幽灵钮,毁档动作待在角落;悬停提示走慢档(1s),别扫过就嚷嚷 */
 .fc-newchat {
+  --tip-delay: var(--tip-delay-slow);
   margin-left: auto;
   flex: none;
   display: inline-flex;

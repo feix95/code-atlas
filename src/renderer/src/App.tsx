@@ -744,7 +744,6 @@ function App(): React.JSX.Element {
         gitLoading={gitLoading}
         chatSuggestionsOn={chatSuggestionsOn}
         chat={chat}
-        chatContext={chatContext}
         fileLinks={fileLinks}
         goAskInChat={goAskInChat}
         handleLoadGraph={handleLoadGraph}
