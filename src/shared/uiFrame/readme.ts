@@ -100,6 +100,8 @@ export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, 
     [page.htmlPath, `${page.title}参考实现,浏览器打开即为标准效果`],
     ...iconFiles.map((f): [string, string] => [f, 'lucide 图标原文']),
     ['design.json', '同一份数据的 DTCG 结构化版本'],
+    ['adapters/tailwind.theme.css', 'Tailwind CSS v4 @theme 主题文件(§13.5)'],
+    ['adapters/uiTheme.ts', 'React Native 主题对象,数值为逻辑像素(§13.5)'],
     ['preview/', '组件与页面的标准外观截图(字体加载完成后截取)'],
     ['LICENSES.md', '图标与字体的许可声明']
   ]

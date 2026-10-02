@@ -707,7 +707,9 @@ try {
     'fonts/inter/inter-latin-wght-normal.woff2',
     'preview/home.png',
     'preview/button.png',
-    'preview/card.png'
+    'preview/card.png',
+    'adapters/tailwind.theme.css',
+    'adapters/uiTheme.ts'
   ]) {
     assert.ok(existsSync(join(exported, rel)), `exported spec package must contain ${rel}`)
   }
@@ -785,6 +787,18 @@ try {
     .filter({ hasText: '#00FF00' })
     .waitFor()
   await shot('uiframe-imported')
+  // M1-g 适配器剪贴板(§13.5):复制 Tailwind / RN 主题,出成功横幅
+  await page.getByRole('button', { name: '复制主题 ▾', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Tailwind v4 主题(@theme)' }).click()
+  await page.getByText('Tailwind v4 @theme 主题已复制到剪贴板').waitFor()
+  // 读回剪贴板核对内容确为 @theme 文件
+  const clip = await page.evaluate(() => navigator.clipboard.readText())
+  assert.ok(clip.includes('@theme'), '剪贴板里必须是 Tailwind @theme 文件')
+  assert.ok(clip.includes('--color-primary:'), '主题文件要含变量定义')
+  await page.getByRole('button', { name: '复制主题 ▾', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'React Native 主题对象' }).click()
+  await page.getByText('React Native 主题对象已复制到剪贴板').waitFor()
+  await page.getByRole('button', { name: '知道了', exact: true }).click()
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'

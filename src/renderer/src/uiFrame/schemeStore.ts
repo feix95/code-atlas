@@ -176,6 +176,10 @@ export const schemeActions = {
   dismissNotice(): void {
     emit({ notice: null })
   },
+  /** 轻量反馈(复制到剪贴板等):借 notice 横幅展示 */
+  flash(text: string): void {
+    emit({ notice: text })
+  },
   /**
    * 导入(§14):三种来源解析出的 doc 以「未入库」身份上画布;
    * 战报(套用/跳过计数)挂 notice 由页面横幅展示。

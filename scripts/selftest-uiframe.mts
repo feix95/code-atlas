@@ -22,6 +22,7 @@ import {
   isDeviceId
 } from '../src/shared/uiFrame/devices.ts'
 import { contrastRatio, platformIssues } from '../src/shared/uiFrame/platformRules.ts'
+import { reactNativeThemeTs, tailwindThemeCss } from '../src/shared/uiFrame/adapters.ts'
 import {
   manifestFor,
   parseDoc,
@@ -649,6 +650,38 @@ check('默认方案提示有价值:桌面与手机都检出边界对比度与点
   const phone = platformIssues(templateDoc('tint-phone'))
   assert.ok(phone.some((i) => i.rule === '最小点击区' && i.target === 'control-md'))
   assert.ok(!phone.some((i) => i.rule === '悬停态缺失'), '手机不查悬停态')
+})
+
+console.log('── 导出适配器(M1-g,§13.5)')
+check('Tailwind @theme:命名空间归位、ref 解为字面值、暗色值进 [data-theme] 块', () => {
+  const css = tailwindThemeCss(doc)
+  assert.ok(css.includes('@theme {'), '必须有 @theme 块')
+  assert.ok(css.includes('--color-primary: #2563EB;'))
+  assert.ok(css.includes('--spacing-4: 1rem;'), 'space-4 归位 spacing')
+  assert.ok(css.includes('--text-md: '), 'font-size 归位 text')
+  assert.ok(css.includes('--font-sans:'), 'font-family 改名 font-sans')
+  assert.ok(css.includes("[data-theme='dark']"))
+  assert.ok(css.includes('--color-primary: #60A5FA;'), '暗色档值写进暗色块')
+  assert.ok(css.includes('--control-md: '), '无归位的变量原样保留')
+  assert.ok(!css.includes('var(--'), 'ref 必须解成字面值')
+})
+check('RN 主题对象:亮暗分桶、尺寸出数值、字族出数组、ref 解到底', () => {
+  const ts = reactNativeThemeTs(doc)
+  assert.ok(ts.includes('export const uiTheme'))
+  assert.ok(ts.includes('light: {') && ts.includes('dark: {'), '亮暗分桶')
+  assert.ok(ts.includes('primary: "#2563EB"') || ts.includes("primary: '#2563EB'"))
+  assert.ok(ts.includes('heightMd: 40'), 'btn-height-md 经 ref 解析为 40')
+  assert.ok(/family:\s*\[/.test(ts), '字族出数组')
+  assert.ok(/offset:\s*{/.test(ts), '阴影出 RN 结构')
+  assert.ok(!ts.includes('undefined'), '不许出现未解析值')
+})
+check('规格包含两个适配器文件,体检仍零错误零提醒', () => {
+  const p = buildPackage(doc, assets)
+  assert.ok(p.files['adapters/tailwind.theme.css'].includes('@theme'))
+  assert.ok(p.files['adapters/uiTheme.ts'].includes('export const uiTheme'))
+  const errs = lintPackage(p, PAGES).filter((i) => i.level === 'error')
+  for (const i of errs) console.log(`    [${i.check}] ${i.file}: ${i.message}`)
+  assert.equal(errs.length, 0)
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

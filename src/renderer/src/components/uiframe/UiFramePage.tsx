@@ -1,5 +1,6 @@
 // 「UI 框架」页签(§5):起步页(选平台/模板/我的方案)→ 工具条 + 画布 + 属性面板。
 import { useMemo, useState } from 'react'
+import { reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
 import { platformIssues } from '@shared/uiFrame/platformRules'
 import type { ThemeName, UiPlatform } from '@shared/uiFrame/types'
@@ -120,6 +121,7 @@ export function UiFramePage(): React.JSX.Element {
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [naming, setNaming] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
   const exporter = useUiFrameExport()
   // 平台规范提醒(§5.7):随方案每次改动实时重算
   const issues = useMemo(() => platformIssues(doc), [doc])
@@ -145,6 +147,22 @@ export function UiFramePage(): React.JSX.Element {
   const onSave = (): void => {
     if (schemeId) void schemeActions.save(doc)
     else setNaming(true)
+  }
+
+  // 复制适配主题到剪贴板(§13.5):与导出包内的 adapters/ 文件同一份生成器
+  const copyAdapter = async (kind: 'tailwind' | 'rn'): Promise<void> => {
+    const text = kind === 'tailwind' ? tailwindThemeCss(doc) : reactNativeThemeTs(doc)
+    try {
+      await navigator.clipboard.writeText(text)
+      schemeActions.flash(
+        kind === 'tailwind'
+          ? 'Tailwind v4 @theme 主题已复制到剪贴板'
+          : 'React Native 主题对象已复制到剪贴板'
+      )
+    } catch {
+      schemeActions.flash('剪贴板不可用:请到导出的规格包里取 adapters/ 下的同名文件')
+    }
+    setCopyOpen(false)
   }
 
   return (
@@ -285,6 +303,26 @@ export function UiFramePage(): React.JSX.Element {
         <button type="button" className="btn btn-ghost" disabled={busy === 'save'} onClick={onSave}>
           {busy === 'save' ? '正在保存……' : '保存方案'}
         </button>
+        <div className="uf-copy">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            aria-expanded={copyOpen}
+            onClick={() => setCopyOpen(!copyOpen)}
+          >
+            复制主题 ▾
+          </button>
+          {copyOpen && (
+            <div className="uf-copy-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => void copyAdapter('tailwind')}>
+                Tailwind v4 主题(@theme)
+              </button>
+              <button type="button" role="menuitem" onClick={() => void copyAdapter('rn')}>
+                React Native 主题对象
+              </button>
+            </div>
+          )}
+        </div>
         <button
           type="button"
           className="btn btn-primary"
