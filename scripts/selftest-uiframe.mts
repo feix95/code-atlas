@@ -115,8 +115,8 @@ check('体检零错误零提醒', () => {
   for (const i of issues) console.log(`    ${i.level} [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(issues.length, 0)
 })
-check('规格包文件齐全(§13.3):注册表 9 个组件的 css 与演示页俱全', () => {
-  assert.equal(RECIPES.length, 9)
+check('规格包文件齐全(§13.3):注册表全部组件的 css 与演示页俱全', () => {
+  assert.equal(RECIPES.length, 53)
   for (const f of [
     'README-给AI.md',
     'page-template.html',

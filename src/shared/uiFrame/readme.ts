@@ -25,7 +25,9 @@ const SLOT_LABEL: Record<IconSlot, string> = {
   'app-row-1': '应用页第 1 行前置图标',
   'app-row-2': '应用页第 2 行前置图标',
   'app-row-3': '应用页第 3 行前置图标',
-  'app-arrow': '应用页第 2 行尾部箭头'
+  'app-arrow': '应用页第 2 行尾部箭头',
+  'demo-search': '搜索框前置图标',
+  'demo-down': '下拉选择箭头'
 }
 
 const HARD_RULES = [

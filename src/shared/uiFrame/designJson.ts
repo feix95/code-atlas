@@ -16,6 +16,11 @@ function colorValue(hex: string): Json {
   return { colorSpace: 'srgb', components: hexComponents(hex), alpha: 1, hex: hex.toLowerCase() }
 }
 
+/** 颜色文本 → DTCG 颜色对象:#rrggbb 走 hex 通道,rgba() 等带 alpha 的走分量通道 */
+function anyColorValue(text: string): Json {
+  return /^#[0-9a-fA-F]{6}$/.test(text) ? colorValue(text) : rgbaValue(text)
+}
+
 /** rgba(r, g, b, a) → DTCG 颜色对象 */
 function rgbaValue(rgba: string): Json {
   const m = /rgba?\(([^)]+)\)/.exec(rgba)
@@ -41,7 +46,7 @@ function typedValue(
       return { type: inner.type, value: `{${target.path.join('.')}}` }
     }
     case 'color':
-      return { type: 'color', value: colorValue(value.light), dark: colorValue(value.dark) }
+      return { type: 'color', value: anyColorValue(value.light), dark: anyColorValue(value.dark) }
     case 'dimension':
       return { type: 'dimension', value: dim(value.px, root) }
     case 'em':

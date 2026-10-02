@@ -110,6 +110,18 @@ button {
   border: 0;
   background: none;
 }
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+th,
+td {
+  padding: 0;
+  font-weight: inherit;
+  text-align: inherit;
+}
 `
 
 /** reset.css 清零过默认样式的标签(体检「默认样式依赖」对照用) */
@@ -134,7 +146,10 @@ export const RESET_TAGS = [
   'figure',
   'blockquote',
   'dl',
-  'dd'
+  'dd',
+  'table',
+  'th',
+  'td'
 ]
 
 /** 组件样式文件的键与路径:键 comp-<id> → components/<id>.css */

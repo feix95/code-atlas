@@ -1,7 +1,7 @@
 // 方案文件(§15)与方案库(§5.8)的纯函数层:序列化、解析迁移、清单、id 与快照命名。
 // M1 以文件夹形式存放;M2 启用 zip 时内部结构不变。
 import { defaultDeviceId, isDeviceId } from './devices.ts'
-import { defaultTokens } from './template.ts'
+import { defaultDoc, defaultTokens } from './template.ts'
 import type { IconSlot, PlacedPart, SchemeManifest, TokenDef, UiFrameDoc } from './types.ts'
 
 export const SCHEME_FORMAT_VERSION = 1
@@ -107,7 +107,8 @@ export function parseDoc(text: string): UiFrameDoc {
     template: typeof raw['template'] === 'string' ? raw['template'] : 'blank',
     rootFontPx,
     tokens,
-    icons: cleanIcons as Record<IconSlot, string>,
+    // 旧文档缺槽位时补默认图标(新增 IconSlot 后旧方案也能渲染)
+    icons: { ...defaultDoc().icons, ...cleanIcons } as Record<IconSlot, string>,
     placed,
     ...(raw['a11yEnhanced'] === true ? { a11yEnhanced: true } : {}),
     ...(typeof raw['targetStack'] === 'string' && raw['targetStack']
