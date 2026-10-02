@@ -1,7 +1,7 @@
 // 「UI 框架」页签(§5 + 工作台改造):起步页(选平台/模板/我的方案)→ 工具条 + 底板 + 属性面板;
 // 画布视图与方案库浮层归 workbenchStore(零件盒在侧栏,两边共用一本账)。
 import { useEffect, useMemo, useState } from 'react'
-import { reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
+import { flutterThemeDart, reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
 import { platformIssues } from '@shared/uiFrame/platformRules'
 import type { ThemeName, UiPlatform } from '@shared/uiFrame/types'
@@ -195,14 +195,21 @@ export function UiFramePage(): React.JSX.Element {
   }
 
   // 复制适配主题到剪贴板(§13.5):与导出包内的 adapters/ 文件同一份生成器
-  const copyAdapter = async (kind: 'tailwind' | 'rn'): Promise<void> => {
-    const text = kind === 'tailwind' ? tailwindThemeCss(doc) : reactNativeThemeTs(doc)
+  const copyAdapter = async (kind: 'tailwind' | 'rn' | 'flutter'): Promise<void> => {
+    const text =
+      kind === 'tailwind'
+        ? tailwindThemeCss(doc)
+        : kind === 'flutter'
+          ? flutterThemeDart(doc)
+          : reactNativeThemeTs(doc)
     try {
       await navigator.clipboard.writeText(text)
       schemeActions.flash(
         kind === 'tailwind'
           ? 'Tailwind v4 @theme 主题已复制到剪贴板'
-          : 'React Native 主题对象已复制到剪贴板'
+          : kind === 'flutter'
+            ? 'Flutter ThemeData 主题已复制到剪贴板'
+            : 'React Native 主题对象已复制到剪贴板'
       )
     } catch {
       schemeActions.flash('剪贴板不可用:请到导出的规格包里取 adapters/ 下的同名文件')
@@ -378,6 +385,9 @@ export function UiFramePage(): React.JSX.Element {
                 </button>
                 <button type="button" role="menuitem" onClick={() => void copyAdapter('rn')}>
                   复制 React Native 主题对象
+                </button>
+                <button type="button" role="menuitem" onClick={() => void copyAdapter('flutter')}>
+                  复制 Flutter 主题(ThemeData)
                 </button>
               </div>
             )}

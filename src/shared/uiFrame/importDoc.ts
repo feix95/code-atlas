@@ -348,25 +348,79 @@ function dtcgValue(
   }
 }
 
-// ── 源 3:CSS 变量(:root { --x: … } 全文或粘贴片段)──
+// ── 源 3:CSS 变量(:root { --x: … } 全文或粘贴片段;兼容 Tailwind v4 @theme)──
+
+/** Tailwind v4 @theme 命名空间 → 本方案变量名前缀(与 adapters.ts 的 TW_NS 互为逆向) */
+const TW_IMPORT: Array<[twPrefix: string, ours: string]> = [
+  ['spacing-', 'space-'],
+  ['text-', 'font-size-'],
+  ['leading-', 'line-height-'],
+  ['font-weight-', 'font-weight-'],
+  ['radius-', 'radius-'],
+  ['shadow-', 'shadow-'],
+  ['color-', 'color-']
+]
+
+/** @theme 变量名 → 本方案变量名;认得的前缀归位,认不得的原样返回(仍按原名匹配) */
+function twToToken(name: string): string {
+  if (name === 'font-sans') return 'font-family'
+  for (const [prefix, ours] of TW_IMPORT) {
+    if (name.startsWith(prefix)) return `${ours}${name.slice(prefix.length)}`
+  }
+  return name
+}
+
+const DECL_RE = /--([\w-]+)\s*:\s*([^;{}]+);/g
+const DARK_BLOCK_RE = /\[\s*data-theme\s*=\s*['"]?dark['"]?\s*\]\s*\{([^}]*)\}/g
 
 export function importCssVars(text: string, fallbackName: string): ImportResult {
   const doc = defaultDoc()
   doc.name = fallbackName
   const c = new Collector()
+  const isTailwind = /@theme\b/.test(text)
+
+  // 暗色块单独摘出:先按 data-theme 块合并颜色的 dark 端,再扫全文的亮色声明
+  const darkDecls = new Map<string, string>()
+  for (const m of text.matchAll(DARK_BLOCK_RE)) {
+    for (const d of m[1]!.matchAll(DECL_RE)) darkDecls.set(d[1]!, d[2]!)
+  }
+  const lightText = text.replace(DARK_BLOCK_RE, '')
+
   const decls = new Map<string, string>()
-  for (const m of text.matchAll(/--([\w-]+)\s*:\s*([^;{}]+);/g)) {
+  for (const m of lightText.matchAll(DECL_RE)) {
     decls.set(m[1]!, m[2]!)
   }
-  if (decls.size === 0) throw new Error('没在文本里找到 --变量: 值; 形式的声明')
-  for (const [name, raw] of decls) {
+  if (decls.size === 0 && darkDecls.size === 0) {
+    throw new Error('没在文本里找到 --变量: 值; 形式的声明')
+  }
+  for (const [rawName, raw] of decls) {
+    const name = twToToken(rawName)
     const existing = doc.tokens[name]
     if (!existing) {
-      c.miss(name)
+      c.miss(rawName)
       continue
     }
     applyToken(doc, c, name, inferValue(raw, existing.value, doc.rootFontPx))
   }
+  // 第二遍:暗色块只并回颜色/阴影的 dark 端,不覆盖亮色值
+  for (const [rawName, raw] of darkDecls) {
+    const name = twToToken(rawName)
+    const def = doc.tokens[name]
+    if (!def) continue
+    const parsed = inferValue(raw, def.value, doc.rootFontPx)
+    if (parsed?.kind === 'color' && def.value.kind === 'color') {
+      doc.tokens[name] = { ...def, value: { ...def.value, dark: parsed.light } }
+      c.applied++
+    } else if (parsed?.kind === 'shadow' && def.value.kind === 'shadow') {
+      doc.tokens[name] = { ...def, value: { ...def.value, dark: parsed.light } }
+      c.applied++
+    }
+  }
   if (c.applied === 0) throw new Error('一个变量都没对上:--名字 与本方案变量名不一致')
-  return { doc, applied: c.applied, skipped: c.skipped, sourceLabel: 'CSS 变量' }
+  return {
+    doc,
+    applied: c.applied,
+    skipped: c.skipped,
+    sourceLabel: isTailwind ? 'Tailwind @theme' : 'CSS 变量'
+  }
 }

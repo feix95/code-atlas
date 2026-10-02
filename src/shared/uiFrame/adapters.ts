@@ -54,6 +54,91 @@ export function tailwindThemeCss(doc: UiFrameDoc): string {
 }
 
 const camel = (s: string): string => s.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase())
+
+/** CSS 颜色文本(#rrggbb / #rrggbbaa / rgba())→ Flutter 0xAARRGGBB 字面量;认不出回 null */
+function flutterColor(text: string): string | null {
+  const hex = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(text.trim())
+  if (hex) {
+    const a = hex[2] ?? 'FF'
+    return `0x${a.toUpperCase()}${hex[1]!.toUpperCase()}`
+  }
+  const m = /rgba?\(([^)]+)\)/.exec(text.trim())
+  if (!m) return null
+  const parts = m[1]!.split(',').map((s) => s.trim())
+  const [r, g, b] = parts.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(Number(n)))))
+  const alpha = Math.max(0, Math.min(1, Number(parts[3] ?? '1')))
+  const to2 = (n: number): string => n.toString(16).padStart(2, '0').toUpperCase()
+  return `0x${to2(Math.round(alpha * 255))}${to2(r)}${to2(g)}${to2(b)}`
+}
+
+/** Flutter ThemeData 主题(§13.5):ui_theme.dart 一份文件,亮暗双 ThemeData + 全部变量常量 */
+export function flutterThemeDart(doc: UiFrameDoc): string {
+  const colors: string[] = []
+  const dims: string[] = []
+  const fonts: string[] = []
+  for (const [name, def] of Object.entries(doc.tokens)) {
+    const v = def.value.kind === 'ref' ? resolveValue(doc.tokens, name) : def.value
+    const id = camel(name.replace(/-/g, '-'))
+    if (v.kind === 'color') {
+      const light = flutterColor(v.light)
+      const dark = flutterColor(v.dark)
+      if (light && dark) {
+        colors.push(
+          `  static const light${id[0]!.toUpperCase()}${id.slice(1)} = Color(${light});`,
+          `  static const dark${id[0]!.toUpperCase()}${id.slice(1)} = Color(${dark});`
+        )
+      }
+    } else if (v.kind === 'dimension') {
+      dims.push(`  static const double ${id} = ${v.px};`)
+    } else if (v.kind === 'number' || v.kind === 'fontWeight' || v.kind === 'em') {
+      dims.push(`  static const double ${id} = ${v.value};`)
+    } else if (v.kind === 'fontFamily') {
+      fonts.push(`  static const ${id} = <String>[${v.families.map((f) => `'${f}'`).join(', ')}];`)
+    }
+  }
+  return [
+    `// ui_theme.dart · Flutter 主题(由「${doc.name}」导出,数值为逻辑像素)`,
+    '// 用法:MaterialApp(theme: uiThemeLight(), darkTheme: uiThemeDark())',
+    '',
+    "import 'package:flutter/material.dart';",
+    '',
+    '/// 颜色常量:light/dark 两套前缀;其余变量为尺寸或数值',
+    'class UiTokens {',
+    '  UiTokens._();',
+    '',
+    '  // ── 颜色(亮) ──',
+    ...colors.filter((_, i) => i % 2 === 0),
+    '  // ── 颜色(暗) ──',
+    ...colors.filter((_, i) => i % 2 === 1),
+    '',
+    '  // ── 尺寸与数值 ──',
+    ...dims,
+    '',
+    '  // ── 字体族 ──',
+    ...fonts,
+    '}',
+    '',
+    'ThemeData uiThemeLight() => ThemeData(',
+    '  brightness: Brightness.light,',
+    '  colorScheme: ColorScheme.fromSeed(',
+    '    seedColor: UiTokens.lightColorPrimary,',
+    '    brightness: Brightness.light,',
+    '  ),',
+    '  scaffoldBackgroundColor: UiTokens.lightColorBg,',
+    ');',
+    '',
+    'ThemeData uiThemeDark() => ThemeData(',
+    '  brightness: Brightness.dark,',
+    '  colorScheme: ColorScheme.fromSeed(',
+    '    seedColor: UiTokens.darkColorPrimary,',
+    '    brightness: Brightness.dark,',
+    '  ),',
+    '  scaffoldBackgroundColor: UiTokens.darkColorBg,',
+    ');',
+    ''
+  ].join('\n')
+}
+
 const jsKey = (member: string): string => {
   const c = camel(member)
   return /^[a-zA-Z_$][\w$]*$/.test(c) ? c : JSON.stringify(member)

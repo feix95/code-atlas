@@ -27,7 +27,11 @@ import {
   isDeviceId
 } from '../src/shared/uiFrame/devices.ts'
 import { contrastRatio, platformIssues } from '../src/shared/uiFrame/platformRules.ts'
-import { reactNativeThemeTs, tailwindThemeCss } from '../src/shared/uiFrame/adapters.ts'
+import {
+  flutterThemeDart,
+  reactNativeThemeTs,
+  tailwindThemeCss
+} from '../src/shared/uiFrame/adapters.ts'
 import {
   manifestFor,
   parseDoc,
@@ -766,10 +770,49 @@ check('RN 主题对象:亮暗分桶、尺寸出数值、字族出数组、ref �
   assert.ok(/offset:\s*{/.test(ts), '阴影出 RN 结构')
   assert.ok(!ts.includes('undefined'), '不许出现未解析值')
 })
-check('规格包含两个适配器文件,体检仍零错误零提醒', () => {
+check('Flutter ThemeData:颜色出 0xAARRGGBB、亮暗双 ThemeData、ref 解为字面值', () => {
+  const dart = flutterThemeDart(doc)
+  assert.ok(dart.includes("import 'package:flutter/material.dart';"))
+  assert.ok(dart.includes('ThemeData uiThemeLight()') && dart.includes('ThemeData uiThemeDark()'))
+  assert.ok(dart.includes('lightColorPrimary = Color(0xFF2563EB)'), '亮色 6 位 hex → FF 前缀')
+  assert.ok(dart.includes('darkColorPrimary = Color(0xFF60A5FA)'), '暗色独立成常量')
+  assert.ok(/double\s+controlMd\s*=\s*40/.test(dart), '尺寸 ref 解成数字')
+  assert.ok(!dart.includes('var(--'), 'ref 必须解成字面值')
+  const ov = flutterThemeDart(templateDoc('tint-phone'))
+  assert.ok(/0x[0-9A-F]{8}/.test(ov), 'rgba 遮罩色要转出 8 位 ARGB')
+})
+check('Tailwind @theme 导入:命名空间逆归位、暗色块并回 dark 端(§13.5 往返)', () => {
+  const css = tailwindThemeCss(doc)
+  const r = importCssVars(css, 'tw 主题')
+  assert.equal(r.sourceLabel, 'Tailwind @theme')
+  assert.deepEqual(r.doc.tokens['color-primary']?.value, {
+    kind: 'color',
+    light: '#2563EB',
+    dark: '#60A5FA'
+  })
+  assert.deepEqual(r.doc.tokens['space-4']?.value, { kind: 'dimension', px: 16 })
+  assert.equal(r.doc.tokens['font-family']?.value.kind, 'fontFamily', 'font-sans 归位 font-family')
+  const v = r.doc.tokens['control-md']?.value
+  assert.ok(v && 'px' in v && v.px === 40, '无归位变量按原名对上')
+})
+check('外来 Tailwind 主题:非本家名字入 skipped,同语义变量仍对上', () => {
+  const r = importCssVars(
+    `@theme { --color-primary:#123456; --spacing-4:2rem; --color-weird-99:#000000; }`,
+    '外来'
+  )
+  assert.deepEqual(r.doc.tokens['color-primary']?.value, {
+    kind: 'color',
+    light: '#123456',
+    dark: '#123456'
+  })
+  assert.deepEqual(r.doc.tokens['space-4']?.value, { kind: 'dimension', px: 32 })
+  assert.ok(r.skipped.includes('color-weird-99'))
+})
+check('规格包含三个适配器文件,体检仍零错误零提醒', () => {
   const p = buildPackage(doc, assets)
   assert.ok(p.files['adapters/tailwind.theme.css'].includes('@theme'))
   assert.ok(p.files['adapters/uiTheme.ts'].includes('export const uiTheme'))
+  assert.ok(p.files['adapters/ui_theme.dart'].includes('ThemeData uiThemeLight'))
   const errs = lintPackage(p, PAGES).filter((i) => i.level === 'error')
   for (const i of errs) console.log(`    [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(errs.length, 0)

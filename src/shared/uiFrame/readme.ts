@@ -104,6 +104,7 @@ export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, 
     ['design.json', '同一份数据的 DTCG 结构化版本'],
     ['adapters/tailwind.theme.css', 'Tailwind CSS v4 @theme 主题文件(§13.5)'],
     ['adapters/uiTheme.ts', 'React Native 主题对象,数值为逻辑像素(§13.5)'],
+    ['adapters/ui_theme.dart', 'Flutter ThemeData 主题,亮暗双套(§13.5)'],
     ['preview/', '组件与页面的标准外观截图(字体加载完成后截取)'],
     ['LICENSES.md', '图标与字体的许可声明']
   ]
