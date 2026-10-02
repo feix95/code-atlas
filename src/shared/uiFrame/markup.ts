@@ -54,9 +54,41 @@ function iconHtml(slot: IconSlot, ctx: MarkupContext): string {
     : svg
 }
 
-function partOfIcon(slot: IconSlot): string {
-  return slot === 'hero-cta' || slot === 'demo-button' ? 'btn-icon' : 'card-icon'
+/** 图标槽位 → 画布部件名(选中后属性面板按这个名字找手柄与图标选择器) */
+const ICON_PART: Record<IconSlot, string> = {
+  'demo-button': 'btn-icon',
+  'hero-cta': 'btn-icon',
+  'demo-ibtn': 'ibtn-icon',
+  'demo-check': 'chk-mark',
+  'demo-input': 'ipt-icon',
+  'demo-li': 'li-lead-icon',
+  'demo-arrow': 'li-trail-icon',
+  'demo-card': 'card-icon',
+  'feature-1': 'card-icon',
+  'feature-2': 'card-icon',
+  'feature-3': 'card-icon'
 }
+
+function partOfIcon(slot: IconSlot): string {
+  return ICON_PART[slot]
+}
+
+/** HTML 空元素:只写开标签,不写闭合标签 */
+const VOID_TAGS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'source',
+  'track',
+  'wbr'
+])
 
 /** 一个节点 → HTML(子节点依次拼接,不插入任何空白:规则 13) */
 export function nodeHtml(node: PageNode, ctx: MarkupContext): string {
@@ -67,6 +99,7 @@ export function nodeHtml(node: PageNode, ctx: MarkupContext): string {
   }
   if (ctx.mode === 'canvas' && node.part) attrs.push(`data-uf-part="${node.part}"`)
   const open = `<${node.tag}${attrs.length ? ` ${attrs.join(' ')}` : ''}>`
+  if (VOID_TAGS.has(node.tag)) return open
   const icon = node.icon ? iconHtml(node.icon, ctx) : ''
   const text = node.text ? escapeHtml(node.text) : ''
   const kids = (node.children ?? []).map((c) => nodeHtml(c, ctx)).join('')

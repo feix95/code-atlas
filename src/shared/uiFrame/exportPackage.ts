@@ -2,17 +2,19 @@
 // 所有产物由同一份 UiFrameDoc 生成(规则 14),不存在分别手写的副本。
 import { designJson } from './designJson.ts'
 import {
-  DEMO_STYLES,
-  HOME_PAGE,
-  PAGE_STYLES,
+  compHtmlPath,
   demoBody,
+  demoStyles,
+  HOME_PAGE,
   htmlDocument,
+  PAGE_STYLES,
   pageTemplateHtml,
   STYLE_FILES,
   styleTexts
 } from './documents.ts'
 import { fontPlans, fontsCss, PACKAGE_FONT_URL, type FontSource } from './fonts.ts'
 import { svgFile, type MarkupContext } from './markup.ts'
+import { RECIPES } from './recipes/index.ts'
 import { licensesMd, pageMd, readmeMd, type LicenseTexts } from './readme.ts'
 import type { IconLookup, PreviewPlan, SpecPackage, UiFrameDoc } from './types.ts'
 
@@ -24,9 +26,14 @@ export interface PackageAssets {
   stamp: string
 }
 
+/** 每个组件演示页一张预览截图 + 页面参考实现一张 */
 export const PREVIEWS: PreviewPlan[] = [
-  { html: 'components/button.html', png: 'preview/button.png', width: 960, height: 0 },
-  { html: 'components/card.html', png: 'preview/card.png', width: 1180, height: 0 },
+  ...RECIPES.map((r): PreviewPlan => ({
+    html: compHtmlPath(r.id),
+    png: `preview/${r.id}.png`,
+    width: 960,
+    height: 0
+  })),
   {
     html: 'pages/home.html',
     png: 'preview/home.png',
@@ -61,22 +68,17 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
       ctx,
       styleMode: link
     }),
-    'components/button.html': htmlDocument({
-      title: '按钮 · 演示',
-      body: demoBody('button'),
-      styles: DEMO_STYLES.button,
-      ctx,
-      styleMode: link
-    }),
-    'components/card.html': htmlDocument({
-      title: '卡片 · 演示',
-      body: demoBody('card'),
-      styles: DEMO_STYLES.card,
-      ctx,
-      styleMode: link
-    }),
     'design.json': designJson(doc),
     'LICENSES.md': licensesMd(assets.licenses)
+  }
+  for (const r of RECIPES) {
+    files[compHtmlPath(r.id)] = htmlDocument({
+      title: `${r.label} · 演示`,
+      body: demoBody(r.id),
+      styles: demoStyles(r.id),
+      ctx,
+      styleMode: link
+    })
   }
   for (const [key, path] of Object.entries(STYLE_FILES) as Array<[keyof typeof texts, string]>) {
     files[path] = texts[key]

@@ -1,6 +1,6 @@
 // 固定示例页(§5.5 示例屏、§19 M0):落地页结构 + 页面布局样式。
 // 结构沿用 2026-10-02 实测页(§23.1);每个元素写明标签、class、属性与链接(规则 6)。
-import type { CssRule } from './recipes.ts'
+import type { CssRule } from './recipes/types.ts'
 import type { PageNode } from './types.ts'
 
 const v = (name: string): string => `var(--${name})`

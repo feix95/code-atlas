@@ -10,6 +10,8 @@ import { hasErrors, lintPackage } from '../src/shared/uiFrame/lint.ts'
 import { LUCIDE_VERSION, svgText } from '../src/shared/uiFrame/markup.ts'
 import { describePx, remText, snapPx } from '../src/shared/uiFrame/units.ts'
 import { resolvePx } from '../src/shared/uiFrame/resolve.ts'
+import { demoBody } from '../src/shared/uiFrame/demo.ts'
+import { RECIPES } from '../src/shared/uiFrame/recipes/index.ts'
 import { htmlDocument, PAGE_STYLES, styleTexts } from '../src/shared/uiFrame/documents.ts'
 import type {
   IconNode,
@@ -36,7 +38,11 @@ const assets: PackageAssets = {
   },
   stamp: '20261002-1200'
 }
-const PAGES = { 'pages/home.md': HOME_PAGE.body }
+/** 页面结构体检对象:页面 + 每个组件演示页(键随意,体检只按结构树检查) */
+const PAGES: Record<string, PageNode[]> = {
+  'pages/home.md': HOME_PAGE.body,
+  ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
+}
 
 let passed = 0
 function check(name: string, fn: () => void): void {
@@ -76,17 +82,14 @@ check('体检零错误零提醒', () => {
   for (const i of issues) console.log(`    ${i.level} [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(issues.length, 0)
 })
-check('规格包文件齐全(§13.3)', () => {
+check('规格包文件齐全(§13.3):注册表 9 个组件的 css 与演示页俱全', () => {
+  assert.equal(RECIPES.length, 9)
   for (const f of [
     'README-给AI.md',
     'page-template.html',
     'tokens.css',
     'reset.css',
     'fonts/fonts.css',
-    'components/button.css',
-    'components/button.html',
-    'components/card.css',
-    'components/card.html',
     'components/_demo.css',
     'pages/home.md',
     'pages/home.css',
@@ -95,10 +98,19 @@ check('规格包文件齐全(§13.3)', () => {
     'icons/timer.svg',
     'icons/music.svg',
     'icons/dumbbell.svg',
+    'icons/ellipsis.svg',
+    'icons/check.svg',
+    'icons/search.svg',
+    'icons/bell.svg',
+    'icons/chevron-right.svg',
     'design.json',
     'LICENSES.md'
   ]) {
     assert.ok(f in pkg.files, `缺文件 ${f}`)
+  }
+  for (const r of RECIPES) {
+    assert.ok(`components/${r.id}.css` in pkg.files, `缺组件样式 ${r.id}`)
+    assert.ok(`components/${r.id}.html` in pkg.files, `缺演示页 ${r.id}`)
   }
   assert.match(pkg.folderName, /^UI规格包_落地页示例_20261002-1200$/)
 })
@@ -117,12 +129,21 @@ check('组件变量随容器亮暗重新取值(引用颜色/阴影的变量在 [
   )
 })
 check('组件 CSS 无演示 class,演示 CSS 有状态模拟', () => {
-  assert.doesNotMatch(pkg.files['components/button.css'], /is-hover|\.demo/)
+  for (const r of RECIPES) {
+    assert.doesNotMatch(pkg.files[`components/${r.id}.css`], /is-hover|\.demo/, r.id)
+  }
   assert.match(pkg.files['components/button.css'], /\.btn--solid:hover:not\(:disabled\)/)
   assert.match(pkg.files['components/_demo.css'], /\.btn--solid\.is-hover/)
 })
+check('表单组件走真实状态属性,不用 class 模拟勾选', () => {
+  const swCss = pkg.files['components/switch.css']
+  assert.match(swCss, /\.sw__in:checked \+ \.sw__thumb/)
+  assert.match(pkg.files['components/checkbox.html'], /checked/)
+  assert.match(pkg.files['components/checkbox.html'], /disabled/)
+  assert.match(pkg.files['components/input.html'], /placeholder="输入内容"/)
+})
 check('导出 HTML 无画布痕迹,元素之间无空白(规则 13)', () => {
-  for (const f of ['pages/home.html', 'components/button.html', 'components/card.html']) {
+  for (const f of ['pages/home.html', ...RECIPES.map((r) => `components/${r.id}.html`)]) {
     const html = pkg.files[f]
     assert.doesNotMatch(html, /data-uf-/, `${f} 带了画布属性`)
     const body = html.slice(html.indexOf('<body>'), html.indexOf('</body>'))

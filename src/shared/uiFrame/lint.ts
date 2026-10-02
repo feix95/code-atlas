@@ -13,7 +13,7 @@ import {
   VAGUE_WORDS
 } from './lintRules.ts'
 import { tagsOf } from './markup.ts'
-import { RECIPES } from './recipes.ts'
+import { RECIPES } from './recipes/index.ts'
 import { checkConsistency, checkDesignJsonData } from './lintData.ts'
 import type { LintIssue, PageNode, SpecPackage } from './types.ts'
 
@@ -118,9 +118,13 @@ function escapesRoot(fromFile: string, href: string): boolean {
 }
 
 function checkRefs(pkg: SpecPackage, issues: Issues): void {
-  const defined = new Set(
-    [...(pkg.files['tokens.css'] ?? '').matchAll(/--([\w-]+)\s*:/g)].map((m) => m[1])
-  )
+  // 变量定义集合:tokens.css + 组件/页面 CSS 里声明的组件级自定义属性(_demo.css 除外,
+  // 演示样式禁止自封变量)。组件级属性如 .sw { --sw-w: var(--sw-width-md) } 是合法手法(§7.4 变体改绑)。
+  const defined = new Set<string>()
+  for (const [file, text] of Object.entries(pkg.files)) {
+    if (!file.endsWith('.css') || file.endsWith('_demo.css')) continue
+    for (const m of text.matchAll(/--([\w-]+)\s*:/g)) defined.add(m[1])
+  }
   const fontFiles = new Set(pkg.fonts.flatMap((p) => p.files.map((f) => `fonts/${p.dir}/${f}`)))
   const exists = (path: string): boolean => path in pkg.files || fontFiles.has(path)
   for (const [file, text] of Object.entries(pkg.files)) {
@@ -237,7 +241,7 @@ function checkStates(pkg: SpecPackage, issues: Issues): void {
     if (recipe.states.length === 0) continue
     const file = `components/${recipe.id}.css`
     const css = pkg.files[file] ?? ''
-    for (const s of INTERACTIVE_STATES) {
+    for (const s of recipe.requiredStates ?? INTERACTIVE_STATES) {
       if (!css.includes(s)) {
         issues.push({ level: 'warn', check: '状态缺失', file, message: `交互组件缺少 ${s} 状态` })
       }

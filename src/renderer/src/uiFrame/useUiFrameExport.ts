@@ -1,9 +1,11 @@
 // 导出流程状态机:组装规格包 → 体检(错误级阻止导出)→ 主进程写盘与截图 → 结果。
 import { useState } from 'react'
 import { buildPackage } from '@shared/uiFrame/exportPackage'
+import { demoBody } from '@shared/uiFrame/demo'
 import { hasErrors, lintPackage } from '@shared/uiFrame/lint'
 import { HOME_PAGE } from '@shared/uiFrame/page'
-import type { LintIssue, UiFrameDoc } from '@shared/uiFrame/types'
+import { RECIPES } from '@shared/uiFrame/recipes/index'
+import type { LintIssue, PageNode, UiFrameDoc } from '@shared/uiFrame/types'
 import { packageAssets } from './assets'
 
 export type ExportState =
@@ -13,8 +15,11 @@ export type ExportState =
   | { kind: 'done'; path: string; warnings: LintIssue[]; unloadedFonts: string[] }
   | { kind: 'error'; message: string }
 
-/** 页面规格文件 → 结构树(体检逐页检查标签与属性) */
-const PAGES = { 'pages/home.md': HOME_PAGE.body }
+/** 页面与每个组件演示页的结构树(体检逐个检查标签与属性) */
+const PAGES: Record<string, PageNode[]> = {
+  'pages/home.md': HOME_PAGE.body,
+  ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
+}
 
 export function useUiFrameExport(): {
   state: ExportState

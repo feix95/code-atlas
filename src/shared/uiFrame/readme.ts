@@ -1,14 +1,19 @@
 // 给 AI 的文字:README-给AI.md(§13.4)、pages/home.md(页面规格)、LICENSES.md。
 // 全文只用「必须 / 禁止」(规则 8);体检会扫描含糊词。
-import { STYLE_FILES } from './documents.ts'
+import { compCssPath, compHtmlPath, STYLE_FILES } from './documents.ts'
 import { escapeHtml } from './markup.ts'
 import { HOME_PAGE } from './page.ts'
-import { RECIPES } from './recipes.ts'
+import { RECIPES } from './recipes/index.ts'
 import { declaredCss, isThemed } from './resolve.ts'
 import type { IconSlot, PageNode, TokenTier, UiFrameDoc } from './types.ts'
 
 const SLOT_LABEL: Record<IconSlot, string> = {
   'demo-button': '按钮演示页的图标按钮',
+  'demo-ibtn': '图标按钮演示页',
+  'demo-check': '复选框演示页的勾号',
+  'demo-input': '输入框演示页的前置图标',
+  'demo-li': '列表行演示页的前置图标',
+  'demo-arrow': '列表行演示页的尾部箭头',
   'demo-card': '卡片演示页的图标',
   'hero-cta': '首页「免费开始」按钮',
   'feature-1': '首页第 1 张卡片',
@@ -76,11 +81,12 @@ export function fileIndex(iconFiles: string[]): Array<[string, string]> {
     [STYLE_FILES.tokens, '全部变量,亮暗两套'],
     [STYLE_FILES.reset, '清零浏览器默认样式'],
     [STYLE_FILES.fonts, '字体加载;字体文件位于 fonts/inter/ 与 fonts/noto-sans-sc/'],
-    [STYLE_FILES.button, '按钮样式,直接复用'],
-    [STYLE_FILES.card, '卡片样式,直接复用'],
+    ...RECIPES.map((r): [string, string] => [compCssPath(r.id), `${r.label}样式,直接复用`]),
     [STYLE_FILES.demo, '仅供演示页使用,禁止复制'],
-    ['components/button.html', '按钮演示页:全部变体 × 状态 × 亮暗'],
-    ['components/card.html', '卡片演示页:亮暗两套'],
+    ...RECIPES.map((r): [string, string] => [
+      compHtmlPath(r.id),
+      `${r.label}演示页:全部变体 × 状态 × 亮暗`
+    ]),
     ['pages/home.md', '首页页面规格:结构树与页面变量'],
     [STYLE_FILES.home, '首页布局样式'],
     ['pages/home.html', '首页参考实现,浏览器打开即为标准效果'],
@@ -95,7 +101,7 @@ export function readmeMd(doc: UiFrameDoc, iconFiles: string[]): string {
   const files = fileIndex(iconFiles)
   const recipes = RECIPES.map((r) => {
     const params = Object.keys(doc.tokens).filter((n) => doc.tokens[n].path[0] === r.group)
-    return `### ${r.label}\n\n- 样式文件:\`components/${r.id}.css\`;演示页:\`components/${r.id}.html\`\n- 状态:${r.stateNames.join('、')}\n- 组件变量:${params.map((n) => `\`--${n}\``).join('、')}`
+    return `### ${r.label}\n\n- 样式文件:\`${compCssPath(r.id)}\`;演示页:\`${compHtmlPath(r.id)}\`\n- 状态:${r.stateNames.join('、')}\n- 组件变量:${params.map((n) => `\`--${n}\``).join('、')}`
   }).join('\n\n')
   const usedIcons = (Object.keys(doc.icons) as IconSlot[])
     .map((slot) => `| \`icons/${doc.icons[slot]}.svg\` | ${SLOT_LABEL[slot]} |`)
@@ -126,7 +132,7 @@ ${HARD_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 ├── tokens.css            复制自规格包
 ├── reset.css             复制自规格包
 ├── components/
-│   ├── button.css        复制自规格包
+│   ├── button.css        复制自规格包(页面用到的组件样式)
 │   └── card.css          复制自规格包
 └── pages/
     └── home.css          复制自规格包
@@ -200,7 +206,7 @@ export function pageMd(doc: UiFrameDoc): string {
   return `# ${HOME_PAGE.title} · 页面规格
 
 - 视口:${HOME_PAGE.width} × ${HOME_PAGE.height};主题:亮色(\`<html data-theme="light">\`)。
-- 布局样式:\`${STYLE_FILES.home}\`;组件样式:\`${STYLE_FILES.button}\`、\`${STYLE_FILES.card}\`。
+- 布局样式:\`${STYLE_FILES.home}\`;组件样式:\`${compCssPath('button')}\`、\`${compCssPath('card')}\`。
 - 参考实现:\`pages/home.html\`,其结构与下方结构树逐项一致。
 - 下方每一行即一个元素:标签、class 与属性必须原样使用;文案必须逐字使用;同级元素之间禁止插入任何其他元素。
 

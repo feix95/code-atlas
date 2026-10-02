@@ -1,9 +1,10 @@
 // 规格包里的样式与 HTML 文档:tokens.css、reset.css、页面骨架、组件演示页、页面参考实现。
 // 画布与导出用同一批函数生成(所见即所导出):画布把样式内联进 <style>,导出写成 <link>。
-import { DEMOS, demoRules, wallBody } from './demo.ts'
+import { demoBody, demoRules, wallBody } from './demo.ts'
 import { nodeHtml, type MarkupContext } from './markup.ts'
 import { HOME_PAGE, HOME_RULES } from './page.ts'
-import { CARD, BUTTON, componentCss, rulesCss } from './recipes.ts'
+import { componentCss, rulesCss } from './recipes/kit.ts'
+import { RECIPES } from './recipes/index.ts'
 import { declaredCss, isThemed } from './resolve.ts'
 import type { PageNode, ThemeName, TokenTier, UiFrameDoc } from './types.ts'
 
@@ -135,30 +136,34 @@ export const RESET_TAGS = [
   'dd'
 ]
 
+/** 组件样式文件的键与路径:键 comp-<id> → components/<id>.css */
+export const compStyleKey = (id: string): string => `comp-${id}`
+export const compCssPath = (id: string): string => `components/${id}.css`
+export const compHtmlPath = (id: string): string => `components/${id}.html`
+
 /** 规格包里的样式文件(相对规格包根目录);导出与画布按这个顺序加载 */
-export const STYLE_FILES = {
+export const STYLE_FILES: Record<string, string> = {
   fonts: 'fonts/fonts.css',
   tokens: 'tokens.css',
   reset: 'reset.css',
-  button: 'components/button.css',
-  card: 'components/card.css',
+  ...Object.fromEntries(RECIPES.map((r) => [compStyleKey(r.id), compCssPath(r.id)])),
   demo: 'components/_demo.css',
   home: 'pages/home.css'
-} as const
+}
 
-type StyleKey = keyof typeof STYLE_FILES
+type StyleKey = string
 
 /** 每个样式文件的正文(字体 CSS 由调用方提供,导出与画布的字体地址不同) */
 export function styleTexts(doc: UiFrameDoc, fontsCss: string): Record<StyleKey, string> {
-  return {
+  const texts: Record<StyleKey, string> = {
     fonts: fontsCss,
     tokens: tokensCss(doc),
     reset: RESET_CSS,
-    button: componentCss(BUTTON),
-    card: componentCss(CARD),
     demo: `/* _demo.css · 仅供演示页使用:禁止复制进正式页面 */\n\n${rulesCss(demoRules())}\n`,
     home: `/* 首页 · 页面布局样式 */\n\n${rulesCss(HOME_RULES)}\n`
   }
+  for (const r of RECIPES) texts[compStyleKey(r.id)] = componentCss(r)
+  return texts
 }
 
 export interface HtmlDocOptions {
@@ -194,17 +199,33 @@ export function htmlDocument(opts: HtmlDocOptions): string {
   ].join('\n')
 }
 
-/** 正式页面要加载的样式(不含 _demo.css) */
-export const PAGE_STYLES: StyleKey[] = ['fonts', 'tokens', 'reset', 'button', 'card', 'home']
-export const DEMO_STYLES: Record<'button' | 'card', StyleKey[]> = {
-  button: ['fonts', 'tokens', 'reset', 'button', 'demo'],
-  card: ['fonts', 'tokens', 'reset', 'card', 'demo']
-}
-export const WALL_STYLES: StyleKey[] = ['fonts', 'tokens', 'reset', 'button', 'card', 'demo']
+/** 正式页面要加载的样式(不含 _demo.css);示例页用到按钮与卡片 */
+export const PAGE_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  compStyleKey('button'),
+  compStyleKey('card'),
+  'home'
+]
 
-export function demoBody(id: 'button' | 'card'): PageNode[] {
-  return DEMOS[id]()
+/** 组件演示页要加载的样式:本组件 + 演示结构里复用的其他组件(demoDeps)+ _demo.css */
+export function demoStyles(id: string): StyleKey[] {
+  const recipe = RECIPES.find((r) => r.id === id)
+  if (!recipe) throw new Error(`未注册的组件:${id}`)
+  const deps = (recipe.demoDeps ?? []).map(compStyleKey)
+  return ['fonts', 'tokens', 'reset', ...deps, compStyleKey(id), 'demo']
 }
+
+export const WALL_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  ...RECIPES.map((r) => compStyleKey(r.id)),
+  'demo'
+]
+
+export { demoBody }
 
 export { wallBody, HOME_PAGE }
 

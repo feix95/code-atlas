@@ -39,7 +39,17 @@ export type TokenMap = Record<string, TokenDef>
 
 /** 图标槽位:页面与演示页里每个用到图标的位置 */
 export type IconSlot =
-  'demo-button' | 'demo-card' | 'hero-cta' | 'feature-1' | 'feature-2' | 'feature-3'
+  | 'demo-button'
+  | 'demo-ibtn'
+  | 'demo-check'
+  | 'demo-input'
+  | 'demo-li'
+  | 'demo-arrow'
+  | 'demo-card'
+  | 'hero-cta'
+  | 'feature-1'
+  | 'feature-2'
+  | 'feature-3'
 
 export interface UiFrameDoc {
   schemaVersion: 1

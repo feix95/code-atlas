@@ -74,6 +74,172 @@ export const PARTS: Record<string, PartDef> = {
       { edge: 'right', token: 'card-icon-size', label: '图标尺寸', factor: 1, min: 8, max: 48 }
     ]
   },
+  ibtn: {
+    label: '图标按钮 · 中',
+    group: 'ibtn',
+    handles: [
+      { edge: 'right', token: 'ibtn-size-md', label: '按钮尺寸', factor: 1, min: 16, max: 96 },
+      { edge: 'corner', token: 'ibtn-radius', label: '圆角', factor: 1, min: 0, max: 48 }
+    ]
+  },
+  'ibtn-sm': {
+    label: '图标按钮 · 小',
+    group: 'ibtn',
+    handles: [
+      { edge: 'right', token: 'ibtn-size-sm', label: '按钮尺寸', factor: 1, min: 16, max: 96 },
+      { edge: 'corner', token: 'ibtn-radius', label: '圆角', factor: 1, min: 0, max: 48 }
+    ]
+  },
+  'ibtn-lg': {
+    label: '图标按钮 · 大',
+    group: 'ibtn',
+    handles: [
+      { edge: 'right', token: 'ibtn-size-lg', label: '按钮尺寸', factor: 1, min: 16, max: 96 },
+      { edge: 'corner', token: 'ibtn-radius', label: '圆角', factor: 1, min: 0, max: 48 }
+    ]
+  },
+  'ibtn-icon': {
+    label: '图标按钮图标',
+    group: 'ibtn',
+    handles: [
+      { edge: 'right', token: 'ibtn-icon-size', label: '图标尺寸', factor: 1, min: 8, max: 48 }
+    ]
+  },
+  sw: {
+    label: '开关 · 中',
+    group: 'sw',
+    handles: [
+      { edge: 'right', token: 'sw-width-md', label: '轨道宽', factor: 1, min: 24, max: 96 },
+      { edge: 'bottom', token: 'sw-height-md', label: '轨道高', factor: 1, min: 12, max: 64 }
+    ]
+  },
+  'sw-sm': {
+    label: '开关 · 小',
+    group: 'sw',
+    handles: [
+      { edge: 'right', token: 'sw-width-sm', label: '轨道宽', factor: 1, min: 24, max: 96 },
+      { edge: 'bottom', token: 'sw-height-sm', label: '轨道高', factor: 1, min: 12, max: 64 }
+    ]
+  },
+  chk: {
+    label: '复选框 · 中',
+    group: 'chk',
+    handles: [
+      { edge: 'right', token: 'chk-size-md', label: '尺寸', factor: 1, min: 10, max: 48 },
+      { edge: 'corner', token: 'chk-radius', label: '圆角', factor: 1, min: 0, max: 24 }
+    ]
+  },
+  'chk-sm': {
+    label: '复选框 · 小',
+    group: 'chk',
+    handles: [
+      { edge: 'right', token: 'chk-size-sm', label: '尺寸', factor: 1, min: 10, max: 48 },
+      { edge: 'corner', token: 'chk-radius', label: '圆角', factor: 1, min: 0, max: 24 }
+    ]
+  },
+  'chk-mark': {
+    label: '复选框勾号',
+    group: 'chk',
+    handles: [
+      { edge: 'right', token: 'chk-mark-md', label: '勾号尺寸', factor: 1, min: 6, max: 40 }
+    ]
+  },
+  'ipt-box': {
+    label: '输入框',
+    group: 'ipt',
+    handles: [
+      { edge: 'bottom', token: 'ipt-height-md', label: '高度', factor: 1, min: 24, max: 96 },
+      { edge: 'right', token: 'ipt-width', label: '宽度', factor: 1, min: 80, max: 640 },
+      { edge: 'corner', token: 'ipt-radius', label: '圆角', factor: 1, min: 0, max: 48 }
+    ]
+  },
+  'ipt-icon': {
+    label: '输入框图标',
+    group: 'ipt',
+    handles: [
+      { edge: 'right', token: 'ipt-icon-size', label: '图标尺寸', factor: 1, min: 8, max: 40 }
+    ]
+  },
+  tab: {
+    label: '页签',
+    group: 'tab',
+    handles: [
+      {
+        edge: 'right',
+        token: 'tab-padding-x-md',
+        label: '左右内边距',
+        factor: 0.5,
+        min: 0,
+        max: 64
+      },
+      {
+        edge: 'bottom',
+        token: 'tab-padding-y-md',
+        label: '上下内边距',
+        factor: 0.5,
+        min: 0,
+        max: 32
+      }
+    ]
+  },
+  li: {
+    label: '列表行',
+    group: 'li',
+    handles: [
+      { edge: 'right', token: 'li-padding-x', label: '左右内边距', factor: 0.5, min: 0, max: 64 },
+      { edge: 'bottom', token: 'li-padding-y', label: '上下内边距', factor: 0.5, min: 0, max: 48 }
+    ]
+  },
+  'li-lead': {
+    label: '列表行前置位',
+    group: 'li',
+    handles: [
+      { edge: 'right', token: 'li-icon-box', label: '前置位尺寸', factor: 1, min: 16, max: 64 }
+    ]
+  },
+  'li-lead-icon': {
+    label: '列表行前置图标',
+    group: 'li',
+    handles: [
+      { edge: 'right', token: 'li-icon-size', label: '图标尺寸', factor: 1, min: 8, max: 48 }
+    ]
+  },
+  'li-avatar': {
+    label: '列表行头像',
+    group: 'li',
+    handles: [{ edge: 'right', token: 'li-avatar', label: '头像尺寸', factor: 1, min: 16, max: 80 }]
+  },
+  'li-trail': { label: '列表行尾部', group: 'li', handles: [] },
+  'li-trail-icon': {
+    label: '列表行尾部图标',
+    group: 'li',
+    handles: [
+      { edge: 'right', token: 'li-trail-icon', label: '图标尺寸', factor: 1, min: 8, max: 40 }
+    ]
+  },
+  'li-value': {
+    label: '列表行数值',
+    group: 'li',
+    handles: [
+      { edge: 'bottom', token: 'li-value-size', label: '数值字号', factor: 1, min: 8, max: 32 }
+    ]
+  },
+  tip: {
+    label: '提示气泡',
+    group: 'tip',
+    handles: [
+      { edge: 'right', token: 'tip-padding-x', label: '左右内边距', factor: 0.5, min: 0, max: 48 },
+      { edge: 'bottom', token: 'tip-padding-y', label: '上下内边距', factor: 0.5, min: 0, max: 32 },
+      { edge: 'corner', token: 'tip-radius', label: '圆角', factor: 1, min: 0, max: 32 }
+    ]
+  },
+  'tip-arrow': {
+    label: '提示气泡箭头',
+    group: 'tip',
+    handles: [
+      { edge: 'right', token: 'tip-arrow-size', label: '箭头尺寸', factor: 1, min: 4, max: 24 }
+    ]
+  },
   'page-header': {
     label: '顶栏',
     group: 'page',
