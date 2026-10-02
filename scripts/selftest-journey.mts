@@ -564,6 +564,28 @@ try {
   // UI 框架(规格见 docs/to-do list《UI框架-需求规格》):rail 开单例签 → 组件墙渲染 → 点选按钮出手柄 →
   // 拖高度手柄(+8 逻辑像素磁吸到 --control-lg)→ 撤销复原 → 导出规格包(对话框替身)→ 文件、字体、截图齐全
   await page.getByRole('button', { name: 'UI 框架', exact: true }).click()
+  // M1-c 起步页(§5.2):选平台 → 模板按平台过滤 → 空白起步 / 我的方案 / 导入(未上线禁用)
+  await page.getByRole('group', { name: '目标平台' }).waitFor()
+  await page.getByRole('button', { name: '极简工作台', exact: true }).waitFor()
+  await page.getByRole('button', { name: '现代仪表盘', exact: true }).waitFor()
+  await page.getByRole('button', { name: '手机端', exact: true }).click()
+  await page.getByRole('button', { name: '色调圆角', exact: true }).waitFor()
+  await page.getByRole('button', { name: '留白清透', exact: true }).waitFor()
+  assert.equal(
+    await page.getByRole('button', { name: '现代仪表盘', exact: true }).count(),
+    0,
+    'desktop templates must not show under phone platform'
+  )
+  await page.getByRole('button', { name: '电脑端', exact: true }).click()
+  assert.ok(
+    await page.getByRole('button', { name: '导入方案' }).isDisabled(),
+    'import entry must stay disabled until M1-d'
+  )
+  await page.getByText('还没有保存过的方案', { exact: false }).waitFor()
+  await shot('uiframe-start')
+  await page.getByRole('button', { name: '极简工作台', exact: true }).click()
+  await page.locator('.uf-scheme-name').filter({ hasText: '极简工作台方案' }).waitFor()
+  await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
   const canvas = page.frameLocator('iframe.uf-canvas-frame')
   const solidBtn = canvas.locator('button.btn--solid[data-uf-part="btn-md"]').first()
   await solidBtn.waitFor()
@@ -640,6 +662,56 @@ try {
     assert.ok(existsSync(join(exported, rel)), `exported spec package must contain ${rel}`)
   }
   await shot('uiframe-exported')
+  // M1-c 方案库(§5.8):保存(起名)→ 重命名 → 复制 → 导出方案文件 → 删除 → 快照回滚
+  await page.getByRole('button', { name: '保存方案', exact: true }).click()
+  const saveDialog = page.getByRole('dialog', { name: '保存方案' })
+  await saveDialog.waitFor()
+  await saveDialog.getByRole('textbox', { name: '方案名' }).fill('旅程验证方案')
+  await saveDialog.getByRole('button', { name: '保存', exact: true }).click()
+  // 保存顺带离屏截缩略图,给它余量;落库后「未入库」收摊
+  await page.locator('.uf-chip').waitFor({ state: 'detached', timeout: 30_000 })
+  await page.locator('.uf-scheme-name').click()
+  const lib = page.getByRole('dialog', { name: '我的方案库' })
+  await lib.waitFor()
+  const libRows = lib.locator('.uf-lib-row')
+  await libRows.first().waitFor()
+  assert.equal(await libRows.count(), 1, 'library must list the just-saved scheme')
+  await libRows.first().getByRole('button', { name: '重命名', exact: true }).click()
+  const renameDialog = page.getByRole('dialog', { name: '重命名方案' })
+  await renameDialog.getByRole('textbox', { name: '方案名' }).fill('旅程方案二号')
+  await renameDialog.getByRole('button', { name: '确定', exact: true }).click()
+  await lib.locator('.uf-lib-name').filter({ hasText: '旅程方案二号' }).waitFor()
+  await libRows.first().getByRole('button', { name: '复制', exact: true }).click()
+  const copyDialog = page.getByRole('dialog', { name: '复制方案' })
+  await copyDialog.getByRole('textbox', { name: '方案名' }).fill('导出验证方案')
+  await copyDialog.getByRole('button', { name: '确定', exact: true }).click()
+  await libRows.nth(1).waitFor()
+  assert.equal(await libRows.count(), 2, 'copy must add a second scheme')
+  // 导出方案文件(§15 文件夹):对话框替身在 main 里,落地 manifest + design
+  const schemeExportDir = join(run, 'scheme-export')
+  await mkdir(schemeExportDir, { recursive: true })
+  await control({ uiframeExportDir: schemeExportDir })
+  const copyRow = libRows.filter({ hasText: '导出验证方案' })
+  await copyRow.getByRole('button', { name: '导出', exact: true }).click()
+  const exportedManifest = join(schemeExportDir, '导出验证方案', 'manifest.json')
+  for (let i = 0; i < 60 && !existsSync(exportedManifest); i++) await page.waitForTimeout(250)
+  await control({ uiframeExportDir: null })
+  assert.ok(existsSync(exportedManifest), 'scheme export must write manifest.json')
+  assert.ok(
+    existsSync(join(schemeExportDir, '导出验证方案', 'design.json')),
+    'scheme export must write design.json'
+  )
+  // 删除复制行:二次确认后回一行
+  await copyRow.getByRole('button', { name: '删除', exact: true }).click()
+  await copyRow.getByRole('button', { name: '再点一次删除', exact: true }).click()
+  await page.waitForFunction((n) => document.querySelectorAll('.uf-lib-row').length === n, 1)
+  // 快照:保存时落过一版,回滚它 → 方案名回到保存时刻的名字(快照是那时的存档)
+  await libRows.first().getByRole('button', { name: '快照', exact: true }).click()
+  const restoreBtn = libRows.first().getByRole('button', { name: '回到这版', exact: true }).first()
+  await restoreBtn.waitFor()
+  await restoreBtn.click()
+  await page.locator('.uf-scheme-name').filter({ hasText: '旅程验证方案' }).waitFor()
+  await shot('uiframe-library')
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'

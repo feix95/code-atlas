@@ -77,6 +77,15 @@ export const CH = {
   // ── UI 框架:规格包导出(只写用户自选位置)/ 打开最近一次导出的文件夹 ──
   uiFrameExport: 'atlas:uiframe-export',
   uiFrameRevealExport: 'atlas:uiframe-reveal-export',
+  // ── UI 框架:我的方案库(§5.8,只写 userData 下的方案库) ──
+  uiFrameSchemeList: 'atlas:uiframe-scheme-list',
+  uiFrameSchemeSave: 'atlas:uiframe-scheme-save',
+  uiFrameSchemeOpen: 'atlas:uiframe-scheme-open',
+  uiFrameSchemeRename: 'atlas:uiframe-scheme-rename',
+  uiFrameSchemeDelete: 'atlas:uiframe-scheme-delete',
+  uiFrameSchemeSnapshots: 'atlas:uiframe-scheme-snapshots',
+  uiFrameSchemeRestore: 'atlas:uiframe-scheme-restore',
+  uiFrameSchemeExport: 'atlas:uiframe-scheme-export',
   // ── 桌宠 ──
   // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗

@@ -51,10 +51,14 @@ export type IconSlot =
   | 'feature-2'
   | 'feature-3'
 
+export type UiPlatform = 'desktop' | 'phone'
+
 export interface UiFrameDoc {
   schemaVersion: 1
   name: string
-  platform: 'desktop'
+  platform: UiPlatform
+  /** 起步模板 id(§9);模板与空白起步的户口名 */
+  template: string
   rootFontPx: number
   tokens: TokenMap
   icons: Record<IconSlot, string>
@@ -102,6 +106,47 @@ export interface PreviewPlan {
 /** 导出结果:用户取消 / 写盘完成(附字体未加载的截图清单) */
 export type UiFrameExportResult =
   { status: 'canceled' } | { status: 'done'; path: string; unloadedFontPreviews: string[] }
+
+/** 方案文件 manifest.json(§15):格式版本号必须带,老方案靠它迁移 */
+export interface SchemeManifest {
+  formatVersion: 1
+  id: string
+  name: string
+  platform: UiPlatform
+  /** 风格预设名(§8) */
+  style: string
+  /** 起步模板 id;空白起步记 'blank' */
+  template: string
+  createdAt: string
+  modifiedAt: string
+  appVersion: string
+}
+
+/** 方案库清单行(§5.8):列表要缩略图、平台、风格、最后修改时间 */
+export interface SchemeMeta {
+  id: string
+  name: string
+  platform: UiPlatform
+  style: string
+  modifiedAt: string
+  /** data:URL 缩略图;没截成的方案为 null */
+  thumbnail: string | null
+}
+
+/** 方案库读取结果:manifest + design.json 正文(渲染层再 parseDoc) */
+export interface SchemeBundle {
+  manifest: SchemeManifest
+  design: string
+}
+
+/** 保存方案的 IPC 入参;id 为空 = 新建 */
+export interface SchemeSavePayload {
+  id: string | null
+  name: string
+  doc: UiFrameDoc
+  /** 缩略图用:示例页完整 HTML(内联样式);为空跳过缩略图 */
+  thumbHtml: string
+}
 
 export type LintLevel = 'error' | 'warn'
 

@@ -4,6 +4,7 @@ import { registerModelIpc } from './ipcModel.ts'
 import { registerGitIpc } from './ipcGit.ts'
 import { registerChatIpc } from './ipcChat.ts'
 import { registerUiFrameIpc } from './ipcUiFrame.ts'
+import { registerUiFrameSchemeIpc } from './uiFrameSchemes.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -12,4 +13,5 @@ export function registerIpc(): void {
   registerGitIpc()
   registerChatIpc()
   registerUiFrameIpc()
+  registerUiFrameSchemeIpc()
 }

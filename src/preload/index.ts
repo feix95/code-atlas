@@ -6,7 +6,14 @@ import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
-import type { SpecPackage, UiFrameExportResult } from '../shared/uiFrame/types.ts'
+import type {
+  SchemeBundle,
+  SchemeManifest,
+  SchemeMeta,
+  SchemeSavePayload,
+  SpecPackage,
+  UiFrameExportResult
+} from '../shared/uiFrame/types.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -244,6 +251,27 @@ const atlasApi = {
     ipcRenderer.invoke(CH.uiFrameExport, pkg),
   /** 打开最近一次导出的规格包文件夹 */
   uiFrameRevealExport: (): Promise<boolean> => ipcRenderer.invoke(CH.uiFrameRevealExport),
+  // ── 我的方案库(§5.8):列方案/保存/打开/改名/删除/快照列表/回快照/导出方案文件 ──
+  uiFrameSchemeList: (): Promise<SchemeMeta[]> => ipcRenderer.invoke(CH.uiFrameSchemeList),
+  /** 保存当前方案;id 为空 = 新建(返回新方案 id),有 id = 覆盖存 */
+  uiFrameSchemeSave: (
+    payload: SchemeSavePayload
+  ): Promise<{ id: string; manifest: SchemeManifest }> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeSave, payload),
+  uiFrameSchemeOpen: (id: string): Promise<SchemeBundle> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeOpen, id),
+  uiFrameSchemeRename: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeRename, id, name),
+  uiFrameSchemeDelete: (id: string): Promise<void> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeDelete, id),
+  uiFrameSchemeSnapshots: (id: string): Promise<string[]> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeSnapshots, id),
+  /** 回滚到某个快照:返回该快照的 design.json 正文 */
+  uiFrameSchemeRestore: (id: string, stamp: string): Promise<string> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeRestore, id, stamp),
+  /** 导出方案文件(文件夹形式):manifest + design + 缩略图,写到用户自选位置 */
+  uiFrameSchemeExport: (id: string): Promise<UiFrameExportResult> =>
+    ipcRenderer.invoke(CH.uiFrameSchemeExport, id),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void =>

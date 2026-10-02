@@ -266,6 +266,7 @@ export function defaultDoc(): UiFrameDoc {
     schemaVersion: 1,
     name: '落地页示例',
     platform: 'desktop',
+    template: 'minimal-desk',
     rootFontPx: DEFAULT_ROOT_PX,
     tokens: defaultTokens(),
     icons: {

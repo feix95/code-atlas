@@ -1,5 +1,5 @@
-// UI 框架的方案账本:当前方案 + 撤销 / 重做栈。模块级单例,关掉页签再打开改动仍在(本次运行内)。
-// 「我的方案」落盘属于 M1(§5.8),这里只管内存。
+// UI 框架的方案账本:当前方案文档 + 撤销 / 重做栈。模块级单例,关掉页签再打开改动仍在(本次运行内)。
+// 「我的方案」落盘与库操作在 schemeStore.ts(§5.8);这里只管文档内容与历史。
 import { useSyncExternalStore } from 'react'
 import { defaultDoc, defaultTokens } from '@shared/uiFrame/template'
 import type { IconSlot, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
@@ -47,6 +47,15 @@ export const docActions = {
   },
   resetAll(): void {
     commit(defaultDoc())
+  },
+  /** 整份换方案(开方案/换起步模板):不进撤销栈,历史清空 */
+  replaceDoc(next: UiFrameDoc): void {
+    emit({ doc: next, past: [], future: [] })
+  },
+  /** 只改方案名(保存/重命名走这条):不进撤销栈 */
+  renameDoc(name: string): void {
+    if (state.doc.name === name) return
+    emit({ ...state, doc: { ...state.doc, name } })
   },
   undo(): void {
     const prev = state.past[state.past.length - 1]

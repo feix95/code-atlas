@@ -15,6 +15,15 @@ import { boardBody, boardCss, boardValueText } from '../src/shared/uiFrame/board
 import { rulesCss } from '../src/shared/uiFrame/recipes/kit.ts'
 import { RECIPES } from '../src/shared/uiFrame/recipes/index.ts'
 import { htmlDocument, PAGE_STYLES, styleTexts } from '../src/shared/uiFrame/documents.ts'
+import {
+  manifestFor,
+  parseDoc,
+  schemeIdFromName,
+  serializeDoc,
+  snapshotStamp,
+  SNAPSHOT_RE
+} from '../src/shared/uiFrame/scheme.ts'
+import { BLANK_ID, TEMPLATES, templateDoc } from '../src/shared/uiFrame/templates.ts'
 import type {
   IconNode,
   LintIssue,
@@ -341,6 +350,84 @@ check('画布模式只多 data-uf-* 属性,其余逐字相同', () => {
   const canvas = make('canvas')
   assert.match(canvas, /data-uf-part="btn-lg"/)
   assert.equal(canvas.replace(/ data-uf-(part|icon)="[^"]*"/g, ''), make('export'))
+})
+
+console.log('── 模板与方案(M1-c)')
+check('首批模板 4 个:2 电脑 + 2 手机,空白起步不在模板表里', () => {
+  assert.equal(TEMPLATES.length, 4)
+  assert.equal(TEMPLATES.filter((t) => t.platform === 'desktop').length, 2)
+  assert.equal(TEMPLATES.filter((t) => t.platform === 'phone').length, 2)
+  assert.ok(TEMPLATES.every((t) => t.id !== BLANK_ID))
+  for (const t of TEMPLATES) {
+    assert.ok(t.name && t.style && t.blurb, `模板 ${t.id} 缺名/风格/简介`)
+  }
+})
+check('模板覆盖值落在变量表上,平台与户口名正确', () => {
+  const tint = templateDoc('tint-phone')
+  assert.equal(tint.platform, 'phone')
+  assert.equal(tint.template, 'tint-phone')
+  assert.deepEqual(tint.tokens['color-primary']?.value, {
+    kind: 'color',
+    light: '#6750A4',
+    dark: '#D0BCFF'
+  })
+  assert.deepEqual(tint.tokens['btn-radius']?.value, { kind: 'ref', ref: 'radius-full' })
+  const blank = templateDoc(BLANK_ID, 'phone')
+  assert.equal(blank.platform, 'phone')
+  assert.equal(blank.template, BLANK_ID)
+  // 空白起步 = 中性默认值:主色仍是默认蓝
+  assert.deepEqual(blank.tokens['color-primary']?.value, doc.tokens['color-primary'].value)
+})
+check('四个模板都能过体检(各自建包 lint 零错误)', () => {
+  for (const t of TEMPLATES) {
+    const p = buildPackage(templateDoc(t.id), assets)
+    const errs = lintPackage(p, PAGES).filter((i) => i.level === 'error')
+    for (const i of errs) console.log(`    ${t.id}: [${i.check}] ${i.file}: ${i.message}`)
+    assert.equal(errs.length, 0, `模板 ${t.id} 体检有错误`)
+  }
+})
+check('方案序列化往返:serializeDoc → parseDoc 变量、图标、户口名一致', () => {
+  const edited = templateDoc('modern-desk')
+  edited.name = '测试方案甲'
+  edited.tokens['btn-height-md'] = {
+    ...edited.tokens['btn-height-md'],
+    value: { kind: 'dimension', px: 44 }
+  }
+  edited.icons['demo-button'] = 'star'
+  const back = parseDoc(serializeDoc(edited))
+  assert.equal(back.name, '测试方案甲')
+  assert.equal(back.platform, 'desktop')
+  assert.equal(back.template, 'modern-desk')
+  assert.deepEqual(back.tokens['btn-height-md'], edited.tokens['btn-height-md'])
+  assert.equal(back.icons['demo-button'], 'star')
+})
+check('parseDoc 清洗:坏 kind 变量剔除、缺变量补默认、版本不符抛错', () => {
+  const raw = JSON.parse(serializeDoc(doc)) as Record<string, unknown>
+  const tokens = raw['tokens'] as Record<string, unknown>
+  tokens['evil'] = { path: ['x', 'y'], label: '坏', tier: 'base', value: { kind: 'alien' } }
+  delete tokens['color-primary']
+  const back = parseDoc(JSON.stringify(raw))
+  assert.ok(!('evil' in back.tokens), '坏 kind 的变量必须被剔除')
+  assert.ok(back.tokens['color-primary'], '缺的变量要补回默认模板值')
+  assert.throws(() => parseDoc('{"schemaVersion":99,"tokens":{}}'), /版本不支持/)
+})
+check('方案 id 合法化:中文保留、特殊字符清洗、纯符号兜底时间戳', () => {
+  assert.equal(schemeIdFromName('我的 方案!', '20261002-1200'), '我的-方案')
+  assert.equal(schemeIdFromName('  //..//  ', '20261002-1200'), '方案-20261002-1200')
+  assert.equal(schemeIdFromName('', '20261002-1200'), '方案-20261002-1200')
+})
+check('manifestFor 与快照名:格式版本、模板户口、时间戳形态', () => {
+  const m = manifestFor(doc, {
+    id: 'x',
+    style: '极简中性',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    appVersion: '0.2.0'
+  })
+  assert.equal(m.formatVersion, 1)
+  assert.equal(m.template, doc.template)
+  assert.equal(m.createdAt, '2026-01-01T00:00:00.000Z')
+  assert.match(snapshotStamp(new Date('2026-10-02T12:03:04')), /^20261002-120304$/)
+  assert.match('20261002-120304.json', SNAPSHOT_RE)
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

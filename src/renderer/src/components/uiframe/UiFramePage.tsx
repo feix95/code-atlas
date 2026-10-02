@@ -1,13 +1,16 @@
-// 「UI 框架」页签(§5):工具条 + 画布 + 属性面板。M0 范围见规格 §19:按钮 + 卡片 + 固定示例页。
+// 「UI 框架」页签(§5):起步页(选平台/模板/我的方案)→ 工具条 + 画布 + 属性面板。
 import { useState } from 'react'
 import type { ThemeName } from '@shared/uiFrame/types'
 import { VIEW_LABEL, type CanvasView } from '../../uiFrame/canvasDoc'
 import { docActions, useUiFrameDoc } from '../../uiFrame/docStore'
+import { schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { useUiFrameExport, type ExportState } from '../../uiFrame/useUiFrameExport'
 import { Notice } from '../Notice'
 import { UiFrameCanvas } from './UiFrameCanvas'
 import { UiFrameInspector } from './UiFrameInspector'
+import { SaveNameDialog, UiFrameLibrary } from './UiFrameSchemes'
+import { UiFrameStart } from './UiFrameStart'
 
 const VIEWS: CanvasView[] = ['wall', 'board', 'page']
 const THEMES: Array<[ThemeName, string]> = [
@@ -100,15 +103,40 @@ function ExportBanner({
 
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
+  const { started, schemeId, busy, error } = useSchemeState()
   const [view, setView] = useState<CanvasView>('wall')
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
   const [selection, setSelection] = useState<CanvasSelection | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [naming, setNaming] = useState(false)
   const exporter = useUiFrameExport()
+
+  if (!started) {
+    return (
+      <div className="uf-page">
+        <UiFrameStart />
+      </div>
+    )
+  }
+
+  const onSave = (): void => {
+    if (schemeId) void schemeActions.save(doc)
+    else setNaming(true)
+  }
 
   return (
     <div className="uf-page" onKeyDown={handleUndoKey}>
       <div className="uf-toolbar" role="toolbar" aria-label="UI 框架工具条">
+        <button
+          type="button"
+          className="btn btn-ghost uf-scheme-name"
+          title="打开方案库"
+          onClick={() => setLibraryOpen(true)}
+        >
+          {doc.name}
+          {schemeId === null && <span className="uf-chip">未入库</span>}
+        </button>
         <div className="uf-seg" role="group" aria-label="视图">
           {VIEWS.map((v) => (
             <button
@@ -175,6 +203,9 @@ export function UiFramePage(): React.JSX.Element {
         <button type="button" className="btn btn-ghost" onClick={docActions.resetAll}>
           恢复模板
         </button>
+        <button type="button" className="btn btn-ghost" disabled={busy === 'save'} onClick={onSave}>
+          {busy === 'save' ? '正在保存……' : '保存方案'}
+        </button>
         <button
           type="button"
           className="btn btn-primary"
@@ -184,6 +215,7 @@ export function UiFramePage(): React.JSX.Element {
           {exporter.state.kind === 'saving' ? '正在导出……' : '导出规格包'}
         </button>
       </div>
+      {error && <Notice kind="error">{error}</Notice>}
       <ExportBanner state={exporter.state} onDismiss={exporter.dismiss} />
       <div className="uf-main">
         <UiFrameCanvas
@@ -198,6 +230,17 @@ export function UiFramePage(): React.JSX.Element {
         />
         <UiFrameInspector doc={doc} selection={selection} />
       </div>
+      {libraryOpen && <UiFrameLibrary onClose={() => setLibraryOpen(false)} />}
+      {naming && (
+        <SaveNameDialog
+          initial={doc.name}
+          onSubmit={(name) => {
+            setNaming(false)
+            void schemeActions.save(doc, name)
+          }}
+          onClose={() => setNaming(false)}
+        />
+      )}
     </div>
   )
 }

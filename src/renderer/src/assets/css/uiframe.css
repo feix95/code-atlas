@@ -15,6 +15,13 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--line);
+  /* 工具条满员时不许折行/压缩,超出整体横向滚动 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.uf-toolbar > * {
+  flex: none;
 }
 
 .uf-toolbar-gap {
@@ -37,6 +44,7 @@
   color: var(--muted);
   font: inherit;
   font-size: var(--font-sm);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -363,4 +371,247 @@
 
 .uf-more {
   justify-self: start;
+}
+
+/* ── 起步页(§5.2)与我的方案库(§5.8)── */
+
+.uf-start {
+  grid-row: 1 / -1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 60rem;
+}
+
+.uf-start-title {
+  font-size: var(--font-lg);
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+}
+
+.uf-start-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.uf-start-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.uf-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+
+.uf-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.uf-card:hover {
+  border-color: var(--line-strong);
+}
+
+.uf-card:focus-visible {
+  outline: 2px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+.uf-card:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.uf-card-dashed {
+  border-style: dashed;
+  background: transparent;
+}
+
+.uf-card-name {
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+}
+
+.uf-card-meta,
+.uf-card-blurb {
+  font-size: var(--font-xs);
+  color: var(--muted);
+  line-height: var(--lh-150);
+}
+
+.uf-scheme {
+  padding: var(--space-2);
+}
+
+.uf-scheme-thumb {
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  object-position: top;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.uf-scheme-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uf-scheme-name {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uf-chip {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 浮层:命名框与方案库共用背板 */
+.uf-modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+}
+
+.uf-modal {
+  width: min(26rem, calc(100vw - var(--space-7)));
+  max-height: calc(100vh - var(--space-7));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.uf-modal .uf-input {
+  width: 100%;
+}
+
+.uf-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.uf-lib {
+  width: min(40rem, calc(100vw - var(--space-7)));
+}
+
+.uf-lib-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.uf-lib-head-ops {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.uf-lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.uf-lib-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.uf-lib-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.uf-lib-thumb {
+  width: 4.5rem;
+  height: 2.8rem;
+  object-fit: cover;
+  object-position: top;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  flex: none;
+}
+
+.uf-lib-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.uf-lib-name {
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uf-lib-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.uf-link-danger {
+  color: var(--danger);
+}
+
+.uf-lib-snaps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.uf-lib-snap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-xs);
 }
