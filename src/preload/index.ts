@@ -8,6 +8,8 @@ import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/mod
 import type { SearchNamesResult } from '../shared/searchNames.ts'
 import type { QuizBriefSaveResult } from '../shared/quiz/types.ts'
 import type {
+  ProvenanceCheckItem,
+  ProvenanceVerdict,
   SchemeBundle,
   SchemeManifest,
   SchemeMeta,
@@ -289,6 +291,9 @@ const atlasApi = {
     design: string
     name: string
   } | null> => ipcRenderer.invoke(CH.uiFrameImportUiframe),
+  /** §14 防编造:选自填表数值的出处项目根,主进程只读比对;取消回 null */
+  uiFrameVerify: (items: ProvenanceCheckItem[]): Promise<ProvenanceVerdict[] | null> =>
+    ipcRenderer.invoke(CH.uiFrameVerify, items),
   /** 立项问卷(§3.6):立项单 .md 存到用户自选路径;取消回 canceled */
   quizBriefSave: (name: string, text: string): Promise<QuizBriefSaveResult> =>
     ipcRenderer.invoke(CH.quizBriefSave, { name, text }),

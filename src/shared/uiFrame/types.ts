@@ -184,3 +184,35 @@ export interface LintIssue {
   file: string
   message: string
 }
+
+/** 出处声明(§14 防编造):agent 填表时附在每个变量上的来源信息 */
+export interface ProvenanceClaim {
+  /** 变量名(与 tokens 键一致) */
+  name: string
+  /** 相对项目根的文件路径 */
+  file: string
+  /** 1 起始行号 */
+  line: number
+  /** agent 声称该行里的字面值(可空,缺了按导入后的值核对) */
+  value: string | null
+  /** 置信度:实测 / 推算(自由文本,仅展示) */
+  confidence: string | null
+}
+
+/** 出处核对结果:status 给 UI 标徽用,detail 一行说明 */
+export interface ProvenanceVerdict {
+  name: string
+  file: string
+  line: number
+  /** matched=已核对;line-off=文件里找得到但行号偏;mismatch=对不上;nofile=文件找不到 */
+  status: 'matched' | 'line-off' | 'mismatch' | 'nofile'
+  detail: string
+}
+
+/** 核对请求项:渲染层把导入后的字面值算好送主进程,主进程只做只读比对 */
+export interface ProvenanceCheckItem {
+  name: string
+  file: string
+  line: number
+  expect: string
+}

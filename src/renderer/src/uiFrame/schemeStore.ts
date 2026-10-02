@@ -12,9 +12,17 @@ import { parseDoc } from '@shared/uiFrame/scheme'
 import { BLANK_ID, templateDoc } from '@shared/uiFrame/templates'
 import { defaultDeviceId } from '@shared/uiFrame/devices'
 import type { QuizPrefill } from '@shared/quiz/prefill'
-import type { SchemeMeta, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
+import type {
+  ProvenanceCheckItem,
+  ProvenanceClaim,
+  ProvenanceVerdict,
+  SchemeMeta,
+  UiFrameDoc,
+  UiPlatform
+} from '@shared/uiFrame/types'
+import { literalCss, resolveValue } from '@shared/uiFrame/resolve'
 import { canvasHtml } from './canvasDoc'
-import { docActions } from './docStore'
+import { currentDoc, docActions } from './docStore'
 import { workbenchActions } from './workbenchStore'
 
 interface SchemeState {
@@ -30,6 +38,10 @@ interface SchemeState {
   error: string | null
   /** 导入后的一句话战报(套用 N 个变量、跳过 M 个);null = 无 */
   notice: string | null
+  /** 本次导入带出的出处声明(§14);空表 = 没出处可核 */
+  claims: ProvenanceClaim[]
+  /** 出处核对结果;null = 还没核对 */
+  verify: ProvenanceVerdict[] | null
 }
 
 let state: SchemeState = {
@@ -38,7 +50,9 @@ let state: SchemeState = {
   schemes: null,
   busy: null,
   error: null,
-  notice: null
+  notice: null,
+  claims: [],
+  verify: null
 }
 const listeners = new Set<() => void>()
 
@@ -255,16 +269,52 @@ export const schemeActions = {
       workbenchActions.docReplaced()
       const skippedNote =
         result.skipped.length > 0 ? `;没对上的 ${result.skipped.length} 个已跳过` : ''
+      const claimsNote =
+        result.claims.length > 0 ? `;带了 ${result.claims.length} 条出处,可在导入面板核对` : ''
       emit({
         busy: null,
         started: true,
         schemeId: null,
-        notice: `${result.sourceLabel}导入完成:套用了 ${result.applied} 个变量${skippedNote}。方案未入库,调完点「保存」收进我的方案。`
+        claims: result.claims,
+        verify: null,
+        notice: `${result.sourceLabel}导入完成:套用了 ${result.applied} 个变量${skippedNote}${claimsNote}。方案未入库,调完点「保存」收进我的方案。`
       })
       return result
     } catch (error) {
       emit({ error: humanError('导入', error), busy: null })
       return null
+    }
+  },
+  /** §14 防编造:把本次导入带的出处送主进程,只读逐项比对所选项目文件夹 */
+  async verifyClaims(): Promise<void> {
+    const doc = currentDoc()
+    const items: ProvenanceCheckItem[] = state.claims.map((cl) => {
+      const def = doc.tokens[cl.name]
+      const v = def
+        ? def.value.kind === 'ref'
+          ? resolveValue(doc.tokens, cl.name)
+          : def.value
+        : null
+      const expect = cl.value ?? (v ? literalCss(v, 'light', doc.rootFontPx) : '')
+      return { name: cl.name, file: cl.file, line: cl.line, expect }
+    })
+    emit({ busy: 'open', error: null })
+    try {
+      const verdicts = await window.atlas.uiFrameVerify(items)
+      if (verdicts === null) {
+        emit({ busy: null })
+        return
+      }
+      const ok = verdicts.filter((v) => v.status === 'matched').length
+      const off = verdicts.filter((v) => v.status === 'line-off').length
+      const bad = verdicts.filter((v) => v.status === 'mismatch' || v.status === 'nofile').length
+      emit({
+        busy: null,
+        verify: verdicts,
+        notice: `出处核对:${ok} 项已核对,${off} 项行号对偏,${bad} 项对不上。`
+      })
+    } catch (error) {
+      emit({ error: humanError('核对出处', error), busy: null })
     }
   }
 }

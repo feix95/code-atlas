@@ -5,7 +5,7 @@ import { DTCG_EXT } from './designJson.ts'
 import { defaultDeviceId, isDeviceId } from './devices.ts'
 import { parseDoc } from './scheme.ts'
 import { defaultDoc } from './template.ts'
-import type { IconSlot, TokenValue, UiFrameDoc, UiPlatform } from './types.ts'
+import type { IconSlot, ProvenanceClaim, TokenValue, UiFrameDoc, UiPlatform } from './types.ts'
 
 export type ImportSource = 'scheme' | 'dtcg' | 'css'
 
@@ -16,6 +16,8 @@ export interface ImportResult {
   /** 没匹配上的来源键名(最多记前 20 个) */
   skipped: string[]
   sourceLabel: string
+  /** agent 填表附带的出处声明(§14 防编造);没有出处时为空表 */
+  claims: ProvenanceClaim[]
 }
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json }
@@ -207,7 +209,13 @@ export function importSchemeFiles(
   if (raw['schemaVersion'] === 1 && typeof raw['tokens'] === 'object') {
     const doc = parseDoc(designText)
     if (manifestName) doc.name = manifestName
-    return { doc, applied: Object.keys(doc.tokens).length, skipped: [], sourceLabel: '方案文件' }
+    return {
+      doc,
+      applied: Object.keys(doc.tokens).length,
+      skipped: [],
+      sourceLabel: '方案文件',
+      claims: []
+    }
   }
   // 导出的 design.json 也是 DTCG;走 DTCG 通道(自家扩展位能还原平台/图标/根字号)
   const r = importDtcgJson(raw, fallbackName)
@@ -230,6 +238,7 @@ function importDtcgJson(root: unknown, fallbackName: string): ImportResult {
   const doc = defaultDoc()
   doc.name = fallbackName
   const c = new Collector()
+  const claims: ProvenanceClaim[] = []
   const obj = root as Record<string, Json>
   const ext = (obj?.['$extensions'] as Record<string, Json> | undefined)?.[DTCG_EXT] as
     Record<string, Json> | undefined
@@ -263,6 +272,17 @@ function importDtcgJson(root: unknown, fallbackName: string): ImportResult {
         Record<string, Json> | undefined
       const modes = (myExt?.['modes'] as Record<string, Json> | undefined)?.['dark']
       if (modes !== undefined) darkModes.set(name, modes)
+      // §14 防编造:agent 填表附的出处(file+line+confidence+可选 value 原文)
+      const src = myExt?.['source'] as Record<string, Json> | undefined
+      if (src && typeof src['file'] === 'string' && src['file']) {
+        claims.push({
+          name,
+          file: src['file'],
+          line: typeof src['line'] === 'number' && src['line'] > 0 ? Math.floor(src['line']) : 0,
+          value: typeof src['value'] === 'string' ? src['value'] : null,
+          confidence: typeof src['confidence'] === 'string' ? src['confidence'] : null
+        })
+      }
       applyToken(doc, c, name, dtcgValue(node, existing.value, rootPx))
       return
     }
@@ -289,7 +309,7 @@ function importDtcgJson(root: unknown, fallbackName: string): ImportResult {
   if (c.applied === 0 && c.skipped.length > 0) {
     throw new Error('没认出任何变量:文件里的变量名与本方案变量名对不上')
   }
-  return { doc, applied: c.applied, skipped: c.skipped, sourceLabel: 'DTCG 变量' }
+  return { doc, applied: c.applied, skipped: c.skipped, sourceLabel: 'DTCG 变量', claims }
 }
 
 function dtcgValue(
@@ -421,6 +441,7 @@ export function importCssVars(text: string, fallbackName: string): ImportResult 
     doc,
     applied: c.applied,
     skipped: c.skipped,
-    sourceLabel: isTailwind ? 'Tailwind @theme' : 'CSS 变量'
+    sourceLabel: isTailwind ? 'Tailwind @theme' : 'CSS 变量',
+    claims: []
   }
 }

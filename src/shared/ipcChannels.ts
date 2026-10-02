@@ -90,6 +90,8 @@ export const CH = {
   uiFrameImportFolder: 'atlas:uiframe-import-folder',
   uiFrameImportFile: 'atlas:uiframe-import-file',
   uiFrameImportUiframe: 'atlas:uiframe-import-uiframe',
+  /** §14 防编造:核对 agent 填表声明的出处(只读用户自选项目目录) */
+  uiFrameVerify: 'atlas:uiframe-verify-provenance',
   // ── 立项问卷(§3):立项单 .md 存到用户自选位置 ──
   quizBriefSave: 'atlas:quiz-brief-save',
   // ── 桌宠 ──

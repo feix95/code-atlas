@@ -5,8 +5,15 @@ import { BrowserWindow, ipcMain, shell } from 'electron'
 import { promises as fs } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
 import { CH } from '../shared/ipcChannels.ts'
-import type { FontPlan, PreviewPlan, UiFrameExportResult } from '../shared/uiFrame/types.ts'
+import type {
+  FontPlan,
+  PreviewPlan,
+  ProvenanceCheckItem,
+  ProvenanceVerdict,
+  UiFrameExportResult
+} from '../shared/uiFrame/types.ts'
 import { unpackUiframe } from '../shared/uiFrame/uiframeFile.ts'
+import { verifyClaim } from '../shared/uiFrame/provenance.ts'
 import { currentWasmOpts } from '../native/wasmPaths.ts'
 import { FONT_FILE_RE, UI_FRAME_FONT_DIRS, uiFrameFontDir } from '../native/uiFrameFonts.ts'
 import { pickPathDialog } from './atlasWindow.ts'
@@ -205,6 +212,47 @@ export function registerUiFrameIpc(): void {
       const text = await readTextIfExists(file)
       if (text === null) throw new Error(`文件读不到:${file}`)
       return { name: file.split(/[\\/]/).pop() ?? 'import', text }
+    }
+  )
+
+  // §14 防编造:用户自选项目根 → 只读比对每条出处(file+line+期望字面值)。
+  // 只读、不递归、不写:claim.file 必须是不越界的相对路径,单个文件超 4MB 直接判 unreadable→mismatch。
+  ipcMain.handle(
+    CH.uiFrameVerify,
+    async (event, raw: unknown): Promise<ProvenanceVerdict[] | null> => {
+      const items = (Array.isArray(raw) ? raw : [])
+        .map((x): ProvenanceCheckItem | null => {
+          if (typeof x !== 'object' || x === null) return null
+          const o = x as Record<string, unknown>
+          if (
+            typeof o['name'] !== 'string' ||
+            typeof o['file'] !== 'string' ||
+            typeof o['line'] !== 'number' ||
+            typeof o['expect'] !== 'string'
+          )
+            return null
+          return { name: o['name'], file: o['file'], line: o['line'], expect: o['expect'] }
+        })
+        .filter((x): x is ProvenanceCheckItem => x !== null)
+      const dir = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
+        title: '选择要核对的项目文件夹(只读,不会改动任何文件)',
+        properties: ['openDirectory']
+      })
+      if (!dir) return null
+      const root = normalize(dir)
+      const cache = new Map<string, Promise<string | null>>()
+      const readFile = (rel: string): Promise<string | null> => {
+        if (isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return Promise.resolve(null)
+        const abs = normalize(join(root, rel))
+        if (!abs.startsWith(root)) return Promise.resolve(null)
+        if (!cache.has(abs)) cache.set(abs, readTextIfExists(abs))
+        return cache.get(abs)!
+      }
+      const verdicts: ProvenanceVerdict[] = []
+      for (const it of items) {
+        verdicts.push(verifyClaim(it.name, it.file, it.line, it.expect, await readFile(it.file)))
+      }
+      return verdicts
     }
   )
 }

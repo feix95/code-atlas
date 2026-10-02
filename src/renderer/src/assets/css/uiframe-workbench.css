@@ -378,3 +378,43 @@
   margin-top: 0;
   flex: 1;
 }
+
+/* 出处核对(§14):agent 填表声明逐条比对结果徽标 */
+.uf-provenance {
+  margin-top: var(--space-3);
+}
+.uf-provenance-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.uf-provenance-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.uf-verdict {
+  font-size: var(--font-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+}
+.uf-verdict-matched {
+  color: var(--green);
+  border-color: var(--green);
+}
+.uf-verdict-line-off {
+  color: var(--warn, #9a6700);
+  border-color: var(--warn, #9a6700);
+}
+.uf-verdict-mismatch,
+.uf-verdict-nofile {
+  color: var(--danger);
+  border-color: var(--danger);
+}

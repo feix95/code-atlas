@@ -42,6 +42,8 @@ import {
 } from '../src/shared/uiFrame/scheme.ts'
 import { BLANK_ID, TEMPLATES, templateDoc } from '../src/shared/uiFrame/templates.ts'
 import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFrame/importDoc.ts'
+import { fillInInstruction } from '../src/shared/uiFrame/fillInstruction.ts'
+import { verifyClaim } from '../src/shared/uiFrame/provenance.ts'
 import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
 import { benchBody } from '../src/shared/uiFrame/benchBoard.ts'
 import { PART_DEFS, partNode } from '../src/shared/uiFrame/parts.ts'
@@ -567,6 +569,50 @@ check('方案文件夹:内部 design.json 直接还原;导出的 DTCG 包也能�
   assert.equal(r1.doc.template, 'tint-phone')
   const r2 = importSchemeFiles(null, pkg.files['design.json'], '导出包')
   assert.equal(r2.applied, Object.keys(doc.tokens).length)
+})
+check('agent 填表:DTCG 带出处扩展 → claims 收齐,值照常套用(§14)', () => {
+  const r = importDtcg(
+    JSON.stringify({
+      color: {
+        primary: {
+          $type: 'color',
+          $value: { colorSpace: 'srgb', components: [0.1, 0.4, 0.9], alpha: 1, hex: '#1a66e6' },
+          $extensions: {
+            'com.codeatlas.uiframe': {
+              source: { file: 'src/theme.css', line: 12, value: '#1a66e6', confidence: '实测' }
+            }
+          }
+        }
+      },
+      space: { md: { $type: 'dimension', $value: { value: 16, unit: 'px' } } }
+    }),
+    '填表'
+  )
+  assert.equal(r.claims.length, 1)
+  assert.deepEqual(r.claims[0], {
+    name: 'color-primary',
+    file: 'src/theme.css',
+    line: 12,
+    value: '#1a66e6',
+    confidence: '实测'
+  })
+})
+check('出处核对:行内命中/行号偏/对不上/文件找不到四态(§14)', () => {
+  const css = ':root{\n  --color-primary: #1a66e6;\n  --space-4: 1rem;\n}'
+  assert.equal(verifyClaim('a', 'f', 2, '#1A66E6', css).status, 'matched')
+  const off = verifyClaim('a', 'f', 1, '#1a66e6', css)
+  assert.equal(off.status, 'line-off')
+  assert.ok(off.detail.includes('第 2 行'))
+  assert.equal(verifyClaim('a', 'f', 2, '#ff0000', css).status, 'mismatch')
+  assert.equal(verifyClaim('a', 'f', 2, '#1a66e6', null).status, 'nofile')
+})
+check('填表指令:含格式规则、出处示例与本方案变量清单', () => {
+  const text = fillInInstruction(doc)
+  assert.ok(text.includes('$extensions'))
+  assert.ok(text.includes('codeatlas'))
+  assert.ok(text.includes('color.primary'), '清单要有变量路径')
+  assert.ok(text.includes('confidence'), '要交代置信度字段')
+  assert.ok(text.includes('design.json'))
 })
 check('全对不上时报人话错误,不静默产空方案', () => {
   assert.throws(() => importDtcg('{"foo":{"bar":{"$value":1}}}', 'x'), /没认出任何变量/)
