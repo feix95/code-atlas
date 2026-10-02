@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron } from 'playwright'
@@ -56,6 +56,8 @@ const state = globalThis.__journey = { configured:false, mode:'success', calls:{
 const { dialog } = require('electron')
 const originalOpenDialog = dialog.showOpenDialog.bind(dialog)
 dialog.showOpenDialog = async (...a) => state.uiframeExportDir ? { canceled:false, filePaths:[state.uiframeExportDir] } : originalOpenDialog(...a)
+// 立项单存盘替身:save 对话框固定回 .planning/journey 下的路径
+dialog.showSaveDialog = async () => state.quizSavePath ? { canceled:false, filePath:state.quizSavePath } : { canceled:true }
 const originalHandle = ipcMain.handle.bind(ipcMain)
 ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...args) => {
   state.calls[channel] = (state.calls[channel] || 0) + 1
@@ -623,10 +625,22 @@ try {
   await quiz.locator('.qz-brief').getByText('# 立项单', { exact: false }).waitFor()
   await quiz.getByRole('button', { name: '复制立项单' }).click()
   await quiz.getByRole('button', { name: '已复制' }).waitFor()
+  // M2-c 出口:存 .md(对话框替身)与技术栈回填;交内置 agent 放最后(会切签)
+  const quizSavePath = join(run, '立项单.md')
+  await control({ quizSavePath })
+  await quiz.getByRole('button', { name: '存成 .md 文件' }).click()
+  await quiz.getByText(/已存到:/).waitFor()
+  assert.ok(existsSync(quizSavePath), '立项单 .md 应写到替身路径')
+  assert.ok(readFileSync(quizSavePath, 'utf8').includes('# 立项单'), '立项单内容落盘')
+  await quiz.getByRole('combobox', { name: '技术栈预设' }).selectOption({ label: 'Tauri + Vue' })
+  await quiz.getByText('已记:').waitFor()
   await shot('uiframe-quiz')
-  // 草稿已存:关掉重开应落在完成页;随后重答回第一组,免得答案影响后续流程
-  await quiz.getByRole('button', { name: '关闭', exact: true }).click()
+  // 交给内置 agent:切到自由对话签,立项单作为问句出现在对话里
+  await quiz.getByRole('button', { name: '交给内置 agent' }).click()
   await quiz.waitFor({ state: 'hidden' })
+  await page.getByText('# 立项单', { exact: false }).first().waitFor()
+  // 回到 UI 框架签:草稿已存,重开落完成页;随后重答回第一组,免得答案影响后续流程
+  await page.getByRole('tab', { name: /UI 框架/ }).click()
   await page.getByRole('button', { name: /立项单已生成/ }).click()
   await quiz.locator('.qz-brief').waitFor()
   await quiz.getByRole('button', { name: '重答一遍' }).click()

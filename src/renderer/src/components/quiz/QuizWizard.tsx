@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildProjectBrief } from '@shared/quiz/brief'
 import { visibleGroups } from '@shared/quiz/questions'
+import { TECH_STACK_PRESETS } from '@shared/quiz/stacks'
 import type { AnswerMap, QuizAnswer, QuizQuestion } from '@shared/quiz/types'
+import { requestQuizAgent } from '../../quiz/quizBridge'
 import { quizActions, useQuiz } from '../../quiz/quizStore'
 
 /** 「让 AI 建议」的固定选项文案 */
@@ -98,10 +100,12 @@ function Question({
   )
 }
 
-/** 完成页:立项单预览 + 复制;导出文件/交 agent/预填在后续子任务接进来 */
+/** 完成页(§3.5/§3.6):立项单预览 + 三个出口(复制/存 .md/交内置 agent)+ 技术栈回填 */
 function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
+  const { techStack } = useQuiz()
   const brief = useMemo(() => buildProjectBrief({ answers }), [answers])
   const [copied, setCopied] = useState(false)
+  const [savedPath, setSavedPath] = useState<string | null>(null)
   const copy = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(brief)
@@ -110,13 +114,29 @@ function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
       setCopied(false)
     }
   }
+  const save = async (): Promise<void> => {
+    const res = await window.atlas.quizBriefSave('', brief)
+    if (res.status === 'done') setSavedPath(res.path)
+  }
+  const toAgent = (): void => {
+    requestQuizAgent(brief)
+    quizActions.close()
+  }
   return (
     <div className="qz-done">
       <h3 className="qz-done-title">立项单生成好了</h3>
-      <p className="qz-hint">这份文档交给你的 AI 编程助手做技术选型;也可以复制下来贴给它。</p>
+      <p className="qz-hint">
+        这份文档交给你的 AI 编程助手做技术选型;可以复制下来贴给它,或存成 .md 文件带走。
+      </p>
       <div className="qz-actions">
         <button type="button" className="btn btn-primary" onClick={() => void copy()}>
           {copied ? '已复制' : '复制立项单'}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={() => void save()}>
+          存成 .md 文件
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={toAgent}>
+          交给内置 agent
         </button>
         <button type="button" className="btn btn-ghost" onClick={quizActions.restart}>
           重答一遍
@@ -124,6 +144,51 @@ function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
         <button type="button" className="btn btn-ghost" onClick={quizActions.close}>
           收工
         </button>
+      </div>
+      {savedPath && <p className="qz-hint">已存到:{savedPath}</p>}
+      <p className="qz-hint">
+        内置的是本机小模型,技术选型质量有限;在设置里接入 LM Studio 的大模型或在线服务商,效果更好。
+      </p>
+      <div className="qz-backfill">
+        <div className="qz-q-title">技术选型结果回填(可选)</div>
+        <p className="qz-hint">
+          agent 给了结论后,从清单里选或直接粘贴回来——它会作为第二步导出时的默认目标技术栈。
+        </p>
+        <div className="qz-backfill-row">
+          <select
+            className="uf-select"
+            aria-label="技术栈预设"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) quizActions.setTechStack(e.target.value)
+              e.target.value = ''
+            }}
+          >
+            <option value="">从预设清单选……</option>
+            {TECH_STACK_PRESETS.map((g) => (
+              <optgroup key={g.platform} label={g.platform}>
+                {g.stacks.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <input
+            className="qz-extra qz-stack-input"
+            type="text"
+            placeholder="或粘贴 agent 的结论,如 Tauri + Vue"
+            aria-label="技术栈结论"
+            value={techStack}
+            onChange={(e) => quizActions.setTechStack(e.target.value)}
+          />
+        </div>
+        {techStack.trim() !== '' && (
+          <p className="qz-hint">
+            已记:<strong>{techStack}</strong>
+          </p>
+        )}
       </div>
       <pre className="qz-brief">{brief}</pre>
     </div>

@@ -355,3 +355,26 @@
   min-width: 0;
   flex: 1;
 }
+
+/* 完成页回填区 */
+.qz-backfill {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.qz-backfill-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.qz-backfill-row .uf-select {
+  flex: none;
+}
+
+.qz-stack-input {
+  margin-top: 0;
+  flex: 1;
+}

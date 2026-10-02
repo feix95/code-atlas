@@ -6,6 +6,7 @@ import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
+import type { QuizBriefSaveResult } from '../shared/quiz/types.ts'
 import type {
   SchemeBundle,
   SchemeManifest,
@@ -282,6 +283,9 @@ const atlasApi = {
   /** 选单个文件(json = DTCG 变量;css = CSS 变量) */
   uiFrameImportFile: (kind: 'json' | 'css'): Promise<{ name: string; text: string } | null> =>
     ipcRenderer.invoke(CH.uiFrameImportFile, kind),
+  /** 立项问卷(§3.6):立项单 .md 存到用户自选路径;取消回 canceled */
+  quizBriefSave: (name: string, text: string): Promise<QuizBriefSaveResult> =>
+    ipcRenderer.invoke(CH.quizBriefSave, { name, text }),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void =>

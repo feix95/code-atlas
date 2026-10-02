@@ -13,26 +13,41 @@ interface QuizState {
   groupIndex: number
   /** 是否走完最后一组,落到完成页 */
   done: boolean
+  /** 技术栈回填(§3.6):预设清单选的或粘贴的 agent 结论;预填第二步时作默认导出目标 */
+  techStack: string
 }
 
-function loadDraft(): { answers: AnswerMap; done: boolean } {
+function loadDraft(): { answers: AnswerMap; done: boolean; techStack: string } {
   try {
     const raw = localStorage.getItem(DRAFT_KEY)
-    if (!raw) return { answers: {}, done: false }
-    const parsed = JSON.parse(raw) as { answers?: AnswerMap; done?: boolean }
-    return { answers: parsed.answers ?? {}, done: parsed.done === true }
+    if (!raw) return { answers: {}, done: false, techStack: '' }
+    const parsed = JSON.parse(raw) as { answers?: AnswerMap; done?: boolean; techStack?: string }
+    return {
+      answers: parsed.answers ?? {},
+      done: parsed.done === true,
+      techStack: typeof parsed.techStack === 'string' ? parsed.techStack : ''
+    }
   } catch {
-    return { answers: {}, done: false }
+    return { answers: {}, done: false, techStack: '' }
   }
 }
 
 const draft = loadDraft()
-let state: QuizState = { open: false, answers: draft.answers, groupIndex: 0, done: draft.done }
+let state: QuizState = {
+  open: false,
+  answers: draft.answers,
+  groupIndex: 0,
+  done: draft.done,
+  techStack: draft.techStack
+}
 const listeners = new Set<() => void>()
 
 function persist(): void {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers: state.answers, done: state.done }))
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ answers: state.answers, done: state.done, techStack: state.techStack })
+    )
   } catch {
     // 存储满了/私密模式:草稿丢就丢,不挡答题
   }
@@ -83,7 +98,10 @@ export const quizActions = {
   finish(): void {
     emit({ done: true })
   },
-  /** 重答:清答案回第一组(草稿一并清) */
+  setTechStack(text: string): void {
+    emit({ techStack: text })
+  },
+  /** 重答:清答案回第一组(草稿一并清);技术栈回填保留,它跟答案无关 */
   restart(): void {
     emit({ answers: {}, groupIndex: 0, done: false })
   }

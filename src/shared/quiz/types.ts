@@ -51,3 +51,6 @@ export interface BriefInput {
   /** 填写日期(yyyy-mm-dd);缺省取当天 */
   date?: string
 }
+
+/** 立项单存盘结果(§3.6 路径一) */
+export type QuizBriefSaveResult = { status: 'canceled' } | { status: 'done'; path: string }

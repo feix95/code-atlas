@@ -38,6 +38,7 @@ import {
   type RecentProject
 } from './recents'
 import { useAiChat } from './useAiChat'
+import { onQuizAgentRequest } from './quiz/quizBridge'
 import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
 import { useZoomKeys } from './useZoomKeys'
@@ -656,6 +657,17 @@ function App(): React.JSX.Element {
     openSettings,
     openAiSettings
   } = useSettingsNav({ activeGroup, openSingletonTab, sidebarCollapsed, toggleSidebarCollapsed })
+  // 立项问卷 → 内置 agent(§3.6 路径二):切 chat 签把立项单当问句发出去;探针忙着就垫灰字
+  useEffect(() => {
+    return onQuizAgentRequest((text) => {
+      openSingletonTab('chat')
+      if (chat.busy) {
+        chat.note('探针正答着话,等它答完再点一次「交给内置 agent」')
+        return
+      }
+      chat.send(text)
+    })
+  }, [chat, openSingletonTab])
   const { nav, pushNav, goNav } = useNavStack({
     folder,
     result,
