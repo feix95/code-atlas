@@ -1,13 +1,13 @@
 // 规格包组装(§13.3):方案 → 相对路径 → 文本。字体文件与截图由主进程按清单补齐。
 // 所有产物由同一份 UiFrameDoc 生成(规则 14),不存在分别手写的副本。
 import { designJson } from './designJson.ts'
+import { deviceFor } from './devices.ts'
 import {
   compHtmlPath,
   demoBody,
   demoStyles,
-  HOME_PAGE,
   htmlDocument,
-  PAGE_STYLES,
+  pageFor,
   pageTemplateHtml,
   STYLE_FILES,
   styleTexts
@@ -26,21 +26,20 @@ export interface PackageAssets {
   stamp: string
 }
 
-/** 每个组件演示页一张预览截图 + 页面参考实现一张 */
-export const PREVIEWS: PreviewPlan[] = [
-  ...RECIPES.map((r): PreviewPlan => ({
-    html: compHtmlPath(r.id),
-    png: `preview/${r.id}.png`,
-    width: 960,
-    height: 0
-  })),
-  {
-    html: 'pages/home.html',
-    png: 'preview/home.png',
-    width: HOME_PAGE.width,
-    height: HOME_PAGE.height
-  }
-]
+/** 每个组件演示页一张预览截图 + 页面参考实现一张(页面按方案平台与设备尺寸截) */
+export function previewsFor(doc: UiFrameDoc): PreviewPlan[] {
+  const page = pageFor(doc.platform)
+  const dev = deviceFor(doc)
+  return [
+    ...RECIPES.map((r): PreviewPlan => ({
+      html: compHtmlPath(r.id),
+      png: `preview/${r.id}.png`,
+      width: 960,
+      height: 0
+    })),
+    { html: page.htmlPath, png: `preview/${page.id}.png`, width: dev.width, height: dev.height }
+  ]
+}
 
 /** 文件夹名只留安全字符,避免 Windows 非法字符 */
 export function safeFolderName(name: string, stamp: string): string {
@@ -57,14 +56,15 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
   const texts = styleTexts(doc, fontsCss(assets.fontSources, PACKAGE_FONT_URL))
   const link = { kind: 'link' as const, hrefBase: '../' }
   const iconFiles = iconFileNames(doc)
+  const page = pageFor(doc.platform)
   const files: Record<string, string> = {
     'README-给AI.md': readmeMd(doc, iconFiles),
-    'page-template.html': pageTemplateHtml(),
-    'pages/home.md': pageMd(doc),
-    'pages/home.html': htmlDocument({
-      title: HOME_PAGE.title,
-      body: HOME_PAGE.body,
-      styles: PAGE_STYLES,
+    'page-template.html': pageTemplateHtml(doc),
+    [page.specPath]: pageMd(doc, page),
+    [page.htmlPath]: htmlDocument({
+      title: page.title,
+      body: page.body,
+      styles: page.styles,
       ctx,
       styleMode: link
     }),
@@ -81,6 +81,8 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
     })
   }
   for (const [key, path] of Object.entries(STYLE_FILES) as Array<[keyof typeof texts, string]>) {
+    // 页面样式只带本平台的那个(另一平台的页面包里本来就没有)
+    if ((key === 'home' || key === 'app') && key !== page.styleKey) continue
     files[path] = texts[key]
   }
   for (const file of iconFiles) {
@@ -93,6 +95,6 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
     folderName: safeFolderName(doc.name, assets.stamp),
     files,
     fonts: fontPlans(assets.fontSources),
-    previews: PREVIEWS
+    previews: previewsFor(doc)
   }
 }

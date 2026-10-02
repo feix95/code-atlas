@@ -14,7 +14,13 @@ import { demoBody } from '../src/shared/uiFrame/demo.ts'
 import { boardBody, boardCss, boardValueText } from '../src/shared/uiFrame/board.ts'
 import { rulesCss } from '../src/shared/uiFrame/recipes/kit.ts'
 import { RECIPES } from '../src/shared/uiFrame/recipes/index.ts'
-import { htmlDocument, PAGE_STYLES, styleTexts } from '../src/shared/uiFrame/documents.ts'
+import { htmlDocument, PAGE_STYLES, pageFor, styleTexts } from '../src/shared/uiFrame/documents.ts'
+import {
+  defaultDeviceId,
+  deviceFor,
+  devicesFor,
+  isDeviceId
+} from '../src/shared/uiFrame/devices.ts'
 import {
   manifestFor,
   parseDoc,
@@ -50,7 +56,11 @@ const assets: PackageAssets = {
   },
   stamp: '20261002-1200'
 }
-/** 页面结构体检对象:页面 + 每个组件演示页(键随意,体检只按结构树检查) */
+/** 页面结构体检对象:本平台的页面 + 每个组件演示页(键随意,体检只按结构树检查) */
+const pagesForDoc = (d: UiFrameDoc): Record<string, PageNode[]> => ({
+  [pageFor(d.platform).specPath]: pageFor(d.platform).body,
+  ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
+})
 const PAGES: Record<string, PageNode[]> = {
   'pages/home.md': HOME_PAGE.body,
   ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
@@ -381,8 +391,9 @@ check('模板覆盖值落在变量表上,平台与户口名正确', () => {
 })
 check('四个模板都能过体检(各自建包 lint 零错误)', () => {
   for (const t of TEMPLATES) {
-    const p = buildPackage(templateDoc(t.id), assets)
-    const errs = lintPackage(p, PAGES).filter((i) => i.level === 'error')
+    const d = templateDoc(t.id)
+    const p = buildPackage(d, assets)
+    const errs = lintPackage(p, pagesForDoc(d)).filter((i) => i.level === 'error')
     for (const i of errs) console.log(`    ${t.id}: [${i.check}] ${i.file}: ${i.message}`)
     assert.equal(errs.length, 0, `模板 ${t.id} 体检有错误`)
   }
@@ -507,6 +518,75 @@ check('方案文件夹:内部 design.json 直接还原;导出的 DTCG 包也能�
 check('全对不上时报人话错误,不静默产空方案', () => {
   assert.throws(() => importDtcg('{"foo":{"bar":{"$value":1}}}', 'x'), /没认出任何变量/)
   assert.throws(() => importCssVars('body{color:red}', 'x'), /没在文本里找到/)
+})
+
+console.log('── 设备与手机端画布(M1-e,§5.4)')
+check('设备预设:桌面 3 档 + 手机 3 档,各有默认档', () => {
+  assert.equal(devicesFor('desktop').length, 3)
+  assert.equal(devicesFor('phone').length, 3)
+  assert.equal(defaultDeviceId('desktop'), 'desktop-1280')
+  assert.equal(defaultDeviceId('phone'), 'phone-390')
+  assert.ok(isDeviceId('phone', 'phone-430'))
+  assert.ok(!isDeviceId('phone', 'desktop-1280'))
+})
+check('deviceFor 兜底:未知 id / 跨平台 id 都回平台默认档', () => {
+  assert.equal(deviceFor({ platform: 'phone', device: 'bogus' }).id, 'phone-390')
+  assert.equal(deviceFor({ platform: 'desktop', device: 'phone-390' }).id, 'desktop-1280')
+  const d390 = deviceFor({ platform: 'phone', device: 'phone-390' })
+  assert.equal(d390.width, 390)
+  assert.equal(d390.statusBar, 54)
+  assert.equal(d390.island, true)
+})
+check('手机方案的规格包:出 pages/app.* 而不是 pages/home.*', () => {
+  const phone = templateDoc('tint-phone')
+  assert.equal(phone.platform, 'phone')
+  assert.equal(phone.device, 'phone-390')
+  const p = buildPackage(phone, assets)
+  assert.ok(p.files['pages/app.html'])
+  assert.ok(p.files['pages/app.md'])
+  assert.ok(p.files['pages/app.css'])
+  assert.ok(!('pages/home.html' in p.files), '手机包里不该有桌面页')
+  assert.ok(!('pages/home.css' in p.files), '手机包里不该有桌面页样式')
+  // 体检:手机页面结构树 + 全量组件演示页,零错误
+  const errs = lintPackage(p, pagesForDoc(phone)).filter((i) => i.level === 'error')
+  for (const i of errs) console.log(`    phone: [${i.check}] ${i.file}: ${i.message}`)
+  assert.equal(errs.length, 0)
+  // 预览清单:页面截图按设备尺寸
+  const pv = p.previews[p.previews.length - 1]
+  assert.equal(pv.html, 'pages/app.html')
+  assert.equal(pv.width, 390)
+  assert.equal(pv.height, 844)
+  // design.json 带设备口径,导回能还原
+  const dj = JSON.parse(p.files['design.json']) as Record<string, unknown>
+  const ext = (dj['$extensions'] as Record<string, unknown>)['com.codeatlas.uiframe'] as Record<
+    string,
+    unknown
+  >
+  assert.equal(ext['device'], 'phone-390')
+  const back = importDtcg(p.files['design.json'], '回读')
+  assert.equal(back.doc.device, 'phone-390')
+})
+check('parseDoc:非法设备 id 回默认档,跨平台 id 不认', () => {
+  const raw = JSON.parse(serializeDoc(doc)) as Record<string, unknown>
+  raw['device'] = 'phone-390' // 平台是 desktop,这个 id 不属于它
+  assert.equal(parseDoc(JSON.stringify(raw)).device, 'desktop-1280')
+  const raw2 = JSON.parse(serializeDoc(templateDoc('tint-phone'))) as Record<string, unknown>
+  raw2['device'] = 'phone-430'
+  assert.equal(parseDoc(JSON.stringify(raw2)).device, 'phone-430')
+})
+check('示例页结构与文件随平台走:pageFor 与画布同源', () => {
+  const desk = pageFor('desktop')
+  const phone = pageFor('phone')
+  assert.equal(desk.htmlPath, 'pages/home.html')
+  assert.equal(phone.htmlPath, 'pages/app.html')
+  assert.notEqual(desk.specPath, phone.specPath)
+  // 手机示例页引用了它声明的全部组件样式(icon-button/input/tabs/list-row/switch/button)
+  for (const s of phone.styles.filter((k) => k.startsWith('comp-'))) {
+    assert.ok(
+      RECIPES.some((r) => `comp-${r.id}` === s),
+      `app 页声明了未注册的组件样式:${s}`
+    )
+  }
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

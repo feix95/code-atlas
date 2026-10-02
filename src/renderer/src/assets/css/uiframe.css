@@ -102,6 +102,18 @@
   box-shadow: var(--shadow-pop);
 }
 
+/* 定尺寸舞台(示例页 / 手机):收缩到内容宽,useMeasured 量出的才是设备宽,适应宽度才算得对 */
+.uf-canvas-stage.is-page,
+.uf-canvas-stage.is-device {
+  width: max-content;
+}
+
+/* 机身与窗口框自带投影/边框,舞台不再叠 */
+.uf-canvas-stage.is-device,
+.uf-canvas-stage.is-page:has(.uf-window) {
+  box-shadow: none;
+}
+
 .uf-canvas-frame {
   display: block;
   width: 100%;
@@ -636,4 +648,160 @@
   font-family: var(--mono);
   font-size: var(--font-xs);
   line-height: var(--lh-150);
+}
+
+/* ---- 设备外框(§5.4):手机机身 / 桌面窗口,画布装饰,不进规格包 ---- */
+
+.uf-device {
+  /* 机身硬件参数:属于设备外观数据,不随主题变化 */
+  --uf-hardware: #1a1a1a;
+  --uf-bezel-radius: 2.75rem;
+  --uf-island-w: 7.5rem;
+  --uf-island-h: 2.1875rem;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--uf-bezel-radius);
+  background: var(--uf-hardware);
+  box-shadow: var(--shadow-pop);
+}
+
+.uf-device.is-plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.uf-screen {
+  position: relative;
+}
+
+.uf-device:not(.is-plain) .uf-screen {
+  overflow: hidden;
+  border-radius: calc(var(--uf-bezel-radius) - var(--space-3));
+}
+
+.uf-chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.uf-statusbar,
+.uf-homebar,
+.uf-island,
+.uf-safe-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.uf-statusbar {
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-5);
+}
+
+.uf-statusbar-time {
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  line-height: var(--lh-100);
+}
+
+.uf-statusbar-glyphs {
+  display: block;
+  width: 3.5rem;
+  height: auto;
+}
+
+.uf-island {
+  top: var(--space-3);
+  left: 50%;
+  right: auto;
+  width: var(--uf-island-w);
+  height: var(--uf-island-h);
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--uf-hardware);
+}
+
+.uf-homebar {
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uf-homebar-pill {
+  width: 8.5rem;
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.uf-safe-line {
+  border-top: 1px dashed var(--sash-hi);
+  opacity: 0.6;
+}
+
+.uf-safe-line[style*='bottom'] {
+  top: auto;
+  border-top: 0;
+  border-bottom: 1px dashed var(--sash-hi);
+}
+
+/* 桌面窗口框:标题栏 + 三圆点,页面视图可选装饰 */
+.uf-window {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas-tint);
+  box-shadow: var(--shadow-pop);
+}
+
+.uf-window-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--space-6);
+  padding: 0 var(--space-3);
+  background: var(--chrome-panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.uf-window-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--traffic-idle);
+}
+
+.uf-window-dot:nth-child(1) {
+  background: var(--traffic-red);
+}
+
+.uf-window-dot:nth-child(2) {
+  background: var(--traffic-yellow);
+}
+
+.uf-window-dot:nth-child(3) {
+  background: var(--traffic-green);
+}
+
+/* 工具条里的平台 / 设备尺寸下拉 */
+.uf-select {
+  height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+  white-space: nowrap;
+  flex: none;
 }

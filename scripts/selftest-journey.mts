@@ -645,6 +645,41 @@ try {
   await page.getByRole('button', { name: '示例页', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   await shot('uiframe-page')
+  // M1-e 手机画布(§5.4):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
+  await page.locator('select[aria-label="平台"]').selectOption('phone')
+  await page.locator('.uf-device').waitFor()
+  await page.locator('.uf-statusbar').waitFor()
+  await page.locator('.uf-homebar').waitFor()
+  await page.locator('.uf-island').waitFor() // 390 档有灵动岛
+  assert.equal(await page.locator('.uf-safe-line').count(), 2, '手机画布默认画两条安全区线')
+  // 设备内容宽 390 逻辑像素(画布缩放进外层 stage,iframe 本体保持设备宽)
+  await page.waitForFunction(() => {
+    const el = document.querySelector('iframe.uf-canvas-frame') as HTMLIFrameElement | null
+    return el?.clientWidth === 390
+  })
+  await canvas.locator('.app-screen').waitFor() // 手机示例页结构(底部页签栏在,见 appPage)
+  await shot('uiframe-phone')
+  // 安全区开关:关掉线消失,开回来
+  await page.getByRole('button', { name: '安全区', exact: true }).click()
+  await page.locator('.uf-safe-line').first().waitFor({ state: 'detached' })
+  await page.getByRole('button', { name: '安全区', exact: true }).click()
+  await page.locator('.uf-safe-line').first().waitFor()
+  // 换大屏预设 → 设备宽随动
+  await page.locator('select[aria-label="设备尺寸"]').selectOption('phone-430')
+  await page.waitForFunction(() => {
+    const el = document.querySelector('iframe.uf-canvas-frame') as HTMLIFrameElement | null
+    return el?.clientWidth === 430
+  })
+  // 设备外框开关:关掉只剩裸屏(机身件退场,屏幕还在)
+  await page.getByRole('button', { name: '外框', exact: true }).click()
+  await page.locator('.uf-statusbar').waitFor({ state: 'detached' })
+  await page.locator('.uf-device.is-plain').waitFor()
+  await page.getByRole('button', { name: '外框', exact: true }).click()
+  await page.locator('.uf-statusbar').waitFor()
+  // 切回桌面:设备选项回到桌面档,机身消失,示例页回 home
+  await page.locator('select[aria-label="平台"]').selectOption('desktop')
+  await page.locator('.uf-device').waitFor({ state: 'detached' })
+  await canvas.locator('header.page-header').waitFor()
   const exportDir = join(run, 'uiframe')
   await mkdir(exportDir, { recursive: true })
   await control({ uiframeExportDir: exportDir })

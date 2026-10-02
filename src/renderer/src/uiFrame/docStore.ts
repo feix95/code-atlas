@@ -1,8 +1,9 @@
 // UI 框架的方案账本:当前方案文档 + 撤销 / 重做栈。模块级单例,关掉页签再打开改动仍在(本次运行内)。
 // 「我的方案」落盘与库操作在 schemeStore.ts(§5.8);这里只管文档内容与历史。
 import { useSyncExternalStore } from 'react'
+import { defaultDeviceId, isDeviceId } from '@shared/uiFrame/devices'
 import { defaultDoc, defaultTokens } from '@shared/uiFrame/template'
-import type { IconSlot, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
+import type { IconSlot, TokenValue, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
 
 /** 撤销栈上限 */
 const HISTORY_LIMIT = 100
@@ -47,6 +48,15 @@ export const docActions = {
   },
   resetAll(): void {
     commit(defaultDoc())
+  },
+  /** 切平台(§5.4 顶栏「平台」):变量保留,设备档重置为新平台默认 */
+  setPlatform(platform: UiPlatform): void {
+    if (state.doc.platform === platform) return
+    commit({ ...state.doc, platform, device: defaultDeviceId(platform) })
+  },
+  setDevice(device: string): void {
+    if (!isDeviceId(state.doc.platform, device) || state.doc.device === device) return
+    commit({ ...state.doc, device })
   },
   /** 整份换方案(开方案/换起步模板):不进撤销栈,历史清空 */
   replaceDoc(next: UiFrameDoc): void {

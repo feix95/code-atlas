@@ -1,6 +1,7 @@
 // 首批模板(§9.2):模板 = 平台 + 风格预设 + 全套变量。
 // 实现方式:在默认变量表上叠加每套模板的覆盖值;组件变体差异经「组件级自定义属性」
 // 传回变量名(如按钮圆角改成全圆),不写死数值,导出的包同样零写死。
+import { defaultDeviceId } from './devices.ts'
 import { defaultDoc } from './template.ts'
 import type { TokenValue, UiFrameDoc, UiPlatform } from './types.ts'
 
@@ -134,6 +135,7 @@ export function templateDoc(id: string, platform?: UiPlatform): UiFrameDoc {
   doc.name = meta ? `${meta.name}方案` : '未命名方案'
   doc.template = id
   doc.platform = meta ? meta.platform : (platform ?? 'desktop')
+  doc.device = defaultDeviceId(doc.platform)
   const over = meta ? (OVERRIDES[meta.id] ?? {}) : {}
   for (const [name, value] of Object.entries(over)) {
     const def = doc.tokens[name]

@@ -83,6 +83,7 @@ export function designJson(doc: UiFrameDoc): string {
       [DTCG_EXT]: {
         schemaVersion: doc.schemaVersion,
         platform: doc.platform,
+        device: doc.device,
         rootFontPx: doc.rootFontPx,
         themes: ['light', 'dark'],
         icons: doc.icons

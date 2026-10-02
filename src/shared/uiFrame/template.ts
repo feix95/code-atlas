@@ -2,6 +2,7 @@
 // 以便功能导出的包与实测对照答案逐项比对。
 // 三层变量(§6.1):基础变量写死数值;组件变量与页面变量默认引用基础变量。
 import type { TokenDef, TokenMap, TokenTier, TokenValue, UiFrameDoc } from './types.ts'
+import { defaultDeviceId } from './devices.ts'
 import { DEFAULT_ROOT_PX } from './units.ts'
 
 type Entry = [group: string, name: string, label: string, value: TokenValue]
@@ -242,7 +243,19 @@ const PAGE: Entry[] = [
   ['page', 'features-gap', '卡片间距', ref('space-6')],
   ['page', 'features-pad-bottom', '卡片区下留白', ref('space-24')],
   ['page', 'footer-pad', '页脚内边距', ref('space-8')],
-  ['page', 'footer-text-size', '页脚字号', ref('font-size-md')]
+  ['page', 'footer-text-size', '页脚字号', ref('font-size-md')],
+  // 手机端示例页(§5.4):安全区与导航/列表/按钮排布的页面级变量
+  ['app', 'safe-top', '顶部安全区(状态栏)', px(56)],
+  ['app', 'safe-bottom', '底部安全区(手势条)', px(40)],
+  ['app', 'nav-height', '导航栏高度', px(52)],
+  ['app', 'nav-gap', '导航项间距', ref('space-2')],
+  ['app', 'gutter', '页面左右留白', ref('space-4')],
+  ['app', 'title-size', '导航标题字号', ref('font-size-lg')],
+  ['app', 'title-weight', '导航标题字重', ref('font-weight-semibold')],
+  ['app', 'body-gap', '内容区块间距', ref('space-4')],
+  ['app', 'body-pad-y', '内容区上下留白', ref('space-4')],
+  ['app', 'list-radius', '列表卡片圆角', ref('radius-lg')],
+  ['app', 'cta-gap', '底部按钮上间距', ref('space-4')]
 ]
 
 function build(entries: Entry[], tier: TokenTier, into: TokenMap): void {
@@ -266,6 +279,7 @@ export function defaultDoc(): UiFrameDoc {
     schemaVersion: 1,
     name: '落地页示例',
     platform: 'desktop',
+    device: defaultDeviceId('desktop'),
     template: 'minimal-desk',
     rootFontPx: DEFAULT_ROOT_PX,
     tokens: defaultTokens(),
@@ -280,7 +294,14 @@ export function defaultDoc(): UiFrameDoc {
       'hero-cta': 'arrow-right',
       'feature-1': 'timer',
       'feature-2': 'music',
-      'feature-3': 'dumbbell'
+      'feature-3': 'dumbbell',
+      'app-back': 'chevron-left',
+      'app-bell': 'bell',
+      'app-search': 'search',
+      'app-row-1': 'dumbbell',
+      'app-row-2': 'zap',
+      'app-row-3': 'flame',
+      'app-arrow': 'chevron-right'
     }
   }
 }

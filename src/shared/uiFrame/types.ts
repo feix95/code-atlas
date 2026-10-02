@@ -50,6 +50,13 @@ export type IconSlot =
   | 'feature-1'
   | 'feature-2'
   | 'feature-3'
+  | 'app-back'
+  | 'app-bell'
+  | 'app-search'
+  | 'app-row-1'
+  | 'app-row-2'
+  | 'app-row-3'
+  | 'app-arrow'
 
 export type UiPlatform = 'desktop' | 'phone'
 
@@ -57,6 +64,8 @@ export interface UiFrameDoc {
   schemaVersion: 1
   name: string
   platform: UiPlatform
+  /** 画布设备预设 id(§5.4);切平台时重置为该平台的默认档 */
+  device: string
   /** 起步模板 id(§9);模板与空白起步的户口名 */
   template: string
   rootFontPx: number

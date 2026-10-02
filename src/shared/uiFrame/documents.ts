@@ -1,12 +1,13 @@
 // 规格包里的样式与 HTML 文档:tokens.css、reset.css、页面骨架、组件演示页、页面参考实现。
 // 画布与导出用同一批函数生成(所见即所导出):画布把样式内联进 <style>,导出写成 <link>。
+import { APP_PAGE, APP_RULES } from './appPage.ts'
 import { demoBody, demoRules, wallBody } from './demo.ts'
 import { nodeHtml, type MarkupContext } from './markup.ts'
 import { HOME_PAGE, HOME_RULES } from './page.ts'
 import { componentCss, rulesCss } from './recipes/kit.ts'
 import { RECIPES } from './recipes/index.ts'
 import { declaredCss, isThemed } from './resolve.ts'
-import type { PageNode, ThemeName, TokenTier, UiFrameDoc } from './types.ts'
+import type { PageNode, ThemeName, TokenTier, UiFrameDoc, UiPlatform } from './types.ts'
 
 const TIER_TITLE: Record<TokenTier, string> = {
   base: '基础变量',
@@ -148,7 +149,8 @@ export const STYLE_FILES: Record<string, string> = {
   reset: 'reset.css',
   ...Object.fromEntries(RECIPES.map((r) => [compStyleKey(r.id), compCssPath(r.id)])),
   demo: 'components/_demo.css',
-  home: 'pages/home.css'
+  home: 'pages/home.css',
+  app: 'pages/app.css'
 }
 
 type StyleKey = string
@@ -160,7 +162,8 @@ export function styleTexts(doc: UiFrameDoc, fontsCss: string): Record<StyleKey, 
     tokens: tokensCss(doc),
     reset: RESET_CSS,
     demo: `/* _demo.css · 仅供演示页使用:禁止复制进正式页面 */\n\n${rulesCss(demoRules())}\n`,
-    home: `/* 首页 · 页面布局样式 */\n\n${rulesCss(HOME_RULES)}\n`
+    home: `/* 首页 · 页面布局样式 */\n\n${rulesCss(HOME_RULES)}\n`,
+    app: `/* 示例应用页 · 手机端页面布局样式 */\n\n${rulesCss(APP_RULES)}\n`
   }
   for (const r of RECIPES) texts[compStyleKey(r.id)] = componentCss(r)
   return texts
@@ -209,6 +212,57 @@ export const PAGE_STYLES: StyleKey[] = [
   'home'
 ]
 
+/** 手机端示例页用到的组件样式 */
+export const APP_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  compStyleKey('button'),
+  compStyleKey('icon-button'),
+  compStyleKey('input'),
+  compStyleKey('tabs'),
+  compStyleKey('list-row'),
+  compStyleKey('switch'),
+  'app'
+]
+
+export interface PageDef {
+  id: string
+  title: string
+  body: PageNode[]
+  /** 页面样式文件键(home / app)与规格包内路径 */
+  styleKey: 'home' | 'app'
+  /** 页面规格文档相对路径 */
+  specPath: string
+  /** 参考实现相对路径 */
+  htmlPath: string
+  styles: StyleKey[]
+}
+
+/** 当前平台的示例页(所见即所导出:画布与规格包用同一个页面) */
+export function pageFor(platform: UiPlatform): PageDef {
+  if (platform === 'phone') {
+    return {
+      id: APP_PAGE.id,
+      title: APP_PAGE.title,
+      body: APP_PAGE.body,
+      styleKey: 'app',
+      specPath: 'pages/app.md',
+      htmlPath: 'pages/app.html',
+      styles: APP_STYLES
+    }
+  }
+  return {
+    id: HOME_PAGE.id,
+    title: HOME_PAGE.title,
+    body: HOME_PAGE.body,
+    styleKey: 'home',
+    specPath: 'pages/home.md',
+    htmlPath: 'pages/home.html',
+    styles: PAGE_STYLES
+  }
+}
+
 /** 组件演示页要加载的样式:本组件 + 演示结构里复用的其他组件(demoDeps)+ _demo.css */
 export function demoStyles(id: string): StyleKey[] {
   const recipe = RECIPES.find((r) => r.id === id)
@@ -229,20 +283,23 @@ export { demoBody }
 
 export { wallBody, HOME_PAGE }
 
+export { APP_PAGE }
+
 /** page-template.html:页面骨架,<head> 全部写死,agent 只往 <body> 里填结构(规则 10) */
-export function pageTemplateHtml(): string {
-  const links = PAGE_STYLES.map((k) => `<link rel="stylesheet" href="${STYLE_FILES[k]}">`)
+export function pageTemplateHtml(doc: Pick<UiFrameDoc, 'platform'>): string {
+  const page = pageFor(doc.platform)
+  const links = page.styles.map((k) => `<link rel="stylesheet" href="${STYLE_FILES[k]}">`)
   return [
     '<!doctype html>',
     '<html lang="zh-CN" data-theme="light">',
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<title>${HOME_PAGE.title}</title>`,
+    `<title>${page.title}</title>`,
     ...links,
     '</head>',
     '<body>',
-    '<!-- 在此填入页面结构:见 pages/home.md -->',
+    `<!-- 在此填入页面结构:见 ${page.specPath} -->`,
     '</body>',
     '</html>',
     ''

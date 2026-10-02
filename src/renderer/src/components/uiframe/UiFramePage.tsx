@@ -1,6 +1,7 @@
 // 「UI 框架」页签(§5):起步页(选平台/模板/我的方案)→ 工具条 + 画布 + 属性面板。
 import { useState } from 'react'
-import type { ThemeName } from '@shared/uiFrame/types'
+import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
+import type { ThemeName, UiPlatform } from '@shared/uiFrame/types'
 import { VIEW_LABEL, type CanvasView } from '../../uiFrame/canvasDoc'
 import { docActions, useUiFrameDoc } from '../../uiFrame/docStore'
 import { schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
@@ -13,6 +14,10 @@ import { SaveNameDialog, UiFrameLibrary } from './UiFrameSchemes'
 import { UiFrameStart } from './UiFrameStart'
 
 const VIEWS: CanvasView[] = ['wall', 'board', 'page']
+const PLATFORMS: Array<[UiPlatform, string]> = [
+  ['desktop', '电脑端'],
+  ['phone', '手机端']
+]
 const THEMES: Array<[ThemeName, string]> = [
   ['light', '亮色'],
   ['dark', '暗色']
@@ -107,6 +112,8 @@ export function UiFramePage(): React.JSX.Element {
   const [view, setView] = useState<CanvasView>('wall')
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
+  const [chrome, setChrome] = useState(true)
+  const [safeArea, setSafeArea] = useState(true)
   const [selection, setSelection] = useState<CanvasSelection | null>(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [naming, setNaming] = useState(false)
@@ -147,6 +154,53 @@ export function UiFramePage(): React.JSX.Element {
           {doc.name}
           {schemeId === null && <span className="uf-chip">未入库</span>}
         </button>
+        <select
+          className="uf-select"
+          aria-label="平台"
+          value={doc.platform}
+          onChange={(e) => {
+            docActions.setPlatform(e.target.value as UiPlatform)
+            setSelection(null)
+          }}
+        >
+          {PLATFORMS.map(([p, label]) => (
+            <option key={p} value={p}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="uf-select"
+          aria-label="设备尺寸"
+          value={deviceFor(doc).id}
+          onChange={(e) => docActions.setDevice(e.target.value)}
+        >
+          {devicesFor(doc.platform).map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={`uf-seg-btn${chrome ? ' is-on' : ''}`}
+          aria-pressed={chrome}
+          title={doc.platform === 'phone' ? '机身外框(状态栏/灵动岛/手势条)' : '窗口外框'}
+          onClick={() => setChrome(!chrome)}
+        >
+          外框
+        </button>
+        {doc.platform === 'phone' && (
+          <button
+            type="button"
+            className={`uf-seg-btn${safeArea ? ' is-on' : ''}`}
+            aria-pressed={safeArea}
+            title="安全区参考线"
+            onClick={() => setSafeArea(!safeArea)}
+          >
+            安全区
+          </button>
+        )}
         <div className="uf-seg" role="group" aria-label="视图">
           {VIEWS.map((v) => (
             <button
@@ -241,6 +295,8 @@ export function UiFramePage(): React.JSX.Element {
           view={view}
           theme={theme}
           fit={fit}
+          chrome={chrome}
+          safeArea={safeArea}
           selection={selection}
           onSelect={setSelection}
           onCommit={docActions.setToken}

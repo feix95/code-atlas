@@ -2,8 +2,8 @@
 import { useState } from 'react'
 import { buildPackage } from '@shared/uiFrame/exportPackage'
 import { demoBody } from '@shared/uiFrame/demo'
+import { pageFor } from '@shared/uiFrame/documents'
 import { hasErrors, lintPackage } from '@shared/uiFrame/lint'
-import { HOME_PAGE } from '@shared/uiFrame/page'
 import { RECIPES } from '@shared/uiFrame/recipes/index'
 import type { LintIssue, PageNode, UiFrameDoc } from '@shared/uiFrame/types'
 import { packageAssets } from './assets'
@@ -15,10 +15,13 @@ export type ExportState =
   | { kind: 'done'; path: string; warnings: LintIssue[]; unloadedFonts: string[] }
   | { kind: 'error'; message: string }
 
-/** 页面与每个组件演示页的结构树(体检逐个检查标签与属性) */
-const PAGES: Record<string, PageNode[]> = {
-  'pages/home.md': HOME_PAGE.body,
-  ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
+/** 页面与每个组件演示页的结构树(体检逐个检查标签与属性);页面随方案平台 */
+function pagesFor(doc: UiFrameDoc): Record<string, PageNode[]> {
+  const page = pageFor(doc.platform)
+  return {
+    [page.specPath]: page.body,
+    ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
+  }
 }
 
 export function useUiFrameExport(): {
@@ -32,7 +35,7 @@ export function useUiFrameExport(): {
     setState({ kind: 'saving' })
     try {
       const pkg = buildPackage(doc, packageAssets(new Date()))
-      const issues = lintPackage(pkg, PAGES)
+      const issues = lintPackage(pkg, pagesFor(doc))
       if (hasErrors(issues)) {
         setState({ kind: 'blocked', issues })
         return

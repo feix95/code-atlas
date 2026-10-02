@@ -47,7 +47,7 @@ export function useCanvasFrame({
   doc,
   view,
   theme,
-  minHeight,
+  viewport,
   selection,
   onSelect,
   onKey
@@ -55,7 +55,8 @@ export function useCanvasFrame({
   doc: UiFrameDoc
   view: CanvasView
   theme: ThemeName
-  minHeight: number
+  /** 画布视口:fixed = 手机定高,内容在 iframe 内部滚动;否则按内容自动长高 */
+  viewport: { height: number; fixed: boolean }
   selection: CanvasSelection | null
   onSelect: (sel: CanvasSelection | null) => void
   onKey: (e: KeyboardEvent) => void
@@ -77,12 +78,17 @@ export function useCanvasFrame({
     handlersRef.current = { onSelect, onKey }
   })
 
-  /** 按 body 实际内容高度定 iframe 高度(documentElement.scrollHeight 不会小于当前视口,换视图后缩不回去) */
+  /** 按 body 实际内容高度定 iframe 高度(documentElement.scrollHeight 不会小于当前视口,换视图后缩不回去);
+   *  手机端固定视口高,内容在 iframe 内部滚动 */
   function fitHeight(): void {
     const frame = frameRef.current
     const body = frame?.contentDocument?.body
     if (!frame || !body) return
-    frame.style.height = `${Math.max(minHeight, Math.ceil(body.getBoundingClientRect().height))}px`
+    if (viewport.fixed) {
+      frame.style.height = `${viewport.height}px`
+      return
+    }
+    frame.style.height = `${Math.max(viewport.height, Math.ceil(body.getBoundingClientRect().height))}px`
   }
 
   function onLoad(): void {
@@ -132,9 +138,9 @@ export function useCanvasFrame({
       cancelAnimationFrame(raf)
       ro?.disconnect()
     }
-    // fitHeight 只读 ref 与 minHeight,随 minHeight 变化重挂即可
+    // fitHeight 只读 ref 与 viewport,随视口变化重挂即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frameDoc, minHeight])
+  }, [frameDoc, viewport.height, viewport.fixed])
 
   // 选中框与悬停框:每帧对齐元素真实位置(拖动中元素实时变大变小)
   useEffect(() => {

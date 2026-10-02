@@ -2,6 +2,7 @@
 // 三条源共用一个口径:只改写「同名已存在」变量的 value——名字对不上的键记入 skipped 名单,
 // 不往变量表里生造新变量(变量表是固定结构,导入不是扩表)。
 import { DTCG_EXT } from './designJson.ts'
+import { defaultDeviceId, isDeviceId } from './devices.ts'
 import { parseDoc } from './scheme.ts'
 import { defaultDoc } from './template.ts'
 import type { IconSlot, TokenValue, UiFrameDoc, UiPlatform } from './types.ts'
@@ -237,6 +238,9 @@ function importDtcgJson(root: unknown, fallbackName: string): ImportResult {
   if (ext?.['platform'] === 'phone' || ext?.['platform'] === 'desktop') {
     doc.platform = ext['platform'] as UiPlatform
   }
+  doc.device = isDeviceId(doc.platform, ext?.['device'])
+    ? (ext?.['device'] as string)
+    : defaultDeviceId(doc.platform)
   if (typeof ext?.['template'] === 'string') doc.template = ext['template'] as string
   const icons = ext?.['icons']
   if (typeof icons === 'object' && icons !== null && !Array.isArray(icons)) {

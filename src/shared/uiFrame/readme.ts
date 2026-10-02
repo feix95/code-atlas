@@ -1,8 +1,8 @@
 // 给 AI 的文字:README-给AI.md(§13.4)、pages/home.md(页面规格)、LICENSES.md。
 // 全文只用「必须 / 禁止」(规则 8);体检会扫描含糊词。
-import { compCssPath, compHtmlPath, STYLE_FILES } from './documents.ts'
+import { compCssPath, compHtmlPath, pageFor, STYLE_FILES, type PageDef } from './documents.ts'
 import { escapeHtml } from './markup.ts'
-import { HOME_PAGE } from './page.ts'
+import { deviceFor } from './devices.ts'
 import { RECIPES } from './recipes/index.ts'
 import { declaredCss, isThemed } from './resolve.ts'
 import type { IconSlot, PageNode, TokenTier, UiFrameDoc } from './types.ts'
@@ -18,7 +18,14 @@ const SLOT_LABEL: Record<IconSlot, string> = {
   'hero-cta': '首页「免费开始」按钮',
   'feature-1': '首页第 1 张卡片',
   'feature-2': '首页第 2 张卡片',
-  'feature-3': '首页第 3 张卡片'
+  'feature-3': '首页第 3 张卡片',
+  'app-back': '应用页导航返回按钮',
+  'app-bell': '应用页导航通知按钮',
+  'app-search': '应用页搜索框前置图标',
+  'app-row-1': '应用页第 1 行前置图标',
+  'app-row-2': '应用页第 2 行前置图标',
+  'app-row-3': '应用页第 3 行前置图标',
+  'app-arrow': '应用页第 2 行尾部箭头'
 }
 
 const HARD_RULES = [
@@ -74,7 +81,8 @@ function tokenTable(doc: UiFrameDoc, tier: TokenTier): string {
 }
 
 /** 规格包文件索引(体检「未引用文件」以此为准) */
-export function fileIndex(iconFiles: string[]): Array<[string, string]> {
+export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, string]> {
+  const page = pageFor(doc.platform)
   return [
     ['README-给AI.md', '本说明,必须先读'],
     ['page-template.html', '页面骨架,必须以此为起点'],
@@ -87,9 +95,9 @@ export function fileIndex(iconFiles: string[]): Array<[string, string]> {
       compHtmlPath(r.id),
       `${r.label}演示页:全部变体 × 状态 × 亮暗`
     ]),
-    ['pages/home.md', '首页页面规格:结构树与页面变量'],
-    [STYLE_FILES.home, '首页布局样式'],
-    ['pages/home.html', '首页参考实现,浏览器打开即为标准效果'],
+    [page.specPath, `${page.title}页面规格:结构树与页面变量`],
+    [STYLE_FILES[page.styleKey], `${page.title}布局样式`],
+    [page.htmlPath, `${page.title}参考实现,浏览器打开即为标准效果`],
     ...iconFiles.map((f): [string, string] => [f, 'lucide 图标原文']),
     ['design.json', '同一份数据的 DTCG 结构化版本'],
     ['preview/', '组件与页面的标准外观截图(字体加载完成后截取)'],
@@ -98,7 +106,17 @@ export function fileIndex(iconFiles: string[]): Array<[string, string]> {
 }
 
 export function readmeMd(doc: UiFrameDoc, iconFiles: string[]): string {
-  const files = fileIndex(iconFiles)
+  const page = pageFor(doc.platform)
+  const dev = deviceFor(doc)
+  const isPhone = doc.platform === 'phone'
+  const files = fileIndex(doc, iconFiles)
+  const compLines = page.styles
+    .filter((s) => s.startsWith('comp-'))
+    .map(
+      (s, i, arr) =>
+        `${i === arr.length - 1 ? '│   └──' : '│   ├──'} ${s.slice(5)}.css          复制自规格包`
+    )
+    .join('\n')
   const recipes = RECIPES.map((r) => {
     const params = Object.keys(doc.tokens).filter((n) => doc.tokens[n].path[0] === r.group)
     return `### ${r.label}\n\n- 样式文件:\`${compCssPath(r.id)}\`;演示页:\`${compHtmlPath(r.id)}\`\n- 状态:${r.stateNames.join('、')}\n- 组件变量:${params.map((n) => `\`--${n}\``).join('、')}`
@@ -116,8 +134,8 @@ ${HARD_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
 ## 2. 目标平台与技术栈
 
-- 平台:电脑端网页;参考视口 ${HOME_PAGE.width} × ${HOME_PAGE.height}。
-- 技术栈:原生 HTML + CSS。目标项目使用其他前端框架时,必须保持与 \`pages/home.html\` 相同的元素结构、class 与样式文件,只改写模板语法。
+- 平台:${isPhone ? '手机端页面' : '电脑端网页'};参考视口 ${dev.width} × ${dev.height}(${dev.label})。
+- 技术栈:原生 HTML + CSS。目标项目使用其他前端框架时,必须保持与 \`${page.htmlPath}\` 相同的元素结构、class 与样式文件,只改写模板语法。
 - 根字号 ${doc.rootFontPx}px,尺寸单位一律为 rem(1rem = ${doc.rootFontPx}px)。
 - 亮暗主题:在 \`<html>\` 上写 \`data-theme="light"\` 或 \`data-theme="dark"\`;本页面使用亮色。
 
@@ -132,14 +150,13 @@ ${HARD_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 ├── tokens.css            复制自规格包
 ├── reset.css             复制自规格包
 ├── components/
-│   ├── button.css        复制自规格包(页面用到的组件样式)
-│   └── card.css          复制自规格包
+${compLines}
 └── pages/
-    └── home.css          复制自规格包
+    └── ${page.id}.css          复制自规格包
 \`\`\`
 
 - \`index.html\` 必须用相对路径引用以上文件,写法与 \`page-template.html\` 完全一致。
-- 禁止把 \`components/_demo.css\`、\`components/*.html\`、\`pages/home.html\`、\`preview/\`、\`design.json\` 复制进结果文件夹。
+- 禁止把 \`components/_demo.css\`、\`components/*.html\`、\`pages/*.html\`、\`preview/\`、\`design.json\` 复制进结果文件夹。
 
 ## 4. 文件索引
 
@@ -159,7 +176,7 @@ ${recipes}
 
 | 页面 | 规格 | 样式 | 参考实现 |
 | --- | --- | --- | --- |
-| ${HOME_PAGE.title} | \`pages/home.md\` | \`${STYLE_FILES.home}\` | \`pages/home.html\` |
+| ${page.title} | \`${page.specPath}\` | \`${STYLE_FILES[page.styleKey]}\` | \`${page.htmlPath}\` |
 
 ## 8. 图标清单
 
@@ -174,7 +191,7 @@ ${usedIcons}
 
 ## 10. 平台规范
 
-- 可点击元素的点击区必须不小于 24 × 24 逻辑像素(WCAG 2.2)。
+- 可点击元素的点击区必须不小于 ${isPhone ? '44 × 44' : '24 × 24'} 逻辑像素(${isPhone ? 'iOS HIG;Android 为 48 × 48' : 'WCAG 2.2'})。
 - 正文文字与背景的对比度必须不低于 4.5:1(WCAG AA)。
 
 ## 11. 交付前自检清单
@@ -201,18 +218,23 @@ function nodeLine(node: PageNode, doc: UiFrameDoc, depth: number): string[] {
   return [line, ...(node.children ?? []).flatMap((c) => nodeLine(c, doc, depth + 1))]
 }
 
-export function pageMd(doc: UiFrameDoc): string {
+export function pageMd(doc: UiFrameDoc, page: PageDef): string {
+  const dev = deviceFor(doc)
   const pageTokens = Object.keys(doc.tokens).filter((n) => doc.tokens[n].tier === 'page')
-  return `# ${HOME_PAGE.title} · 页面规格
+  const comps = page.styles
+    .filter((s) => s.startsWith('comp-'))
+    .map((s) => `\`${compCssPath(s.slice(5))}\``)
+    .join('、')
+  return `# ${page.title} · 页面规格
 
-- 视口:${HOME_PAGE.width} × ${HOME_PAGE.height};主题:亮色(\`<html data-theme="light">\`)。
-- 布局样式:\`${STYLE_FILES.home}\`;组件样式:\`${compCssPath('button')}\`、\`${compCssPath('card')}\`。
-- 参考实现:\`pages/home.html\`,其结构与下方结构树逐项一致。
+- 视口:${dev.width} × ${dev.height}(${dev.label});主题:亮色(\`<html data-theme="light">\`)。
+- 布局样式:\`${STYLE_FILES[page.styleKey]}\`;组件样式:${comps}。
+- 参考实现:\`${page.htmlPath}\`,其结构与下方结构树逐项一致。
 - 下方每一行即一个元素:标签、class 与属性必须原样使用;文案必须逐字使用;同级元素之间禁止插入任何其他元素。
 
 ## 结构树(\`<body>\` 内,自上而下)
 
-${HOME_PAGE.body.flatMap((n) => nodeLine(n, doc, 0)).join('\n')}
+${page.body.flatMap((n) => nodeLine(n, doc, 0)).join('\n')}
 
 ## 页面变量
 

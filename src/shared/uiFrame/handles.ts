@@ -267,6 +267,35 @@ export const PARTS: Record<string, PartDef> = {
         max: 256
       }
     ]
+  },
+  'app-screen': { label: '应用页容器', group: 'app', handles: [] },
+  'app-nav': {
+    label: '应用导航栏',
+    group: 'app',
+    handles: [
+      {
+        edge: 'bottom',
+        token: 'app-nav-height',
+        label: '导航栏高度',
+        factor: 1,
+        min: 32,
+        max: 128
+      }
+    ]
+  },
+  'app-body': {
+    label: '页面内容区',
+    group: 'app',
+    handles: [
+      {
+        edge: 'bottom',
+        token: 'app-body-gap',
+        label: '区块间距',
+        factor: 1,
+        min: 0,
+        max: 64
+      }
+    ]
   }
 }
 
