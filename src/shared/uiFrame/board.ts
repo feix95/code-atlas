@@ -37,7 +37,8 @@ export const GROUPS: Array<[group: string, title: string, kind: BoardKind]> = [
   ['border-width', '描边宽度', 'stroke'],
   ['focus-ring', '焦点环', 'ring'],
   ['opacity', '透明度', 'opacity'],
-  ['shadow', '阴影', 'shadow']
+  ['shadow', '阴影', 'shadow'],
+  ['bp', '响应式断点', 'ruler']
 ]
 
 /** 变量在板上的读数(维度变量给 rem + px,颜色给亮暗两值);画布提交后也用它原地刷新 */

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { flutterThemeDart, reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
+import { pagesFor } from '@shared/uiFrame/documents'
 import { platformIssues } from '@shared/uiFrame/platformRules'
 import type { ThemeName, UiPlatform } from '@shared/uiFrame/types'
 import { VIEW_LABEL, type CanvasView } from '../../uiFrame/canvasDoc'
@@ -142,7 +143,7 @@ function ExportBanner({
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
   const { started, schemeId, busy, error, notice } = useSchemeState()
-  const { view, libraryOpen, placedSel } = useWorkbench()
+  const { view, libraryOpen, placedSel, pageId } = useWorkbench()
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
   const [chrome, setChrome] = useState(true)
@@ -300,6 +301,22 @@ export function UiFramePage(): React.JSX.Element {
             检查
             <span className={`uf-badge${issues.length ? ' is-warn' : ''}`}>{issues.length}</span>
           </button>
+          {view === 'bench' && doc.placed.length === 0 && (
+            <div className="uf-seg" role="group" aria-label="示例页">
+              {pagesFor(doc.platform).map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`uf-seg-btn${(pageId ?? pagesFor(doc.platform)[0].id) === p.id ? ' is-on' : ''}`}
+                  aria-pressed={(pageId ?? pagesFor(doc.platform)[0].id) === p.id}
+                  title={`底板躺「${p.title}」(${p.htmlPath})`}
+                  onClick={() => workbenchActions.setPage(i === 0 ? null : p.id)}
+                >
+                  {p.title}
+                </button>
+              ))}
+            </div>
+          )}
           {view === 'bench' && (
             <div className="uf-seg" role="group" aria-label="主题">
               {THEMES.map(([t, label]) => (

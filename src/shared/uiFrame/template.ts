@@ -98,7 +98,12 @@ const BASE: Entry[] = [
       light: 'rgba(28, 25, 23, 0.08)',
       dark: 'rgba(0, 0, 0, 0.5)'
     }
-  ]
+  ],
+  // 响应式断点(§7.2):典型页 CSS 的 @media 边界从这里取数
+  ['bp', 'sm', '断点 · 小屏', px(640)],
+  ['bp', 'md', '断点 · 中屏', px(768)],
+  ['bp', 'lg', '断点 · 大屏', px(1024)],
+  ['bp', 'xl', '断点 · 特大屏', px(1280)]
 ]
 
 const COMPONENT: Entry[] = [
@@ -585,7 +590,17 @@ const PAGE: Entry[] = [
   ['app', 'body-gap', '内容区块间距', ref('space-4')],
   ['app', 'body-pad-y', '内容区上下留白', ref('space-4')],
   ['app', 'list-radius', '列表卡片圆角', ref('radius-lg')],
-  ['app', 'cta-gap', '底部按钮上间距', ref('space-4')]
+  ['app', 'cta-gap', '底部按钮上间距', ref('space-4')],
+  // 典型页布局(M3-f):内容宽度、区块间距、卡片留白
+  ['pg', 'content-max', '页面内容最大宽度', ref('page-content-max')],
+  ['pg', 'narrow-max', '窄页面最大宽度', px(720)],
+  ['pg', 'pad-y', '页面上下留白', ref('space-8')],
+  ['pg', 'section-gap', '页面区块间距', ref('space-8')],
+  ['pg', 'toolbar-gap', '工具行间距', ref('space-3')],
+  ['pg', 'field-gap', '表单字段间距', ref('space-4')],
+  ['pg', 'actions-gap', '操作按钮间距', ref('space-3')],
+  ['pg', 'card-pad', '卡片内边距', ref('space-6')],
+  ['pg', 'title-size', '页面标题字号', px(28)]
 ]
 
 function build(entries: Entry[], tier: TokenTier, into: TokenMap): void {

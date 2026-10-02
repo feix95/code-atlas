@@ -8,7 +8,7 @@ import {
   demoBody,
   demoStyles,
   htmlDocument,
-  pageFor,
+  pagesFor,
   pageTemplateHtml,
   STYLE_FILES,
   styleTexts
@@ -30,7 +30,6 @@ export interface PackageAssets {
 
 /** 每个组件演示页一张预览截图 + 页面参考实现一张(页面按方案平台与设备尺寸截) */
 export function previewsFor(doc: UiFrameDoc): PreviewPlan[] {
-  const page = pageFor(doc.platform)
   const dev = deviceFor(doc)
   return [
     ...RECIPES.map((r): PreviewPlan => ({
@@ -39,7 +38,12 @@ export function previewsFor(doc: UiFrameDoc): PreviewPlan[] {
       width: 960,
       height: 0
     })),
-    { html: page.htmlPath, png: `preview/${page.id}.png`, width: dev.width, height: dev.height }
+    ...pagesFor(doc.platform).map((p): PreviewPlan => ({
+      html: p.htmlPath,
+      png: `preview/${p.id}.png`,
+      width: dev.width,
+      height: dev.height
+    }))
   ]
 }
 
@@ -63,23 +67,25 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
   const texts = styleTexts(doc, fontsCss(assets.fontSources, PACKAGE_FONT_URL))
   const link = { kind: 'link' as const, hrefBase: '../' }
   const iconFiles = iconFileNames(doc)
-  const page = pageFor(doc.platform)
+  const pages = pagesFor(doc.platform)
   const files: Record<string, string> = {
     'README-给AI.md': readmeMd(doc, iconFiles),
     'page-template.html': pageTemplateHtml(doc),
-    [page.specPath]: pageMd(doc, page),
-    [page.htmlPath]: htmlDocument({
-      title: page.title,
-      body: page.body,
-      styles: page.styles,
-      ctx,
-      styleMode: link
-    }),
     'design.json': designJson(doc),
     'adapters/tailwind.theme.css': tailwindThemeCss(doc),
     'adapters/uiTheme.ts': reactNativeThemeTs(doc),
     'adapters/ui_theme.dart': flutterThemeDart(doc),
     'LICENSES.md': licensesMd(assets.licenses)
+  }
+  for (const p of pages) {
+    files[p.specPath] = pageMd(doc, p)
+    files[p.htmlPath] = htmlDocument({
+      title: p.title,
+      body: p.body,
+      styles: p.styles,
+      ctx,
+      styleMode: link
+    })
   }
   for (const r of RECIPES) {
     files[compHtmlPath(r.id)] = htmlDocument({
@@ -90,9 +96,12 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
       styleMode: link
     })
   }
+  const pageStyleKeys = new Set(pages.map((p) => p.styleKey))
   for (const [key, path] of Object.entries(STYLE_FILES) as Array<[keyof typeof texts, string]>) {
-    // 页面样式只带本平台的那个(另一平台的页面包里本来就没有)
-    if ((key === 'home' || key === 'app') && key !== page.styleKey) continue
+    // 页面样式只带包里实际存在的页(home/app 平台各一,典型页两边都有)
+    if (key === 'home' || key === 'app' || path.startsWith('pages/')) {
+      if (!pageStyleKeys.has(key)) continue
+    }
     files[path] = texts[key]
   }
   for (const file of iconFiles) {

@@ -1,10 +1,20 @@
 // 给 AI 的文字:README-给AI.md(§13.4)、pages/home.md(页面规格)、LICENSES.md。
 // 全文只用「必须 / 禁止」(规则 8);体检会扫描含糊词。
 import { iconSvgRelPath } from './customIcon.ts'
-import { compCssPath, compHtmlPath, pageFor, STYLE_FILES, type PageDef } from './documents.ts'
+import {
+  compCssPath,
+  compHtmlPath,
+  pageFor,
+  PAGE_RULES,
+  pagesFor,
+  pgMedia,
+  STYLE_FILES,
+  type PageDef
+} from './documents.ts'
 import { escapeHtml } from './markup.ts'
 import { deviceFor } from './devices.ts'
 import { RECIPES } from './recipes/index.ts'
+import { rulesCss } from './recipes/kit.ts'
 import { declaredCss, isThemed } from './resolve.ts'
 import type { IconSlot, PageNode, TokenTier, UiFrameDoc } from './types.ts'
 
@@ -85,7 +95,7 @@ function tokenTable(doc: UiFrameDoc, tier: TokenTier): string {
 
 /** 规格包文件索引(体检「未引用文件」以此为准) */
 export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, string]> {
-  const page = pageFor(doc.platform)
+  const pages = pagesFor(doc.platform)
   return [
     ['README-给AI.md', '本说明,必须先读'],
     ['page-template.html', '页面骨架,必须以此为起点'],
@@ -98,9 +108,11 @@ export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, 
       compHtmlPath(r.id),
       `${r.label}演示页:全部变体 × 状态 × 亮暗`
     ]),
-    [page.specPath, `${page.title}页面规格:结构树与页面变量`],
-    [STYLE_FILES[page.styleKey], `${page.title}布局样式`],
-    [page.htmlPath, `${page.title}参考实现,浏览器打开即为标准效果`],
+    ...pages.flatMap((p): Array<[string, string]> => [
+      [p.specPath, `${p.title}页面规格:结构树与页面变量`],
+      [STYLE_FILES[p.styleKey], `${p.title}布局样式`],
+      [p.htmlPath, `${p.title}参考实现,浏览器打开即为标准效果`]
+    ]),
     ...iconFiles.map((f): [string, string] => [f, 'lucide 图标原文']),
     ['design.json', '同一份数据的 DTCG 结构化版本'],
     ['adapters/tailwind.theme.css', 'Tailwind CSS v4 @theme 主题文件(§13.5)'],
@@ -113,14 +125,21 @@ export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, 
 
 export function readmeMd(doc: UiFrameDoc, iconFiles: string[]): string {
   const page = pageFor(doc.platform)
+  const pages = pagesFor(doc.platform)
   const dev = deviceFor(doc)
   const isPhone = doc.platform === 'phone'
   const files = fileIndex(doc, iconFiles)
-  const compLines = page.styles
-    .filter((s) => s.startsWith('comp-'))
+  const compIds = [...new Set(pages.flatMap((p) => p.styles.filter((s) => s.startsWith('comp-'))))]
+  const compLines = compIds
     .map(
       (s, i, arr) =>
         `${i === arr.length - 1 ? '│   └──' : '│   ├──'} ${s.slice(5)}.css          复制自规格包`
+    )
+    .join('\n')
+  const pageLines = pages
+    .map(
+      (p, i) =>
+        `${i === pages.length - 1 ? '    └──' : '    ├──'} ${p.id}.css          复制自规格包`
     )
     .join('\n')
   const recipes = RECIPES.map((r) => {
@@ -158,7 +177,7 @@ ${HARD_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 ├── components/
 ${compLines}
 └── pages/
-    └── ${page.id}.css          复制自规格包
+${pageLines}
 \`\`\`
 
 - \`index.html\` 必须用相对路径引用以上文件,写法与 \`page-template.html\` 完全一致。
@@ -182,7 +201,7 @@ ${recipes}
 
 | 页面 | 规格 | 样式 | 参考实现 |
 | --- | --- | --- | --- |
-| ${page.title} | \`${page.specPath}\` | \`${STYLE_FILES[page.styleKey]}\` | \`${page.htmlPath}\` |
+${pages.map((p) => `| ${p.title} | \`${p.specPath}\` | \`${STYLE_FILES[p.styleKey]}\` | \`${p.htmlPath}\` |`).join('\n')}
 
 ## 8. 图标清单
 
@@ -226,7 +245,10 @@ function nodeLine(node: PageNode, doc: UiFrameDoc, depth: number): string[] {
 
 export function pageMd(doc: UiFrameDoc, page: PageDef): string {
   const dev = deviceFor(doc)
-  const pageTokens = Object.keys(doc.tokens).filter((n) => doc.tokens[n].tier === 'page')
+  const cssText = rulesCss(PAGE_RULES[page.styleKey] ?? []) + pgMedia(doc)
+  const pageTokens = Object.keys(doc.tokens).filter(
+    (n) => doc.tokens[n].tier === 'page' && cssText.includes(`--${n}`)
+  )
   const comps = page.styles
     .filter((s) => s.startsWith('comp-'))
     .map((s) => `\`${compCssPath(s.slice(5))}\``)

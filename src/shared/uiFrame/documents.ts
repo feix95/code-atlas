@@ -4,7 +4,16 @@ import { APP_PAGE, APP_RULES } from './appPage.ts'
 import { demoBody, demoRules, wallBody } from './demo.ts'
 import { nodeHtml, type MarkupContext } from './markup.ts'
 import { HOME_PAGE, HOME_RULES } from './page.ts'
+import {
+  FORM_PAGE,
+  FORM_RULES,
+  LIST_PAGE,
+  LIST_RULES,
+  SETTINGS_PAGE,
+  SETTINGS_RULES
+} from './pages.ts'
 import { componentCss, rulesCss } from './recipes/kit.ts'
+import type { CssRule } from './recipes/types.ts'
 import { RECIPES } from './recipes/index.ts'
 import { declaredCss, isThemed } from './resolve.ts'
 import type { PageNode, ThemeName, TokenTier, UiFrameDoc, UiPlatform } from './types.ts'
@@ -165,7 +174,10 @@ export const STYLE_FILES: Record<string, string> = {
   ...Object.fromEntries(RECIPES.map((r) => [compStyleKey(r.id), compCssPath(r.id)])),
   demo: 'components/_demo.css',
   home: 'pages/home.css',
-  app: 'pages/app.css'
+  app: 'pages/app.css',
+  list: 'pages/list.css',
+  settings: 'pages/settings.css',
+  form: 'pages/form.css'
 }
 
 type StyleKey = string
@@ -178,10 +190,43 @@ export function styleTexts(doc: UiFrameDoc, fontsCss: string): Record<StyleKey, 
     reset: RESET_CSS,
     demo: `/* _demo.css · 仅供演示页使用:禁止复制进正式页面 */\n\n${rulesCss(demoRules())}\n`,
     home: `/* 首页 · 页面布局样式 */\n\n${rulesCss(HOME_RULES)}\n`,
-    app: `/* 示例应用页 · 手机端页面布局样式 */\n\n${rulesCss(APP_RULES)}\n`
+    app: `/* 示例应用页 · 手机端页面布局样式 */\n\n${rulesCss(APP_RULES)}\n`,
+    list: `/* 列表页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(LIST_RULES)}\n${pgMedia(doc)}`,
+    settings: `/* 设置页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(SETTINGS_RULES)}\n${pgMedia(doc)}`,
+    form: `/* 表单页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(FORM_RULES)}\n${pgMedia(doc)}`
   }
   for (const r of RECIPES) texts[compStyleKey(r.id)] = componentCss(r)
   return texts
+}
+
+/** 典型页响应式块:断点数值取自 --bp-* 变量(§7.2),改断点即改媒体查询 */
+export function pgMedia(doc: UiFrameDoc): string {
+  const bp = (name: string): string => declaredCss(doc.tokens, name, 'light', doc.rootFontPx)
+  return [
+    `/* 响应式:≤${bp('bp-md')} 工具行纵向堆叠,≤${bp('bp-sm')} 页面留白收窄 */`,
+    `@media (max-width: ${bp('bp-md')}) {`,
+    '  .pg-toolbar {',
+    '    flex-direction: column;',
+    '    align-items: stretch;',
+    '  }',
+    '',
+    '  .pg-toolbar .srch {',
+    '    width: auto;',
+    '  }',
+    '',
+    '  .pg-spacer {',
+    '    display: none;',
+    '  }',
+    '}',
+    '',
+    `@media (max-width: ${bp('bp-sm')}) {`,
+    '  .pg {',
+    '    padding-right: var(--app-gutter);',
+    '    padding-left: var(--app-gutter);',
+    '  }',
+    '}',
+    ''
+  ].join('\n')
 }
 
 export interface HtmlDocOptions {
@@ -241,12 +286,52 @@ export const APP_STYLES: StyleKey[] = [
   'app'
 ]
 
+/** 典型页(§5.5)要加载的组件样式 */
+export const LIST_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  compStyleKey('appbar'),
+  compStyleKey('button'),
+  compStyleKey('search'),
+  compStyleKey('list-row'),
+  compStyleKey('pagination'),
+  'list'
+]
+
+export const SETTINGS_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  compStyleKey('appbar'),
+  compStyleKey('button'),
+  compStyleKey('avatar'),
+  compStyleKey('list-row'),
+  compStyleKey('switch'),
+  compStyleKey('divider'),
+  'settings'
+]
+
+export const FORM_STYLES: StyleKey[] = [
+  'fonts',
+  'tokens',
+  'reset',
+  compStyleKey('appbar'),
+  compStyleKey('button'),
+  compStyleKey('input'),
+  compStyleKey('textarea'),
+  compStyleKey('select'),
+  compStyleKey('radio'),
+  compStyleKey('checkbox'),
+  'form'
+]
+
 export interface PageDef {
   id: string
   title: string
   body: PageNode[]
-  /** 页面样式文件键(home / app)与规格包内路径 */
-  styleKey: 'home' | 'app'
+  /** 页面样式文件键(对应 STYLE_FILES)与规格包内路径 */
+  styleKey: string
   /** 页面规格文档相对路径 */
   specPath: string
   /** 参考实现相对路径 */
@@ -276,6 +361,51 @@ export function pageFor(platform: UiPlatform): PageDef {
     htmlPath: 'pages/home.html',
     styles: PAGE_STYLES
   }
+}
+
+/** 平台无关的典型页(§5.5):桌面与手机的规格包都会带上 */
+const TYPICAL_PAGES: PageDef[] = [
+  {
+    id: LIST_PAGE.id,
+    title: LIST_PAGE.title,
+    body: LIST_PAGE.body,
+    styleKey: 'list',
+    specPath: 'pages/list.md',
+    htmlPath: 'pages/list.html',
+    styles: LIST_STYLES
+  },
+  {
+    id: SETTINGS_PAGE.id,
+    title: SETTINGS_PAGE.title,
+    body: SETTINGS_PAGE.body,
+    styleKey: 'settings',
+    specPath: 'pages/settings.md',
+    htmlPath: 'pages/settings.html',
+    styles: SETTINGS_STYLES
+  },
+  {
+    id: FORM_PAGE.id,
+    title: FORM_PAGE.title,
+    body: FORM_PAGE.body,
+    styleKey: 'form',
+    specPath: 'pages/form.md',
+    htmlPath: 'pages/form.html',
+    styles: FORM_STYLES
+  }
+]
+
+/** 规格包要导出的全部页面:平台示例页 + 三个典型页 */
+export function pagesFor(platform: UiPlatform): PageDef[] {
+  return [pageFor(platform), ...TYPICAL_PAGES]
+}
+
+/** 页面样式键 → 布局规则(pageMd 提取「本页用到的页面变量」用) */
+export const PAGE_RULES: Record<string, CssRule[]> = {
+  home: HOME_RULES,
+  app: APP_RULES,
+  list: LIST_RULES,
+  settings: SETTINGS_RULES,
+  form: FORM_RULES
 }
 
 /** 组件演示页要加载的样式:本组件 + 演示结构里复用的其他组件(demoDeps)+ _demo.css */

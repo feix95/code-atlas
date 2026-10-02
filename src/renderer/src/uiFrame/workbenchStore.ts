@@ -31,6 +31,8 @@ interface WorkbenchState {
   placedSel: string | null
   /** 零件盒正拖着的配方 id;画布靠它关 iframe 的 pointer-events,让 drop 落在父层 */
   dragPart: string | null
+  /** 底板示例页 id(M3-f 典型页);null = 平台默认页(home/app) */
+  pageId: string | null
 }
 
 let state: WorkbenchState = {
@@ -39,7 +41,8 @@ let state: WorkbenchState = {
   blankExample: false,
   libraryOpen: false,
   placedSel: null,
-  dragPart: null
+  dragPart: null,
+  pageId: null
 }
 const listeners = new Set<() => void>()
 
@@ -70,7 +73,11 @@ export const workbenchActions = {
   },
   /** 换方案/重新起步后复位界面态:回底板、清定位、空白底板恢复空态 */
   docReplaced(): void {
-    emit({ view: 'bench', jump: null, blankExample: false, placedSel: null })
+    emit({ view: 'bench', jump: null, blankExample: false, placedSel: null, pageId: null })
+  },
+  /** 底板躺哪张示例页(典型页切换);null 回平台默认页 */
+  setPage(pageId: string | null): void {
+    if (state.pageId !== pageId) emit({ pageId })
   },
   setLibraryOpen(open: boolean): void {
     emit({ libraryOpen: open })

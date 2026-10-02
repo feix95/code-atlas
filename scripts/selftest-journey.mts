@@ -762,6 +762,14 @@ try {
   await placedShell.first().click()
   await page.keyboard.press('Delete')
   await canvas.locator('header.page-header').waitFor()
+  // M3-f 典型页(§5.5):底板示例页签切「表单页」/「列表页」,结构与导出的 pages/*.html 同源
+  await page.getByRole('button', { name: '表单页', exact: true }).click()
+  await canvas.locator('form.pg-form').waitFor()
+  await page.getByRole('button', { name: '列表页', exact: true }).click()
+  await canvas.locator('.pg-toolbar').waitFor()
+  await shot('uiframe-pg-list')
+  await page.getByRole('button', { name: '首页', exact: true }).click()
+  await canvas.locator('header.page-header').waitFor()
   // M1-e 手机画布(§5.4):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
   await page.locator('select[aria-label="平台"]').selectOption('phone')
   await page.locator('.uf-device').waitFor()

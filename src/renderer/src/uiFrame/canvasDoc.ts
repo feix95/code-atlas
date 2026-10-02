@@ -6,6 +6,7 @@ import {
   compStyleKey,
   htmlDocument,
   pageFor,
+  pagesFor,
   styleTexts,
   tokensCss,
   WALL_STYLES,
@@ -41,12 +42,12 @@ function fonts(): string {
   return fontsCache
 }
 
-export function canvasHtml(doc: UiFrameDoc, view: CanvasView): string {
+export function canvasHtml(doc: UiFrameDoc, view: CanvasView, pageId?: string | null): string {
   // 变量板/底板是画布专属视图:样式不进规格包,单独一段 <style>
   const texts = styleTexts(doc, fonts())
   texts['board'] = `/* 变量板 · 画布专属,不导出 */\n\n${rulesCss(boardCss())}\n`
   texts['bench'] = `/* 底板拼装 · 画布专属,不导出 */\n\n${rulesCss(BENCH_RULES)}\n`
-  const page = pageFor(doc.platform)
+  const page = pagesFor(doc.platform).find((p) => p.id === pageId) ?? pageFor(doc.platform)
   // 底板上摆了零件 → 渲染零件板;还没摆 → 模板示例页(空白起步的空态由画布外层盖)
   const benchBoard = view === 'bench' && doc.placed.length > 0
   const body =

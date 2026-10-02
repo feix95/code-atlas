@@ -19,7 +19,14 @@ import { demoBody } from '../src/shared/uiFrame/demo.ts'
 import { boardBody, boardCss, boardValueText } from '../src/shared/uiFrame/board.ts'
 import { rulesCss } from '../src/shared/uiFrame/recipes/kit.ts'
 import { RECIPES } from '../src/shared/uiFrame/recipes/index.ts'
-import { htmlDocument, PAGE_STYLES, pageFor, styleTexts } from '../src/shared/uiFrame/documents.ts'
+import {
+  htmlDocument,
+  PAGE_STYLES,
+  pageFor,
+  pagesFor,
+  pgMedia,
+  styleTexts
+} from '../src/shared/uiFrame/documents.ts'
 import {
   defaultDeviceId,
   deviceFor,
@@ -80,13 +87,13 @@ const assets: PackageAssets = {
   },
   stamp: '20261002-1200'
 }
-/** 页面结构体检对象:本平台的页面 + 每个组件演示页(键随意,体检只按结构树检查) */
+/** 页面结构体检对象:本平台全部导出页 + 每个组件演示页(键随意,体检只按结构树检查) */
 const pagesForDoc = (d: UiFrameDoc): Record<string, PageNode[]> => ({
-  [pageFor(d.platform).specPath]: pageFor(d.platform).body,
+  ...Object.fromEntries(pagesFor(d.platform).map((p) => [p.specPath, p.body])),
   ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
 })
 const PAGES: Record<string, PageNode[]> = {
-  'pages/home.md': HOME_PAGE.body,
+  ...Object.fromEntries(pagesFor('desktop').map((p) => [p.specPath, p.body])),
   ...Object.fromEntries(RECIPES.map((r) => [`components/${r.id}.html`, demoBody(r.id)]))
 }
 
@@ -140,6 +147,15 @@ check('规格包文件齐全(§13.3):注册表全部组件的 css 与演示页�
     'pages/home.md',
     'pages/home.css',
     'pages/home.html',
+    'pages/list.md',
+    'pages/list.css',
+    'pages/list.html',
+    'pages/settings.md',
+    'pages/settings.css',
+    'pages/settings.html',
+    'pages/form.md',
+    'pages/form.css',
+    'pages/form.html',
     'icons/arrow-right.svg',
     'icons/timer.svg',
     'icons/music.svg',
@@ -189,7 +205,10 @@ check('表单组件走真实状态属性,不用 class 模拟勾选', () => {
   assert.match(pkg.files['components/input.html'], /placeholder="输入内容"/)
 })
 check('导出 HTML 无画布痕迹,元素之间无空白(规则 13)', () => {
-  for (const f of ['pages/home.html', ...RECIPES.map((r) => `components/${r.id}.html`)]) {
+  for (const f of [
+    ...pagesFor(doc.platform).map((p) => p.htmlPath),
+    ...RECIPES.map((r) => `components/${r.id}.html`)
+  ]) {
     const html = pkg.files[f]
     assert.doesNotMatch(html, /data-uf-/, `${f} 带了画布属性`)
     const body = html.slice(html.indexOf('<body>'), html.indexOf('</body>'))
@@ -651,17 +670,28 @@ check('手机方案的规格包:出 pages/app.* 而不是 pages/home.*', () => {
   assert.ok(p.files['pages/app.html'])
   assert.ok(p.files['pages/app.md'])
   assert.ok(p.files['pages/app.css'])
+  // 典型页(列表/设置/表单)平台无关,手机包同样携带
+  for (const id of ['list', 'settings', 'form']) {
+    assert.ok(p.files[`pages/${id}.html`], `手机包缺 pages/${id}.html`)
+    assert.ok(p.files[`pages/${id}.css`], `手机包缺 pages/${id}.css`)
+  }
   assert.ok(!('pages/home.html' in p.files), '手机包里不该有桌面页')
   assert.ok(!('pages/home.css' in p.files), '手机包里不该有桌面页样式')
   // 体检:手机页面结构树 + 全量组件演示页,零错误
   const errs = lintPackage(p, pagesForDoc(phone)).filter((i) => i.level === 'error')
   for (const i of errs) console.log(`    phone: [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(errs.length, 0)
-  // 预览清单:页面截图按设备尺寸
-  const pv = p.previews[p.previews.length - 1]
-  assert.equal(pv.html, 'pages/app.html')
-  assert.equal(pv.width, 390)
-  assert.equal(pv.height, 844)
+  // 预览清单:每张页面截图按设备尺寸(平台页 + 三个典型页)
+  const pv = p.previews.find((x) => x.html === 'pages/app.html')
+  assert.ok(pv, '预览清单缺 app 页')
+  assert.equal(pv!.width, 390)
+  assert.equal(pv!.height, 844)
+  for (const id of ['app', 'list', 'settings', 'form']) {
+    assert.ok(
+      p.previews.some((x) => x.png === `preview/${id}.png`),
+      `预览清单缺 ${id}`
+    )
+  }
   // design.json 带设备口径,导回能还原
   const dj = JSON.parse(p.files['design.json']) as Record<string, unknown>
   const ext = (dj['$extensions'] as Record<string, unknown>)['com.codeatlas.uiframe'] as Record<
@@ -693,6 +723,65 @@ check('示例页结构与文件随平台走:pageFor 与画布同源', () => {
       `app 页声明了未注册的组件样式:${s}`
     )
   }
+})
+
+console.log('── 典型页与响应式断点(M3-f,§5.5/§7.2)')
+check('pagesFor:平台示例页 + 列表/设置/表单典型页,四页齐出', () => {
+  const ids = pagesFor('desktop').map((p) => p.id)
+  assert.deepEqual(ids, ['home', 'list', 'settings', 'form'])
+  assert.deepEqual(
+    pagesFor('phone').map((p) => p.id),
+    ['app', 'list', 'settings', 'form']
+  )
+})
+check('典型页结构引用注册组件,页面样式全 token 值', () => {
+  for (const p of pagesFor('desktop').filter((x) => x.styleKey !== 'home')) {
+    for (const s of p.styles.filter((k) => k.startsWith('comp-'))) {
+      assert.ok(
+        RECIPES.some((r) => `comp-${r.id}` === s),
+        `${p.id} 声明了未注册的组件样式:${s}`
+      )
+    }
+  }
+  // 页面布局规则只许 var()/结构性值(媒体查询的断点值合法,单独在 @media 断言里查)
+  const listCss = pkg.files['pages/list.css']
+  const rulesPart = listCss.slice(0, listCss.indexOf('/* 响应式'))
+  assert.doesNotMatch(rulesPart, /:\s*[1-9][0-9.]*(?:px|rem|em)/)
+  assert.match(pkg.files['pages/settings.html'], /class="li/)
+  assert.match(pkg.files['pages/form.html'], /<form class="pg-card pg-form"/)
+})
+check('响应式断点:bp-* 进 tokens.css,典型页 CSS 用 @media 引用断点值', () => {
+  const tokens = pkg.files['tokens.css']
+  for (const [name, px] of [
+    ['bp-sm', '640'],
+    ['bp-md', '768'],
+    ['bp-lg', '1024'],
+    ['bp-xl', '1280']
+  ]) {
+    assert.match(
+      tokens,
+      new RegExp(
+        `--${name}: ${px === '640' ? '40rem' : px === '768' ? '48rem' : px === '1024' ? '64rem' : '80rem'};`
+      )
+    )
+  }
+  const media = pgMedia(doc)
+  assert.match(media, /@media \(max-width: 48rem\)/)
+  assert.match(media, /@media \(max-width: 40rem\)/)
+  assert.ok(pkg.files['pages/list.css'].includes('@media (max-width: 48rem)'))
+})
+check('改断点变量 → @media 边界跟着变(数值中间商:一处改处处改)', () => {
+  const d = defaultDoc()
+  d.tokens['bp-md'] = { ...d.tokens['bp-md'], value: { kind: 'dimension', px: 800 } }
+  assert.match(pgMedia(d), /@media \(max-width: 50rem\)/)
+})
+check('pageMd 只列本页实际引用的页面变量', () => {
+  const listMd = pkg.files['pages/list.md']
+  assert.match(listMd, /--pg-content-max/)
+  assert.doesNotMatch(listMd, /--app-safe-top/)
+  const formMd = pkg.files['pages/form.md']
+  assert.match(formMd, /--pg-field-gap/)
+  assert.doesNotMatch(formMd, /--app-nav-height/)
 })
 
 console.log('── 平台规范校验(M1-f,§5.7)')

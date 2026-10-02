@@ -106,15 +106,15 @@ export function UiFrameCanvas({
   const dev = deviceFor(doc)
   const isPhone = dev.platform === 'phone'
   const icons = doc.icons
-  const { jump, blankExample, placedSel, dragPart } = useWorkbench()
+  const { jump, blankExample, placedSel, dragPart, pageId } = useWorkbench()
   // 只有视图/平台/图标变了才重建文档;变量变化走 applyTokens 原地替换,不闪屏。
   // doc.platform 是依赖信号:平台切换换整页结构(desktop home ↔ phone app),必须重建 iframe。
   // 底板摆放也触发重建:零件增减/属性变化需要新文档;变量仍走 applyTokens 热替换
   const srcDoc = useMemo(() => {
     void doc.platform
     void doc.placed
-    return canvasHtml({ ...currentDoc(), icons }, view)
-  }, [icons, view, doc.platform, doc.placed])
+    return canvasHtml({ ...currentDoc(), icons }, view, pageId)
+  }, [icons, view, doc.platform, doc.placed, pageId])
   const { frameRef, selBoxRef, hoverBoxRef, frameDoc, onLoad, fitHeight } = useCanvasFrame({
     doc,
     view,
