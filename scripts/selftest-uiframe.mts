@@ -3,7 +3,12 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { buildPackage, type PackageAssets } from '../src/shared/uiFrame/exportPackage.ts'
+import {
+  buildPackage,
+  iconFileNames,
+  type PackageAssets
+} from '../src/shared/uiFrame/exportPackage.ts'
+import { fileIndex } from '../src/shared/uiFrame/readme.ts'
 import { HOME_PAGE } from '../src/shared/uiFrame/page.ts'
 import { defaultDoc } from '../src/shared/uiFrame/template.ts'
 import { hasErrors, lintPackage } from '../src/shared/uiFrame/lint.ts'
@@ -682,6 +687,54 @@ check('规格包含两个适配器文件,体检仍零错误零提醒', () => {
   const errs = lintPackage(p, PAGES).filter((i) => i.level === 'error')
   for (const i of errs) console.log(`    [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(errs.length, 0)
+})
+
+console.log('── M1 收口:全链路验收(§19 M1 标准)')
+check('空白起步:空方案也产出零错误的完整规格包', () => {
+  const d = templateDoc(BLANK_ID)
+  const p = buildPackage(d, assets)
+  const errs = lintPackage(p, pagesForDoc(d)).filter((i) => i.level === 'error')
+  for (const i of errs) console.log(`    [${i.check}] ${i.file}: ${i.message}`)
+  assert.equal(errs.length, 0)
+})
+check('全部模板 × 双平台:8 种组合出包体检全零错误', () => {
+  for (const t of TEMPLATES) {
+    for (const platform of ['desktop', 'phone'] as const) {
+      const d = { ...templateDoc(t.id), platform, device: defaultDeviceId(platform) }
+      const errs = lintPackage(buildPackage(d, assets), pagesForDoc(d)).filter(
+        (i) => i.level === 'error'
+      )
+      assert.equal(
+        errs.length,
+        0,
+        `${t.id}/${platform}: ${errs.map((i) => `${i.check}→${i.file}`).join(' | ')}`
+      )
+    }
+  }
+})
+check('确定性导出:同一份数据两次出包,文件集合与逐字节内容一致', () => {
+  const a = buildPackage(doc, assets)
+  const b = buildPackage(doc, assets)
+  assert.deepEqual(Object.keys(a.files).sort(), Object.keys(b.files).sort())
+  for (const k of Object.keys(a.files)) {
+    assert.equal(a.files[k], b.files[k], `${k} 两次产出不一致`)
+  }
+})
+check('README 文件索引 ↔ 产物一一对应:索引条目全在包内,包内文件全被索引', () => {
+  const indexed = new Set(fileIndex(doc, iconFileNames(doc)).map(([p]) => p))
+  const emitted = new Set(Object.keys(pkg.files))
+  for (const p of indexed) {
+    if (p.endsWith('/')) continue // 目录条目(preview/)
+    assert.ok(emitted.has(p), `索引列了 ${p} 但包里没有`)
+  }
+  for (const p of emitted) {
+    assert.ok(indexed.has(p), `包里多了 ${p} 但索引没收录`)
+  }
+})
+check('图标槽位换图标后,导出包文件同步换', () => {
+  const files = iconFileNames({ ...doc, icons: { ...doc.icons, 'demo-ibtn': 'plus' } })
+  assert.ok(files.includes('icons/plus.svg'), '换成 plus 后包内要有 icons/plus.svg')
+  assert.ok(!files.includes('icons/ellipsis.svg'), '不再被引用的图标不该入包')
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

@@ -358,8 +358,14 @@ try {
   const tipRow = page.locator('.tree:not(.search-results) .tree-main[data-tip]').first()
   // 窗口拉宽保证右侧摆得下:窄窗翻面是正当行为,这里要锁的是「右缘(sash 线)出」
   await page.setViewportSize({ width: 1280, height: 800 })
-  await tipRow.hover()
   const bubble = page.locator('.tip-bubble')
+  // hover 的 scrollIntoView 可能在 mouseover 之后才补发 scroll 事件,把 1s 慢档计时器收掉;
+  // 真机使用不受影响——重悬一次即可,重试三次兜底这类事件时序抖动
+  for (let attempt = 0; attempt < 3 && (await bubble.count()) === 0; attempt++) {
+    await page.mouse.move(12, 320)
+    await tipRow.hover()
+    await bubble.waitFor({ timeout: 4_000 }).catch(() => {})
+  }
   await bubble.waitFor()
   assert.ok((await bubble.textContent())?.trim(), 'tooltip must carry the annotation text')
   assert.equal(await bubble.getAttribute('data-side'), 'right', 'tree tooltip must open right')
@@ -799,6 +805,16 @@ try {
   await page.getByRole('menuitem', { name: 'React Native 主题对象' }).click()
   await page.getByText('React Native 主题对象已复制到剪贴板').waitFor()
   await page.getByRole('button', { name: '知道了', exact: true }).click()
+  // M1-h 收口:空白起步路径(§19 M1「从空白到方案包」)——方案库「新建方案」回起步页 → 空白起步 → 组件墙即渲染
+  await page.getByTitle('打开方案库', { exact: true }).click()
+  await page.getByRole('button', { name: '新建方案', exact: true }).click()
+  await page.getByRole('button', { name: '空白起步', exact: true }).click()
+  await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
+  // 画布视图态留在上一程的「变量板」,先切回组件墙再断言
+  await page.getByRole('button', { name: '组件墙', exact: true }).click()
+  const blankCanvas = page.frameLocator('iframe.uf-canvas-frame')
+  await blankCanvas.locator('button.btn--solid').first().waitFor()
+  await shot('uiframe-blank')
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'

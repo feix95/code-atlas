@@ -725,13 +725,13 @@ AI 照做的精度,从高到低:
 
 ### 13.5 导出目标(适配器)
 
-| 目标                                 | 产物                               | 里程碑                                  |
-| ------------------------------------ | ---------------------------------- | --------------------------------------- |
-| 网页 · 原生 CSS 变量 + HTML 参考实现 | `tokens.css` + `components/*.html` | M0                                      |
-| 网页 · Tailwind CSS v4               | `@theme` 主题文件                  | M1                                      |
-| React Native                         | 主题对象(TypeScript)               | M3(实测建议提前至 M1 末,见 §22 问题 18) |
-| Flutter                              | ThemeData(Dart)                    | M3                                      |
-| SwiftUI / Jetpack Compose            | 主题代码                           | M3 以后                                 |
+| 目标                                 | 产物                               | 里程碑  |
+| ------------------------------------ | ---------------------------------- | ------- |
+| 网页 · 原生 CSS 变量 + HTML 参考实现 | `tokens.css` + `components/*.html` | M0      |
+| 网页 · Tailwind CSS v4               | `@theme` 主题文件                  | M1      |
+| React Native                         | 主题对象(TypeScript)               | M1      |
+| Flutter                              | ThemeData(Dart)                    | M3      |
+| SwiftUI / Jetpack Compose            | 主题代码                           | M3 以后 |
 
 ### 13.6 导出形式对比【给定:按行业通用规则走,并做多方案比对】
 
