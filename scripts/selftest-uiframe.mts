@@ -12,7 +12,7 @@ import { fileIndex } from '../src/shared/uiFrame/readme.ts'
 import { HOME_PAGE } from '../src/shared/uiFrame/page.ts'
 import { defaultDoc } from '../src/shared/uiFrame/template.ts'
 import { hasErrors, lintPackage } from '../src/shared/uiFrame/lint.ts'
-import { LUCIDE_VERSION, svgText } from '../src/shared/uiFrame/markup.ts'
+import { iconSlotsOf, LUCIDE_VERSION, svgText } from '../src/shared/uiFrame/markup.ts'
 import { describePx, remText, snapPx } from '../src/shared/uiFrame/units.ts'
 import { resolvePx } from '../src/shared/uiFrame/resolve.ts'
 import { demoBody } from '../src/shared/uiFrame/demo.ts'
@@ -52,6 +52,8 @@ import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFr
 import { fillInInstruction } from '../src/shared/uiFrame/fillInstruction.ts'
 import { verifyClaim } from '../src/shared/uiFrame/provenance.ts'
 import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
+import { nudgeValue } from '../src/shared/uiFrame/tweak.ts'
+import { editTarget, refTargetOf, tokenUsage } from '../src/shared/uiFrame/usage.ts'
 import {
   CUSTOM_ICON_PREFIX,
   iconSvgRelPath,
@@ -1118,6 +1120,66 @@ check('custom 图标:槽位值 custom:<名>,design.json 往返 + 规格包内联
   assert.ok(p.files['icons/custom-logo.svg']?.includes('<rect'), '包内要有自定义 svg 文件')
   const usedInline = Object.values(p.files).some((f) => f.includes('<rect'))
   assert.ok(usedInline, '页面或演示里要内联自定义 svg 原文')
+})
+
+console.log('── M3-g:键盘微调 · 空格对比 · 共用变量 · 变体轴补全')
+
+check('键盘微调(§5.6):方向键 ±1 步长、Shift ±4 步长,吃上下限', () => {
+  const px = { kind: 'dimension', px: 40 } as const
+  assert.deepEqual(nudgeValue(px, 1, 1), { kind: 'dimension', px: 42 })
+  assert.deepEqual(nudgeValue(px, -1, 1), { kind: 'dimension', px: 38 })
+  assert.deepEqual(nudgeValue(px, 1, 4), { kind: 'dimension', px: 48 })
+  assert.deepEqual(nudgeValue(px, -1, 4, 36, 96), { kind: 'dimension', px: 36 })
+  assert.deepEqual(nudgeValue(px, 1, 4, 0, 44), { kind: 'dimension', px: 44 })
+  const lh = { kind: 'number', value: 1.5 } as const
+  assert.deepEqual(nudgeValue(lh, 1, 1), { kind: 'number', value: 1.55 })
+  assert.deepEqual(nudgeValue({ kind: 'fontWeight', value: 400 }, -1, 4), {
+    kind: 'fontWeight',
+    value: 360
+  })
+  assert.equal(nudgeValue({ kind: 'color', light: '#000000', dark: '#FFFFFF' }, 1, 1), null)
+})
+
+check('共用变量影响面:ref 目标数出「引用它的变量 + var() 规则」', () => {
+  const u = tokenUsage(doc.tokens, 'radius-md')
+  assert.ok(u.refs.length >= 3, `radius-md 应被多个组件变量引用,实际 ${u.refs.length}`)
+  assert.ok(u.total >= u.refs.length)
+  assert.equal(tokenUsage(doc.tokens, 'zzz-no-such-token').total, 0)
+})
+
+check('「写哪」口径:shared 写引用目标,local 写回本变量(断开成专属值)', () => {
+  const refName = Object.keys(doc.tokens).find(
+    (n) => refTargetOf(doc.tokens[n].value) === 'radius-md'
+  )
+  assert.ok(refName, '默认模板要有引用 radius-md 的组件变量')
+  assert.equal(editTarget(refName, 'shared', doc.tokens), 'radius-md')
+  assert.equal(editTarget(refName, 'local', doc.tokens), refName)
+  assert.equal(editTarget('radius-md', 'shared', doc.tokens), 'radius-md')
+})
+
+check('变体轴补全(§7.4):按钮浅底/文字/危险/形状/撑满,页签卡片,卡片四态', () => {
+  const btnCss = pkg.files['components/button.css']
+  const btnHtml = pkg.files['components/button.html']
+  for (const sel of [
+    '.btn--tint',
+    '.btn--text',
+    '.btn--danger',
+    '.btn--square',
+    '.btn--pill',
+    '.btn--block'
+  ])
+    assert.ok(btnCss.includes(sel), `button.css 缺 ${sel}`)
+  for (const cls of ['btn--tint', 'btn--text', 'btn--danger', 'btn--pill', 'btn--block'])
+    assert.ok(btnHtml.includes(cls), `button.html 演示缺 ${cls}`)
+  assert.match(pkg.files['components/tabs.css'], /\.tabs--card/)
+  assert.ok(pkg.files['components/tabs.html'].includes('tabs--card'))
+  for (const sel of ['.card--outline', '.card--shadow', '.card--fill', '.card--click'])
+    assert.ok(pkg.files['components/card.css'].includes(sel), `card.css 缺 ${sel}`)
+  assert.match(pkg.files['components/card.css'], /\.card--click:hover/)
+  assert.ok(pkg.files['components/switch.html'].includes('sw-txt'))
+  // 输入框附件轴:尾图标 + 清除钮两个图标槽位进演示结构
+  const slots = iconSlotsOf(demoBody('input'))
+  assert.ok(slots.includes('demo-down') && slots.includes('demo-x'), '输入框演示缺附件槽位')
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

@@ -14,7 +14,8 @@ import {
 const VARIANTS: Array<[cls: string, name: string]> = [
   ['', '下划线'],
   ['tabs--pill', '胶囊'],
-  ['tabs--seg', '分段']
+  ['tabs--seg', '分段'],
+  ['tabs--card', '浏览器卡片']
 ]
 
 const TAB_STATES: Array<[cls: string, label: string, selected: boolean]> = [
@@ -128,6 +129,28 @@ export const TABS: ComponentRecipe = {
     {
       sel: '.tabs--seg .tab[aria-selected="true"]',
       decls: [['box-shadow', v('tab-seg-shadow')]]
+    },
+    // 浏览器卡片型(§7.4):选中页签上方圆角、贴卡片边线,底边并入分组底线
+    {
+      sel: '.tabs--card',
+      decls: [
+        ['--tab-radius', v('radius-md')],
+        ['--tab-on-bg', v('color-surface')],
+        ['gap', '0'],
+        ['border-bottom', `${v('border-width-1')} solid ${v('color-border')}`]
+      ]
+    },
+    {
+      sel: '.tabs--card .tab',
+      decls: [
+        ['border', `${v('border-width-1')} solid transparent`],
+        ['border-bottom', '0'],
+        ['border-radius', `${v('tab-radius')} ${v('tab-radius')} 0 0`]
+      ]
+    },
+    {
+      sel: '.tabs--card .tab[aria-selected="true"]',
+      decls: [['border-color', v('color-border')]]
     }
   ],
   states: [

@@ -129,7 +129,6 @@
 .uf-rules-dot.is-warn {
   background: var(--amber);
 }
-
 .uf-rules-dot.is-error {
   background: var(--danger);
 }
@@ -226,6 +225,7 @@
 }
 
 .uf-main {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 20rem;
   min-height: 0;
@@ -488,6 +488,42 @@
 .uf-unit {
   color: var(--muted);
   font-size: var(--font-xs);
+}
+
+/* ── 共用变量提示(M3-g §5.6):ref 变量的「影响面 + 改哪」行 ── */
+.uf-share-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.uf-share-count,
+.uf-share-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uf-share-scope .uf-seg-btn {
+  padding: 0 var(--space-2);
+  font-size: var(--font-xs);
+}
+
+/* 空格前后对比的提示徽标 */
+.uf-compare-badge {
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--sash-hi);
+  color: #fff;
+  font-size: var(--font-xs);
+  pointer-events: none;
 }
 
 .uf-link {

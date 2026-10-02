@@ -6,6 +6,7 @@ import { resolvePx } from '@shared/uiFrame/resolve'
 import { defaultTokens } from '@shared/uiFrame/template'
 import type { TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
 import { describePx } from '@shared/uiFrame/units'
+import { refTargetOf, tokenUsage } from '@shared/uiFrame/usage'
 
 const DEFAULTS = defaultTokens()
 
@@ -46,6 +47,12 @@ export function useHandleDrag({
     activeRef.current = true
     target.setPointerCapture(e.pointerId)
 
+    // §5.6 共用变量提示:手柄绑的变量是 ref 时,徽标顺带报目标的引用面
+    const shareTip = (): string => {
+      const v = doc.tokens[handle.token]?.value
+      const target = v ? refTargetOf(v) : null
+      return target ? ` · 引自 --${target},影响 ${tokenUsage(doc.tokens, target).total} 处` : ''
+    }
     const onMove = (ev: PointerEvent): void => {
       const dx = (ev.clientX - startX) / scale
       const dy = (ev.clientY - startY) / scale
@@ -56,7 +63,7 @@ export function useHandleDrag({
       onPreview({ ...doc, tokens: { ...doc.tokens, [handle.token]: { ...def, value: out.value } } })
       setBadge({
         label: handle.label,
-        text: `${describePx(out.px, doc.rootFontPx)}${out.magnet ? ` · = --${out.magnet}` : ''}`
+        text: `${describePx(out.px, doc.rootFontPx)}${out.magnet ? ` · = --${out.magnet}` : ''}${shareTip()}`
       })
     }
     const finish = (): void => {

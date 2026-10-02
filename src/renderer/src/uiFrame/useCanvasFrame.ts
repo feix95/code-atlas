@@ -183,10 +183,13 @@ export function useCanvasFrame({
       hoverRef.current = null
     }
     const onKeyDown = (e: KeyboardEvent): void => handlersRef.current.onKey(e)
+    // 空格对比需要 keyup 才算松手:iframe 里按住空格,松开时事件落在 iframe 自己的 window 上
+    const onKeyUp = (e: KeyboardEvent): void => handlersRef.current.onKey(e)
     frameDoc.addEventListener('click', onClick, true)
     frameDoc.addEventListener('mousemove', onMove)
     frameDoc.addEventListener('mouseleave', onLeave)
     frameDoc.addEventListener('keydown', onKeyDown)
+    frameDoc.addEventListener('keyup', onKeyUp)
     frameDoc.addEventListener('mousedown', onMouseDown)
     frameDoc.addEventListener('pointerdown', onPointerDown)
     frameDoc.addEventListener('pointermove', onPointerMove)
@@ -206,6 +209,7 @@ export function useCanvasFrame({
       frameDoc.removeEventListener('mousemove', onMove)
       frameDoc.removeEventListener('mouseleave', onLeave)
       frameDoc.removeEventListener('keydown', onKeyDown)
+      frameDoc.removeEventListener('keyup', onKeyUp)
       frameDoc.removeEventListener('mousedown', onMouseDown)
       frameDoc.removeEventListener('pointerdown', onPointerDown)
       frameDoc.removeEventListener('pointermove', onPointerMove)

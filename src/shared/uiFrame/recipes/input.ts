@@ -1,7 +1,7 @@
 // 输入框配方:<label class="ipt-box"><svg?><input class="ipt"></label>
 // 视觉壳在 .ipt-box 上(描边 / 填充底 / 下划线三种样式),内部 .ipt 是无框裸输入,
 // 带不带图标外观一致;尺寸与样式全部通过组件级自定义属性改绑变量。
-import type { PageNode, ThemeName } from '../types.ts'
+import type { IconSlot, PageNode, ThemeName } from '../types.ts'
 import {
   DEMO_STATE_CLASS,
   demoCol,
@@ -36,7 +36,6 @@ export const INPUT: ComponentRecipe = {
       decls: [
         ['--ipt-height', v('ipt-height-md')],
         ['--ipt-fs', v('ipt-font-size-md')],
-        ['--ipt-radius', v('ipt-radius')],
         ['box-sizing', 'border-box'],
         ['display', 'flex'],
         ['align-items', 'center'],
@@ -111,7 +110,7 @@ export const INPUT: ComponentRecipe = {
     {
       sel: '.ipt-box--underline',
       decls: [
-        ['--ipt-radius', v('radius-none')],
+        ['border-radius', v('radius-none')],
         ['border-top-color', 'transparent'],
         ['border-right-color', 'transparent'],
         ['border-left-color', 'transparent']
@@ -154,12 +153,18 @@ export const INPUT: ComponentRecipe = {
     }
   ],
   demo(theme: ThemeName): PageNode {
-    const field = (cls: string, stateCls: string, disabled: boolean, icon: boolean): PageNode => ({
+    const field = (
+      cls: string,
+      stateCls: string,
+      disabled: boolean,
+      leadIcon?: IconSlot,
+      trailIcon?: IconSlot
+    ): PageNode => ({
       tag: 'label',
       cls: `ipt-box${cls ? ` ${cls}` : ''}${stateCls ? ` ${stateCls}` : ''}`,
       part: 'ipt-box',
       children: [
-        ...(icon ? [{ tag: 'span', cls: 'ipt-ic', icon: 'demo-input' } as PageNode] : []),
+        ...(leadIcon ? [{ tag: 'span', cls: 'ipt-ic', icon: leadIcon } as PageNode] : []),
         (() => {
           const input: PageNode = {
             tag: 'input',
@@ -168,27 +173,39 @@ export const INPUT: ComponentRecipe = {
           }
           if (disabled) input.attrs!['disabled'] = ''
           return input
-        })()
+        })(),
+        ...(trailIcon ? [{ tag: 'span', cls: 'ipt-ic', icon: trailIcon } as PageNode] : [])
       ]
     })
     const variantRows = VARIANTS.map(([cls, name]) =>
       demoRow([
         demoLabel(name),
-        demoCol(STATES.map(([state, , disabled]) => field(cls, state, disabled, false)))
+        demoCol(STATES.map(([state, , disabled]) => field(cls, state, disabled)))
       ])
     )
     const iconRow = demoRow([
       demoLabel('带图标'),
-      demoCol([field('', '', false, true), field('ipt-box--filled', '', false, true)])
+      demoCol([
+        field('', '', false, 'demo-input'),
+        field('ipt-box--filled', '', false, 'demo-input')
+      ])
+    ])
+    // 附件轴(§7.4):尾图标 / 清除钮
+    const attachRow = demoRow([
+      demoLabel('附件'),
+      demoCol([
+        field('', '', false, undefined, 'demo-down'),
+        field('', '', false, undefined, 'demo-x')
+      ])
     ])
     const sizeRow = demoRow([
       demoLabel('尺寸'),
       demoCol([
-        field('ipt-box--sm', '', false, false),
-        field('', '', false, false),
-        field('ipt-box--lg', '', false, false)
+        field('ipt-box--sm', '', false),
+        field('', '', false),
+        field('ipt-box--lg', '', false)
       ])
     ])
-    return demoSection(theme, '输入框', [...variantRows, iconRow, sizeRow])
+    return demoSection(theme, '输入框', [...variantRows, iconRow, attachRow, sizeRow])
   }
 }

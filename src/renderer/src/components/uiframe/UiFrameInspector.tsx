@@ -1,11 +1,13 @@
 // 属性面板:选中部件的可拖参数与全部参数,数值输入即改;图标部件附图标选择器。
 // 变量板点选的基础变量(data-uf-part="tok:<名>")走单变量编辑:数字、取色、阴影分量、字体名。
 import { useState } from 'react'
-import { PARTS } from '@shared/uiFrame/handles'
+import { PARTS, type HandleDef } from '@shared/uiFrame/handles'
 import { PART_MAP } from '@shared/uiFrame/parts'
 import { literalCss, resolveValue } from '@shared/uiFrame/resolve'
+import { nudgeValue } from '@shared/uiFrame/tweak'
 import type { IconSlot, TokenDef, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
 import { describePx } from '@shared/uiFrame/units'
+import { editTarget, refTargetOf, tokenUsage } from '@shared/uiFrame/usage'
 import { docActions, isTokenEdited } from '../../uiFrame/docStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { workbenchActions } from '../../uiFrame/workbenchStore'
@@ -35,37 +37,91 @@ function withNumber(value: TokenValue, n: number): TokenValue {
 function TokenRow({
   doc,
   name,
-  hot
+  hot,
+  bounds
 }: {
   doc: UiFrameDoc
   name: string
   hot: boolean
+  /** 手柄带的上下限(§5.6 键盘微调同样吃它);没手柄的变量不给 */
+  bounds?: { min: number; max: number }
 }): React.JSX.Element {
   const def = doc.tokens[name]
-  const resolved = resolveValue(doc.tokens, name)
+  // ref 变量的「写哪」:shared = 改变量本身(波及全部引用处),local = 只改这一处(断开支用专属值)
+  const [scope, setScope] = useState<'shared' | 'local'>('local')
+  const refTarget = refTargetOf(def.value)
+  const writeTo = editTarget(name, scope, doc.tokens)
+  const resolved = resolveValue(doc.tokens, writeTo)
   const mode = editable(resolved)
   const current = numberOf(resolved)
   const [draft, setDraft] = useState<string | null>(null)
+  // 影响面:ref 变量数它引用的目标被多少处用;字面量变量数多少处引用它
+  const shared = refTarget ? tokenUsage(doc.tokens, refTarget) : tokenUsage(doc.tokens, name)
+  const writeEdited = writeTo === name ? isTokenEdited(doc, name) : isTokenEdited(doc, writeTo)
   const shown =
     mode === 'px'
       ? describePx(current, doc.rootFontPx)
       : literalCss(resolved, 'light', doc.rootFontPx)
+  const write = (value: TokenValue): void => docActions.setToken(writeTo, value)
   const commit = (): void => {
     if (draft === null) return
     const n = Number(draft)
     setDraft(null)
-    if (Number.isFinite(n) && n !== current) docActions.setToken(name, withNumber(resolved, n))
+    if (Number.isFinite(n) && n !== current) write(withNumber(resolved, n))
+  }
+  // §5.6 键盘微调:方向键 ±1 步长,Shift + 方向键 ±4 步长,吃手柄上下限
+  const nudge = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+    const next = nudgeValue(
+      resolved,
+      e.key === 'ArrowUp' ? 1 : -1,
+      e.shiftKey ? 4 : 1,
+      bounds?.min ?? -Infinity,
+      bounds?.max ?? Infinity
+    )
+    if (next) write(next)
   }
   return (
     <div className={`uf-row${hot ? ' is-hot' : ''}`}>
       <div className="uf-row-head">
         <span className="uf-row-label">{def.label}</span>
-        {isTokenEdited(doc, name) && (
-          <button type="button" className="uf-link" onClick={() => docActions.resetToken(name)}>
+        {writeEdited && (
+          <button type="button" className="uf-link" onClick={() => docActions.resetToken(writeTo)}>
             恢复默认
           </button>
         )}
       </div>
+      {refTarget && (
+        <div className="uf-share-hint">
+          <span className="uf-share-count">
+            绑在 --{refTarget} 上,它同时影响 {shared.total} 处
+          </span>
+          <span className="uf-seg uf-share-scope" role="group" aria-label="改动范围">
+            <button
+              type="button"
+              className={`uf-seg-btn${scope === 'local' ? ' is-on' : ''}`}
+              aria-pressed={scope === 'local'}
+              title="断开引用,这个参数改用专属值,其它地方不受影响"
+              onClick={() => setScope('local')}
+            >
+              只改这一处
+            </button>
+            <button
+              type="button"
+              className={`uf-seg-btn${scope === 'shared' ? ' is-on' : ''}`}
+              aria-pressed={scope === 'shared'}
+              title={`改 --${refTarget} 本身,引用它的 ${shared.total} 处一起变`}
+              onClick={() => setScope('shared')}
+            >
+              改变量本身
+            </button>
+          </span>
+        </div>
+      )}
+      {!refTarget && shared.refs.length > 0 && (
+        <p className="uf-share-note">共用变量:{shared.refs.length} 个变量引用它,改动会一起生效</p>
+      )}
       <div className="uf-row-body">
         {mode ? (
           <label className="uf-num">
@@ -79,7 +135,8 @@ function TokenRow({
               onBlur={commit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') commit()
-                if (e.key === 'Escape') setDraft(null)
+                else if (e.key === 'Escape') setDraft(null)
+                else nudge(e)
               }}
             />
             {mode === 'px' && <span className="uf-unit">px</span>}
@@ -89,7 +146,9 @@ function TokenRow({
       </div>
       <span className="uf-row-ref mono">
         --{name}
-        {def.value.kind === 'ref' ? ` → --${def.value.ref}` : ' · 自定义值'}
+        {refTarget
+          ? ` → --${refTarget}${scope === 'shared' ? '(改它)' : '(断开,专属值)'}`
+          : ' · 自定义值'}
       </span>
     </div>
   )
@@ -344,10 +403,13 @@ export function UiFrameInspector({
         </p>
         <p className="uf-hint">底板上的零件可以直接拖位置;零件盒里的组件拖上来或双击即可上板。</p>
         <p className="uf-hint">拖动默认按 0.125rem 吸附,靠近已有变量会自动吸上;按住 Alt 自由拖。</p>
+        <p className="uf-hint">
+          选中数值后方向键微调一步,Shift + 方向键四步;按住空格看修改前的样子。
+        </p>
       </aside>
     )
   }
-  const hot = new Set(part.handles.map((h) => h.token))
+  const hot = new Map(part.handles.map((h: HandleDef) => [h.token, h]))
   const names = Object.keys(doc.tokens).filter((n) => doc.tokens[n].path[0] === part.group)
   const ordered = [...names.filter((n) => hot.has(n)), ...names.filter((n) => !hot.has(n))]
   const slot: IconSlot | null = selection.iconSlot
@@ -368,11 +430,13 @@ export function UiFrameInspector({
       <section className="uf-section">
         <h3 className="uf-section-title">参数</h3>
         {ordered.map((n) => (
+          // key 不带 value:方向键微调每按一次就提交,key 带值会重挂载丢焦点,连按就废
           <TokenRow
-            key={`${n}:${JSON.stringify(doc.tokens[n].value)}`}
+            key={n}
             doc={doc}
             name={n}
             hot={hot.has(n)}
+            bounds={hot.get(n) ? { min: hot.get(n)!.min, max: hot.get(n)!.max } : undefined}
           />
         ))}
       </section>

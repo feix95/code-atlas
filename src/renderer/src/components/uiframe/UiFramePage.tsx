@@ -38,9 +38,37 @@ function isUndoKey(e: KeyboardEvent | React.KeyboardEvent): 'undo' | 'redo' | nu
   return e.shiftKey ? 'redo' : 'undo'
 }
 
+/** 事件目标是不是「会吃掉空格的控件」:画布 iframe 里的节点不算(它们是道具) */
+function eatsSpace(t: EventTarget | null): boolean {
+  if (!(t instanceof Element)) return false
+  // iframe 内元素的 ownerDocument 不是外层 document,先判掉再走外层 instanceof
+  if (t.ownerDocument !== document) return false
+  return (
+    t instanceof HTMLInputElement ||
+    t instanceof HTMLTextAreaElement ||
+    t instanceof HTMLSelectElement ||
+    t instanceof HTMLButtonElement ||
+    t instanceof HTMLAnchorElement ||
+    (t instanceof HTMLElement && t.isContentEditable)
+  )
+}
+
 function handleUndoKey(e: KeyboardEvent | React.KeyboardEvent): void {
   // 已处理过的别再处理:div 冒泡拦截后 window 监听会再见一次同一事件
   if (e.defaultPrevented) return
+  // 空格前后对比(§5.6):按住显示修改前,松开恢复;不进撤销栈
+  if (e.key === ' ' || e.code === 'Space') {
+    if (eatsSpace(e.target)) return
+    e.preventDefault()
+    if (e.type === 'keydown') {
+      if (!e.repeat) workbenchActions.setComparing(true)
+    } else {
+      workbenchActions.setComparing(false)
+    }
+    return
+  }
+  // 其余快捷键只在按下时触发:keyup 也进这里(window + iframe 两边都转发了)
+  if (e.type !== 'keydown') return
   // 底板选中零件时 Delete/Backspace 删实例,Esc 取消选中(M3-a)
   const placed = workbenchNow().placedSel
   if (e.key === 'Escape' && placed) {
@@ -143,7 +171,7 @@ function ExportBanner({
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
   const { started, schemeId, busy, error, notice } = useSchemeState()
-  const { view, libraryOpen, placedSel, pageId } = useWorkbench()
+  const { view, libraryOpen, placedSel, pageId, comparing } = useWorkbench()
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
   const [chrome, setChrome] = useState(true)
@@ -168,8 +196,20 @@ export function UiFramePage(): React.JSX.Element {
   // .uf-page 内的事件先被 div 拦截并 preventDefault,window 这里靠 defaultPrevented 去重
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => handleUndoKey(e)
+    const onBlur = (): void => workbenchActions.setComparing(false)
+    const onVis = (): void => {
+      if (document.visibilityState === 'hidden') onBlur()
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKey)
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKey)
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [])
 
   // 回起步页(新建方案/换模板)时把浮层状态收干净,免得回画布时库面板还盖着
@@ -438,8 +478,15 @@ export function UiFramePage(): React.JSX.Element {
         )}
       </div>
       <div className="uf-main">
+        {comparing && (
+          <span className="uf-compare-badge" role="status">
+            看的是修改前,松开空格返回
+          </span>
+        )}
         <UiFrameCanvas
           doc={doc}
+          // 空格前后对比:有历史就临时显示上一版快照;画布只换变量不重载(§5.6)
+          beforeDoc={comparing ? (past[past.length - 1] ?? null) : null}
           view={view}
           theme={theme}
           fit={fit}

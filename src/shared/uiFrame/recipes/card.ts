@@ -1,12 +1,19 @@
 // 卡片配方:图标底块 + 标题 + 说明;变体见 §7.4(描边 / 阴影 / 填充底、可点击)。
 import type { PageNode, ThemeName } from '../types.ts'
-import { demoSection, v, type ComponentRecipe } from './kit.ts'
+import { demoCol, demoLabel, demoRow, demoSection, v, type ComponentRecipe } from './kit.ts'
+
+// 样式轴(§7.4):描边 / 阴影 / 填充底
+const VARIANTS: Array<[cls: string, name: string]> = [
+  ['card--outline', '描边'],
+  ['card--shadow', '阴影'],
+  ['card--fill', '填充底']
+]
 
 export const CARD: ComponentRecipe = {
   id: 'card',
   label: '卡片',
   group: 'card',
-  stateNames: ['默认'],
+  stateNames: ['默认', '悬停', '焦点'],
   rules: [
     {
       sel: '.card',
@@ -67,20 +74,87 @@ export const CARD: ComponentRecipe = {
         ['line-height', v('card-text-line-height')],
         ['color', v('color-text-secondary')]
       ]
+    },
+    // 样式轴(§7.4):纯描边 / 纯阴影 / 填充底
+    { sel: '.card--outline', decls: [['box-shadow', 'none']] },
+    {
+      sel: '.card--shadow',
+      decls: [
+        ['border-color', 'transparent'],
+        ['box-shadow', v('card-shadow')]
+      ]
+    },
+    {
+      sel: '.card--fill',
+      decls: [
+        ['background', v('color-hover-bg')],
+        ['border-color', 'transparent'],
+        ['box-shadow', 'none']
+      ]
+    },
+    // 可点击(§7.4):手型光标,悬停/焦点态走下方 states
+    {
+      sel: '.card--click',
+      decls: [['cursor', 'pointer']]
     }
   ],
-  states: [],
+  states: [
+    {
+      base: '.card--click',
+      state: 'hover',
+      decls: [['border-color', v('color-border-strong')]]
+    },
+    {
+      base: '.card--click',
+      state: 'active',
+      decls: [['border-color', v('color-primary')]]
+    },
+    {
+      base: '.card--click',
+      state: 'focus',
+      real: ':focus-visible',
+      decls: [
+        ['outline', `${v('focus-ring-width')} solid ${v('color-focus')}`],
+        ['outline-offset', v('focus-ring-offset')]
+      ]
+    }
+  ],
   demo(theme: ThemeName): PageNode {
-    const card: PageNode = {
+    const card = (cls: string, title: string): PageNode => ({
       tag: 'div',
-      cls: 'card',
+      cls: `card${cls ? ` ${cls}` : ''}`,
       part: 'card',
       children: [
         { tag: 'div', cls: 'card__icon', icon: 'demo-card', part: 'card-icon-box' },
-        { tag: 'h3', cls: 'card__title', text: '卡片标题' },
+        { tag: 'h3', cls: 'card__title', text: title },
         { tag: 'p', cls: 'card__text', text: '卡片说明文字,用于展示正文字号与行高。' }
       ]
+    })
+    const variantGrid = {
+      tag: 'div',
+      cls: 'demo-cards',
+      children: VARIANTS.map(([cls]) =>
+        card(
+          cls,
+          cls === 'card--outline' ? '描边卡片' : cls === 'card--shadow' ? '阴影卡片' : '填充底卡片'
+        )
+      )
     }
-    return demoSection(theme, '卡片', [{ tag: 'div', cls: 'demo-cards', children: [card] }])
+    const clickRow = demoRow([
+      demoLabel('可点击'),
+      demoCol([
+        {
+          tag: 'div',
+          cls: 'card card--click',
+          part: 'card',
+          attrs: { tabindex: '0', role: 'button' },
+          children: [
+            { tag: 'h3', cls: 'card__title', text: '可点击卡片' },
+            { tag: 'p', cls: 'card__text', text: '悬停换描边色,焦点出焦点环。' }
+          ]
+        }
+      ])
+    ])
+    return demoSection(theme, '卡片', [variantGrid, clickRow])
   }
 }

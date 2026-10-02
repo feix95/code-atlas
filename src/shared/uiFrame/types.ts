@@ -59,6 +59,7 @@ export type IconSlot =
   | 'app-arrow'
   | 'demo-search'
   | 'demo-down'
+  | 'demo-x'
 
 export type UiPlatform = 'desktop' | 'phone'
 

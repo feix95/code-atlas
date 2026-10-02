@@ -35,7 +35,8 @@ const SLOT_LABEL: Record<IconSlot, string> = {
   'demo-arrow': '列表尾部箭头',
   'demo-card': '卡片图标',
   'demo-search': '搜索图标',
-  'demo-down': '下拉箭头'
+  'demo-down': '下拉箭头',
+  'demo-x': '清除钮'
 }
 
 const PLATFORM_LABEL = { desktop: '电脑', phone: '手机' } as const

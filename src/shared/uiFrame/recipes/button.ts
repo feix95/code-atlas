@@ -18,8 +18,16 @@ const SIZES: Array<['sm' | 'lg', string]> = [
 
 const VARIANTS: Array<[string, string]> = [
   ['solid', '实心'],
+  ['tint', '浅底'],
   ['outline', '描边'],
-  ['ghost', '幽灵']
+  ['ghost', '幽灵'],
+  ['text', '文字']
+]
+
+// 语义轴(§7.4):主要走 color-primary,危险走 btn-danger-* 三态
+const SEMANTICS: Array<[string, string]> = [
+  ['solid', '主要'],
+  ['solid btn--danger', '危险']
 ]
 
 const STATES: Array<[cls: string, label: string, disabled: boolean]> = [
@@ -89,6 +97,39 @@ export const BUTTON: ComponentRecipe = {
     },
     { sel: '.btn--outline', decls: [['border-color', v('color-border-strong')]] },
     {
+      sel: '.btn--tint',
+      decls: [
+        ['background', v('color-primary-subtle')],
+        ['color', v('color-primary')]
+      ]
+    },
+    {
+      sel: '.btn--text',
+      decls: [
+        ['padding', `0 ${v('space-1')}`],
+        ['color', v('color-primary')]
+      ]
+    },
+    // 危险语义(§7.4 语义轴):实心款换危险三色
+    {
+      sel: '.btn--danger',
+      decls: [
+        ['background', v('btn-danger-bg')],
+        ['color', v('color-on-primary')]
+      ]
+    },
+    // 形状轴:方角 / 胶囊(默认圆角由 --btn-radius 管)
+    { sel: '.btn--square', decls: [['border-radius', v('radius-none')]] },
+    { sel: '.btn--pill', decls: [['border-radius', v('radius-full')]] },
+    // 宽度轴:撑满容器(§7.4 宽度;块级 flex 自动占满一行,flex 爹里再补 stretch)
+    {
+      sel: '.btn--block',
+      decls: [
+        ['display', 'flex'],
+        ['align-self', 'stretch']
+      ]
+    },
+    {
       sel: '.btn:disabled',
       decls: [
         ['opacity', v('opacity-disabled')],
@@ -99,6 +140,12 @@ export const BUTTON: ComponentRecipe = {
   states: [
     { base: '.btn--solid', state: 'hover', decls: [['background', v('color-primary-hover')]] },
     { base: '.btn--solid', state: 'active', decls: [['background', v('color-primary-active')]] },
+    { base: '.btn--tint', state: 'hover', decls: [['background', v('btn-tint-hover-bg')]] },
+    { base: '.btn--tint', state: 'active', decls: [['background', v('btn-tint-hover-bg')]] },
+    { base: '.btn--danger', state: 'hover', decls: [['background', v('btn-danger-hover-bg')]] },
+    { base: '.btn--danger', state: 'active', decls: [['background', v('btn-danger-active-bg')]] },
+    { base: '.btn--text', state: 'hover', decls: [['background', v('color-hover-bg')]] },
+    { base: '.btn--text', state: 'active', decls: [['background', v('color-pressed-bg')]] },
     { base: '.btn--outline', state: 'hover', decls: [['background', v('color-hover-bg')]] },
     { base: '.btn--outline', state: 'active', decls: [['background', v('color-pressed-bg')]] },
     { base: '.btn--ghost', state: 'hover', decls: [['background', v('color-hover-bg')]] },
@@ -141,6 +188,32 @@ export const BUTTON: ComponentRecipe = {
       },
       { ...btn('btn btn--outline', '继续', 'btn-md'), icon: 'demo-button', iconAt: 'end' }
     ])
-    return demoSection(theme, '按钮', [...variantRows, sizeRow, iconRow])
+    // 语义/形状/宽度轴(§7.4):SEMANTICS 复用样式轴的 class 组合
+    const semanticRow = demoRow([
+      demoLabel('语义'),
+      ...SEMANTICS.map(([cls, name]) => btn(`btn btn--${cls}`, name, 'btn-md'))
+    ])
+    const shapeRow = demoRow([
+      demoLabel('形状'),
+      btn('btn btn--solid', '圆角', 'btn-md'),
+      btn('btn btn--solid btn--square', '方角', 'btn-md'),
+      btn('btn btn--solid btn--pill', '胶囊', 'btn-md')
+    ])
+    const blockRow = demoRow([
+      demoLabel('宽度'),
+      {
+        tag: 'div',
+        cls: 'demo-stretch',
+        children: [btn('btn btn--solid btn--block', '撑满容器', 'btn-md')]
+      }
+    ])
+    return demoSection(theme, '按钮', [
+      ...variantRows,
+      semanticRow,
+      sizeRow,
+      shapeRow,
+      iconRow,
+      blockRow
+    ])
   }
 }

@@ -85,7 +85,8 @@ const ICON_PART: Record<IconSlot, string> = {
   'app-row-3': 'li-lead-icon',
   'app-arrow': 'li-trail-icon',
   'demo-search': 'srch-ic',
-  'demo-down': 'sel-ic'
+  'demo-down': 'sel-ic',
+  'demo-x': 'ipt-icon'
 }
 
 function partOfIcon(slot: IconSlot): string {

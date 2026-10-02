@@ -33,6 +33,8 @@ interface WorkbenchState {
   dragPart: string | null
   /** 底板示例页 id(M3-f 典型页);null = 平台默认页(home/app) */
   pageId: string | null
+  /** 按住空格的前后对比(§5.6):true = 画布临时显示上一版快照,松开恢复 */
+  comparing: boolean
 }
 
 let state: WorkbenchState = {
@@ -42,7 +44,8 @@ let state: WorkbenchState = {
   libraryOpen: false,
   placedSel: null,
   dragPart: null,
-  pageId: null
+  pageId: null,
+  comparing: false
 }
 const listeners = new Set<() => void>()
 
@@ -87,6 +90,10 @@ export const workbenchActions = {
   },
   setDragPart(id: string | null): void {
     if (state.dragPart !== id) emit({ dragPart: id })
+  },
+  /** 空格前后对比:不进撤销栈,纯界面态;窗口失焦/隐藏也得由调用方松开 */
+  setComparing(on: boolean): void {
+    if (state.comparing !== on) emit({ comparing: on })
   }
 }
 

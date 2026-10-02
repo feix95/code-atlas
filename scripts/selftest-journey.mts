@@ -710,6 +710,64 @@ try {
   await page.waitForTimeout(150)
   const btnUndo = await solidBtn.boundingBox()
   assert.ok(btnUndo && Math.abs(btnUndo.height - 40) < 0.5, 'undo must restore the button height')
+  // M3-g 键盘微调(§5.6):选中数值后方向键 ±1 步(2px),Shift + 方向键 ±4 步(8px)
+  const rowOf = (tok: string): ReturnType<typeof page.locator> =>
+    page.locator('.uf-row').filter({ has: page.locator('.uf-row-ref', { hasText: `--${tok}` }) })
+  const heightInput = rowOf('btn-height-md').locator('input')
+  await heightInput.waitFor()
+  await heightInput.click()
+  await page.keyboard.press('ArrowUp')
+  await page.waitForTimeout(120)
+  const step1 = await solidBtn.boundingBox()
+  assert.ok(step1 && Math.abs(step1.height - 42) < 0.5, 'ArrowUp nudge must add one 2px step')
+  await page.keyboard.down('Shift')
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.up('Shift')
+  await page.waitForTimeout(120)
+  const step4 = await solidBtn.boundingBox()
+  assert.ok(step4 && Math.abs(step4.height - 50) < 0.5, 'Shift+ArrowUp must add four steps (8px)')
+  // M3-g 共用变量(§5.6):ref 变量行出影响面提示,「改变量本身」后写到 radius-md
+  const radiusRow = rowOf('btn-radius')
+  const radiusInput = radiusRow.locator('input')
+  await radiusInput.waitFor()
+  await radiusRow.locator('.uf-share-hint').waitFor()
+  await radiusRow
+    .locator('.uf-share-count')
+    .filter({ hasText: /绑在 --radius-md 上,它同时影响 \d+ 处/ })
+    .waitFor()
+  assert.equal(
+    await radiusRow.locator('.uf-share-scope .uf-seg-btn.is-on').innerText(),
+    '只改这一处',
+    'ref 变量默认改这一处(断开成专属值)'
+  )
+  await radiusRow.getByRole('button', { name: '改变量本身', exact: true }).click()
+  await radiusRow.locator('.uf-row-ref').filter({ hasText: 'radius-md(改它)' }).waitFor()
+  await radiusInput.click()
+  await page.keyboard.press('ArrowUp')
+  await page.waitForTimeout(150)
+  // radius-md 8 → 10:输入框圆角(ipt-radius → radius-md)跟着变,证写的是共用变量本身
+  const iptRadius = async (): Promise<string> =>
+    canvas
+      .locator('.ipt-box')
+      .first()
+      .evaluate((el) => getComputedStyle(el).borderRadius)
+  assert.equal(await iptRadius(), '10px', 'shared-scope nudge must write --radius-md itself')
+  // M3-g 空格前后对比(§5.6):按住看上一版(radius-md 还是 8),松开回当前
+  await solidBtn.click()
+  await page.keyboard.down(' ')
+  await page.locator('.uf-compare-badge').waitFor()
+  await page.waitForFunction(() => {
+    const f = document.querySelector('iframe.uf-canvas-frame') as HTMLIFrameElement | null
+    const box = f?.contentDocument?.querySelector('.ipt-box')
+    return box ? getComputedStyle(box).borderRadius === '8px' : false
+  })
+  await page.keyboard.up(' ')
+  await page.waitForFunction(() => {
+    const f = document.querySelector('iframe.uf-canvas-frame') as HTMLIFrameElement | null
+    const box = f?.contentDocument?.querySelector('.ipt-box')
+    return box ? getComputedStyle(box).borderRadius === '10px' : false
+  })
+  await shot('uiframe-compare')
   // 变量板(§5.5):点色板条目 → 属性面板出取色器 → 改主色后画布读数与组件一起更新 → 撤销复原
   await page.getByRole('button', { name: '变量板', exact: true }).click()
   const swatch = canvas.locator('[data-uf-part="tok:color-primary"]').first()

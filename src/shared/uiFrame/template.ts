@@ -554,7 +554,12 @@ const COMPONENT: Entry[] = [
   ['ptr', 'icon-size', '图标位尺寸', ref('control-sm')],
   ['ptr', 'icon', '图标尺寸', ref('icon-md')],
   ['ptr', 'font-size', '字号', ref('font-size-sm')],
-  ['ptr', 'border-width', '描边宽度', ref('border-width-1')]
+  ['ptr', 'border-width', '描边宽度', ref('border-width-1')],
+  // 变体轴补全(M3-g,§7.4):浅底按钮悬停底与危险语义三态
+  ['btn', 'tint-hover-bg', '浅底按钮 · 悬停底', color('#DBEAFE', '#1E3A8A')],
+  ['btn', 'danger-bg', '危险按钮 · 底', color('#DC2626', '#B91C1C')],
+  ['btn', 'danger-hover-bg', '危险按钮 · 悬停底', color('#B91C1C', '#991B1B')],
+  ['btn', 'danger-active-bg', '危险按钮 · 按下底', color('#991B1B', '#7F1D1D')]
 ]
 
 const PAGE: Entry[] = [
@@ -648,7 +653,8 @@ export function defaultDoc(): UiFrameDoc {
       'app-row-3': 'flame',
       'app-arrow': 'chevron-right',
       'demo-search': 'search',
-      'demo-down': 'chevron-down'
+      'demo-down': 'chevron-down',
+      'demo-x': 'x'
     },
     customIcons: {},
     placed: []

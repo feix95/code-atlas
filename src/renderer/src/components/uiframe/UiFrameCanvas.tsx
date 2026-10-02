@@ -79,6 +79,7 @@ function DeviceChrome({
 
 export function UiFrameCanvas({
   doc,
+  beforeDoc,
   view,
   theme,
   selection,
@@ -90,6 +91,8 @@ export function UiFrameCanvas({
   onKey
 }: {
   doc: UiFrameDoc
+  /** 空格前后对比(§5.6):非空时画布变量临时按这份快照显示,不重建文档不进历史 */
+  beforeDoc: UiFrameDoc | null
   view: CanvasView
   theme: ThemeName
   /** 示例页适应画布宽度(false = 实际大小);手机端恒按宽度适应 */
@@ -116,7 +119,7 @@ export function UiFrameCanvas({
     return canvasHtml({ ...currentDoc(), icons }, view, pageId)
   }, [icons, view, doc.platform, doc.placed, pageId])
   const { frameRef, selBoxRef, hoverBoxRef, frameDoc, onLoad, fitHeight } = useCanvasFrame({
-    doc,
+    doc: beforeDoc ?? doc,
     view,
     theme,
     viewport: { height: isPhone || view === 'bench' ? dev.height : 0, fixed: isPhone },

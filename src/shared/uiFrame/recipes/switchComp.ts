@@ -112,6 +112,15 @@ export const SWITCH: ComponentRecipe = {
     {
       sel: '.sw:has(.sw__in:disabled) .sw__in',
       decls: [['cursor', 'not-allowed']]
+    },
+    // 带文字(§7.4 文字轴):开关后随一行说明文字
+    {
+      sel: '.sw-txt',
+      decls: [
+        ['font-size', v('font-size-md')],
+        ['line-height', v('line-height-normal')],
+        ['color', v('color-text')]
+      ]
     }
   ],
   states: [
@@ -167,6 +176,13 @@ export const SWITCH: ComponentRecipe = {
       sw('sw--sm sw--pop', true, false),
       sw('sw--pop', true, false)
     ])
-    return demoSection(theme, '开关', [mainRow, popRow, sizeRow])
+    const textRow = demoRow([
+      demoLabel('带文字'),
+      sw('', true, false),
+      { tag: 'span', cls: 'sw-txt', text: '接收通知' },
+      sw('sw--pop', false, false),
+      { tag: 'span', cls: 'sw-txt', text: '静音' }
+    ])
+    return demoSection(theme, '开关', [mainRow, popRow, sizeRow, textRow])
   }
 }

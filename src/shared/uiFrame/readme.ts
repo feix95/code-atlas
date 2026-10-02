@@ -38,7 +38,8 @@ const SLOT_LABEL: Record<IconSlot, string> = {
   'app-row-3': '应用页第 3 行前置图标',
   'app-arrow': '应用页第 2 行尾部箭头',
   'demo-search': '搜索框前置图标',
-  'demo-down': '下拉选择箭头'
+  'demo-down': '下拉选择箭头',
+  'demo-x': '输入框演示页的清除钮'
 }
 
 const HARD_RULES = [

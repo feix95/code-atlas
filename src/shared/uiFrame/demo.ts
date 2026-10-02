@@ -61,6 +61,14 @@ export function demoRules(): CssRule[] {
       ]
     },
     {
+      sel: '.demo-stretch',
+      decls: [
+        ['flex', 'auto'],
+        ['display', 'flex'],
+        ['min-width', v('space-24')]
+      ]
+    },
+    {
       sel: '.demo-label',
       decls: [
         ['width', v('space-16')],
