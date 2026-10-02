@@ -5,6 +5,7 @@ import { TEMPLATES } from '@shared/uiFrame/templates'
 import type { SchemeMeta, UiPlatform } from '@shared/uiFrame/types'
 import { BLANK_ID, schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
 import { Notice } from '../Notice'
+import { UiFrameImport } from './UiFrameImport'
 import { SchemeCard } from './UiFrameSchemes'
 
 const PLATFORMS: Array<[UiPlatform, string]> = [
@@ -15,6 +16,7 @@ const PLATFORMS: Array<[UiPlatform, string]> = [
 export function UiFrameStart(): React.JSX.Element {
   const { schemes, busy, error } = useSchemeState()
   const [platform, setPlatform] = useState<UiPlatform>('desktop')
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     if (schemes === null) void schemeActions.refresh()
@@ -73,11 +75,10 @@ export function UiFrameStart(): React.JSX.Element {
             type="button"
             className="uf-card uf-card-dashed"
             aria-label="导入方案"
-            disabled
-            title="下个里程碑接入"
+            onClick={() => setImportOpen(true)}
           >
             <span className="uf-card-name">导入方案</span>
-            <span className="uf-card-blurb">方案文件夹 / DTCG 变量 / CSS 变量(即将上线)</span>
+            <span className="uf-card-blurb">方案文件夹 / DTCG 变量 / CSS 变量</span>
           </button>
         </div>
       </section>
@@ -99,6 +100,7 @@ export function UiFrameStart(): React.JSX.Element {
           </div>
         )}
       </section>
+      {importOpen && <UiFrameImport onClose={() => setImportOpen(false)} />}
     </div>
   )
 }

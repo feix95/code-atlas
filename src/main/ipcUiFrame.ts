@@ -1,5 +1,6 @@
 // UI 框架 · 规格包导出(§13、§1.5):只写用户在对话框里自选的位置,从不碰任何用户项目。
 // 渲染层给出全部文本文件 + 字体清单 + 截图清单;主进程校验路径、写盘、复制字体、截图。
+// §14 导入同在本文件:只读用户自选的方案文件夹 / token 文件,不写一字。
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { promises as fs } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
@@ -98,6 +99,33 @@ async function writePreviews(target: string, previews: PreviewPlan[]): Promise<s
 
 let lastExportDir: string | null = null
 
+/** 导入文件的大小上限(4MB;变量文件远到不了这个量级) */
+const IMPORT_MAX_BYTES = 4 * 1024 * 1024
+
+async function readTextIfExists(path: string): Promise<string | null> {
+  try {
+    const stat = await fs.stat(path)
+    if (stat.size > IMPORT_MAX_BYTES)
+      throw new Error(`文件过大(>${IMPORT_MAX_BYTES / 1024 / 1024}MB)`)
+    return await fs.readFile(path, 'utf8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw err
+  }
+}
+
+export interface SchemeFolderPayload {
+  manifest: string | null
+  design: string
+  /** 文件夹名(方案名兜底) */
+  name: string
+}
+
+export interface ImportFilePayload {
+  name: string
+  text: string
+}
+
 export function registerUiFrameIpc(): void {
   ipcMain.handle(CH.uiFrameExport, async (event, raw: unknown): Promise<UiFrameExportResult> => {
     const payload = parsePayload(raw)
@@ -121,4 +149,41 @@ export function registerUiFrameIpc(): void {
     const err = await shell.openPath(lastExportDir)
     return err === ''
   })
+
+  // ── 导入(§14):全部只读用户自选路径 ──
+  ipcMain.handle(CH.uiFrameImportFolder, async (event): Promise<SchemeFolderPayload | null> => {
+    const dir = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: '选择方案文件夹(含 design.json)',
+      properties: ['openDirectory']
+    })
+    if (!dir) return null
+    const design = await readTextIfExists(join(dir, 'design.json'))
+    if (design === null) throw new Error(`文件夹里没有 design.json:${dir}`)
+    const manifest = await readTextIfExists(join(dir, 'manifest.json'))
+    const name =
+      dir
+        .replace(/[\\/]+$/, '')
+        .split(/[\\/]/)
+        .pop() ?? '导入方案'
+    return { manifest, design, name }
+  })
+
+  ipcMain.handle(
+    CH.uiFrameImportFile,
+    async (event, rawKind: unknown): Promise<ImportFilePayload | null> => {
+      const kind = rawKind === 'css' ? 'css' : 'json'
+      const file = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
+        title: kind === 'css' ? '选择 CSS 变量文件' : '选择 DTCG 变量 JSON',
+        properties: ['openFile'],
+        filters:
+          kind === 'css'
+            ? [{ name: 'CSS 文件', extensions: ['css'] }]
+            : [{ name: 'JSON 文件', extensions: ['json'] }]
+      })
+      if (!file) return null
+      const text = await readTextIfExists(file)
+      if (text === null) throw new Error(`文件读不到:${file}`)
+      return { name: file.split(/[\\/]/).pop() ?? 'import', text }
+    }
+  )
 }

@@ -103,7 +103,7 @@ function ExportBanner({
 
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
-  const { started, schemeId, busy, error } = useSchemeState()
+  const { started, schemeId, busy, error, notice } = useSchemeState()
   const [view, setView] = useState<CanvasView>('wall')
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
@@ -111,6 +111,16 @@ export function UiFramePage(): React.JSX.Element {
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [naming, setNaming] = useState(false)
   const exporter = useUiFrameExport()
+
+  // 回起步页(新建方案/换模板)时把浮层状态收干净,免得回画布时库面板还盖着
+  const [prevStarted, setPrevStarted] = useState(started)
+  if (prevStarted !== started) {
+    setPrevStarted(started)
+    if (!started) {
+      setLibraryOpen(false)
+      setNaming(false)
+    }
+  }
 
   if (!started) {
     return (
@@ -216,6 +226,14 @@ export function UiFramePage(): React.JSX.Element {
         </button>
       </div>
       {error && <Notice kind="error">{error}</Notice>}
+      {notice && (
+        <Notice kind="info">
+          {notice}{' '}
+          <button type="button" className="uf-link" onClick={schemeActions.dismissNotice}>
+            知道了
+          </button>
+        </Notice>
+      )}
       <ExportBanner state={exporter.state} onDismiss={exporter.dismiss} />
       <div className="uf-main">
         <UiFrameCanvas

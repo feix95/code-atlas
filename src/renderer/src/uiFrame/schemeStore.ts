@@ -2,6 +2,12 @@
 // 与 docStore 分工:docStore 管「文档内容 + 撤销栈」,这里管「这份文档是哪个方案 + 库操作」。
 // 模块级单例:关页签再开不丢;落盘全部走 preload 的 uiFrameScheme* 通道(主进程写 userData)。
 import { useSyncExternalStore } from 'react'
+import {
+  importCssVars,
+  importDtcg,
+  importSchemeFiles,
+  type ImportResult
+} from '@shared/uiFrame/importDoc'
 import { parseDoc } from '@shared/uiFrame/scheme'
 import { BLANK_ID, templateDoc } from '@shared/uiFrame/templates'
 import type { SchemeMeta, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
@@ -19,9 +25,18 @@ interface SchemeState {
   busy: 'save' | 'open' | 'list' | null
   /** 最近一次库操作的人话报错;null = 无 */
   error: string | null
+  /** 导入后的一句话战报(套用 N 个变量、跳过 M 个);null = 无 */
+  notice: string | null
 }
 
-let state: SchemeState = { started: false, schemeId: null, schemes: null, busy: null, error: null }
+let state: SchemeState = {
+  started: false,
+  schemeId: null,
+  schemes: null,
+  busy: null,
+  error: null,
+  notice: null
+}
 const listeners = new Set<() => void>()
 
 function emit(patch: Partial<SchemeState>): void {
@@ -157,6 +172,60 @@ export const schemeActions = {
   /** 回到起步页(换平台/换模板/开别的方案) */
   backToStart(): void {
     emit({ started: false })
+  },
+  dismissNotice(): void {
+    emit({ notice: null })
+  },
+  /**
+   * 导入(§14):三种来源解析出的 doc 以「未入库」身份上画布;
+   * 战报(套用/跳过计数)挂 notice 由页面横幅展示。
+   */
+  async importDoc(
+    source: 'scheme-folder' | 'dtcg-file' | 'css-file' | 'css-text',
+    pastedText?: string
+  ): Promise<ImportResult | null> {
+    if (state.busy) return null
+    emit({ busy: 'open', error: null })
+    try {
+      let result: ImportResult
+      if (source === 'css-text') {
+        result = importCssVars(pastedText ?? '', '粘贴的变量')
+      } else if (source === 'css-file') {
+        const f = await window.atlas.uiFrameImportFile('css')
+        if (!f) {
+          emit({ busy: null })
+          return null
+        }
+        result = importCssVars(f.text, f.name.replace(/\.css$/i, ''))
+      } else if (source === 'dtcg-file') {
+        const f = await window.atlas.uiFrameImportFile('json')
+        if (!f) {
+          emit({ busy: null })
+          return null
+        }
+        result = importDtcg(f.text, f.name.replace(/\.json$/i, ''))
+      } else {
+        const folder = await window.atlas.uiFrameImportFolder()
+        if (!folder) {
+          emit({ busy: null })
+          return null
+        }
+        result = importSchemeFiles(folder.manifest, folder.design, folder.name)
+      }
+      docActions.replaceDoc(result.doc)
+      const skippedNote =
+        result.skipped.length > 0 ? `;没对上的 ${result.skipped.length} 个已跳过` : ''
+      emit({
+        busy: null,
+        started: true,
+        schemeId: null,
+        notice: `${result.sourceLabel}导入完成:套用了 ${result.applied} 个变量${skippedNote}。方案未入库,调完点「保存」收进我的方案。`
+      })
+      return result
+    } catch (error) {
+      emit({ error: humanError('导入', error), busy: null })
+      return null
+    }
   }
 }
 

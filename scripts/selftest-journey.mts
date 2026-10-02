@@ -577,10 +577,14 @@ try {
     'desktop templates must not show under phone platform'
   )
   await page.getByRole('button', { name: '电脑端', exact: true }).click()
-  assert.ok(
-    await page.getByRole('button', { name: '导入方案' }).isDisabled(),
-    'import entry must stay disabled until M1-d'
-  )
+  // 导入(M1-d):入口卡 → 浮层三条来源 + 粘贴框
+  await page.getByRole('button', { name: '导入方案' }).click()
+  const importDialog = page.getByRole('dialog', { name: '导入方案' })
+  await importDialog.waitFor()
+  await importDialog.getByRole('button', { name: '方案文件夹' }).waitFor()
+  await importDialog.getByRole('button', { name: /DTCG/ }).waitFor()
+  await page.keyboard.press('Escape')
+  await importDialog.waitFor({ state: 'hidden' })
   await page.getByText('还没有保存过的方案', { exact: false }).waitFor()
   await shot('uiframe-start')
   await page.getByRole('button', { name: '极简工作台', exact: true }).click()
@@ -712,6 +716,29 @@ try {
   await restoreBtn.click()
   await page.locator('.uf-scheme-name').filter({ hasText: '旅程验证方案' }).waitFor()
   await shot('uiframe-library')
+  // M1-d 导入(§14):库面板「新建方案」回起步页 → 导入浮层 → 粘贴 CSS 变量 → 战报 + 变量板读数换值
+  await page.locator('.uf-scheme-name').click()
+  await page
+    .getByRole('dialog', { name: '我的方案库' })
+    .getByRole('button', { name: '新建方案', exact: true })
+    .click()
+  await page.getByRole('group', { name: '目标平台' }).waitFor()
+  await page.getByRole('button', { name: '导入方案' }).click()
+  const imp = page.getByRole('dialog', { name: '导入方案' })
+  await imp.waitFor()
+  await imp
+    .getByRole('textbox', { name: '粘贴 CSS 变量' })
+    .fill(':root{--color-primary:#00ff00;--space-4:1.25rem;--bogus-99:7px;}')
+  await imp.getByRole('button', { name: '解析粘贴内容', exact: true }).click()
+  // 导入成功 → 自动进画布,战报横幅报数(套用 2 个,跳过 1 个 bogus)
+  await page.getByText(/导入完成:套用了 2 个变量/).waitFor()
+  await page.getByText(/没对上的 1 个/).waitFor()
+  await page.getByRole('button', { name: '变量板', exact: true }).click()
+  await canvas
+    .locator('[data-uf-part="tok:color-primary"] .vb-val')
+    .filter({ hasText: '#00FF00' })
+    .waitFor()
+  await shot('uiframe-imported')
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'

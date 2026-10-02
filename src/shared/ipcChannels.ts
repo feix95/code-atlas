@@ -86,6 +86,9 @@ export const CH = {
   uiFrameSchemeSnapshots: 'atlas:uiframe-scheme-snapshots',
   uiFrameSchemeRestore: 'atlas:uiframe-scheme-restore',
   uiFrameSchemeExport: 'atlas:uiframe-scheme-export',
+  // ── UI 框架:导入(§14,只读用户自选路径) ──
+  uiFrameImportFolder: 'atlas:uiframe-import-folder',
+  uiFrameImportFile: 'atlas:uiframe-import-file',
   // ── 桌宠 ──
   // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗

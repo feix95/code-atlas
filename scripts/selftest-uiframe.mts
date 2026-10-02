@@ -24,6 +24,7 @@ import {
   SNAPSHOT_RE
 } from '../src/shared/uiFrame/scheme.ts'
 import { BLANK_ID, TEMPLATES, templateDoc } from '../src/shared/uiFrame/templates.ts'
+import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFrame/importDoc.ts'
 import type {
   IconNode,
   LintIssue,
@@ -428,6 +429,84 @@ check('manifestFor 与快照名:格式版本、模板户口、时间戳形态', 
   assert.equal(m.createdAt, '2026-01-01T00:00:00.000Z')
   assert.match(snapshotStamp(new Date('2026-10-02T12:03:04')), /^20261002-120304$/)
   assert.match('20261002-120304.json', SNAPSHOT_RE)
+})
+
+console.log('── 导入(M1-d,§14)')
+check('导出 design.json → 导回:全部变量数值逐字一致(往返验收)', () => {
+  const exported = pkg.files['design.json']
+  const back = importDtcg(exported, '回读')
+  // DTCG 只带数值(与图标/平台/根字号);逐变量比对 value
+  for (const [name, def] of Object.entries(doc.tokens)) {
+    assert.deepEqual(back.doc.tokens[name]?.value, def.value, `往返不一致:${name}`)
+  }
+  assert.equal(back.doc.platform, doc.platform)
+  assert.equal(back.doc.rootFontPx, doc.rootFontPx)
+  assert.equal(back.doc.icons['demo-button'], doc.icons['demo-button'])
+  assert.equal(back.applied, Object.keys(doc.tokens).length)
+  assert.deepEqual(back.skipped, [])
+})
+check('外来的 DTCG:同名变量被套用,生面孔记 skipped,引用链还原', () => {
+  const foreign = JSON.stringify({
+    color: {
+      primary: { $type: 'color', $value: { hex: '#123456' } },
+      'brand-new': { $type: 'color', $value: { hex: '#abcdef' } }
+    },
+    control: { md: { $type: 'dimension', $value: { value: 3, unit: 'rem' } } },
+    btn: { 'height-md': { $type: 'dimension', $value: '{control.md}' } }
+  })
+  const r = importDtcg(foreign, '外来')
+  assert.deepEqual(r.doc.tokens['color-primary']?.value, {
+    kind: 'color',
+    light: '#123456',
+    dark: '#123456'
+  })
+  assert.deepEqual(r.doc.tokens['control-md']?.value, { kind: 'dimension', px: 48 })
+  assert.deepEqual(r.doc.tokens['btn-height-md']?.value, { kind: 'ref', ref: 'control-md' })
+  assert.ok(r.skipped.includes('color-brand-new'))
+})
+check('CSS 变量:按既有 kind 猜值; var()→ref; 不认识的名字跳过', () => {
+  const r = importCssVars(
+    `:root{--color-primary:#00ff00;--space-4:1.25rem;--btn-height-md:var(--control-lg);--nope:9px;}`,
+    '粘贴'
+  )
+  assert.equal(r.applied, 3)
+  assert.deepEqual(r.doc.tokens['color-primary']?.value, {
+    kind: 'color',
+    light: '#00FF00',
+    dark: '#00FF00'
+  })
+  assert.deepEqual(r.doc.tokens['space-4']?.value, { kind: 'dimension', px: 20 })
+  assert.deepEqual(r.doc.tokens['btn-height-md']?.value, { kind: 'ref', ref: 'control-lg' })
+  assert.ok(r.skipped.includes('nope'))
+})
+check('CSS 变量:阴影与字体族按既有 kind 解析', () => {
+  const r = importCssVars(
+    `--shadow-sm:0 2px 8px rgba(0,0,0,0.2);--font-family:"My Sans",Inter,sans-serif;`,
+    'x'
+  )
+  const shadow = r.doc.tokens['shadow-sm']?.value
+  assert.equal(shadow?.kind, 'shadow')
+  if (shadow?.kind === 'shadow') {
+    assert.equal(shadow.y, 2)
+    assert.equal(shadow.blur, 8)
+    assert.equal(shadow.light, 'rgba(0,0,0,0.2)')
+  }
+  assert.deepEqual(r.doc.tokens['font-family']?.value, {
+    kind: 'fontFamily',
+    families: ['My Sans', 'Inter', 'sans-serif']
+  })
+})
+check('方案文件夹:内部 design.json 直接还原;导出的 DTCG 包也能走方案入口', () => {
+  const own = serializeDoc(templateDoc('tint-phone'))
+  const r1 = importSchemeFiles('{"name":"库名"}', own, 'x')
+  assert.equal(r1.doc.name, '库名')
+  assert.equal(r1.doc.template, 'tint-phone')
+  const r2 = importSchemeFiles(null, pkg.files['design.json'], '导出包')
+  assert.equal(r2.applied, Object.keys(doc.tokens).length)
+})
+check('全对不上时报人话错误,不静默产空方案', () => {
+  assert.throws(() => importDtcg('{"foo":{"bar":{"$value":1}}}', 'x'), /没认出任何变量/)
+  assert.throws(() => importCssVars('body{color:red}', 'x'), /没在文本里找到/)
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

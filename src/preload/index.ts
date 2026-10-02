@@ -272,6 +272,16 @@ const atlasApi = {
   /** 导出方案文件(文件夹形式):manifest + design + 缩略图,写到用户自选位置 */
   uiFrameSchemeExport: (id: string): Promise<UiFrameExportResult> =>
     ipcRenderer.invoke(CH.uiFrameSchemeExport, id),
+  // ── 导入(§14):弹系统对话框读用户自选的文件夹/文件,只读不写 ──
+  /** 选方案文件夹:读 manifest.json(可空)+ design.json(必需)的文本 */
+  uiFrameImportFolder: (): Promise<{
+    manifest: string | null
+    design: string
+    name: string
+  } | null> => ipcRenderer.invoke(CH.uiFrameImportFolder),
+  /** 选单个文件(json = DTCG 变量;css = CSS 变量) */
+  uiFrameImportFile: (kind: 'json' | 'css'): Promise<{ name: string; text: string } | null> =>
+    ipcRenderer.invoke(CH.uiFrameImportFile, kind),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void =>
