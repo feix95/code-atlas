@@ -27,9 +27,20 @@ interface WorkbenchState {
   blankExample: boolean
   /** 方案库浮层开关(零件盒「管理」与工具条方案名共用) */
   libraryOpen: boolean
+  /** 底板上选中的零件实例 id(M3-a);null = 没选 */
+  placedSel: string | null
+  /** 零件盒正拖着的配方 id;画布靠它关 iframe 的 pointer-events,让 drop 落在父层 */
+  dragPart: string | null
 }
 
-let state: WorkbenchState = { view: 'bench', jump: null, blankExample: false, libraryOpen: false }
+let state: WorkbenchState = {
+  view: 'bench',
+  jump: null,
+  blankExample: false,
+  libraryOpen: false,
+  placedSel: null,
+  dragPart: null
+}
 const listeners = new Set<() => void>()
 
 function emit(patch: Partial<WorkbenchState>): void {
@@ -39,11 +50,17 @@ function emit(patch: Partial<WorkbenchState>): void {
 
 export const workbenchActions = {
   setView(view: CanvasView): void {
-    if (state.view !== view) emit({ view })
+    // 换视图同一次 emit 清掉底板零件选中:不能靠渲染期回调清,会踩掉同事件里后写的 selectPlaced
+    if (state.view !== view) emit({ view, placedSel: null })
   },
   /** 定位:切到目标视图 + 记账等画布消化(画布在目标视图的文档就绪后滚动/选中) */
   jump(target: JumpTarget): void {
-    emit({ view: jumpView(target), jump: { seq: (state.jump?.seq ?? 0) + 1, target } })
+    const view = jumpView(target)
+    emit({
+      view,
+      ...(view !== state.view ? { placedSel: null } : {}),
+      jump: { seq: (state.jump?.seq ?? 0) + 1, target }
+    })
   },
   clearJump(): void {
     if (state.jump) emit({ jump: null })
@@ -53,10 +70,16 @@ export const workbenchActions = {
   },
   /** 换方案/重新起步后复位界面态:回底板、清定位、空白底板恢复空态 */
   docReplaced(): void {
-    emit({ view: 'bench', jump: null, blankExample: false })
+    emit({ view: 'bench', jump: null, blankExample: false, placedSel: null })
   },
   setLibraryOpen(open: boolean): void {
     emit({ libraryOpen: open })
+  },
+  selectPlaced(id: string | null): void {
+    if (state.placedSel !== id) emit({ placedSel: id })
+  },
+  setDragPart(id: string | null): void {
+    if (state.dragPart !== id) emit({ dragPart: id })
   }
 }
 
@@ -67,4 +90,9 @@ function subscribe(l: () => void): () => void {
 
 export function useWorkbench(): WorkbenchState {
   return useSyncExternalStore(subscribe, () => state)
+}
+
+/** 非订阅读取:键盘处理器等即时场景取最新界面态 */
+export function workbenchNow(): WorkbenchState {
+  return state
 }

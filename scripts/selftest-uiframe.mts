@@ -39,6 +39,8 @@ import {
 import { BLANK_ID, TEMPLATES, templateDoc } from '../src/shared/uiFrame/templates.ts'
 import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFrame/importDoc.ts'
 import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
+import { benchBody } from '../src/shared/uiFrame/benchBoard.ts'
+import { PART_DEFS, partNode } from '../src/shared/uiFrame/parts.ts'
 import { strToU8, zipSync } from 'fflate'
 import type {
   IconNode,
@@ -819,6 +821,65 @@ check('图标槽位换图标后,导出包文件同步换', () => {
   const files = iconFileNames({ ...doc, icons: { ...doc.icons, 'demo-ibtn': 'plus' } })
   assert.ok(files.includes('icons/plus.svg'), '换成 plus 后包内要有 icons/plus.svg')
   assert.ok(!files.includes('icons/ellipsis.svg'), '不再被引用的图标不该入包')
+})
+
+console.log('── M3-a 底板拼装:数据层')
+check('底板摆放随方案往返:serialize → parse 后实例逐条一致', () => {
+  const d: typeof doc = {
+    ...doc,
+    placed: [
+      { id: 'p1', recipe: 'button', x: 40, y: 24 },
+      { id: 'p2', recipe: 'card', x: 120, y: 96 }
+    ]
+  }
+  const back = parseDoc(serializeDoc(d))
+  assert.deepEqual(back.placed, d.placed)
+})
+check('老方案没有 placed 字段:解析后为空数组,不报错', () => {
+  const raw = JSON.parse(serializeDoc(doc)) as Record<string, unknown>
+  delete raw['placed']
+  const back = parseDoc(JSON.stringify(raw))
+  assert.deepEqual(back.placed, [])
+})
+check('坏摆放条目被丢掉不挡打开:缺字段/非有限坐标/生面孔都剔除', () => {
+  const raw = JSON.parse(serializeDoc(doc)) as Record<string, unknown>
+  raw['placed'] = [
+    { id: 'ok', recipe: 'button', x: 1, y: 2 },
+    { id: 'no-recipe', x: 1, y: 2 },
+    { id: 'nan', recipe: 'button', x: Number.NaN, y: 0 },
+    'garbage'
+  ]
+  const back = parseDoc(JSON.stringify(raw))
+  assert.deepEqual(back.placed, [{ id: 'ok', recipe: 'button', x: 1, y: 2 }])
+})
+check('零件注册表:每个零件 id 都有对应配方与样板节点', () => {
+  for (const def of PART_DEFS) {
+    assert.ok(
+      RECIPES.some((r) => r.id === def.id),
+      `零件 ${def.id} 没有对应配方`
+    )
+    assert.ok(partNode(def.id), `零件 ${def.id} 样板为空`)
+  }
+})
+check('底板结构:每个实例包一层 data-uf-placed 壳并带坐标', () => {
+  const d = { ...doc, placed: [{ id: 'p9', recipe: 'button', x: 33, y: 57 }] }
+  const board = benchBody(d)
+  assert.equal(board.cls, 'uf-board')
+  const shell = board.children?.[0]
+  assert.equal(shell?.cls, 'uf-placed')
+  assert.equal(shell?.attrs?.['data-uf-placed'], 'p9')
+  assert.equal(shell?.attrs?.['style'], 'left:33px;top:57px')
+})
+check('.uiframe 容器把摆放一起打包:zip 往返后 placed 不丢', () => {
+  const d = { ...doc, placed: [{ id: 'pz', recipe: 'switch', x: 8, y: 8 }] }
+  const packed = packUiframe({
+    manifest: JSON.stringify(
+      manifestFor(d, { id: 't', style: 's', createdAt: 'x', appVersion: '0' })
+    ),
+    design: serializeDoc(d)
+  })
+  const un = unpackUiframe(packed)
+  assert.deepEqual(parseDoc(un.design).placed, d.placed)
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

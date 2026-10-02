@@ -50,7 +50,10 @@ export function useCanvasFrame({
   theme,
   viewport,
   selection,
+  placedSel,
   onSelect,
+  onSelectPlaced,
+  onMovePlaced,
   onKey
 }: {
   doc: UiFrameDoc
@@ -59,7 +62,12 @@ export function useCanvasFrame({
   /** 画布视口:fixed = 手机定高,内容在 iframe 内部滚动;否则按内容自动长高 */
   viewport: { height: number; fixed: boolean }
   selection: CanvasSelection | null
+  /** 底板选中的零件实例 id(M3-a) */
+  placedSel: string | null
   onSelect: (sel: CanvasSelection | null) => void
+  onSelectPlaced: (id: string | null) => void
+  /** 零件拖动落点提交(布局 px,与 PlacedPart.x/y 同坐标系) */
+  onMovePlaced: (id: string, x: number, y: number) => void
   onKey: (e: KeyboardEvent) => void
 }): {
   frameRef: React.RefObject<HTMLIFrameElement | null>
@@ -74,9 +82,9 @@ export function useCanvasFrame({
   const hoverBoxRef = useRef<HTMLDivElement | null>(null)
   const hoverRef = useRef<Element | null>(null)
   const [frameDoc, setFrameDoc] = useState<Document | null>(null)
-  const handlersRef = useRef({ onSelect, onKey })
+  const handlersRef = useRef({ onSelect, onSelectPlaced, onMovePlaced, onKey })
   useEffect(() => {
-    handlersRef.current = { onSelect, onKey }
+    handlersRef.current = { onSelect, onSelectPlaced, onMovePlaced, onKey }
   })
 
   /** 按 body 实际内容高度定 iframe 高度(documentElement.scrollHeight 不会小于当前视口,换视图后缩不回去);
@@ -108,8 +116,65 @@ export function useCanvasFrame({
     const win = frameDoc.defaultView
     const onClick = (e: MouseEvent): void => {
       e.preventDefault()
+      // 底板上的零件先判 placed 壳:点击 = 选中实例(移动/删除),不进变量选中
+      const placedEl = (e.target as Partial<Element> | null)?.closest?.('[data-uf-placed]') ?? null
+      if (placedEl) {
+        handlersRef.current.onSelect(null)
+        handlersRef.current.onSelectPlaced(placedEl.getAttribute('data-uf-placed'))
+        return
+      }
       const el = partOf(e.target)
+      handlersRef.current.onSelectPlaced(null)
       handlersRef.current.onSelect(el ? selectionOf(el, frameDoc) : null)
+    }
+    // 零件拖动(M3-a):pointerdown 在 .uf-placed 上 → 过程位置直接改元素 style,
+    // pointerup 才提交一次进撤销栈(不拖一步压一步历史)
+    let moveDrag: {
+      id: string
+      startX: number
+      startY: number
+      baseX: number
+      baseY: number
+      el: Element
+    } | null = null
+    const onPointerDown = (e: PointerEvent): void => {
+      const el = (e.target as Partial<Element> | null)?.closest?.('[data-uf-placed]') ?? null
+      if (!el || e.button !== 0) return
+      const id = el.getAttribute('data-uf-placed')
+      if (!id) return
+      e.preventDefault()
+      handlersRef.current.onSelectPlaced(id)
+      moveDrag = {
+        id,
+        startX: e.clientX,
+        startY: e.clientY,
+        baseX: parseFloat((el as HTMLElement).style.left) || 0,
+        baseY: parseFloat((el as HTMLElement).style.top) || 0,
+        el
+      }
+    }
+    const onPointerMove = (e: PointerEvent): void => {
+      if (!moveDrag) return
+      const x = Math.max(0, moveDrag.baseX + (e.clientX - moveDrag.startX))
+      const y = Math.max(0, moveDrag.baseY + (e.clientY - moveDrag.startY))
+      ;(moveDrag.el as HTMLElement).style.left = `${x}px`
+      ;(moveDrag.el as HTMLElement).style.top = `${y}px`
+    }
+    // 底板零件是「道具」:mousedown 默认行为会把焦点让给零件里的 input,之后 Delete 会被
+    // 「输入框里不删」的守卫拦下;拦住聚焦,点击选中/拖动与 Delete 键删除才始终成立
+    const onMouseDown = (e: MouseEvent): void => {
+      if ((e.target as Partial<Element> | null)?.closest?.('[data-uf-placed]')) e.preventDefault()
+    }
+    const onPointerUp = (e: PointerEvent): void => {
+      if (!moveDrag) return
+      const x = Math.max(0, moveDrag.baseX + (e.clientX - moveDrag.startX))
+      const y = Math.max(0, moveDrag.baseY + (e.clientY - moveDrag.startY))
+      handlersRef.current.onMovePlaced(moveDrag.id, x, y)
+      moveDrag = null
+    }
+    // 拖出 iframe 边界会收不到 pointerup:pointercancel/指针移出时丢弃这次拖动,不留悬挂状态
+    const onPointerCancel = (): void => {
+      moveDrag = null
     }
     const onMove = (e: MouseEvent): void => {
       hoverRef.current = partOf(e.target)
@@ -122,6 +187,11 @@ export function useCanvasFrame({
     frameDoc.addEventListener('mousemove', onMove)
     frameDoc.addEventListener('mouseleave', onLeave)
     frameDoc.addEventListener('keydown', onKeyDown)
+    frameDoc.addEventListener('mousedown', onMouseDown)
+    frameDoc.addEventListener('pointerdown', onPointerDown)
+    frameDoc.addEventListener('pointermove', onPointerMove)
+    frameDoc.addEventListener('pointerup', onPointerUp)
+    frameDoc.addEventListener('pointercancel', onPointerCancel)
     // 推迟到下一帧再量:避免改 iframe 高度在同一帧内再次触发观察(ResizeObserver loop)
     let raf = 0
     const ro = win
@@ -136,6 +206,11 @@ export function useCanvasFrame({
       frameDoc.removeEventListener('mousemove', onMove)
       frameDoc.removeEventListener('mouseleave', onLeave)
       frameDoc.removeEventListener('keydown', onKeyDown)
+      frameDoc.removeEventListener('mousedown', onMouseDown)
+      frameDoc.removeEventListener('pointerdown', onPointerDown)
+      frameDoc.removeEventListener('pointermove', onPointerMove)
+      frameDoc.removeEventListener('pointerup', onPointerUp)
+      frameDoc.removeEventListener('pointercancel', onPointerCancel)
       cancelAnimationFrame(raf)
       ro?.disconnect()
     }
@@ -148,7 +223,11 @@ export function useCanvasFrame({
     if (!frameDoc) return
     let raf = 0
     const tick = (): void => {
-      const selected = selection ? findSelected(frameDoc, selection) : null
+      const selected = selection
+        ? findSelected(frameDoc, selection)
+        : placedSel
+          ? frameDoc.querySelector(`[data-uf-placed="${placedSel}"]`)
+          : null
       placeBox(selBoxRef.current, selected)
       const hovered = hoverRef.current
       placeBox(hoverBoxRef.current, hovered === selected ? null : hovered)
@@ -156,7 +235,7 @@ export function useCanvasFrame({
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [frameDoc, selection])
+  }, [frameDoc, selection, placedSel])
 
   return { frameRef, selBoxRef, hoverBoxRef, frameDoc, onLoad, fitHeight }
 }

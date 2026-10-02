@@ -1,11 +1,10 @@
 // 零件盒(§5.3 左栏):UI 框架签激活时占住全局侧栏,把「组件/变量/风格/图标/我的方案」放在手边。
-// 点击不是拖上底板(M3 才开放摆放),是跳到对应视图定位:组件→零件墙节、变量→变量板分区、
-// 图标→底板/墙上的槽位(顺带选中,属性面板直接换图标);风格→一键套用;我的方案→直接打开。
+// 组件行两种上板方式(M3-a):拖到底板 / 双击直接落一块;单击仍是跳零件墙定位调数值。
 import { useEffect } from 'react'
 import { GROUPS } from '@shared/uiFrame/board'
 import { pageFor } from '@shared/uiFrame/documents'
 import { iconSlotsOf } from '@shared/uiFrame/markup'
-import { RECIPES } from '@shared/uiFrame/recipes/index'
+import { PART_DEFS } from '@shared/uiFrame/parts'
 import { BLANK_ID, TEMPLATES, type TemplateMeta } from '@shared/uiFrame/templates'
 import type { IconSlot } from '@shared/uiFrame/types'
 import { iconLookup } from '../../uiFrame/assets'
@@ -100,18 +99,35 @@ export function UiFrameParts(): React.JSX.Element {
         <>
           <details open>
             <summary>组件</summary>
-            {RECIPES.map((r) => (
+            {PART_DEFS.map((p) => (
               <button
-                key={r.id}
+                key={p.id}
                 type="button"
                 className="uf-part-row"
-                title="去零件墙看它的全部样式与状态"
-                onClick={() => workbenchActions.jump({ kind: 'component', id: r.id })}
+                draggable
+                title="拖到底板上摆,或双击直接落一块;单击去零件墙调数值"
+                onClick={() => workbenchActions.jump({ kind: 'component', id: p.id })}
+                onDoubleClick={() => {
+                  // 双击兜底:级联落位,免得不会拖的人放不上去
+                  workbenchActions.setView('bench')
+                  const n = doc.placed.length
+                  const id = docActions.addPlaced(p.id, 24 + (n % 8) * 20, 24 + (n % 8) * 20)
+                  workbenchActions.selectPlaced(id)
+                }}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/x-uiframe-part', p.id)
+                  e.dataTransfer.effectAllowed = 'copy'
+                  workbenchActions.setView('bench')
+                  workbenchActions.setDragPart(p.id)
+                }}
+                onDragEnd={() => workbenchActions.setDragPart(null)}
               >
-                <span className="uf-part-name">{r.label}</span>
+                <span className="uf-part-name">{p.label}</span>
               </button>
             ))}
-            <p className="uf-hint uf-parts-hint">点名字去零件墙调;拖上底板排在后续版本。</p>
+            <p className="uf-hint uf-parts-hint">
+              拖到底板上摆,或双击直接落一块;点名字去零件墙调数值。
+            </p>
           </details>
           <details open>
             <summary>变量</summary>

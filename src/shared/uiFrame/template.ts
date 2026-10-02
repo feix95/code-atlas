@@ -302,6 +302,7 @@ export function defaultDoc(): UiFrameDoc {
       'app-row-2': 'zap',
       'app-row-3': 'flame',
       'app-arrow': 'chevron-right'
-    }
+    },
+    placed: []
   }
 }

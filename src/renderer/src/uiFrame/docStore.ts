@@ -4,7 +4,13 @@ import { useSyncExternalStore } from 'react'
 import { defaultDeviceId, isDeviceId } from '@shared/uiFrame/devices'
 import { defaultDoc, defaultTokens } from '@shared/uiFrame/template'
 import { templateOverrides } from '@shared/uiFrame/templates'
-import type { IconSlot, TokenValue, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
+import type {
+  IconSlot,
+  PlacedPart,
+  TokenValue,
+  UiFrameDoc,
+  UiPlatform
+} from '@shared/uiFrame/types'
 
 /** 撤销栈上限 */
 const HISTORY_LIMIT = 100
@@ -62,6 +68,30 @@ export const docActions = {
   /** 整份换方案(开方案/换起步模板):不进撤销栈,历史清空 */
   replaceDoc(next: UiFrameDoc): void {
     emit({ doc: next, past: [], future: [] })
+  },
+  // ── 底板拼装(M3-a):放置/移动/删除都进撤销栈,与变量改动同一历史 ──
+  /** 摆上一个零件(拖放或双击零件盒);x/y 是底板内容坐标 */
+  addPlaced(recipe: string, x: number, y: number): string {
+    const id = `p${Date.now().toString(36)}-${state.doc.placed.length}`
+    const part: PlacedPart = { id, recipe, x: Math.round(x), y: Math.round(y) }
+    commit({ ...state.doc, placed: [...state.doc.placed, part] })
+    return id
+  },
+  /** 拖到新位置(拖动结束才提交一次,过程位置改在 iframe 元素上不打扰撤销栈) */
+  movePlaced(id: string, x: number, y: number): void {
+    const idx = state.doc.placed.findIndex((p) => p.id === id)
+    if (idx < 0) return
+    const cur = state.doc.placed[idx]
+    const nx = Math.round(x)
+    const ny = Math.round(y)
+    if (cur.x === nx && cur.y === ny) return
+    const placed = state.doc.placed.slice()
+    placed[idx] = { ...cur, x: nx, y: ny }
+    commit({ ...state.doc, placed })
+  },
+  removePlaced(id: string): void {
+    if (!state.doc.placed.some((p) => p.id === id)) return
+    commit({ ...state.doc, placed: state.doc.placed.filter((p) => p.id !== id) })
   },
   /** 零件盒「风格」一键套用:把该模板的变量覆盖合进当前方案,进撤销栈可 Ctrl+Z 回退。
    *  方案名与平台/设备不动;template 记成该模板(方案库的「风格」列由它推) */

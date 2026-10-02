@@ -2,7 +2,7 @@
 // M1 以文件夹形式存放;M2 启用 zip 时内部结构不变。
 import { defaultDeviceId, isDeviceId } from './devices.ts'
 import { defaultTokens } from './template.ts'
-import type { IconSlot, SchemeManifest, TokenDef, UiFrameDoc } from './types.ts'
+import type { IconSlot, PlacedPart, SchemeManifest, TokenDef, UiFrameDoc } from './types.ts'
 
 export const SCHEME_FORMAT_VERSION = 1
 
@@ -82,6 +82,23 @@ export function parseDoc(text: string): UiFrameDoc {
   }
   const platform = raw['platform'] === 'phone' ? 'phone' : 'desktop'
   const rootFontPx = typeof raw['rootFontPx'] === 'number' ? raw['rootFontPx'] : 16
+  // 底板摆放(M3-a):逐条清洗,坏条目丢掉不挡打开
+  const placed: PlacedPart[] = []
+  if (Array.isArray(raw['placed'])) {
+    for (const p of raw['placed'] as Array<Record<string, unknown>>) {
+      if (
+        p &&
+        typeof p.id === 'string' &&
+        typeof p.recipe === 'string' &&
+        typeof p.x === 'number' &&
+        typeof p.y === 'number' &&
+        Number.isFinite(p.x) &&
+        Number.isFinite(p.y)
+      ) {
+        placed.push({ id: p.id, recipe: p.recipe, x: p.x, y: p.y })
+      }
+    }
+  }
   return {
     schemaVersion: 1,
     name: typeof raw['name'] === 'string' && raw['name'] ? raw['name'] : '未命名方案',
@@ -91,6 +108,7 @@ export function parseDoc(text: string): UiFrameDoc {
     rootFontPx,
     tokens,
     icons: cleanIcons as Record<IconSlot, string>,
+    placed,
     ...(raw['a11yEnhanced'] === true ? { a11yEnhanced: true } : {}),
     ...(typeof raw['targetStack'] === 'string' && raw['targetStack']
       ? { targetStack: raw['targetStack'] }

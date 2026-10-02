@@ -735,6 +735,33 @@ try {
   await page.getByRole('button', { name: '底板', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   await shot('uiframe-page')
+  // M3-a 底板拼装:零件盒双击「开关」上板 → 属性面板出零件卡 → 拖动移位 → Delete 删 → 撤销找回
+  await page.locator('.uf-parts .uf-part-row .uf-part-name', { hasText: /^开关$/ }).dblclick()
+  const placedShell = canvas.locator('[data-uf-placed]')
+  await placedShell.first().waitFor()
+  await page.locator('.uf-panel-title').filter({ hasText: '零件 · 开关' }).waitFor()
+  const pb = await placedShell.first().boundingBox()
+  assert.ok(pb, 'placed part must render on the bench')
+  // 抓手取零件中心:小零件按 +10 偏移会落到壳外
+  await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(pb.x + pb.width / 2 + 70, pb.y + pb.height / 2 + 60, { steps: 6 })
+  await page.mouse.up()
+  // 落点提交后 iframe 按 doc 重建:壳的内联 left 应变成新坐标
+  await page.waitForFunction(() => {
+    const f = document.querySelector('iframe.uf-canvas-frame') as HTMLIFrameElement | null
+    const el = f?.contentDocument?.querySelector('[data-uf-placed]') as HTMLElement | null
+    return !!el && parseFloat(el.style.left) > 50
+  })
+  await shot('uiframe-bench-part')
+  // Delete 删实例 → 摆空回示例页;撤销找回(撤销不恢复选中,需重新点选)
+  await page.keyboard.press('Delete')
+  await canvas.locator('header.page-header').waitFor()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await placedShell.first().waitFor()
+  await placedShell.first().click()
+  await page.keyboard.press('Delete')
+  await canvas.locator('header.page-header').waitFor()
   // M1-e 手机画布(§5.4):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
   await page.locator('select[aria-label="平台"]').selectOption('phone')
   await page.locator('.uf-device').waitFor()
@@ -781,6 +808,9 @@ try {
   await rulesPanel.locator('.uf-rules-item', { hasText: '44px' }).waitFor({ state: 'detached' })
   await page.getByRole('button', { name: '底板', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
+  // M3-a 持久化:留一个「输入框」在底板上,保存/快照回滚后它应原样回来
+  await page.locator('.uf-parts .uf-part-row .uf-part-name', { hasText: /^输入框$/ }).dblclick()
+  await canvas.locator('[data-uf-placed]').waitFor()
   const exportDir = join(run, 'uiframe')
   await mkdir(exportDir, { recursive: true })
   await control({ uiframeExportDir: exportDir })
@@ -851,6 +881,8 @@ try {
   await restoreBtn.waitFor()
   await restoreBtn.click()
   await page.locator('.uf-scheme-name').filter({ hasText: '旅程验证方案' }).waitFor()
+  // 回滚到保存时刻的方案:底板上的输入框零件随方案存档一起回来(M3-a 持久化)
+  await canvas.locator('[data-uf-placed]').waitFor()
   await shot('uiframe-library')
   // M1-d 导入(§14):库面板「新建方案」回起步页 → 导入浮层 → 粘贴 CSS 变量 → 战报 + 变量板读数换值
   await page.locator('.uf-scheme-name').click()
@@ -907,6 +939,14 @@ try {
   await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
   await page.locator('.uf-bench-empty').waitFor()
   await shot('uiframe-blank')
+  // M3-a 拖放路径:从零件盒把「卡片」真拖到空白底板上(HTML5 drag → drop 落点成实例),
+  // 落板后空态退场;再 Delete 删掉,空态回来
+  await page.dragAndDrop('.uf-parts .uf-part-row:has(.uf-part-name:text-is("卡片"))', '.uf-screen')
+  await canvas.locator('[data-uf-placed]').waitFor()
+  await page.locator('.uf-bench-empty').waitFor({ state: 'detached' })
+  await canvas.locator('[data-uf-placed]').click()
+  await page.keyboard.press('Delete')
+  await page.locator('.uf-bench-empty').waitFor()
   await page.getByRole('button', { name: '填入示例页看看', exact: true }).click()
   await page.locator('.uf-bench-empty').waitFor({ state: 'detached' })
   const blankCanvas = page.frameLocator('iframe.uf-canvas-frame')

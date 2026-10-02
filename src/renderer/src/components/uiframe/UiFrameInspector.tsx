@@ -2,11 +2,13 @@
 // 变量板点选的基础变量(data-uf-part="tok:<名>")走单变量编辑:数字、取色、阴影分量、字体名。
 import { useState } from 'react'
 import { PARTS } from '@shared/uiFrame/handles'
+import { PART_MAP } from '@shared/uiFrame/parts'
 import { literalCss, resolveValue } from '@shared/uiFrame/resolve'
 import type { IconSlot, TokenDef, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
 import { describePx } from '@shared/uiFrame/units'
 import { docActions, isTokenEdited } from '../../uiFrame/docStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
+import { workbenchActions } from '../../uiFrame/workbenchStore'
 import { IconPicker } from './IconPicker'
 
 /** 可在面板里直接输数字的变量类型 */
@@ -275,15 +277,64 @@ function TokenInspector({ doc, name }: { doc: UiFrameDoc; name: string }): React
 
 export function UiFrameInspector({
   doc,
-  selection
+  selection,
+  placedSel
 }: {
   doc: UiFrameDoc
   selection: CanvasSelection | null
+  /** 底板选中的零件实例 id(M3-a) */
+  placedSel: string | null
 }): React.JSX.Element {
   // 变量板条目:part 为 "tok:<变量名>",不走部件配方
   const tok = selection?.part.startsWith('tok:') ? selection.part.slice(4) : null
   const part = selection && !tok ? PARTS[selection.part] : undefined
   if (tok) return <TokenInspector doc={doc} name={tok} />
+  // 底板零件实例:挪位置靠拖,删按 Delete;数值细节去零件墙对应节调
+  if (placedSel && !part) {
+    const placed = doc.placed.find((p) => p.id === placedSel)
+    const def = placed ? PART_MAP[placed.recipe] : undefined
+    return (
+      <aside className="uf-inspector" aria-label="属性">
+        <h2 className="uf-panel-title">零件 · {def?.label ?? placed?.recipe ?? '已消失'}</h2>
+        {placed ? (
+          <>
+            <section className="uf-section">
+              <h3 className="uf-section-title">位置</h3>
+              <p className="uf-hint">
+                x {placed.x} · y {placed.y}
+              </p>
+              <p className="uf-hint">在底板上直接拖它挪位置;按 Delete 删掉,Esc 取消选中。</p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  docActions.removePlaced(placed.id)
+                  workbenchActions.selectPlaced(null)
+                }}
+              >
+                从底板删掉
+              </button>
+            </section>
+            <section className="uf-section">
+              <h3 className="uf-section-title">数值</h3>
+              <p className="uf-hint">
+                零件的尺寸、颜色、状态样式在「零件墙」对应节统一调;
+                <button
+                  type="button"
+                  className="uf-link"
+                  onClick={() => workbenchActions.jump({ kind: 'component', id: placed.recipe })}
+                >
+                  去调{def?.label ?? '它'}
+                </button>
+              </p>
+            </section>
+          </>
+        ) : (
+          <p className="uf-hint">这个零件已经不在底板上了。</p>
+        )}
+      </aside>
+    )
+  }
   if (!selection || !part) {
     return (
       <aside className="uf-inspector" aria-label="属性">
@@ -291,6 +342,7 @@ export function UiFrameInspector({
         <p className="uf-hint">
           点选画布里的按钮、卡片、图标或页面区块,在这里调整数值;选中后也可以直接拖动蓝色手柄。
         </p>
+        <p className="uf-hint">底板上的零件可以直接拖位置;零件盒里的组件拖上来或双击即可上板。</p>
         <p className="uf-hint">拖动默认按 0.125rem 吸附,靠近已有变量会自动吸上;按住 Alt 自由拖。</p>
       </aside>
     )

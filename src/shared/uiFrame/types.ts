@@ -60,6 +60,17 @@ export type IconSlot =
 
 export type UiPlatform = 'desktop' | 'phone'
 
+/** 底板上摆的一个零件实例(M3-a 页面拼装):配方 id + 自由坐标 */
+export interface PlacedPart {
+  /** 实例 id:选中/移动/删除的定位锚,生成时唯一 */
+  id: string
+  /** 零件注册表 entries 的配方 id(src/shared/uiFrame/parts.ts) */
+  recipe: string
+  /** 底板内容坐标(px,未缩放坐标系) */
+  x: number
+  y: number
+}
+
 export interface UiFrameDoc {
   schemaVersion: 1
   name: string
@@ -71,6 +82,8 @@ export interface UiFrameDoc {
   rootFontPx: number
   tokens: TokenMap
   icons: Record<IconSlot, string>
+  /** 底板上的零件摆放(M3-a);空数组 = 底板显示模板示例页或空态 */
+  placed: PlacedPart[]
   /** 问卷 D9「需要重点照顾」→ §5.7 加强档校验(更大字号下限、更高对比度) */
   a11yEnhanced?: boolean
   /** 立项单技术选型回填(§3.6):导出时的默认目标技术栈 */

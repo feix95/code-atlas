@@ -1,6 +1,6 @@
 // 「UI 框架」页签(§5 + 工作台改造):起步页(选平台/模板/我的方案)→ 工具条 + 底板 + 属性面板;
 // 画布视图与方案库浮层归 workbenchStore(零件盒在侧栏,两边共用一本账)。
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
 import { platformIssues } from '@shared/uiFrame/platformRules'
@@ -10,7 +10,7 @@ import { docActions, useUiFrameDoc } from '../../uiFrame/docStore'
 import { schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { useUiFrameExport, type ExportState } from '../../uiFrame/useUiFrameExport'
-import { useWorkbench, workbenchActions } from '../../uiFrame/workbenchStore'
+import { useWorkbench, workbenchActions, workbenchNow } from '../../uiFrame/workbenchStore'
 import { Notice } from '../Notice'
 import { UiFrameCanvas } from './UiFrameCanvas'
 import { UiFrameInspector } from './UiFrameInspector'
@@ -38,6 +38,31 @@ function isUndoKey(e: KeyboardEvent | React.KeyboardEvent): 'undo' | 'redo' | nu
 }
 
 function handleUndoKey(e: KeyboardEvent | React.KeyboardEvent): void {
+  // 已处理过的别再处理:div 冒泡拦截后 window 监听会再见一次同一事件
+  if (e.defaultPrevented) return
+  // 底板选中零件时 Delete/Backspace 删实例,Esc 取消选中(M3-a)
+  const placed = workbenchNow().placedSel
+  if (e.key === 'Escape' && placed) {
+    workbenchActions.selectPlaced(null)
+    return
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && placed) {
+    // 画布内的 input 是道具不是真编辑框,不拦;外层页面的真实表单控件才拦
+    const t = e.target
+    const inCanvas = t instanceof Element && t.ownerDocument !== document
+    if (
+      !inCanvas &&
+      (t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        (t instanceof HTMLElement && t.isContentEditable))
+    )
+      return
+    e.preventDefault()
+    docActions.removePlaced(placed)
+    workbenchActions.selectPlaced(null)
+    return
+  }
   const which = isUndoKey(e)
   if (!which) return
   if (e.target instanceof HTMLInputElement) return
@@ -117,7 +142,7 @@ function ExportBanner({
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
   const { started, schemeId, busy, error, notice } = useSchemeState()
-  const { view, libraryOpen } = useWorkbench()
+  const { view, libraryOpen, placedSel } = useWorkbench()
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
   const [chrome, setChrome] = useState(true)
@@ -130,12 +155,21 @@ export function UiFramePage(): React.JSX.Element {
   // 平台规范提醒(§5.7):随方案每次改动实时重算
   const issues = useMemo(() => platformIssues(doc), [doc])
 
-  // 换视图(含零件盒跳转)就清掉选中:旧视图的部件在新画布上不存在
+  // 换视图(含零件盒跳转)就清掉部件选中:旧视图的部件在新画布上不存在;
+  // 底板零件的选中在 workbenchStore 的 setView/jump 里同一笔清(渲染期回调会踩掉同事件后写的选中)
   const [prevView, setPrevView] = useState(view)
   if (prevView !== view) {
     setPrevView(view)
     setSelection(null)
   }
+
+  // 快捷键挂 window:焦点在侧栏零件盒时 Delete/Ctrl+Z 也得灵(侧栏不在 .uf-page 子树里);
+  // .uf-page 内的事件先被 div 拦截并 preventDefault,window 这里靠 defaultPrevented 去重
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => handleUndoKey(e)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // 回起步页(新建方案/换模板)时把浮层状态收干净,免得回画布时库面板还盖着
   const [prevStarted, setPrevStarted] = useState(started)
@@ -389,7 +423,7 @@ export function UiFramePage(): React.JSX.Element {
           onCommit={docActions.setToken}
           onKey={handleUndoKey}
         />
-        <UiFrameInspector doc={doc} selection={selection} />
+        <UiFrameInspector doc={doc} selection={selection} placedSel={placedSel} />
       </div>
       {libraryOpen && <UiFrameLibrary onClose={() => workbenchActions.setLibraryOpen(false)} />}
       {naming && (

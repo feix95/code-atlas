@@ -7,7 +7,7 @@ import { PARTS } from '@shared/uiFrame/handles'
 import { BLANK_ID } from '@shared/uiFrame/templates'
 import type { ThemeName, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
 import { applyTokens, canvasHtml, VIEW_LABEL } from '../../uiFrame/canvasDoc'
-import { currentDoc } from '../../uiFrame/docStore'
+import { currentDoc, docActions } from '../../uiFrame/docStore'
 import { selectionOf, useCanvasFrame, type CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { useHandleDrag } from '../../uiFrame/useHandleDrag'
 import { useMeasured } from '../../uiFrame/useMeasured'
@@ -106,19 +106,25 @@ export function UiFrameCanvas({
   const dev = deviceFor(doc)
   const isPhone = dev.platform === 'phone'
   const icons = doc.icons
+  const { jump, blankExample, placedSel, dragPart } = useWorkbench()
   // 只有视图/平台/图标变了才重建文档;变量变化走 applyTokens 原地替换,不闪屏。
   // doc.platform 是依赖信号:平台切换换整页结构(desktop home ↔ phone app),必须重建 iframe。
+  // 底板摆放也触发重建:零件增减/属性变化需要新文档;变量仍走 applyTokens 热替换
   const srcDoc = useMemo(() => {
     void doc.platform
+    void doc.placed
     return canvasHtml({ ...currentDoc(), icons }, view)
-  }, [icons, view, doc.platform])
+  }, [icons, view, doc.platform, doc.placed])
   const { frameRef, selBoxRef, hoverBoxRef, frameDoc, onLoad, fitHeight } = useCanvasFrame({
     doc,
     view,
     theme,
     viewport: { height: isPhone || view === 'bench' ? dev.height : 0, fixed: isPhone },
     selection,
+    placedSel,
     onSelect,
+    onSelectPlaced: (id) => workbenchActions.selectPlaced(id),
+    onMovePlaced: (id, x, y) => docActions.movePlaced(id, x, y),
     onKey
   })
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -136,9 +142,9 @@ export function UiFrameCanvas({
   const fixedStage = view === 'bench' || isPhone
   const wantFit = (view === 'bench' && fit) || isPhone
   const scale = wantFit ? Math.min(1, avail / Math.max(1, stageSize.w)) : 1
-  const { jump, blankExample } = useWorkbench()
   // 空白起步的底板:设备框里不渲染示例页,只留空态提示与「填入示例页」出口(界面上方浮层,不占方案数据)
-  const blankBench = view === 'bench' && doc.template === BLANK_ID && !blankExample
+  const blankBench =
+    view === 'bench' && doc.template === BLANK_ID && !blankExample && doc.placed.length === 0
 
   // 零件盒/检查面板的定位请求:目标视图的文档就绪后滚动到位,图标/变量顺带选中(进属性面板)
   useEffect(() => {
@@ -211,12 +217,32 @@ export function UiFrameCanvas({
       title={`${VIEW_LABEL[view]}画布`}
       srcDoc={srcDoc}
       onLoad={onLoad}
+      style={dragPart ? { pointerEvents: 'none' } : undefined}
     />
   )
+
+  // 底板拖放(M3-a):零件盒拖过来的配方落在屏幕区域;拖动时 iframe 关 pointer-events 好让 drop 传到父层
+  const screenEl = useRef<HTMLDivElement | null>(null)
+  const onDropPart = (e: React.DragEvent): void => {
+    if (view !== 'bench') return
+    const recipe = e.dataTransfer.getData('application/x-uiframe-part')
+    if (!recipe) return
+    e.preventDefault()
+    const rect = screenEl.current?.getBoundingClientRect()
+    if (!rect) return
+    // 屏幕坐标 → 底板内容坐标:除掉舞台缩放,手机端补 iframe 内部滚动位移
+    const frameScroll = frameDoc?.documentElement.scrollTop ?? 0
+    const x = (e.clientX - rect.left) / scale
+    const y = (e.clientY - rect.top) / scale + (isPhone ? frameScroll : 0)
+    const id = docActions.addPlaced(recipe, x, y)
+    workbenchActions.selectPlaced(id)
+    workbenchActions.setDragPart(null)
+  }
 
   // 屏幕区域:选中框对齐的基准;手机端定高(iframe 内滚),桌面端随内容长高
   const screen = (
     <div
+      ref={screenEl}
       className="uf-screen"
       style={
         isPhone
@@ -225,13 +251,15 @@ export function UiFrameCanvas({
             ? { width: `${dev.width}px` }
             : undefined
       }
+      onDragOver={dragPart ? (e) => e.preventDefault() : undefined}
+      onDrop={onDropPart}
     >
       {frame}
       {blankBench && (
         <div className="uf-bench-empty">
           <p className="uf-bench-empty-title">底板是空的</p>
           <p className="uf-bench-empty-hint">
-            往底板上自由摆零件会在后续版本开放;先在变量与零件墙上调数值。
+            把零件盒里的组件拖上来,或双击落一块;也可以先填入示例页再改。
           </p>
           <button
             type="button"
