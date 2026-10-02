@@ -155,3 +155,203 @@
   padding-left: var(--space-2);
   padding-right: var(--space-2);
 }
+
+/* ── 立项问卷(M2-b):全屏向导,盖在页签内容之上 ── */
+.qz-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  background: color-mix(in srgb, var(--canvas-tint) 82%, transparent);
+}
+
+.qz-sheet {
+  width: min(760px, 100%);
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg, 0 8px 32px rgb(0 0 0 / 24%));
+}
+
+.qz-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.qz-title {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.qz-progress {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.qz-head-btns {
+  margin-left: auto;
+}
+
+.qz-bar {
+  height: 3px;
+  margin: var(--space-3) 0 var(--space-5);
+  border-radius: var(--radius-full, 999px);
+  background: var(--chrome-panel);
+}
+
+.qz-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sash-hi);
+  transition: width 0.2s ease;
+}
+
+.qz-group-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-md);
+  color: var(--text-strong);
+}
+
+.qz-q {
+  margin-bottom: var(--space-5);
+}
+
+.qz-q-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.qz-q-id {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.qz-note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.qz-opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-2);
+}
+
+.qz-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qz-opt:hover {
+  border-color: var(--sash-hi);
+}
+
+.qz-opt.is-on {
+  border-color: var(--sash-hi);
+  background: color-mix(in srgb, var(--sash-hi) 10%, var(--surface));
+  color: var(--text-strong);
+}
+
+.qz-opt-mark {
+  color: var(--sash-hi);
+  flex: none;
+}
+
+.qz-opt-ai {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.qz-extra {
+  margin-top: var(--space-2);
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+}
+
+.qz-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.qz-foot .btn-primary {
+  margin-left: auto;
+}
+
+.qz-hint {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.qz-done-title {
+  margin: 0 0 var(--space-2);
+  color: var(--text-strong);
+}
+
+.qz-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.qz-brief {
+  max-height: 340px;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--chrome-panel);
+  font-size: var(--font-sm);
+  white-space: pre-wrap;
+}
+
+/* 起步页问卷入口卡 */
+.uf-quiz-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--chrome-panel);
+}
+
+.uf-quiz-entry-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}

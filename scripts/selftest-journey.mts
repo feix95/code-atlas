@@ -601,6 +601,38 @@ try {
   await importDialog.waitFor({ state: 'hidden' })
   await page.getByText('还没有保存过的方案', { exact: false }).waitFor()
   await shot('uiframe-start')
+  // M2 立项问卷(§3):入口卡 → 向导 → A1 条件显隐(A2/A3 随手机选项出现)→
+  // 「让 AI 建议」→ 七组走到底 → 完成页复制立项单
+  await page.getByRole('button', { name: '开始问卷', exact: true }).click()
+  const quiz = page.getByRole('dialog', { name: '立项问卷' })
+  await quiz.waitFor()
+  await quiz.getByRole('checkbox', { name: '电脑桌面应用' }).click()
+  await quiz.getByRole('checkbox', { name: '手机 app' }).click()
+  // 条件显隐(§3.2):选了手机才有 iOS/Android 题
+  await quiz.getByText('手机端系统').waitFor()
+  await quiz.getByRole('checkbox', { name: 'iOS' }).click()
+  await quiz
+    .locator('.qz-q', { hasText: '离线使用' })
+    .getByRole('button', { name: '不确定,让 AI 建议' })
+    .click()
+  for (let i = 0; i < 6; i++) {
+    await quiz.getByRole('button', { name: '下一组', exact: true }).click()
+  }
+  await quiz.getByRole('button', { name: '生成立项单', exact: true }).click()
+  await quiz.getByText('立项单生成好了').waitFor()
+  await quiz.locator('.qz-brief').getByText('# 立项单', { exact: false }).waitFor()
+  await quiz.getByRole('button', { name: '复制立项单' }).click()
+  await quiz.getByRole('button', { name: '已复制' }).waitFor()
+  await shot('uiframe-quiz')
+  // 草稿已存:关掉重开应落在完成页;随后重答回第一组,免得答案影响后续流程
+  await quiz.getByRole('button', { name: '关闭', exact: true }).click()
+  await quiz.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: /立项单已生成/ }).click()
+  await quiz.locator('.qz-brief').waitFor()
+  await quiz.getByRole('button', { name: '重答一遍' }).click()
+  await quiz.getByText('A 组 · 平台与设备').waitFor()
+  await quiz.getByRole('button', { name: '先放着,草稿自动存' }).click()
+  await quiz.waitFor({ state: 'hidden' })
   await page.getByRole('button', { name: '极简工作台', exact: true }).click()
   await page.locator('.uf-scheme-name').filter({ hasText: '极简工作台方案' }).waitFor()
   await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()

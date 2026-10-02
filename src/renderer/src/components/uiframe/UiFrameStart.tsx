@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { TEMPLATES } from '@shared/uiFrame/templates'
 import type { SchemeMeta, UiPlatform } from '@shared/uiFrame/types'
+import { quizActions, useQuiz } from '../../quiz/quizStore'
 import { BLANK_ID, schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
 import { Notice } from '../Notice'
+import { QuizWizard } from '../quiz/QuizWizard'
 import { UiFrameImport } from './UiFrameImport'
 import { SchemeCard } from './UiFrameSchemes'
 
@@ -15,6 +17,7 @@ const PLATFORMS: Array<[UiPlatform, string]> = [
 
 export function UiFrameStart(): React.JSX.Element {
   const { schemes, busy, error } = useSchemeState()
+  const { answers: quizAnswers, done: quizDone } = useQuiz()
   const [platform, setPlatform] = useState<UiPlatform>('desktop')
   const [importOpen, setImportOpen] = useState(false)
 
@@ -35,6 +38,24 @@ export function UiFrameStart(): React.JSX.Element {
           模板是一套调好风格的完整方案,在它的基础上改数值;也可以从空白或你已存的方案开始。
         </p>
       </div>
+
+      <section className="uf-start-section uf-start-quiz" aria-label="立项问卷">
+        <div className="uf-quiz-entry">
+          <div className="uf-quiz-entry-text">
+            <span className="uf-card-name">第一步(选做):立项问卷</span>
+            <span className="uf-card-blurb">
+              答几道选择题定立项条件,生成立项单交给 AI 做技术选型;答案还会预填下面的初始值。
+            </span>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => quizActions.open()}>
+            {quizDone
+              ? '立项单已生成 · 查看'
+              : Object.keys(quizAnswers).length > 0
+                ? '继续问卷'
+                : '开始问卷'}
+          </button>
+        </div>
+      </section>
 
       <div className="uf-seg" role="group" aria-label="目标平台">
         {PLATFORMS.map(([p, label]) => (
@@ -104,6 +125,7 @@ export function UiFrameStart(): React.JSX.Element {
         )}
       </section>
       {importOpen && <UiFrameImport onClose={() => setImportOpen(false)} />}
+      <QuizWizard />
     </div>
   )
 }
