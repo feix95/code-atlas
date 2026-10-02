@@ -656,6 +656,50 @@ check('默认方案提示有价值:桌面与手机都检出边界对比度与点
   assert.ok(phone.some((i) => i.rule === '最小点击区' && i.target === 'control-md'))
   assert.ok(!phone.some((i) => i.rule === '悬停态缺失'), '手机不查悬停态')
 })
+check('D9 加强档(§5.7):字号下限 +2、文字对比度 7:1、边界 4.5:1,消息带标记', () => {
+  const d = defaultDoc()
+  d.tokens['font-size-md'] = { ...d.tokens['font-size-md'], value: { kind: 'dimension', px: 13 } }
+  assert.equal(
+    platformIssues(d).filter((i) => i.rule === '正文字号下限').length,
+    0,
+    '桌面 12px 下限,13 放行'
+  )
+  const enhanced = { ...d, a11yEnhanced: true }
+  const list = platformIssues(enhanced)
+  assert.equal(list.filter((i) => i.rule === '正文字号下限').length, 1, '加强档 14px 下限,13 拦')
+  assert.ok(list.find((i) => i.rule === '正文字号下限')?.message.includes('加强档'))
+  assert.ok(
+    list.every((i) => i.rule !== '文字对比度' || i.message.includes('7')),
+    '加强档文字对比度按 7:1 卡'
+  )
+  // 边界用例:4.5~7 之间的对比度,普通档放行、加强档拦(#707070 对 #FAFAF9 ≈4.64;暗色档保持默认)
+  const mid = defaultDoc()
+  const darkText =
+    mid.tokens['color-text'].value.kind === 'color'
+      ? mid.tokens['color-text'].value.dark
+      : '#F8FAFC'
+  mid.tokens['color-text'] = {
+    ...mid.tokens['color-text'],
+    value: { kind: 'color', light: '#707070', dark: darkText }
+  }
+  const midIssues = platformIssues(mid).filter(
+    (i) => i.rule === '文字对比度' && i.target === 'color-text'
+  )
+  const midEnhanced = platformIssues({ ...mid, a11yEnhanced: true }).filter(
+    (i) => i.rule === '文字对比度' && i.target === 'color-text'
+  )
+  assert.equal(midIssues.length, 0, '4.64:1 过 AA 4.5')
+  assert.ok(midEnhanced.length >= 1, '4.64:1 不过 AAA 7,加强档拦')
+})
+check('a11yEnhanced/targetStack 字段随 design.json 往返', () => {
+  const d = { ...defaultDoc(), a11yEnhanced: true, targetStack: 'Tauri + Vue' }
+  const back = parseDoc(serializeDoc(d))
+  assert.equal(back.a11yEnhanced, true)
+  assert.equal(back.targetStack, 'Tauri + Vue')
+  const plain = parseDoc(serializeDoc(defaultDoc()))
+  assert.equal(plain.a11yEnhanced, undefined, '老方案没这个字段,不能冒出加强档')
+  assert.equal(plain.targetStack, undefined)
+})
 
 console.log('── 导出适配器(M1-g,§13.5)')
 check('Tailwind @theme:命名空间归位、ref 解为字面值、暗色值进 [data-theme] 块', () => {

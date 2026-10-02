@@ -71,6 +71,10 @@ export interface UiFrameDoc {
   rootFontPx: number
   tokens: TokenMap
   icons: Record<IconSlot, string>
+  /** 问卷 D9「需要重点照顾」→ §5.7 加强档校验(更大字号下限、更高对比度) */
+  a11yEnhanced?: boolean
+  /** 立项单技术选型回填(§3.6):导出时的默认目标技术栈 */
+  targetStack?: string
 }
 
 /** lucide icon-nodes.json 的单个图标:[标签名, 属性] 列表 */

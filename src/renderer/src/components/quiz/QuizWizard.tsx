@@ -2,11 +2,13 @@
 // 每题带「不确定,让 AI 建议」;草稿自动落 localStorage(见 quizStore)。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildProjectBrief } from '@shared/quiz/brief'
+import { quizPrefill } from '@shared/quiz/prefill'
 import { visibleGroups } from '@shared/quiz/questions'
 import { TECH_STACK_PRESETS } from '@shared/quiz/stacks'
 import type { AnswerMap, QuizAnswer, QuizQuestion } from '@shared/quiz/types'
 import { requestQuizAgent } from '../../quiz/quizBridge'
 import { quizActions, useQuiz } from '../../quiz/quizStore'
+import { schemeActions } from '../../uiFrame/schemeStore'
 
 /** 「让 AI 建议」的固定选项文案 */
 const AI_LABEL = '不确定,让 AI 建议'
@@ -102,8 +104,8 @@ function Question({
 
 /** 完成页(§3.5/§3.6):立项单预览 + 三个出口(复制/存 .md/交内置 agent)+ 技术栈回填 */
 function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
-  const { techStack } = useQuiz()
-  const brief = useMemo(() => buildProjectBrief({ answers }), [answers])
+  const { techStack, productName } = useQuiz()
+  const brief = useMemo(() => buildProjectBrief({ answers, productName }), [answers, productName])
   const [copied, setCopied] = useState(false)
   const [savedPath, setSavedPath] = useState<string | null>(null)
   const copy = async (): Promise<void> => {
@@ -122,13 +124,37 @@ function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
     requestQuizAgent(brief)
     quizActions.close()
   }
+  // 入口 A → 第二步:带着答案直接起方案(平台/风格/密度/主色/D9 加强档由问卷定)
+  const toBench = (): void => {
+    const prefill = quizPrefill(answers)
+    schemeActions.startFromQuiz(prefill, { productName, techStack })
+    schemeActions.flash(
+      prefill.templateId
+        ? '已按问卷预填:平台、风格、密度与主色都铺好了'
+        : '已按问卷预填平台与密度;所选风格暂未内置,从空白起步'
+    )
+    quizActions.close()
+  }
   return (
     <div className="qz-done">
       <h3 className="qz-done-title">立项单生成好了</h3>
       <p className="qz-hint">
         这份文档交给你的 AI 编程助手做技术选型;可以复制下来贴给它,或存成 .md 文件带走。
       </p>
+      <div className="qz-backfill-row">
+        <input
+          className="qz-extra qz-stack-input"
+          type="text"
+          placeholder="产品名(可空,会进立项单和方案名)"
+          aria-label="产品名"
+          value={productName}
+          onChange={(e) => quizActions.setProductName(e.target.value)}
+        />
+      </div>
       <div className="qz-actions">
+        <button type="button" className="btn btn-primary" onClick={toBench}>
+          带着答案调 UI
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => void copy()}>
           {copied ? '已复制' : '复制立项单'}
         </button>

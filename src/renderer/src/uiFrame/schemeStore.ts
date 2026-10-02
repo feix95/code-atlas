@@ -10,6 +10,8 @@ import {
 } from '@shared/uiFrame/importDoc'
 import { parseDoc } from '@shared/uiFrame/scheme'
 import { BLANK_ID, templateDoc } from '@shared/uiFrame/templates'
+import { defaultDeviceId } from '@shared/uiFrame/devices'
+import type { QuizPrefill } from '@shared/quiz/prefill'
 import type { SchemeMeta, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
 import { canvasHtml } from './canvasDoc'
 import { docActions } from './docStore'
@@ -82,6 +84,28 @@ export const schemeActions = {
   /** 起步:模板(id ∈ TEMPLATES)或空白(BLANK_ID);platform 仅空白起步时用 */
   startFresh(templateId: string, platform: UiPlatform): void {
     docActions.replaceDoc(templateDoc(templateId, platform))
+    workbenchActions.docReplaced()
+    emit({ started: true, schemeId: null, error: null })
+  },
+  /** 问卷预填起步(§2 入口 A → 第二步):模板/平台/密度/主色/加强档按答案铺好;
+   *  模板与问卷平台不一致时以问卷平台为准(风格变量照样套) */
+  startFromQuiz(
+    prefill: QuizPrefill,
+    opts: { productName?: string; techStack?: string } = {}
+  ): void {
+    const doc = templateDoc(prefill.templateId ?? BLANK_ID, prefill.platform)
+    if (doc.platform !== prefill.platform) {
+      doc.platform = prefill.platform
+      doc.device = defaultDeviceId(prefill.platform)
+    }
+    for (const [name, value] of Object.entries(prefill.overrides)) {
+      const def = doc.tokens[name]
+      if (def) doc.tokens[name] = { ...def, value }
+    }
+    if (opts.productName?.trim()) doc.name = opts.productName.trim()
+    if (prefill.a11yEnhanced) doc.a11yEnhanced = true
+    if (opts.techStack?.trim()) doc.targetStack = opts.techStack.trim()
+    docActions.replaceDoc(doc)
     workbenchActions.docReplaced()
     emit({ started: true, schemeId: null, error: null })
   },

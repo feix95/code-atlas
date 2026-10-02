@@ -15,20 +15,33 @@ interface QuizState {
   done: boolean
   /** 技术栈回填(§3.6):预设清单选的或粘贴的 agent 结论;预填第二步时作默认导出目标 */
   techStack: string
+  /** 产品名(§3.5 基本信息,可空):进立项单,也当预填方案的默认名 */
+  productName: string
 }
 
-function loadDraft(): { answers: AnswerMap; done: boolean; techStack: string } {
+function loadDraft(): {
+  answers: AnswerMap
+  done: boolean
+  techStack: string
+  productName: string
+} {
   try {
     const raw = localStorage.getItem(DRAFT_KEY)
-    if (!raw) return { answers: {}, done: false, techStack: '' }
-    const parsed = JSON.parse(raw) as { answers?: AnswerMap; done?: boolean; techStack?: string }
+    if (!raw) return { answers: {}, done: false, techStack: '', productName: '' }
+    const parsed = JSON.parse(raw) as {
+      answers?: AnswerMap
+      done?: boolean
+      techStack?: string
+      productName?: string
+    }
     return {
       answers: parsed.answers ?? {},
       done: parsed.done === true,
-      techStack: typeof parsed.techStack === 'string' ? parsed.techStack : ''
+      techStack: typeof parsed.techStack === 'string' ? parsed.techStack : '',
+      productName: typeof parsed.productName === 'string' ? parsed.productName : ''
     }
   } catch {
-    return { answers: {}, done: false, techStack: '' }
+    return { answers: {}, done: false, techStack: '', productName: '' }
   }
 }
 
@@ -38,7 +51,8 @@ let state: QuizState = {
   answers: draft.answers,
   groupIndex: 0,
   done: draft.done,
-  techStack: draft.techStack
+  techStack: draft.techStack,
+  productName: draft.productName
 }
 const listeners = new Set<() => void>()
 
@@ -46,7 +60,12 @@ function persist(): void {
   try {
     localStorage.setItem(
       DRAFT_KEY,
-      JSON.stringify({ answers: state.answers, done: state.done, techStack: state.techStack })
+      JSON.stringify({
+        answers: state.answers,
+        done: state.done,
+        techStack: state.techStack,
+        productName: state.productName
+      })
     )
   } catch {
     // 存储满了/私密模式:草稿丢就丢,不挡答题
@@ -100,6 +119,9 @@ export const quizActions = {
   },
   setTechStack(text: string): void {
     emit({ techStack: text })
+  },
+  setProductName(text: string): void {
+    emit({ productName: text })
   },
   /** 重答:清答案回第一组(草稿一并清);技术栈回填保留,它跟答案无关 */
   restart(): void {

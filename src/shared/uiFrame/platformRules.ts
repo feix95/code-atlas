@@ -20,8 +20,11 @@ const TOUCH_MIN: Record<UiPlatform, { min: number; hint: string }> = {
   desktop: { min: 24, hint: 'WCAG 24px,建议 32 以上' }
 }
 
-/** 正文字号下限(§5.7):手机 14 / 电脑 12 */
+/** 正文字号下限(§5.7):手机 14 / 电脑 12;问卷 D9「需要重点照顾」→ 加强档再 +2 */
 const BODY_FONT_MIN: Record<UiPlatform, number> = { phone: 14, desktop: 12 }
+/** 加强档(§5.7 D9):正文对比度 4.5→7(AAA),控件边界 3→4.5,字号下限 +2 */
+const A11Y_TEXT_MIN = { normal: 4.5, enhanced: 7 }
+const A11Y_BOUNDARY_MIN = { normal: 3, enhanced: 4.5 }
 
 /** 可作为点击区的控件变量名:控件高度档、图标按钮尺寸、复选框尺寸、开关轨道等 */
 const HIT_TARGET_RE =
@@ -169,7 +172,10 @@ export function platformIssues(doc: UiFrameDoc): PlatformIssue[] {
     )
   }
 
-  // 文字对比度 ≥4.5(WCAG AA 正文)
+  // 文字对比度 ≥4.5(WCAG AA 正文);加强档 ≥7(AAA)
+  const enhanced = doc.a11yEnhanced === true
+  const textMin = enhanced ? A11Y_TEXT_MIN.enhanced : A11Y_TEXT_MIN.normal
+  const boundaryMin = enhanced ? A11Y_BOUNDARY_MIN.enhanced : A11Y_BOUNDARY_MIN.normal
   for (const [fg, bg] of TEXT_PAIRS) {
     for (const theme of THEMES) {
       const a = resolvedColor(doc, fg, theme)
@@ -180,12 +186,12 @@ export function platformIssues(doc: UiFrameDoc): PlatformIssue[] {
         push('文字对比度', 'warn', fg, `--${fg} 含非十六进制颜色,对比度未核算`)
         continue
       }
-      if (ratio < 4.5) {
+      if (ratio < textMin) {
         push(
           '文字对比度',
           'warn',
           fg,
-          `${theme === 'light' ? '亮色' : '暗色'}下 --${fg} 对 --${bg} 为 ${ratio.toFixed(2)}:1,低于正文 4.5:1`
+          `${theme === 'light' ? '亮色' : '暗色'}下 --${fg} 对 --${bg} 为 ${ratio.toFixed(2)}:1,低于正文 ${textMin}:1${enhanced ? '(加强档)' : ''}`
         )
       }
     }
@@ -199,26 +205,26 @@ export function platformIssues(doc: UiFrameDoc): PlatformIssue[] {
       if (a === null || b === null) continue
       const ratio = contrastRatio(a, b)
       if (ratio === null) continue
-      if (ratio < 3) {
+      if (ratio < boundaryMin) {
         push(
           '控件边界对比度',
           'warn',
           fg,
-          `${theme === 'light' ? '亮色' : '暗色'}下 --${fg} 对 --${bg} 为 ${ratio.toFixed(2)}:1,低于控件边界 3:1`
+          `${theme === 'light' ? '亮色' : '暗色'}下 --${fg} 对 --${bg} 为 ${ratio.toFixed(2)}:1,低于控件边界 ${boundaryMin}:1${enhanced ? '(加强档)' : ''}`
         )
       }
     }
   }
 
-  // 正文字号下限:正文档 font-size-md 按平台查
+  // 正文字号下限:正文档 font-size-md 按平台查;加强档再 +2
   const bodyPx = resolvedPx(doc, 'font-size-md')
-  const bodyMin = BODY_FONT_MIN[doc.platform]
+  const bodyMin = BODY_FONT_MIN[doc.platform] + (enhanced ? 2 : 0)
   if (bodyPx !== null && bodyPx < bodyMin) {
     push(
       '正文字号下限',
       'warn',
       'font-size-md',
-      `--font-size-md = ${bodyPx}px,低于${doc.platform === 'phone' ? '手机' : '电脑'}端正文 ${bodyMin}px`
+      `--font-size-md = ${bodyPx}px,低于${doc.platform === 'phone' ? '手机' : '电脑'}端正文 ${bodyMin}px${enhanced ? '(加强档)' : ''}`
     )
   }
 

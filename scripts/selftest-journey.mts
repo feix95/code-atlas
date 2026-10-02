@@ -639,14 +639,36 @@ try {
   await quiz.getByRole('button', { name: '交给内置 agent' }).click()
   await quiz.waitFor({ state: 'hidden' })
   await page.getByText('# 立项单', { exact: false }).first().waitFor()
-  // 回到 UI 框架签:草稿已存,重开落完成页;随后重答回第一组,免得答案影响后续流程
+  // 回到 UI 框架签:草稿已存,重开落完成页;重答一遍做 M2-d 预填验收
   await page.getByRole('tab', { name: /UI 框架/ }).click()
   await page.getByRole('button', { name: /立项单已生成/ }).click()
   await quiz.locator('.qz-brief').waitFor()
+  // M2-d 答案预填第二步(§3.6 入口 A):只答 A1 手机 → 走完 → 产品名 → 带着答案调 UI
   await quiz.getByRole('button', { name: '重答一遍' }).click()
   await quiz.getByText('A 组 · 平台与设备').waitFor()
-  await quiz.getByRole('button', { name: '先放着,草稿自动存' }).click()
+  await quiz.getByRole('checkbox', { name: '手机 app' }).click()
+  for (let i = 0; i < 6; i++) {
+    await quiz.getByRole('button', { name: '下一组', exact: true }).click()
+  }
+  await quiz.getByRole('button', { name: '生成立项单', exact: true }).click()
+  await quiz.getByText('立项单生成好了').waitFor()
+  await quiz.getByRole('textbox', { name: '产品名' }).fill('问卷起步品')
+  await quiz.getByRole('button', { name: '带着答案调 UI' }).click()
   await quiz.waitFor({ state: 'hidden' })
+  // 预填落点:方案名=产品名、平台=手机端;G1 没答 → 空白起步,底板空态
+  await page.locator('.uf-scheme-name').filter({ hasText: '问卷起步品' }).waitFor()
+  await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
+  assert.ok(
+    (await page.getByRole('combobox', { name: '平台' }).inputValue()) === 'phone',
+    '问卷 A1 手机应把平台预填成手机端'
+  )
+  await page.locator('.uf-bench-empty-title').filter({ hasText: '底板是空的' }).waitFor()
+  // 回起步页继续原流程:极简工作台模板
+  await page.locator('.uf-scheme-name').click()
+  await page
+    .getByRole('dialog', { name: '我的方案库' })
+    .getByRole('button', { name: '新建方案' })
+    .click()
   await page.getByRole('button', { name: '极简工作台', exact: true }).click()
   await page.locator('.uf-scheme-name').filter({ hasText: '极简工作台方案' }).waitFor()
   await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()

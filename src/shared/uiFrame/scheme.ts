@@ -90,7 +90,11 @@ export function parseDoc(text: string): UiFrameDoc {
     template: typeof raw['template'] === 'string' ? raw['template'] : 'blank',
     rootFontPx,
     tokens,
-    icons: cleanIcons as Record<IconSlot, string>
+    icons: cleanIcons as Record<IconSlot, string>,
+    ...(raw['a11yEnhanced'] === true ? { a11yEnhanced: true } : {}),
+    ...(typeof raw['targetStack'] === 'string' && raw['targetStack']
+      ? { targetStack: raw['targetStack'] }
+      : {})
   }
 }
 
