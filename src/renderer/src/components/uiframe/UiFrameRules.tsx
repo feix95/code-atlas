@@ -1,5 +1,5 @@
-// 平台规范提醒面板(§5.7):工具栏「规范」chip 点开,列出当前方案的规范问题。
-// 提醒不拦截导出;点变量条目跳到变量板对应行,点组件条目跳组件墙。
+// 平台适配检查面板(§5.7):工具栏「检查」chip 点开,列出当前方案的规范问题。
+// 提醒不拦截导出;点变量条目跳到变量板对应行,点组件条目跳零件墙。
 import type { PlatformIssue } from '@shared/uiFrame/platformRules'
 
 export function UiFrameRules({
@@ -12,9 +12,9 @@ export function UiFrameRules({
   onClose: () => void
 }): React.JSX.Element {
   return (
-    <div className="uf-rules" role="dialog" aria-label="平台规范提醒">
+    <div className="uf-rules" role="dialog" aria-label="平台适配检查">
       <div className="uf-rules-head">
-        <span>平台规范提醒 · {issues.length} 条</span>
+        <span>平台适配检查 · {issues.length} 条</span>
         <button type="button" className="btn btn-ghost uf-rules-x" onClick={onClose}>
           收起
         </button>

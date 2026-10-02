@@ -128,6 +128,11 @@ const OVERRIDES: Record<string, Record<string, TokenValue>> = {
   }
 }
 
+/** 模板对默认变量表的覆盖(零件盒「风格」一键套用用);未知 id 给空表 */
+export function templateOverrides(id: string): Record<string, TokenValue> {
+  return OVERRIDES[id] ?? {}
+}
+
 /** 由模板生成方案:默认变量表 + 该模板覆盖值;空白起步 = 默认表 + 名字 */
 export function templateDoc(id: string, platform?: UiPlatform): UiFrameDoc {
   const meta = TEMPLATES.find((t) => t.id === id)

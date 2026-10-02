@@ -1,0 +1,157 @@
+/* ── UI 框架 · 工作台改造(零件盒侧栏 / 底板空态 / 导出按钮组)──
+/* ── 工作台改造:零件盒(占全局侧栏)────────────────────── */
+/* .uf-parts 是 .sidebar 的直接子层,宽度吃 --sidebar-w(.sidebar > * 规则) */
+
+.uf-parts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-2) var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+
+.uf-parts details {
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.uf-parts details:last-child {
+  border-bottom: 0;
+}
+
+.uf-parts summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-semi);
+  cursor: pointer;
+  user-select: none;
+}
+
+.uf-parts summary:hover {
+  background: var(--hover);
+}
+
+.uf-part-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 1.75rem;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.uf-part-row:hover {
+  background: var(--hover);
+}
+
+.uf-part-row.is-on {
+  background: var(--selected-bg);
+}
+
+.uf-part-row-action {
+  color: var(--muted);
+}
+
+.uf-part-ico {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  color: var(--muted);
+}
+
+.uf-part-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uf-part-meta {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uf-part-sub {
+  margin: var(--space-2) var(--space-2) 0;
+  color: var(--chrome-muted);
+  font-size: var(--font-xs);
+}
+
+.uf-parts-hint {
+  margin: var(--space-1) var(--space-2);
+  font-size: var(--font-xs);
+  line-height: var(--lh-150);
+}
+
+/* ── 空白底板空态(盖住 iframe 的浮层;填入示例页后消失)── */
+.uf-bench-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  background: var(--canvas-tint);
+  text-align: center;
+}
+
+.uf-bench-empty-title {
+  margin: 0;
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-w-semi);
+  color: var(--text);
+}
+
+.uf-bench-empty-hint {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+/* ── 导出按钮组:「导出给 AI」主钮 + ▾ 次级菜单(复制主题)── */
+.uf-export {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.uf-export-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.uf-export-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: 1px;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}

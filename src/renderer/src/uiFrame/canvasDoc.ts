@@ -13,12 +13,12 @@ import { rulesCss } from '@shared/uiFrame/recipes/kit'
 import type { UiFrameDoc } from '@shared/uiFrame/types'
 import { canvasFontsCss, iconLookup } from './assets'
 
-export type CanvasView = 'wall' | 'board' | 'page'
+export type CanvasView = 'wall' | 'board' | 'bench'
 
 export const VIEW_LABEL: Record<CanvasView, string> = {
-  wall: '组件墙',
-  board: '变量板',
-  page: '示例页'
+  bench: '底板',
+  wall: '零件墙',
+  board: '变量板'
 }
 
 /** 变量板只加载变量与自身样式,不带组件/页面样式 */

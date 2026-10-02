@@ -649,6 +649,7 @@ function App(): React.JSX.Element {
   // 设置导航中枢:模式判定、侧栏收起态进出账、分类跳转请求都收在钩里(useSettingsNav)
   const {
     settingsMode,
+    uiframeMode,
     settingsSection,
     setSettingsSection,
     settingsReq,
@@ -896,6 +897,7 @@ function App(): React.JSX.Element {
               settingsSection={settingsSection}
               onSettingsSection={openSettings}
               onOpenBrowseFile={openBrowseFile}
+              uiframeMode={uiframeMode}
             />
             {result && !scanning ? (
               // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动

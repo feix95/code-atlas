@@ -17,6 +17,8 @@ export function useSettingsNav({
   toggleSidebarCollapsed: () => void
 }): {
   settingsMode: boolean
+  /** UI 框架模式(工作台改造):激活签是 UI 框架页时,侧栏换脸成零件盒 */
+  uiframeMode: boolean
   /** 侧栏导航高亮哪页:openSettings 直接落账,设置页切页时也回报同一本 */
   settingsSection: SectionKey
   setSettingsSection: (key: SectionKey) => void
@@ -43,17 +45,20 @@ export function useSettingsNav({
     openSettings('ai')
   }
 
-  // 设置模式:全局激活组落在主窗、且它的激活签是设置页 → 侧栏换脸成设置导航。
-  // 分屏下认全局激活组不认「某组里还开着设置」:点去别的组,侧栏就回文件树(跟着焦点走)
-  const settingsMode =
-    activeGroup !== null &&
-    groupHost(activeGroup) === MAIN_HOST &&
-    activeGroup.tabs.find((t) => t.id === activeGroup.activeId)?.kind === 'settings'
+  // 侧栏换脸模式:全局激活组落在主窗、且它的激活签是设置页 / UI 框架页 → 侧栏换脸。
+  // 分屏下认全局激活组不认「某组里还开着」:点去别的组,侧栏就回文件树(跟着焦点走)
+  const activeKind =
+    activeGroup !== null && groupHost(activeGroup) === MAIN_HOST
+      ? activeGroup.tabs.find((t) => t.id === activeGroup.activeId)?.kind
+      : undefined
+  const settingsMode = activeKind === 'settings'
+  const uiframeMode = activeKind === 'uiframe'
+  const faceMode = settingsMode || uiframeMode
 
-  // 进设置时侧栏收着就先掀开(藏着的导航等于没有),走时无条件还原进门前那一下的收起态
+  // 进换脸模式时侧栏收着就先掀开(藏着的导航等于没有),走时无条件还原进门前那一下的收起态
   const sidebarCollapsedOnEnter = useRef<boolean | null>(null)
   useEffect(() => {
-    if (settingsMode) {
+    if (faceMode) {
       if (sidebarCollapsedOnEnter.current === null) {
         sidebarCollapsedOnEnter.current = sidebarCollapsed
         if (sidebarCollapsed) toggleSidebarCollapsed()
@@ -63,10 +68,11 @@ export function useSettingsNav({
       sidebarCollapsedOnEnter.current = null
       if (wasCollapsed !== sidebarCollapsed) toggleSidebarCollapsed()
     }
-  }, [settingsMode, sidebarCollapsed, toggleSidebarCollapsed])
+  }, [faceMode, sidebarCollapsed, toggleSidebarCollapsed])
 
   return {
     settingsMode,
+    uiframeMode,
     settingsSection,
     setSettingsSection,
     settingsReq,

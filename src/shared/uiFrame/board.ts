@@ -24,7 +24,7 @@ type BoardKind =
   | 'shadow'
 
 /** 基础变量分组 → 变量板分区(顺序即展示顺序;kind 决定视觉样式) */
-const GROUPS: Array<[group: string, title: string, kind: BoardKind]> = [
+export const GROUPS: Array<[group: string, title: string, kind: BoardKind]> = [
   ['color', '颜色', 'color'],
   ['font', '字体', 'family'],
   ['font-size', '字号', 'type'],
@@ -139,6 +139,7 @@ export function boardBody(doc: UiFrameDoc): PageNode[] {
     sections.push({
       tag: 'section',
       cls: 'vb-sec',
+      attrs: { 'data-uf-board-group': group },
       children: [
         { tag: 'h2', cls: 'vb-title', text: title },
         {

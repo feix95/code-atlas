@@ -12,20 +12,26 @@
 .uf-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--line);
-  /* 工具条满员时不许折行/压缩,超出整体横向滚动 */
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.uf-toolbar > * {
+/* 窄窗自适应:环境控件组内可折行;动作组整体落到第二行,靠右对齐不被截断 */
+.uf-tb-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.uf-tb-actions {
+  flex-wrap: nowrap;
+  margin-left: auto;
   flex: none;
-}
-
-.uf-toolbar-gap {
-  flex: 1;
 }
 
 .uf-seg {
@@ -180,10 +186,6 @@
 }
 
 /* 复制主题下拉(§13.5 适配器) */
-.uf-copy {
-  position: relative;
-}
-
 .uf-copy-menu {
   position: absolute;
   top: calc(100% + var(--space-1));

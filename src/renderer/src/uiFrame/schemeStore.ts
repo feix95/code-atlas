@@ -13,6 +13,7 @@ import { BLANK_ID, templateDoc } from '@shared/uiFrame/templates'
 import type { SchemeMeta, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
 import { canvasHtml } from './canvasDoc'
 import { docActions } from './docStore'
+import { workbenchActions } from './workbenchStore'
 
 interface SchemeState {
   /** 是否已选过起步(本运行期内).false = 还在起步页 */
@@ -51,7 +52,7 @@ function humanError(action: string, error: unknown): string {
 
 /** 缩略图:示例页的内联样式 HTML,主进程离屏截成 thumbnail.png */
 function thumbHtml(doc: UiFrameDoc): string {
-  return canvasHtml(doc, 'page')
+  return canvasHtml(doc, 'bench')
 }
 
 async function runBusy<T>(busy: SchemeState['busy'], job: () => Promise<T>): Promise<T | null> {
@@ -81,6 +82,7 @@ export const schemeActions = {
   /** 起步:模板(id ∈ TEMPLATES)或空白(BLANK_ID);platform 仅空白起步时用 */
   startFresh(templateId: string, platform: UiPlatform): void {
     docActions.replaceDoc(templateDoc(templateId, platform))
+    workbenchActions.docReplaced()
     emit({ started: true, schemeId: null, error: null })
   },
   /** 打开库里的方案 */
@@ -88,6 +90,7 @@ export const schemeActions = {
     await runBusy('open', async () => {
       const bundle = await window.atlas.uiFrameSchemeOpen(id)
       docActions.replaceDoc(parseDoc(bundle.design))
+      workbenchActions.docReplaced()
       emit({ started: true, schemeId: id })
     })
   },
@@ -163,6 +166,7 @@ export const schemeActions = {
     await runBusy('open', async () => {
       const design = await window.atlas.uiFrameSchemeRestore(id, stamp)
       docActions.replaceDoc(parseDoc(design))
+      workbenchActions.docReplaced()
       emit({ started: true, schemeId: id })
     })
   },
@@ -217,6 +221,7 @@ export const schemeActions = {
         result = importSchemeFiles(folder.manifest, folder.design, folder.name)
       }
       docActions.replaceDoc(result.doc)
+      workbenchActions.docReplaced()
       const skippedNote =
         result.skipped.length > 0 ? `;没对上的 ${result.skipped.length} 个已跳过` : ''
       emit({

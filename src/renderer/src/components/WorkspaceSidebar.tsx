@@ -17,6 +17,7 @@ import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
 import { TreeIcon } from './Icons'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
+import { UiFrameParts, UiFramePartsTitle } from './uiframe/UiFrameParts'
 
 export function WorkspaceSidebar({
   result,
@@ -61,7 +62,8 @@ export function WorkspaceSidebar({
   onOpenBrowseFile,
   settingsMode,
   settingsSection,
-  onSettingsSection
+  onSettingsSection,
+  uiframeMode
 }: {
   /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
   result: ScanResult | null
@@ -129,6 +131,8 @@ export function WorkspaceSidebar({
   settingsSection: SectionKey
   /** 点导航 = 发一次跳转请求(走 sectionReq 同一条道,seq 记账) */
   onSettingsSection: (key: SectionKey) => void
+  /** UI 框架模式(工作台改造):激活签是 UI 框架页时,侧栏换脸成零件盒;文件树同样保活藏着 */
+  uiframeMode: boolean
 }): React.JSX.Element {
   // ── workspace 卡 = 浏览器地址栏(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
   //    ⇅ 钮开/收;Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
@@ -189,6 +193,8 @@ export function WorkspaceSidebar({
           <div className="sidebar-top cfg-snav-head">
             <span className="cfg-snav-title">设置</span>
           </div>
+        ) : uiframeMode ? (
+          <UiFramePartsTitle />
         ) : (
           <div className="sidebar-top">
             <div
@@ -287,7 +293,8 @@ export function WorkspaceSidebar({
             ))}
           </nav>
         )}
-        <div className="sidebar-mid" hidden={settingsMode}>
+        {uiframeMode && <UiFrameParts />}
+        <div className="sidebar-mid" hidden={settingsMode || uiframeMode}>
           {result ? (
             // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
             search ? (

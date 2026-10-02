@@ -567,9 +567,17 @@ try {
   await page.waitForTimeout(100)
   assert.ok((await calls('atlas:ai-cancel')) > 0)
   assert.match(await page.locator('.ai-card .badge').innerText(), /已取消/)
-  // UI 框架(规格见 docs/to-do list《UI框架-需求规格》):rail 开单例签 → 组件墙渲染 → 点选按钮出手柄 →
-  // 拖高度手柄(+8 逻辑像素磁吸到 --control-lg)→ 撤销复原 → 导出规格包(对话框替身)→ 文件、字体、截图齐全
+  // UI 框架(规格见 docs/to-do list《UI框架-需求规格》):rail 开单例签 → 侧栏换脸零件盒 →
+  // 底板渲染 → 拖高度手柄(+8 逻辑像素磁吸到 --control-lg)→ 撤销复原 → 导出给 AI(对话框替身)→ 文件、字体、截图齐全
   await page.getByRole('button', { name: 'UI 框架', exact: true }).click()
+  // 工作台改造:侧栏换脸成零件盒,文件树藏起(保活不卸载)
+  await page.locator('.sidebar .uf-parts').waitFor()
+  await page.locator('.sidebar .cfg-snav-title').filter({ hasText: '工作台' }).waitFor()
+  assert.equal(
+    await page.locator('.sidebar .sidebar-mid:not([hidden])').count(),
+    0,
+    'uiframe tab must hide the file tree'
+  )
   // M1-c 起步页(§5.2):选平台 → 模板按平台过滤 → 空白起步 / 我的方案 / 导入(未上线禁用)
   await page.getByRole('group', { name: '目标平台' }).waitFor()
   await page.getByRole('button', { name: '极简工作台', exact: true }).waitFor()
@@ -596,7 +604,12 @@ try {
   await page.getByRole('button', { name: '极简工作台', exact: true }).click()
   await page.locator('.uf-scheme-name').filter({ hasText: '极简工作台方案' }).waitFor()
   await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
+  // 默认视图是底板(示例页躺在设备/窗口框里),零件盒点「按钮」跳零件墙对应节
   const canvas = page.frameLocator('iframe.uf-canvas-frame')
+  await canvas.locator('header.page-header').waitFor()
+  await page.locator('.uf-parts .uf-part-row .uf-part-name', { hasText: /^按钮$/ }).click()
+  await page.locator('.uf-seg-btn.is-on').filter({ hasText: '零件墙' }).waitFor()
+  await canvas.locator('[data-uf-wall="button"]').waitFor()
   const solidBtn = canvas.locator('button.btn--solid[data-uf-part="btn-md"]').first()
   await solidBtn.waitFor()
   const btnBefore = await solidBtn.boundingBox()
@@ -648,7 +661,7 @@ try {
     .locator('[data-uf-part="tok:color-primary"] .vb-val')
     .filter({ hasText: '#2563EB / #60A5FA' })
     .waitFor()
-  await page.getByRole('button', { name: '示例页', exact: true }).click()
+  await page.getByRole('button', { name: '底板', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   await shot('uiframe-page')
   // M1-e 手机画布(§5.4):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
@@ -683,8 +696,8 @@ try {
   await page.getByRole('button', { name: '外框', exact: true }).click()
   await page.locator('.uf-statusbar').waitFor()
   // M1-f 规范提醒(§5.7):手机端出现 iOS 44 点击区提醒,点条目跳变量板选中该变量
-  await page.getByRole('button', { name: /^规范/ }).click()
-  const rulesPanel = page.getByRole('dialog', { name: '平台规范提醒' })
+  await page.getByRole('button', { name: /^检查/ }).click()
+  const rulesPanel = page.getByRole('dialog', { name: '平台适配检查' })
   await rulesPanel.waitFor()
   await rulesPanel.locator('.uf-rules-item', { hasText: '最小点击区' }).first().waitFor()
   await rulesPanel.locator('.uf-rules-item', { hasText: '44px' }).first().waitFor()
@@ -695,13 +708,14 @@ try {
   await page.locator('select[aria-label="平台"]').selectOption('desktop')
   await page.locator('.uf-device').waitFor({ state: 'detached' })
   await rulesPanel.locator('.uf-rules-item', { hasText: '44px' }).waitFor({ state: 'detached' })
-  await page.getByRole('button', { name: '示例页', exact: true }).click()
+  await page.getByRole('button', { name: '底板', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   const exportDir = join(run, 'uiframe')
   await mkdir(exportDir, { recursive: true })
   await control({ uiframeExportDir: exportDir })
-  await page.getByRole('button', { name: '导出规格包', exact: true }).click()
+  await page.getByRole('button', { name: '导出给 AI', exact: true }).click()
   await page.getByText('规格包已导出').waitFor({ timeout: 90_000 })
+  await page.getByText(/交给你的 AI 编程助手/).waitFor()
   await control({ uiframeExportDir: null })
   const exported = (await page.locator('.uf-page .notice code').first().innerText()).trim()
   for (const rel of [
@@ -793,29 +807,48 @@ try {
     .filter({ hasText: '#00FF00' })
     .waitFor()
   await shot('uiframe-imported')
-  // M1-g 适配器剪贴板(§13.5):复制 Tailwind / RN 主题,出成功横幅
-  await page.getByRole('button', { name: '复制主题 ▾', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Tailwind v4 主题(@theme)' }).click()
+  // M1-g 适配器剪贴板(§13.5):导出钮旁的 ▾ 菜单里复制 Tailwind / RN 主题,出成功横幅
+  await page.getByRole('button', { name: '更多导出方式', exact: true }).click()
+  await page.getByRole('menuitem', { name: '复制 Tailwind v4 主题(@theme)' }).click()
   await page.getByText('Tailwind v4 @theme 主题已复制到剪贴板').waitFor()
   // 读回剪贴板核对内容确为 @theme 文件
   const clip = await page.evaluate(() => navigator.clipboard.readText())
   assert.ok(clip.includes('@theme'), '剪贴板里必须是 Tailwind @theme 文件')
   assert.ok(clip.includes('--color-primary:'), '主题文件要含变量定义')
-  await page.getByRole('button', { name: '复制主题 ▾', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'React Native 主题对象' }).click()
+  await page.getByRole('button', { name: '更多导出方式', exact: true }).click()
+  await page.getByRole('menuitem', { name: '复制 React Native 主题对象' }).click()
   await page.getByText('React Native 主题对象已复制到剪贴板').waitFor()
   await page.getByRole('button', { name: '知道了', exact: true }).click()
-  // M1-h 收口:空白起步路径(§19 M1「从空白到方案包」)——方案库「新建方案」回起步页 → 空白起步 → 组件墙即渲染
+  // 工作台改造:零件盒「风格」一键套用——点「现代简洁」整套变量换值(可撤销)
+  await page.locator('.uf-parts .uf-part-row', { hasText: '现代简洁' }).click()
+  await page.getByText(/已套用「现代简洁」风格/).waitFor()
+  await canvas
+    .locator('[data-uf-part="tok:color-primary"] .vb-val')
+    .filter({ hasText: '#18181B' })
+    .waitFor()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await canvas
+    .locator('[data-uf-part="tok:color-primary"] .vb-val')
+    .filter({ hasText: '#00FF00' })
+    .waitFor()
+  // M1-h 收口:空白起步路径(§19 M1「从空白到方案包」)——方案库「新建方案」回起步页 →
+  // 空白起步 → 底板是真空态(示例页不预载),「填入示例页看看」后才出内容
   await page.getByTitle('打开方案库', { exact: true }).click()
   await page.getByRole('button', { name: '新建方案', exact: true }).click()
   await page.getByRole('button', { name: '空白起步', exact: true }).click()
   await page.locator('.uf-chip').filter({ hasText: '未入库' }).waitFor()
-  // 画布视图态留在上一程的「变量板」,先切回组件墙再断言
-  await page.getByRole('button', { name: '组件墙', exact: true }).click()
+  await page.locator('.uf-bench-empty').waitFor()
+  await shot('uiframe-blank')
+  await page.getByRole('button', { name: '填入示例页看看', exact: true }).click()
+  await page.locator('.uf-bench-empty').waitFor({ state: 'detached' })
   const blankCanvas = page.frameLocator('iframe.uf-canvas-frame')
   await blankCanvas.locator('button.btn--solid').first().waitFor()
-  await shot('uiframe-blank')
+  await page.getByRole('button', { name: '零件墙', exact: true }).click()
+  await blankCanvas.locator('button.btn--solid[data-uf-part="btn-md"]').first().waitFor()
+  await shot('uiframe-blank-wall')
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
+  // 关签后侧栏换回文件树
+  await page.locator('.sidebar .uf-parts').waitFor({ state: 'detached' })
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'
   })

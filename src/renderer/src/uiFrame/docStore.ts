@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react'
 import { defaultDeviceId, isDeviceId } from '@shared/uiFrame/devices'
 import { defaultDoc, defaultTokens } from '@shared/uiFrame/template'
+import { templateOverrides } from '@shared/uiFrame/templates'
 import type { IconSlot, TokenValue, UiFrameDoc, UiPlatform } from '@shared/uiFrame/types'
 
 /** 撤销栈上限 */
@@ -61,6 +62,22 @@ export const docActions = {
   /** 整份换方案(开方案/换起步模板):不进撤销栈,历史清空 */
   replaceDoc(next: UiFrameDoc): void {
     emit({ doc: next, past: [], future: [] })
+  },
+  /** 零件盒「风格」一键套用:把该模板的变量覆盖合进当前方案,进撤销栈可 Ctrl+Z 回退。
+   *  方案名与平台/设备不动;template 记成该模板(方案库的「风格」列由它推) */
+  applyTemplateStyle(templateId: string): void {
+    const over = templateOverrides(templateId)
+    const tokens = { ...state.doc.tokens }
+    let applied = 0
+    for (const [name, value] of Object.entries(over)) {
+      const def = tokens[name]
+      if (def) {
+        tokens[name] = { ...def, value }
+        applied += 1
+      }
+    }
+    if (applied === 0 && state.doc.template === templateId) return
+    commit({ ...state.doc, tokens, template: templateId })
   },
   /** 只改方案名(保存/重命名走这条):不进撤销栈 */
   renameDoc(name: string): void {

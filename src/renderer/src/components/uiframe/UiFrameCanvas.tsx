@@ -1,15 +1,17 @@
 // UI 框架画布:iframe 渲染规格包同款文档,上面叠一层选中框与拖动手柄。
 // 「适应宽度」用 transform: scale() 整体缩放(iframe 与选中框同比例),拖动位移按比例换回逻辑像素。
 // 手机端(§5.4):外层套设备外框(状态栏 / 灵动岛 / 底部手势条 / 安全区线),iframe 定高内滚。
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { deviceFor } from '@shared/uiFrame/devices'
 import { PARTS } from '@shared/uiFrame/handles'
+import { BLANK_ID } from '@shared/uiFrame/templates'
 import type { ThemeName, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
-import { applyTokens, canvasHtml } from '../../uiFrame/canvasDoc'
+import { applyTokens, canvasHtml, VIEW_LABEL } from '../../uiFrame/canvasDoc'
 import { currentDoc } from '../../uiFrame/docStore'
-import { useCanvasFrame, type CanvasSelection } from '../../uiFrame/useCanvasFrame'
+import { selectionOf, useCanvasFrame, type CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { useHandleDrag } from '../../uiFrame/useHandleDrag'
 import { useMeasured } from '../../uiFrame/useMeasured'
+import { jumpView, useWorkbench, workbenchActions } from '../../uiFrame/workbenchStore'
 import type { CanvasView } from '../../uiFrame/canvasDoc'
 
 const EDGE_LABEL = { right: '右边', bottom: '下边', corner: '左上角' } as const
@@ -114,7 +116,7 @@ export function UiFrameCanvas({
     doc,
     view,
     theme,
-    viewport: { height: isPhone || view === 'page' ? dev.height : 0, fixed: isPhone },
+    viewport: { height: isPhone || view === 'bench' ? dev.height : 0, fixed: isPhone },
     selection,
     onSelect,
     onKey
@@ -131,9 +133,44 @@ export function UiFrameCanvas({
     w: dev.width,
     h: dev.height
   })
-  const fixedStage = view === 'page' || isPhone
-  const wantFit = (view === 'page' && fit) || isPhone
+  const fixedStage = view === 'bench' || isPhone
+  const wantFit = (view === 'bench' && fit) || isPhone
   const scale = wantFit ? Math.min(1, avail / Math.max(1, stageSize.w)) : 1
+  const { jump, blankExample } = useWorkbench()
+  // 空白起步的底板:设备框里不渲染示例页,只留空态提示与「填入示例页」出口(界面上方浮层,不占方案数据)
+  const blankBench = view === 'bench' && doc.template === BLANK_ID && !blankExample
+
+  // 零件盒/检查面板的定位请求:目标视图的文档就绪后滚动到位,图标/变量顺带选中(进属性面板)
+  useEffect(() => {
+    if (!frameDoc || !jump || jumpView(jump.target) !== view) return
+    const t = jump.target
+    const el =
+      t.kind === 'component'
+        ? frameDoc.querySelector(`[data-uf-wall="${t.id}"]`)
+        : t.kind === 'boardGroup'
+          ? frameDoc.querySelector(`[data-uf-board-group="${t.group}"]`)
+          : t.kind === 'token'
+            ? frameDoc.querySelector(`[data-uf-part="tok:${t.name}"]`)
+            : frameDoc.querySelector(`[data-uf-icon="${t.slot}"]`)
+    workbenchActions.clearJump()
+    if (!el) return
+    const frame = frameRef.current
+    const scroll = scrollRef.current
+    if (isPhone) {
+      // 手机端 iframe 定高内滚,元素交给它自己滚
+      el.scrollIntoView()
+    } else if (frame && scroll) {
+      // 元素在 iframe 内的位置 × 舞台缩放 + iframe 在滚动容器里的位置
+      const top =
+        scroll.scrollTop +
+        frame.getBoundingClientRect().top -
+        scroll.getBoundingClientRect().top +
+        el.getBoundingClientRect().top * scale -
+        24
+      scroll.scrollTop = Math.max(0, top)
+    }
+    if (t.kind === 'token' || t.kind === 'icon') onSelect(selectionOf(el, frameDoc))
+  }, [frameDoc, jump, view, isPhone, scale, onSelect, frameRef])
   const drag = useHandleDrag({
     doc,
     scale,
@@ -171,7 +208,7 @@ export function UiFrameCanvas({
     <iframe
       ref={frameRef}
       className="uf-canvas-frame"
-      title={view === 'page' ? '示例页画布' : view === 'board' ? '变量板画布' : '组件墙画布'}
+      title={`${VIEW_LABEL[view]}画布`}
       srcDoc={srcDoc}
       onLoad={onLoad}
     />
@@ -184,12 +221,27 @@ export function UiFrameCanvas({
       style={
         isPhone
           ? { width: `${dev.width}px`, height: `${dev.height}px` }
-          : view === 'page'
+          : view === 'bench'
             ? { width: `${dev.width}px` }
             : undefined
       }
     >
       {frame}
+      {blankBench && (
+        <div className="uf-bench-empty">
+          <p className="uf-bench-empty-title">底板是空的</p>
+          <p className="uf-bench-empty-hint">
+            往底板上自由摆零件会在后续版本开放;先在变量与零件墙上调数值。
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => workbenchActions.fillExample()}
+          >
+            填入示例页看看
+          </button>
+        </div>
+      )}
       {isPhone && chrome && (
         <DeviceChrome
           statusBar={dev.statusBar}
@@ -215,14 +267,14 @@ export function UiFrameCanvas({
       >
         <div
           ref={stageRef}
-          className={`uf-canvas-stage${view === 'page' ? ' is-page' : ''}${isPhone ? ' is-device' : ''}${drag.dragging ? ' is-dragging' : ''}`}
+          className={`uf-canvas-stage${view === 'bench' ? ' is-page' : ''}${isPhone ? ' is-device' : ''}${drag.dragging ? ' is-dragging' : ''}`}
           style={{
             transform: scale === 1 ? undefined : `scale(${scale})`
           }}
         >
           {isPhone ? (
             <div className={`uf-device${chrome ? '' : ' is-plain'}`}>{screen}</div>
-          ) : view === 'page' && chrome ? (
+          ) : view === 'bench' && chrome ? (
             <div className="uf-window">
               <div className="uf-window-bar">
                 <span className="uf-window-dot" />

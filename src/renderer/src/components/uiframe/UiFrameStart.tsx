@@ -29,6 +29,9 @@ export function UiFrameStart(): React.JSX.Element {
       <div className="uf-start-head">
         <h2 className="uf-start-title">选个起点</h2>
         <p className="uf-hint">
+          在这里调好界面的数值与风格,导出成规格包交给你的 AI——它照着做出一模一样的界面。
+        </p>
+        <p className="uf-hint">
           模板是一套调好风格的完整方案,在它的基础上改数值;也可以从空白或你已存的方案开始。
         </p>
       </div>

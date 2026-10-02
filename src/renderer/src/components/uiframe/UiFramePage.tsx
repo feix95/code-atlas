@@ -1,4 +1,5 @@
-// 「UI 框架」页签(§5):起步页(选平台/模板/我的方案)→ 工具条 + 画布 + 属性面板。
+// 「UI 框架」页签(§5 + 工作台改造):起步页(选平台/模板/我的方案)→ 工具条 + 底板 + 属性面板;
+// 画布视图与方案库浮层归 workbenchStore(零件盒在侧栏,两边共用一本账)。
 import { useMemo, useState } from 'react'
 import { reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
@@ -9,6 +10,7 @@ import { docActions, useUiFrameDoc } from '../../uiFrame/docStore'
 import { schemeActions, useSchemeState } from '../../uiFrame/schemeStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
 import { useUiFrameExport, type ExportState } from '../../uiFrame/useUiFrameExport'
+import { useWorkbench, workbenchActions } from '../../uiFrame/workbenchStore'
 import { Notice } from '../Notice'
 import { UiFrameCanvas } from './UiFrameCanvas'
 import { UiFrameInspector } from './UiFrameInspector'
@@ -16,7 +18,7 @@ import { SaveNameDialog, UiFrameLibrary } from './UiFrameSchemes'
 import { UiFrameRules } from './UiFrameRules'
 import { UiFrameStart } from './UiFrameStart'
 
-const VIEWS: CanvasView[] = ['wall', 'board', 'page']
+const VIEWS: CanvasView[] = ['bench', 'wall', 'board']
 const PLATFORMS: Array<[UiPlatform, string]> = [
   ['desktop', '电脑端'],
   ['phone', '手机端']
@@ -84,7 +86,10 @@ function ExportBanner({
   const hasWarn = state.warnings.length > 0 || state.unloadedFonts.length > 0
   return (
     <Notice kind={hasWarn ? 'warn' : 'info'}>
-      <strong>规格包已导出</strong>:<code>{state.path}</code>{' '}
+      <strong>规格包已导出</strong>:<code>{state.path}</code>
+      <span className="uf-hint">
+        把这个文件夹整个交给你的 AI 编程助手,它照着数值做出一模一样的界面。
+      </span>{' '}
       <button
         type="button"
         className="uf-link"
@@ -112,26 +117,32 @@ function ExportBanner({
 export function UiFramePage(): React.JSX.Element {
   const { doc, past, future } = useUiFrameDoc()
   const { started, schemeId, busy, error, notice } = useSchemeState()
-  const [view, setView] = useState<CanvasView>('wall')
+  const { view, libraryOpen } = useWorkbench()
   const [theme, setTheme] = useState<ThemeName>('light')
   const [fit, setFit] = useState(true)
   const [chrome, setChrome] = useState(true)
   const [safeArea, setSafeArea] = useState(true)
   const [selection, setSelection] = useState<CanvasSelection | null>(null)
-  const [libraryOpen, setLibraryOpen] = useState(false)
   const [naming, setNaming] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const [copyOpen, setCopyOpen] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exporter = useUiFrameExport()
   // 平台规范提醒(§5.7):随方案每次改动实时重算
   const issues = useMemo(() => platformIssues(doc), [doc])
+
+  // 换视图(含零件盒跳转)就清掉选中:旧视图的部件在新画布上不存在
+  const [prevView, setPrevView] = useState(view)
+  if (prevView !== view) {
+    setPrevView(view)
+    setSelection(null)
+  }
 
   // 回起步页(新建方案/换模板)时把浮层状态收干净,免得回画布时库面板还盖着
   const [prevStarted, setPrevStarted] = useState(started)
   if (prevStarted !== started) {
     setPrevStarted(started)
     if (!started) {
-      setLibraryOpen(false)
+      workbenchActions.setLibraryOpen(false)
       setNaming(false)
     }
   }
@@ -162,175 +173,182 @@ export function UiFramePage(): React.JSX.Element {
     } catch {
       schemeActions.flash('剪贴板不可用:请到导出的规格包里取 adapters/ 下的同名文件')
     }
-    setCopyOpen(false)
+    setExportMenuOpen(false)
   }
 
   return (
     <div className="uf-page" onKeyDown={handleUndoKey}>
       <div className="uf-toolbar" role="toolbar" aria-label="UI 框架工具条">
-        <button
-          type="button"
-          className="btn btn-ghost uf-scheme-name"
-          title="打开方案库"
-          onClick={() => setLibraryOpen(true)}
-        >
-          {doc.name}
-          {schemeId === null && <span className="uf-chip">未入库</span>}
-        </button>
-        <select
-          className="uf-select"
-          aria-label="平台"
-          value={doc.platform}
-          onChange={(e) => {
-            docActions.setPlatform(e.target.value as UiPlatform)
-            setSelection(null)
-          }}
-        >
-          {PLATFORMS.map(([p, label]) => (
-            <option key={p} value={p}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          className="uf-select"
-          aria-label="设备尺寸"
-          value={deviceFor(doc).id}
-          onChange={(e) => docActions.setDevice(e.target.value)}
-        >
-          {devicesFor(doc.platform).map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className={`uf-seg-btn${chrome ? ' is-on' : ''}`}
-          aria-pressed={chrome}
-          title={doc.platform === 'phone' ? '机身外框(状态栏/灵动岛/手势条)' : '窗口外框'}
-          onClick={() => setChrome(!chrome)}
-        >
-          外框
-        </button>
-        {doc.platform === 'phone' && (
+        <div className="uf-tb-group">
           <button
             type="button"
-            className={`uf-seg-btn${safeArea ? ' is-on' : ''}`}
-            aria-pressed={safeArea}
-            title="安全区参考线"
-            onClick={() => setSafeArea(!safeArea)}
+            className="btn btn-ghost uf-scheme-name"
+            title="打开方案库"
+            onClick={() => workbenchActions.setLibraryOpen(true)}
           >
-            安全区
+            {doc.name}
+            {schemeId === null && <span className="uf-chip">未入库</span>}
           </button>
-        )}
-        <button
-          type="button"
-          className={`uf-seg-btn uf-rules-btn${rulesOpen ? ' is-on' : ''}`}
-          aria-pressed={rulesOpen}
-          title="平台规范提醒(§5.7,实时提醒不拦截)"
-          onClick={() => setRulesOpen(!rulesOpen)}
-        >
-          规范
-          <span className={`uf-badge${issues.length ? ' is-warn' : ''}`}>{issues.length}</span>
-        </button>
-        <div className="uf-seg" role="group" aria-label="视图">
-          {VIEWS.map((v) => (
+          <select
+            className="uf-select"
+            aria-label="平台"
+            value={doc.platform}
+            onChange={(e) => {
+              docActions.setPlatform(e.target.value as UiPlatform)
+              setSelection(null)
+            }}
+          >
+            {PLATFORMS.map(([p, label]) => (
+              <option key={p} value={p}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="uf-select"
+            aria-label="设备尺寸"
+            value={deviceFor(doc).id}
+            onChange={(e) => docActions.setDevice(e.target.value)}
+          >
+            {devicesFor(doc.platform).map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <div className="uf-seg" role="group" aria-label="视图">
+            {VIEWS.map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={`uf-seg-btn${view === v ? ' is-on' : ''}`}
+                aria-pressed={view === v}
+                onClick={() => workbenchActions.setView(v)}
+              >
+                {VIEW_LABEL[v]}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={`uf-seg-btn${chrome ? ' is-on' : ''}`}
+            aria-pressed={chrome}
+            title={doc.platform === 'phone' ? '机身外框(状态栏/灵动岛/手势条)' : '窗口外框'}
+            onClick={() => setChrome(!chrome)}
+          >
+            外框
+          </button>
+          {doc.platform === 'phone' && (
             <button
-              key={v}
               type="button"
-              className={`uf-seg-btn${view === v ? ' is-on' : ''}`}
-              aria-pressed={view === v}
-              onClick={() => {
-                setView(v)
-                setSelection(null)
-              }}
+              className={`uf-seg-btn${safeArea ? ' is-on' : ''}`}
+              aria-pressed={safeArea}
+              title="安全区参考线"
+              onClick={() => setSafeArea(!safeArea)}
             >
-              {VIEW_LABEL[v]}
+              安全区
             </button>
-          ))}
-        </div>
-        {view === 'page' && (
-          <div className="uf-seg" role="group" aria-label="主题">
-            {THEMES.map(([t, label]) => (
-              <button
-                key={t}
-                type="button"
-                className={`uf-seg-btn${theme === t ? ' is-on' : ''}`}
-                aria-pressed={theme === t}
-                onClick={() => setTheme(t)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-        {view === 'page' && (
-          <div className="uf-seg" role="group" aria-label="画布缩放">
-            {ZOOMS.map(([isFit, label]) => (
-              <button
-                key={label}
-                type="button"
-                className={`uf-seg-btn${fit === isFit ? ' is-on' : ''}`}
-                aria-pressed={fit === isFit}
-                onClick={() => setFit(isFit)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-        <span className="uf-toolbar-gap" />
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={past.length === 0}
-          onClick={docActions.undo}
-        >
-          撤销
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={future.length === 0}
-          onClick={docActions.redo}
-        >
-          重做
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={docActions.resetAll}>
-          恢复模板
-        </button>
-        <button type="button" className="btn btn-ghost" disabled={busy === 'save'} onClick={onSave}>
-          {busy === 'save' ? '正在保存……' : '保存方案'}
-        </button>
-        <div className="uf-copy">
+          )}
           <button
             type="button"
-            className="btn btn-ghost"
-            aria-expanded={copyOpen}
-            onClick={() => setCopyOpen(!copyOpen)}
+            className={`uf-seg-btn uf-rules-btn${rulesOpen ? ' is-on' : ''}`}
+            aria-pressed={rulesOpen}
+            title="平台适配检查(实时提醒,不影响导出)"
+            onClick={() => setRulesOpen(!rulesOpen)}
           >
-            复制主题 ▾
+            检查
+            <span className={`uf-badge${issues.length ? ' is-warn' : ''}`}>{issues.length}</span>
           </button>
-          {copyOpen && (
-            <div className="uf-copy-menu" role="menu">
-              <button type="button" role="menuitem" onClick={() => void copyAdapter('tailwind')}>
-                Tailwind v4 主题(@theme)
-              </button>
-              <button type="button" role="menuitem" onClick={() => void copyAdapter('rn')}>
-                React Native 主题对象
-              </button>
+          {view === 'bench' && (
+            <div className="uf-seg" role="group" aria-label="主题">
+              {THEMES.map(([t, label]) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`uf-seg-btn${theme === t ? ' is-on' : ''}`}
+                  aria-pressed={theme === t}
+                  onClick={() => setTheme(t)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {view === 'bench' && (
+            <div className="uf-seg" role="group" aria-label="画布缩放">
+              {ZOOMS.map(([isFit, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`uf-seg-btn${fit === isFit ? ' is-on' : ''}`}
+                  aria-pressed={fit === isFit}
+                  onClick={() => setFit(isFit)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={exporter.state.kind === 'saving'}
-          onClick={() => void exporter.run(doc)}
-        >
-          {exporter.state.kind === 'saving' ? '正在导出……' : '导出规格包'}
-        </button>
+        <div className="uf-tb-group uf-tb-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={past.length === 0}
+            onClick={docActions.undo}
+          >
+            撤销
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={future.length === 0}
+            onClick={docActions.redo}
+          >
+            重做
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={docActions.resetAll}>
+            恢复默认
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={busy === 'save'}
+            onClick={onSave}
+          >
+            {busy === 'save' ? '正在保存……' : '保存方案'}
+          </button>
+          <div className="uf-export">
+            <button
+              type="button"
+              className="btn btn-primary uf-export-main"
+              disabled={exporter.state.kind === 'saving'}
+              onClick={() => void exporter.run(doc)}
+            >
+              {exporter.state.kind === 'saving' ? '正在导出……' : '导出给 AI'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary uf-export-caret"
+              aria-label="更多导出方式"
+              aria-expanded={exportMenuOpen}
+              title="复制主题到剪贴板(Tailwind / React Native)"
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+            >
+              ▾
+            </button>
+            {exportMenuOpen && (
+              <div className="uf-copy-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => void copyAdapter('tailwind')}>
+                  复制 Tailwind v4 主题(@theme)
+                </button>
+                <button type="button" role="menuitem" onClick={() => void copyAdapter('rn')}>
+                  复制 React Native 主题对象
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       <div className="uf-strip">
         {error && <Notice kind="error">{error}</Notice>}
@@ -347,13 +365,11 @@ export function UiFramePage(): React.JSX.Element {
           <UiFrameRules
             issues={issues}
             onPick={(target) => {
-              // 变量条目跳变量板并选中该行;组件条目跳组件墙
+              // 变量条目跳变量板并选中该行;组件条目跳零件墙
               if (target.startsWith('组件:')) {
-                setView('wall')
-                setSelection(null)
+                workbenchActions.jump({ kind: 'component', id: target.slice(3) })
               } else {
-                setView('board')
-                setSelection({ part: `tok:${target}`, index: 0, iconSlot: null })
+                workbenchActions.jump({ kind: 'token', name: target })
               }
             }}
             onClose={() => setRulesOpen(false)}
@@ -375,7 +391,7 @@ export function UiFramePage(): React.JSX.Element {
         />
         <UiFrameInspector doc={doc} selection={selection} />
       </div>
-      {libraryOpen && <UiFrameLibrary onClose={() => setLibraryOpen(false)} />}
+      {libraryOpen && <UiFrameLibrary onClose={() => workbenchActions.setLibraryOpen(false)} />}
       {naming && (
         <SaveNameDialog
           initial={doc.name}

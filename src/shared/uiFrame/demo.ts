@@ -11,9 +11,13 @@ export function demoBody(id: string): PageNode[] {
   return THEMES.map((theme) => recipe.demo(theme))
 }
 
-/** 画布「组件墙」:全部组件同屏(亮暗各一份) */
+/** 画布「零件墙」:全部组件同屏(亮暗各一份);data-uf-wall 包一层供零件盒定位跳转 */
 export function wallBody(): PageNode[] {
-  return RECIPES.flatMap((r) => THEMES.map((theme) => r.demo(theme)))
+  return RECIPES.map((r) => ({
+    tag: 'div',
+    attrs: { 'data-uf-wall': r.id },
+    children: THEMES.map((theme) => r.demo(theme))
+  }))
 }
 
 /** _demo.css 正文:演示排版 + 各组件的状态模拟规则 */

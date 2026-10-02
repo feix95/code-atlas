@@ -17,7 +17,8 @@ function partOf(target: EventTarget | null): Element | null {
   return el && typeof el.closest === 'function' ? el.closest('[data-uf-part]') : null
 }
 
-function selectionOf(el: Element, frameDoc: Document): CanvasSelection {
+/** 由 iframe 内元素反推出选中账(部件名 + 同名第几个 + 图标槽位);零件盒定位也用它 */
+export function selectionOf(el: Element, frameDoc: Document): CanvasSelection {
   const part = el.getAttribute('data-uf-part') ?? ''
   const all = [...frameDoc.querySelectorAll(`[data-uf-part="${part}"]`)]
   const slot =
@@ -99,7 +100,7 @@ export function useCanvasFrame({
   useEffect(() => {
     if (!frameDoc) return
     applyTokens(frameDoc, doc)
-    frameDoc.documentElement.setAttribute('data-theme', view === 'page' ? theme : 'light')
+    frameDoc.documentElement.setAttribute('data-theme', view === 'bench' ? theme : 'light')
   }, [frameDoc, doc, theme, view])
 
   useEffect(() => {
