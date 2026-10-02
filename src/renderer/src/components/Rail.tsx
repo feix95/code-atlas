@@ -13,6 +13,7 @@ export function Rail({
   onGraph,
   onOverview,
   onChat,
+  onUiFrame,
   onSettings
 }: {
   hasWorkspace: boolean
@@ -20,6 +21,8 @@ export function Rail({
   onGraph: () => void
   onOverview: () => void
   onChat: () => void
+  /** UI 框架:app 级单例签,不依赖工作区 */
+  onUiFrame: () => void
   onSettings: () => void
 }): React.JSX.Element {
   return (
@@ -56,6 +59,16 @@ export function Rail({
         aria-label="自由对话"
       >
         <TreeIcon name="bot" size={RAIL_ICON} mono />
+      </button>
+      <button
+        type="button"
+        className="rail-btn"
+        onClick={onUiFrame}
+        data-tip="UI 框架"
+        data-tip-side="right"
+        aria-label="UI 框架"
+      >
+        <TreeIcon name="layoutTemplate" size={RAIL_ICON} mono />
       </button>
       <button
         type="button"

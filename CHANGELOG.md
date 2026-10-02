@@ -398,3 +398,4 @@
 - refactor(ui): 自由对话顶行参考 chip 退役——资料附件照旧随选中项喂模型,只摘报幕牌(展开弹层/状态/右键口/prop 链一并收);「新对话」悬停提示换规范句式「清空当前对话记录,无法找回」,并入 --tip-delay-slow 1s 慢档
 - feat(ai): AI 来源新增「在线 API」(OpenAI 兼容,预设 DeepSeek/Kimi/智谱/通义/硅基流动/OpenRouter/OpenAI/自定义),首次启用须隐私确认,Key 经 safeStorage 加密落盘,「读取模型」带 Key 兼任连接测试,401/402/429/5xx 翻成人话,上下文按选定档位(默认 32k)。本地两路请求与报错行为不变,新增 test:cloud 自测
 - feat(ai): 在线 API 上下文档位放宽至 16k~1M 且可自由填写(默认 128k);服务商新增 Claude/Grok/Gemini、撤下通义千问与硅基流动,名单统一「产品名(公司名)」口径并按「国内→国际→聚合→自定义」排序
+- feat(ui): 新增「UI 框架」页签 M0——rail 独立入口,组件墙(按钮 3 样式 × 5 状态 × 亮暗 + 卡片)与固定示例页在 iframe 里按规格包同款文档渲染,点选出手柄拖高度/内边距/圆角/图标尺寸(0.125rem 吸附 + 同族变量磁吸,Alt 自由拖,撤销/重做),lucide 图标选择器,一键导出规格包(README-给AI/页面骨架/tokens/reset/打包字体/组件与页面参考实现/DTCG design.json/字体加载后截图),导出前体检含糊词/写死数值/缺属性/演示代码泄漏/数据不一致即阻止;新增 test:uiframe 自测与 uiframe:compare 页面比对工具,规格见 docs/to-do list《UI框架-需求规格》。

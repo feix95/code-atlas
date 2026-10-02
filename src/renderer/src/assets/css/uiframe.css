@@ -1,0 +1,331 @@
+/* ── UI 框架页签(规格:docs/to-do list《UI框架-需求规格(UI Spec Builder)》§5)──
+   工具条 + 画布(iframe 渲染规格包同款文档)+ 属性面板;选中框与手柄统一走 --sash-hi */
+
+.uf-page {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--canvas-tint);
+}
+
+.uf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.uf-toolbar-gap {
+  flex: 1;
+}
+
+.uf-seg {
+  display: inline-flex;
+  padding: calc(var(--space-1) / 2);
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--chrome-panel);
+}
+
+.uf-seg-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.uf-seg-btn:hover {
+  color: var(--text);
+}
+
+.uf-seg-btn.is-on {
+  background: var(--surface);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.uf-page > .notice {
+  margin: var(--space-2) var(--space-4) 0;
+}
+
+.uf-issues {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+.uf-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  min-height: 0;
+}
+
+/* ── 画布 ── */
+.uf-canvas-scroll {
+  overflow: auto;
+  /* 滚动条位常驻:适应宽度的缩放比例不会因滚动条出现 / 消失而来回跳 */
+  scrollbar-gutter: stable;
+  min-width: 0;
+  padding: var(--space-6);
+  background: var(--surface-soft);
+}
+
+/* 适应宽度:外层盒按缩放后的尺寸占位,舞台以左上角为原点等比缩放 */
+.uf-canvas-fit {
+  margin: 0 auto;
+}
+
+.uf-canvas-stage {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  transform-origin: 0 0;
+}
+
+.uf-canvas-stage.is-page {
+  flex: none;
+  box-shadow: var(--shadow-pop);
+}
+
+.uf-canvas-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.uf-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.uf-hover-box,
+.uf-sel-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  box-sizing: border-box;
+}
+
+.uf-hover-box {
+  outline: 1px dashed var(--sash-hi);
+}
+
+/* 拖动中只留选中框,悬停框不跟着乱闪 */
+.uf-canvas-stage.is-dragging .uf-hover-box {
+  visibility: hidden;
+}
+
+.uf-sel-box {
+  outline: 2px solid var(--sash-hi);
+}
+
+/* 手柄尺寸:短边 = --space-3,长边 = --space-6,外凸半个短边 */
+.uf-handle {
+  --uf-handle-short: var(--space-3);
+  --uf-handle-long: var(--space-6);
+  --uf-handle-out: calc(var(--uf-handle-short) / -2);
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--canvas-tint);
+  border-radius: var(--radius-pill);
+  background: var(--sash-hi);
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.uf-handle--right {
+  top: 50%;
+  right: var(--uf-handle-out);
+  width: var(--uf-handle-short);
+  height: var(--uf-handle-long);
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.uf-handle--bottom {
+  bottom: var(--uf-handle-out);
+  left: 50%;
+  width: var(--uf-handle-long);
+  height: var(--uf-handle-short);
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.uf-handle--corner {
+  top: var(--uf-handle-out);
+  left: var(--uf-handle-out);
+  width: var(--uf-handle-short);
+  height: var(--uf-handle-short);
+  cursor: nwse-resize;
+}
+
+.uf-drag-badge {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  left: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--tip-bg);
+  color: var(--tip-ink);
+  font-size: var(--font-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow-tip);
+}
+
+/* ── 属性面板 ── */
+.uf-inspector {
+  overflow: auto;
+  min-height: 0;
+  padding: var(--space-4);
+  border-left: 1px solid var(--line);
+  background: var(--chrome-panel);
+}
+
+.uf-panel-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-w-semi);
+}
+
+.uf-section {
+  margin: 0 0 var(--space-5);
+}
+
+.uf-section-title {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-medium);
+}
+
+.uf-hint {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: var(--lh-160);
+}
+
+.uf-row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.uf-row.is-hot {
+  background: var(--surface);
+}
+
+.uf-row-head,
+.uf-row-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.uf-row-label {
+  font-size: var(--font-md);
+}
+
+.uf-row-value,
+.uf-row-ref {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uf-num {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uf-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: calc(var(--control-height) * 0.8);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+}
+
+.uf-num .uf-input {
+  width: 5rem;
+}
+
+.uf-input:focus-visible {
+  outline: 2px solid var(--sash-hi);
+  outline-offset: -1px;
+}
+
+.uf-unit {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uf-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sash-hi);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.uf-link:hover {
+  text-decoration: underline;
+}
+
+/* ── 图标选择器 ── */
+.uf-icon-picker {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.uf-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.uf-icon-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.uf-icon-cell:hover {
+  border-color: var(--line-strong);
+}
+
+.uf-icon-cell.is-on {
+  border-color: var(--sash-hi);
+  color: var(--sash-hi);
+}
+
+.uf-more {
+  justify-self: start;
+}

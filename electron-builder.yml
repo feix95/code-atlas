@@ -40,6 +40,16 @@ extraResources:
   # 本地开发放 vendor/llama-cpp/,已 gitignore)。运行时 resolveServerProgram 认这个位置
   - from: vendor/llama-cpp
     to: llama-cpp
+  # UI 框架规格包随包字体(SIL OFL,可变字体 woff2,约 5MB):导出时复制进规格包 fonts/,
+  # 运行时 src/native/uiFrameFonts.ts 认这个位置(fontsource 为开发依赖,不随 node_modules 进包)
+  - from: node_modules/@fontsource-variable/inter/files
+    to: uiframe-fonts/inter
+    filter:
+      - '*-wght-normal.woff2'
+  - from: node_modules/@fontsource-variable/noto-sans-sc/files
+    to: uiframe-fonts/noto-sans-sc
+    filter:
+      - '*-wght-normal.woff2'
   # 托盘图标(桌宠托管第一锤):打包后 Tray 从 resources/app.ico 认;开发模式直接读 build/icon.ico
   - from: build/icon.ico
     to: app.ico

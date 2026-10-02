@@ -26,6 +26,7 @@ import { CodePreview } from './CodePreview'
 import { ProjectOverview } from './ProjectOverview'
 import { SettingsPage, type SectionKey } from './SettingsPage'
 import { GraphView } from './GraphView'
+import { UiFramePage } from './uiframe/UiFramePage'
 
 export function TabBody({
   tab,
@@ -147,6 +148,8 @@ export function TabBody({
       />
     )
   }
+  // UI 框架:app 级单例签,不吃工作区(规格见 docs/to-do list《UI框架-需求规格(UI Spec Builder)》)
+  if (tab.kind === 'uiframe') return <UiFramePage />
   // 设置页:UI v3 §6 弹窗退役改页签;关签 = 页签带的 ×(页内无页脚,即改即存无账要结)
   if (tab.kind === 'settings') {
     return (

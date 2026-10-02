@@ -816,6 +816,14 @@ const BOOK: Record<string, React.ReactNode> = {
   ),
   // 概览(lucide navigation,规格 §6 槽位2)
   navigation: <polygon points="3 11 22 2 13 21 11 13 3 11" />,
+  // UI 框架(lucide layout-template)
+  layoutTemplate: (
+    <>
+      <rect width="18" height="7" x="3" y="3" rx="1" />
+      <rect width="9" height="7" x="3" y="14" rx="1" />
+      <rect width="5" height="7" x="16" y="14" rx="1" />
+    </>
+  ),
   // AI 状态三态(规格 §6.1):就绪绿勾圈 / 加载中蓝弧(旋转靠 CSS) / 未加载灰插头
   circleCheck: (
     <>

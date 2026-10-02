@@ -6,6 +6,7 @@ import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
+import type { SpecPackage, UiFrameExportResult } from '../shared/uiFrame/types.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -238,6 +239,11 @@ const atlasApi = {
   /** 右键文件链接「在文件资源管理器中显示」:资源管理器弹出并选中文件,不开文件 */
   revealFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; message?: string }> =>
     ipcRenderer.invoke(CH.revealFilePath, rootPath, relPath),
+  /** UI 框架导出规格包:主进程弹「选择保存位置」,写文件 + 复制字体 + 截图 */
+  uiFrameExport: (pkg: SpecPackage): Promise<UiFrameExportResult> =>
+    ipcRenderer.invoke(CH.uiFrameExport, pkg),
+  /** 打开最近一次导出的规格包文件夹 */
+  uiFrameRevealExport: (): Promise<boolean> => ipcRenderer.invoke(CH.uiFrameRevealExport),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */
   onModelStatus: (callback: (status: ModelStatus) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: ModelStatus): void =>

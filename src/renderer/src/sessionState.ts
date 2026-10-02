@@ -17,7 +17,8 @@ const KNOWN_KINDS: readonly PaneKind[] = [
   'preview',
   'graph',
   'settings',
-  'peek'
+  'peek',
+  'uiframe'
 ]
 
 /** 存档里的一张页签:字段名照抄 PaneTab;on = 这组正亮着的那张(用标记不用序号,掉签后不错位) */

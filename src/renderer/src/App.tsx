@@ -847,6 +847,7 @@ function App(): React.JSX.Element {
               onGraph={() => openSingletonTab('graph')}
               onOverview={() => openSingletonTab('overview')}
               onChat={() => openSingletonTab('chat')}
+              onUiFrame={() => openSingletonTab('uiframe')}
               onSettings={() => openSettings()}
             />
             {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),

@@ -52,7 +52,10 @@ cp.execFile = function(file, ...args) {
 }
 globalThis.fetch = async () => { throw new Error('Journey forbids network requests') }
 net.fetch = globalThis.fetch
-const state = globalThis.__journey = { configured:false, mode:'success', calls:{}, partial:false, holdGit:false, holdGraph:false, releases:[] }
+const state = globalThis.__journey = { configured:false, mode:'success', calls:{}, partial:false, holdGit:false, holdGraph:false, releases:[], uiframeExportDir:null }
+const { dialog } = require('electron')
+const originalOpenDialog = dialog.showOpenDialog.bind(dialog)
+dialog.showOpenDialog = async (...a) => state.uiframeExportDir ? { canceled:false, filePaths:[state.uiframeExportDir] } : originalOpenDialog(...a)
 const originalHandle = ipcMain.handle.bind(ipcMain)
 ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...args) => {
   state.calls[channel] = (state.calls[channel] || 0) + 1
@@ -558,6 +561,64 @@ try {
   await page.waitForTimeout(100)
   assert.ok((await calls('atlas:ai-cancel')) > 0)
   assert.match(await page.locator('.ai-card .badge').innerText(), /已取消/)
+  // UI 框架(规格见 docs/to-do list《UI框架-需求规格》):rail 开单例签 → 组件墙渲染 → 点选按钮出手柄 →
+  // 拖高度手柄(+8 逻辑像素磁吸到 --control-lg)→ 撤销复原 → 导出规格包(对话框替身)→ 文件、字体、截图齐全
+  await page.getByRole('button', { name: 'UI 框架', exact: true }).click()
+  const canvas = page.frameLocator('iframe.uf-canvas-frame')
+  const solidBtn = canvas.locator('button.btn--solid[data-uf-part="btn-md"]').first()
+  await solidBtn.waitFor()
+  const btnBefore = await solidBtn.boundingBox()
+  assert.ok(
+    btnBefore && Math.abs(btnBefore.height - 40) < 0.5,
+    'default md button must be 2.5rem (40px) tall'
+  )
+  await solidBtn.click()
+  const heightHandle = page.locator('.uf-handle--bottom')
+  await heightHandle.waitFor()
+  const hb = await heightHandle.boundingBox()
+  assert.ok(hb, 'selected button must show the height handle')
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 + 8, { steps: 6 })
+  await page.locator('.uf-drag-badge').filter({ hasText: '--control-lg' }).waitFor()
+  await page.mouse.up()
+  await page.waitForTimeout(150)
+  const btnAfter = await solidBtn.boundingBox()
+  assert.ok(
+    btnAfter && Math.abs(btnAfter.height - 48) < 0.5,
+    'dragging +8px must snap the height to --control-lg (48px)'
+  )
+  await page.locator('.uf-row-ref').filter({ hasText: '--btn-height-md → --control-lg' }).waitFor()
+  await shot('uiframe-drag')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await page.waitForTimeout(150)
+  const btnUndo = await solidBtn.boundingBox()
+  assert.ok(btnUndo && Math.abs(btnUndo.height - 40) < 0.5, 'undo must restore the button height')
+  await page.getByRole('button', { name: '示例页', exact: true }).click()
+  await canvas.locator('header.page-header').waitFor()
+  await shot('uiframe-page')
+  const exportDir = join(run, 'uiframe')
+  await mkdir(exportDir, { recursive: true })
+  await control({ uiframeExportDir: exportDir })
+  await page.getByRole('button', { name: '导出规格包', exact: true }).click()
+  await page.getByText('规格包已导出').waitFor({ timeout: 90_000 })
+  await control({ uiframeExportDir: null })
+  const exported = (await page.locator('.uf-page .notice code').first().innerText()).trim()
+  for (const rel of [
+    'README-给AI.md',
+    'page-template.html',
+    'tokens.css',
+    'pages/home.html',
+    'fonts/fonts.css',
+    'fonts/inter/inter-latin-wght-normal.woff2',
+    'preview/home.png',
+    'preview/button.png',
+    'preview/card.png'
+  ]) {
+    assert.ok(existsSync(join(exported, rel)), `exported spec package must contain ${rel}`)
+  }
+  await shot('uiframe-exported')
+  await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'
   })

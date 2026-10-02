@@ -46,8 +46,10 @@
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-workspace.mts",
     "test:filesize": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-filesize.mts",
     "test:journey": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-journey.mts",
-    "test": "npm run test:scanner && npm run test:search && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:graphview && npm run test:ai && npm run test:agent && npm run test:cloud && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:session && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:markdown && npm run test:filelinks && npm run test:contextbill && npm run test:personalization && npm run test:panehost && npm run test:filesize && npm run test:workspace",
-    "test:panehost": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-panehost.mts"
+    "test": "npm run test:scanner && npm run test:search && npm run test:parser && npm run test:analyzer && npm run test:highlight && npm run test:wasmpaths && npm run test:modelshelf && npm run test:paths && npm run test:depgraph && npm run test:graphview && npm run test:ai && npm run test:agent && npm run test:cloud && npm run test:window && npm run test:appearance && npm run test:recents && npm run test:session && npm run test:nav && npm run test:git && npm run test:summaries && npm run test:notes && npm run test:devlog && npm run test:preview && npm run test:markdown && npm run test:filelinks && npm run test:contextbill && npm run test:personalization && npm run test:panehost && npm run test:uiframe && npm run test:filesize && npm run test:workspace",
+    "test:panehost": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-panehost.mts",
+    "test:uiframe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-uiframe.mts",
+    "uiframe:compare": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/uiframe-compare.mts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -59,6 +61,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/noto-sans-sc": "5.3.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^26.4.1",
@@ -73,6 +77,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "lucide-static": "1.48.0",
     "playwright": "1.55.1",
     "png-to-ico": "^3.0.2",
     "prettier": "^3.9.6",

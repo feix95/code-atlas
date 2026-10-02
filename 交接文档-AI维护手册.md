@@ -11,6 +11,7 @@
 - 单文件行数上限: src/ 内单文件不超过 1000 行, 超限文件登记于 selftest-filesize 白名单、行数只降不升; 向大文件追加代码前先评估另立小文件; 拆分单独成锤——纯搬家不改行为、每锤全绿、拆出块按职责归位(共享逻辑进 shared/、界面件进 components/ 等)。
 - 发布流程: 推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿, 人工确认后正式发布; 升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`; 新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。
 - 模型列表只呈现客观事实: 大小/时间/模态/下载量从 Hugging Face 原样拉取, 筛选交用户; 唯一允许的软件判断是"本机无法运行"的兜底标记。模型下载走双源(HF 直连 → hf-mirror 镜像), 支持断点续传, 完成后自动写入 AI 配置。
+- 装或升级依赖后必须确认 `node_modules/electron/dist/electron.exe` 存在: npm 重装 electron 时可能跳过其安装脚本, 缺失即 `npm run dev` 报「Electron uninstall」; 修复命令 `node node_modules/electron/install.js`(优先读本机缓存)。worktree 的 node_modules 为主仓 Junction, 在 worktree 里装依赖会同时改动主仓。
 - 自测不访问真实网络: 联网场景一律 mock 注入——本地与 CI 网络可达性不同, 依赖真实网络的测试无法在两边同时稳定通过。typecheck 仅覆盖 src/ 不覆盖 scripts/, 自测脚本参数须跟随签名变更。
 
 ## UI 改动自查清单(CSS/布局改动提交前执行)
@@ -54,6 +55,7 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - 页签模型: 文件签绑死文件(一文件一签, 重开只激活旧签, 点文件不动其他页签, 点文件夹只选中不开签); 概览/自由对话/图谱/设置为单例签, 由 rail 入口开合; 无跟随、无钉住。概览/项目导览页为过渡内容, 将随重构摘除。
 - 页签撕窗: 页签拖出窗外或右键「移到新窗口」= 撕成无边框独立子窗(自绘标题栏+完整页签带+分屏正文, 拖边缩放); 同进程子窗+Portal 共享应用基座, 签的正房活 DOM 整体搬家; ×/关窗连签销户(Chrome 语义), 子窗拖空自动关, 主窗拖空留空板不关; 拖回主窗/跨窗落点为后续里程碑。桌宠与气泡窗已退役。
 - 全盘浏览、复杂分屏不属于新手主路径, 不得抢占首次打开的主入口。
+- UI 框架(需求唯一来源: `docs/to-do list/UI框架-需求规格（UI Spec Builder）.md`): 导出只写用户在对话框里自选的位置, 不写入任何用户项目; 规格包所有产物由 `src/shared/uiFrame/` 同一份方案生成, 导出前体检有错误即阻止; 画布与导出共用同一批生成函数(所见即所导出), 改导出格式必须同步跑 `npm run test:uiframe`。
 - 不写入无意义缓存: AI 解释/翻译/榜单等结果仅驻留内存, 不落盘、不实现持久缓存; `userData/models/` 为用户主动下载的模型, 属功能本体不在此列。
 - 本地模型进程仅凭 PID、端口或同名程序无法确认归属; 自动清理只能终止本应用持有的子进程。builtin.ts 中旧注释为历史记录, 以本契约与当前实现为准。
 - 扫描完成即可展示地图, 修改记录后台补齐; 项目切换与返回首页须作废上一代扫描、关系分析、目录展开与文件分析结果。

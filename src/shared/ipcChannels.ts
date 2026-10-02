@@ -74,6 +74,9 @@ export const CH = {
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
+  // ── UI 框架:规格包导出(只写用户自选位置)/ 打开最近一次导出的文件夹 ──
+  uiFrameExport: 'atlas:uiframe-export',
+  uiFrameRevealExport: 'atlas:uiframe-reveal-export',
   // ── 桌宠 ──
   // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗
