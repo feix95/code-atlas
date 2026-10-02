@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { GROUPS } from '@shared/uiFrame/board'
 import { pageFor } from '@shared/uiFrame/documents'
+import { customKey, isCustomIcon } from '@shared/uiFrame/customIcon'
 import { iconSlotsOf } from '@shared/uiFrame/markup'
 import { PART_DEFS } from '@shared/uiFrame/parts'
 import { BLANK_ID, TEMPLATES, type TemplateMeta } from '@shared/uiFrame/templates'
@@ -39,8 +40,17 @@ const SLOT_LABEL: Record<IconSlot, string> = {
 
 const PLATFORM_LABEL = { desktop: '电脑', phone: '手机' } as const
 
-function IconRow({ slot, icon }: { slot: IconSlot; icon: string }): React.JSX.Element {
+function IconRow({
+  slot,
+  icon,
+  custom
+}: {
+  slot: IconSlot
+  icon: string
+  custom: Record<string, string>
+}): React.JSX.Element {
   const node = iconLookup(icon)
+  const customSvg = isCustomIcon(icon) ? custom[customKey(icon)] : undefined
   return (
     <button
       type="button"
@@ -48,7 +58,14 @@ function IconRow({ slot, icon }: { slot: IconSlot; icon: string }): React.JSX.El
       title={`在画布上定位并换图标(${slot})`}
       onClick={() => workbenchActions.jump({ kind: 'icon', slot })}
     >
-      <span className="uf-part-ico">{node ? <LucideGlyph node={node} size="1rem" /> : null}</span>
+      <span className="uf-part-ico">
+        {node ? (
+          <LucideGlyph node={node} size="1rem" />
+        ) : customSvg ? (
+          // 文本已在导入/解析时被消毒(剥脚本/事件/外链)
+          <span className="uf-part-ico-svg" dangerouslySetInnerHTML={{ __html: customSvg }} />
+        ) : null}
+      </span>
       <span className="uf-part-name">{SLOT_LABEL[slot]}</span>
       <code className="uf-part-meta">{icon}</code>
     </button>
@@ -168,11 +185,13 @@ export function UiFrameParts(): React.JSX.Element {
                 空白底板还没内容;填入示例页后这里列出页面图标。
               </p>
             ) : (
-              benchSlots.map((slot) => <IconRow key={slot} slot={slot} icon={doc.icons[slot]} />)
+              benchSlots.map((slot) => (
+                <IconRow key={slot} slot={slot} icon={doc.icons[slot]} custom={doc.customIcons} />
+              ))
             )}
             <p className="uf-part-sub">组件图标</p>
             {demoSlots.map((slot) => (
-              <IconRow key={slot} slot={slot} icon={doc.icons[slot]} />
+              <IconRow key={slot} slot={slot} icon={doc.icons[slot]} custom={doc.customIcons} />
             ))}
           </details>
         </>

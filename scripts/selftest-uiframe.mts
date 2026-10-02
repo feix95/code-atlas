@@ -45,6 +45,13 @@ import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFr
 import { fillInInstruction } from '../src/shared/uiFrame/fillInstruction.ts'
 import { verifyClaim } from '../src/shared/uiFrame/provenance.ts'
 import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
+import {
+  CUSTOM_ICON_PREFIX,
+  iconSvgRelPath,
+  isCustomIcon,
+  sanitizeSvgIcon
+} from '../src/shared/uiFrame/customIcon.ts'
+import { iconCategory, iconSearch } from '../src/shared/uiFrame/iconCatalog.ts'
 import { benchBody } from '../src/shared/uiFrame/benchBoard.ts'
 import { PART_DEFS, partNode } from '../src/shared/uiFrame/parts.ts'
 import { strToU8, zipSync } from 'fflate'
@@ -969,6 +976,59 @@ check('.uiframe 容器把摆放一起打包:zip 往返后 placed 不丢', () => 
   })
   const un = unpackUiframe(packed)
   assert.deepEqual(parseDoc(un.design).placed, d.placed)
+})
+
+console.log('── 图标系统(M3-e):分类/中文搜索/自定义 SVG')
+const ICON_SAMPLE = [
+  'arrow-left',
+  'arrow-right',
+  'check',
+  'chevron-down',
+  'home',
+  'loader-circle',
+  'search',
+  'settings',
+  'shopping-cart',
+  'trash-2',
+  'user',
+  'x'
+]
+const noTags = (): string[] => []
+check('中文别名搜索:「搜索」命中 search,「购物车」命中 shopping-cart;查无此词回空', () => {
+  assert.deepEqual(iconSearch('搜索', ICON_SAMPLE, noTags), ['search'])
+  assert.deepEqual(iconSearch('购物车', ICON_SAMPLE, noTags), ['shopping-cart'])
+  assert.deepEqual(iconSearch('不存在词', ICON_SAMPLE, noTags), [])
+  assert.deepEqual(iconSearch('arrow', ICON_SAMPLE, noTags).sort(), ['arrow-left', 'arrow-right'])
+})
+check('分类归桶:样本图标各自进桶,认不出的进「其他」', () => {
+  assert.equal(iconCategory('arrow-left'), 'arrow')
+  assert.equal(iconCategory('shopping-cart'), 'biz')
+  assert.equal(iconCategory('zzz-unknown'), 'misc')
+})
+check('自定义 SVG 消毒:收合规 <svg>,剥不得的元素与属性当场拒收', () => {
+  const ok = sanitizeSvgIcon('<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg>')
+  assert.ok(ok.includes('<svg') && ok.includes('circle'))
+  assert.ok(sanitizeSvgIcon('<svg><path d="M0 0" /></svg>').includes('viewBox'), '缺 viewBox 要补')
+  assert.throws(() => sanitizeSvgIcon('<svg><script>alert(1)</script></svg>'), /不被支持/)
+  assert.throws(() => sanitizeSvgIcon('<svg><circle onload="x()" /></svg>'), /事件属性|外链/)
+  assert.throws(() => sanitizeSvgIcon('<div></div>'), /单个 <svg>/)
+})
+check('custom 图标:槽位值 custom:<名>,design.json 往返 + 规格包内联与落文件', () => {
+  const svg = sanitizeSvgIcon('<svg viewBox="0 0 8 8"><rect width="8" height="8" /></svg>')
+  const d = {
+    ...doc,
+    customIcons: { logo: svg },
+    icons: { ...doc.icons, 'demo-button': `${CUSTOM_ICON_PREFIX}logo` }
+  }
+  assert.ok(isCustomIcon(d.icons['demo-button']!))
+  assert.equal(iconSvgRelPath(d.icons['demo-button']!), 'icons/custom-logo.svg')
+  assert.equal(iconSvgRelPath('arrow-right'), 'icons/arrow-right.svg')
+  const back = parseDoc(serializeDoc(d))
+  assert.equal(back.customIcons['logo'], svg)
+  const p = buildPackage(d, assets)
+  assert.ok(p.files['icons/custom-logo.svg']?.includes('<rect'), '包内要有自定义 svg 文件')
+  const usedInline = Object.values(p.files).some((f) => f.includes('<rect'))
+  assert.ok(usedInline, '页面或演示里要内联自定义 svg 原文')
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

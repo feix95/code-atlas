@@ -84,6 +84,8 @@ export interface UiFrameDoc {
   rootFontPx: number
   tokens: TokenMap
   icons: Record<IconSlot, string>
+  /** 自定义 SVG 图标(M3-e):名 → 消毒后的 <svg> 文本;槽位值写 custom:<名> */
+  customIcons: Record<string, string>
   /** 底板上的零件摆放(M3-a);空数组 = 底板显示模板示例页或空态 */
   placed: PlacedPart[]
   /** 问卷 D9「需要重点照顾」→ §5.7 加强档校验(更大字号下限、更高对比度) */

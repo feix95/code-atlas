@@ -1,5 +1,6 @@
 // 结构 → HTML:页面结构树、图标 SVG 原文。
 // 画布模式给可选中的元素挂 data-uf-part;导出模式不挂,规格包里不出现任何编辑器痕迹。
+import { customKey, isCustomIcon } from './customIcon.ts'
 import type { IconLookup, IconNode, IconSlot, PageNode } from './types.ts'
 
 /** 与 package.json 锁定的 lucide-static 版本一致(自测校验) */
@@ -42,13 +43,22 @@ export interface MarkupContext {
   mode: MarkupMode
   icons: Record<IconSlot, string>
   lookup: IconLookup
+  /** 自定义 SVG 图标(M3-e):custom:<名> → 消毒后的 <svg> 文本 */
+  custom?: Record<string, string>
 }
 
 function iconHtml(slot: IconSlot, ctx: MarkupContext): string {
   const name = ctx.icons[slot]
-  const node = ctx.lookup(name)
-  if (!node) throw new Error(`图标不存在:${name}(槽位 ${slot})`)
-  const svg = svgText(node)
+  let svg: string
+  if (isCustomIcon(name)) {
+    const raw = ctx.custom?.[customKey(name)]
+    if (!raw) throw new Error(`自定义图标不存在:${name}(槽位 ${slot})`)
+    svg = raw
+  } else {
+    const node = ctx.lookup(name)
+    if (!node) throw new Error(`图标不存在:${name}(槽位 ${slot})`)
+    svg = svgText(node)
+  }
   return ctx.mode === 'canvas'
     ? svg.replace('<svg ', `<svg data-uf-part="${partOfIcon(slot)}" data-uf-icon="${slot}" `)
     : svg

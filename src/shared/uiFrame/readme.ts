@@ -1,5 +1,6 @@
 // 给 AI 的文字:README-给AI.md(§13.4)、pages/home.md(页面规格)、LICENSES.md。
 // 全文只用「必须 / 禁止」(规则 8);体检会扫描含糊词。
+import { iconSvgRelPath } from './customIcon.ts'
 import { compCssPath, compHtmlPath, pageFor, STYLE_FILES, type PageDef } from './documents.ts'
 import { escapeHtml } from './markup.ts'
 import { deviceFor } from './devices.ts'
@@ -127,7 +128,7 @@ export function readmeMd(doc: UiFrameDoc, iconFiles: string[]): string {
     return `### ${r.label}\n\n- 样式文件:\`${compCssPath(r.id)}\`;演示页:\`${compHtmlPath(r.id)}\`\n- 状态:${r.stateNames.join('、')}\n- 组件变量:${params.map((n) => `\`--${n}\``).join('、')}`
   }).join('\n\n')
   const usedIcons = (Object.keys(doc.icons) as IconSlot[])
-    .map((slot) => `| \`icons/${doc.icons[slot]}.svg\` | ${SLOT_LABEL[slot]} |`)
+    .map((slot) => `| \`${iconSvgRelPath(doc.icons[slot])}\` | ${SLOT_LABEL[slot]} |`)
     .join('\n')
   return `# UI 规格包 · 给 AI 的说明(必须先读)
 
@@ -216,7 +217,7 @@ function nodeLine(node: PageNode, doc: UiFrameDoc, depth: number): string[] {
   if (node.text) bits.push(`文案「${escapeHtml(node.text)}」`)
   if (node.icon) {
     bits.push(
-      `内联 \`icons/${doc.icons[node.icon]}.svg\` 原文,位于文案${node.iconAt === 'end' ? '之后' : '之前'}`
+      `内联 \`${iconSvgRelPath(doc.icons[node.icon])}\` 原文,位于文案${node.iconAt === 'end' ? '之后' : '之前'}`
     )
   }
   const line = `${'  '.repeat(depth)}- ${bits.join(';')}`

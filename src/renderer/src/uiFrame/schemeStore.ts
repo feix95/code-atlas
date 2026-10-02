@@ -241,6 +241,11 @@ export const schemeActions = {
           return null
         }
         result = importSchemeFiles(f.manifest, f.design, f.name)
+        // 自定义图标兜底:design.json 没收录时,从 zip 的 assets/icons/custom-*.svg 回补
+        for (const [file, svg] of Object.entries(f.icons ?? {})) {
+          const m = /^custom-([\w一-龥.-]{1,40})\.svg$/.exec(file)
+          if (m && !result.doc.customIcons[m[1]!]) result.doc.customIcons[m[1]!] = svg
+        }
       } else if (source === 'css-text') {
         result = importCssVars(pastedText ?? '', '粘贴的变量')
       } else if (source === 'css-file') {

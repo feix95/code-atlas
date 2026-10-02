@@ -127,6 +127,8 @@ export interface SchemeFolderPayload {
   design: string
   /** 文件夹名(方案名兜底) */
   name: string
+  /** assets/icons/ 里解出的 svg 文本(.uiframe 导入用;文件夹导入为空) */
+  icons?: Record<string, string>
 }
 
 export interface ImportFilePayload {
@@ -170,13 +172,17 @@ export function registerUiFrameIpc(): void {
     const stat = await fs.stat(file)
     if (stat.size > IMPORT_MAX_BYTES)
       throw new Error(`文件过大(>${IMPORT_MAX_BYTES / 1024 / 1024}MB)`)
-    const { manifest, design } = unpackUiframe(new Uint8Array(await fs.readFile(file)))
+    const { manifest, design, icons } = unpackUiframe(new Uint8Array(await fs.readFile(file)))
     const name =
       file
         .split(/[\\/]/)
         .pop()
         ?.replace(/\.uiframe$/i, '') ?? '导入方案'
-    return { manifest, design, name }
+    const iconTexts: Record<string, string> = {}
+    for (const [n, bytes] of Object.entries(icons)) {
+      if (n.endsWith('.svg')) iconTexts[n] = new TextDecoder().decode(bytes)
+    }
+    return { manifest, design, name, icons: iconTexts }
   })
 
   ipcMain.handle(CH.uiFrameImportFolder, async (event): Promise<SchemeFolderPayload | null> => {
@@ -199,14 +205,21 @@ export function registerUiFrameIpc(): void {
   ipcMain.handle(
     CH.uiFrameImportFile,
     async (event, rawKind: unknown): Promise<ImportFilePayload | null> => {
-      const kind = rawKind === 'css' ? 'css' : 'json'
+      const kind = rawKind === 'css' ? 'css' : rawKind === 'svg' ? 'svg' : 'json'
       const file = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
-        title: kind === 'css' ? '选择 CSS 变量文件' : '选择 DTCG 变量 JSON',
+        title:
+          kind === 'css'
+            ? '选择 CSS 变量文件'
+            : kind === 'svg'
+              ? '选择 SVG 图标文件'
+              : '选择 DTCG 变量 JSON',
         properties: ['openFile'],
         filters:
           kind === 'css'
             ? [{ name: 'CSS 文件', extensions: ['css'] }]
-            : [{ name: 'JSON 文件', extensions: ['json'] }]
+            : kind === 'svg'
+              ? [{ name: 'SVG 图标', extensions: ['svg'] }]
+              : [{ name: 'JSON 文件', extensions: ['json'] }]
       })
       if (!file) return null
       const text = await readTextIfExists(file)

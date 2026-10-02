@@ -53,6 +53,14 @@ export const docActions = {
     if (state.doc.icons[slot] === icon) return
     commit({ ...state.doc, icons: { ...state.doc.icons, [slot]: icon } })
   },
+  /** 自定义图标(M3-e):消毒后的 svg 文本入库,顺带把槽位指过去;同槽一步进撤销栈 */
+  addCustomIcon(slot: IconSlot, name: string, svg: string): void {
+    commit({
+      ...state.doc,
+      customIcons: { ...state.doc.customIcons, [name]: svg },
+      icons: { ...state.doc.icons, [slot]: `custom:${name}` }
+    })
+  },
   resetAll(): void {
     commit(defaultDoc())
   },

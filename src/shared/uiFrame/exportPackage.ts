@@ -13,6 +13,7 @@ import {
   STYLE_FILES,
   styleTexts
 } from './documents.ts'
+import { CUSTOM_ICON_PREFIX, iconSvgRelPath } from './customIcon.ts'
 import { fontPlans, fontsCss, PACKAGE_FONT_URL, type FontSource } from './fonts.ts'
 import { svgFile, type MarkupContext } from './markup.ts'
 import { RECIPES } from './recipes/index.ts'
@@ -49,11 +50,16 @@ export function safeFolderName(name: string, stamp: string): string {
 }
 
 export function iconFileNames(doc: UiFrameDoc): string[] {
-  return [...new Set(Object.values(doc.icons))].map((n) => `icons/${n}.svg`)
+  return [...new Set(Object.values(doc.icons))].map(iconSvgRelPath)
 }
 
 export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackage {
-  const ctx: MarkupContext = { mode: 'export', icons: doc.icons, lookup: assets.lookup }
+  const ctx: MarkupContext = {
+    mode: 'export',
+    icons: doc.icons,
+    lookup: assets.lookup,
+    custom: doc.customIcons
+  }
   const texts = styleTexts(doc, fontsCss(assets.fontSources, PACKAGE_FONT_URL))
   const link = { kind: 'link' as const, hrefBase: '../' }
   const iconFiles = iconFileNames(doc)
@@ -91,6 +97,13 @@ export function buildPackage(doc: UiFrameDoc, assets: PackageAssets): SpecPackag
   }
   for (const file of iconFiles) {
     const name = file.slice('icons/'.length, -'.svg'.length)
+    if (name.startsWith('custom-')) {
+      const key = name.slice('custom-'.length)
+      const raw = doc.customIcons[key]
+      if (!raw) throw new Error(`自定义图标不存在:${CUSTOM_ICON_PREFIX}${key}`)
+      files[file] = `<!-- 自定义图标 · ${key} · 随方案携带 -->\n${raw}\n`
+      continue
+    }
     const node = assets.lookup(name)
     if (!node) throw new Error(`图标不存在:${name}`)
     files[file] = svgFile(name, node)

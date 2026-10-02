@@ -635,6 +635,7 @@ export function defaultDoc(): UiFrameDoc {
       'demo-search': 'search',
       'demo-down': 'chevron-down'
     },
+    customIcons: {},
     placed: []
   }
 }

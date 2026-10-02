@@ -69,7 +69,7 @@ export function canvasHtml(doc: UiFrameDoc, view: CanvasView): string {
     title: VIEW_LABEL[view],
     body,
     styles,
-    ctx: { mode: 'canvas', icons: doc.icons, lookup: iconLookup },
+    ctx: { mode: 'canvas', icons: doc.icons, lookup: iconLookup, custom: doc.customIcons },
     styleMode: { kind: 'inline', texts }
   })
 }

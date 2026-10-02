@@ -418,3 +418,41 @@
   color: var(--danger);
   border-color: var(--danger);
 }
+
+/* 图标选择器升级(M3-e):分类页签条 + 自定义区 */
+.uf-icon-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+.uf-cat {
+  font-size: var(--font-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.uf-cat.is-on {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.uf-icon-custom {
+  margin-top: var(--space-3);
+}
+.uf-icon-import {
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--muted);
+}
+.uf-part-ico-svg svg {
+  width: 1rem;
+  height: 1rem;
+}
+.uf-icon-cell svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}

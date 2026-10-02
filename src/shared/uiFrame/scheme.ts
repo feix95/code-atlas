@@ -1,5 +1,6 @@
 // 方案文件(§15)与方案库(§5.8)的纯函数层:序列化、解析迁移、清单、id 与快照命名。
 // M1 以文件夹形式存放;M2 启用 zip 时内部结构不变。
+import { isCustomIconName } from './customIcon.ts'
 import { defaultDeviceId, isDeviceId } from './devices.ts'
 import { defaultDoc, defaultTokens } from './template.ts'
 import type { IconSlot, PlacedPart, SchemeManifest, TokenDef, UiFrameDoc } from './types.ts'
@@ -51,6 +52,18 @@ function isTokenValue(raw: unknown): boolean {
   if (typeof raw !== 'object' || raw === null) return false
   const v = raw as Record<string, unknown>
   return typeof v['kind'] === 'string' && KNOWN_KINDS.has(v['kind'])
+}
+
+/** customIcons 清洗:名要合法、值要是 <svg> 文本(恶意形态在这一层直接丢) */
+function cleanCustomIcons(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (typeof raw !== 'object' || raw === null) return out
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (isCustomIconName(k) && typeof v === 'string' && /^<svg[\s>]/.test(v.trim())) {
+      out[k] = v
+    }
+  }
+  return out
 }
 
 /** 解析 design.json:版本校验 + 逐条清洗,缺字段补默认模板(老方案在新版打开不掉变量) */
@@ -109,6 +122,8 @@ export function parseDoc(text: string): UiFrameDoc {
     tokens,
     // 旧文档缺槽位时补默认图标(新增 IconSlot 后旧方案也能渲染)
     icons: { ...defaultDoc().icons, ...cleanIcons } as Record<IconSlot, string>,
+    // 自定义图标(M3-e):只收名字合法、文本是 <svg> 的条目;坏条目丢掉
+    customIcons: cleanCustomIcons(raw['customIcons']),
     placed,
     ...(raw['a11yEnhanced'] === true ? { a11yEnhanced: true } : {}),
     ...(typeof raw['targetStack'] === 'string' && raw['targetStack']

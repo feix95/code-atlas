@@ -213,10 +213,24 @@ export function registerUiFrameSchemeIpc(): void {
       })
       if (!target) return { status: 'canceled' }
       const thumbnail = await fs.readFile(join(dir, 'thumbnail.png')).catch(() => null)
+      const design = await fs.readFile(join(dir, 'design.json'), 'utf8')
+      // 自定义图标(M3-e)随包走一份文件形态:assets/icons/custom-<名>.svg
+      const icons: Record<string, Uint8Array> = {}
+      try {
+        const parsed = JSON.parse(design) as { customIcons?: Record<string, unknown> }
+        for (const [key, svg] of Object.entries(parsed.customIcons ?? {})) {
+          if (typeof svg === 'string' && /^[\w一-龥.-]{1,40}$/.test(key)) {
+            icons[`custom-${key}.svg`] = new TextEncoder().encode(svg)
+          }
+        }
+      } catch {
+        // design.json 解析失败时照原样打包,自定义图标缺席不挡导出
+      }
       const zipped = packUiframe({
         manifest: JSON.stringify(manifest),
-        design: await fs.readFile(join(dir, 'design.json'), 'utf8'),
-        thumbnail
+        design,
+        thumbnail,
+        icons
       })
       await fs.writeFile(target, zipped)
       return { status: 'done', path: target, unloadedFontPreviews: [] }

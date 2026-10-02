@@ -281,15 +281,19 @@ const atlasApi = {
     manifest: string | null
     design: string
     name: string
+    icons?: Record<string, string>
   } | null> => ipcRenderer.invoke(CH.uiFrameImportFolder),
-  /** 选单个文件(json = DTCG 变量;css = CSS 变量) */
-  uiFrameImportFile: (kind: 'json' | 'css'): Promise<{ name: string; text: string } | null> =>
+  /** 选单个文件(json = DTCG 变量;css = CSS 变量/Tailwind;svg = 自定义图标) */
+  uiFrameImportFile: (
+    kind: 'json' | 'css' | 'svg'
+  ): Promise<{ name: string; text: string } | null> =>
     ipcRenderer.invoke(CH.uiFrameImportFile, kind),
   /** 选 .uiframe 方案文件(§15 zip 容器);主进程解包后回 manifest/design 原文 */
   uiFrameImportUiframe: (): Promise<{
     manifest: string | null
     design: string
     name: string
+    icons?: Record<string, string>
   } | null> => ipcRenderer.invoke(CH.uiFrameImportUiframe),
   /** §14 防编造:选自填表数值的出处项目根,主进程只读比对;取消回 null */
   uiFrameVerify: (items: ProvenanceCheckItem[]): Promise<ProvenanceVerdict[] | null> =>

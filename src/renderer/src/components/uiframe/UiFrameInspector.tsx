@@ -357,7 +357,12 @@ export function UiFrameInspector({
       {slot && (
         <section className="uf-section">
           <h3 className="uf-section-title">图标</h3>
-          <IconPicker current={doc.icons[slot]} onPick={(name) => docActions.setIcon(slot, name)} />
+          <IconPicker
+            current={doc.icons[slot]}
+            custom={doc.customIcons}
+            onPick={(name) => docActions.setIcon(slot, name)}
+            onCustom={(name, svg) => docActions.addCustomIcon(slot, name, svg)}
+          />
         </section>
       )}
       <section className="uf-section">
