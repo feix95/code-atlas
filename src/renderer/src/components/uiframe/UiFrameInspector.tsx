@@ -1,8 +1,9 @@
 // 属性面板:选中部件的可拖参数与全部参数,数值输入即改;图标部件附图标选择器。
+// 变量板点选的基础变量(data-uf-part="tok:<名>")走单变量编辑:数字、取色、阴影分量、字体名。
 import { useState } from 'react'
 import { PARTS } from '@shared/uiFrame/handles'
 import { literalCss, resolveValue } from '@shared/uiFrame/resolve'
-import type { IconSlot, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
+import type { IconSlot, TokenDef, TokenValue, UiFrameDoc } from '@shared/uiFrame/types'
 import { describePx } from '@shared/uiFrame/units'
 import { docActions, isTokenEdited } from '../../uiFrame/docStore'
 import type { CanvasSelection } from '../../uiFrame/useCanvasFrame'
@@ -92,6 +93,186 @@ function TokenRow({
   )
 }
 
+/** 变量板选中项的标题行:变量名 + 恢复默认 */
+function TokenHead({
+  doc,
+  name,
+  def
+}: {
+  doc: UiFrameDoc
+  name: string
+  def: TokenDef
+}): React.JSX.Element {
+  return (
+    <div className="uf-row-head">
+      <span className="uf-row-label">{def.label}</span>
+      <span className="uf-row-ref mono">--{name}</span>
+      {isTokenEdited(doc, name) && (
+        <button type="button" className="uf-link" onClick={() => docActions.resetToken(name)}>
+          恢复默认
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** 颜色变量:亮 / 暗两个取色器(#RRGGBB);只限 base 层的字面颜色 */
+function ColorEditor({
+  name,
+  value
+}: {
+  name: string
+  value: Extract<TokenValue, { kind: 'color' }>
+}): React.JSX.Element {
+  const pick = (theme: 'light' | 'dark', hex: string): void =>
+    docActions.setToken(name, { ...value, [theme]: hex })
+  return (
+    <div className="uf-row-body">
+      {(['light', 'dark'] as const).map((t) => (
+        <label key={t} className="uf-color">
+          <input
+            type="color"
+            value={value[t]}
+            aria-label={t === 'light' ? '亮色值' : '暗色值'}
+            onChange={(e) => pick(t, e.target.value)}
+          />
+          <span className="uf-row-value mono">{value[t]}</span>
+          <span className="uf-unit">{t === 'light' ? '亮' : '暗'}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/** 阴影变量:x/y/模糊/扩散 数字 + 亮暗色文本(rgba 不便用取色器) */
+function ShadowEditor({
+  name,
+  value
+}: {
+  name: string
+  value: Extract<TokenValue, { kind: 'shadow' }>
+}): React.JSX.Element {
+  const setNum = (key: 'x' | 'y' | 'blur' | 'spread', raw: string): void => {
+    const n = Number(raw)
+    if (Number.isFinite(n)) docActions.setToken(name, { ...value, [key]: n })
+  }
+  const setColor = (theme: 'light' | 'dark', raw: string): void =>
+    docActions.setToken(name, { ...value, [theme]: raw })
+  const NUMS: Array<[key: 'x' | 'y' | 'blur' | 'spread', label: string]> = [
+    ['x', '水平'],
+    ['y', '垂直'],
+    ['blur', '模糊'],
+    ['spread', '扩散']
+  ]
+  return (
+    <div className="uf-row-body uf-shadow-edit">
+      {NUMS.map(([key, label]) => (
+        <label key={key} className="uf-num">
+          <input
+            className="uf-input"
+            type="number"
+            step={1}
+            value={value[key]}
+            aria-label={label}
+            onChange={(e) => setNum(key, e.target.value)}
+          />
+          <span className="uf-unit">{label}</span>
+        </label>
+      ))}
+      {(['light', 'dark'] as const).map((t) => (
+        <label key={t} className="uf-shadow-color">
+          <input
+            className="uf-input"
+            type="text"
+            value={value[t]}
+            aria-label={t === 'light' ? '亮色阴影' : '暗色阴影'}
+            onChange={(e) => setColor(t, e.target.value)}
+          />
+          <span className="uf-unit">{t === 'light' ? '亮' : '暗'}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/** 字体变量:逗号分隔的字族名文本 */
+function FamilyEditor({
+  name,
+  value
+}: {
+  name: string
+  value: Extract<TokenValue, { kind: 'fontFamily' }>
+}): React.JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = (): void => {
+    if (draft === null) return
+    const families = draft
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    setDraft(null)
+    if (families.length) docActions.setToken(name, { kind: 'fontFamily', families })
+  }
+  return (
+    <div className="uf-row-body">
+      <label className="uf-num uf-family">
+        <input
+          className="uf-input"
+          type="text"
+          value={draft ?? value.families.join(', ')}
+          aria-label="字体族"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') setDraft(null)
+          }}
+        />
+      </label>
+    </div>
+  )
+}
+
+/** 变量板点选「tok:<名>」 → 单变量编辑(§5.5 直接改变量) */
+function TokenInspector({ doc, name }: { doc: UiFrameDoc; name: string }): React.JSX.Element {
+  const def = doc.tokens[name]
+  if (!def) {
+    return (
+      <aside className="uf-inspector" aria-label="属性">
+        <p className="uf-hint">变量不存在:{name}</p>
+      </aside>
+    )
+  }
+  const resolved = resolveValue(doc.tokens, name)
+  const value = def.value
+  return (
+    <aside className="uf-inspector" aria-label="属性">
+      <h2 className="uf-panel-title">变量</h2>
+      <section className="uf-section">
+        {resolved.kind === 'color' && value.kind === 'color' ? (
+          <div className="uf-row is-hot">
+            <TokenHead doc={doc} name={name} def={def} />
+            <ColorEditor name={name} value={value} />
+          </div>
+        ) : resolved.kind === 'shadow' && value.kind === 'shadow' ? (
+          <div className="uf-row is-hot">
+            <TokenHead doc={doc} name={name} def={def} />
+            <ShadowEditor name={name} value={value} />
+          </div>
+        ) : resolved.kind === 'fontFamily' && value.kind === 'fontFamily' ? (
+          <div className="uf-row is-hot">
+            <TokenHead doc={doc} name={name} def={def} />
+            <FamilyEditor name={name} value={value} />
+          </div>
+        ) : (
+          <TokenRow doc={doc} name={name} hot={false} />
+        )}
+        <p className="uf-hint">改动立刻生效在画布上;Ctrl+Z 撤销,工具条可恢复模板。</p>
+      </section>
+    </aside>
+  )
+}
+
 export function UiFrameInspector({
   doc,
   selection
@@ -99,7 +280,10 @@ export function UiFrameInspector({
   doc: UiFrameDoc
   selection: CanvasSelection | null
 }): React.JSX.Element {
-  const part = selection ? PARTS[selection.part] : undefined
+  // 变量板条目:part 为 "tok:<变量名>",不走部件配方
+  const tok = selection?.part.startsWith('tok:') ? selection.part.slice(4) : null
+  const part = selection && !tok ? PARTS[selection.part] : undefined
+  if (tok) return <TokenInspector doc={doc} name={tok} />
   if (!selection || !part) {
     return (
       <aside className="uf-inspector" aria-label="属性">

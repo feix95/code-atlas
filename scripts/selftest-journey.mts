@@ -594,6 +594,28 @@ try {
   await page.waitForTimeout(150)
   const btnUndo = await solidBtn.boundingBox()
   assert.ok(btnUndo && Math.abs(btnUndo.height - 40) < 0.5, 'undo must restore the button height')
+  // 变量板(§5.5):点色板条目 → 属性面板出取色器 → 改主色后画布读数与组件一起更新 → 撤销复原
+  await page.getByRole('button', { name: '变量板', exact: true }).click()
+  const swatch = canvas.locator('[data-uf-part="tok:color-primary"]').first()
+  await swatch.waitFor()
+  await swatch.click()
+  const colorPicker = page.locator('.uf-color input[type="color"]').first()
+  await colorPicker.waitFor()
+  await colorPicker.evaluate((el) => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    set.call(el, '#ff0000')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await canvas
+    .locator('[data-uf-part="tok:color-primary"] .vb-val')
+    .filter({ hasText: '#ff0000 / #60A5FA' })
+    .waitFor()
+  await shot('uiframe-board')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await canvas
+    .locator('[data-uf-part="tok:color-primary"] .vb-val')
+    .filter({ hasText: '#2563EB / #60A5FA' })
+    .waitFor()
   await page.getByRole('button', { name: '示例页', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   await shot('uiframe-page')

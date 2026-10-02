@@ -252,6 +252,41 @@
   gap: var(--space-1);
 }
 
+/* ── 变量板选中编辑(取色器 / 阴影分量 / 字体) ── */
+.uf-color {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uf-color input[type='color'] {
+  width: var(--control-height);
+  height: calc(var(--control-height) * 0.8);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.uf-shadow-edit {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.uf-shadow-edit .uf-num .uf-input {
+  width: 4rem;
+}
+
+.uf-shadow-color,
+.uf-family {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
 .uf-input {
   box-sizing: border-box;
   width: 100%;

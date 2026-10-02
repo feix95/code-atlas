@@ -11,6 +11,8 @@ import { LUCIDE_VERSION, svgText } from '../src/shared/uiFrame/markup.ts'
 import { describePx, remText, snapPx } from '../src/shared/uiFrame/units.ts'
 import { resolvePx } from '../src/shared/uiFrame/resolve.ts'
 import { demoBody } from '../src/shared/uiFrame/demo.ts'
+import { boardBody, boardCss, boardValueText } from '../src/shared/uiFrame/board.ts'
+import { rulesCss } from '../src/shared/uiFrame/recipes/kit.ts'
 import { RECIPES } from '../src/shared/uiFrame/recipes/index.ts'
 import { htmlDocument, PAGE_STYLES, styleTexts } from '../src/shared/uiFrame/documents.ts'
 import type {
@@ -287,6 +289,42 @@ check('行内间距依赖:父级不是 flex 时提醒', () => {
     }
   ]
   assert.ok(lintPackage(pkg, { 'pages/x.md': inline }).some((i) => i.check === '行内间距依赖'))
+})
+
+console.log('── 变量板(§5.5)')
+check('每个基础变量在板上各有一个条目,part 为 tok:<名>且一一对应', () => {
+  const parts: string[] = []
+  const walk = (n: PageNode): void => {
+    if (n.part) parts.push(n.part)
+    n.children?.forEach(walk)
+  }
+  boardBody(doc).forEach(walk)
+  const base = Object.keys(doc.tokens).filter((n) => doc.tokens[n].tier === 'base')
+  assert.equal(parts.length, base.length)
+  for (const p of parts) {
+    assert.ok(p.startsWith('tok:'), `part 不是 tok: 前缀 ${p}`)
+    assert.ok(doc.tokens[p.slice(4)], `板上 part 无对应变量 ${p}`)
+  }
+  for (const n of base) assert.ok(parts.includes(`tok:${n}`), `变量 ${n} 没上板`)
+})
+check('变量板读数:dimension 给 rem+px,颜色给亮暗两值', () => {
+  assert.equal(boardValueText(doc, 'control-md'), '2.5rem · 40px')
+  assert.equal(boardValueText(doc, 'color-primary'), '#2563EB / #60A5FA')
+})
+check('变量板样式全走变量引用,色板同时给亮暗两个 data-theme 小样', () => {
+  const css = rulesCss(boardCss())
+  assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}|\d+px/)
+  const html = htmlDocument({
+    title: '变量板',
+    body: boardBody(doc),
+    styles: ['fonts', 'tokens', 'reset', 'board'],
+    ctx: { mode: 'export', icons: doc.icons, lookup: assets.lookup },
+    styleMode: { kind: 'inline', texts: { ...styleTexts(doc, ''), board: css } }
+  })
+  assert.match(
+    html,
+    /<span data-theme="light" style="background: var\(--color-primary\)"><\/span><span data-theme="dark"/
+  )
 })
 
 console.log('── 画布与导出同源')

@@ -9,7 +9,7 @@ import { Notice } from '../Notice'
 import { UiFrameCanvas } from './UiFrameCanvas'
 import { UiFrameInspector } from './UiFrameInspector'
 
-const VIEWS: CanvasView[] = ['wall', 'page']
+const VIEWS: CanvasView[] = ['wall', 'board', 'page']
 const THEMES: Array<[ThemeName, string]> = [
   ['light', '亮色'],
   ['dark', '暗色']
