@@ -270,7 +270,7 @@ const atlasApi = {
   /** 回滚到某个快照:返回该快照的 design.json 正文 */
   uiFrameSchemeRestore: (id: string, stamp: string): Promise<string> =>
     ipcRenderer.invoke(CH.uiFrameSchemeRestore, id, stamp),
-  /** 导出方案文件(文件夹形式):manifest + design + 缩略图,写到用户自选位置 */
+  /** 导出 .uiframe 方案文件(§15 zip):manifest + design + 缩略图打进单文件,存到用户自选路径 */
   uiFrameSchemeExport: (id: string): Promise<UiFrameExportResult> =>
     ipcRenderer.invoke(CH.uiFrameSchemeExport, id),
   // ── 导入(§14):弹系统对话框读用户自选的文件夹/文件,只读不写 ──
@@ -283,6 +283,12 @@ const atlasApi = {
   /** 选单个文件(json = DTCG 变量;css = CSS 变量) */
   uiFrameImportFile: (kind: 'json' | 'css'): Promise<{ name: string; text: string } | null> =>
     ipcRenderer.invoke(CH.uiFrameImportFile, kind),
+  /** 选 .uiframe 方案文件(§15 zip 容器);主进程解包后回 manifest/design 原文 */
+  uiFrameImportUiframe: (): Promise<{
+    manifest: string | null
+    design: string
+    name: string
+  } | null> => ipcRenderer.invoke(CH.uiFrameImportUiframe),
   /** 立项问卷(§3.6):立项单 .md 存到用户自选路径;取消回 canceled */
   quizBriefSave: (name: string, text: string): Promise<QuizBriefSaveResult> =>
     ipcRenderer.invoke(CH.quizBriefSave, { name, text }),

@@ -81,6 +81,17 @@ export async function pickPathDialog(
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }
 
+/** 保存对话框(导出方案文件等):取消回 null,确定回目标完整路径 */
+export async function pickSaveDialog(
+  win: BrowserWindow | null,
+  options: Electron.SaveDialogOptions
+): Promise<string | null> {
+  const result = win
+    ? await dialog.showSaveDialog(win, options)
+    : await dialog.showSaveDialog(options)
+  return result.canceled || !result.filePath ? null : result.filePath
+}
+
 /** 开发模式加载 Vite 开发服务器,打包后加载本地文件;?view= 分诊认 VIEWS 户口(不传 = 主窗) */
 export function loadView(win: BrowserWindow, view?: ViewName): void {
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {

@@ -6,6 +6,7 @@ import { promises as fs } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
 import { CH } from '../shared/ipcChannels.ts'
 import type { FontPlan, PreviewPlan, UiFrameExportResult } from '../shared/uiFrame/types.ts'
+import { unpackUiframe } from '../shared/uiFrame/uiframeFile.ts'
 import { currentWasmOpts } from '../native/wasmPaths.ts'
 import { FONT_FILE_RE, UI_FRAME_FONT_DIRS, uiFrameFontDir } from '../native/uiFrameFonts.ts'
 import { pickPathDialog } from './atlasWindow.ts'
@@ -151,6 +152,26 @@ export function registerUiFrameIpc(): void {
   })
 
   // ── 导入(§14):全部只读用户自选路径 ──
+  // .uiframe 方案文件(§15 zip 容器):读字节 → 解包 → 透传 manifest/design 给渲染层复用文件夹导入的清洗
+  ipcMain.handle(CH.uiFrameImportUiframe, async (event): Promise<SchemeFolderPayload | null> => {
+    const file = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: '选择 .uiframe 方案文件',
+      properties: ['openFile'],
+      filters: [{ name: 'CodeAtlas 方案', extensions: ['uiframe'] }]
+    })
+    if (!file) return null
+    const stat = await fs.stat(file)
+    if (stat.size > IMPORT_MAX_BYTES)
+      throw new Error(`文件过大(>${IMPORT_MAX_BYTES / 1024 / 1024}MB)`)
+    const { manifest, design } = unpackUiframe(new Uint8Array(await fs.readFile(file)))
+    const name =
+      file
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.uiframe$/i, '') ?? '导入方案'
+    return { manifest, design, name }
+  })
+
   ipcMain.handle(CH.uiFrameImportFolder, async (event): Promise<SchemeFolderPayload | null> => {
     const dir = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
       title: '选择方案文件夹(含 design.json)',

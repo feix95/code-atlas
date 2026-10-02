@@ -4,6 +4,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron } from 'playwright'
+import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
+import { serializeDoc } from '../src/shared/uiFrame/scheme.ts'
+import { templateDoc } from '../src/shared/uiFrame/templates.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const base = join(root, '.planning', 'journey')
@@ -52,10 +55,10 @@ cp.execFile = function(file, ...args) {
 }
 globalThis.fetch = async () => { throw new Error('Journey forbids network requests') }
 net.fetch = globalThis.fetch
-const state = globalThis.__journey = { configured:false, mode:'success', calls:{}, partial:false, holdGit:false, holdGraph:false, releases:[], uiframeExportDir:null }
+const state = globalThis.__journey = { configured:false, mode:'success', calls:{}, partial:false, holdGit:false, holdGraph:false, releases:[], uiframeExportDir:null, uiframeImportFile:null }
 const { dialog } = require('electron')
 const originalOpenDialog = dialog.showOpenDialog.bind(dialog)
-dialog.showOpenDialog = async (...a) => state.uiframeExportDir ? { canceled:false, filePaths:[state.uiframeExportDir] } : originalOpenDialog(...a)
+dialog.showOpenDialog = async (...a) => state.uiframeImportFile ? { canceled:false, filePaths:[state.uiframeImportFile] } : state.uiframeExportDir ? { canceled:false, filePaths:[state.uiframeExportDir] } : originalOpenDialog(...a)
 // 立项单存盘替身:save 对话框固定回 .planning/journey 下的路径
 dialog.showSaveDialog = async () => state.quizSavePath ? { canceled:false, filePath:state.quizSavePath } : { canceled:true }
 const originalHandle = ipcMain.handle.bind(ipcMain)
@@ -827,20 +830,17 @@ try {
   await copyDialog.getByRole('button', { name: '确定', exact: true }).click()
   await libRows.nth(1).waitFor()
   assert.equal(await libRows.count(), 2, 'copy must add a second scheme')
-  // 导出方案文件(§15 文件夹):对话框替身在 main 里,落地 manifest + design
-  const schemeExportDir = join(run, 'scheme-export')
-  await mkdir(schemeExportDir, { recursive: true })
-  await control({ uiframeExportDir: schemeExportDir })
+  // 导出 .uiframe 方案文件(§15 zip):save 对话框替身在 main 里,落地单文件 zip 容器
+  const schemeZipPath = join(run, '导出验证方案.uiframe')
+  await control({ quizSavePath: schemeZipPath })
   const copyRow = libRows.filter({ hasText: '导出验证方案' })
   await copyRow.getByRole('button', { name: '导出', exact: true }).click()
-  const exportedManifest = join(schemeExportDir, '导出验证方案', 'manifest.json')
-  for (let i = 0; i < 60 && !existsSync(exportedManifest); i++) await page.waitForTimeout(250)
-  await control({ uiframeExportDir: null })
-  assert.ok(existsSync(exportedManifest), 'scheme export must write manifest.json')
-  assert.ok(
-    existsSync(join(schemeExportDir, '导出验证方案', 'design.json')),
-    'scheme export must write design.json'
-  )
+  for (let i = 0; i < 60 && !existsSync(schemeZipPath); i++) await page.waitForTimeout(250)
+  await control({ quizSavePath: null })
+  assert.ok(existsSync(schemeZipPath), 'scheme export must write the .uiframe file')
+  const unzipped = unpackUiframe(new Uint8Array(readFileSync(schemeZipPath)))
+  assert.ok(unzipped.manifest?.includes('导出验证方案'), '.uiframe 里要有 manifest.json 且带方案名')
+  assert.ok(unzipped.design.includes('"schemaVersion"'), '.uiframe 里要有 design.json')
   // 删除复制行:二次确认后回一行
   await copyRow.getByRole('button', { name: '删除', exact: true }).click()
   await copyRow.getByRole('button', { name: '再点一次删除', exact: true }).click()
@@ -914,6 +914,32 @@ try {
   await page.getByRole('button', { name: '零件墙', exact: true }).click()
   await blankCanvas.locator('button.btn--solid[data-uf-part="btn-md"]').first().waitFor()
   await shot('uiframe-blank-wall')
+  // M2-e .uiframe 导入(§15):造一个手机模板方案 zip → 导入浮层「方案文件(.uiframe)」→ 落画布
+  const importDoc2 = templateDoc('tint-phone')
+  importDoc2.name = 'ZIP 导入验证'
+  const importZip = join(run, '外来方案.uiframe')
+  await writeFile(
+    importZip,
+    packUiframe({
+      manifest: JSON.stringify({ formatVersion: 1, name: 'ZIP 导入验证', platform: 'phone' }),
+      design: serializeDoc(importDoc2)
+    })
+  )
+  await control({ uiframeImportFile: importZip })
+  await page.getByTitle('打开方案库', { exact: true }).click()
+  await page.getByRole('button', { name: '新建方案', exact: true }).click()
+  await page.getByRole('button', { name: '导入方案' }).click()
+  await page
+    .getByRole('dialog', { name: '导入方案' })
+    .getByRole('button', { name: '方案文件(.uiframe)', exact: true })
+    .click()
+  await control({ uiframeImportFile: null })
+  await page.locator('.uf-scheme-name').filter({ hasText: 'ZIP 导入验证' }).waitFor()
+  await page.getByText(/导入完成:套用了/).waitFor()
+  assert.ok(
+    (await page.getByRole('combobox', { name: '平台' }).inputValue()) === 'phone',
+    '.uiframe 里的手机方案应把手机平台带进来'
+  )
   await page.getByRole('button', { name: '关闭 UI 框架', exact: true }).click()
   // 关签后侧栏换回文件树
   await page.locator('.sidebar .uf-parts').waitFor({ state: 'detached' })

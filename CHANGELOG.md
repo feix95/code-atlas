@@ -414,3 +414,5 @@
 - feat(quiz): UI 框架 M2-c 立项单三出口与技术栈回填——新 ipcQuiz + quizBriefSave 通道(showSaveDialog 存 .md 到用户自选位置);完成页加「存成 .md」「交给内置 agent」(新 quizBridge 事件桥,App 监听后切 chat 签把立项单当问句发出,探针忙垫灰字;附本机小模型质量提示);技术栈回填区(§3.7 预设清单 optgroup + 自由粘贴),随草稿存 localStorage;journey 补存盘落盘校验/回填/切签断言,dialog 替身补 showSaveDialog
 
 - feat(quiz): UI 框架 M2-d 问卷答案预填第二步——「带着答案调 UI」按钮把问卷直送工作台:quizPrefill 映射落进 startFromQuiz(A1→平台/设备档、G1 风格→模板、G4 密度→间距/控件 2px 网格覆盖、G3 色号→主色、D9→a11yEnhanced);UiFrameDoc 新增 a11yEnhanced/targetStack 可选字段并随 design.json 往返;§5.7 加强档落地(正文字号下限 +2、文字对比度 4.5→7 AAA、控件边界 3→4.5,消息带「加强档」标记);完成页加产品名输入(进立项单也当方案名);技术栈回填随预填进 doc.targetStack;自测 +3(加强档阈值三档、AA/AAA 边界用例、字段往返),journey 补重答→A1 手机→预填→手机端空白底板全链
+
+- feat(uiframe): UI 框架 M2-e .uiframe zip 方案文件——§15 单文件容器落地:新增 shared/uiFrame/uiframeFile.ts(fflate 打包/解包,manifest.json+design.json+thumbnail.png+assets/icons/ 预位,manifest 必带格式版本号);库面板导出改存 .uiframe(save 对话框+过滤器);导入面板新增「方案文件(.uiframe)」入口(新通道 uiFrameImportUiframe,主进程解包后复用文件夹导入清洗),旧文件夹导入保留为「旧格式」;新依赖 fflate@0.8.3(MIT/零依赖/纯 JS);atlasWindow 加 pickSaveDialog;自测 +1(zip 往返/PK 魔数/版本拒绝/非 zip 拒绝/icons 目录保留位),journey 补导出落地解包校验+导入 .uiframe 手机方案全链

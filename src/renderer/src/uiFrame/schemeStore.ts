@@ -213,14 +213,21 @@ export const schemeActions = {
    * 战报(套用/跳过计数)挂 notice 由页面横幅展示。
    */
   async importDoc(
-    source: 'scheme-folder' | 'dtcg-file' | 'css-file' | 'css-text',
+    source: 'scheme-folder' | 'uiframe-file' | 'dtcg-file' | 'css-file' | 'css-text',
     pastedText?: string
   ): Promise<ImportResult | null> {
     if (state.busy) return null
     emit({ busy: 'open', error: null })
     try {
       let result: ImportResult
-      if (source === 'css-text') {
+      if (source === 'uiframe-file') {
+        const f = await window.atlas.uiFrameImportUiframe()
+        if (!f) {
+          emit({ busy: null })
+          return null
+        }
+        result = importSchemeFiles(f.manifest, f.design, f.name)
+      } else if (source === 'css-text') {
         result = importCssVars(pastedText ?? '', '粘贴的变量')
       } else if (source === 'css-file') {
         const f = await window.atlas.uiFrameImportFile('css')

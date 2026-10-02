@@ -38,6 +38,8 @@ import {
 } from '../src/shared/uiFrame/scheme.ts'
 import { BLANK_ID, TEMPLATES, templateDoc } from '../src/shared/uiFrame/templates.ts'
 import { importCssVars, importDtcg, importSchemeFiles } from '../src/shared/uiFrame/importDoc.ts'
+import { packUiframe, unpackUiframe } from '../src/shared/uiFrame/uiframeFile.ts'
+import { strToU8, zipSync } from 'fflate'
 import type {
   IconNode,
   LintIssue,
@@ -447,6 +449,44 @@ check('manifestFor 与快照名:格式版本、模板户口、时间戳形态', 
   assert.equal(m.createdAt, '2026-01-01T00:00:00.000Z')
   assert.match(snapshotStamp(new Date('2026-10-02T12:03:04')), /^20261002-120304$/)
   assert.match('20261002-120304.json', SNAPSHOT_RE)
+})
+check('.uiframe zip(§15):打包解包往返,成员齐全,版本/非 zip 拒绝', () => {
+  const manifest = JSON.stringify(
+    manifestFor(doc, {
+      id: 'x',
+      style: '极简中性',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      appVersion: '0.2.0'
+    })
+  )
+  const design = serializeDoc(doc)
+  const thumb = new Uint8Array([137, 80, 78, 71])
+  const zipped = packUiframe({ manifest, design, thumbnail: thumb })
+  // zip 魔数 PK
+  assert.equal(zipped[0], 0x50)
+  assert.equal(zipped[1], 0x4b)
+  const back = unpackUiframe(zipped)
+  assert.equal(back.design, design)
+  assert.equal(back.manifest, manifest)
+  assert.deepEqual([...back.thumbnail!], [137, 80, 78, 71])
+  // 解出的 design 直接过 parseDoc,和原 doc 等价
+  assert.deepEqual(parseDoc(back.design), doc)
+  // 自定义图标成员落在 assets/icons/ 下(M3-e 预位)
+  const withIcon = packUiframe({
+    manifest,
+    design,
+    icons: { 'x.svg': new TextEncoder().encode('<svg/>') }
+  })
+  const backIcon = unpackUiframe(withIcon)
+  assert.ok('x.svg' in backIcon.icons, 'icons 成员应留在 assets/icons/ 下')
+  // 版本不符与非 zip 都要拦(版本不对的包绕过打包校验,直接 zipSync 造)
+  const badVer = zipSync({
+    'manifest.json': strToU8(JSON.stringify({ formatVersion: 99 })),
+    'design.json': strToU8(design)
+  })
+  assert.throws(() => unpackUiframe(badVer), /版本不支持/)
+  assert.throws(() => unpackUiframe(new TextEncoder().encode('not a zip')), /有效的方案文件/)
+  assert.throws(() => packUiframe({ manifest: '{"formatVersion":2}', design }), /版本不对/)
 })
 
 console.log('── 导入(M1-d,§14)')

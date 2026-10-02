@@ -40,9 +40,17 @@ export function UiFrameImport({ onClose }: { onClose: () => void }): React.JSX.E
             type="button"
             className="btn btn-ghost"
             disabled={loading}
+            onClick={() => void schemeActions.importDoc('uiframe-file')}
+          >
+            方案文件(.uiframe)
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={loading}
             onClick={() => void schemeActions.importDoc('scheme-folder')}
           >
-            方案文件夹
+            方案文件夹(旧格式)
           </button>
           <button
             type="button"

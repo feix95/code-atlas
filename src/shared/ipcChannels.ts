@@ -89,6 +89,7 @@ export const CH = {
   // ── UI 框架:导入(§14,只读用户自选路径) ──
   uiFrameImportFolder: 'atlas:uiframe-import-folder',
   uiFrameImportFile: 'atlas:uiframe-import-file',
+  uiFrameImportUiframe: 'atlas:uiframe-import-uiframe',
   // ── 立项问卷(§3):立项单 .md 存到用户自选位置 ──
   quizBriefSave: 'atlas:quiz-brief-save',
   // ── 桌宠 ──

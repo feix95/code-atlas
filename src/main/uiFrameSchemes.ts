@@ -21,7 +21,8 @@ import type {
   SchemeSavePayload,
   UiFrameExportResult
 } from '../shared/uiFrame/types.ts'
-import { pickPathDialog } from './atlasWindow.ts'
+import { pickSaveDialog } from './atlasWindow.ts'
+import { packUiframe } from '../shared/uiFrame/uiframeFile.ts'
 import { userDataDir } from './paths.ts'
 import { captureHtml } from './uiFrameCapture.ts'
 
@@ -198,34 +199,26 @@ export function registerUiFrameSchemeIpc(): void {
     }
   )
 
-  // 导出为方案文件(§15 文件夹形式):复制 manifest + design + thumbnail 到用户自选位置,不带快照
+  // 导出为 .uiframe 方案文件(§15 zip 容器):manifest + design + thumbnail 打进单文件,不带快照
   ipcMain.handle(
     CH.uiFrameSchemeExport,
     async (event, rawId: unknown): Promise<UiFrameExportResult> => {
       const dir = schemeDir(rawId)
       const manifest = await readManifest(dir)
       if (!manifest) throw new Error('方案不存在')
-      const parent = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
-        title: '选择方案文件的保存位置',
-        properties: ['openDirectory', 'createDirectory']
+      const target = await pickSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+        title: '导出方案文件',
+        defaultPath: `${manifest.name}.uiframe`,
+        filters: [{ name: 'CodeAtlas 方案', extensions: ['uiframe'] }]
       })
-      if (!parent) return { status: 'canceled' }
-      let target = join(parent, manifest.name)
-      for (let i = 1; i < 100; i++) {
-        const candidate = i === 1 ? target : `${target}(${i})`
-        const taken = await fs.stat(candidate).then(
-          () => true,
-          () => false
-        )
-        if (!taken) {
-          target = candidate
-          break
-        }
-      }
-      await fs.mkdir(target, { recursive: true })
-      for (const file of ['manifest.json', 'design.json', 'thumbnail.png']) {
-        await fs.copyFile(join(dir, file), join(target, file)).catch(() => undefined)
-      }
+      if (!target) return { status: 'canceled' }
+      const thumbnail = await fs.readFile(join(dir, 'thumbnail.png')).catch(() => null)
+      const zipped = packUiframe({
+        manifest: JSON.stringify(manifest),
+        design: await fs.readFile(join(dir, 'design.json'), 'utf8'),
+        thumbnail
+      })
+      await fs.writeFile(target, zipped)
       return { status: 'done', path: target, unloadedFontPreviews: [] }
     }
   )
