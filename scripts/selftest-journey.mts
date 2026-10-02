@@ -676,9 +676,20 @@ try {
   await page.locator('.uf-device.is-plain').waitFor()
   await page.getByRole('button', { name: '外框', exact: true }).click()
   await page.locator('.uf-statusbar').waitFor()
-  // 切回桌面:设备选项回到桌面档,机身消失,示例页回 home
+  // M1-f 规范提醒(§5.7):手机端出现 iOS 44 点击区提醒,点条目跳变量板选中该变量
+  await page.getByRole('button', { name: /^规范/ }).click()
+  const rulesPanel = page.getByRole('dialog', { name: '平台规范提醒' })
+  await rulesPanel.waitFor()
+  await rulesPanel.locator('.uf-rules-item', { hasText: '最小点击区' }).first().waitFor()
+  await rulesPanel.locator('.uf-rules-item', { hasText: '44px' }).first().waitFor()
+  await rulesPanel.locator('.uf-rules-target', { hasText: 'control-md' }).first().click()
+  await canvas.locator('[data-uf-part="tok:control-md"]').waitFor()
+  await shot('uiframe-rules')
+  // 切回桌面:设备选项回到桌面档,机身消失,示例页回 home;44px 档提醒同时消失
   await page.locator('select[aria-label="平台"]').selectOption('desktop')
   await page.locator('.uf-device').waitFor({ state: 'detached' })
+  await rulesPanel.locator('.uf-rules-item', { hasText: '44px' }).waitFor({ state: 'detached' })
+  await page.getByRole('button', { name: '示例页', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
   const exportDir = join(run, 'uiframe')
   await mkdir(exportDir, { recursive: true })

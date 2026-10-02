@@ -58,8 +58,125 @@
   box-shadow: var(--shadow-sm);
 }
 
-.uf-page > .notice {
+/* 横幅区:始终占第二行,保证画布主区稳定落在 1fr 行 */
+.uf-strip {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.uf-strip > .notice {
   margin: var(--space-2) var(--space-4) 0;
+}
+
+/* 规范提醒面板(§5.7):横幅区的可收清单 */
+.uf-rules {
+  margin: var(--space-2) var(--space-4) 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.uf-rules-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+}
+
+.uf-rules-empty {
+  padding: var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.uf-rules-list {
+  max-height: 9.5rem;
+  overflow-y: auto;
+}
+
+.uf-rules-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+.uf-rules-item + .uf-rules-item {
+  border-top: 1px solid var(--line);
+}
+
+.uf-rules-dot {
+  flex: none;
+  align-self: center;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+}
+
+.uf-rules-dot.is-warn {
+  background: var(--amber);
+}
+
+.uf-rules-dot.is-error {
+  background: var(--danger);
+}
+
+.uf-rules-rule {
+  flex: none;
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+}
+
+.uf-rules-target {
+  flex: none;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: inherit;
+  font-family: var(--mono);
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.uf-rules-target:hover {
+  text-decoration: underline;
+}
+
+.uf-rules-msg {
+  color: var(--muted);
+}
+
+.uf-rules-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uf-badge {
+  display: inline-block;
+  min-width: 1.25em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-panel);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: var(--lh-150);
+  text-align: center;
+}
+
+.uf-badge.is-warn {
+  background: var(--amber);
+  color: var(--surface);
 }
 
 .uf-issues {

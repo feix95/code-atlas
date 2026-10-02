@@ -21,6 +21,7 @@ import {
   devicesFor,
   isDeviceId
 } from '../src/shared/uiFrame/devices.ts'
+import { contrastRatio, platformIssues } from '../src/shared/uiFrame/platformRules.ts'
 import {
   manifestFor,
   parseDoc,
@@ -587,6 +588,67 @@ check('示例页结构与文件随平台走:pageFor 与画布同源', () => {
       `app 页声明了未注册的组件样式:${s}`
     )
   }
+})
+
+console.log('── 平台规范校验(M1-f,§5.7)')
+check('对比度算法:黑白 21:1、同色 1:1、参数顺序无关', () => {
+  assert.equal(Math.round(contrastRatio('#000000', '#ffffff') ?? 0), 21)
+  assert.equal(contrastRatio('#ffffff', '#ffffff'), 1)
+  assert.equal(contrastRatio('#123', '#112233'), contrastRatio('#112233', '#123'))
+})
+check('最小点击区分平台:同一值 30px,桌面放行、手机拦', () => {
+  const d = defaultDoc()
+  d.tokens['control-sm'] = { ...d.tokens['control-sm'], value: { kind: 'dimension', px: 30 } }
+  const desk = platformIssues(d).filter((i) => i.rule === '最小点击区' && i.target === 'control-sm')
+  assert.equal(desk.length, 0)
+  const p = { ...d, platform: 'phone' as const, device: 'phone-390' }
+  const phone = platformIssues(p).filter(
+    (i) => i.rule === '最小点击区' && i.target === 'control-sm'
+  )
+  assert.equal(phone.length, 1)
+  assert.ok(phone[0].message.includes('44'))
+})
+check('正文字号下限随平台:font-size-md=13 手机拦、桌面放行', () => {
+  const d = defaultDoc()
+  d.tokens['font-size-md'] = { ...d.tokens['font-size-md'], value: { kind: 'dimension', px: 13 } }
+  assert.equal(
+    platformIssues(d).filter((i) => i.rule === '正文字号下限').length,
+    0,
+    '桌面 12px 下限,13 放行'
+  )
+  const p = { ...d, platform: 'phone' as const, device: 'phone-390' }
+  assert.equal(platformIssues(p).filter((i) => i.rule === '正文字号下限').length, 1)
+})
+check('引用失效是 error 级;非整数 px 与离网格间距分别拦', () => {
+  const d = defaultDoc()
+  d.tokens['btn-height-md'] = { ...d.tokens['btn-height-md'], value: { kind: 'ref', ref: 'ghost' } }
+  d.tokens['space-4'] = { ...d.tokens['space-4'], value: { kind: 'dimension', px: 21 } }
+  d.tokens['card-padding'] = { ...d.tokens['card-padding'], value: { kind: 'dimension', px: 24.5 } }
+  const list = platformIssues(d)
+  const dead = list.find((i) => i.rule === '引用失效')
+  assert.equal(dead?.level, 'error')
+  assert.ok(list.some((i) => i.rule === '非步长数值' && i.target === 'space-4'))
+  assert.ok(list.some((i) => i.rule === '非步长数值' && i.target === 'card-padding'))
+})
+check('刻意值豁免:radius-full=999、1px 描边、3px 开关内缩不报非步长', () => {
+  const list = platformIssues(defaultDoc())
+  for (const n of ['radius-full', 'border-width-1', 'sw-inset-md']) {
+    assert.ok(!list.some((i) => i.rule === '非步长数值' && i.target === n), `${n} 不该被判非步长`)
+  }
+})
+check('状态缺失:无交互组件(卡片/提示气泡)不查,焦点态两端都查、悬停态仅桌面', () => {
+  const desk = platformIssues(defaultDoc())
+  assert.equal(desk.filter((i) => i.rule === '悬停态缺失').length, 0, '交互组件都该有悬停态')
+  assert.equal(desk.filter((i) => i.rule === '焦点态缺失').length, 0)
+  assert.ok(!desk.some((i) => i.target === '组件:card'), '卡片不是交互组件,不该被查')
+})
+check('默认方案提示有价值:桌面与手机都检出边界对比度与点击区提醒', () => {
+  const desk = platformIssues(defaultDoc())
+  assert.ok(desk.some((i) => i.rule === '控件边界对比度'))
+  assert.ok(desk.some((i) => i.rule === '最小点击区' && i.target === 'icon-md'))
+  const phone = platformIssues(templateDoc('tint-phone'))
+  assert.ok(phone.some((i) => i.rule === '最小点击区' && i.target === 'control-md'))
+  assert.ok(!phone.some((i) => i.rule === '悬停态缺失'), '手机不查悬停态')
 })
 
 console.log(`✅ UI 框架规格包自测全绿(${passed} 项)`)

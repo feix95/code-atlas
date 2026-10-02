@@ -1,6 +1,7 @@
 // 「UI 框架」页签(§5):起步页(选平台/模板/我的方案)→ 工具条 + 画布 + 属性面板。
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { deviceFor, devicesFor } from '@shared/uiFrame/devices'
+import { platformIssues } from '@shared/uiFrame/platformRules'
 import type { ThemeName, UiPlatform } from '@shared/uiFrame/types'
 import { VIEW_LABEL, type CanvasView } from '../../uiFrame/canvasDoc'
 import { docActions, useUiFrameDoc } from '../../uiFrame/docStore'
@@ -11,6 +12,7 @@ import { Notice } from '../Notice'
 import { UiFrameCanvas } from './UiFrameCanvas'
 import { UiFrameInspector } from './UiFrameInspector'
 import { SaveNameDialog, UiFrameLibrary } from './UiFrameSchemes'
+import { UiFrameRules } from './UiFrameRules'
 import { UiFrameStart } from './UiFrameStart'
 
 const VIEWS: CanvasView[] = ['wall', 'board', 'page']
@@ -117,7 +119,10 @@ export function UiFramePage(): React.JSX.Element {
   const [selection, setSelection] = useState<CanvasSelection | null>(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [naming, setNaming] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
   const exporter = useUiFrameExport()
+  // 平台规范提醒(§5.7):随方案每次改动实时重算
+  const issues = useMemo(() => platformIssues(doc), [doc])
 
   // 回起步页(新建方案/换模板)时把浮层状态收干净,免得回画布时库面板还盖着
   const [prevStarted, setPrevStarted] = useState(started)
@@ -201,6 +206,16 @@ export function UiFramePage(): React.JSX.Element {
             安全区
           </button>
         )}
+        <button
+          type="button"
+          className={`uf-seg-btn uf-rules-btn${rulesOpen ? ' is-on' : ''}`}
+          aria-pressed={rulesOpen}
+          title="平台规范提醒(§5.7,实时提醒不拦截)"
+          onClick={() => setRulesOpen(!rulesOpen)}
+        >
+          规范
+          <span className={`uf-badge${issues.length ? ' is-warn' : ''}`}>{issues.length}</span>
+        </button>
         <div className="uf-seg" role="group" aria-label="视图">
           {VIEWS.map((v) => (
             <button
@@ -279,16 +294,34 @@ export function UiFramePage(): React.JSX.Element {
           {exporter.state.kind === 'saving' ? '正在导出……' : '导出规格包'}
         </button>
       </div>
-      {error && <Notice kind="error">{error}</Notice>}
-      {notice && (
-        <Notice kind="info">
-          {notice}{' '}
-          <button type="button" className="uf-link" onClick={schemeActions.dismissNotice}>
-            知道了
-          </button>
-        </Notice>
-      )}
-      <ExportBanner state={exporter.state} onDismiss={exporter.dismiss} />
+      <div className="uf-strip">
+        {error && <Notice kind="error">{error}</Notice>}
+        {notice && (
+          <Notice kind="info">
+            {notice}{' '}
+            <button type="button" className="uf-link" onClick={schemeActions.dismissNotice}>
+              知道了
+            </button>
+          </Notice>
+        )}
+        <ExportBanner state={exporter.state} onDismiss={exporter.dismiss} />
+        {rulesOpen && (
+          <UiFrameRules
+            issues={issues}
+            onPick={(target) => {
+              // 变量条目跳变量板并选中该行;组件条目跳组件墙
+              if (target.startsWith('组件:')) {
+                setView('wall')
+                setSelection(null)
+              } else {
+                setView('board')
+                setSelection({ part: `tok:${target}`, index: 0, iconSlot: null })
+              }
+            }}
+            onClose={() => setRulesOpen(false)}
+          />
+        )}
+      </div>
       <div className="uf-main">
         <UiFrameCanvas
           doc={doc}
