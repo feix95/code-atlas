@@ -15,6 +15,7 @@ import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import type { NoteEntry, NoteMap } from '@shared/notes'
 import { buildCrumbs, findFile } from '../scanTreeTools'
 import type { PaneTab, PaneViewMode } from '../paneTabs'
+import { useTabZoom } from '../tabZoom'
 import { useAiAsk, type AiTurn } from '../useAiAsk'
 import type { AiChatApi } from '../useAiChat'
 import { usePresetQuestions } from '../usePresetQuestions'
@@ -108,6 +109,9 @@ export function TabBody({
   /** 预览头「阅读/代码」快速开关:切本签的看片档(账挂在签身上,跟右键菜单同一份) */
   onSetViewMode?: (id: string, mode: PaneViewMode) => void
 }): React.JSX.Element | null {
+  // 本签的缩放档(缩放跟签走这锤):户口按 tab.id 查,换文档不换档。
+  // 放最顶上无条件调 —— 下面一串 early return 不能踩到钩子顺序
+  const tabZoom = useTabZoom(tab.id)
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
   // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
   // 文件节点是浏览账上现捏的最小件 —— CodePreview 照旧走 joinRoot 路径契约读盘
@@ -130,6 +134,7 @@ export function TabBody({
         refLimit={0}
         onAddRef={() => {}}
         viewMode={tab.viewMode}
+        docZoom={tabZoom}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
       />
     )
@@ -252,6 +257,7 @@ export function TabBody({
         onAddRef={addPreviewRef}
         jump={previewJump}
         viewMode={tab.viewMode}
+        docZoom={tabZoom}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
         fileLinks={fileLinks}
       />

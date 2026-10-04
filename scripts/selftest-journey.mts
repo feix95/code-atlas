@@ -230,7 +230,43 @@ try {
     16,
     'doc zoom must not touch the root font size'
   )
+  // 缩放跟签走(缩放跟签走这锤):瞄签已滚大。开设置签 —— 它是 CSS zoom 整页缩的路子,
+  // 户口从 100% 起;给它滚一档上去再切回瞄签:字号还停在滚完那档,各签各记各的
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  const cfgPage = page.locator('.cfg-page')
+  await cfgPage.waitFor()
+  const cfgBox = await cfgPage.boundingBox()
+  assert.ok(cfgBox, 'settings body must have a box')
+  await page.mouse.move(cfgBox.x + cfgBox.width / 2, cfgBox.y + cfgBox.height / 2)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -240)
+  await page.keyboard.up('Control')
+  // CSS zoom 落层元素的内联 style —— 量的就是它,不猜 getComputedStyle 的口径
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.tab-zoom-layer:has(.cfg-page)')
+    return el !== null && parseFloat((el as HTMLElement).style.zoom) > 1
+  })
+  // 设置签的档归位,别把放大带进后面的设置页截图
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, 240)
+  await page.keyboard.up('Control')
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.tab-zoom-layer:has(.cfg-page)')
+    return el !== null && (el as HTMLElement).style.zoom === ''
+  })
+  // 切回瞄签:字号还是滚完那一档 —— 档跟签绑定,不跟文档/焦点走
+  await peekTab.click()
+  const docFontKept = await codeText.evaluate(
+    (el) => parseFloat(getComputedStyle(el).fontSize) || 0
+  )
+  assert.ok(Math.abs(docFontKept - docFontAfter) < 0.01, 'per-tab zoom must survive the tab switch')
+  // 用完收摊:点亮设置签再收掉(关闭钮只在激活/悬停签上现身),回瞄签 ——
+  // 不然下面「页签全关光」的账就对不上了
+  await page.locator('.tabbar-tab').filter({ hasText: '设置' }).click()
+  await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
+  await peekTab.click()
   // 归位:滚回去把 docZoom 退回 1,别把放大带进后续断言 —— 字号回到原值才算账平
+  await page.mouse.move(viewBox.x + viewBox.width / 2, viewBox.y + viewBox.height / 2)
   await page.keyboard.down('Control')
   await page.mouse.wheel(0, 240)
   await page.keyboard.up('Control')

@@ -15,8 +15,6 @@ import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
 import { loadCodeWrapOn, saveCodeWrapOn } from '../codePrefs'
-import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
-import { DOC_ZOOM_STEP } from '@shared/docZoom'
 
 /** 「一闪而过」小开关的亮灯时长(P2-1):整条复制提示停久一点,引用落袋提示短停 */
 const COPIED_ALL_MS = 2000
@@ -31,9 +29,6 @@ const MARK_ICON_SIZE = 16
 const WRAP_MAX_LINES = 5000
 /** 单行字数闸:超过就只跳语法着色(超长行多是打包产物/单行 JSON,上色纯属白烧) */
 const LINE_HL_MAX_CHARS = 5000
-/** 滚轮一格的像素门槛 / 碎步账的保鲜期(Ctrl+滚轮文档缩放用,和界面缩放滚轮同脾气) */
-const WHEEL_NOTCH = 100
-const WHEEL_ACC_TTL_MS = 400
 
 /** 选中的一段 + 它四样东西的落点(第一百一十四锤) */
 interface Selection extends SelectionGeometry {
@@ -159,6 +154,7 @@ export function CodePreview({
   onAddRef,
   jump,
   viewMode,
+  docZoom,
   onSetViewMode,
   fileLinks
 }: {
@@ -173,6 +169,9 @@ export function CodePreview({
   jump?: { line: number; seq: number } | null
   /** 看片档位(阅读模式这锤):undefined/'source' = 源码;'reading' = md 渲染态(只对 md 系生效) */
   viewMode?: PaneViewMode
+  /** 本签的文档字号系数(缩放跟签走这锤):户口在 TabZoomLayer 那层的 --doc-zoom,
+      这里只要数值 —— 变档要重量行高 */
+  docZoom: number
   /** 头部「阅读/代码」快速开关:切本签的看片档(账在页签身上,和右键菜单同一份) */
   onSetViewMode?: (mode: PaneViewMode) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
@@ -259,8 +258,6 @@ export function CodePreview({
   const wrap = wrapAllowed && wrapOn
   // 阅读模式(这锤的新档):md 系签才生效 —— MiniMD 渲染态,行号/分色/选区引用是源码档的家务
   const reading = viewMode === 'reading' && canReadingMode(file.relPath)
-  // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
-  const docZoom = useDocZoom()
 
   // 行高只量一次:等宽字体行行等高,量准一次,全文的滚动高度就是它乘出来的。
   // 界面缩放改了根字号,行高跟着变,重量一遍。
@@ -278,31 +275,6 @@ export function CodePreview({
     return () => win.removeEventListener(CH.uiScaleChanged, measure)
     // docZoom 变档也得重量:字号乘了系数,行高跟着变
   }, [result, docZoom])
-
-  // Ctrl+滚轮 = 文档字号缩放(docZoom,小葵定的分工:界面缩放只吃键盘 +/-/0)。
-  // 监听器挂预览元素本身 —— 天然 realm-safe(子窗签的滚轮事件在子窗文档里转,沾不到全局 window);
-  // 碎步积累成整档才翻、隔久清账,触控板捏合在 Chromium 里也报 ctrl+wheel,捏合白捡。
-  useEffect(() => {
-    const view = codeViewRef.current
-    if (!view) return
-    let acc = 0
-    let last = 0
-    const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY
-      const now = performance.now()
-      if (now - last > WHEEL_ACC_TTL_MS) acc = 0
-      last = now
-      acc += dy
-      const steps = Math.trunc(acc / WHEEL_NOTCH)
-      if (steps === 0) return
-      acc -= steps * WHEEL_NOTCH
-      setDocZoom(getDocZoom() - steps * DOC_ZOOM_STEP) // 向下滚(deltaY>0)= 缩小
-    }
-    view.addEventListener('wheel', onWheel, { passive: false })
-    return () => view.removeEventListener('wheel', onWheel)
-  }, [result, reading])
 
   // 视口高度:可视行数靠它;窗口/分栏改尺寸跟着重算
   useEffect(() => {
@@ -647,7 +619,6 @@ export function CodePreview({
               className="code-view is-reading"
               ref={codeViewRef}
               tabIndex={0}
-              style={{ '--doc-zoom': docZoom } as React.CSSProperties}
               aria-label={`${file.relPath} 的阅读模式,全文可滚;按 Ctrl+A 复制全文`}
               onScroll={onScroll}
               onContextMenu={onReadContextMenu}
@@ -669,7 +640,6 @@ export function CodePreview({
               className="code-view"
               ref={codeViewRef}
               tabIndex={0}
-              style={{ '--doc-zoom': docZoom } as React.CSSProperties}
               aria-label={`${file.relPath} 的内容预览,全文可滚;选中一段可以引用到对话;按 Ctrl+A 复制全文`}
               onScroll={onScroll}
               onContextMenu={onCodeContextMenu}

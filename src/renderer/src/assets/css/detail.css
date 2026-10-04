@@ -132,6 +132,16 @@ body.is-sash-dragging .pane-sash::after {
   position: relative;
 }
 
+/* 页签缩放收口层(Ctrl+滚轮跟签走这锤):每张签一块,flex 契约照 pane-body 抄 ——
+   层不破布局链,--doc-zoom(文件签字号乘法)与 CSS zoom(概览/对话/设置整页缩)都落这层 */
+.tab-zoom-layer {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* 拖页签悬在别组正文中心:许诺「松手挪到这一组」(拆半屏只走左右缘)。
    Obsidian 式画法:整片 drop-mark 半透明蓝铺底,无描边无字 */
 .pane-drop-hint {

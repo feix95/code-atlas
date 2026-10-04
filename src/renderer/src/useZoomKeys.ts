@@ -1,6 +1,6 @@
 // 键盘界面缩放(浏览器惯例):Ctrl +/-/0 → 界面缩放,走 setUiScale 原路 —— 落盘 + 根字号 +
 // uiScaleChanged 广播 + 主进程窗口记账,全链自动跟上,这里不养第二本账。
-// Ctrl+滚轮不归这里:那是预览文档的字号缩放(docZoom),挂在 CodePreview 的 .code-view 上 ——
+// Ctrl+滚轮不归这里:那是页签内容缩放(缩放跟签走,户口 tabZoom.ts),挂在 TabZoomLayer 上 ——
 // 界面是界面,文档是文档,两本账分开记。
 import { useEffect, useRef } from 'react'
 import { clampUiScale } from '@shared/uiScale'

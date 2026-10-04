@@ -4,6 +4,7 @@
 import { Fragment } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { PaneEmptyBoard } from './TabBody'
+import { TabZoomLayer } from './TabZoomLayer'
 
 export function PaneGroups({
   groups,
@@ -69,8 +70,11 @@ export function PaneGroups({
             >
               <div className="pane-body" data-group-id={g.id}>
                 {act && act.kind !== 'settings' ? (
-                  // 每组正房只住一个房间(VS Code 的克制);设置签走下面的保活层
-                  renderTabBody(act)
+                  // 每组正房只住一个房间(VS Code 的克制);设置签走下面的保活层。
+                  // key=签 id:换签重挂收口层,滚轮碎步账不跨签串台
+                  <TabZoomLayer key={act.id} tab={act}>
+                    {renderTabBody(act)}
+                  </TabZoomLayer>
                 ) : !act ? (
                   // 这组没有亮着的页签(还没开签/全关光):大 logo 底板
                   <PaneEmptyBoard />
@@ -92,7 +96,7 @@ export function PaneGroups({
                       key={t.id}
                       className={`pane-keep-alive${t.id === g.activeId ? '' : ' is-hidden'}`}
                     >
-                      {renderTabBody(t)}
+                      <TabZoomLayer tab={t}>{renderTabBody(t)}</TabZoomLayer>
                     </div>
                   ))}
               </div>
