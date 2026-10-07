@@ -693,6 +693,12 @@
   background: var(--drop-mark);
 }
 
+/* 三档开关的当前档吃主题色(旧单钮换脸标态退役:三颗同脸,靠色分高下) */
+.code-mode-btn[aria-pressed='true'] {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
 /* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」;走 sash-hi 实色(分屏拖边同一条血) */
 .code-mark {
   position: fixed;

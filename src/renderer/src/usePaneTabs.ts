@@ -92,7 +92,7 @@ export function usePaneTabs(deps: {
       name: file.name,
       icon: file.summary?.icon ?? 'file',
       scopeRoot,
-      viewMode: canReadingMode(file.relPath) ? 'reading' : undefined
+      viewMode: canReadingMode(file.relPath) ? 'live' : undefined
     }
   }
 

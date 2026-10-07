@@ -27,7 +27,7 @@ export interface SessionTab {
   name: string
   icon: string
   scopeRoot?: string
-  /** 文件签的看片档位(阅读模式这锤):源码档不落账(默认),阅读档记 'reading' */
+  /** 文件签的看片档位(md 三档锤):source/reading/live 都落账;undefined = 源码 */
   viewMode?: PaneViewMode
   on?: boolean
 }
@@ -92,8 +92,11 @@ function parseTab(raw: unknown): SessionTab | null {
     icon,
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
-    // 看片档位只认两个合法户口;写坏了的当没存过(回默认源码档)
-    viewMode: t['viewMode'] === 'reading' || t['viewMode'] === 'source' ? t['viewMode'] : undefined,
+    // 看片档位只认三个合法户口;写坏了的当没存过(md 签回默认 live,非 md 回源码档)
+    viewMode:
+      t['viewMode'] === 'reading' || t['viewMode'] === 'source' || t['viewMode'] === 'live'
+        ? t['viewMode']
+        : undefined,
     on: t['on'] === true ? true : undefined
   }
 }

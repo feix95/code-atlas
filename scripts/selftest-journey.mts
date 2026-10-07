@@ -199,9 +199,10 @@ try {
   await peekTab.waitFor()
   assert.equal(await peekTab.count(), 1, 'browse file must open a peek preview tab')
   // 文档缩放(文档字号这锤):Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
-  // 量 .code-text 的 computed font-size —— --doc-zoom 乘进去的就是它,真账不量 CSS 变量
+  // 量 .cm-content 的 computed font-size(编辑锤:正文户口搬进了 CodeMirror,旧 .code-text 退役)
+  // —— --doc-zoom 乘进去的就是它,真账不量 CSS 变量
   const codeView = page.locator('.code-view').first()
-  const codeText = codeView.locator('.code-text').first()
+  const codeText = codeView.locator('.cm-content').first()
   // attached 而非 visible:空文件的 <pre> 零尺寸不可见,但 font-size 照样量得出
   await codeText.waitFor({ state: 'attached' })
   const docFontBefore = await codeText.evaluate(
@@ -227,7 +228,7 @@ try {
   await page.mouse.wheel(0, 240)
   await page.keyboard.up('Control')
   await page.waitForFunction((target) => {
-    const el = document.querySelector('.code-view .code-text')
+    const el = document.querySelector('.code-view .cm-content')
     return el !== null && Math.abs(parseFloat(getComputedStyle(el).fontSize) - target) < 0.01
   }, docFontBefore)
   await shot('browse-peek')
@@ -403,8 +404,8 @@ try {
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
   await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
-  // md 系文件签默认阅读档:渲染容器是 .code-reading,不是源码档的 .code-text
-  await page.locator('.code-reading').filter({ hasText: 'Getting started' }).waitFor()
+  // md 系文件签默认 Live Preview(md 三档锤):容器是 .cm-editor,上妆后标题记号藏起只剩大字
+  await page.locator('.cm-editor').filter({ hasText: 'Getting started' }).waitFor()
   await searchBox.fill('绝没有这个词zzz')
   await page
     .locator('.search-results')
@@ -454,7 +455,7 @@ try {
   await page.getByRole('button', { name: /^文件 README\.md/ }).focus()
   await page.keyboard.press('Enter')
   await page
-    .locator('.code-reading')
+    .locator('.cm-editor')
     .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
   await page.locator('.tabbar-tab').filter({ hasText: '关系图谱' }).locator('.tabbar-name').click()
@@ -474,7 +475,7 @@ try {
   await overview()
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page
-    .locator('.code-reading')
+    .locator('.cm-editor')
     .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
   await selectMain()
@@ -498,7 +499,7 @@ try {
   // 文件讲解卡照旧在
   await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
   await page.getByRole('button', { name: '查看文件内容', exact: true }).click()
-  await page.locator('.code-text').filter({ hasText: 'export const start' }).waitFor()
+  await page.locator('.cm-line').filter({ hasText: 'export const start' }).waitFor()
   // 回归:预览带超长单行的文件不得把内容区顶出视口 —— 超宽内容靠 min-content 传染链
   // 顶穿 .workspace/.detail,右组分屏曾被挤出屏幕;.workspace/.content 已补 min-width:0 断链
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'wide.ts' }).dblclick()

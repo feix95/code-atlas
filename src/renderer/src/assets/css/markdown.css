@@ -502,3 +502,127 @@
     stroke-dashoffset: 0;
   }
 }
+
+/* ── Live Preview 装饰(md 三档锤)──
+   标题行量级与阅读档同一份(2 / 1.5 / 1.25 / 1 / 0.875 / 0.85em),
+   字号相对 scroller 基字号走 —— Ctrl+滚轮的 --doc-zoom 天然全场同步 */
+.cm-host .cm-live-h1,
+.cm-host .cm-live-h2,
+.cm-host .cm-live-h3,
+.cm-host .cm-live-h4 {
+  font-weight: var(--font-w-strong);
+  color: var(--text-strong);
+}
+
+.cm-host .cm-live-h5,
+.cm-host .cm-live-h6 {
+  font-weight: var(--font-w-semi);
+  color: var(--text-strong);
+}
+
+.cm-host .cm-live-h1 {
+  font-size: 2em;
+}
+.cm-host .cm-live-h2 {
+  font-size: 1.5em;
+}
+.cm-host .cm-live-h3 {
+  font-size: 1.25em;
+}
+.cm-host .cm-live-h4 {
+  font-size: 1em;
+}
+.cm-host .cm-live-h5 {
+  font-size: 0.875em;
+}
+.cm-host .cm-live-h6 {
+  font-size: 0.85em;
+}
+
+/* setext 下划线(===/---)收摊:字号行高压零,行还在(能点进去卸妆) */
+.cm-host .cm-live-setext {
+  font-size: 0;
+  line-height: 0;
+}
+
+/* 引用块:左缘竖条 + 哑灰字(与阅读档 blockquote 同配方) */
+.cm-host .cm-live-quote {
+  border-left: 3px solid var(--line);
+  padding-left: 0.6em;
+  color: var(--muted);
+}
+
+/* 围栏代码块:行底铺淡底,``` 围栏行再哑一档 */
+.cm-host .cm-live-codeblock {
+  background: var(--surface-soft);
+}
+.cm-host .cm-live-codeblock.cm-live-fence {
+  color: var(--muted-2);
+}
+
+/* 行内件:斜/粗/删线走本色,行内代码吃阅读档同款药丸皮 */
+.cm-host .cm-live-em {
+  font-style: italic;
+}
+.cm-host .cm-live-strong {
+  font-weight: var(--font-w-strong);
+  color: var(--text-strong);
+}
+.cm-host .cm-live-del {
+  text-decoration: line-through;
+}
+.cm-host .cm-live-code {
+  font-size: 0.85em;
+  background: var(--hover);
+  border-radius: var(--radius-xxs);
+  padding: 0.05em 0.3em;
+  color: var(--muted);
+}
+.cm-host .cm-live-link {
+  color: var(--accent-bright);
+}
+.cm-host .cm-live-img {
+  color: var(--muted);
+}
+.cm-host .cm-live-num {
+  color: var(--accent-bright);
+}
+
+/* 小圆点替身:主题色,比正文小记号轻一点 */
+.cm-host .cm-live-bullet {
+  color: var(--sash-hi);
+}
+
+/* 待办复选框:跟阅读档 .md-task 同一配方 */
+.cm-host .cm-live-task {
+  margin: 0 0.4em 0 0.15em;
+  accent-color: var(--sash-hi);
+  vertical-align: -0.08em;
+  cursor: pointer;
+}
+
+/* 分割线替身:上下留气,真横线吃满栏宽 */
+.cm-host .cm-live-hr {
+  padding: 0.5em 0;
+  display: flex;
+  align-items: center;
+}
+.cm-host .cm-live-hr hr {
+  flex: 1;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+}
+
+/* 表格替身:块级占位,内层全吃 .md 同款的 .md-table 皮;
+   认不出表格的烂摊源码退回等宽块,别装成功 */
+.cm-host .cm-live-table {
+  padding: 0.3em 0;
+}
+.cm-host .cm-live-table-raw {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  color: var(--muted);
+}

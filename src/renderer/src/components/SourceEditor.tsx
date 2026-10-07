@@ -31,6 +31,7 @@ export function SourceEditor({
   initialText,
   initialColors,
   wrap,
+  live,
   canAddRef,
   refLimit,
   onAddRef,
@@ -45,6 +46,8 @@ export function SourceEditor({
   /** 打开时的分色账(可缺,缺了白字) */
   initialColors?: number[][][]
   wrap: boolean
+  /** Live Preview(md 三档):md 签的默认档,边写边上妆;只有 md 系会传 true */
+  live?: boolean
   canAddRef: boolean
   refLimit: number
   onAddRef: (ref: ChatCodeRef) => void
@@ -166,6 +169,7 @@ export function SourceEditor({
         doc: initialText,
         extensions: buildSourceExtensions({
           wrap,
+          live,
           hooks: {
             onChanged: () => {
               dirty = true

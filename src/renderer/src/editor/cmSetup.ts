@@ -18,8 +18,10 @@ import {
   type DecorationSet
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { markdown } from '@codemirror/lang-markdown'
 // 相对路径引 shared(不走 @shared 别名):node 自测直接驱动本文件,别名只活在 vite 里
 import { HL_KINDS } from '../../../shared/highlight.ts'
+import { livePreview } from './markdownLive.ts'
 
 // ── 一、分色账翻译:主进程 tree-sitter 的「行内段落账」→ CM 的装饰标记 ──
 // 单位天然同构:两边都是 UTF-16 偏移,col 即行内偏移,0 换算(Q3 调研结论)。
@@ -116,13 +118,21 @@ export interface SourceHooks {
   onSaveNow: () => void
 }
 
-export function buildSourceExtensions(opts: { wrap: boolean; hooks: SourceHooks }): Extension[] {
+export function buildSourceExtensions(opts: {
+  wrap: boolean
+  /** Live Preview(md 三档锤):markdown 语法树 + 上妆/卸妆装饰管线;只对 md 系签开 */
+  live?: boolean
+  hooks: SourceHooks
+}): Extension[] {
   return [
     lineNumbers(),
     drawSelection(),
     history(),
     highlightField,
     wrapCompartment.of(opts.wrap ? EditorView.lineWrapping : []),
+    // Live Preview:markdown() 养语法树(白捡 Enter 续列表/Backspace 摘记号的键位),
+    // livePreview 照着树上妆 —— 只对 md 签开,别的文件这两件不进装配单
+    ...(opts.live ? [markdown(), livePreview] : []),
     keymap.of([
       { key: 'Alt-z', run: () => (opts.hooks.onToggleWrap(), true) },
       // Mod = Ctrl(Win/Linux)/Cmd(Mac):跟自动保存同一条写盘通道,按了催一笔

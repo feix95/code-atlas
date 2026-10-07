@@ -399,3 +399,4 @@
 - feat(ai): AI 来源新增「在线 API」(OpenAI 兼容,预设 DeepSeek/Kimi/智谱/通义/硅基流动/OpenRouter/OpenAI/自定义),首次启用须隐私确认,Key 经 safeStorage 加密落盘,「读取模型」带 Key 兼任连接测试,401/402/429/5xx 翻成人话,上下文按选定档位(默认 32k)。本地两路请求与报错行为不变,新增 test:cloud 自测
 - feat(ai): 在线 API 上下文档位放宽至 16k~1M 且可自由填写(默认 128k);服务商新增 Claude/Grok/Gemini、撤下通义千问与硅基流动,名单统一「产品名(公司名)」口径并按「国内→国际→聚合→自定义」排序
 - feat(preview): 文件预览可编辑——文本文件源码档换 CodeMirror 6 编辑器,停笔 1 秒自动落盘、切签/关签/关窗补尾班、Ctrl+S 催存,保存失败琥珀提示+隔 5 秒重试两次;主进程新增 saveFile(守根界/目录/二进制/超大闸,CRLF 与 BOM 原样奉还)与 watchFile(外部改动通报、自家人写盘不响铃)通道,选区角标美术退役、引用与拖拽功能保留;自测 test:fileedit + test:cmeditor 入链
+- feat(preview): md 三档上岗——Markdown 默认 Live Preview(标题/加粗/斜体/行内码/列表/待办/引用/围栏/hr/表格边写边上妆,光标行露源码卸妆),页头三钮与页签右键同切「实时预览/阅读/源码」,档位随签存档、陌生档值自动回安全档;非 md 文件照旧源码档;新增 editor/markdownLive.ts 装饰引擎与 test:mdlive 自测

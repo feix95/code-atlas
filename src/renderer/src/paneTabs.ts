@@ -7,13 +7,19 @@ import type { PaneKind } from './paneKinds'
  * 概览/小探针/图谱/设置是单例签,每品类全应用只此一张,rail/菜单入口开合。
  * 没有跟随、没有钉住:页签代表的就是它自己那份内容。
  */
-/** 文件签的看片档位(阅读模式这锤):source=源码(行号/分色/选区引用),reading=md 渲染态 */
-export type PaneViewMode = 'source' | 'reading'
+/**
+ * 文件签的看片档位(md 三档锤):
+ * source=源码编辑器(行号/分色/选区引用),reading=md 渲染态只读,
+ * live=Live Preview(编辑器里上妆/卸妆,md 系签的默认档)。
+ * 非 md 文件签永远 undefined(=源码档)。
+ */
+export type PaneViewMode = 'source' | 'reading' | 'live'
 
-/** 能进阅读模式的后缀(md 系):别的文件没有「渲染态」,菜单里连选项都不摆 */
+/** 有渲染态的后缀(md 系):live/阅读 两档都只对它开门,别的文件菜单里连选项都不摆 */
 const READING_EXTS = new Set(['md', 'markdown', 'mdx'])
 
-/** 这个文件能不能切阅读模式(纯函数):按后缀认,点在路径段上的点才算(目录名里的点不搅局) */
+/** 这个文件有没有渲染态(纯函数):md 系才回 true —— live/阅读 两档共用这道门,
+ *  点在路径段上的点才算(目录名里的点不搅局) */
 export function canReadingMode(relPath: string): boolean {
   const i = relPath.lastIndexOf('.')
   const sep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'))

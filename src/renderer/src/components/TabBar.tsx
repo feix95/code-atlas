@@ -192,25 +192,33 @@ export function TabBar({
       )
     }
 
-    // 看片档(文件签常驻):当前档行尾打勾,点另一档切过去;
-    // 非 md 文件签的「阅读模式」灰挂「Markdown 文件专属」tip —— 勾钉源码档,系统状态不说谎
+    // 看片档(文件签常驻·md 三档锤):实时预览/阅读/源码三选一,当前档行尾打勾;
+    // 非 md 文件签前两档灰挂「Markdown 文件专属」tip —— 勾钉源码档,系统状态不说谎
     if (isFile) {
-      const readable = canReadingMode(t.relPath)
-      const readingOn = readable && (t.viewMode ?? 'source') === 'reading'
+      const mdAble = canReadingMode(t.relPath)
+      const mode = t.viewMode ?? (mdAble ? 'live' : 'source')
       items.push(
         MENU_SEP,
         {
+          label: '实时预览',
+          icon: 'penLine',
+          checked: mdAble && mode === 'live',
+          disabled: !mdAble,
+          tip: mdAble ? undefined : 'Markdown 文件专属',
+          run: () => onSetViewMode?.(t.id, 'live')
+        },
+        {
           label: '阅读模式',
           icon: 'bookOpen',
-          checked: readingOn,
-          disabled: !readable,
-          tip: readable ? undefined : 'Markdown 文件专属',
+          checked: mode === 'reading',
+          disabled: !mdAble,
+          tip: mdAble ? undefined : 'Markdown 文件专属',
           run: () => onSetViewMode?.(t.id, 'reading')
         },
         {
           label: '源码模式',
           icon: 'code',
-          checked: !readingOn,
+          checked: !mdAble || mode === 'source',
           run: () => onSetViewMode?.(t.id, 'source')
         }
       )

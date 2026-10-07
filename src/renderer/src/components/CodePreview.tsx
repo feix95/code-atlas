@@ -143,8 +143,12 @@ export function CodePreview({
   const total = useMemo(() => (diskText === '' ? 0 : diskText.split('\n').length), [diskText])
   const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
   const wrap = wrapAllowed && wrapOn
-  // 阅读模式(这锤的新档):md 系签才生效 —— MiniMD 渲染态,编辑器是源码档的家务
-  const reading = viewMode === 'reading' && canReadingMode(file.relPath)
+  // 看片三档(md 三档锤):live=编辑器里上妆/卸妆(默认),reading=MiniMD 渲染态只读,
+  // source=裸源码编辑器;三档只在 md 系签生效,别的文件永远是源码档
+  const canMd = canReadingMode(file.relPath)
+  const mode = viewMode ?? (canMd ? 'live' : 'source')
+  const reading = canMd && mode === 'reading'
+  const live = canMd && mode === 'live'
   // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
@@ -240,21 +244,41 @@ export function CodePreview({
   }
 
   /**
-   * 阅读/代码快速开关(和页签右键菜单同一份 viewMode 账):图标换脸标态 ——
-   * bookOpen = 正读渲染稿,code = 正在编辑;非 md 文件常驻置灰(菜单同款口径)。
+   * 三档快速开关(md 三档锤,和页签右键菜单同一份 viewMode 账):
+   * 实时预览(笔) / 阅读(书) / 源码(</>),当前档吃主题色标态;
+   * 非 md 文件还是那颗常驻置灰的钮 —— 菜单同款口径,「Markdown 文件专属」。
    */
-  const canRead = canReadingMode(file.relPath)
-  const modeBtn: React.JSX.Element = (
+  const modeBtns: React.JSX.Element = canMd ? (
+    <>
+      {(
+        [
+          ['live', 'penLine', '实时预览(边写边看效果)'],
+          ['reading', 'bookOpen', '阅读模式'],
+          ['source', 'code', '源码模式']
+        ] as const
+      ).map(([m, icon, tip]) => (
+        <button
+          key={m}
+          type="button"
+          className="code-mode-btn"
+          aria-pressed={mode === m}
+          aria-label={tip}
+          data-tip={tip}
+          onClick={() => onSetViewMode?.(m)}
+        >
+          <TreeIcon name={icon} size={WRAP_ICON_SIZE} />
+        </button>
+      ))}
+    </>
+  ) : (
     <button
       type="button"
       className="code-mode-btn"
-      disabled={!canRead}
-      aria-pressed={reading}
-      aria-label={reading ? '切到代码模式' : '切到阅读模式'}
-      data-tip={!canRead ? 'Markdown 文件专属' : reading ? '当前:阅读模式' : '当前:编辑模式'}
-      onClick={() => onSetViewMode?.(reading ? 'source' : 'reading')}
+      disabled
+      aria-label="源码模式"
+      data-tip="Markdown 文件专属"
     >
-      <TreeIcon name={reading ? 'bookOpen' : 'code'} size={WRAP_ICON_SIZE} />
+      <TreeIcon name="code" size={WRAP_ICON_SIZE} />
     </button>
   )
 
@@ -264,7 +288,7 @@ export function CodePreview({
           签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突 */}
       {result?.status === 'ok' && (
         <div className="code-pane-head">
-          {onSetViewMode && modeBtn}
+          {onSetViewMode && modeBtns}
           <button
             type="button"
             className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
@@ -321,15 +345,17 @@ export function CodePreview({
               </article>
             </div>
           ) : (
-            /* 源码档:CodeMirror 编辑器 —— 自动保存、分色、选区引用全在它屋里 */
+            /* 实时预览/源码档:同一台 CodeMirror 编辑器,live 档位多挂 markdown 语法树+上妆管线;
+               key 带档位 —— 切档重立编辑器,老编辑器的落盘尾班先把最新稿保下来 */
             <div
               className="code-view is-editing"
               ref={codeViewRef}
               style={{ '--doc-zoom': docZoom } as React.CSSProperties}
             >
               <SourceEditor
-                key={file.relPath}
+                key={`${file.relPath}:${live ? 'live' : 'source'}`}
                 rootPath={rootPath}
+                live={live}
                 relPath={file.relPath}
                 initialText={text}
                 /* 文稿和盘上对得上才给初始色:对不上是带着未存改动,旧色错位不如不给 */
