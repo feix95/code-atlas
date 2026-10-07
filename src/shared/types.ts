@@ -603,3 +603,19 @@ export interface FilePreviewResult {
    */
   colors?: number[][][]
 }
+
+/** 文件写盘回执(预览编辑锤):mtimeMs 给文件监视器对账 —— 对上这个时间的 watch 事件是我们自己写的,吞掉 */
+export interface SaveFileResult {
+  mtimeMs: number
+}
+
+/**
+ * 主进程 → 渲染层:打开中的文件被外部改动(atlas:file-changed 推送的账本)。
+ * 全员广播,渲染层只对自己打开中的 relPath 有反应。
+ */
+export interface FileChangedPayload {
+  rootPath: string
+  relPath: string
+  /** 最新修改时间(ms);文件已被删 = null */
+  mtimeMs: number | null
+}

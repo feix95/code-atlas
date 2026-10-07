@@ -21,6 +21,7 @@ import type {
   DriveInfo,
   FeatureLocateResult,
   FileStructure,
+  FileChangedPayload,
   FilePreviewResult,
   GitChangesResult,
   ModelContextInfo,
@@ -138,6 +139,22 @@ const atlasApi = {
     ipcRenderer.invoke(CH.readPreview, rootPath, relPath),
   depGraph: (rootPath: string): Promise<DepGraphResult> =>
     ipcRenderer.invoke(CH.depGraph, rootPath),
+  // ── 文件编辑与监视(预览编辑锤) ──
+  /** 把文本写进项目内文件;返回写后 mtime,给文件监视器对自激账 */
+  saveFile: (rootPath: string, relPath: string, text: string): Promise<{ mtimeMs: number }> =>
+    ipcRenderer.invoke(CH.saveFile, rootPath, relPath, text),
+  /** 盯一个打开中的文件:外面有人动它就推 fileChanged;ok=false = 文件读不到,监视降级 */
+  watchFile: (rootPath: string, relPath: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(CH.watchFile, rootPath, relPath),
+  unwatchFile: (rootPath: string, relPath: string): Promise<void> =>
+    ipcRenderer.invoke(CH.unwatchFile, rootPath, relPath),
+  /** 订阅「打开中的文件被外部改了」;返回退订函数 */
+  onFileChanged: (callback: (payload: FileChangedPayload) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: FileChangedPayload): void =>
+      callback(payload)
+    ipcRenderer.on(CH.fileChanged, listener)
+    return () => ipcRenderer.removeListener(CH.fileChanged, listener)
+  },
   // 模型货架:实时榜(双源拉取+本机家底)+ 仓库文件清单
   modelShelf: (): Promise<ShelfResult> => ipcRenderer.invoke(CH.modelShelf),
   modelFiles: (repoId: string): Promise<RepoFile[]> => ipcRenderer.invoke(CH.modelFiles, repoId),

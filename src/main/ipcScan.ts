@@ -1,4 +1,4 @@
-import { accessDeniedMessage, formatSize } from './aiEvidence.ts'
+import { accessDeniedMessage, formatSize } from '../shared/fsMessages.ts'
 import { ipcMain } from 'electron'
 import { promises as fs } from 'node:fs'
 import { scanDirectory } from '../scanner/index.ts'

@@ -1,9 +1,7 @@
 import { extOf } from './paths.ts'
 import {
-  accessDeniedMessage,
   effectiveTeaching,
   explainWithCancel,
-  formatSize,
   makeDeltaSender,
   readHeader,
   readTextPreview,
@@ -12,6 +10,7 @@ import {
   respondWithEvidence,
   sendResetDelta
 } from './aiEvidence.ts'
+import { accessDeniedMessage, formatSize } from '../shared/fsMessages.ts'
 import { ipcMain } from 'electron'
 import { basename } from 'node:path'
 import { promises as fs } from 'node:fs'

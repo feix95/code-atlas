@@ -1,5 +1,5 @@
 import { openDevLogWindow, setUiScaleFactor } from './appShell.ts'
-import { accessDeniedMessage } from './aiEvidence.ts'
+import { accessDeniedMessage } from '../shared/fsMessages.ts'
 import { app, ipcMain, BrowserWindow, type OpenDialogOptions } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'

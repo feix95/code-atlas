@@ -74,6 +74,12 @@ export const CH = {
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
+  // ── 文件编辑与监视(预览编辑锤) ──
+  saveFile: 'atlas:save-file',
+  watchFile: 'atlas:watch-file',
+  unwatchFile: 'atlas:unwatch-file',
+  /** 主进程 → 渲染层推送:打开中的文件被外部改了(全员广播,各窗自己对账) */
+  fileChanged: 'atlas:file-changed',
   // ── 桌宠 ──
   // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗
