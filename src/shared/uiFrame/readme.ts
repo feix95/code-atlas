@@ -1,4 +1,4 @@
-// 给 AI 的文字:README-给AI.md(§13.4)、pages/home.md(页面规格)、LICENSES.md。
+// 给 AI 的文字:README-给AI.md(第 13.4 节)、pages/home.md(页面规格)、LICENSES.md。
 // 全文只用「必须 / 禁止」(规则 8);体检会扫描含糊词。
 import { iconSvgRelPath } from './customIcon.ts'
 import {
@@ -116,9 +116,9 @@ export function fileIndex(doc: UiFrameDoc, iconFiles: string[]): Array<[string, 
     ]),
     ...iconFiles.map((f): [string, string] => [f, 'lucide 图标原文']),
     ['design.json', '同一份数据的 DTCG 结构化版本'],
-    ['adapters/tailwind.theme.css', 'Tailwind CSS v4 @theme 主题文件(§13.5)'],
-    ['adapters/uiTheme.ts', 'React Native 主题对象,数值为逻辑像素(§13.5)'],
-    ['adapters/ui_theme.dart', 'Flutter ThemeData 主题,亮暗双套(§13.5)'],
+    ['adapters/tailwind.theme.css', 'Tailwind CSS v4 @theme 主题文件(第 13.5 节)'],
+    ['adapters/uiTheme.ts', 'React Native 主题对象,数值为逻辑像素(第 13.5 节)'],
+    ['adapters/ui_theme.dart', 'Flutter ThemeData 主题,亮暗双套(第 13.5 节)'],
     ['preview/', '组件与页面的标准外观截图(字体加载完成后截取)'],
     ['LICENSES.md', '图标与字体的许可声明']
   ]

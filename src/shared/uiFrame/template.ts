@@ -1,6 +1,6 @@
-// M0 默认模板(§9、§19):数值沿用 2026-10-02 手工实测的规格包(§23.1),
+// M0 默认模板(第 9 节、第 19 节):数值沿用 2026-10-02 手工实测的规格包(第 23.1 节),
 // 以便功能导出的包与实测对照答案逐项比对。
-// 三层变量(§6.1):基础变量写死数值;组件变量与页面变量默认引用基础变量。
+// 三层变量(第 6.1 节):基础变量写死数值;组件变量与页面变量默认引用基础变量。
 import type { TokenDef, TokenMap, TokenTier, TokenValue, UiFrameDoc } from './types.ts'
 import { defaultDeviceId } from './devices.ts'
 import { DEFAULT_ROOT_PX } from './units.ts'
@@ -99,7 +99,7 @@ const BASE: Entry[] = [
       dark: 'rgba(0, 0, 0, 0.5)'
     }
   ],
-  // 响应式断点(§7.2):典型页 CSS 的 @media 边界从这里取数
+  // 响应式断点(第 7.2 节):典型页 CSS 的 @media 边界从这里取数
   ['bp', 'sm', '断点 · 小屏', px(640)],
   ['bp', 'md', '断点 · 中屏', px(768)],
   ['bp', 'lg', '断点 · 大屏', px(1024)],
@@ -555,7 +555,7 @@ const COMPONENT: Entry[] = [
   ['ptr', 'icon', '图标尺寸', ref('icon-md')],
   ['ptr', 'font-size', '字号', ref('font-size-sm')],
   ['ptr', 'border-width', '描边宽度', ref('border-width-1')],
-  // 变体轴补全(M3-g,§7.4):浅底按钮悬停底与危险语义三态
+  // 变体轴补全(M3-g,第 7.4 节):浅底按钮悬停底与危险语义三态
   ['btn', 'tint-hover-bg', '浅底按钮 · 悬停底', color('#DBEAFE', '#1E3A8A')],
   ['btn', 'danger-bg', '危险按钮 · 底', color('#DC2626', '#B91C1C')],
   ['btn', 'danger-hover-bg', '危险按钮 · 悬停底', color('#B91C1C', '#991B1B')],
@@ -584,7 +584,7 @@ const PAGE: Entry[] = [
   ['page', 'features-pad-bottom', '卡片区下留白', ref('space-24')],
   ['page', 'footer-pad', '页脚内边距', ref('space-8')],
   ['page', 'footer-text-size', '页脚字号', ref('font-size-md')],
-  // 手机端示例页(§5.4):安全区与导航/列表/按钮排布的页面级变量
+  // 手机端示例页(第 5.4 节):安全区与导航/列表/按钮排布的页面级变量
   ['app', 'safe-top', '顶部安全区(状态栏)', px(56)],
   ['app', 'safe-bottom', '底部安全区(手势条)', px(40)],
   ['app', 'nav-height', '导航栏高度', px(52)],

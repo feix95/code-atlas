@@ -190,7 +190,7 @@ export const INPUT: ComponentRecipe = {
         field('ipt-box--filled', '', false, 'demo-input')
       ])
     ])
-    // 附件轴(§7.4):尾图标 / 清除钮
+    // 附件轴(第 7.4 节):尾图标 / 清除钮
     const attachRow = demoRow([
       demoLabel('附件'),
       demoCol([

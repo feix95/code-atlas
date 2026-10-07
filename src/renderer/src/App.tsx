@@ -132,7 +132,7 @@ function App(): React.JSX.Element {
   const [expanding, setExpanding] = useState<string | null>(null)
   const expandingRef = useRef(false)
   const [treeNote, setTreeNote] = useState<string | null>(null)
-  // 顶栏搜索词 ↔ 深搜账(UI v3 §7.2):防抖/seq/按词对齐全在钩子里,App 只拿词和清单面板
+  // 顶栏搜索词 ↔ 深搜账(UI v3 第 7.2 节):防抖/seq/按词对齐全在钩子里,App 只拿词和清单面板
   const {
     query: searchQuery,
     setQuery: setSearchQuery,
@@ -220,7 +220,7 @@ function App(): React.JSX.Element {
     setTreeNote(null)
     setGitInfo(null)
     setNotes({})
-    // 新工作区 = 新的浏览上下文:搜索词和清单一起清空(§7.2:词一清树就回来)
+    // 新工作区 = 新的浏览上下文:搜索词和清单一起清空(第 7.2 节:词一清树就回来)
     clearSearch()
     try {
       const scanned = await window.atlas.scanFolder(dir)
@@ -506,7 +506,7 @@ function App(): React.JSX.Element {
 
   // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
-  // 最近列表 ✕ 即删(UI v3 §7.1:删了就是删了,旧撤销横幅链路退役),pin 钮同理即写账
+  // 最近列表 ✕ 即删(UI v3 第 7.1 节:删了就是删了,旧撤销横幅链路退役),pin 钮同理即写账
   function removeRecent(path: string): void {
     setRecents(forgetRecentProject(path))
   }
@@ -515,8 +515,8 @@ function App(): React.JSX.Element {
     setRecents(toggleRecentPin(path))
   }
 
-  // ── 深搜结果的打开动作(UI v3 §7.2,本次重构唯一功能变更)──
-  // 文件夹命中 = 打开为工作区(§7.2 给定):走地址栏同一条扫描路
+  // ── 深搜结果的打开动作(UI v3 第 7.2 节,本次重构唯一功能变更)──
+  // 文件夹命中 = 打开为工作区(第 7.2 节 给定):走地址栏同一条扫描路
   function openSearchDir(hit: SearchNameHit): void {
     void scanPath(hit.absPath)
   }
@@ -540,7 +540,7 @@ function App(): React.JSX.Element {
     openPreview(hit.relPath)
   }
 
-  // 「这台电脑」下钻单击文件 = 「瞄一眼」文件签(peek 品类,§7.1):
+  // 「这台电脑」下钻单击文件 = 「瞄一眼」文件签(peek 品类,第 7.1 节):
   // 读根记在页签的 scopeRoot 上(浏览树的盘根),文件节点是浏览账现捏的最小件
   function openBrowseFile(scopeRoot: string, file: { name: string; relPath: string }): void {
     const dot = file.name.lastIndexOf('.')
@@ -657,7 +657,7 @@ function App(): React.JSX.Element {
     openSettings,
     openAiSettings
   } = useSettingsNav({ activeGroup, openSingletonTab, sidebarCollapsed, toggleSidebarCollapsed })
-  // 立项问卷 → 内置 agent(§3.6 路径二):切 chat 签把立项单当问句发出去;探针忙着就垫灰字
+  // 立项问卷 → 内置 agent(第 3.6 节 路径二):切 chat 签把立项单当问句发出去;探针忙着就垫灰字
   useEffect(() => {
     return onQuizAgentRequest((text) => {
       openSingletonTab('chat')
@@ -853,7 +853,7 @@ function App(): React.JSX.Element {
           />
 
           {/* 第 2 层:rail | 侧栏 | 内容区,全在顶栏之下。
-              侧栏常驻(§7.1 不存在空侧栏):没开工作区时树区 = 「这台电脑」盘符列表 */}
+              侧栏常驻(第 7.1 节 不存在空侧栏):没开工作区时树区 = 「这台电脑」盘符列表 */}
           <div className="app-body">
             <Rail
               hasWorkspace={result !== null && !scanning}

@@ -1,5 +1,5 @@
 // 最近打开的项目自测(第八十一锤):垃圾账不炸、同路径挤旧顶新、超长滚动、删账干净、时间话术
-// UI v3 §7.1 pin 账:pin 跟着路径走、不占历史名额、菜单分区(pin 倒序 + 历史 5 条)
+// UI v3 第 7.1 节 pin 账:pin 跟着路径走、不占历史名额、菜单分区(pin 倒序 + 历史 5 条)
 import assert from 'node:assert/strict'
 import {
   RECENTS_MAX,

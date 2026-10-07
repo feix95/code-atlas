@@ -1,13 +1,13 @@
 // UI 框架(UI Spec Builder)的数据结构总账:方案、变量、页面结构、规格包。
-// 规格见 docs/to-do list《UI框架-需求规格(UI Spec Builder)》§6、§12、§13。
+// 规格见 docs/to-do list《UI框架-需求规格(UI Spec Builder)》第 6 节、第 12 节、第 13 节。
 // 全部为纯类型,渲染层、主进程、自测共用这一份定义。
 
 export type ThemeName = 'light' | 'dark'
 
-/** 变量层级(§6.1):基础变量 → 组件变量 / 页面变量;后两者默认引用基础变量 */
+/** 变量层级(第 6.1 节):基础变量 → 组件变量 / 页面变量;后两者默认引用基础变量 */
 export type TokenTier = 'base' | 'component' | 'page'
 
-/** 变量值。尺寸一律存逻辑像素(§12 内部存储),导出时按根字号换算 rem */
+/** 变量值。尺寸一律存逻辑像素(第 12 节 内部存储),导出时按根字号换算 rem */
 export type TokenValue =
   | { kind: 'color'; light: string; dark: string }
   | { kind: 'dimension'; px: number }
@@ -78,9 +78,9 @@ export interface UiFrameDoc {
   schemaVersion: 1
   name: string
   platform: UiPlatform
-  /** 画布设备预设 id(§5.4);切平台时重置为该平台的默认档 */
+  /** 画布设备预设 id(第 5.4 节);切平台时重置为该平台的默认档 */
   device: string
-  /** 起步模板 id(§9);模板与空白起步的户口名 */
+  /** 起步模板 id(第 9 节);模板与空白起步的户口名 */
   template: string
   rootFontPx: number
   tokens: TokenMap
@@ -89,9 +89,9 @@ export interface UiFrameDoc {
   customIcons: Record<string, string>
   /** 底板上的零件摆放(M3-a);空数组 = 底板显示模板示例页或空态 */
   placed: PlacedPart[]
-  /** 问卷 D9「需要重点照顾」→ §5.7 加强档校验(更大字号下限、更高对比度) */
+  /** 问卷 D9「需要重点照顾」→ 第 5.7 节 加强档校验(更大字号下限、更高对比度) */
   a11yEnhanced?: boolean
-  /** 立项单技术选型回填(§3.6):导出时的默认目标技术栈 */
+  /** 立项单技术选型回填(第 3.6 节):导出时的默认目标技术栈 */
   targetStack?: string
 }
 
@@ -99,7 +99,7 @@ export interface UiFrameDoc {
 export type IconNode = Array<[string, Record<string, string>]>
 export type IconLookup = (name: string) => IconNode | undefined
 
-/** 页面结构节点(§13.2 规则 6:每个元素写明标签、class、关键属性) */
+/** 页面结构节点(第 13.2 节 规则 6:每个元素写明标签、class、关键属性) */
 export interface PageNode {
   tag: string
   cls?: string
@@ -138,13 +138,13 @@ export interface PreviewPlan {
 export type UiFrameExportResult =
   { status: 'canceled' } | { status: 'done'; path: string; unloadedFontPreviews: string[] }
 
-/** 方案文件 manifest.json(§15):格式版本号必须带,老方案靠它迁移 */
+/** 方案文件 manifest.json(第 15 节):格式版本号必须带,老方案靠它迁移 */
 export interface SchemeManifest {
   formatVersion: 1
   id: string
   name: string
   platform: UiPlatform
-  /** 风格预设名(§8) */
+  /** 风格预设名(第 8 节) */
   style: string
   /** 起步模板 id;空白起步记 'blank' */
   template: string
@@ -153,7 +153,7 @@ export interface SchemeManifest {
   appVersion: string
 }
 
-/** 方案库清单行(§5.8):列表要缩略图、平台、风格、最后修改时间 */
+/** 方案库清单行(第 5.8 节):列表要缩略图、平台、风格、最后修改时间 */
 export interface SchemeMeta {
   id: string
   name: string
@@ -188,7 +188,7 @@ export interface LintIssue {
   message: string
 }
 
-/** 出处声明(§14 防编造):agent 填表时附在每个变量上的来源信息 */
+/** 出处声明(第 14 节 防编造):agent 填表时附在每个变量上的来源信息 */
 export interface ProvenanceClaim {
   /** 变量名(与 tokens 键一致) */
   name: string

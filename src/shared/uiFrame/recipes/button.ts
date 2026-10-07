@@ -1,5 +1,5 @@
 // 按钮配方:实心 / 描边 / 幽灵 × 小中大 × 默认/悬停/按下/焦点/禁用。
-// 变体维度见 §7.4;状态表同时生成真实伪类与演示 class。
+// 变体维度见 第 7.4 节;状态表同时生成真实伪类与演示 class。
 import type { PageNode, ThemeName } from '../types.ts'
 import {
   DEMO_STATE_CLASS,
@@ -24,7 +24,7 @@ const VARIANTS: Array<[string, string]> = [
   ['text', '文字']
 ]
 
-// 语义轴(§7.4):主要走 color-primary,危险走 btn-danger-* 三态
+// 语义轴(第 7.4 节):主要走 color-primary,危险走 btn-danger-* 三态
 const SEMANTICS: Array<[string, string]> = [
   ['solid', '主要'],
   ['solid btn--danger', '危险']
@@ -110,7 +110,7 @@ export const BUTTON: ComponentRecipe = {
         ['color', v('color-primary')]
       ]
     },
-    // 危险语义(§7.4 语义轴):实心款换危险三色
+    // 危险语义(第 7.4 节 语义轴):实心款换危险三色
     {
       sel: '.btn--danger',
       decls: [
@@ -121,7 +121,7 @@ export const BUTTON: ComponentRecipe = {
     // 形状轴:方角 / 胶囊(默认圆角由 --btn-radius 管)
     { sel: '.btn--square', decls: [['border-radius', v('radius-none')]] },
     { sel: '.btn--pill', decls: [['border-radius', v('radius-full')]] },
-    // 宽度轴:撑满容器(§7.4 宽度;块级 flex 自动占满一行,flex 爹里再补 stretch)
+    // 宽度轴:撑满容器(第 7.4 节 宽度;块级 flex 自动占满一行,flex 爹里再补 stretch)
     {
       sel: '.btn--block',
       decls: [
@@ -188,7 +188,7 @@ export const BUTTON: ComponentRecipe = {
       },
       { ...btn('btn btn--outline', '继续', 'btn-md'), icon: 'demo-button', iconAt: 'end' }
     ])
-    // 语义/形状/宽度轴(§7.4):SEMANTICS 复用样式轴的 class 组合
+    // 语义/形状/宽度轴(第 7.4 节):SEMANTICS 复用样式轴的 class 组合
     const semanticRow = demoRow([
       demoLabel('语义'),
       ...SEMANTICS.map(([cls, name]) => btn(`btn btn--${cls}`, name, 'btn-md'))

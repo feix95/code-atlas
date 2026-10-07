@@ -47,13 +47,13 @@
   width: var(--sidebar-w);
 }
 
-/* workspace 栏(§7.0):顶缘留白减半,卡片上移 */
+/* workspace 栏(第 7.0 节):顶缘留白减半,卡片上移 */
 .sidebar-top {
   padding: calc(var(--u) * 0.1875) calc(var(--u) * 0.1875) calc(var(--u) * 0.28125);
   flex-shrink: 0;
 }
 
-/* workspace 卡(§3.4 按图推算+小葵实测定稿):高 0.8u、底吃浮层灰 chrome-float、
+/* workspace 卡(第 3.4 节 按图推算+小葵实测定稿):高 0.8u、底吃浮层灰 chrome-float、
    无描边、圆角吃地址栏组 token——浏览器地址栏式填充块。B1 先当纯路径输入框用,B5 再补 ⇅ 菜单 */
 .ws-card {
   position: relative;
@@ -128,7 +128,7 @@
   transform: translateY(-0.28125rem);
 }
 
-/* ── 工作区菜单(§7.1):浮层盖在文件树上,宽与卡同宽、卡下留小缝;
+/* ── 工作区菜单(第 7.1 节):浮层盖在文件树上,宽与卡同宽、卡下留小缝;
     上区 pin+历史(可视 5 条内部滚动),分隔线下固定盘根区 ── */
 .ws-menu {
   position: absolute;
@@ -321,7 +321,7 @@
   font-size: var(--font-ui-small);
 }
 
-/* 「这台电脑」空态(§7.1):盘符行,B8 升级成可下钻的树行 */
+/* 「这台电脑」空态(第 7.1 节):盘符行,B8 升级成可下钻的树行 */
 .drive-browser {
   flex: 1;
   min-height: 0;
@@ -391,7 +391,7 @@
   padding: var(--space-2) var(--space-1) var(--space-4) var(--space-2);
 }
 
-/* 底部扫描状态条(§3):高 0.6u,只属于侧栏,收起时随侧栏一起消失 */
+/* 底部扫描状态条(第 3 节):高 0.6u,只属于侧栏,收起时随侧栏一起消失 */
 .sidebar-footer {
   display: flex;
   align-items: center;
@@ -709,7 +709,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  /* 行高 0.6u(§7 的 0.75u 实测偏疏,小葵连压两档定稿):紧凑档,图标字仍从容 */
+  /* 行高 0.6u(第 7 节 的 0.75u 实测偏疏,小葵连压两档定稿):紧凑档,图标字仍从容 */
   height: calc(var(--u) * 0.6);
   margin: 1px 0;
   border-radius: var(--radius-sm);
@@ -729,7 +729,7 @@
   background: var(--selected-bg);
 }
 
-/* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
+/* 懒加载探测中的小圈圈(第 7 节 摘三角后挂在图标位) */
 .tree-spin {
   width: 0.5625rem;
   height: 0.5625rem;
@@ -761,7 +761,7 @@
   border: none;
   background: transparent;
   color: var(--muted);
-  /* 文件名 ≈0.95rem(§7 按图推算):比 UI 中档字大一档 */
+  /* 文件名 ≈0.95rem(第 7 节 按图推算):比 UI 中档字大一档 */
   font-size: 0.95rem;
   font-family: inherit;
   text-align: left;
@@ -822,7 +822,7 @@
   color: var(--muted-2);
 }
 
-/* ── 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
+/* ── 深搜结果清单(第 7.2 节):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
 .search-results .sr-state {
   margin: var(--space-2) var(--space-1);
   color: var(--muted-2);

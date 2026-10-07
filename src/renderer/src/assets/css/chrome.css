@@ -9,7 +9,7 @@
   height: var(--u);
   flex-shrink: 0;
   background: var(--chrome-topbar);
-  /* 底缘一条细线 = 顶栏与第二层的分界;激活页签压在线上断开它(§5.1) */
+  /* 底缘一条细线 = 顶栏与第二层的分界;激活页签压在线上断开它(第 5.1 节) */
   border-bottom: 1px solid var(--line);
   user-select: none;
 }
@@ -184,7 +184,7 @@
   height: var(--chrome-search-row-height);
 }
 
-/* ── 页签区(§5.1 Chrome 式):每个页签组一条胶囊带,与下方分屏列一一对齐;
+/* ── 页签区(第 5.1 节 Chrome 式):每个页签组一条胶囊带,与下方分屏列一一对齐;
    两组之间的细柱 = 分屏分界线的上延;带外空白(缝隙/尾段)仍是拖窗面 ── */
 .topbar-tabs {
   flex: 1;
@@ -276,7 +276,7 @@
 }
 
 /* 激活签 = 页面面色的胶囊,字用最深档;签身底缘靠 .tabbar 下探的裁剪盒盖到
-   顶栏底线上 —— 线到签身断开,签面与正文连成一片(§5.1)。
+   顶栏底线上 —— 线到签身断开,签面与正文连成一片(第 5.1 节)。
    box-shadow 描外轮廓:上缘+左右缘贴外边各 1px(顺顶角圆角走、不占布局),
    底部两角弧线在 ::before/::after 里接着这条线绕上去 */
 .tabbar-tab.is-active,
@@ -302,7 +302,7 @@
   pointer-events: none;
 }
 
-/* 底角反向外扩(§5.1):伪元素是块签色板,朝签身那侧挖出半径同顶角的四分之一圆 ——
+/* 底角反向外扩(第 5.1 节):伪元素是块签色板,朝签身那侧挖出半径同顶角的四分之一圆 ——
    圆界上压一圈 --line 环带 = 外轮廓线在弧上的接续,圆外整块铺签色:
    弧尖在底缘与顶栏底线相切收口,镂空底行也不会透出顶栏底线 */
 .tabbar-tab.is-active::before {
@@ -538,7 +538,7 @@ body.is-tab-dragging * {
   background: var(--chrome-hover);
 }
 
-/* 窗控三键(规格 §5.2):1u 方格顶天立地并排(宽=高撑满整行),— ▢ 悬停灰底,× 悬停红底白叉 */
+/* 窗控三键(规格 第 5.2 节):1u 方格顶天立地并排(宽=高撑满整行),— ▢ 悬停灰底,× 悬停红底白叉 */
 .win-ctl {
   display: flex;
   align-items: stretch;
@@ -651,7 +651,7 @@ body.is-tab-dragging * {
   margin-bottom: calc(var(--u) * 0.21875);
 }
 
-/* AI 状态浮层(§6.1 锚位):贴 rail 底钮上方往右弹进内容区,
+/* AI 状态浮层(第 6.1 节 锚位):贴 rail 底钮上方往右弹进内容区,
    Windows 系统托盘/Discord 左下角同款;Esc/点外/滚轮收起 */
 .ai-status-pop {
   position: fixed;

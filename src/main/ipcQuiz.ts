@@ -1,4 +1,4 @@
-// 立项问卷(§3.6 路径一):立项单 .md 写到用户在保存对话框里自选的位置,不写别处。
+// 立项问卷(第 3.6 节 路径一):立项单 .md 写到用户在保存对话框里自选的位置,不写别处。
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { promises as fs } from 'node:fs'
 import { CH } from '../shared/ipcChannels.ts'

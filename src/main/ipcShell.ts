@@ -154,7 +154,7 @@ export function registerShellIpc(): void {
     return drives
   })
 
-  // 「这台电脑」下钻(UI v3 §7.1):列某目录的直属一层,不递归 —— 侧栏懒加载浏览的口粮。
+  // 「这台电脑」下钻(UI v3 第 7.1 节):列某目录的直属一层,不递归 —— 侧栏懒加载浏览的口粮。
   // 忽略名单/符号链接的口径与目录扫描一致;打不开的层抛人话错,界面在原地照实说
   ipcMain.handle(CH.browseDir, async (_event, absPath: unknown): Promise<BrowseEntry[]> => {
     if (typeof absPath !== 'string' || absPath.trim() === '') throw new Error('参数不合法')

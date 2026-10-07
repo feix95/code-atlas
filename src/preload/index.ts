@@ -135,7 +135,7 @@ const atlasApi = {
     ipcRenderer.invoke(CH.scanFolder, folderPath),
   scanSubdir: (rootPath: string, relPath: string): Promise<ScanResult> =>
     ipcRenderer.invoke(CH.scanSubdir, rootPath, relPath),
-  /** 工作区文件名深搜(UI v3 §7.2):主进程真扫磁盘,新词顶掉在跑的旧一轮 */
+  /** 工作区文件名深搜(UI v3 第 7.2 节):主进程真扫磁盘,新词顶掉在跑的旧一轮 */
   searchNames: (rootPath: string, query: string): Promise<SearchNamesResult> =>
     ipcRenderer.invoke(CH.searchNames, rootPath, query),
   analyzeFile: (
@@ -254,7 +254,7 @@ const atlasApi = {
     ipcRenderer.invoke(CH.uiFrameExport, pkg),
   /** 打开最近一次导出的规格包文件夹 */
   uiFrameRevealExport: (): Promise<boolean> => ipcRenderer.invoke(CH.uiFrameRevealExport),
-  // ── 我的方案库(§5.8):列方案/保存/打开/改名/删除/快照列表/回快照/导出方案文件 ──
+  // ── 我的方案库(第 5.8 节):列方案/保存/打开/改名/删除/快照列表/回快照/导出方案文件 ──
   uiFrameSchemeList: (): Promise<SchemeMeta[]> => ipcRenderer.invoke(CH.uiFrameSchemeList),
   /** 保存当前方案;id 为空 = 新建(返回新方案 id),有 id = 覆盖存 */
   uiFrameSchemeSave: (
@@ -272,10 +272,10 @@ const atlasApi = {
   /** 回滚到某个快照:返回该快照的 design.json 正文 */
   uiFrameSchemeRestore: (id: string, stamp: string): Promise<string> =>
     ipcRenderer.invoke(CH.uiFrameSchemeRestore, id, stamp),
-  /** 导出 .uiframe 方案文件(§15 zip):manifest + design + 缩略图打进单文件,存到用户自选路径 */
+  /** 导出 .uiframe 方案文件(第 15 节 zip):manifest + design + 缩略图打进单文件,存到用户自选路径 */
   uiFrameSchemeExport: (id: string): Promise<UiFrameExportResult> =>
     ipcRenderer.invoke(CH.uiFrameSchemeExport, id),
-  // ── 导入(§14):弹系统对话框读用户自选的文件夹/文件,只读不写 ──
+  // ── 导入(第 14 节):弹系统对话框读用户自选的文件夹/文件,只读不写 ──
   /** 选方案文件夹:读 manifest.json(可空)+ design.json(必需)的文本 */
   uiFrameImportFolder: (): Promise<{
     manifest: string | null
@@ -288,17 +288,17 @@ const atlasApi = {
     kind: 'json' | 'css' | 'svg'
   ): Promise<{ name: string; text: string } | null> =>
     ipcRenderer.invoke(CH.uiFrameImportFile, kind),
-  /** 选 .uiframe 方案文件(§15 zip 容器);主进程解包后回 manifest/design 原文 */
+  /** 选 .uiframe 方案文件(第 15 节 zip 容器);主进程解包后回 manifest/design 原文 */
   uiFrameImportUiframe: (): Promise<{
     manifest: string | null
     design: string
     name: string
     icons?: Record<string, string>
   } | null> => ipcRenderer.invoke(CH.uiFrameImportUiframe),
-  /** §14 防编造:选自填表数值的出处项目根,主进程只读比对;取消回 null */
+  /** 第 14 节 防编造:选自填表数值的出处项目根,主进程只读比对;取消回 null */
   uiFrameVerify: (items: ProvenanceCheckItem[]): Promise<ProvenanceVerdict[] | null> =>
     ipcRenderer.invoke(CH.uiFrameVerify, items),
-  /** 立项问卷(§3.6):立项单 .md 存到用户自选路径;取消回 canceled */
+  /** 立项问卷(第 3.6 节):立项单 .md 存到用户自选路径;取消回 canceled */
   quizBriefSave: (name: string, text: string): Promise<QuizBriefSaveResult> =>
     ipcRenderer.invoke(CH.quizBriefSave, { name, text }),
   /** 订阅模型状态变化(热身进度/就绪/出岔子);返回退订函数,组件卸载时调用 */

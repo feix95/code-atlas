@@ -1,5 +1,5 @@
-// 题目全集(§3.3):A~G 七组,每题自带条件显隐谓词;选项 id 稳定,推导规则靠它判断。
-// 「让 AI 建议」不在 options 里,界面层对每题统一追加该项(§3.2)。
+// 题目全集(第 3.3 节):A~G 七组,每题自带条件显隐谓词;选项 id 稳定,推导规则靠它判断。
+// 「让 AI 建议」不在 options 里,界面层对每题统一追加该项(第 3.2 节)。
 
 import type { AnswerMap, QuizGroupId, QuizOption, QuizQuestion } from './types.ts'
 
@@ -12,7 +12,7 @@ const picked = (answers: AnswerMap, qid: string, ...ids: string[]): boolean => {
   return a?.kind === 'options' && ids.some((id) => a.ids.includes(id))
 }
 
-/** 手机或平板都算「移动端」,A3 系统题对两者显示(§3.2 例) */
+/** 手机或平板都算「移动端」,A3 系统题对两者显示(第 3.2 节 例) */
 const hasMobile = (answers: AnswerMap): boolean => picked(answers, 'A1', 'phone', 'tablet')
 const hasDesktop = (answers: AnswerMap): boolean => picked(answers, 'A1', 'desktop')
 const hasPhone = (answers: AnswerMap): boolean => picked(answers, 'A1', 'phone')

@@ -43,7 +43,7 @@ function TokenRow({
   doc: UiFrameDoc
   name: string
   hot: boolean
-  /** 手柄带的上下限(§5.6 键盘微调同样吃它);没手柄的变量不给 */
+  /** 手柄带的上下限(第 5.6 节 键盘微调同样吃它);没手柄的变量不给 */
   bounds?: { min: number; max: number }
 }): React.JSX.Element {
   const def = doc.tokens[name]
@@ -69,7 +69,7 @@ function TokenRow({
     setDraft(null)
     if (Number.isFinite(n) && n !== current) write(withNumber(resolved, n))
   }
-  // §5.6 键盘微调:方向键 ±1 步长,Shift + 方向键 ±4 步长,吃手柄上下限
+  // 第 5.6 节 键盘微调:方向键 ±1 步长,Shift + 方向键 ±4 步长,吃手柄上下限
   const nudge = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
     e.preventDefault()
@@ -294,7 +294,7 @@ function FamilyEditor({
   )
 }
 
-/** 变量板点选「tok:<名>」 → 单变量编辑(§5.5 直接改变量) */
+/** 变量板点选「tok:<名>」 → 单变量编辑(第 5.5 节 直接改变量) */
 function TokenInspector({ doc, name }: { doc: UiFrameDoc; name: string }): React.JSX.Element {
   const def = doc.tokens[name]
   if (!def) {

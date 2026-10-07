@@ -1,4 +1,4 @@
-// 平台规范校验(§5.7):实时提醒,不强制拦截。阈值随方案平台分档;问卷 D9「重点照顾」档
+// 平台规范校验(第 5.7 节):实时提醒,不强制拦截。阈值随方案平台分档;问卷 D9「重点照顾」档
 // 留 strict 参数,问卷上线后由调用方传入。纯函数,渲染层与自测共用。
 import { componentCss } from './recipes/kit.ts'
 import { RECIPES } from './recipes/index.ts'
@@ -6,7 +6,7 @@ import { resolveValue } from './resolve.ts'
 import type { LintLevel, ThemeName, UiFrameDoc, UiPlatform } from './types.ts'
 
 export interface PlatformIssue {
-  /** §5.7 规则名(点击区 / 文字对比度 / …) */
+  /** 第 5.7 节 规则名(点击区 / 文字对比度 / …) */
   rule: string
   level: LintLevel
   /** 出问题的变量名(-- 前缀省略);组件级问题记 `组件:<id>` */
@@ -14,15 +14,15 @@ export interface PlatformIssue {
   message: string
 }
 
-/** 最小点击区阈值(§5.7):手机按 iOS 44pt(Android 48 在提醒文案里给出);电脑按 WCAG 2.2 的 24 */
+/** 最小点击区阈值(第 5.7 节):手机按 iOS 44pt(Android 48 在提醒文案里给出);电脑按 WCAG 2.2 的 24 */
 const TOUCH_MIN: Record<UiPlatform, { min: number; hint: string }> = {
   phone: { min: 44, hint: 'iOS 44pt / Android 48dp' },
   desktop: { min: 24, hint: 'WCAG 24px,建议 32 以上' }
 }
 
-/** 正文字号下限(§5.7):手机 14 / 电脑 12;问卷 D9「需要重点照顾」→ 加强档再 +2 */
+/** 正文字号下限(第 5.7 节):手机 14 / 电脑 12;问卷 D9「需要重点照顾」→ 加强档再 +2 */
 const BODY_FONT_MIN: Record<UiPlatform, number> = { phone: 14, desktop: 12 }
-/** 加强档(§5.7 D9):正文对比度 4.5→7(AAA),控件边界 3→4.5,字号下限 +2 */
+/** 加强档(第 5.7 节 D9):正文对比度 4.5→7(AAA),控件边界 3→4.5,字号下限 +2 */
 const A11Y_TEXT_MIN = { normal: 4.5, enhanced: 7 }
 const A11Y_BOUNDARY_MIN = { normal: 3, enhanced: 4.5 }
 
@@ -30,7 +30,7 @@ const A11Y_BOUNDARY_MIN = { normal: 3, enhanced: 4.5 }
 const HIT_TARGET_RE =
   /^(control-(sm|md|lg)|(?:btn|ipt)-height-(sm|md|lg)|ibtn-size-(sm|md|lg)|chk-size-(sm|md)|sw-(width|height)-(sm|md))$/
 
-/** 文字对比度配对(§5.7 WCAG AA ≥4.5):语义色正文组合,亮暗两套都查 */
+/** 文字对比度配对(第 5.7 节 WCAG AA ≥4.5):语义色正文组合,亮暗两套都查 */
 const TEXT_PAIRS: Array<[string, string]> = [
   ['color-text', 'color-bg'],
   ['color-text', 'color-surface'],
@@ -40,7 +40,7 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['color-primary', 'color-primary-subtle']
 ]
 
-/** 控件边界对比度配对(§5.7 WCAG 1.4.11 ≥3):输入框/开关/焦点环等控件边界与相邻底 */
+/** 控件边界对比度配对(第 5.7 节 WCAG 1.4.11 ≥3):输入框/开关/焦点环等控件边界与相邻底 */
 const BOUNDARY_PAIRS: Array<[string, string]> = [
   ['color-border', 'color-bg'],
   ['color-border', 'color-surface'],
@@ -110,14 +110,14 @@ function resolvedColor(doc: UiFrameDoc, name: string, theme: ThemeName): string 
   }
 }
 
-/** §5.7 实时校验:输入整份方案,出分级问题清单(warn 提醒 / error 报错) */
+/** 第 5.7 节 实时校验:输入整份方案,出分级问题清单(warn 提醒 / error 报错) */
 export function platformIssues(doc: UiFrameDoc): PlatformIssue[] {
   const issues: PlatformIssue[] = []
   const push = (rule: string, level: LintLevel, target: string, message: string): void => {
     issues.push({ rule, level, target, message })
   }
 
-  // 引用失效:ref 指向不存在的变量(§5.7 记为报错)
+  // 引用失效:ref 指向不存在的变量(第 5.7 节 记为报错)
   for (const [name, def] of Object.entries(doc.tokens)) {
     if (def.value.kind === 'ref' && !doc.tokens[def.value.ref]) {
       push('引用失效', 'error', name, `--${name} 引用不存在的 --${def.value.ref}`)

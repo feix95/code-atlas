@@ -100,7 +100,7 @@ export interface DriveInfo {
   kind?: 'fixed' | 'removable' | 'network' | 'optical'
 }
 
-/** 「这台电脑」下钻浏览的一层条目(UI v3 §7.1):名字 + 是否目录 + 主进程拼好的绝对路径。
+/** 「这台电脑」下钻浏览的一层条目(UI v3 第 7.1 节):名字 + 是否目录 + 主进程拼好的绝对路径。
  *  绝对路径由主进程出账,渲染层原样回传(打开为工作区/往更深一层列) —— 路径契约不手拼 */
 export interface BrowseEntry {
   name: string

@@ -1,4 +1,4 @@
-// 导入(§14):方案文件夹 / DTCG token JSON / CSS 变量,全部解析成 UiFrameDoc。
+// 导入(第 14 节):方案文件夹 / DTCG token JSON / CSS 变量,全部解析成 UiFrameDoc。
 // 三条源共用一个口径:只改写「同名已存在」变量的 value——名字对不上的键记入 skipped 名单,
 // 不往变量表里生造新变量(变量表是固定结构,导入不是扩表)。
 import { DTCG_EXT } from './designJson.ts'
@@ -16,7 +16,7 @@ export interface ImportResult {
   /** 没匹配上的来源键名(最多记前 20 个) */
   skipped: string[]
   sourceLabel: string
-  /** agent 填表附带的出处声明(§14 防编造);没有出处时为空表 */
+  /** agent 填表附带的出处声明(第 14 节 防编造);没有出处时为空表 */
   claims: ProvenanceClaim[]
 }
 
@@ -272,7 +272,7 @@ function importDtcgJson(root: unknown, fallbackName: string): ImportResult {
         Record<string, Json> | undefined
       const modes = (myExt?.['modes'] as Record<string, Json> | undefined)?.['dark']
       if (modes !== undefined) darkModes.set(name, modes)
-      // §14 防编造:agent 填表附的出处(file+line+confidence+可选 value 原文)
+      // 第 14 节 防编造:agent 填表附的出处(file+line+confidence+可选 value 原文)
       const src = myExt?.['source'] as Record<string, Json> | undefined
       if (src && typeof src['file'] === 'string' && src['file']) {
         claims.push({

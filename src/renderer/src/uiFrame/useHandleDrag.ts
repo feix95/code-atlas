@@ -1,4 +1,4 @@
-// 拖动手柄(§5.6「像拉窗口那样」):按下即捕获指针,移动中实时预览、不加缓动,松手提交一次进撤销栈。
+// 拖动手柄(第 5.6 节「像拉窗口那样」):按下即捕获指针,移动中实时预览、不加缓动,松手提交一次进撤销栈。
 // 默认 0.125rem 步长吸附 + 同族变量磁吸;按住 Alt 自由拖。
 import { useRef, useState } from 'react'
 import { dragDelta, resolveDrag, type HandleDef } from '@shared/uiFrame/handles'
@@ -47,7 +47,7 @@ export function useHandleDrag({
     activeRef.current = true
     target.setPointerCapture(e.pointerId)
 
-    // §5.6 共用变量提示:手柄绑的变量是 ref 时,徽标顺带报目标的引用面
+    // 第 5.6 节 共用变量提示:手柄绑的变量是 ref 时,徽标顺带报目标的引用面
     const shareTip = (): string => {
       const v = doc.tokens[handle.token]?.value
       const target = v ? refTargetOf(v) : null

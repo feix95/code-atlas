@@ -1,4 +1,4 @@
-// 「这台电脑」下钻浏览(UI v3 §7.1):侧栏空态 = 盘符列表,单击目录原地展开
+// 「这台电脑」下钻浏览(UI v3 第 7.1 节):侧栏空态 = 盘符列表,单击目录原地展开
 // (懒加载纯浏览,不开工作区),双击目录 = 打开为工作区,单击文件 = 开预览页签。
 // 行骨架沿用树行(0.75u 高/图标位可转圈/摘三角),手感与文件树一致;
 // 浏览账在 useDriveBrowser —— 没点过的层才来这儿画名字。
@@ -7,7 +7,7 @@ import { driveCapacity, driveKindName } from '../driveMeta'
 import { useDriveBrowser, type BrowseDir, type BrowseNode } from '../useDriveBrowser'
 import { TreeIcon } from './Icons'
 
-/** 与 FileTree 同一颗图标旋钮(§7 ≈1.1rem) */
+/** 与 FileTree 同一颗图标旋钮(第 7 节 ≈1.1rem) */
 const BROWSE_ICON_SIZE = 18
 
 export function DriveBrowser({

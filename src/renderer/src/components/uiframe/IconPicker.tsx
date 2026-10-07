@@ -1,4 +1,4 @@
-// 图标选择器(§10,M3-e 补全):分类页签 + 中英文搜索 + 最近使用 + 自定义 SVG。
+// 图标选择器(第 10 节,M3-e 补全):分类页签 + 中英文搜索 + 最近使用 + 自定义 SVG。
 // 一次只画有限个,避免 1800+ 图标一起上屏;自定义图标渲染消毒后的原文。
 import { createElement, useMemo, useState } from 'react'
 import {

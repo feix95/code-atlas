@@ -1,4 +1,4 @@
-// rail 底槽的 AI 状态钮(UI v3 §6.1):图形形状区分就绪/加载/未连接等状态,图标颜色随主题。
+// rail 底槽的 AI 状态钮(UI v3 第 6.1 节):图形形状区分就绪/加载/未连接等状态,图标颜色随主题。
 // 点击弹浮层(锚位:贴钮上方往右弹,Windows 系统托盘/Discord 同款),Esc/点外/滚轮收起。
 // 浮层内容沿用旧文档第七节全套:供应商+状态文案、热身进度(纯文字)、模型名+大小、
 // 热身中「取消」/就绪「卸下」/未醒与异常态「装载」、内置「换模型」文件快捷道、
@@ -10,7 +10,7 @@ import { PROVIDER_SHORT_LABEL } from '../../../shared/aiSetup.ts'
 import { AiSetupContext } from '../aiSetupContext'
 import { useMenuDismiss } from '../useMenuDismiss'
 
-/** 状态脸:三态外的第四态 = 红插头(§6.1:出错 = 红 unplug) */
+/** 状态脸:三态外的第四态 = 红插头(第 6.1 节:出错 = 红 unplug) */
 type AiFace = 'ready' | 'loading' | 'idle' | 'error'
 
 function faceOf(configured: boolean | null | undefined, status: ModelStatus | null): AiFace {

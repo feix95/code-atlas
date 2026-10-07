@@ -1,5 +1,5 @@
 // 列表行配方:<div class="li">[前置]<div class="li__main">主/次行</div>[尾部]</div>
-// 变体轴(§7.4):单行/两行 × 前置(无/图标/头像)× 尾部(无/箭头/开关/数值)。
+// 变体轴(第 7.4 节):单行/两行 × 前置(无/图标/头像)× 尾部(无/箭头/开关/数值)。
 // 演示矩阵每轴至少覆盖一次;尾部开关直接复用 .sw 组件(演示页会加载全部组件 CSS)。
 import type { PageNode, ThemeName } from '../types.ts'
 import { DEMO_STATE_CLASS, demoCol, demoRow, demoSection, v, type ComponentRecipe } from './kit.ts'

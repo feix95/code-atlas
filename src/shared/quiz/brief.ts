@@ -1,4 +1,4 @@
-// 《立项单.md》生成器(§3.5):纯函数,答案 → 可交给任何 agent 的立项文档。
+// 《立项单.md》生成器(第 3.5 节):纯函数,答案 → 可交给任何 agent 的立项文档。
 // 结构固定五节:基本信息 / 答案总表 / 推导约束 / 给 agent 的任务说明 / 待定项清单。
 
 import { QUIZ_GROUPS, visibleQuestions } from './questions.ts'
@@ -29,7 +29,7 @@ function answerTable(input: BriefInput): { rows: string[]; aiItems: string[] } {
   return { rows, aiItems }
 }
 
-/** 给 agent 的固定任务说明(§3.5 第 4 节) */
+/** 给 agent 的固定任务说明(第 3.5 节 第 4 节) */
 const AGENT_TASK = `基于以上条件,给出 2~3 套技术选型方案的对比表(技术栈、优缺点、成本、学习难度、风险)与推荐,并对「待 AI 建议项」逐条给出建议。`
 
 export function buildProjectBrief(input: BriefInput): string {

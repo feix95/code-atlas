@@ -73,7 +73,7 @@ check('parseWindowState:块头小于窗口下限就夹到下限;maximized 缺省
   assert.equal(saved!.maximized, false)
 })
 
-// ── UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale ──
+// ── UI v3·第 2.2 节:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale ──
 
 check('parseWindowState:scale 合法才认账;认了 scale,宽高下限按系数折回基准口径', () => {
   const saved = parseWindowState({

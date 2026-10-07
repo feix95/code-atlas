@@ -1,4 +1,4 @@
-// 填表指令(§14):生成一份给用户自有 AI agent 的说明书,让它从用户项目代码里
+// 填表指令(第 14 节):生成一份给用户自有 AI agent 的说明书,让它从用户项目代码里
 // 提取设计数值、写成 CodeAtlas 能直接导入的 design.json(DTCG + 出处扩展)。
 // 纯文本生成,与导出包/导入器共用同一套变量名口径。
 import { resolveValue } from './resolve.ts'
@@ -32,7 +32,7 @@ function dtcgPath(name: string): string {
   return i < 0 ? name : `${name.slice(0, i)}.${name.slice(i + 1)}`
 }
 
-/** 填表指令全文(§14):用户整段复制给自己的 agent,产出 design.json 后回 CodeAtlas 导入 */
+/** 填表指令全文(第 14 节):用户整段复制给自己的 agent,产出 design.json 后回 CodeAtlas 导入 */
 export function fillInInstruction(doc: UiFrameDoc): string {
   const groups = new Map<string, string[]>()
   for (const [name, def] of Object.entries(doc.tokens)) {

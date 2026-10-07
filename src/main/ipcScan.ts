@@ -43,7 +43,7 @@ export function registerScanIpc(): void {
     })
   })
 
-  // 工作区文件名深搜(UI v3 §7.2):根下深扫磁盘,文件/文件夹名含关键字即命中。
+  // 工作区文件名深搜(UI v3 第 7.2 节):根下深扫磁盘,文件/文件夹名含关键字即命中。
   // 最新有效制:新一轮起身后旧一轮就地收工回 cancelled(渲染层也按自己的 seq 扔旧账)
   let searchSeq = 0
   ipcMain.handle(CH.searchNames, (_event, rootPath: unknown, query: unknown) => {

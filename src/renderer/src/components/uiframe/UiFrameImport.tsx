@@ -1,4 +1,4 @@
-// 「导入」浮层(§14):来源 —— .uiframe 方案文件、旧方案文件夹、DTCG/design.json、
+// 「导入」浮层(第 14 节):来源 —— .uiframe 方案文件、旧方案文件夹、DTCG/design.json、
 // CSS 变量(文件或粘贴)、Tailwind @theme(走 CSS 变量入口自动识别)。
 // 另有两件 M3-d 装备:「复制填表指令」给用户自有 agent 从现有 app 提数值;
 // 带出处(agent 声称的 file+line)的导入完成后可就地核对(主进程只读比对)。

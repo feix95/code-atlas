@@ -16,7 +16,7 @@ export interface RecentProject {
   n: string
   /** 上次打开的时刻(ms) */
   t: number
-  /** 钉住时刻(ms,UI v3 §7.1):有值 = 常驻 pin 区,不占历史名额、不被时间淘汰 */
+  /** 钉住时刻(ms,UI v3 第 7.1 节):有值 = 常驻 pin 区,不占历史名额、不被时间淘汰 */
   pin?: number
 }
 
@@ -87,7 +87,7 @@ export function nextPinToggle(raw: unknown, path: string, ts: number): RecentPro
   return capLedger(next)
 }
 
-/** 工作区菜单的分区视图(纯函数,§7.1):pin 区按 pin 时刻倒序置顶,
+/** 工作区菜单的分区视图(纯函数,第 7.1 节):pin 区按 pin 时刻倒序置顶,
  *  历史区 = 最近未 pin 的前 5 条;两区天然去重(一条账只在一区) */
 export function menuWorkspaceRows(list: RecentProject[]): {
   pinned: RecentProject[]

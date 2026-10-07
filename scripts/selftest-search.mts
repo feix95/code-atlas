@@ -6,7 +6,7 @@ import { searchNames } from '../src/scanner/searchNames.ts'
 import { SEARCH_NAMES_MAX } from '../src/shared/searchNames.ts'
 import { MAX_DEPTH, MAX_NODES } from '../src/scanner/index.ts'
 
-// 深搜遍历器自测(UI v3 §7.2):文件名/文件夹名深扫磁盘的每一条规矩都要立得住 ——
+// 深搜遍历器自测(UI v3 第 7.2 节):文件名/文件夹名深扫磁盘的每一条规矩都要立得住 ——
 // 命中口径、相对路径契约、忽略名单、没点开过的目录、排序、上限截断、
 // 保护闸照实记账、最新有效制的取消旗。
 

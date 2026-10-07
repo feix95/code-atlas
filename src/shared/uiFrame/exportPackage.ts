@@ -1,4 +1,4 @@
-// 规格包组装(§13.3):方案 → 相对路径 → 文本。字体文件与截图由主进程按清单补齐。
+// 规格包组装(第 13.3 节):方案 → 相对路径 → 文本。字体文件与截图由主进程按清单补齐。
 // 所有产物由同一份 UiFrameDoc 生成(规则 14),不存在分别手写的副本。
 import { flutterThemeDart, reactNativeThemeTs, tailwindThemeCss } from './adapters.ts'
 import { designJson } from './designJson.ts'

@@ -1,4 +1,4 @@
-// 平台适配检查面板(§5.7):工具栏「检查」chip 点开,列出当前方案的规范问题。
+// 平台适配检查面板(第 5.7 节):工具栏「检查」chip 点开,列出当前方案的规范问题。
 // 提醒不拦截导出;点变量条目跳到变量板对应行,点组件条目跳零件墙。
 import type { PlatformIssue } from '@shared/uiFrame/platformRules'
 

@@ -56,7 +56,7 @@ export function tokensCss(doc: UiFrameDoc): string {
   ].join('\n')
 }
 
-/** reset.css:清零浏览器默认样式(§13.2 规则 7);数值只有 0 */
+/** reset.css:清零浏览器默认样式(第 13.2 节 规则 7);数值只有 0 */
 export const RESET_CSS = `/* reset.css · 清零浏览器默认样式:页面里的间距一律由显式变量写出 */
 
 *,
@@ -191,15 +191,15 @@ export function styleTexts(doc: UiFrameDoc, fontsCss: string): Record<StyleKey, 
     demo: `/* _demo.css · 仅供演示页使用:禁止复制进正式页面 */\n\n${rulesCss(demoRules())}\n`,
     home: `/* 首页 · 页面布局样式 */\n\n${rulesCss(HOME_RULES)}\n`,
     app: `/* 示例应用页 · 手机端页面布局样式 */\n\n${rulesCss(APP_RULES)}\n`,
-    list: `/* 列表页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(LIST_RULES)}\n${pgMedia(doc)}`,
-    settings: `/* 设置页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(SETTINGS_RULES)}\n${pgMedia(doc)}`,
-    form: `/* 表单页 · 页面布局样式(§5.5 典型页) */\n\n${rulesCss(FORM_RULES)}\n${pgMedia(doc)}`
+    list: `/* 列表页 · 页面布局样式(第 5.5 节 典型页) */\n\n${rulesCss(LIST_RULES)}\n${pgMedia(doc)}`,
+    settings: `/* 设置页 · 页面布局样式(第 5.5 节 典型页) */\n\n${rulesCss(SETTINGS_RULES)}\n${pgMedia(doc)}`,
+    form: `/* 表单页 · 页面布局样式(第 5.5 节 典型页) */\n\n${rulesCss(FORM_RULES)}\n${pgMedia(doc)}`
   }
   for (const r of RECIPES) texts[compStyleKey(r.id)] = componentCss(r)
   return texts
 }
 
-/** 典型页响应式块:断点数值取自 --bp-* 变量(§7.2),改断点即改媒体查询 */
+/** 典型页响应式块:断点数值取自 --bp-* 变量(第 7.2 节),改断点即改媒体查询 */
 export function pgMedia(doc: UiFrameDoc): string {
   const bp = (name: string): string => declaredCss(doc.tokens, name, 'light', doc.rootFontPx)
   return [
@@ -286,7 +286,7 @@ export const APP_STYLES: StyleKey[] = [
   'app'
 ]
 
-/** 典型页(§5.5)要加载的组件样式 */
+/** 典型页(第 5.5 节)要加载的组件样式 */
 export const LIST_STYLES: StyleKey[] = [
   'fonts',
   'tokens',
@@ -363,7 +363,7 @@ export function pageFor(platform: UiPlatform): PageDef {
   }
 }
 
-/** 平台无关的典型页(§5.5):桌面与手机的规格包都会带上 */
+/** 平台无关的典型页(第 5.5 节):桌面与手机的规格包都会带上 */
 const TYPICAL_PAGES: PageDef[] = [
   {
     id: LIST_PAGE.id,

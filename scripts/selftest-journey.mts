@@ -300,7 +300,7 @@ try {
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
   await page.locator('.cfg-page').waitFor({ state: 'hidden' })
   await page.locator('.tabbar-tab').waitFor({ state: 'detached' })
-  // UI v3(B8)续:双击盘根 = 开为工作区(§7.1)——挪到设置测试后跑:
+  // UI v3(B8)续:双击盘根 = 开为工作区(第 7.1 节)——挪到设置测试后跑:
   // 页签改版后开工作区栏仍是空的(签只在点文件/单例入口时开)
   await firstDrive.dblclick()
   await page.locator('main.workspace').waitFor()
@@ -619,7 +619,7 @@ try {
     0,
     'uiframe tab must hide the file tree'
   )
-  // M1-c 起步页(§5.2):选平台 → 模板按平台过滤 → 空白起步 / 我的方案 / 导入(未上线禁用)
+  // M1-c 起步页(第 5.2 节):选平台 → 模板按平台过滤 → 空白起步 / 我的方案 / 导入(未上线禁用)
   await page.getByRole('group', { name: '目标平台' }).waitFor()
   await page.getByRole('button', { name: '极简工作台', exact: true }).waitFor()
   await page.getByRole('button', { name: '现代仪表盘', exact: true }).waitFor()
@@ -642,14 +642,14 @@ try {
   await importDialog.waitFor({ state: 'hidden' })
   await page.getByText('还没有保存过的方案', { exact: false }).waitFor()
   await shot('uiframe-start')
-  // M2 立项问卷(§3):入口卡 → 向导 → A1 条件显隐(A2/A3 随手机选项出现)→
+  // M2 立项问卷(第 3 节):入口卡 → 向导 → A1 条件显隐(A2/A3 随手机选项出现)→
   // 「让 AI 建议」→ 七组走到底 → 完成页复制立项单
   await page.getByRole('button', { name: '开始问卷', exact: true }).click()
   const quiz = page.getByRole('dialog', { name: '立项问卷' })
   await quiz.waitFor()
   await quiz.getByRole('checkbox', { name: '电脑桌面应用' }).click()
   await quiz.getByRole('checkbox', { name: '手机 app' }).click()
-  // 条件显隐(§3.2):选了手机才有 iOS/Android 题
+  // 条件显隐(第 3.2 节):选了手机才有 iOS/Android 题
   await quiz.getByText('手机端系统').waitFor()
   await quiz.getByRole('checkbox', { name: 'iOS' }).click()
   await quiz
@@ -682,7 +682,7 @@ try {
   await page.getByRole('tab', { name: /UI 框架/ }).click()
   await page.getByRole('button', { name: /立项单已生成/ }).click()
   await quiz.locator('.qz-brief').waitFor()
-  // M2-d 答案预填第二步(§3.6 入口 A):只答 A1 手机 → 走完 → 产品名 → 带着答案调 UI
+  // M2-d 答案预填第二步(第 3.6 节 入口 A):只答 A1 手机 → 走完 → 产品名 → 带着答案调 UI
   await quiz.getByRole('button', { name: '重答一遍' }).click()
   await quiz.getByText('A 组 · 平台与设备').waitFor()
   await quiz.getByRole('checkbox', { name: '手机 app' }).click()
@@ -746,7 +746,7 @@ try {
   await page.waitForTimeout(150)
   const btnUndo = await solidBtn.boundingBox()
   assert.ok(btnUndo && Math.abs(btnUndo.height - 40) < 0.5, 'undo must restore the button height')
-  // M3-g 键盘微调(§5.6):选中数值后方向键 ±1 步(2px),Shift + 方向键 ±4 步(8px)
+  // M3-g 键盘微调(第 5.6 节):选中数值后方向键 ±1 步(2px),Shift + 方向键 ±4 步(8px)
   const rowOf = (tok: string): ReturnType<typeof page.locator> =>
     page.locator('.uf-row').filter({ has: page.locator('.uf-row-ref', { hasText: `--${tok}` }) })
   const heightInput = rowOf('btn-height-md').locator('input')
@@ -762,7 +762,7 @@ try {
   await page.waitForTimeout(120)
   const step4 = await solidBtn.boundingBox()
   assert.ok(step4 && Math.abs(step4.height - 50) < 0.5, 'Shift+ArrowUp must add four steps (8px)')
-  // M3-g 共用变量(§5.6):ref 变量行出影响面提示,「改变量本身」后写到 radius-md
+  // M3-g 共用变量(第 5.6 节):ref 变量行出影响面提示,「改变量本身」后写到 radius-md
   const radiusRow = rowOf('btn-radius')
   const radiusInput = radiusRow.locator('input')
   await radiusInput.waitFor()
@@ -788,7 +788,7 @@ try {
       .first()
       .evaluate((el) => getComputedStyle(el).borderRadius)
   assert.equal(await iptRadius(), '10px', 'shared-scope nudge must write --radius-md itself')
-  // M3-g 空格前后对比(§5.6):按住看上一版(radius-md 还是 8),松开回当前
+  // M3-g 空格前后对比(第 5.6 节):按住看上一版(radius-md 还是 8),松开回当前
   await solidBtn.click()
   await page.keyboard.down(' ')
   await page.locator('.uf-compare-badge').waitFor()
@@ -804,7 +804,7 @@ try {
     return box ? getComputedStyle(box).borderRadius === '10px' : false
   })
   await shot('uiframe-compare')
-  // 变量板(§5.5):点色板条目 → 属性面板出取色器 → 改主色后画布读数与组件一起更新 → 撤销复原
+  // 变量板(第 5.5 节):点色板条目 → 属性面板出取色器 → 改主色后画布读数与组件一起更新 → 撤销复原
   await page.getByRole('button', { name: '变量板', exact: true }).click()
   const swatch = canvas.locator('[data-uf-part="tok:color-primary"]').first()
   await swatch.waitFor()
@@ -856,7 +856,7 @@ try {
   await placedShell.first().click()
   await page.keyboard.press('Delete')
   await canvas.locator('header.page-header').waitFor()
-  // M3-f 典型页(§5.5):底板示例页签切「表单页」/「列表页」,结构与导出的 pages/*.html 同源
+  // M3-f 典型页(第 5.5 节):底板示例页签切「表单页」/「列表页」,结构与导出的 pages/*.html 同源
   await page.getByRole('button', { name: '表单页', exact: true }).click()
   await canvas.locator('form.pg-form').waitFor()
   await page.getByRole('button', { name: '列表页', exact: true }).click()
@@ -864,7 +864,7 @@ try {
   await shot('uiframe-pg-list')
   await page.getByRole('button', { name: '首页', exact: true }).click()
   await canvas.locator('header.page-header').waitFor()
-  // M1-e 手机画布(§5.4):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
+  // M1-e 手机画布(第 5.4 节):平台切手机 → 设备外框三件套齐全 → 安全区开关 → 换尺寸预设 → 切回桌面
   await page.locator('select[aria-label="平台"]').selectOption('phone')
   await page.locator('.uf-device').waitFor()
   await page.locator('.uf-statusbar').waitFor()
@@ -895,7 +895,7 @@ try {
   await page.locator('.uf-device.is-plain').waitFor()
   await page.getByRole('button', { name: '外框', exact: true }).click()
   await page.locator('.uf-statusbar').waitFor()
-  // M1-f 规范提醒(§5.7):手机端出现 iOS 44 点击区提醒,点条目跳变量板选中该变量
+  // M1-f 规范提醒(第 5.7 节):手机端出现 iOS 44 点击区提醒,点条目跳变量板选中该变量
   await page.getByRole('button', { name: /^检查/ }).click()
   const rulesPanel = page.getByRole('dialog', { name: '平台适配检查' })
   await rulesPanel.waitFor()
@@ -937,7 +937,7 @@ try {
     assert.ok(existsSync(join(exported, rel)), `exported spec package must contain ${rel}`)
   }
   await shot('uiframe-exported')
-  // M1-c 方案库(§5.8):保存(起名)→ 重命名 → 复制 → 导出方案文件 → 删除 → 快照回滚
+  // M1-c 方案库(第 5.8 节):保存(起名)→ 重命名 → 复制 → 导出方案文件 → 删除 → 快照回滚
   await page.getByRole('button', { name: '保存方案', exact: true }).click()
   const saveDialog = page.getByRole('dialog', { name: '保存方案' })
   await saveDialog.waitFor()
@@ -962,7 +962,7 @@ try {
   await copyDialog.getByRole('button', { name: '确定', exact: true }).click()
   await libRows.nth(1).waitFor()
   assert.equal(await libRows.count(), 2, 'copy must add a second scheme')
-  // 导出 .uiframe 方案文件(§15 zip):save 对话框替身在 main 里,落地单文件 zip 容器
+  // 导出 .uiframe 方案文件(第 15 节 zip):save 对话框替身在 main 里,落地单文件 zip 容器
   const schemeZipPath = join(run, '导出验证方案.uiframe')
   await control({ quizSavePath: schemeZipPath })
   const copyRow = libRows.filter({ hasText: '导出验证方案' })
@@ -986,7 +986,7 @@ try {
   // 回滚到保存时刻的方案:底板上的输入框零件随方案存档一起回来(M3-a 持久化)
   await canvas.locator('[data-uf-placed]').waitFor()
   await shot('uiframe-library')
-  // M1-d 导入(§14):库面板「新建方案」回起步页 → 导入浮层 → 粘贴 CSS 变量 → 战报 + 变量板读数换值
+  // M1-d 导入(第 14 节):库面板「新建方案」回起步页 → 导入浮层 → 粘贴 CSS 变量 → 战报 + 变量板读数换值
   await page.locator('.uf-scheme-name').click()
   await page
     .getByRole('dialog', { name: '我的方案库' })
@@ -1009,7 +1009,7 @@ try {
     .filter({ hasText: '#00FF00' })
     .waitFor()
   await shot('uiframe-imported')
-  // M1-g 适配器剪贴板(§13.5):导出钮旁的 ▾ 菜单里复制 Tailwind / RN 主题,出成功横幅
+  // M1-g 适配器剪贴板(第 13.5 节):导出钮旁的 ▾ 菜单里复制 Tailwind / RN 主题,出成功横幅
   await page.getByRole('button', { name: '更多导出方式', exact: true }).click()
   await page.getByRole('menuitem', { name: '复制 Tailwind v4 主题(@theme)' }).click()
   await page.getByText('Tailwind v4 @theme 主题已复制到剪贴板').waitFor()
@@ -1033,7 +1033,7 @@ try {
     .locator('[data-uf-part="tok:color-primary"] .vb-val')
     .filter({ hasText: '#00FF00' })
     .waitFor()
-  // M1-h 收口:空白起步路径(§19 M1「从空白到方案包」)——方案库「新建方案」回起步页 →
+  // M1-h 收口:空白起步路径(第 19 节 M1「从空白到方案包」)——方案库「新建方案」回起步页 →
   // 空白起步 → 底板是真空态(示例页不预载),「填入示例页看看」后才出内容
   await page.getByTitle('打开方案库', { exact: true }).click()
   await page.getByRole('button', { name: '新建方案', exact: true }).click()
@@ -1056,7 +1056,7 @@ try {
   await page.getByRole('button', { name: '零件墙', exact: true }).click()
   await blankCanvas.locator('button.btn--solid[data-uf-part="btn-md"]').first().waitFor()
   await shot('uiframe-blank-wall')
-  // M2-e .uiframe 导入(§15):造一个手机模板方案 zip → 导入浮层「方案文件(.uiframe)」→ 落画布
+  // M2-e .uiframe 导入(第 15 节):造一个手机模板方案 zip → 导入浮层「方案文件(.uiframe)」→ 落画布
   const importDoc2 = templateDoc('tint-phone')
   importDoc2.name = 'ZIP 导入验证'
   const importZip = join(run, '外来方案.uiframe')

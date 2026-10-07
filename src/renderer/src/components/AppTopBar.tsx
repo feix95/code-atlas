@@ -31,7 +31,7 @@ export function AppTopBar({
   hasWorkspace: boolean
   /** 设置模式(第二步):侧栏换脸成设置导航时,搜索/前进后退/刷新都是文件树的家务,置灰 */
   settingsMode?: boolean
-  /** 侧栏这一列此刻露着 = 搜索框/导航组才营业(收起时整组消失,规格 §4.3) */
+  /** 侧栏这一列此刻露着 = 搜索框/导航组才营业(收起时整组消失,规格 第 4.3 节) */
   sidebarShown: boolean
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
@@ -128,7 +128,7 @@ export function AppTopBar({
           </>
         )}
       </div>
-      {/* 页签区(§5.1):各分屏组的胶囊页签带;缝隙与尾部空白仍是拖窗面 */}
+      {/* 页签区(第 5.1 节):各分屏组的胶囊页签带;缝隙与尾部空白仍是拖窗面 */}
       <div className="topbar-tabs">{tabs}</div>
       {/* 窗控三键:整高块并排;— ▢ 悬停灰底,× 悬停红底白叉(Windows 惯例) */}
       <div className="win-ctl">

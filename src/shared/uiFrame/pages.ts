@@ -1,4 +1,4 @@
-// 典型页(M3-f,§5.5 示例屏扩编):列表页 / 设置页 / 表单页。
+// 典型页(M3-f,第 5.5 节 示例屏扩编):列表页 / 设置页 / 表单页。
 // 结构完全复用组件配方产出的真实标签与 class(与演示页同一份 HTML 形态);
 // 页面级样式只写布局,数值一律 var(--pg-*) / var(--page-*) / var(--space-*)。
 import type { CssRule } from './recipes/types.ts'
@@ -91,7 +91,7 @@ const textField = (placeholder: string): PageNode => ({
   children: [{ tag: 'input', cls: 'ipt', attrs: { type: 'text', placeholder } }]
 })
 
-// ── 列表页(§5.5)──
+// ── 列表页(第 5.5 节)──
 
 export const LIST_PAGE = {
   id: 'list',
@@ -152,7 +152,7 @@ export const LIST_PAGE = {
   ]
 }
 
-// ── 设置页(§5.5)──
+// ── 设置页(第 5.5 节)──
 
 export const SETTINGS_PAGE = {
   id: 'settings',
@@ -218,7 +218,7 @@ export const SETTINGS_PAGE = {
   ]
 }
 
-// ── 表单页(§5.5)──
+// ── 表单页(第 5.5 节)──
 
 export const FORM_PAGE = {
   id: 'form',
@@ -301,7 +301,7 @@ export const FORM_PAGE = {
   ]
 }
 
-// ── 页面布局样式(全部变量值;§13.2 规则 11)──
+// ── 页面布局样式(全部变量值;第 13.2 节 规则 11)──
 
 const pgBase: CssRule[] = [
   {

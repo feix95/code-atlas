@@ -1,4 +1,4 @@
-// 立项问卷向导(§3.2):每组一屏、顶部进度、条件显隐由 shared/quiz 数据层算。
+// 立项问卷向导(第 3.2 节):每组一屏、顶部进度、条件显隐由 shared/quiz 数据层算。
 // 每题带「不确定,让 AI 建议」;草稿自动落 localStorage(见 quizStore)。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildProjectBrief } from '@shared/quiz/brief'
@@ -102,7 +102,7 @@ function Question({
   )
 }
 
-/** 完成页(§3.5/§3.6):立项单预览 + 三个出口(复制/存 .md/交内置 agent)+ 技术栈回填 */
+/** 完成页(第 3.5 节/第 3.6 节):立项单预览 + 三个出口(复制/存 .md/交内置 agent)+ 技术栈回填 */
 function DoneView({ answers }: { answers: AnswerMap }): React.JSX.Element {
   const { techStack, productName } = useQuiz()
   const brief = useMemo(() => buildProjectBrief({ answers, productName }), [answers, productName])

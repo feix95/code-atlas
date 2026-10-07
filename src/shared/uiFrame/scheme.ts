@@ -1,4 +1,4 @@
-// 方案文件(§15)与方案库(§5.8)的纯函数层:序列化、解析迁移、清单、id 与快照命名。
+// 方案文件(第 15 节)与方案库(第 5.8 节)的纯函数层:序列化、解析迁移、清单、id 与快照命名。
 // M1 以文件夹形式存放;M2 启用 zip 时内部结构不变。
 import { isCustomIconName } from './customIcon.ts'
 import { defaultDeviceId, isDeviceId } from './devices.ts'
@@ -132,7 +132,7 @@ export function parseDoc(text: string): UiFrameDoc {
   }
 }
 
-/** 生成 manifest(§15):版本号 + 平台 + 风格 + 起止时间 + 应用版本 */
+/** 生成 manifest(第 15 节):版本号 + 平台 + 风格 + 起止时间 + 应用版本 */
 export function manifestFor(
   doc: UiFrameDoc,
   opts: { id: string; style: string; createdAt: string; appVersion: string }

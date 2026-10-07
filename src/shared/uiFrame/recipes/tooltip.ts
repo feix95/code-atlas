@@ -1,5 +1,5 @@
 // 提示气泡配方:<span class="tip">文字<span class="tip__arrow"></span></span>
-// 变体轴(§7.4):深色底 / 浅色底 × 带不带小尾巴(箭头)。
+// 变体轴(第 7.4 节):深色底 / 浅色底 × 带不带小尾巴(箭头)。
 // 箭头是旋转 45deg 的方角块(deg 不是长度单位,不触发写死数值检查);
 // 挂在气泡下沿,外露半边的偏移量走 tip-arrow-drop 变量。
 import type { PageNode, ThemeName } from '../types.ts'

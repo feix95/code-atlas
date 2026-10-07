@@ -38,7 +38,7 @@ interface SchemeState {
   error: string | null
   /** 导入后的一句话战报(套用 N 个变量、跳过 M 个);null = 无 */
   notice: string | null
-  /** 本次导入带出的出处声明(§14);空表 = 没出处可核 */
+  /** 本次导入带出的出处声明(第 14 节);空表 = 没出处可核 */
   claims: ProvenanceClaim[]
   /** 出处核对结果;null = 还没核对 */
   verify: ProvenanceVerdict[] | null
@@ -101,7 +101,7 @@ export const schemeActions = {
     workbenchActions.docReplaced()
     emit({ started: true, schemeId: null, error: null })
   },
-  /** 问卷预填起步(§2 入口 A → 第二步):模板/平台/密度/主色/加强档按答案铺好;
+  /** 问卷预填起步(第 2 节 入口 A → 第二步):模板/平台/密度/主色/加强档按答案铺好;
    *  模板与问卷平台不一致时以问卷平台为准(风格变量照样套) */
   startFromQuiz(
     prefill: QuizPrefill,
@@ -223,7 +223,7 @@ export const schemeActions = {
     emit({ notice: text })
   },
   /**
-   * 导入(§14):三种来源解析出的 doc 以「未入库」身份上画布;
+   * 导入(第 14 节):三种来源解析出的 doc 以「未入库」身份上画布;
    * 战报(套用/跳过计数)挂 notice 由页面横幅展示。
    */
   async importDoc(
@@ -290,7 +290,7 @@ export const schemeActions = {
       return null
     }
   },
-  /** §14 防编造:把本次导入带的出处送主进程,只读逐项比对所选项目文件夹 */
+  /** 第 14 节 防编造:把本次导入带的出处送主进程,只读逐项比对所选项目文件夹 */
   async verifyClaims(): Promise<void> {
     const doc = currentDoc()
     const items: ProvenanceCheckItem[] = state.claims.map((cl) => {

@@ -130,7 +130,7 @@ export const TABS: ComponentRecipe = {
       sel: '.tabs--seg .tab[aria-selected="true"]',
       decls: [['box-shadow', v('tab-seg-shadow')]]
     },
-    // 浏览器卡片型(§7.4):选中页签上方圆角、贴卡片边线,底边并入分组底线
+    // 浏览器卡片型(第 7.4 节):选中页签上方圆角、贴卡片边线,底边并入分组底线
     {
       sel: '.tabs--card',
       decls: [

@@ -1,4 +1,4 @@
-// 立项问卷界面账:答案 + 当前组序号 + 完成态;草稿自动落 localStorage,中途关掉可接着答(§3.2)。
+// 立项问卷界面账:答案 + 当前组序号 + 完成态;草稿自动落 localStorage,中途关掉可接着答(第 3.2 节)。
 // 纯界面态放这;题目/规则/立项单逻辑全在 shared/quiz/ 的数据层。
 import { useSyncExternalStore } from 'react'
 import type { AnswerMap, QuizAnswer } from '@shared/quiz/types'
@@ -13,9 +13,9 @@ interface QuizState {
   groupIndex: number
   /** 是否走完最后一组,落到完成页 */
   done: boolean
-  /** 技术栈回填(§3.6):预设清单选的或粘贴的 agent 结论;预填第二步时作默认导出目标 */
+  /** 技术栈回填(第 3.6 节):预设清单选的或粘贴的 agent 结论;预填第二步时作默认导出目标 */
   techStack: string
-  /** 产品名(§3.5 基本信息,可空):进立项单,也当预填方案的默认名 */
+  /** 产品名(第 3.5 节 基本信息,可空):进立项单,也当预填方案的默认名 */
   productName: string
 }
 

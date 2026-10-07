@@ -19,7 +19,7 @@ export function jumpView(target: JumpTarget): CanvasView {
 }
 
 interface WorkbenchState {
-  /** 画布当前视图;默认底板(§5.3:进来先见「我的 app」,不是零件目录) */
+  /** 画布当前视图;默认底板(第 5.3 节:进来先见「我的 app」,不是零件目录) */
   view: CanvasView
   /** 待消化的定位请求;seq 递增保证同目标重复点也触发 */
   jump: { seq: number; target: JumpTarget } | null
@@ -33,7 +33,7 @@ interface WorkbenchState {
   dragPart: string | null
   /** 底板示例页 id(M3-f 典型页);null = 平台默认页(home/app) */
   pageId: string | null
-  /** 按住空格的前后对比(§5.6):true = 画布临时显示上一版快照,松开恢复 */
+  /** 按住空格的前后对比(第 5.6 节):true = 画布临时显示上一版快照,松开恢复 */
   comparing: boolean
 }
 

@@ -1,4 +1,4 @@
-// design.json(§13.3、规则 14):DTCG 2025.10 格式的纯数据,与 tokens.css 同源生成。
+// design.json(第 13.3 节、规则 14):DTCG 2025.10 格式的纯数据,与 tokens.css 同源生成。
 // 亮暗两套:$value 为亮色,暗色写在 $extensions 的 modes 里。
 import { remNumber } from './units.ts'
 import type { TokenDef, TokenValue, UiFrameDoc } from './types.ts'

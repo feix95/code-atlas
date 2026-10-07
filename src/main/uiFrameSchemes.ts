@@ -1,4 +1,4 @@
-// 「我的方案」库(§5.8、§15):userData/ui-frame-schemes/<id>/ 一方案一文件夹。
+// 「我的方案」库(第 5.8 节、第 15 节):userData/ui-frame-schemes/<id>/ 一方案一文件夹。
 // 文件结构 = 方案文件本体(manifest.json + design.json + thumbnail.png)+ snapshots/ 历史快照。
 // 只写方案库目录与用户自选的导出位置,不碰任何用户项目。
 import { app, BrowserWindow, ipcMain } from 'electron'
@@ -199,7 +199,7 @@ export function registerUiFrameSchemeIpc(): void {
     }
   )
 
-  // 导出为 .uiframe 方案文件(§15 zip 容器):manifest + design + thumbnail 打进单文件,不带快照
+  // 导出为 .uiframe 方案文件(第 15 节 zip 容器):manifest + design + thumbnail 打进单文件,不带快照
   ipcMain.handle(
     CH.uiFrameSchemeExport,
     async (event, rawId: unknown): Promise<UiFrameExportResult> => {

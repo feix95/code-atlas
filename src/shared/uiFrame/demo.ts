@@ -1,5 +1,5 @@
 // 组件演示页(components/<组件>.html 与画布「组件墙」共用):全部变体 × 状态 × 亮暗。
-// 内容由组件配方注册表驱动(§7.1);演示专用的排版与状态模拟 class 只进 _demo.css(规则 12)。
+// 内容由组件配方注册表驱动(第 7.1 节);演示专用的排版与状态模拟 class 只进 _demo.css(规则 12)。
 import { RECIPES } from './recipes/index.ts'
 import { demoStateRules, THEMES, v, type CssRule } from './recipes/kit.ts'
 import type { PageNode } from './types.ts'

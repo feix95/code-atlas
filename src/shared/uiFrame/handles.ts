@@ -1,4 +1,4 @@
-// 画布部件 → 拖动手柄映射(§5.6、§7.1 手柄映射):哪个部件、哪条边、改哪个变量、换算系数与上下限。
+// 画布部件 → 拖动手柄映射(第 5.6 节、第 7.1 节 手柄映射):哪个部件、哪条边、改哪个变量、换算系数与上下限。
 // 新增可拖部件只加配置。系数:拖动 1 逻辑像素对应变量变化多少(左右对称的内边距为 0.5)。
 import { magnetCandidates, refGroup } from './resolve.ts'
 import type { TokenMap, TokenValue } from './types.ts'

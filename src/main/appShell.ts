@@ -44,7 +44,7 @@ let tray: Tray | null = null
 // 不立旗的话关窗=收起,窗口永远走不到销毁那一步
 let quitting = false
 
-// 界面缩放系数的主进程账本(UI 重构 v3·§2.2):窗口记事本记「100% 基准值」,
+// 界面缩放系数的主进程账本(UI 重构 v3·第 2.2 节):窗口记事本记「100% 基准值」,
 // 落盘/落窗都要拿它换算。渲染层 setUiScale 落盘后走 atlas:ui-scale-sync 报进来;
 // 初值取上次存档里记的 scale —— 应用关着的时候缩放不可能变,这个值就是准的
 let currentUiScale = 1
@@ -177,7 +177,7 @@ export function createWindow(): void {
   // 最大化时不记铺满屏的假尺寸,只记「是最大化」这一票
   const persistWindowState = (): void => {
     if (mainWindow.isDestroyed()) return
-    // 落盘一律折回 100% 基准值 + 记下当时系数(规格 §2.2:140% 时物理尺寸也 ×1.4,
+    // 落盘一律折回 100% 基准值 + 记下当时系数(规格 第 2.2 节:140% 时物理尺寸也 ×1.4,
     // 换档重开,窗口相对 UI 的比例恒定);x/y 是屏幕物理坐标,不折
     writeWindowState(userDataDir(), {
       box: baseWindowBox(normalBox ?? mainWindow.getBounds(), currentUiScale),

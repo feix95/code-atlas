@@ -113,7 +113,7 @@ export const SWITCH: ComponentRecipe = {
       sel: '.sw:has(.sw__in:disabled) .sw__in',
       decls: [['cursor', 'not-allowed']]
     },
-    // 带文字(§7.4 文字轴):开关后随一行说明文字
+    // 带文字(第 7.4 节 文字轴):开关后随一行说明文字
     {
       sel: '.sw-txt',
       decls: [

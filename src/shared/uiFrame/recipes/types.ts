@@ -1,5 +1,5 @@
-// 组件配方的类型(§7.1):样式规则表、状态表、演示节、拖动手柄在 handles.ts。
-// 组件 CSS(真实 :hover 等伪类)与演示 CSS(.is-hover 等模拟 class)由同一张状态表生成(§13.2 规则 12);
+// 组件配方的类型(第 7.1 节):样式规则表、状态表、演示节、拖动手柄在 handles.ts。
+// 组件 CSS(真实 :hover 等伪类)与演示 CSS(.is-hover 等模拟 class)由同一张状态表生成(第 13.2 节 规则 12);
 // 样式值只写 var(),数值全部住在 tokens.css(规则 11)。新增组件 = 新增一份配方。
 import type { PageNode, ThemeName } from '../types.ts'
 

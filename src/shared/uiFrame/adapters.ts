@@ -1,4 +1,4 @@
-// 导出适配器(§13.5):把方案变量转写成目标框架的主题文件。
+// 导出适配器(第 13.5 节):把方案变量转写成目标框架的主题文件。
 // Tailwind v4 → @theme 主题表;React Native → TypeScript 主题对象(数值为逻辑像素)。
 // 纯函数,导出包、剪贴板复制与自测共用同一份生成器。
 import { isThemed, literalCss, resolveValue } from './resolve.ts'
@@ -26,7 +26,7 @@ function twVar(name: string): string {
   return name
 }
 
-/** Tailwind v4 主题文件(§13.5):@theme 给亮色值,暗色值落在 [data-theme='dark'] 块(与 tokens.css 同一约定) */
+/** Tailwind v4 主题文件(第 13.5 节):@theme 给亮色值,暗色值落在 [data-theme='dark'] 块(与 tokens.css 同一约定) */
 export function tailwindThemeCss(doc: UiFrameDoc): string {
   const light: string[] = []
   const dark: string[] = []
@@ -71,7 +71,7 @@ function flutterColor(text: string): string | null {
   return `0x${to2(Math.round(alpha * 255))}${to2(r)}${to2(g)}${to2(b)}`
 }
 
-/** Flutter ThemeData 主题(§13.5):ui_theme.dart 一份文件,亮暗双 ThemeData + 全部变量常量 */
+/** Flutter ThemeData 主题(第 13.5 节):ui_theme.dart 一份文件,亮暗双 ThemeData + 全部变量常量 */
 export function flutterThemeDart(doc: UiFrameDoc): string {
   const colors: string[] = []
   const dims: string[] = []
@@ -163,7 +163,7 @@ function rnLiteral(v: TokenValue, theme: ThemeName, indent: string): string {
   }
 }
 
-/** React Native 主题对象(§13.5):亮暗两套颜色/阴影在 light/dark 分桶下,其余按变量分组 */
+/** React Native 主题对象(第 13.5 节):亮暗两套颜色/阴影在 light/dark 分桶下,其余按变量分组 */
 export function reactNativeThemeTs(doc: UiFrameDoc): string {
   const themed = new Map<string, Map<string, string>>() // theme → group → "key: value"
   const plain = new Map<string, string[]>() // group → members

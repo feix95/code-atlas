@@ -1,4 +1,4 @@
-// 「我的方案」库面板(§5.8):列表 + 打开 / 重命名 / 复制 / 快照 / 导出 / 删除。
+// 「我的方案」库面板(第 5.8 节):列表 + 打开 / 重命名 / 复制 / 快照 / 导出 / 删除。
 // 起步页与工作区工具条都从这里进;删除要二次确认,快照可回滚(回滚不改盘上的当前版,下次保存才落)。
 import { useEffect, useState } from 'react'
 import type { SchemeMeta } from '@shared/uiFrame/types'

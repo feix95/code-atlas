@@ -1,8 +1,8 @@
-// 卡片配方:图标底块 + 标题 + 说明;变体见 §7.4(描边 / 阴影 / 填充底、可点击)。
+// 卡片配方:图标底块 + 标题 + 说明;变体见 第 7.4 节(描边 / 阴影 / 填充底、可点击)。
 import type { PageNode, ThemeName } from '../types.ts'
 import { demoCol, demoLabel, demoRow, demoSection, v, type ComponentRecipe } from './kit.ts'
 
-// 样式轴(§7.4):描边 / 阴影 / 填充底
+// 样式轴(第 7.4 节):描边 / 阴影 / 填充底
 const VARIANTS: Array<[cls: string, name: string]> = [
   ['card--outline', '描边'],
   ['card--shadow', '阴影'],
@@ -75,7 +75,7 @@ export const CARD: ComponentRecipe = {
         ['color', v('color-text-secondary')]
       ]
     },
-    // 样式轴(§7.4):纯描边 / 纯阴影 / 填充底
+    // 样式轴(第 7.4 节):纯描边 / 纯阴影 / 填充底
     { sel: '.card--outline', decls: [['box-shadow', 'none']] },
     {
       sel: '.card--shadow',
@@ -92,7 +92,7 @@ export const CARD: ComponentRecipe = {
         ['box-shadow', 'none']
       ]
     },
-    // 可点击(§7.4):手型光标,悬停/焦点态走下方 states
+    // 可点击(第 7.4 节):手型光标,悬停/焦点态走下方 states
     {
       sel: '.card--click',
       decls: [['cursor', 'pointer']]

@@ -1,6 +1,6 @@
 // UI 框架画布:iframe 渲染规格包同款文档,上面叠一层选中框与拖动手柄。
 // 「适应宽度」用 transform: scale() 整体缩放(iframe 与选中框同比例),拖动位移按比例换回逻辑像素。
-// 手机端(§5.4):外层套设备外框(状态栏 / 灵动岛 / 底部手势条 / 安全区线),iframe 定高内滚。
+// 手机端(第 5.4 节):外层套设备外框(状态栏 / 灵动岛 / 底部手势条 / 安全区线),iframe 定高内滚。
 import { useEffect, useMemo, useRef } from 'react'
 import { deviceFor } from '@shared/uiFrame/devices'
 import { PARTS } from '@shared/uiFrame/handles'
@@ -91,13 +91,13 @@ export function UiFrameCanvas({
   onKey
 }: {
   doc: UiFrameDoc
-  /** 空格前后对比(§5.6):非空时画布变量临时按这份快照显示,不重建文档不进历史 */
+  /** 空格前后对比(第 5.6 节):非空时画布变量临时按这份快照显示,不重建文档不进历史 */
   beforeDoc: UiFrameDoc | null
   view: CanvasView
   theme: ThemeName
   /** 示例页适应画布宽度(false = 实际大小);手机端恒按宽度适应 */
   fit: boolean
-  /** 设备外框(§5.4 装饰元素);手机=机身,桌面=窗口框 */
+  /** 设备外框(第 5.4 节 装饰元素);手机=机身,桌面=窗口框 */
   chrome: boolean
   /** 手机端画安全区参考线 */
   safeArea: boolean

@@ -1,4 +1,4 @@
-/* ── UI 框架页签(规格:docs/to-do list《UI框架-需求规格(UI Spec Builder)》§5)──
+/* ── UI 框架页签(规格:docs/to-do list《UI框架-需求规格(UI Spec Builder)》第 5 节)──
    工具条 + 画布(iframe 渲染规格包同款文档)+ 属性面板;选中框与手柄统一走 --sash-hi */
 
 .uf-page {
@@ -75,7 +75,7 @@
   margin: var(--space-2) var(--space-4) 0;
 }
 
-/* 规范提醒面板(§5.7):横幅区的可收清单 */
+/* 规范提醒面板(第 5.7 节):横幅区的可收清单 */
 .uf-rules {
   margin: var(--space-2) var(--space-4) 0;
   border: 1px solid var(--line);
@@ -184,7 +184,7 @@
   color: var(--surface);
 }
 
-/* 复制主题下拉(§13.5 适配器) */
+/* 复制主题下拉(第 13.5 节 适配器) */
 .uf-copy-menu {
   position: absolute;
   top: calc(100% + var(--space-1));
@@ -490,7 +490,7 @@
   font-size: var(--font-xs);
 }
 
-/* ── 共用变量提示(M3-g §5.6):ref 变量的「影响面 + 改哪」行 ── */
+/* ── 共用变量提示(M3-g 第 5.6 节):ref 变量的「影响面 + 改哪」行 ── */
 .uf-share-hint {
   display: flex;
   align-items: center;
@@ -577,7 +577,7 @@
   justify-self: start;
 }
 
-/* ── 起步页(§5.2)与我的方案库(§5.8)── */
+/* ── 起步页(第 5.2 节)与我的方案库(第 5.8 节)── */
 
 .uf-start {
   grid-row: 1 / -1;
@@ -820,7 +820,7 @@
   font-size: var(--font-xs);
 }
 
-/* ── 导入浮层(§14)── */
+/* ── 导入浮层(第 14 节)── */
 
 .uf-import-ops {
   display: flex;
@@ -842,7 +842,7 @@
   line-height: var(--lh-150);
 }
 
-/* ---- 设备外框(§5.4):手机机身 / 桌面窗口,画布装饰,不进规格包 ---- */
+/* ---- 设备外框(第 5.4 节):手机机身 / 桌面窗口,画布装饰,不进规格包 ---- */
 
 .uf-device {
   /* 机身硬件参数:属于设备外观数据,不随主题变化 */

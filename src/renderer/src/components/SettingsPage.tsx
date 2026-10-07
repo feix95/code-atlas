@@ -40,7 +40,7 @@ function clampContextSize(raw: string): number | undefined {
 export type { SectionKey }
 
 /**
- * 设置页(UI v3 §6:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
+ * 设置页(UI v3 第 6 节:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
  * 左侧栏一项 = 右侧一整页(Obsidian 式,滚动翻节已退役),页键与导航共用 SectionKey。
  * 即改即存 —— Obsidian/VS Code 同款:控件每拨一下当场生效并落盘,
  * 文本输入的连击走 300ms 防抖聚成一笔;没有草稿账本、没有页脚确认。

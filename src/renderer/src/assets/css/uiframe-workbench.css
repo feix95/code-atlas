@@ -379,7 +379,7 @@
   flex: 1;
 }
 
-/* 出处核对(§14):agent 填表声明逐条比对结果徽标 */
+/* 出处核对(第 14 节):agent 填表声明逐条比对结果徽标 */
 .uf-provenance {
   margin-top: var(--space-3);
 }

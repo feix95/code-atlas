@@ -6,7 +6,7 @@ import { NotePen, TreeIcon } from './Icons'
 import { openFilePathMenuFor } from './filePathMenuStore'
 
 /** 文件树图标总控:本树内所有 icon(文件/文件夹)共享这一个尺寸,改这里全场生效;
- *  只管这棵树,跟其他区域的图标尺寸互不相干。UI v3 §7 ≈1.1rem = 18px@100% */
+ *  只管这棵树,跟其他区域的图标尺寸互不相干。UI v3 第 7 节 ≈1.1rem = 18px@100% */
 const TREE_ICON_SIZE = 18
 
 interface TreeRowProps {
@@ -111,7 +111,7 @@ function TreeRow({
     .filter(Boolean)
     .join('\n')
 
-  // 展开/收起(UI v3 §7 摘三角:单击文件夹行 = 选中+展开一体,行首不再摆箭头);
+  // 展开/收起(UI v3 第 7 节 摘三角:单击文件夹行 = 选中+展开一体,行首不再摆箭头);
   // 没探过的目录,点行才是触发扫描的唯一入口
   function toggleExpand(): void {
     if (dir.lazy) {

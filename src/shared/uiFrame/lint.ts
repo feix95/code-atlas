@@ -1,4 +1,4 @@
-// 规格包体检(§13.7):导出前扫描规格包,输出问题清单。错误级阻止导出,提醒级允许导出。
+// 规格包体检(第 13.7 节):导出前扫描规格包,输出问题清单。错误级阻止导出,提醒级允许导出。
 // 纯函数:输入规格包与页面结构,不读盘、不碰界面。
 import { RESET_TAGS } from './documents.ts'
 import {
@@ -119,7 +119,7 @@ function escapesRoot(fromFile: string, href: string): boolean {
 
 function checkRefs(pkg: SpecPackage, issues: Issues): void {
   // 变量定义集合:tokens.css + 组件/页面 CSS 里声明的组件级自定义属性(_demo.css 除外,
-  // 演示样式禁止自封变量)。组件级属性如 .sw { --sw-w: var(--sw-width-md) } 是合法手法(§7.4 变体改绑)。
+  // 演示样式禁止自封变量)。组件级属性如 .sw { --sw-w: var(--sw-width-md) } 是合法手法(第 7.4 节 变体改绑)。
   const defined = new Set<string>()
   for (const [file, text] of Object.entries(pkg.files)) {
     if (!file.endsWith('.css') || file.endsWith('_demo.css')) continue

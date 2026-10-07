@@ -33,7 +33,7 @@ export const CH = {
   appVersion: 'atlas:app-version',
   scanFolder: 'atlas:scan-folder',
   scanSubdir: 'atlas:scan-subdir',
-  // 工作区文件名深搜(UI v3 §7.2,唯一功能变更):invoke 配 handle,最新有效制顶掉旧一轮
+  // 工作区文件名深搜(UI v3 第 7.2 节,唯一功能变更):invoke 配 handle,最新有效制顶掉旧一轮
   searchNames: 'atlas:search-names',
   analyzeFile: 'atlas:analyze-file',
   readPreview: 'atlas:read-preview',
@@ -77,7 +77,7 @@ export const CH = {
   // ── UI 框架:规格包导出(只写用户自选位置)/ 打开最近一次导出的文件夹 ──
   uiFrameExport: 'atlas:uiframe-export',
   uiFrameRevealExport: 'atlas:uiframe-reveal-export',
-  // ── UI 框架:我的方案库(§5.8,只写 userData 下的方案库) ──
+  // ── UI 框架:我的方案库(第 5.8 节,只写 userData 下的方案库) ──
   uiFrameSchemeList: 'atlas:uiframe-scheme-list',
   uiFrameSchemeSave: 'atlas:uiframe-scheme-save',
   uiFrameSchemeOpen: 'atlas:uiframe-scheme-open',
@@ -86,13 +86,13 @@ export const CH = {
   uiFrameSchemeSnapshots: 'atlas:uiframe-scheme-snapshots',
   uiFrameSchemeRestore: 'atlas:uiframe-scheme-restore',
   uiFrameSchemeExport: 'atlas:uiframe-scheme-export',
-  // ── UI 框架:导入(§14,只读用户自选路径) ──
+  // ── UI 框架:导入(第 14 节,只读用户自选路径) ──
   uiFrameImportFolder: 'atlas:uiframe-import-folder',
   uiFrameImportFile: 'atlas:uiframe-import-file',
   uiFrameImportUiframe: 'atlas:uiframe-import-uiframe',
-  /** §14 防编造:核对 agent 填表声明的出处(只读用户自选项目目录) */
+  /** 第 14 节 防编造:核对 agent 填表声明的出处(只读用户自选项目目录) */
   uiFrameVerify: 'atlas:uiframe-verify-provenance',
-  // ── 立项问卷(§3):立项单 .md 存到用户自选位置 ──
+  // ── 立项问卷(第 3 节):立项单 .md 存到用户自选位置 ──
   quizBriefSave: 'atlas:quiz-brief-save',
   // ── 桌宠 ──
   // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是

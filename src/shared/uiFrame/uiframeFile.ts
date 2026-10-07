@@ -1,4 +1,4 @@
-// .uiframe 方案文件(§15):zip 容器,内部 manifest.json + design.json + assets/icons/ + thumbnail.png。
+// .uiframe 方案文件(第 15 节):zip 容器,内部 manifest.json + design.json + assets/icons/ + thumbnail.png。
 // 打包/解包是纯函数层:主进程负责选路径与读写,渲染层只拿字符串;格式版本号在 manifest 里(见 scheme.ts)。
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { SCHEME_FORMAT_VERSION } from './scheme.ts'

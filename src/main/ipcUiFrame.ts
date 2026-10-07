@@ -1,6 +1,6 @@
-// UI 框架 · 规格包导出(§13、§1.5):只写用户在对话框里自选的位置,从不碰任何用户项目。
+// UI 框架 · 规格包导出(第 13 节、第 1.5 节):只写用户在对话框里自选的位置,从不碰任何用户项目。
 // 渲染层给出全部文本文件 + 字体清单 + 截图清单;主进程校验路径、写盘、复制字体、截图。
-// §14 导入同在本文件:只读用户自选的方案文件夹 / token 文件,不写一字。
+// 第 14 节 导入同在本文件:只读用户自选的方案文件夹 / token 文件,不写一字。
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { promises as fs } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
@@ -160,8 +160,8 @@ export function registerUiFrameIpc(): void {
     return err === ''
   })
 
-  // ── 导入(§14):全部只读用户自选路径 ──
-  // .uiframe 方案文件(§15 zip 容器):读字节 → 解包 → 透传 manifest/design 给渲染层复用文件夹导入的清洗
+  // ── 导入(第 14 节):全部只读用户自选路径 ──
+  // .uiframe 方案文件(第 15 节 zip 容器):读字节 → 解包 → 透传 manifest/design 给渲染层复用文件夹导入的清洗
   ipcMain.handle(CH.uiFrameImportUiframe, async (event): Promise<SchemeFolderPayload | null> => {
     const file = await pickPathDialog(BrowserWindow.fromWebContents(event.sender), {
       title: '选择 .uiframe 方案文件',
@@ -228,7 +228,7 @@ export function registerUiFrameIpc(): void {
     }
   )
 
-  // §14 防编造:用户自选项目根 → 只读比对每条出处(file+line+期望字面值)。
+  // 第 14 节 防编造:用户自选项目根 → 只读比对每条出处(file+line+期望字面值)。
   // 只读、不递归、不写:claim.file 必须是不越界的相对路径,单个文件超 4MB 直接判 unreadable→mismatch。
   ipcMain.handle(
     CH.uiFrameVerify,

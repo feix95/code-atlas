@@ -113,7 +113,7 @@ export function TabBody({
   // 放最顶上无条件调 —— 下面一串 early return 不能踩到钩子顺序
   const tabZoom = useTabZoom(tab.id)
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
-  // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
+  // 盘符下钻的「瞄一眼」预览(UI v3 第 7.1 节):读根记在页签上(scopeRoot = 浏览树的盘根),
   // 文件节点是浏览账上现捏的最小件 —— CodePreview 照旧走 joinRoot 路径契约读盘
   if (tab.kind === 'peek') {
     if (!tab.scopeRoot) return null
@@ -155,7 +155,7 @@ export function TabBody({
   }
   // UI 框架:app 级单例签,不吃工作区(规格见 docs/to-do list《UI框架-需求规格(UI Spec Builder)》)
   if (tab.kind === 'uiframe') return <UiFramePage />
-  // 设置页:UI v3 §6 弹窗退役改页签;关签 = 页签带的 ×(页内无页脚,即改即存无账要结)
+  // 设置页:UI v3 第 6 节 弹窗退役改页签;关签 = 页签带的 ×(页内无页脚,即改即存无账要结)
   if (tab.kind === 'settings') {
     return (
       <SettingsPage

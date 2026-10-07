@@ -569,7 +569,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="m19.8 19.8 2.2 2.2" />
     </>
   ),
-  // ── 工作区卡/菜单供稿(UI v3 §7.3 小葵原样收录,lucide 线稿)──
+  // ── 工作区卡/菜单供稿(UI v3 第 7.3 节 小葵原样收录,lucide 线稿)──
   // 菜单收起态指示:lucide chevrons-up-down
   chevronsUpDown: (
     <>
@@ -758,14 +758,14 @@ const BOOK: Record<string, React.ReactNode> = {
   // 裸对勾(不带圈):预设卡角上的「选中了」小标记
   checkBare: <path d="M20 6 9 17l-5-5" />,
   // ── UI v3 框架件(小葵供稿,lucide 线稿;框架图标一律 mono 吃 currentColor,不给户口色)──
-  // 搜索框放大镜(lucide search,规格 §5.3)
+  // 搜索框放大镜(lucide search,规格 第 5.3 节)
   search: (
     <>
       <path d="m21 21-4.34-4.34" />
       <circle cx="11" cy="11" r="8" />
     </>
   ),
-  // 收起侧栏钮(lucide panel-left,规格 §5 槽位1)
+  // 收起侧栏钮(lucide panel-left,规格 第 5 节 槽位1)
   panelLeft: (
     <>
       <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -805,7 +805,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <line x1="12" x2="12" y1="22" y2="18" />
     </>
   ),
-  // 关系图谱(lucide view,规格 §6 槽位1)
+  // 关系图谱(lucide view,规格 第 6 节 槽位1)
   view: (
     <>
       <path d="M21 17v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2" />
@@ -814,7 +814,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" />
     </>
   ),
-  // 概览(lucide navigation,规格 §6 槽位2)
+  // 概览(lucide navigation,规格 第 6 节 槽位2)
   navigation: <polygon points="3 11 22 2 13 21 11 13 3 11" />,
   // UI 框架(lucide layout-template)
   layoutTemplate: (
@@ -824,7 +824,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <rect width="5" height="7" x="16" y="14" rx="1" />
     </>
   ),
-  // AI 状态三态(规格 §6.1):就绪绿勾圈 / 加载中蓝弧(旋转靠 CSS) / 未加载灰插头
+  // AI 状态三态(规格 第 6.1 节):就绪绿勾圈 / 加载中蓝弧(旋转靠 CSS) / 未加载灰插头
   circleCheck: (
     <>
       <circle cx="12" cy="12" r="10" />

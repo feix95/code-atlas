@@ -1,5 +1,5 @@
 // 立项问卷(M2-a)数据层自测:纯 node 直跑。
-// 覆盖:§3.2 条件显隐、§3.4 推导规则、§3.5 立项单结构、§3.6/G 组答案预填第二步。
+// 覆盖:第 3.2 节 条件显隐、第 3.4 节 推导规则、第 3.5 节 立项单结构、第 3.6 节/G 组答案预填第二步。
 import assert from 'node:assert/strict'
 import {
   QUESTIONS,
@@ -16,15 +16,15 @@ import type { AnswerMap } from '../src/shared/quiz/types.ts'
 const choice = (...ids: string[]) => ({ kind: 'options' as const, ids })
 const ai = { kind: 'ai' as const }
 
-// ── 题目表完整性:§3.3 的 23 道题、七组全在 ──
-assert.equal(QUESTIONS.length, 29, '题库应为 §3.3 的 29 道题')
+// ── 题目表完整性:第 3.3 节 的 23 道题、七组全在 ──
+assert.equal(QUESTIONS.length, 29, '题库应为 第 3.3 节 的 29 道题')
 assert.deepEqual(
   [...new Set(QUESTIONS.map((q) => q.group))],
   ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
   '分组应为 A~G 七组且按序'
 )
 
-// ── 条件显隐(§3.2)──
+// ── 条件显隐(第 3.2 节)──
 {
   const none: AnswerMap = {}
   const ids = visibleQuestions(none).map((q) => q.id)
@@ -62,7 +62,7 @@ assert.deepEqual(
   assert.equal(optionLabel('A5', 'offline'), '必须能完全离线')
 }
 
-// ── 推导规则(§3.4)──
+// ── 推导规则(第 3.4 节)──
 {
   const has = (a: AnswerMap, id: string) => matchedRules(a).some((r) => r.id === id)
   assert.equal(has({ D2: choice('sync') }, 'need-backend'), true)
@@ -81,10 +81,10 @@ assert.deepEqual(
   assert.equal(has({ F1: choice('zero') }, 'zero-budget'), true)
   assert.equal(has({ A5: choice('offline') }, 'offline-first'), true)
   assert.equal(has({ D9: choice('enhanced') }, 'a11y-enhanced'), true)
-  assert.equal(QUIZ_RULES.length, 12, '§3.4 首批 12 条规则')
+  assert.equal(QUIZ_RULES.length, 12, '第 3.4 节 首批 12 条规则')
 }
 
-// ── 立项单(§3.5 五节结构)──
+// ── 立项单(第 3.5 节 五节结构)──
 {
   const answers: AnswerMap = {
     A1: choice('desktop', 'phone'),
@@ -119,11 +119,11 @@ assert.deepEqual(
   assert.ok(!md2.includes('A4 屏幕方向'), '隐藏题不进立项单')
 }
 
-// ── 技术栈预设(§3.7)──
+// ── 技术栈预设(第 3.7 节)──
 assert.equal(TECH_STACK_PRESETS.length, 4)
 assert.ok(TECH_STACK_PRESETS[1].stacks.includes('React Native(Expo)'))
 
-// ── 预填第二步(§2/G 组)──
+// ── 预填第二步(第 2 节/G 组)──
 {
   const p = quizPrefill({
     A1: choice('phone'),

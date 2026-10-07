@@ -1,4 +1,4 @@
-// 字体(§11):Inter + 思源黑体(Noto Sans SC)可变字体,woff2 打包进规格包,完全离线。
+// 字体(第 11 节):Inter + 思源黑体(Noto Sans SC)可变字体,woff2 打包进规格包,完全离线。
 // 字体面清单从 fontsource 的 index.css 解析;导出与画布用同一份清单,只是文件地址不同。
 import type { FontPlan } from './types.ts'
 

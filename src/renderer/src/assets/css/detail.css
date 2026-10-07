@@ -91,7 +91,7 @@ body.is-sash-dragging .topbar-side {
   border-left: 1px solid var(--line);
 }
 
-/* 分割条:跟左栏分割条一家 —— 平时一根细线,悬停/拖动时 4px 粗蓝条(§7 给定) */
+/* 分割条:跟左栏分割条一家 —— 平时一根细线,悬停/拖动时 4px 粗蓝条(第 7 节 给定) */
 .pane-sash {
   flex: none;
   width: 5px;

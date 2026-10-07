@@ -1,4 +1,4 @@
-// 问卷答案 → 第二步初始值(§2「答案预填」、§3.6 回填)。
+// 问卷答案 → 第二步初始值(第 2 节「答案预填」、第 3.6 节 回填)。
 // 只产出确定性的映射结果:平台、起步模板、密度与主色的变量覆盖;怎么用它由界面层决定。
 
 import type { TokenValue, UiPlatform } from '../uiFrame/types.ts'
@@ -13,7 +13,7 @@ const one = (answers: AnswerMap, qid: string): string | null => {
   return a?.kind === 'options' ? (a.ids[0] ?? null) : null
 }
 
-/** G1 风格 → 已实现模板的映射;§8.2 九风格里四个未实现(选它们记进立项单,不预填) */
+/** G1 风格 → 已实现模板的映射;第 8.2 节 九风格里四个未实现(选它们记进立项单,不预填) */
 const STYLE_TEMPLATE: Record<string, string> = {
   minimal: 'minimal-desk',
   modern: 'modern-desk',
@@ -64,11 +64,11 @@ export interface QuizPrefill {
   overrides: Record<string, TokenValue>
   /** G1 选的风格名(含未实现风格),供界面层提示用 */
   styleId: string | null
-  /** D9 选「需要重点照顾」→ §5.7 加强档校验 */
+  /** D9 选「需要重点照顾」→ 第 5.7 节 加强档校验 */
   a11yEnhanced: boolean
 }
 
-/** A1 含手机/平板 → phone;桌面/网页/小程序 → desktop(网页先按电脑端画布,§22-4) */
+/** A1 含手机/平板 → phone;桌面/网页/小程序 → desktop(网页先按电脑端画布,第 22 节-4) */
 export function quizPrefill(answers: AnswerMap): QuizPrefill {
   const platform: UiPlatform = picked(answers, 'A1', 'phone', 'tablet') ? 'phone' : 'desktop'
   const styleId = one(answers, 'G1')

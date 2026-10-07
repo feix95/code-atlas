@@ -1,6 +1,6 @@
 // 资源管理器式左栏(UI v3 第 2 层 · 常驻):workspace 栏(地址栏式卡 + ⇅ 菜单)
 // + 文件树 + 扫描状态脚栏,右缘一条可拖分割条。
-// 规格 §7.1「不存在空侧栏」:没开工作区时树区 = 「这台电脑」盘符列表;
+// 规格 第 7.1 节「不存在空侧栏」:没开工作区时树区 = 「这台电脑」盘符列表;
 // 现在的盘符行单击即开,B8 换成资源管理器语义(单击原地展开、双击开为工作区)。
 // 「项目导览」钮按规格摘除:导览内容 = 概览页签的零状态,入口挪进 rail。
 import { useEffect, useState } from 'react'
@@ -65,7 +65,7 @@ export function WorkspaceSidebar({
   onSettingsSection,
   uiframeMode
 }: {
-  /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
+  /** null = 没开工作区:树区换成「这台电脑」盘符列表(第 7.1 节 空态) */
   result: ScanResult | null
   notes: NoteMap
   selectedFile: ScanFileNode | null
@@ -81,7 +81,7 @@ export function WorkspaceSidebar({
   saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
   treeNote: string | null
-  /** 顶栏搜索词的深搜账本(UI v3 §7.2):非 null = 树区整体换成结果清单;
+  /** 顶栏搜索词的深搜账本(UI v3 第 7.2 节):非 null = 树区整体换成结果清单;
       null = 没词/没工作区,文件树原样站岗 */
   search: {
     q: string
@@ -92,7 +92,7 @@ export function WorkspaceSidebar({
   } | null
   /** 文件命中:探开父链再开预览页签(App 的 openSearchFile) */
   onOpenSearchFile: (hit: SearchNameHit) => void
-  /** 文件夹命中:打开为工作区(§7.2 给定) */
+  /** 文件夹命中:打开为工作区(第 7.2 节 给定) */
   onOpenSearchDir: (hit: SearchNameHit) => void
   folder: string | null
   scanning: boolean
@@ -104,7 +104,7 @@ export function WorkspaceSidebar({
   dismissPathHint: () => void
   goPath: () => Promise<void>
   setPathShaking: React.Dispatch<React.SetStateAction<boolean>>
-  /** 工作区菜单(§7.1):recents 账本原样进,菜单内部分 pin/历史两区 */
+  /** 工作区菜单(第 7.1 节):recents 账本原样进,菜单内部分 pin/历史两区 */
   recents: RecentProject[]
   /** 菜单里点条目:直接进入该工作区(= 输路径回车的同一动作) */
   onOpenWorkspace: (path: string) => void
@@ -134,7 +134,7 @@ export function WorkspaceSidebar({
   /** UI 框架模式(工作台改造):激活签是 UI 框架页时,侧栏换脸成零件盒;文件树同样保活藏着 */
   uiframeMode: boolean
 }): React.JSX.Element {
-  // ── workspace 卡 = 浏览器地址栏(§7.0):点卡任意处 = 聚焦输入框 + 弹出菜单;
+  // ── workspace 卡 = 浏览器地址栏(第 7.0 节):点卡任意处 = 聚焦输入框 + 弹出菜单;
   //    ⇅ 钮开/收;Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
   const [menuOpen, setMenuOpen] = useState(false)
   // 键盘高亮行号:-1 = 还没动过方向键,Enter 还按「输入的路径」走;按下箭头才开始挑条目
@@ -296,7 +296,7 @@ export function WorkspaceSidebar({
         {uiframeMode && <UiFrameParts />}
         <div className="sidebar-mid" hidden={settingsMode || uiframeMode}>
           {result ? (
-            // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
+            // 第 7.2 节:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
             search ? (
               <SearchResults
                 query={search.q}
@@ -324,7 +324,7 @@ export function WorkspaceSidebar({
               />
             )
           ) : (
-            /* 「这台电脑」空态(§7.1):盘符列表可下钻 —— 单击原地展开,
+            /* 「这台电脑」空态(第 7.1 节):盘符列表可下钻 —— 单击原地展开,
              双击开为工作区,单击文件开预览页签 */
             <DriveBrowser
               drives={drives}

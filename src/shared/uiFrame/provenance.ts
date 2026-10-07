@@ -1,4 +1,4 @@
-// 出处核对的纯比对逻辑(§14 防编造):主进程读到文件文本后在这里判定,
+// 出处核对的纯比对逻辑(第 14 节 防编造):主进程读到文件文本后在这里判定,
 // 渲染层与自测共用同一把尺。判定四态见 ProvenanceVerdict.status。
 import type { ProvenanceVerdict } from './types.ts'
 

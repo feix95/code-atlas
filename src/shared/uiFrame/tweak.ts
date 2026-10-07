@@ -1,4 +1,4 @@
-// 键盘微调与前后对比(§5.6):方向键 ±1 步长、Shift + 方向键 ±4 步长。
+// 键盘微调与前后对比(第 5.6 节):方向键 ±1 步长、Shift + 方向键 ±4 步长。
 // 步长口径与拖动手柄一致:像素变量 = 吸附步长(0.125rem),字重 10,其余数字 0.05。
 import { SNAP_STEP_PX } from './units.ts'
 import type { TokenValue } from './types.ts'

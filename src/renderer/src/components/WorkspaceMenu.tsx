@@ -1,4 +1,4 @@
-// 工作区菜单(UI v3 §7.1):浮层挂在 workspace 卡下沿 —— 上区 pin 置顶 + 历史区(最多 5 条),
+// 工作区菜单(UI v3 第 7.1 节):浮层挂在 workspace 卡下沿 —— 上区 pin 置顶 + 历史区(最多 5 条),
 // 分隔线下常驻一条「我的电脑」,点了回这台电脑、文件树给盘符列;条目单行路径文本,点开为工作区;
 // 行首 pin 图标悬停显形(pin↔pin-off 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动
 // 高亮 + Enter 进入(按键由 workspace 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感;
@@ -63,7 +63,7 @@ export function WorkspaceMenu({
         >
           <span className="wsm-path">{r.p}</span>
         </button>
-        {/* 行尾 × 即删(§7.1 拍板:删了就是删了,无撤销) */}
+        {/* 行尾 × 即删(第 7.1 节 拍板:删了就是删了,无撤销) */}
         <button
           type="button"
           className="wsm-del"
@@ -98,7 +98,7 @@ export function WorkspaceMenu({
           {history.map((r, i) => renderRow(r, pinned.length + i))}
         </div>
       )}
-      {/* 常驻「我的电脑」(§7.1 拍板):分隔线下固定一条,点了回家、树区给盘符列;
+      {/* 常驻「我的电脑」(第 7.1 节 拍板):分隔线下固定一条,点了回家、树区给盘符列;
           不归键盘高亮账,鼠标点 */}
       <div className="wsm-sep" aria-hidden="true" />
       <div className="wsm-drives">

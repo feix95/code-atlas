@@ -1,4 +1,4 @@
-// 「UI 框架」页签(§5 + 工作台改造):起步页(选平台/模板/我的方案)→ 工具条 + 底板 + 属性面板;
+// 「UI 框架」页签(第 5 节 + 工作台改造):起步页(选平台/模板/我的方案)→ 工具条 + 底板 + 属性面板;
 // 画布视图与方案库浮层归 workbenchStore(零件盒在侧栏,两边共用一本账)。
 import { useEffect, useMemo, useState } from 'react'
 import { flutterThemeDart, reactNativeThemeTs, tailwindThemeCss } from '@shared/uiFrame/adapters'
@@ -56,7 +56,7 @@ function eatsSpace(t: EventTarget | null): boolean {
 function handleUndoKey(e: KeyboardEvent | React.KeyboardEvent): void {
   // 已处理过的别再处理:div 冒泡拦截后 window 监听会再见一次同一事件
   if (e.defaultPrevented) return
-  // 空格前后对比(§5.6):按住显示修改前,松开恢复;不进撤销栈
+  // 空格前后对比(第 5.6 节):按住显示修改前,松开恢复;不进撤销栈
   if (e.key === ' ' || e.code === 'Space') {
     if (eatsSpace(e.target)) return
     e.preventDefault()
@@ -181,7 +181,7 @@ export function UiFramePage(): React.JSX.Element {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exporter = useUiFrameExport()
-  // 平台规范提醒(§5.7):随方案每次改动实时重算
+  // 平台规范提醒(第 5.7 节):随方案每次改动实时重算
   const issues = useMemo(() => platformIssues(doc), [doc])
 
   // 换视图(含零件盒跳转)就清掉部件选中:旧视图的部件在新画布上不存在;
@@ -235,7 +235,7 @@ export function UiFramePage(): React.JSX.Element {
     else setNaming(true)
   }
 
-  // 复制适配主题到剪贴板(§13.5):与导出包内的 adapters/ 文件同一份生成器
+  // 复制适配主题到剪贴板(第 13.5 节):与导出包内的 adapters/ 文件同一份生成器
   const copyAdapter = async (kind: 'tailwind' | 'rn' | 'flutter'): Promise<void> => {
     const text =
       kind === 'tailwind'
@@ -485,7 +485,7 @@ export function UiFramePage(): React.JSX.Element {
         )}
         <UiFrameCanvas
           doc={doc}
-          // 空格前后对比:有历史就临时显示上一版快照;画布只换变量不重载(§5.6)
+          // 空格前后对比:有历史就临时显示上一版快照;画布只换变量不重载(第 5.6 节)
           beforeDoc={comparing ? (past[past.length - 1] ?? null) : null}
           view={view}
           theme={theme}

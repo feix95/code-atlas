@@ -1,5 +1,5 @@
 // UI 框架(UI Spec Builder)规格包自测:纯 node 直跑,读 node_modules 里的 lucide 与字体清单。
-// 覆盖:单位换算、默认模板导出零体检错误、实测暴露的缺口能被体检拦下(§23.2)、产物同源一致。
+// 覆盖:单位换算、默认模板导出零体检错误、实测暴露的缺口能被体检拦下(第 23.2 节)、产物同源一致。
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -137,7 +137,7 @@ check('体检零错误零提醒', () => {
   for (const i of issues) console.log(`    ${i.level} [${i.check}] ${i.file}: ${i.message}`)
   assert.equal(issues.length, 0)
 })
-check('规格包文件齐全(§13.3):注册表全部组件的 css 与演示页俱全', () => {
+check('规格包文件齐全(第 13.3 节):注册表全部组件的 css 与演示页俱全', () => {
   assert.equal(RECIPES.length, 53)
   for (const f of [
     'README-给AI.md',
@@ -282,7 +282,7 @@ check('组件变量改为具体数值后:tokens.css 与 design.json 同步,体�
   assert.equal(hasErrors(lintPackage(p2, PAGES)), false)
 })
 
-console.log('── 体检拦得住实测缺口(§23.2)')
+console.log('── 体检拦得住实测缺口(第 23.2 节)')
 check('含糊词:「可从 Google Fonts 引入」', () => {
   const p = clonePkg(pkg)
   p.files['README-给AI.md'] += '\n字体可从 Google Fonts 引入。\n'
@@ -356,7 +356,7 @@ check('行内间距依赖:父级不是 flex 时提醒', () => {
   assert.ok(lintPackage(pkg, { 'pages/x.md': inline }).some((i) => i.check === '行内间距依赖'))
 })
 
-console.log('── 变量板(§5.5)')
+console.log('── 变量板(第 5.5 节)')
 check('每个基础变量在板上各有一个条目,part 为 tok:<名>且一一对应', () => {
   const parts: string[] = []
   const walk = (n: PageNode): void => {
@@ -486,7 +486,7 @@ check('manifestFor 与快照名:格式版本、模板户口、时间戳形态', 
   assert.match(snapshotStamp(new Date('2026-10-02T12:03:04')), /^20261002-120304$/)
   assert.match('20261002-120304.json', SNAPSHOT_RE)
 })
-check('.uiframe zip(§15):打包解包往返,成员齐全,版本/非 zip 拒绝', () => {
+check('.uiframe zip(第 15 节):打包解包往返,成员齐全,版本/非 zip 拒绝', () => {
   const manifest = JSON.stringify(
     manifestFor(doc, {
       id: 'x',
@@ -525,7 +525,7 @@ check('.uiframe zip(§15):打包解包往返,成员齐全,版本/非 zip 拒绝'
   assert.throws(() => packUiframe({ manifest: '{"formatVersion":2}', design }), /版本不对/)
 })
 
-console.log('── 导入(M1-d,§14)')
+console.log('── 导入(M1-d,第 14 节)')
 check('导出 design.json → 导回:全部变量数值逐字一致(往返验收)', () => {
   const exported = pkg.files['design.json']
   const back = importDtcg(exported, '回读')
@@ -598,7 +598,7 @@ check('方案文件夹:内部 design.json 直接还原;导出的 DTCG 包也能�
   const r2 = importSchemeFiles(null, pkg.files['design.json'], '导出包')
   assert.equal(r2.applied, Object.keys(doc.tokens).length)
 })
-check('agent 填表:DTCG 带出处扩展 → claims 收齐,值照常套用(§14)', () => {
+check('agent 填表:DTCG 带出处扩展 → claims 收齐,值照常套用(第 14 节)', () => {
   const r = importDtcg(
     JSON.stringify({
       color: {
@@ -625,7 +625,7 @@ check('agent 填表:DTCG 带出处扩展 → claims 收齐,值照常套用(§14)
     confidence: '实测'
   })
 })
-check('出处核对:行内命中/行号偏/对不上/文件找不到四态(§14)', () => {
+check('出处核对:行内命中/行号偏/对不上/文件找不到四态(第 14 节)', () => {
   const css = ':root{\n  --color-primary: #1a66e6;\n  --space-4: 1rem;\n}'
   assert.equal(verifyClaim('a', 'f', 2, '#1A66E6', css).status, 'matched')
   const off = verifyClaim('a', 'f', 1, '#1a66e6', css)
@@ -647,7 +647,7 @@ check('全对不上时报人话错误,不静默产空方案', () => {
   assert.throws(() => importCssVars('body{color:red}', 'x'), /没在文本里找到/)
 })
 
-console.log('── 设备与手机端画布(M1-e,§5.4)')
+console.log('── 设备与手机端画布(M1-e,第 5.4 节)')
 check('设备预设:桌面 3 档 + 手机 3 档,各有默认档', () => {
   assert.equal(devicesFor('desktop').length, 3)
   assert.equal(devicesFor('phone').length, 3)
@@ -727,7 +727,7 @@ check('示例页结构与文件随平台走:pageFor 与画布同源', () => {
   }
 })
 
-console.log('── 典型页与响应式断点(M3-f,§5.5/§7.2)')
+console.log('── 典型页与响应式断点(M3-f,第 5.5 节/第 7.2 节)')
 check('pagesFor:平台示例页 + 列表/设置/表单典型页,四页齐出', () => {
   const ids = pagesFor('desktop').map((p) => p.id)
   assert.deepEqual(ids, ['home', 'list', 'settings', 'form'])
@@ -786,7 +786,7 @@ check('pageMd 只列本页实际引用的页面变量', () => {
   assert.doesNotMatch(formMd, /--app-nav-height/)
 })
 
-console.log('── 平台规范校验(M1-f,§5.7)')
+console.log('── 平台规范校验(M1-f,第 5.7 节)')
 check('对比度算法:黑白 21:1、同色 1:1、参数顺序无关', () => {
   assert.equal(Math.round(contrastRatio('#000000', '#ffffff') ?? 0), 21)
   assert.equal(contrastRatio('#ffffff', '#ffffff'), 1)
@@ -846,7 +846,7 @@ check('默认方案提示有价值:桌面与手机都检出边界对比度与点
   assert.ok(phone.some((i) => i.rule === '最小点击区' && i.target === 'control-md'))
   assert.ok(!phone.some((i) => i.rule === '悬停态缺失'), '手机不查悬停态')
 })
-check('D9 加强档(§5.7):字号下限 +2、文字对比度 7:1、边界 4.5:1,消息带标记', () => {
+check('D9 加强档(第 5.7 节):字号下限 +2、文字对比度 7:1、边界 4.5:1,消息带标记', () => {
   const d = defaultDoc()
   d.tokens['font-size-md'] = { ...d.tokens['font-size-md'], value: { kind: 'dimension', px: 13 } }
   assert.equal(
@@ -891,7 +891,7 @@ check('a11yEnhanced/targetStack 字段随 design.json 往返', () => {
   assert.equal(plain.targetStack, undefined)
 })
 
-console.log('── 导出适配器(M1-g,§13.5)')
+console.log('── 导出适配器(M1-g,第 13.5 节)')
 check('Tailwind @theme:命名空间归位、ref 解为字面值、暗色值进 [data-theme] 块', () => {
   const css = tailwindThemeCss(doc)
   assert.ok(css.includes('@theme {'), '必须有 @theme 块')
@@ -925,7 +925,7 @@ check('Flutter ThemeData:颜色出 0xAARRGGBB、亮暗双 ThemeData、ref 解为
   const ov = flutterThemeDart(templateDoc('tint-phone'))
   assert.ok(/0x[0-9A-F]{8}/.test(ov), 'rgba 遮罩色要转出 8 位 ARGB')
 })
-check('Tailwind @theme 导入:命名空间逆归位、暗色块并回 dark 端(§13.5 往返)', () => {
+check('Tailwind @theme 导入:命名空间逆归位、暗色块并回 dark 端(第 13.5 节 往返)', () => {
   const css = tailwindThemeCss(doc)
   const r = importCssVars(css, 'tw 主题')
   assert.equal(r.sourceLabel, 'Tailwind @theme')
@@ -962,7 +962,7 @@ check('规格包含三个适配器文件,体检仍零错误零提醒', () => {
   assert.equal(errs.length, 0)
 })
 
-console.log('── M1 收口:全链路验收(§19 M1 标准)')
+console.log('── M1 收口:全链路验收(第 19 节 M1 标准)')
 check('空白起步:空方案也产出零错误的完整规格包', () => {
   const d = templateDoc(BLANK_ID)
   const p = buildPackage(d, assets)
@@ -1124,7 +1124,7 @@ check('custom 图标:槽位值 custom:<名>,design.json 往返 + 规格包内联
 
 console.log('── M3-g:键盘微调 · 空格对比 · 共用变量 · 变体轴补全')
 
-check('键盘微调(§5.6):方向键 ±1 步长、Shift ±4 步长,吃上下限', () => {
+check('键盘微调(第 5.6 节):方向键 ±1 步长、Shift ±4 步长,吃上下限', () => {
   const px = { kind: 'dimension', px: 40 } as const
   assert.deepEqual(nudgeValue(px, 1, 1), { kind: 'dimension', px: 42 })
   assert.deepEqual(nudgeValue(px, -1, 1), { kind: 'dimension', px: 38 })
@@ -1157,7 +1157,7 @@ check('「写哪」口径:shared 写引用目标,local 写回本变量(断开成
   assert.equal(editTarget('radius-md', 'shared', doc.tokens), 'radius-md')
 })
 
-check('变体轴补全(§7.4):按钮浅底/文字/危险/形状/撑满,页签卡片,卡片四态', () => {
+check('变体轴补全(第 7.4 节):按钮浅底/文字/危险/形状/撑满,页签卡片,卡片四态', () => {
   const btnCss = pkg.files['components/button.css']
   const btnHtml = pkg.files['components/button.html']
   for (const sel of [

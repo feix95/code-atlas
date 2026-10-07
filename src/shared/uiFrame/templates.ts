@@ -1,4 +1,4 @@
-// 首批模板(§9.2):模板 = 平台 + 风格预设 + 全套变量。
+// 首批模板(第 9.2 节):模板 = 平台 + 风格预设 + 全套变量。
 // 实现方式:在默认变量表上叠加每套模板的覆盖值;组件变体差异经「组件级自定义属性」
 // 传回变量名(如按钮圆角改成全圆),不写死数值,导出的包同样零写死。
 import { defaultDeviceId } from './devices.ts'
@@ -13,12 +13,12 @@ export interface TemplateMeta {
   id: string
   name: string
   platform: UiPlatform
-  /** 风格预设名(§8) */
+  /** 风格预设名(第 8 节) */
   style: string
   blurb: string
 }
 
-/** §9.2 首批 4 个模板 + 空白起步(blank 不在表里,起步页单独画) */
+/** 第 9.2 节 首批 4 个模板 + 空白起步(blank 不在表里,起步页单独画) */
 export const TEMPLATES: TemplateMeta[] = [
   {
     id: 'minimal-desk',

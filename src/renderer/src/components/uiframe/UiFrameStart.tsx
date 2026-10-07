@@ -1,4 +1,4 @@
-// 「UI 框架」起步页(§5.2):选平台 → 选起点(模板 / 空白 / 我的方案 / 导入)。
+// 「UI 框架」起步页(第 5.2 节):选平台 → 选起点(模板 / 空白 / 我的方案 / 导入)。
 // 模板卡按平台过滤;我的方案列出库清单(缩略图、平台、风格、最后修改时间);导入归 M1-d。
 import { useEffect, useState } from 'react'
 import { TEMPLATES } from '@shared/uiFrame/templates'
