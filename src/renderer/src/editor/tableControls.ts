@@ -1,6 +1,7 @@
 /** 表格控件层:行列抓手拖拽重排、边缘加号、松手回弹动画 */
 import type { EditorView } from '@codemirror/view'
 import { appendRow } from './tableCellEditing.ts'
+import { attachGripHover, makeGripZones } from './tableGripHover.ts'
 import { dispatchModel, findTableRange, readModelFromDom } from './tableDom.ts'
 
 // ── 抓手与边缘加号(Excel 式体感) ──
@@ -95,38 +96,17 @@ export function attachTableControls(view: EditorView, box: HTMLElement, wrapEl: 
   addCol.className = 'cm-live-edge-add cm-live-edge-col'
   addCol.textContent = '＋'
   addCol.title = '右侧加一列'
-  ui.append(rowGrip, colGrip, addRow, addCol)
+  ui.append(...makeGripZones(doc), rowGrip, colGrip, addRow, addCol)
   box.appendChild(ui)
 
-  // 悬停哪行哪列,抓手就贴到那行左缘/那列顶缘
-  let hoverCell: HTMLElement | null = null
-  box.addEventListener('mousemove', (e) => {
-    const t = e.target
-    const cell = t instanceof Node ? (t as Element).closest?.('td, th') : null
-    // 鼠标移到抓手/加号/缝隙上时目标不是格子:保留上一个悬停格,抓手按下才找得到行列
-    if (!cell) return
-    hoverCell = cell as HTMLElement
-    if (drag) return
-    const boxRect = box.getBoundingClientRect()
-    const cellRect = hoverCell.getBoundingClientRect()
-    const tr = hoverCell.closest('tr')
-    const inBody = tr?.closest('tbody') != null
-    rowGrip.classList.toggle('is-on', inBody)
-    colGrip.classList.add('is-on')
-    if (tr && inBody) {
-      const trRect = tr.getBoundingClientRect()
-      rowGrip.style.top = `${trRect.top - boxRect.top + trRect.height / 2}px`
-    }
-    colGrip.style.left = `${cellRect.left - boxRect.left + cellRect.width / 2}px`
-  })
-  box.addEventListener('mouseleave', (e) => {
-    if (e.relatedTarget instanceof Node && ui.contains(e.relatedTarget)) return
-    hoverCell = null
-    if (!drag) {
-      rowGrip.classList.remove('is-on')
-      colGrip.classList.remove('is-on')
-    }
-  })
+  // 抓手只在鼠标贴近表格顶边/左边的热区里现身(判定见 tableGripHover.ts)
+  const gripTargets = attachGripHover(
+    box,
+    wrapEl.querySelector<HTMLElement>('table') ?? wrapEl,
+    rowGrip,
+    colGrip,
+    () => drag !== null
+  )
 
   // ── 拖拽重排 ──
   let drag: DragState | null = null
@@ -247,16 +227,13 @@ export function attachTableControls(view: EditorView, box: HTMLElement, wrapEl: 
     doc.addEventListener('keydown', onKey, true)
   }
   rowGrip.addEventListener('mousedown', (e) => {
-    const tr = hoverCell?.closest('tr')
-    const tbody = tr?.closest('tbody')
-    if (!tr || !tbody) return
-    const idx = [...tbody.querySelectorAll('tr')].indexOf(tr)
+    const tr = gripTargets.rowRow()
+    const idx = tr ? [...(tr.parentElement?.children ?? [])].indexOf(tr) : -1
     if (idx >= 0) startDrag('row', idx)(e)
   })
   colGrip.addEventListener('mousedown', (e) => {
-    const tr = hoverCell?.closest('tr')
-    if (!tr || !hoverCell) return
-    const idx = [...tr.querySelectorAll('th, td')].indexOf(hoverCell as HTMLTableCellElement)
+    const th = gripTargets.colCell()
+    const idx = th ? [...(th.parentElement?.children ?? [])].indexOf(th) : -1
     if (idx >= 0) startDrag('col', idx)(e)
   })
 

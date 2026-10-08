@@ -681,6 +681,11 @@
   inset: 0;
   pointer-events: none;
 }
+/* 外侧透明感应带:尺寸由 JS 按热区常量写入;只负责把鼠标事件送回表格容器 */
+.cm-live-grip-zone {
+  position: absolute;
+  pointer-events: auto;
+}
 .cm-live-grip,
 .cm-live-edge-add {
   pointer-events: none; /* 隐身时不吃点击:透明控件也是命中目标,会截胡边缘卸妆 */

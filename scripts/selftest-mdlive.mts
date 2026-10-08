@@ -5,6 +5,7 @@ import {
   tableModelFromSource,
   serializeTable
 } from '../src/renderer/src/editor/markdownTable.ts'
+import { gripHitTest } from '../src/renderer/src/editor/tableGripHover.ts'
 import {
   emptyGridOf,
   gridToMarkdown,
@@ -216,6 +217,35 @@ function main(): void {
   assert.deepEqual(parseCellsPayload(JSON.stringify(grid)), grid, '应用内载荷无损往返')
   assert.equal(parseCellsPayload('{"x":1}'), null, '非二维字符串数组的载荷拒收')
   assert.equal(gridToMarkdown(grid), '| a | b\\|c |\n| --- | --- |\n| 1 | 2 |', '格子 → 管道表')
+
+  // ── 抓手热区:热区在表格边缘外侧宽(罩住图标)、内侧窄(格子中间不现身) ──
+  const cols = [
+    { start: 100, end: 200 },
+    { start: 200, end: 400 }
+  ]
+  const rows = [
+    { start: 150, end: 200 },
+    { start: 200, end: 250 }
+  ]
+  const hit = (x: number, y: number): ReturnType<typeof gripHitTest> =>
+    gripHitTest({
+      pointer: { x, y },
+      tableTop: 100,
+      tableLeft: 100,
+      headCols: cols,
+      bodyRows: rows,
+      zone: { outer: 20, inner: 4 }
+    })
+  assert.deepEqual(hit(300, 95), { col: 1, row: null }, '顶边外侧的槽:命中鼠标所在列')
+  assert.deepEqual(hit(300, 80), { col: 1, row: null }, '外侧热区边界(含)')
+  assert.deepEqual(hit(300, 79), { col: null, row: null }, '超出外侧热区:不现身')
+  assert.deepEqual(hit(300, 103), { col: 1, row: null }, '顶边内侧一线:命中')
+  assert.deepEqual(hit(300, 106), { col: null, row: null }, '内侧超过一线(格子里):不现身')
+  assert.deepEqual(hit(85, 220), { col: null, row: 1 }, '左边外侧的槽:命中鼠标所在数据行')
+  assert.deepEqual(hit(105, 220), { col: null, row: null }, '左边内侧超过一线(格子里):不现身')
+  assert.deepEqual(hit(250, 220), { col: null, row: null }, '格子中间:不现身')
+  assert.deepEqual(hit(85, 102), { col: null, row: null }, '左上角外侧:表头行不挂行抓手')
+  assert.deepEqual(hit(450, 95), { col: null, row: null }, '超出表格右侧:无列可命中')
 
   console.log('✅ Live Preview 装饰清单自测全部通过')
   console.log(
