@@ -247,7 +247,7 @@ export function CodePreview({
 
   /**
    * 只读↔编辑单钮(md 三档锤·渐进披露拍板):页头只摆一颗,图标亮「当前在哪档」——
-   * 只读档是书脸,编辑档是笔脸(源码档就 </> 脸);提示语说动作「切换到…」。
+   * 只读档是书脸,编辑档是笔脸(源码档就 </> 脸);提示语说全「现在处于…,点击后切换为…」。
    * 同为编辑档的 live↔source 切档收进页签右键菜单,页头不堆同性质兄弟;
    * 非 md 文件还是那颗常驻置灰的钮 —— 菜单同款口径,「Markdown 文件专属」。
    */
@@ -259,8 +259,8 @@ export function CodePreview({
           <button
             type="button"
             className="code-mode-btn"
-            aria-label="切换到编辑模式"
-            data-tip="切换到编辑模式"
+            aria-label="现在处于阅读模式,点击后切换为编辑模式"
+            data-tip="现在处于阅读模式,点击后切换为编辑模式"
             onClick={() => onSetViewMode?.(back)}
           >
             <TreeIcon name="bookOpen" size={WRAP_ICON_SIZE} />
@@ -271,8 +271,8 @@ export function CodePreview({
       <button
         type="button"
         className="code-mode-btn"
-        aria-label="切换到只读模式"
-        data-tip="切换到只读模式"
+        aria-label="现在处于编辑模式,点击后切换为阅读模式"
+        data-tip="现在处于编辑模式,点击后切换为阅读模式"
         onClick={() => onSetViewMode?.('reading')}
       >
         <TreeIcon name={mode === 'source' ? 'code' : 'penLine'} size={WRAP_ICON_SIZE} />

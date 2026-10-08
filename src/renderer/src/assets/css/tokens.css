@@ -132,10 +132,12 @@
   --switch-knob: #ffffff;
   --chip-on-bg: #dde3e7;
   --chip-on-ink: #1d2226;
-  --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, monospace;
+  /* CJK 兜底段(两族字栈共用):西文字体都不含中文字形,不点名就会掉到系统默认
+     (Windows 上常落成宋体,和正文雅黑两张脸);点名后中文统一走雅黑/苹方 */
+  --cjk: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC';
+  --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, var(--cjk), monospace;
   /* 正文非等宽字栈(live 档排版对齐阅读档用):与 body 同一份,别两处各写各的 */
-  --sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', var(--cjk), sans-serif;
   /* ── 色板(浅色,Obsidian 无色阶)──
      灰阶真值户口在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
      外观系统 achro 回落和石墨种子色都查那本 —— 这边是同款写真的首帧兜底,两边必须一致 */

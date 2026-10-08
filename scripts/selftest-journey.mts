@@ -425,10 +425,14 @@ try {
   await page.locator('.cm-live-h1').click()
   await page.locator('.cm-live-h1').filter({ hasText: '#' }).waitFor()
   await page.locator('.cm-live-table td').filter({ hasText: '9' }).waitFor()
-  // 右缘 ＋列(悬停现身):点了表头多一格;底缘 ＋行:正文多一行
+  // 右缘 ＋列(悬停现身):点了表头多一格;底缘 ＋行:正文多一行。
+  // 钮的 pointer-events 靠 .cm-live-table:hover 才开口 —— 先把鼠标真实压到钮上再点,
+  // 否则命中检测的瞬间悬停可能还没挂上,底下的 td 会截胡(抖动,不是回归)
   await page.locator('.cm-live-table').hover()
+  await page.locator('.cm-live-edge-col').hover()
   await page.locator('.cm-live-edge-col').click()
   await page.locator('.cm-live-table th').nth(2).waitFor()
+  await page.locator('.cm-live-edge-row').hover()
   await page.locator('.cm-live-edge-row').click()
   await page.locator('.cm-live-table tbody tr').nth(1).waitFor()
   // 点表格边缘(非格子)照旧卸妆露管道源码 —— 替身敲门砖 + 烂表逃生口

@@ -188,6 +188,15 @@
   vertical-align: -0.08em;
 }
 
+/* 列表记号:阅读档的真 marker 吃同一条浅中灰(--muted-2),与 live 档观感对齐;
+   有序标号再上半粗,与 .cm-live-num 同配方 */
+.code-reading .md li::marker {
+  color: var(--muted-2);
+}
+.code-reading .md ol > li::marker {
+  font-weight: var(--font-w-semi);
+}
+
 /* ── 阅读档疏密排版(数值户口在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动) ── */
 
 .code-reading .md {
@@ -594,13 +603,16 @@
 .cm-host .cm-live-img {
   color: var(--muted);
 }
+/* 有序标号:浅中灰(--muted-2,与小圆点同一条灰),半粗提口气不抢正文 */
 .cm-host .cm-live-num {
-  color: var(--accent-bright);
+  color: var(--muted-2);
+  font-weight: var(--font-w-semi);
 }
 
-/* 小圆点替身:深灰(--muted),比正文字大一档更醒目;line-height 归零不撑高行 */
+/* 小圆点替身:浅中灰(--muted-2,与有序标号同一条灰),比正文字大一档更醒目;
+   line-height 归零不撑高行 */
 .cm-host .cm-live-bullet {
-  color: var(--muted);
+  color: var(--muted-2);
   font-size: 1.5em;
   line-height: 0;
   vertical-align: -0.05em;
