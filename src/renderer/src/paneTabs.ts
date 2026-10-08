@@ -38,6 +38,8 @@ export interface PaneTab {
   scopeRoot?: string
   /** 文件签的看片档位(阅读模式这锤):undefined = 源码;记在签身上,拖窗/存档都跟着走 */
   viewMode?: PaneViewMode
+  /** 上次用的编辑档(md 三档锤):'live'/'source';阅读档点单钮回写档时落回它,缺省回 live */
+  lastEditMode?: 'live' | 'source'
 }
 
 /**

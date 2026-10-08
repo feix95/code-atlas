@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
 import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 import { hostNameOf, startWindowDrag } from '../windowDrag'
 
@@ -220,6 +221,15 @@ export function TabBar({
           icon: 'code',
           checked: !mdAble || mode === 'source',
           run: () => onSetViewMode?.(t.id, 'source')
+        },
+        // 自动换行(渐进披露:页头钮退役收进菜单):全局一档、所有文件签通吃,
+        // 图标换脸+行尾勾标态,Alt+Z 快捷键照走同一份全局账
+        {
+          label: '自动换行',
+          icon: getCodeWrapOn() ? 'wrapText' : 'textAlignStart',
+          checked: getCodeWrapOn(),
+          tip: 'Alt+Z',
+          run: () => toggleCodeWrap()
         }
       )
     }

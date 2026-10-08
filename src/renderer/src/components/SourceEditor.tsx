@@ -170,6 +170,13 @@ export function SourceEditor({
         extensions: buildSourceExtensions({
           wrap,
           live,
+          // 内联标题(Obsidian inline title):文件名掐尾去扩展名,与阅读档 MiniMD title 同配方
+          liveTitle: live
+            ? (relPath
+                .split(/[\\/]/)
+                .pop()
+                ?.replace(/\.[^.]+$/, '') ?? '')
+            : undefined,
           hooks: {
             onChanged: () => {
               dirty = true

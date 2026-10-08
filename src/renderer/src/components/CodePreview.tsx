@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
@@ -9,7 +9,7 @@ import { openContextMenu } from './contextMenuStore'
 import { SourceEditor } from './SourceEditor'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
-import { loadCodeWrapOn, saveCodeWrapOn } from '../codePrefs'
+import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
 import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
 import { DOC_ZOOM_STEP } from '@shared/docZoom'
 
@@ -48,6 +48,7 @@ export function CodePreview({
   onAddRef,
   jump,
   viewMode,
+  lastEditMode,
   onSetViewMode,
   fileLinks
 }: {
@@ -60,9 +61,11 @@ export function CodePreview({
   onAddRef: (ref: ChatCodeRef) => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
-  /** 看片档位:undefined/'source' = 源码编辑;'reading' = md 渲染态(只对 md 系生效) */
+  /** 看片档位:undefined/'source' = 源码编辑;'reading' = md 渲染态;'live' = 实时预览(只对 md 系生效) */
   viewMode?: PaneViewMode
-  /** 头部「阅读/代码」快速开关:切本签的看片档(账在页签身上,和右键菜单同一份) */
+  /** 上次用的编辑档:读档单钮点回去时落回它,缺省回 live */
+  lastEditMode?: 'live' | 'source'
+  /** 头部「阅读/编辑」单钮 + 右键菜单共用的切档通道(账在页签身上) */
   onSetViewMode?: (mode: PaneViewMode) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
@@ -114,7 +117,8 @@ export function CodePreview({
    * 折行开关(全局默认开这锤):一个开关管所有文件,存 localStorage 重启不失忆;
    * 超行数闸的文件摁不动(巨物默认不折行的保守口味)。
    */
-  const [wrapOn, setWrapOn] = useState(loadCodeWrapOn)
+  // 折行账读全局可订阅小账本(页签右键菜单也能拨这颗开关,不止本件的 Alt+Z)
+  const wrapOn = useSyncExternalStore(subscribeCodeWrap, getCodeWrapOn)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事。
@@ -185,13 +189,11 @@ export function CodePreview({
     []
   )
 
-  /** 折行开关一个口:页头钮、Alt+Z(编辑器内外都通)都走这里,偏好当场落盘 */
+  /** 折行开关的巨物闸:行数超闸的文件摁不动(全局账本唯一写口在 codePrefs,
+      页签右键菜单那条路不设闸 —— 菜单拨的是「想要不要」,给不给闸说了算) */
   const toggleWrap = useCallback((): void => {
     if (!wrapAllowed) return
-    setWrapOn((prev) => {
-      saveCodeWrapOn(!prev)
-      return !prev
-    })
+    toggleCodeWrap()
   }, [wrapAllowed])
 
   function onPaneKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
@@ -244,32 +246,38 @@ export function CodePreview({
   }
 
   /**
-   * 三档快速开关(md 三档锤,和页签右键菜单同一份 viewMode 账):
-   * 实时预览(笔) / 阅读(书) / 源码(</>),当前档吃主题色标态;
+   * 只读↔编辑单钮(md 三档锤·渐进披露拍板):页头只摆一颗,图标亮「当前在哪档」——
+   * 只读档是书脸,编辑档是笔脸(源码档就 </> 脸);提示语说动作「切换到…」。
+   * 同为编辑档的 live↔source 切档收进页签右键菜单,页头不堆同性质兄弟;
    * 非 md 文件还是那颗常驻置灰的钮 —— 菜单同款口径,「Markdown 文件专属」。
    */
   const modeBtns: React.JSX.Element = canMd ? (
-    <>
-      {(
-        [
-          ['live', 'penLine', '实时预览(边写边看效果)'],
-          ['reading', 'bookOpen', '阅读模式'],
-          ['source', 'code', '源码模式']
-        ] as const
-      ).map(([m, icon, tip]) => (
-        <button
-          key={m}
-          type="button"
-          className="code-mode-btn"
-          aria-pressed={mode === m}
-          aria-label={tip}
-          data-tip={tip}
-          onClick={() => onSetViewMode?.(m)}
-        >
-          <TreeIcon name={icon} size={WRAP_ICON_SIZE} />
-        </button>
-      ))}
-    </>
+    mode === 'reading' ? (
+      (() => {
+        const back = lastEditMode ?? 'live'
+        return (
+          <button
+            type="button"
+            className="code-mode-btn"
+            aria-label="切换到编辑模式"
+            data-tip="切换到编辑模式"
+            onClick={() => onSetViewMode?.(back)}
+          >
+            <TreeIcon name="bookOpen" size={WRAP_ICON_SIZE} />
+          </button>
+        )
+      })()
+    ) : (
+      <button
+        type="button"
+        className="code-mode-btn"
+        aria-label="切换到只读模式"
+        data-tip="切换到只读模式"
+        onClick={() => onSetViewMode?.('reading')}
+      >
+        <TreeIcon name={mode === 'source' ? 'code' : 'penLine'} size={WRAP_ICON_SIZE} />
+      </button>
+    )
   ) : (
     <button
       type="button"
@@ -284,31 +292,10 @@ export function CodePreview({
 
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
-      {/* 页头栏:两档共用一排功能钮(模式开关 + 换行钮),右对齐;文件名不摆 ——
-          签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突 */}
-      {result?.status === 'ok' && (
-        <div className="code-pane-head">
-          {onSetViewMode && modeBtns}
-          <button
-            type="button"
-            className={`code-wrap-btn${wrap ? ' is-on' : ''}`}
-            disabled={!wrapAllowed}
-            aria-pressed={wrap}
-            aria-label="自动换行(Alt+Z)"
-            data-tip={
-              !wrapAllowed
-                ? `这份文件超过 ${WRAP_MAX_LINES} 行,折行先歇着`
-                : wrap
-                  ? '当前:自动换行'
-                  : '当前:不换行'
-            }
-            onClick={toggleWrap}
-          >
-            {/* 状态走图标换脸(小葵拍板,不靠底色):折回箭头 = 开着,参差行尾 = 关着 */}
-            <TreeIcon name={wrap ? 'wrapText' : 'textAlignStart'} size={WRAP_ICON_SIZE} />
-          </button>
-        </div>
-      )}
+      {/* 页头栏:只有文件可渲染时才立,右对齐一颗读↔写单钮;文件名不摆 ——
+          签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突。
+          折行钮退役进页签右键菜单(渐进披露),快捷键 Alt+Z 和全局账照旧 */}
+      {result?.status === 'ok' && <div className="code-pane-head">{onSetViewMode && modeBtns}</div>}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">
@@ -348,7 +335,7 @@ export function CodePreview({
             /* 实时预览/源码档:同一台 CodeMirror 编辑器,live 档位多挂 markdown 语法树+上妆管线;
                key 带档位 —— 切档重立编辑器,老编辑器的落盘尾班先把最新稿保下来 */
             <div
-              className="code-view is-editing"
+              className={`code-view is-editing${live ? ' is-live' : ''}`}
               ref={codeViewRef}
               style={{ '--doc-zoom': docZoom } as React.CSSProperties}
             >

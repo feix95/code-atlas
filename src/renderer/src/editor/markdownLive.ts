@@ -12,10 +12,11 @@ import { syntaxTree } from '@codemirror/language'
 import { markdownLanguage } from '@codemirror/lang-markdown'
 import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
-import type { Extension, Range } from '@codemirror/state'
+import { Facet, StateEffect, StateField } from '@codemirror/state'
+import type { EditorState, Extension, Range } from '@codemirror/state'
 import type { Tree, SyntaxNode } from '@lezer/common'
-// 相对路径引 shared(不走 @shared 别名):node 自测直接驱动本文件,别名只活在 vite 里
-import { parseMarkdown, type MdInline } from '../../../shared/markdown.ts'
+import { widgetFocus } from './liveFocus.ts'
+import { TableWidget, tableModelFromSource } from './markdownTable.ts'
 
 /** 装饰清单的一行:planLiveDecos 的产出(纯数据,自测对着它对账) */
 export type LiveDeco =
@@ -230,64 +231,35 @@ export function planLiveDecos(
 
 // ── 装饰清单 → CM6 Decoration ──
 
-/** MdInline → DOM(表格单元格的内文用;MiniMD renderInline 的 DOM 版,同一套类名) */
-function inlineToDom(nodes: MdInline[], doc: Document, host: HTMLElement): void {
-  for (const n of nodes) {
-    switch (n.t) {
-      case 'bold': {
-        const el = doc.createElement('strong')
-        el.textContent = n.text
-        host.appendChild(el)
-        break
-      }
-      case 'em': {
-        const el = doc.createElement('em')
-        el.textContent = n.text
-        host.appendChild(el)
-        break
-      }
-      case 'del': {
-        const el = doc.createElement('del')
-        el.textContent = n.text
-        host.appendChild(el)
-        break
-      }
-      case 'mark': {
-        const el = doc.createElement('mark')
-        el.className = 'md-mark'
-        el.textContent = n.text
-        host.appendChild(el)
-        break
-      }
-      case 'code': {
-        const el = doc.createElement('code')
-        el.textContent = n.text
-        host.appendChild(el)
-        break
-      }
-      case 'link': {
-        const el = doc.createElement('span')
-        el.className = 'md-link'
-        el.dataset.tip = n.href
-        el.textContent = n.label
-        host.appendChild(el)
-        break
-      }
-      default:
-        host.appendChild(doc.createTextNode(n.text))
-    }
+/**
+ * 块替身的统一敲门砖(ignoreEvent 案):替身挂了 ignoreEvent,编辑器对它身上的
+ * 鼠标事件一概装瞎 —— 单击落不进光标,拖出的蓝底是浏览器原生选中(跟编辑器选区
+ * 两本账,小葵踩过的坑)。修法:mousedown 拦掉原生选中,把编辑器光标摁进源码块
+ * 再夺回焦点;选区一进块,装饰重算自然卸妆(Obsidian 同款手感)。
+ */
+function revealAt(view: EditorView, from: number): (e: MouseEvent) => void {
+  return (e) => {
+    e.preventDefault()
+    view.dispatch({ selection: { anchor: from } })
+    view.focus()
   }
 }
 
-/** 无序列表记号替身:一颗小圆点 */
+/** 无序列表记号替身:一颗小圆点(点它卸妆露回 - 记号) */
 class BulletWidget extends WidgetType {
+  readonly from: number
+  constructor(from: number) {
+    super()
+    this.from = from
+  }
   eq(other: WidgetType): boolean {
-    return other instanceof BulletWidget
+    return other instanceof BulletWidget && other.from === this.from
   }
   toDOM(view: EditorView): HTMLElement {
     const el = view.dom.ownerDocument.createElement('span')
     el.className = 'cm-live-bullet'
     el.textContent = '•'
+    el.onmousedown = revealAt(view, this.from)
     return el
   }
   ignoreEvent(): boolean {
@@ -329,16 +301,22 @@ class CheckboxWidget extends WidgetType {
   }
 }
 
-/** 分割线替身:一条真横线 */
+/** 分割线替身:一条真横线(点它卸妆露回 --- 源码行) */
 class HrWidget extends WidgetType {
+  readonly from: number
+  constructor(from: number) {
+    super()
+    this.from = from
+  }
   eq(other: WidgetType): boolean {
-    return other instanceof HrWidget
+    return other instanceof HrWidget && other.from === this.from
   }
   toDOM(view: EditorView): HTMLElement {
     const doc = view.dom.ownerDocument
     const box = doc.createElement('div')
     box.className = 'cm-live-hr'
     box.appendChild(doc.createElement('hr'))
+    box.onmousedown = revealAt(view, this.from)
     return box
   }
   ignoreEvent(): boolean {
@@ -346,70 +324,33 @@ class HrWidget extends WidgetType {
   }
 }
 
-/**
- * 表格替身:源码段落整块换成 .md 同款真表格 ——
- * 解析走 shared/markdown.ts 的 parseMarkdown(和阅读档同一份 AST,长相天然一致);
- * 认不出表格(改了一半的烂摊)就退回等宽源码,不硬画。
- */
-class TableWidget extends WidgetType {
-  readonly src: string
-  constructor(src: string) {
+/** live 档的内联标题户口(cmSetup 装配时喂文件名,缺省 '' = 不摆) */
+export const liveTitle = Facet.define<string, string>({ combine: (v) => v[0] ?? '' })
+
+/** 内联标题替身(Obsidian inline title):文档首行之上摆文件名,吃 .md-title 皮 */
+class TitleWidget extends WidgetType {
+  readonly title: string
+  constructor(title: string) {
     super()
-    this.src = src
+    this.title = title
   }
   eq(other: WidgetType): boolean {
-    return other instanceof TableWidget && other.src === this.src
+    return other instanceof TitleWidget && other.title === this.title
   }
   toDOM(view: EditorView): HTMLElement {
-    const doc = view.dom.ownerDocument
-    const box = doc.createElement('div')
-    box.className = 'cm-live-table md'
-    const tbl = parseMarkdown(this.src).find((b) => b.t === 'table')
-    if (!tbl || tbl.t !== 'table') {
-      const pre = doc.createElement('pre')
-      pre.className = 'cm-live-table-raw'
-      pre.textContent = this.src
-      box.appendChild(pre)
-      return box
-    }
-    const wrap = doc.createElement('div')
-    wrap.className = 'md-table-wrap'
-    const table = doc.createElement('table')
-    table.className = 'md-table'
-    const thead = doc.createElement('thead')
-    const trh = doc.createElement('tr')
-    tbl.head.forEach((cell, j) => {
-      const th = doc.createElement('th')
-      th.style.textAlign = tbl.aligns[j] ?? 'left'
-      inlineToDom(cell, doc, th)
-      trh.appendChild(th)
-    })
-    thead.appendChild(trh)
-    table.appendChild(thead)
-    const tbody = doc.createElement('tbody')
-    for (const row of tbl.body) {
-      const tr = doc.createElement('tr')
-      row.forEach((cell, j) => {
-        const td = doc.createElement('td')
-        td.style.textAlign = tbl.aligns[j] ?? 'left'
-        inlineToDom(cell, doc, td)
-        tr.appendChild(td)
-      })
-      tbody.appendChild(tr)
-    }
-    table.appendChild(tbody)
-    wrap.appendChild(table)
-    box.appendChild(wrap)
-    return box
+    const el = view.dom.ownerDocument.createElement('div')
+    el.className = 'md-title'
+    el.textContent = this.title
+    // 标题不是文档内容:点它把光标带回文档头(点着有反应,不装瞎)
+    el.onmousedown = revealAt(view, 0)
+    return el
   }
   ignoreEvent(): boolean {
     return true
   }
 }
 
-const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
 const hideDeco = Decoration.replace({})
-const hrDeco = Decoration.replace({ widget: new HrWidget(), block: true })
 const markPool = new Map<string, Decoration>()
 function clsMark(cls: string): Decoration {
   let d = markPool.get(cls)
@@ -447,7 +388,7 @@ export function liveDecoSet(
         ranges.push(clsMark(it.cls).range(it.from, it.to))
         break
       case 'bullet':
-        ranges.push(bulletDeco.range(it.from, it.to))
+        ranges.push(Decoration.replace({ widget: new BulletWidget(it.from) }).range(it.from, it.to))
         break
       case 'task':
         ranges.push(
@@ -458,66 +399,92 @@ export function liveDecoSet(
         )
         break
       case 'hr':
-        ranges.push(hrDeco.range(it.from, it.to))
-        break
-      case 'table':
         ranges.push(
-          Decoration.replace({ widget: new TableWidget(read(it.from, it.to)), block: true }).range(
-            it.from,
-            it.to
-          )
+          Decoration.replace({ widget: new HrWidget(it.from), block: true }).range(it.from, it.to)
         )
         break
+      case 'table': {
+        // 解析不出的烂表不给替身,源码原样晾着(逃生口内置)
+        const model = tableModelFromSource(read(it.from, it.to))
+        if (!model) break
+        ranges.push(
+          Decoration.replace({
+            widget: new TableWidget(model, it.from, revealAt),
+            block: true
+          }).range(it.from, it.to)
+        )
+        break
+      }
     }
   }
   return Decoration.set(ranges, true)
 }
 
-/** 编辑器侧组装:可见区 → 清单 → 装饰集 */
-function buildLiveDecos(view: EditorView): DecorationSet {
-  const doc = view.state.doc
-  return liveDecoSet(
-    planLiveDecos(
-      syntaxTree(view.state),
-      view.state.selection.ranges.map((r) => ({ from: r.from, to: r.to })),
-      view.visibleRanges,
-      (from, to) => {
-        const a = doc.lineAt(from).number
-        const b = doc.lineAt(to).number
-        const starts: number[] = []
-        for (let i = a; i <= b; i++) starts.push(doc.line(i).from)
-        return starts
-      },
-      (f, t) => view.state.sliceDoc(f, t)
-    ),
-    (f, t) => view.state.sliceDoc(f, t)
+/** 编辑器侧组装:整份文档 → 清单 → 装饰集(头上再叠一颗内联标题替身,有户口才摆) */
+function buildLiveDecos(state: EditorState): DecorationSet {
+  const doc = state.doc
+  // 焦点在表格等块替身里时,编辑器选区是过期的旧光标,当作「光标不在任何块里」
+  const selRanges = state.field(widgetFocus)
+    ? []
+    : state.selection.ranges.map((r) => ({ from: r.from, to: r.to }))
+  const items = planLiveDecos(
+    syntaxTree(state),
+    selRanges,
+    [{ from: 0, to: doc.length }],
+    (from, to) => {
+      const a = doc.lineAt(from).number
+      const b = doc.lineAt(to).number
+      const starts: number[] = []
+      for (let i = a; i <= b; i++) starts.push(doc.line(i).from)
+      return starts
+    },
+    (f, t) => state.sliceDoc(f, t)
   )
+  const set = liveDecoSet(items, (f, t) => state.sliceDoc(f, t))
+  const title = state.facet(liveTitle)
+  if (!title) return set
+  return set.update({
+    add: [Decoration.widget({ widget: new TitleWidget(title), side: -1, block: true }).range(0)]
+  })
 }
 
 /**
- * Live Preview 扩展(cmSetup 里 markdown() 之后挂):
- * 装饰集跟着 文档变化/选区移动/视口滚动/语法树长齐 重算 ——
- * 换字挪选区只重贴可见区一份清单,整份文档绝不重扫。
+ * 后台解析完工的信号:超大 md 的语法树是分批长出来的,
+ * 树每长一截插件就往这里敲一笔,驱动下面的 compute 重算一次装饰。
  */
-export const livePreview: Extension = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = buildLiveDecos(view)
-    }
-    update(u: ViewUpdate): void {
-      if (
-        u.docChanged ||
-        u.selectionSet ||
-        u.viewportChanged ||
-        syntaxTree(u.state) !== syntaxTree(u.startState)
-      ) {
-        this.decorations = buildLiveDecos(u.view)
+const treeGrown = StateEffect.define<null>()
+const treeGen = StateField.define<number>({
+  create: () => 0,
+  update: (v, tr) => tr.effects.reduce((n, e) => (e.is(treeGrown) ? n + 1 : n), v)
+})
+
+/**
+ * Live Preview 扩展(cmSetup 里 markdown() 之后挂):
+ * 块级装饰(表格/hr 整块换替身)不许走 ViewPlugin 出账(CM6 硬规矩,插件一报块装饰就崩),
+ * 所以装饰集归 EditorView.decorations.compute 管 —— 跟着 文档/选区/解析进度 重算。
+ * 代价:不再只贴可见区,每次整份文档过一遍清单(md 文件量级撑得住)。
+ */
+export const livePreview: Extension = [
+  treeGen,
+  widgetFocus,
+  EditorView.decorations.compute(['doc', 'selection', treeGen, widgetFocus], (state) =>
+    buildLiveDecos(state)
+  ),
+  // 语法树长了但没新编辑(后台解析完工)→ 微任务转一圈后敲信号重算;
+  // 不许在 update 里直接 dispatch(CM6 禁 update 内开新事务),视图没了就当没看见
+  ViewPlugin.fromClass(
+    class {
+      update(u: ViewUpdate): void {
+        if (syntaxTree(u.state) !== syntaxTree(u.startState)) {
+          const view = u.view
+          setTimeout(() => {
+            if (view.dom.isConnected) view.dispatch({ effects: treeGrown.of(null) })
+          })
+        }
       }
     }
-  },
-  { decorations: (v) => v.decorations }
-)
+  )
+]
 
 /** 自测专用:纯 node 环境下给一段 md 算出装饰清单(编辑器同款 livePlanDecos 入口) */
 export function planLiveDecosForText(text: string, selFrom: number, selTo: number): LiveDeco[] {

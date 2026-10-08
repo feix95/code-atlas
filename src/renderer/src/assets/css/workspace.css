@@ -535,12 +535,13 @@
   border-right: 1px solid var(--line);
 }
 
-/* 预览头折行开关 + 阅读/代码快速开关:同款纯图标小方钮,开/关靠图标换脸
-   (不靠底色,小葵拍板);悬停提示走慢档,稳悬停才亮 */
-.code-wrap-btn,
+/* 预览头读↔写单钮:纯图标小方钮,开/关靠图标换脸(不靠底色,小葵拍板);
+   悬停提示走慢档,稳悬停才亮。折行钮已退役进页签右键菜单(渐进披露) */
 .code-mode-btn {
   --tip-delay: var(--tip-delay-slow);
   flex-shrink: 0;
+  /* 右缘往回收 4px(小葵手感):不靠贴边,留一丝呼吸 */
+  margin-right: var(--space-1);
   width: 1.6rem;
   height: 1.6rem;
   display: inline-flex;
@@ -556,15 +557,11 @@
   cursor: pointer;
 }
 
-.code-wrap-btn:hover:not(:disabled),
 .code-mode-btn:hover:not(:disabled) {
   color: var(--accent-bright);
   background: var(--hover);
 }
 
-/* 开态没有专属底色(图标换脸已标态):is-on 类留着做状态标记,样式不挂 */
-
-.code-wrap-btn:disabled,
 .code-mode-btn:disabled {
   opacity: 0.4;
   cursor: default;
@@ -683,9 +680,14 @@
 }
 
 /* 选中底色跟引用功能同一条血(--drop-mark):drawSelection 画的是装饰层,两套类名都喂 */
-.cm-host .cm-selectionBackground,
-.cm-host .cm-focused .cm-selectionBackground {
-  background: var(--drop-mark);
+/* CM 内置主题的选区色选择器带 6 层类名(聚焦淡紫 #d7d4f0 / 失焦灰),普通覆写压不住,必须 !important;
+   选区层默认画在正文之下,会被围栏代码块等实心行底挡住,改抬到正文之上(30% 透明,不盖字) */
+.cm-host .cm-scroller > .cm-selectionLayer {
+  z-index: 1 !important; /* CM 把 z-index 写在行内样式(-2),只有 !important 压得过 */
+  pointer-events: none;
+}
+.cm-host .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--drop-mark) !important;
 }
 
 /* 原生选中兜底(没走 drawSelection 的角落) */
@@ -693,10 +695,10 @@
   background: var(--drop-mark);
 }
 
-/* 三档开关的当前档吃主题色(旧单钮换脸标态退役:三颗同脸,靠色分高下) */
-.code-mode-btn[aria-pressed='true'] {
-  color: var(--accent-bright);
-  background: var(--hover);
+/* 表格格子等聚焦的原生可编辑子元素:CM 的 hideNativeSelection 强给 Highlight(系统深蓝) !important,同样 !important 抢回 */
+.cm-host .cm-editor .cm-content :focus::selection,
+.cm-host .cm-editor .cm-content :focus ::selection {
+  background: var(--drop-mark) !important;
 }
 
 /* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」;走 sash-hi 实色(分屏拖边同一条血) */

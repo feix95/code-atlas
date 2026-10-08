@@ -28,7 +28,11 @@ await writeFile(
   '# Sample project\nThis application helps organize tasks.\n'
 )
 await writeFile(join(project, 'src/main.ts'), 'export const start = () => 1\n')
-await writeFile(join(project, 'docs/guide.md'), '# Getting started\n')
+// 表格 + hr 是 Live Preview 块级装饰的户口 —— 缺了它们,块装饰禁令的崩网在 journey 里探不到
+await writeFile(
+  join(project, 'docs/guide.md'),
+  '# Getting started\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n'
+)
 await writeFile(join(project, 'package.json'), '{"name":"sample-project","private":true}')
 // 超宽单行文件:预览装上后 min-content 极宽,回归分屏/内容区被顶出视口的 bug
 await writeFile(join(project, 'wide.ts'), `export const wide = '${'x'.repeat(2400)}'\n`)
@@ -404,8 +408,35 @@ try {
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
   await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
-  // md 系文件签默认 Live Preview(md 三档锤):容器是 .cm-editor,上妆后标题记号藏起只剩大字
+  // md 系文件签默认 Live Preview(md 三档锤):容器是 .cm-editor,上妆后标题记号藏起只剩大字;
+  // 块级替身也要现身(表格/hr 走 compute 出账 —— 走插件出账是 CM6 禁令,一报就崩)
   await page.locator('.cm-editor').filter({ hasText: 'Getting started' }).waitFor()
+  await page.locator('.cm-live-table .md-table').waitFor()
+  await page.locator('.cm-live-hr').waitFor()
+  // 格内编辑(Obsidian 式):格子常驻 contenteditable 装饰源码格,点进去即编辑、
+  // 表格始终渲染态不塌妆;敲字整表重序列化写回源码
+  const cell = page.locator('.cm-live-table td').filter({ hasText: '1' }).first()
+  await cell.click()
+  await cell.locator('.cm-live-cell-src').fill('9')
+  await page.locator('.cm-live-table td').filter({ hasText: '9' }).waitFor()
+  // 点标题文字卸妆(md-title margin 案):借皮的 margin-bottom 不在 border-box 内,
+  // CM 行高账量不到 → 它之下所有行记账偏低、单击穿透到下一行;margin 换 padding 归位后,
+  // 单击标题行必须落进本行、# 记号现身 —— 顺带验证点格外后表格仍是渲染态
+  await page.locator('.cm-live-h1').click()
+  await page.locator('.cm-live-h1').filter({ hasText: '#' }).waitFor()
+  await page.locator('.cm-live-table td').filter({ hasText: '9' }).waitFor()
+  // 右缘 ＋列(悬停现身):点了表头多一格;底缘 ＋行:正文多一行
+  await page.locator('.cm-live-table').hover()
+  await page.locator('.cm-live-edge-col').click()
+  await page.locator('.cm-live-table th').nth(2).waitFor()
+  await page.locator('.cm-live-edge-row').click()
+  await page.locator('.cm-live-table tbody tr').nth(1).waitFor()
+  // 点表格边缘(非格子)照旧卸妆露管道源码 —— 替身敲门砖 + 烂表逃生口
+  await page.locator('.cm-live-table').click({ position: { x: 2, y: 2 } })
+  await page.locator('.cm-live-table').waitFor({ state: 'detached' })
+  await page.locator('.cm-content').filter({ hasText: '| a | b |' }).waitFor()
+  // 深搜框是悬停展开的:刚才鼠标在表格上舞了一圈,先悬停再填词
+  await page.locator('.tb-search').hover()
   await searchBox.fill('绝没有这个词zzz')
   await page
     .locator('.search-results')

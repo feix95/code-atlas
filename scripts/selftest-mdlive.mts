@@ -1,5 +1,19 @@
 import assert from 'node:assert/strict'
 import { planLiveDecosForText, type LiveDeco } from '../src/renderer/src/editor/markdownLive.ts'
+import {
+  splitRowCells,
+  tableModelFromSource,
+  serializeTable
+} from '../src/renderer/src/editor/markdownTable.ts'
+import {
+  emptyGridOf,
+  gridToMarkdown,
+  gridToTsv,
+  isSingleCell,
+  normalizeRange,
+  parseCellsPayload,
+  parseClipboardText
+} from '../src/renderer/src/editor/tableGrid.ts'
 
 /**
  * Live Preview 装饰清单自测(md 三档锤):
@@ -119,8 +133,94 @@ function main(): void {
   )
   has(plan, (d) => d.t === 'mark' && d.cls === 'cm-live-img', '图片染哑灰')
 
+  // ── 七、格内编辑的模型账:splitRowCells 切格 / tableModelFromSource 建账 /
+  //       serializeTable 回写规范 GFM ──
+  assert.deepEqual(splitRowCells('| 名 | 价 |'), ['名', '价'], '常规两格掐边')
+  assert.deepEqual(splitRowCells('| a | b'), ['a', 'b'], '缺尾管尾段也是格')
+  assert.deepEqual(splitRowCells('| a\\|b | c |'), ['a\\|b', 'c'], '转义竖线不断格')
+  assert.deepEqual(splitRowCells('|  | x |'), ['', 'x'], '空格格户口不丢')
+  assert.deepEqual(splitRowCells('a | b | c'), ['a', 'b', 'c'], '无外管也切')
+
+  const model = tableModelFromSource('| a | b |\n| --- | ---: |\n| 1 | 2 |')
+  assert.deepEqual(
+    model,
+    { head: ['a', 'b'], aligns: ['left', 'right'], rows: [['1', '2']] },
+    '源码建账:表头+对齐+数据行'
+  )
+  assert.equal(tableModelFromSource('| a |\n| xx |\n| 1 |'), null, '第二行不是分隔行就不认账')
+  assert.deepEqual(
+    tableModelFromSource('| a | b |\n| :---: | --- |')?.aligns,
+    ['center', 'left'],
+    '居中对齐户口进账'
+  )
+
+  // 序列化:对齐写回分隔行;裸 | 转义、换行压空格护行格结构
+  assert.equal(
+    serializeTable({ head: ['a', 'b'], aligns: ['left', 'right'], rows: [['1', '2']] }),
+    '| a | b |\n| --- | ---: |\n| 1 | 2 |',
+    '模型序列化成规范 GFM'
+  )
+  assert.equal(
+    serializeTable({ head: ['x|y'], aligns: ['left'], rows: [['a\nb']] }),
+    '| x\\|y |\n| --- |\n| a b |',
+    '格内裸管转义、换行压空格'
+  )
+  // 缺格行补齐、多格行按表头裁(烂表落笔即规范)
+  assert.equal(
+    serializeTable({ head: ['h1', 'h2'], aligns: ['left', 'left'], rows: [['only']] }),
+    '| h1 | h2 |\n| --- | --- |\n| only |  |',
+    '缺格行补空格'
+  )
+  // 回合账:规范源码 → 模型 → 序列化 = 幂等
+  const canonical = '| a | b |\n| --- | --- |\n| 1 | 2 |'
+  assert.equal(serializeTable(tableModelFromSource(canonical)!), canonical, '规范源码往返幂等')
+
+  // ── 表格多格选区:矩形归一 + 剪贴板格子账 ──
+  assert.deepEqual(
+    normalizeRange({ row: 3, col: 2 }, { row: 1, col: 4 }),
+    { top: 1, left: 2, bottom: 3, right: 4 },
+    '任意方向拖选都归一成左上到右下'
+  )
+  assert.ok(isSingleCell(normalizeRange({ row: 1, col: 1 }, { row: 1, col: 1 })), '同格 = 单格')
+  assert.deepEqual(
+    emptyGridOf({ top: 1, left: 1, bottom: 2, right: 3 }),
+    [
+      ['', '', ''],
+      ['', '', '']
+    ],
+    '清空用的空格子按矩形尺寸出'
+  )
+  const grid = [
+    ['a', 'b\\|c'],
+    ['1', '2']
+  ]
+  assert.equal(gridToTsv(grid), 'a\tb|c\n1\t2', 'TSV:制表符分列、换行分行,\\| 还原成 |')
+  assert.deepEqual(
+    parseClipboardText('a\tb\n1\t2\n'),
+    [
+      ['a', 'b'],
+      ['1', '2']
+    ],
+    '认 TSV(忽略尾换行)'
+  )
+  assert.deepEqual(
+    parseClipboardText('| h1 | h2 |\n| --- | --- |\n| x | y |'),
+    [
+      ['h1', 'h2'],
+      ['x', 'y']
+    ],
+    '认管道表源码(表头+数据行)'
+  )
+  assert.deepEqual(parseClipboardText('  单个值 '), [['单个值']], '单值压成一格')
+  assert.equal(parseClipboardText('  \n '), null, '空内容不处理')
+  assert.deepEqual(parseCellsPayload(JSON.stringify(grid)), grid, '应用内载荷无损往返')
+  assert.equal(parseCellsPayload('{"x":1}'), null, '非二维字符串数组的载荷拒收')
+  assert.equal(gridToMarkdown(grid), '| a | b\\|c |\n| --- | --- |\n| 1 | 2 |', '格子 → 管道表')
+
   console.log('✅ Live Preview 装饰清单自测全部通过')
-  console.log('   标题行皮/记号卸妆 · 行内五件 · 列表三态 · 引用/围栏/hr/表格 · setext 收摊')
+  console.log(
+    '   标题行皮/记号卸妆 · 行内五件 · 列表三态 · 引用/围栏/hr/表格 · setext 收摊 · 表格模型 · 格子选区与剪贴板'
+  )
 }
 
 main()

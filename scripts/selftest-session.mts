@@ -58,7 +58,8 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
           relPath: 'src/b.ts',
           name: 'b.ts',
           icon: 'ts',
-          viewMode: 'reading'
+          viewMode: 'reading',
+          lastEditMode: 'source'
         }
       ]
     },
@@ -78,6 +79,40 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
   assert.equal(back.groups.length, 2)
   assert.equal(back.groups[0].tabs[1].on, true)
   assert.equal(back.groups[0].tabs[1].viewMode, 'reading', '看片档位跟着签走')
+  assert.equal(back.groups[0].tabs[1].lastEditMode, 'source', '上次编辑档跟着签走')
+})
+
+check('parseSession:写坏的 lastEditMode 扔掉,水合后档还在签身上', () => {
+  const s = parseSession({
+    v: 1,
+    folder: 'C:\\a',
+    groups: [
+      {
+        tabs: [
+          {
+            kind: 'preview',
+            relPath: 'a.ts',
+            name: 'a.ts',
+            icon: 'ts',
+            viewMode: 'reading',
+            lastEditMode: 'source'
+          },
+          {
+            kind: 'preview',
+            relPath: 'src/b.ts',
+            name: 'b.ts',
+            icon: 'ts',
+            viewMode: 'live',
+            lastEditMode: 'nonsense'
+          }
+        ]
+      }
+    ]
+  })
+  assert.equal(s?.groups[0].tabs[0].lastEditMode, 'source', '合法编辑档认账')
+  assert.equal(s?.groups[0].tabs[1].lastEditMode, undefined, '野档扔掉')
+  const h = hydrateSession(s!, tree)
+  assert.equal(h?.groups[0].tabs[0].lastEditMode, 'source', '水合后编辑档还在签身上')
 })
 
 check('parseSession:写坏的 viewMode 不连累签,直接当没存过;水合后档还在', () => {

@@ -129,6 +129,7 @@ export function TabBody({
         refLimit={0}
         onAddRef={() => {}}
         viewMode={tab.viewMode}
+        lastEditMode={tab.lastEditMode}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
       />
     )
@@ -249,6 +250,7 @@ export function TabBody({
         onAddRef={addPreviewRef}
         jump={previewJump}
         viewMode={tab.viewMode}
+        lastEditMode={tab.lastEditMode}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
         fileLinks={fileLinks}
       />
