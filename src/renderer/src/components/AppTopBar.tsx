@@ -101,12 +101,6 @@ export function AppTopBar({
   const maximized = useWindowMaximized()
   const searchRef = useRef<HTMLInputElement>(null)
   const fitted = useFittedPlaceholder(searchRef, !hasWorkspace)
-  // 禁用解释的全句交给悬停气泡:框里只放塞得下的短文案(外方方案第二条腿)
-  const searchTip = !hasWorkspace
-    ? '先打开一个文件夹才能搜索'
-    : settingsMode
-      ? '设置页用不到文件搜索'
-      : undefined
   return (
     // 顶栏死空间拖窗/双击最大化走手动引擎:原生 app-region:drag 会吃 Windows
     // Aero Shake(摇窗最小化其它窗,小葵点名要哑火);可交互件(按钮/输入框/
@@ -139,7 +133,7 @@ export function AppTopBar({
         {sidebarShown && (
           <>
             {/* 工作区文件名搜索:B1 先接旧的树内过滤,深搜升级在 B7 */}
-            <label className={`tb-search${fitted.tight ? ' is-tight' : ''}`} data-tip={searchTip}>
+            <label className={`tb-search${fitted.tight ? ' is-tight' : ''}`}>
               <TreeIcon name="search" size={TOP_ICON} strokeWidth={TOP_ICON_STROKE} mono />
               <input
                 ref={searchRef}

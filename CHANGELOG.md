@@ -406,3 +406,4 @@
 - feat(preview): 内联大标题点击改名(Obsidian 同款)——md 阅读档与 Live Preview 页顶文件名标题点击变输入框(Enter/失焦提交、Esc 取消,只改主名留扩展名);主进程新增 renameFile 通道(非法字符/控制符/超长/同目录撞名/越界拦截)+监视户口随迁新路径,改名成功后树节点/页签户口/选中态/备注/引用段统一换账不闪加载;改名编排另立 useFileRename.ts,App.tsx 仍顶破千行闸登记棘轮白名单(chrome.css 并记)
 - refactor(ui): 超限文件拆分毕业——App.tsx 拆出 ScanOrError(扫描中/打开失败整屏)与 AuxWindows(子窗 Portal 门房,户口过滤一并收进)回到 966 行;chrome.css 按职责拆四件(tabs.css 页签系统 355/rail.css 栏+AI 状态浮层 296/controls.css 通用控件 136/auxwin.css 子窗壳 37,主档余 229 只留顶栏与窗控),filesize 白名单清空;纯搬家零行为变化
 - feat(ai): AI 状态浮层诚实化+播报收口——在线 API 没实测过只说「已配置」灰点(「测试连接」真打通才改口就绪/没连上),「AI 设置」链在已站设置页时原名置灰;refreshModelStatus 照 provider 三源取数(lastBroadcast 真播出账去重、同家「忙」态不被闲态抢话、换 provider 当场换脸);顶栏搜索框禁用 placeholder 按实宽降级换短句(is-tight 收 padding/gap),全句挪悬停气泡
+- fix(ui): 顶栏搜索框禁用态悬停气泡退役——框内降级 placeholder 本身已把「先打开文件夹」说清,气泡复述同一句属噪音
