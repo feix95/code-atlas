@@ -12,6 +12,9 @@ import { buildSummaryText } from '../shared/compact.ts'
 import { CURRENT_QUESTION_PREFIX, CURRENT_QUESTION_SUFFIX } from '../shared/chatHistory.ts'
 import { teachingSlice } from './prompts.ts'
 import type { TeachingLevel } from '../shared/personalization.ts'
+import type { AgentChatMessage } from './agent.ts'
+
+type PlainChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
 /** 自由聊天历史窗口的上限(单位:消息条数):最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
  * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。
@@ -199,10 +202,10 @@ export function buildAttachmentText(attachment: ChatContextAttachment): string {
  * codeRefs = 用户从左栏预览里选中的代码;带了它就给人设加一节「代码老师」的讲法。
  * teaching = 讲解深度档(教学三档):人设尾永远追加对应切片,off 档就是「不教学不出术语表」。
  */
-export function buildFreeChatMessages(
+export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMessage>(
   system: string,
   attachment: ChatContextAttachment | null,
-  history: AiHistoryMessage[],
+  history: H[],
   question: string,
   webMaterial: { query: string; material: string } | null | undefined,
   codeRefs: ChatCodeRef[],
@@ -210,7 +213,7 @@ export function buildFreeChatMessages(
   teaching: TeachingLevel,
   /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
   summary?: string
-): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+): Array<PlainChatMessage | H> {
   // 当前问题只包 <current_question> 标签本体;联网资料、参考资料指路都跟在标签后面,
   // agent 链取问题时按标签一剥就是干净原文
   const webTail = webMaterial
@@ -226,7 +229,7 @@ export function buildFreeChatMessages(
   // 却粘着联网资料/参考资料指路话,小模型按「长得最像待答问题」作答就会偏 —— 包一对显式标签,
   // 主进程 agent 链取问题时剥掉(stripCurrentQuestionAnchor),提醒卡引用的还是干净原文
   const tail = `${CURRENT_QUESTION_PREFIX}${question}${CURRENT_QUESTION_SUFFIX}${webTail}${refHint}`
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+  const messages: Array<PlainChatMessage | H> = [
     {
       role: 'system',
       // 教学切片全场景生效:有引用时跟在代码老师节后,没引用时直接接人设
@@ -275,15 +278,19 @@ export const CODE_TEACHER_ADDENDUM = `${TAG.codeTeaching.open}
 ${TAG.rules.open}选中的只是片段,前后的代码你看不到 —— 看不出来的就明说「从这一段看不出来」,绝不许替它编上下文,也不许编别的文件里的内容。${TAG.rules.close}
 ${TAG.codeTeaching.close}`
 
-/** 相邻同角色的消息合并成一条:附件+首问、历史断层都不会出现"连续两条 user"的怪形态 */
-function mergeConsecutiveMessages(
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-  const merged: typeof messages = []
+/** 纯文字消息(没带工具调用字段):只有它们能被合并;tool 消息和带 tool_calls 的 assistant 必须原样保留成对 */
+function isPlainMessage(message: AgentChatMessage): message is PlainChatMessage {
+  return message.role !== 'tool' && !('tool_calls' in message)
+}
+
+/** 相邻同角色的纯文字消息合并成一条:附件+首问、历史断层都不会出现"连续两条 user"的怪形态 */
+function mergeConsecutiveMessages<M extends AgentChatMessage>(messages: M[]): M[] {
+  const merged: M[] = []
   for (const msg of messages) {
     const last = merged[merged.length - 1]
-    if (last && last.role === msg.role) last.content = `${last.content}\n\n${msg.content}`
-    else merged.push({ ...msg })
+    if (last && last.role === msg.role && isPlainMessage(last) && isPlainMessage(msg))
+      last.content = `${last.content}\n\n${msg.content}`
+    else merged.push(isPlainMessage(msg) ? { ...msg } : msg)
   }
   return merged
 }

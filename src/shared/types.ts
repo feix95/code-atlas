@@ -465,6 +465,11 @@ export interface AiChatRequest {
   question: string
   /** 之前的问答(只含用户和探针的消息,资料附件不进来) */
   history: AiHistoryMessage[]
+  /**
+   * 会话编号:渲染层每开一场对话生成一个,「新对话」换新。小模型档的主进程凭它记住
+   * 每轮翻文件的完整往来;缺省 = 不记会话,历史退回纯文字。
+   */
+  conversationId?: string
   /** 当前选中对象的资料;没选中就是 null */
   context: ChatContextAttachment | null
   /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一锤);没有就是 undefined */

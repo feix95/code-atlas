@@ -39,6 +39,7 @@ import type {
   AiChatLookupPayload,
   AiDeltaPayload,
   AiExplainResult,
+  AiProviderKind,
   AiStreamStats,
   ChatTarget
 } from '../shared/types.ts'
@@ -298,6 +299,7 @@ export const electronGetJson: LookupGetTransport = async (url, headers) => {
 export async function resolveChatTargetOrError(): Promise<
   | {
       target: ChatTarget
+      provider: AiProviderKind
       webLookup: boolean
       budgets: { mapTokens: number; replyTokens: number }
       style: string
@@ -340,6 +342,7 @@ export async function resolveChatTargetOrError(): Promise<
   const teaching = sanitizePersonalization(config.personalization).teaching
   return {
     target: resolved.target,
+    provider: config.provider,
     webLookup: config.webLookup === true,
     budgets: budgetsForContext(ctx),
     style,

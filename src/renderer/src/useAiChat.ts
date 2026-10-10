@@ -7,7 +7,7 @@ import type {
   ChatMessage
 } from '@shared/types'
 import { TAG } from '@shared/promptTags'
-import { collectHistoryRounds, FREE_CHAT_HISTORY_MAX } from '@shared/chatHistory'
+import { collectHistoryRounds, CHAT_HISTORY_SEND_MAX } from '@shared/chatHistory'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
@@ -70,9 +70,9 @@ const AGENT_KEY = 'atlas-freechat-agent'
 
 /** 历史按「轮」成对收集(答旧题修复锤):只收一问一答都落地的完整轮,报错/取消/半截的
  * 整轮扔,悬空旧问题不再沉进历史勾着小模型答旧题。纯逻辑住 shared/chatHistory.ts,
- * 渲染层与自测共用同一份口径;本地模型上下文有限,主进程还会再洗一遍兜底 */
+ * 渲染层与自测共用同一份口径;发得宽(CHAT_HISTORY_SEND_MAX),取舍交给主进程按模型档位定 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
-  return collectHistoryRounds(messages, FREE_CHAT_HISTORY_MAX)
+  return collectHistoryRounds(messages, CHAT_HISTORY_SEND_MAX)
 }
 
 export function useAiChat(
@@ -111,6 +111,8 @@ export function useAiChat(
   agentRef.current = agent
   const busyRef = useRef(false)
   const idRef = useRef('')
+  // 会话编号:一场对话一个,「新对话」换新;主进程凭它记住每轮翻文件的完整往来
+  const conversationIdRef = useRef(crypto.randomUUID())
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   // 附件的活户口径:发请求时取当下渲染的这份,用户切换选中对象后自动带新的
@@ -277,6 +279,7 @@ export function useAiChat(
           requestId,
           question: q,
           history: buildHistory(messagesRef.current),
+          conversationId: conversationIdRef.current,
           context: contextRef.current,
           codeRefs: useRefs,
           thinking: thinkingRef.current,
@@ -424,6 +427,7 @@ export function useAiChat(
     if (idRef.current) void window.atlas.aiCancel(idRef.current)
     idRef.current = ''
     busyRef.current = false
+    conversationIdRef.current = crypto.randomUUID()
     setBusy(false)
     setMessages([])
   }

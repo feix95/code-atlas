@@ -11,6 +11,10 @@ import {
   sendResetDelta
 } from './aiEvidence.ts'
 import { runAgentChat } from './agentChat.ts'
+import { sendAgentStep } from './agentTools.ts'
+import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from './chatMemory.ts'
+import { estimateThreadTokens, toPlainHistory } from '../ai/chatThread.ts'
+import type { AgentChatMessage } from '../ai/agent.ts'
 import { clipboard, ipcMain, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
@@ -25,7 +29,6 @@ import {
   explainWithModel,
   explainWithMessages,
   isContextOverflow,
-  sanitizeHistory,
   buildAttachmentText,
   sanitizeAttachment,
   sanitizeCodeRefs,
@@ -46,7 +49,12 @@ import {
 } from '../shared/personalization.ts'
 import { buildChatSystem } from '../ai/prompts.ts'
 import { CH } from '../shared/ipcChannels.ts'
-import type { AiChatResult, AiExplainResult, WebLookupMeta } from '../shared/types.ts'
+import type {
+  AiChatResult,
+  AiExplainResult,
+  AiHistoryMessage,
+  WebLookupMeta
+} from '../shared/types.ts'
 
 export function registerChatIpc(): void {
   // 自由对话:独立通道、独立人设(Atlas 小探针)。当前选中对象的资料以「附件」身份
@@ -79,7 +87,6 @@ export function registerChatIpc(): void {
     }
     const questionText = question || '讲讲选中的这段代码'
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
-    const history = sanitizeHistory(body.history)
     const attachment = sanitizeAttachment(body.context)
     // 思考模式(第一百一十五锤):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
     const thinking = body.thinking === true
@@ -142,14 +149,28 @@ export function registerChatIpc(): void {
     const cap = thinking
       ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS
       : resolved.budgets.replyTokens
+    // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
+    // 固定开销 = 人设+附件+本轮问题+联网资料,历史预算从剩余座位里划
+    const fixedTokens =
+      estimateTokens(systemPrompt) +
+      estimateTokens(attachment ? buildAttachmentText(attachment) : '') +
+      estimateTokens(questionText) +
+      estimateTokens(webMaterial ? webMaterial.material : '')
+    const memory = planChatMemory({
+      body,
+      provider: resolved.provider,
+      contextTokens: resolved.ctx,
+      fixedTokens,
+      replyTokens: cap
+    })
+    const plainHistory = toPlainHistory(memory.planned.messages)
+    const droppedNotice = droppedRoundsNotice(memory.planned)
+    if (droppedNotice) sendAgentStep(event, requestId, droppedNotice)
     // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
     // 剩下的折成字符才是引用能带的量;穷保底、富封顶,额度跟着用户设的上下文走
     const otherTokens =
-      estimateTokens(systemPrompt) +
-      estimateTokens(attachment ? buildAttachmentText(attachment) : '') +
-      estimateTokens(history.map((h) => h.content).join('\n')) +
-      estimateTokens(questionText) +
-      estimateTokens(webMaterial ? webMaterial.material : '')
+      fixedTokens +
+      estimateThreadTokens(body.agent === true ? memory.planned.messages : plainHistory)
     const refsBudget = codeRefsBudget({
       contextTokens: resolved.ctx,
       otherTokens,
@@ -159,16 +180,17 @@ export function registerChatIpc(): void {
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
     // 手动压缩的早前对话摘要(第一百四十二锤):/compact 之后每次请求都带,垫在历史前面当背景记忆
     const summary = sanitizeCompactSummary(body.summary)
-    const messages = buildFreeChatMessages(
-      systemPrompt,
-      attachment,
-      history,
-      questionText2,
-      webMaterial,
-      codeRefs,
-      resolved.teaching,
-      summary
-    )
+    const assembleMessages = <H extends AgentChatMessage = AiHistoryMessage>(chatHistory: H[]) =>
+      buildFreeChatMessages(
+        systemPrompt,
+        attachment,
+        chatHistory,
+        questionText2,
+        webMaterial,
+        codeRefs,
+        resolved.teaching,
+        summary
+      )
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (body.agent === true) {
@@ -191,7 +213,7 @@ export function registerChatIpc(): void {
           requestId,
           target: resolved.target,
           systemPrompt,
-          baseMessages: messages,
+          baseMessages: assembleMessages(memory.planned.messages),
           rootPath: agentRoot,
           ctx: resolved.ctx,
           replyCap: cap,
@@ -200,7 +222,8 @@ export function registerChatIpc(): void {
           startedAt,
           webLookup: meta,
           webSearchEnabled: resolved.webLookup === true,
-          tavilyKey: resolved.tavilyKey
+          tavilyKey: resolved.tavilyKey,
+          onTurnComplete: (trace, answer) => rememberAgentTurn(memory, question, trace, answer)
         })
       } finally {
         if (requestId !== '') explainAborters.delete(requestId)
@@ -216,7 +239,7 @@ export function registerChatIpc(): void {
       }
       let res = await explainWithMessages(
         resolved.target,
-        messages,
+        assembleMessages(plainHistory),
         makeDeltaSender(event, requestId),
         aborter.signal,
         cap,
@@ -226,19 +249,9 @@ export function registerChatIpc(): void {
       // 只兜一次,再爆就照实给指路话,不跟它无限耗
       if (res.status === 'error' && isContextOverflow(res.text)) {
         sendResetDelta(event, requestId)
-        const slimMessages = buildFreeChatMessages(
-          systemPrompt,
-          attachment,
-          history.slice(-2),
-          questionText2,
-          webMaterial,
-          codeRefs,
-          resolved.teaching,
-          summary
-        )
         res = await explainWithMessages(
           resolved.target,
-          slimMessages,
+          assembleMessages(plainHistory.slice(-2)),
           makeDeltaSender(event, requestId),
           aborter.signal,
           cap,

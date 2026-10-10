@@ -45,6 +45,7 @@ import { isContextOverflow } from '../ai/index.ts'
 import { truncateAtRepetition } from '../ai/repetition.ts'
 import { sanitizeWebQuery } from '../ai/weblookup.ts'
 import { AGENT_FILES_ADDENDUM, SLICE_NO_TOOLS } from '../ai/prompts.ts'
+import { flattenToolMessages } from '../ai/chatThread.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { sanitizeExternalDirectoryPath } from './agentAccess.ts'
 import type {
@@ -74,7 +75,7 @@ export async function runAgentChat(input: {
   requestId: string
   target: ChatTarget
   systemPrompt: string
-  baseMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  baseMessages: AgentChatMessage[]
   rootPath: string
   ctx: number
   replyCap: number
@@ -86,10 +87,13 @@ export async function runAgentChat(input: {
   webSearchEnabled: boolean
   /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 小葵定) */
   tavilyKey?: string
+  /** 顺利交卷时回报本轮的工具往来(assistant 的 tool_calls + tool 结果,不含提问和提醒/质检插话)和最终答案:会话记忆靠它记档 */
+  onTurnComplete?: (trace: AgentChatMessage[], answer: string) => void
 }): Promise<AiChatResult> {
   const { event, requestId, target, baseMessages, rootPath, ctx, replyCap, allowThinking, signal } =
     input
   const messages: AgentChatMessage[] = [...baseMessages]
+  const turnTrace: AgentChatMessage[] = []
   // 本轮用户真正的问题 = 组装消息里最后一条 user(附件/摘要/历史都垫在它前面);
   // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下。
   // 剥掉注意力锚(答旧题修复·刀三):提醒卡引用的是干净的问题原文,标牌不进提醒
@@ -106,6 +110,7 @@ export async function runAgentChat(input: {
   let engineNoTools = noToolEngines.has(engineKey)
   if (engineNoTools) {
     sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
+    messages.splice(0, messages.length, ...flattenToolMessages(messages))
   }
   // 人设后面垫翻文件切片(prompts.ts 的逐字稿):教它现在有什么手脚;
   // 联网查证开着再垫一段上网守则(模型这才知道有 web_search)。拆除兜底认同一把尺子,别拆岔了
@@ -215,6 +220,7 @@ export async function runAgentChat(input: {
           )
         }
         sendAgentStep(event, requestId, '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你')
+        input.onTurnComplete?.(turnTrace, text)
         return agentResult(input, 'supported', text, usage, resultReasoning())
       }
       // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
@@ -229,6 +235,7 @@ export async function runAgentChat(input: {
         noToolEngines.add(engineKey)
         engineNoTools = true
         skipNudgeOnce = true
+        messages.splice(0, messages.length, ...flattenToolMessages(messages))
         sendAgentStep(
           event,
           requestId,
@@ -357,10 +364,12 @@ export async function runAgentChat(input: {
         }
       }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
+      input.onTurnComplete?.(turnTrace, text)
       return agentResult(input, 'supported', text, usage, resultReasoning())
     }
     // 工具调用原样回填进对话(服务端要求 assistant 消息和 tool 结果成对出现)
     messages.push(raw)
+    turnTrace.push(raw)
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
@@ -516,6 +525,7 @@ export async function runAgentChat(input: {
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
     }
     messages.push(...toolResults)
+    turnTrace.push(...toolResults)
     // 每轮工具结果后垫提醒卡(LLM 优化锤):撤掉上一张再垫新的,对话里永远只挂
     // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事。
     // 缰绳门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
