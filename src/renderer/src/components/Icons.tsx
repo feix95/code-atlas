@@ -600,11 +600,11 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" />
     </>
   ),
-  // 刷新/重来(设置页原名 rotate,和顶栏 IconRefresh 同一支笔)
+  // 刷新/重来(设置页原名 rotate,和顶栏 IconRefresh 同一支笔;lucide rotate-cw 顺时针,与转圈方向一致)
   refresh: (
     <>
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
     </>
   ),
   // ── 设置页收编(P2-8:第二本 ICON_PATHS 并册,全是 Lucide 线稿,走 mono 单色斑) ──

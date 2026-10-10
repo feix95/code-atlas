@@ -78,8 +78,8 @@ export function RailAiStatus(): React.JSX.Element {
       : face === 'loading'
         ? 'AI 模型热身中'
         : face === 'error'
-          ? 'AI 出岔子了'
-          : 'AI 未加载'
+          ? 'AI 出错'
+          : 'AI 未装载'
 
   return (
     <>
@@ -160,11 +160,11 @@ function headView(
 } {
   if (status.provider === 'cloud' && status.state === 'ready') {
     if (probe?.kind === 'ok') return { dot: 'ok', text: '就绪' }
-    if (probe?.kind === 'fail') return { dot: 'bad', text: '没连上' }
+    if (probe?.kind === 'fail') return { dot: 'bad', text: '未连接' }
     return {
       dot: 'off',
       text: '已配置',
-      tip: '配置填全了,还没真连过 —— 点「测试连接」验'
+      tip: '配置已填写,尚未测试连接'
     }
   }
   switch (status.state) {
@@ -175,18 +175,18 @@ function headView(
           status.progress === null
             ? '热身中……'
             : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`,
-        tip: status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined
+        tip: status.estimated ? '进度为估算值' : undefined
       }
     case 'busy':
-      return { dot: 'go', text: '忙' }
+      return { dot: 'go', text: '处理中' }
     case 'ready':
       return { dot: 'ok', text: '就绪' }
     case 'idle':
-      return { dot: 'off', text: '没叫醒' }
+      return { dot: 'off', text: '未装载' }
     case 'unreachable':
-      return { dot: 'bad', text: '没连上' }
+      return { dot: 'bad', text: '未连接' }
     default:
-      return { dot: 'bad', text: '出岔子了' }
+      return { dot: 'bad', text: '出错' }
   }
 }
 
@@ -195,10 +195,10 @@ function headView(
 function builtinAct(status: ModelStatus): { label: string; tip: string; run: () => void } | null {
   if (status.provider !== 'builtin' || status.state === 'busy') return null
   if (status.state === 'loading')
-    return { label: '取消', tip: '停掉这次装载', run: () => void window.atlas.modelEject() }
+    return { label: '取消', tip: '取消本次装载', run: () => void window.atlas.modelEject() }
   if (status.state === 'ready')
-    return { label: '卸下', tip: '从内存卸下,释放显存', run: () => void window.atlas.modelEject() }
-  return { label: '装载', tip: '把模型读进内存', run: () => void window.atlas.modelLoad() }
+    return { label: '卸下', tip: '卸载模型,释放显存', run: () => void window.atlas.modelEject() }
+  return { label: '装载', tip: '装载模型到内存', run: () => void window.atlas.modelLoad() }
 }
 
 /** 状态浮层:头=点+供应商名+状态词,身份行=模型+账(大小/上下文档位),
@@ -256,7 +256,7 @@ function AiStatusPanel({
     <button
       type="button"
       className="ai-pop-nav"
-      data-tip="看模型请求的底层日志"
+      data-tip="查看 AI 请求日志"
       onClick={() => {
         void window.atlas.devLogsOpen()
         onClose()
@@ -402,7 +402,7 @@ function AiStatusPanel({
                 type="button"
                 className="ai-pop-act"
                 disabled={probe?.kind === 'busy'}
-                data-tip="拿配置里的 Key 真打一次服务商接口,验连通和 Key;不产 token,不计费"
+                data-tip="检查连接和 Key 是否有效,不产生费用"
                 onClick={() => void probeCloud()}
               >
                 测试连接
@@ -422,7 +422,7 @@ function AiStatusPanel({
               <button
                 type="button"
                 className="ai-pop-act"
-                data-tip="换一个 GGUF 模型文件:选完写进 AI 设置,引擎自动按新模型重载"
+                data-tip="更换模型文件,并自动重新装载"
                 onClick={() => void switchModelFile()}
               >
                 换模型

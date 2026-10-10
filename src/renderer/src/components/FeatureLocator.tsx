@@ -93,7 +93,7 @@ export function FeatureLocator({
             type="text"
             value={question}
             placeholder="描述想找的功能,AI 带路帮你指路;也可点下方类目直达"
-            data-tip="用法:想找什么就写什么(如「程序从哪个文件启动」「配置写在哪」),带路人照着项目地图指路;常见的类目点下方词条直接找,按文件名称与目录规则匹配,结果仅供定位参考。"
+            data-tip="描述想找的内容,如「配置写在哪」;按文件名和目录匹配,结果仅供参考"
             aria-label="描述你要找的功能"
             onChange={(e) => setQuestion(e.target.value)}
           />

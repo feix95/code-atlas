@@ -106,7 +106,8 @@
   padding: 0.625rem 0.8125rem 0.375rem;
 }
 
-/* 圆点只做四色助理:绿=可用(已验证)/蓝=进行中(热身、忙)/红=异常/灰=未启用;
+/* 圆点只做四色助理:绿=可用(已验证)/绿闪烁=进行中(热身、忙)/红=异常/灰=未启用;
+   进行中与就绪同用绿色系(进行中即「走向就绪」),绿蓝不同屏;
    真值由状态词担——在线 API 没测过是「已配置」灰点,测过才升绿「就绪」 */
 .ai-pop-dot {
   flex: none;
@@ -119,7 +120,24 @@
   background: var(--green);
 }
 .ai-pop-dot.is-go {
-  background: var(--sash-hi);
+  background: var(--green);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 呼吸闪烁:亮灭缓慢起伏,表达「进行中」;关闭动画偏好下静止常绿 */
+  .ai-pop-dot.is-go {
+    animation: ai-dot-breathe 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes ai-dot-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 .ai-pop-dot.is-bad {
   background: var(--danger);
@@ -229,12 +247,13 @@
 }
 
 /* 底栏:左边带路的文字链(日志钉最左),右边干活的描边钮 ——
-   与未配置卡同一套规矩:导航永居左、动作永居右 */
+   与未配置卡同一套规矩:导航永居左、动作永居右。
+   左缘 0.8125rem 与正文文字列对齐;右缘与上下同为 0.5rem,描边钮离右边/底边等距 */
 .ai-pop-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.8125rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.8125rem;
   border-top: 1px solid var(--line-soft);
 }
 
@@ -256,10 +275,10 @@
   color: var(--muted-2);
   cursor: default;
 }
-/* 未配置卡的唯一主张:描边加粗表达权重,不用实心;压右端 */
+/* 未配置卡的唯一主张:文字加粗表达权重,不用实心;压右端。
+   描边沿用 .ai-pop-act 的「平时浅线、悬停加深」,不另设深色线 */
 .ai-pop-act.is-call {
   margin-left: auto;
-  border-color: var(--muted);
   font-weight: var(--font-w-semi);
 }
 
