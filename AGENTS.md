@@ -15,6 +15,7 @@
 ## 验证命令
 
 - 模块完成后按序全绿再交: `npm run typecheck` → `npm run lint` → `npm test` → `npm run build` → `npm run test:journey`。
+- 纯样式/微调类的小改动不必每步跑全链, 等 commit 前跑一次全套即可; 中途只跑与改动直接相关的检查。
 - commit 前必须跑 `npm run format`: CI 的 `npm run format:check` 为硬闸, 格式漂移即红灯。
 - 新增自测脚本必须登记进 package.json 的 `test` 命令链: 本地 `npm test` 与 CI 只执行链内脚本, 漏挂即静默漏测。
 

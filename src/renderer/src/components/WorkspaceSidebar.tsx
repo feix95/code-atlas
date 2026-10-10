@@ -16,6 +16,7 @@ import { FileTree } from './FileTree'
 import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
 import { TreeIcon } from './Icons'
+import { SlideIndicator } from './SlideIndicator'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 
 export function WorkspaceSidebar({
@@ -277,6 +278,11 @@ export function WorkspaceSidebar({
         )}
         {settingsMode && (
           <nav className="cfg-snav" aria-label="设置导航">
+            <SlideIndicator
+              targetSelector=".cfg-snav-item.is-active"
+              activeKey={settingsSection}
+              className="cfg-snav-ind"
+            />
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.key}

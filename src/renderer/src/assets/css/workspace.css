@@ -380,6 +380,11 @@
   font-size: var(--font-sm);
 }
 
+/* 文件树根:滑动选中药丸(SlideIndicator)的量位与定位基准 */
+.tree {
+  position: relative;
+}
+
 .tree-scroll {
   min-height: 0;
   flex: 1;
@@ -793,9 +798,13 @@
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六锤摘遮罩,底色不再染色) */
+/* 选中态必须比 hover 抢眼:底色由滑动药丸(SlideIndicator)承担,行自身透明(盖过 hover 底);名字染亮 */
 .tree-row.is-selected {
-  background: var(--selected-bg);
+  background: transparent;
+}
+
+.tree-ind {
+  border-radius: var(--radius-sm);
 }
 
 /* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
