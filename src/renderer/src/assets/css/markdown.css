@@ -296,6 +296,28 @@
   line-height: 1.111;
 }
 
+/* 内联标题可改名(内联标题改名锤):能改的标题悬停给文本光标;
+   输入框吃标题同一身皮,Obsidian 同款素脸——无边线无底纹,只多一个光标 */
+.md-title[role='button'] {
+  cursor: text;
+}
+
+.md-title-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  outline: none;
+}
+
+.md-title-input:disabled {
+  opacity: 0.6;
+}
+
 .md .md-link {
   color: var(--accent-bright);
   text-decoration: underline;

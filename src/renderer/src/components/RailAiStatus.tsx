@@ -1,14 +1,16 @@
 // rail 底槽的 AI 状态钮(UI v3 §6.1):图形形状区分就绪/加载/未连接等状态,图标颜色随主题。
 // 点击弹浮层(锚位:贴钮上方往右弹,Windows 系统托盘/Discord 同款),Esc/点外/滚轮收起。
-// 浮层内容沿用旧文档第七节全套:供应商+状态文案、热身进度(纯文字)、模型名+大小、
-// 热身中「取消」/就绪「卸下」/未醒与异常态「装载」、内置「换模型」文件快捷道、
-// 「AI 设置」「日志」入口、status.message 截断悬停看全文、
-// 未配置「设置 AI」引导 —— 旧底部状态栏(ModelStatusBar)随它上岗退役。
+// 浮层版式(v4 重设计):头=圆点+供应商真名(在线 API 带服务商)+状态词,
+// 身份行=模型名+大小/上下文档位,反馈槽=测试结论与引擎消息共用一行,
+// 底栏=左带路文字链(日志钉最左、AI 设置次之)、右干活描边钮(测试连接/装卸/换模型)。
+// 诚实线:在线 API 没测过只说「已配置」;已在 AI 设置页时该链原名置灰。
 import { useContext, useEffect, useState } from 'react'
-import type { ModelStatus } from '../../../shared/types.ts'
-import { PROVIDER_SHORT_LABEL } from '../../../shared/aiSetup.ts'
+import type { AiConfig, ModelStatus } from '../../../shared/types.ts'
+import { PROVIDER_OPTIONS } from '../../../shared/aiSetup.ts'
+import { findCloudVendor } from '../../../shared/cloudVendors.ts'
 import { AiSetupContext } from '../aiSetupContext'
 import { useMenuDismiss } from '../useMenuDismiss'
+import { friendlyErr } from '../errText'
 
 /** 状态脸:三态外的第四态 = 红插头(§6.1:出错 = 红 unplug) */
 type AiFace = 'ready' | 'loading' | 'idle' | 'error'
@@ -142,7 +144,65 @@ export function RailAiStatus(): React.JSX.Element {
   )
 }
 
-/** 状态浮层:供应商+状态文案+热身进度(纯字)+模型名+大小+取消/卸下+AI 设置/日志+引导,一项不裁 */
+/** 一次「测试连接」的结论:busy=正在问,ok=服务商回了名单,fail=报人话错 */
+type Probe = { kind: 'busy' | 'ok' | 'fail'; text: string }
+
+/** 头部视图:圆点只做四色助理(绿=可用/蓝=进行中/红=异常/灰=未启用),
+    真值由状态词担——在线 API 底层报「就绪」只代表配置填全,从没真连过,
+    翻译成「已配置」+灰点;本会话测过了才按测试结论改口(就绪绿/没连上红) */
+function headView(
+  status: ModelStatus,
+  probe: Probe | null
+): {
+  dot: 'ok' | 'go' | 'bad' | 'off'
+  text: string
+  tip?: string
+} {
+  if (status.provider === 'cloud' && status.state === 'ready') {
+    if (probe?.kind === 'ok') return { dot: 'ok', text: '就绪' }
+    if (probe?.kind === 'fail') return { dot: 'bad', text: '没连上' }
+    return {
+      dot: 'off',
+      text: '已配置',
+      tip: '配置填全了,还没真连过 —— 点「测试连接」验'
+    }
+  }
+  switch (status.state) {
+    case 'loading':
+      return {
+        dot: 'go',
+        text:
+          status.progress === null
+            ? '热身中……'
+            : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`,
+        tip: status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined
+      }
+    case 'busy':
+      return { dot: 'go', text: '忙' }
+    case 'ready':
+      return { dot: 'ok', text: '就绪' }
+    case 'idle':
+      return { dot: 'off', text: '没叫醒' }
+    case 'unreachable':
+      return { dot: 'bad', text: '没连上' }
+    default:
+      return { dot: 'bad', text: '出岔子了' }
+  }
+}
+
+/** 内置模型的装卸动作:热身中=取消,就绪=卸下,没叫醒/出岔子/连不上=装载主动热身;
+    外接的装卸归 LM Studio 管,这里不出钮 */
+function builtinAct(status: ModelStatus): { label: string; tip: string; run: () => void } | null {
+  if (status.provider !== 'builtin' || status.state === 'busy') return null
+  if (status.state === 'loading')
+    return { label: '取消', tip: '停掉这次装载', run: () => void window.atlas.modelEject() }
+  if (status.state === 'ready')
+    return { label: '卸下', tip: '从内存卸下,释放显存', run: () => void window.atlas.modelEject() }
+  return { label: '装载', tip: '把模型读进内存', run: () => void window.atlas.modelLoad() }
+}
+
+/** 状态浮层:头=点+供应商名+状态词,身份行=模型+账(大小/上下文档位),
+    反馈槽=测试结果与引擎消息共用一行,底栏=左带路文字链(日志钉最左)、右干活描边钮 */
 function AiStatusPanel({
   status,
   onClose
@@ -152,148 +212,225 @@ function AiStatusPanel({
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const configured = setup?.configured
+  const [probe, setProbe] = useState<Probe | null>(null)
+  /** 在线 API 的服务商名和上下文档位要回配置取(状态播报里没带) */
+  const [cfg, setCfg] = useState<AiConfig | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.atlas
+      .aiConfigGet()
+      .then((c) => {
+        if (alive) setCfg(c)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  async function probeCloud(): Promise<void> {
+    setProbe({ kind: 'busy', text: '正在问服务商…' })
+    const config = cfg ?? (await window.atlas.aiConfigGet().catch(() => null))
+    if (config?.provider !== 'cloud') {
+      setProbe({ kind: 'fail', text: '读不到在线 API 的配置' })
+      return
+    }
+    try {
+      // aiListModels 兼任连接/Key 测试:只打元数据接口,不产 token 不计费;报错主进程已翻人话
+      const ids = await window.atlas.aiListModels({
+        baseUrl: config.cloud.baseUrl,
+        apiKey: config.cloud.apiKey,
+        provider: 'cloud'
+      })
+      setProbe({
+        kind: 'ok',
+        text: ids.length > 0 ? `服务商列出 ${ids.length} 个模型` : '服务商没列出模型'
+      })
+    } catch (err) {
+      setProbe({ kind: 'fail', text: friendlyErr(err) })
+    }
+  }
+
+  const logNav = (
+    <button
+      type="button"
+      className="ai-pop-nav"
+      data-tip="看模型请求的底层日志"
+      onClick={() => {
+        void window.atlas.devLogsOpen()
+        onClose()
+      }}
+    >
+      日志
+    </button>
+  )
 
   if (configured !== true) {
     return (
       <div className="ai-status-pop" role="dialog" aria-label="AI 状态">
-        <p className="ai-pop-title">
-          {configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}
-        </p>
-        <p className="ai-pop-note">项目地图和文件阅读可以直接使用</p>
-        {configured === false && setup && (
+        <div className="ai-pop-empty">
+          <p className="ai-pop-title">
+            {configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}
+          </p>
+          {configured === false && <p className="ai-pop-note">项目地图和文件阅读可以直接使用</p>}
+        </div>
+        {configured === false && (
           <div className="ai-pop-actions">
-            <button
-              type="button"
-              className="ai-pop-act is-primary"
-              onClick={() => {
-                setup.openSettings()
-                onClose()
-              }}
-            >
-              设置 AI
-            </button>
+            <div className="ai-pop-navs">{logNav}</div>
+            {setup && (
+              <button
+                type="button"
+                className="ai-pop-act is-call"
+                data-tip="打开 AI 设置页"
+                onClick={() => {
+                  setup.openSettings()
+                  onClose()
+                }}
+              >
+                设置 AI
+              </button>
+            )}
           </div>
         )}
       </div>
     )
   }
 
+  const head = status ? headView(status, probe) : null
+  const providerName = status
+    ? status.provider === 'cloud'
+      ? `在线 API · ${cfg ? (findCloudVendor(cfg.cloud.vendor)?.label.split('(')[0] ?? '自定义') : '…'}`
+      : (PROVIDER_OPTIONS.find((p) => p.id === status.provider)?.label ?? status.provider)
+    : ''
+  const metaExtra = !status
+    ? ''
+    : status.provider === 'builtin'
+      ? formatBytes(status.sizeBytes)
+      : status.provider === 'cloud' && cfg
+        ? `上下文 ${cfg.cloud.contextSize.toLocaleString()}`
+        : ''
+  // 反馈槽:测试结果优先(它更新),没测过才落引擎消息;异常消息配 ✕,其余纯文字
+  const broken = status?.state === 'error' || status?.state === 'unreachable'
+  const feedback: { ico: 'spin' | 'ok' | 'bad' | 'none'; text: string; tip?: string } | null = probe
+    ? {
+        ico: probe.kind === 'busy' ? 'spin' : probe.kind === 'ok' ? 'ok' : 'bad',
+        text: probe.text,
+        tip: probe.kind === 'fail' ? probe.text : undefined
+      }
+    : status?.message
+      ? { ico: broken ? 'bad' : 'none', text: status.message, tip: status.message }
+      : null
+  const loadAct = status ? builtinAct(status) : null
+
   return (
     <div className="ai-status-pop" role="dialog" aria-label="AI 状态">
-      {status ? (
+      {status && head ? (
         <>
-          <StatusRows status={status} />
-          {status.message && (
-            <p
-              className={`ai-pop-message${status.state === 'error' ? ' is-error' : ''}`}
-              data-tip={status.message}
+          <div className="ai-pop-head">
+            <span className={`ai-pop-dot is-${head.dot}`} aria-hidden="true" />
+            <span className="ai-pop-who">{providerName}</span>
+            <span
+              className={`ai-pop-state${head.dot === 'bad' ? ' is-error' : ''}`}
+              data-tip={head.tip}
             >
-              {status.message}
-            </p>
-          )}
-          {(status.modelName || formatBytes(status.sizeBytes) !== '') && (
-            <div className="ai-pop-row ai-pop-meta">
+              {head.text}
+            </span>
+          </div>
+          {(status.modelName || metaExtra) && (
+            <div className="ai-pop-meta">
               {status.modelName && (
                 <span className="ai-pop-name mono" data-tip={status.modelName}>
                   {status.modelName}
                 </span>
               )}
-              {formatBytes(status.sizeBytes) !== '' && (
-                <span className="ai-pop-size mono">{formatBytes(status.sizeBytes)}</span>
-              )}
+              {status.modelName && metaExtra && <span aria-hidden="true">·</span>}
+              {metaExtra && <span>{metaExtra}</span>}
             </div>
           )}
         </>
       ) : (
-        <p className="ai-pop-note">模型状态还没回话,引擎那边可能在热身</p>
+        <div className="ai-pop-empty">
+          <p className="ai-pop-note">模型状态还没回话,引擎那边可能在热身</p>
+        </div>
+      )}
+      {feedback && (
+        <div
+          className="ai-pop-probe"
+          data-tip={feedback.tip}
+          role={feedback.ico === 'bad' ? 'alert' : 'status'}
+        >
+          <span
+            className={`ai-pop-pico${feedback.ico === 'ok' ? ' is-ok' : ''}${feedback.ico === 'bad' ? ' is-bad' : ''}`}
+            aria-hidden="true"
+          >
+            {feedback.ico === 'spin' ? (
+              <span className="ai-pop-spin" />
+            ) : feedback.ico === 'ok' ? (
+              '✓'
+            ) : feedback.ico === 'bad' ? (
+              '✕'
+            ) : (
+              ''
+            )}
+          </span>
+          <span className="ai-pop-probe-text">{feedback.text}</span>
+        </div>
       )}
       <div className="ai-pop-actions">
-        {status?.provider === 'builtin' && (
-          <button
-            type="button"
-            className="ai-pop-act"
-            data-tip="换一个 GGUF 模型文件:选完写进 AI 设置,引擎自动按新模型重载"
-            onClick={() => void switchModelFile()}
-          >
-            换模型
-          </button>
+        <div className="ai-pop-navs">
+          {logNav}
+          {setup && (
+            <button
+              type="button"
+              className="ai-pop-nav"
+              disabled={setup.isOnAiSettings}
+              data-tip={setup.isOnAiSettings ? '当前就在 AI 设置页' : '打开 AI 设置页'}
+              onClick={() => {
+                setup.openSettings()
+                onClose()
+              }}
+            >
+              AI 设置
+            </button>
+          )}
+        </div>
+        {(status?.provider === 'cloud' || status?.provider === 'builtin') && (
+          <div className="ai-pop-acts">
+            {status.provider === 'cloud' && (
+              <button
+                type="button"
+                className="ai-pop-act"
+                disabled={probe?.kind === 'busy'}
+                data-tip="拿配置里的 Key 真打一次服务商接口,验连通和 Key;不产 token,不计费"
+                onClick={() => void probeCloud()}
+              >
+                测试连接
+              </button>
+            )}
+            {loadAct && (
+              <button
+                type="button"
+                className="ai-pop-act"
+                data-tip={loadAct.tip}
+                onClick={loadAct.run}
+              >
+                {loadAct.label}
+              </button>
+            )}
+            {status.provider === 'builtin' && (
+              <button
+                type="button"
+                className="ai-pop-act"
+                data-tip="换一个 GGUF 模型文件:选完写进 AI 设置,引擎自动按新模型重载"
+                onClick={() => void switchModelFile()}
+              >
+                换模型
+              </button>
+            )}
+          </div>
         )}
-        {setup && (
-          <button
-            type="button"
-            className="ai-pop-act"
-            onClick={() => {
-              setup.openSettings()
-              onClose()
-            }}
-          >
-            AI 设置
-          </button>
-        )}
-        <button
-          type="button"
-          className="ai-pop-act"
-          data-tip="Developer 日志:看模型后台原话、请求报账"
-          onClick={() => {
-            void window.atlas.devLogsOpen()
-            onClose()
-          }}
-        >
-          日志
-        </button>
       </div>
-    </div>
-  )
-}
-
-/** 第一行:供应商 pill + 状态文案(含热身进度,只写字不画条)+ 取消/卸下动作 */
-function StatusRows({ status }: { status: ModelStatus }): React.JSX.Element {
-  const providerName = PROVIDER_SHORT_LABEL[status.provider]
-  const stateText =
-    status.state === 'loading'
-      ? status.progress === null
-        ? '热身中……'
-        : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`
-      : status.state === 'idle'
-        ? '还没叫醒'
-        : status.state === 'busy'
-          ? '忙'
-          : status.state === 'ready'
-            ? '就绪'
-            : status.state === 'unreachable'
-              ? '没连上'
-              : '出岔子了'
-  const broken = status.state === 'error' || status.state === 'unreachable'
-
-  // 内置模型的装卸动作:热身中=取消,就绪=卸下,没叫醒/出岔子/连不上=装载主动热身;
-  // 外接的装卸归 LM Studio 管,这里不出钮
-  const act =
-    status.provider !== 'builtin'
-      ? null
-      : status.state === 'loading'
-        ? { label: '取消', run: () => void window.atlas.modelEject() }
-        : status.state === 'ready'
-          ? { label: '卸下', run: () => void window.atlas.modelEject() }
-          : status.state === 'busy'
-            ? null
-            : { label: '装载', run: () => void window.atlas.modelLoad() }
-
-  return (
-    <div className="ai-pop-row">
-      <span className="ai-pop-provider">{providerName}</span>
-      <span
-        className={`ai-pop-state${broken ? ' is-error' : ''}`}
-        data-tip={
-          status.estimated ? '进度按上次热身耗时估的 —— 引擎不报真数,这里不编数' : undefined
-        }
-      >
-        {stateText}
-      </span>
-      {act && (
-        <button type="button" className="ai-pop-act" onClick={act.run}>
-          {act.label}
-        </button>
-      )}
     </div>
   )
 }

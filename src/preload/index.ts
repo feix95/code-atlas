@@ -27,6 +27,7 @@ import type {
   ModelContextInfo,
   ModelFitVerdict,
   ModelStatus,
+  RenameFileResult,
   ScanDirNode,
   ScanResult,
   DevLogEntry
@@ -143,6 +144,9 @@ const atlasApi = {
   /** 把文本写进项目内文件;返回写后 mtime,给文件监视器对自激账 */
   saveFile: (rootPath: string, relPath: string, text: string): Promise<{ mtimeMs: number }> =>
     ipcRenderer.invoke(CH.saveFile, rootPath, relPath, text),
+  /** 内联标题改名:只递新主名(不含扩展名),扩展名保留;返回新户口(relPath/name)给渲染层换账 */
+  renameFile: (rootPath: string, relPath: string, newBase: string): Promise<RenameFileResult> =>
+    ipcRenderer.invoke(CH.renameFile, rootPath, relPath, newBase),
   /** 盯一个打开中的文件:外面有人动它就推 fileChanged;ok=false = 文件读不到,监视降级 */
   watchFile: (rootPath: string, relPath: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke(CH.watchFile, rootPath, relPath),

@@ -1,0 +1,295 @@
+/* rail 栏 + AI 状态浮层(拆自 chrome.css,纯搬家):第二列竖向工具栏与底端 AI 状态气泡 */
+/* ── rail(第 2 层最左列):图谱/概览/对话/设置 + 底端 AI 状态 ── */
+
+.rail {
+  width: var(--u);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--chrome-topbar); /* 与顶栏同底同色(规格给定) */
+  border-right: 1px solid var(--line);
+}
+
+/* rail 钮:点击区 0.75u 见方、图标居中;纵向节奏 = 槽 0.9375u + 顶距 0.4375u ≈ 1.375u */
+.rail-btn {
+  width: calc(var(--u) * 0.9375);
+  height: calc(var(--u) * 0.9375);
+  margin-top: calc(var(--u) * 0.4375);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: transparent;
+  color: var(--chrome-ink);
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rail > .rail-btn:not(.rail-ai) {
+  position: relative;
+  isolation: isolate;
+  padding: 0;
+  clip-path: inset(calc(var(--u) * 0.09375) round var(--radius-xxs));
+}
+
+.rail > .rail-btn:not(.rail-ai)::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: calc(var(--u) * 0.09375);
+  border-radius: var(--radius-xxs);
+  background: var(--chrome-hover);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rail > .rail-btn:not(.rail-ai) > svg {
+  position: relative;
+  z-index: 1;
+}
+
+.rail > .rail-btn:not(.rail-ai):hover:not(:disabled) {
+  background: transparent;
+}
+
+.rail > .rail-btn:not(.rail-ai):hover:not(:disabled)::before,
+.rail > .rail-btn:not(.rail-ai):focus-visible::before {
+  opacity: 1;
+}
+
+.rail-ai:hover:not(:disabled) {
+  background: var(--chrome-hover);
+}
+
+.rail-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* AI 状态钮压底 */
+.rail-ai {
+  width: calc(var(--u) * 0.75);
+  height: calc(var(--u) * 0.75);
+  padding: 0;
+  margin-top: auto;
+  margin-bottom: calc(var(--u) * 0.21875);
+}
+
+/* AI 状态浮层(§6.1 锚位):出生在 rail 底钮正上方、左缘与钮左对齐 —
+   rail 宽 1u、钮 0.75u 居中 ⇒ 钮左缘 = 0.125u;钮顶沿距窗底 0.96875u
+   (0.21875u 底距 + 0.75u 钮高),卡底再让一条 ~0.15u 的缝。
+   Esc/点外/滚轮收起。
+   两列版式:左槽 0.8125rem 起放图标(点/✓/✕/转圈),文字列 1.8125rem 统一左缘;
+   信息区一整块不切割,底栏一根 hairline 隔开 —— 全卡只有一条线 */
+.ai-status-pop {
+  position: fixed;
+  left: calc(var(--u) * 0.125);
+  bottom: calc(var(--u) * 1.125);
+  z-index: var(--z-popover);
+  width: 15.75rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+
+.ai-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.8125rem 0.375rem;
+}
+
+/* 圆点只做四色助理:绿=可用(已验证)/蓝=进行中(热身、忙)/红=异常/灰=未启用;
+   真值由状态词担——在线 API 没测过是「已配置」灰点,测过才升绿「就绪」 */
+.ai-pop-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+.ai-pop-dot.is-ok {
+  background: var(--green);
+}
+.ai-pop-dot.is-go {
+  background: var(--sash-hi);
+}
+.ai-pop-dot.is-bad {
+  background: var(--danger);
+}
+
+.ai-pop-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-weight: var(--font-w-semi);
+}
+
+.ai-pop-state {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ai-pop-state.is-error {
+  color: var(--danger);
+}
+
+/* 身份行进文字列:与标题同一条左缘;单行打住,模型名超长先省略 */
+.ai-pop-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0 0.8125rem 0.5rem 1.8125rem;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+}
+
+.ai-pop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* 反馈槽:测试结果与引擎消息共用;图标站左槽、文字站文字列;
+   图标担色(✓绿/✕红),文字保持墨色——结论在头部红过一次,这里只说原因;
+   状态行一律单行省略,全文交给 tooltip */
+.ai-pop-probe {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.8125rem 0.625rem;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+}
+
+.ai-pop-pico {
+  flex: none;
+  width: 0.625rem;
+  text-align: center;
+  color: var(--muted-2);
+}
+.ai-pop-pico.is-ok {
+  color: var(--green);
+}
+.ai-pop-pico.is-bad {
+  color: var(--danger);
+}
+
+.ai-pop-probe-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-pop-spin {
+  display: inline-block;
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  border-top-color: var(--muted);
+  animation: ai-status-spin 0.7s linear infinite;
+}
+
+/* 未配置态:无图标列,文字直接贴卡缘 —— 全卡一条左缘 */
+.ai-pop-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6875rem 0.8125rem 0.625rem;
+}
+
+.ai-pop-title {
+  margin: 0;
+  color: var(--text-strong);
+  font-weight: var(--font-w-semi);
+}
+
+.ai-pop-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: 1.55;
+}
+
+/* 底栏:左边带路的文字链(日志钉最左),右边干活的描边钮 ——
+   与未配置卡同一套规矩:导航永居左、动作永居右 */
+.ai-pop-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8125rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.ai-pop-act {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--font-xs);
+  font-family: inherit;
+  padding: 0.1875rem 0.625rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-pop-act:hover:not(:disabled) {
+  border-color: var(--muted-2);
+}
+.ai-pop-act:disabled {
+  color: var(--muted-2);
+  cursor: default;
+}
+/* 未配置卡的唯一主张:描边加粗表达权重,不用实心;压右端 */
+.ai-pop-act.is-call {
+  margin-left: auto;
+  border-color: var(--muted);
+  font-weight: var(--font-w-semi);
+}
+
+/* 带路的文字链:注意力权重最低 —— 用最浅灰,悬停才加深;
+   禁用保持原名置灰(已在目标页时),理由交给 tooltip 说 */
+.ai-pop-navs {
+  display: flex;
+  gap: 0.625rem;
+}
+
+/* 干活的描边钮组:压右端;无动作时整组不出现,左边只留导航链 */
+.ai-pop-acts {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+.ai-pop-nav {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-pop-nav:hover:not(:disabled) {
+  color: var(--text-strong);
+  text-decoration: underline;
+}
+.ai-pop-nav:disabled {
+  cursor: default;
+}

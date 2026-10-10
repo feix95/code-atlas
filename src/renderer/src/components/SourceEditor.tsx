@@ -17,6 +17,7 @@ import {
   setHighlight,
   wrapCompartment
 } from '../editor/cmSetup'
+import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 
 /** 停手多久自动落盘(小葵拍板:约 1 秒防抖) */
 const AUTOSAVE_MS = 1000
@@ -37,6 +38,7 @@ export function SourceEditor({
   onAddRef,
   onTextChange,
   onToggleWrap,
+  onRenameFile,
   jump
 }: {
   rootPath: string
@@ -55,6 +57,8 @@ export function SourceEditor({
   onTextChange: (text: string) => void
   /** 编辑内的 Alt+Z 扳动折行:跟页头那颗钮走同一个开关 */
   onToggleWrap: () => void
+  /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执 */
+  onRenameFile?: (base: string) => Promise<RenameOutcome>
   jump?: { line: number; seq: number } | null
 }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -68,7 +72,8 @@ export function SourceEditor({
     refLimit,
     onAddRef,
     onTextChange,
-    onToggleWrap
+    onToggleWrap,
+    onRenameFile
   })
   useEffect(() => {
     propsRef.current = {
@@ -78,7 +83,8 @@ export function SourceEditor({
       refLimit,
       onAddRef,
       onTextChange,
-      onToggleWrap
+      onToggleWrap,
+      onRenameFile
     }
   })
 
@@ -171,11 +177,27 @@ export function SourceEditor({
           wrap,
           live,
           // 内联标题(Obsidian inline title):文件名掐尾去扩展名,与阅读档 MiniMD title 同配方
-          liveTitle: live
-            ? (relPath
-                .split(/[\\/]/)
-                .pop()
-                ?.replace(/\.[^.]+$/, '') ?? '')
+          liveTitle: live ? fileBaseName(relPath.split(/[\\/]/).pop() ?? '') : undefined,
+          /* 内联标题改名通道(内联标题改名锤):改名前先把账结清 —— 在路上的保存等它落袋,
+             脏文稿先落盘;不然改名后旧路径会被迟到的自动保存「复活」成第二个文件。
+             存不进去就别让改(改了内存稿会丢)。重挂前的空窗期把 relPath 就地换账,
+             万一这缝里又来一笔写盘,直接去新路径 */
+          titleRename: propsRef.current.onRenameFile
+            ? async (base: string): Promise<RenameOutcome> => {
+                if (timer) {
+                  clearTimeout(timer)
+                  timer = null
+                }
+                if (inFlight) await inFlight
+                await save()
+                if (inFlight) await inFlight
+                if (dirty) {
+                  return { ok: false, error: '改动还没存进文件,存上了再改名' }
+                }
+                const r = await propsRef.current.onRenameFile!(base)
+                if (r.ok) propsRef.current.relPath = r.relPath
+                return r
+              }
             : undefined,
           hooks: {
             onChanged: () => {

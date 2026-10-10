@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createRequestScope } from '../src/renderer/src/requestScope.ts'
 import { guideEntries, isTreePartial } from '../src/shared/scanCoverage.ts'
 import { isAiConfigured } from '../src/shared/aiSetup.ts'
+import { findFile, renameFileNode } from '../src/renderer/src/scanTreeTools.ts'
 import type { AiConfig, ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
 
 {
@@ -143,6 +144,38 @@ function dir(
     ['a-dir', 'z-dir', 'a.ts', 'b.ts'],
     '排序只换顺序,relPath 原样'
   )
+}
+
+// ── 内联标题改名:renameFileNode 换名重排 ──
+{
+  const tree = dir('root', '', [
+    dir('docs', 'docs', [file('b.md', 'docs/b.md'), file('c.md', 'docs/c.md')]),
+    file('top.md', 'top.md')
+  ])
+  const hit = renameFileNode(tree, 'docs/b.md', 'a.md')
+  assert.ok(hit !== null)
+  assert.equal(hit.node.relPath, 'docs/a.md')
+  assert.equal(hit.node.name, 'a.md')
+  // 换名后同层照扫描器口径重排(a.md 挤到 c.md 前);目录依旧在前
+  const docs = hit.tree.children[0] as ScanDirNode
+  assert.deepEqual(
+    docs.children.map((c) => c.name),
+    ['a.md', 'c.md']
+  )
+  assert.ok(findFile(hit.tree, 'docs/a.md') !== null, '新路径在树里找得到')
+  assert.equal(findFile(hit.tree, 'docs/b.md'), null, '旧路径不该再找到')
+}
+
+{
+  // 根级文件 + 树里没这个人 → 回 null,树里的户口一个不动
+  const tree = dir('root', '', [file('top.md', 'top.md'), file('z.md', 'z.md')])
+  const hit = renameFileNode(tree, 'top.md', 'a.md')
+  assert.ok(hit !== null)
+  assert.deepEqual(
+    hit.tree.children.map((c) => c.relPath),
+    ['a.md', 'z.md']
+  )
+  assert.equal(renameFileNode(tree, 'ghost.md', 'g.md'), null)
 }
 
 function cfg(

@@ -21,7 +21,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 // 相对路径引 shared(不走 @shared 别名):node 自测直接驱动本文件,别名只活在 vite 里
 import { HL_KINDS } from '../../../shared/highlight.ts'
-import { livePreview, liveTitle } from './markdownLive.ts'
+import type { RenameOutcome } from '../../../shared/fileRename.ts'
+import { livePreview, liveRename, liveTitle } from './markdownLive.ts'
 
 // ── 一、分色账翻译:主进程 tree-sitter 的「行内段落账」→ CM 的装饰标记 ──
 // 单位天然同构:两边都是 UTF-16 偏移,col 即行内偏移,0 换算(Q3 调研结论)。
@@ -124,6 +125,8 @@ export function buildSourceExtensions(opts: {
   live?: boolean
   /** live 档的内联标题(Obsidian inline title):文件名掐尾去扩展名;空串 = 不摆 */
   liveTitle?: string
+  /** 内联标题改名通道(内联标题改名锤):喂了标题才可点改名;缺省标题只展示 */
+  titleRename?: (base: string) => Promise<RenameOutcome>
   hooks: SourceHooks
 }): Extension[] {
   return [
@@ -139,7 +142,12 @@ export function buildSourceExtensions(opts: {
     // base 必须喂 markdownLanguage(含 GFM):裸 markdown() 用的是 commonmarkLanguage,
     // 不认表格/删除线/待办框 —— 装饰引擎的账本是按 GFM 语法树算的(GFM 裸奔坑)
     ...(opts.live
-      ? [markdown({ base: markdownLanguage }), liveTitle.of(opts.liveTitle ?? ''), livePreview]
+      ? [
+          markdown({ base: markdownLanguage }),
+          liveTitle.of(opts.liveTitle ?? ''),
+          ...(opts.titleRename ? [liveRename.of(opts.titleRename)] : []),
+          livePreview
+        ]
       : []),
     keymap.of([
       { key: 'Alt-z', run: () => (opts.hooks.onToggleWrap(), true) },

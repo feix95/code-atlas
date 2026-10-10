@@ -69,6 +69,49 @@ export function findFile(node: ScanTreeNode, relPath: string): ScanFileNode | nu
   return null
 }
 
+/** 与扫描器同款排序:文件夹在前、文件在后,各自按名称排(中文按拼音) */
+function sortTreeChildren(children: ScanTreeNode[]): void {
+  children.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+    return a.name.localeCompare(b.name, 'zh')
+  })
+}
+
+/**
+ * 文件改名(内联标题改名锤):树上只换名不挪窝 —— 沿 relPath 一路浅拷到父目录,
+ * 换文件节点的 name/relPath 并照扫描器口径重排同层;找不到就回 null,账本原样。
+ * 其余字段(语言/标签/首行标题)原封不动 —— 改名保扩展名,这些账不跟着变。
+ */
+export function renameFileNode(
+  root: ScanDirNode,
+  oldRelPath: string,
+  newName: string
+): { tree: ScanDirNode; node: ScanFileNode } | null {
+  const parts = oldRelPath.split('/')
+  const newRelPath = [...parts.slice(0, -1), newName].join('/')
+  let renamed: ScanFileNode | null = null
+  const walk = (node: ScanDirNode, i: number): ScanDirNode => {
+    if (i === parts.length - 1) {
+      const idx = node.children.findIndex((c) => c.type === 'file' && c.relPath === oldRelPath)
+      if (idx < 0) return node
+      const old = node.children[idx] as ScanFileNode
+      const fresh: ScanFileNode = { ...old, name: newName, relPath: newRelPath }
+      renamed = fresh
+      const children = node.children.map((c, j) => (j === idx ? fresh : c))
+      sortTreeChildren(children)
+      return { ...node, children }
+    }
+    return {
+      ...node,
+      children: node.children.map((c) =>
+        c.type === 'directory' && c.name === parts[i] ? walk(c, i + 1) : c
+      )
+    }
+  }
+  const tree = walk(root, 0)
+  return renamed ? { tree, node: renamed } : null
+}
+
 /** 收齐全树的 relPath,给聊天文件链接建索引用:AI 提到谁,就拿这份花名册查户口 */
 export function collectRelPaths(node: ScanTreeNode): string[] {
   const out: string[] = []

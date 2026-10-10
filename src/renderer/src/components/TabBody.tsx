@@ -11,6 +11,7 @@ import type {
   ScanResult
 } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
+import type { RenameOutcome } from '@shared/fileRename'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import type { NoteEntry, NoteMap } from '@shared/notes'
 import { buildCrumbs, findFile } from '../scanTreeTools'
@@ -63,7 +64,8 @@ export function TabBody({
   onAiConfigSaved,
   onChatSuggestionsChange,
   onSettingsSection,
-  onSetViewMode
+  onSetViewMode,
+  onRenameFile
 }: {
   tab: PaneTab
   result: ScanResult | null
@@ -106,6 +108,8 @@ export function TabBody({
   onSettingsSection: (key: SectionKey) => void
   /** 预览头「阅读/代码」快速开关:切本签的看片档(账挂在签身上,跟右键菜单同一份) */
   onSetViewMode?: (id: string, mode: PaneViewMode) => void
+  /** 内联标题改名通道(内联标题改名锤):预览/瞄签都能用,账本认签认 scopeRoot */
+  onRenameFile?: (tab: PaneTab, base: string) => Promise<RenameOutcome>
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
   // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
@@ -131,6 +135,7 @@ export function TabBody({
         viewMode={tab.viewMode}
         lastEditMode={tab.lastEditMode}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
+        onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
       />
     )
   }
@@ -253,6 +258,7 @@ export function TabBody({
         lastEditMode={tab.lastEditMode}
         onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
         fileLinks={fileLinks}
+        onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
       />
     )
   }

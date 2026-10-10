@@ -9,6 +9,7 @@ import { openContextMenu } from './contextMenuStore'
 import { SourceEditor } from './SourceEditor'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
 import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
 import { DOC_ZOOM_STEP } from '@shared/docZoom'
@@ -50,7 +51,8 @@ export function CodePreview({
   viewMode,
   lastEditMode,
   onSetViewMode,
-  fileLinks
+  fileLinks,
+  onRenameFile
 }: {
   rootPath: string
   file: ScanFileNode
@@ -69,6 +71,9 @@ export function CodePreview({
   onSetViewMode?: (mode: PaneViewMode) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
+  /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执;
+      不传 = 标题只展示(live/阅读两档共用) */
+  onRenameFile?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   const codeViewRef = useRef<HTMLDivElement>(null)
   // ── 换文件就地复位(隐身案这锤):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
@@ -85,18 +90,21 @@ export function CodePreview({
   })
   const result = loadedAt.file === file.relPath ? loadedAt.result : null
   const err = loadedAt.file === file.relPath ? loadedAt.err : null
-  /** 「已复制」一闪而过小开关的账 */
+  /** 「已复制」一闪而过小开关 + 改名报错条的账 */
   const [uiAt, setUiAt] = useState<{
     file: string
     copiedAll: boolean
+    renameErr: string | null
   }>({
     file: '',
-    copiedAll: false
+    copiedAll: false,
+    renameErr: null
   })
   const copiedAll = uiAt.file === file.relPath && uiAt.copiedAll
+  const renameErr = uiAt.file === file.relPath ? uiAt.renameErr : null
   /** 改小开关:只动当前文件的账;换了文件才姗姗来迟的开关(迟到定时器),当没看见 */
   const patchUi = useCallback(
-    (patch: Partial<{ copiedAll: boolean }>): void => {
+    (patch: Partial<{ copiedAll: boolean; renameErr: string | null }>): void => {
       setUiAt((prev) => (prev.file === file.relPath ? { ...prev, ...patch } : prev))
     },
     [file.relPath]
@@ -112,6 +120,33 @@ export function CodePreview({
       setEditAt({ file: file.relPath, text: t })
     },
     [file.relPath]
+  )
+
+  /**
+   * 内联标题改名通道(内联标题改名锤):回执一到,读稿/草稿的账就地换成新路径 ——
+   * 等 App 换完扫描树与页签,file.relPath 落到新值,两边正好接上,
+   * 不闪「正在读文件」;败了把报错挂上提示条(账跟着文件名,换文件自动消)。
+   */
+  const requestRename = useCallback(
+    async (base: string): Promise<RenameOutcome> => {
+      if (!onRenameFile) return { ok: false, error: '改名通道没接上' }
+      const r = await onRenameFile(base)
+      if (r.ok) {
+        setLoadedAt((prev) =>
+          prev.file === file.relPath
+            ? { file: r.relPath, result: prev.result, err: prev.err }
+            : prev
+        )
+        setEditAt((prev) =>
+          prev?.file === file.relPath ? { file: r.relPath, text: prev.text } : prev
+        )
+        patchUi({ renameErr: null })
+      } else {
+        patchUi({ renameErr: r.error })
+      }
+      return r
+    },
+    [onRenameFile, file.relPath, patchUi]
   )
   /**
    * 折行开关(全局默认开这锤):一个开关管所有文件,存 localStorage 重启不失忆;
@@ -309,6 +344,7 @@ export function CodePreview({
       {!err && result?.status === 'ok' && (
         <>
           {copiedAll && <p className="code-pane-note">全文已复制到剪贴板</p>}
+          {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
           {reading ? (
             /* 阅读档:md 系签的渲染态 —— MiniMD 排版进可读栏,吃编辑器留下的最新文稿 */
             <div
@@ -320,14 +356,13 @@ export function CodePreview({
               onContextMenu={onReadContextMenu}
             >
               <article className="code-reading">
-                {/* 内联标题(Obsidian 同款):文件名掐尾去扩展名,摆正文顶上居中 */}
+                {/* 内联标题(Obsidian 同款):文件名掐尾去扩展名,摆正文顶上;
+                    接了改名通道就能点进去改(live/阅读同一条) */}
                 <MiniMD
                   text={text}
                   fileLinks={fileLinks ?? undefined}
-                  title={file.relPath
-                    .split(/[\\/]/)
-                    .pop()
-                    ?.replace(/\.[^.]+$/, '')}
+                  title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
+                  onRenameTitle={onRenameFile ? requestRename : undefined}
                 />
               </article>
             </div>
@@ -353,6 +388,7 @@ export function CodePreview({
                 onAddRef={onAddRef}
                 onTextChange={onTextChange}
                 onToggleWrap={toggleWrap}
+                onRenameFile={onRenameFile ? requestRename : undefined}
                 jump={jump}
               />
             </div>

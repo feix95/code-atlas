@@ -2,7 +2,7 @@ import { userDataDir } from './paths.ts'
 import { BrowserWindow } from 'electron'
 import { parseLmStudioModelState } from '../ai/index.ts'
 import { loadAiConfig, resolveAiTarget } from '../ai/config.ts'
-import { lastBuiltinStatus } from '../ai/builtin.ts'
+import { builtinIdleStatus, lastBuiltinStatus } from '../ai/builtin.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
@@ -13,7 +13,12 @@ import type { AiConfig, AiProviderKind, AiStreamStats, ModelStatus } from '../sh
 // 内置引擎的状态由 builtin.ts 播报员推过来;外接 LM Studio 没法订阅,只能低频去问。
 // 两路都汇到 broadcastModelStatus,渲染层的常驻底栏只认这一条频道。
 
+/** 最后一次真播出去的状态(轮询/引擎播报员/忙闲播报共用这一个口):
+    「卡上现在显示什么」的唯一真相 —— 刷新去重要认它,不能只认上次算过的外接账 */
+let lastBroadcast: ModelStatus | null = null
+
 export function broadcastModelStatus(status: ModelStatus): void {
+  lastBroadcast = status
   // 第八十八锤:必须挨个窗都发 —— Developer 日志窗进了队,「[0]」不一定是主窗;
   // 广播喂给没人听的日志窗,主窗底栏就冻死在「还没叫醒」
   for (const win of BrowserWindow.getAllWindows()) {
@@ -70,15 +75,22 @@ function sameStatus(a: ModelStatus | null, b: ModelStatus): boolean {
   )
 }
 
-/** 手动刷一次状态:外接走探测广播;内置的状态归引擎播报员管,这里不越权。
- *  在线 API 状态没变就不广播:否则 10 秒轮询会把干活中的「忙」盖回「就绪」 */
+/** 手动刷一次状态(存档/轮询/开窗都走这):照当前配置的 provider 立刻报话。
+ *  内置拿引擎播报员手里最新的账,没账按配置兜底(同 modelStatusGet 口径)——
+ *  换了 provider 要当场换脸,不能干等引擎下一句。
+ *  两道闸:卡上正在播的已经就是这份 = 没变不打扰;
+ *  同家还在「忙」(请求在飞):算出来的闲态别抢话,忙播报员自己会收尾 */
 export async function refreshModelStatus(): Promise<void> {
   const config = await loadAiConfig(userDataDir())
-  if (config.provider === 'builtin') return
   const status =
-    config.provider === 'cloud' ? cloudStatus(config) : await probeLmStudioStatus(config)
-  if (config.provider === 'cloud' && sameStatus(lastExternalStatus, status)) return
-  lastExternalStatus = status
+    config.provider === 'builtin'
+      ? (lastBuiltinStatus() ?? builtinIdleStatus(config.builtin.modelPath))
+      : config.provider === 'cloud'
+        ? cloudStatus(config)
+        : await probeLmStudioStatus(config)
+  if (sameStatus(lastBroadcast, status)) return
+  if (lastBroadcast?.provider === status.provider && lastBroadcast.state === 'busy') return
+  if (status.provider !== 'builtin') lastExternalStatus = status
   broadcastModelStatus(status)
 }
 

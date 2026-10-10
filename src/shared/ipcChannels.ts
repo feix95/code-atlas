@@ -74,8 +74,9 @@ export const CH = {
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
-  // ── 文件编辑与监视(预览编辑锤) ──
+  // ── 文件编辑与监视(预览编辑锤 / 内联标题改名锤) ──
   saveFile: 'atlas:save-file',
+  renameFile: 'atlas:rename-file',
   watchFile: 'atlas:watch-file',
   unwatchFile: 'atlas:unwatch-file',
   /** 主进程 → 渲染层推送:打开中的文件被外部改了(全员广播,各窗自己对账) */

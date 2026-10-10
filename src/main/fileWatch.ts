@@ -89,6 +89,25 @@ export class FileWatchRegistry {
     if (entry) entry.ownMtimeMs = mtimeMs
   }
 
+  /**
+   * 自家人改名(内联标题改名锤):户口迁去新路径 —— 老监工收摊,新路径上立同等户口的监工。
+   * lastSeen 记上改名后的 mtime:换户口头一回事件对上账本吞掉,不误报「外面动了」;
+   * 新路径立不起监工(读不到等)就空着手回来,与 add 回 false 的降级同口径。
+   */
+  move(oldAbs: string, newAbs: string, newRelPath: string, mtimeMs: number): void {
+    const entry = this.entries.get(oldAbs)
+    if (!entry) return
+    const { refs, rootPath } = entry
+    this.drop(oldAbs)
+    if (this.add(rootPath, newRelPath, newAbs)) {
+      const moved = this.entries.get(newAbs)
+      if (moved) {
+        moved.refs = refs
+        moved.lastSeenMs = mtimeMs
+      }
+    }
+  }
+
   dispose(): void {
     for (const absPath of [...this.entries.keys()]) this.drop(absPath)
   }
@@ -115,6 +134,8 @@ export class FileWatchRegistry {
     const entry = this.entries.get(absPath)
     if (!entry) return
     const stat = await fs.stat(absPath).catch(() => null)
+    // stat 悬空期间户口可能已迁/已收(自家人改名等):旧账不再报,免谎报「被删」
+    if (this.entries.get(absPath) !== entry) return
     const mtimeMs = stat?.isFile() ? stat.mtimeMs : null
     if (mtimeMs !== null) {
       if (entry.ownMtimeMs === mtimeMs) {

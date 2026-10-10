@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type {
   DepGraphResult,
   DriveInfo,
@@ -18,12 +17,12 @@ import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
 import { ContextMenu } from './components/ContextMenu'
-import { Notice } from './components/Notice'
-import { ProgressDots } from './components/ProgressDots'
+import { ScanOrError } from './components/ScanOrError'
 import { AppTopBar } from './components/AppTopBar'
 import { Rail } from './components/Rail'
 import { TopBarTabs } from './components/TopBarTabs'
-import { AuxWindowShell, type TabAreaProps } from './components/AuxWindowShell'
+import { AuxWindows } from './components/AuxWindows'
+import type { TabAreaProps } from './components/AuxWindowShell'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { TooltipHost } from './components/Tooltip'
 import { PaneGroups } from './components/PaneGroups'
@@ -45,6 +44,7 @@ import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { usePaneTabs } from './usePaneTabs'
 import { useSettingsNav } from './useSettingsNav'
 import { useAuxWindows } from './useAuxWindows'
+import { useFileRename } from './useFileRename'
 import { groupsForHost, MAIN_HOST } from './paneTabs'
 import { useSessionRestore } from './useSessionRestore'
 import { useNavStack } from './useNavStack'
@@ -627,6 +627,7 @@ function App(): React.JSX.Element {
     activateTab,
     closeTab,
     closeTabsInGroup,
+    renameFileTab,
     setTabViewMode,
     markFlash,
     applyPaneSplit,
@@ -686,6 +687,20 @@ function App(): React.JSX.Element {
     markFlash,
     editNoteFromTree,
     saveNote
+  })
+
+  // 内联标题改名(内联标题改名锤):编排本体在 useFileRename,
+  // 这里只递账本 —— 树/选中/备注/引用/页签户口一次换清新路径
+  const handleRenameFile = useFileRename({
+    result,
+    selectedFile,
+    folder,
+    notes,
+    setResult,
+    setSelectedFile,
+    setNotes,
+    setPreviewRefs,
+    renameFileTab
   })
 
   // 会话复现(Obsidian 式):开机还原上次的工作区+页签布局,账目变动防抖落账 ——
@@ -756,6 +771,7 @@ function App(): React.JSX.Element {
         handleDropNode={handleDropNode}
         handleDropRef={handleDropRef}
         onSetViewMode={setTabViewMode}
+        onRenameFile={handleRenameFile}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
         onSettingsSection={setSettingsSection}
@@ -785,7 +801,13 @@ function App(): React.JSX.Element {
   )
 
   return (
-    <AiSetupContext.Provider value={{ configured: aiConfigured, openSettings: openAiSettings }}>
+    <AiSetupContext.Provider
+      value={{
+        configured: aiConfigured,
+        openSettings: openAiSettings,
+        isOnAiSettings: settingsMode && settingsSection === 'ai'
+      }}
+    >
       <TeachingContext.Provider value={teaching}>
         <div
           className={`app${sidebarCollapsed ? ' is-side-collapsed' : ''}`}
@@ -904,43 +926,13 @@ function App(): React.JSX.Element {
             ) : scanning || error ? (
               // 扫描中/失败:这两种状态优先于页签房;其余情况(含没开项目)一律进签区,
               // 空签组自然落 PaneEmptyBoard 空板
-              <main className="content">
-                {scanning && (
-                  <div className="state" role="status" aria-live="polite">
-                    <h1>正在整理项目地图…</h1>
-                    <ProgressDots />
-                    <p>只读取文件,不会修改代码。文件较多时可以返回首页,换一个更小的文件夹。</p>
-                    <button type="button" className="btn" onClick={goHome}>
-                      返回首页
-                    </button>
-                  </div>
-                )}
-                {!scanning && error && (
-                  <div className="state" role="alert">
-                    <h1>这个文件夹没能打开</h1>
-                    <Notice kind="error">{error}</Notice>
-                    <p>可以重试,或重新选择项目文件夹。</p>
-                    <div className="state-actions">
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => {
-                          if (folder) void scanPath(folder)
-                          else void handlePick()
-                        }}
-                      >
-                        重试
-                      </button>
-                      <button type="button" className="btn" onClick={() => void handlePick()}>
-                        选择项目文件夹
-                      </button>
-                      <button type="button" className="btn btn-ghost" onClick={goHome}>
-                        返回首页
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </main>
+              <ScanOrError
+                scanning={scanning}
+                error={error}
+                onRetry={() => (folder ? void scanPath(folder) : void handlePick())}
+                onPick={() => void handlePick()}
+                onGoHome={goHome}
+              />
             ) : (
               // 没开工作区也能有房:单例签(设置/图谱)孤零零一张签也要正文区
               <main className="workspace">
@@ -957,20 +949,14 @@ function App(): React.JSX.Element {
           <ContextMenu />
         </div>
 
-        {/* 撕窗子窗(页签撕窗锤):每扇子窗一份壳(标题栏+页签带+分屏正文),
+        {/* 撕窗子窗(页签撕窗锤):壳本体在 AuxWindows 组件,
             Portal 渲染进子窗 document —— 同一棵 React 树,活的签的正房整体搬家 */}
-        {auxWins.map((a) =>
-          createPortal(
-            <AuxWindowShell
-              key={a.id}
-              aux={a}
-              groups={groupsForHost(groups, a.id)}
-              tabArea={tabArea}
-              onRequestClose={() => closeAuxWindow(a.id)}
-            />,
-            a.container
-          )
-        )}
+        <AuxWindows
+          auxWins={auxWins}
+          groups={groups}
+          tabArea={tabArea}
+          onRequestClose={closeAuxWindow}
+        />
       </TeachingContext.Provider>
     </AiSetupContext.Provider>
   )

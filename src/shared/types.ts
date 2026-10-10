@@ -609,6 +609,15 @@ export interface SaveFileResult {
   mtimeMs: number
 }
 
+/** 文件改名回执(内联标题改名锤):渲染层拿它给页签/扫描树/选中态换新户口 */
+export interface RenameFileResult {
+  /** 改名后的 relPath('/' 分隔,与旧路径同目录) */
+  relPath: string
+  /** 改名后的文件名(含扩展名) */
+  name: string
+  mtimeMs: number
+}
+
 /**
  * 主进程 → 渲染层:打开中的文件被外部改动(atlas:file-changed 推送的账本)。
  * 全员广播,渲染层只对自己打开中的 relPath 有反应。

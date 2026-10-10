@@ -364,6 +364,28 @@ export function usePaneTabs(deps: {
     }
   }
 
+  // 文件改名(内联标题改名锤):开着的文件签就地换户口 —— relPath/名牌换新的,
+  // 档位/组位一概不动;户口认 (relPath, scopeRoot) 两件,与开签对账同口径
+  function renameFileTab(
+    scopeRoot: string | undefined,
+    oldRelPath: string,
+    newRelPath: string,
+    newName: string
+  ): void {
+    setGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        tabs: g.tabs.map((t) =>
+          isFileKind(t.kind) &&
+          t.relPath === oldRelPath &&
+          (t.scopeRoot ?? '') === (scopeRoot ?? '')
+            ? { ...t, relPath: newRelPath, name: newName }
+            : t
+        )
+      }))
+    )
+  }
+
   // 页签看片档位(阅读模式这锤):源码/阅读记在签身上 —— 拖去子窗、会话存档都跟着签走;
   // 落到编辑档(live/source)时顺手记成「上次编辑档」,阅读档点单钮回去时落回原档
   function setTabViewMode(id: string, mode: PaneViewMode): void {
@@ -436,6 +458,7 @@ export function usePaneTabs(deps: {
     activateTab,
     closeTab,
     closeTabsInGroup,
+    renameFileTab,
     setTabViewMode,
     markFlash,
     applyPaneSplit,

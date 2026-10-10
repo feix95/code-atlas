@@ -17,6 +17,8 @@ import type { EditorState, Extension, Range } from '@codemirror/state'
 import type { Tree, SyntaxNode } from '@lezer/common'
 import { widgetFocus } from './liveFocus.ts'
 import { TableWidget, tableModelFromSource } from './markdownTable.ts'
+// 相对路径引 shared(不走 @shared 别名):node 自测直接驱动本文件,别名只活在 vite 里
+import type { RenameOutcome } from '../../../shared/fileRename.ts'
 
 /** 装饰清单的一行:planLiveDecos 的产出(纯数据,自测对着它对账) */
 export type LiveDeco =
@@ -327,7 +329,17 @@ class HrWidget extends WidgetType {
 /** live 档的内联标题户口(cmSetup 装配时喂文件名,缺省 '' = 不摆) */
 export const liveTitle = Facet.define<string, string>({ combine: (v) => v[0] ?? '' })
 
-/** 内联标题替身(Obsidian inline title):文档首行之上摆文件名,吃 .md-title 皮 */
+/** live 档的标题改名通道(内联标题改名锤):cmSetup 喂回调,缺省 = 标题只展示不可改 */
+export const liveRename = Facet.define<
+  ((base: string) => Promise<RenameOutcome>) | undefined,
+  ((base: string) => Promise<RenameOutcome>) | undefined
+>({ combine: (v) => v[0] })
+
+/**
+ * 内联标题替身(Obsidian inline title):文档首行之上摆文件名,吃 .md-title 皮。
+ * 接了改名通道时点击原地变输入框 —— Enter/失焦提交,Esc 取消;
+ * 输入框吃标题同一身皮(.md-title-input),只露一条功能色底线。
+ */
 class TitleWidget extends WidgetType {
   readonly title: string
   constructor(title: string) {
@@ -338,11 +350,56 @@ class TitleWidget extends WidgetType {
     return other instanceof TitleWidget && other.title === this.title
   }
   toDOM(view: EditorView): HTMLElement {
-    const el = view.dom.ownerDocument.createElement('div')
+    const doc = view.dom.ownerDocument
+    const el = doc.createElement('div')
     el.className = 'md-title'
     el.textContent = this.title
-    // 标题不是文档内容:点它把光标带回文档头(点着有反应,不装瞎)
-    el.onmousedown = revealAt(view, 0)
+    const rename = view.state.facet(liveRename)
+    if (!rename) {
+      // 没接改名通道:点它把光标带回文档头(点着有反应,不装瞎)
+      el.onmousedown = revealAt(view, 0)
+      return el
+    }
+    el.style.cursor = 'text'
+    const title = this.title
+    /** 提交只跑一次:disabled 触发的 blur、连按的 Enter,都靠这道闸挡住 */
+    let done = false
+    el.onmousedown = (e) => {
+      if (e.target !== el) return // 点在输入框上,归输入框自己管
+      e.preventDefault()
+      if (done) return
+      el.textContent = ''
+      const input = doc.createElement('input')
+      input.className = 'md-title-input'
+      input.value = title
+      input.setAttribute('aria-label', '新文件名(不含扩展名)')
+      el.appendChild(input)
+      input.focus()
+      input.select()
+      const commit = async (cancel: boolean): Promise<void> => {
+        if (done) return
+        done = true
+        const v = input.value.trim()
+        let renamed = false
+        if (!cancel && v !== '' && v !== title) {
+          input.disabled = true
+          renamed = (await rename(v)).ok
+        }
+        // 取消/失败:退回大字;成功则户口换账、编辑器重挂,这里不用还原
+        if (!renamed) el.textContent = title
+      }
+      input.onkeydown = (ev) => {
+        ev.stopPropagation() // 键位归输入框,不透给编辑器(ignoreEvent 之外的保险)
+        if (ev.key === 'Enter') {
+          ev.preventDefault()
+          void commit(false)
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault()
+          void commit(true)
+        }
+      }
+      input.onblur = () => void commit(false)
+    }
     return el
   }
   ignoreEvent(): boolean {

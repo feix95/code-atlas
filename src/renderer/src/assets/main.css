@@ -1,6 +1,10 @@
 /* 样式总入口:分段搬进 css/,import 顺序 = 原文件拼接顺序(导入顺序即行为) */
 @import './css/tokens.css';
 @import './css/chrome.css';
+@import './css/tabs.css';
+@import './css/rail.css';
+@import './css/controls.css';
+@import './css/auxwin.css';
 @import './css/workspace.css';
 @import './css/detail.css';
 @import './css/ai-chat.css';

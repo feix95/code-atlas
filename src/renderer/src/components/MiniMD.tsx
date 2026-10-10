@@ -1,6 +1,8 @@
 import { memo, type ReactNode } from 'react'
 import { findFileLinks, resolveFileRef, type FileLinkTarget } from '@shared/fileLinks'
 import { parseMarkdown, type MdBlock, type MdInline, type MdList } from '@shared/markdown'
+import type { RenameOutcome } from '@shared/fileRename'
+import { InlineTitle } from './InlineTitle'
 
 /**
  * 迷你 Markdown 渲染(第一百零七锤起;阅读模式锤拆成 解析/描画 两层):
@@ -210,17 +212,22 @@ export const MiniMD = memo(function MiniMD({
   text,
   caret,
   fileLinks,
-  title
+  title,
+  onRenameTitle
 }: {
   text: string
   caret?: boolean
   fileLinks?: FileLinkTarget
   /** 文档内联标题(阅读模式喂文件名);不传不摆 */
   title?: string
+  /** 内联标题改名通道(内联标题改名锤):喂了标题才可点改名;不传 = 标题只展示 */
+  onRenameTitle?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   return (
     <div className="md">
-      {title !== undefined && title !== '' && <div className="md-title">{title}</div>}
+      {title !== undefined && title !== '' && (
+        <InlineTitle title={title} onRename={onRenameTitle} />
+      )}
       {renderBlocks(parseMarkdown(text), fileLinks, { n: 0 })}
       {caret && <span className="stream-caret">▌</span>}
     </div>

@@ -2,7 +2,7 @@
 // fileChanged 是主进程主动推的事件 —— 同一个文件可能同时被主窗/子窗的签开着,
 // 一律全员广播,渲染层自己对账(只对打开中的文件有反应)。
 import { BrowserWindow, ipcMain } from 'electron'
-import { saveTextFile } from './fileEdit.ts'
+import { renameTextFile, saveTextFile } from './fileEdit.ts'
 import { FileWatchRegistry } from './fileWatch.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { CH } from '../shared/ipcChannels.ts'
@@ -28,6 +28,24 @@ export function registerEditIpc(): void {
       const result = await saveTextFile(rootPath, relPath, text)
       if (typeof rootPath === 'string' && typeof relPath === 'string') {
         watches.noteOwnWrite(joinRoot(rootPath, relPath), result.mtimeMs)
+      }
+      return result
+    }
+  )
+
+  // 文件改名(内联标题改名锤):改完顺手给监视器迁户口,老路径上的监工跟着挪去新路径,
+  // 不然旧户口的下一跳事件会谎报「文件被删了」
+  ipcMain.handle(
+    CH.renameFile,
+    async (_event, rootPath: unknown, relPath: unknown, newBase: unknown) => {
+      const result = await renameTextFile(rootPath, relPath, newBase)
+      if (typeof rootPath === 'string' && typeof relPath === 'string') {
+        watches.move(
+          joinRoot(rootPath, relPath),
+          joinRoot(rootPath, result.relPath),
+          result.relPath,
+          result.mtimeMs
+        )
       }
       return result
     }

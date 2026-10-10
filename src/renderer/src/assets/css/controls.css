@@ -1,0 +1,135 @@
+/* 通用控件(拆自 chrome.css,纯搬家):焦点环全场常灭 + .btn/.btn-primary/.btn-ghost/.icon-btn + .path-hint 气泡 */
+/* 焦点描边全场常灭:Electron 会把鼠标点过的钮误判成键盘焦点,
+   深色环时隐时现属视觉噪音(同 win-btn 旧案判决);键盘焦点的提示
+   改用各组件自己的非描边手段(rail 灰块、× 显形、sash 高亮线) */
+:focus-visible {
+  outline: none;
+}
+
+/* ── 按钮(浅蓝/实心蓝/幽灵/图标,四态齐全)── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3125rem;
+  height: 1.875rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  /* 上缘一条受光线(Obsidian 招牌细节):控件像实体一样"凸"出来;浅色底下这条线隐形,无副作用 */
+  box-shadow: var(--shadow-inset-hi);
+  color: var(--accent-bright);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    border-color var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth),
+    transform var(--dur-2) var(--ease-smooth);
+}
+
+.btn:hover {
+  background: var(--accent-soft);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* 忙碌时按钮文字自己就是进度(⏳ 全删了,干等就是「……」);灰但不装禁止符 */
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 实心按钮平涂、不叠阴影:受光线+厚度边那套只在近灰皮上成立,
+   彩色/近黑 accent 上要么隐形要么变味,索性全摘(2026-09-22 小葵拍板) */
+.btn-primary {
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+  background: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  color: var(--secondary-deep);
+  border-color: color-mix(in srgb, var(--secondary) 55%, transparent);
+  background: color-mix(in srgb, var(--secondary) 10%, transparent);
+}
+
+/* 图标按钮:热区放大到 2.25rem 兜住「双重缩放(系统 150% × 应用 zoom)下的小幅命中偏移」,
+   字形 1rem 视觉不变;line-height 锁 1 防字形基线漂移 */
+.icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--font-lg);
+  line-height: var(--lh-100);
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+/* 空路径点了「前往」:气泡提示挂输入框正下方(现宿主 = 侧栏 workspace 卡) */
+.path-hint {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0.625rem;
+  z-index: var(--z-popover);
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  box-shadow: var(--shadow-pop);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ws-card.is-shaking {
+    animation: path-shake 0.35s var(--ease-smooth);
+  }
+}
+
+@keyframes path-shake {
+  20% {
+    transform: translateX(-0.25rem);
+  }
+  40% {
+    transform: translateX(0.25rem);
+  }
+  60% {
+    transform: translateX(-0.1875rem);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
