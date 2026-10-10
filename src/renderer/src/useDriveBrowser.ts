@@ -66,11 +66,46 @@ function patchDir(dir: BrowseDir, relPath: string, patch: (d: BrowseDir) => Brow
   }
 }
 
+/** 主进程列出的一条目录项 → 浏览树节点 */
+function toNode(parent: BrowseDir, e: BrowseEntry): BrowseNode {
+  const rel = parent.relPath === '' ? e.name : `${parent.relPath}/${e.name}`
+  return e.dir
+    ? {
+        type: 'directory',
+        name: e.name,
+        relPath: rel,
+        absPath: e.absPath,
+        open: false,
+        loading: false,
+        error: null,
+        children: null
+      }
+    : { type: 'file', name: e.name, relPath: rel, absPath: e.absPath }
+}
+
+/** 新列表换旧列表:同名目录沿用旧节点(保住展开态与已探子层),其余按新列表来 */
+function mergeChildren(parent: BrowseDir, entries: BrowseEntry[]): BrowseNode[] {
+  const oldDirs = new Map(
+    (parent.children ?? []).flatMap((c) => (c.type === 'directory' ? [[c.name, c] as const] : []))
+  )
+  return entries.map((e) => (e.dir && oldDirs.get(e.name)) || toNode(parent, e))
+}
+
+/** 收集已探过(children 非空)的目录,刷新时逐个重列 */
+function collectProbed(dir: BrowseDir, out: BrowseDir[] = []): BrowseDir[] {
+  if (dir.children === null) return out
+  out.push(dir)
+  for (const c of dir.children) if (c.type === 'directory') collectProbed(c, out)
+  return out
+}
+
 export function useDriveBrowser(): {
   /** key = 盘根路径;没点过的盘还没树,渲染侧用 freshRoot 兜底画行 */
   trees: Record<string, BrowseDir>
   /** 单击目录行:已探过 = 开合;没探过 = 列一层再张开 */
   toggleDir: (d: DriveInfo, relPath: string) => Promise<void>
+  /** 刷新:已探过的目录全部重列一遍,展开态保留;某层列不出来就挂错误,不影响其他层 */
+  reloadProbed: () => Promise<void>
 } {
   const [trees, setTrees] = useState<Record<string, BrowseDir>>({})
 
@@ -98,26 +133,32 @@ export function useDriveBrowser(): {
     patch(d.root, relPath, (x) => ({ ...x, loading: true, error: null }))
     try {
       const entries: BrowseEntry[] = await window.atlas.browseDir(target.absPath)
-      const children: BrowseNode[] = entries.map((e): BrowseNode => {
-        const rel = target.relPath === '' ? e.name : `${target.relPath}/${e.name}`
-        return e.dir
-          ? {
-              type: 'directory',
-              name: e.name,
-              relPath: rel,
-              absPath: e.absPath,
-              open: false,
-              loading: false,
-              error: null,
-              children: null
-            }
-          : { type: 'file', name: e.name, relPath: rel, absPath: e.absPath }
-      })
+      const children = entries.map((e) => toNode(target, e))
       patch(d.root, relPath, (x) => ({ ...x, loading: false, open: true, children }))
     } catch (err) {
       patch(d.root, relPath, (x) => ({ ...x, loading: false, error: cleanErrMsg(err) }))
     }
   }
 
-  return { trees, toggleDir }
+  async function reloadProbed(): Promise<void> {
+    const probed = Object.entries(trees).flatMap(([root, tree]) =>
+      collectProbed(tree).map((dir) => ({ root, dir }))
+    )
+    await Promise.all(
+      probed.map(async ({ root, dir }) => {
+        try {
+          const entries = await window.atlas.browseDir(dir.absPath)
+          patch(root, dir.relPath, (x) => ({
+            ...x,
+            error: null,
+            children: mergeChildren(x, entries)
+          }))
+        } catch (err) {
+          patch(root, dir.relPath, (x) => ({ ...x, error: cleanErrMsg(err) }))
+        }
+      })
+    )
+  }
+
+  return { trees, toggleDir, reloadProbed }
 }

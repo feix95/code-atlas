@@ -1,0 +1,50 @@
+/* ── 通用轻提示 Toast + 顶栏刷新钮转圈 ──
+   Toast 与 .tip-bubble 同款黑底白字,落 .app 内(透明窗合成器裁根层 fixed 件);
+   区域本身不吃鼠标。入场只淡入上浮,reduced-motion 下直接出现 */
+
+.toast-region {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-7);
+  transform: translateX(-50%);
+  z-index: var(--z-tip);
+  display: flex;
+  justify-content: center;
+  max-width: calc(100% - var(--space-7));
+  pointer-events: none;
+}
+
+.toast {
+  padding: var(--space-2) var(--space-4);
+  background: var(--tip-bg);
+  color: var(--tip-ink);
+  border-radius: var(--radius-md);
+  font-size: var(--font-md);
+  line-height: var(--lh-150);
+  box-shadow: var(--shadow-pop);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast {
+    animation: toast-in var(--dur-3) var(--ease-smooth);
+  }
+
+  /* 刷新钮转圈:时长与 hook 的最短转动时长(MIN_SPIN_MS)对齐,至少转满一圈 */
+  .tb-btn.is-spinning .top-icon {
+    transform-origin: center;
+    animation: refresh-spin var(--dur-spin) linear infinite;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

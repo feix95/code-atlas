@@ -407,3 +407,4 @@
 - refactor(ui): 超限文件拆分毕业——App.tsx 拆出 ScanOrError(扫描中/打开失败整屏)与 AuxWindows(子窗 Portal 门房,户口过滤一并收进)回到 966 行;chrome.css 按职责拆四件(tabs.css 页签系统 355/rail.css 栏+AI 状态浮层 296/controls.css 通用控件 136/auxwin.css 子窗壳 37,主档余 229 只留顶栏与窗控),filesize 白名单清空;纯搬家零行为变化
 - feat(ai): AI 状态浮层诚实化+播报收口——在线 API 没实测过只说「已配置」灰点(「测试连接」真打通才改口就绪/没连上),「AI 设置」链在已站设置页时原名置灰;refreshModelStatus 照 provider 三源取数(lastBroadcast 真播出账去重、同家「忙」态不被闲态抢话、换 provider 当场换脸);顶栏搜索框禁用 placeholder 按实宽降级换短句(is-tight 收 padding/gap),全句挪悬停气泡
 - fix(ui): 顶栏搜索框禁用态悬停气泡退役——框内降级 placeholder 本身已把「先打开文件夹」说清,气泡复述同一句属噪音
+- feat(ui): 顶栏刷新钮点击后图标转满一圈、完成后底部 Toast 回报结果;「这台电脑」下刷新原先无反应,现重列盘符并重读已展开目录,Toast 说明盘符增减或无变化,失败带原因;新增通用 Toast 组件与 test:driverefresh 自测

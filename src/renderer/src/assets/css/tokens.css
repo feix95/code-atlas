@@ -77,6 +77,7 @@
   --dur-1: 0.07s;
   --dur-2: 0.15s;
   --dur-3: 0.3s;
+  --dur-spin: 0.6s; /* 刷新钮转一圈;与 useRefreshFeedback 的 MIN_SPIN_MS 同值 */
   --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 回弹感:过冲后归位 */
   /* ── 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /

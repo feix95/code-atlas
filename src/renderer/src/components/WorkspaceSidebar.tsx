@@ -57,6 +57,7 @@ export function WorkspaceSidebar({
   onSashKeyDown,
   drives,
   drivesNote,
+  driveRefreshNonce,
   onGoHome,
   onOpenBrowseFile,
   settingsMode,
@@ -119,6 +120,8 @@ export function WorkspaceSidebar({
   /** 「这台电脑」空态:盘符列表与加载/失败消息(App 首页同款数据源) */
   drives: DriveInfo[] | null
   drivesNote: string | null
+  /** 顶栏刷新计数:递增即让盘符浏览树重读已展开的目录 */
+  driveRefreshNonce: number
   /** 菜单常驻「我的电脑」:回家,树区交给盘符列 */
   onGoHome: () => void
   /** 浏览态单击文件:开「瞄一眼」预览页签(scopeRoot = 浏览树的盘根) */
@@ -322,6 +325,7 @@ export function WorkspaceSidebar({
             <DriveBrowser
               drives={drives}
               drivesNote={drivesNote}
+              refreshNonce={driveRefreshNonce}
               onOpenWorkspace={onOpenWorkspace}
               onOpenFile={onOpenBrowseFile}
             />

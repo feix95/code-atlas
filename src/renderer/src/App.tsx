@@ -25,6 +25,10 @@ import { AuxWindows } from './components/AuxWindows'
 import type { TabAreaProps } from './components/AuxWindowShell'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { TooltipHost } from './components/Tooltip'
+import { Toast } from './components/Toast'
+import { describeDriveChange } from './driveRefresh'
+import { useRefreshFeedback } from './useRefreshFeedback'
+import { useToast } from './useToast'
 import { PaneGroups } from './components/PaneGroups'
 import { TabBody } from './components/TabBody'
 import { cleanErrMsg } from './errText'
@@ -78,6 +82,9 @@ function App(): React.JSX.Element {
   // 首页盘符列表(第六十锤):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
   const [drives, setDrives] = useState<DriveInfo[] | null>(null)
   const [drivesNote, setDrivesNote] = useState<string | null>(null)
+  const [driveRefreshNonce, setDriveRefreshNonce] = useState(0)
+  const { toast, showToast } = useToast()
+  const { refreshing, runRefresh } = useRefreshFeedback(showToast)
   // 最近打开的项目(第八十一锤):存 localStorage,开过谁就记谁,首页一排卡片点回去
   const [recents, setRecents] = useState<RecentProject[]>(() => readRecentProjects())
   const [folder, setFolder] = useState<string | null>(null)
@@ -279,10 +286,18 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  // 刷新 = 把当前项目重扫一遍;没开项目就点了,什么也不做
+  // 刷新 = 开着项目就重扫一遍,在「这台电脑」就重列盘符并重读已展开的目录;
+  // 两种场景都经 runRefresh:刷新钮转圈 + Toast 说结果,不留「点了没反应」的沉默
   async function handleRefresh(): Promise<void> {
-    if (!folder) return
-    if (!scanning) await scanPath(folder)
+    if (scanning) return
+    await runRefresh(async () => {
+      if (folder) return (await scanPath(folder)) ? '已刷新,项目已重新读取' : null
+      const list = await window.atlas.listDrives()
+      setDrives(list)
+      setDrivesNote(null)
+      setDriveRefreshNonce((n) => n + 1)
+      return describeDriveChange(drives, list)
+    })
   }
 
   // 空路径点了「前往」/回车:聚焦 + 轻晃 + 气泡提示,几秒后自己消失
@@ -835,6 +850,7 @@ function App(): React.JSX.Element {
             nav={nav}
             goNav={goNav}
             handleRefresh={handleRefresh}
+            refreshing={refreshing}
             filter={searchQuery}
             onFilterChange={setSearchQuery}
             tabs={
@@ -912,6 +928,7 @@ function App(): React.JSX.Element {
               onSashKeyDown={onSashKeyDown}
               drives={drives}
               drivesNote={drivesNote}
+              driveRefreshNonce={driveRefreshNonce}
               onGoHome={goHome}
               settingsMode={settingsMode}
               settingsSection={settingsSection}
@@ -943,6 +960,7 @@ function App(): React.JSX.Element {
 
           {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
           <TooltipHost />
+          <Toast toast={toast} />
           {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
           <FilePathMenu />
           {/* 通用右键菜单(全局单例,第二台):选区「引用到对话」这类不对着文件的右键走这儿 */}

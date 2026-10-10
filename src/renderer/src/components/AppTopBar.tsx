@@ -76,6 +76,7 @@ export function AppTopBar({
   nav,
   goNav,
   handleRefresh,
+  refreshing,
   filter,
   onFilterChange,
   tabs
@@ -92,6 +93,8 @@ export function AppTopBar({
   nav: { stack: NavLocation[]; index: number }
   goNav: (delta: number) => Promise<void>
   handleRefresh: () => Promise<void>
+  /** 刷新进行中:刷新钮图标转圈(至少转满一圈,结果由 Toast 回报) */
+  refreshing: boolean
   filter: string
   onFilterChange: (v: string) => void
   /** Chrome 页签带(B3):App 按页签组算好条带宽度递进来;
@@ -173,7 +176,7 @@ export function AppTopBar({
               </button>
               <button
                 type="button"
-                className="tb-btn"
+                className={`tb-btn${refreshing ? ' is-spinning' : ''}`}
                 onClick={() => void handleRefresh()}
                 disabled={scanning || settingsMode}
                 data-tip={scanning ? '扫描中……' : '刷新'}

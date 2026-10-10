@@ -2,6 +2,7 @@
 // (懒加载纯浏览,不开工作区),双击目录 = 打开为工作区,单击文件 = 开预览页签。
 // 行骨架沿用树行(0.75u 高/图标位可转圈/摘三角),手感与文件树一致;
 // 浏览账在 useDriveBrowser —— 没点过的层才来这儿画名字。
+import { useEffect, useRef } from 'react'
 import type { DriveInfo } from '@shared/types'
 import { driveCapacity, driveKindName } from '../driveMeta'
 import { useDriveBrowser, type BrowseDir, type BrowseNode } from '../useDriveBrowser'
@@ -13,17 +14,30 @@ const BROWSE_ICON_SIZE = 18
 export function DriveBrowser({
   drives,
   drivesNote,
+  refreshNonce,
   onOpenWorkspace,
   onOpenFile
 }: {
   drives: DriveInfo[] | null
   drivesNote: string | null
+  /** 每递增一次 = 顶栏点了刷新:已展开探过的目录重列一遍 */
+  refreshNonce: number
   /** 双击目录(含盘根本身):绝对路径原样回传,走地址栏同一条扫描路 */
   onOpenWorkspace: (absPath: string) => void
   /** 单击文件:开「瞄一眼」预览页签(scopeRoot = 这棵树的盘根) */
   onOpenFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
 }): React.JSX.Element {
-  const { trees, toggleDir } = useDriveBrowser()
+  const { trees, toggleDir, reloadProbed } = useDriveBrowser()
+  const reloadRef = useRef(reloadProbed)
+  useEffect(() => {
+    reloadRef.current = reloadProbed
+  })
+  const handledNonce = useRef(refreshNonce)
+  useEffect(() => {
+    if (handledNonce.current === refreshNonce) return
+    handledNonce.current = refreshNonce
+    void reloadRef.current()
+  }, [refreshNonce])
   if (drives === null && !drivesNote) {
     return (
       <div className="drive-browser">
