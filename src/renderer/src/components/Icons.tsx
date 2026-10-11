@@ -382,6 +382,13 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </>
   ),
+  // 开锁(lucide lock-open):预览头只读锁的「可编辑」脸
+  lockOpen: (
+    <>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+    </>
+  ),
   // 密钥(v5 换 Lucide key-round):圆环在右上,齿朝左下
   key: (
     <>

@@ -13,15 +13,26 @@ export interface ContextMenuItem {
   tip?: string
   /** 行内图标(TreeIcon 户口名):带图标档的菜单(Obsidian 式页签菜单)才摆,窄身档不带 */
   icon?: string
-  /** 行尾状态勾:一组互斥档位里「当前在哪档」亮灯(阅读/源码模式这类) */
-  checked?: boolean
-  /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它 */
-  run: () => void | string | Promise<string | null | void>
+  /** 开关行:有值 = 行尾画一颗开关(true=开),点一下拨动且菜单不收摊,让人亲眼看到状态翻面;
+   *  开关画面由菜单自己翻(各开关互相独立),run 只管把账改掉 */
+  switchOn?: boolean
+  /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它。
+   *  开关行会收到拨完之后的新读数(菜单不收摊可连拨,别用打开时抓的旧值取反) */
+  run: (nextOn?: boolean) => void | string | Promise<string | null | void>
+}
+
+/** 分区小标题:不可点的一行小灰字,告诉人下面几行是同一类东西 */
+export interface ContextMenuHeading {
+  heading: string
 }
 
 /** 组间细线记号:行项清单里插一条 = 两组之间画道分隔线(Obsidian 菜单分组) */
 export const MENU_SEP = 'sep' as const
-export type ContextMenuEntry = ContextMenuItem | typeof MENU_SEP
+export type ContextMenuEntry = ContextMenuItem | ContextMenuHeading | typeof MENU_SEP
+
+export function isMenuHeading(entry: ContextMenuEntry): entry is ContextMenuHeading {
+  return typeof entry === 'object' && 'heading' in entry
+}
 
 export interface ContextMenuRequest {
   x: number

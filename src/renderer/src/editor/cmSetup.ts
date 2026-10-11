@@ -127,9 +127,15 @@ export function buildSourceExtensions(opts: {
   liveTitle?: string
   /** 内联标题改名通道(内联标题改名锤):喂了标题才可点改名;缺省标题只展示 */
   titleRename?: (base: string) => Promise<RenameOutcome>
+  /** 只读锁:键盘/粘贴/拖入一切改字入口一律拒收(readOnly 管命令,changeFilter 兜程序化改动);
+   *  选区、复制、引用、搜索照常。锁与解锁靠重立编辑器切换(调用方 key 带锁位) */
+  readOnly?: boolean
   hooks: SourceHooks
 }): Extension[] {
   return [
+    ...(opts.readOnly
+      ? [EditorState.readOnly.of(true), EditorState.changeFilter.of(() => false)]
+      : []),
     // 行号槽只在源码档挂:live 档对齐阅读档排版(Obsidian 同款,默认无行号);
     // 行号账没丢 —— 选区引用/跳行仍按文档行算,只是不画出来
     ...(opts.live ? [] : [lineNumbers()]),

@@ -29,8 +29,8 @@ export interface SessionTab {
   scopeRoot?: string
   /** 文件签的看片档位(md 三档锤):source/reading/live 都落账;undefined = 源码 */
   viewMode?: PaneViewMode
-  /** 上次编辑档(读档单钮回写档的落点):'live'/'source';缺省回 live */
-  lastEditMode?: 'live' | 'source'
+  /** 只读锁:只认 true,别的值当没锁 */
+  readOnly?: boolean
   on?: boolean
 }
 
@@ -70,7 +70,7 @@ export function serializeSession(
         icon: t.icon,
         scopeRoot: t.scopeRoot,
         viewMode: t.viewMode,
-        lastEditMode: t.lastEditMode,
+        readOnly: t.readOnly,
         on: t.id === g.activeId ? true : undefined
       }))
     }))
@@ -100,10 +100,7 @@ function parseTab(raw: unknown): SessionTab | null {
       t['viewMode'] === 'reading' || t['viewMode'] === 'source' || t['viewMode'] === 'live'
         ? t['viewMode']
         : undefined,
-    lastEditMode:
-      t['lastEditMode'] === 'live' || t['lastEditMode'] === 'source'
-        ? t['lastEditMode']
-        : undefined,
+    readOnly: t['readOnly'] === true ? true : undefined,
     on: t['on'] === true ? true : undefined
   }
 }
@@ -167,7 +164,7 @@ export function hydrateSession(
       icon: t.icon,
       scopeRoot: t.scopeRoot,
       viewMode: t.viewMode,
-      lastEditMode: t.lastEditMode
+      readOnly: t.readOnly
     }))
     const onIdx = live.findIndex((t) => t.on)
     const group: PaneGroup = {

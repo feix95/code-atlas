@@ -643,7 +643,7 @@ function App(): React.JSX.Element {
     closeTab,
     closeTabsInGroup,
     renameFileTab,
-    setTabViewMode,
+    setTabViewFlags,
     markFlash,
     applyPaneSplit,
     onPaneSashDown,
@@ -745,7 +745,7 @@ function App(): React.JSX.Element {
     setDropMark,
     onTabDragEnd,
     onDetachTab,
-    setTabViewMode,
+    setTabViewFlags,
     revealTabInTree,
     workspaceRoot: result?.rootPath ?? null,
     paneSplit,
@@ -785,7 +785,7 @@ function App(): React.JSX.Element {
         removePreviewRef={removePreviewRef}
         handleDropNode={handleDropNode}
         handleDropRef={handleDropRef}
-        onSetViewMode={setTabViewMode}
+        onSetViewFlags={setTabViewFlags}
         onRenameFile={handleRenameFile}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
@@ -868,7 +868,7 @@ function App(): React.JSX.Element {
                   setDropMark={setDropMark}
                   onTabDragEnd={onTabDragEnd}
                   onDetachTab={onDetachTab}
-                  onSetViewMode={setTabViewMode}
+                  onSetViewFlags={setTabViewFlags}
                   onRevealInTree={revealTabInTree}
                   workspaceRoot={result?.rootPath ?? null}
                   paneSplit={paneSplit}

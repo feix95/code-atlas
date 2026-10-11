@@ -15,9 +15,9 @@ import {
   moveTabToHost,
   nextTabId,
   type PaneGroup,
-  type PaneTab,
-  type PaneViewMode
+  type PaneTab
 } from './paneTabs'
+import { applyViewFlags, type ViewFlagsWant } from './viewState'
 import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
 
@@ -386,22 +386,16 @@ export function usePaneTabs(deps: {
     )
   }
 
-  // 页签看片档位(阅读模式这锤):源码/阅读记在签身上 —— 拖去子窗、会话存档都跟着签走;
-  // 落到编辑档(live/source)时顺手记成「上次编辑档」,阅读档点单钮回去时落回原档
-  function setTabViewMode(id: string, mode: PaneViewMode): void {
+  // 页签看片开关(排版显示 × 只读):记在签身上 —— 拖去子窗、会话存档都跟着签走;
+  // 开关读数与账本字段的换算只走 viewState.applyViewFlags
+  function setTabViewFlags(id: string, want: ViewFlagsWant): void {
     setGroups((prev) =>
       prev.map((g) =>
         g.tabs.some((t) => t.id === id)
           ? {
               ...g,
               tabs: g.tabs.map((t) =>
-                t.id === id
-                  ? {
-                      ...t,
-                      viewMode: mode,
-                      ...(mode === 'reading' ? {} : { lastEditMode: mode })
-                    }
-                  : t
+                t.id === id ? { ...t, ...applyViewFlags(t.relPath, t, want) } : t
               )
             }
           : g
@@ -459,7 +453,7 @@ export function usePaneTabs(deps: {
     closeTab,
     closeTabsInGroup,
     renameFileTab,
-    setTabViewMode,
+    setTabViewFlags,
     markFlash,
     applyPaneSplit,
     onPaneSashDown,

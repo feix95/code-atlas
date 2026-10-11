@@ -33,6 +33,7 @@ export function SourceEditor({
   initialColors,
   wrap,
   live,
+  readOnly,
   canAddRef,
   refLimit,
   onAddRef,
@@ -50,6 +51,8 @@ export function SourceEditor({
   wrap: boolean
   /** Live Preview(md 三档):md 签的默认档,边写边上妆;只有 md 系会传 true */
   live?: boolean
+  /** 只读锁:挂上就拒收一切改字(切换靠父层 key 重立编辑器) */
+  readOnly?: boolean
   canAddRef: boolean
   refLimit: number
   onAddRef: (ref: ChatCodeRef) => void
@@ -176,6 +179,7 @@ export function SourceEditor({
         extensions: buildSourceExtensions({
           wrap,
           live,
+          readOnly,
           // 内联标题(Obsidian inline title):文件名掐尾去扩展名,与阅读档 MiniMD title 同配方
           liveTitle: live ? fileBaseName(relPath.split(/[\\/]/).pop() ?? '') : undefined,
           /* 内联标题改名通道(内联标题改名锤):改名前先把账结清 —— 在路上的保存等它落袋,

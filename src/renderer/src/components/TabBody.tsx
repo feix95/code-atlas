@@ -15,7 +15,8 @@ import type { RenameOutcome } from '@shared/fileRename'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
 import type { NoteEntry, NoteMap } from '@shared/notes'
 import { buildCrumbs, findFile } from '../scanTreeTools'
-import type { PaneTab, PaneViewMode } from '../paneTabs'
+import type { PaneTab } from '../paneTabs'
+import type { ViewFlagsWant } from '../viewState'
 import { useAiAsk, type AiTurn } from '../useAiAsk'
 import type { AiChatApi } from '../useAiChat'
 import { usePresetQuestions } from '../usePresetQuestions'
@@ -64,7 +65,7 @@ export function TabBody({
   onAiConfigSaved,
   onChatSuggestionsChange,
   onSettingsSection,
-  onSetViewMode,
+  onSetViewFlags,
   onRenameFile
 }: {
   tab: PaneTab
@@ -106,8 +107,8 @@ export function TabBody({
   onChatSuggestionsChange: (v: boolean) => void
   /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
   onSettingsSection: (key: SectionKey) => void
-  /** 预览头「阅读/代码」快速开关:切本签的看片档(账挂在签身上,跟右键菜单同一份) */
-  onSetViewMode?: (id: string, mode: PaneViewMode) => void
+  /** 预览头「只读锁」快速钮:拨本签的看片开关(账挂在签身上,跟右键菜单同一份) */
+  onSetViewFlags?: (id: string, want: ViewFlagsWant) => void
   /** 内联标题改名通道(内联标题改名锤):预览/瞄签都能用,账本认签认 scopeRoot */
   onRenameFile?: (tab: PaneTab, base: string) => Promise<RenameOutcome>
 }): React.JSX.Element | null {
@@ -133,8 +134,8 @@ export function TabBody({
         refLimit={0}
         onAddRef={() => {}}
         viewMode={tab.viewMode}
-        lastEditMode={tab.lastEditMode}
-        onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
+        readOnly={tab.readOnly}
+        onSetViewFlags={onSetViewFlags ? (w) => onSetViewFlags(tab.id, w) : undefined}
         onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
       />
     )
@@ -255,8 +256,8 @@ export function TabBody({
         onAddRef={addPreviewRef}
         jump={previewJump}
         viewMode={tab.viewMode}
-        lastEditMode={tab.lastEditMode}
-        onSetViewMode={onSetViewMode ? (m) => onSetViewMode(tab.id, m) : undefined}
+        readOnly={tab.readOnly}
+        onSetViewFlags={onSetViewFlags ? (w) => onSetViewFlags(tab.id, w) : undefined}
         fileLinks={fileLinks}
         onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
       />

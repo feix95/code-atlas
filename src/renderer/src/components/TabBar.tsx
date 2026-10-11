@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
-import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import type { PaneViewMode } from '../paneTabs'
+import { viewFlags, type ViewFlagsWant } from '../viewState'
 import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
 import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 import { hostNameOf, startWindowDrag } from '../windowDrag'
@@ -16,8 +17,10 @@ export interface TabBarTab {
   relPath: string
   /** peek 签的读根(盘符下钻):复制路径/资源管理器按它拼绝对路径 */
   scopeRoot?: string
-  /** 文件签的看片档位(阅读模式这锤):菜单里给当前档打勾 */
+  /** 文件签的看片档位:菜单里换算成「排版显示」开关的读数 */
   viewMode?: PaneViewMode
+  /** 文件签的只读锁:菜单里「只读」开关的读数 */
+  readOnly?: boolean
 }
 
 /**
@@ -59,7 +62,7 @@ export function TabBar({
   onCloseMany,
   onMoveTab,
   onDetachTab,
-  onSetViewMode,
+  onSetViewFlags,
   onRevealInTree,
   workspaceRoot,
   dragSourceId,
@@ -87,8 +90,8 @@ export function TabBar({
   ) => void
   /** 右键菜单「移到新窗口」:不拖也撕(页签撕窗锤),所有页签一视同仁 */
   onDetachTab?: (id: string) => void
-  /** 右键菜单「阅读/源码模式」:切文件签的看片档位 */
-  onSetViewMode?: (id: string, mode: PaneViewMode) => void
+  /** 右键菜单「排版显示/只读」开关:拨文件签的看片状态 */
+  onSetViewFlags?: (id: string, want: ViewFlagsWant) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
   onRevealInTree?: (id: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
@@ -159,9 +162,9 @@ export function TabBar({
 
   /**
    * 页签右键菜单(Obsidian 式分组,阅读模式这锤):走全局通用菜单,
-   * 组间一道细线;行内图标 + 「当前档」行尾勾。菜单行按签品类现拼:
-   * 单例签没有文件动作和看片档;非 md 文件签的「阅读模式」灰挂 tip(禁用优于隐藏,
-   * 菜单形状稳定+功能可发现);peek 签没有树定位。
+   * 组间一道细线;行内图标,状态类选项画开关。菜单行按签品类现拼:
+   * 单例签没有文件动作和选项区;非 md 文件签不摆「排版显示」(没有这一维);
+   * peek 签没有树定位。
    * realm 铁律:doc 记进请求,菜单开在子窗时它自己窗内那台接活。
    */
   function openTabMenu(e: React.MouseEvent, t: TabBarTab): void {
@@ -193,42 +196,34 @@ export function TabBar({
       )
     }
 
-    // 看片档(文件签常驻·md 三档锤):实时预览/阅读/源码三选一,当前档行尾打勾;
-    // 非 md 文件签前两档灰挂「Markdown 文件专属」tip —— 勾钉源码档,系统状态不说谎
+    // 选项区(文件签常驻):三个互相独立的开关 —— 排版显示(只有 md 系有这一维,别的文件不摆)、
+    // 只读(所有文件都有)、自动换行(全局一档,所有文件签通吃,Alt+Z 走同一份全局账)。
+    // 开关行点了不收摊,run 收到拨完的新读数;读数与账本字段的换算只走 viewState
     if (isFile) {
-      const mdAble = canReadingMode(t.relPath)
-      const mode = t.viewMode ?? (mdAble ? 'live' : 'source')
-      items.push(
-        MENU_SEP,
-        {
-          label: '实时预览',
-          icon: 'penLine',
-          checked: mdAble && mode === 'live',
-          disabled: !mdAble,
-          tip: mdAble ? undefined : 'Markdown 文件专属',
-          run: () => onSetViewMode?.(t.id, 'live')
-        },
-        {
-          label: '阅读模式',
+      const flags = viewFlags(t.relPath, t)
+      items.push(MENU_SEP, { heading: '选项' })
+      if (flags.canRender) {
+        items.push({
+          label: '排版显示',
           icon: 'bookOpen',
-          checked: mode === 'reading',
-          disabled: !mdAble,
-          tip: mdAble ? undefined : 'Markdown 文件专属',
-          run: () => onSetViewMode?.(t.id, 'reading')
-        },
+          tip: '开:标题、粗体等按成品样式显示;关:显示原始符号',
+          switchOn: flags.render,
+          run: (on) => onSetViewFlags?.(t.id, { render: on })
+        })
+      }
+      items.push(
         {
-          label: '源码模式',
-          icon: 'code',
-          checked: !mdAble || mode === 'source',
-          run: () => onSetViewMode?.(t.id, 'source')
+          label: '只读',
+          icon: 'lock',
+          tip: '开:锁定文件,防止误改',
+          switchOn: flags.readOnly,
+          run: (on) => onSetViewFlags?.(t.id, { readOnly: on })
         },
-        // 自动换行(渐进披露:页头钮退役收进菜单):全局一档、所有文件签通吃,
-        // 图标换脸+行尾勾标态,Alt+Z 快捷键照走同一份全局账
         {
           label: '自动换行',
-          icon: getCodeWrapOn() ? 'wrapText' : 'textAlignStart',
-          checked: getCodeWrapOn(),
+          icon: 'wrapText',
           tip: 'Alt+Z',
+          switchOn: getCodeWrapOn(),
           run: () => toggleCodeWrap()
         }
       )

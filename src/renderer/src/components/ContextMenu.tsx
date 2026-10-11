@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   closeContextMenu,
   currentContextMenu,
+  isMenuHeading,
   MENU_SEP,
   subscribeContextMenu,
   type ContextMenuRequest
@@ -14,7 +15,8 @@ import { MENU_ICON_SIZE } from '../inputMetrics'
  * 通用右键菜单(第二台全局单例):不是「对着文件」的右键菜单走这儿 ——
  * 调用方报坐标 + 行项清单,皮肤复用 file-path-menu 那一套(全 app 右键菜单一个规格)。
  * 行项的 run 返回字符串时,那一行先亮出这句反馈(「已复制 ✓」式)停一拍再收摊。
- * 行项清单里插 MENU_SEP = 组间一道细线(Obsidian 式分组);item.icon 走 TreeIcon 行内图。
+ * 行项清单里插 MENU_SEP = 组间一道细线(Obsidian 式分组);item.icon 走 TreeIcon 行内图;
+ * { heading } = 分区小标题;item.switchOn = 开关行(复用设置页 .cfg-switch,点了不收摊)。
  * realm 铁律:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
  */
 
@@ -27,6 +29,8 @@ const ROW_H = 34
 const ROW_H_COMPACT = 24
 /** 组间细线在估高里的份额:1px 线 + 上下各 ~3px 外距 */
 const SEP_H = 7
+/** 分区小标题行的估高:小字一行 + 上下透气 */
+const HEADING_H = 26
 /** 外框一圈的厚度(边框 + 内边距)在估高里的份额:通用档 10px,窄身档 6px */
 const CHROME = 10
 const CHROME_COMPACT = 6
@@ -90,10 +94,13 @@ function ContextMenuCard({
 }): React.JSX.Element {
   /** 点了某行后该行亮出的反馈文字(行号记账,只亮被点的那行) */
   const [lingering, setLingering] = useState<{ index: number; text: string } | null>(null)
+  /** 开关行被拨过之后的当前读数(行号记账):各开关互相独立,菜单自己翻面,不等外面重开 */
+  const [flipped, setFlipped] = useState<Record<number, boolean>>({})
   const rowH = request.compact ? ROW_H_COMPACT : ROW_H
+  const entryH = (it: (typeof request.items)[number]): number =>
+    it === MENU_SEP ? SEP_H : isMenuHeading(it) ? HEADING_H : rowH
   const menuH =
-    request.items.reduce((h, it) => h + (it === MENU_SEP ? SEP_H : rowH), 0) +
-    (request.compact ? CHROME_COMPACT : CHROME)
+    request.items.reduce((h, it) => h + entryH(it), 0) + (request.compact ? CHROME_COMPACT : CHROME)
   const pos = clampedPosition(
     request.x,
     request.y,
@@ -108,14 +115,25 @@ function ContextMenuCard({
       style={{ left: pos.left, top: pos.top }}
       role="menu"
     >
-      {request.items.map((item, i) =>
-        item === MENU_SEP ? (
-          <div key={i} className="file-path-menu-sep" role="separator" aria-hidden="true" />
-        ) : (
+      {request.items.map((item, i) => {
+        if (item === MENU_SEP) {
+          return <div key={i} className="file-path-menu-sep" role="separator" aria-hidden="true" />
+        }
+        if (isMenuHeading(item)) {
+          return (
+            <div key={i} className="file-path-menu-heading" role="presentation">
+              {item.heading}
+            </div>
+          )
+        }
+        const isSwitch = item.switchOn !== undefined
+        const switchOn = flipped[i] ?? item.switchOn === true
+        return (
           <button
             key={i}
             type="button"
-            role="menuitem"
+            role={isSwitch ? 'menuitemcheckbox' : 'menuitem'}
+            aria-checked={isSwitch ? switchOn : undefined}
             className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
             /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
                data-tip 会白挂;aria-disabled 是 ARIA 菜单模式的推荐写法,行仍可悬停读提示,
@@ -124,6 +142,11 @@ function ContextMenuCard({
             data-tip={item.tip}
             onClick={() => {
               if (item.disabled) return
+              if (isSwitch) {
+                setFlipped((f) => ({ ...f, [i]: !switchOn }))
+                void item.run(!switchOn)
+                return
+              }
               void Promise.resolve(item.run()).then((feedback) => {
                 if (typeof feedback !== 'string' || feedback === '') {
                   closeContextMenu()
@@ -142,14 +165,17 @@ function ContextMenuCard({
             <span className="fpm-label">
               {lingering?.index === i ? lingering.text : item.label}
             </span>
-            {item.checked === true && (
-              <span className="fpm-check" aria-hidden="true">
-                <TreeIcon name="checkBare" size={MENU_ICON_SIZE - 2} mono />
+            {isSwitch && (
+              <span
+                className={`cfg-switch fpm-switch${switchOn ? ' is-on' : ''}`}
+                aria-hidden="true"
+              >
+                <span />
               </span>
             )}
           </button>
         )
-      )}
+      })}
     </div>
   )
 }

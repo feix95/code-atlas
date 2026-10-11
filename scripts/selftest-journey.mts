@@ -311,6 +311,40 @@ try {
     3,
     'clicking a folder must not open a tab'
   )
+  // 选项区开关(只读):代码文件的菜单只有「只读/自动换行」,没有 md 才有的「排版显示」;
+  // 点开关不收摊、状态当场翻面,页头锁钮同步,锁住后键入被拒收;再点一次解锁(不留状态给后面的步骤)
+  const lockTab = page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText('package.json', { exact: true }) })
+  await lockTab.click()
+  await lockTab.click({ button: 'right' })
+  assert.equal(
+    await page.getByRole('menuitemcheckbox', { name: '排版显示' }).count(),
+    0,
+    'non-markdown tab menu must not offer the render switch'
+  )
+  const lockRow = page.getByRole('menuitemcheckbox', { name: '只读' })
+  assert.equal(await lockRow.getAttribute('aria-checked'), 'false')
+  await lockRow.click()
+  assert.equal(
+    await lockRow.getAttribute('aria-checked'),
+    'true',
+    'switch row must flip in place and keep the menu open'
+  )
+  await page.keyboard.press('Escape')
+  await page.locator('.code-mode-btn[aria-pressed="true"]').waitFor({ timeout: 5_000 })
+  const lockedText = await page.locator('.cm-content').first().innerText()
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.type('zzz')
+  assert.equal(
+    await page.locator('.cm-content').first().innerText(),
+    lockedText,
+    'a read-only tab must reject typing'
+  )
+  await lockTab.click({ button: 'right' })
+  await page.getByRole('menuitemcheckbox', { name: '只读' }).click()
+  await page.keyboard.press('Escape')
+  await page.locator('.code-mode-btn[aria-pressed="false"]').waitFor({ timeout: 5_000 })
   // 页签撕窗(M1):右键「移到新窗口」= 签撕去同进程子窗 —— 子窗带自绘标题栏和
   // 自己的页签带,主窗名下签数减一;关子窗连签销户(Chrome 语义),窗数回原
   const tearTab = page

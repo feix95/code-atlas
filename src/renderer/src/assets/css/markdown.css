@@ -404,11 +404,20 @@
   color: inherit;
 }
 
-/* 行尾状态勾(互斥档位的「当前档」亮灯,阅读/源码模式) */
-.fpm-check {
+/* 开关行的行尾开关:外观复用设置页 .cfg-switch(personalize.css),这里只管贴右缘 */
+.fpm-switch {
   margin-left: auto;
-  display: inline-flex;
-  color: var(--sash-hi);
+  display: inline-block;
+  pointer-events: none;
+}
+
+/* 分区小标题:不可点的小灰字,告诉人下面几行是同一类设置 */
+.file-path-menu-heading {
+  padding: 0.25rem 0.625rem 0.125rem;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: var(--lh-150);
+  cursor: default;
 }
 
 .fpm-label {

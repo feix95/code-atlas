@@ -8,7 +8,8 @@ import { MiniMD } from './MiniMD'
 import { openContextMenu } from './contextMenuStore'
 import { SourceEditor } from './SourceEditor'
 import type { FileLinkTarget } from '@shared/fileLinks'
-import { canReadingMode, type PaneViewMode } from '../paneTabs'
+import type { PaneViewMode } from '../paneTabs'
+import { viewFlags, type ViewFlagsWant } from '../viewState'
 import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
 import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
@@ -49,8 +50,8 @@ export function CodePreview({
   onAddRef,
   jump,
   viewMode,
-  lastEditMode,
-  onSetViewMode,
+  readOnly,
+  onSetViewFlags,
   fileLinks,
   onRenameFile
 }: {
@@ -65,10 +66,10 @@ export function CodePreview({
   jump?: { line: number; seq: number } | null
   /** 看片档位:undefined/'source' = 源码编辑;'reading' = md 渲染态;'live' = 实时预览(只对 md 系生效) */
   viewMode?: PaneViewMode
-  /** 上次用的编辑档:读档单钮点回去时落回它,缺省回 live */
-  lastEditMode?: 'live' | 'source'
-  /** 头部「阅读/编辑」单钮 + 右键菜单共用的切档通道(账在页签身上) */
-  onSetViewMode?: (mode: PaneViewMode) => void
+  /** 只读锁(source 档与代码文件的显式账;reading 档自带只读) */
+  readOnly?: boolean
+  /** 头部「只读锁」钮 + 右键菜单开关共用的拨动通道(账在页签身上,换算见 viewState) */
+  onSetViewFlags?: (want: ViewFlagsWant) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
   /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执;
@@ -184,7 +185,8 @@ export function CodePreview({
   const wrap = wrapAllowed && wrapOn
   // 看片三档(md 三档锤):live=编辑器里上妆/卸妆(默认),reading=MiniMD 渲染态只读,
   // source=裸源码编辑器;三档只在 md 系签生效,别的文件永远是源码档
-  const canMd = canReadingMode(file.relPath)
+  const flags = viewFlags(file.relPath, { viewMode, readOnly })
+  const canMd = flags.canRender
   const mode = viewMode ?? (canMd ? 'live' : 'source')
   const reading = canMd && mode === 'reading'
   const live = canMd && mode === 'live'
@@ -281,56 +283,29 @@ export function CodePreview({
   }
 
   /**
-   * 只读↔编辑单钮(md 三档锤·渐进披露拍板):页头只摆一颗,图标亮「当前在哪档」——
-   * 只读档是书脸,编辑档是笔脸(源码档就 </> 脸);提示语说全「现在处于…,点击后切换为…」。
-   * 同为编辑档的 live↔source 切档收进页签右键菜单,页头不堆同性质兄弟;
-   * 非 md 文件还是那颗常驻置灰的钮 —— 菜单同款口径,「Markdown 文件专属」。
+   * 只读锁单钮(所有文件通用):图标亮「当前状态」—— 锁着是合上的锁,可编辑是开着的锁;
+   * 提示语说全「现在…,点击后…」。排版显示等其他选项收进页签右键菜单的开关,页头不堆兄弟。
    */
-  const modeBtns: React.JSX.Element = canMd ? (
-    mode === 'reading' ? (
-      (() => {
-        const back = lastEditMode ?? 'live'
-        return (
-          <button
-            type="button"
-            className="code-mode-btn"
-            aria-label="现在处于阅读模式,点击后切换为编辑模式"
-            data-tip="现在处于阅读模式,点击后切换为编辑模式"
-            onClick={() => onSetViewMode?.(back)}
-          >
-            <TreeIcon name="bookOpen" size={WRAP_ICON_SIZE} />
-          </button>
-        )
-      })()
-    ) : (
-      <button
-        type="button"
-        className="code-mode-btn"
-        aria-label="现在处于编辑模式,点击后切换为阅读模式"
-        data-tip="现在处于编辑模式,点击后切换为阅读模式"
-        onClick={() => onSetViewMode?.('reading')}
-      >
-        <TreeIcon name={mode === 'source' ? 'code' : 'penLine'} size={WRAP_ICON_SIZE} />
-      </button>
-    )
-  ) : (
+  const lockTip = flags.readOnly ? '现在已锁定为只读,点击解除锁定' : '现在可以编辑,点击锁定为只读'
+  const lockBtn: React.JSX.Element = (
     <button
       type="button"
       className="code-mode-btn"
-      disabled
-      aria-label="源码模式"
-      data-tip="Markdown 文件专属"
+      aria-label={lockTip}
+      aria-pressed={flags.readOnly}
+      data-tip={lockTip}
+      onClick={() => onSetViewFlags?.({ readOnly: !flags.readOnly })}
     >
-      <TreeIcon name="code" size={WRAP_ICON_SIZE} />
+      <TreeIcon name={flags.readOnly ? 'lock' : 'lockOpen'} size={WRAP_ICON_SIZE} mono />
     </button>
   )
 
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
-      {/* 页头栏:只有文件可渲染时才立,右对齐一颗读↔写单钮;文件名不摆 ——
+      {/* 页头栏:文件读成了才立,右对齐一颗只读锁钮;文件名不摆 ——
           签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突。
           折行钮退役进页签右键菜单(渐进披露),快捷键 Alt+Z 和全局账照旧 */}
-      {result?.status === 'ok' && <div className="code-pane-head">{onSetViewMode && modeBtns}</div>}
+      {result?.status === 'ok' && <div className="code-pane-head">{onSetViewFlags && lockBtn}</div>}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">
@@ -375,9 +350,10 @@ export function CodePreview({
               style={{ '--doc-zoom': docZoom } as React.CSSProperties}
             >
               <SourceEditor
-                key={`${file.relPath}:${live ? 'live' : 'source'}`}
+                key={`${file.relPath}:${live ? 'live' : 'source'}:${flags.readOnly ? 'ro' : 'rw'}`}
                 rootPath={rootPath}
                 live={live}
+                readOnly={flags.readOnly}
                 relPath={file.relPath}
                 initialText={text}
                 /* 文稿和盘上对得上才给初始色:对不上是带着未存改动,旧色错位不如不给 */
