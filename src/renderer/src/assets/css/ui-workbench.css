@@ -1,0 +1,259 @@
+/* UI 工作台版式(对照 Figma UI3):画布(标尺 + 底板 + 画板)+ 底部浮动工具栏 + 右侧属性面板;
+   左侧栏占用全局侧栏 */
+:root {
+  --uwb-inspector-w: 15rem; /* 属性面板宽(Figma 右侧栏默认 240px) */
+  --uwb-toolbar-h: calc(var(--u) * 1.2); /* 浮动工具栏高 */
+  --uwb-toolbar-min-w: 20rem; /* 工具栏空置时的最小宽,放进工具后由内容撑开 */
+  --uwb-toolbar-gap: var(--space-4); /* 工具栏离画布底边的距离 */
+  --uwb-ruler-size: 1.25rem; /* 标尺厚度 */
+  /* 底板比面板深一档,白画板从底上浮出来 */
+  --uwb-backdrop: #e6e6e6;
+  --uwb-artboard-bg: #ffffff;
+  /* 标尺配色(drawRuler 从计算样式读取) */
+  --uwb-ruler-bg: var(--chrome-panel);
+  --uwb-ruler-range: var(--chrome-hover);
+  --uwb-ruler-tick: var(--muted-2);
+  --uwb-ruler-text: var(--muted);
+}
+
+:root[data-theme='dark'] {
+  --uwb-backdrop: #1a1a1a;
+}
+
+.ui-workbench {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--canvas-tint);
+}
+
+/* 画布舞台:浮动工具栏的定位锚,工具栏只浮在画布上,不压属性面板 */
+.uwb-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+/* 画布 = 2×2 网格:左上角块 | 上标尺 / 左标尺 | 视口 */
+.uwb-canvas {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--uwb-ruler-size) minmax(0, 1fr);
+  grid-template-rows: var(--uwb-ruler-size) minmax(0, 1fr);
+}
+
+.uwb-ruler-corner {
+  background: var(--uwb-ruler-bg);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-ruler {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--sans);
+  font-size: var(--font-xxs);
+}
+
+.uwb-ruler.is-horizontal {
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-ruler.is-vertical {
+  border-right: 1px solid var(--line);
+}
+
+/* 视口 = 底板:画板在其中平移缩放,溢出部分裁掉 */
+.uwb-viewport {
+  position: relative;
+  overflow: hidden;
+  background: var(--uwb-backdrop);
+  touch-action: none;
+}
+
+.uwb-viewport.is-pan-ready {
+  cursor: grab;
+}
+
+.uwb-viewport.is-pan-panning {
+  cursor: grabbing;
+}
+
+.uwb-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.uwb-artboard {
+  background: var(--uwb-artboard-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.uwb-artboard-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
+/* 画板名签:贴画板左上方,不随缩放变大小 */
+.uwb-artboard-label {
+  position: absolute;
+  transform: translateY(-100%);
+  padding-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.uwb-toolbar {
+  position: absolute;
+  left: calc(50% + var(--uwb-ruler-size) / 2);
+  bottom: var(--uwb-toolbar-gap);
+  transform: translateX(-50%);
+  z-index: var(--z-float);
+  min-width: var(--uwb-toolbar-min-w);
+  height: var(--uwb-toolbar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  background: var(--chrome-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+}
+
+.uwb-inspector {
+  flex-shrink: 0;
+  width: var(--uwb-inspector-w);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome-panel);
+  border-left: 1px solid var(--line);
+}
+
+.uwb-inspector-head {
+  flex-shrink: 0;
+  height: var(--u);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-zoom {
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.uwb-inspector-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* 属性面板分区 */
+.uwb-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-section-title {
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+}
+
+.uwb-select {
+  width: 100%;
+}
+
+.uwb-field-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.uwb-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uwb-field-label,
+.uwb-field-unit {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.uwb-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 0 var(--space-2);
+}
+
+/* 横竖屏切换:当前方向用功能强调色描边 */
+.uwb-orient {
+  align-items: center;
+}
+
+.uwb-orient .cfg-btn[aria-pressed='true'] {
+  color: var(--sash-hi);
+  border-color: var(--sash-hi);
+}
+
+/* 左侧栏正文(挂在全局 .sidebar 里) */
+.uwb-side-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: auto;
+}
+
+/* 空区域占位:区域名 + 用途说明 */
+.uwb-hint {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+  text-align: center;
+  user-select: none;
+}
+
+.uwb-hint.is-compact {
+  flex-direction: row;
+  gap: var(--space-2);
+  padding: 0;
+}
+
+.uwb-hint-name {
+  color: var(--muted);
+  font-weight: var(--font-w-medium);
+}

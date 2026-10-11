@@ -27,6 +27,7 @@ import { CodePreview } from './CodePreview'
 import { ProjectOverview } from './ProjectOverview'
 import { SettingsPage, type SectionKey } from './SettingsPage'
 import { GraphView } from './GraphView'
+import { UiWorkbench } from './uiWorkbench/UiWorkbench'
 
 export function TabBody({
   tab,
@@ -160,6 +161,8 @@ export function TabBody({
       />
     )
   }
+  // UI 工作台:不吃工作区,和设置一样拦在 result 闸之前
+  if (tab.kind === 'uiworkbench') return <UiWorkbench />
   if (!result) return null
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'overview') {
@@ -456,7 +459,7 @@ export function PaneEmptyBoard(): React.JSX.Element {
       </span>
       <p className="pane-empty-title">还没有打开的页签</p>
       <p className="pane-empty-hint">
-        在左侧文件树点一个文件就开预览;功能页(概览/小探针/图谱/设置)在左侧图标栏开
+        在左侧文件树点一个文件就开预览;功能页(概览/小探针/图谱/UI 工作台/设置)在左侧图标栏开
       </p>
     </div>
   )

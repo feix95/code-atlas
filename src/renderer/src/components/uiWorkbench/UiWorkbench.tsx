@@ -1,0 +1,51 @@
+// UI 工作台(实验分支):用户以最小可复用单位拼装自己的 app 界面,导出 token JSON + 可插拔适配器产物。
+// 版式对照 Figma UI3:左侧栏占用全局侧栏(UiWorkbenchSidebar);页签内 = 画布(标尺 + 底板 + 画板)
+// + 底部浮动工具栏 + 右侧属性面板。Figma UI3 无顶栏,顶部由应用页签带承担;面板顶栏放在属性面板顶部。
+import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
+import { artboardPrefsActions, useArtboardPrefs } from '../../uiWorkbench/artboardPrefsStore'
+import { useCanvasViewport } from '../../uiWorkbench/useCanvasViewport'
+import { ArtboardPanel } from './ArtboardPanel'
+import { CanvasStage } from './CanvasStage'
+import { RegionHint } from './RegionHint'
+
+const ZOOM_TIP =
+  'Ctrl+滚轮 缩放 · 滚轮 平移 · 空格或中键拖动 平移\nCtrl+0 回到 100% · Shift+1 适配窗口'
+
+export function UiWorkbench(): React.JSX.Element {
+  // 画板尺寸存本机偏好:关掉再打开沿用上次的尺寸
+  const prefs = useArtboardPrefs()
+  const board = prefs.last
+  const viewport = useCanvasViewport(board)
+
+  function changeBoard(next: ArtboardSize): void {
+    artboardPrefsActions.record(next)
+    viewport.refit(next)
+  }
+
+  return (
+    <section className="ui-workbench" aria-label="UI 工作台">
+      <div className="uwb-stage">
+        <CanvasStage board={board} viewport={viewport} />
+        <div className="uwb-toolbar" role="toolbar" aria-label="工具栏">
+          <RegionHint region="toolbar" compact />
+        </div>
+      </div>
+      <aside className="uwb-inspector" aria-label="属性面板">
+        <div className="uwb-inspector-head">
+          <span className="uwb-zoom" data-tip={ZOOM_TIP} aria-label="画布缩放比例">
+            {`${Math.round(viewport.view.zoom * 100)}%`}
+          </span>
+        </div>
+        <div className="uwb-inspector-body">
+          <ArtboardPanel
+            board={board}
+            prefs={prefs}
+            onChange={changeBoard}
+            onSavePreset={(name) => artboardPrefsActions.savePreset(name, board)}
+            onRemovePreset={artboardPrefsActions.removePreset}
+          />
+        </div>
+      </aside>
+    </section>
+  )
+}

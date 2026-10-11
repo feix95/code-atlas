@@ -663,6 +663,7 @@ function App(): React.JSX.Element {
   const mainGroups = groupsForHost(groups, MAIN_HOST)
   // 设置导航中枢:模式判定、侧栏收起态进出账、分类跳转请求都收在钩里(useSettingsNav)
   const {
+    sidebarFace,
     settingsMode,
     settingsSection,
     setSettingsSection,
@@ -840,7 +841,7 @@ function App(): React.JSX.Element {
           <AppTopBar
             scanning={scanning}
             hasWorkspace={result !== null}
-            settingsMode={settingsMode}
+            fileNavOff={sidebarFace !== 'files'}
             sidebarShown={!sidebarCollapsed}
             sidebarCollapsed={sidebarCollapsed}
             onToggleSidebar={toggleSidebarCollapsed}
@@ -881,6 +882,7 @@ function App(): React.JSX.Element {
               onGraph={() => openSingletonTab('graph')}
               onOverview={() => openSingletonTab('overview')}
               onChat={() => openSingletonTab('chat')}
+              onUiWorkbench={() => openSingletonTab('uiworkbench')}
               onSettings={() => openSettings()}
             />
             {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
@@ -926,7 +928,7 @@ function App(): React.JSX.Element {
               drivesNote={drivesNote}
               driveRefreshNonce={driveRefreshNonce}
               onGoHome={goHome}
-              settingsMode={settingsMode}
+              sidebarFace={sidebarFace}
               settingsSection={settingsSection}
               onSettingsSection={openSettings}
               onOpenBrowseFile={openBrowseFile}

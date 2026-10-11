@@ -571,6 +571,39 @@ try {
   }, themeBefore)
   await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
   await page.locator('.graph-view').waitFor({ state: 'detached' })
+  // UI 工作台:rail 钮开单例签 → 空白页面就位 → 再点只聚焦不生第二张 → 关签卸载
+  const uiWorkbenchBtn = page.getByRole('button', { name: 'UI 工作台', exact: true })
+  await uiWorkbenchBtn.click()
+  await page.getByRole('region', { name: 'UI 工作台', exact: true }).waitFor()
+  await page.getByRole('region', { name: 'UI 工作台左侧栏' }).waitFor()
+  await uiWorkbenchBtn.click()
+  assert.equal(
+    await page.locator('.tabbar-tab').filter({ hasText: 'UI 工作台' }).count(),
+    1,
+    'UI workbench is a singleton tab'
+  )
+  // 画布:Ctrl+滚轮缩放画板;鼠标在画布上时 Ctrl+0 只把画板回 100%,不动应用界面缩放
+  const zoomReadout = page.locator('.uwb-zoom')
+  const zoomBefore = await zoomReadout.innerText()
+  await page.locator('.uwb-viewport').hover()
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -400)
+  await page.keyboard.up('Control')
+  await page.waitForFunction(
+    (prev) => document.querySelector('.uwb-zoom')?.textContent !== prev,
+    zoomBefore
+  )
+  const uiScaleBefore = await page.evaluate(() => window.atlas.getUiScale())
+  await page.keyboard.press('Control+0')
+  await page.waitForFunction(() => document.querySelector('.uwb-zoom')?.textContent === '100%')
+  assert.equal(
+    await page.evaluate(() => window.atlas.getUiScale()),
+    uiScaleBefore,
+    'Ctrl+0 over the canvas must not reset the app UI scale'
+  )
+  await shot('ui-workbench-canvas')
+  await page.getByRole('button', { name: '关闭 UI 工作台', exact: true }).click()
+  await page.locator('.ui-workbench').waitFor({ state: 'detached' })
   await overview()
   await page.getByRole('button', { name: /读项目说明/ }).click()
   await page

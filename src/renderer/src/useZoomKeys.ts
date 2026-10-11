@@ -2,6 +2,7 @@
 // uiScaleChanged 广播 + 主进程窗口记账,全链自动跟上,这里不养第二本账。
 // Ctrl+滚轮不归这里:那是预览文档的字号缩放(docZoom),挂在 CodePreview 的 .code-view 上 ——
 // 界面是界面,文档是文档,两本账分开记。
+// 已被别处接管的按键(defaultPrevented,如鼠标停在 UI 工作台画布上时的画板缩放)直接跳过。
 import { useEffect, useRef } from 'react'
 import { clampUiScale } from '@shared/uiScale'
 
@@ -16,7 +17,7 @@ export function installZoomKeys(win: Window, onChange: (scale: number) => void):
     onChange(f)
   }
   const onKey = (e: KeyboardEvent): void => {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+    if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
     const cur = window.atlas.getUiScale()
     if (e.key === '0') apply(1)
     else if (e.key === '+' || e.key === '=') apply(cur + STEP)

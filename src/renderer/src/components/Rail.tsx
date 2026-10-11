@@ -1,4 +1,5 @@
-// 第 2 层最左的图标列(UI v3 · §6):图谱 → 概览 → 自由对话 → 设置,底端 AI 状态。
+// 第 2 层最左的图标列(UI v3 第 6 节):图谱 → 概览 → 自由对话 → UI 工作台 → 设置,底端 AI 状态。
+// UI 工作台不吃工作区(设计的是用户自己的 app 界面),没开项目也能点。
 // 列宽 1u(= 顶栏高),与顶栏同底同色;图标 ~0.425u,点击区 ~0.75u。
 // 图谱本体还没实现(规格见《项目结构图谱》),点开一张单例占位页签;
 // AI 状态 = 三态图标 + 状态浮层(内容沿用旧文档第七节,细节在 RailAiStatus)。
@@ -13,6 +14,7 @@ export function Rail({
   onGraph,
   onOverview,
   onChat,
+  onUiWorkbench,
   onSettings
 }: {
   hasWorkspace: boolean
@@ -20,6 +22,7 @@ export function Rail({
   onGraph: () => void
   onOverview: () => void
   onChat: () => void
+  onUiWorkbench: () => void
   onSettings: () => void
 }): React.JSX.Element {
   return (
@@ -56,6 +59,16 @@ export function Rail({
         aria-label="自由对话"
       >
         <TreeIcon name="bot" size={RAIL_ICON} mono />
+      </button>
+      <button
+        type="button"
+        className="rail-btn"
+        onClick={onUiWorkbench}
+        data-tip="UI 工作台"
+        data-tip-side="right"
+        aria-label="UI 工作台"
+      >
+        <TreeIcon name="palette" size={RAIL_ICON} mono />
       </button>
       <button
         type="button"

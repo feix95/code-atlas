@@ -69,7 +69,7 @@ function useFittedPlaceholder(
 export function AppTopBar({
   scanning,
   hasWorkspace,
-  settingsMode,
+  fileNavOff,
   sidebarShown,
   sidebarCollapsed,
   onToggleSidebar,
@@ -84,8 +84,8 @@ export function AppTopBar({
   scanning: boolean
   /** 工作区在台面上;没开项目时搜索框置灰(深搜要有工作区根,规格默认项) */
   hasWorkspace: boolean
-  /** 设置模式(第二步):侧栏换脸成设置导航时,搜索/前进后退/刷新都是文件树的家务,置灰 */
-  settingsMode?: boolean
+  /** 侧栏换脸(设置导航/UI 工作台左侧栏)时,搜索/前进后退/刷新都是文件树的家务,置灰 */
+  fileNavOff?: boolean
   /** 侧栏这一列此刻露着 = 搜索框/导航组才营业(收起时整组消失,规格 §4.3) */
   sidebarShown: boolean
   sidebarCollapsed: boolean
@@ -145,7 +145,7 @@ export function AppTopBar({
                 placeholder={hasWorkspace ? '搜索文件' : fitted.text}
                 aria-label="搜索文件"
                 spellCheck={false}
-                disabled={!hasWorkspace || settingsMode}
+                disabled={!hasWorkspace || fileNavOff}
                 onChange={(e) => onFilterChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') onFilterChange('')
@@ -158,7 +158,7 @@ export function AppTopBar({
                 type="button"
                 className="tb-btn"
                 onClick={() => void goNav(-1)}
-                disabled={scanning || settingsMode || nav.index <= 0}
+                disabled={scanning || fileNavOff || nav.index <= 0}
                 data-tip="后退"
                 aria-label="后退"
               >
@@ -168,7 +168,7 @@ export function AppTopBar({
                 type="button"
                 className="tb-btn"
                 onClick={() => void goNav(1)}
-                disabled={scanning || settingsMode || nav.index >= nav.stack.length - 1}
+                disabled={scanning || fileNavOff || nav.index >= nav.stack.length - 1}
                 data-tip="前进"
                 aria-label="前进"
               >
@@ -178,7 +178,7 @@ export function AppTopBar({
                 type="button"
                 className={`tb-btn${refreshing ? ' is-spinning' : ''}`}
                 onClick={() => void handleRefresh()}
-                disabled={scanning || settingsMode}
+                disabled={scanning || fileNavOff}
                 data-tip={scanning ? '扫描中……' : '刷新'}
                 aria-label="刷新"
               >

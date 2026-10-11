@@ -17,6 +17,8 @@ import { SearchResults } from './SearchResults'
 import { WorkspaceMenu } from './WorkspaceMenu'
 import { TreeIcon } from './Icons'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
+import type { SidebarFace } from '../useSettingsNav'
+import { UiWorkbenchSidebar } from './uiWorkbench/UiWorkbenchSidebar'
 
 export function WorkspaceSidebar({
   result,
@@ -60,7 +62,7 @@ export function WorkspaceSidebar({
   driveRefreshNonce,
   onGoHome,
   onOpenBrowseFile,
-  settingsMode,
+  sidebarFace,
   settingsSection,
   onSettingsSection
 }: {
@@ -126,8 +128,8 @@ export function WorkspaceSidebar({
   onGoHome: () => void
   /** 浏览态单击文件:开「瞄一眼」预览页签(scopeRoot = 浏览树的盘根) */
   onOpenBrowseFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
-  /** 设置模式(第二步):当前激活签是设置页时,侧栏换脸成设置导航;文件树保活藏着,不丢展开/滚动 */
-  settingsMode: boolean
+  /** 侧栏的脸:激活签是设置页/UI 工作台时换成对应的脸;文件树保活藏着,不丢展开/滚动 */
+  sidebarFace: SidebarFace
   /** 设置导航高亮项(App 的 settingsSection 账,滚动间谍喂的) */
   settingsSection: SectionKey
   /** 点导航 = 发一次跳转请求(走 sectionReq 同一条道,seq 记账) */
@@ -180,6 +182,7 @@ export function WorkspaceSidebar({
     }
     if (e.key === 'Escape') setPathDraft(folder ?? '')
   }
+  const settingsMode = sidebarFace === 'settings'
   return (
     <>
       {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
@@ -188,7 +191,9 @@ export function WorkspaceSidebar({
         {/* 设置模式:顶卡换「设置」标题行,中段换分类导航;
             文件树/搜索结果整棵藏进 .sidebar-mid(display:none 保活不卸载),
             展开态和滚动位都长在节点自己身上,换回来原样还在 */}
-        {settingsMode ? (
+        {sidebarFace === 'uiworkbench' ? (
+          <UiWorkbenchSidebar />
+        ) : settingsMode ? (
           <div className="sidebar-top cfg-snav-head">
             <span className="cfg-snav-title">设置</span>
           </div>
@@ -290,7 +295,7 @@ export function WorkspaceSidebar({
             ))}
           </nav>
         )}
-        <div className="sidebar-mid" hidden={settingsMode}>
+        <div className="sidebar-mid" hidden={sidebarFace !== 'files'}>
           {result ? (
             // §7.2:搜索词非空 = 树区整体换成深搜清单;清空词,文件树原样回来
             search ? (
