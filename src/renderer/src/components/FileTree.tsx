@@ -4,7 +4,6 @@ import { DRAG_MIME_NODE } from '@shared/dragTypes'
 import type { NoteMap } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
 import { openFilePathMenuFor } from './filePathMenuStore'
-import { SlideIndicator } from './SlideIndicator'
 
 /** 文件树图标总控:本树内所有 icon(文件/文件夹)共享这一个尺寸,改这里全场生效;
  *  只管这棵树,跟其他区域的图标尺寸互不相干。UI v3 §7 ≈1.1rem = 18px@100% */
@@ -284,13 +283,6 @@ export function FileTree({
       <div className="tree-scroll" ref={scrollRef}>
         {/* 悬停提示组户口(文件树算一个整体):行间游走即时接力不收摊,进组第一颗按慢档亮 */}
         <div className="tree" data-tip-group="filetree">
-          {/* 树行长跳(相隔超过约三行)不滑:淡出淡入,不画飞行轨迹 */}
-          <SlideIndicator
-            targetSelector=".tree-row.is-selected"
-            activeKey={selectedPath}
-            fadeBeyondPx={64}
-            className="tree-ind"
-          />
           <TreeRow
             node={root}
             depth={0}

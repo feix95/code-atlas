@@ -68,25 +68,25 @@
   cursor: default;
 }
 
-/* AI 状态钮压底 */
+/* AI 状态钮压底:底距与左右同值(栏宽 1u − 钮 0.75u,左右各 0.125u) */
 .rail-ai {
   width: calc(var(--u) * 0.75);
   height: calc(var(--u) * 0.75);
   padding: 0;
   margin-top: auto;
-  margin-bottom: calc(var(--u) * 0.21875);
+  margin-bottom: calc(var(--u) * 0.125);
 }
 
 /* AI 状态浮层(§6.1 锚位):出生在 rail 底钮正上方、左缘与钮左对齐 —
-   rail 宽 1u、钮 0.75u 居中 ⇒ 钮左缘 = 0.125u;钮顶沿距窗底 0.96875u
-   (0.21875u 底距 + 0.75u 钮高),卡底再让一条 ~0.15u 的缝。
+   rail 宽 1u、钮 0.75u 居中 ⇒ 钮左缘 = 0.125u;钮顶沿距窗底 0.875u
+   (0.125u 底距 + 0.75u 钮高),卡底再让一条 ~0.15u 的缝。
    Esc/点外/滚轮收起。
    两列版式:左槽 0.8125rem 起放图标(点/✓/✕/转圈),文字列 1.8125rem 统一左缘;
    信息区一整块不切割,底栏一根 hairline 隔开 —— 全卡只有一条线 */
 .ai-status-pop {
   position: fixed;
   left: calc(var(--u) * 0.125);
-  bottom: calc(var(--u) * 1.125);
+  bottom: calc(var(--u) * 1.03125);
   z-index: var(--z-popover);
   width: 15.75rem;
   display: flex;

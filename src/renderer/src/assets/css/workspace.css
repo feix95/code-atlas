@@ -380,11 +380,6 @@
   font-size: var(--font-sm);
 }
 
-/* 文件树根:滑动选中药丸(SlideIndicator)的量位与定位基准 */
-.tree {
-  position: relative;
-}
-
 .tree-scroll {
   min-height: 0;
   flex: 1;
@@ -396,13 +391,14 @@
   padding: var(--space-2) var(--space-1) var(--space-4) var(--space-2);
 }
 
-/* 底部扫描状态条(§3):高 0.6u,只属于侧栏,收起时随侧栏一起消失 */
+/* 底部扫描状态条(§3):只属于侧栏,收起时随侧栏一起消失。
+   高 1u + 1px 顶线 ⇒ 内容中心距窗底正好 0.5u,与 rail 底槽 AI 状态钮同一条中心线 */
 .sidebar-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  height: 2.4rem;
+  height: calc(var(--u) + 1px);
   padding: 0 0.75rem;
   color: var(--muted);
   border-top: 1px solid var(--line);
@@ -798,13 +794,9 @@
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:底色由滑动药丸(SlideIndicator)承担,行自身透明(盖过 hover 底);名字染亮 */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六锤摘遮罩,底色不再染色) */
 .tree-row.is-selected {
-  background: transparent;
-}
-
-.tree-ind {
-  border-radius: var(--radius-sm);
+  background: var(--selected-bg);
 }
 
 /* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
