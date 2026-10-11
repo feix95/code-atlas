@@ -7,15 +7,7 @@ import type { PaneKind } from './paneKinds'
  * 概览/小探针/图谱/设置是单例签,每品类全应用只此一张,rail/菜单入口开合。
  * 没有跟随、没有钉住:页签代表的就是它自己那份内容。
  */
-/**
- * 文件签的看片档位(md 三档锤):
- * source=源码编辑器(行号/分色/选区引用),reading=md 渲染态只读,
- * live=Live Preview(编辑器里上妆/卸妆,md 系签的默认档)。
- * 非 md 文件签永远 undefined(=源码档)。
- */
-export type PaneViewMode = 'source' | 'reading' | 'live'
-
-/** 有渲染态的后缀(md 系):live/阅读 两档都只对它开门,别的文件菜单里连选项都不摆 */
+/** 有渲染态的后缀(md 系):排版显示只对它们开门,别的文件菜单里连选项都不摆 */
 const READING_EXTS = new Set(['md', 'markdown', 'mdx'])
 
 /** 这个文件有没有渲染态(纯函数):md 系才回 true —— live/阅读 两档共用这道门,
@@ -36,10 +28,6 @@ export interface PaneTab {
   /** 「瞄一眼」文件签(peek)的读根:盘符下钻不归工作区,
    *  CodePreview 读文件走 joinRoot(scopeRoot, relPath);工作区文件签不填 */
   scopeRoot?: string
-  /** 文件签的看片档位(阅读模式这锤):undefined = 源码;记在签身上,拖窗/存档都跟着走 */
-  viewMode?: PaneViewMode
-  /** 只读锁(source 档与代码文件的显式账;reading 档自带只读);界面开关换算见 viewState.ts */
-  readOnly?: boolean
 }
 
 /**

@@ -417,3 +417,4 @@
 - fix(ui): 侧栏底部扫描状态条高 2.4rem 改 1u+1px,内容中心与 rail 底槽 AI 状态钮同一条中心线(原先低约 1.3px)
 - feat(ui): 页签右键菜单「实时预览/阅读模式/源码模式」三选一改为选项区三个独立开关——排版显示(仅 md 系)、只读(所有文件,代码文件首次可锁)、自动换行,开关复用设置页 .cfg-switch、点了不收摊;预览头「阅读/代码」钮改只读锁钮;viewMode+readOnly 换算收进 viewState.ts,存档增 readOnly,lastEditMode 退役;菜单协议增 switchOn 与分区小标题、退役 checked。根因:单选三档把「怎么显示」和「能不能改」绑在一起,首次看的人读不懂,代码文件还凭空灰挂两项;新增 test:viewstate 自测与 journey 锁开关步骤
 - fix(ui): 页签只读锁解锁后锁焊死——toTabView 解锁分支省略 readOnly 键,浅合并落账留下旧 true 永远清不掉(菜单常蓝、编辑器拒字但光标照闪);现返回体两字段永远显式在场,落账处也改逐字段覆盖;journey 补「解锁后重开菜单+真打字」验收步
+- feat(ui): 预览三开关(排版显示/只读/自动换行)收编全局偏好——账进 codePrefs(localStorage,子窗经 storage 事件对齐),一拨所有已开签就地翻面、新开签与重启都继承;PaneTab 的 viewMode/readOnly 户口、setTabViewFlags 与 onSetViewFlags 传链退役,viewState 只留 全局账×文件出身 换算,会话存档不再记签级看片字段(旧档字段无害忽略);selftest-viewstate 重写、session 自测跟进、journey 补跨签跟随断言

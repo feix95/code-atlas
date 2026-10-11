@@ -4,7 +4,6 @@
 // 空壳即死:名下签全挪走/关光那刻,这扇窗自己收摊(Chrome 语义;主窗不在此列,它是工作台)。
 import { useEffect } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
-import type { ViewFlagsWant } from '../viewState'
 import { syncAuxChrome, type AuxWindowHandle } from '../useAuxWindows'
 import { TopBarTabs } from './TopBarTabs'
 import { PaneGroups } from './PaneGroups'
@@ -34,8 +33,6 @@ export interface TabAreaProps {
   >
   onTabDragEnd: (id: string) => void
   onDetachTab: (id: string) => void
-  /** 页签右键「阅读/源码模式」(阅读模式这锤):切文件签的看片档位 */
-  setTabViewFlags: (id: string, want: ViewFlagsWant) => void
   /** 页签右键「在文件列表中显示当前文件」:回主窗侧栏树里指出来 */
   revealTabInTree: (id: string) => void
   /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
@@ -101,7 +98,6 @@ export function AuxWindowShell({
           setDropMark={tabArea.setDropMark}
           onTabDragEnd={tabArea.onTabDragEnd}
           onDetachTab={tabArea.onDetachTab}
-          onSetViewFlags={tabArea.setTabViewFlags}
           onRevealInTree={tabArea.revealTabInTree}
           workspaceRoot={tabArea.workspaceRoot}
           paneSplit={tabArea.paneSplit}

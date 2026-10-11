@@ -7,7 +7,6 @@ import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
 import { dirChainOf } from './scanTreeTools'
 import {
-  canReadingMode,
   clampPaneSplit,
   dropHostGroups,
   groupHost,
@@ -17,7 +16,6 @@ import {
   type PaneGroup,
   type PaneTab
 } from './paneTabs'
-import { applyViewFlags, type ViewFlagsWant } from './viewState'
 import type { AiChatApi } from './useAiChat'
 import type { AiTurn } from './useAiAsk'
 
@@ -91,8 +89,7 @@ export function usePaneTabs(deps: {
       relPath: file.relPath,
       name: file.name,
       icon: file.summary?.icon ?? 'file',
-      scopeRoot,
-      viewMode: canReadingMode(file.relPath) ? 'live' : undefined
+      scopeRoot
     }
   }
 
@@ -386,26 +383,6 @@ export function usePaneTabs(deps: {
     )
   }
 
-  // 页签看片开关(排版显示 × 只读):记在签身上 —— 拖去子窗、会话存档都跟着签走;
-  // 开关读数与账本字段的换算只走 viewState.applyViewFlags
-  function setTabViewFlags(id: string, want: ViewFlagsWant): void {
-    setGroups((prev) =>
-      prev.map((g) =>
-        g.tabs.some((t) => t.id === id)
-          ? {
-              ...g,
-              tabs: g.tabs.map((t) => {
-                if (t.id !== id) return t
-                // 两字段显式落账:浅合并下返回体省略的键不会清旧值,必须逐字段覆盖
-                const nv = applyViewFlags(t.relPath, t, want)
-                return { ...t, viewMode: nv.viewMode, readOnly: nv.readOnly }
-              })
-            }
-          : g
-      )
-    )
-  }
-
   // 两组分割条:拖动调左右比例(左边占比记进本机),双击回对半
   function applyPaneSplit(v: number): void {
     const next = clampPaneSplit(v)
@@ -456,7 +433,6 @@ export function usePaneTabs(deps: {
     closeTab,
     closeTabsInGroup,
     renameFileTab,
-    setTabViewFlags,
     markFlash,
     applyPaneSplit,
     onPaneSashDown,

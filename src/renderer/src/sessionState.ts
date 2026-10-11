@@ -6,7 +6,7 @@
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 import type { ScanDirNode } from '@shared/types'
 import { findDir, findFile } from './scanTreeTools.ts'
-import { nextTabId, type PaneGroup, type PaneTab, type PaneViewMode } from './paneTabs.ts'
+import { nextTabId, type PaneGroup, type PaneTab } from './paneTabs.ts'
 import { KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds.ts'
 
 const SESSION_KEY = 'atlas.session'
@@ -27,10 +27,6 @@ export interface SessionTab {
   name: string
   icon: string
   scopeRoot?: string
-  /** 文件签的看片档位(md 三档锤):source/reading/live 都落账;undefined = 源码 */
-  viewMode?: PaneViewMode
-  /** 只读锁:只认 true,别的值当没锁 */
-  readOnly?: boolean
   on?: boolean
 }
 
@@ -69,8 +65,6 @@ export function serializeSession(
         name: t.name,
         icon: t.icon,
         scopeRoot: t.scopeRoot,
-        viewMode: t.viewMode,
-        readOnly: t.readOnly,
         on: t.id === g.activeId ? true : undefined
       }))
     }))
@@ -95,12 +89,7 @@ function parseTab(raw: unknown): SessionTab | null {
     icon,
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
-    // 看片档位只认三个合法户口;写坏了的当没存过(md 签回默认 live,非 md 回源码档)
-    viewMode:
-      t['viewMode'] === 'reading' || t['viewMode'] === 'source' || t['viewMode'] === 'live'
-        ? t['viewMode']
-        : undefined,
-    readOnly: t['readOnly'] === true ? true : undefined,
+    // 旧档里的 viewMode/readOnly 不再读:看片开关已收进全局偏好(codePrefs),与签无关
     on: t['on'] === true ? true : undefined
   }
 }
@@ -162,9 +151,7 @@ export function hydrateSession(
       relPath: t.relPath,
       name: t.name,
       icon: t.icon,
-      scopeRoot: t.scopeRoot,
-      viewMode: t.viewMode,
-      readOnly: t.readOnly
+      scopeRoot: t.scopeRoot
     }))
     const onIdx = live.findIndex((t) => t.on)
     const group: PaneGroup = {

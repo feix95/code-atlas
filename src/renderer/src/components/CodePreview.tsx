@@ -8,8 +8,7 @@ import { MiniMD } from './MiniMD'
 import { openContextMenu } from './contextMenuStore'
 import { SourceEditor } from './SourceEditor'
 import type { FileLinkTarget } from '@shared/fileLinks'
-import type { PaneViewMode } from '../paneTabs'
-import { viewFlags, type ViewFlagsWant } from '../viewState'
+import { applyViewFlags, getViewFlagsBits, subscribeViewFlags, viewFlags } from '../viewState'
 import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
 import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
@@ -49,9 +48,6 @@ export function CodePreview({
   refLimit,
   onAddRef,
   jump,
-  viewMode,
-  readOnly,
-  onSetViewFlags,
   fileLinks,
   onRenameFile
 }: {
@@ -64,12 +60,6 @@ export function CodePreview({
   onAddRef: (ref: ChatCodeRef) => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
-  /** 看片档位:undefined/'source' = 源码编辑;'reading' = md 渲染态;'live' = 实时预览(只对 md 系生效) */
-  viewMode?: PaneViewMode
-  /** 只读锁(source 档与代码文件的显式账;reading 档自带只读) */
-  readOnly?: boolean
-  /** 头部「只读锁」钮 + 右键菜单开关共用的拨动通道(账在页签身上,换算见 viewState) */
-  onSetViewFlags?: (want: ViewFlagsWant) => void
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
   /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执;
@@ -183,13 +173,15 @@ export function CodePreview({
   const total = useMemo(() => (diskText === '' ? 0 : diskText.split('\n').length), [diskText])
   const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
   const wrap = wrapAllowed && wrapOn
-  // 看片三档(md 三档锤):live=编辑器里上妆/卸妆(默认),reading=MiniMD 渲染态只读,
-  // source=裸源码编辑器;三档只在 md 系签生效,别的文件永远是源码档
-  const flags = viewFlags(file.relPath, { viewMode, readOnly })
+  // 看片开关(排版显示 × 只读)是全局一档:账在 codePrefs,拨一下所有签就地翻面 ——
+  // 订阅只为触发重渲,读数照旧走 viewFlags 换算口
+  useSyncExternalStore(subscribeViewFlags, getViewFlagsBits)
+  const flags = viewFlags(file.relPath)
   const canMd = flags.canRender
-  const mode = viewMode ?? (canMd ? 'live' : 'source')
-  const reading = canMd && mode === 'reading'
-  const live = canMd && mode === 'live'
+  // md 渲染态两个分支:reading=排版+只读(MiniMD 上妆全文),live=排版+可编辑(编辑器里上妆/卸妆);
+  // 排版关或非 md 都是裸源码编辑器(只读照常生效)
+  const reading = canMd && flags.render && flags.readOnly
+  const live = canMd && flags.render && !flags.readOnly
   // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
@@ -294,7 +286,7 @@ export function CodePreview({
       aria-label={lockTip}
       aria-pressed={flags.readOnly}
       data-tip={lockTip}
-      onClick={() => onSetViewFlags?.({ readOnly: !flags.readOnly })}
+      onClick={() => applyViewFlags({ readOnly: !flags.readOnly })}
     >
       <TreeIcon name={flags.readOnly ? 'lock' : 'lockOpen'} size={WRAP_ICON_SIZE} mono />
     </button>
@@ -305,7 +297,7 @@ export function CodePreview({
       {/* 页头栏:文件读成了才立,右对齐一颗只读锁钮;文件名不摆 ——
           签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突。
           折行钮退役进页签右键菜单(渐进披露),快捷键 Alt+Z 和全局账照旧 */}
-      {result?.status === 'ok' && <div className="code-pane-head">{onSetViewFlags && lockBtn}</div>}
+      {result?.status === 'ok' && <div className="code-pane-head">{lockBtn}</div>}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
         <div className="card-waiting">

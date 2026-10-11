@@ -57,9 +57,7 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
           kind: 'preview',
           relPath: 'src/b.ts',
           name: 'b.ts',
-          icon: 'ts',
-          viewMode: 'source',
-          readOnly: true
+          icon: 'ts'
         }
       ]
     },
@@ -78,59 +76,53 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
   assert.equal(back.sel, 'src/b.ts')
   assert.equal(back.groups.length, 2)
   assert.equal(back.groups[0].tabs[1].on, true)
-  assert.equal(back.groups[0].tabs[1].viewMode, 'source', '看片档位跟着签走')
-  assert.equal(back.groups[0].tabs[1].readOnly, true, '只读锁跟着签走')
+  assert.equal('viewMode' in back.groups[0].tabs[1], false, '看片档位不再跟签走')
+  assert.equal('readOnly' in back.groups[0].tabs[1], false, '只读锁不再跟签走')
 })
 
-check(
-  'parseSession:只读锁只认 true,写坏的扔掉;水合后锁还在签身上;旧档里的 lastEditMode 无害',
-  () => {
-    const s = parseSession({
-      v: 1,
-      folder: 'C:\\a',
-      groups: [
-        {
-          tabs: [
-            { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts', readOnly: true },
-            { kind: 'preview', relPath: 'src/b.ts', name: 'b.ts', icon: 'ts', readOnly: 'yes' },
-            {
-              kind: 'preview',
-              relPath: 'a.ts',
-              name: 'a.ts',
-              icon: 'ts',
-              viewMode: 'live',
-              lastEditMode: 'source'
-            }
-          ]
-        }
-      ]
-    })
-    assert.equal(s?.groups[0].tabs[0].readOnly, true, '合法锁认账')
-    assert.equal(s?.groups[0].tabs[1].readOnly, undefined, '野值扔掉当没锁')
-    assert.equal(s?.groups[0].tabs[2].viewMode, 'live', '旧档的签照常读,多余字段不碍事')
-    const h = hydrateSession(s!, tree)
-    assert.equal(h?.groups[0].tabs[0].readOnly, true, '水合后锁还在签身上')
-  }
-)
-
-check('parseSession:写坏的 viewMode 不连累签,直接当没存过;水合后档还在', () => {
+check('parseSession:旧档里的 viewMode/readOnly 不再读(看片开关是全局偏好),多余字段不碍事', () => {
   const s = parseSession({
     v: 1,
     folder: 'C:\\a',
     groups: [
       {
         tabs: [
-          { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts', viewMode: 'reading' },
-          { kind: 'preview', relPath: 'src/b.ts', name: 'b.ts', icon: 'ts', viewMode: 'nonsense' }
+          {
+            kind: 'preview',
+            relPath: 'a.ts',
+            name: 'a.ts',
+            icon: 'ts',
+            readOnly: true,
+            viewMode: 'reading'
+          },
+          {
+            kind: 'preview',
+            relPath: 'src/b.ts',
+            name: 'b.ts',
+            icon: 'ts',
+            readOnly: 'yes',
+            viewMode: 'nonsense'
+          },
+          {
+            kind: 'preview',
+            relPath: 'a.ts',
+            name: 'a.ts',
+            icon: 'ts',
+            viewMode: 'live',
+            lastEditMode: 'source'
+          }
         ]
       }
     ]
   })
-  assert.equal(s?.groups[0].tabs[0].viewMode, 'reading', '合法档认账')
-  assert.equal(s?.groups[0].tabs[1].viewMode, undefined, '野档扔掉回默认')
-  const h = hydrateSession(s!, tree)
-  assert.equal(h?.groups[0].tabs[0].viewMode, 'reading', '水合后档还在签身上')
-  assert.equal(h?.groups[0].tabs[1].viewMode, undefined)
+  assert.ok(s)
+  assert.equal(s.groups[0].tabs.length, 3, '老字段不连累签,全部照常还原')
+  for (const t of s.groups[0].tabs) {
+    assert.equal('viewMode' in t, false, '档位字段不再上账')
+    assert.equal('readOnly' in t, false, '只读字段不再上账')
+  }
+  const h = hydrateSession(s, tree)
+  assert.equal(h?.groups[0].tabs.length, 3, '水合照旧,签面干净')
 })
 
 check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', () => {

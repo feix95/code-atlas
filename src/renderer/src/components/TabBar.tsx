@@ -1,8 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
-import type { PaneViewMode } from '../paneTabs'
-import { viewFlags, type ViewFlagsWant } from '../viewState'
+import { applyViewFlags, viewFlags } from '../viewState'
 import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
 import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 import { hostNameOf, startWindowDrag } from '../windowDrag'
@@ -17,10 +16,6 @@ export interface TabBarTab {
   relPath: string
   /** peek 签的读根(盘符下钻):复制路径/资源管理器按它拼绝对路径 */
   scopeRoot?: string
-  /** 文件签的看片档位:菜单里换算成「排版显示」开关的读数 */
-  viewMode?: PaneViewMode
-  /** 文件签的只读锁:菜单里「只读」开关的读数 */
-  readOnly?: boolean
 }
 
 /**
@@ -62,7 +57,6 @@ export function TabBar({
   onCloseMany,
   onMoveTab,
   onDetachTab,
-  onSetViewFlags,
   onRevealInTree,
   workspaceRoot,
   dragSourceId,
@@ -90,8 +84,6 @@ export function TabBar({
   ) => void
   /** 右键菜单「移到新窗口」:不拖也撕(页签撕窗锤),所有页签一视同仁 */
   onDetachTab?: (id: string) => void
-  /** 右键菜单「排版显示/只读」开关:拨文件签的看片状态 */
-  onSetViewFlags?: (id: string, want: ViewFlagsWant) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
   onRevealInTree?: (id: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
@@ -196,18 +188,18 @@ export function TabBar({
       )
     }
 
-    // 选项区(文件签常驻):三个互相独立的开关 —— 排版显示(只有 md 系有这一维,别的文件不摆)、
-    // 只读(所有文件都有)、自动换行(全局一档,所有文件签通吃,Alt+Z 走同一份全局账)。
-    // 开关行点了不收摊,run 收到拨完的新读数;读数与账本字段的换算只走 viewState
+    // 选项区(文件签常驻):三个互相独立的开关全是全局一档 —— 排版显示(只有 md 系有这一维,
+    // 别的文件不摆)、只读(所有文件通吃)、自动换行(Alt+Z 走同一份全局账)。
+    // 拨一颗 = 全局偏好翻面,所有已开的签就地跟随;读数换算只走 viewState
     if (isFile) {
-      const flags = viewFlags(t.relPath, t)
+      const flags = viewFlags(t.relPath)
       items.push(MENU_SEP, { heading: '选项' })
       if (flags.canRender) {
         items.push({
           label: '排版显示',
           icon: 'bookOpen',
           switchOn: flags.render,
-          run: (on) => onSetViewFlags?.(t.id, { render: on })
+          run: (on) => applyViewFlags({ render: on })
         })
       }
       items.push(
@@ -215,7 +207,7 @@ export function TabBar({
           label: '只读',
           icon: 'lock',
           switchOn: flags.readOnly,
-          run: (on) => onSetViewFlags?.(t.id, { readOnly: on })
+          run: (on) => applyViewFlags({ readOnly: on })
         },
         {
           label: '自动换行',

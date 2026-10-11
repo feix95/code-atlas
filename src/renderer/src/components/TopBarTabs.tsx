@@ -11,7 +11,6 @@
 // 中心/边缘判分屏许诺;窗外松手撕新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
-import type { ViewFlagsWant } from '../viewState'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -107,7 +106,6 @@ export function TopBarTabs({
   setDropMark,
   onTabDragEnd,
   onDetachTab,
-  onSetViewFlags,
   onRevealInTree,
   workspaceRoot,
   paneSplit
@@ -133,8 +131,6 @@ export function TopBarTabs({
   onTabDragEnd: (id: string) => void
   /** 右键菜单「移到新窗口」:不拖也撕,所有签一视同仁 */
   onDetachTab?: (id: string) => void
-  /** 右键菜单「阅读/源码模式」:切文件签的看片档位(阅读模式这锤) */
-  onSetViewFlags?: (id: string, want: ViewFlagsWant) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里指出来(App 的活) */
   onRevealInTree?: (id: string) => void
   /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
@@ -523,7 +519,6 @@ export function TopBarTabs({
               onCloseMany={(ids) => closeTabsInGroup(g.id, ids)}
               onMoveTab={moveTab}
               onDetachTab={onDetachTab}
-              onSetViewFlags={onSetViewFlags}
               onRevealInTree={onRevealInTree}
               workspaceRoot={workspaceRoot}
               dragSourceId={drag?.id ?? null}

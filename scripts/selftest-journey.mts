@@ -341,6 +341,21 @@ try {
     lockedText,
     'a read-only tab must reject typing'
   )
+  // 全局账验证:锁是在 package.json 签上拨的,别的签读数跟着翻 ——
+  // README 签菜单里「只读」已开,正文页头锁钮也是锁态(右键不激活签,正文断言前先点回)
+  const readmeTab = page
+    .locator('.tabbar-tab')
+    .filter({ has: page.locator('.tabbar-name').getByText('README.md', { exact: true }) })
+  await readmeTab.click({ button: 'right' })
+  assert.equal(
+    await page.getByRole('menuitemcheckbox', { name: '只读' }).getAttribute('aria-checked'),
+    'true',
+    'a flip on one tab must read on for every tab (the switch is global)'
+  )
+  await page.keyboard.press('Escape')
+  await readmeTab.click()
+  await page.locator('.code-mode-btn[aria-pressed="true"]').waitFor({ timeout: 5_000 })
+  await lockTab.click()
   await lockTab.click({ button: 'right' })
   await page.getByRole('menuitemcheckbox', { name: '只读' }).click()
   await page.keyboard.press('Escape')
