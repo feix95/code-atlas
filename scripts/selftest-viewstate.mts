@@ -45,9 +45,9 @@ check('md 四个组合从任意起点都能走到,且落账形态唯一', () => 
   ] as const
   for (const from of states) {
     const cases = [
-      { render: true, readOnly: false, want: { viewMode: 'live' } },
-      { render: true, readOnly: true, want: { viewMode: 'reading' } },
-      { render: false, readOnly: false, want: { viewMode: 'source' } },
+      { render: true, readOnly: false, want: { viewMode: 'live', readOnly: undefined } },
+      { render: true, readOnly: true, want: { viewMode: 'reading', readOnly: undefined } },
+      { render: false, readOnly: false, want: { viewMode: 'source', readOnly: undefined } },
       { render: false, readOnly: true, want: { viewMode: 'source', readOnly: true } }
     ]
     for (const c of cases) {
@@ -69,15 +69,17 @@ check('单拨一个开关,另一个保持原样', () => {
   // 纯文本只读里开排版:只读保留 → 阅读
   assert.deepEqual(
     applyViewFlags('a.md', { viewMode: 'source', readOnly: true }, { render: true }),
-    { viewMode: 'reading' }
+    { viewMode: 'reading', readOnly: undefined }
   )
   // 阅读里关只读 → 实时预览
   assert.deepEqual(applyViewFlags('a.md', { viewMode: 'reading' }, { readOnly: false }), {
-    viewMode: 'live'
+    viewMode: 'live',
+    readOnly: undefined
   })
   // 实时预览里开只读 → 阅读
   assert.deepEqual(applyViewFlags('a.md', { viewMode: 'live' }, { readOnly: true }), {
-    viewMode: 'reading'
+    viewMode: 'reading',
+    readOnly: undefined
   })
 })
 
@@ -95,6 +97,20 @@ check('代码文件:只读可开关、落在 readOnly 上;排版请求被忽略,
     readOnly: undefined
   })
   assert.equal(viewFlags('src/a.ts', { readOnly: true }).readOnly, true)
+})
+
+check('浅合并落账不残留锁:返回值省略的键就是旧值阴魂不散的地方', () => {
+  // 账本是这样落的:{...旧签, ...applyViewFlags(...)} —— 返回对象不写 readOnly 键,
+  // 旧签上的 readOnly:true 会原样活下来(曾把锁焊死:菜单常蓝、编辑器拒字)
+  const stale = { viewMode: 'source' as const, readOnly: true }
+  const merged = { ...stale, ...applyViewFlags('a.md', stale, { readOnly: false }) }
+  assert.equal(merged.readOnly, undefined, '解锁后账本上不得剩 readOnly:true')
+  assert.equal(viewFlags('a.md', merged).readOnly, false)
+  // 锁折叠进 reading 的也一样:stale true + reading → 开排版再解锁,同样不许留
+  const merged2 = { ...stale, ...applyViewFlags('a.md', stale, { render: true }) }
+  const merged3 = { ...merged2, ...applyViewFlags('a.md', merged2, { readOnly: false }) }
+  assert.equal(merged3.readOnly, undefined)
+  assert.equal(viewFlags('a.md', merged3).readOnly, false)
 })
 
 check('无后缀与目录名带点的路径不算 md', () => {

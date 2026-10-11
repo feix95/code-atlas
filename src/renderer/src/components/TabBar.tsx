@@ -206,7 +206,6 @@ export function TabBar({
         items.push({
           label: '排版显示',
           icon: 'bookOpen',
-          tip: '开:标题、粗体等按成品样式显示;关:显示原始符号',
           switchOn: flags.render,
           run: (on) => onSetViewFlags?.(t.id, { render: on })
         })
@@ -215,14 +214,12 @@ export function TabBar({
         {
           label: '只读',
           icon: 'lock',
-          tip: '开:锁定文件,防止误改',
           switchOn: flags.readOnly,
           run: (on) => onSetViewFlags?.(t.id, { readOnly: on })
         },
         {
           label: '自动换行',
           icon: 'wrapText',
-          tip: 'Alt+Z',
           switchOn: getCodeWrapOn(),
           run: () => toggleCodeWrap()
         }

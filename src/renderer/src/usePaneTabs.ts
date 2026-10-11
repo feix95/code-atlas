@@ -394,9 +394,12 @@ export function usePaneTabs(deps: {
         g.tabs.some((t) => t.id === id)
           ? {
               ...g,
-              tabs: g.tabs.map((t) =>
-                t.id === id ? { ...t, ...applyViewFlags(t.relPath, t, want) } : t
-              )
+              tabs: g.tabs.map((t) => {
+                if (t.id !== id) return t
+                // 两字段显式落账:浅合并下返回体省略的键不会清旧值,必须逐字段覆盖
+                const nv = applyViewFlags(t.relPath, t, want)
+                return { ...t, viewMode: nv.viewMode, readOnly: nv.readOnly }
+              })
             }
           : g
       )

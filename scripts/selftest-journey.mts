@@ -345,6 +345,21 @@ try {
   await page.getByRole('menuitemcheckbox', { name: '只读' }).click()
   await page.keyboard.press('Escape')
   await page.locator('.code-mode-btn[aria-pressed="false"]').waitFor({ timeout: 5_000 })
+  await lockTab.click({ button: 'right' })
+  assert.equal(
+    await page.getByRole('menuitemcheckbox', { name: '只读' }).getAttribute('aria-checked'),
+    'false',
+    'a reopened menu must read the unlocked ledger, not the last click'
+  )
+  await page.keyboard.press('Escape')
+  const editableText = await page.locator('.cm-content').first().innerText()
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.type('zzz')
+  assert.notEqual(
+    await page.locator('.cm-content').first().innerText(),
+    editableText,
+    'an unlocked tab must accept typing'
+  )
   // 页签撕窗(M1):右键「移到新窗口」= 签撕去同进程子窗 —— 子窗带自绘标题栏和
   // 自己的页签带,主窗名下签数减一;关子窗连签销户(Chrome 语义),窗数回原
   const tearTab = page

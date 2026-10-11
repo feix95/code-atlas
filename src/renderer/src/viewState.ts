@@ -36,11 +36,13 @@ export function viewFlags(relPath: string, tab: TabView): ViewFlags {
   }
 }
 
-/** 两个开关的目标读数 → 落账形态(每种组合只有一种存法) */
+/** 两个开关的目标读数 → 落账形态(每种组合只有一种存法);
+    readOnly 键永远显式在场:调用方按浅合并落账,键不在 = 旧值原样留在签上
+    (曾把锁焊死:解锁返回体没写 readOnly,旧 true 阴魂不散,菜单常蓝、编辑器拒字) */
 function toTabView(canRender: boolean, render: boolean, readOnly: boolean): TabView {
   if (!canRender) return { viewMode: undefined, readOnly: readOnly || undefined }
-  if (render) return { viewMode: readOnly ? 'reading' : 'live' }
-  return readOnly ? { viewMode: 'source', readOnly: true } : { viewMode: 'source' }
+  if (render) return { viewMode: readOnly ? 'reading' : 'live', readOnly: undefined }
+  return { viewMode: 'source', readOnly: readOnly || undefined }
 }
 
 /** 拨一个或两个开关:没提到的那个保持原样;代码文件的排版请求直接忽略 */
