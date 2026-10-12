@@ -70,8 +70,6 @@ function trackPointer(
   const root = win.document.documentElement
   const prevCursor = root.style.cursor
   if (dragCursor) root.style.cursor = dragCursor
-  // 撤销批次:整笔手势(每帧 dispatch)松手时只记一步,嵌套在更外层批次里自动被吸收
-  docActions.beginBatch()
   let last: DragEventLike | null = null
   const move = (e: PointerEvent): void => {
     last = e
@@ -97,10 +95,21 @@ function trackPointer(
     win.removeEventListener('pointercancel', end)
     win.removeEventListener('blur', end)
     if (dragCursor) root.style.cursor = prevCursor
-    onEnd()
-    docActions.endBatch()
+    try {
+      onEnd()
+    } finally {
+      docActions.endBatch()
+    }
   }
-  target.setPointerCapture(down.pointerId)
+  // 先捕获再开批:setPointerCapture 一旦抛异常,批次就不会被留下挂起;
+  // 抛出时顺手还原手势光标,不留钉死的 cursor
+  try {
+    target.setPointerCapture(down.pointerId)
+  } catch (err) {
+    if (dragCursor) root.style.cursor = prevCursor
+    throw err
+  }
+  docActions.beginBatch()
   win.addEventListener('pointermove', move)
   win.addEventListener('keydown', modifier, true)
   win.addEventListener('keyup', modifier, true)
@@ -135,37 +144,46 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
     if (toolRef.current === 'rect') {
       // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算
       if (!e.currentTarget.ownerDocument.defaultView) return
-      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手补默认尺寸,外层批次包住三段
+      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手补默认尺寸,外层批次包住三段;
+      // 中途任何一步抛异常都必须把外层批次结掉再抛出,否则批次挂起、撤销永久失灵
       docActions.beginBatch()
-      const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 })
-      docActions.dispatch({ type: 'add', node })
-      docActions.select(node.id)
-      trackPointer(
-        e,
-        (ev) =>
-          docActions.dispatch({
-            type: 'update',
-            id: node.id,
-            patch: rectFromDrag(start, toDesign(ev), {
-              isSquare: ev.shiftKey,
-              isFromCenter: ev.altKey
-            })
-          }),
-        () => {
-          const fresh = getDocState().nodes.find((n) => n.id === node.id)
-          if (fresh && fresh.width === 1 && fresh.height === 1) {
+      try {
+        const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 })
+        docActions.dispatch({ type: 'add', node })
+        docActions.select(node.id)
+        trackPointer(
+          e,
+          (ev) =>
             docActions.dispatch({
               type: 'update',
               id: node.id,
-              patch: { width: RECT_CLICK_SIZE, height: RECT_CLICK_SIZE }
-            })
-          }
-          // 最外层批次在此结算:整个「画一个矩形」= 一步撤销
-          docActions.endBatch()
-          // 工具常驻(PS 式):画完不弹回移动,连画不用反复选;退出靠 V / Esc / 工具钮
-        },
-        'crosshair'
-      )
+              patch: rectFromDrag(start, toDesign(ev), {
+                isSquare: ev.shiftKey,
+                isFromCenter: ev.altKey
+              })
+            }),
+          () => {
+            try {
+              const fresh = getDocState().nodes.find((n) => n.id === node.id)
+              if (fresh && fresh.width === 1 && fresh.height === 1) {
+                docActions.dispatch({
+                  type: 'update',
+                  id: node.id,
+                  patch: { width: RECT_CLICK_SIZE, height: RECT_CLICK_SIZE }
+                })
+              }
+            } finally {
+              // 最外层批次在此结算:整个「画一个矩形」= 一步撤销
+              docActions.endBatch()
+            }
+            // 工具常驻(PS 式):画完不弹回移动,连画不用反复选;退出靠 V / Esc / 工具钮
+          },
+          'crosshair'
+        )
+      } catch (err) {
+        docActions.endBatch()
+        throw err
+      }
       return
     }
     const hit = hitTopmost(getDocState().nodes, start)

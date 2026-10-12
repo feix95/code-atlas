@@ -531,6 +531,34 @@ check('撤销联动选中:撤销「添加」selectedId 归 null;撤销「删除�
   doc.select(null)
 })
 
+check('批次异常路径:begin 后中途抛异常、finally 里 end,计数归零入账恢复', () => {
+  const doc = docActions
+  // 模拟手势中途炸掉:begin → dispatch → 抛异常 → catch/finally 里 endBatch
+  doc.beginBatch()
+  try {
+    doc.dispatch({ type: 'update', id: 'rect-0', patch: { x: 1 } })
+    throw new Error('gesture exploded')
+  } catch {
+    doc.endBatch()
+  }
+  // 批次必须归零:之后的单次 dispatch 立即入账,undo/redo 不再被挂起批次卡住
+  const r = createRect(getDocState().nodes, { x: 0, y: 0, width: 10, height: 10 })
+  doc.dispatch({ type: 'add', node: r })
+  doc.undo()
+  assert.equal(
+    getDocState().nodes.some((n) => n.id === r.id),
+    false,
+    '异常批次结清后 undo 可用'
+  )
+  doc.redo()
+  assert.equal(
+    getDocState().nodes.some((n) => n.id === r.id),
+    true,
+    'redo 同样恢复'
+  )
+  doc.dispatch({ type: 'remove', id: r.id })
+})
+
 check('cloneRect:序号取现有最大 + 1,偏移落位,源对象不动', () => {
   const a = {
     ...createRect([], { x: 10, y: 20, width: 30, height: 40 }),

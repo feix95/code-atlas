@@ -423,3 +423,4 @@
 - feat(ui): 新增实验性 UI 工作台单例页签(画布/标尺/画板预设)
 - feat(workbench): 工作台撤销/重做——Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y,拖动手势一笔一步
 - feat(workbench): 工作台复制/粘贴/剪切/原地复制与方向键微调
+- fix(workbench): 撤销批次在异常路径上必须结算
