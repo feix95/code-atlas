@@ -2,9 +2,9 @@
    左侧栏占用全局侧栏 */
 :root {
   --uwb-inspector-w: 15rem; /* 属性面板宽(Figma 右侧栏默认 240px) */
-  --uwb-toolbar-h: var(--u); /* 浮动工具栏高(一条 chrome 基准) */
+  --uwb-toolbar-h: calc(var(--u) * 1.6); /* 浮动工具栏高(64px @16px 根字号) */
   --uwb-toolbar-gap: var(--space-4); /* 工具栏离画布底边的距离 */
-  --uwb-grip-w: 1.375rem; /* 抓手格位展开宽(22px),拖拽换算由组件从计算样式回读 */
+  --uwb-grip-w: 2.25rem; /* 抓手格位展开宽(36px),拖拽换算由组件从计算样式回读 */
   --uwb-ruler-size: 1.25rem; /* 标尺厚度 */
   /* 底板比面板深一档,白画板从底上浮出来 */
   --uwb-backdrop: #e6e6e6;
@@ -126,10 +126,10 @@
   height: var(--uwb-toolbar-h);
   display: flex;
   align-items: center;
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2);
   background: var(--chrome-surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 2px solid var(--line);
+  border-radius: calc(var(--u) * 0.5);
   box-shadow: var(--shadow-pop);
 }
 
@@ -139,18 +139,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.875rem;
-  height: 1.875rem;
+  width: 3rem;
+  height: 3rem;
   color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* 相邻工具钮的间距走 margin 而非栏级 gap:宽 0 的收起格位才不会白吃一道缝 */
 .uwb-tool + .uwb-tool {
-  margin-left: 0.125rem;
+  margin-left: var(--space-1);
 }
 
 .uwb-tool:hover {
@@ -189,21 +189,23 @@
 }
 
 /* 隐形触发条:收起态时格位没有可悬面积,靠这条贴在端部的热区引启动画;
-   向外探 --uwb-grip-w,正好也是格位撑开后的覆盖区 */
+   内探 space-5 盖住栏端部(含最后工具钮边缘),外探只给 space-2 一点提前量——
+   探太远会让指针在看不见的空白上拿到抓手光标,误以为热区失控;
+   展开后的格位是实体元素,自己就能接 hover,不靠触发条外探 */
 .uwb-grip-zone {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: calc(var(--uwb-grip-w) + var(--space-3));
+  width: calc(var(--space-5) + var(--space-2));
   cursor: grab;
 }
 
 .uwb-grip-zone.is-left {
-  left: calc(var(--uwb-grip-w) * -1);
+  left: calc(var(--space-2) * -1);
 }
 
 .uwb-grip-zone.is-right {
-  right: calc(var(--uwb-grip-w) * -1);
+  right: calc(var(--space-2) * -1);
 }
 
 /* 展开状态由组件点亮:is-grip-*(悬停晕区内)与 is-dragging-*(对应侧拖动中);
@@ -232,7 +234,7 @@
   align-items: center;
   justify-content: center;
   width: var(--uwb-grip-w);
-  height: 1.5rem;
+  height: var(--u);
   padding: 0;
   border: 0;
   background: transparent;

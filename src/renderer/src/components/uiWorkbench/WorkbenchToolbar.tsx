@@ -1,6 +1,6 @@
 // 底部浮动工具栏:最小积木工具。当前只有 移动(V) 与 矩形(R),登记在 TOOLS 一处。
 // 图标为 lucide-static v0.469.0 原始路径数据(24×24 网格): select=mouse-pointer-2,
-// rect=rectangle-horizontal;strokeWidth 1.8 使 20px 渲染下视觉描边恰为 1.5px。
+// rect=rectangle-horizontal;strokeWidth 1.8 使 32px 渲染下视觉描边恰为 2.4px。
 // 悬浮可拖:栏是弹性一体件,两端各一个栏内「格位」平时宽 0 收起,悬到端部时
 // 格位撑开、六点抓手淡入,栏本体随之变长(底色/描边/圆角/阴影同出一身);
 // 左端展开用负 margin 让栏向左长,工具不动;格位/触发条按下即拖,位置写 localStorage 重启沿用。
@@ -51,8 +51,8 @@ function ToolIcon({ tool }: { tool: CanvasTool }): React.JSX.Element {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="20"
-      height="20"
+      width="32"
+      height="32"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -68,7 +68,7 @@ function ToolIcon({ tool }: { tool: CanvasTool }): React.JSX.Element {
 /** 六点抓手:lucide grip-vertical 的 2×3 点位,实心小圆点 */
 function GripDots(): React.JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="20" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="24" height="32" fill="currentColor" aria-hidden="true">
       {[9, 15].map((cx) =>
         [5, 12, 19].map((cy) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2" />)
       )}
@@ -148,20 +148,25 @@ export function WorkbenchToolbar({
   })
 
   /* 格位展开判定:触发条/格位 pointerenter 点亮;点亮后每次指针移动用 bar 的实时
-     包围盒 + 外扩晕区复查,出了晕区才熄灭。展开会让 bar 位移,判定框跟着它走,
-     不会像纯 CSS :hover 那样「触发区搬走→悬停丢失→收起→又触发」死循环 */
+     包围盒 + 外扩晕区复查,命中栏内元素或在晕区内就续命,否则才熄灭。展开会让
+     bar 位移,判定框跟着它走,不会纯 CSS :hover 那样「触发区搬走→丢失→再触发」
+     死循环;触发条外探刻意收窄到晕区带(±28)以内,悬停死环由命中目标兜底 */
   useEffect(() => {
     if (!grip) return
     const bar = barRef.current
     const win = bar?.ownerDocument.defaultView
     if (!bar || !win) return
     const move = (e: PointerEvent): void => {
+      // 触发条比晕区带更外(外探 --uwb-grip-w > 28px):命中栏内元素(触发条/格位/
+      // 工具钮)即续命,不然慢速接近停在晕区带外的死环里,灯亮一下就被熄掉
+      const overBar = e.target instanceof win.Element && bar.contains(e.target)
       const r = bar.getBoundingClientRect()
       const inside =
-        e.clientX >= r.left - 28 &&
-        e.clientX <= r.right + 28 &&
-        e.clientY >= r.top - 2 &&
-        e.clientY <= r.bottom + 2
+        overBar ||
+        (e.clientX >= r.left - 28 &&
+          e.clientX <= r.right + 28 &&
+          e.clientY >= r.top - 2 &&
+          e.clientY <= r.bottom + 2)
       if (!inside) setGrip(null)
     }
     win.addEventListener('pointermove', move)

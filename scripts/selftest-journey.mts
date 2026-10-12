@@ -767,7 +767,7 @@ try {
       rightGap: barR.right - svgs[svgs.length - 1].getBoundingClientRect().right
     }
   })
-  assert.ok(Math.abs(collapsed.h - 40) <= 0.5, 'toolbar height must be 40px (var(--u))')
+  assert.ok(Math.abs(collapsed.h - 64) <= 0.5, 'toolbar height must be 64px (var(--u) * 1.6)')
   assert.ok(
     Math.abs(collapsed.leftGap - collapsed.rightGap) <= 0.5,
     'collapsed toolbar end padding must be symmetric'
@@ -796,7 +796,26 @@ try {
   await page.waitForTimeout(260)
   const rightGap = await gripGap('is-right')
   assert.ok(Math.abs(leftGap - rightGap) <= 0.5, 'expanded grip inset must be symmetric left/right')
+  // 出界熄灭回归:触发条只外探 8px,晕区带 28px——挪到 +33(两者之外)必须收起
+  barBox = (await bar.boundingBox())!
+  await page.mouse.move(barBox.x + barBox.width + 33, barBox.y + barBox.height / 2)
+  await page.waitForTimeout(260)
+  assert.equal(
+    await page.evaluate(() =>
+      document.querySelector('.uwb-toolbar')?.classList.contains('is-grip-r')
+    ),
+    false,
+    'pointer beyond grip zone and halo must collapse the grip'
+  )
+  // 拖回触发条重新点亮,再按住拖动
+  barBox = (await bar.boundingBox())!
+  await page.mouse.move(barBox.x + barBox.width + 4, barBox.y + barBox.height / 2)
+  await page.waitForFunction(() =>
+    document.querySelector('.uwb-toolbar')?.classList.contains('is-grip-r')
+  )
+  await page.waitForTimeout(220)
   // 拖动存档格式不变;关签重开,位置按存档原地恢复不漂移
+  barBox = (await bar.boundingBox())!
   await page.mouse.down()
   await page.mouse.move(barBox.x + barBox.width + 56, barBox.y + barBox.height / 2 + 30, {
     steps: 4

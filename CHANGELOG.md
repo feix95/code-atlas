@@ -427,3 +427,4 @@
 - revert(main): 恢复默认应用菜单,待真机验证 Ctrl+Z 是否需要摘除
 - fix(workbench): 工具栏焦点环残留;style(workbench): 工具栏紧凑化与抓手重做
 - fix(workbench): 小键盘方向键(Numpad2/4/6/8)同样微调选中节点
+- style(workbench): 工具栏缩至 64px 高,抓手触发条收窄、晕区死环修复
