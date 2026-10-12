@@ -9,6 +9,7 @@ import {
   findArtboardOption,
   matchArtboardOption
 } from '../../uiWorkbench/artboardOptions'
+import { NumberField } from './NumberField'
 import { OrientationToggle } from './OrientationToggle'
 import { SavePresetForm } from './SavePresetForm'
 
@@ -60,15 +61,19 @@ export function ArtboardPanel({
         <option value={CUSTOM_OPTION}>自定义</option>
       </select>
       <div className="uwb-field-row">
-        <SideInput
+        <NumberField
           inputRef={widthRef}
           label="宽"
+          ariaLabel="画板宽"
           value={board.width}
+          parse={parseArtboardSide}
           onCommit={(width) => onChange({ ...board, width })}
         />
-        <SideInput
+        <NumberField
           label="高"
+          ariaLabel="画板高"
           value={board.height}
+          parse={parseArtboardSide}
           onCommit={(height) => onChange({ ...board, height })}
         />
       </div>
@@ -83,44 +88,5 @@ export function ArtboardPanel({
         onRemove={onRemovePreset}
       />
     </section>
-  )
-}
-
-function SideInput({
-  label,
-  value,
-  onCommit,
-  inputRef
-}: {
-  label: string
-  value: number
-  onCommit: (value: number) => void
-  inputRef?: React.RefObject<HTMLInputElement | null>
-}): React.JSX.Element {
-  function commit(input: HTMLInputElement): void {
-    const parsed = parseArtboardSide(input.value)
-    input.value = String(parsed ?? value)
-    if (parsed !== null && parsed !== value) onCommit(parsed)
-  }
-  return (
-    <label className="uwb-field">
-      <span className="uwb-field-label">{label}</span>
-      {/* key 跟随数值:外部改尺寸(选预设)时输入框重挂,草稿随之刷新 */}
-      <input
-        key={value}
-        ref={inputRef}
-        className="cfg-input uwb-input"
-        inputMode="numeric"
-        defaultValue={value}
-        aria-label={`画板${label}`}
-        spellCheck={false}
-        onBlur={(e) => commit(e.currentTarget)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit(e.currentTarget)
-          else if (e.key === 'Escape') e.currentTarget.value = String(value)
-        }}
-      />
-      <span className="uwb-field-unit">px</span>
-    </label>
   )
 }

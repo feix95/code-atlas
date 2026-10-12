@@ -1,6 +1,8 @@
 // UI 工作台画板:尺寸单位为逻辑像素(设计数值,跨平台可精确换算);预设与尺寸边界只在这里登记。
 // 预设命名用描述性名称,不使用他方商标;每种设备只登记一个方向,另一方向由横竖屏切换对调宽高得到。
 
+import { parseIntegerInput } from './numberInput.ts'
+
 export interface ArtboardSize {
   width: number
   height: number
@@ -30,9 +32,7 @@ export const DEFAULT_ARTBOARD: ArtboardSize = { width: 390, height: 844 }
 
 /** 用户输入的单边尺寸 → 合法整数;非数字返回 null(调用方保留原值) */
 export function parseArtboardSide(raw: string): number | null {
-  const value = Number(raw.trim())
-  if (raw.trim() === '' || !Number.isFinite(value)) return null
-  return Math.min(ARTBOARD_SIDE_MAX, Math.max(ARTBOARD_SIDE_MIN, Math.round(value)))
+  return parseIntegerInput(raw, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX)
 }
 
 /** 画板方向:宽大于高为横屏,其余(含正方形)为竖屏 */

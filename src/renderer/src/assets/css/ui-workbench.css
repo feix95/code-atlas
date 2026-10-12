@@ -3,7 +3,6 @@
 :root {
   --uwb-inspector-w: 15rem; /* 属性面板宽(Figma 右侧栏默认 240px) */
   --uwb-toolbar-h: calc(var(--u) * 1.2); /* 浮动工具栏高 */
-  --uwb-toolbar-min-w: 20rem; /* 工具栏空置时的最小宽,放进工具后由内容撑开 */
   --uwb-toolbar-gap: var(--space-4); /* 工具栏离画布底边的距离 */
   --uwb-ruler-size: 1.25rem; /* 标尺厚度 */
   /* 底板比面板深一档,白画板从底上浮出来 */
@@ -20,16 +19,17 @@
   --uwb-backdrop: #1a1a1a;
 }
 
+/* 不设 overflow:hidden:悬浮工具栏要能滑出工作台左缘、压住全局侧栏(rail 除外);
+   画布内容由 .uwb-viewport 自己裁,属性面板由它自己的 overflow:auto 管 */
 .ui-workbench {
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
-  overflow: hidden;
   background: var(--canvas-tint);
 }
 
-/* 画布舞台:浮动工具栏的定位锚,工具栏只浮在画布上,不压属性面板 */
+/* 画布舞台:浮动工具栏的定位锚,工具栏可浮到整个工作区(侧栏/画布/属性面板)上 */
 .uwb-stage {
   position: relative;
   flex: 1;
@@ -122,15 +122,211 @@
   bottom: var(--uwb-toolbar-gap);
   transform: translateX(-50%);
   z-index: var(--z-float);
-  min-width: var(--uwb-toolbar-min-w);
   height: var(--uwb-toolbar-h);
   display: flex;
   align-items: center;
+  gap: var(--space-1);
   padding: 0 var(--space-3);
   background: var(--chrome-surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-pop);
+}
+
+/* 工具钮三态对照 HTML 样张(tmp/ui-workbench-tool-icons.html):
+   静止透明 → 悬停微亮 → 选中功能蓝 16% 底 + 55% 描边 + 微阴影;描边常驻透明防止态切换时跳动 */
+.uwb-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.uwb-tool:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.uwb-tool[aria-pressed='true'] {
+  color: var(--sash-hi);
+  background: color-mix(in srgb, var(--sash-hi) 16%, transparent);
+  border-color: color-mix(in srgb, var(--sash-hi) 55%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 选中态悬停仍给反馈:蓝底加深一档 */
+.uwb-tool[aria-pressed='true']:hover {
+  background: color-mix(in srgb, var(--sash-hi) 26%, transparent);
+}
+
+.uwb-tool:focus-visible {
+  outline: 1.5px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+/* 抓手格位:栏内的弹性槽位,宽 0 收起 → 悬停撑到 1.5rem,栏本体随之变长;
+   栏是唯一容器(底色/描边/圆角/阴影同出一身),格位不占视觉层、永不遮工具 */
+.uwb-grip-slot {
+  flex: none;
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 隐形触发条:收起态时格位没有可悬面积,靠这条贴在端部的热区引启动画;
+   向外探 1.5rem,正好也是格位撑开后的覆盖区 */
+.uwb-grip-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(1.5rem + var(--space-3));
+  cursor: grab;
+}
+
+.uwb-grip-zone.is-left {
+  left: -1.5rem;
+}
+
+.uwb-grip-zone.is-right {
+  right: -1.5rem;
+}
+
+/* 展开状态由组件点亮:is-grip-*(悬停晕区内)与 is-dragging-*(对应侧拖动中);
+   左端负 margin 让栏向左长(工具不动)。不用 CSS :hover 驱动——触发区随栏位移,
+   纯 hover 会「搬走→丢失→收回→再触发」震荡,判定见 WorkbenchToolbar */
+.uwb-toolbar {
+  transition: margin 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.uwb-toolbar.is-grip-l,
+.uwb-toolbar.is-dragging-l {
+  margin-left: -1.5rem;
+}
+
+.uwb-toolbar.is-grip-l .uwb-grip-slot.is-left,
+.uwb-toolbar.is-dragging-l .uwb-grip-slot.is-left,
+.uwb-toolbar.is-grip-r .uwb-grip-slot.is-right,
+.uwb-toolbar.is-dragging-r .uwb-grip-slot.is-right {
+  width: 1.5rem;
+}
+
+/* 六点抓手:格位里的图标,格位收起时裁掉不可见,撑开后淡入 */
+.uwb-grip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted-2);
+  opacity: 0;
+  cursor: grab;
+  transition:
+    opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.uwb-toolbar:is(.is-grip-l, .is-grip-r, .is-dragging) .uwb-grip {
+  color: var(--text);
+  opacity: 1;
+}
+
+.uwb-grip:focus-visible {
+  outline: 1.5px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+.uwb-toolbar.is-dragging .uwb-grip-slot,
+.uwb-toolbar.is-dragging .uwb-grip-zone,
+.uwb-toolbar.is-dragging .uwb-grip {
+  cursor: grabbing;
+}
+
+/* 选中覆盖层:示意线条与手柄一律功能蓝,不进设计数值;本体不拦指针,仅手柄热区可点 */
+.uwb-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.uwb-sel {
+  fill: none;
+  stroke: var(--sash-hi);
+  stroke-width: 1.5px;
+}
+
+.uwb-radius-handle,
+.uwb-knob,
+.uwb-corner-handle {
+  fill: var(--chrome-surface);
+  stroke: var(--sash-hi);
+  stroke-width: 1.5px;
+}
+
+.uwb-corner-handle {
+  pointer-events: all;
+}
+
+.uwb-radius-handle {
+  pointer-events: all;
+}
+
+.uwb-radius-handle:hover {
+  fill: var(--sash-hi);
+}
+
+.uwb-knob-stem {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+  opacity: 0;
+}
+
+.uwb-knob {
+  opacity: 0;
+}
+
+.uwb-knob-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: grab;
+}
+
+.uwb-knob-zone:hover .uwb-knob,
+.uwb-knob-zone:hover .uwb-knob-stem,
+.uwb-overlay.is-knob-live .uwb-knob,
+.uwb-overlay.is-knob-live .uwb-knob-stem {
+  opacity: 1;
+}
+
+.uwb-viewport.is-tool-rect {
+  cursor: crosshair;
+}
+
+/* 矩形工具下按住空格平移时抓手优先(后于 is-tool-rect 生效) */
+.uwb-viewport.is-tool-rect.is-pan-ready {
+  cursor: grab;
+}
+
+.uwb-viewport.is-tool-rect.is-pan-panning {
+  cursor: grabbing;
+}
+
+.uwb-export {
+  margin-right: auto;
 }
 
 .uwb-inspector {

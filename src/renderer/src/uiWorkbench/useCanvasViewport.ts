@@ -28,6 +28,8 @@ export interface CanvasViewportApi {
   /** 画板尺寸变更后重新适配窗口 */
   refit: (board: ArtboardSize) => void
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
+  /** 鼠标是否停在画布上:快捷键(缩放/工具/删除)只在此为真时归画布处理 */
+  isHoveredRef: React.RefObject<boolean>
 }
 
 export function useCanvasViewport(board: ArtboardSize): CanvasViewportApi {
@@ -61,7 +63,8 @@ export function useCanvasViewport(board: ArtboardSize): CanvasViewportApi {
     viewSize,
     panMode: pan.panMode,
     refit,
-    onPointerDown: pan.onPointerDown
+    onPointerDown: pan.onPointerDown,
+    isHoveredRef
   }
 }
 

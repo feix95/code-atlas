@@ -33,6 +33,29 @@ import {
   buildArtboardOptionGroups,
   matchArtboardOption
 } from '../src/renderer/src/uiWorkbench/artboardOptions.ts'
+import {
+  angleDeg,
+  cornerLocal,
+  hitTopmost,
+  radiusFromLocal,
+  rectFromDrag,
+  resizeRect,
+  snapValue,
+  toLocal,
+  toWorld
+} from '../src/shared/uiWorkbench/geometry.ts'
+import {
+  applyNodeAction,
+  applyRectPatch,
+  createRect,
+  normalizeRotation,
+  uniformRadius,
+  withCornerRadius,
+  type RectNode
+} from '../src/shared/uiWorkbench/node.ts'
+import { hexToSrgb, toDtcgTokens } from '../src/shared/uiWorkbench/export/tokensDtcg.ts'
+import { artboardCss, toHtml } from '../src/shared/uiWorkbench/export/cssAdapter.ts'
+import { toSvg } from '../src/shared/uiWorkbench/export/svgAdapter.ts'
 
 function check(name: string, fn: () => void): void {
   fn()
@@ -196,6 +219,187 @@ check('尺寸下拉:横竖屏切换后仍回选原预设,精确匹配优先', ()
   assert.equal(matchArtboardOption(groups, { width: 1024, height: 768 })?.value, 'builtin:tablet')
   assert.equal(matchArtboardOption(groups, { width: 400, height: 900 })?.savedId, 's1')
   assert.equal(matchArtboardOption(groups, { width: 900, height: 400 })?.savedId, 's1')
+})
+
+check('拖框:普通矩形、Shift 正方形、Alt 从中心、结果取整', () => {
+  assert.deepEqual(
+    rectFromDrag({ x: 10, y: 10 }, { x: 50, y: 40 }, { isSquare: false, isFromCenter: false }),
+    { x: 10, y: 10, width: 40, height: 30 }
+  )
+  assert.deepEqual(
+    rectFromDrag({ x: 10, y: 10 }, { x: 50, y: 40 }, { isSquare: true, isFromCenter: false }),
+    { x: 10, y: 10, width: 40, height: 40 }
+  )
+  assert.deepEqual(
+    rectFromDrag({ x: 50, y: 50 }, { x: 60, y: 40 }, { isSquare: false, isFromCenter: true }),
+    { x: 40, y: 40, width: 20, height: 20 }
+  )
+  const tiny = rectFromDrag(
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { isSquare: false, isFromCenter: false }
+  )
+  assert.equal(tiny.width, 1)
+})
+
+check('旋转矩形坐标换算:世界↔本地往返、命中测试吃旋转', () => {
+  const node: RectNode = {
+    id: 'rect-1',
+    type: 'rect',
+    name: 'r',
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 50,
+    rotation: 90,
+    radii: [0, 0, 0, 0],
+    fill: '#d9d9d9'
+  }
+  const p = { x: 60, y: 20 }
+  const roundTrip = toWorld(node, toLocal(node, p))
+  assert.ok(Math.abs(roundTrip.x - p.x) < 1e-9 && Math.abs(roundTrip.y - p.y) < 1e-9)
+  // 旋转 90° 后,原矩形上方远处(50,-20)落在命中区内,左下方(-50,25)在外
+  assert.ok(hitTopmost([node], { x: 50, y: -20 }) === node)
+  assert.ok(hitTopmost([node], { x: -50, y: 25 }) === null)
+  assert.ok(Math.abs(angleDeg({ x: 0, y: 0 }, { x: 0, y: 10 }) - 90) < 1e-9)
+})
+
+check('角缩放:对角色点当锚点,旋转矩形的锚点世界坐标不动', () => {
+  const box = { x: 100, y: 100, width: 40, height: 20, rotation: 0 }
+  assert.deepEqual(resizeRect(box, 2, { x: 60, y: 30 }), {
+    x: 100,
+    y: 100,
+    width: 60,
+    height: 30,
+    rotation: 0
+  })
+  // 拖左上角到本地 (10,5):右下角 (140,120) 锚定不动,框缩到 (110,105) 起
+  assert.deepEqual(resizeRect(box, 0, { x: 10, y: 5 }), {
+    x: 110,
+    y: 105,
+    width: 30,
+    height: 15,
+    rotation: 0
+  })
+  // Shift 等比:取宽/高各自的缩放倍率中较大的那个,按原始宽高比统一缩放(2:1)
+  assert.deepEqual(resizeRect(box, 2, { x: 60, y: 50 }, true), {
+    x: 100,
+    y: 100,
+    width: 100,
+    height: 50,
+    rotation: 0
+  })
+  // 旋转矩形:锚点(左上角)世界坐标不变
+  const rot = { x: 0, y: 0, width: 100, height: 50, rotation: 90 }
+  const before = toWorld(rot, cornerLocal(rot, 0))
+  const resized = resizeRect(rot, 2, { x: 120, y: 70 })
+  const after = toWorld(resized, cornerLocal(resized, 0))
+  assert.ok(Math.abs(before.x - after.x) <= 1 && Math.abs(before.y - after.y) <= 1)
+  assert.equal(resized.width, 120)
+  assert.equal(resized.height, 70)
+})
+
+check('圆角手势:投影换算钳到短边一半,节点落地规则收口', () => {
+  const box = { x: 0, y: 0, width: 100, height: 40, rotation: 0 }
+  // 左上角向内拖:沿对角线投影即半径
+  assert.equal(radiusFromLocal(box, 0, { x: 20, y: 20 }), 20)
+  assert.equal(radiusFromLocal(box, 0, { x: 200, y: 200 }), 20) // 上限 = 短边一半
+  assert.equal(radiusFromLocal(box, 2, { x: 60, y: 0 }), 20)
+  const node = createRect([], { x: 0, y: 0, width: 100, height: 40 })
+  assert.equal(node.id, 'rect-1')
+  assert.equal(node.name, '矩形 1')
+  // Shift 吸附:半径取到最近的 4 的倍数
+  assert.equal(snapValue(14, 4), 16)
+  assert.equal(snapValue(13, 4), 12)
+  assert.equal(snapValue(2, 4), 4)
+  assert.equal(snapValue(0, 4), 0)
+  const patched = applyRectPatch(node, {
+    width: 30,
+    radii: withCornerRadius(node.radii, 'all', 30)
+  })
+  assert.deepEqual([...patched.radii], [15, 15, 15, 15])
+  assert.equal(uniformRadius(patched.radii), 15)
+  assert.equal(normalizeRotation(-30), 330)
+})
+
+check('节点命令:add/update/remove,删除后序号不复用', () => {
+  const a = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  let nodes = applyNodeAction([a], {
+    type: 'add',
+    node: createRect([a], { x: 5, y: 5, width: 10, height: 10 })
+  })
+  assert.equal(nodes.length, 2)
+  nodes = applyNodeAction(nodes, { type: 'update', id: 'rect-1', patch: { rotation: 450 } })
+  assert.equal(nodes[0].rotation, 90)
+  nodes = applyNodeAction(nodes, { type: 'remove', id: 'rect-1' })
+  assert.equal(createRect(nodes, { x: 0, y: 0, width: 1, height: 1 }).id, 'rect-3')
+})
+
+check('tokens.json(DTCG):画板与节点数值、结构信息进 $extensions', () => {
+  const node = createRect([], { x: 10, y: 20, width: 100, height: 40 })
+  const doc = {
+    artboard: { width: 390, height: 844 },
+    nodes: [{ ...node, rotation: 45, radii: [8, 8, 0, 0] }]
+  }
+  interface TokenEntry {
+    $type?: string
+    $value?: unknown
+    $extensions?: Record<string, { order: number }>
+    [key: string]: unknown
+  }
+  const tokens = toDtcgTokens(doc) as { artboard: TokenEntry; nodes: Record<string, TokenEntry> }
+  assert.deepEqual(tokens.artboard.width, {
+    $type: 'dimension',
+    $value: { value: 390, unit: 'px' }
+  })
+  const r1 = tokens.nodes['rect-1']
+  const entry = (k: string): TokenEntry => r1[k] as TokenEntry
+  assert.deepEqual(entry('x').$value, { value: 10, unit: 'px' })
+  assert.equal(entry('rotation').$type, 'number')
+  assert.equal(entry('rotation').$value, 45)
+  const radius = r1.radius as Record<string, TokenEntry>
+  assert.deepEqual(radius['bottom-right'].$value, { value: 0, unit: 'px' })
+  const fill = entry('fill').$value as { colorSpace: string; hex: string }
+  assert.equal(fill.colorSpace, 'srgb')
+  assert.equal(fill.hex, '#d9d9d9')
+  assert.equal(r1.$extensions?.['app.codeatlas.ui-workbench'].order, 0)
+  assert.deepEqual(hexToSrgb('#ff0000'), [1, 0, 0])
+})
+
+check('CSS 适配器:四角同值写单值,分设写四值,旋转写 transform', () => {
+  const a = {
+    ...createRect([], { x: 0, y: 0, width: 10, height: 10 }),
+    radii: [8, 8, 8, 8]
+  } as RectNode
+  const b = {
+    ...createRect([a], { x: 0, y: 0, width: 10, height: 10 }),
+    radii: [1, 2, 3, 4],
+    rotation: 30
+  } as RectNode
+  const css = artboardCss({ artboard: { width: 100, height: 100 }, nodes: [a, b] })
+  assert.ok(css.includes('border-radius: 8px;'))
+  assert.ok(css.includes('border-radius: 1px 2px 3px 4px;'))
+  assert.ok(css.includes('transform: rotate(30deg);'))
+  assert.ok(
+    toHtml({ artboard: { width: 390, height: 844 }, nodes: [a] }).includes('<div class="rect-1">')
+  )
+})
+
+check('SVG 适配器:四角同值用 rect rx,分设用路径,旋转带圆心', () => {
+  const a = {
+    ...createRect([], { x: 0, y: 0, width: 10, height: 10 }),
+    radii: [4, 4, 4, 4]
+  } as RectNode
+  const b = {
+    ...createRect([a], { x: 5, y: 5, width: 20, height: 10 }),
+    radii: [1, 2, 3, 4],
+    rotation: 90
+  } as RectNode
+  const svg = toSvg({ artboard: { width: 390, height: 844 }, nodes: [a, b] })
+  assert.ok(svg.includes('<rect id="rect-1"') && svg.includes('rx="4"'))
+  assert.ok(svg.includes('<path id="rect-2"'))
+  assert.ok(svg.includes('rotate(90 15 10)'))
+  assert.ok(svg.startsWith('<svg') && svg.includes('viewBox="0 0 390 844"'))
 })
 
 console.log('UI 工作台纯逻辑自测全部通过')
