@@ -424,3 +424,4 @@
 - feat(workbench): 工作台撤销/重做——Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y,拖动手势一笔一步
 - feat(workbench): 工作台复制/粘贴/剪切/原地复制与方向键微调
 - fix(workbench): 撤销批次在异常路径上必须结算
+- revert(main): 恢复默认应用菜单,待真机验证 Ctrl+Z 是否需要摘除
