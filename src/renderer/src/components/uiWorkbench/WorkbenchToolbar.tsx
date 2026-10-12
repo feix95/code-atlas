@@ -1,6 +1,6 @@
 // 底部浮动工具栏:最小积木工具。当前只有 移动(V) 与 矩形(R),登记在 TOOLS 一处。
 // 图标为 lucide-static v0.469.0 原始路径数据(24×24 网格): select=mouse-pointer-2,
-// rect=rectangle-horizontal;strokeWidth 2.25 使 16px 渲染下视觉描边恰为 1.5px。
+// rect=rectangle-horizontal;strokeWidth 1.8 使 20px 渲染下视觉描边恰为 1.5px。
 // 悬浮可拖:栏是弹性一体件,两端各一个栏内「格位」平时宽 0 收起,悬到端部时
 // 格位撑开、六点抓手淡入,栏本体随之变长(底色/描边/圆角/阴影同出一身);
 // 左端展开用负 margin 让栏向左长,工具不动;格位/触发条按下即拖,位置写 localStorage 重启沿用。
@@ -51,11 +51,11 @@ function ToolIcon({ tool }: { tool: CanvasTool }): React.JSX.Element {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="16"
-      height="16"
+      width="20"
+      height="20"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.25"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -68,7 +68,7 @@ function ToolIcon({ tool }: { tool: CanvasTool }): React.JSX.Element {
 /** 六点抓手:lucide grip-vertical 的 2×3 点位,实心小圆点 */
 function GripDots(): React.JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" width="12" height="18" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="14" height="20" fill="currentColor" aria-hidden="true">
       {[9, 15].map((cx) =>
         [5, 12, 19].map((cy) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2" />)
       )}
@@ -76,13 +76,16 @@ function GripDots(): React.JSX.Element {
   )
 }
 
-/** 收起态尺寸:展开格位那 1.5rem 不记入比例换算,免得悬停展开本身挪走基准 */
+/** 收起态尺寸:展开格位的宽度(--uwb-grip-w,计算样式里可能是 rem/px)不记入
+    比例换算,免得悬停展开本身挪走基准;读不到就回落到 rem 直算 */
 function collapsedSize(bar: HTMLElement): { w: number; h: number } {
   const doc = bar.ownerDocument
   const win = doc.defaultView
   const rem = win ? parseFloat(win.getComputedStyle(doc.documentElement).fontSize) || 16 : 16
+  const raw = win ? win.getComputedStyle(bar).getPropertyValue('--uwb-grip-w').trim() : ''
+  const gripW = raw.endsWith('rem') ? parseFloat(raw) * rem : parseFloat(raw) || 1.375 * rem
   const expanded = /is-(?:grip|dragging)-[lr]/.test(bar.className)
-  return { w: bar.offsetWidth - (expanded ? 1.5 * rem : 0), h: bar.offsetHeight }
+  return { w: bar.offsetWidth - (expanded ? gripW : 0), h: bar.offsetHeight }
 }
 
 /** 工具栏可及范围 = 整个工作区:左缘 = rail 右缘(可压侧栏,压不到 rail),其余三缘 = .app-body */
@@ -281,6 +284,8 @@ export function WorkbenchToolbar({
           aria-label={`${t.label}工具(${t.hotkey})`}
           aria-pressed={tool === t.tool}
           data-tip={`${t.label} (${t.hotkey})`}
+          // 鼠标按下不抢焦点:不然点过的按钮挂着焦点,之后按快捷键会补出 focus-visible 蓝环
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(t.tool)}
         >
           <ToolIcon tool={t.tool} />

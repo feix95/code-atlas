@@ -425,3 +425,4 @@
 - feat(workbench): 工作台复制/粘贴/剪切/原地复制与方向键微调
 - fix(workbench): 撤销批次在异常路径上必须结算
 - revert(main): 恢复默认应用菜单,待真机验证 Ctrl+Z 是否需要摘除
+- fix(workbench): 工具栏焦点环残留;style(workbench): 工具栏紧凑化与抓手重做

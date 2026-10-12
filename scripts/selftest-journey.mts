@@ -732,6 +732,82 @@ try {
   // 克隆体还选着,点画布空处取消选中,属性面板回到画板
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
   await page.getByRole('region', { name: '画板', exact: true }).waitFor()
+  // 工具栏焦点环回归:鼠标点过的钮不挂焦点,之后按快捷键不得补出 focus-visible 蓝环
+  const rectTool = page.getByRole('button', { name: '矩形工具(R)', exact: true })
+  await rectTool.click()
+  await canvasVp.hover()
+  await page.keyboard.press('v')
+  assert.equal(
+    await rectTool.evaluate((el) => el.matches(':focus-visible')),
+    false,
+    'clicked tool button must not keep a focus-visible ring'
+  )
+  // 工具栏量体:收起态两端留白对称、栏高 40px;左右格位展开后抓手缩进对称
+  const bar = page.locator('.uwb-toolbar')
+  const collapsed = await page.evaluate(() => {
+    const el = document.querySelector('.uwb-toolbar')
+    if (!el) throw new Error('toolbar missing')
+    const svgs = [...el.querySelectorAll('.uwb-tool svg')]
+    const barR = el.getBoundingClientRect()
+    return {
+      h: barR.height,
+      leftGap: svgs[0].getBoundingClientRect().left - barR.left,
+      rightGap: barR.right - svgs[svgs.length - 1].getBoundingClientRect().right
+    }
+  })
+  assert.ok(Math.abs(collapsed.h - 40) <= 0.5, 'toolbar height must be 40px (var(--u))')
+  assert.ok(
+    Math.abs(collapsed.leftGap - collapsed.rightGap) <= 0.5,
+    'collapsed toolbar end padding must be symmetric'
+  )
+  const gripGap = async (side: 'is-left' | 'is-right'): Promise<number> =>
+    page.evaluate((s) => {
+      const el = document.querySelector('.uwb-toolbar')
+      const svg = el?.querySelector(`.uwb-grip-slot.${s} svg`)
+      if (!el || !svg) throw new Error('grip svg missing')
+      const barR = el.getBoundingClientRect()
+      const svgR = svg.getBoundingClientRect()
+      return s === 'is-left' ? svgR.left - barR.left : barR.right - svgR.right
+    }, side)
+  let barBox = (await bar.boundingBox())!
+  await page.mouse.move(barBox.x - 6, barBox.y + barBox.height / 2)
+  await page.waitForFunction(() =>
+    document.querySelector('.uwb-toolbar')?.classList.contains('is-grip-l')
+  )
+  await page.waitForTimeout(260)
+  const leftGap = await gripGap('is-left')
+  barBox = (await bar.boundingBox())!
+  await page.mouse.move(barBox.x + barBox.width + 6, barBox.y + barBox.height / 2)
+  await page.waitForFunction(() =>
+    document.querySelector('.uwb-toolbar')?.classList.contains('is-grip-r')
+  )
+  await page.waitForTimeout(260)
+  const rightGap = await gripGap('is-right')
+  assert.ok(Math.abs(leftGap - rightGap) <= 0.5, 'expanded grip inset must be symmetric left/right')
+  // 拖动存档格式不变;关签重开,位置按存档原地恢复不漂移
+  await page.mouse.down()
+  await page.mouse.move(barBox.x + barBox.width + 56, barBox.y + barBox.height / 2 + 30, {
+    steps: 4
+  })
+  await page.mouse.up()
+  const savedPos = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('uwb-toolbar-pos') ?? 'null')
+  )
+  assert.ok(
+    Number.isFinite(savedPos?.fx) && Number.isFinite(savedPos?.fy),
+    'uwb-toolbar-pos must stay in {fx,fy} frac format'
+  )
+  await page.mouse.move(vpBox.x + 200, vpBox.y + 100)
+  const draggedBox = (await bar.boundingBox())!
+  await page.getByRole('button', { name: '关闭 UI 工作台', exact: true }).click()
+  await page.locator('.ui-workbench').waitFor({ state: 'detached' })
+  await uiWorkbenchBtn.click()
+  await page.getByRole('region', { name: 'UI 工作台', exact: true }).waitFor()
+  const restoredBox = (await page.locator('.uwb-toolbar').boundingBox())!
+  assert.ok(
+    Math.abs(restoredBox.x - draggedBox.x) <= 0.5 && Math.abs(restoredBox.y - draggedBox.y) <= 0.5,
+    'toolbar must restore archived position after reopen'
+  )
   await page.getByRole('button', { name: '关闭 UI 工作台', exact: true }).click()
   await page.locator('.ui-workbench').waitFor({ state: 'detached' })
   await overview()
