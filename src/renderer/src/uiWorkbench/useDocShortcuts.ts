@@ -1,6 +1,7 @@
 // 文档级快捷键:Ctrl+Z 撤销 / Ctrl+Shift+Z、Ctrl+Y 重做(macOS Cmd 同理,键位认 e.code 不认 e.key);
 // Ctrl+C 复制 / Ctrl+V 粘贴(逐级 +10 偏移)/ Ctrl+X 剪切 / Ctrl+D 原地复制;
-// 方向键微调选中节点 1px,Shift+方向键 10px,按住连发整笔只记一步撤销。
+// 方向键微调选中节点 1px,Shift+方向键 10px,按住连发整笔只记一步撤销;
+// 小键盘方向键(Numpad2/4/6/8)与主键区方向键同效。
 // 与 useToolKeys 的分工:那边是画布悬停才生效的单键(V/R/Delete);这里是文档快捷键——
 // 不要求鼠标在画布上(面板改完数值鼠标还停在面板,Ctrl+Z 照样要灵),
 // 但焦点在输入框/可编辑区时不接管,保住输入框的原生编辑键;
@@ -17,11 +18,17 @@ let clipboard: { node: RectNode; pastes: number } | null = null
 const NUDGE_STEP = 1
 const NUDGE_STEP_SHIFT = 10
 const PASTE_OFFSET = 10
+// 方向认 e.code 不认 e.key:小键盘方向键码恒为 Numpad*(不吃 NumLock,
+// key 才会随 NumLock 变成数字),画布上数字键本就无功能,统一按方向处理
 const ARROW_DELTA: Record<string, { x: number; y: number }> = {
   ArrowLeft: { x: -1, y: 0 },
   ArrowUp: { x: 0, y: -1 },
   ArrowRight: { x: 1, y: 0 },
-  ArrowDown: { x: 0, y: 1 }
+  ArrowDown: { x: 0, y: 1 },
+  Numpad4: { x: -1, y: 0 },
+  Numpad8: { x: 0, y: -1 },
+  Numpad6: { x: 1, y: 0 },
+  Numpad2: { x: 0, y: 1 }
 }
 
 export function useDocShortcuts(viewport: CanvasViewportApi): void {

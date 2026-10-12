@@ -729,6 +729,18 @@ try {
     (x) => document.querySelector<HTMLInputElement>('input[aria-label="X"]')?.value === String(x),
     xBefore
   )
+  // 小键盘方向键(e.code 恒为 Numpad*)与主键区同效;按完撤掉不留尾巴
+  await page.keyboard.press('Numpad6')
+  assert.equal(
+    Number(await xField.inputValue()),
+    xBefore + 1,
+    'numpad arrow must nudge selected rect'
+  )
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction(
+    (x) => document.querySelector<HTMLInputElement>('input[aria-label="X"]')?.value === String(x),
+    xBefore
+  )
   // 克隆体还选着,点画布空处取消选中,属性面板回到画板
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
   await page.getByRole('region', { name: '画板', exact: true }).waitFor()
