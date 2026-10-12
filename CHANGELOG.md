@@ -421,3 +421,4 @@
 - fix(ui): 页签只读锁解锁后锁焊死
 - feat(ui): 预览三开关收编全局偏好(codePrefs)
 - feat(ui): 新增实验性 UI 工作台单例页签(画布/标尺/画板预设)
+- feat(workbench): 工作台撤销/重做——Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y,拖动手势一笔一步

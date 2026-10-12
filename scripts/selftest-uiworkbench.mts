@@ -56,6 +56,17 @@ import {
 import { hexToSrgb, toDtcgTokens } from '../src/shared/uiWorkbench/export/tokensDtcg.ts'
 import { artboardCss, toHtml } from '../src/shared/uiWorkbench/export/cssAdapter.ts'
 import { toSvg } from '../src/shared/uiWorkbench/export/svgAdapter.ts'
+import {
+  emptyHistory,
+  HISTORY_LIMIT,
+  pushHistory,
+  redoHistory,
+  sameNodes,
+  undoHistory,
+  type DocHistory,
+  type Snapshot
+} from '../src/shared/uiWorkbench/history.ts'
+import { docActions, getDocState } from '../src/renderer/src/uiWorkbench/documentStore.ts'
 
 function check(name: string, fn: () => void): void {
   fn()
@@ -400,6 +411,123 @@ check('SVG 适配器:四角同值用 rect rx,分设用路径,旋转带圆心', (
   assert.ok(svg.includes('<path id="rect-2"'))
   assert.ok(svg.includes('rotate(90 15 10)'))
   assert.ok(svg.startsWith('<svg') && svg.includes('viewBox="0 0 390 844"'))
+})
+
+// ── 撤销/重做历史(history.ts + documentStore) ──
+
+check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的', () => {
+  const snap = (x: number): Snapshot => ({
+    nodes: [{ ...createRect([], { x, y: 0, width: 10, height: 10 }), x } as RectNode],
+    selectedId: null
+  })
+  const first = snap(0)
+  let h: DocHistory = pushHistory(emptyHistory(), first)
+  for (let i = 1; i <= HISTORY_LIMIT + 20; i++) h = pushHistory(h, snap(i))
+  assert.equal(h.past.length, HISTORY_LIMIT)
+  assert.notEqual(h.past[0], first, '最早一张应已被挤出')
+})
+
+check('undo 后 redo 回原状态;undo 后新 push 清空 future;空栈返回 null', () => {
+  const s0: Snapshot = { nodes: [], selectedId: null }
+  const n1 = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  const s1: Snapshot = { nodes: [n1], selectedId: n1.id }
+  let h = pushHistory(emptyHistory(), s0)
+  const u = undoHistory(h, s1)
+  assert.ok(u)
+  assert.equal(u.restore.nodes.length, 0)
+  h = u.history
+  const r = redoHistory(h, s0)
+  assert.ok(r)
+  assert.deepEqual(r.restore.nodes, s1.nodes)
+  // undo 之后产生新动作:redo 分支作废
+  h = pushHistory(u.history, s0)
+  assert.equal(h.future.length, 0)
+  assert.equal(redoHistory(h, s0), null)
+  assert.equal(undoHistory(emptyHistory(), s0), null)
+})
+
+check('sameNodes:值同则同,radii 差一角、长度不同都算异', () => {
+  const a = createRect([], { x: 1, y: 2, width: 30, height: 40 })
+  const copy = { ...a, radii: [...a.radii] } as RectNode
+  assert.ok(sameNodes([a], [copy]))
+  assert.ok(!sameNodes([a], [{ ...a, radii: [9, 0, 0, 0] } as RectNode]))
+  assert.ok(!sameNodes([a], [a, a]))
+})
+
+check('批次语义:手势多帧只记一步;改回原值零入账;嵌套批次最外层结算', () => {
+  const doc = docActions
+  // 此时文档为空、历史为空(用例顺序保证);先立一个基准节点
+  const base = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  doc.dispatch({ type: 'add', node: base })
+  assert.equal(getDocState().canUndo, true)
+  doc.undo()
+  assert.equal(getDocState().nodes.length, 0)
+  assert.equal(getDocState().canUndo, false)
+  doc.redo()
+  assert.equal(getDocState().nodes.length, 1)
+
+  // begin → 多次 update → end:只多一步
+  doc.beginBatch()
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 10 } })
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 20, y: 30 } })
+  doc.endBatch()
+  doc.undo()
+  assert.equal(getDocState().nodes[0].x, 0)
+  doc.redo()
+  assert.equal(getDocState().nodes[0].x, 20)
+
+  // begin → 改出去又改回来 → end:零入账
+  doc.beginBatch()
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 55 } })
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 20 } })
+  doc.endBatch()
+  assert.equal(getDocState().canRedo, false)
+
+  // 嵌套:内层 end 不结算,外层 end 才入账
+  doc.beginBatch()
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 99 } })
+  doc.beginBatch()
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 88 } })
+  doc.endBatch()
+  doc.undo() // 批次未结算,undo 应为 no-op
+  assert.equal(getDocState().nodes[0].x, 88)
+  doc.endBatch()
+  doc.undo()
+  assert.equal(getDocState().nodes[0].x, 20)
+
+  // 批次外的单次 dispatch:一次一步
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 7 } })
+  doc.dispatch({ type: 'update', id: base.id, patch: { x: 8 } })
+  doc.undo()
+  assert.equal(getDocState().nodes[0].x, 7)
+  doc.undo()
+  assert.equal(getDocState().nodes[0].x, 20)
+})
+
+check('撤销联动选中:撤销「添加」selectedId 归 null;撤销「删除」节点回来且重新选中', () => {
+  const doc = docActions
+  const rect = createRect(getDocState().nodes, { x: 0, y: 0, width: 10, height: 10 })
+  doc.dispatch({ type: 'add', node: rect })
+  doc.select(rect.id)
+  doc.undo()
+  assert.equal(
+    getDocState().nodes.some((n) => n.id === rect.id),
+    false
+  )
+  assert.equal(getDocState().selectedId, null)
+  doc.redo()
+  doc.select(rect.id)
+  doc.dispatch({ type: 'remove', id: rect.id })
+  assert.equal(getDocState().selectedId, null)
+  doc.undo()
+  assert.equal(
+    getDocState().nodes.some((n) => n.id === rect.id),
+    true
+  )
+  assert.equal(getDocState().selectedId, rect.id)
+  // 善后:撤掉这张测试矩形,不留账给后面的用例
+  doc.dispatch({ type: 'remove', id: rect.id })
+  doc.select(null)
 })
 
 console.log('UI 工作台纯逻辑自测全部通过')

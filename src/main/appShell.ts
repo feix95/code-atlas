@@ -145,6 +145,11 @@ export function createWindow(): void {
   let normalBox: WindowBox | null = savedBox
   let stateSaveTimer: NodeJS.Timeout | null = null
 
+  // 关掉默认应用菜单:它的 Edit 角色带着系统加速键(Ctrl+Z/X/C/V/Y 等),
+  // 按键会先被菜单角色截走,渲染进程的 keydown 收不到——工作台的撤销/剪贴板
+  // 快捷键全在自己手里跑,菜单栏本就 autoHideMenuBar 隐身,索性摘干净
+  Menu.setApplicationMenu(null)
+
   const mainWindow = new BrowserWindow({
     width: placedBox?.width ?? 1200,
     height: placedBox?.height ?? 800,

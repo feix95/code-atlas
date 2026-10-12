@@ -45,8 +45,12 @@ export function NumberField({
         spellCheck={false}
         onBlur={(e) => commit(e.currentTarget)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit(e.currentTarget)
-          else if (e.key === 'Escape') e.currentTarget.value = String(value ?? '')
+          // 回车提交后交出焦点:焦点留在框内时 Ctrl+Z 是输入框的文字撤销,
+          // 交出去才能让工作台的文档撤销接管(Figma 同款交互)
+          if (e.key === 'Enter') {
+            commit(e.currentTarget)
+            e.currentTarget.blur()
+          } else if (e.key === 'Escape') e.currentTarget.value = String(value ?? '')
         }}
       />
       <span className="uwb-field-unit">{unit}</span>

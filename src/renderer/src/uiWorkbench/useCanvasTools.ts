@@ -28,6 +28,7 @@ import {
 import { docActions, getDocState, selectedNode } from './documentStore'
 import { cornerResizeCursor } from './cursors'
 import { isEditableTarget } from './isEditableTarget'
+import { useDocShortcuts } from './useDocShortcuts'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 export type CanvasTool = 'select' | 'rect'
@@ -69,6 +70,8 @@ function trackPointer(
   const root = win.document.documentElement
   const prevCursor = root.style.cursor
   if (dragCursor) root.style.cursor = dragCursor
+  // 撤销批次:整笔手势(每帧 dispatch)松手时只记一步,嵌套在更外层批次里自动被吸收
+  docActions.beginBatch()
   let last: DragEventLike | null = null
   const move = (e: PointerEvent): void => {
     last = e
@@ -95,6 +98,7 @@ function trackPointer(
     win.removeEventListener('blur', end)
     if (dragCursor) root.style.cursor = prevCursor
     onEnd()
+    docActions.endBatch()
   }
   target.setPointerCapture(down.pointerId)
   win.addEventListener('pointermove', move)
@@ -129,6 +133,10 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
     e.preventDefault()
     const start = toDesign(e)
     if (toolRef.current === 'rect') {
+      // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算
+      if (!e.currentTarget.ownerDocument.defaultView) return
+      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手补默认尺寸,外层批次包住三段
+      docActions.beginBatch()
       const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 })
       docActions.dispatch({ type: 'add', node })
       docActions.select(node.id)
@@ -152,6 +160,8 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
               patch: { width: RECT_CLICK_SIZE, height: RECT_CLICK_SIZE }
             })
           }
+          // 最外层批次在此结算:整个「画一个矩形」= 一步撤销
+          docActions.endBatch()
           // 工具常驻(PS 式):画完不弹回移动,连画不用反复选;退出靠 V / Esc / 工具钮
         },
         'crosshair'
@@ -255,6 +265,7 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
   }
 
   useToolKeys(viewport, setTool)
+  useDocShortcuts(viewport)
 
   return {
     tool,
