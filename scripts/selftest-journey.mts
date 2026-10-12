@@ -697,6 +697,40 @@ try {
   await page.locator('.uwb-sel').waitFor()
   await page.keyboard.press('Control+y')
   await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  // 复制/粘贴/微调:找回矩形 → Ctrl+C 连贴两次出两个逐级偏移的克隆;方向键挪一格可整笔撤销
+  await page.keyboard.press('Control+z')
+  await page.locator('.uwb-sel').waitFor()
+  await page.keyboard.press('Control+c')
+  await page.keyboard.press('Control+v')
+  await page.keyboard.press('Control+v')
+  const pastedCount = await page.evaluate(
+    () =>
+      (
+        document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null
+      )?.contentDocument?.querySelectorAll('[class^="rect-"]').length ?? 0
+  )
+  assert.equal(pastedCount, 3, 'Ctrl+V twice must paste two cloned rects')
+  const xField = page.getByRole('textbox', { name: 'X', exact: true })
+  const xBefore = Number(await xField.inputValue())
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
+  assert.equal(Number(await xField.inputValue()), xBefore + 2, 'arrows nudge 1px each')
+  await page.keyboard.press('Shift+ArrowRight')
+  assert.equal(Number(await xField.inputValue()), xBefore + 12, 'Shift+arrow nudges 10px')
+  // 三次点按 = 三笔账:逐次撤销验证每次按键都是独立一步
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction(
+    (x) => document.querySelector<HTMLInputElement>('input[aria-label="X"]')?.value === String(x),
+    xBefore + 2
+  )
+  await page.keyboard.press('Control+z')
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction(
+    (x) => document.querySelector<HTMLInputElement>('input[aria-label="X"]')?.value === String(x),
+    xBefore
+  )
+  // 克隆体还选着,点画布空处取消选中,属性面板回到画板
+  await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
   await page.getByRole('region', { name: '画板', exact: true }).waitFor()
   await page.getByRole('button', { name: '关闭 UI 工作台', exact: true }).click()
   await page.locator('.ui-workbench').waitFor({ state: 'detached' })

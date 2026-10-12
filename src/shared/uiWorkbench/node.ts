@@ -111,6 +111,27 @@ export function createRect(
   )
 }
 
+/** 克隆矩形:序号规则同 createRect(现有最大 + 1),位置按 offset 平移,源对象不动 */
+export function cloneRect(
+  source: RectNode,
+  nodes: readonly RectNode[],
+  offset: { x: number; y: number }
+): RectNode {
+  const used = nodes.map((n) => Number(/^rect-(\d+)$/.exec(n.id)?.[1] ?? 0))
+  const seq = Math.max(0, ...used) + 1
+  return applyRectPatch(
+    {
+      ...source,
+      id: `rect-${seq}`,
+      name: `矩形 ${seq}`,
+      x: source.x + offset.x,
+      y: source.y + offset.y,
+      radii: [...source.radii] as CornerRadii
+    },
+    {}
+  )
+}
+
 /** 四角同值时返回该值,否则 null(属性面板显示「混合」) */
 export function uniformRadius(radii: CornerRadii): number | null {
   return radii.every((r) => r === radii[0]) ? radii[0] : null

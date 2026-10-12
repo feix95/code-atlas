@@ -47,6 +47,7 @@ import {
 import {
   applyNodeAction,
   applyRectPatch,
+  cloneRect,
   createRect,
   normalizeRotation,
   uniformRadius,
@@ -528,6 +529,29 @@ check('撤销联动选中:撤销「添加」selectedId 归 null;撤销「删除�
   // 善后:撤掉这张测试矩形,不留账给后面的用例
   doc.dispatch({ type: 'remove', id: rect.id })
   doc.select(null)
+})
+
+check('cloneRect:序号取现有最大 + 1,偏移落位,源对象不动', () => {
+  const a = {
+    ...createRect([], { x: 10, y: 20, width: 30, height: 40 }),
+    radii: [4, 4, 4, 4]
+  } as RectNode
+  const b = createRect([a], { x: 0, y: 0, width: 10, height: 10 })
+  // 序号断层(rect-1、rect-5):新号取 max+1,不撞已有 id
+  const gapped = { ...b, id: 'rect-5', name: '矩形 5' } as RectNode
+  const nodes = [a, gapped]
+  const clone = cloneRect(a, nodes, { x: 10, y: 10 })
+  assert.equal(clone.id, 'rect-6')
+  assert.equal(clone.name, '矩形 6')
+  assert.equal(clone.x, a.x + 10)
+  assert.equal(clone.y, a.y + 10)
+  assert.deepEqual(clone.radii, a.radii)
+  assert.ok(clone.radii !== a.radii, 'radii 是独立拷贝')
+  assert.equal(
+    nodes.some((n) => n.id === clone.id),
+    false
+  )
+  assert.equal(a.x, 10, '源节点不被修改')
 })
 
 console.log('UI 工作台纯逻辑自测全部通过')
