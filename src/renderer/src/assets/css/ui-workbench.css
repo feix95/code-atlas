@@ -292,13 +292,15 @@
 
 .uwb-radius-handle,
 .uwb-knob,
-.uwb-corner-handle {
+.uwb-corner-handle,
+.uwb-edge-handle {
   fill: var(--chrome-surface);
   stroke: var(--sash-hi);
   stroke-width: 1.5px;
 }
 
-.uwb-corner-handle {
+.uwb-corner-handle,
+.uwb-edge-handle {
   pointer-events: all;
 }
 
@@ -337,6 +339,28 @@
 .uwb-guide {
   stroke: var(--sash-hi);
   stroke-width: 1px;
+}
+
+/* 框选选框:功能蓝虚线 + 浅蓝底(Figma 同款视觉语言),手势示意不进设计数值 */
+.uwb-marquee {
+  fill: color-mix(in srgb, var(--sash-hi) 12%, transparent);
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+
+/* 多选态属性面板:数量卡 + 一句可用操作提示 */
+.uwb-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.uwb-multi-hint {
+  color: var(--muted-2);
+  font-size: 0.75rem;
 }
 
 .uwb-viewport.is-tool-rect {

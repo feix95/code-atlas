@@ -94,9 +94,13 @@ export function snapMove(
   }
 }
 
-/** 节点列表 → 吸附目标盒列表(排除自身),调用方再拼上画板盒 */
-export function snapTargets(nodes: readonly RectNode[], excludeId: string): SnapBox[] {
+/** 节点列表 → 吸附目标盒列表(排除被拖者:单选给单个 id,整组移动给 id 数组),调用方再拼上画板盒 */
+export function snapTargets(
+  nodes: readonly RectNode[],
+  excludeIds: string | readonly string[]
+): SnapBox[] {
+  const skip = new Set(typeof excludeIds === 'string' ? [excludeIds] : excludeIds)
   return nodes
-    .filter((n) => n.id !== excludeId)
+    .filter((n) => !skip.has(n.id))
     .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
 }

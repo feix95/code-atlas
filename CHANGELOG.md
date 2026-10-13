@@ -436,3 +436,7 @@
 - fix(workbench): 取色器 Esc 取消挂死批次吞掉撤销,色板/下拉焦点不再变 Ctrl+Z 死键
 - style(workbench): 矩形工具图标改方形,选中态减负,六点居中,宽高框去 px 后缀
 - feat(workbench): 移动拖动对齐吸附——边/中线互吸+引导线(Figma 式),Shift 轴锁,Ctrl 临时禁吸
+- feat(workbench): 空白拖框选多选(相交判定),Shift 加减选,整组移动/删除/复制/微调,Ctrl+A 全选
+- feat(workbench): 矩形画完自动回弹选择工具(Figma 式)
+- feat(workbench): 边中点手柄单边缩放,Shift 吸 4 网格,旋转矩形沿边法线
+- fix(workbench): Delete/Backspace 升级文档级键,不再要求指针悬停画布

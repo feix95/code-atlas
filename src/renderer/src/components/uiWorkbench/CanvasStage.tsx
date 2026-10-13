@@ -21,13 +21,13 @@ const ARTBOARD_DOC =
 export function CanvasStage({
   board,
   doc,
-  selected,
+  selectedNodes,
   viewport,
   tools
 }: {
   board: ArtboardSize
   doc: WorkbenchDocument
-  selected: RectNode | null
+  selectedNodes: readonly RectNode[]
   viewport: CanvasViewportApi
   tools: CanvasToolsApi
 }): React.JSX.Element {
@@ -100,7 +100,21 @@ export function CanvasStage({
             )}
           </svg>
         )}
-        {selected && <SelectionOverlay node={selected} view={view} tools={tools} />}
+        {selectedNodes.length > 0 && (
+          <SelectionOverlay nodes={selectedNodes} view={view} tools={tools} />
+        )}
+        {/* 框选手势中的虚线选框:设计单位 → 屏幕坐标,只作手势示意不进设计数值 */}
+        {tools.marquee && (
+          <svg className="uwb-overlay" aria-hidden="true">
+            <rect
+              className="uwb-marquee"
+              x={view.panX + tools.marquee.x * view.zoom}
+              y={view.panY + tools.marquee.y * view.zoom}
+              width={tools.marquee.width * view.zoom}
+              height={tools.marquee.height * view.zoom}
+            />
+          </svg>
+        )}
       </div>
     </div>
   )

@@ -12,6 +12,10 @@ export const CORNERS: readonly CornerIndex[] = [0, 1, 2, 3]
 /** 导出用的角名(DTCG token 名 / 说明文字) */
 export const CORNER_KEYS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const
 
+/** 四边名:边中点手柄(单边缩放)按此序渲染——上右下左,同 CSS 习惯 */
+export const EDGES = ['top', 'right', 'bottom', 'left'] as const
+export type EdgeName = (typeof EDGES)[number]
+
 /** 描边线型:实线 / 虚线;不勾线时整个 stroke 为 null,线型不入档 */
 export type StrokeStyle = 'solid' | 'dashed'
 

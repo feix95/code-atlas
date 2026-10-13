@@ -39,7 +39,9 @@ import {
   hitTopmost,
   radiusFromLocal,
   rectFromDrag,
+  rectOverlapsBox,
   resizeRect,
+  resizeRectEdge,
   snapValue,
   toLocal,
   toWorld
@@ -313,6 +315,45 @@ check('角缩放:对角色点当锚点,旋转矩形的锚点世界坐标不动',
   assert.equal(resized.height, 70)
 })
 
+check('边缩放:只动被拖那条边,对边钉死;Shift 吸网格', () => {
+  const box = { x: 100, y: 100, width: 40, height: 20, rotation: 0 }
+  // 拖右边中点到本地 x=60:只有宽变,x/y/高原样
+  assert.deepEqual(resizeRectEdge(box, 'right', { x: 60, y: 10 }), {
+    x: 100,
+    y: 100,
+    width: 60,
+    height: 20,
+    rotation: 0
+  })
+  // 拖左边到本地 x=10:右缘 140 钉死,宽缩成 30,x 挪到 110
+  assert.deepEqual(resizeRectEdge(box, 'left', { x: 10, y: 99 }), {
+    x: 110,
+    y: 100,
+    width: 30,
+    height: 20,
+    rotation: 0
+  })
+  // 拖上边到本地 y=5:下缘 120 钉死,高 15,y 挪到 105;指针横向乱晃(99)不影响
+  assert.deepEqual(resizeRectEdge(box, 'top', { x: 99, y: 5 }), {
+    x: 100,
+    y: 105,
+    width: 40,
+    height: 15,
+    rotation: 0
+  })
+  // Shift = 边长吸 4 网格:拖到 63 → 64
+  assert.equal(resizeRectEdge(box, 'right', { x: 63, y: 0 }, 4).width, 64)
+  // 旋转矩形:左边拖动只对宽,左边中点的对边(右边中点)世界坐标不动
+  const rot = { x: 0, y: 0, width: 100, height: 50, rotation: 90 }
+  const anchorBefore = toWorld(rot, { x: rot.width, y: rot.height / 2 })
+  const next = resizeRectEdge(rot, 'left', { x: -20, y: 25 })
+  const anchorAfter = toWorld(next, { x: next.width, y: next.height / 2 })
+  assert.ok(Math.abs(anchorBefore.x - anchorAfter.x) <= 1)
+  assert.ok(Math.abs(anchorBefore.y - anchorAfter.y) <= 1)
+  assert.equal(next.width, 120)
+  assert.equal(next.height, 50)
+})
+
 check('圆角手势:投影换算钳到短边一半,节点落地规则收口', () => {
   const box = { x: 0, y: 0, width: 100, height: 40, rotation: 0 }
   // 左上角向内拖:沿对角线投影即半径
@@ -509,6 +550,33 @@ check('snapTargets:排除自身,只剩其余节点的包围盒', () => {
   const a = createRect([], { x: 0, y: 0, width: 10, height: 10 })
   const b = createRect([a], { x: 50, y: 0, width: 10, height: 10 })
   assert.deepEqual(snapTargets([a, b], a.id), [{ x: 50, y: 0, width: 10, height: 10 }])
+  // 整组移动:传 id 数组,把整组都排除
+  const c = createRect([a, b], { x: 90, y: 0, width: 10, height: 10 })
+  assert.deepEqual(snapTargets([a, b, c], [a.id, b.id]), [{ x: 90, y: 0, width: 10, height: 10 }])
+})
+
+// ── 框选命中(rectOverlapsBox)──
+
+check('框选相交判定:扫到任意部分即中,全包/擦边都算,完全在外不算', () => {
+  const node = { x: 100, y: 100, width: 40, height: 40, rotation: 0 }
+  // 部分相交(只扫到右下角)
+  assert.ok(rectOverlapsBox(node, { x: 0, y: 0, width: 110, height: 110 }))
+  // 全包
+  assert.ok(rectOverlapsBox(node, { x: 0, y: 0, width: 300, height: 300 }))
+  // 擦一条边:框右缘正好压在矩形左缘上
+  assert.ok(rectOverlapsBox(node, { x: 0, y: 0, width: 100, height: 200 }))
+  // 完全在外
+  assert.ok(!rectOverlapsBox(node, { x: 0, y: 0, width: 50, height: 50 }))
+  assert.ok(!rectOverlapsBox(node, { x: 200, y: 100, width: 40, height: 40 }))
+})
+
+check('框选旋转矩形:按真实旋转轮廓判定,不拿声明外接框糊弄', () => {
+  // 100×20 转 90° 绕中心 (60,10):实际占地是 x 50~70、y -40~60 的竖条
+  const node = { x: 10, y: 0, width: 100, height: 20, rotation: 90 }
+  // 框扫到竖条中部(60,50)附近 → 中
+  assert.ok(rectOverlapsBox(node, { x: 55, y: 40, width: 10, height: 10 }))
+  // 框在声明外接框右上角(x 60~100、y -30~-5):未旋转轮廓会误判相交,旋转后实际无占地 → 不中
+  assert.ok(!rectOverlapsBox(node, { x: 75, y: -25, width: 20, height: 15 }))
 })
 
 // ── 撤销/重做历史(history.ts + documentStore) ──
@@ -516,7 +584,7 @@ check('snapTargets:排除自身,只剩其余节点的包围盒', () => {
 check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的', () => {
   const snap = (x: number): Snapshot => ({
     nodes: [{ ...createRect([], { x, y: 0, width: 10, height: 10 }), x } as RectNode],
-    selectedId: null
+    selectedIds: []
   })
   const first = snap(0)
   let h: DocHistory = pushHistory(emptyHistory(), first)
@@ -526,9 +594,9 @@ check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的',
 })
 
 check('undo 后 redo 回原状态;undo 后新 push 清空 future;空栈返回 null', () => {
-  const s0: Snapshot = { nodes: [], selectedId: null }
+  const s0: Snapshot = { nodes: [], selectedIds: [] }
   const n1 = createRect([], { x: 0, y: 0, width: 10, height: 10 })
-  const s1: Snapshot = { nodes: [n1], selectedId: n1.id }
+  const s1: Snapshot = { nodes: [n1], selectedIds: [n1.id] }
   let h = pushHistory(emptyHistory(), s0)
   const u = undoHistory(h, s1)
   assert.ok(u)

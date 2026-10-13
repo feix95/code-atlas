@@ -858,10 +858,13 @@ try {
   await canvasVp.hover()
   await page.keyboard.press('r')
   // 设计坐标系内画:A (60,420) 60×50;B (200,400) 60×50
+  // 画完工具自动回弹选择(Figma 式):画 B 前得再按一次 r
   await page.mouse.move(sx(60), sy(420))
   await page.mouse.down()
   await page.mouse.move(sx(120), sy(470), { steps: 3 })
   await page.mouse.up()
+  await canvasVp.hover()
+  await page.keyboard.press('r')
   await page.mouse.move(sx(200), sy(400))
   await page.mouse.down()
   await page.mouse.move(sx(260), sy(450), { steps: 3 })
@@ -927,7 +930,82 @@ try {
     (x) => document.querySelector<HTMLInputElement>('input[aria-label="X"]')?.value === String(x),
     xBefore
   )
-  // 克隆体还选着,点画布空处取消选中,属性面板回到画板
+  // 框选(Figma 式):空白处拖出虚线选框,扫到即中。A(60,420,60×50) B(58,478,60×50)
+  // 用一个罩住俩的框圈进来;上面三个克隆体在 y≤352,框从 y=410 起拖碰不到
+  const rectTotal = (): Promise<number> =>
+    page.evaluate(
+      () =>
+        (
+          document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement
+        ).contentDocument?.querySelectorAll('[class^="rect-"]').length ?? -1
+    )
+  await canvasVp.hover()
+  await page.mouse.move(sx(40), sy(410))
+  await page.mouse.down()
+  await page.mouse.move(sx(150), sy(540), { steps: 4 })
+  // rect 是零面积几何体,visible 判定不认它——用 attached
+  await page.locator('.uwb-marquee').waitFor({ state: 'attached' })
+  await page.mouse.up()
+  assert.equal(await page.locator('.uwb-sel').count(), 2, 'marquee must select both rects')
+  await page.getByText('已选 2 个对象').waitFor()
+  // Shift+点击已选的 A 中心 → 减选,只剩 B
+  await page.keyboard.down('Shift')
+  await page.mouse.click(sx(90), sy(445))
+  await page.keyboard.up('Shift')
+  assert.equal(await page.locator('.uwb-sel').count(), 1, 'Shift+click must deselect A only')
+  // 再框选俩 → Ctrl+D 整组复制:克隆俩也整体选中;Ctrl+Z 撤回到 A、B 选中
+  await page.mouse.move(sx(40), sy(410))
+  await page.mouse.down()
+  await page.mouse.move(sx(150), sy(540), { steps: 4 })
+  await page.mouse.up()
+  await page.keyboard.press('Control+d')
+  assert.equal(await rectTotal(), 7, 'Ctrl+D must clone both selected rects')
+  assert.equal(await page.locator('.uwb-sel').count(), 2, 'duplicate selects the two clones')
+  await page.keyboard.press('Control+z')
+  assert.equal(await rectTotal(), 5, 'undo drops the two clones')
+  assert.equal(await page.locator('.uwb-sel').count(), 2, 'undo restores the marquee selection')
+  // Delete 整组删:A、B 同时消失,选集清空;且指针停在属性面板上 Delete 也得灵(文档级键)
+  await page.locator('.uwb-inspector').hover()
+  await page.keyboard.press('Delete')
+  assert.equal(await rectTotal(), 3, 'Delete removes all selected rects')
+  assert.equal(await page.locator('.uwb-sel').count(), 0, 'selection empties with the nodes')
+  // 边中点柄(单边缩放,PS 同款):点选残留的克隆体,拖右边中点外扩 30 → 只宽变,对边钉死
+  await page.mouse.click(sx(277), sy(312))
+  await page.locator('.uwb-sel').waitFor()
+  assert.equal(
+    await page.locator('.uwb-edge-handle').count(),
+    4,
+    'single selection shows 4 edge handles'
+  )
+  const xFieldE = page.getByRole('textbox', { name: 'X', exact: true })
+  const wFieldE = page.getByRole('textbox', { name: '宽', exact: true })
+  const hFieldE = page.getByRole('textbox', { name: '高', exact: true })
+  const xEdge0 = Number(await xFieldE.inputValue())
+  const wEdge0 = Number(await wFieldE.inputValue())
+  const hEdge0 = Number(await hFieldE.inputValue())
+  // 克隆体带着旋转角:拖要沿「右边」的法线方向(本地 +x 轴的屏幕投影),否则位移只有 cos 分量
+  const rotDeg = Number(await page.getByRole('textbox', { name: '角度', exact: true }).inputValue())
+  const rad = (rotDeg * Math.PI) / 180
+  const edgeBox = await page.locator('.uwb-edge-handle').nth(1).boundingBox() // 上右下左 → 1=右边
+  if (!edgeBox) throw new Error('right edge handle missing')
+  await page.mouse.move(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(
+    edgeBox.x + edgeBox.width / 2 + 30 * Math.cos(rad),
+    edgeBox.y + edgeBox.height / 2 + 30 * Math.sin(rad),
+    { steps: 3 }
+  )
+  await page.mouse.up()
+  assert.equal(Number(await wFieldE.inputValue()), wEdge0 + 30, 'right edge drag grows width only')
+  // 旋转矩形对边中点投影出半像素,取整路径允许 ±1 晃动(同角缩放断言口径)
+  assert.ok(
+    Math.abs(Number(await xFieldE.inputValue()) - xEdge0) <= 1,
+    'opposite edge stays pinned within rounding wiggle'
+  )
+  assert.equal(Number(await hFieldE.inputValue()), hEdge0, 'height untouched')
+  await page.keyboard.press('Control+z')
+  assert.equal(Number(await wFieldE.inputValue()), wEdge0, 'undo restores width')
+  // 点画布空处本已是空选;属性面板回到画板
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
   await page.getByRole('region', { name: '画板', exact: true }).waitFor()
   // 工具栏焦点环回归:鼠标点过的钮不挂焦点,之后按快捷键不得补出 focus-visible 蓝环

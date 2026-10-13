@@ -3,10 +3,10 @@
 // 手势期间的中间帧不入账:documentStore 的批次(beginBatch/endBatch)负责把一笔手势收成一条。
 import type { RectNode } from './node.ts'
 
-/** 一步撤销需要还原的全部内容:节点列表 + 当时的选中 */
+/** 一步撤销需要还原的全部内容:节点列表 + 当时的多选集 */
 export interface Snapshot {
   nodes: readonly RectNode[]
-  selectedId: string | null
+  selectedIds: readonly string[]
 }
 
 /** 历史上限:内存栈,超过丢最老的 */

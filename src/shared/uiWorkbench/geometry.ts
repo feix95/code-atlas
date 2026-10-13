@@ -1,6 +1,6 @@
 // 设计坐标下的几何纯计算:旋转矩形的坐标换算、命中、拖框、圆角与旋转手势换算。
 // 坐标系:画板左上角为原点,x 向右、y 向下;角度顺时针为正(atan2 在 y 向下坐标系里天然顺时针递增)。
-import { maxCornerRadius, type CornerIndex, type RectNode } from './node.ts'
+import { maxCornerRadius, type CornerIndex, type EdgeName, type RectNode } from './node.ts'
 
 export interface Point {
   x: number
@@ -58,6 +58,40 @@ export function hitRect(r: Shape, p: Point): boolean {
 export function hitTopmost(nodes: readonly RectNode[], p: Point): RectNode | null {
   for (let i = nodes.length - 1; i >= 0; i--) if (hitRect(nodes[i], p)) return nodes[i]
   return null
+}
+
+/** 框选相交判定(SAT 分离轴):选框(轴对齐)扫到矩形任意部分即中,旋转矩形同样适用;
+ *  只比较四对投影轴(选框两根 + 矩形自身两根),任一根上投影不相交即未命中 */
+export function rectOverlapsBox(r: Shape, box: RectBox): boolean {
+  const rad = r.rotation * DEG
+  const axes: Point[] = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: Math.cos(rad), y: Math.sin(rad) },
+    { x: -Math.sin(rad), y: Math.cos(rad) }
+  ]
+  const corners = [0, 1, 2, 3].map((c) => toWorld(r, cornerLocal(r, c as CornerIndex)))
+  const boxCorners: Point[] = [
+    { x: box.x, y: box.y },
+    { x: box.x + box.width, y: box.y },
+    { x: box.x + box.width, y: box.y + box.height },
+    { x: box.x, y: box.y + box.height }
+  ]
+  const project = (axis: Point, pts: Point[]): [number, number] => {
+    let lo = Infinity
+    let hi = -Infinity
+    for (const p of pts) {
+      const d = p.x * axis.x + p.y * axis.y
+      if (d < lo) lo = d
+      if (d > hi) hi = d
+    }
+    return [lo, hi]
+  }
+  return axes.every((axis) => {
+    const [aLo, aHi] = project(axis, corners)
+    const [bLo, bHi] = project(axis, boxCorners)
+    return aLo <= bHi && bLo <= aHi
+  })
 }
 
 /** 拖框:Shift 正方形,Alt 从中心向外;结果取整、边长至少 1 */
@@ -135,6 +169,41 @@ export function resizeRect(
   const off = rotatePoint({ x: anchor.x - width / 2, y: anchor.y - height / 2 }, r.rotation)
   return {
     ...ghost,
+    x: Math.round(fixedWorld.x - off.x - width / 2),
+    y: Math.round(fixedWorld.y - off.y - height / 2)
+  }
+}
+
+/** 边中点拖拽(单边缩放,PS/Figma 变换框同款):只动被拖那条边,对边中点当锚(世界坐标不动),
+ *  旋转矩形沿自身法线量距;拖过对边按镜像尺寸继续(不翻转);snapStep>0 时边长吸网格;
+ *  结果取整、边长至少 1 */
+export function resizeRectEdge(r: Shape, edge: EdgeName, local: Point, snapStep = 0): Shape {
+  const horizontal = edge === 'left' || edge === 'right'
+  // 被拖边到对边的距离 = 新边长;左边/上边以对边为原点反量
+  let size = horizontal
+    ? Math.abs(local.x - (edge === 'left' ? r.width : 0))
+    : Math.abs(local.y - (edge === 'top' ? r.height : 0))
+  if (snapStep > 0) size = snapValue(size, snapStep)
+  const width = horizontal ? Math.max(1, Math.round(size)) : r.width
+  const height = horizontal ? r.height : Math.max(1, Math.round(size))
+  // 对边中点在世界坐标里钉死:新框沿法线方向从锚点反向铺开
+  const anchorLocal: Point = {
+    x: edge === 'right' ? 0 : edge === 'left' ? r.width : r.width / 2,
+    y: edge === 'bottom' ? 0 : edge === 'top' ? r.height : r.height / 2
+  }
+  const anchorGhost: Point = {
+    x: edge === 'right' ? 0 : edge === 'left' ? width : width / 2,
+    y: edge === 'bottom' ? 0 : edge === 'top' ? height : height / 2
+  }
+  const fixedWorld = toWorld(r, anchorLocal)
+  const off = rotatePoint(
+    { x: anchorGhost.x - width / 2, y: anchorGhost.y - height / 2 },
+    r.rotation
+  )
+  return {
+    ...r,
+    width,
+    height,
     x: Math.round(fixedWorld.x - off.x - width / 2),
     y: Math.round(fixedWorld.y - off.y - height / 2)
   }

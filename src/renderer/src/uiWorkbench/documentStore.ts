@@ -22,13 +22,22 @@ import {
 
 export interface WorkbenchDocState {
   nodes: readonly RectNode[]
+  /** 多选集(框选/Shift 加减选):按加入顺序排列 */
+  selectedIds: readonly string[]
+  /** 恰为单选时的节点 id;空选/多选为 null——单对象手势(缩放/圆角/旋转)与面板吃它 */
   selectedId: string | null
   /** 撤销/重做栈状态,供按钮置灰;每次提交时随历史刷新 */
   canUndo: boolean
   canRedo: boolean
 }
 
-let state: WorkbenchDocState = { nodes: [], selectedId: null, canUndo: false, canRedo: false }
+let state: WorkbenchDocState = {
+  nodes: [],
+  selectedIds: [],
+  selectedId: null,
+  canUndo: false,
+  canRedo: false
+}
 let history: DocHistory = emptyHistory()
 // 手势批次:深度计数支持嵌套(如画矩形 = 外层批次包住 trackPointer 的内层批次);
 // 批次起点的基准快照只在最外层结算时入栈
@@ -36,9 +45,11 @@ let batchDepth = 0
 let batchBase: Snapshot | null = null
 const listeners = new Set<() => void>()
 
-function commit(next: Pick<WorkbenchDocState, 'nodes' | 'selectedId'>): void {
+function commit(next: Pick<WorkbenchDocState, 'nodes' | 'selectedIds'>): void {
   state = {
-    ...next,
+    nodes: next.nodes,
+    selectedIds: next.selectedIds,
+    selectedId: next.selectedIds.length === 1 ? next.selectedIds[0] : null,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0
   }
@@ -58,11 +69,14 @@ export function useDocState(): WorkbenchDocState {
   return useSyncExternalStore(subscribe, getDocState)
 }
 
-/** 恢复快照:选中可能指向已不存在的节点(如撤销「选中后删除」),兜底置空 */
+/** 恢复快照:选集里可能有已不存在的节点(如撤销「多选后删除」),按现存活节点过滤 */
 function restore(snap: Snapshot): void {
-  const selectedId =
-    snap.selectedId && snap.nodes.some((n) => n.id === snap.selectedId) ? snap.selectedId : null
-  commit({ nodes: snap.nodes, selectedId })
+  const alive = new Set(snap.nodes.map((n) => n.id))
+  commit({ nodes: snap.nodes, selectedIds: snap.selectedIds.filter((id) => alive.has(id)) })
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i])
 }
 
 export const docActions = {
@@ -71,18 +85,36 @@ export const docActions = {
     const nodes = applyNodeAction(state.nodes, action)
     // 批次内只更新画面不入账;批次外的真改动(no-op 除外)立即记一步
     if (batchDepth === 0 && !sameNodes(nodes, before.nodes)) {
-      history = pushHistory(history, { nodes: before.nodes, selectedId: before.selectedId })
+      history = pushHistory(history, { nodes: before.nodes, selectedIds: before.selectedIds })
     }
-    const removed = action.type === 'remove' && action.id === state.selectedId
-    commit({ nodes, selectedId: removed ? null : state.selectedId })
+    // 被删节点从选集剔除;其余动作不动选集
+    const selectedIds =
+      action.type === 'remove'
+        ? state.selectedIds.filter((id) => id !== action.id)
+        : state.selectedIds
+    commit({ nodes, selectedIds })
   },
+  /** 替换选集:null/[] = 清空(点空白、Esc) */
   select(id: string | null): void {
-    if (id !== state.selectedId) commit({ nodes: state.nodes, selectedId: id })
+    docActions.selectIds(id === null ? [] : [id])
+  },
+  selectIds(ids: readonly string[]): void {
+    if (!sameIds(ids, state.selectedIds)) {
+      commit({ nodes: state.nodes, selectedIds: [...ids] })
+    }
+  },
+  /** Shift+点击:在选集里则剔除,不在则追加(Figma 式加减选) */
+  toggleSelect(id: string): void {
+    docActions.selectIds(
+      state.selectedIds.includes(id)
+        ? state.selectedIds.filter((s) => s !== id)
+        : [...state.selectedIds, id]
+    )
   },
   /** 手势/复合动作开始:期间的 dispatch 只改画面,最外层 endBatch 才记一步 */
   beginBatch(): void {
     batchDepth += 1
-    if (batchDepth === 1) batchBase = { nodes: state.nodes, selectedId: state.selectedId }
+    if (batchDepth === 1) batchBase = { nodes: state.nodes, selectedIds: state.selectedIds }
   },
   endBatch(): void {
     if (batchDepth === 0) return
@@ -94,25 +126,32 @@ export const docActions = {
     if (base && !sameNodes(state.nodes, base.nodes)) {
       history = pushHistory(history, base)
       // 结算时未必有 dispatch 兜底刷新,这里补一次让 canUndo/canRedo 跟上
-      commit({ nodes: state.nodes, selectedId: state.selectedId })
+      commit({ nodes: state.nodes, selectedIds: state.selectedIds })
     }
   },
   undo(): void {
     if (batchDepth > 0) return
-    const r = undoHistory(history, { nodes: state.nodes, selectedId: state.selectedId })
+    const r = undoHistory(history, { nodes: state.nodes, selectedIds: state.selectedIds })
     if (!r) return
     history = r.history
     restore(r.restore)
   },
   redo(): void {
     if (batchDepth > 0) return
-    const r = redoHistory(history, { nodes: state.nodes, selectedId: state.selectedId })
+    const r = redoHistory(history, { nodes: state.nodes, selectedIds: state.selectedIds })
     if (!r) return
     history = r.history
     restore(r.restore)
   }
 }
 
+/** 恰为单选时返回该节点(单对象手势与属性面板专用);多选/空选返回 null */
 export function selectedNode(s: WorkbenchDocState): RectNode | null {
   return s.nodes.find((n) => n.id === s.selectedId) ?? null
+}
+
+/** 选中的全部节点,按文档顺序(覆盖层与整组操作共用) */
+export function selectedNodes(s: WorkbenchDocState): RectNode[] {
+  const ids = new Set(s.selectedIds)
+  return s.nodes.filter((n) => ids.has(n.id))
 }

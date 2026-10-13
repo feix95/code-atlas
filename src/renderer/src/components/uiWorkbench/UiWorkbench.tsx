@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import { artboardPrefsActions, useArtboardPrefs } from '../../uiWorkbench/artboardPrefsStore'
-import { selectedNode, useDocState } from '../../uiWorkbench/documentStore'
+import { selectedNode, selectedNodes, useDocState } from '../../uiWorkbench/documentStore'
 import { useCanvasTools } from '../../uiWorkbench/useCanvasTools'
 import { useCanvasViewport } from '../../uiWorkbench/useCanvasViewport'
 import { ArtboardPanel } from './ArtboardPanel'
@@ -25,6 +25,7 @@ export function UiWorkbench(): React.JSX.Element {
   const tools = useCanvasTools(viewport, board)
   const docState = useDocState()
   const selected = selectedNode(docState)
+  const selectedAll = selectedNodes(docState)
   const doc = useMemo(() => ({ artboard: board, nodes: docState.nodes }), [board, docState.nodes])
 
   function changeBoard(next: ArtboardSize): void {
@@ -38,7 +39,7 @@ export function UiWorkbench(): React.JSX.Element {
         <CanvasStage
           board={board}
           doc={doc}
-          selected={selected}
+          selectedNodes={selectedAll}
           viewport={viewport}
           tools={tools}
         />
@@ -54,6 +55,11 @@ export function UiWorkbench(): React.JSX.Element {
         <div className="uwb-inspector-body">
           {selected ? (
             <RectPanel node={selected} />
+          ) : selectedAll.length > 1 ? (
+            <div className="uwb-multi" role="status">
+              {`已选 ${selectedAll.length} 个对象`}
+              <span className="uwb-multi-hint">可整组移动 / 删除 / 复制粘贴,Esc 取消选择</span>
+            </div>
           ) : (
             <ArtboardPanel
               board={board}

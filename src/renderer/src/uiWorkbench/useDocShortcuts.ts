@@ -1,6 +1,8 @@
 // 文档级快捷键:Ctrl+Z 撤销 / Ctrl+Shift+Z、Ctrl+Y 重做(macOS Cmd 同理,键位认 e.code 不认 e.key);
-// Ctrl+C 复制 / Ctrl+V 粘贴(逐级 +10 偏移)/ Ctrl+X 剪切 / Ctrl+D 原地复制;
+// Ctrl+A 全选 / Ctrl+C 复制 / Ctrl+V 粘贴(逐级 +10 偏移)/ Ctrl+X 剪切 / Ctrl+D 原地复制;
+// 复制粘贴作用于整个选集:多选复制、成组贴回,贴完整体选中;
 // 方向键微调选中节点 1px,Shift+方向键 10px,按住连发整笔只记一步撤销;
+// Delete/Backspace 删除整组选中;
 // 小键盘方向键(Numpad2/4/6/8)与主键区方向键同效。
 // 与 useToolKeys 的分工:那边是画布悬停才生效的单键(V/R/Delete);这里是文档快捷键——
 // 不要求鼠标在画布上(面板改完数值鼠标还停在面板,Ctrl+Z 照样要灵),
@@ -13,7 +15,7 @@ import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 // 工作台内存剪贴板:只活在本模块,不碰系统剪贴板;pastes 计数让连续粘贴逐级错开
-let clipboard: { node: RectNode; pastes: number } | null = null
+let clipboard: { nodes: RectNode[]; pastes: number } | null = null
 
 const NUDGE_STEP = 1
 const NUDGE_STEP_SHIFT = 10
@@ -60,31 +62,51 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
       return true
     }
 
-    const copySelection = (): RectNode | null => {
-      const { nodes, selectedId } = getDocState()
-      const node = nodes.find((n) => n.id === selectedId)
-      if (!node) return null
+    const copySelection = (): RectNode[] => {
+      const { nodes, selectedIds } = getDocState()
+      const picked = nodes.filter((n) => selectedIds.includes(n.id))
+      if (picked.length === 0) return []
       // 深拷贝存剪贴板:之后源节点再被改动,贴出来的还是复制那一刻的样子
-      clipboard = { node: { ...node, radii: [...node.radii] as typeof node.radii }, pastes: 0 }
-      return node
+      clipboard = {
+        nodes: picked.map((n) => ({ ...n, radii: [...n.radii] as typeof n.radii })),
+        pastes: 0
+      }
+      return picked
     }
 
     const onKey = (e: KeyboardEvent): void => {
       // 方向键微调:按住期间的首发 keydown 开批次,keyup 齐了就结算;blur 兜底
       const delta = ARROW_DELTA[e.code]
       if (delta && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (!own(e) || !getDocState().selectedId) return
+        if (!own(e) || getDocState().selectedIds.length === 0) return
         // 集合空就开批:正常是首发 keydown;blur 丢账后飘来的 repeat 也算新的一按
         if (heldArrows.size === 0) docActions.beginBatch()
         heldArrows.add(e.code)
-        const node = getDocState().nodes.find((n) => n.id === getDocState().selectedId)
-        if (node) {
-          const step = e.shiftKey ? NUDGE_STEP_SHIFT : NUDGE_STEP
-          docActions.dispatch({
-            type: 'update',
-            id: node.id,
-            patch: { x: node.x + delta.x * step, y: node.y + delta.y * step }
-          })
+        const step = e.shiftKey ? NUDGE_STEP_SHIFT : NUDGE_STEP
+        // 整组微调:选中几个动几个,同批同位移
+        for (const n of getDocState().nodes) {
+          if (getDocState().selectedIds.includes(n.id)) {
+            docActions.dispatch({
+              type: 'update',
+              id: n.id,
+              patch: { x: n.x + delta.x * step, y: n.y + delta.y * step }
+            })
+          }
+        }
+        e.preventDefault()
+        return
+      }
+      // Delete/Backspace 整组删除:文档级键,不要求指针悬停画布
+      // (悬停门槛只管 V/R 这类换工具键——删除在面板焦点之外随时要灵)
+      if (!(e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
+        if (!own(e)) return
+        const { selectedIds } = getDocState()
+        if (selectedIds.length === 0) return
+        docActions.beginBatch()
+        try {
+          for (const id of selectedIds) docActions.dispatch({ type: 'remove', id })
+        } finally {
+          docActions.endBatch()
         }
         e.preventDefault()
         return
@@ -98,36 +120,65 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
         case 'KeyY':
           docActions.redo()
           break
+        case 'KeyA':
+          docActions.selectIds(getDocState().nodes.map((n) => n.id))
+          break
         case 'KeyC':
-          if (!copySelection()) return
+          if (copySelection().length === 0) return
           break
         case 'KeyV': {
           if (!clipboard) return
           clipboard.pastes += 1
-          const node = cloneRect(clipboard.node, getDocState().nodes, {
-            x: PASTE_OFFSET * clipboard.pastes,
-            y: PASTE_OFFSET * clipboard.pastes
-          })
-          docActions.dispatch({ type: 'add', node })
-          docActions.select(node.id)
+          docActions.beginBatch()
+          try {
+            // 逐个克隆:序号在「含已贴节点」的列表上重算,一次粘贴内 id 不撞车;整组贴完整体选中
+            const offset = {
+              x: PASTE_OFFSET * clipboard.pastes,
+              y: PASTE_OFFSET * clipboard.pastes
+            }
+            const newIds: string[] = []
+            for (const src of clipboard.nodes) {
+              const node = cloneRect(src, getDocState().nodes, offset)
+              docActions.dispatch({ type: 'add', node })
+              newIds.push(node.id)
+            }
+            docActions.selectIds(newIds)
+          } finally {
+            docActions.endBatch()
+          }
           break
         }
         case 'KeyX': {
           const src = copySelection()
-          if (!src) return
-          // 剪切 = 复制 + 删除,合成一步撤销
+          if (src.length === 0) return
+          // 剪切 = 复制 + 全删,合成一步撤销
           docActions.beginBatch()
-          docActions.dispatch({ type: 'remove', id: src.id })
-          docActions.endBatch()
+          try {
+            for (const n of src) docActions.dispatch({ type: 'remove', id: n.id })
+          } finally {
+            docActions.endBatch()
+          }
           break
         }
         case 'KeyD': {
-          const { nodes, selectedId } = getDocState()
-          const src = nodes.find((n) => n.id === selectedId)
-          if (!src) return
-          const node = cloneRect(src, nodes, { x: PASTE_OFFSET, y: PASTE_OFFSET })
-          docActions.dispatch({ type: 'add', node })
-          docActions.select(node.id)
+          const { nodes, selectedIds } = getDocState()
+          const picked = nodes.filter((n) => selectedIds.includes(n.id))
+          if (picked.length === 0) return
+          docActions.beginBatch()
+          try {
+            const newIds: string[] = []
+            for (const src of picked) {
+              const node = cloneRect(src, getDocState().nodes, {
+                x: PASTE_OFFSET,
+                y: PASTE_OFFSET
+              })
+              docActions.dispatch({ type: 'add', node })
+              newIds.push(node.id)
+            }
+            docActions.selectIds(newIds)
+          } finally {
+            docActions.endBatch()
+          }
           break
         }
         default:
