@@ -1,11 +1,13 @@
 // 撤销/重做历史(纯逻辑,无 React / DOM):快照式双栈。
 // past = 可撤销的基准快照,future = 可重做的快照;一步 = 「动作前的状态」压入 past。
 // 手势期间的中间帧不入账:documentStore 的批次(beginBatch/endBatch)负责把一笔手势收成一条。
+import type { LineNode } from './line.ts'
 import type { RectNode } from './node.ts'
+import type { SceneNode } from './scene.ts'
 
 /** 一步撤销需要还原的全部内容:节点列表 + 当时的多选集 */
 export interface Snapshot {
-  nodes: readonly RectNode[]
+  nodes: readonly SceneNode[]
   selectedIds: readonly string[]
 }
 
@@ -60,11 +62,27 @@ function sameStroke(a: RectNode['stroke'], b: RectNode['stroke']): boolean {
   return a.color === b.color && a.width === b.width && a.style === b.style
 }
 
+function sameLine(a: LineNode, b: SceneNode): boolean {
+  return (
+    b.type === 'line' &&
+    a.id === b.id &&
+    a.name === b.name &&
+    a.x1 === b.x1 &&
+    a.y1 === b.y1 &&
+    a.x2 === b.x2 &&
+    a.y2 === b.y2 &&
+    a.cap === b.cap &&
+    sameStroke(a.stroke, b.stroke)
+  )
+}
+
 /** 逐节点逐字段值比较:applyNodeAction 每次都生成新数组新对象,引用比较恒为 false */
-export function sameNodes(a: readonly RectNode[], b: readonly RectNode[]): boolean {
+export function sameNodes(a: readonly SceneNode[], b: readonly SceneNode[]): boolean {
   if (a.length !== b.length) return false
   return a.every((na, i) => {
     const nb = b[i]
+    if (na.type === 'line') return sameLine(na, nb)
+    if (nb.type !== 'rect') return false
     return (
       na.id === nb.id &&
       na.type === nb.type &&
@@ -76,6 +94,7 @@ export function sameNodes(a: readonly RectNode[], b: readonly RectNode[]): boole
       na.rotation === nb.rotation &&
       na.fill === nb.fill &&
       sameStroke(na.stroke, nb.stroke) &&
+      na.styleId === nb.styleId &&
       na.radii.every((r, j) => r === nb.radii[j])
     )
   })

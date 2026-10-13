@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import type { WorkbenchDocument } from '@shared/uiWorkbench/export/types'
-import type { RectNode } from '@shared/uiWorkbench/node'
+import type { SceneNode } from '@shared/uiWorkbench/scene'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
 import type { CanvasViewportApi } from '../../uiWorkbench/useCanvasViewport'
 import { ArtboardNodes } from './ArtboardNodes'
@@ -27,7 +27,7 @@ export function CanvasStage({
 }: {
   board: ArtboardSize
   doc: WorkbenchDocument
-  selectedNodes: readonly RectNode[]
+  selectedNodes: readonly SceneNode[]
   viewport: CanvasViewportApi
   tools: CanvasToolsApi
 }): React.JSX.Element {

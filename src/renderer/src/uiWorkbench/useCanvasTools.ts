@@ -10,11 +10,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   angleDeg,
-  hitTopmost,
   radiusFromLocal,
   rectCenter,
   rectFromDrag,
-  rectOverlapsBox,
   resizeRect,
   resizeRectEdge,
   snapAngle,
@@ -32,14 +30,19 @@ import {
   type CornerIndex,
   type EdgeName
 } from '@shared/uiWorkbench/node'
+import type { LineNode } from '@shared/uiWorkbench/line'
+import { hitTopmost, nodeOverlapsBox, translatePatch, unionBox } from '@shared/uiWorkbench/scene'
 import { snapMove, snapTargets, type SnapGuides } from '@shared/uiWorkbench/snap'
-import { docActions, getDocState, selectedNode } from './documentStore'
+import { docActions, getDocState, selectedLine, selectedRect } from './documentStore'
 import { cornerResizeCursor, edgeResizeCursor } from './cursors'
 import { isEditableTarget } from './isEditableTarget'
+import { startLineDraw, startLineEndpointDrag } from './lineGestures'
+import { getNewRectAppearance } from './newRectDefaultsStore'
+import { releaseEditableFocus, trackPointer } from './trackPointer'
 import { useDocShortcuts } from './useDocShortcuts'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
-export type CanvasTool = 'select' | 'rect'
+export type CanvasTool = 'select' | 'rect' | 'line'
 /** 正在进行的选中手势(覆盖层用来保持旋钮可见) */
 export type GestureKind = 'radius' | 'rotate' | null
 
@@ -47,6 +50,8 @@ export type GestureKind = 'radius' | 'rotate' | null
 const RADIUS_SNAP_STEP = 4
 /** 对齐吸附的命中距离(屏幕像素):除以 zoom 换成设计单位,放得越大吸得越「松」 */
 const SNAP_THRESHOLD_PX = 5
+/** 直线点选容差(屏幕像素):线细,不放宽就点不中;除以 zoom 换成设计单位 */
+const LINE_HIT_TOLERANCE_PX = 6
 
 export interface CanvasToolsApi {
   tool: CanvasTool
@@ -61,87 +66,8 @@ export interface CanvasToolsApi {
   startEdgeDrag: (e: React.PointerEvent, edge: EdgeName) => void
   startRadiusDrag: (e: React.PointerEvent, corner: CornerIndex) => void
   startRotateDrag: (e: React.PointerEvent) => void
+  startEndpointDrag: (e: React.PointerEvent, which: 'start' | 'end') => void
 }
-
-/** 画布手势的 pointerdown 都 preventDefault(防选中文字),浏览器因此不会转移焦点:
- *  之前停在面板输入框/下拉上的焦点会原地留着,isEditableTarget 随即把 Delete、V/R、方向键
- *  和 Ctrl+Z 全挡成死键(症状:重启后能用,碰过面板控件再点画布就失灵)。手势一开始主动释放 */
-function releaseEditableFocus(doc: Document): void {
-  const active = doc.activeElement
-  if (isEditableTarget(active)) (active as HTMLElement).blur()
-}
-
-/** 手势换算只依赖这几样:指针位置 + 修饰键状态(PointerEvent 与合成重放共用) */
-type DragEventLike = Pick<
-  PointerEvent,
-  'clientX' | 'clientY' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'altKey'
->
-
-/** 拖动期间挂 window 级监听:指针飞出元素手势也不断;结束时收掉。
- *  修饰键按下/松开会在最后一次指针位置原地重算——按 Shift 立即吸附、松开落回原值(PS 式);
- *  dragCursor 把手势光标钉在文档根上,指针悬到别处也不跳回默认;
- *  setPointerCapture + blur 兜底:窗口外松手/失焦也能收尾,光标不会被钉死 */
-function trackPointer(
-  down: React.PointerEvent,
-  onMove: (e: DragEventLike) => void,
-  onEnd: () => void,
-  dragCursor?: string
-): void {
-  releaseEditableFocus(down.currentTarget.ownerDocument)
-  const target = down.currentTarget
-  const win = target.ownerDocument.defaultView
-  if (!win) return
-  const root = win.document.documentElement
-  const prevCursor = root.style.cursor
-  if (dragCursor) root.style.cursor = dragCursor
-  let last: DragEventLike | null = null
-  const move = (e: PointerEvent): void => {
-    last = e
-    onMove(e)
-  }
-  const modifier = (e: KeyboardEvent): void => {
-    if (!last || (e.key !== 'Shift' && e.key !== 'Control' && e.key !== 'Alt' && e.key !== 'Meta'))
-      return
-    onMove({
-      clientX: last.clientX,
-      clientY: last.clientY,
-      shiftKey: e.shiftKey,
-      ctrlKey: e.ctrlKey,
-      metaKey: e.metaKey,
-      altKey: e.altKey
-    })
-  }
-  const end = (): void => {
-    win.removeEventListener('pointermove', move)
-    win.removeEventListener('keydown', modifier, true)
-    win.removeEventListener('keyup', modifier, true)
-    win.removeEventListener('pointerup', end)
-    win.removeEventListener('pointercancel', end)
-    win.removeEventListener('blur', end)
-    if (dragCursor) root.style.cursor = prevCursor
-    try {
-      onEnd()
-    } finally {
-      docActions.endBatch()
-    }
-  }
-  // 先捕获再开批:setPointerCapture 一旦抛异常,批次就不会被留下挂起;
-  // 抛出时顺手还原手势光标,不留钉死的 cursor
-  try {
-    target.setPointerCapture(down.pointerId)
-  } catch (err) {
-    if (dragCursor) root.style.cursor = prevCursor
-    throw err
-  }
-  docActions.beginBatch()
-  win.addEventListener('pointermove', move)
-  win.addEventListener('keydown', modifier, true)
-  win.addEventListener('keyup', modifier, true)
-  win.addEventListener('pointerup', end)
-  win.addEventListener('pointercancel', end)
-  win.addEventListener('blur', end)
-}
-
 export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize): CanvasToolsApi {
   const [tool, setTool] = useState<CanvasTool>('select')
   const [activeGesture, setActiveGesture] = useState<GestureKind>(null)
@@ -170,6 +96,10 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     e.preventDefault()
     releaseEditableFocus(e.currentTarget.ownerDocument)
     const start = toDesign(e)
+    if (toolRef.current === 'line') {
+      startLineDraw(e, { toDesign, onDone: fallbackToSelect })
+      return
+    }
     if (toolRef.current === 'rect') {
       // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算
       if (!e.currentTarget.ownerDocument.defaultView) return
@@ -178,7 +108,9 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
       docActions.beginBatch()
       try {
         const prevSelectedIds = getDocState().selectedIds
-        const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 })
+        // 新矩形吃「新矩形默认外观」;起手 1×1 会把圆角钳成 0,所以拖动每帧都重新带上默认圆角
+        const look = getNewRectAppearance()
+        const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 }, look)
         docActions.dispatch({ type: 'add', node })
         docActions.select(node.id)
         trackPointer(
@@ -187,10 +119,14 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
             docActions.dispatch({
               type: 'update',
               id: node.id,
-              patch: rectFromDrag(start, toDesign(ev), {
-                isSquare: ev.shiftKey,
-                isFromCenter: ev.altKey
-              })
+              patch: {
+                ...rectFromDrag(start, toDesign(ev), {
+                  isSquare: ev.shiftKey,
+                  isFromCenter: ev.altKey
+                }),
+                radii: look.radii,
+                styleId: look.styleId
+              }
             }),
           () => {
             try {
@@ -198,7 +134,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
               // 只点没拖(PS 规矩):松手时仍是落点 1×1 = 没有有效拖动,直接回收——
               // 与 add 同批抵消,净零不入账,也不会冒出幽灵矩形;
               // 顺手还回按下前的选集——单击=什么都没发生,连选中态都不动
-              if (fresh && fresh.width === 1 && fresh.height === 1) {
+              if (fresh?.type === 'rect' && fresh.width === 1 && fresh.height === 1) {
                 docActions.dispatch({ type: 'remove', id: node.id })
                 docActions.selectIds(prevSelectedIds)
               }
@@ -217,7 +153,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
       }
       return
     }
-    const hit = hitTopmost(getDocState().nodes, start)
+    const hit = hitTopmost(getDocState().nodes, start, LINE_HIT_TOLERANCE_PX / viewRef.current.zoom)
     if (!hit) {
       // 空白起拖 = 框选(Figma/PS 同款手势,折在选择工具里):扫到谁选谁,命中高亮实时刷;
       // Shift = 并入现有选集;只点没拖 = 单击空白清选(Shift+单击空白不动选集)
@@ -237,7 +173,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
           if (box.width > 0 || box.height > 0) moved = true
           setMarquee(box)
           const hits = getDocState()
-            .nodes.filter((n) => rectOverlapsBox(n, box))
+            .nodes.filter((n) => nodeOverlapsBox(n, box))
             .map((n) => n.id)
           docActions.selectIds([...base, ...hits.filter((id) => !base.includes(id))])
         },
@@ -262,13 +198,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     const movingIds = [...getDocState().selectedIds]
     const collapseOnClick = !e.shiftKey && movingIds.length > 1
     const moving = getDocState().nodes.filter((n) => movingIds.includes(n.id))
-    const origins = new Map(moving.map((n) => [n.id, { x: n.x, y: n.y }]))
-    const union = {
-      x: Math.min(...moving.map((n) => n.x)),
-      y: Math.min(...moving.map((n) => n.y)),
-      width: Math.max(...moving.map((n) => n.x + n.width)) - Math.min(...moving.map((n) => n.x)),
-      height: Math.max(...moving.map((n) => n.y + n.height)) - Math.min(...moving.map((n) => n.y))
-    }
+    const union = unionBox(moving)
     let moved = false
     trackPointer(
       e,
@@ -303,11 +233,12 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
         moved = true
         const ddx = unionX - union.x
         const ddy = unionY - union.y
-        for (const id of movingIds) {
-          const o = origins.get(id)
-          if (o) {
-            docActions.dispatch({ type: 'update', id, patch: { x: o.x + ddx, y: o.y + ddy } })
-          }
+        for (const origin of moving) {
+          docActions.dispatch({
+            type: 'update',
+            id: origin.id,
+            patch: translatePatch(origin, ddx, ddy)
+          })
         }
       },
       () => {
@@ -321,7 +252,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   }
 
   function startResizeDrag(e: React.PointerEvent, corner: CornerIndex): void {
-    const node = selectedNode(getDocState())
+    const node = selectedRect(getDocState())
     if (!node || e.button !== 0) return
     trackPointer(
       e,
@@ -338,7 +269,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
 
   /** 边中点拖拽:只动被拖那条边,对边钉死;Shift 吸 4pt 网格(同圆角柄约定) */
   function startEdgeDrag(e: React.PointerEvent, edge: EdgeName): void {
-    const node = selectedNode(getDocState())
+    const node = selectedRect(getDocState())
     if (!node || e.button !== 0) return
     trackPointer(
       e,
@@ -359,7 +290,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   }
 
   function startRadiusDrag(e: React.PointerEvent, corner: CornerIndex): void {
-    const node = selectedNode(getDocState())
+    const node = selectedRect(getDocState())
     if (!node || e.button !== 0) return
     setActiveGesture('radius')
     const cap = maxCornerRadius(node.width, node.height)
@@ -385,7 +316,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   }
 
   function startRotateDrag(e: React.PointerEvent): void {
-    const node = selectedNode(getDocState())
+    const node = selectedRect(getDocState())
     if (!node || e.button !== 0) return
     const center = rectCenter(node)
     const base = angleDeg(center, toDesign(e))
@@ -408,9 +339,15 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     )
   }
 
-  /** 调整手势松手后:矩形工具自动回落到移动工具(已是移动时幂等) */
+  /** 调整手势松手后:绘制工具(矩形/直线)自动回落到移动工具(已是移动时幂等) */
   function fallbackToSelect(): void {
-    if (toolRef.current === 'rect') setTool('select')
+    if (toolRef.current !== 'select') setTool('select')
+  }
+
+  function startEndpointDrag(e: React.PointerEvent, which: 'start' | 'end'): void {
+    const line: LineNode | null = selectedLine(getDocState())
+    if (!line || e.button !== 0) return
+    startLineEndpointDrag(e, line, which, { toDesign, onDone: fallbackToSelect })
   }
 
   useToolKeys(viewport, setTool)
@@ -426,11 +363,12 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     startResizeDrag,
     startEdgeDrag,
     startRadiusDrag,
-    startRotateDrag
+    startRotateDrag,
+    startEndpointDrag
   }
 }
 
-/** 单键快捷键:鼠标在画布上且焦点不在输入框时生效——Esc 取消选中,V 移动,R 矩形;
+/** 单键快捷键:鼠标在画布上且焦点不在输入框时生效——Esc 取消选中,V 移动,R 矩形,L 直线;
  *  Delete 不在这层:它是文档级操作,归 useDocShortcuts(指针停在面板上也要删得掉) */
 function useToolKeys(viewport: CanvasViewportApi, setTool: (tool: CanvasTool) => void): void {
   const { viewportRef, isHoveredRef } = viewport
@@ -446,6 +384,7 @@ function useToolKeys(viewport: CanvasViewportApi, setTool: (tool: CanvasTool) =>
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.code === 'KeyV') setTool('select')
       else if (e.code === 'KeyR') setTool('rect')
+      else if (e.code === 'KeyL') setTool('line')
       else return
       e.preventDefault()
     }

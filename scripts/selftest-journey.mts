@@ -1005,6 +1005,78 @@ try {
   assert.equal(Number(await hFieldE.inputValue()), hEdge0, 'height untouched')
   await page.keyboard.press('Control+z')
   assert.equal(Number(await wFieldE.inputValue()), wEdge0, 'undo restores width')
+  // ── 外观样式(Figma 式活链接):存方案 → 应用 → 手动改脱钩 → 同名覆盖回写 → 删除保数值 ──
+  const styleSelect = page.getByRole('combobox', { name: '外观样式', exact: true })
+  const styleNameOf = (): Promise<string> =>
+    styleSelect.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? '')
+  // 残留克隆体仍选中:调成特征外观(填充 #22aaee、四角圆角)并存为「主按钮」
+  await fillHex.fill('#22aaee')
+  await fillHex.press('Enter')
+  await cornerField.fill('8')
+  await cornerField.press('Enter')
+  const schemeRadius = await cornerField.inputValue() // 短边可能钳小,以落地值为准
+  const saveStyleBtn = page.getByRole('button', { name: '存为样式', exact: true })
+  const styleNameInput = page.getByRole('textbox', { name: '样式名', exact: true })
+  await saveStyleBtn.click()
+  await styleNameInput.fill('主按钮')
+  await styleNameInput.press('Enter')
+  assert.equal(await styleNameOf(), '主按钮', 'saving links the rect to the named style')
+  // 新画一个矩形(画完回弹选择工具、自动选中)→ 下拉应用方案:外观三件套同步 + 挂链
+  await canvasVp.hover()
+  await page.keyboard.press('r')
+  await page.mouse.move(sx(200), sy(560))
+  await page.mouse.down()
+  await page.mouse.move(sx(240), sy(600), { steps: 3 })
+  await page.mouse.up()
+  await styleSelect.selectOption({ label: '主按钮' })
+  assert.equal(await fillHex.inputValue(), '#22aaee', 'apply style copies fill')
+  assert.equal(await cornerField.inputValue(), schemeRadius, 'apply style copies radii')
+  // 手动改外观 → 静默脱钩:下拉回「无样式」
+  await fillHex.fill('#111111')
+  await fillHex.press('Enter')
+  assert.equal(await styleSelect.inputValue(), '', 'manual appearance edit detaches the link')
+  // 重挂 → 点回源克隆体改填充、同名再存:定义更新,回写到仍挂着的矩形
+  await styleSelect.selectOption({ label: '主按钮' })
+  await page.mouse.click(sx(277), sy(312))
+  await fillHex.fill('#00cc88')
+  await fillHex.press('Enter')
+  await saveStyleBtn.click()
+  await styleNameInput.fill('主按钮')
+  await styleNameInput.press('Enter')
+  await page.mouse.click(sx(220), sy(580))
+  await page.waitForFunction(
+    () =>
+      document.querySelector<HTMLInputElement>('input[aria-label="填充色"]')?.value === '#00cc88'
+  )
+  assert.equal(await styleNameOf(), '主按钮', 'style overwrite propagates to linked nodes')
+  // 删除样式:定义没了,挂着的矩形保留当前数值、链接清空
+  await page.getByRole('button', { name: '删除样式', exact: true }).click()
+  assert.equal(await fillHex.inputValue(), '#00cc88', 'delete style keeps current values')
+  assert.equal(await styleSelect.inputValue(), '', 'delete style clears the link')
+  // Ctrl+Alt+C/V 匿名外观拷贝:以克隆体当前值为准,贴到新矩形
+  await page.mouse.click(sx(277), sy(312))
+  const srcFill = await fillHex.inputValue()
+  const srcRadius = await cornerField.inputValue()
+  await page.keyboard.press('Control+Alt+c')
+  await page.mouse.click(sx(220), sy(580))
+  await page.keyboard.press('Control+Alt+v')
+  assert.equal(await fillHex.inputValue(), srcFill, 'appearance paste copies fill')
+  assert.equal(await cornerField.inputValue(), srcRadius, 'appearance paste copies radii')
+  // 多选整组换装:克隆体另存「副样式」→ Shift 加选新矩形 → 整组应用
+  await page.mouse.click(sx(277), sy(312))
+  await fillHex.fill('#aacc00')
+  await fillHex.press('Enter')
+  await saveStyleBtn.click()
+  await styleNameInput.fill('副样式')
+  await styleNameInput.press('Enter')
+  await page.keyboard.down('Shift')
+  await page.mouse.click(sx(220), sy(580))
+  await page.keyboard.up('Shift')
+  assert.equal(await page.locator('.uwb-sel').count(), 2, 'shift+click builds the pair')
+  await page.getByRole('combobox', { name: '整组应用样式' }).selectOption({ label: '副样式' })
+  await page.mouse.click(sx(220), sy(580))
+  assert.equal(await fillHex.inputValue(), '#aacc00', 'group apply dresses each node')
+  assert.equal(await styleNameOf(), '副样式', 'group apply links each node')
   // 点画布空处本已是空选;属性面板回到画板
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
   await page.getByRole('region', { name: '画板', exact: true }).waitFor()

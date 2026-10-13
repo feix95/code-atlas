@@ -54,12 +54,6 @@ export function hitRect(r: Shape, p: Point): boolean {
   return q.x >= 0 && q.y >= 0 && q.x <= r.width && q.y <= r.height
 }
 
-/** 后画的在上层:倒序找第一个命中的 */
-export function hitTopmost(nodes: readonly RectNode[], p: Point): RectNode | null {
-  for (let i = nodes.length - 1; i >= 0; i--) if (hitRect(nodes[i], p)) return nodes[i]
-  return null
-}
-
 /** 框选相交判定(SAT 分离轴):选框(轴对齐)扫到矩形任意部分即中,旋转矩形同样适用;
  *  只比较四对投影轴(选框两根 + 矩形自身两根),任一根上投影不相交即未命中 */
 export function rectOverlapsBox(r: Shape, box: RectBox): boolean {

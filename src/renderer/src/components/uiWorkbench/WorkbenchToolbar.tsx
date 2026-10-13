@@ -1,6 +1,6 @@
-// 底部浮动工具栏:最小积木工具。当前只有 移动(V) 与 矩形(R),登记在 TOOLS 一处。
+// 底部浮动工具栏:最小积木工具。当前有 移动(V)、矩形(R)、直线(L),登记在 TOOLS 一处。
 // 图标为 lucide-static v0.469.0 原始路径数据(24×24 网格): select=mouse-pointer-2,
-// rect=square;strokeWidth 1.8 使 32px 渲染下视觉描边恰为 2.4px。
+// rect=square,line=slash;strokeWidth 1.8 使 32px 渲染下视觉描边恰为 2.4px。
 // 悬浮可拖:栏是弹性一体件,两端各一个栏内「格位」平时宽 0 收起,悬到端部时
 // 格位撑开、六点抓手淡入,栏本体随之变长(底色/描边/圆角/阴影同出一身);
 // 左端展开用负 margin 让栏向左长,工具不动;格位/触发条按下即拖,位置写 localStorage 重启沿用。
@@ -9,14 +9,16 @@ import type { CanvasTool } from '../../uiWorkbench/useCanvasTools'
 
 const TOOLS: readonly { tool: CanvasTool; label: string; hotkey: string }[] = [
   { tool: 'select', label: '移动', hotkey: 'V' },
-  { tool: 'rect', label: '矩形', hotkey: 'R' }
+  { tool: 'rect', label: '矩形', hotkey: 'R' },
+  { tool: 'line', label: '直线', hotkey: 'L' }
 ]
 
 const TOOL_ICONS: Record<CanvasTool, React.JSX.Element> = {
   select: (
     <path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z" />
   ),
-  rect: <rect width="18" height="18" x="3" y="3" rx="2" />
+  rect: <rect width="18" height="18" x="3" y="3" rx="2" />,
+  line: <path d="M22 2 2 22" />
 }
 
 /* 存储格式 v2:栏「收起态中心」在工作区框里的归一化比例(fx/fy ≈ 0~1)。

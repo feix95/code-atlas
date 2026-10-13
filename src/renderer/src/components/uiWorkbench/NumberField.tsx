@@ -1,6 +1,7 @@
 // 属性面板通用数值框:回车或失焦提交,Esc 还原;非法输入还原为当前值,越界钳到合法范围。
 // key 跟随数值:外部改值(拖画布、选预设)时输入框重挂,草稿随之刷新。
 import { useRef } from 'react'
+import { useScrubLabel } from '../../uiWorkbench/useScrubLabel'
 
 export function NumberField({
   label,
@@ -10,7 +11,8 @@ export function NumberField({
   inputRef,
   unit,
   placeholder,
-  ariaLabel
+  ariaLabel,
+  isScrubbable = true
 }: {
   label: string
   /** null = 多值混合(显示空白 + placeholder) */
@@ -22,9 +24,13 @@ export function NumberField({
   unit?: string
   placeholder?: string
   ariaLabel?: string
+  /** 标签可拖拽调值(PS 式);改值会产生副作用的框(如画板尺寸)传 false */
+  isScrubbable?: boolean
 }): React.JSX.Element {
   const selfRef = useRef<HTMLInputElement | null>(null)
   const ref = inputRef ?? selfRef
+  const startScrub = useScrubLabel({ value, parse, onCommit })
+  const canScrub = isScrubbable && value !== null
 
   function commit(input: HTMLInputElement): void {
     const parsed = parse(input.value)
@@ -34,7 +40,13 @@ export function NumberField({
 
   return (
     <label className="uwb-field">
-      <span className="uwb-field-label">{label}</span>
+      <span
+        className={canScrub ? 'uwb-field-label is-scrub' : 'uwb-field-label'}
+        onPointerDown={canScrub ? startScrub : undefined}
+        onClick={canScrub ? (e) => e.preventDefault() : undefined}
+      >
+        {label}
+      </span>
       <input
         key={value}
         ref={ref}

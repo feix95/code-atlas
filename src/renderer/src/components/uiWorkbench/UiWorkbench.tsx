@@ -5,12 +5,21 @@
 import { useMemo } from 'react'
 import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import { artboardPrefsActions, useArtboardPrefs } from '../../uiWorkbench/artboardPrefsStore'
-import { selectedNode, selectedNodes, useDocState } from '../../uiWorkbench/documentStore'
+import {
+  docActions,
+  selectedNode,
+  selectedNodes,
+  useDocState
+} from '../../uiWorkbench/documentStore'
+import { useStyles } from '../../uiWorkbench/styleStore'
 import { useCanvasTools } from '../../uiWorkbench/useCanvasTools'
 import { useCanvasViewport } from '../../uiWorkbench/useCanvasViewport'
 import { ArtboardPanel } from './ArtboardPanel'
 import { CanvasStage } from './CanvasStage'
 import { ExportMenu } from './ExportMenu'
+import { LinePanel } from './LinePanel'
+import { NewLinePanel } from './NewLinePanel'
+import { NewRectPanel } from './NewRectPanel'
 import { RectPanel } from './RectPanel'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
 
@@ -26,7 +35,38 @@ export function UiWorkbench(): React.JSX.Element {
   const docState = useDocState()
   const selected = selectedNode(docState)
   const selectedAll = selectedNodes(docState)
-  const doc = useMemo(() => ({ artboard: board, nodes: docState.nodes }), [board, docState.nodes])
+  const styles = useStyles()
+  // 导出 doc 带上样式库:token 适配器按「定义+引用」发出,其余适配器忽略该字段
+  const doc = useMemo(
+    () => ({ artboard: board, nodes: docState.nodes, styles }),
+    [board, docState.nodes, styles]
+  )
+
+  /** 多选态:把某个样式整组应用(写定义值+挂 styleId,合成一笔撤销);选「无样式」= 整组脱钩 */
+  function applyStyleToSelection(styleId: string): void {
+    const s = styles.find((it) => it.id === styleId)
+    docActions.beginBatch()
+    try {
+      // 样式只属于矩形;选集里的直线跳过
+      for (const n of selectedAll) {
+        if (n.type !== 'rect') continue
+        docActions.dispatch({
+          type: 'update',
+          id: n.id,
+          patch: s
+            ? {
+                fill: s.fill,
+                stroke: s.stroke,
+                radii: [...s.radii] as typeof n.radii,
+                styleId: s.id
+              }
+            : { styleId: null }
+        })
+      }
+    } finally {
+      docActions.endBatch()
+    }
+  }
 
   function changeBoard(next: ArtboardSize): void {
     artboardPrefsActions.record(next)
@@ -54,12 +94,36 @@ export function UiWorkbench(): React.JSX.Element {
         </div>
         <div className="uwb-inspector-body">
           {selected ? (
-            <RectPanel node={selected} />
+            selected.type === 'rect' ? (
+              <RectPanel node={selected} />
+            ) : (
+              <LinePanel node={selected} />
+            )
           ) : selectedAll.length > 1 ? (
             <div className="uwb-multi" role="status">
               {`已选 ${selectedAll.length} 个对象`}
+              <select
+                className="cfg-select uwb-select"
+                aria-label="整组应用样式"
+                value=""
+                onChange={(e) => applyStyleToSelection(e.target.value)}
+              >
+                <option value="" disabled>
+                  整组应用样式…
+                </option>
+                {styles.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                <option value="">无样式(整组脱钩)</option>
+              </select>
               <span className="uwb-multi-hint">可整组移动 / 删除 / 复制粘贴,Esc 取消选择</span>
             </div>
+          ) : tools.tool === 'rect' ? (
+            <NewRectPanel />
+          ) : tools.tool === 'line' ? (
+            <NewLinePanel />
           ) : (
             <ArtboardPanel
               board={board}

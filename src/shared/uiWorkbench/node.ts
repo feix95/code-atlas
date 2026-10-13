@@ -2,7 +2,7 @@
 // 单位:逻辑像素,一律整数。x/y = 未旋转时的左上角,相对画板原点。
 // 旋转:角度 [0, 360),绕自身中心,顺时针为正(与 CSS / React Native / Godot 的屏幕坐标一致)。
 // 圆角顺序:左上、右上、右下、左下(同 CSS border-radius);每角不超过短边的一半。
-// 所有修改走 NodeAction(命令):手动拖拽、属性面板、日后的撤销与 AI 修改共用同一入口。
+// 所有修改走 NodeAction(命令,定义在 scene.ts):手动拖拽、属性面板、日后的撤销与 AI 修改共用同一入口。
 import { ARTBOARD_SIDE_MAX, ARTBOARD_SIDE_MIN } from './artboard.ts'
 
 export type CornerIndex = 0 | 1 | 2 | 3
@@ -41,16 +41,16 @@ export interface RectNode {
   fill: string | null
   /** 描边;null = 不勾线 */
   stroke: RectStroke | null
+  /** 挂接的外观样式 id(styles.ts 里的 RectStyle);null = 自由身 */
+  styleId: string | null
 }
 
 export type RectPatch = Partial<
-  Pick<RectNode, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'radii' | 'fill' | 'stroke'>
+  Pick<
+    RectNode,
+    'x' | 'y' | 'width' | 'height' | 'rotation' | 'radii' | 'fill' | 'stroke' | 'styleId'
+  >
 >
-
-export type NodeAction =
-  | { type: 'add'; node: RectNode }
-  | { type: 'update'; id: string; patch: RectPatch }
-  | { type: 'remove'; id: string }
 
 /** 新矩形默认填充(Figma 同款浅灰,白画板上看得清) */
 export const RECT_DEFAULT_FILL = '#d9d9d9'
@@ -88,18 +88,20 @@ export function parseHexColor(raw: string): string | null {
   return /^[0-9a-f]{6}$/.test(text) ? `#${text}` : null
 }
 
-function sanitizeStroke(stroke: RectStroke): RectStroke | null {
+export function sanitizeStroke(stroke: RectStroke): RectStroke | null {
   const color = parseHexColor(stroke.color)
   if (!color || (stroke.style !== 'solid' && stroke.style !== 'dashed')) return null
   return { color, width: clampInt(stroke.width, 1, RECT_STROKE_WIDTH_MAX), style: stroke.style }
 }
 
-/** 补丁落地前的统一校验:取整、钳边界;尺寸变小时圆角跟着收;非法颜色回退原值 */
+/** 补丁落地前的统一校验:取整、钳边界;尺寸变小时圆角跟着收;非法颜色回退原值;
+ *  外观字段(fill/stroke/radii)被手动改而补丁没带 styleId → 静默脱离样式链接(Figma 式) */
 export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
   const merged = { ...node, ...patch }
   const width = clampInt(merged.width, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX)
   const height = clampInt(merged.height, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX)
   const limit = maxCornerRadius(width, height)
+  const touchesAppearance = 'fill' in patch || 'stroke' in patch || 'radii' in patch
   return {
     ...merged,
     x: clampInt(merged.x, -NODE_COORD_LIMIT, NODE_COORD_LIMIT),
@@ -109,25 +111,16 @@ export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
     rotation: normalizeRotation(merged.rotation),
     radii: mapRadii(merged.radii, (r) => clampInt(r, 0, limit)),
     fill: merged.fill === null ? null : (parseHexColor(merged.fill) ?? node.fill),
-    stroke: merged.stroke === null ? null : (sanitizeStroke(merged.stroke) ?? node.stroke)
-  }
-}
-
-export function applyNodeAction(nodes: readonly RectNode[], action: NodeAction): RectNode[] {
-  switch (action.type) {
-    case 'add':
-      return [...nodes, applyRectPatch(action.node, {})]
-    case 'update':
-      return nodes.map((n) => (n.id === action.id ? applyRectPatch(n, action.patch) : n))
-    case 'remove':
-      return nodes.filter((n) => n.id !== action.id)
+    stroke: merged.stroke === null ? null : (sanitizeStroke(merged.stroke) ?? node.stroke),
+    styleId: 'styleId' in patch ? (patch.styleId ?? null) : touchesAppearance ? null : node.styleId
   }
 }
 
 /** 新矩形的 id 与名字:序号取现有最大值 + 1(删掉的号不复用,导出的类名稳定) */
 export function createRect(
-  nodes: readonly RectNode[],
-  box: Pick<RectNode, 'x' | 'y' | 'width' | 'height'>
+  nodes: readonly { id: string }[],
+  box: Pick<RectNode, 'x' | 'y' | 'width' | 'height'>,
+  appearance: Partial<Pick<RectNode, 'fill' | 'stroke' | 'radii' | 'styleId'>> = {}
 ): RectNode {
   const used = nodes.map((n) => Number(/^rect-(\d+)$/.exec(n.id)?.[1] ?? 0))
   const seq = Math.max(0, ...used) + 1
@@ -140,7 +133,9 @@ export function createRect(
       rotation: 0,
       radii: [0, 0, 0, 0],
       fill: RECT_DEFAULT_FILL,
-      stroke: null
+      stroke: null,
+      styleId: null,
+      ...appearance
     },
     {}
   )
@@ -149,7 +144,7 @@ export function createRect(
 /** 克隆矩形:序号规则同 createRect(现有最大 + 1),位置按 offset 平移,源对象不动 */
 export function cloneRect(
   source: RectNode,
-  nodes: readonly RectNode[],
+  nodes: readonly { id: string }[],
   offset: { x: number; y: number }
 ): RectNode {
   const used = nodes.map((n) => Number(/^rect-(\d+)$/.exec(n.id)?.[1] ?? 0))

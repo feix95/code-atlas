@@ -293,7 +293,8 @@
 .uwb-radius-handle,
 .uwb-knob,
 .uwb-corner-handle,
-.uwb-edge-handle {
+.uwb-edge-handle,
+.uwb-endpoint-handle {
   fill: var(--chrome-surface);
   stroke: var(--sash-hi);
   stroke-width: 1.5px;
@@ -306,6 +307,15 @@
 
 .uwb-radius-handle {
   pointer-events: all;
+}
+
+.uwb-endpoint-handle {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.uwb-endpoint-handle:hover {
+  fill: var(--sash-hi);
 }
 
 .uwb-radius-handle:hover {
@@ -363,16 +373,19 @@
   font-size: 0.75rem;
 }
 
-.uwb-viewport.is-tool-rect {
+.uwb-viewport.is-tool-rect,
+.uwb-viewport.is-tool-line {
   cursor: crosshair;
 }
 
-/* 矩形工具下按住空格平移时抓手优先(后于 is-tool-rect 生效) */
-.uwb-viewport.is-tool-rect.is-pan-ready {
+/* 绘制工具(矩形/直线)下按住空格平移时抓手优先(后于 is-tool-* 生效) */
+.uwb-viewport.is-tool-rect.is-pan-ready,
+.uwb-viewport.is-tool-line.is-pan-ready {
   cursor: grab;
 }
 
-.uwb-viewport.is-tool-rect.is-pan-panning {
+.uwb-viewport.is-tool-rect.is-pan-panning,
+.uwb-viewport.is-tool-line.is-pan-panning {
   cursor: grabbing;
 }
 
@@ -452,6 +465,12 @@
   flex-shrink: 0;
   color: var(--muted);
   font-size: var(--font-xs);
+}
+
+/* 数值框标签可拖拽调值(PS 式):悬停即左右拖拽光标,不选中文字 */
+.uwb-field-label.is-scrub {
+  cursor: ew-resize;
+  user-select: none;
 }
 
 .uwb-input {
@@ -543,6 +562,13 @@
 .uwb-field-row > .uwb-select {
   flex: 1;
   min-width: 0;
+}
+
+/* 样式分区:命名输入框占满行宽(cfg-input 自带固定宽,这里压回弹性) */
+.uwb-style-name {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 
 /* 左侧栏正文(挂在全局 .sidebar 里) */

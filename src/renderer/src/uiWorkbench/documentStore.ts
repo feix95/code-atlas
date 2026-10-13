@@ -4,12 +4,14 @@
 // 撤销模型:快照式历史(@shared/uiWorkbench/history)。手势(beginBatch~endBatch)收成一步;
 // 批次之外的单次 dispatch(面板回车、Delete)各记一步;只改选中的 select 不入账。
 import { useSyncExternalStore } from 'react'
+import type { LineNode } from '../../../shared/uiWorkbench/line.ts'
+import type { RectNode } from '../../../shared/uiWorkbench/node.ts'
 // 相对路径而非 @shared:自测脚本是裸 node 跑的,不认 tsconfig 的 paths 别名
 import {
   applyNodeAction,
   type NodeAction,
-  type RectNode
-} from '../../../shared/uiWorkbench/node.ts'
+  type SceneNode
+} from '../../../shared/uiWorkbench/scene.ts'
 import {
   emptyHistory,
   pushHistory,
@@ -21,7 +23,7 @@ import {
 } from '../../../shared/uiWorkbench/history.ts'
 
 export interface WorkbenchDocState {
-  nodes: readonly RectNode[]
+  nodes: readonly SceneNode[]
   /** 多选集(框选/Shift 加减选):按加入顺序排列 */
   selectedIds: readonly string[]
   /** 恰为单选时的节点 id;空选/多选为 null——单对象手势(缩放/圆角/旋转)与面板吃它 */
@@ -146,12 +148,24 @@ export const docActions = {
 }
 
 /** 恰为单选时返回该节点(单对象手势与属性面板专用);多选/空选返回 null */
-export function selectedNode(s: WorkbenchDocState): RectNode | null {
+export function selectedNode(s: WorkbenchDocState): SceneNode | null {
   return s.nodes.find((n) => n.id === s.selectedId) ?? null
 }
 
+/** 恰为单选且是矩形时返回它(缩放/圆角/旋转手势专用) */
+export function selectedRect(s: WorkbenchDocState): RectNode | null {
+  const node = selectedNode(s)
+  return node?.type === 'rect' ? node : null
+}
+
+/** 恰为单选且是直线时返回它(端点拖拽专用) */
+export function selectedLine(s: WorkbenchDocState): LineNode | null {
+  const node = selectedNode(s)
+  return node?.type === 'line' ? node : null
+}
+
 /** 选中的全部节点,按文档顺序(覆盖层与整组操作共用) */
-export function selectedNodes(s: WorkbenchDocState): RectNode[] {
+export function selectedNodes(s: WorkbenchDocState): SceneNode[] {
   const ids = new Set(s.selectedIds)
   return s.nodes.filter((n) => ids.has(n.id))
 }

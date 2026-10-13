@@ -2,7 +2,7 @@
 // 拖动中矩形的 起边/中线/终边 逐一对目标(其他矩形 + 画板)的 起边/中线/终边,
 // 最近且落在阈值内的那对即吸附;返回值附引导线的位置与跨越范围,交给覆盖层画线。
 // 阈值是屏幕像素换算来的设计单位,调用方负责 /zoom。
-import type { RectNode } from './node.ts'
+import { nodeBox, type SceneNode } from './scene.ts'
 
 /** 吸附参与方需要的最小几何:轴对齐包围盒(旋转矩形按声明外接框算,与选中描边同口径) */
 export interface SnapBox {
@@ -96,11 +96,9 @@ export function snapMove(
 
 /** 节点列表 → 吸附目标盒列表(排除被拖者:单选给单个 id,整组移动给 id 数组),调用方再拼上画板盒 */
 export function snapTargets(
-  nodes: readonly RectNode[],
+  nodes: readonly SceneNode[],
   excludeIds: string | readonly string[]
 ): SnapBox[] {
   const skip = new Set(typeof excludeIds === 'string' ? [excludeIds] : excludeIds)
-  return nodes
-    .filter((n) => !skip.has(n.id))
-    .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
+  return nodes.filter((n) => !skip.has(n.id)).map(nodeBox)
 }

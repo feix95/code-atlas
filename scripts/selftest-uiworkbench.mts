@@ -36,7 +36,6 @@ import {
 import {
   angleDeg,
   cornerLocal,
-  hitTopmost,
   radiusFromLocal,
   rectFromDrag,
   rectOverlapsBox,
@@ -47,7 +46,6 @@ import {
   toWorld
 } from '../src/shared/uiWorkbench/geometry.ts'
 import {
-  applyNodeAction,
   applyRectPatch,
   cloneRect,
   createRect,
@@ -58,6 +56,40 @@ import {
   type RectNode
 } from '../src/shared/uiWorkbench/node.ts'
 import { snapMove, snapTargets } from '../src/shared/uiWorkbench/snap.ts'
+import {
+  applyLinePatch,
+  cloneLine,
+  createLine,
+  hitLine,
+  lineAngle,
+  lineEndpointPatch,
+  lineFromDrag,
+  lineLength,
+  lineOverlapsBox,
+  lineWithAngle,
+  lineWithLength,
+  type LineNode
+} from '../src/shared/uiWorkbench/line.ts'
+import {
+  applyNodeAction,
+  cloneNode,
+  hitTopmost,
+  nodeBox,
+  nodeOverlapsBox,
+  snapshotNode,
+  translatePatch,
+  unionBox
+} from '../src/shared/uiWorkbench/scene.ts'
+import { SCRUB_PX_PER_STEP, scrubStep } from '../src/shared/uiWorkbench/scrub.ts'
+import {
+  appearanceOf,
+  normalizeStyleName,
+  removeStylePreset,
+  sameAppearance,
+  sanitizeStylePresets,
+  saveStylePreset,
+  type RectStyle
+} from '../src/shared/uiWorkbench/styles.ts'
 import { hexToSrgb, toDtcgTokens } from '../src/shared/uiWorkbench/export/tokensDtcg.ts'
 import { artboardCss, toHtml } from '../src/shared/uiWorkbench/export/cssAdapter.ts'
 import { toSvg } from '../src/shared/uiWorkbench/export/svgAdapter.ts'
@@ -275,8 +307,8 @@ check('旋转矩形坐标换算:世界↔本地往返、命中测试吃旋转', 
   const roundTrip = toWorld(node, toLocal(node, p))
   assert.ok(Math.abs(roundTrip.x - p.x) < 1e-9 && Math.abs(roundTrip.y - p.y) < 1e-9)
   // 旋转 90° 后,原矩形上方远处(50,-20)落在命中区内,左下方(-50,25)在外
-  assert.ok(hitTopmost([node], { x: 50, y: -20 }) === node)
-  assert.ok(hitTopmost([node], { x: -50, y: 25 }) === null)
+  assert.ok(hitTopmost([node], { x: 50, y: -20 }, 0) === node)
+  assert.ok(hitTopmost([node], { x: -50, y: 25 }, 0) === null)
   assert.ok(Math.abs(angleDeg({ x: 0, y: 0 }, { x: 0, y: 10 }) - 90) < 1e-9)
 })
 
@@ -388,6 +420,29 @@ check('节点命令:add/update/remove,删除后序号不复用', () => {
   assert.equal(nodes[0].rotation, 90)
   nodes = applyNodeAction(nodes, { type: 'remove', id: 'rect-1' })
   assert.equal(createRect(nodes, { x: 0, y: 0, width: 1, height: 1 }).id, 'rect-3')
+})
+
+check('createRect 带默认外观:填充/描边/样式落地,起手 1×1 圆角被钳 0,拖大后补丁带回圆角', () => {
+  const look = {
+    fill: '#112233',
+    stroke: { color: '#ffffff', width: 2, style: 'dashed' as const },
+    radii: [12, 12, 12, 12] as const,
+    styleId: 's1'
+  }
+  const seed = createRect([], { x: 0, y: 0, width: 1, height: 1 }, look)
+  assert.equal(seed.fill, '#112233')
+  assert.deepEqual(seed.stroke, look.stroke)
+  assert.equal(seed.styleId, 's1')
+  assert.deepEqual([...seed.radii], [0, 0, 0, 0])
+  const grown = applyRectPatch(seed, {
+    width: 80,
+    height: 60,
+    radii: look.radii,
+    styleId: look.styleId
+  })
+  assert.deepEqual([...grown.radii], [12, 12, 12, 12])
+  assert.equal(grown.styleId, 's1')
+  assert.equal(createRect([], { x: 0, y: 0, width: 5, height: 5 }).fill, '#d9d9d9')
 })
 
 check('tokens.json(DTCG):画板与节点数值、结构信息进 $extensions', () => {
@@ -581,6 +636,16 @@ check('框选旋转矩形:按真实旋转轮廓判定,不拿声明外接框糊�
 
 // ── 撤销/重做历史(history.ts + documentStore) ──
 
+check('标签拖拽步长:右增左减,不足一步累积不丢,Shift 十倍', () => {
+  assert.deepEqual(scrubStep(0, SCRUB_PX_PER_STEP * 3, false), { delta: 3, rest: 0 })
+  assert.deepEqual(scrubStep(0, -SCRUB_PX_PER_STEP * 2, false), { delta: -2, rest: 0 })
+  const half = scrubStep(0, SCRUB_PX_PER_STEP / 2, false)
+  assert.equal(half.delta, 0)
+  assert.equal(scrubStep(half.rest, SCRUB_PX_PER_STEP / 2, false).delta, 1)
+  assert.equal(scrubStep(0, SCRUB_PX_PER_STEP, true).delta, 10)
+  assert.equal(scrubStep(0, 0, false).delta, 0)
+})
+
 check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的', () => {
   const snap = (x: number): Snapshot => ({
     nodes: [{ ...createRect([], { x, y: 0, width: 10, height: 10 }), x } as RectNode],
@@ -752,4 +817,378 @@ check('cloneRect:序号取现有最大 + 1,偏移落位,源对象不动', () => 
   assert.equal(a.x, 10, '源节点不被修改')
 })
 
+// ── 外观样式(styles.ts + styleId 活链接)──
+
+check('样式名规范:去空白截断,留空回落「样式 N」', () => {
+  assert.equal(normalizeStyleName('  主按钮 ', 1), '主按钮')
+  assert.equal(normalizeStyleName('   ', 3), '样式 3')
+  assert.equal(normalizeStyleName('x'.repeat(40), 1).length, 32)
+})
+
+check('样式仓库:存取/同名覆盖沿用原 id/删除;坏档反序列化逐条丢弃', () => {
+  const app = {
+    fill: '#ff0000',
+    stroke: { color: '#00ff00', width: 2, style: 'dashed' as const },
+    radii: [2, 4, 6, 8] as [number, number, number, number]
+  }
+  const fresh = saveStylePreset([], { id: 's1', name: 'A', ...app })
+  assert.equal(fresh.overwrote, false)
+  // 同名覆盖:定义换成新值,但沿用原 id——挂着的节点靠 id 认,改名才断链
+  const over = saveStylePreset(fresh.list, { id: 's9', name: 'A', ...app, fill: '#0000ff' })
+  assert.equal(over.overwrote, true)
+  assert.equal(over.id, 's1')
+  assert.equal(over.list[0].fill, '#0000ff')
+  assert.deepEqual(removeStylePreset(over.list, 's1'), [])
+  // 坏字段:空 id、非法色、非法描边、圆角不足四角 —— 逐条丢,好的留下
+  const cleaned = sanitizeStylePresets([
+    { id: 'ok', name: '好', fill: '#112233', stroke: null, radii: [0, 0, 0, 0] },
+    { id: '', name: 'x', fill: '#112233', stroke: null, radii: [0, 0, 0, 0] },
+    { id: 'bad', name: '坏', fill: 'red', stroke: null, radii: [0, 0, 0, 0] },
+    {
+      id: 'bad2',
+      name: '坏2',
+      fill: '#112233',
+      stroke: { color: 'zz', width: 1, style: 'solid' },
+      radii: [0, 0, 0, 0]
+    },
+    { id: 'bad3', name: '坏3', fill: '#112233', stroke: null, radii: [0, 0] },
+    'garbage'
+  ])
+  assert.deepEqual(
+    cleaned.map((s) => s.id),
+    ['ok']
+  )
+})
+
+check('样式链接:applyRectPatch 脱钩规则——改外观静默脱,改几何不脱,补丁带 styleId 不脱', () => {
+  const linked = applyRectPatch(createRect([], { x: 0, y: 0, width: 10, height: 10 }), {
+    fill: '#123456',
+    styleId: 's1'
+  })
+  assert.equal(linked.styleId, 's1')
+  // 手动改外观三件套任一 → 静默脱钩(Figma 式)
+  assert.equal(applyRectPatch(linked, { fill: '#ffffff' }).styleId, null)
+  assert.equal(applyRectPatch(linked, { stroke: null }).styleId, null)
+  assert.equal(applyRectPatch(linked, { radii: [0, 0, 0, 0] }).styleId, null)
+  // 纯几何改动不碰链接
+  assert.equal(applyRectPatch(linked, { x: 5, width: 20, rotation: 45 }).styleId, 's1')
+  // 应用样式的补丁(外观 + styleId 同包)不误脱;显式 null 脱钩
+  assert.equal(applyRectPatch(linked, { fill: '#ffffff', styleId: 's2' }).styleId, 's2')
+  assert.equal(applyRectPatch(linked, { styleId: null }).styleId, null)
+})
+
+check('外观提取/比对:appearanceOf 拷贝三件套,sameAppearance 值比较', () => {
+  const node = applyRectPatch(createRect([], { x: 0, y: 0, width: 10, height: 10 }), {
+    fill: '#22aaee',
+    stroke: { color: '#000000', width: 2, style: 'solid' },
+    radii: [4, 4, 4, 4]
+  })
+  const app = appearanceOf(node)
+  assert.ok(sameAppearance(app, { ...app, stroke: { ...app.stroke! } }))
+  assert.ok(!sameAppearance(app, { ...app, fill: null }))
+  assert.ok(!sameAppearance(app, { ...app, radii: [0, 0, 0, 0] }))
+  // radii 是独立拷贝:改返回的不动节点
+  app.radii[0] = 99
+  assert.equal(node.radii[0], 4)
+})
+
+check('样式入账:应用/手动脱钩/覆盖回写各一笔;脱钩可撤回到链接态', () => {
+  const doc = docActions
+  const a = createRect(getDocState().nodes, { x: 0, y: 0, width: 10, height: 10 })
+  const b = createRect([...getDocState().nodes, a], { x: 50, y: 0, width: 10, height: 10 })
+  doc.beginBatch()
+  doc.dispatch({ type: 'add', node: a })
+  doc.dispatch({ type: 'add', node: b })
+  doc.endBatch()
+  const byId = (id: string): RectNode | undefined => getDocState().nodes.find((n) => n.id === id)
+  // 应用样式:外观 + styleId 同包,一笔
+  doc.dispatch({
+    type: 'update',
+    id: a.id,
+    patch: { fill: '#123456', radii: [8, 8, 8, 8], styleId: 's1' }
+  })
+  doc.dispatch({
+    type: 'update',
+    id: b.id,
+    patch: { fill: '#123456', radii: [8, 8, 8, 8], styleId: 's1' }
+  })
+  assert.equal(byId(a.id)?.styleId, 's1')
+  // 手动改 a 的填充 → 脱钩,一笔入账;撤回即回到链接态
+  doc.dispatch({ type: 'update', id: a.id, patch: { fill: '#ff0000' } })
+  assert.equal(byId(a.id)?.styleId, null)
+  doc.undo()
+  assert.equal(byId(a.id)?.styleId, 's1')
+  assert.equal(byId(a.id)?.fill, '#123456')
+  // 模拟「同名覆盖保存」:批次回写所有挂接节点 → 一笔撤销整体回
+  doc.beginBatch()
+  for (const n of getDocState().nodes) {
+    if (n.styleId === 's1')
+      doc.dispatch({ type: 'update', id: n.id, patch: { fill: '#000000', styleId: 's1' } })
+  }
+  doc.endBatch()
+  assert.ok(
+    getDocState()
+      .nodes.filter((n) => n.styleId === 's1')
+      .every((n) => n.fill === '#000000')
+  )
+  doc.undo()
+  assert.ok(
+    getDocState()
+      .nodes.filter((n) => n.styleId === 's1')
+      .every((n) => n.fill === '#123456')
+  )
+  // 模拟「删除样式」:批次清 styleId,节点保留现值
+  doc.beginBatch()
+  for (const n of getDocState().nodes) {
+    if (n.styleId === 's1') doc.dispatch({ type: 'update', id: n.id, patch: { styleId: null } })
+  }
+  doc.endBatch()
+  assert.ok(getDocState().nodes.every((n) => n.styleId === null))
+  assert.equal(byId(a.id)?.fill, '#123456')
+  // 善后:清场不留账
+  doc.beginBatch()
+  doc.dispatch({ type: 'remove', id: a.id })
+  doc.dispatch({ type: 'remove', id: b.id })
+  doc.endBatch()
+})
+
+check('tokens.json 带样式:styles 组发定义,节点 $extensions.style 记引用', () => {
+  const style: RectStyle = {
+    id: 's1',
+    name: '主按钮',
+    fill: '#22aaee',
+    stroke: { color: '#000000', width: 2, style: 'solid' },
+    radii: [8, 8, 8, 8]
+  }
+  const linked = applyRectPatch(createRect([], { x: 0, y: 0, width: 10, height: 10 }), {
+    fill: '#22aaee',
+    stroke: { color: '#000000', width: 2, style: 'solid' },
+    radii: [8, 8, 8, 8],
+    styleId: 's1'
+  })
+  const free = createRect([linked], { x: 50, y: 0, width: 10, height: 10 })
+  const tokens = toDtcgTokens({
+    artboard: { width: 390, height: 844 },
+    nodes: [linked, free],
+    styles: [style]
+  }) as {
+    styles: Record<string, Record<string, unknown>>
+    nodes: Record<string, { $extensions: Record<string, Record<string, unknown>> }>
+  }
+  // 定义组:按 id 为键,名字与数值都在
+  const def = tokens.styles['s1']
+  assert.ok(def)
+  assert.match(def.$description as string, /主按钮/)
+  const radius = def.radius as Record<string, { $value: { value: number } }>
+  assert.equal(radius['top-left'].$value.value, 8)
+  // 引用:挂接节点记 style id,自由节点不记
+  const ext = tokens.nodes[linked.id].$extensions['app.codeatlas.ui-workbench']
+  assert.equal(ext.style, 's1')
+  assert.equal(tokens.nodes[free.id].$extensions['app.codeatlas.ui-workbench'].style, undefined)
+})
+
+const LOOK = {
+  stroke: { color: '#112233', width: 4, style: 'dashed' as const },
+  cap: 'round' as const
+}
+const ENDS = { x1: 10, y1: 20, x2: 110, y2: 20 }
+
+check('直线创建:序号取现有最大 + 1,带默认外观;端点取 2 位小数并钳边界', () => {
+  const a = createLine([], ENDS)
+  assert.equal(a.id, 'line-1')
+  assert.equal(a.name, '直线 1')
+  assert.deepEqual(a.stroke, { color: '#000000', width: 1, style: 'solid' })
+  assert.equal(a.cap, 'butt')
+  const b = createLine([a], ENDS, LOOK)
+  assert.equal(b.id, 'line-2')
+  assert.deepEqual(b.stroke, LOOK.stroke)
+  assert.equal(b.cap, 'round')
+  assert.equal(createLine([a, b], ENDS).id, 'line-3')
+  const p = applyLinePatch(a, { x1: 1.23456, x2: 999999 })
+  assert.equal(p.x1, 1.23)
+  assert.ok(p.x2 < 999999)
+  assert.equal(
+    applyLinePatch(a, { stroke: { color: 'nope', width: 3, style: 'solid' } }).stroke,
+    a.stroke
+  )
+  assert.equal(applyLinePatch(a, { cap: 'zigzag' as unknown as LineNode['cap'] }).cap, 'butt')
+})
+
+check('直线长度/角度:派生值正确,改长度保起点方向,改角度保起点长度', () => {
+  const l = createLine([], { x1: 0, y1: 0, x2: 30, y2: 40 })
+  assert.equal(lineLength(l), 50)
+  assert.equal(Math.round(lineAngle(l)), 53)
+  assert.equal(lineAngle(createLine([], { x1: 0, y1: 0, x2: -10, y2: 0 })), 180)
+  assert.equal(lineAngle(createLine([], { x1: 0, y1: 0, x2: 0, y2: -10 })), 270)
+  const longer = applyLinePatch(l, lineWithLength(l, 100))
+  assert.equal(Math.round(lineLength(longer)), 100)
+  assert.equal(Math.round(lineAngle(longer)), 53)
+  const turned = applyLinePatch(l, lineWithAngle(l, 90))
+  assert.equal(turned.x2, 0)
+  assert.equal(turned.y2, 50)
+  assert.equal(lineLength(createLine([], { x1: 5, y1: 5, x2: 5, y2: 5 })), 0)
+})
+
+check('直线拖出:自由绘制取整;Shift 吸 15° 水平/垂直精确无 -0;Alt 以按下点为中点', () => {
+  assert.deepEqual(
+    lineFromDrag(
+      { x: 10.4, y: 20.6 },
+      { x: 50.2, y: 30.7 },
+      { isAngleSnap: false, isFromCenter: false }
+    ),
+    { x1: 10, y1: 21, x2: 50, y2: 31 }
+  )
+  const h = lineFromDrag(
+    { x: 10, y: 10 },
+    { x: 110, y: 18 },
+    { isAngleSnap: true, isFromCenter: false }
+  )
+  assert.equal(h.y2, 10)
+  assert.ok(Math.abs(h.x2 - 110.31) < 0.5)
+  const v = lineFromDrag(
+    { x: 10, y: 10 },
+    { x: 14, y: 110 },
+    { isAngleSnap: true, isFromCenter: false }
+  )
+  assert.equal(v.x2, 10)
+  assert.ok(Object.is(v.x2, 10) && !Object.is(v.x2, -0))
+  const d = lineFromDrag(
+    { x: 0, y: 0 },
+    { x: 100, y: 90 },
+    { isAngleSnap: true, isFromCenter: false }
+  )
+  assert.ok(Math.abs(d.x2 - d.y2) < 0.02)
+  const c = lineFromDrag(
+    { x: 50, y: 50 },
+    { x: 80, y: 50 },
+    { isAngleSnap: false, isFromCenter: true }
+  )
+  assert.deepEqual(c, { x1: 20, y1: 50, x2: 80, y2: 50 })
+})
+
+check('直线拖端点:另一端钉死,被拖端跟指针', () => {
+  const l = createLine([], ENDS)
+  assert.deepEqual(lineEndpointPatch(l, 'end', { x: 200, y: 70 }, false), { x2: 200, y2: 70 })
+  assert.deepEqual(lineEndpointPatch(l, 'start', { x: 0, y: 5 }, false), { x1: 0, y1: 5 })
+  const snapped = lineEndpointPatch(l, 'end', { x: 210, y: 25 }, true)
+  assert.equal(snapped.y2, 20)
+})
+
+check('直线命中与框选:容差内命中,线外不中;线段穿过选框(端点都在框外)也算扫到', () => {
+  const l = createLine([], ENDS)
+  assert.ok(hitLine(l, { x: 60, y: 24 }, 6))
+  assert.ok(!hitLine(l, { x: 60, y: 40 }, 6))
+  assert.ok(!hitLine(l, { x: 200, y: 20 }, 6))
+  const fat = createLine([], ENDS, { stroke: { color: '#000000', width: 40, style: 'solid' } })
+  assert.ok(hitLine(fat, { x: 60, y: 38 }, 0))
+  const rect = createRect([], { x: 0, y: 0, width: 100, height: 100 })
+  assert.equal(hitTopmost([rect, l], { x: 60, y: 20 }, 6), l)
+  assert.ok(lineOverlapsBox(l, { x: 50, y: 0, width: 10, height: 40 }))
+  assert.ok(!lineOverlapsBox(l, { x: 50, y: 30, width: 10, height: 40 }))
+  assert.ok(lineOverlapsBox(l, { x: 60, y: 20, width: 0, height: 0 }))
+  assert.ok(nodeOverlapsBox(l, { x: 0, y: 0, width: 20, height: 40 }))
+})
+
+check('场景通用操作:外接框/联合框/平移/克隆/深拷贝对矩形与直线一视同仁', () => {
+  const rect = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  const line = createLine([], { x1: 50, y1: 80, x2: 20, y2: 30 })
+  assert.deepEqual(nodeBox(line), { x: 20, y: 30, width: 30, height: 50 })
+  assert.deepEqual(unionBox([rect, line]), { x: 0, y: 0, width: 50, height: 80 })
+  assert.deepEqual(translatePatch(rect, 5, 6), { x: 5, y: 6 })
+  assert.deepEqual(translatePatch(line, 5, 6), { x1: 55, y1: 86, x2: 25, y2: 36 })
+  const copy = cloneNode(line, [rect, line], { x: 10, y: 10 })
+  assert.equal(copy.id, 'line-2')
+  assert.equal(copy.type === 'line' && copy.x1, 60)
+  assert.deepEqual(cloneLine(line, [line], { x: 0, y: 0 }).stroke, line.stroke)
+  const snap = snapshotNode(line)
+  assert.notEqual(snap, line)
+  assert.notEqual((snap as LineNode).stroke, line.stroke)
+  assert.deepEqual(snapTargets([rect, line], rect.id), [nodeBox(line)])
+})
+
+check('场景命令:直线 add/update/remove;对矩形打直线补丁不串字段', () => {
+  const rect = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  const line = createLine([rect], ENDS)
+  let nodes = applyNodeAction([rect], { type: 'add', node: line })
+  assert.equal(nodes.length, 2)
+  nodes = applyNodeAction(nodes, { type: 'update', id: line.id, patch: { x2: 300.567 } })
+  assert.equal((nodes[1] as LineNode).x2, 300.57)
+  nodes = applyNodeAction(nodes, { type: 'update', id: rect.id, patch: { x1: 5 } as never })
+  assert.equal('x1' in nodes[0] && nodes[0].type === 'rect' ? 'leak' : 'clean', 'clean')
+  nodes = applyNodeAction(nodes, { type: 'remove', id: line.id })
+  assert.equal(nodes.length, 1)
+})
+
+check('直线判等:端点/线宽/端点样式任一不同即异;矩形与直线互不相等', () => {
+  const a = createLine([], ENDS)
+  const same = { ...a, stroke: { ...a.stroke } }
+  assert.ok(sameNodes([a], [same]))
+  assert.ok(!sameNodes([a], [{ ...same, x2: 111 }]))
+  assert.ok(!sameNodes([a], [{ ...same, cap: 'round' }]))
+  assert.ok(!sameNodes([a], [{ ...same, stroke: { ...a.stroke, width: 2 } }]))
+  assert.ok(!sameNodes([a], [createRect([], { x: 0, y: 0, width: 10, height: 10 })]))
+})
+
+check('直线导出:SVG <line> 带端点样式/虚线;CSS 旋转盒子;tokens 带两端点与派生长度角度', () => {
+  const doc = {
+    artboard: { width: 200, height: 200 },
+    nodes: [
+      createLine([], { x1: 10, y1: 20, x2: 110, y2: 20 }),
+      createLine([{ id: 'line-1' }], { x1: 0, y1: 0, x2: 30, y2: 40 }, LOOK)
+    ]
+  }
+  const svg = toSvg(doc)
+  assert.ok(
+    svg.includes(
+      '<line id="line-1" x1="10" y1="20" x2="110" y2="20" stroke="#000000" stroke-width="1" stroke-linecap="butt"/>'
+    )
+  )
+  assert.ok(svg.includes('stroke-linecap="round" stroke-dasharray="12 8"'))
+  const css = artboardCss(doc)
+  assert.ok(
+    css.includes('.line-1 {') &&
+      css.includes('top: 19.5px') &&
+      css.includes('width: 100px') &&
+      css.includes('height: 1px')
+  )
+  assert.ok(!css.split('.line-2')[0].includes('transform: rotate'))
+  const second = css.split('.line-2 {')[1]
+  assert.ok(
+    second.includes('left: -2px') &&
+      second.includes('border-radius: 2px') &&
+      second.includes('rotate(53.13deg)')
+  )
+  assert.ok(second.includes('repeating-linear-gradient'))
+  assert.ok(toHtml(doc).includes('<div class="line-2"></div>'))
+  const tokens = toDtcgTokens(doc) as { nodes: Record<string, Record<string, { $value: unknown }>> }
+  const t = tokens.nodes['line-2']
+  assert.deepEqual(t.x2.$value, { value: 30, unit: 'px' })
+  assert.deepEqual(t.length.$value, { value: 50, unit: 'px' })
+  assert.equal(t.angle.$value, 53.13)
+  assert.ok(String((t as unknown as { $description: string }).$description).startsWith('直线 2('))
+  assert.equal((t.stroke.$value as { width: { value: number } }).width.value, 4)
+  const ext = (t as unknown as { $extensions: Record<string, { cap: string; nodeType: string }> })
+    .$extensions['app.codeatlas.ui-workbench']
+  assert.equal(ext.cap, 'round')
+  assert.equal(ext.nodeType, 'line')
+})
+
+check('直线进撤销栈:添加/移动/删除各一步,撤销还原端点;undo 后选集只留活着的', () => {
+  const before = getDocState().nodes.length
+  const line = createLine(getDocState().nodes, ENDS)
+  docActions.dispatch({ type: 'add', node: line })
+  docActions.select(line.id)
+  docActions.dispatch({ type: 'update', id: line.id, patch: translatePatch(line, 5, 5) })
+  const moved = getDocState().nodes.find((n) => n.id === line.id) as LineNode
+  assert.equal(moved.x1, 15)
+  docActions.undo()
+  assert.equal((getDocState().nodes.find((n) => n.id === line.id) as LineNode).x1, 10)
+  docActions.dispatch({ type: 'remove', id: line.id })
+  assert.equal(getDocState().nodes.length, before)
+  docActions.undo()
+  assert.ok(getDocState().nodes.some((n) => n.id === line.id))
+  docActions.undo()
+  assert.equal(getDocState().nodes.length, before)
+  assert.ok(!getDocState().selectedIds.includes(line.id))
+})
 console.log('UI 工作台纯逻辑自测全部通过')

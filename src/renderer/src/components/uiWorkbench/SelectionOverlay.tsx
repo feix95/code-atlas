@@ -4,13 +4,8 @@
 // 全部用 app 的功能蓝 --sash-hi,只作工具示意不进设计数值。SVG 平铺在视口上(屏幕坐标),
 // 本体不拦截指针(pointer-events: none),只有手柄与旋钮热区可点。
 import { cornerLocal, radiusHandleLocal, rotatePoint, toWorld } from '@shared/uiWorkbench/geometry'
-import {
-  CORNERS,
-  EDGES,
-  type CornerIndex,
-  type EdgeName,
-  type RectNode
-} from '@shared/uiWorkbench/node'
+import { CORNERS, EDGES, type CornerIndex, type EdgeName } from '@shared/uiWorkbench/node'
+import type { SceneNode } from '@shared/uiWorkbench/scene'
 import { cornerResizeCursor, edgeResizeCursor } from '../../uiWorkbench/cursors'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
 import type { Viewport } from '../../uiWorkbench/viewport'
@@ -23,6 +18,8 @@ const KNOB_R = 4
 const KNOB_ZONE_R = 10
 /** 旋钮距顶边中点的距离(CSS px) */
 const KNOB_GAP = 22
+/** 直线端点手柄半径(CSS px) */
+const ENDPOINT_R = 5
 /** 圆角手柄离角的最小内缩距离(CSS px,随缩放换算成设计单位) */
 const RADIUS_MIN_INSET_PX = 10
 /** 小于这个屏幕尺寸的矩形不显示圆角手柄(点不准) */
@@ -38,7 +35,7 @@ export function SelectionOverlay({
   view,
   tools
 }: {
-  nodes: readonly RectNode[]
+  nodes: readonly SceneNode[]
   view: Viewport
   tools: CanvasToolsApi
 }): React.JSX.Element {
@@ -48,10 +45,15 @@ export function SelectionOverlay({
   })
   const outlines = nodes.map((n) => ({
     id: n.id,
-    points: CORNERS.map((c) => toScreen(toWorld(n, cornerLocal(n, c))))
+    points:
+      n.type === 'line'
+        ? [toScreen({ x: n.x1, y: n.y1 }), toScreen({ x: n.x2, y: n.y2 })]
+        : CORNERS.map((c) => toScreen(toWorld(n, cornerLocal(n, c))))
   }))
-  // 手柄/旋钮只服务单选;多选只剩各对象描边
-  const node = nodes.length === 1 ? nodes[0] : null
+  // 手柄/旋钮只服务单选;多选只剩各对象描边。矩形有缩放/圆角/旋转手柄,直线只有两个端点手柄
+  const single = nodes.length === 1 ? nodes[0] : null
+  const node = single?.type === 'rect' ? single : null
+  const line = single?.type === 'line' ? single : null
   const outline = node ? outlines[0].points : []
   const showRadius =
     node !== null && Math.min(node.width, node.height) * view.zoom >= MIN_SIZE_FOR_HANDLES
@@ -73,6 +75,23 @@ export function SelectionOverlay({
           points={o.points.map((p) => `${p.x},${p.y}`).join(' ')}
         />
       ))}
+      {line &&
+        outlines[0].points.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={ENDPOINT_R}
+            className="uwb-endpoint-handle"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              tools.startEndpointDrag(e, i === 0 ? 'start' : 'end')
+            }}
+          >
+            <title>{i === 0 ? '拖动起点' : '拖动终点'},Shift 吸附 15°</title>
+          </circle>
+        ))}
       {node && knob && topCenter && (
         <>
           {/* 处理器挂在整个旋钮区:隐形热区(比可见圆点大)也要吃按下,否则冒泡到画布会被当成点空处取消选中 */}

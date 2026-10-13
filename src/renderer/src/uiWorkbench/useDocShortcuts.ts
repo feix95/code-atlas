@@ -1,5 +1,7 @@
 // 文档级快捷键:Ctrl+Z 撤销 / Ctrl+Shift+Z、Ctrl+Y 重做(macOS Cmd 同理,键位认 e.code 不认 e.key);
 // Ctrl+A 全选 / Ctrl+C 复制 / Ctrl+V 粘贴(逐级 +10 偏移)/ Ctrl+X 剪切 / Ctrl+D 原地复制;
+// Ctrl+Alt+C 复制外观 / Ctrl+Alt+V 粘贴外观(Figma 式匿名路径:只拷填充+描边+圆角,
+// 不拷几何与样式链接,贴上即脱钩);
 // 复制粘贴作用于整个选集:多选复制、成组贴回,贴完整体选中;
 // 方向键微调选中节点 1px,Shift+方向键 10px,按住连发整笔只记一步撤销;
 // Delete/Backspace 删除整组选中;
@@ -9,13 +11,16 @@
 // 但焦点在输入框/可编辑区时不接管,保住输入框的原生编辑键;
 // 焦点落在工作台 DOM 之外的控件上(双分屏另一侧)也不抢键。
 import { useEffect } from 'react'
-import { cloneRect, type RectNode } from '@shared/uiWorkbench/node'
+import { cloneNode, snapshotNode, translatePatch, type SceneNode } from '@shared/uiWorkbench/scene'
+import { appearanceOf, type StyleAppearance } from '@shared/uiWorkbench/styles'
 import { docActions, getDocState } from './documentStore'
 import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 // 工作台内存剪贴板:只活在本模块,不碰系统剪贴板;pastes 计数让连续粘贴逐级错开
-let clipboard: { nodes: RectNode[]; pastes: number } | null = null
+let clipboard: { nodes: SceneNode[]; pastes: number } | null = null
+// 外观匿名剪贴板(Ctrl+Alt+C/V):只装 fill/stroke/radii,不装 styleId——贴上即脱钩
+let appearanceClipboard: StyleAppearance | null = null
 
 const NUDGE_STEP = 1
 const NUDGE_STEP_SHIFT = 10
@@ -62,13 +67,13 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
       return true
     }
 
-    const copySelection = (): RectNode[] => {
+    const copySelection = (): SceneNode[] => {
       const { nodes, selectedIds } = getDocState()
       const picked = nodes.filter((n) => selectedIds.includes(n.id))
       if (picked.length === 0) return []
       // 深拷贝存剪贴板:之后源节点再被改动,贴出来的还是复制那一刻的样子
       clipboard = {
-        nodes: picked.map((n) => ({ ...n, radii: [...n.radii] as typeof n.radii })),
+        nodes: picked.map(snapshotNode),
         pastes: 0
       }
       return picked
@@ -89,7 +94,7 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
             docActions.dispatch({
               type: 'update',
               id: n.id,
-              patch: { x: n.x + delta.x * step, y: n.y + delta.y * step }
+              patch: translatePatch(n, delta.x * step, delta.y * step)
             })
           }
         }
@@ -111,7 +116,9 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
         e.preventDefault()
         return
       }
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || !own(e)) return
+      if (!(e.ctrlKey || e.metaKey) || !own(e)) return
+      // Alt 只放行 C/V(外观匿名复制粘贴),其余 Ctrl+Alt+* 不接管
+      if (e.altKey && e.code !== 'KeyC' && e.code !== 'KeyV') return
       switch (e.code) {
         case 'KeyZ':
           if (e.shiftKey) docActions.redo()
@@ -124,9 +131,34 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
           docActions.selectIds(getDocState().nodes.map((n) => n.id))
           break
         case 'KeyC':
-          if (copySelection().length === 0) return
+          if (e.altKey) {
+            // 复制外观:取选集里第一个矩形(单选常态),只拷 fill/stroke/radii;直线没有这三件,不参与
+            const src = getDocState().nodes.find(
+              (n) => n.type === 'rect' && getDocState().selectedIds.includes(n.id)
+            )
+            if (src?.type !== 'rect') return
+            appearanceClipboard = appearanceOf(src)
+          } else if (copySelection().length === 0) return
           break
         case 'KeyV': {
+          if (e.altKey) {
+            // 粘贴外观:整组矩形应用,补丁不带 styleId → applyRectPatch 静默脱钩;选集里的直线跳过
+            if (!appearanceClipboard) return
+            const { nodes, selectedIds } = getDocState()
+            const rectIds = nodes
+              .filter((n) => n.type === 'rect' && selectedIds.includes(n.id))
+              .map((n) => n.id)
+            if (rectIds.length === 0) return
+            docActions.beginBatch()
+            try {
+              for (const id of rectIds) {
+                docActions.dispatch({ type: 'update', id, patch: { ...appearanceClipboard } })
+              }
+            } finally {
+              docActions.endBatch()
+            }
+            break
+          }
           if (!clipboard) return
           clipboard.pastes += 1
           docActions.beginBatch()
@@ -138,7 +170,7 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
             }
             const newIds: string[] = []
             for (const src of clipboard.nodes) {
-              const node = cloneRect(src, getDocState().nodes, offset)
+              const node = cloneNode(src, getDocState().nodes, offset)
               docActions.dispatch({ type: 'add', node })
               newIds.push(node.id)
             }
@@ -168,7 +200,7 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
           try {
             const newIds: string[] = []
             for (const src of picked) {
-              const node = cloneRect(src, getDocState().nodes, {
+              const node = cloneNode(src, getDocState().nodes, {
                 x: PASTE_OFFSET,
                 y: PASTE_OFFSET
               })

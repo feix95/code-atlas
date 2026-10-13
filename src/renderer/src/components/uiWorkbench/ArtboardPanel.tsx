@@ -65,6 +65,7 @@ export function ArtboardPanel({
           inputRef={widthRef}
           label="宽"
           ariaLabel="画板宽"
+          isScrubbable={false}
           value={board.width}
           parse={parseArtboardSide}
           onCommit={(width) => onChange({ ...board, width })}
@@ -100,6 +101,7 @@ export function ArtboardPanel({
         <NumberField
           label="高"
           ariaLabel="画板高"
+          isScrubbable={false}
           value={board.height}
           parse={parseArtboardSide}
           onCommit={(height) => onChange({ ...board, height })}
