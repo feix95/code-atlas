@@ -63,6 +63,14 @@ export interface CanvasToolsApi {
   startRotateDrag: (e: React.PointerEvent) => void
 }
 
+/** 画布手势的 pointerdown 都 preventDefault(防选中文字),浏览器因此不会转移焦点:
+ *  之前停在面板输入框/下拉上的焦点会原地留着,isEditableTarget 随即把 Delete、V/R、方向键
+ *  和 Ctrl+Z 全挡成死键(症状:重启后能用,碰过面板控件再点画布就失灵)。手势一开始主动释放 */
+function releaseEditableFocus(doc: Document): void {
+  const active = doc.activeElement
+  if (isEditableTarget(active)) (active as HTMLElement).blur()
+}
+
 /** 手势换算只依赖这几样:指针位置 + 修饰键状态(PointerEvent 与合成重放共用) */
 type DragEventLike = Pick<
   PointerEvent,
@@ -79,6 +87,7 @@ function trackPointer(
   onEnd: () => void,
   dragCursor?: string
 ): void {
+  releaseEditableFocus(down.currentTarget.ownerDocument)
   const target = down.currentTarget
   const win = target.ownerDocument.defaultView
   if (!win) return
@@ -159,6 +168,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     e.preventDefault()
+    releaseEditableFocus(e.currentTarget.ownerDocument)
     const start = toDesign(e)
     if (toolRef.current === 'rect') {
       // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算

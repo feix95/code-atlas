@@ -440,3 +440,4 @@
 - feat(workbench): 矩形画完自动回弹选择工具(Figma 式)
 - feat(workbench): 边中点手柄单边缩放,Shift 吸 4 网格,旋转矩形沿边法线
 - fix(workbench): Delete/Backspace 升级文档级键,不再要求指针悬停画布
+- fix(workbench): 画布手势起手释放面板输入框/下拉的残留焦点,修复碰过面板控件后 Delete/V/R/方向键/Ctrl+Z 失灵
