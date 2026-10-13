@@ -435,3 +435,4 @@
 - fix(workbench): 矩形工具单击不再生成幽灵矩形;sameNodes 补比 stroke 修描边不入账
 - fix(workbench): 取色器 Esc 取消挂死批次吞掉撤销,色板/下拉焦点不再变 Ctrl+Z 死键
 - style(workbench): 矩形工具图标改方形,选中态减负,六点居中,宽高框去 px 后缀
+- feat(workbench): 移动拖动对齐吸附——边/中线互吸+引导线(Figma 式),Shift 轴锁,Ctrl 临时禁吸

@@ -17,6 +17,7 @@ import {
   toLocal,
   type Point
 } from '@shared/uiWorkbench/geometry'
+import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import {
   createRect,
   maxCornerRadius,
@@ -24,6 +25,7 @@ import {
   withCornerRadius,
   type CornerIndex
 } from '@shared/uiWorkbench/node'
+import { snapMove, snapTargets, type SnapGuides } from '@shared/uiWorkbench/snap'
 import { docActions, getDocState, selectedNode } from './documentStore'
 import { cornerResizeCursor } from './cursors'
 import { isEditableTarget } from './isEditableTarget'
@@ -36,11 +38,15 @@ export type GestureKind = 'radius' | 'rotate' | null
 
 /** Shift 拖圆角柄的吸附步长:4pt 网格约定 */
 const RADIUS_SNAP_STEP = 4
+/** 对齐吸附的命中距离(屏幕像素):除以 zoom 换成设计单位,放得越大吸得越「松」 */
+const SNAP_THRESHOLD_PX = 5
 
 export interface CanvasToolsApi {
   tool: CanvasTool
   setTool: (tool: CanvasTool) => void
   activeGesture: GestureKind
+  /** 移动拖动中的对齐引导线(设计单位),覆盖层照着画线 */
+  guides: SnapGuides
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
   startResizeDrag: (e: React.PointerEvent, corner: CornerIndex) => void
   startRadiusDrag: (e: React.PointerEvent, corner: CornerIndex) => void
@@ -117,14 +123,17 @@ function trackPointer(
   win.addEventListener('blur', end)
 }
 
-export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
+export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize): CanvasToolsApi {
   const [tool, setTool] = useState<CanvasTool>('select')
   const [activeGesture, setActiveGesture] = useState<GestureKind>(null)
+  const [guides, setGuides] = useState<SnapGuides>({ v: null, h: null })
   const viewRef = useRef(viewport.view)
   const toolRef = useRef(tool)
+  const boardRef = useRef(board)
   useEffect(() => {
     viewRef.current = viewport.view
     toolRef.current = tool
+    boardRef.current = board
   })
   const toDesign = (e: { clientX: number; clientY: number }): Point => {
     const el = viewport.viewportRef.current
@@ -197,16 +206,39 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
       e,
       (ev) => {
         const cur = toDesign(ev)
+        let dx = cur.x - start.x
+        let dy = cur.y - start.y
+        // Shift 轴锁:位移主方向走直线,另一轴钉死(Figma 式)
+        if (ev.shiftKey) {
+          if (Math.abs(dx) >= Math.abs(dy)) dy = 0
+          else dx = 0
+        }
+        let nx = Math.round(origin.x + dx)
+        let ny = Math.round(origin.y + dy)
+        let next: SnapGuides = { v: null, h: null }
+        // Ctrl/Cmd 按住 = 临时禁用吸附(Figma 式);修饰键中途变化由 trackPointer 原地重放本函数
+        if (!ev.ctrlKey && !ev.metaKey) {
+          const s = snapMove(
+            { x: origin.x + dx, y: origin.y + dy, width: hit.width, height: hit.height },
+            [
+              ...snapTargets(getDocState().nodes, hit.id),
+              { x: 0, y: 0, width: boardRef.current.width, height: boardRef.current.height }
+            ],
+            SNAP_THRESHOLD_PX / viewRef.current.zoom
+          )
+          next = s.guides
+          // 吸上的轴用精确值(中线对奇数宽可能出 .5),没吸上的轴用上面取整过的
+          if (s.guides.v) nx = s.x
+          if (s.guides.h) ny = s.y
+        }
+        setGuides(next)
         docActions.dispatch({
           type: 'update',
           id: hit.id,
-          patch: {
-            x: Math.round(origin.x + cur.x - start.x),
-            y: Math.round(origin.y + cur.y - start.y)
-          }
+          patch: { x: nx, y: ny }
         })
       },
-      () => {},
+      () => setGuides({ v: null, h: null }),
       'move'
     )
   }
@@ -289,6 +321,7 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
     tool,
     setTool,
     activeGesture,
+    guides,
     onPointerDown,
     startResizeDrag,
     startRadiusDrag,

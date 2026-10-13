@@ -846,6 +846,56 @@ try {
       )?.contentDocument?.querySelectorAll('[class^="rect-"]').length ?? 0
   )
   assert.equal(pastedCount, 3, 'Ctrl+V twice must paste two cloned rects')
+  // 对齐吸附(Figma 式):拖矩形靠近他人边线自动吸上+引导线;Shift 拖 = 轴锁;Ctrl 按住 = 临时禁吸。
+  // 视口 pan 非零(实测 103,-52),屏幕偏移 ≠ 设计坐标——先读 pan/zoom 做换算
+  const viewNow = await page.evaluate(() => {
+    const t = (document.querySelector('.uwb-world') as HTMLElement).style.transform
+    const m = t.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(([\d.]+)\)/)!
+    return { panX: Number(m[1]), panY: Number(m[2]), zoom: Number(m[3]) }
+  })
+  const sx = (dx: number): number => vpBox.x + viewNow.panX + dx * viewNow.zoom
+  const sy = (dy: number): number => vpBox.y + viewNow.panY + dy * viewNow.zoom
+  await canvasVp.hover()
+  await page.keyboard.press('r')
+  // 设计坐标系内画:A (60,420) 60×50;B (200,400) 60×50
+  await page.mouse.move(sx(60), sy(420))
+  await page.mouse.down()
+  await page.mouse.move(sx(120), sy(470), { steps: 3 })
+  await page.mouse.up()
+  await page.mouse.move(sx(200), sy(400))
+  await page.mouse.down()
+  await page.mouse.move(sx(260), sy(450), { steps: 3 })
+  await page.mouse.up()
+  await page.keyboard.press('v')
+  const xSnap = page.getByRole('textbox', { name: 'X', exact: true })
+  const ySnap = page.getByRole('textbox', { name: 'Y', exact: true })
+  // 抓 B 中心(230,425)拖到左缘差 2px → 吸成 60,引导线现身
+  await page.mouse.move(sx(230), sy(425))
+  await page.mouse.down()
+  await page.mouse.move(sx(88), sy(428), { steps: 4 })
+  // line 是零面积几何体,Playwright 的 visible 判定不认它——用 attached
+  await page.locator('.uwb-guide').first().waitFor({ state: 'attached' })
+  await page.mouse.up()
+  assert.equal(await xSnap.inputValue(), '60', 'drag must snap B left edge to A left edge')
+  assert.equal(await ySnap.inputValue(), '403', 'unsnapped axis keeps raw value')
+  // Shift 轴锁:斜拖只走主方向,x 钉在 60 不动;B 现于 (60,403)
+  await page.mouse.move(sx(90), sy(428))
+  await page.mouse.down()
+  await page.keyboard.down('Shift')
+  await page.mouse.move(sx(40), sy(503), { steps: 4 })
+  assert.equal(await xSnap.inputValue(), '60', 'Shift axis-lock pins x')
+  assert.equal(await ySnap.inputValue(), '478', 'dominant axis moves freely')
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+  // Ctrl 按住:B 现于 (60,478),同样位移落 58 不吸,引导线也不出
+  await page.keyboard.down('Control')
+  await page.mouse.move(sx(90), sy(503))
+  await page.mouse.down()
+  await page.mouse.move(sx(88), sy(506), { steps: 3 })
+  assert.equal(await page.locator('.uwb-guide').count(), 0, 'Ctrl suppresses snap guides')
+  await page.mouse.up()
+  await page.keyboard.up('Control')
+  assert.equal(await xSnap.inputValue(), '58', 'Ctrl disables snapping')
   const xField = page.getByRole('textbox', { name: 'X', exact: true })
   const xBefore = Number(await xField.inputValue())
   await page.keyboard.press('ArrowRight')

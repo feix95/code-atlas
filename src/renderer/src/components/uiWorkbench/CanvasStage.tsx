@@ -78,6 +78,28 @@ export function CanvasStage({
           {`画板 ${board.width} × ${board.height}`}
         </div>
         {frameBody && <ArtboardNodes body={frameBody} doc={doc} />}
+        {(tools.guides.v || tools.guides.h) && (
+          <svg className="uwb-overlay" aria-hidden="true">
+            {tools.guides.v && (
+              <line
+                className="uwb-guide"
+                x1={view.panX + tools.guides.v.x * view.zoom}
+                y1={view.panY + tools.guides.v.y1 * view.zoom}
+                x2={view.panX + tools.guides.v.x * view.zoom}
+                y2={view.panY + tools.guides.v.y2 * view.zoom}
+              />
+            )}
+            {tools.guides.h && (
+              <line
+                className="uwb-guide"
+                x1={view.panX + tools.guides.h.x1 * view.zoom}
+                y1={view.panY + tools.guides.h.y * view.zoom}
+                x2={view.panX + tools.guides.h.x2 * view.zoom}
+                y2={view.panY + tools.guides.h.y * view.zoom}
+              />
+            )}
+          </svg>
+        )}
         {selected && <SelectionOverlay node={selected} view={view} tools={tools} />}
       </div>
     </div>

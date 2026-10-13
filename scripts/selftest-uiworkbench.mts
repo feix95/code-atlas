@@ -55,6 +55,7 @@ import {
   withCornerRadius,
   type RectNode
 } from '../src/shared/uiWorkbench/node.ts'
+import { snapMove, snapTargets } from '../src/shared/uiWorkbench/snap.ts'
 import { hexToSrgb, toDtcgTokens } from '../src/shared/uiWorkbench/export/tokensDtcg.ts'
 import { artboardCss, toHtml } from '../src/shared/uiWorkbench/export/cssAdapter.ts'
 import { toSvg } from '../src/shared/uiWorkbench/export/svgAdapter.ts'
@@ -469,6 +470,45 @@ check('外观适配:不填/不勾时三端都缺省;描边按「内描边」口�
     width: { value: 2, unit: 'px' },
     style: 'dashed'
   })
+})
+
+// ── 对齐吸附(snap.ts) ──
+
+check('snapMove:阈值内吸最近锚点(边/中线),阈值外不动,两轴独立', () => {
+  const target = { x: 100, y: 0, width: 40, height: 40 }
+  // 左缘差 3 在阈值 5 内 → 吸到 100;引导线位置 = 目标锚点,纵跨取两矩形并集
+  let s = snapMove({ x: 103, y: 200, width: 20, height: 20 }, [target], 5)
+  assert.equal(s.x, 100)
+  assert.equal(s.guides.v?.x, 100)
+  assert.equal(s.guides.v?.y1, 0)
+  assert.equal(s.guides.v?.y2, 220)
+  // 所有锚点都在阈值外 → 不吸,无引导线
+  s = snapMove({ x: 146, y: 200, width: 20, height: 20 }, [target], 5)
+  assert.equal(s.x, 146)
+  assert.equal(s.guides.v, null)
+  // 中线对中线:被拖中心 x+10 对目标中心 120,差 3 → 吸成 110,引导线在 120
+  s = snapMove({ x: 107, y: 200, width: 20, height: 20 }, [target], 5)
+  assert.equal(s.x, 110)
+  assert.equal(s.guides.v?.x, 120)
+  // 右缘对左缘(贴边摆放):x+20 对 100,差 -2 → 吸成 80
+  s = snapMove({ x: 82, y: 200, width: 20, height: 20 }, [target], 5)
+  assert.equal(s.x, 80)
+  // 两轴同时命中:左缘 100 + 上缘 0
+  s = snapMove({ x: 103, y: 3, width: 20, height: 20 }, [target], 5)
+  assert.equal(s.x, 100)
+  assert.equal(s.y, 0)
+  assert.ok(s.guides.v !== null && s.guides.h !== null)
+  // 多目标取最近:左缘对 100(差 -3)、右缘对 t2 右缘 200(差 +1),取差 1 → 吸成 104
+  const t2 = { x: 160, y: 0, width: 40, height: 40 }
+  s = snapMove({ x: 103, y: 500, width: 96, height: 20 }, [target, t2], 5)
+  assert.equal(s.x, 104)
+  assert.equal(s.guides.v?.x, 200)
+})
+
+check('snapTargets:排除自身,只剩其余节点的包围盒', () => {
+  const a = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  const b = createRect([a], { x: 50, y: 0, width: 10, height: 10 })
+  assert.deepEqual(snapTargets([a, b], a.id), [{ x: 50, y: 0, width: 10, height: 10 }])
 })
 
 // ── 撤销/重做历史(history.ts + documentStore) ──

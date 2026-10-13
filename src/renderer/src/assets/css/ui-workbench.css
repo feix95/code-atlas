@@ -333,6 +333,12 @@
   opacity: 1;
 }
 
+/* 对齐引导线:拖动吸附命中时贯穿两边的细线(Figma 红线 / PS 洋红线的本色版) */
+.uwb-guide {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+}
+
 .uwb-viewport.is-tool-rect {
   cursor: crosshair;
 }

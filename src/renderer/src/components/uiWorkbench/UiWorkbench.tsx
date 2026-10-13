@@ -22,7 +22,7 @@ export function UiWorkbench(): React.JSX.Element {
   const prefs = useArtboardPrefs()
   const board = prefs.last
   const viewport = useCanvasViewport(board)
-  const tools = useCanvasTools(viewport)
+  const tools = useCanvasTools(viewport, board)
   const docState = useDocState()
   const selected = selectedNode(docState)
   const doc = useMemo(() => ({ artboard: board, nodes: docState.nodes }), [board, docState.nodes])
