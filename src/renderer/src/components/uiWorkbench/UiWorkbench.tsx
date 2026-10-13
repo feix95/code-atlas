@@ -11,6 +11,8 @@ import {
   selectedNodes,
   useDocState
 } from '../../uiWorkbench/documentStore'
+import { useLineStyles } from '../../uiWorkbench/lineStyleStore'
+import { newRectDefaultsActions } from '../../uiWorkbench/newRectDefaultsStore'
 import { useStyles } from '../../uiWorkbench/styleStore'
 import { useCanvasTools } from '../../uiWorkbench/useCanvasTools'
 import { useCanvasViewport } from '../../uiWorkbench/useCanvasViewport'
@@ -36,10 +38,11 @@ export function UiWorkbench(): React.JSX.Element {
   const selected = selectedNode(docState)
   const selectedAll = selectedNodes(docState)
   const styles = useStyles()
+  const lineStyles = useLineStyles()
   // 导出 doc 带上样式库:token 适配器按「定义+引用」发出,其余适配器忽略该字段
   const doc = useMemo(
-    () => ({ artboard: board, nodes: docState.nodes, styles }),
-    [board, docState.nodes, styles]
+    () => ({ artboard: board, nodes: docState.nodes, styles, lineStyles }),
+    [board, docState.nodes, styles, lineStyles]
   )
 
   /** 多选态:把某个样式整组应用(写定义值+挂 styleId,合成一笔撤销);选「无样式」= 整组脱钩 */
@@ -66,6 +69,7 @@ export function UiWorkbench(): React.JSX.Element {
     } finally {
       docActions.endBatch()
     }
+    newRectDefaultsActions.rememberStyle(s?.id ?? null, s)
   }
 
   function changeBoard(next: ArtboardSize): void {

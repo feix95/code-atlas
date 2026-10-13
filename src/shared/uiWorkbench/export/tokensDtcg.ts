@@ -7,6 +7,7 @@
 // 样式以「定义+引用」发出:styles 组存方案定义(与节点数值同口径),节点 $extensions.style 记挂接 id;
 // 节点数值仍按展开值发,不依赖样式在不在场——agent 可认链接也可直接复刻。
 import { lineAngle, lineLength, round2, type LineNode } from '../line.ts'
+import type { LineStyle } from '../lineStyles.ts'
 import { CORNER_KEYS, type RectStroke } from '../node.ts'
 import type { SceneNode } from '../scene.ts'
 import type { RectStyle } from '../styles.ts'
@@ -64,12 +65,26 @@ function styleTokens(style: RectStyle): Record<string, unknown> {
   return tokens
 }
 
+function lineStyleTokens(style: LineStyle): Record<string, unknown> {
+  return {
+    $description: `直线样式「${style.name}」(整包:描边+端点样式)。节点 $extensions.style 引用此 id`,
+    $extensions: { [DTCG_EXTENSION_KEY]: { cap: style.cap } },
+    stroke: borderToken(style.stroke, LINE_STROKE_NOTE)
+  }
+}
+
 /** 直线:两端点 + 派生的长度/角度;端点样式 cap 放 $extensions(DTCG 没有等价的简单类型) */
 function lineTokens(node: LineNode, order: number): Record<string, unknown> {
   return {
     $description: `${node.name}(直线)。起点/终点为相对画板原点的位置,长度与角度由两端点派生`,
     $extensions: {
-      [DTCG_EXTENSION_KEY]: { nodeType: node.type, name: node.name, order, cap: node.cap }
+      [DTCG_EXTENSION_KEY]: {
+        nodeType: node.type,
+        name: node.name,
+        order,
+        cap: node.cap,
+        ...(node.styleId ? { style: node.styleId } : {})
+      }
     },
     x1: dimension(node.x1),
     y1: dimension(node.y1),
@@ -121,7 +136,10 @@ export function toDtcgTokens(doc: WorkbenchDocument): Record<string, unknown> {
       width: dimension(doc.artboard.width),
       height: dimension(doc.artboard.height)
     },
-    styles: Object.fromEntries((doc.styles ?? []).map((s) => [s.id, styleTokens(s)])),
+    styles: Object.fromEntries([
+      ...(doc.styles ?? []).map((s) => [s.id, styleTokens(s)]),
+      ...(doc.lineStyles ?? []).map((s) => [s.id, lineStyleTokens(s)])
+    ]),
     nodes: Object.fromEntries(doc.nodes.map((n, i) => [n.id, nodeTokens(n, i)]))
   }
 }

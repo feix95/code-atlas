@@ -72,6 +72,7 @@ function sameLine(a: LineNode, b: SceneNode): boolean {
     a.x2 === b.x2 &&
     a.y2 === b.y2 &&
     a.cap === b.cap &&
+    a.styleId === b.styleId &&
     sameStroke(a.stroke, b.stroke)
   )
 }

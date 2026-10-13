@@ -351,6 +351,21 @@
   stroke-width: 1px;
 }
 
+/* 间距标注:线段 + 端点短横 + 数值,与对齐引导线同色 */
+.uwb-gap-line {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+}
+
+.uwb-gap-label {
+  fill: var(--sash-hi);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-medium);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+
 /* 框选选框:功能蓝虚线 + 浅蓝底(Figma 同款视觉语言),手势示意不进设计数值 */
 .uwb-marquee {
   fill: color-mix(in srgb, var(--sash-hi) 12%, transparent);
@@ -579,28 +594,77 @@
   overflow: auto;
 }
 
-/* 空区域占位:区域名 + 用途说明 */
-.uwb-hint {
+/* 左侧栏 · 样式组:标题行(带存入钮)+ 列表;条目点一下放入画板,行尾减号删除 */
+.uwb-groups {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.uwb-groups-head {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  padding: var(--space-4);
+  justify-content: space-between;
+}
+
+.uwb-groups-empty {
   color: var(--muted-2);
   font-size: var(--font-sm);
-  text-align: center;
-  user-select: none;
+  line-height: 1.5;
 }
 
-.uwb-hint.is-compact {
-  flex-direction: row;
-  gap: var(--space-2);
+.uwb-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
   padding: 0;
+  list-style: none;
 }
 
-.uwb-hint-name {
-  color: var(--muted);
-  font-weight: var(--font-w-medium);
+.uwb-group-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uwb-group-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.uwb-group-item:hover {
+  background: var(--hover);
+}
+
+.uwb-group-item:focus-visible {
+  outline: 1.5px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+.uwb-group-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uwb-group-meta {
+  color: var(--muted-2);
+  font-size: var(--font-xs);
 }

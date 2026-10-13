@@ -33,7 +33,15 @@ const RECT_PATCH_KEYS: readonly (keyof RectPatch)[] = [
   'stroke',
   'styleId'
 ]
-const LINE_PATCH_KEYS: readonly (keyof LinePatch)[] = ['x1', 'y1', 'x2', 'y2', 'stroke', 'cap']
+const LINE_PATCH_KEYS: readonly (keyof LinePatch)[] = [
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'stroke',
+  'cap',
+  'styleId'
+]
 
 /** 只留下属于该节点类型的补丁字段:对矩形打直线补丁(反之亦然)不会把外来字段混进节点 */
 function onlyKeys<T extends object>(patch: object, keys: readonly (keyof T)[]): T {

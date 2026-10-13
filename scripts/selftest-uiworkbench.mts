@@ -55,7 +55,14 @@ import {
   withCornerRadius,
   type RectNode
 } from '../src/shared/uiWorkbench/node.ts'
-import { snapMove, snapTargets } from '../src/shared/uiWorkbench/snap.ts'
+import { snapMove, snapTargets, type SnapBox } from '../src/shared/uiWorkbench/snap.ts'
+import { gapMarks, neighborGaps, snapSpacing } from '../src/shared/uiWorkbench/spacing.ts'
+import {
+  SCALE_HANDLES,
+  scaleBoxByHandle,
+  scaleNodePatch,
+  type ScaleHandle
+} from '../src/shared/uiWorkbench/groupScale.ts'
 import {
   applyLinePatch,
   cloneLine,
@@ -82,9 +89,24 @@ import {
 } from '../src/shared/uiWorkbench/scene.ts'
 import { SCRUB_PX_PER_STEP, scrubStep } from '../src/shared/uiWorkbench/scrub.ts'
 import {
+  lineAppearanceOf,
+  linkedLineStyleId,
+  resolveLinkedLineLook,
+  sanitizeLineStyles,
+  type LineStyle
+} from '../src/shared/uiWorkbench/lineStyles.ts'
+import {
+  buildGroup,
+  describeGroup,
+  groupSize,
+  instantiateGroup,
+  sanitizeGroups
+} from '../src/shared/uiWorkbench/groups.ts'
+import {
   appearanceOf,
   normalizeStyleName,
   removeStylePreset,
+  resolveLinkedLook,
   sameAppearance,
   sanitizeStylePresets,
   saveStylePreset,
@@ -1068,9 +1090,15 @@ check('直线拖出:自由绘制取整;Shift 吸 15° 水平/垂直精确无 -0;
 
 check('直线拖端点:另一端钉死,被拖端跟指针', () => {
   const l = createLine([], ENDS)
-  assert.deepEqual(lineEndpointPatch(l, 'end', { x: 200, y: 70 }, false), { x2: 200, y2: 70 })
-  assert.deepEqual(lineEndpointPatch(l, 'start', { x: 0, y: 5 }, false), { x1: 0, y1: 5 })
-  const snapped = lineEndpointPatch(l, 'end', { x: 210, y: 25 }, true)
+  assert.deepEqual(lineEndpointPatch(l, 'end', { x: 200, y: 70 }, { isAngleSnap: false }), {
+    x2: 200,
+    y2: 70
+  })
+  assert.deepEqual(lineEndpointPatch(l, 'start', { x: 0, y: 5 }, { isAngleSnap: false }), {
+    x1: 0,
+    y1: 5
+  })
+  const snapped = lineEndpointPatch(l, 'end', { x: 210, y: 25 }, { isAngleSnap: true })
   assert.equal(snapped.y2, 20)
 })
 
@@ -1190,5 +1218,269 @@ check('直线进撤销栈:添加/移动/删除各一步,撤销还原端点;undo 
   docActions.undo()
   assert.equal(getDocState().nodes.length, before)
   assert.ok(!getDocState().selectedIds.includes(line.id))
+})
+check('新矩形沿用最近样式:取样式最新定义(同名覆盖后跟着变);样式被删按无样式落位并保留数值', () => {
+  const styles: RectStyle[] = [
+    { id: 's1', name: '卡片', fill: '#ff0000', stroke: null, radii: [8, 8, 8, 8] }
+  ]
+  const look = { fill: '#00ff00', stroke: null, radii: [0, 0, 0, 0] as const, styleId: 's1' }
+  const live = resolveLinkedLook(look, styles)
+  assert.equal(live.fill, '#ff0000')
+  assert.deepEqual([...live.radii], [8, 8, 8, 8])
+  assert.equal(live.styleId, 's1')
+  const edited = resolveLinkedLook(look, [{ ...styles[0], fill: '#0000ff' }])
+  assert.equal(edited.fill, '#0000ff')
+  const orphan = resolveLinkedLook(look, [])
+  assert.equal(orphan.fill, '#00ff00')
+  assert.equal(orphan.styleId, null)
+  assert.equal(resolveLinkedLook({ ...look, styleId: null }, styles).fill, '#00ff00')
+})
+
+check('直线端点吸附取值:吸到中线的 .5 在 isPrecise 下保留,自由绘制仍取整', () => {
+  const free = lineFromDrag(
+    { x: 0, y: 0 },
+    { x: 50.5, y: 10 },
+    { isAngleSnap: false, isFromCenter: false }
+  )
+  assert.equal(free.x2, 51)
+  const precise = lineFromDrag(
+    { x: 0, y: 0 },
+    { x: 50.5, y: 10 },
+    { isAngleSnap: false, isFromCenter: false, isPrecise: true }
+  )
+  assert.equal(precise.x2, 50.5)
+  const l = createLine([], ENDS)
+  assert.deepEqual(
+    lineEndpointPatch(l, 'end', { x: 200.5, y: 20 }, { isAngleSnap: false, isPrecise: true }),
+    { x2: 200.5, y2: 20 }
+  )
+  const snapped = snapMove(
+    { x: 108, y: 21, width: 0, height: 0 },
+    [
+      { x: 0, y: 0, width: 110, height: 50 },
+      { x: 10, y: 20, width: 0, height: 0 }
+    ],
+    5
+  )
+  assert.equal(snapped.x, 110)
+  assert.equal(snapped.y, 20)
+})
+check('直线样式:改外观静默脱钩、改端点不脱;存档逐条校验;活链接取最新定义', () => {
+  const style: LineStyle = {
+    id: 'l1',
+    name: '分割线',
+    stroke: { color: '#999999', width: 2, style: 'dashed' },
+    cap: 'round'
+  }
+  const linked = applyLinePatch(createLine([], ENDS), { ...lineAppearanceOf(style), styleId: 'l1' })
+  assert.equal(linked.styleId, 'l1')
+  assert.equal(applyLinePatch(linked, { x2: 300 }).styleId, 'l1')
+  assert.equal(applyLinePatch(linked, { cap: 'square' }).styleId, null)
+  assert.equal(applyLinePatch(linked, { stroke: { ...linked.stroke, width: 5 } }).styleId, null)
+  assert.equal(applyLinePatch(linked, { cap: 'square', styleId: 'l1' }).styleId, 'l1')
+  assert.equal(linkedLineStyleId(linked, [style]), 'l1')
+  assert.equal(linkedLineStyleId(linked, []), '')
+  const stored = JSON.parse(
+    JSON.stringify([style, { id: '', name: 'x' }, { ...style, id: 'l2', cap: 'zig' }])
+  )
+  assert.deepEqual(sanitizeLineStyles(stored), [style])
+  assert.deepEqual(sanitizeLineStyles('nope'), [])
+  const look = {
+    stroke: { color: '#000000', width: 1, style: 'solid' as const },
+    cap: 'butt' as const,
+    styleId: 'l1'
+  }
+  assert.equal(resolveLinkedLineLook(look, [style]).cap, 'round')
+  assert.equal(resolveLinkedLineLook(look, [{ ...style, cap: 'square' }]).cap, 'square')
+  const orphan = resolveLinkedLineLook(look, [])
+  assert.equal(orphan.styleId, null)
+  assert.equal(orphan.stroke.width, 1)
+})
+
+check('样式组:存为相对坐标 JSON,放入时重编 id、整体平移、散开可改;往返不丢', () => {
+  const rect = applyRectPatch(createRect([], { x: 100, y: 50, width: 40, height: 20 }), {
+    radii: [4, 4, 4, 4],
+    stroke: { color: '#112233', width: 2, style: 'solid' }
+  })
+  const line = createLine([rect], { x1: 120, y1: 90, x2: 220, y2: 90 }, LOOK)
+  const group = buildGroup('g1', '  卡片+线  ', 1, [rect, line])
+  assert.equal(group.name, '卡片+线')
+  assert.deepEqual(unionBox(group.nodes), { x: 0, y: 0, width: 120, height: 40 })
+  assert.equal(group.nodes[0].type === 'rect' && group.nodes[0].x, 0)
+  assert.equal(rect.x, 100)
+  assert.equal(buildGroup('g2', '   ', 3, [rect]).name, '样式组 3')
+  assert.deepEqual(groupSize(group), { width: 120, height: 40 })
+  assert.equal(describeGroup(group), '1 个矩形 · 1 条直线')
+  const existing = [createRect([], { x: 0, y: 0, width: 5, height: 5 })]
+  const made = instantiateGroup(group, existing, { x: 300, y: 400 })
+  assert.deepEqual(
+    made.map((n) => n.id),
+    ['rect-2', 'line-1']
+  )
+  assert.equal(made[0].type === 'rect' && made[0].x, 300)
+  assert.equal(made[0].type === 'rect' && made[0].y, 400)
+  assert.equal(made[1].type === 'line' && made[1].x1, 320)
+  assert.equal(made[1].type === 'line' && made[1].y1, 440)
+  assert.equal(made[1].type === 'line' && made[1].cap, 'round')
+  const again = instantiateGroup(group, [...existing, ...made], { x: 0, y: 0 })
+  assert.deepEqual(
+    again.map((n) => n.id),
+    ['rect-3', 'line-2']
+  )
+  assert.equal(group.nodes[0].type === 'rect' && group.nodes[0].x, 0)
+  const round = sanitizeGroups(JSON.parse(JSON.stringify([group])))
+  assert.equal(round.length, 1)
+  assert.deepEqual(
+    round[0].nodes.map((n) => n.type),
+    ['rect', 'line']
+  )
+  assert.equal(describeGroup(round[0]), '1 个矩形 · 1 条直线')
+  const inserted = instantiateGroup(round[0], [], { x: 10, y: 10 })
+  assert.equal(inserted[0].type === 'rect' && inserted[0].stroke?.width, 2)
+})
+
+check('样式组存档校验:坏节点整组丢弃、空组/无名/非数组丢弃,超限截断', () => {
+  const rect = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  const good = { id: 'g1', name: 'ok', nodes: [rect] }
+  assert.equal(sanitizeGroups([good]).length, 1)
+  assert.equal(
+    sanitizeGroups([{ ...good, nodes: [rect, { type: 'rect', name: 'bad' }] }]).length,
+    0
+  )
+  assert.equal(sanitizeGroups([{ ...good, nodes: [] }]).length, 0)
+  assert.equal(sanitizeGroups([{ ...good, name: '  ' }]).length, 0)
+  assert.equal(sanitizeGroups([{ ...good, id: '' }]).length, 0)
+  assert.equal(sanitizeGroups([{ ...good, nodes: [{ ...rect, type: 'circle' }] }]).length, 0)
+  assert.deepEqual(sanitizeGroups({ not: 'array' }), [])
+  const many = Array.from({ length: 80 }, (_, i) => ({ ...good, id: `g${i}` }))
+  assert.equal(sanitizeGroups(many).length, 64)
+  const clamped = sanitizeGroups([{ ...good, nodes: [{ ...rect, width: 999999 }] }])[0].nodes[0]
+  assert.ok(clamped.type === 'rect' && clamped.width <= 20000)
+})
+
+check('tokens 带直线样式:定义进 styles 组,线节点 $extensions.style 记引用', () => {
+  const style: LineStyle = {
+    id: 'l1',
+    name: '分割线',
+    stroke: { color: '#999999', width: 2, style: 'dashed' },
+    cap: 'round'
+  }
+  const line = applyLinePatch(createLine([], ENDS), { ...lineAppearanceOf(style), styleId: 'l1' })
+  const tokens = toDtcgTokens({
+    artboard: { width: 100, height: 100 },
+    nodes: [line],
+    lineStyles: [style]
+  }) as {
+    styles: Record<string, { $extensions: Record<string, { cap: string }> }>
+    nodes: Record<string, { $extensions: Record<string, { style?: string }> }>
+  }
+  assert.equal(tokens.styles.l1.$extensions['app.codeatlas.ui-workbench'].cap, 'round')
+  assert.equal(tokens.nodes[line.id].$extensions['app.codeatlas.ui-workbench'].style, 'l1')
+})
+check('间距吸附:按已有空隙吸成等距、前后邻居居中、阈值外/锁轴不吸、被挡住的空隙不算参考', () => {
+  const box = (x: number, y: number, width: number, height: number): SnapBox => ({
+    x,
+    y,
+    width,
+    height
+  })
+  const stack = [box(0, 0, 100, 50), box(0, 80, 100, 50)]
+  const near = snapSpacing(box(0, 163, 100, 50), stack, 5, { x: false, y: false })
+  assert.equal(near.y, 160)
+  assert.equal(near.isSnapped.y, true)
+  assert.equal(near.isSnapped.x, false)
+  assert.equal(near.refMarks.length, 1)
+  assert.equal(near.refMarks[0].value, 30)
+  assert.equal(
+    snapSpacing(box(0, 170, 100, 50), stack, 5, { x: false, y: false }).isSnapped.y,
+    false
+  )
+  assert.equal(
+    snapSpacing(box(0, 163, 100, 50), stack, 5, { x: false, y: true }).isSnapped.y,
+    false
+  )
+  assert.equal(snapSpacing(box(0, 163, 100, 50), stack, 5, { x: true, y: true }).isSnapped.y, false)
+  const between = snapSpacing(box(0, 77, 100, 40), [box(0, 0, 100, 50), box(0, 150, 100, 50)], 5, {
+    x: false,
+    y: false
+  })
+  assert.equal(between.y, 80)
+  const blocked = [box(0, 0, 100, 100), box(10, 50, 80, 0), box(0, 130, 100, 50)]
+  assert.equal(
+    snapSpacing(box(0, 262, 100, 50), blocked, 5, { x: false, y: false }).isSnapped.y,
+    false
+  )
+  const gaps = neighborGaps(box(120, 0, 30, 50), [box(0, 0, 100, 50)])
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].axis, 'h')
+  assert.equal(gaps[0].value, 20)
+  assert.equal(gapMarks(box(120, 0, 30, 50), [box(0, 0, 100, 50)], gaps, true).length, 1)
+})
+check('多选整体缩放:手柄换新联合框(锚点/等比/中心/不翻转),节点按框映射,直线端点同映射', () => {
+  const handle = (id: string): ScaleHandle => SCALE_HANDLES.find((h) => h.id === id)!
+  const free = { isProportional: false, isFromCenter: false }
+  const box = { x: 100, y: 100, width: 200, height: 100 }
+  assert.deepEqual(scaleBoxByHandle(box, handle('se'), { x: 400, y: 250 }, free), {
+    x: 100,
+    y: 100,
+    width: 300,
+    height: 150
+  })
+  assert.deepEqual(scaleBoxByHandle(box, handle('nw'), { x: 50, y: 60 }, free), {
+    x: 50,
+    y: 60,
+    width: 250,
+    height: 140
+  })
+  assert.deepEqual(scaleBoxByHandle(box, handle('e'), { x: 500, y: 999 }, free), {
+    x: 100,
+    y: 100,
+    width: 400,
+    height: 100
+  })
+  const prop = scaleBoxByHandle(
+    box,
+    handle('se'),
+    { x: 400, y: 150 },
+    {
+      ...free,
+      isProportional: true
+    }
+  )
+  assert.deepEqual(prop, { x: 100, y: 100, width: 300, height: 150 })
+  const edgeProp = scaleBoxByHandle(
+    box,
+    handle('e'),
+    { x: 500, y: 0 },
+    {
+      ...free,
+      isProportional: true
+    }
+  )
+  assert.deepEqual(edgeProp, { x: 100, y: 50, width: 400, height: 200 })
+  const center = scaleBoxByHandle(
+    box,
+    handle('e'),
+    { x: 400, y: 0 },
+    {
+      ...free,
+      isFromCenter: true
+    }
+  )
+  assert.deepEqual(center, { x: 0, y: 100, width: 400, height: 100 })
+  const crushed = scaleBoxByHandle(box, handle('e'), { x: 0, y: 0 }, free)
+  assert.equal(crushed.width, 1)
+  assert.equal(crushed.x, 100)
+  const rect = createRect([], { x: 120, y: 110, width: 100, height: 50 })
+  const line = createLine([rect], { x1: 120, y1: 200, x2: 280, y2: 200 }, LOOK)
+  const to = { x: 100, y: 100, width: 400, height: 200 }
+  const rp = scaleNodePatch(rect, box, to)
+  assert.deepEqual(rp, { x: 140, y: 120, width: 200, height: 100 })
+  const lp = scaleNodePatch(line, box, to)
+  assert.deepEqual(lp, { x1: 140, y1: 300, x2: 460, y2: 300 })
+  const nodes = [rect, line].map(
+    (n) => applyNodeAction([n], { type: 'update', id: n.id, patch: scaleNodePatch(n, box, to) })[0]
+  )
+  assert.deepEqual(unionBox(nodes), { x: 140, y: 120, width: 320, height: 180 })
 })
 console.log('UI 工作台纯逻辑自测全部通过')

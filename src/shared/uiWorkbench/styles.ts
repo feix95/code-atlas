@@ -26,6 +26,22 @@ export function appearanceOf(node: RectNode): StyleAppearance {
   }
 }
 
+/** 挂着样式的外观 → 取样式的最新定义(同名覆盖后跟着变,活链接);样式已被删除则按「无样式」落位,保留最后已知数值。
+ *  「新矩形默认外观」靠它:记住的是样式 id,不是当时的数值 */
+export function resolveLinkedLook(
+  look: StyleAppearance & { styleId: string | null },
+  styles: readonly RectStyle[]
+): StyleAppearance & { styleId: string | null } {
+  const linked = styles.find((s) => s.id === look.styleId)
+  if (!linked) return { fill: look.fill, stroke: look.stroke, radii: look.radii, styleId: null }
+  return {
+    fill: linked.fill,
+    stroke: linked.stroke ? { ...linked.stroke } : null,
+    radii: [...linked.radii] as CornerRadii,
+    styleId: linked.id
+  }
+}
+
 /** 外观三件套值比较:判「当前矩形是否还等于方案定义」(链接态展示用) */
 export function sameAppearance(a: StyleAppearance, b: StyleAppearance): boolean {
   const sa = a.stroke
@@ -42,20 +58,20 @@ export function sameAppearance(a: StyleAppearance, b: StyleAppearance): boolean 
   )
 }
 
-/** 方案名:去首尾空白、截断;留空回落「样式 N」 */
-export function normalizeStyleName(raw: string, seq: number): string {
-  return raw.trim().slice(0, STYLE_NAME_MAX) || `样式 ${seq}`
+/** 方案名:去首尾空白、截断;留空回落「<前缀> N」(默认「样式 N」,样式组传自己的前缀) */
+export function normalizeStyleName(raw: string, seq: number, prefix = '样式'): string {
+  return raw.trim().slice(0, STYLE_NAME_MAX) || `${prefix} ${seq}`
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isHex(value: unknown): value is string {
+export function isHex(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/.test(value)
 }
 
-function toStroke(value: unknown): RectStroke | null {
+export function toStroke(value: unknown): RectStroke | null {
   if (value === null) return null
   if (!isRecord(value)) return null
   const { color, width, style } = value
@@ -70,7 +86,7 @@ function toStroke(value: unknown): RectStroke | null {
   return { color, width: width as number, style }
 }
 
-function toRadii(value: unknown): CornerRadii | null {
+export function toRadii(value: unknown): CornerRadii | null {
   if (!Array.isArray(value) || value.length !== 4) return null
   if (!value.every((r) => Number.isInteger(r) && (r as number) >= 0)) return null
   return [value[0] as number, value[1] as number, value[2] as number, value[3] as number]
@@ -107,10 +123,10 @@ export function sanitizeStylePresets(value: unknown): RectStyle[] {
 
 /** 存方案:同名覆盖原位(沿用原 id——挂着的实例靠 id 认,改名才断链);
  *  返回 { list, id, overwrote } 让调用方决定要不要把新定义回写到挂接节点 */
-export function saveStylePreset(
-  list: readonly RectStyle[],
-  preset: RectStyle
-): { list: RectStyle[]; id: string; overwrote: boolean } {
+export function saveStylePreset<T extends { id: string; name: string }>(
+  list: readonly T[],
+  preset: T
+): { list: T[]; id: string; overwrote: boolean } {
   const index = list.findIndex((s) => s.name === preset.name)
   if (index < 0)
     return { list: [...list, preset].slice(0, STYLES_MAX), id: preset.id, overwrote: false }
@@ -122,6 +138,6 @@ export function saveStylePreset(
   }
 }
 
-export function removeStylePreset(list: readonly RectStyle[], id: string): RectStyle[] {
+export function removeStylePreset<T extends { id: string }>(list: readonly T[], id: string): T[] {
   return list.filter((s) => s.id !== id)
 }

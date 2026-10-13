@@ -442,3 +442,4 @@
 - fix(workbench): Delete/Backspace 升级文档级键,不再要求指针悬停画布
 - fix(workbench): 画布手势起手释放面板输入框/下拉的残留焦点,修复碰过面板控件后 Delete/V/R/方向键/Ctrl+Z 失灵
 - feat(workbench): 新增直线工具(L 键,Shift 吸 15°、Alt 中心绘制、拖端点、端点样式、虚线、导出 SVG/CSS/tokens);feat(workbench): 数值框标签左右拖拽调值;feat(workbench): 矩形/直线工具选中时面板显示新对象默认外观;feat(workbench): 外观样式库(整包存取、活链接、Ctrl+Alt+C/V 外观复制粘贴)
+feat(workbench): 直线样式库与左侧样式组(存/放入/删除,放入为散开普通对象);feat(workbench): 拖动等间距吸附与按住修饰键的间距标注,Alt/Ctrl+Alt 拖拽复制;feat(workbench): 多选联合变换框整体缩放(Shift 等比、Alt 中心锚)

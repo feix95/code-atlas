@@ -31,12 +31,16 @@ import {
   type EdgeName
 } from '@shared/uiWorkbench/node'
 import type { LineNode } from '@shared/uiWorkbench/line'
-import { hitTopmost, nodeOverlapsBox, translatePatch, unionBox } from '@shared/uiWorkbench/scene'
-import { snapMove, snapTargets, type SnapGuides } from '@shared/uiWorkbench/snap'
+import { hitTopmost, nodeOverlapsBox } from '@shared/uiWorkbench/scene'
+import { snapMove, snapTargets, type SnapBox, type SnapGuides } from '@shared/uiWorkbench/snap'
+import type { GapMark } from '@shared/uiWorkbench/spacing'
+import type { ScaleHandle } from '@shared/uiWorkbench/groupScale'
 import { docActions, getDocState, selectedLine, selectedRect } from './documentStore'
 import { cornerResizeCursor, edgeResizeCursor } from './cursors'
 import { isEditableTarget } from './isEditableTarget'
-import { startLineDraw, startLineEndpointDrag } from './lineGestures'
+import { startLineDraw, startLineEndpointDrag, type LineGestureDeps } from './lineGestures'
+import { startGroupScaleDrag } from './groupScaleGesture'
+import { SNAP_THRESHOLD_PX, startNodeDrag, type MoveGestureDeps } from './moveGesture'
 import { getNewRectAppearance } from './newRectDefaultsStore'
 import { releaseEditableFocus, trackPointer } from './trackPointer'
 import { useDocShortcuts } from './useDocShortcuts'
@@ -48,8 +52,6 @@ export type GestureKind = 'radius' | 'rotate' | null
 
 /** Shift 拖圆角柄的吸附步长:4pt 网格约定 */
 const RADIUS_SNAP_STEP = 4
-/** 对齐吸附的命中距离(屏幕像素):除以 zoom 换成设计单位,放得越大吸得越「松」 */
-const SNAP_THRESHOLD_PX = 5
 /** 直线点选容差(屏幕像素):线细,不放宽就点不中;除以 zoom 换成设计单位 */
 const LINE_HIT_TOLERANCE_PX = 6
 
@@ -59,6 +61,8 @@ export interface CanvasToolsApi {
   activeGesture: GestureKind
   /** 移动拖动中的对齐引导线(设计单位),覆盖层照着画线 */
   guides: SnapGuides
+  /** 移动拖动中的间距标注(等间距吸附 / 按住修饰键时的邻居距离),覆盖层照着画 */
+  gaps: GapMark[]
   /** 框选手势中的选框(设计单位),覆盖层照着画虚线框 */
   marquee: RectBox | null
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
@@ -67,11 +71,13 @@ export interface CanvasToolsApi {
   startRadiusDrag: (e: React.PointerEvent, corner: CornerIndex) => void
   startRotateDrag: (e: React.PointerEvent) => void
   startEndpointDrag: (e: React.PointerEvent, which: 'start' | 'end') => void
+  startGroupScale: (e: React.PointerEvent, handle: ScaleHandle) => void
 }
 export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize): CanvasToolsApi {
   const [tool, setTool] = useState<CanvasTool>('select')
   const [activeGesture, setActiveGesture] = useState<GestureKind>(null)
   const [guides, setGuides] = useState<SnapGuides>({ v: null, h: null })
+  const [gaps, setGaps] = useState<GapMark[]>([])
   const [marquee, setMarquee] = useState<RectBox | null>(null)
   const viewRef = useRef(viewport.view)
   const toolRef = useRef(tool)
@@ -97,7 +103,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     releaseEditableFocus(e.currentTarget.ownerDocument)
     const start = toDesign(e)
     if (toolRef.current === 'line') {
-      startLineDraw(e, { toDesign, onDone: fallbackToSelect })
+      startLineDraw(e, lineGestureDeps())
       return
     }
     if (toolRef.current === 'rect') {
@@ -184,71 +190,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
       )
       return
     }
-    // 命中节点:先定选集再移动。Shift 点已选节点 = 挂起剔除(单击才剔,拖动仍带它走,即 Figma 的
-    // Shift+拖动 = 整组轴锁移动);Shift 点未选 = 并入;无 Shift 点未选 = 替换选集
-    let pendingDeselectId: string | null = null
-    if (e.shiftKey) {
-      if (getDocState().selectedIds.includes(hit.id)) pendingDeselectId = hit.id
-      else docActions.selectIds([...getDocState().selectedIds, hit.id])
-    } else if (!getDocState().selectedIds.includes(hit.id)) {
-      docActions.select(hit.id)
-    }
-    // 整组移动:按下瞬间的选集即移动集,联合外接框当「被拖矩形」进吸附;
-    // 多选时普通单击某个已选成员 = 收拢到只选它(Figma 式),拖动则整组动
-    const movingIds = [...getDocState().selectedIds]
-    const collapseOnClick = !e.shiftKey && movingIds.length > 1
-    const moving = getDocState().nodes.filter((n) => movingIds.includes(n.id))
-    const union = unionBox(moving)
-    let moved = false
-    trackPointer(
-      e,
-      (ev) => {
-        const cur = toDesign(ev)
-        let dx = cur.x - start.x
-        let dy = cur.y - start.y
-        // Shift 轴锁:位移主方向走直线,另一轴钉死(Figma 式)
-        if (ev.shiftKey) {
-          if (Math.abs(dx) >= Math.abs(dy)) dy = 0
-          else dx = 0
-        }
-        let unionX = Math.round(union.x + dx)
-        let unionY = Math.round(union.y + dy)
-        let next: SnapGuides = { v: null, h: null }
-        // Ctrl/Cmd 按住 = 临时禁用吸附(Figma 式);修饰键中途变化由 trackPointer 原地重放本函数
-        if (!ev.ctrlKey && !ev.metaKey) {
-          const s = snapMove(
-            { x: union.x + dx, y: union.y + dy, width: union.width, height: union.height },
-            [
-              ...snapTargets(getDocState().nodes, movingIds),
-              { x: 0, y: 0, width: boardRef.current.width, height: boardRef.current.height }
-            ],
-            SNAP_THRESHOLD_PX / viewRef.current.zoom
-          )
-          next = s.guides
-          // 吸上的轴用精确值(中线对奇数宽可能出 .5),没吸上的轴用上面取整过的
-          if (s.guides.v) unionX = s.x
-          if (s.guides.h) unionY = s.y
-        }
-        setGuides(next)
-        moved = true
-        const ddx = unionX - union.x
-        const ddy = unionY - union.y
-        for (const origin of moving) {
-          docActions.dispatch({
-            type: 'update',
-            id: origin.id,
-            patch: translatePatch(origin, ddx, ddy)
-          })
-        }
-      },
-      () => {
-        setGuides({ v: null, h: null })
-        // 单击才落实 Shift 剔除;拖动过就不剔(Figma:Shift+拖已选对象 = 整组轴锁移动)
-        if (!moved && pendingDeselectId) docActions.toggleSelect(pendingDeselectId)
-        else if (!moved && collapseOnClick) docActions.select(hit.id)
-      },
-      'move'
-    )
+    startNodeDrag(e, hit.id, start, moveGestureDeps())
   }
 
   function startResizeDrag(e: React.PointerEvent, corner: CornerIndex): void {
@@ -344,11 +286,46 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     if (toolRef.current !== 'select') setTool('select')
   }
 
+  /** 点吸附:拖动中的端点当零尺寸盒,向其他对象 + 画板 + extra 的 起边/中线/终边 靠拢 */
+  function snapPoint(
+    point: Point,
+    excludeIds: readonly string[],
+    extra: readonly SnapBox[]
+  ): { point: Point; guides: SnapGuides } {
+    const s = snapMove(
+      { x: point.x, y: point.y, width: 0, height: 0 },
+      [
+        ...snapTargets(getDocState().nodes, excludeIds),
+        { x: 0, y: 0, width: boardRef.current.width, height: boardRef.current.height },
+        ...extra
+      ],
+      SNAP_THRESHOLD_PX / viewRef.current.zoom
+    )
+    return { point: { x: s.x, y: s.y }, guides: s.guides }
+  }
+
+  function moveGestureDeps(): MoveGestureDeps {
+    return {
+      toDesign,
+      getZoom: () => viewRef.current.zoom,
+      getBoard: () => boardRef.current,
+      setGuides,
+      setGaps
+    }
+  }
+
+  function lineGestureDeps(): LineGestureDeps {
+    return { toDesign, onDone: fallbackToSelect, snapPoint, setGuides }
+  }
+
   function startEndpointDrag(e: React.PointerEvent, which: 'start' | 'end'): void {
     const line: LineNode | null = selectedLine(getDocState())
     if (!line || e.button !== 0) return
-    startLineEndpointDrag(e, line, which, { toDesign, onDone: fallbackToSelect })
+    startLineEndpointDrag(e, line, which, lineGestureDeps())
   }
+
+  const startGroupScale = (e: React.PointerEvent, handle: ScaleHandle): void =>
+    startGroupScaleDrag(e, handle, toDesign)
 
   useToolKeys(viewport, setTool)
   useDocShortcuts(viewport)
@@ -358,13 +335,15 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     setTool,
     activeGesture,
     guides,
+    gaps,
     marquee,
     onPointerDown,
     startResizeDrag,
     startEdgeDrag,
     startRadiusDrag,
     startRotateDrag,
-    startEndpointDrag
+    startEndpointDrag,
+    startGroupScale
   }
 }
 

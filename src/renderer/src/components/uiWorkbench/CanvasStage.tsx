@@ -11,6 +11,7 @@ import type { SceneNode } from '@shared/uiWorkbench/scene'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
 import type { CanvasViewportApi } from '../../uiWorkbench/useCanvasViewport'
 import { ArtboardNodes } from './ArtboardNodes'
+import { GapMarks } from './GapMarks'
 import { Ruler } from './Ruler'
 import { SelectionOverlay } from './SelectionOverlay'
 
@@ -100,6 +101,7 @@ export function CanvasStage({
             )}
           </svg>
         )}
+        {tools.gaps.length > 0 && <GapMarks marks={tools.gaps} view={view} />}
         {selectedNodes.length > 0 && (
           <SelectionOverlay nodes={selectedNodes} view={view} tools={tools} />
         )}

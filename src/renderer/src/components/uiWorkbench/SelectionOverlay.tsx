@@ -1,6 +1,6 @@
 // 选中覆盖层:旋转矩形的描边、四角圆角手柄、顶边外侧的旋转旋钮。
-// 多选时每个节点各画一条描边(Figma 式),不挂手柄——缩放/圆角/旋转是单对象手势;
-// 恰为单选时才显示全套手柄与旋钮。
+// 多选时每个节点各画一条描边(Figma 式),另加联合外接框与 8 个整体缩放手柄(GroupScaleHandles);
+// 圆角/旋转是单对象手势,恰为单选时才显示全套手柄与旋钮。
 // 全部用 app 的功能蓝 --sash-hi,只作工具示意不进设计数值。SVG 平铺在视口上(屏幕坐标),
 // 本体不拦截指针(pointer-events: none),只有手柄与旋钮热区可点。
 import { cornerLocal, radiusHandleLocal, rotatePoint, toWorld } from '@shared/uiWorkbench/geometry'
@@ -8,6 +8,7 @@ import { CORNERS, EDGES, type CornerIndex, type EdgeName } from '@shared/uiWorkb
 import type { SceneNode } from '@shared/uiWorkbench/scene'
 import { cornerResizeCursor, edgeResizeCursor } from '../../uiWorkbench/cursors'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
+import { GroupScaleHandles } from './GroupScaleHandles'
 import type { Viewport } from '../../uiWorkbench/viewport'
 
 /** 角缩放手柄半宽(CSS px)与圆角手柄半径 */
@@ -71,10 +72,11 @@ export function SelectionOverlay({
       {outlines.map((o) => (
         <polygon
           key={o.id}
-          className="uwb-sel"
+          className="uwb-sel uwb-sel-node"
           points={o.points.map((p) => `${p.x},${p.y}`).join(' ')}
         />
       ))}
+      {nodes.length > 1 && <GroupScaleHandles nodes={nodes} view={view} tools={tools} />}
       {line &&
         outlines[0].points.map((p, i) => (
           <circle

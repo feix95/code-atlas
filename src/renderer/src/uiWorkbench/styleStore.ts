@@ -1,6 +1,5 @@
-// 外观样式仓库(渲染端):localStorage + 订阅广播,同 artboardPrefsStore 的做法。
-// 样式定义存本机,关掉重开不丢;节点经 styleId 挂接(活链接),改定义/删定义的回写走 docActions。
-import { useSyncExternalStore } from 'react'
+// 矩形外观样式仓库(渲染端):存本机,关掉重开不丢;节点经 styleId 挂接(活链接),
+// 改定义/删定义的回写走 docActions。读写与订阅由 persistentList 工厂统一承担。
 import {
   normalizeStyleName,
   removeStylePreset,
@@ -9,61 +8,33 @@ import {
   type RectStyle,
   type StyleAppearance
 } from '@shared/uiWorkbench/styles'
+import { createPersistentList } from './persistentList'
 
-const KEY = 'atlas.uiWorkbench.styles'
+const store = createPersistentList<RectStyle>(
+  'atlas.uiWorkbench.styles',
+  '外观样式',
+  sanitizeStylePresets
+)
 
-function readStored(): RectStyle[] {
-  try {
-    const raw = localStorage.getItem(KEY)
-    return raw === null ? [] : sanitizeStylePresets(JSON.parse(raw))
-  } catch (err) {
-    console.warn('[uiWorkbench] 外观样式存档读取失败,回落空表', { key: KEY, err })
-    return []
-  }
-}
-
-let styles = readStored()
-const listeners = new Set<() => void>()
-
-function commit(next: RectStyle[]): void {
-  styles = next
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next))
-  } catch (err) {
-    console.warn('[uiWorkbench] 外观样式存档写入失败', { key: KEY, err })
-  }
-  for (const cb of listeners) cb()
-}
-
-function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  return () => listeners.delete(cb)
-}
-
-export function useStyles(): RectStyle[] {
-  return useSyncExternalStore(subscribe, () => styles)
-}
-
-export function getStyles(): RectStyle[] {
-  return styles
-}
+export const useStyles = store.use as () => RectStyle[]
+export const getStyles = store.get as () => RectStyle[]
 
 export const styleActions = {
   /** 存方案:同名覆盖(沿用原 id——挂接节点靠 id 认,不会被换名弄丢);
    *  返回 { id, overwrote }:overwrote 为 true 时调用方应把新定义回写到所有挂接节点 */
   save(rawName: string, appearance: StyleAppearance): { id: string; overwrote: boolean } {
-    const name = normalizeStyleName(rawName, styles.length + 1)
+    const styles = getStyles()
     const r = saveStylePreset(styles, {
       id: crypto.randomUUID(),
-      name,
+      name: normalizeStyleName(rawName, styles.length + 1),
       fill: appearance.fill,
       stroke: appearance.stroke,
       radii: appearance.radii
     })
-    commit(r.list)
+    store.set(r.list)
     return { id: r.id, overwrote: r.overwrote }
   },
   remove(id: string): void {
-    commit(removeStylePreset(styles, id))
+    store.set(removeStylePreset(getStyles(), id))
   }
 }

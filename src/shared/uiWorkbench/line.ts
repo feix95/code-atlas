@@ -23,9 +23,13 @@ export interface LineNode {
   y2: number
   stroke: RectStroke
   cap: LineCap
+  /** 挂接的直线样式 id(lineStyles.ts 里的 LineStyle);null = 自由身 */
+  styleId: string | null
 }
 
-export type LinePatch = Partial<Pick<LineNode, 'x1' | 'y1' | 'x2' | 'y2' | 'stroke' | 'cap'>>
+export type LinePatch = Partial<
+  Pick<LineNode, 'x1' | 'y1' | 'x2' | 'y2' | 'stroke' | 'cap' | 'styleId'>
+>
 
 export interface LineEnds {
   x1: number
@@ -56,9 +60,11 @@ function clampCoord(value: number): number {
   return round2(Math.min(NODE_COORD_LIMIT, Math.max(-NODE_COORD_LIMIT, value)))
 }
 
-/** 补丁落地前的统一校验:端点钳边界取 2 位小数;非法描边/端点样式回退原值 */
+/** 补丁落地前的统一校验:端点钳边界取 2 位小数;非法描边/端点样式回退原值;
+ *  外观字段(stroke/cap)被手动改而补丁没带 styleId → 静默脱离样式链接(同矩形) */
 export function applyLinePatch(node: LineNode, patch: LinePatch): LineNode {
   const merged = { ...node, ...patch }
+  const touchesAppearance = 'stroke' in patch || 'cap' in patch
   return {
     ...merged,
     x1: clampCoord(merged.x1),
@@ -66,7 +72,8 @@ export function applyLinePatch(node: LineNode, patch: LinePatch): LineNode {
     x2: clampCoord(merged.x2),
     y2: clampCoord(merged.y2),
     stroke: sanitizeStroke(merged.stroke) ?? node.stroke,
-    cap: LINE_CAPS.includes(merged.cap) ? merged.cap : node.cap
+    cap: LINE_CAPS.includes(merged.cap) ? merged.cap : node.cap,
+    styleId: 'styleId' in patch ? (patch.styleId ?? null) : touchesAppearance ? null : node.styleId
   }
 }
 
@@ -79,7 +86,7 @@ function nextSeq(nodes: readonly { id: string }[]): number {
 export function createLine(
   nodes: readonly { id: string }[],
   ends: LineEnds,
-  look: Partial<Pick<LineNode, 'stroke' | 'cap'>> = {}
+  look: Partial<Pick<LineNode, 'stroke' | 'cap' | 'styleId'>> = {}
 ): LineNode {
   const seq = nextSeq(nodes)
   return applyLinePatch(
@@ -90,6 +97,7 @@ export function createLine(
       ...ends,
       stroke: { ...LINE_DEFAULT_STROKE },
       cap: LINE_DEFAULT_CAP,
+      styleId: null,
       ...look
     },
     {}
@@ -146,11 +154,12 @@ export function lineTranslatePatch(line: LineEnds, dx: number, dy: number): Line
 }
 
 /** 拖出直线:start 按下点,end 当前点。isAngleSnap(Shift)把方向吸到 15° 整倍数、长度不变;
- *  isFromCenter(Alt)以 start 为中点向两侧对称展开。自由绘制端点取整数,吸角时保留 2 位小数 */
+ *  isFromCenter(Alt)以 start 为中点向两侧对称展开。自由绘制端点取整数;吸角或吸附到对象(isPrecise)时保留 2 位小数,
+ *  否则吸到中线的 .5 会被取整弄丢 */
 export function lineFromDrag(
   start: Pt,
   end: Pt,
-  mods: { isAngleSnap: boolean; isFromCenter: boolean }
+  mods: { isAngleSnap: boolean; isFromCenter: boolean; isPrecise?: boolean }
 ): LineEnds {
   let dx = end.x - start.x
   let dy = end.y - start.y
@@ -160,7 +169,7 @@ export function lineFromDrag(
     dx = Math.cos(snapped) * length
     dy = Math.sin(snapped) * length
   }
-  const round = mods.isAngleSnap ? round2 : Math.round
+  const round = mods.isAngleSnap || mods.isPrecise ? round2 : Math.round
   return {
     x1: round(mods.isFromCenter ? start.x - dx : start.x),
     y1: round(mods.isFromCenter ? start.y - dy : start.y),
@@ -174,10 +183,10 @@ export function lineEndpointPatch(
   line: LineEnds,
   which: 'start' | 'end',
   pointer: Pt,
-  isAngleSnap: boolean
+  mods: { isAngleSnap: boolean; isPrecise?: boolean }
 ): LinePatch {
   const fixed = which === 'end' ? { x: line.x1, y: line.y1 } : { x: line.x2, y: line.y2 }
-  const moved = lineFromDrag(fixed, pointer, { isAngleSnap, isFromCenter: false })
+  const moved = lineFromDrag(fixed, pointer, { ...mods, isFromCenter: false })
   return which === 'end' ? { x2: moved.x2, y2: moved.y2 } : { x1: moved.x2, y1: moved.y2 }
 }
 

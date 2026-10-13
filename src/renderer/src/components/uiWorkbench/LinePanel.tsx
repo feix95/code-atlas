@@ -1,4 +1,4 @@
-// 属性面板 · 直线分区:位置(起点/终点坐标)、长度与角度(由两端点派生,改它们 = 起点不动重算终点)、
+// 属性面板 · 直线分区:样式(与矩形同一个分区组件)、位置(起点/终点坐标)、长度与角度(由两端点派生,改它们 = 起点不动重算终点)、
 // 描边(颜色/线宽/线型/端点样式)。直线必有描边,没有「移除描边」。
 // 数值一律经 dispatch 落地(钳边界、取 2 位小数由 applyLinePatch 收口)。
 // onPatch / isDefaults:同 RectPanel,「新直线默认外观」模式下 node 是承载默认值的预览节点,只展示描边分区。
@@ -21,8 +21,10 @@ import {
   type StrokeStyle
 } from '@shared/uiWorkbench/node'
 import { docActions } from '../../uiWorkbench/documentStore'
+import { useLineStyleActions } from '../../uiWorkbench/useLineStyleActions'
 import { ColorField } from './ColorField'
 import { NumberField } from './NumberField'
+import { StyleSection } from './StyleSection'
 
 const coord = (raw: string): number | null =>
   parseIntegerInput(raw, -NODE_COORD_LIMIT, NODE_COORD_LIMIT)
@@ -46,6 +48,7 @@ export function LinePanel({
     onPatch ??
     ((p: LinePatch): void => docActions.dispatch({ type: 'update', id: node.id, patch: p }))
   const { stroke } = node
+  const styleBindings = useLineStyleActions(node, patch, isDefaults)
   return (
     <>
       {isDefaults && (
@@ -54,6 +57,13 @@ export function LinePanel({
           <span className="uwb-multi-hint">下面的外观会用于接下来画出的每条直线</span>
         </section>
       )}
+      <StyleSection
+        styles={styleBindings.styles}
+        linkedId={styleBindings.linkedId}
+        onApply={styleBindings.apply}
+        onSave={styleBindings.save}
+        onRemove={styleBindings.remove}
+      />
       {!isDefaults && (
         <section className="uwb-section" aria-label={node.name}>
           <h3 className="uwb-section-title">{node.name}</h3>

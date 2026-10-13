@@ -2,7 +2,6 @@
 // 角度;圆角 = 四角同值 + 四角分设(混合显示空);外观 = 填充(可空)+ 描边(可空,含线宽/线型)。
 // 样式规则:应用 = 挂 styleId 并写入定义值;手动改外观 = 静默脱钩;同名保存 = 覆盖定义并回写所有挂接节点。
 // 数值一律经 dispatch 落地(取整、钳边界、四角不超过短边一半由 applyRectPatch 收口)。
-import { useState } from 'react'
 import { parseIntegerInput } from '@shared/uiWorkbench/numberInput'
 import {
   CORNER_KEYS,
@@ -22,57 +21,14 @@ import { ARTBOARD_SIDE_MAX, ARTBOARD_SIDE_MIN } from '@shared/uiWorkbench/artboa
 import { NODE_COORD_LIMIT } from '@shared/uiWorkbench/node'
 import { appearanceOf } from '@shared/uiWorkbench/styles'
 import { docActions, getDocState } from '../../uiWorkbench/documentStore'
+import { newRectDefaultsActions } from '../../uiWorkbench/newRectDefaultsStore'
 import { styleActions, useStyles } from '../../uiWorkbench/styleStore'
 import { NumberField } from './NumberField'
 import { ColorField } from './ColorField'
+import { MinusIcon, PlusIcon, RowButton } from './RowButton'
+import { StyleSection } from './StyleSection'
 
 const CORNER_LABELS = ['左上', '右上', '右下', '左下'] as const
-
-const SVG_ICON = {
-  viewBox: '0 0 24 24',
-  width: 16,
-  height: 16,
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true
-} as const
-
-const PLUS_ICON = (
-  <svg {...SVG_ICON}>
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-)
-const MINUS_ICON = (
-  <svg {...SVG_ICON}>
-    <path d="M5 12h14" />
-  </svg>
-)
-
-/** 分区行尾 ghost 图标钮(加 / 减):与画板行的对调、存删预设同款 */
-function RowButton({
-  label,
-  icon,
-  onClick
-}: {
-  label: string
-  icon: React.ReactNode
-  onClick: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      className="uwb-field-btn"
-      aria-label={label}
-      data-tip={label}
-      onClick={onClick}
-    >
-      {icon}
-    </button>
-  )
-}
 
 /** onPatch 缺省 = 改文档里的这个节点;传入则改别处(「新矩形默认外观」模式:node 是承载默认值的
  *  预览节点,只展示外观分区,位置/尺寸/角度由拖出矩形时决定,面板不给) */
@@ -102,8 +58,6 @@ export function RectPanel({
     return v === null ? null : normalizeRotation(v)
   }
   const styles = useStyles()
-  const [naming, setNaming] = useState(false)
-  const [styleName, setStyleName] = useState('')
   // 挂着的方案 id;定义被删的悬空 id 按「无样式」落位
   const linkedId = styles.some((s) => s.id === node.styleId) ? (node.styleId ?? '') : ''
 
@@ -111,6 +65,7 @@ export function RectPanel({
   function applyStyle(id: string): void {
     if (id === '') {
       patch({ styleId: null })
+      newRectDefaultsActions.rememberStyle(null)
       return
     }
     const s = styles.find((it) => it.id === id)
@@ -121,13 +76,12 @@ export function RectPanel({
       radii: [...s.radii] as typeof node.radii,
       styleId: s.id
     })
+    newRectDefaultsActions.rememberStyle(s.id, s)
   }
 
   /** 存为样式:同名覆盖并把新定义回写所有挂接节点(活链接);最后把当前矩形挂上(或保持挂) */
-  function saveStyle(): void {
-    const { id, overwrote } = styleActions.save(styleName, appearanceOf(node))
-    setNaming(false)
-    setStyleName('')
+  function saveStyle(name: string): void {
+    const { id, overwrote } = styleActions.save(name, appearanceOf(node))
     docActions.beginBatch()
     try {
       if (overwrote) {
@@ -139,6 +93,7 @@ export function RectPanel({
         }
       }
       if (node.styleId !== id) patch({ styleId: id })
+      newRectDefaultsActions.rememberStyle(id, appearanceOf(node))
     } finally {
       docActions.endBatch()
     }
@@ -170,49 +125,13 @@ export function RectPanel({
           <span className="uwb-multi-hint">下面的外观会用于接下来画出的每个矩形</span>
         </section>
       )}
-      <section className="uwb-section" aria-label="样式">
-        <h3 className="uwb-section-title">样式</h3>
-        <div className="uwb-field-row">
-          <select
-            className="cfg-select uwb-select"
-            aria-label="外观样式"
-            value={linkedId}
-            onChange={(e) => applyStyle(e.target.value)}
-          >
-            <option value="">无样式</option>
-            {styles.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <RowButton
-            label="存为样式"
-            icon={PLUS_ICON}
-            onClick={() => {
-              setNaming((v) => !v)
-              setStyleName('')
-            }}
-          />
-          {linkedId && <RowButton label="删除样式" icon={MINUS_ICON} onClick={removeStyle} />}
-        </div>
-        {naming && (
-          <div className="uwb-field-row">
-            <input
-              className="cfg-input uwb-style-name"
-              aria-label="样式名"
-              placeholder={`同名覆盖;留空 = 样式 ${styles.length + 1}`}
-              value={styleName}
-              autoFocus
-              onChange={(e) => setStyleName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveStyle()
-                else if (e.key === 'Escape') setNaming(false)
-              }}
-            />
-          </div>
-        )}
-      </section>
+      <StyleSection
+        styles={styles}
+        linkedId={linkedId}
+        onApply={applyStyle}
+        onSave={saveStyle}
+        onRemove={removeStyle}
+      />
       {!isDefaults && (
         <section className="uwb-section" aria-label={node.name}>
           <h3 className="uwb-section-title">{node.name}</h3>
@@ -300,14 +219,18 @@ export function RectPanel({
               <span className="uwb-field-empty">不填充</span>
               <RowButton
                 label="添加填充"
-                icon={PLUS_ICON}
+                icon={<PlusIcon />}
                 onClick={() => patch({ fill: RECT_DEFAULT_FILL })}
               />
             </>
           ) : (
             <>
               <ColorField label="填充色" value={node.fill} onCommit={(fill) => patch({ fill })} />
-              <RowButton label="移除填充" icon={MINUS_ICON} onClick={() => patch({ fill: null })} />
+              <RowButton
+                label="移除填充"
+                icon={<MinusIcon />}
+                onClick={() => patch({ fill: null })}
+              />
             </>
           )}
         </div>
@@ -319,7 +242,7 @@ export function RectPanel({
             <span className="uwb-field-empty">不描边</span>
             <RowButton
               label="添加描边"
-              icon={PLUS_ICON}
+              icon={<PlusIcon />}
               onClick={() => patch({ stroke: RECT_DEFAULT_STROKE })}
             />
           </div>
@@ -333,7 +256,7 @@ export function RectPanel({
               />
               <RowButton
                 label="移除描边"
-                icon={MINUS_ICON}
+                icon={<MinusIcon />}
                 onClick={() => patch({ stroke: null })}
               />
             </div>

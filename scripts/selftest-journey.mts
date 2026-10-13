@@ -650,7 +650,7 @@ try {
   await page.mouse.down()
   await page.mouse.move(vpBox.x + 420, vpBox.y + 280, { steps: 4 })
   await page.mouse.up()
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   assert.equal(await page.locator('.uwb-radius-handle').count(), 4, 'rect gets 4 radius handles')
   // 矩形本体渲染在画板 iframe 里(CSS 适配器输出,与导出同源)
   const frameFill = await page.evaluate(() => {
@@ -765,7 +765,7 @@ try {
   await page.mouse.down()
   await page.mouse.move(vpBox.x + 400, vpBox.y + 150, { steps: 3 })
   await page.mouse.up()
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   assert.notEqual(await page.getByLabel('角度').inputValue(), '0', 'rotate knob changes rotation')
   // 角缩放:拖右下白方块,宽高变化且选中不丢
   const widthField = page.getByRole('textbox', { name: '宽', exact: true })
@@ -778,7 +778,7 @@ try {
   await page.mouse.down()
   await page.mouse.move(brBox.x + 34, brBox.y + 24, { steps: 3 })
   await page.mouse.up()
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   const afterW = await widthField.inputValue()
   const afterH = await heightField.inputValue()
   assert.ok(afterW !== beforeW || afterH !== beforeH, 'corner handle resizes the rect')
@@ -805,11 +805,11 @@ try {
   await canvasVp.hover()
   await page.keyboard.press('v')
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
-  await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  await page.locator('.uwb-sel-node').waitFor({ state: 'detached' })
   await page.mouse.click(vpBox.x + 360, vpBox.y + 240)
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   await page.keyboard.press('Delete')
-  await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  await page.locator('.uwb-sel-node').waitFor({ state: 'detached' })
   // 只点不拖不生成(PS 规矩):矩形工具下单击画布,松手即回收,不留幽灵矩形
   await page.keyboard.press('r')
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
@@ -826,16 +826,16 @@ try {
   await page.keyboard.press('v')
   // 撤销/重做:Ctrl+Z 找回刚删的矩形并带选中;Ctrl+Shift+Z 把删除重做回去
   await page.keyboard.press('Control+z')
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   await page.keyboard.press('Control+Shift+z')
-  await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  await page.locator('.uwb-sel-node').waitFor({ state: 'detached' })
   await page.keyboard.press('Control+z')
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   await page.keyboard.press('Control+y')
-  await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  await page.locator('.uwb-sel-node').waitFor({ state: 'detached' })
   // 复制/粘贴/微调:找回矩形 → Ctrl+C 连贴两次出两个逐级偏移的克隆;方向键挪一格可整笔撤销
   await page.keyboard.press('Control+z')
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   await page.keyboard.press('Control+c')
   await page.keyboard.press('Control+v')
   await page.keyboard.press('Control+v')
@@ -946,13 +946,13 @@ try {
   // rect 是零面积几何体,visible 判定不认它——用 attached
   await page.locator('.uwb-marquee').waitFor({ state: 'attached' })
   await page.mouse.up()
-  assert.equal(await page.locator('.uwb-sel').count(), 2, 'marquee must select both rects')
+  assert.equal(await page.locator('.uwb-sel-node').count(), 2, 'marquee must select both rects')
   await page.getByText('已选 2 个对象').waitFor()
   // Shift+点击已选的 A 中心 → 减选,只剩 B
   await page.keyboard.down('Shift')
   await page.mouse.click(sx(90), sy(445))
   await page.keyboard.up('Shift')
-  assert.equal(await page.locator('.uwb-sel').count(), 1, 'Shift+click must deselect A only')
+  assert.equal(await page.locator('.uwb-sel-node').count(), 1, 'Shift+click must deselect A only')
   // 再框选俩 → Ctrl+D 整组复制:克隆俩也整体选中;Ctrl+Z 撤回到 A、B 选中
   await page.mouse.move(sx(40), sy(410))
   await page.mouse.down()
@@ -960,18 +960,22 @@ try {
   await page.mouse.up()
   await page.keyboard.press('Control+d')
   assert.equal(await rectTotal(), 7, 'Ctrl+D must clone both selected rects')
-  assert.equal(await page.locator('.uwb-sel').count(), 2, 'duplicate selects the two clones')
+  assert.equal(await page.locator('.uwb-sel-node').count(), 2, 'duplicate selects the two clones')
   await page.keyboard.press('Control+z')
   assert.equal(await rectTotal(), 5, 'undo drops the two clones')
-  assert.equal(await page.locator('.uwb-sel').count(), 2, 'undo restores the marquee selection')
+  assert.equal(
+    await page.locator('.uwb-sel-node').count(),
+    2,
+    'undo restores the marquee selection'
+  )
   // Delete 整组删:A、B 同时消失,选集清空;且指针停在属性面板上 Delete 也得灵(文档级键)
   await page.locator('.uwb-inspector').hover()
   await page.keyboard.press('Delete')
   assert.equal(await rectTotal(), 3, 'Delete removes all selected rects')
-  assert.equal(await page.locator('.uwb-sel').count(), 0, 'selection empties with the nodes')
+  assert.equal(await page.locator('.uwb-sel-node').count(), 0, 'selection empties with the nodes')
   // 边中点柄(单边缩放,PS 同款):点选残留的克隆体,拖右边中点外扩 30 → 只宽变,对边钉死
   await page.mouse.click(sx(277), sy(312))
-  await page.locator('.uwb-sel').waitFor()
+  await page.locator('.uwb-sel-node').waitFor()
   assert.equal(
     await page.locator('.uwb-edge-handle').count(),
     4,
@@ -1072,7 +1076,7 @@ try {
   await page.keyboard.down('Shift')
   await page.mouse.click(sx(220), sy(580))
   await page.keyboard.up('Shift')
-  assert.equal(await page.locator('.uwb-sel').count(), 2, 'shift+click builds the pair')
+  assert.equal(await page.locator('.uwb-sel-node').count(), 2, 'shift+click builds the pair')
   await page.getByRole('combobox', { name: '整组应用样式' }).selectOption({ label: '副样式' })
   await page.mouse.click(sx(220), sy(580))
   assert.equal(await fillHex.inputValue(), '#aacc00', 'group apply dresses each node')

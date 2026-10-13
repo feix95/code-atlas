@@ -47,6 +47,11 @@ export function useArtboardPrefs(): ArtboardPrefs {
   return useSyncExternalStore(subscribe, () => prefs)
 }
 
+/** 非 React 场景读取当前画板偏好(如样式组放入时按画板尺寸居中) */
+export function getArtboardPrefs(): ArtboardPrefs {
+  return prefs
+}
+
 export const artboardPrefsActions = {
   record(size: ArtboardSize): void {
     commit(recordArtboardSize(prefs, size))
