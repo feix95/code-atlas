@@ -21,14 +21,18 @@ function rule(selector: string, decls: readonly [string, string][]): string {
 }
 
 function nodeRule(node: RectNode): string {
+  // border-box:描边画在节点内侧,外接框恒等于 x/y/宽/高,各平台按同一口径复刻
   const decls: [string, string][] = [
     ['position', 'absolute'],
+    ['box-sizing', 'border-box'],
     ['left', px(node.x)],
     ['top', px(node.y)],
     ['width', px(node.width)],
-    ['height', px(node.height)],
-    ['background', node.fill]
+    ['height', px(node.height)]
   ]
+  if (node.fill !== null) decls.push(['background', node.fill])
+  if (node.stroke !== null)
+    decls.push(['border', `${px(node.stroke.width)} ${node.stroke.style} ${node.stroke.color}`])
   if (node.radii.some((r) => r > 0)) decls.push(['border-radius', borderRadius(node)])
   if (node.rotation !== 0) decls.push(['transform', `rotate(${node.rotation}deg)`])
   return rule(`.${node.id}`, decls)

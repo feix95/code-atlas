@@ -428,3 +428,10 @@
 - fix(workbench): 工具栏焦点环残留;style(workbench): 工具栏紧凑化与抓手重做
 - fix(workbench): 小键盘方向键(Numpad2/4/6/8)同样微调选中节点
 - style(workbench): 工具栏缩至 64px 高,抓手触发条收窄、晕区死环修复
+- feat(workbench): 矩形填充/描边属性——填充可留空,描边实线/虚线/线宽,色板+hex 输入
+- feat(workbench): 取色器拖动实时预览,整段挑色收成一笔撤销
+- feat(workbench): 画板宽高对调钮与书签式预设存取,方向行退役
+- fix(main): 摘除默认应用菜单,真键盘 Ctrl+Z 不再被 Edit 角色加速键截走
+- fix(workbench): 矩形工具单击不再生成幽灵矩形;sameNodes 补比 stroke 修描边不入账
+- fix(workbench): 取色器 Esc 取消挂死批次吞掉撤销,色板/下拉焦点不再变 Ctrl+Z 死键
+- style(workbench): 矩形工具图标改方形,选中态减负,六点居中,宽高框去 px 后缀

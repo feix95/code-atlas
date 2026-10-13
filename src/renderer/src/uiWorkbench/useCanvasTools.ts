@@ -21,7 +21,6 @@ import {
   createRect,
   maxCornerRadius,
   normalizeRotation,
-  RECT_CLICK_SIZE,
   withCornerRadius,
   type CornerIndex
 } from '@shared/uiWorkbench/node'
@@ -144,10 +143,11 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
     if (toolRef.current === 'rect') {
       // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算
       if (!e.currentTarget.ownerDocument.defaultView) return
-      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手补默认尺寸,外层批次包住三段;
+      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手结算(没拖动则回收),外层批次包住;
       // 中途任何一步抛异常都必须把外层批次结掉再抛出,否则批次挂起、撤销永久失灵
       docActions.beginBatch()
       try {
+        const prevSelected = getDocState().selectedId
         const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 })
         docActions.dispatch({ type: 'add', node })
         docActions.select(node.id)
@@ -165,12 +165,12 @@ export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
           () => {
             try {
               const fresh = getDocState().nodes.find((n) => n.id === node.id)
+              // 只点没拖(PS 规矩):松手时仍是落点 1×1 = 没有有效拖动,直接回收——
+              // 与 add 同批抵消,净零不入账,也不会冒出幽灵矩形;
+              // 顺手还回按下前的选中——单击=什么都没发生,连选中态都不动
               if (fresh && fresh.width === 1 && fresh.height === 1) {
-                docActions.dispatch({
-                  type: 'update',
-                  id: node.id,
-                  patch: { width: RECT_CLICK_SIZE, height: RECT_CLICK_SIZE }
-                })
+                docActions.dispatch({ type: 'remove', id: node.id })
+                docActions.select(prevSelected)
               }
             } finally {
               // 最外层批次在此结算:整个「画一个矩形」= 一步撤销

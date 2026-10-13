@@ -9,7 +9,7 @@
 import { useEffect } from 'react'
 import { cloneRect, type RectNode } from '@shared/uiWorkbench/node'
 import { docActions, getDocState } from './documentStore'
-import { isEditableTarget } from './isEditableTarget'
+import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 // 工作台内存剪贴板:只活在本模块,不碰系统剪贴板;pastes 计数让连续粘贴逐级错开
@@ -41,7 +41,11 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
 
     /** 按键归不归工作台管:可编辑区不接管;焦点在工作台之外的控件上(别组分屏)不抢 */
     const own = (e: KeyboardEvent): boolean => {
-      if (isEditableTarget(e.target)) return false
+      // Ctrl/Cmd+* 只让渡给真吃编辑键的目标:色板/下拉/开关这类非文本控件没有原生撤销,
+      // 让出去 = 焦点停在上面时 Ctrl+Z 变成死键;单键(方向键/V/R)维持全量屏蔽
+      if (e.ctrlKey || e.metaKey) {
+        if (isTextEditingTarget(e.target)) return false
+      } else if (isEditableTarget(e.target)) return false
       const root = viewportRef.current?.closest('.ui-workbench') ?? null
       const target = e.target
       if (

@@ -54,6 +54,12 @@ export function redoHistory(
   }
 }
 
+function sameStroke(a: RectNode['stroke'], b: RectNode['stroke']): boolean {
+  if (a === b) return true
+  if (a === null || b === null) return false
+  return a.color === b.color && a.width === b.width && a.style === b.style
+}
+
 /** 逐节点逐字段值比较:applyNodeAction 每次都生成新数组新对象,引用比较恒为 false */
 export function sameNodes(a: readonly RectNode[], b: readonly RectNode[]): boolean {
   if (a.length !== b.length) return false
@@ -69,6 +75,7 @@ export function sameNodes(a: readonly RectNode[], b: readonly RectNode[]): boole
       na.height === nb.height &&
       na.rotation === nb.rotation &&
       na.fill === nb.fill &&
+      sameStroke(na.stroke, nb.stroke) &&
       na.radii.every((r, j) => r === nb.radii[j])
     )
   })

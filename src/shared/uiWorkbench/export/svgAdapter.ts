@@ -1,5 +1,6 @@
 // SVG 适配器:WorkbenchDocument → 矢量图。画板 = viewBox(自动裁切画板外内容);
 // 四角同值用 <rect rx>,不同值用路径逐角画圆弧;旋转用 transform="rotate(角度 中心x 中心y)"。
+// 描边与 CSS border 同为「内描边」口径:SVG 原生描边居中于轮廓,故用 2 倍宽 + clipPath 裁出内半。
 import { uniformRadius, type RectNode } from '../node.ts'
 import { rectCenter } from '../geometry.ts'
 import { ARTBOARD_BACKGROUND } from './cssAdapter.ts'
@@ -22,14 +23,28 @@ function roundedRectPath(node: RectNode): string {
   ].join(' ')
 }
 
-function nodeElement(node: RectNode): string {
+function shapeMarkup(node: RectNode, extra: string): string {
+  const uniform = uniformRadius(node.radii)
+  if (uniform === null) return `<path d="${roundedRectPath(node)}"${extra}/>`
+  const rx = uniform > 0 ? ` rx="${uniform}"` : ''
+  return `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}"${rx}${extra}/>`
+}
+
+function nodeElements(node: RectNode): string[] {
   const c = rectCenter(node)
   const transform = node.rotation !== 0 ? ` transform="rotate(${node.rotation} ${c.x} ${c.y})"` : ''
-  const common = `id="${node.id}" fill="${node.fill}"${transform}`
-  const uniform = uniformRadius(node.radii)
-  if (uniform === null) return `  <path ${common} d="${roundedRectPath(node)}"/>`
-  const rx = uniform > 0 ? ` rx="${uniform}"` : ''
-  return `  <rect ${common} x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}"${rx}/>`
+  const lines: string[] = []
+  if (node.stroke !== null)
+    lines.push(`  <defs><clipPath id="clip-${node.id}">${shapeMarkup(node, '')}</clipPath></defs>`)
+  lines.push(`  ${shapeMarkup(node, ` id="${node.id}" fill="${node.fill ?? 'none'}"${transform}`)}`)
+  if (node.stroke !== null) {
+    const { color, width, style } = node.stroke
+    const dash = style === 'dashed' ? ` stroke-dasharray="${width * 3} ${width * 2}"` : ''
+    lines.push(
+      `  ${shapeMarkup(node, ` fill="none" stroke="${color}" stroke-width="${width * 2}" clip-path="url(#clip-${node.id})"${transform}${dash}`)}`
+    )
+  }
+  return lines
 }
 
 export function toSvg(doc: WorkbenchDocument): string {
@@ -37,7 +52,7 @@ export function toSvg(doc: WorkbenchDocument): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     `  <rect width="${width}" height="${height}" fill="${ARTBOARD_BACKGROUND}"/>`,
-    ...doc.nodes.map(nodeElement),
+    ...doc.nodes.flatMap(nodeElements),
     '</svg>',
     ''
   ].join('\n')

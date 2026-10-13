@@ -50,6 +50,7 @@ import {
   cloneRect,
   createRect,
   normalizeRotation,
+  RECT_STROKE_WIDTH_MAX,
   uniformRadius,
   withCornerRadius,
   type RectNode
@@ -408,10 +409,66 @@ check('SVG 适配器:四角同值用 rect rx,分设用路径,旋转带圆心', (
     rotation: 90
   } as RectNode
   const svg = toSvg({ artboard: { width: 390, height: 844 }, nodes: [a, b] })
-  assert.ok(svg.includes('<rect id="rect-1"') && svg.includes('rx="4"'))
-  assert.ok(svg.includes('<path id="rect-2"'))
+  assert.ok(svg.includes('id="rect-1"') && svg.includes('rx="4"'))
+  assert.ok(svg.includes('<path') && svg.includes('id="rect-2"'))
   assert.ok(svg.includes('rotate(90 15 10)'))
   assert.ok(svg.startsWith('<svg') && svg.includes('viewBox="0 0 390 844"'))
+})
+
+check('外观补丁:颜色归一化小写、非法回退原值、描边宽钳范围', () => {
+  const a = createRect([], { x: 0, y: 0, width: 10, height: 10 })
+  assert.equal(applyRectPatch(a, { fill: '#FF8800' }).fill, '#ff8800')
+  assert.equal(applyRectPatch(a, { fill: 'f80' }).fill, '#ff8800')
+  assert.equal(applyRectPatch(a, { fill: null }).fill, null)
+  assert.equal(applyRectPatch(a, { fill: 'notacolor' }).fill, '#d9d9d9')
+  const stroked = applyRectPatch(a, {
+    stroke: { color: '#ABCDEF', width: 2.6, style: 'solid' }
+  })
+  assert.deepEqual(stroked.stroke, { color: '#abcdef', width: 3, style: 'solid' })
+  const clamped = applyRectPatch(stroked, {
+    stroke: { color: '#abcdef', width: 999, style: 'solid' }
+  })
+  assert.equal(clamped.stroke?.width, RECT_STROKE_WIDTH_MAX)
+  assert.deepEqual(
+    applyRectPatch(stroked, {
+      stroke: { color: 'notacolor', width: 4, style: 'solid' }
+    }).stroke,
+    stroked.stroke
+  )
+  assert.equal(applyRectPatch(stroked, { stroke: null }).stroke, null)
+})
+
+check('外观适配:不填/不勾时三端都缺省;描边按「内描边」口径进三端', () => {
+  const styled = applyRectPatch(createRect([], { x: 0, y: 0, width: 10, height: 10 }), {
+    fill: null,
+    stroke: { color: '#112233', width: 2, style: 'dashed' }
+  })
+  const doc = { artboard: { width: 100, height: 100 }, nodes: [styled] }
+  // CSS:fill=null 不写 background;描边写 border,box-sizing 保证外接框不变
+  const css = artboardCss(doc)
+  const nodeRule = css.match(/\.rect-1 \{[^}]+\}/)?.[0] ?? ''
+  assert.ok(!nodeRule.includes('background'))
+  assert.ok(nodeRule.includes('box-sizing: border-box;'))
+  assert.ok(nodeRule.includes('border: 2px dashed #112233;'))
+  // SVG:不填充写 fill="none";内描边 = 2 倍宽 + clipPath 裁内半;虚线给 dasharray
+  const svg = toSvg(doc)
+  assert.ok(svg.includes('id="rect-1"') && svg.includes('fill="none"'))
+  assert.ok(svg.includes('clip-path="url(#clip-rect-1)"'))
+  assert.ok(svg.includes('stroke-width="4"'))
+  assert.ok(svg.includes('stroke-dasharray="6 4"'))
+  // tokens:fill 缺省,stroke 进 DTCG border 复合类型
+  const tokens = toDtcgTokens(doc) as {
+    nodes: Record<string, Record<string, { $type?: string; $value?: unknown } | undefined>>
+  }
+  const r1 = tokens.nodes['rect-1']
+  assert.equal(r1.fill, undefined)
+  const stroke = r1.stroke
+  assert.equal(stroke?.$type, 'border')
+  assert.deepEqual(stroke?.$value, {
+    color: { colorSpace: 'srgb', components: hexToSrgb('#112233'), alpha: 1, hex: '#112233' },
+    width: { value: 2, unit: 'px' },
+    style: 'dashed'
+  })
 })
 
 // ── 撤销/重做历史(history.ts + documentStore) ──
@@ -447,12 +504,17 @@ check('undo 后 redo 回原状态;undo 后新 push 清空 future;空栈返回 nu
   assert.equal(undoHistory(emptyHistory(), s0), null)
 })
 
-check('sameNodes:值同则同,radii 差一角、长度不同都算异', () => {
+check('sameNodes:值同则同,radii 差一角、长度不同、stroke 差一项都算异', () => {
   const a = createRect([], { x: 1, y: 2, width: 30, height: 40 })
   const copy = { ...a, radii: [...a.radii] } as RectNode
   assert.ok(sameNodes([a], [copy]))
   assert.ok(!sameNodes([a], [{ ...a, radii: [9, 0, 0, 0] } as RectNode]))
   assert.ok(!sameNodes([a], [a, a]))
+  // 历史判等必须覆盖 stroke:漏比会让描边类 dispatch 被当 no-op 跳过入账
+  const stroked = { ...a, stroke: { color: '#000000', width: 1, style: 'solid' as const } }
+  assert.ok(!sameNodes([a], [stroked]))
+  assert.ok(!sameNodes([stroked], [{ ...stroked, stroke: { ...stroked.stroke, width: 2 } }]))
+  assert.ok(sameNodes([stroked], [{ ...stroked, stroke: { ...stroked.stroke } }]))
 })
 
 check('批次语义:手势多帧只记一步;改回原值零入账;嵌套批次最外层结算', () => {

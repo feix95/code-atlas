@@ -1,6 +1,8 @@
-// 设计数值导出为 W3C Design Tokens(DTCG 2025.10)JSON:画板尺寸 + 每个节点的位置、尺寸、旋转、圆角、填充。
+// 设计数值导出为 W3C Design Tokens(DTCG 2025.10)JSON:画板尺寸 + 每个节点的位置、尺寸、旋转、圆角、填充、描边。
 // 尺寸类用 dimension({ value, unit: "px" });颜色用 color({ colorSpace: "srgb", components, alpha, hex });
+// 描边用 DTCG border 复合类型({ color, width, style }),口径为「内描边」(同 CSS border-box)。
 // DTCG 没有角度类型,旋转用 number 并在 $description 写明单位与方向。
+// 填充/描边为 null 时对应 token 整个缺省(缺省 = 不填充/不描边),不写空值。
 // 节点结构信息(类型、名字、层级顺序)放在组的 $extensions 里,供 AI agent 按数值复刻。
 import { CORNER_KEYS, type RectNode } from '../node.ts'
 import type { ExportFormat, WorkbenchDocument } from './types.ts'
@@ -33,7 +35,7 @@ function color(hex: string): Token {
 
 function nodeTokens(node: RectNode, order: number): Record<string, unknown> {
   const radius = Object.fromEntries(CORNER_KEYS.map((key, i) => [key, dimension(node.radii[i])]))
-  return {
+  const tokens: Record<string, unknown> = {
     $description: `${node.name}(矩形)。x/y 为未旋转时左上角相对画板原点的位置`,
     $extensions: { [DTCG_EXTENSION_KEY]: { nodeType: node.type, name: node.name, order } },
     x: dimension(node.x),
@@ -45,9 +47,20 @@ function nodeTokens(node: RectNode, order: number): Record<string, unknown> {
       $value: node.rotation,
       $description: '旋转角度(度),绕自身中心顺时针为正'
     },
-    radius,
-    fill: color(node.fill)
+    radius
   }
+  if (node.fill !== null) tokens.fill = color(node.fill)
+  if (node.stroke !== null)
+    tokens.stroke = {
+      $type: 'border',
+      $value: {
+        color: color(node.stroke.color).$value,
+        width: { value: node.stroke.width, unit: 'px' },
+        style: node.stroke.style
+      },
+      $description: '内描边:画在节点轮廓内侧,不外扩(同 CSS border-box 口径)'
+    }
+  return tokens
 }
 
 export function toDtcgTokens(doc: WorkbenchDocument): Record<string, unknown> {

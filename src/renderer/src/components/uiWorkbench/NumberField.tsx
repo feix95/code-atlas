@@ -8,7 +8,7 @@ export function NumberField({
   parse,
   onCommit,
   inputRef,
-  unit = 'px',
+  unit,
   placeholder,
   ariaLabel
 }: {
@@ -18,6 +18,7 @@ export function NumberField({
   parse: (raw: string) => number | null
   onCommit: (value: number) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
+  /** 单位后缀(如 px/°);不传不渲染,窄行里省宽度 */
   unit?: string
   placeholder?: string
   ariaLabel?: string
@@ -53,7 +54,7 @@ export function NumberField({
           } else if (e.key === 'Escape') e.currentTarget.value = String(value ?? '')
         }}
       />
-      <span className="uwb-field-unit">{unit}</span>
+      {unit ? <span className="uwb-field-unit">{unit}</span> : null}
     </label>
   )
 }

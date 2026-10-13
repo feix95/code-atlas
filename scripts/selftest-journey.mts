@@ -582,6 +582,45 @@ try {
     1,
     'UI workbench is a singleton tab'
   )
+  // 画板分区:宽高间的对调钮一键互换(默认 390×844);正方形时禁态且点了无效。
+  // 放在缩放段之前:改画板会重新 fit 视口,后面 Ctrl+0 的归位断言不受影响
+  const widthInput = page.getByLabel('画板宽')
+  const heightInput = page.getByLabel('画板高')
+  const swapBtn = page.getByRole('button', { name: '对调宽高' })
+  assert.equal(await widthInput.inputValue(), '390')
+  assert.equal(await heightInput.inputValue(), '844')
+  await swapBtn.click()
+  assert.equal(await widthInput.inputValue(), '844', 'swap swaps W/H')
+  assert.equal(await heightInput.inputValue(), '390')
+  await heightInput.fill('844')
+  await heightInput.press('Enter')
+  assert.equal(
+    await swapBtn.getAttribute('aria-disabled'),
+    'true',
+    'swap button is inert on a square artboard'
+  )
+  await swapBtn.click({ force: true })
+  assert.equal(await heightInput.inputValue(), '844', 'inert swap does not change size')
+  await widthInput.fill('390')
+  await widthInput.press('Enter')
+  assert.equal(await widthInput.inputValue(), '390', 'board restored to 390x844')
+  // 书签钮:一键以当前尺寸存预设(空名自动以「宽 × 高」命名),已存态再点即删
+  const presetSelect = page.getByLabel('画板尺寸预设')
+  const saveBtn = page.getByRole('button', { name: '存为预设' })
+  const removeBtn = page.getByRole('button', { name: '删除预设' })
+  await saveBtn.click()
+  assert.ok(
+    (await presetSelect.inputValue()).startsWith('saved:'),
+    'saving selects the new saved preset'
+  )
+  await removeBtn.waitFor()
+  await removeBtn.click()
+  assert.equal(
+    await presetSelect.inputValue(),
+    'builtin:phone-standard',
+    'removing the preset falls back to the builtin match'
+  )
+  await saveBtn.waitFor()
   // 画布:Ctrl+滚轮缩放画板;鼠标在画布上时 Ctrl+0 只把画板回 100%,不动应用界面缩放
   const zoomReadout = page.locator('.uwb-zoom')
   const zoomBefore = await zoomReadout.innerText()
@@ -624,6 +663,89 @@ try {
   await page.getByRole('region', { name: '矩形 1' }).waitFor()
   await page.getByRole('region', { name: '圆角' }).waitFor()
   await shot('ui-workbench-rect')
+  // 外观分区:填充可移除/改色;描边可添加并调线宽/线型;画布 iframe 与导出同源即时反映
+  const fillSection = page.getByRole('region', { name: '填充', exact: true })
+  const strokeSection = page.getByRole('region', { name: '描边', exact: true })
+  await fillSection.waitFor()
+  await strokeSection.waitFor()
+  // 描边宽按设计值比对:高 DPI 下 Chromium 把 border 宽吸附到物理像素(如 DPR1.5 时 1px→0.667px),
+  // 故线宽断言用 ±0.5px 容差,只验设计口径正确;颜色/线型不吃 DPI,仍精确比对
+  const waitRectStyle = (expected: {
+    background?: string
+    borderWidth?: number
+    borderStyle?: string
+  }): Promise<void> =>
+    page
+      .waitForFunction(
+        (want) => {
+          const doc = (document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null)
+            ?.contentDocument
+          const node = doc?.querySelector('.rect-1')
+          const style = node ? doc?.defaultView?.getComputedStyle(node) : undefined
+          if (!style) return false
+          return (
+            (want.background === undefined || style.backgroundColor === want.background) &&
+            (want.borderWidth === undefined ||
+              Math.abs(parseFloat(style.borderTopWidth) - want.borderWidth) <= 0.5) &&
+            (want.borderStyle === undefined || style.borderTopStyle === want.borderStyle)
+          )
+        },
+        expected,
+        { timeout: 5000 }
+      )
+      .then(() => undefined)
+  // 移除填充 → 画布透明;加回后改 hex → 画布变新色
+  await fillSection.getByRole('button', { name: '移除填充' }).click()
+  await waitRectStyle({ background: 'rgba(0, 0, 0, 0)' })
+  await fillSection.getByRole('button', { name: '添加填充' }).click()
+  const fillHex = fillSection.getByRole('textbox', { name: '填充色', exact: true })
+  await fillHex.fill('#ff8800')
+  await fillHex.press('Enter')
+  await waitRectStyle({ background: 'rgb(255, 136, 0)' })
+  // 取色器实时预览:连续 input 逐帧落地、画布即时变色;change(关弹窗)结算——
+  // 整段挑色收成一步,Ctrl+Z 一按直接回到取色前的颜色,不留一串碎账
+  await page.evaluate(() => {
+    const swatch = document.querySelector('input[aria-label="填充色取色"]') as HTMLInputElement
+    for (const hex of ['#00ff00', '#0000ff', '#123456']) {
+      swatch.value = hex
+      swatch.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  })
+  await waitRectStyle({ background: 'rgb(18, 52, 86)' })
+  await page.evaluate(() => {
+    document
+      .querySelector('input[aria-label="填充色取色"]')
+      ?.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await page.keyboard.press('Control+z')
+  await waitRectStyle({ background: 'rgb(255, 136, 0)' })
+  // Esc 取消取色器(只发 cancel 不发 change):还原值提交进批 → 净零不入账;
+  // 随后聚焦色板按 Ctrl+Z——既验证批次没挂死(撤销活着),也验证焦点在非文本控件上不是死键
+  await page.evaluate(() => {
+    const swatch = document.querySelector('input[aria-label="填充色取色"]') as HTMLInputElement
+    swatch.value = '#ff00ff'
+    swatch.dispatchEvent(new Event('input', { bubbles: true }))
+    swatch.value = '#ff8800' // 取消时浏览器把值还原成取色前原值,此处模拟还原
+    swatch.dispatchEvent(new Event('cancel', { bubbles: true }))
+  })
+  await waitRectStyle({ background: 'rgb(255, 136, 0)' })
+  await page.evaluate(() =>
+    (document.querySelector('input[aria-label="填充色取色"]') as HTMLElement).focus()
+  )
+  await page.keyboard.press('Control+z')
+  await waitRectStyle({ background: 'rgb(217, 217, 217)' })
+  await page.keyboard.press('Control+Shift+z')
+  await waitRectStyle({ background: 'rgb(255, 136, 0)' })
+  // 添加描边 → 1px 实线;线型切虚线、线宽改 3 → 画布同步;Ctrl+Z 逐笔撤
+  await strokeSection.getByRole('button', { name: '添加描边' }).click()
+  await waitRectStyle({ borderStyle: 'solid', borderWidth: 1 })
+  await strokeSection.getByRole('combobox', { name: '线型' }).selectOption('dashed')
+  const strokeWidthField = strokeSection.getByRole('textbox', { name: '线宽' })
+  await strokeWidthField.fill('3')
+  await strokeWidthField.press('Enter')
+  await waitRectStyle({ borderStyle: 'dashed', borderWidth: 3 })
+  await page.keyboard.press('Control+z')
+  await waitRectStyle({ borderStyle: 'dashed', borderWidth: 1 })
   // Shift + 圆角柄:拖动中按下 Shift 不动鼠标也立即吸附,松开落回原值(PS 式)
   // 指针落点以矩形左上角顶点(300,200)为基准:手柄会随半径自己挪位置,不能用它的包围盒
   const radiusHandle = page.locator('.uwb-radius-handle').nth(0)
@@ -688,6 +810,20 @@ try {
   await page.locator('.uwb-sel').waitFor()
   await page.keyboard.press('Delete')
   await page.locator('.uwb-sel').waitFor({ state: 'detached' })
+  // 只点不拖不生成(PS 规矩):矩形工具下单击画布,松手即回收,不留幽灵矩形
+  await page.keyboard.press('r')
+  await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
+  assert.equal(
+    await page.evaluate(
+      () =>
+        (
+          document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null
+        )?.contentDocument?.querySelectorAll('[class*="rect-"]').length ?? -1
+    ),
+    0,
+    'bare click with rect tool must not leave a rect behind'
+  )
+  await page.keyboard.press('v')
   // 撤销/重做:Ctrl+Z 找回刚删的矩形并带选中;Ctrl+Shift+Z 把删除重做回去
   await page.keyboard.press('Control+z')
   await page.locator('.uwb-sel').waitFor()

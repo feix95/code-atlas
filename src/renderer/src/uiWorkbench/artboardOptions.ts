@@ -56,7 +56,8 @@ export function buildArtboardOptionGroups(prefs: ArtboardPrefs): ArtboardOptionG
   }))
   const saved: ArtboardOption[] = prefs.saved.map((p) => ({
     value: `saved:${p.id}`,
-    label: `${p.name} ${formatSize(p)}`,
+    // 名称即尺寸(一键存的自动名)时只显示一遍,不重复拼接
+    label: p.name === formatSize(p) ? p.name : `${p.name} ${formatSize(p)}`,
     size: { width: p.width, height: p.height },
     source: 'saved',
     savedId: p.id

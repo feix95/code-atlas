@@ -12,6 +12,17 @@ export const CORNERS: readonly CornerIndex[] = [0, 1, 2, 3]
 /** 导出用的角名(DTCG token 名 / 说明文字) */
 export const CORNER_KEYS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const
 
+/** 描边线型:实线 / 虚线;不勾线时整个 stroke 为 null,线型不入档 */
+export type StrokeStyle = 'solid' | 'dashed'
+
+export interface RectStroke {
+  /** 描边色,6 位小写 hex(sRGB) */
+  color: string
+  /** 描边宽(逻辑像素) */
+  width: number
+  style: StrokeStyle
+}
+
 export interface RectNode {
   id: string
   type: 'rect'
@@ -22,12 +33,14 @@ export interface RectNode {
   height: number
   rotation: number
   radii: CornerRadii
-  /** 填充色,6 位小写 hex(sRGB) */
-  fill: string
+  /** 填充色,6 位小写 hex(sRGB);null = 不填充 */
+  fill: string | null
+  /** 描边;null = 不勾线 */
+  stroke: RectStroke | null
 }
 
 export type RectPatch = Partial<
-  Pick<RectNode, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'radii'>
+  Pick<RectNode, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'radii' | 'fill' | 'stroke'>
 >
 
 export type NodeAction =
@@ -37,8 +50,10 @@ export type NodeAction =
 
 /** 新矩形默认填充(Figma 同款浅灰,白画板上看得清) */
 export const RECT_DEFAULT_FILL = '#d9d9d9'
-/** 单击不拖时生成的默认边长 */
-export const RECT_CLICK_SIZE = 100
+/** 启用描边时的默认描边参数(去掉描边是 stroke=null,不走零宽) */
+export const RECT_DEFAULT_STROKE: RectStroke = { color: '#000000', width: 1, style: 'solid' }
+/** 描边宽上限 */
+export const RECT_STROKE_WIDTH_MAX = 100
 /** 坐标边界:允许画到画板外(会被画板裁掉),但不放任到无穷 */
 export const NODE_COORD_LIMIT = ARTBOARD_SIDE_MAX * 2
 
@@ -62,7 +77,20 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)))
 }
 
-/** 补丁落地前的统一校验:取整、钳边界;尺寸变小时圆角跟着收 */
+/** 颜色输入解析:# 可省,3 位扩成 6 位,统一小写;不合法返回 null(调用方保留原值) */
+export function parseHexColor(raw: string): string | null {
+  const text = raw.trim().toLowerCase().replace(/^#/, '')
+  if (/^[0-9a-f]{3}$/.test(text)) return `#${[...text].map((c) => c + c).join('')}`
+  return /^[0-9a-f]{6}$/.test(text) ? `#${text}` : null
+}
+
+function sanitizeStroke(stroke: RectStroke): RectStroke | null {
+  const color = parseHexColor(stroke.color)
+  if (!color || (stroke.style !== 'solid' && stroke.style !== 'dashed')) return null
+  return { color, width: clampInt(stroke.width, 1, RECT_STROKE_WIDTH_MAX), style: stroke.style }
+}
+
+/** 补丁落地前的统一校验:取整、钳边界;尺寸变小时圆角跟着收;非法颜色回退原值 */
 export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
   const merged = { ...node, ...patch }
   const width = clampInt(merged.width, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX)
@@ -75,7 +103,9 @@ export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
     width,
     height,
     rotation: normalizeRotation(merged.rotation),
-    radii: mapRadii(merged.radii, (r) => clampInt(r, 0, limit))
+    radii: mapRadii(merged.radii, (r) => clampInt(r, 0, limit)),
+    fill: merged.fill === null ? null : (parseHexColor(merged.fill) ?? node.fill),
+    stroke: merged.stroke === null ? null : (sanitizeStroke(merged.stroke) ?? node.stroke)
   }
 }
 
@@ -105,7 +135,8 @@ export function createRect(
       ...box,
       rotation: 0,
       radii: [0, 0, 0, 0],
-      fill: RECT_DEFAULT_FILL
+      fill: RECT_DEFAULT_FILL,
+      stroke: null
     },
     {}
   )
