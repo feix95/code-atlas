@@ -11,7 +11,13 @@
 // 但焦点在输入框/可编辑区时不接管,保住输入框的原生编辑键;
 // 焦点落在工作台 DOM 之外的控件上(双分屏另一侧)也不抢键。
 import { useEffect } from 'react'
-import { cloneNode, snapshotNode, translatePatch, type SceneNode } from '@shared/uiWorkbench/scene'
+import {
+  cloneNode,
+  isPickable,
+  snapshotNode,
+  translatePatch,
+  type SceneNode
+} from '@shared/uiWorkbench/scene'
 import { appearanceOf, type StyleAppearance } from '@shared/uiWorkbench/styles'
 import { docActions, getDocState } from './documentStore'
 import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
@@ -90,7 +96,7 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
         const step = e.shiftKey ? NUDGE_STEP_SHIFT : NUDGE_STEP
         // 整组微调:选中几个动几个,同批同位移
         for (const n of getDocState().nodes) {
-          if (getDocState().selectedIds.includes(n.id)) {
+          if (!n.locked && getDocState().selectedIds.includes(n.id)) {
             docActions.dispatch({
               type: 'update',
               id: n.id,
@@ -128,7 +134,11 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
           docActions.redo()
           break
         case 'KeyA':
-          docActions.selectIds(getDocState().nodes.map((n) => n.id))
+          docActions.selectIds(
+            getDocState()
+              .nodes.filter(isPickable)
+              .map((n) => n.id)
+          )
           break
         case 'KeyC':
           if (e.altKey) {

@@ -7,11 +7,13 @@
 import { useState } from 'react'
 import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import type { WorkbenchDocument } from '@shared/uiWorkbench/export/types'
+import { pageBackgroundCss, type PageBackground } from '@shared/uiWorkbench/page'
 import type { SceneNode } from '@shared/uiWorkbench/scene'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
 import type { CanvasViewportApi } from '../../uiWorkbench/useCanvasViewport'
 import { ArtboardNodes } from './ArtboardNodes'
 import { GapMarks } from './GapMarks'
+import { LayerHoverOutline } from './LayerHoverOutline'
 import { Ruler } from './Ruler'
 import { SelectionOverlay } from './SelectionOverlay'
 
@@ -22,17 +24,21 @@ const ARTBOARD_DOC =
 export function CanvasStage({
   board,
   doc,
+  background,
   selectedNodes,
   viewport,
   tools
 }: {
   board: ArtboardSize
+  /** 当前页的画布底色(铺在默认底板之上、画板之下) */
+  background: PageBackground
   doc: WorkbenchDocument
   selectedNodes: readonly SceneNode[]
   viewport: CanvasViewportApi
   tools: CanvasToolsApi
 }): React.JSX.Element {
   const { viewportRef, view, panMode, onPointerDown } = viewport
+  const pageColor = pageBackgroundCss(background)
   const [frameBody, setFrameBody] = useState<HTMLBodyElement | null>(null)
   // srcDoc 加载时序不可靠:ref 挂载先读一次 body,onLoad 再校正一次(文档被替换时换到新 body)
   const syncFrameBody = (el: HTMLIFrameElement | null): void => {
@@ -59,6 +65,9 @@ export function CanvasStage({
         aria-label="画布"
         onPointerDown={handlePointerDown}
       >
+        {pageColor && (
+          <div className="uwb-page-bg" style={{ backgroundColor: pageColor }} aria-hidden="true" />
+        )}
         <div
           className="uwb-world"
           style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}
@@ -102,6 +111,7 @@ export function CanvasStage({
           </svg>
         )}
         {tools.gaps.length > 0 && <GapMarks marks={tools.gaps} view={view} />}
+        <LayerHoverOutline nodes={doc.nodes} view={view} />
         {selectedNodes.length > 0 && (
           <SelectionOverlay nodes={selectedNodes} view={view} tools={tools} />
         )}

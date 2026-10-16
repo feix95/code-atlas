@@ -125,6 +125,7 @@ import {
   type DocHistory,
   type Snapshot
 } from '../src/shared/uiWorkbench/history.ts'
+import { createPage } from '../src/shared/uiWorkbench/page.ts'
 import { docActions, getDocState } from '../src/renderer/src/uiWorkbench/documentStore.ts'
 
 function check(name: string, fn: () => void): void {
@@ -317,6 +318,8 @@ check('旋转矩形坐标换算:世界↔本地往返、命中测试吃旋转', 
     id: 'rect-1',
     type: 'rect',
     name: 'r',
+    visible: true,
+    locked: false,
     x: 0,
     y: 0,
     width: 100,
@@ -670,7 +673,10 @@ check('标签拖拽步长:右增左减,不足一步累积不丢,Shift 十倍', (
 
 check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的', () => {
   const snap = (x: number): Snapshot => ({
-    nodes: [{ ...createRect([], { x, y: 0, width: 10, height: 10 }), x } as RectNode],
+    pages: [
+      { ...createPage([]), nodes: [{ ...createRect([], { x, y: 0, width: 10, height: 10 }), x }] }
+    ],
+    activePageId: 'page-1',
     selectedIds: []
   })
   const first = snap(0)
@@ -681,17 +687,22 @@ check('历史栈上限:连推超过 100 步,past 恒为 100,丢的是最老的',
 })
 
 check('undo 后 redo 回原状态;undo 后新 push 清空 future;空栈返回 null', () => {
-  const s0: Snapshot = { nodes: [], selectedIds: [] }
+  const page = createPage([])
+  const s0: Snapshot = { pages: [page], activePageId: page.id, selectedIds: [] }
   const n1 = createRect([], { x: 0, y: 0, width: 10, height: 10 })
-  const s1: Snapshot = { nodes: [n1], selectedIds: [n1.id] }
+  const s1: Snapshot = {
+    pages: [{ ...page, nodes: [n1] }],
+    activePageId: page.id,
+    selectedIds: [n1.id]
+  }
   let h = pushHistory(emptyHistory(), s0)
   const u = undoHistory(h, s1)
   assert.ok(u)
-  assert.equal(u.restore.nodes.length, 0)
+  assert.equal(u.restore.pages[0].nodes.length, 0)
   h = u.history
   const r = redoHistory(h, s0)
   assert.ok(r)
-  assert.deepEqual(r.restore.nodes, s1.nodes)
+  assert.deepEqual(r.restore.pages[0].nodes, s1.pages[0].nodes)
   // undo 之后产生新动作:redo 分支作废
   h = pushHistory(u.history, s0)
   assert.equal(h.future.length, 0)

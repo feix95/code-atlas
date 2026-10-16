@@ -94,11 +94,11 @@ export function snapMove(
   }
 }
 
-/** 节点列表 → 吸附目标盒列表(排除被拖者:单选给单个 id,整组移动给 id 数组),调用方再拼上画板盒 */
+/** 节点列表 → 吸附目标盒列表(排除被拖者:单选给单个 id,整组移动给 id 数组;隐藏的节点不参与),调用方再拼上画板盒 */
 export function snapTargets(
   nodes: readonly SceneNode[],
   excludeIds: string | readonly string[]
 ): SnapBox[] {
   const skip = new Set(typeof excludeIds === 'string' ? [excludeIds] : excludeIds)
-  return nodes.filter((n) => !skip.has(n.id)).map(nodeBox)
+  return nodes.filter((n) => n.visible && !skip.has(n.id)).map(nodeBox)
 }

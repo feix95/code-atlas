@@ -31,7 +31,7 @@ import {
   type EdgeName
 } from '@shared/uiWorkbench/node'
 import type { LineNode } from '@shared/uiWorkbench/line'
-import { hitTopmost, nodeOverlapsBox } from '@shared/uiWorkbench/scene'
+import { hitTopmost, isPickable, nodeOverlapsBox } from '@shared/uiWorkbench/scene'
 import { snapMove, snapTargets, type SnapBox, type SnapGuides } from '@shared/uiWorkbench/snap'
 import type { GapMark } from '@shared/uiWorkbench/spacing'
 import type { ScaleHandle } from '@shared/uiWorkbench/groupScale'
@@ -179,7 +179,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
           if (box.width > 0 || box.height > 0) moved = true
           setMarquee(box)
           const hits = getDocState()
-            .nodes.filter((n) => nodeOverlapsBox(n, box))
+            .nodes.filter((n) => isPickable(n) && nodeOverlapsBox(n, box))
             .map((n) => n.id)
           docActions.selectIds([...base, ...hits.filter((id) => !base.includes(id))])
         },

@@ -3,11 +3,14 @@
 // 手势期间的中间帧不入账:documentStore 的批次(beginBatch/endBatch)负责把一笔手势收成一条。
 import type { LineNode } from './line.ts'
 import type { RectNode } from './node.ts'
+import type { Page } from './page.ts'
 import type { SceneNode } from './scene.ts'
 
-/** 一步撤销需要还原的全部内容:节点列表 + 当时的多选集 */
+/** 一步撤销需要还原的全部内容:全部页面 + 动作发生时所在的页 + 当时的多选集
+ *  (撤销会跳回动作发生的那一页,Figma 同款;只切页不入账) */
 export interface Snapshot {
-  nodes: readonly SceneNode[]
+  pages: readonly Page[]
+  activePageId: string
   selectedIds: readonly string[]
 }
 
@@ -67,6 +70,8 @@ function sameLine(a: LineNode, b: SceneNode): boolean {
     b.type === 'line' &&
     a.id === b.id &&
     a.name === b.name &&
+    a.visible === b.visible &&
+    a.locked === b.locked &&
     a.x1 === b.x1 &&
     a.y1 === b.y1 &&
     a.x2 === b.x2 &&
@@ -88,6 +93,8 @@ export function sameNodes(a: readonly SceneNode[], b: readonly SceneNode[]): boo
       na.id === nb.id &&
       na.type === nb.type &&
       na.name === nb.name &&
+      na.visible === nb.visible &&
+      na.locked === nb.locked &&
       na.x === nb.x &&
       na.y === nb.y &&
       na.width === nb.width &&
@@ -97,6 +104,24 @@ export function sameNodes(a: readonly SceneNode[], b: readonly SceneNode[]): boo
       sameStroke(na.stroke, nb.stroke) &&
       na.styleId === nb.styleId &&
       na.radii.every((r, j) => r === nb.radii[j])
+    )
+  })
+}
+
+/** 逐页比较:页名、底色、画板尺寸、节点(含顺序)任一不同即异;页顺序也算 */
+export function samePages(a: readonly Page[], b: readonly Page[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((pa, i) => {
+    const pb = b[i]
+    return (
+      pa.id === pb.id &&
+      pa.name === pb.name &&
+      pa.background.color === pb.background.color &&
+      pa.background.opacity === pb.background.opacity &&
+      pa.background.visible === pb.background.visible &&
+      pa.artboard.width === pb.artboard.width &&
+      pa.artboard.height === pb.artboard.height &&
+      sameNodes(pa.nodes, pb.nodes)
     )
   })
 }

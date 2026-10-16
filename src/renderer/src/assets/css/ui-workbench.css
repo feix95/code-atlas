@@ -85,6 +85,13 @@
   cursor: grabbing;
 }
 
+/* 页面画布底色:铺满视口、不随平移缩放,盖在默认底板上;不拦指针 */
+.uwb-page-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .uwb-world {
   position: absolute;
   top: 0;
@@ -586,22 +593,133 @@
   width: auto;
 }
 
-/* 左侧栏正文(挂在全局 .sidebar 里) */
+/* 左侧栏正文(挂在全局 .sidebar 里):页面 / 图层 / 样式组自上而下叠放,图层吃剩余高度,
+   各区自己滚动 */
 .uwb-side-body {
   flex: 1;
   min-height: 0;
   display: flex;
-  overflow: auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* 左侧栏 · 样式组:标题行(带存入钮)+ 列表;条目点一下放入画板,行尾减号删除 */
-.uwb-groups {
-  flex: 1;
+.uwb-side-section {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
+  overflow: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-pages {
+  flex: 0 1 auto;
+  max-height: 30%;
+}
+
+.uwb-layers {
+  flex: 1 1 0;
+}
+
+/* 图层 / 页面行 */
+.uwb-layer-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uwb-layer {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 1.75rem;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  color: var(--text);
+  border-radius: var(--radius-xs);
+  cursor: default;
+  user-select: none;
+}
+
+.uwb-layer:hover {
+  background: var(--hover);
+}
+
+.uwb-layer.is-selected {
+  background: var(--selected-bg);
+}
+
+.uwb-layer.is-hidden {
+  color: var(--muted-2);
+}
+
+.uwb-layer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uwb-rename {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.uwb-layer-toggle {
+  opacity: 0;
+}
+
+.uwb-layer:hover .uwb-layer-toggle,
+.uwb-layer-toggle:focus-visible,
+.uwb-layer-toggle.is-attention {
+  opacity: 1;
+}
+
+/* 拖拽排序的落点指示线(功能蓝) */
+.uwb-layer.is-drop-before::before,
+.uwb-layer.is-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--sash-hi);
+}
+
+.uwb-layer.is-drop-before::before {
+  top: -1px;
+}
+
+.uwb-layer.is-drop-after::after {
+  bottom: -1px;
+}
+
+/* 图层悬停联动:画布上对应对象的细描边 */
+.uwb-hover-node {
+  fill: none;
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+}
+
+/* 左侧栏 · 样式组:标题行(带存入钮)+ 列表;条目点一下放入画板,行尾减号删除 */
+.uwb-groups {
+  flex: 0 1 auto;
+  max-height: 35%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: auto;
 }
 
 .uwb-groups-head {

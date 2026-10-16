@@ -3,10 +3,11 @@
 // 圆角/旋转是单对象手势,恰为单选时才显示全套手柄与旋钮。
 // 全部用 app 的功能蓝 --sash-hi,只作工具示意不进设计数值。SVG 平铺在视口上(屏幕坐标),
 // 本体不拦截指针(pointer-events: none),只有手柄与旋钮热区可点。
-import { cornerLocal, radiusHandleLocal, rotatePoint, toWorld } from '@shared/uiWorkbench/geometry'
+import { radiusHandleLocal, rotatePoint, toWorld } from '@shared/uiWorkbench/geometry'
 import { CORNERS, EDGES, type CornerIndex, type EdgeName } from '@shared/uiWorkbench/node'
 import type { SceneNode } from '@shared/uiWorkbench/scene'
 import { cornerResizeCursor, edgeResizeCursor } from '../../uiWorkbench/cursors'
+import { nodeOutline } from '../../uiWorkbench/nodeOutline'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
 import { GroupScaleHandles } from './GroupScaleHandles'
 import type { Viewport } from '../../uiWorkbench/viewport'
@@ -44,15 +45,11 @@ export function SelectionOverlay({
     x: view.panX + p.x * view.zoom,
     y: view.panY + p.y * view.zoom
   })
-  const outlines = nodes.map((n) => ({
-    id: n.id,
-    points:
-      n.type === 'line'
-        ? [toScreen({ x: n.x1, y: n.y1 }), toScreen({ x: n.x2, y: n.y2 })]
-        : CORNERS.map((c) => toScreen(toWorld(n, cornerLocal(n, c))))
-  }))
+  const outlines = nodes.map((n) => ({ id: n.id, points: nodeOutline(n, view) }))
   // 手柄/旋钮只服务单选;多选只剩各对象描边。矩形有缩放/圆角/旋转手柄,直线只有两个端点手柄
-  const single = nodes.length === 1 ? nodes[0] : null
+  // 锁定的节点(只能从图层面板选进来)只画描边,不给任何改动手柄
+  const single = nodes.length === 1 && !nodes[0].locked ? nodes[0] : null
+  const canScaleGroup = nodes.length > 1 && nodes.every((n) => !n.locked)
   const node = single?.type === 'rect' ? single : null
   const line = single?.type === 'line' ? single : null
   const outline = node ? outlines[0].points : []
@@ -76,7 +73,7 @@ export function SelectionOverlay({
           points={o.points.map((p) => `${p.x},${p.y}`).join(' ')}
         />
       ))}
-      {nodes.length > 1 && <GroupScaleHandles nodes={nodes} view={view} tools={tools} />}
+      {canScaleGroup && <GroupScaleHandles nodes={nodes} view={view} tools={tools} />}
       {line &&
         outlines[0].points.map((p, i) => (
           <circle

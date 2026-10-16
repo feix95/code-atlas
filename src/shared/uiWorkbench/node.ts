@@ -27,7 +27,24 @@ export interface RectStroke {
   style: StrokeStyle
 }
 
-export interface RectNode {
+/** 图层通用状态(矩形、直线共用):隐藏 = 不渲染/不命中/不导出;锁定 = 画布上点不中,只能从图层面板选 */
+export interface LayerState {
+  visible: boolean
+  locked: boolean
+}
+
+export const DEFAULT_LAYER_STATE: LayerState = { visible: true, locked: false }
+
+/** 图层名/页面名长度上限 */
+export const NAME_MAX_LENGTH = 64
+
+/** 名字输入归一:去首尾空白并截断;空串回退 fallback(调用方传原名,改名不能改成空) */
+export function sanitizeName(raw: string, fallback: string): string {
+  const text = raw.trim().slice(0, NAME_MAX_LENGTH)
+  return text === '' ? fallback : text
+}
+
+export interface RectNode extends LayerState {
   id: string
   type: 'rect'
   name: string
@@ -48,7 +65,18 @@ export interface RectNode {
 export type RectPatch = Partial<
   Pick<
     RectNode,
-    'x' | 'y' | 'width' | 'height' | 'rotation' | 'radii' | 'fill' | 'stroke' | 'styleId'
+    | 'x'
+    | 'y'
+    | 'width'
+    | 'height'
+    | 'rotation'
+    | 'radii'
+    | 'fill'
+    | 'stroke'
+    | 'styleId'
+    | 'name'
+    | 'visible'
+    | 'locked'
   >
 >
 
@@ -104,6 +132,9 @@ export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
   const touchesAppearance = 'fill' in patch || 'stroke' in patch || 'radii' in patch
   return {
     ...merged,
+    name: sanitizeName(merged.name, node.name),
+    visible: merged.visible !== false,
+    locked: merged.locked === true,
     x: clampInt(merged.x, -NODE_COORD_LIMIT, NODE_COORD_LIMIT),
     y: clampInt(merged.y, -NODE_COORD_LIMIT, NODE_COORD_LIMIT),
     width,
@@ -130,6 +161,7 @@ export function createRect(
       type: 'rect',
       name: `矩形 ${seq}`,
       ...box,
+      ...DEFAULT_LAYER_STATE,
       rotation: 0,
       radii: [0, 0, 0, 0],
       fill: RECT_DEFAULT_FILL,

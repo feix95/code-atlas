@@ -1,28 +1,42 @@
-// 工作台设计文档的渲染端仓库:节点列表 + 当前选中。模块单例 + 订阅(同 artboardPrefsStore 的做法),
-// 切页签、撕成子窗都不丢;暂只在内存里,关掉软件即清空(保存方案是以后的步骤)。
-// 节点修改一律经 dispatch(NodeAction),与撤销 / AI 修改共用同一入口。
+// 工作台设计文档的渲染端仓库:页面列表(每页 = 画布底色 + 画板尺寸 + 节点列表)+ 当前页 + 当前选中。
+// 模块单例 + 订阅(同 artboardPrefsStore 的做法),切页签、撕成子窗都不丢;
+// 暂只在内存里,关掉软件即清空(保存方案是以后的步骤)。
+// 节点修改一律经 dispatch(NodeAction,作用于当前页),与撤销 / AI 修改共用同一入口;页面级修改走 docActions 的 page 系列。
 // 撤销模型:快照式历史(@shared/uiWorkbench/history)。手势(beginBatch~endBatch)收成一步;
-// 批次之外的单次 dispatch(面板回车、Delete)各记一步;只改选中的 select 不入账。
+// 批次之外的单次 dispatch(面板回车、Delete)各记一步;只改选中的 select、只切页的 switchPage 不入账。
 import { useSyncExternalStore } from 'react'
 import type { LineNode } from '../../../shared/uiWorkbench/line.ts'
 import type { RectNode } from '../../../shared/uiWorkbench/node.ts'
 // 相对路径而非 @shared:自测脚本是裸 node 跑的,不认 tsconfig 的 paths 别名
+import { getArtboardPrefs } from './artboardPrefsStore.ts'
 import {
-  applyNodeAction,
-  type NodeAction,
-  type SceneNode
-} from '../../../shared/uiWorkbench/scene.ts'
+  activeAfterRemove,
+  applyNodeActionToPage,
+  createPage,
+  defaultPageBackground,
+  patchPage,
+  removePage,
+  reorderPage,
+  type Page,
+  type PagePatch
+} from '../../../shared/uiWorkbench/page.ts'
+import type { NodeAction, SceneNode } from '../../../shared/uiWorkbench/scene.ts'
 import {
   emptyHistory,
   pushHistory,
   redoHistory,
-  sameNodes,
+  samePages,
   undoHistory,
   type DocHistory,
   type Snapshot
 } from '../../../shared/uiWorkbench/history.ts'
 
 export interface WorkbenchDocState {
+  pages: readonly Page[]
+  activePageId: string
+  /** 当前页;pages 永远至少一页 */
+  activePage: Page
+  /** 当前页的节点列表(= activePage.nodes),数组顺序即 z 序,越靠后越在上层 */
   nodes: readonly SceneNode[]
   /** 多选集(框选/Shift 加减选):按加入顺序排列 */
   selectedIds: readonly string[]
@@ -33,29 +47,56 @@ export interface WorkbenchDocState {
   canRedo: boolean
 }
 
-let state: WorkbenchDocState = {
-  nodes: [],
-  selectedIds: [],
-  selectedId: null,
-  canUndo: false,
-  canRedo: false
+type DocCore = Pick<Snapshot, 'pages' | 'activePageId' | 'selectedIds'>
+
+function buildState(core: DocCore, hist: DocHistory): WorkbenchDocState {
+  const activePage = core.pages.find((p) => p.id === core.activePageId) ?? core.pages[0]
+  return {
+    pages: core.pages,
+    activePageId: activePage.id,
+    activePage,
+    nodes: activePage.nodes,
+    selectedIds: core.selectedIds,
+    selectedId: core.selectedIds.length === 1 ? core.selectedIds[0] : null,
+    canUndo: hist.past.length > 0,
+    canRedo: hist.future.length > 0
+  }
 }
+
+/** 第一页的底色跟随创建时的明暗主题(Figma 同款);自测里没有 document,按浅色算 */
+const IS_DARK_THEME =
+  typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
+// 第一页的画板尺寸沿用本机记住的上次尺寸(重启后新文档不回到出厂尺寸)
+const FIRST_PAGE = createPage([], undefined, {
+  background: defaultPageBackground(IS_DARK_THEME),
+  artboard: getArtboardPrefs().last
+})
 let history: DocHistory = emptyHistory()
+let state: WorkbenchDocState = buildState(
+  { pages: [FIRST_PAGE], activePageId: FIRST_PAGE.id, selectedIds: [] },
+  history
+)
 // 手势批次:深度计数支持嵌套(如画矩形 = 外层批次包住 trackPointer 的内层批次);
 // 批次起点的基准快照只在最外层结算时入栈
 let batchDepth = 0
 let batchBase: Snapshot | null = null
 const listeners = new Set<() => void>()
 
-function commit(next: Pick<WorkbenchDocState, 'nodes' | 'selectedIds'>): void {
-  state = {
-    nodes: next.nodes,
-    selectedIds: next.selectedIds,
-    selectedId: next.selectedIds.length === 1 ? next.selectedIds[0] : null,
-    canUndo: history.past.length > 0,
-    canRedo: history.future.length > 0
-  }
+function commit(next: DocCore): void {
+  state = buildState(next, history)
   for (const cb of listeners) cb()
+}
+
+function snapshotOf(s: WorkbenchDocState): Snapshot {
+  return { pages: s.pages, activePageId: s.activePageId, selectedIds: s.selectedIds }
+}
+
+/** 文档内容改动:批次外的真改动(no-op 除外)立即记一步,批次内只更新画面 */
+function change(next: DocCore): void {
+  if (batchDepth === 0 && !samePages(next.pages, state.pages)) {
+    history = pushHistory(history, snapshotOf(state))
+  }
+  commit(next)
 }
 
 function subscribe(cb: () => void): () => void {
@@ -71,10 +112,26 @@ export function useDocState(): WorkbenchDocState {
   return useSyncExternalStore(subscribe, getDocState)
 }
 
-/** 恢复快照:选集里可能有已不存在的节点(如撤销「多选后删除」),按现存活节点过滤 */
+/** 恢复快照:跳回动作发生的页;选集里可能有已不存在的节点(如撤销「多选后删除」),按现存活节点过滤 */
 function restore(snap: Snapshot): void {
-  const alive = new Set(snap.nodes.map((n) => n.id))
-  commit({ nodes: snap.nodes, selectedIds: snap.selectedIds.filter((id) => alive.has(id)) })
+  const page = snap.pages.find((p) => p.id === snap.activePageId) ?? snap.pages[0]
+  const alive = new Set(page.nodes.map((n) => n.id))
+  commit({
+    pages: snap.pages,
+    activePageId: page.id,
+    selectedIds: snap.selectedIds.filter((id) => alive.has(id))
+  })
+}
+
+/** 撤销/重做压进对侧栈的「当前」快照:所在页对齐到「目标与当前之间内容不同的那一页」(那一页在当前还存在的话),
+ *  这样来回撤销重做都落在动作发生的那一页(新建页的重做落在新页);找不到差异页就沿用当前所在页 */
+function currentFacing(target: Snapshot): Snapshot {
+  const current = snapshotOf(state)
+  const changed = current.pages.find((page) => {
+    const old = target.pages.find((p) => p.id === page.id)
+    return !old || !samePages([old], [page])
+  })
+  return changed ? { ...current, activePageId: changed.id } : current
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
@@ -83,18 +140,15 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 
 export const docActions = {
   dispatch(action: NodeAction): void {
-    const before = state
-    const nodes = applyNodeAction(state.nodes, action)
-    // 批次内只更新画面不入账;批次外的真改动(no-op 除外)立即记一步
-    if (batchDepth === 0 && !sameNodes(nodes, before.nodes)) {
-      history = pushHistory(history, { nodes: before.nodes, selectedIds: before.selectedIds })
-    }
-    // 被删节点从选集剔除;其余动作不动选集
-    const selectedIds =
-      action.type === 'remove'
-        ? state.selectedIds.filter((id) => id !== action.id)
-        : state.selectedIds
-    commit({ nodes, selectedIds })
+    const pages = applyNodeActionToPage(state.pages, state.activePageId, action)
+    // 被删、被隐藏的节点从选集剔除(隐藏即看不见,不该还留着选中框);其余动作不动选集
+    const isDeselecting =
+      action.type === 'remove' ||
+      (action.type === 'update' && 'visible' in action.patch && action.patch.visible === false)
+    const selectedIds = isDeselecting
+      ? state.selectedIds.filter((id) => id !== action.id)
+      : state.selectedIds
+    change({ pages, activePageId: state.activePageId, selectedIds })
   },
   /** 替换选集:null/[] = 清空(点空白、Esc) */
   select(id: string | null): void {
@@ -102,7 +156,7 @@ export const docActions = {
   },
   selectIds(ids: readonly string[]): void {
     if (!sameIds(ids, state.selectedIds)) {
-      commit({ nodes: state.nodes, selectedIds: [...ids] })
+      commit({ pages: state.pages, activePageId: state.activePageId, selectedIds: [...ids] })
     }
   },
   /** Shift+点击:在选集里则剔除,不在则追加(Figma 式加减选) */
@@ -113,10 +167,46 @@ export const docActions = {
         : [...state.selectedIds, id]
     )
   },
+  /** 切页:清空选中,不入撤销栈(只是换个视角) */
+  switchPage(id: string): void {
+    if (id === state.activePageId || !state.pages.some((p) => p.id === id)) return
+    commit({ pages: state.pages, activePageId: id, selectedIds: [] })
+  },
+  /** 新建页(继承当前页的底色与画板尺寸)并切过去;入撤销栈,撤销回到原页 */
+  addPage(): void {
+    const page = createPage(state.pages, state.activePage)
+    change({ pages: [...state.pages, page], activePageId: page.id, selectedIds: [] })
+  },
+  /** 删页:只剩一页时不动;删的是当前页则切到相邻页;靠撤销找回 */
+  removePage(id: string): void {
+    if (state.pages.length <= 1) return
+    const activePageId = activeAfterRemove(state.pages, id, state.activePageId)
+    const switched = activePageId !== state.activePageId
+    change({
+      pages: removePage(state.pages, id),
+      activePageId,
+      selectedIds: switched ? [] : state.selectedIds
+    })
+  },
+  /** 改页属性(改名、底色、画板尺寸) */
+  patchPage(id: string, patch: PagePatch): void {
+    change({
+      pages: patchPage(state.pages, id, patch),
+      activePageId: state.activePageId,
+      selectedIds: state.selectedIds
+    })
+  },
+  reorderPage(id: string, toIndex: number): void {
+    change({
+      pages: reorderPage(state.pages, id, toIndex),
+      activePageId: state.activePageId,
+      selectedIds: state.selectedIds
+    })
+  },
   /** 手势/复合动作开始:期间的 dispatch 只改画面,最外层 endBatch 才记一步 */
   beginBatch(): void {
     batchDepth += 1
-    if (batchDepth === 1) batchBase = { nodes: state.nodes, selectedIds: state.selectedIds }
+    if (batchDepth === 1) batchBase = snapshotOf(state)
   },
   endBatch(): void {
     if (batchDepth === 0) return
@@ -125,22 +215,30 @@ export const docActions = {
     const base = batchBase
     batchBase = null
     // 拖回原位、纯点击选中:净变化为零,不入账
-    if (base && !sameNodes(state.nodes, base.nodes)) {
+    if (base && !samePages(state.pages, base.pages)) {
       history = pushHistory(history, base)
       // 结算时未必有 dispatch 兜底刷新,这里补一次让 canUndo/canRedo 跟上
-      commit({ nodes: state.nodes, selectedIds: state.selectedIds })
+      commit({
+        pages: state.pages,
+        activePageId: state.activePageId,
+        selectedIds: state.selectedIds
+      })
     }
   },
   undo(): void {
     if (batchDepth > 0) return
-    const r = undoHistory(history, { nodes: state.nodes, selectedIds: state.selectedIds })
+    const target = history.past.at(-1)
+    if (!target) return
+    const r = undoHistory(history, currentFacing(target))
     if (!r) return
     history = r.history
     restore(r.restore)
   },
   redo(): void {
     if (batchDepth > 0) return
-    const r = redoHistory(history, { nodes: state.nodes, selectedIds: state.selectedIds })
+    const target = history.future.at(-1)
+    if (!target) return
+    const r = redoHistory(history, currentFacing(target))
     if (!r) return
     history = r.history
     restore(r.restore)

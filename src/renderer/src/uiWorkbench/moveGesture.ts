@@ -58,7 +58,10 @@ export function startNodeDrag(
   const pendingDeselectId = resolveSelection(hitId, e.shiftKey)
   const isDuplicate = e.altKey
   const collapseOnClick = !e.shiftKey && getDocState().selectedIds.length > 1
-  let moving = getDocState().nodes.filter((n) => getDocState().selectedIds.includes(n.id))
+  // 锁定的节点(经图层面板选进选集的)不跟着动
+  let moving = getDocState().nodes.filter(
+    (n) => !n.locked && getDocState().selectedIds.includes(n.id)
+  )
   const union = unionBox(moving)
   let hasMoved = false
   let hasDuplicated = false

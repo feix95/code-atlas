@@ -105,6 +105,8 @@ function toRect(value: Record<string, unknown>): RectNode | null {
         height: height as number
       }),
       name,
+      visible: value.visible !== false,
+      locked: value.locked === true,
       rotation: rotation as number,
       radii: r,
       fill: fill as string | null,
@@ -130,6 +132,8 @@ function toLine(value: Record<string, unknown>): LineNode | null {
       id: 'line-1',
       type: 'line',
       name,
+      visible: value.visible !== false,
+      locked: value.locked === true,
       x1: x1 as number,
       y1: y1 as number,
       x2: x2 as number,

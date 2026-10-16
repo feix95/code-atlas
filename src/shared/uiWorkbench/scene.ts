@@ -21,8 +21,12 @@ export type NodeAction =
   | { type: 'add'; node: SceneNode }
   | { type: 'update'; id: string; patch: NodePatch }
   | { type: 'remove'; id: string }
+  /** 调 z 序:toIndex = 移动后在数组里的下标(越大越靠上层),越界钳到两端 */
+  | { type: 'reorder'; id: string; toIndex: number }
 
+const LAYER_PATCH_KEYS = ['name', 'visible', 'locked'] as const
 const RECT_PATCH_KEYS: readonly (keyof RectPatch)[] = [
+  ...LAYER_PATCH_KEYS,
   'x',
   'y',
   'width',
@@ -34,6 +38,7 @@ const RECT_PATCH_KEYS: readonly (keyof RectPatch)[] = [
   'styleId'
 ]
 const LINE_PATCH_KEYS: readonly (keyof LinePatch)[] = [
+  ...LAYER_PATCH_KEYS,
   'x1',
   'y1',
   'x2',
@@ -65,7 +70,17 @@ export function applyNodeAction(nodes: readonly SceneNode[], action: NodeAction)
       return nodes.map((n) => (n.id === action.id ? applyPatch(n, action.patch) : n))
     case 'remove':
       return nodes.filter((n) => n.id !== action.id)
+    case 'reorder':
+      return reorderNode(nodes, action.id, action.toIndex)
   }
+}
+
+function reorderNode(nodes: readonly SceneNode[], id: string, toIndex: number): SceneNode[] {
+  const from = nodes.findIndex((n) => n.id === id)
+  if (from < 0) return [...nodes]
+  const rest = nodes.filter((n) => n.id !== id)
+  const to = Math.min(rest.length, Math.max(0, Math.round(toIndex)))
+  return [...rest.slice(0, to), nodes[from], ...rest.slice(to)]
 }
 
 /** 轴对齐外接框:矩形取声明的 x/y/宽/高(旋转矩形不展开,与选中描边同口径),直线取两端点包围盒 */
@@ -104,14 +119,24 @@ export function hitNode(node: SceneNode, p: Point, lineTolerance: number): boole
   return node.type === 'rect' ? hitRect(node, p) : hitLine(node, p, lineTolerance)
 }
 
-/** 后画的在上层:倒序找第一个命中的 */
+/** 画布上能点中/框中的节点:可见且未锁定(锁定的只能从图层面板选;隐藏的看不见也点不到) */
+export function isPickable(node: SceneNode): boolean {
+  return node.visible && !node.locked
+}
+
+/** 参与渲染与导出的节点:隐藏的不画不导 */
+export function visibleNodes(nodes: readonly SceneNode[]): SceneNode[] {
+  return nodes.filter((n) => n.visible)
+}
+
+/** 后画的在上层:倒序找第一个命中的(不可点选的节点跳过) */
 export function hitTopmost(
   nodes: readonly SceneNode[],
   p: Point,
   lineTolerance: number
 ): SceneNode | null {
   for (let i = nodes.length - 1; i >= 0; i--)
-    if (hitNode(nodes[i], p, lineTolerance)) return nodes[i]
+    if (isPickable(nodes[i]) && hitNode(nodes[i], p, lineTolerance)) return nodes[i]
   return null
 }
 

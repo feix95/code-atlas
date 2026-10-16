@@ -8,7 +8,6 @@ import {
   type StyleGroup
 } from '@shared/uiWorkbench/groups'
 import { removeStylePreset, saveStylePreset } from '@shared/uiWorkbench/styles'
-import { getArtboardPrefs } from './artboardPrefsStore'
 import { docActions, getDocState, selectedNodes } from './documentStore'
 import { createPersistentList } from './persistentList'
 
@@ -42,7 +41,7 @@ export const groupActions = {
   insert(id: string): void {
     const group = getGroups().find((g) => g.id === id)
     if (!group) return
-    const board = getArtboardPrefs().last
+    const board = getDocState().activePage.artboard
     const size = groupSize(group)
     const isChained =
       lastInsert?.groupId === id && isSameIds(lastInsert.ids, getDocState().selectedIds)

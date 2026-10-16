@@ -2,7 +2,14 @@
 // 坐标相对画板原点,范围同矩形;端点保留 2 位小数(Shift 吸 15° 时端点才不被整数取整带偏角度)。
 // 描边必有(没有描边的线不存在),线宽/颜色/线型复用矩形的 RectStroke;端点样式 cap 对应 SVG stroke-linecap。
 // 本文件不引用 geometry.ts / scene.ts,避免循环依赖;命中/框选判定在 scene.ts 里按类型分派到这里。
-import { NODE_COORD_LIMIT, sanitizeStroke, type RectStroke } from './node.ts'
+import {
+  DEFAULT_LAYER_STATE,
+  NODE_COORD_LIMIT,
+  sanitizeName,
+  sanitizeStroke,
+  type LayerState,
+  type RectStroke
+} from './node.ts'
 
 /** 端点样式:平头(无) / 圆头 / 方头(后两者各向外多出半个线宽) */
 export type LineCap = 'butt' | 'round' | 'square'
@@ -13,7 +20,7 @@ export const LINE_CAP_LABELS: Record<LineCap, string> = {
   square: '方头'
 }
 
-export interface LineNode {
+export interface LineNode extends LayerState {
   id: string
   type: 'line'
   name: string
@@ -28,7 +35,10 @@ export interface LineNode {
 }
 
 export type LinePatch = Partial<
-  Pick<LineNode, 'x1' | 'y1' | 'x2' | 'y2' | 'stroke' | 'cap' | 'styleId'>
+  Pick<
+    LineNode,
+    'x1' | 'y1' | 'x2' | 'y2' | 'stroke' | 'cap' | 'styleId' | 'name' | 'visible' | 'locked'
+  >
 >
 
 export interface LineEnds {
@@ -67,6 +77,9 @@ export function applyLinePatch(node: LineNode, patch: LinePatch): LineNode {
   const touchesAppearance = 'stroke' in patch || 'cap' in patch
   return {
     ...merged,
+    name: sanitizeName(merged.name, node.name),
+    visible: merged.visible !== false,
+    locked: merged.locked === true,
     x1: clampCoord(merged.x1),
     y1: clampCoord(merged.y1),
     x2: clampCoord(merged.x2),
@@ -94,6 +107,7 @@ export function createLine(
       id: `line-${seq}`,
       type: 'line',
       name: `直线 ${seq}`,
+      ...DEFAULT_LAYER_STATE,
       ...ends,
       stroke: { ...LINE_DEFAULT_STROKE },
       cap: LINE_DEFAULT_CAP,

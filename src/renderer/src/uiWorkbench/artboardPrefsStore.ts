@@ -10,11 +10,14 @@ import {
   sanitizeArtboardPrefs,
   saveArtboardPreset,
   type ArtboardPrefs
-} from '@shared/uiWorkbench/artboardPrefs'
+  // 相对路径而非 @shared:documentStore 要读它,而自测脚本是裸 node 跑的,不认 tsconfig 的 paths 别名
+} from '../../../shared/uiWorkbench/artboardPrefs.ts'
 
 const KEY = 'atlas.uiWorkbench.artboard'
 
 function readStored(): ArtboardPrefs {
+  // 自测里没有 localStorage:直接用默认,不报警
+  if (typeof localStorage === 'undefined') return DEFAULT_ARTBOARD_PREFS
   try {
     const raw = localStorage.getItem(KEY)
     return raw === null ? DEFAULT_ARTBOARD_PREFS : sanitizeArtboardPrefs(JSON.parse(raw))
