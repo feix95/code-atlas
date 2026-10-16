@@ -97,7 +97,6 @@ export function ColorField({
         className="uwb-swatch"
         defaultValue={value}
         aria-label={`${label}取色`}
-        data-tip={`${label}取色`}
       />
       <input
         key={value}

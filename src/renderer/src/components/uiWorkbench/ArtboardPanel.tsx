@@ -76,7 +76,6 @@ export function ArtboardPanel({
           className="uwb-field-btn"
           aria-label="对调宽高"
           aria-disabled={board.width === board.height || undefined}
-          data-tip={board.width === board.height ? '正方形无需对调' : '对调宽高(横竖互换)'}
           onClick={() =>
             board.width !== board.height && onChange({ width: board.height, height: board.width })
           }
@@ -111,9 +110,6 @@ export function ArtboardPanel({
           type="button"
           className={`uwb-field-btn${savedId ? ' is-saved' : ''}`}
           aria-label={savedId ? '删除预设' : '存为预设'}
-          data-tip={
-            savedId ? `已存为预设,点此删除\n${matched?.label ?? ''}` : '存为预设(以当前尺寸命名)'
-          }
           onClick={() => {
             if (savedId) onRemovePreset(savedId)
             else {

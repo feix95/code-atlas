@@ -30,7 +30,6 @@ export function PagePanel({ page }: { page: Page }): React.JSX.Element {
           className="uwb-field-btn"
           aria-label={background.visible ? '隐藏画布底色' : '显示画布底色'}
           aria-pressed={!background.visible}
-          data-tip={background.visible ? '隐藏画布底色' : '显示画布底色'}
           onClick={() => patchBackground({ visible: !background.visible })}
         >
           <TreeIcon name={background.visible ? 'eye' : 'eyeOff'} size={PAGE_ICON_SIZE} mono />

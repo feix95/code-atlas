@@ -38,13 +38,7 @@ export function RowButton({
   onClick: () => void
 }): React.JSX.Element {
   return (
-    <button
-      type="button"
-      className="uwb-field-btn"
-      aria-label={label}
-      data-tip={label}
-      onClick={onClick}
-    >
+    <button type="button" className="uwb-field-btn" aria-label={label} onClick={onClick}>
       {icon}
     </button>
   )

@@ -30,7 +30,7 @@ export function GroupsPanel(): React.JSX.Element {
           className="uwb-field-btn"
           aria-label="存为样式组"
           aria-disabled={!hasSelection || undefined}
-          data-tip={hasSelection ? '把选中的对象存为样式组' : SAVE_NEEDS_SELECTION_TIP}
+          data-tip={hasSelection ? undefined : SAVE_NEEDS_SELECTION_TIP}
           onClick={() => {
             if (!hasSelection) return
             setIsNaming((v) => !v)
@@ -67,7 +67,6 @@ export function GroupsPanel(): React.JSX.Element {
               <button
                 type="button"
                 className="uwb-group-item"
-                data-tip="点击放入画板"
                 onClick={() => groupActions.insert(g.id)}
               >
                 <span className="uwb-group-name">{g.name}</span>

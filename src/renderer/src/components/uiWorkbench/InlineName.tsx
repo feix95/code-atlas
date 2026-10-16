@@ -27,11 +27,7 @@ export function InlineName({
   }
 
   if (!isEditing) {
-    return (
-      <span className={className} data-tip="双击改名">
-        {value}
-      </span>
-    )
+    return <span className={className}>{value}</span>
   }
   return (
     <input
