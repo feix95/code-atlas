@@ -4,6 +4,8 @@ import { registerModelIpc } from './ipcModel.ts'
 import { registerGitIpc } from './ipcGit.ts'
 import { registerChatIpc } from './ipcChat.ts'
 import { registerEditIpc } from './ipcEdit.ts'
+import { registerLaunchPlanIpc } from './ipcLaunchPlan.ts'
+import { registerEngineIpc } from './ipcEngine.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -12,4 +14,6 @@ export function registerIpc(): void {
   registerGitIpc()
   registerChatIpc()
   registerEditIpc()
+  registerLaunchPlanIpc()
+  registerEngineIpc()
 }

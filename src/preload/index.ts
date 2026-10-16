@@ -5,6 +5,13 @@ import { readNumPref, writeNumPref } from '../shared/localPrefs.ts'
 import type { Appearance } from '../shared/appearancePrefs.ts'
 import type { TavilyProbeResult } from '../shared/tavily.ts'
 import type { ModelDownloadProgress, RepoFile, ShelfResult } from '../shared/modelShelf.ts'
+import type { LaunchPlanInfo } from '../shared/launchPlan.ts'
+import type { ModelLaunchSettings } from '../shared/launchSettings.ts'
+import type {
+  EngineBackend,
+  EngineInstallProgressInfo,
+  EngineStateInfo
+} from '../shared/engineCatalog.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
 import type {
   AiChatLookupPayload,
@@ -272,6 +279,24 @@ const atlasApi = {
   /** 模型档案(上下文档位的账本):出厂上限 + 层数头数 + 机器家底,一次端齐;翻不到回 null */
   modelContextInfo: (modelPath: string): Promise<ModelContextInfo | null> =>
     ipcRenderer.invoke(CH.modelContextInfo, modelPath),
+  /** 本机运行方案(智能启动锤):机器家底 + 当前内置模型的启动计划,只读不算命;
+      draft 传了按草稿预览(不动存档) */
+  aiLaunchPlan: (draft?: ModelLaunchSettings | null): Promise<LaunchPlanInfo | null> =>
+    ipcRenderer.invoke(CH.aiLaunchPlan, draft),
+  // ── 引擎后端管理(第 4 期)──
+  engineState: (): Promise<EngineStateInfo | null> => ipcRenderer.invoke(CH.engineState),
+  engineInstall: (backend: EngineBackend): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(CH.engineInstall, backend),
+  engineInstallCancel: (backend: EngineBackend): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(CH.engineInstallCancel, backend),
+  engineRemove: (backend: EngineBackend): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(CH.engineRemove, backend),
+  onEngineInstallProgress: (callback: (p: EngineInstallProgressInfo) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, p: Parameters<typeof callback>[0]): void =>
+      callback(p)
+    ipcRenderer.on(CH.engineInstallProgress, listener)
+    return () => ipcRenderer.removeListener(CH.engineInstallProgress, listener)
+  },
   /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声,页面弹人话横幅;返回退订函数 */
   onRendererRevived: (callback: () => void): (() => void) => {
     const listener = (): void => callback()

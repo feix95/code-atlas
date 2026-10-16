@@ -9,6 +9,13 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import type { ModelStatus, VisionSupport } from '../shared/types.ts'
 import { normalizeContextSize, PROBE_HEALTH_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
 import { addDevLog } from '../shared/devlog.ts'
+import { bookkeepingContextSize, planCaveat } from '../shared/launchPlan.ts'
+import {
+  launchSignature,
+  parseExtraArgs,
+  type ModelLaunchSettings
+} from '../shared/launchSettings.ts'
+import { buildLaunchPlan } from './launchPlanner.ts'
 import { fetchWithTimeout } from './http.ts'
 import { findMmprojFor } from './mmproj.ts'
 import { probeBuiltinVision } from './visionProbe.ts'
@@ -46,8 +53,8 @@ export interface BuiltinLaunchHost {
   isStopping(): boolean
   /** 新一轮启动清掉上次的叫停账 */
   resetStopping(): void
-  /** 记下这次实际喂给引擎的 -c 档位与 --mmproj 路径(对账账本) */
-  markStarted(ctxSize: number, mmprojPath: string): void
+  /** 记下这次实际喂给引擎的 -c 档位、--mmproj 路径与高级启动账签名(对账账本) */
+  markStarted(ctxSize: number, mmprojPath: string, launchSig: string): void
   /** 状态栏播报(loading/ready/error) */
   announce(status: ModelStatus): void
   /** 组一份内置 provider 的状态卡(与 builtin.ts 同一工厂) */
@@ -72,6 +79,8 @@ export interface BuiltinLaunchHost {
   /** 热身账本读写(builtin.ts 管 userData 目录;估价基准/入账) */
   readWarmupMs(modelPath: string): number | null
   recordWarmupMs(modelPath: string, ms: number): void
+  /** 引擎日志里见了显存不够的记号(保险丝据此换「显存不够」那句人话) */
+  noteEngineOom(seen: boolean): void
 }
 
 // ── 热身估价(纯函数;账本读写经 host 走 builtin.ts 的 userData 目录)──
@@ -152,8 +161,13 @@ async function fetchModelId(baseUrl: string): Promise<string> {
   return model
 }
 
+/** 引擎日志里的显存不够记号(纯函数,自测覆盖):保险丝据此换「显存不够」那句人话 */
+export function engineLogHasOom(line: string): boolean {
+  return /ErrorOutOfDeviceMemory|out of memory|cudaMalloc failed|failed to allocate/i.test(line)
+}
+
 /**
- * 拉起 llama-server 并等它就绪:spawn → /health 轮询(503 带进度就报真数,
+ * 拉起 llama-server 并等它就绪:出启动方案 → spawn → /health 轮询(503 带进度就报真数,
  * 没报按热身账本估一条)→ /v1/models 拿模型名 → /props 探视觉能力 → 报 ready。
  * skipMmproj = 保险丝重拉:上次带投影仪把自己拉死了,这次摘掉按纯文本跑,
  * 就绪播报捎一句人话说明。
@@ -164,22 +178,48 @@ export async function launchBuiltinServer(
   modelPath: string,
   baseUrl: string,
   contextSize: number,
-  skipMmproj = false
+  launch: ModelLaunchSettings | null = null,
+  opts: {
+    skipMmproj?: boolean
+    mmprojDropNote?: string
+    /** devlog 启动行展示的引擎名(第 4 期:'CUDA 加速 · b11685'/'自带引擎'/'自指引擎') */
+    engineLabel?: string
+    /** 后端退路重拉成功时就绪播报捎的一句 */
+    engineNote?: string
+  } = {}
 ): Promise<{ baseUrl: string; model: string }> {
+  const skipMmproj = opts.skipMmproj ?? false
+  const mmprojDropNote = opts.mmprojDropNote
+  const engineLabel = opts.engineLabel
+  const engineNote = opts.engineNote
   const ctxSize = normalizeContextSize(contextSize)
   // 视觉能力锤:模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
   // 没带就按纯文本跑。记进对账账本 —— 旁边增删 mmproj 后下次提问对账重启
   const mmproj = skipMmproj ? null : findMmprojFor(modelPath)
-  host.markStarted(ctxSize, mmproj ?? '')
+  // 智能启动锤:机器家底 + 模型户口过一遍纯算盘,出本轮启动参数;用户在「高级」里
+  // 指定过的字段原样进算盘,梯子不碰。显卡层数默认交给引擎 --fit 自动摆层。
+  const { plan } = await buildLaunchPlan(modelPath, ctxSize, mmproj, launch?.overrides)
+  // 专家命令行:白名单解析,合法的排在方案参数之后(后写赢);非法整段丢弃只留日志,不拦启动
+  const extra = parseExtraArgs(launch?.extraArgs ?? '')
+  const extraArgs = extra.ok ? extra.args : []
+  if (launch?.extraArgs && !extra.ok) {
+    addDevLog('system', `专家参数被拒:${extra.reason} —— 按自动方案启动`)
+  }
+  // 对账账本永远记「用户要的档」:计划把上下文调小时账上仍按用户档记,
+  // 不然下一轮对不上账,引擎被反复重启(自测钉死这条约定)
+  host.markStarted(bookkeepingContextSize(contextSize), mmproj ?? '', launchSignature(launch))
   host.resetStopping() // 新的一轮启动:上次「主动叫停」的标记就地清账
+  host.noteEngineOom(false) // OOM 记号账也清掉,只认本轮引擎日志
   const facts = host.idleFacts(modelPath)
   const startedAt = Date.now()
   const lastWarmupMs = host.readWarmupMs(modelPath)
   // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
   addDevLog(
     'system',
-    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${ctxSize} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)${mmproj ? ` · 视觉投影仪(--mmproj ${mmproj})` : ''}`
+    `启动内置引擎:${engineLabel ? `${engineLabel}(${serverPath})` : serverPath} · 模型 ${modelPath} · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)${mmproj ? ` · 视觉投影仪(--mmproj ${mmproj})` : ''} · 方案参数:${plan.args.join(' ') || '(引擎默认)'}${extraArgs.length ? ` · 专家参数:${extraArgs.join(' ')}` : ''}`
   )
+  // 方案为什么这么配,每条理由都留底(用户界面上挑最要紧的一句,全量走这里)
+  for (const reason of plan.reasons) addDevLog('system', `启动方案:${reason}`)
   const child = spawn(
     serverPath,
     [
@@ -189,14 +229,15 @@ export async function launchBuiltinServer(
       String(BUILTIN_PORT),
       '--host',
       '127.0.0.1',
-      '-c',
-      String(ctxSize),
-      '-ngl',
-      '999',
       // --jinja(第一百二十八锤):让引擎用模型自带的对话模板,工具调用(agent 的
       // 翻文件)靠它才开得了;chat_template_kwargs 的思考开关也走这条路。换模型后生效
       '--jinja',
-      ...(mmproj ? ['--mmproj', mmproj] : [])
+      ...(mmproj ? ['--mmproj', mmproj] : []),
+      // 方案参数(-c/-ngl/--no-mmproj-offload/-ctk/-ctv/-fa)由纯算盘给出;
+      // auto 层数时这里绝不出 -ngl,引擎的 --fit 才有权自动摆层。
+      // 专家参数排在最后:同名旗后写赢(用户显式指定优先于算盘)
+      ...plan.args,
+      ...extraArgs
     ],
     {
       windowsHide: true,
@@ -214,6 +255,7 @@ export async function launchBuiltinServer(
     if (!line.trim()) return
     addDevLog('engine', line)
     latestGpuOffload = parseGpuOffloadReport(line) ?? latestGpuOffload
+    if (engineLogHasOom(line)) host.noteEngineOom(true)
   }
   // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
   // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
@@ -324,8 +366,14 @@ export async function launchBuiltinServer(
     if (offloadWarning) addDevLog('system', offloadWarning)
     // 就绪后问一轮 /props:modalities.vision 是引擎自己报的能力账,状态栏标签认它
     const vision = await probeBuiltinVision(baseUrl)
-    // 降级重拉成功的要跟人讲清楚:眼睛没装上,现在按纯文本跑着
-    const readyNote = [offloadWarning, skipMmproj ? '视觉文件加载失败,已按纯文本启动' : null]
+    // 降级重拉成功的要跟人讲清楚:眼睛没装上,现在按纯文本跑着;
+    // 方案里的妥协(上下文调小/投影仪放内存/黑板降格)也挑最要紧的一句一并说明
+    const readyNote = [
+      offloadWarning,
+      skipMmproj ? (mmprojDropNote ?? '视觉文件没能加载,已按纯文本启动') : null,
+      engineNote ?? null,
+      planCaveat(plan, ctxSize)
+    ]
       .filter((s): s is string => typeof s === 'string' && s.length > 0)
       .join(';')
     host.announce(

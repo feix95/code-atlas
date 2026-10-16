@@ -6,6 +6,8 @@ import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { TreeIcon } from './Icons'
 import { CfgQ, CfgRow } from './CfgRow'
 import { CloudConsent } from './CloudConsent.tsx'
+import { EngineBackendPanel } from './EngineBackendPanel.tsx'
+import { LaunchPlanCard } from './LaunchPlanCard.tsx'
 import { ModelNameRow } from './ModelNameRow.tsx'
 import { ModelShelfPanel } from './ModelShelfPanel.tsx'
 import { SettingsCloud } from './SettingsCloud.tsx'
@@ -158,6 +160,16 @@ export function SettingsModel({
                   )}
                 </div>
               </CfgRow>
+              {/* 智能启动锤:这台机器会怎么跑当前模型,摊成一张卡;
+                  「高级设置」里逐项手动指定,按模型文件各自记账(没选模型给提示) */}
+              <LaunchPlanCard
+                modelPath={modelPath}
+                contextSize={config.contextSize}
+                config={config}
+                onConfigChange={onConfigChange}
+              />
+              {/* 引擎后端管理(第 4 期):推荐 + 一键安装 + 手动选择 */}
+              <EngineBackendPanel config={config} onConfigChange={onConfigChange} />
               <div className="cfg-divider" />
               <CfgRow
                 label={

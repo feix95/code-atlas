@@ -3,6 +3,8 @@
 import type { PersonalizationConfig } from './personalization.ts'
 import type { CloudVendorId } from './cloudVendors.ts'
 import type { ChatImage } from './chatImage.ts'
+import type { ModelLaunchSettings } from './launchSettings.ts'
+import type { EngineBackendChoice } from './engineCatalog.ts'
 
 /** 全树速览给节点配的一句大白话标签(规则引擎现场算,不劳烦 AI) */
 export interface NodeSummary {
@@ -227,6 +229,10 @@ export interface AiBuiltinSettings {
   serverPath: string
   /** GGUF 模型文件的绝对路径 */
   modelPath: string
+  /** 每个模型各自的高级启动账(键 = 归一化的模型路径);没有这本账 = 全自动 */
+  launch?: Record<string, ModelLaunchSettings>
+  /** 引擎后端选择:'auto'(默认,按机器推荐)或显式 cuda/vulkan/cpu;只在非 auto 时落盘 */
+  backend?: EngineBackendChoice
 }
 
 /** AI 配置(存 userData,含三个 Provider 的全部设置 + 当前选用谁) */
@@ -327,6 +333,12 @@ export interface GgufShape {
   kvHeadCount: number | null
   /** 嵌入维度(拿它除以头数 = 每头宽度) */
   embeddingLength: number | null
+  /** 架构名(general.architecture,如 llama/gemma4);没写着就为 null */
+  architecture: string | null
+  /** MoE 专家总数;稠密模型/读不到为 null */
+  expertCount: number | null
+  /** 每步激活的专家数;读不到为 null */
+  expertUsedCount: number | null
 }
 
 /** 设置页上下文档位的账本原料:模型档案 + 机器家底,一次端齐(翻不到的条目是 null) */

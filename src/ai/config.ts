@@ -14,6 +14,9 @@ import {
   sanitizeCloudVendorId
 } from '../shared/cloudVendors.ts'
 import { DEFAULT_PERSONALIZATION, sanitizePersonalization } from '../shared/personalization.ts'
+import { sanitizeLaunchRecord } from '../shared/launchSettings.ts'
+import type { ModelLaunchSettings } from '../shared/launchSettings.ts'
+import { sanitizeBackendChoice } from '../shared/engineCatalog.ts'
 import { sanitizeTavilyKey } from '../shared/tavily.ts'
 import { openSecret, sealSecret } from './secretCodec.ts'
 
@@ -69,6 +72,13 @@ function str(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback
 }
 
+/** 启动账洗完一本不剩就当没这字段(JSON.stringify 丢 undefined,存档干干净净) */
+function nonEmptyLaunch(
+  r: Record<string, ModelLaunchSettings>
+): Record<string, ModelLaunchSettings> | undefined {
+  return Object.keys(r).length > 0 ? r : undefined
+}
+
 export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
   const fallback = defaultAiConfig()
   try {
@@ -96,7 +106,13 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
       },
       builtin: {
         serverPath: typeof bi.serverPath === 'string' ? bi.serverPath : '',
-        modelPath: typeof bi.modelPath === 'string' ? bi.modelPath : ''
+        modelPath: typeof bi.modelPath === 'string' ? bi.modelPath : '',
+        // 每模型高级启动账(老配置没这字段 = 全自动);脏账洗一遍,空账直接不落
+        launch: nonEmptyLaunch(sanitizeLaunchRecord(bi.launch)),
+        // 引擎后端:'auto' 或脏值一律不落字段(缺省即自动)
+        ...(sanitizeBackendChoice(bi.backend) !== 'auto'
+          ? { backend: sanitizeBackendChoice(bi.backend) }
+          : {})
       },
       // 老配置没有 cloud 分支 = 全默认(未确认、未填 Key);密文解不开(换机器)= Key 为空,请用户重填
       cloud: normalizeCloud(cl, openSecret(cl)),
@@ -129,7 +145,13 @@ export async function saveAiConfig(userDataDir: string, config: AiConfig): Promi
     },
     builtin: {
       serverPath: config.builtin.serverPath.trim(),
-      modelPath: config.builtin.modelPath.trim()
+      modelPath: config.builtin.modelPath.trim(),
+      // 高级启动账照洗再落盘:只留白名单值;全空时字段整个不出现,自动档不占存档
+      launch: nonEmptyLaunch(sanitizeLaunchRecord(config.builtin.launch)),
+      // 引擎后端:只落显式选择;'auto'/脏值读回时就是自动,不占存档
+      ...(sanitizeBackendChoice(config.builtin.backend) !== 'auto'
+        ? { backend: sanitizeBackendChoice(config.builtin.backend) }
+        : {})
     },
     cloud: normalizeCloud(cloudRaw, typeof cloudRaw.apiKey === 'string' ? cloudRaw.apiKey : ''),
     webLookup: config.webLookup === true,
