@@ -148,7 +148,7 @@
 
 .eng-bar-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--sash-hi);
   border-radius: var(--radius-pill);
   transition: width 0.2s var(--ease-smooth, ease);
 }
