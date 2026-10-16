@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
+import { isImageFile } from '@shared/fileKinds'
 import {
   DRAG_MIME_NODE,
   DRAG_MIME_REF,
@@ -65,6 +66,7 @@ export function FreeChatPanel({
   suggestions,
   onDropNode,
   onDropRef,
+  rootPath,
   fileLinks,
   suggestionsOn
 }: {
@@ -76,6 +78,8 @@ export function FreeChatPanel({
   suggestions?: string[]
   /** 拖文件进聊天挂引用(第一百二十五锤):传了才接拖拽;文件夹/读不了的由 App 端垫灰字指路 */
   onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
+  /** 拖来的图片读盘用(拖拽分流):不传时图片退回挂引用老路垫灰字 */
+  rootPath?: string
   /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
   onDropRef?: (ref: ChatCodeRef) => void
   /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
@@ -255,7 +259,15 @@ export function FreeChatPanel({
           e.preventDefault()
           try {
             const node = JSON.parse(raw) as DragNodePayload
-            if (node.relPath) onDropNode(node.kind, node.relPath)
+            if (node.relPath) {
+              const name = node.relPath.split('/').pop() ?? node.relPath
+              // 文件树拖来的图片走图片附件正门(拖拽分流):读盘 → 待发账,不再当文本挂引用
+              if (rootPath && node.kind === 'file' && isImageFile(name)) {
+                void chatImages.addFromRelPath(rootPath, node.relPath)
+              } else {
+                onDropNode(node.kind, node.relPath)
+              }
+            }
           } catch {
             // 不是咱家的货,不接
           }
@@ -430,7 +442,7 @@ export function FreeChatPanel({
         {chat.messages.length > 0 && composerEl}
         <p className="fc-tip">
           回车发送 · Shift+回车换行
-          {onDropNode || onDropRef ? ' · 拖文件或选中的代码进来挂引用' : ''}
+          {onDropNode || onDropRef ? ' · 拖文件或选中的代码进来挂引用,图片直接进待发区' : ''}
         </p>
       </div>
     </div>

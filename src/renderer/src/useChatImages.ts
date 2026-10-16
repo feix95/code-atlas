@@ -5,16 +5,19 @@ import { sniffImage } from '@shared/imageMeta'
 import { IMAGE_PREVIEW_MAX_BYTES } from '@shared/preview'
 
 /**
- * 待发图片的小账本(第一百五十二锤):三个入口(「+」菜单选文件、剪贴板粘贴、
- * 从系统拖文件进来)都汇到 addFiles —— 同一份校验口径:只收 JPG/PNG(魔数验,不认后缀)、
+ * 待发图片的小账本(第一百五十二锤):四个入口(「+」菜单选文件、剪贴板粘贴、
+ * 从系统拖文件进来、从文件树拖图片进来)都汇到 addFiles —— 同一份校验口径:只收 JPG/PNG(魔数验,不认后缀)、
  * 单张不超上限、最多 3 张;收进来的先压长边到 1024 再入账(保持原格式)。
  * 能力闸:纯文本模型一律拒收并垫灰字;能力中途变成纯文本时,待发图片自动清掉并报一声。
+ * 文件树拖来的只有 relPath,由 addFromRelPath 走 readPreview 读盘再汇进来,不另开秤。
  */
 export interface ChatImagesApi {
   images: ChatImage[]
   /** 入口置灰依据:text-only 不放行(reason),unknown 放行但带提醒(hint) */
   gate: { allow: boolean; reason?: string; hint?: string }
   addFiles: (files: Iterable<File>) => Promise<void>
+  /** 文件树拖来的图片(只有 relPath):读盘 → 转 File → 汇进 addFiles 同一把尺 */
+  addFromRelPath: (rootPath: string, relPath: string) => Promise<void>
   removeImage: (id: string) => void
   clear: () => void
 }
@@ -119,6 +122,33 @@ export function useChatImages(
     }
   }
 
+  /** 文件树拖来的图片:readPreview 读盘验身份(谢客线/越界/错误话术全复用它), 图片数据转成标准 File 再汇进 addFiles */
+  async function addFromRelPath(rootPath: string, relPath: string): Promise<void> {
+    const gateNow = imageGate(visionRef.current, 1)
+    if (!gateNow.allow) {
+      noteRef.current(gateNow.reason ?? '当前模型看不了图片')
+      return
+    }
+    const name = relPath.split('/').pop() ?? relPath
+    const readFailed = `「${name}」读不出来,没带进来`
+    const res = await window.atlas.readPreview(rootPath, relPath).catch(() => null)
+    if (!res) {
+      noteRef.current(readFailed)
+      return
+    }
+    if (res.status !== 'image' || !res.image) {
+      noteRef.current(res.reason || readFailed)
+      return
+    }
+    const img = res.image
+    try {
+      const blob = await (await fetch(img.dataUrl)).blob()
+      await addFiles([new File([blob], name, { type: img.mime })])
+    } catch {
+      noteRef.current(readFailed)
+    }
+  }
+
   function removeImage(id: string): void {
     setImages((prev) => {
       const next = prev.filter((img) => img.id !== id)
@@ -136,6 +166,7 @@ export function useChatImages(
     images,
     gate: imageGate(vision, 1),
     addFiles,
+    addFromRelPath,
     removeImage,
     clear
   }

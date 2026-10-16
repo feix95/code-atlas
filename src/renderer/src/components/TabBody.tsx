@@ -234,6 +234,7 @@ export function TabBody({
           onRemoveRef={removePreviewRef}
           onDropNode={handleDropNode}
           onDropRef={handleDropRef}
+          rootPath={result.rootPath}
           fileLinks={fileLinks}
           suggestionsOn={chatSuggestionsOn}
         />
