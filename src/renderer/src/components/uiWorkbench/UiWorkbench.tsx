@@ -1,11 +1,11 @@
 // UI 工作台(实验分支):用户以最小可复用单位拼装自己的 app 界面,导出 token JSON + 可插拔适配器产物。
 // 版式对照 Figma UI3:左侧栏占用全局侧栏(UiWorkbenchSidebar);页签内 = 画布(标尺 + 底板 + 画板)
 // + 底部浮动工具栏 + 右侧属性面板。Figma UI3 无顶栏,顶部由应用页签带承担;面板顶栏放导出与缩放。
-// 没选中时属性面板显示页面(画布底色)与画板设置;选中节点时换成该节点的属性(Figma 同款)。
-import { useEffect, useMemo } from 'react'
-import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
-import { visibleNodes } from '@shared/uiWorkbench/scene'
-import { artboardPrefsActions, useArtboardPrefs } from '../../uiWorkbench/artboardPrefsStore'
+// 没选中时属性面板显示页面(画布底色);选中节点时换成该节点的属性(Figma 同款);画板是页面里的普通对象。
+import { useEffect, useMemo, useRef } from 'react'
+import { pageExportTargets } from '@shared/uiWorkbench/export/frameDocument'
+import { contentBox } from '@shared/uiWorkbench/scene'
+import { useArtboardPrefs } from '../../uiWorkbench/artboardPrefsStore'
 import {
   docActions,
   selectedNode,
@@ -17,9 +17,9 @@ import { newRectDefaultsActions } from '../../uiWorkbench/newRectDefaultsStore'
 import { useStyles } from '../../uiWorkbench/styleStore'
 import { useCanvasTools } from '../../uiWorkbench/useCanvasTools'
 import { useCanvasViewport } from '../../uiWorkbench/useCanvasViewport'
-import { ArtboardPanel } from './ArtboardPanel'
 import { CanvasStage } from './CanvasStage'
 import { ExportMenu } from './ExportMenu'
+import { FramePanel } from './FramePanel'
 import { LinePanel } from './LinePanel'
 import { NewLinePanel } from './NewLinePanel'
 import { NewRectPanel } from './NewRectPanel'
@@ -27,29 +27,30 @@ import { PagePanel } from './PagePanel'
 import { RectPanel } from './RectPanel'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
 
-const ZOOM_TIP =
-  'Ctrl+滚轮 缩放 · 滚轮 平移 · 空格或中键拖动 平移\nCtrl+0 回到 100% · Shift+1 适配窗口'
-
 export function UiWorkbench(): React.JSX.Element {
-  // 画板尺寸归当前页(Figma 里 Frame 属于 Page);本机偏好只管「最近用过」「我的预设」与新文档的初始尺寸
-  const prefs = useArtboardPrefs()
   const docState = useDocState()
-  const board = docState.activePage.artboard
-  const viewport = useCanvasViewport(board)
-  const tools = useCanvasTools(viewport, board)
-  const { refit } = viewport
-  // 切页或画板尺寸变了(改尺寸、撤销/重做)都重新适配窗口
+  // 适配窗口的目标 = 当前页全部可见内容的外接框;页面是空的就取一块上次用过的画板尺寸大小的空地
+  const lastSize = useArtboardPrefs().last
+  const fitTarget = contentBox(docState.nodes) ?? { x: 0, y: 0, ...lastSize }
+  const fitRef = useRef(fitTarget)
   useEffect(() => {
-    refit({ width: board.width, height: board.height })
-  }, [docState.activePageId, board.width, board.height, refit])
+    fitRef.current = fitTarget
+  })
+  const viewport = useCanvasViewport(fitTarget)
+  const tools = useCanvasTools(viewport)
+  const { refit } = viewport
+  // 只在切页时重新适配(编辑内容不该让视图跳动)
+  useEffect(() => {
+    refit(fitRef.current)
+  }, [docState.activePageId, refit])
   const selected = selectedNode(docState)
   const selectedAll = selectedNodes(docState)
   const styles = useStyles()
   const lineStyles = useLineStyles()
-  // 导出 doc 带上样式库:token 适配器按「定义+引用」发出,其余适配器忽略该字段
-  const doc = useMemo(
-    () => ({ artboard: board, nodes: visibleNodes(docState.nodes), styles, lineStyles }),
-    [board, docState.nodes, styles, lineStyles]
+  // 导出清单带上样式库:token 适配器按「定义+引用」发出,其余适配器忽略该字段
+  const exportTargets = useMemo(
+    () => pageExportTargets(docState.nodes, { styles, lineStyles }),
+    [docState.nodes, styles, lineStyles]
   )
 
   /** 多选态:把某个样式整组应用(写定义值+挂 styleId,合成一笔撤销);选「无样式」= 整组脱钩 */
@@ -79,18 +80,12 @@ export function UiWorkbench(): React.JSX.Element {
     newRectDefaultsActions.rememberStyle(s?.id ?? null, s)
   }
 
-  function changeBoard(next: ArtboardSize): void {
-    docActions.patchPage(docState.activePageId, { artboard: next })
-    artboardPrefsActions.record(next)
-  }
-
   return (
     <section className="ui-workbench" aria-label="UI 工作台">
       <div className="uwb-stage">
         <CanvasStage
-          board={board}
           background={docState.activePage.background}
-          doc={doc}
+          nodes={docState.nodes}
           selectedNodes={selectedAll}
           viewport={viewport}
           tools={tools}
@@ -99,8 +94,8 @@ export function UiWorkbench(): React.JSX.Element {
       </div>
       <aside className="uwb-inspector" aria-label="属性面板">
         <div className="uwb-inspector-head">
-          <ExportMenu doc={doc} />
-          <span className="uwb-zoom" data-tip={ZOOM_TIP} aria-label="画布缩放比例">
+          <ExportMenu targets={exportTargets} />
+          <span className="uwb-zoom" aria-label="画布缩放比例">
             {`${Math.round(viewport.view.zoom * 100)}%`}
           </span>
         </div>
@@ -108,6 +103,8 @@ export function UiWorkbench(): React.JSX.Element {
           {selected ? (
             selected.type === 'rect' ? (
               <RectPanel node={selected} />
+            ) : selected.type === 'frame' ? (
+              <FramePanel node={selected} />
             ) : (
               <LinePanel node={selected} />
             )
@@ -137,16 +134,7 @@ export function UiWorkbench(): React.JSX.Element {
           ) : tools.tool === 'line' ? (
             <NewLinePanel />
           ) : (
-            <>
-              <PagePanel page={docState.activePage} />
-              <ArtboardPanel
-                board={board}
-                prefs={prefs}
-                onChange={changeBoard}
-                onSavePreset={(name) => artboardPrefsActions.savePreset(name, board)}
-                onRemovePreset={artboardPrefsActions.removePreset}
-              />
-            </>
+            <PagePanel page={docState.activePage} />
           )}
         </div>
       </aside>

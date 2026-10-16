@@ -1,7 +1,8 @@
 // UI 工作台画布视口的纯计算:缩放、平移、适配窗口、标尺刻度。
-// 坐标约定:屏幕点(相对视口左上角,CSS px)= pan + 设计点 × zoom;画板左上角为设计坐标原点。
+// 坐标约定:屏幕点(相对视口左上角,CSS px)= pan + 设计点 × zoom;页面坐标原点即设计坐标原点。
 // zoom = 1 时 1 逻辑像素 = 1 CSS px(应用界面缩放改的是根字号,不影响 CSS px)。
 import type { ArtboardSize } from '../../../shared/uiWorkbench/artboard.ts'
+import type { RectBox } from '../../../shared/uiWorkbench/geometry.ts'
 
 export interface Viewport {
   zoom: number
@@ -34,21 +35,23 @@ export function zoomAt(view: Viewport, nextZoom: number, x: number, y: number): 
   return { zoom, panX: x - (x - view.panX) * ratio, panY: y - (y - view.panY) * ratio }
 }
 
-/** 画板按指定缩放居中 */
-export function centerArtboard(board: ArtboardSize, size: ViewSize, zoom: number): Viewport {
+/** 适配窗口:把一块设计区域放进视口(四周留白、居中),放大不超过 100% */
+export function fitBox(box: RectBox, size: ViewSize): Viewport {
+  const availW = Math.max(1, size.width - FIT_PADDING * 2)
+  const availH = Math.max(1, size.height - FIT_PADDING * 2)
+  const zoom = clampZoom(
+    Math.min(1, availW / Math.max(1, box.width), availH / Math.max(1, box.height))
+  )
   return {
     zoom,
-    panX: (size.width - board.width * zoom) / 2,
-    panY: (size.height - board.height * zoom) / 2
+    panX: (size.width - box.width * zoom) / 2 - box.x * zoom,
+    panY: (size.height - box.height * zoom) / 2 - box.y * zoom
   }
 }
 
-/** 适配窗口:整张画板放进视口(四周留白),放大不超过 100% */
+/** 画板(原点在设计坐标 0,0)适配窗口 */
 export function fitArtboard(board: ArtboardSize, size: ViewSize): Viewport {
-  const availW = Math.max(1, size.width - FIT_PADDING * 2)
-  const availH = Math.max(1, size.height - FIT_PADDING * 2)
-  const zoom = clampZoom(Math.min(1, availW / board.width, availH / board.height))
-  return centerArtboard(board, size, zoom)
+  return fitBox({ x: 0, y: 0, ...board }, size)
 }
 
 /** 标尺主刻度候选间距(设计单位) */

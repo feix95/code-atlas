@@ -5,6 +5,7 @@
 // 撤销模型:快照式历史(@shared/uiWorkbench/history)。手势(beginBatch~endBatch)收成一步;
 // 批次之外的单次 dispatch(面板回车、Delete)各记一步;只改选中的 select、只切页的 switchPage 不入账。
 import { useSyncExternalStore } from 'react'
+import { createFrame, type BoxNode } from '../../../shared/uiWorkbench/frame.ts'
 import type { LineNode } from '../../../shared/uiWorkbench/line.ts'
 import type { RectNode } from '../../../shared/uiWorkbench/node.ts'
 // 相对路径而非 @shared:自测脚本是裸 node 跑的,不认 tsconfig 的 paths 别名
@@ -21,6 +22,7 @@ import {
   type PagePatch
 } from '../../../shared/uiWorkbench/page.ts'
 import type { NodeAction, SceneNode } from '../../../shared/uiWorkbench/scene.ts'
+import { subtreeIds } from '../../../shared/uiWorkbench/tree.ts'
 import {
   emptyHistory,
   pushHistory,
@@ -66,11 +68,14 @@ function buildState(core: DocCore, hist: DocHistory): WorkbenchDocState {
 /** 第一页的底色跟随创建时的明暗主题(Figma 同款);自测里没有 document,按浅色算 */
 const IS_DARK_THEME =
   typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
-// 第一页的画板尺寸沿用本机记住的上次尺寸(重启后新文档不回到出厂尺寸)
-const FIRST_PAGE = createPage([], undefined, {
-  background: defaultPageBackground(IS_DARK_THEME),
-  artboard: getArtboardPrefs().last
-})
+/** 新文档的第一页:默认预置一个画板,尺寸沿用本机记住的上次尺寸(重启后不回到出厂尺寸);之后新建的页是空的 */
+function freshFirstPage(isSeeded: boolean): Page {
+  return {
+    ...createPage([], undefined, { background: defaultPageBackground(IS_DARK_THEME) }),
+    nodes: isSeeded ? [createFrame([], { x: 0, y: 0, ...getArtboardPrefs().last })] : []
+  }
+}
+const FIRST_PAGE = freshFirstPage(true)
 let history: DocHistory = emptyHistory()
 let state: WorkbenchDocState = buildState(
   { pages: [FIRST_PAGE], activePageId: FIRST_PAGE.id, selectedIds: [] },
@@ -141,13 +146,12 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 export const docActions = {
   dispatch(action: NodeAction): void {
     const pages = applyNodeActionToPage(state.pages, state.activePageId, action)
-    // 被删、被隐藏的节点从选集剔除(隐藏即看不见,不该还留着选中框);其余动作不动选集
+    // 被删、被隐藏的节点(画板连后代)从选集剔除(隐藏即看不见,不该还留着选中框);其余动作不动选集
     const isDeselecting =
       action.type === 'remove' ||
       (action.type === 'update' && 'visible' in action.patch && action.patch.visible === false)
-    const selectedIds = isDeselecting
-      ? state.selectedIds.filter((id) => id !== action.id)
-      : state.selectedIds
+    const gone = isDeselecting ? new Set(subtreeIds(state.nodes, action.id)) : null
+    const selectedIds = gone ? state.selectedIds.filter((id) => !gone.has(id)) : state.selectedIds
     change({ pages, activePageId: state.activePageId, selectedIds })
   },
   /** 替换选集:null/[] = 清空(点空白、Esc) */
@@ -203,6 +207,14 @@ export const docActions = {
       selectedIds: state.selectedIds
     })
   },
+  /** 丢弃当前文档、换成全新的一页(清空撤销栈与选中);isSeeded=false 给空白页,自测与「新建文档」共用 */
+  resetDocument(isSeeded = true): void {
+    const page = freshFirstPage(isSeeded)
+    history = emptyHistory()
+    batchDepth = 0
+    batchBase = null
+    commit({ pages: [page], activePageId: page.id, selectedIds: [] })
+  },
   /** 手势/复合动作开始:期间的 dispatch 只改画面,最外层 endBatch 才记一步 */
   beginBatch(): void {
     batchDepth += 1
@@ -243,6 +255,12 @@ export const docActions = {
     history = r.history
     restore(r.restore)
   }
+}
+
+/** 恰为单选且是矩形或画板时返回它(缩放手势专用:这两类共用盒子几何) */
+export function selectedBox(s: WorkbenchDocState): BoxNode | null {
+  const node = selectedNode(s)
+  return node && node.type !== 'line' ? node : null
 }
 
 /** 恰为单选时返回该节点(单对象手势与属性面板专用);多选/空选返回 null */

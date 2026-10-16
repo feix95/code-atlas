@@ -3,7 +3,8 @@
 import type { Point } from '@shared/uiWorkbench/geometry'
 import { scaleBoxByHandle, scaleNodePatch, type ScaleHandle } from '@shared/uiWorkbench/groupScale'
 import { unionBox } from '@shared/uiWorkbench/scene'
-import { docActions, selectedNodes, getDocState } from './documentStore'
+import { movableSelection } from '@shared/uiWorkbench/tree'
+import { docActions, getDocState } from './documentStore'
 import { trackPointer } from './trackPointer'
 
 /** 手柄方向 → resize 光标:同号角 = 左上右下对角,异号 = 右上左下对角 */
@@ -19,9 +20,10 @@ export function startGroupScaleDrag(
   toDesign: (e: { clientX: number; clientY: number }) => Point
 ): void {
   if (e.button !== 0) return
-  const origins = selectedNodes(getDocState())
-  if (origins.length < 2) return
-  const from = unionBox(origins)
+  // 选集的根定变换框;画板的后代随之一起映射(与整组移动同口径)
+  const { roots, all: origins } = movableSelection(getDocState().nodes, getDocState().selectedIds)
+  if (roots.length < 2) return
+  const from = unionBox(roots)
   trackPointer(
     e,
     (ev) => {

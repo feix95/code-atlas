@@ -661,6 +661,9 @@ check('框选旋转矩形:按真实旋转轮廓判定,不拿声明外接框糊�
 
 // ── 撤销/重做历史(history.ts + documentStore) ──
 
+// 文档仓库默认预置一个画板;历史/批次用例按「空白文档」写,先换成空白页
+docActions.resetDocument(false)
+
 check('标签拖拽步长:右增左减,不足一步累积不丢,Shift 十倍', () => {
   assert.deepEqual(scrubStep(0, SCRUB_PX_PER_STEP * 3, false), { delta: 3, rest: 0 })
   assert.deepEqual(scrubStep(0, -SCRUB_PX_PER_STEP * 2, false), { delta: -2, rest: 0 })

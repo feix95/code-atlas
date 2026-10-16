@@ -2,13 +2,14 @@
 // 四角同值用 <rect rx>,不同值用路径逐角画圆弧;旋转用 transform="rotate(角度 中心x 中心y)"。
 // 描边与 CSS border 同为「内描边」口径:SVG 原生描边居中于轮廓,故用 2 倍宽 + clipPath 裁出内半。
 import type { LineNode } from '../line.ts'
-import { uniformRadius, type RectNode } from '../node.ts'
+import type { BoxNode } from '../frame.ts'
+import { uniformRadius } from '../node.ts'
 import type { SceneNode } from '../scene.ts'
 import { rectCenter } from '../geometry.ts'
 import { ARTBOARD_BACKGROUND } from './cssAdapter.ts'
 import type { ExportFormat, WorkbenchDocument } from './types.ts'
 
-function roundedRectPath(node: RectNode): string {
+function roundedRectPath(node: BoxNode): string {
   const { x, y, width: w, height: h } = node
   const [tl, tr, br, bl] = node.radii
   return [
@@ -25,7 +26,7 @@ function roundedRectPath(node: RectNode): string {
   ].join(' ')
 }
 
-function shapeMarkup(node: RectNode, extra: string): string {
+function shapeMarkup(node: BoxNode, extra: string): string {
   const uniform = uniformRadius(node.radii)
   if (uniform === null) return `<path d="${roundedRectPath(node)}"${extra}/>`
   const rx = uniform > 0 ? ` rx="${uniform}"` : ''
@@ -61,9 +62,10 @@ function nodeElements(node: SceneNode): string[] {
 
 export function toSvg(doc: WorkbenchDocument): string {
   const { width, height } = doc.artboard
+  const fill = doc.artboardFill === undefined ? ARTBOARD_BACKGROUND : doc.artboardFill
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `  <rect width="${width}" height="${height}" fill="${ARTBOARD_BACKGROUND}"/>`,
+    ...(fill === null ? [] : [`  <rect width="${width}" height="${height}" fill="${fill}"/>`]),
     ...doc.nodes.flatMap(nodeElements),
     '</svg>',
     ''

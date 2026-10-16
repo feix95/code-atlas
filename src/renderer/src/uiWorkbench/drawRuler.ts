@@ -1,4 +1,4 @@
-// 标尺绘制(canvas 2D):底色 + 画板范围底 + 主次刻度 + 主刻度数字。
+// 标尺绘制(canvas 2D):底色 + 选中范围底 + 主次刻度 + 主刻度数字。
 // 颜色与字体从标尺元素的计算样式读取(CSS 变量统一管理,换主题后重画即跟上)。
 import { rulerTicks, type RulerTick } from './viewport.ts'
 
@@ -9,8 +9,9 @@ export interface RulerFrame {
   zoom: number
   /** 该轴平移量(CSS px) */
   pan: number
-  /** 画板在该轴上的设计长度,用于画范围底 */
-  boardLength: number
+  /** 高亮范围(设计坐标)的起点与长度:选中对象在该轴上的占位;长度 0 = 不画 */
+  rangeStart: number
+  rangeLength: number
 }
 
 interface RulerCanvas {
@@ -55,10 +56,11 @@ function drawBackground(rc: RulerCanvas, frame: RulerFrame): void {
   const { ctx, style, width, height, isHorizontal } = rc
   ctx.fillStyle = style.getPropertyValue('--uwb-ruler-bg')
   ctx.fillRect(0, 0, width, height)
-  const rangeLen = frame.boardLength * frame.zoom
+  const rangeLen = frame.rangeLength * frame.zoom
+  const rangePos = frame.pan + frame.rangeStart * frame.zoom
   ctx.fillStyle = style.getPropertyValue('--uwb-ruler-range')
-  if (isHorizontal) ctx.fillRect(frame.pan, 0, rangeLen, height)
-  else ctx.fillRect(0, frame.pan, width, rangeLen)
+  if (isHorizontal) ctx.fillRect(rangePos, 0, rangeLen, height)
+  else ctx.fillRect(0, rangePos, width, rangeLen)
 }
 
 function drawTick(rc: RulerCanvas, tick: RulerTick): void {

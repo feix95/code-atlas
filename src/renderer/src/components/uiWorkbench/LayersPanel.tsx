@@ -1,9 +1,10 @@
-// 左侧栏 · 图层:当前页的对象列表,上层在上(Figma 同款)。
-// 点行选中(Shift 加减选)、双击改名、眼睛显隐、锁头锁定、拖行调 z 序;鼠标停在行上,画布上描出对应对象。
+// 左侧栏 · 图层:当前页的对象树,同级上层在上(Figma 同款);画板是容器,后代缩进显示在它下面,可折叠。
+// 点行选中(Shift 加减选)、双击改名、眼睛显隐、锁头锁定、拖行在同级内调 z 序;鼠标停在行上,画布上描出对应对象。
+// 想把对象挪进/挪出画板,在画布上拖(松手按中心点认爹)。隐藏、锁定向后代继承,行上按继承后的状态变灰。
 // 图层 = 当前页节点数组的另一种视图:所有改动都走 docActions.dispatch,与画布手势、撤销共用一条路。
 import { useEffect, useRef, useState } from 'react'
-import { layerDisplayOrder, layerReorderIndex } from '@shared/uiWorkbench/layers'
-import type { SceneNode } from '@shared/uiWorkbench/scene'
+import { layerTreeReorderIndex, layerTreeRows, type LayerRow } from '@shared/uiWorkbench/layers'
+import { hiddenIds } from '@shared/uiWorkbench/tree'
 import { docActions, useDocState } from '../../uiWorkbench/documentStore'
 import { setHoveredLayer } from '../../uiWorkbench/layerHoverStore'
 import { dropMarkerClass, ROW_ATTR, useRowReorder } from '../../uiWorkbench/useRowReorder'
@@ -35,7 +36,6 @@ function LayerToggle({
       className={`uwb-field-btn uwb-layer-toggle${isAttention ? ' is-attention' : ''}`}
       aria-label={label}
       aria-pressed={isOn}
-      data-tip={label}
       onClick={onToggle}
     >
       <TreeIcon name={isOn ? onIcon : offIcon} size={TOGGLE_ICON_SIZE} mono />
@@ -52,36 +52,65 @@ function patchLayer(
 
 export function LayersPanel(): React.JSX.Element {
   const { nodes, selectedIds } = useDocState()
-  const rows = layerDisplayOrder(nodes)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
+  const rows = layerTreeRows(nodes, collapsed)
+  const hidden = hiddenIds(nodes)
   const listRef = useRef<HTMLUListElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  function toggleFold(id: string): void {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+  }
   const { drag, startRow } = useRowReorder({
     listRef,
     onPress: (row, isShift) => {
-      const id = rows[row].id
+      const id = rows[row].node.id
       if (isShift) docActions.toggleSelect(id)
       else if (!selectedIds.includes(id)) docActions.select(id)
     },
     onDrop: (fromRow, slot) => {
-      const toIndex = layerReorderIndex(rows.length, fromRow, slot)
-      if (toIndex !== null) docActions.dispatch({ type: 'reorder', id: rows[fromRow].id, toIndex })
+      const toIndex = layerTreeReorderIndex(nodes, rows, fromRow, slot)
+      if (toIndex !== null) {
+        docActions.dispatch({ type: 'reorder', id: rows[fromRow].node.id, toIndex })
+      }
     }
   })
 
   useEffect(() => () => setHoveredLayer(null), [])
 
-  function renderRow(node: SceneNode, row: number): React.JSX.Element {
+  function renderRow(
+    { node, depth, hasChildren, isExpanded }: LayerRow,
+    row: number
+  ): React.JSX.Element {
     const isSelected = selectedIds.includes(node.id)
     return (
       <li
         key={node.id}
         {...{ [ROW_ATTR]: '' }}
-        className={`uwb-layer${isSelected ? ' is-selected' : ''}${node.visible ? '' : ' is-hidden'}${dropMarkerClass(drag, row, rows.length)}`}
+        style={{ '--depth': depth } as React.CSSProperties}
+        className={`uwb-layer${isSelected ? ' is-selected' : ''}${hidden.has(node.id) ? ' is-hidden' : ''}${dropMarkerClass(drag, row, rows.length)}`}
         onPointerDown={(e) => startRow(e, row)}
         onDoubleClick={() => setEditingId(node.id)}
         onPointerEnter={() => setHoveredLayer(node.id)}
         onPointerLeave={() => setHoveredLayer(null)}
       >
+        {hasChildren ? (
+          <button
+            type="button"
+            className={`uwb-layer-fold${isExpanded ? '' : ' is-collapsed'}`}
+            aria-label={isExpanded ? '折叠' : '展开'}
+            aria-expanded={isExpanded}
+            onClick={() => toggleFold(node.id)}
+          >
+            <TreeIcon name="chevron" size={TOGGLE_ICON_SIZE} mono />
+          </button>
+        ) : (
+          <span className="uwb-layer-fold" aria-hidden="true" />
+        )}
         <LayerKindIcon type={node.type} />
         <InlineName
           value={node.name}
@@ -117,7 +146,9 @@ export function LayersPanel(): React.JSX.Element {
         <h3 className="uwb-section-title">图层</h3>
       </div>
       {rows.length === 0 ? (
-        <p className="uwb-groups-empty">这一页还没有对象。用矩形或直线工具在画板上画一个。</p>
+        <p className="uwb-groups-empty">
+          这一页还没有对象。按 F 拖出一个画板,再用矩形或直线工具在里面画。
+        </p>
       ) : (
         <ul ref={listRef} className="uwb-layer-list">
           {rows.map(renderRow)}

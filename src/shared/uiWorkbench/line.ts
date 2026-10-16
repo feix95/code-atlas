@@ -37,7 +37,17 @@ export interface LineNode extends LayerState {
 export type LinePatch = Partial<
   Pick<
     LineNode,
-    'x1' | 'y1' | 'x2' | 'y2' | 'stroke' | 'cap' | 'styleId' | 'name' | 'visible' | 'locked'
+    | 'x1'
+    | 'y1'
+    | 'x2'
+    | 'y2'
+    | 'stroke'
+    | 'cap'
+    | 'styleId'
+    | 'name'
+    | 'visible'
+    | 'locked'
+    | 'parentId'
   >
 >
 
@@ -80,6 +90,7 @@ export function applyLinePatch(node: LineNode, patch: LinePatch): LineNode {
     name: sanitizeName(merged.name, node.name),
     visible: merged.visible !== false,
     locked: merged.locked === true,
+    parentId: merged.parentId ?? null,
     x1: clampCoord(merged.x1),
     y1: clampCoord(merged.y1),
     x2: clampCoord(merged.x2),

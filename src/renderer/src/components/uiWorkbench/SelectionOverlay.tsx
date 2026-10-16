@@ -6,6 +6,7 @@
 import { radiusHandleLocal, rotatePoint, toWorld } from '@shared/uiWorkbench/geometry'
 import { CORNERS, EDGES, type CornerIndex, type EdgeName } from '@shared/uiWorkbench/node'
 import type { SceneNode } from '@shared/uiWorkbench/scene'
+import { selectionRoots } from '@shared/uiWorkbench/tree'
 import { cornerResizeCursor, edgeResizeCursor } from '../../uiWorkbench/cursors'
 import { nodeOutline } from '../../uiWorkbench/nodeOutline'
 import type { CanvasToolsApi } from '../../uiWorkbench/useCanvasTools'
@@ -49,10 +50,17 @@ export function SelectionOverlay({
   // 手柄/旋钮只服务单选;多选只剩各对象描边。矩形有缩放/圆角/旋转手柄,直线只有两个端点手柄
   // 锁定的节点(只能从图层面板选进来)只画描边,不给任何改动手柄
   const single = nodes.length === 1 && !nodes[0].locked ? nodes[0] : null
-  const canScaleGroup = nodes.length > 1 && nodes.every((n) => !n.locked)
+  // 变换框只认选集的根:画板与它的后代同在选集里时,后代随画板一起映射,不单独算
+  const roots = selectionRoots(
+    nodes,
+    nodes.map((n) => n.id)
+  )
+  const canScaleGroup = roots.length > 1 && roots.every((n) => !n.locked)
   const node = single?.type === 'rect' ? single : null
+  // 矩形与画板共用缩放手柄(角点 + 边中点);圆角与旋转只有矩形有
+  const box = single && single.type !== 'line' ? single : null
   const line = single?.type === 'line' ? single : null
-  const outline = node ? outlines[0].points : []
+  const outline = box ? outlines[0].points : []
   const showRadius =
     node !== null && Math.min(node.width, node.height) * view.zoom >= MIN_SIZE_FOR_HANDLES
   const topCenter = node ? toScreen(toWorld(node, { x: node.width / 2, y: 0 })) : null
@@ -73,7 +81,7 @@ export function SelectionOverlay({
           points={o.points.map((p) => `${p.x},${p.y}`).join(' ')}
         />
       ))}
-      {canScaleGroup && <GroupScaleHandles nodes={nodes} view={view} tools={tools} />}
+      {canScaleGroup && <GroupScaleHandles nodes={roots} view={view} tools={tools} />}
       {line &&
         outlines[0].points.map((p, i) => (
           <circle
@@ -114,6 +122,10 @@ export function SelectionOverlay({
               <title>拖动旋转,Shift 吸附 15°</title>
             </circle>
           </g>
+        </>
+      )}
+      {box && (
+        <>
           {outline.map((p, c) => (
             <rect
               key={c}
@@ -122,7 +134,7 @@ export function SelectionOverlay({
               width={CORNER_HALF * 2}
               height={CORNER_HALF * 2}
               className="uwb-corner-handle"
-              style={{ cursor: cornerResizeCursor(node.rotation, c as CornerIndex) }}
+              style={{ cursor: cornerResizeCursor(box.rotation, c as CornerIndex) }}
               onPointerDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -135,9 +147,9 @@ export function SelectionOverlay({
           {/* 边中点柄:只动被拖那条边(PS/Figma 变换框同款),对边钉死 */}
           {EDGES.map((edge) => {
             const mid = toScreen(
-              toWorld(node, {
-                x: node.width * (edge === 'right' ? 1 : edge === 'left' ? 0 : 0.5),
-                y: node.height * (edge === 'bottom' ? 1 : edge === 'top' ? 0 : 0.5)
+              toWorld(box, {
+                x: box.width * (edge === 'right' ? 1 : edge === 'left' ? 0 : 0.5),
+                y: box.height * (edge === 'bottom' ? 1 : edge === 'top' ? 0 : 0.5)
               })
             )
             const label = { top: '上边', right: '右边', bottom: '下边', left: '左边' }[
@@ -151,7 +163,7 @@ export function SelectionOverlay({
                 width={CORNER_HALF * 2}
                 height={CORNER_HALF * 2}
                 className="uwb-edge-handle"
-                style={{ cursor: edgeResizeCursor(node.rotation, edge) }}
+                style={{ cursor: edgeResizeCursor(box.rotation, edge) }}
                 onPointerDown={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -162,6 +174,10 @@ export function SelectionOverlay({
               </rect>
             )
           })}
+        </>
+      )}
+      {node && (
+        <>
           {showRadius &&
             CORNERS.map((c) => {
               const local = radiusHandleLocal(

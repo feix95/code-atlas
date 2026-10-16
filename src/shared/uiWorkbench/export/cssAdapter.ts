@@ -2,7 +2,8 @@
 // 画布 iframe 渲染用的也是 artboardCss 这一份输出,画布所见即导出所得。
 // 画板 = 定位容器(position: relative + 裁切);节点 = 绝对定位,旋转用 transform(默认绕中心)。
 import { lineAngle, lineLength, round2, type LineNode } from '../line.ts'
-import { uniformRadius, type RectNode } from '../node.ts'
+import type { BoxNode } from '../frame.ts'
+import { uniformRadius } from '../node.ts'
 import type { SceneNode } from '../scene.ts'
 import type { ExportFormat, WorkbenchDocument } from './types.ts'
 
@@ -13,7 +14,7 @@ function px(value: number): string {
   return value === 0 ? '0' : `${value}px`
 }
 
-function borderRadius(node: RectNode): string {
+function borderRadius(node: BoxNode): string {
   const uniform = uniformRadius(node.radii)
   return uniform !== null ? px(uniform) : node.radii.map(px).join(' ')
 }
@@ -67,13 +68,22 @@ function nodeRule(node: SceneNode): string {
   return rule(`.${node.id}`, decls)
 }
 
-export function artboardCss(doc: WorkbenchDocument): string {
-  const board = rule(`.${ARTBOARD_CLASS}`, [
+/** 一批节点的绝对定位规则(不含画板容器):画布上直接放在页面上的对象也走这一份 */
+export function nodesCss(nodes: readonly SceneNode[]): string {
+  return nodes.map(nodeRule).join('\n\n')
+}
+
+/** 画板容器 + 其内全部节点的规则;rootClass 默认 .artboard,画布上同屏多个画板时各取各的类名避免撞车 */
+export function artboardCss(doc: WorkbenchDocument, rootClass: string = ARTBOARD_CLASS): string {
+  const board = rule(`.${rootClass}`, [
     ['position', 'relative'],
     ['width', px(doc.artboard.width)],
     ['height', px(doc.artboard.height)],
     ['overflow', 'hidden'],
-    ['background', ARTBOARD_BACKGROUND]
+    [
+      'background',
+      doc.artboardFill === undefined ? ARTBOARD_BACKGROUND : (doc.artboardFill ?? 'transparent')
+    ]
   ])
   return [board, ...doc.nodes.map(nodeRule)].join('\n\n')
 }

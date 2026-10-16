@@ -12,19 +12,25 @@
 // 焦点落在工作台 DOM 之外的控件上(双分屏另一侧)也不抢键。
 import { useEffect } from 'react'
 import {
-  cloneNode,
-  isPickable,
+  pickableNodes,
   snapshotNode,
   translatePatch,
   type SceneNode
 } from '@shared/uiWorkbench/scene'
+import {
+  cloneTrees,
+  movableSelection,
+  selectionRoots,
+  withDescendants
+} from '@shared/uiWorkbench/tree'
 import { appearanceOf, type StyleAppearance } from '@shared/uiWorkbench/styles'
 import { docActions, getDocState } from './documentStore'
 import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 // 工作台内存剪贴板:只活在本模块,不碰系统剪贴板;pastes 计数让连续粘贴逐级错开
-let clipboard: { nodes: SceneNode[]; pastes: number } | null = null
+// nodes = 选集的根 + 全部后代(画板整棵复制),rootIds = 其中的根
+let clipboard: { nodes: SceneNode[]; rootIds: string[]; pastes: number } | null = null
 // 外观匿名剪贴板(Ctrl+Alt+C/V):只装 fill/stroke/radii,不装 styleId——贴上即脱钩
 let appearanceClipboard: StyleAppearance | null = null
 
@@ -73,16 +79,30 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
       return true
     }
 
+    /** 复制选集(画板连后代);返回选集的根 */
     const copySelection = (): SceneNode[] => {
       const { nodes, selectedIds } = getDocState()
-      const picked = nodes.filter((n) => selectedIds.includes(n.id))
-      if (picked.length === 0) return []
+      const roots = selectionRoots(nodes, selectedIds)
+      if (roots.length === 0) return []
+      const rootIds = roots.map((n) => n.id)
       // 深拷贝存剪贴板:之后源节点再被改动,贴出来的还是复制那一刻的样子
       clipboard = {
-        nodes: picked.map(snapshotNode),
+        nodes: withDescendants(nodes, rootIds).map(snapshotNode),
+        rootIds,
         pastes: 0
       }
-      return picked
+      return roots
+    }
+
+    /** 克隆一批「根 + 后代」落进当前页(父先于子逐个 add),副本的根整体选中 */
+    const addClones = (
+      sources: readonly SceneNode[],
+      rootIds: readonly string[],
+      offset: { x: number; y: number }
+    ): void => {
+      const made = cloneTrees(sources, rootIds, getDocState().nodes, offset)
+      for (const node of made.made) docActions.dispatch({ type: 'add', node })
+      docActions.selectIds(made.rootIds)
     }
 
     const onKey = (e: KeyboardEvent): void => {
@@ -95,14 +115,13 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
         heldArrows.add(e.code)
         const step = e.shiftKey ? NUDGE_STEP_SHIFT : NUDGE_STEP
         // 整组微调:选中几个动几个,同批同位移
-        for (const n of getDocState().nodes) {
-          if (!n.locked && getDocState().selectedIds.includes(n.id)) {
-            docActions.dispatch({
-              type: 'update',
-              id: n.id,
-              patch: translatePatch(n, delta.x * step, delta.y * step)
-            })
-          }
+        // 选中画板时后代随之平移;锁定的(含继承锁定)不动
+        for (const n of movableSelection(getDocState().nodes, getDocState().selectedIds).all) {
+          docActions.dispatch({
+            type: 'update',
+            id: n.id,
+            patch: translatePatch(n, delta.x * step, delta.y * step)
+          })
         }
         e.preventDefault()
         return
@@ -134,10 +153,12 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
           docActions.redo()
           break
         case 'KeyA':
+          // 全选 = 选中所有可点中的根(画板选整棵,不再重复选后代)
           docActions.selectIds(
-            getDocState()
-              .nodes.filter(isPickable)
-              .map((n) => n.id)
+            selectionRoots(
+              getDocState().nodes,
+              pickableNodes(getDocState().nodes).map((n) => n.id)
+            ).map((n) => n.id)
           )
           break
         case 'KeyC':
@@ -173,18 +194,9 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
           clipboard.pastes += 1
           docActions.beginBatch()
           try {
-            // 逐个克隆:序号在「含已贴节点」的列表上重算,一次粘贴内 id 不撞车;整组贴完整体选中
-            const offset = {
-              x: PASTE_OFFSET * clipboard.pastes,
-              y: PASTE_OFFSET * clipboard.pastes
-            }
-            const newIds: string[] = []
-            for (const src of clipboard.nodes) {
-              const node = cloneNode(src, getDocState().nodes, offset)
-              docActions.dispatch({ type: 'add', node })
-              newIds.push(node.id)
-            }
-            docActions.selectIds(newIds)
+            // 整组贴完整体选中;序号在「含已贴节点」的列表上重算,一次粘贴内 id 不撞车
+            const shift = PASTE_OFFSET * clipboard.pastes
+            addClones(clipboard.nodes, clipboard.rootIds, { x: shift, y: shift })
           } finally {
             docActions.endBatch()
           }
@@ -204,20 +216,15 @@ export function useDocShortcuts(viewport: CanvasViewportApi): void {
         }
         case 'KeyD': {
           const { nodes, selectedIds } = getDocState()
-          const picked = nodes.filter((n) => selectedIds.includes(n.id))
-          if (picked.length === 0) return
+          const roots = selectionRoots(nodes, selectedIds)
+          if (roots.length === 0) return
+          const rootIds = roots.map((n) => n.id)
           docActions.beginBatch()
           try {
-            const newIds: string[] = []
-            for (const src of picked) {
-              const node = cloneNode(src, getDocState().nodes, {
-                x: PASTE_OFFSET,
-                y: PASTE_OFFSET
-              })
-              docActions.dispatch({ type: 'add', node })
-              newIds.push(node.id)
-            }
-            docActions.selectIds(newIds)
+            addClones(withDescendants(nodes, rootIds), rootIds, {
+              x: PASTE_OFFSET,
+              y: PASTE_OFFSET
+            })
           } finally {
             docActions.endBatch()
           }

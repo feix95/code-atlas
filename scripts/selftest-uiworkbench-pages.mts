@@ -39,25 +39,24 @@ function check(name: string, fn: () => void): void {
 const BOX = { x: 0, y: 0, width: 10, height: 10 }
 const ids = (nodes: readonly SceneNode[]): string[] => nodes.map((n) => n.id)
 
-check('新页:序号取现有最大 + 1、删掉的号不复用;底色与画板尺寸继承', () => {
+check('新页:序号取现有最大 + 1、删掉的号不复用;底色继承、页面是空的', () => {
   const first = createPage([])
   assert.equal(first.id, 'page-1')
   assert.deepEqual(first.background, PAGE_DEFAULT_BACKGROUND)
   const styled = patchPage([first], 'page-1', {
-    background: { color: '#112233', opacity: 40 },
-    artboard: { width: 500, height: 600 }
+    background: { color: '#112233', opacity: 40 }
   })[0]
   const second = createPage([first], styled)
   assert.equal(second.id, 'page-2')
   assert.equal(second.name, '页面 2')
   assert.deepEqual(second.background, styled.background)
-  assert.deepEqual(second.artboard, { width: 500, height: 600 })
+  assert.equal(second.nodes.length, 0)
   assert.notEqual(second.background, styled.background, '继承是拷贝,不共享引用')
   assert.equal(createPage([first, { id: 'page-5' }]).id, 'page-6')
   assert.equal(createPage([{ id: 'page-1' }, { id: 'page-3' }]).id, 'page-4')
 })
 
-check('改页属性:颜色归一化、非法颜色回退、不透明度钳 0-100、名字不能空、尺寸钳边界', () => {
+check('改页属性:颜色归一化、非法颜色回退、不透明度钳 0-100、名字不能空', () => {
   const page = createPage([])
   const patched = (patch: Parameters<typeof patchPage>[2]) => patchPage([page], page.id, patch)[0]
   assert.equal(patched({ background: { color: 'ABC' } }).background.color, '#aabbcc')
@@ -67,10 +66,6 @@ check('改页属性:颜色归一化、非法颜色回退、不透明度钳 0-100
   assert.equal(patched({ background: { visible: false } }).background.visible, false)
   assert.equal(patched({ name: '  首页  ' }).name, '首页')
   assert.equal(patched({ name: '   ' }).name, page.name)
-  assert.deepEqual(patched({ artboard: { width: 0, height: 99999 } }).artboard, {
-    width: 1,
-    height: 8192
-  })
   assert.equal(patched({ background: { opacity: 50 } }).background.color, page.background.color)
   assert.equal(patchPage([page], 'nope', { name: 'x' })[0], page, '找不到的页原样返回')
 })
@@ -137,7 +132,7 @@ check('z 序调整:移到指定下标,越界钳两端,未知 id 不动,节点对
   assert.equal(applyNodeAction([a, b, c], { type: 'reorder', id: a.id, toIndex: 2 })[2], a)
 })
 
-check('samePages:改名/底色/尺寸/节点顺序/页序任一不同即异,值同则同', () => {
+check('samePages:改名/底色/节点顺序/页序任一不同即异,值同则同', () => {
   const a = createPage([])
   const b = createPage([a])
   assert.ok(samePages([a, b], [{ ...a }, { ...b }]))
@@ -147,7 +142,6 @@ check('samePages:改名/底色/尺寸/节点顺序/页序任一不同即异,值�
   assert.ok(!samePages([a], patchPage([a], a.id, { background: { color: '#000000' } })))
   assert.ok(!samePages([a], patchPage([a], a.id, { background: { opacity: 10 } })))
   assert.ok(!samePages([a], patchPage([a], a.id, { background: { visible: false } })))
-  assert.ok(!samePages([a], patchPage([a], a.id, { artboard: { width: 5, height: 5 } })))
   const r1 = createRect([], BOX)
   const r2 = createRect([r1], BOX)
   const withNodes = (nodes: SceneNode[]) => ({ ...a, nodes })
@@ -156,10 +150,15 @@ check('samePages:改名/底色/尺寸/节点顺序/页序任一不同即异,值�
   assert.ok(!samePages([withNodes([r1])], [withNodes([{ ...r1, locked: true }])]))
 })
 
-check('文档仓库:初始一页、空选中、不可撤销', () => {
+check('文档仓库:初始一页(预置一个画板)、空选中、不可撤销', () => {
   const s = getDocState()
   assert.equal(s.pages.length, 1)
   assert.equal(s.activePageId, 'page-1')
+  assert.deepEqual(
+    s.nodes.map((n) => [n.id, n.type, n.parentId]),
+    [['frame-1', 'frame', null]]
+  )
+  assert.deepEqual(s.selectedIds, [])
   assert.equal(s.nodes, s.activePage.nodes)
   assert.equal(s.canUndo, false)
 })
@@ -174,7 +173,7 @@ check('节点属于所在页:换页后看不到别页节点;切页清空选中�
   assert.equal(getDocState().nodes.length, 0)
   assert.deepEqual(getDocState().selectedIds, [])
   doc.switchPage('page-1')
-  assert.equal(getDocState().nodes.length, 1)
+  assert.equal(getDocState().nodes.length, 2, '预置画板 + 刚加的矩形')
   doc.select(rect.id)
   const undoable = getDocState().canUndo
   doc.switchPage('page-2')
@@ -185,18 +184,15 @@ check('节点属于所在页:换页后看不到别页节点;切页清空选中�
   assert.equal(getDocState().activePageId, 'page-2', '切到自己/不存在的页是 no-op')
 })
 
-check('新建页继承当前页底色与尺寸;撤销新建回到原页,重做回新页', () => {
+check('新建页继承当前页底色、页面是空的;撤销新建回到原页,重做回新页', () => {
   const doc = docActions
   doc.switchPage('page-1')
-  doc.patchPage('page-1', {
-    background: { color: '#202020' },
-    artboard: { width: 321, height: 654 }
-  })
+  doc.patchPage('page-1', { background: { color: '#202020' } })
   doc.addPage()
   const created = getDocState().activePage
   assert.equal(created.id, 'page-3')
   assert.equal(created.background.color, '#202020')
-  assert.deepEqual(created.artboard, { width: 321, height: 654 })
+  assert.equal(created.nodes.length, 0)
   doc.undo()
   assert.equal(getDocState().pages.length, 2)
   assert.equal(getDocState().activePageId, 'page-1')
@@ -266,33 +262,38 @@ check('删页:撤销找回(含节点);只剩一页不能删;删当前页切到�
 check('图层改动进撤销:隐藏、锁定、改名、调序各一步;批次内只记一步', () => {
   const doc = docActions
   doc.switchPage('page-1')
-  const first = getDocState().nodes[0]
+  // page-1 现有:预置画板 frame-1 + 先前加的 rect-1;这里只看两个矩形之间的相对层序
+  const first = getDocState().nodes.find((n) => n.id === 'rect-1')!
   const second = createRect(getDocState().nodes, BOX)
   doc.dispatch({ type: 'add', node: second })
+  const get = (id: string) => getDocState().nodes.find((n) => n.id === id)!
+  const order = (): string[] =>
+    ids(getDocState().nodes).filter((id) => id === first.id || id === second.id)
   doc.dispatch({ type: 'update', id: first.id, patch: { visible: false } })
-  assert.equal(getDocState().nodes[0].visible, false)
+  assert.equal(get(first.id).visible, false)
   doc.undo()
-  assert.equal(getDocState().nodes[0].visible, true)
+  assert.equal(get(first.id).visible, true)
   doc.redo()
   doc.dispatch({ type: 'update', id: first.id, patch: { locked: true, name: '背景' } })
-  assert.equal(getDocState().nodes[0].locked, true)
-  assert.equal(getDocState().nodes[0].name, '背景')
+  assert.equal(get(first.id).locked, true)
+  assert.equal(get(first.id).name, '背景')
   doc.undo()
-  assert.equal(getDocState().nodes[0].locked, false)
+  assert.equal(get(first.id).locked, false)
   doc.redo()
-  doc.dispatch({ type: 'reorder', id: first.id, toIndex: 1 })
-  assert.deepEqual(ids(getDocState().nodes), [second.id, first.id])
+  const top = getDocState().nodes.length
+  doc.dispatch({ type: 'reorder', id: first.id, toIndex: top })
+  assert.deepEqual(order(), [second.id, first.id])
   doc.undo()
-  assert.deepEqual(ids(getDocState().nodes), [first.id, second.id])
+  assert.deepEqual(order(), [first.id, second.id])
   doc.redo()
   doc.beginBatch()
   doc.dispatch({ type: 'reorder', id: first.id, toIndex: 0 })
   doc.dispatch({ type: 'reorder', id: second.id, toIndex: 0 })
   doc.dispatch({ type: 'reorder', id: first.id, toIndex: 0 })
   doc.endBatch()
-  assert.deepEqual(ids(getDocState().nodes), [first.id, second.id])
+  assert.deepEqual(order(), [first.id, second.id])
   doc.undo()
-  assert.deepEqual(ids(getDocState().nodes), [second.id, first.id], '一个批次 = 一步')
+  assert.deepEqual(order(), [second.id, first.id], '一个批次 = 一步')
 })
 
 check('页序调整进撤销;重排后当前页不变', () => {

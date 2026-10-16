@@ -8,6 +8,8 @@ import {
   type StyleGroup
 } from '@shared/uiWorkbench/groups'
 import { removeStylePreset, saveStylePreset } from '@shared/uiWorkbench/styles'
+import { contextFrame, reparentPatches } from '@shared/uiWorkbench/tree'
+import { getArtboardPrefs } from './artboardPrefsStore'
 import { docActions, getDocState, selectedNodes } from './documentStore'
 import { createPersistentList } from './persistentList'
 
@@ -29,7 +31,8 @@ function isSameIds(a: readonly string[], b: readonly string[]): boolean {
 export const groupActions = {
   /** 把当前选中的对象存成样式组:同名覆盖沿用原 id;没有选中对象返回 null */
   saveSelection(rawName: string): { id: string; overwrote: boolean } | null {
-    const picked = selectedNodes(getDocState())
+    // 画板不进样式组(散开的素材),只选了画板就当没选
+    const picked = selectedNodes(getDocState()).filter((n) => n.type !== 'frame')
     if (picked.length === 0) return null
     const groups = getGroups()
     const built = buildGroup(crypto.randomUUID(), rawName, groups.length + 1, picked)
@@ -37,23 +40,32 @@ export const groupActions = {
     store.set(r.list)
     return { id: r.id, overwrote: r.overwrote }
   },
-  /** 放入画板:整组在画板中央落位,整体选中;一次放入 = 一步撤销 */
+  /** 放入当前画板(选中对象所在画板,否则第一个顶层画板;页面没有画板就放在页面原点):
+   *  整组居中落位,按落点认爹,整体选中;一次放入 = 一步撤销 */
   insert(id: string): void {
     const group = getGroups().find((g) => g.id === id)
     if (!group) return
-    const board = getDocState().activePage.artboard
+    const frame = contextFrame(getDocState().nodes, getDocState().selectedIds)
+    const board = frame ?? { x: 0, y: 0, ...getArtboardPrefs().last }
     const size = groupSize(group)
     const isChained =
       lastInsert?.groupId === id && isSameIds(lastInsert.ids, getDocState().selectedIds)
     const cascade = isChained && lastInsert ? lastInsert.count : 0
     const topLeft = {
-      x: Math.round((board.width - size.width) / 2) + cascade * INSERT_CASCADE_PX,
-      y: Math.round((board.height - size.height) / 2) + cascade * INSERT_CASCADE_PX
+      x: board.x + Math.round((board.width - size.width) / 2) + cascade * INSERT_CASCADE_PX,
+      y: board.y + Math.round((board.height - size.height) / 2) + cascade * INSERT_CASCADE_PX
     }
     const made = instantiateGroup(group, getDocState().nodes, topLeft)
     docActions.beginBatch()
     try {
       for (const node of made) docActions.dispatch({ type: 'add', node })
+      const parents = reparentPatches(
+        getDocState().nodes,
+        made.map((n) => n.id)
+      )
+      for (const { id: nodeId, parentId } of parents) {
+        docActions.dispatch({ type: 'update', id: nodeId, patch: { parentId } })
+      }
       docActions.selectIds(made.map((n) => n.id))
     } finally {
       docActions.endBatch()

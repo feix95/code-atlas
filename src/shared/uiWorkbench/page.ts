@@ -1,12 +1,6 @@
-// Page(纯逻辑,无 React / DOM):Figma 式「一页 = 一块画布 + 一棵对象树」。
-// 画布底色是 Page 的属性,不是对象、不进导出;当前画板(≈ Figma 的 Frame)的尺寸也归 Page 所有。
+// Page(纯逻辑,无 React / DOM):Figma 式「一页 = 一块无限画布 + 一棵对象树」。
+// 画布底色是 Page 的属性,不是对象、不进导出;画板(Frame)是页面里的普通对象,不是页面属性。
 // 节点归属于某个 Page;节点的增删改走 scene.ts 的 NodeAction,作用于指定 Page。
-import {
-  ARTBOARD_SIDE_MAX,
-  ARTBOARD_SIDE_MIN,
-  DEFAULT_ARTBOARD,
-  type ArtboardSize
-} from './artboard.ts'
 import { parseHexColor, sanitizeName } from './node.ts'
 import { applyNodeAction, type NodeAction, type SceneNode } from './scene.ts'
 
@@ -21,14 +15,12 @@ export interface Page {
   id: string
   name: string
   background: PageBackground
-  artboard: ArtboardSize
   nodes: readonly SceneNode[]
 }
 
 export interface PagePatch {
   name?: string
   background?: Partial<PageBackground>
-  artboard?: ArtboardSize
 }
 
 /** 画布底色默认值(Figma 同款):浅色主题 #f5f5f5、深色主题 #1e1e1e */
@@ -55,22 +47,18 @@ function pageSeq(pages: readonly { id: string }[]): number {
   return Math.max(0, ...used) + 1
 }
 
-/** 新页:id/名字序号取现有最大 + 1(删掉的号不复用);底色与画板尺寸继承 inherit(Figma 同款),没有则取默认 */
+/** 新页:id/名字序号取现有最大 + 1(删掉的号不复用);画布底色继承 inherit(Figma 同款),没有则取默认;
+ *  新页是空的——画板要自己拉(Figma 同款) */
 export function createPage(
   pages: readonly { id: string }[],
-  inherit?: Pick<Page, 'background' | 'artboard'>,
-  fallback: Pick<Page, 'background' | 'artboard'> = {
-    background: PAGE_DEFAULT_BACKGROUND,
-    artboard: DEFAULT_ARTBOARD
-  }
+  inherit?: Pick<Page, 'background'>,
+  fallback: Pick<Page, 'background'> = { background: PAGE_DEFAULT_BACKGROUND }
 ): Page {
   const seq = pageSeq(pages)
-  const source = inherit ?? fallback
   return {
     id: `page-${seq}`,
     name: `页面 ${seq}`,
-    background: { ...source.background },
-    artboard: { ...source.artboard },
+    background: { ...(inherit ?? fallback).background },
     nodes: []
   }
 }
@@ -87,14 +75,7 @@ function sanitizeBackground(
   }
 }
 
-function sanitizeArtboard(next: ArtboardSize): ArtboardSize {
-  return {
-    width: clampInt(next.width, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX),
-    height: clampInt(next.height, ARTBOARD_SIDE_MIN, ARTBOARD_SIDE_MAX)
-  }
-}
-
-/** 改页属性:名字不能空;底色逐字段校验,非法颜色回退原值;画板尺寸钳到合法边界 */
+/** 改页属性:名字不能空;底色逐字段校验,非法颜色回退原值 */
 export function patchPage(pages: readonly Page[], id: string, patch: PagePatch): Page[] {
   return pages.map((p) =>
     p.id !== id
@@ -104,8 +85,7 @@ export function patchPage(pages: readonly Page[], id: string, patch: PagePatch):
           name: patch.name === undefined ? p.name : sanitizeName(patch.name, p.name),
           background: patch.background
             ? sanitizeBackground(p.background, patch.background)
-            : p.background,
-          artboard: patch.artboard ? sanitizeArtboard(patch.artboard) : p.artboard
+            : p.background
         }
   )
 }

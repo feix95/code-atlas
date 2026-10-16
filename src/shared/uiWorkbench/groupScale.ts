@@ -94,7 +94,7 @@ export function scaleNodePatch(node: SceneNode, from: RectBox, to: RectBox): Nod
   const fy = from.height > 0 ? to.height / from.height : 1
   const mapX = (v: number): number => to.x + (v - from.x) * fx
   const mapY = (v: number): number => to.y + (v - from.y) * fy
-  if (node.type === 'rect') {
+  if (node.type !== 'line') {
     return {
       x: mapX(node.x),
       y: mapY(node.y),

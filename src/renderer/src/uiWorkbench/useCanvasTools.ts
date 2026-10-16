@@ -12,7 +12,6 @@ import {
   angleDeg,
   radiusFromLocal,
   rectCenter,
-  rectFromDrag,
   resizeRect,
   resizeRectEdge,
   snapAngle,
@@ -21,9 +20,7 @@ import {
   type Point,
   type RectBox
 } from '@shared/uiWorkbench/geometry'
-import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
 import {
-  createRect,
   maxCornerRadius,
   normalizeRotation,
   withCornerRadius,
@@ -31,22 +28,23 @@ import {
   type EdgeName
 } from '@shared/uiWorkbench/node'
 import type { LineNode } from '@shared/uiWorkbench/line'
-import { hitTopmost, isPickable, nodeOverlapsBox } from '@shared/uiWorkbench/scene'
+import { hitTopmost, nodeBox, nodeOverlapsBox, pickableNodes } from '@shared/uiWorkbench/scene'
 import { snapMove, snapTargets, type SnapBox, type SnapGuides } from '@shared/uiWorkbench/snap'
 import type { GapMark } from '@shared/uiWorkbench/spacing'
 import type { ScaleHandle } from '@shared/uiWorkbench/groupScale'
-import { docActions, getDocState, selectedLine, selectedRect } from './documentStore'
+import { selectionRoots, topLevelFrameIds } from '@shared/uiWorkbench/tree'
+import { startBoxDraw } from './boxDrawGesture'
+import { docActions, getDocState, selectedBox, selectedLine, selectedRect } from './documentStore'
 import { cornerResizeCursor, edgeResizeCursor } from './cursors'
 import { isEditableTarget } from './isEditableTarget'
 import { startLineDraw, startLineEndpointDrag, type LineGestureDeps } from './lineGestures'
 import { startGroupScaleDrag } from './groupScaleGesture'
 import { SNAP_THRESHOLD_PX, startNodeDrag, type MoveGestureDeps } from './moveGesture'
-import { getNewRectAppearance } from './newRectDefaultsStore'
 import { releaseEditableFocus, trackPointer } from './trackPointer'
 import { useDocShortcuts } from './useDocShortcuts'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
-export type CanvasTool = 'select' | 'rect' | 'line'
+export type CanvasTool = 'select' | 'rect' | 'frame' | 'line'
 /** 正在进行的选中手势(覆盖层用来保持旋钮可见) */
 export type GestureKind = 'radius' | 'rotate' | null
 
@@ -72,8 +70,10 @@ export interface CanvasToolsApi {
   startRotateDrag: (e: React.PointerEvent) => void
   startEndpointDrag: (e: React.PointerEvent, which: 'start' | 'end') => void
   startGroupScale: (e: React.PointerEvent, handle: ScaleHandle) => void
+  /** 按住顶层画板名签:选中并整棵拖动(顶层画板的底面点不中,靠名签) */
+  startFrameDrag: (e: React.PointerEvent, frameId: string) => void
 }
-export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize): CanvasToolsApi {
+export function useCanvasTools(viewport: CanvasViewportApi): CanvasToolsApi {
   const [tool, setTool] = useState<CanvasTool>('select')
   const [activeGesture, setActiveGesture] = useState<GestureKind>(null)
   const [guides, setGuides] = useState<SnapGuides>({ v: null, h: null })
@@ -81,11 +81,9 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   const [marquee, setMarquee] = useState<RectBox | null>(null)
   const viewRef = useRef(viewport.view)
   const toolRef = useRef(tool)
-  const boardRef = useRef(board)
   useEffect(() => {
     viewRef.current = viewport.view
     toolRef.current = tool
-    boardRef.current = board
   })
   const toDesign = (e: { clientX: number; clientY: number }): Point => {
     const el = viewport.viewportRef.current
@@ -106,57 +104,8 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
       startLineDraw(e, lineGestureDeps())
       return
     }
-    if (toolRef.current === 'rect') {
-      // trackPointer 拿不到 win 会直接 return:外层批次先别开,免得挂起不结算
-      if (!e.currentTarget.ownerDocument.defaultView) return
-      // 画矩形是一笔:add(落点 1×1)+ 拖动 update + 松手结算(没拖动则回收),外层批次包住;
-      // 中途任何一步抛异常都必须把外层批次结掉再抛出,否则批次挂起、撤销永久失灵
-      docActions.beginBatch()
-      try {
-        const prevSelectedIds = getDocState().selectedIds
-        // 新矩形吃「新矩形默认外观」;起手 1×1 会把圆角钳成 0,所以拖动每帧都重新带上默认圆角
-        const look = getNewRectAppearance()
-        const node = createRect(getDocState().nodes, { ...start, width: 1, height: 1 }, look)
-        docActions.dispatch({ type: 'add', node })
-        docActions.select(node.id)
-        trackPointer(
-          e,
-          (ev) =>
-            docActions.dispatch({
-              type: 'update',
-              id: node.id,
-              patch: {
-                ...rectFromDrag(start, toDesign(ev), {
-                  isSquare: ev.shiftKey,
-                  isFromCenter: ev.altKey
-                }),
-                radii: look.radii,
-                styleId: look.styleId
-              }
-            }),
-          () => {
-            try {
-              const fresh = getDocState().nodes.find((n) => n.id === node.id)
-              // 只点没拖(PS 规矩):松手时仍是落点 1×1 = 没有有效拖动,直接回收——
-              // 与 add 同批抵消,净零不入账,也不会冒出幽灵矩形;
-              // 顺手还回按下前的选集——单击=什么都没发生,连选中态都不动
-              if (fresh?.type === 'rect' && fresh.width === 1 && fresh.height === 1) {
-                docActions.dispatch({ type: 'remove', id: node.id })
-                docActions.selectIds(prevSelectedIds)
-              }
-            } finally {
-              // 最外层批次在此结算:整个「画一个矩形」= 一步撤销
-              docActions.endBatch()
-            }
-            // 画完自动回弹选择工具(Figma 式):新矩形保持选中,直接就能拖/调
-            setTool('select')
-          },
-          'crosshair'
-        )
-      } catch (err) {
-        docActions.endBatch()
-        throw err
-      }
+    if (toolRef.current === 'rect' || toolRef.current === 'frame') {
+      startBoxDraw(e, toolRef.current, { toDesign, onDone: fallbackToSelect })
       return
     }
     const hit = hitTopmost(getDocState().nodes, start, LINE_HIT_TOLERANCE_PX / viewRef.current.zoom)
@@ -178,9 +127,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
           }
           if (box.width > 0 || box.height > 0) moved = true
           setMarquee(box)
-          const hits = getDocState()
-            .nodes.filter((n) => isPickable(n) && nodeOverlapsBox(n, box))
-            .map((n) => n.id)
+          const hits = marqueeHits(box)
           docActions.selectIds([...base, ...hits.filter((id) => !base.includes(id))])
         },
         () => {
@@ -193,8 +140,14 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     startNodeDrag(e, hit.id, start, moveGestureDeps())
   }
 
+  function startFrameDrag(e: React.PointerEvent, frameId: string): void {
+    if (e.button !== 0) return
+    e.preventDefault()
+    startNodeDrag(e, frameId, toDesign(e), moveGestureDeps())
+  }
+
   function startResizeDrag(e: React.PointerEvent, corner: CornerIndex): void {
-    const node = selectedRect(getDocState())
+    const node = selectedBox(getDocState())
     if (!node || e.button !== 0) return
     trackPointer(
       e,
@@ -211,7 +164,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
 
   /** 边中点拖拽:只动被拖那条边,对边钉死;Shift 吸 4pt 网格(同圆角柄约定) */
   function startEdgeDrag(e: React.PointerEvent, edge: EdgeName): void {
-    const node = selectedRect(getDocState())
+    const node = selectedBox(getDocState())
     if (!node || e.button !== 0) return
     trackPointer(
       e,
@@ -286,7 +239,27 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     if (toolRef.current !== 'select') setTool('select')
   }
 
-  /** 点吸附:拖动中的端点当零尺寸盒,向其他对象 + 画板 + extra 的 起边/中线/终边 靠拢 */
+  /** 框选命中:顶层画板是「桌面上的纸」,只有被选框完整框住才算(否则在纸上拖框会误选整张纸);
+   *  父子同在命中里只留根,避免整棵树被重复选中 */
+  function marqueeHits(box: RectBox): string[] {
+    const { nodes } = getDocState()
+    const tops = topLevelFrameIds(nodes)
+    const hits = pickableNodes(nodes).filter((n) => {
+      if (!nodeOverlapsBox(n, box)) return false
+      if (!tops.has(n.id)) return true
+      const b = nodeBox(n)
+      return (
+        box.x <= b.x &&
+        box.y <= b.y &&
+        box.x + box.width >= b.x + b.width &&
+        box.y + box.height >= b.y + b.height
+      )
+    })
+    const ids = hits.map((n) => n.id)
+    return selectionRoots(nodes, ids).map((n) => n.id)
+  }
+
+  /** 点吸附:拖动中的端点当零尺寸盒,向其他对象(含画板边)+ extra 的 起边/中线/终边 靠拢 */
   function snapPoint(
     point: Point,
     excludeIds: readonly string[],
@@ -294,11 +267,7 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
   ): { point: Point; guides: SnapGuides } {
     const s = snapMove(
       { x: point.x, y: point.y, width: 0, height: 0 },
-      [
-        ...snapTargets(getDocState().nodes, excludeIds),
-        { x: 0, y: 0, width: boardRef.current.width, height: boardRef.current.height },
-        ...extra
-      ],
+      [...snapTargets(getDocState().nodes, excludeIds), ...extra],
       SNAP_THRESHOLD_PX / viewRef.current.zoom
     )
     return { point: { x: s.x, y: s.y }, guides: s.guides }
@@ -308,7 +277,6 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     return {
       toDesign,
       getZoom: () => viewRef.current.zoom,
-      getBoard: () => boardRef.current,
       setGuides,
       setGaps
     }
@@ -343,7 +311,8 @@ export function useCanvasTools(viewport: CanvasViewportApi, board: ArtboardSize)
     startRadiusDrag,
     startRotateDrag,
     startEndpointDrag,
-    startGroupScale
+    startGroupScale,
+    startFrameDrag
   }
 }
 
@@ -363,6 +332,7 @@ function useToolKeys(viewport: CanvasViewportApi, setTool: (tool: CanvasTool) =>
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.code === 'KeyV') setTool('select')
       else if (e.code === 'KeyR') setTool('rect')
+      else if (e.code === 'KeyF') setTool('frame')
       else if (e.code === 'KeyL') setTool('line')
       else return
       e.preventDefault()

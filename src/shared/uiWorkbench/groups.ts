@@ -39,9 +39,11 @@ export function buildGroup(
   seq: number,
   selected: readonly SceneNode[]
 ): StyleGroup {
-  const box = unionBox(selected)
-  const nodes = selected.map((n) => {
-    const copy = snapshotNode(n)
+  // 样式组是散开的素材:画板不进组,存进去的节点也不记所在画板(放入时按落点重新归属)
+  const picked = selected.filter((n) => n.type !== 'frame')
+  const box = unionBox(picked)
+  const nodes = picked.map((n) => {
+    const copy = { ...snapshotNode(n), parentId: null }
     return applyNodeAction([copy], {
       type: 'update',
       id: copy.id,
@@ -134,6 +136,7 @@ function toLine(value: Record<string, unknown>): LineNode | null {
       name,
       visible: value.visible !== false,
       locked: value.locked === true,
+      parentId: null,
       x1: x1 as number,
       y1: y1 as number,
       x2: x2 as number,

@@ -6,9 +6,9 @@
   --uwb-toolbar-gap: var(--space-4); /* 工具栏离画布底边的距离 */
   --uwb-grip-w: 2rem; /* 抓手格位展开宽(32px),拖拽换算由组件从计算样式回读 */
   --uwb-ruler-size: 1.25rem; /* 标尺厚度 */
+  --uwb-layer-indent: 1rem; /* 图层树每一级的缩进 */
   /* 底板比面板深一档,白画板从底上浮出来 */
   --uwb-backdrop: #e6e6e6;
-  --uwb-artboard-bg: #ffffff;
   /* 标尺配色(drawRuler 从计算样式读取) */
   --uwb-ruler-bg: var(--chrome-panel);
   --uwb-ruler-range: var(--chrome-hover);
@@ -92,36 +92,44 @@
   pointer-events: none;
 }
 
-.uwb-world {
+/* 画布内容:一张铺满视口的透明 iframe(整页内容与画板都画在里面),不接收指针;
+   color-scheme 钉成 light 与 iframe 内文档一致,否则深色主题下浏览器会给 iframe 铺不透明底,盖住页面底色 */
+.uwb-page-frame {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
-}
-
-.uwb-artboard {
-  background: var(--uwb-artboard-bg);
-  box-shadow: var(--shadow-sm);
-}
-
-.uwb-artboard-frame {
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
+  color-scheme: light;
+  background: transparent;
   pointer-events: none;
 }
 
-/* 画板名签:贴画板左上方,不随缩放变大小 */
-.uwb-artboard-label {
+/* 画板名签:贴在画板左上方,不随缩放变大小;顶层画板靠它选中与拖动 */
+.uwb-frame-label {
   position: absolute;
   transform: translateY(-100%);
-  padding-bottom: var(--space-1);
+  padding: 0 var(--space-1) var(--space-1);
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--font-xs);
+  text-overflow: ellipsis;
   white-space: nowrap;
-  pointer-events: none;
+  cursor: default;
   user-select: none;
+}
+
+.uwb-frame-label:hover {
+  color: var(--text);
+}
+
+.uwb-frame-label.is-selected {
+  color: var(--sash-hi);
+}
+
+.uwb-frame-label.is-locked {
+  pointer-events: none;
 }
 
 .uwb-toolbar {
@@ -639,11 +647,33 @@
   align-items: center;
   gap: var(--space-2);
   height: 1.75rem;
-  padding: 0 var(--space-1) 0 var(--space-2);
+  padding: 0 var(--space-1) 0 calc(var(--space-2) + var(--depth, 0) * var(--uwb-layer-indent));
   color: var(--text);
   border-radius: var(--radius-xs);
   cursor: default;
   user-select: none;
+}
+
+/* 折叠钮:固定宽的格位(无后代的行放空格位,图标列才对齐);折叠时箭头转向右 */
+.uwb-layer-fold {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
+
+button.uwb-layer-fold {
+  cursor: pointer;
+}
+
+.uwb-layer-fold.is-collapsed {
+  transform: rotate(-90deg);
 }
 
 .uwb-layer:hover {

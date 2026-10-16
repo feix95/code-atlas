@@ -27,13 +27,16 @@ export interface RectStroke {
   style: StrokeStyle
 }
 
-/** 图层通用状态(矩形、直线共用):隐藏 = 不渲染/不命中/不导出;锁定 = 画布上点不中,只能从图层面板选 */
+/** 图层通用状态(矩形、直线、画板共用):隐藏 = 不渲染/不命中/不导出;锁定 = 画布上点不中,只能从图层面板选;
+ *  parentId = 所在画板(frame)的 id,null = 直接放在页面上。坐标一律是页面坐标(不随画板相对化),
+ *  所以挪动画板时要连同它的后代一起挪(见 tree.ts) */
 export interface LayerState {
   visible: boolean
   locked: boolean
+  parentId: string | null
 }
 
-export const DEFAULT_LAYER_STATE: LayerState = { visible: true, locked: false }
+export const DEFAULT_LAYER_STATE: LayerState = { visible: true, locked: false, parentId: null }
 
 /** 图层名/页面名长度上限 */
 export const NAME_MAX_LENGTH = 64
@@ -77,6 +80,7 @@ export type RectPatch = Partial<
     | 'name'
     | 'visible'
     | 'locked'
+    | 'parentId'
   >
 >
 
@@ -135,6 +139,7 @@ export function applyRectPatch(node: RectNode, patch: RectPatch): RectNode {
     name: sanitizeName(merged.name, node.name),
     visible: merged.visible !== false,
     locked: merged.locked === true,
+    parentId: merged.parentId ?? null,
     x: clampInt(merged.x, -NODE_COORD_LIMIT, NODE_COORD_LIMIT),
     y: clampInt(merged.y, -NODE_COORD_LIMIT, NODE_COORD_LIMIT),
     width,

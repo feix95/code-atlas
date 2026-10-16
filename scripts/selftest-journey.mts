@@ -582,6 +582,8 @@ try {
     1,
     'UI workbench is a singleton tab'
   )
+  // 画板是页面里的普通对象:新文档预置一个画板,点它的名签选中后属性面板出画板分区
+  await page.locator('.uwb-frame-label').first().click()
   // 画板分区:宽高间的对调钮一键互换(默认 390×844);正方形时禁态且点了无效。
   // 放在缩放段之前:改画板会重新 fit 视口,后面 Ctrl+0 的归位断言不受影响
   const widthInput = page.getByLabel('画板宽')
@@ -621,6 +623,9 @@ try {
     'removing the preset falls back to the builtin match'
   )
   await saveBtn.waitFor()
+  // 取消选中画板:空选时属性面板回到页面分区
+  await page.locator('.uwb-viewport').hover()
+  await page.keyboard.press('Escape')
   // 画布:Ctrl+滚轮缩放画板;鼠标在画布上时 Ctrl+0 只把画板回 100%,不动应用界面缩放
   const zoomReadout = page.locator('.uwb-zoom')
   const zoomBefore = await zoomReadout.innerText()
@@ -654,7 +659,7 @@ try {
   assert.equal(await page.locator('.uwb-radius-handle').count(), 4, 'rect gets 4 radius handles')
   // 矩形本体渲染在画板 iframe 里(CSS 适配器输出,与导出同源)
   const frameFill = await page.evaluate(() => {
-    const doc = (document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null)
+    const doc = (document.querySelector('.uwb-page-frame') as HTMLIFrameElement | null)
       ?.contentDocument
     const node = doc?.querySelector('.rect-1')
     return node ? doc?.defaultView?.getComputedStyle(node).backgroundColor : null
@@ -678,7 +683,7 @@ try {
     page
       .waitForFunction(
         (want) => {
-          const doc = (document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null)
+          const doc = (document.querySelector('.uwb-page-frame') as HTMLIFrameElement | null)
             ?.contentDocument
           const node = doc?.querySelector('.rect-1')
           const style = node ? doc?.defaultView?.getComputedStyle(node) : undefined
@@ -817,7 +822,7 @@ try {
     await page.evaluate(
       () =>
         (
-          document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null
+          document.querySelector('.uwb-page-frame') as HTMLIFrameElement | null
         )?.contentDocument?.querySelectorAll('[class*="rect-"]').length ?? -1
     ),
     0,
@@ -842,14 +847,16 @@ try {
   const pastedCount = await page.evaluate(
     () =>
       (
-        document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement | null
+        document.querySelector('.uwb-page-frame') as HTMLIFrameElement | null
       )?.contentDocument?.querySelectorAll('[class^="rect-"]').length ?? 0
   )
   assert.equal(pastedCount, 3, 'Ctrl+V twice must paste two cloned rects')
   // 对齐吸附(Figma 式):拖矩形靠近他人边线自动吸上+引导线;Shift 拖 = 轴锁;Ctrl 按住 = 临时禁吸。
   // 视口 pan 非零(实测 103,-52),屏幕偏移 ≠ 设计坐标——先读 pan/zoom 做换算
   const viewNow = await page.evaluate(() => {
-    const t = (document.querySelector('.uwb-world') as HTMLElement).style.transform
+    const frameDoc = (document.querySelector('.uwb-page-frame') as HTMLIFrameElement)
+      .contentDocument
+    const t = (frameDoc?.querySelector('.uwb-root') as HTMLElement).style.transform
     const m = t.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(([\d.]+)\)/)!
     return { panX: Number(m[1]), panY: Number(m[2]), zoom: Number(m[3]) }
   })
@@ -936,7 +943,7 @@ try {
     page.evaluate(
       () =>
         (
-          document.querySelector('.uwb-artboard-frame') as HTMLIFrameElement
+          document.querySelector('.uwb-page-frame') as HTMLIFrameElement
         ).contentDocument?.querySelectorAll('[class^="rect-"]').length ?? -1
     )
   await canvasVp.hover()
@@ -1081,9 +1088,30 @@ try {
   await page.mouse.click(sx(220), sy(580))
   assert.equal(await fillHex.inputValue(), '#aacc00', 'group apply dresses each node')
   assert.equal(await styleNameOf(), '副样式', 'group apply links each node')
-  // 点画布空处本已是空选;属性面板回到画板
+  // 点画布空处本已是空选;属性面板回到页面分区(画布底色)
   await page.mouse.click(vpBox.x + 60, vpBox.y + 60)
-  await page.getByRole('region', { name: '画板', exact: true }).waitFor()
+  await page.locator('.uwb-inspector').getByRole('region', { name: '页面', exact: true }).waitFor()
+  // 画板工具:F 在页面空地拖出第二个画板 → 选中、属性面板出画板分区、图层树多一行
+  const layerRowsBefore = await page.locator('.uwb-layer').count()
+  await canvasVp.hover()
+  await page.keyboard.press('f')
+  await page.mouse.move(vpBox.x + 20, vpBox.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(vpBox.x + 100, vpBox.y + 180, { steps: 4 })
+  await page.mouse.up()
+  await page.getByRole('region', { name: '画板 2', exact: true }).waitFor()
+  assert.equal(
+    await page.locator('.uwb-layer').count(),
+    layerRowsBefore + 1,
+    'drawing a frame adds one layer row'
+  )
+  await page.keyboard.press('Delete')
+  await page.locator('.uwb-inspector').getByRole('region', { name: '页面', exact: true }).waitFor()
+  assert.equal(
+    await page.locator('.uwb-layer').count(),
+    layerRowsBefore,
+    'delete removes the frame'
+  )
   // 工具栏焦点环回归:鼠标点过的钮不挂焦点,之后按快捷键不得补出 focus-visible 蓝环
   const rectTool = page.getByRole('button', { name: '矩形工具(R)', exact: true })
   await rectTool.click()

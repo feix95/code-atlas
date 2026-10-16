@@ -2,9 +2,9 @@
 // 交互对照 Figma:Ctrl+滚轮以鼠标为中心缩放、滚轮平移(Shift 横向)、Ctrl+0 回 100%、Ctrl +/− 缩放、Shift+1 适配。
 // 监听挂在画布所在窗口上(页签可撕成子窗,子窗是另一个 window)。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ArtboardSize } from '../../../shared/uiWorkbench/artboard.ts'
+import type { RectBox } from '../../../shared/uiWorkbench/geometry.ts'
 import {
-  fitArtboard,
+  fitBox,
   zoomAt,
   ZOOM_KEY_FACTOR,
   ZOOM_WHEEL_SENSITIVITY,
@@ -25,37 +25,37 @@ export interface CanvasViewportApi {
   view: Viewport
   viewSize: ViewSize | null
   panMode: PanMode
-  /** 画板尺寸变更后重新适配窗口 */
-  refit: (board: ArtboardSize) => void
+  /** 把指定区域重新适配进窗口(切页、内容范围变化时用) */
+  refit: (target: RectBox) => void
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
   /** 鼠标是否停在画布上:快捷键(缩放/工具/删除)只在此为真时归画布处理 */
   isHoveredRef: React.RefObject<boolean>
 }
 
-export function useCanvasViewport(board: ArtboardSize): CanvasViewportApi {
+export function useCanvasViewport(fitTarget: RectBox): CanvasViewportApi {
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const [view, setView] = useState<Viewport>({ zoom: 1, panX: 0, panY: 0 })
   const [viewSize, setViewSize] = useState<ViewSize | null>(null)
   const sizeRef = useRef<ViewSize | null>(null)
-  const boardRef = useRef(board)
+  const targetRef = useRef(fitTarget)
   const isHoveredRef = useRef(false)
   useEffect(() => {
-    boardRef.current = board
+    targetRef.current = fitTarget
   })
 
-  const refit = useCallback((next: ArtboardSize) => {
-    if (sizeRef.current) setView(fitArtboard(next, sizeRef.current))
+  const refit = useCallback((next: RectBox) => {
+    if (sizeRef.current) setView(fitBox(next, sizeRef.current))
   }, [])
 
   useViewSize(viewportRef, (size) => {
     const isFirst = sizeRef.current === null
     sizeRef.current = size
     setViewSize(size)
-    if (isFirst) setView(fitArtboard(boardRef.current, size))
+    if (isFirst) setView(fitBox(targetRef.current, size))
   })
   useWheel(viewportRef, setView, sizeRef)
   const pan = usePointerPan(viewportRef, isHoveredRef, setView)
-  useZoomShortcuts(viewportRef, isHoveredRef, setView, sizeRef, boardRef)
+  useZoomShortcuts(viewportRef, isHoveredRef, setView, sizeRef, targetRef)
 
   return {
     viewportRef,
@@ -122,7 +122,7 @@ function useZoomShortcuts(
   isHoveredRef: React.RefObject<boolean>,
   setView: React.Dispatch<React.SetStateAction<Viewport>>,
   sizeRef: React.RefObject<ViewSize | null>,
-  boardRef: React.RefObject<ArtboardSize>
+  targetRef: React.RefObject<RectBox>
 ): void {
   useEffect(() => {
     const win = ref.current?.ownerDocument.defaultView
@@ -133,7 +133,7 @@ function useZoomShortcuts(
       const cx = size.width / 2
       const cy = size.height / 2
       const mod = e.ctrlKey || e.metaKey
-      if (!mod && e.shiftKey && e.code === 'Digit1') setView(fitArtboard(boardRef.current, size))
+      if (!mod && e.shiftKey && e.code === 'Digit1') setView(fitBox(targetRef.current, size))
       else if (mod && !e.shiftKey && e.key === '0') setView((v) => zoomAt(v, 1, cx, cy))
       else if (mod && (e.key === '=' || e.key === '+'))
         setView((v) => zoomAt(v, v.zoom * ZOOM_KEY_FACTOR, cx, cy))
@@ -143,5 +143,5 @@ function useZoomShortcuts(
     }
     win.addEventListener('keydown', onKey, true)
     return () => win.removeEventListener('keydown', onKey, true)
-  }, [ref, isHoveredRef, setView, sizeRef, boardRef])
+  }, [ref, isHoveredRef, setView, sizeRef, targetRef])
 }

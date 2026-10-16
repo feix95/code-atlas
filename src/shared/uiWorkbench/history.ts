@@ -72,6 +72,7 @@ function sameLine(a: LineNode, b: SceneNode): boolean {
     a.name === b.name &&
     a.visible === b.visible &&
     a.locked === b.locked &&
+    a.parentId === b.parentId &&
     a.x1 === b.x1 &&
     a.y1 === b.y1 &&
     a.x2 === b.x2 &&
@@ -88,13 +89,14 @@ export function sameNodes(a: readonly SceneNode[], b: readonly SceneNode[]): boo
   return a.every((na, i) => {
     const nb = b[i]
     if (na.type === 'line') return sameLine(na, nb)
-    if (nb.type !== 'rect') return false
+    if (nb.type === 'line' || na.type !== nb.type) return false
     return (
       na.id === nb.id &&
       na.type === nb.type &&
       na.name === nb.name &&
       na.visible === nb.visible &&
       na.locked === nb.locked &&
+      na.parentId === nb.parentId &&
       na.x === nb.x &&
       na.y === nb.y &&
       na.width === nb.width &&
@@ -108,7 +110,7 @@ export function sameNodes(a: readonly SceneNode[], b: readonly SceneNode[]): boo
   })
 }
 
-/** 逐页比较:页名、底色、画板尺寸、节点(含顺序)任一不同即异;页顺序也算 */
+/** 逐页比较:页名、底色、节点(含顺序)任一不同即异;页顺序也算 */
 export function samePages(a: readonly Page[], b: readonly Page[]): boolean {
   if (a.length !== b.length) return false
   return a.every((pa, i) => {
@@ -119,8 +121,6 @@ export function samePages(a: readonly Page[], b: readonly Page[]): boolean {
       pa.background.color === pb.background.color &&
       pa.background.opacity === pb.background.opacity &&
       pa.background.visible === pb.background.visible &&
-      pa.artboard.width === pb.artboard.width &&
-      pa.artboard.height === pb.artboard.height &&
       sameNodes(pa.nodes, pb.nodes)
     )
   })

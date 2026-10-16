@@ -6,10 +6,10 @@
 //   Alt/Ctrl/Shift 任一按住期间,全程显示被拖对象到四向邻居的间距标注。
 // 修饰键中途变化由 trackPointer 原地重放 onMove,标注与吸附随之即时刷新。
 import type { Point } from '@shared/uiWorkbench/geometry'
-import type { ArtboardSize } from '@shared/uiWorkbench/artboard'
-import { cloneNode, translatePatch, unionBox, type SceneNode } from '@shared/uiWorkbench/scene'
+import { translatePatch, unionBox, type SceneNode } from '@shared/uiWorkbench/scene'
 import { snapMove, snapTargets, type SnapGuides } from '@shared/uiWorkbench/snap'
 import { gapMarks, snapSpacing, type GapMark } from '@shared/uiWorkbench/spacing'
+import { cloneTrees, movableSelection, reparentPatches } from '@shared/uiWorkbench/tree'
 import { docActions, getDocState } from './documentStore'
 import { trackPointer } from './trackPointer'
 
@@ -21,7 +21,6 @@ const NO_GUIDES: SnapGuides = { v: null, h: null }
 export interface MoveGestureDeps {
   toDesign: (e: { clientX: number; clientY: number }) => Point
   getZoom: () => number
-  getBoard: () => ArtboardSize
   setGuides: (guides: SnapGuides) => void
   setGaps: (marks: GapMark[]) => void
 }
@@ -37,16 +36,24 @@ function resolveSelection(hitId: string, isShift: boolean): string | null {
   return null
 }
 
-/** 拖出副本:克隆当前移动集(序号在含已克隆节点的列表上重算),副本整体选中,返回副本 */
-function duplicateMoving(source: readonly SceneNode[]): SceneNode[] {
-  const clones: SceneNode[] = []
-  for (const src of source) {
-    const node = cloneNode(src, getDocState().nodes, { x: 0, y: 0 })
-    docActions.dispatch({ type: 'add', node })
-    clones.push(node)
-  }
-  docActions.selectIds(clones.map((n) => n.id))
-  return clones
+interface Moving {
+  /** 选集的根(画板整棵一起动,只有根参与吸附与外接框) */
+  roots: SceneNode[]
+  /** 根 + 全部后代:每帧都要平移的对象 */
+  all: SceneNode[]
+}
+
+/** 拖出副本:克隆当前移动集(画板连后代),副本的根整体选中,返回副本 */
+function duplicateMoving(source: Moving): Moving {
+  const { made, rootIds } = cloneTrees(
+    source.all,
+    source.roots.map((n) => n.id),
+    getDocState().nodes,
+    { x: 0, y: 0 }
+  )
+  for (const node of made) docActions.dispatch({ type: 'add', node })
+  docActions.selectIds(rootIds)
+  return { roots: made.filter((n) => rootIds.includes(n.id)), all: made }
 }
 
 export function startNodeDrag(
@@ -58,11 +65,10 @@ export function startNodeDrag(
   const pendingDeselectId = resolveSelection(hitId, e.shiftKey)
   const isDuplicate = e.altKey
   const collapseOnClick = !e.shiftKey && getDocState().selectedIds.length > 1
-  // 锁定的节点(经图层面板选进选集的)不跟着动
-  let moving = getDocState().nodes.filter(
-    (n) => !n.locked && getDocState().selectedIds.includes(n.id)
-  )
-  const union = unionBox(moving)
+  // 锁定的节点(经图层面板选进选集的)不跟着动;选中画板时后代随它一起动
+  let moving: Moving = movableSelection(getDocState().nodes, getDocState().selectedIds)
+  if (moving.roots.length === 0) return
+  const union = unionBox(moving.roots)
   let hasMoved = false
   let hasDuplicated = false
   trackPointer(
@@ -81,7 +87,7 @@ export function startNodeDrag(
         moving = duplicateMoving(moving)
         hasDuplicated = true
       }
-      const movingIds = moving.map((n) => n.id)
+      const movingIds = moving.all.map((n) => n.id)
       const raw = { x: union.x + dx, y: union.y + dy, width: union.width, height: union.height }
       let unionX = Math.round(raw.x)
       let unionY = Math.round(raw.y)
@@ -92,8 +98,7 @@ export function startNodeDrag(
       let refMarks: GapMark[] = []
       let isSpacingSnapped = false
       if (!((ev.ctrlKey || ev.metaKey) && !isDuplicate)) {
-        const board = deps.getBoard()
-        const s = snapMove(raw, [...others, { x: 0, y: 0, ...board }], threshold)
+        const s = snapMove(raw, others, threshold)
         guides = s.guides
         // 吸上的轴用精确值(中线对奇数宽可能出 .5),没吸上的轴用取整过的
         if (s.guides.v) unionX = s.x
@@ -123,7 +128,7 @@ export function startNodeDrag(
       hasMoved = true
       const ddx = unionX - union.x
       const ddy = unionY - union.y
-      for (const origin of moving) {
+      for (const origin of moving.all) {
         docActions.dispatch({
           type: 'update',
           id: origin.id,
@@ -134,6 +139,13 @@ export function startNodeDrag(
     () => {
       deps.setGuides(NO_GUIDES)
       deps.setGaps([])
+      // 松手按中心点重新认爹:拖进/拖出画板即换归属
+      if (hasMoved) {
+        const rootIds = moving.roots.map((n) => n.id)
+        for (const { id, parentId } of reparentPatches(getDocState().nodes, rootIds)) {
+          docActions.dispatch({ type: 'update', id, patch: { parentId } })
+        }
+      }
       // 单击才落实 Shift 剔除;拖动过就不剔(Shift+拖已选对象 = 整组轴锁移动)
       if (!hasMoved && pendingDeselectId) docActions.toggleSelect(pendingDeselectId)
       else if (!hasMoved && collapseOnClick) docActions.select(hitId)

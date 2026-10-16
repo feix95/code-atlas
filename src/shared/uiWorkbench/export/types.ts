@@ -7,6 +7,8 @@ import type { RectStyle } from '../styles.ts'
 
 export interface WorkbenchDocument {
   artboard: ArtboardSize
+  /** 画板填充:不传 = 白底(兼容旧口径),null = 透明 */
+  artboardFill?: string | null
   /** 绘制顺序:靠后的在上层 */
   nodes: readonly SceneNode[]
   /** 外观样式库(整包方案);节点经 styleId 引用,导出格式可发「定义+引用」而非只铺数值 */
