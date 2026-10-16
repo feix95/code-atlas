@@ -49,7 +49,7 @@ function normalizeCloud(raw: Record<string, unknown>, apiKey: string): AiCloudSe
   }
 }
 
-/** 默认走内置引擎(2026-09-18 小葵定:新用户开箱即内置,配货架顶部「推荐模型」一键下载
+/** 默认走内置引擎(2026-09-18 小葵定:新用户开箱即内置,配模型货架挑一个下载
  *  正好凑成第一步);模型路径留空 = 还没下模型,界面引导去货架。联网查证默认关,说话方式是全默认 */
 export function defaultAiConfig(): AiConfig {
   return {
@@ -192,7 +192,7 @@ export function resolveAiTarget(
         ok: false,
         message: config.builtin.modelPath.trim()
           ? '内置模型正在启动,稍等几秒再试'
-          : '还没选模型:去「AI 设置」展开模型货架,点「推荐模型」一键下载,或自己选一个 GGUF 文件'
+          : '还没选模型:去「AI 设置」展开模型货架,挑一个点「下载并使用」,或自己选一个 GGUF 文件'
       }
     }
     return {

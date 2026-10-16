@@ -8,7 +8,7 @@
   margin-top: var(--space-3);
   /* 与下方「模型上下文」/黄字警告拉开一截(小葵真机:再远点) */
   margin-bottom: 2.5rem;
-  /* 右侧呼吸只管列表内框 —— 推荐卡要跟「收起货架」按钮全宽对齐(小葵真机反馈) */
+  /* 右侧呼吸只管列表内框(小葵真机反馈) */
 }
 /* 超大圆角内框(2026-09-18 小葵设计稿):筛选栏+列表装进同一个框。
    阴影只留贴框的一点点(小葵真机:大投影太脏,靠描边说话,跟弹窗里其他卡片统一设计语言) */
@@ -19,64 +19,6 @@
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   margin-right: 2.8125rem;
-}
-/* 推荐模型卡(2026-09-18 小葵定):不搞特殊待遇 —— 去框去底,和列表行坐一桌;
-   padding 与行完全一致,文字跟下面的模型行对在同一条左线。
-   身份只剩两处小标识:蓝字「推荐模型」标签 + 右侧下载按钮 */
-.shelf-featured {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: 0.8125rem 1.5rem 0.8125rem 1.25rem;
-}
-.shelf-featured-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-/* 「推荐模型」小标签:并进名字行,不独占一行(2026-09-18 小葵定,两行收束) */
-.shelf-featured-tag {
-  margin-right: var(--space-2);
-  font-size: var(--font-xs);
-  font-weight: var(--font-w-semi);
-  color: var(--accent-bright);
-}
-.shelf-featured-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-.shelf-featured-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--font-w-semi);
-  font-size: var(--font-sm);
-  color: var(--text);
-}
-.shelf-featured-sub {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-xs);
-  color: var(--muted);
-}
-/* 大一号的「下载并使用」:同 shelf-dl-btn 一族,只放大加粗,配色不动 —— 别在主题对比度上冒险 */
-.shelf-featured-btn {
-  padding: 0.375rem 1rem;
-  font-size: var(--font-sm);
-  font-weight: var(--font-w-semi);
-}
-.shelf-featured-progress {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: none;
-}
-.shelf-featured-progress .shelf-dl-bar {
-  width: 8rem;
 }
 /* 筛选栏:内框的第一段,与列表同底色,只隔一条淡分隔线。
    筛选控件全走下拉(设置页控件词汇表:离散单选 = 下拉,药丸/分段钮不发在这儿) */

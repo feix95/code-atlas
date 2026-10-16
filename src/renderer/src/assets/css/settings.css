@@ -497,29 +497,11 @@
   flex: 1;
 }
 
-/* 推荐位 = 灰底内嵌卡:压在榜单最上,12/16 外边距 + 12/14 内边距;不描边,灰块自带边界 */
-.shelf-modal .shelf-featured {
-  margin: 0.75rem 1rem 0;
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.625rem;
-  background: var(--surface-soft);
-}
-
-/* 推荐标签按稿退成灰字小标,型号走等宽 —— 蓝字标签是内嵌时代的身份色,稿子里已删 */
-.shelf-modal .shelf-featured-tag {
-  font-size: 0.6875rem;
-  font-weight: var(--font-w-regular);
-  letter-spacing: 0.03125rem;
-  color: var(--chrome-muted);
-}
-
-.shelf-modal .shelf-featured-name,
 .shelf-modal .shelf-name {
   font-family: var(--mono);
   font-size: 0.78125rem;
 }
 
-.shelf-modal .shelf-featured-sub,
 .shelf-modal .shelf-sub {
   font-size: 0.71875rem;
   color: var(--chrome-muted);
@@ -551,8 +533,7 @@
 }
 
 /* 弹层里的下载/选中钮回中性白底描边(稿子的 .btn);「使用中」类绿章保色 */
-.shelf-modal .shelf-dl-btn,
-.shelf-modal .shelf-featured-btn {
+.shelf-modal .shelf-dl-btn {
   height: 1.875rem;
   padding: 0 0.75rem;
   border: 1px solid var(--line-strong);
@@ -562,8 +543,7 @@
   font-size: 0.78125rem;
 }
 
-.shelf-modal .shelf-dl-btn:hover,
-.shelf-modal .shelf-featured-btn:hover {
+.shelf-modal .shelf-dl-btn:hover {
   border-color: var(--line);
   background: var(--surface-soft);
 }

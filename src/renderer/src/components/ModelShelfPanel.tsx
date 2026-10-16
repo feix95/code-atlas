@@ -6,7 +6,7 @@
 // 列表分页:默认 20 条 + 「加载更多」;筛选/排序存 localStorage,下次打开照旧。
 // 信息量(2026-09-18 小葵定):参数量级/收藏/底座/协议/量化翻译全上 —— 这 app 本来就是看文件的,
 // 货架的信息量不能寒酸;全是 API 原样事实,解析不出就不显示。
-// 动效(GSAP 点睛三处):推荐卡入场 / 下载百分比数字滚动 / 展开清单错落淡入;
+// 动效(GSAP 点睛两处):下载百分比数字滚动 / 展开清单错落淡入;
 // 全部尊重系统「减少动态效果」,关了动画功能一分不变。高度过渡归 CSS,GSAP 不碰布局属性。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
@@ -33,14 +33,6 @@ gsap.registerPlugin(useGSAP)
 
 /** 一屏先画几行;「加载更多」每次多画的行数(榜单总量 60,数据已在内存,翻页零请求) */
 const PAGE_SIZE = 20
-
-/** 推荐模型(2026-09-18 小葵定):货架顶部的预置一键下载,新用户(默认内置引擎、还没模型)的第一步。
- *  仓库与文件路径哥实测核过(mradermacher 仓,文件一字不差,8.9 GB);榜单断网它也在 —— 不依赖货架数据 */
-const FEATURED_MODEL = {
-  repoId: 'mradermacher/Ornith-1.5-9B-uncensored-GGUF',
-  filePath: 'Ornith-1.5-9B-uncensored.Q8_0.gguf',
-  sizeLabel: '8.9 GB'
-} as const
 
 /** 状态章的悬停大白话:专业词上章,人话兜底 —— 判定口径(内存 × 系数预算)在这儿说清,
  *  系数跟判定函数同一份户口(shared/modelShelf 的 MODEL_FIT_*),调了不会文案对不上账 */
@@ -138,9 +130,8 @@ export function ModelShelfPanel({
   const [desc, setDesc] = useState(() => loadShelfPrefs().desc)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [download, setDownload] = useState<DownloadState | null>(null)
-  // GSAP 动效的作用域:面板根节点(推荐卡入场/展开淡入都在这棵树里找目标)
+  // GSAP 动效的作用域:面板根节点(展开淡入在这棵树里找目标)
   const panelRef = useRef<HTMLDivElement>(null)
-  const featuredRef = useRef<HTMLElement>(null)
   // 拉货序号:点「再试一次」作废在飞的旧请求,慢回来的旧响应不许覆盖新状态
   const shelfSeqRef = useRef(0)
   const mountedRef = useRef(true)
@@ -255,23 +246,8 @@ export function ModelShelfPanel({
     [expanded, files]
   )
 
-  // ── GSAP 点睛(数字滚动在 AnimatedNumber 里,这是另两处)──
-  // ① 推荐卡入场:面板展开时一次性的下滑淡入 —— 首版 6px/0.35s 太轻,肉眼无感(小葵实测),
-  //   提到 14px/0.45s:能明确感觉到「滑进来」,但不晃;matchMedia 挂着「减少动态效果」,关了动画就原样出现
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia()
-      mm.add({ reduceMotion: '(prefers-reduced-motion: reduce)' }, (ctx) => {
-        const reduce = ctx.conditions?.reduceMotion === true
-        if (reduce || !featuredRef.current) return
-        gsap.from(featuredRef.current, { y: -14, autoAlpha: 0, duration: 0.45, ease: 'power2.out' })
-      })
-      return () => mm.revert()
-    },
-    { scope: panelRef }
-  )
-
-  // ② 展开清单错落淡入:高度过渡归 CSS(grid-rows),GSAP 只管内容逐项浮现;
+  // ── GSAP 点睛(数字滚动在 AnimatedNumber 里,这是另一处)──
+  // 展开清单错落淡入:高度过渡归 CSS(grid-rows),GSAP 只管内容逐项浮现;
   //   首版 4px/0.25s 被高度变化整个掩盖(小葵实测看不见),8px/0.3s 才从过渡里透出来
   useGSAP(
     () => {
@@ -306,64 +282,8 @@ export function ModelShelfPanel({
   const visible = visibleAll.slice(0, visibleCount)
   const hiddenCount = visibleAll.length - visible.length
 
-  // 推荐卡的下载状态:跟展开区共用同一份 download 账,认 repoId+文件路径
-  const featuredActive =
-    download &&
-    download.repoId === FEATURED_MODEL.repoId &&
-    download.filePath === FEATURED_MODEL.filePath
-      ? download
-      : null
-  const featuredDone = featuredActive?.donePath ?? null
-  const featuredPct =
-    featuredActive !== null &&
-    featuredDone === null &&
-    featuredActive.totalBytes !== null &&
-    featuredActive.totalBytes > 0
-      ? Math.min(100, Math.round((featuredActive.receivedBytes / featuredActive.totalBytes) * 100))
-      : null
-
   return (
     <div className="shelf" ref={panelRef}>
-      <section className="shelf-featured" aria-label="推荐模型" ref={featuredRef}>
-        <div className="shelf-featured-card">
-          <div className="shelf-featured-info">
-            {/* 两行收束(2026-09-18 小葵定):「推荐模型」标签并进名字行,不再独占一行 */}
-            <span className="shelf-featured-name">
-              <span className="shelf-featured-tag">推荐模型</span>
-              Ornith-1.5-9B-uncensored(Q8_0)
-            </span>
-            <span className="shelf-featured-sub">
-              {FEATURED_MODEL.sizeLabel} · 下载完自动配置好，即下即用
-            </span>
-          </div>
-          {featuredDone !== null ? (
-            <span className="shelf-dl-done">✓ 已下载，配置已自动指向它</span>
-          ) : featuredActive !== null ? (
-            <div className="shelf-featured-progress">
-              {featuredPct !== null ? (
-                <AnimatedNumber value={featuredPct} suffix="%" />
-              ) : (
-                <span className="shelf-dl-pct">{formatGgufSize(featuredActive.receivedBytes)}</span>
-              )}
-              <span className="shelf-dl-bar" aria-hidden="true">
-                <i style={{ width: `${featuredPct ?? 5}%` }} />
-              </span>
-              <button type="button" className="shelf-dl-btn" onClick={cancelDownload}>
-                取消
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="shelf-dl-btn shelf-featured-btn"
-              onClick={() => startDownload(FEATURED_MODEL.repoId, FEATURED_MODEL.filePath)}
-            >
-              下载并使用
-            </button>
-          )}
-        </div>
-      </section>
-
       {/* 超大圆角内框(小葵设计稿):筛选栏+列表+状态提示装进同一个框,框内一个底色 */}
       <div className="shelf-frame">
         <div className="shelf-toolbar">
@@ -430,7 +350,7 @@ export function ModelShelfPanel({
           <p className="shelf-note is-soft">这个大小上限下没有模型，放宽一点试试。</p>
         )}
 
-        {/* 列表连同「加载更多」一起放进滚动窗口:货架再长也不超一屏,筛选栏和推荐卡永远在场 */}
+        {/* 列表连同「加载更多」一起放进滚动窗口:货架再长也不超一屏,筛选栏永远在场 */}
         <div className="shelf-scroll">
           <ul className="shelf-list">
             {visible.map((entry) => {
