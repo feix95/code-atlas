@@ -57,6 +57,15 @@ export const CH = {
   modelLoad: 'atlas:model-load',
   modelFitCheck: 'atlas:model-fit-check',
   modelContextInfo: 'atlas:model-context-info',
+  // 智能启动锤:本机运行方案(机器家底 + 当前内置模型的启动计划,只读)
+  aiLaunchPlan: 'atlas:ai-launch-plan',
+  // 引擎后端管理(第 4 期):状态查询/一键安装/取消/卸载;进度走 push 通道
+  engineState: 'atlas:engine-state',
+  engineInstall: 'atlas:engine-install',
+  engineInstallCancel: 'atlas:engine-install-cancel',
+  engineRemove: 'atlas:engine-remove',
+  /** 主进程 → 渲染层推送:引擎安装进度(stage + percent) */
+  engineInstallProgress: 'atlas:engine-install-progress',
   // ── AI 请求与流 ──
   aiExplainFile: 'atlas:ai-explain-file',
   aiExplainFolder: 'atlas:ai-explain-folder',

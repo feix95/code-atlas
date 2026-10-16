@@ -64,6 +64,21 @@ class GgufBuilder {
     return this
   }
 
+  /** 数字数组(例:gemma4 的 attention.head_count_kv 是每层一个值) */
+  i32Array(key: string, items: number[]): this {
+    this.kvCount++
+    const count = Buffer.alloc(8)
+    count.writeBigUInt64LE(BigInt(items.length))
+    const elems: Buffer[] = [this.typeBytes(5), count]
+    for (const v of items) {
+      const b = Buffer.alloc(4)
+      b.writeInt32LE(v)
+      elems.push(b)
+    }
+    this.entries.push(...this.keyBytes(key), this.typeBytes(9), ...elems)
+    return this
+  }
+
   strArray(key: string, items: string[]): this {
     this.kvCount++
     const count = Buffer.alloc(8)
@@ -94,7 +109,10 @@ const FULL_SHAPE = {
   blockCount: 32,
   headCount: 32,
   kvHeadCount: 8,
-  embeddingLength: 4096
+  embeddingLength: 4096,
+  architecture: 'llama',
+  expertCount: null,
+  expertUsedCount: null
 }
 
 function main(): void {
@@ -119,6 +137,48 @@ function main(): void {
   assert.equal(parsed.shape.headCount, 32, '头数抓得到')
   assert.equal(parsed.shape.kvHeadCount, 8, 'KV 头数抓得到(GQA 减半那活)')
   assert.equal(parsed.shape.embeddingLength, 4096, '嵌入维度抓得到')
+  assert.equal(parsed.shape.architecture, 'qwen2', '架构名按 general.architecture 报')
+
+  // ── 1.5 架构无关:gemma4 的键全挂 gemma4.* 前缀,kv 头数还是每层一个的数组 ──
+  const gemma4 = parseGgufHeader(
+    new GgufBuilder()
+      .str('general.architecture', 'gemma4')
+      .u32('gemma4.context_length', 262144)
+      .u32('gemma4.block_count', 30)
+      .u32('gemma4.attention.head_count', 16)
+      .i32Array('gemma4.attention.head_count_kv', [8, 8, 8, 8, 8, 2, 8, 8, 8, 8, 8, 2])
+      .u32('gemma4.embedding_length', 2816)
+      .u32('gemma4.expert_count', 128)
+      .u32('gemma4.expert_used_count', 8)
+      .build()
+  )
+  assert.equal(gemma4.status, 'ok')
+  if (gemma4.status !== 'ok') throw new Error('unreachable')
+  assert.equal(gemma4.shape.architecture, 'gemma4', '架构名认得')
+  assert.equal(gemma4.shape.contextLength, 262144, 'gemma4.* 前缀的键抓得到')
+  assert.equal(gemma4.shape.kvHeadCount, 8, '数组型 KV 头数取最大值(保守上界)')
+  assert.equal(gemma4.shape.expertCount, 128, 'MoE 专家总数抓得到')
+  assert.equal(gemma4.shape.expertUsedCount, 8, '激活专家数抓得到')
+
+  // 混着别的架构前缀的键也不打架:赢了的是 general.architecture 点名的
+  const mixed = parseGgufHeader(
+    new GgufBuilder()
+      .str('general.architecture', 'qwen3')
+      .u32('llama.context_length', 4096)
+      .u32('qwen3.context_length', 131072)
+      .u32('qwen3.block_count', 48)
+      .build()
+  )
+  assert.equal(mixed.status, 'ok')
+  if (mixed.status !== 'ok') throw new Error('unreachable')
+  assert.equal(mixed.shape.contextLength, 131072, '户口页点名谁就读谁的键')
+  assert.equal(mixed.shape.blockCount, 48)
+  // 没写户口页的:用前缀里字段最全的那份推断
+  const noArch = parseGgufHeader(
+    new GgufBuilder().u32('mamba.context_length', 2048).u32('mamba.block_count', 24).build()
+  )
+  if (noArch.status !== 'ok') throw new Error('unreachable')
+  assert.equal(noArch.shape.contextLength, 2048, '没标架构也能从键前缀推断')
 
   // ── 2. 坏账/没读完,两种身份分得清 ──
   assert.equal(parseGgufHeader(Buffer.alloc(32, 0x4e)).status, 'bad', '魔数不对 = 坏账')

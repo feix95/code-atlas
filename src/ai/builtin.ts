@@ -5,10 +5,9 @@
 // 端口固定 8766,避开 LM Studio 默认的 1234。上次异常退出留下的孤儿进程,启动/用时收尸还端口。
 import { execFile, type ChildProcess } from 'node:child_process'
 import { existsSync, rmSync, statSync } from 'node:fs'
-import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import os from 'node:os'
-import type { AiBuiltinSettings, GgufShape, ModelStatus, VisionSupport } from '../shared/types.ts'
+import type { AiBuiltinSettings, ModelStatus, VisionSupport } from '../shared/types.ts'
 import { DEFAULT_CONTEXT_SIZE, normalizeContextSize } from '../shared/aiDefaults.ts'
 import { estimateKvBytes, formatGB } from '../shared/contextBill.ts'
 import {
@@ -16,9 +15,11 @@ import {
   MODEL_FIT_RAM_OK_RATIO,
   MODEL_FIT_VRAM_RATIO
 } from '../shared/modelShelf.ts'
-import { parseGgufHeader } from '../shared/gguf.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { readJsonFile, writeJsonFile } from '../shared/jsonFile.ts'
+import { launchFor, launchSignature, type ModelLaunchSettings } from '../shared/launchSettings.ts'
+import { ENGINE_CATALOG } from '../shared/engineCatalog.ts'
+import { locateEngine } from './engineLocator.ts'
 import { findMmprojFor, shouldRetryWithoutMmproj } from './mmproj.ts'
 import {
   BUILTIN_PORT,
@@ -54,6 +55,10 @@ let startedKey = ''
 let startedCtx = 0
 /** 当前子进程实际喂给 --mmproj 的路径(空串 = 没带眼睛);模型旁增删 mmproj 后要按新参数重启 */
 let startedMmproj = ''
+/** 这一轮启动的引擎日志里见过显存不够的记号(保险丝据此换「显存不够」那句人话) */
+let engineOomSeen = false
+/** 当前引擎是按哪份「高级启动账」拉起的(改账重启对账用) */
+let startedLaunchSig = ''
 
 // ── 第七十锤:模型状态播报 ──
 // 引擎在干嘛(没叫醒/热身到百分之几/就绪/出岔子)由这里记账并喊给状态栏。
@@ -225,34 +230,8 @@ export interface ModelFitVerdictPure {
  * 有显存:≤90% 显存 = 全进卡(最快);再往上挤到「显存+一半内存」= 能跑但落内存会慢;
  * 超过 = 必然靠硬盘硬扛,直接劝退。没问到显存:只看内存,权重超过内存七成就算挤。
  */
-/**
- * 翻模型档案(GGUF 头):出厂上下文上限、层数、头数 —— 档位滑块拿它封顶,
- * 黑板账拿它精算。翻不出来(不是 GGUF / 头部超长 / 读失败)老实回 null,不拦人。
- * 头部从 2MB 起步逐级加码读:词表大条目可能把头部顶到几 MB 开外。
- */
-const GGUF_HEAD_SIZES = [2 * 1024 * 1024, 16 * 1024 * 1024, 128 * 1024 * 1024]
-
-export async function readModelShape(modelPath: string): Promise<GgufShape | null> {
-  let handle: Awaited<ReturnType<typeof open>> | null = null
-  try {
-    handle = await open(modelPath, 'r')
-    const fileSize = (await handle.stat()).size
-    for (const size of GGUF_HEAD_SIZES) {
-      const len = Math.min(size, fileSize)
-      const buf = Buffer.alloc(len)
-      const { bytesRead } = await handle.read(buf, 0, len, 0)
-      if (bytesRead < len) return null
-      const parsed = parseGgufHeader(buf)
-      if (parsed.status === 'ok') return parsed.shape
-      if (parsed.status === 'bad') return null
-    }
-    return null
-  } catch {
-    return null
-  } finally {
-    await handle?.close().catch(() => {})
-  }
-}
+// GGUF 档案读取搬进了 modelShape.ts(ipcModel / launchPlanner / 本文件三处共用),re-export 保住老户口
+export { readModelShape } from './modelShape.ts'
 
 export function judgeModelFit(
   modelBytes: number,
@@ -399,8 +378,10 @@ export function isBuiltinRunning(): boolean {
   return child !== null && child.exitCode === null
 }
 
-function settingsKey(settings: AiBuiltinSettings): string {
-  return `${settings.serverPath.trim()}|${settings.modelPath.trim()}`
+/** 对账键(导出给自测):程序路径|模型|引擎后端|高级启动账签名 —— 任何一项变了重启才算数 */
+export function settingsKey(settings: AiBuiltinSettings): string {
+  // 高级启动账 + 引擎后端选择都进对账键:改了任何一项 = 设置变了,要重启才作数
+  return `${settings.serverPath.trim()}|${settings.modelPath.trim()}|${settings.backend ?? 'auto'}|${launchSignature(launchFor(settings))}`
 }
 
 /** 设置有变(换了模型文件或引擎路径)而旧进程还在跑:得重启才作数。
@@ -425,6 +406,12 @@ export function builtinMmprojDiffers(modelPath: string): boolean {
 export function builtinContextDiffers(contextSize: number): boolean {
   if (!isBuiltinRunning()) return false
   return startedCtx !== normalizeContextSize(contextSize)
+}
+
+/** 这个模型的高级启动账跟正在跑的引擎对不上:改了 override/专家参数,下次提问要重启 */
+export function builtinLaunchDiffers(settings: AiBuiltinSettings): boolean {
+  if (!isBuiltinRunning()) return false
+  return startedLaunchSig !== launchSignature(launchFor(settings))
 }
 /**
  * 引擎自动定位:用户不该知道 llama-server 是啥。
@@ -635,8 +622,26 @@ const startBuiltinSingleFlight = createSingleFlight(
       throw err
     }
     let serverPath: string
+    let engineLabel: string
+    let engineFallback: { exePath: string; label: string } | null = null
+    let engineBackendKind: 'custom' | 'installed' | 'vendor' | 'none'
+    let engineBackendId: string | null
     try {
-      serverPath = resolveServerProgram(settings.serverPath)
+      // 引擎定位(第 4 期):自指路径 > 已装引擎(按选择/推荐)> 自带 vendor;
+      // installed 引擎自带「下一颗退路」给启动保险丝
+      const engine = await locateEngine(settings, warmupDir ?? '')
+      if (!engine.exePath) {
+        throw new Error(
+          '没找到内置 AI 引擎,内置模型暂时用不了。请打开「AI 设置」安装一个引擎,或改用 LM Studio。'
+        )
+      }
+      serverPath = engine.exePath
+      engineLabel = engine.label
+      engineBackendKind = engine.kind
+      engineBackendId = engine.backend
+      if (engine.fallbackExe && engine.fallbackLabel) {
+        engineFallback = { exePath: engine.fallbackExe, label: engine.fallbackLabel }
+      }
     } catch (err) {
       announceBuiltinError(settings.modelPath, err)
       throw err
@@ -653,7 +658,14 @@ const startBuiltinSingleFlight = createSingleFlight(
     }
 
     const baseUrl = `http://127.0.0.1:${BUILTIN_PORT}/v1`
-    readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize)
+    const launch = launchFor(settings)
+    // 对账键按「设置」记(不记解析后的 exe 路径):同一设置在 needsRestart 那边才算得平
+    startedKey = settingsKey(settings)
+    // 重拉预算:投影仪保险丝 + 后端退路两条线,合起来最多重拉 2 次,不许循环兜底
+    let relaunches = 0
+    readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize, launch, {
+      engineLabel
+    })
     try {
       const target = await readyPromise
       return target
@@ -663,13 +675,58 @@ const startBuiltinSingleFlight = createSingleFlight(
       // 别把模型损坏/显存不够这类真错吞掉。用户主动叫停的不降级。
       const engineExited = err instanceof EngineExitError
       let finalErr = err
-      if (!stopping && shouldRetryWithoutMmproj(startedMmproj || null, engineExited)) {
-        addDevLog('system', `视觉投影仪加载失败(${startedMmproj}),摘掉 --mmproj 按纯文本重拉一次`)
-        readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize, true)
+      if (
+        relaunches < 2 &&
+        !stopping &&
+        shouldRetryWithoutMmproj(startedMmproj || null, engineExited)
+      ) {
+        relaunches++
+        // 上一轮引擎日志里见过显存不够的记号,话术就直说显存;不然按普通「没装上」说
+        const dropNote = engineOomSeen
+          ? '显存不够,视觉文件没装上,已按纯文本启动'
+          : '视觉文件没能加载,已按纯文本启动'
+        addDevLog(
+          'system',
+          `视觉投影仪加载失败(${startedMmproj}),摘掉 --mmproj 按纯文本重拉一次${engineOomSeen ? '(引擎报过显存不够)' : ''}`
+        )
+        readyPromise = startAndWaitReady(serverPath, modelPath, baseUrl, contextSize, launch, {
+          skipMmproj: true,
+          mmprojDropNote: dropNote,
+          engineLabel
+        })
         try {
           return await readyPromise
         } catch (retryErr) {
           finalErr = retryErr // 降级重拉也挂了:落回下面的验尸/上报,人话照实说
+        }
+      }
+      // 保险丝(第 4 期):installed 引擎一启动就退(驱动/运行库对不上),顺着优先级链
+      // 退到下一颗引擎重拉一次;用户叫停的不退,vendor/自指引擎没有退路也不退。
+      // 这是链条上最后一条保险丝,触发即占满 relaunches<2 的剩余预算,不必再自增
+      if (
+        relaunches < 2 &&
+        !stopping &&
+        engineBackendKind === 'installed' &&
+        engineFallback !== null &&
+        finalErr instanceof EngineExitError
+      ) {
+        const fromName = engineBackendId
+          ? ENGINE_CATALOG[engineBackendId as keyof typeof ENGINE_CATALOG].displayName
+          : '所选'
+        const switchNote = `${fromName}引擎没能启动,已改用 ${engineFallback.label}`
+        addDevLog('system', `${switchNote}(退出码 ${finalErr.exitCode ?? '未知'})`)
+        readyPromise = startAndWaitReady(
+          engineFallback.exePath,
+          modelPath,
+          baseUrl,
+          contextSize,
+          launch,
+          { engineLabel: engineFallback.label, engineNote: switchNote }
+        )
+        try {
+          return await readyPromise
+        } catch (fallbackErr) {
+          finalErr = fallbackErr // 退路也走死:落回验尸/上报
         }
       }
       // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
@@ -719,12 +776,16 @@ export async function ensureBuiltinServer(
     // mmproj 增删了(引擎还按旧参数跑,新眼睛白放)—— 单飞开头会收尸并等端口放行
     const ctxDiffers = builtinContextDiffers(contextSize)
     const mmprojDiffers = builtinMmprojDiffers(settings.modelPath)
-    if (!ctxDiffers && !mmprojDiffers) return readyPromise
+    // 对账键一把罩:程序路径/模型/引擎后端/高级启动账,任何一项变了都得重启
+    const settingsDiffers = startedKey !== settingsKey(settings)
+    if (!ctxDiffers && !mmprojDiffers && !settingsDiffers) return readyPromise
     addDevLog(
       'system',
       ctxDiffers
         ? `上下文档位改成了 ${normalizeContextSize(contextSize)},重启引擎让它生效`
-        : '模型旁的 mmproj 文件变了,重启引擎带上新参数'
+        : mmprojDiffers
+          ? '模型旁的 mmproj 文件变了,重启引擎带上新参数'
+          : '启动设置或引擎选择改了,重启引擎让它生效'
     )
     stopBuiltinServer()
   }
@@ -744,9 +805,13 @@ const launchHost: BuiltinLaunchHost = {
   resetStopping: () => {
     stopping = false
   },
-  markStarted: (ctxSize, mmprojPath) => {
+  markStarted: (ctxSize, mmprojPath, launchSig) => {
     startedCtx = ctxSize
     startedMmproj = mmprojPath
+    startedLaunchSig = launchSig
+  },
+  noteEngineOom: (seen) => {
+    engineOomSeen = seen
   },
   announce: announceBuiltin,
   status: builtinStatus,
@@ -767,10 +832,17 @@ function startAndWaitReady(
   modelPath: string,
   baseUrl: string,
   contextSize = DEFAULT_CONTEXT_SIZE,
-  skipMmproj = false
+  launch: ModelLaunchSettings | null = null,
+  opts: {
+    skipMmproj?: boolean
+    mmprojDropNote?: string
+    /** devlog 启动行展示的引擎名('CUDA 加速 · b11685'/'自带引擎'/'自指引擎') */
+    engineLabel?: string
+    /** 后端退路重拉成功时就绪播报捎的一句('CUDA 引擎没能启动,已改用 X') */
+    engineNote?: string
+  } = {}
 ): Promise<{ baseUrl: string; model: string }> {
-  startedKey = settingsKey({ serverPath, modelPath })
-  return launchBuiltinServer(launchHost, serverPath, modelPath, baseUrl, contextSize, skipMmproj)
+  return launchBuiltinServer(launchHost, serverPath, modelPath, baseUrl, contextSize, launch, opts)
 }
 
 /** 杀掉内置模型子进程。幂等:没在跑就直接返回。取消/卸下/app 退出都走这里。 */
@@ -784,4 +856,5 @@ export function stopBuiltinServer(): void {
   startedKey = ''
   startedCtx = 0
   startedMmproj = ''
+  startedLaunchSig = ''
 }

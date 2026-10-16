@@ -1,138 +1,332 @@
 import type { GgufShape } from './types.ts'
 
 /**
- * GGUF 档案头翻页器(纯函数,自测覆盖):模型文件的开头是一段键值小档案,
- * 这里只翻「出厂上下文上限、层数、头数」这几条要紧的,其余键(包括动辄几 MB 的词表)
- * 按格式算着跳过去 —— 只看账,不动内容,绝不把模型本体读进内存。
- * GGUF 布局:4 字节魔数 + 版本号 + 张量数 + 键值对数;之后每条 = 键名字符串 + 值类型 + 值。
- * 不管模型什么血统(qwen / mistral / …),llama.cpp 转出来的这些键都统一挂 llama.* 前缀。
+ * GGUF 头部键值对解析:流式读,值太大(词表那种成片的数组)就跳过不占内存。
+ * 只看结构档案要用的字段,其余的按格式跳过去。
  */
 
-export type GgufParseResult =
-  { status: 'ok'; shape: GgufShape } | { status: 'truncated' } | { status: 'bad' }
+const G = (buf: Buffer) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 
-/** 头部截断了(缓冲区不够长,再读大一点也许就好) */
-class TruncatedError extends Error {}
-/** 结构是坏的(不是 GGUF / 版本不认 / 数值荒唐),再读多少也没用 */
-class BadGgufError extends Error {}
+const GGH = 0x46554747 // 'GGUF' little-endian
+const GGUF_STRING = 8
+const GGUF_ARRAY = 9
 
-/** 只抓这几条键,别的全跳过 */
-const KEY_MAP: Record<string, keyof GgufShape> = {
-  'llama.context_length': 'contextLength',
-  'llama.block_count': 'blockCount',
-  'llama.attention.head_count': 'headCount',
-  'llama.attention.head_count_kv': 'kvHeadCount',
-  'llama.embedding_length': 'embeddingLength'
+/** 键名是「架构名.字段名」两段:字段后缀 → GgufShape 户口(架构名由键前缀决定) */
+const FIELD_SUFFIXES: Record<string, keyof Omit<GgufShape, 'architecture'>> = {
+  '.context_length': 'contextLength',
+  '.block_count': 'blockCount',
+  '.attention.head_count': 'headCount',
+  '.attention.head_count_kv': 'kvHeadCount',
+  '.embedding_length': 'embeddingLength',
+  '.expert_count': 'expertCount',
+  '.expert_used_count': 'expertUsedCount'
 }
 
-// GGUF 元数据值类型 0~12 的定长字节数;string(8) 和 array(9) 不定长,单独处理
-const FIXED_SIZES: (number | null)[] = [1, 1, 2, 2, 4, 4, 4, 1, null, null, 8, 8, 8]
+/**
+ * 读 GGUF 文件头的前 headBytes 个字节,提取 GgufShape。
+ * 返回:
+ *   ok        —— 头读完且字节没坏
+ *   truncated —— 字节不够,外层可加大 headBytes 重试
+ *   bad       —— 魔数/版本不对,不用重试
+ */
+export type GgufParseStatus = 'ok' | 'truncated' | 'bad'
 
-function need(bytes: number, off: number, buf: Buffer): void {
-  if (off + bytes > buf.length) throw new TruncatedError()
+export interface GgufParseResult {
+  status: GgufParseStatus
+  shape: GgufShape
 }
 
-function readU64(buf: Buffer, off: number): number {
-  need(8, off, buf)
-  const big = buf.readBigUInt64LE(off)
-  if (big > BigInt(Number.MAX_SAFE_INTEGER)) throw new BadGgufError()
-  return Number(big)
-}
+class ShortRead extends Error {}
 
-function readString(buf: Buffer, off: number): { text: string; next: number } {
-  const len = readU64(buf, off)
-  if (len > 1024 * 1024 * 1024) throw new BadGgufError()
-  need(len, off + 8, buf)
-  return { text: buf.toString('utf8', off + 8, off + 8 + len), next: off + 8 + len }
-}
-
-/** 读一个定长标量;string/array 不是标量,回 null 让调用方走各自的道 */
-function readScalar(
-  buf: Buffer,
-  off: number,
-  type: number
-): { next: number; value: number } | null {
-  const size = FIXED_SIZES[type] ?? null
-  if (size === null) return null
-  need(size, off, buf)
-  if (size === 8) return { next: off + 8, value: readU64(buf, off) }
-  if (size === 4) return { next: off + 4, value: buf.readUInt32LE(off) }
-  if (size === 2) return { next: off + 2, value: buf.readUInt16LE(off) }
-  return { next: off + 1, value: buf.readUInt8(off) }
-}
-
-/** 跳过一条不要的值(string 逐条走,array 按元素类型算账跳);只挪光标,不存内容 */
-function skipValue(buf: Buffer, off: number, type: number): number {
-  if (type > 12) throw new BadGgufError()
-  const scalar = readScalar(buf, off, type)
-  if (scalar) return scalar.next
-  if (type === 8) return readString(buf, off).next
-  // array:元素类型(u32) + 条数(u64) + 元素们
-  need(12, off, buf)
-  const elemType = buf.readUInt32LE(off)
-  if (elemType > 12) throw new BadGgufError()
-  const count = readU64(buf, off + 4)
-  let cur = off + 12
-  const size = FIXED_SIZES[elemType] ?? null
-  if (size !== null) {
-    // 定长元素:最少 1 字节一条,条数超出剩余空间就是坏了/没读完
-    if (count > (buf.length - cur) / size) throw new TruncatedError()
-    return cur + count * size
+class Reader {
+  pos = 0
+  private buf: Buffer
+  constructor(buf: Buffer) {
+    this.buf = buf
   }
-  // 不定长元素:每条至少 4 字节(嵌套数组)或 8 字节(字符串先记长度),照最少的把门
-  if (count > (buf.length - cur) / 4) throw new TruncatedError()
-  for (let i = 0; i < count; i++) {
-    if (elemType === 8) {
-      cur = readString(buf, cur).next
-    } else {
-      // 嵌套数组:元素自己还带一层类型标
-      need(4, cur, buf)
-      const innerType = buf.readUInt32LE(cur)
-      cur = skipValue(buf, cur + 4, innerType)
-    }
+  u8(): number {
+    this.need(1)
+    return this.buf[this.pos++]
   }
-  return cur
+  u16(): number {
+    this.need(2)
+    const v = this.buf.readUInt16LE(this.pos)
+    this.pos += 2
+    return v
+  }
+  u32(): number {
+    this.need(4)
+    const v = this.buf.readUInt32LE(this.pos)
+    this.pos += 4
+    return v
+  }
+  u64(): number {
+    this.need(8)
+    const v = Number(this.buf.readBigUInt64LE(this.pos))
+    this.pos += 8
+    return v
+  }
+  i8(): number {
+    this.need(1)
+    return this.buf.readInt8(this.pos++)
+  }
+  i16(): number {
+    this.need(2)
+    const v = this.buf.readInt16LE(this.pos)
+    this.pos += 2
+    return v
+  }
+  i32(): number {
+    this.need(4)
+    const v = this.buf.readInt32LE(this.pos)
+    this.pos += 4
+    return v
+  }
+  i64(): number {
+    this.need(8)
+    const v = Number(this.buf.readBigInt64LE(this.pos))
+    this.pos += 8
+    return v
+  }
+  f32(): number {
+    this.need(4)
+    const v = this.buf.readFloatLE(this.pos)
+    this.pos += 4
+    return v
+  }
+  f64(): number {
+    this.need(8)
+    const v = this.buf.readDoubleLE(this.pos)
+    this.pos += 8
+    return v
+  }
+  bytes(n: number): Buffer {
+    this.need(n)
+    const s = this.buf.subarray(this.pos, this.pos + n)
+    this.pos += n
+    return s
+  }
+  skip(n: number): void {
+    this.need(n)
+    this.pos += n
+  }
+  private need(n: number): void {
+    if (this.pos + n > this.buf.length) throw new ShortRead()
+  }
 }
 
-/** 翻档案头:ok 带回身条目;truncated = 缓冲区不够,再读大一点重试;bad = 这文件不是正经 GGUF */
-export function parseGgufHeader(buf: Buffer): GgufParseResult {
-  try {
-    if (buf.length < 24) throw new TruncatedError()
-    if (buf[0] !== 0x47 || buf[1] !== 0x47 || buf[2] !== 0x55 || buf[3] !== 0x46)
-      throw new BadGgufError()
-    const version = buf.readUInt32LE(4)
-    if (version < 2 || version > 3) throw new BadGgufError()
-    const tensorCount = readU64(buf, 8)
-    const kvCount = readU64(buf, 16)
-    // 荒唐的账头(几十万条键值)当坏账处理,不给坏文件烧时间
-    if (tensorCount > 1_000_000 || kvCount > 1_000_000) throw new BadGgufError()
-    const shape: GgufShape = {
-      contextLength: null,
-      blockCount: null,
-      headCount: null,
-      kvHeadCount: null,
-      embeddingLength: null
-    }
-    let off = 24
-    for (let i = 0; i < kvCount; i++) {
-      const key = readString(buf, off)
-      off = key.next
-      need(4, off, buf)
-      const type = buf.readUInt32LE(off)
-      off += 4
-      const want = KEY_MAP[key.text]
-      if (want !== undefined && (type === 4 || type === 10)) {
-        const scalar = readScalar(buf, off, type)
-        if (scalar === null) throw new BadGgufError()
-        shape[want] = scalar.value
-        off = scalar.next
+/** 单个标量值(数组元素同口径)。返回 null 表示这个类型没数可读 */
+function readScalar(r: Reader, type: number): number | null {
+  switch (type) {
+    case 0:
+      return r.u8()
+    case 1:
+      return r.i8()
+    case 2:
+      return r.u16()
+    case 3:
+      return r.i16()
+    case 4:
+      return r.u32()
+    case 5:
+      return r.i32()
+    case 6:
+      return r.f32()
+    case 7:
+      return r.u8() !== 0 ? 1 : 0
+    case 10:
+      return r.u64()
+    case 11:
+      return r.i64()
+    case 12:
+      return r.f64()
+    default:
+      return null
+  }
+}
+
+function readString(r: Reader): string {
+  const len = r.u64()
+  return r.bytes(len).toString('utf8')
+}
+
+function skipValue(r: Reader, type: number): void {
+  if (type === GGUF_STRING) {
+    const len = r.u64()
+    r.skip(len)
+    return
+  }
+  if (type === GGUF_ARRAY) {
+    const elemType = r.u32()
+    const count = r.u64()
+    for (let i = 0; i < count; i++) {
+      if (elemType === GGUF_STRING) {
+        const slen = r.u64()
+        r.skip(slen)
       } else {
-        off = skipValue(buf, off, type)
+        const size = scalarSize(elemType)
+        if (size === 0) throw new Error('unknown elem type')
+        r.skip(size)
       }
     }
-    return { status: 'ok', shape }
-  } catch (err) {
-    if (err instanceof TruncatedError) return { status: 'truncated' }
-    return { status: 'bad' }
+    return
   }
+  const size = scalarSize(type)
+  if (size === 0) throw new Error('unknown type')
+  r.skip(size)
+}
+
+function scalarSize(type: number): number {
+  switch (type) {
+    case 0:
+    case 1:
+    case 7:
+      return 1
+    case 2:
+    case 3:
+      return 2
+    case 4:
+    case 5:
+    case 6:
+      return 4
+    case 10:
+    case 11:
+    case 12:
+      return 8
+    default:
+      return 0
+  }
+}
+
+/** 键名撞上字段后缀时拆出「架构前缀 + 字段」;不认识的键返回 null */
+function splitFieldKey(
+  key: string
+): { prefix: string; field: keyof Omit<GgufShape, 'architecture'> } | null {
+  for (const suffix of Object.keys(FIELD_SUFFIXES)) {
+    if (key.length > suffix.length && key.endsWith(suffix)) {
+      return { prefix: key.slice(0, -suffix.length), field: FIELD_SUFFIXES[suffix] }
+    }
+  }
+  return null
+}
+
+/** 按架构前缀收拢的候选档案:谁的字段多谁赢 */
+type FieldBag = Partial<Record<keyof Omit<GgufShape, 'architecture'>, number>>
+
+function bagScore(bag: FieldBag): number {
+  return Object.values(bag).filter((v) => v != null).length
+}
+
+/**
+ * 数组型字段的读法(例:gemma4 的 attention.head_count_kv 是每层一个值的数组)。
+ * 只认纯数字数组,取最大值 —— 保守上界,黑板按最费的那层算。
+ * 元素类型是字符串或个数离谱时整个跳过。
+ */
+function readNumberArrayMax(r: Reader): number | null {
+  const elemType = r.u32()
+  const count = r.u64()
+  if (elemType === GGUF_STRING || elemType === GGUF_ARRAY || count <= 0 || count > 4096) {
+    for (let i = 0; i < count; i++) skipValue(r, elemType)
+    return null
+  }
+  let max: number | null = null
+  for (let i = 0; i < count; i++) {
+    const v = readScalar(r, elemType)
+    if (v == null) {
+      // 元素类型读不出数,剩下的按格式跳完就算了
+      const size = scalarSize(elemType)
+      for (let j = i; j < count; j++) r.skip(size)
+      return null
+    }
+    if (max == null || v > max) max = v
+  }
+  return max
+}
+
+export function parseGgufHeader(buf: Buffer): GgufParseResult {
+  const empty: GgufShape = {
+    contextLength: null,
+    blockCount: null,
+    headCount: null,
+    kvHeadCount: null,
+    embeddingLength: null,
+    architecture: null,
+    expertCount: null,
+    expertUsedCount: null
+  }
+  if (buf.length < 24) return { status: 'truncated', shape: empty }
+  const dv = G(buf)
+  if (dv.getUint32(0, true) !== GGH) return { status: 'bad', shape: empty }
+  const version = dv.getUint32(4, true)
+  if (version < 2 || version > 3) return { status: 'bad', shape: empty }
+  const kvCount = Number(dv.getBigUint64(16, true))
+
+  const r = new Reader(buf)
+  r.pos = 24
+  let archName: string | null = null
+  // 按架构前缀分兜收集:gemma4.* 进 gemma4 兜,llama.* 进 llama 兜,互不打架
+  const bags = new Map<string, FieldBag>()
+  const bagOrder: string[] = []
+  try {
+    for (let i = 0; i < kvCount; i++) {
+      const key = readString(r)
+      const type = r.u32()
+      // general.architecture 是户口页,先登记但不进字段兜
+      if (key === 'general.architecture' && type === GGUF_STRING) {
+        archName = readString(r)
+        continue
+      }
+      const hit = splitFieldKey(key)
+      if (!hit) {
+        skipValue(r, type)
+        continue
+      }
+      let value: number | null
+      if (type === GGUF_ARRAY) {
+        value = readNumberArrayMax(r)
+      } else {
+        value = readScalar(r, type)
+        if (value == null) {
+          skipValue(r, type)
+          continue
+        }
+      }
+      if (value == null) continue
+      if (!bags.has(hit.prefix)) {
+        bags.set(hit.prefix, {})
+        bagOrder.push(hit.prefix)
+      }
+      bags.get(hit.prefix)![hit.field] = value
+    }
+  } catch (e) {
+    if (e instanceof ShortRead) return { status: 'truncated', shape: empty }
+    return { status: 'bad', shape: empty }
+  }
+
+  // 挑兜:general.architecture 点名的优先,没有就 llama.* 兜底(老转档惯例),再没有取字段最全的
+  let winner: FieldBag | null = null
+  if (archName && bags.has(archName)) {
+    winner = bags.get(archName)!
+  } else if (bags.has('llama')) {
+    winner = bags.get('llama')!
+  } else {
+    for (const name of bagOrder) {
+      const bag = bags.get(name)!
+      if (!winner || bagScore(bag) > bagScore(winner)) winner = bag
+    }
+  }
+
+  const shape: GgufShape = {
+    contextLength: winner?.contextLength ?? null,
+    blockCount: winner?.blockCount ?? null,
+    headCount: winner?.headCount ?? null,
+    kvHeadCount: winner?.kvHeadCount ?? null,
+    embeddingLength: winner?.embeddingLength ?? null,
+    // 户口页写谁就是谁;没写但兜里有货就报那个前缀(推断出来的)
+    architecture:
+      archName ?? (winner ? (bagOrder.find((n) => bags.get(n) === winner) ?? null) : null),
+    expertCount: winner?.expertCount ?? null,
+    expertUsedCount: winner?.expertUsedCount ?? null
+  }
+  return { status: 'ok', shape }
 }
