@@ -439,6 +439,51 @@
   color: var(--danger);
 }
 
+/* 待发图片原子(第一百五十二锤):缩略图小块+×,与引用原子同一排面躺在文字流里 */
+.fc-img {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  padding: 0.125rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--muted) 10%, var(--surface));
+  line-height: var(--lh-100);
+}
+
+.fc-img-thumb {
+  width: 2rem;
+  height: 2rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  display: block;
+}
+
+.fc-img-x {
+  flex: none;
+  padding: 0 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.fc-img-x:hover {
+  color: var(--danger);
+}
+
+/* 「添加图片」菜单行被能力闸置灰时:不许点,颜色淡下去 */
+.fc-mrow:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fc-mrow:disabled:hover {
+  background: none;
+}
+
 /* 发送/停一停:同一座位换岗 —— 平时实心墨圆白箭头,忙着换成同款墨圆白方块 */
 .fc-send {
   flex: none;

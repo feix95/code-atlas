@@ -4,6 +4,8 @@ import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
 import { TreeIcon } from './Icons'
 import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 import { REF_ONLY_QUESTION, type AiChatApi } from '../useAiChat'
+import { CHAT_IMAGES_MAX, type ChatImage } from '@shared/chatImage'
+import type { ChatImagesApi } from '../useChatImages'
 import { AiSetupContext } from '../aiSetupContext'
 import {
   CHAT_ACTION_ICON_SIZE,
@@ -28,12 +30,15 @@ export function FreeChatComposer({
   chat,
   refs,
   onRemoveRef,
+  chatImages,
   onWillSend
 }: {
   chat: AiChatApi
   /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
   refs: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
+  /** 待发图片账本(第一百五十二锤):选文件/粘贴/拖入都汇进它,能力闸也在它手里 */
+  chatImages: ChatImagesApi
   /** 发送/压缩前先回底:自己的话自己得看见,发出去这一眼不被上翻状态挡住 */
   onWillSend: () => void
 }): React.JSX.Element {
@@ -45,6 +50,8 @@ export function FreeChatComposer({
   // 「+」能力菜单:思考/翻文件两个开关收进这颗钮里;点舱外任何地方收摊
   const [menuOpen, setMenuOpen] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  // 「添加图片」的隐藏文件筐:菜单点了它,弹系统选图框
+  const fileInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (!menuOpen) return
     const doc = formRef.current?.ownerDocument ?? document
@@ -121,11 +128,14 @@ export function FreeChatComposer({
       if (expanded) setExpanded(false)
       return
     }
-    // 挂了引用就允许空着发:这时替他说一句「讲讲选中的这段代码」,不让他对着空气发呆
+    // 挂了引用就允许空着发,带图也一样(图本身就是题目,主进程给兜底问法):
+    // 不让他对着空气发呆,也不让空舱空发
+    const pendingImages = chatImages.images
     const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
-    if (!text || chat.busy) return
+    if ((!text && pendingImages.length === 0) || chat.busy) return
     onWillSend()
-    chat.send(text, draftRefs)
+    chat.send(text, draftRefs, pendingImages)
+    if (pendingImages.length > 0) chatImages.clear()
     setDraft('')
     if (expanded) setExpanded(false)
   }
@@ -294,9 +304,30 @@ export function FreeChatComposer({
           ))}
         </div>
       )}
-      {/* 「+」能力菜单:思考/翻文件/联网三个开关,iOS 拨钮式;点舱外或 Esc 收 */}
+      {/* 「+」能力菜单:添加图片 + 思考/翻文件/联网三个开关,iOS 拨钮式;点舱外或 Esc 收 */}
       {menuOpen && (
         <div className="fc-menu" role="menu" aria-label="能力开关">
+          {/* 添加图片(第一百五十二锤):纯文本模型置灰 —— 悬停给原因;拿不准能力的放行但悬停提醒 */}
+          <button
+            type="button"
+            className="fc-mrow"
+            disabled={!chatImages.gate.allow}
+            data-tip={
+              chatImages.gate.reason ??
+              (chatImages.images.length >= CHAT_IMAGES_MAX
+                ? `一次最多带 ${CHAT_IMAGES_MAX} 张图片`
+                : (chatImages.gate.hint ?? '添加图片(JPG/PNG)'))
+            }
+            onClick={() => {
+              setMenuOpen(false)
+              fileInputRef.current?.click()
+            }}
+          >
+            <span className="fc-mi">
+              <TreeIcon name="image" size={14} mono />
+            </span>
+            添加图片
+          </button>
           <button
             type="button"
             className={`fc-mrow${chat.thinking ? ' is-on' : ''}`}
@@ -347,6 +378,38 @@ export function FreeChatComposer({
           <TreeIcon name="plus" size={CHAT_ACTION_ICON_SIZE} mono />
         </button>
         <div className="fc-field">
+          {/* 隐藏文件筐:「添加图片」菜单项点它弹系统选图;value 清掉,同一张图才能重复选 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            multiple
+            hidden
+            onChange={(e) => {
+              const picked = e.target.files ? Array.from(e.target.files) : []
+              e.target.value = ''
+              if (picked.length > 0) void chatImages.addFiles(picked)
+            }}
+          />
+          {/* 待发图片缩略原子(第一百五十二锤):和引用原子一个排面,× 可键盘删 */}
+          {chatImages.images.map((img: ChatImage) => (
+            <span
+              key={img.id}
+              className="fc-img"
+              data-tip={`${img.name} · ${img.width}×${img.height}`}
+            >
+              <img className="fc-img-thumb" src={img.dataUrl} alt={img.name} />
+              <button
+                type="button"
+                className="fc-img-x"
+                onClick={() => chatImages.removeImage(img.id)}
+                aria-label={`移除图片 ${img.name}`}
+                data-tip="移除这张图片"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
           {/* 内嵌引用原子(小葵拍板,Devin 式):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
           {draftRefs.map((r, i) => (
             <span
@@ -410,6 +473,14 @@ export function FreeChatComposer({
             }}
             onKeyDown={onDraftKeyDown}
             onContextMenu={onDraftContextMenu}
+            // 粘贴剪贴板图片(第一百五十二锤):带了文件(截图/复制的图)就收成待发图;
+            // 纯文本粘贴照旧走默认行为,一个字不动
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData?.files ?? [])
+              if (files.length === 0) return
+              e.preventDefault()
+              void chatImages.addFiles(files)
+            }}
             // 点输入区 = 要打字了,「+」菜单顺手收摊(点在舱内的外点判定管不到这层)
             onFocus={() => setMenuOpen(false)}
           />

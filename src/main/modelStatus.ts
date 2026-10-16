@@ -2,12 +2,21 @@ import { userDataDir } from './paths.ts'
 import { BrowserWindow } from 'electron'
 import { parseLmStudioModelState } from '../ai/index.ts'
 import { loadAiConfig, resolveAiTarget } from '../ai/config.ts'
-import { builtinIdleStatus, lastBuiltinStatus } from '../ai/builtin.ts'
+import { builtinIdleStatus, builtinVisionSupport, lastBuiltinStatus } from '../ai/builtin.ts'
 import { formatStreamStats } from '../shared/aiText.ts'
 import { DEFAULT_LMSTUDIO_BASE_URL, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import { fetchWithTimeout, stripApiSuffix } from '../ai/http.ts'
-import type { AiConfig, AiProviderKind, AiStreamStats, ModelStatus } from '../shared/types.ts'
+import { parseLmStudioModelVision } from '../ai/visionProbe.ts'
+import { cloudVisionOf } from '../shared/visionModels.ts'
+import { sameModelStatus } from '../shared/statusCompare.ts'
+import type {
+  AiConfig,
+  AiProviderKind,
+  AiStreamStats,
+  ModelStatus,
+  VisionSupport
+} from '../shared/types.ts'
 
 // ── 第七十锤:模型状态栏的后厨 ──
 // 内置引擎的状态由 builtin.ts 播报员推过来;外接 LM Studio 没法订阅,只能低频去问。
@@ -36,8 +45,15 @@ export async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus
   try {
     const res = await fetchWithTimeout(`${root}/api/v0/models`, PROBE_LMSTUDIO_MS)
     if (res.ok) {
-      const parsed = parseLmStudioModelState(await res.json().catch(() => null), model)
-      return { ...base, state: parsed.state, progress: parsed.progress }
+      const json = await res.json().catch(() => null)
+      const parsed = parseLmStudioModelState(json, model)
+      // 条目 type 捎带能力账:vlm 能看图,llm 纯文本,认不出 unknown
+      return {
+        ...base,
+        state: parsed.state,
+        progress: parsed.progress,
+        vision: parseLmStudioModelVision(json, model)
+      }
     }
     // 老版本 LM Studio 没有 v0 接口:OpenAI 兼容口能列出模型就当就绪
     const legacy = await fetchWithTimeout(`${root}/v1/models`, PROBE_LMSTUDIO_MS)
@@ -58,21 +74,23 @@ export function cloudStatus(config: AiConfig): ModelStatus {
     provider: 'cloud' as const,
     modelName: config.cloud.model.trim(),
     sizeBytes: null,
-    progress: null
+    progress: null,
+    // 在线 API 没有查询口,按模型名认账(命中已知视觉系才报 vision,其余 unknown)
+    vision: cloudVisionOf(config.cloud.model)
   }
   return resolved.ok
     ? { ...base, state: 'ready' }
     : { ...base, state: 'idle', message: resolved.message }
 }
 
-function sameStatus(a: ModelStatus | null, b: ModelStatus): boolean {
-  return (
-    a !== null &&
-    a.provider === b.provider &&
-    a.state === b.state &&
-    a.modelName === b.modelName &&
-    a.message === b.message
-  )
+/**
+ * 带图请求前的能力闸账(第一百五十二锤):内置按 mmproj 户口(跑着且报过 vision 的优先),
+ * 在线 API 按模型名认账,LM Studio 当场探一轮条目 type。与状态卡的显示口径同源。
+ */
+export async function probeChatVision(config: AiConfig): Promise<VisionSupport> {
+  if (config.provider === 'builtin') return builtinVisionSupport(config.builtin.modelPath)
+  if (config.provider === 'cloud') return cloudVisionOf(config.cloud.model)
+  return (await probeLmStudioStatus(config)).vision ?? 'unknown'
 }
 
 /** 手动刷一次状态(存档/轮询/开窗都走这):照当前配置的 provider 立刻报话。
@@ -88,7 +106,7 @@ export async function refreshModelStatus(): Promise<void> {
       : config.provider === 'cloud'
         ? cloudStatus(config)
         : await probeLmStudioStatus(config)
-  if (sameStatus(lastBroadcast, status)) return
+  if (sameModelStatus(lastBroadcast, status)) return
   if (lastBroadcast?.provider === status.provider && lastBroadcast.state === 'busy') return
   if (status.provider !== 'builtin') lastExternalStatus = status
   broadcastModelStatus(status)

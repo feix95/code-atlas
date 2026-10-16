@@ -9,6 +9,9 @@ import { CODE_REF_CHARS_MAX } from './aiDefaults.ts'
 /** 超过这个体积的文本文件不预览:纯文本揣内存里不重,但几百 MB 的日志怪别请进门 */
 export const PREVIEW_MAX_BYTES = 10 * 1024 * 1024
 
+/** 图片预览的谢客线:整张图转 base64 dataUrl 揣内存,再大的照片墙也先挡在门外 */
+export const IMAGE_PREVIEW_MAX_BYTES = 10 * 1024 * 1024
+
 /** 预览正文 + 账目(全文预览后没有「截断」这回事,总行数永远是全文行数) */
 export interface PreviewClip {
   /** 给界面看的正文(全文,只做过换行归一) */

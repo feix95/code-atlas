@@ -14,6 +14,9 @@ import { runAgentChat } from './agentChat.ts'
 import { sendAgentStep } from './agentTools.ts'
 import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from './chatMemory.ts'
 import { estimateThreadTokens, toPlainHistory } from '../ai/chatThread.ts'
+import { imageGate, planImageBudget, sanitizeChatImages } from '../shared/chatImage.ts'
+import { shrinkChatImage } from './imageShrink.ts'
+import { probeChatVision } from './modelStatus.ts'
 import type { AgentChatMessage } from '../ai/agent.ts'
 import { clipboard, ipcMain, shell } from 'electron'
 import { existsSync } from 'node:fs'
@@ -72,11 +75,25 @@ export function registerChatIpc(): void {
     }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const question = typeof body.question === 'string' ? body.question.trim() : ''
+    // 图片附件(第一百五十二锤):先洗白收编 —— 数量/格式/魔数/大小都验过。
+    // 带了图却一张没进来的,直接说清为什么不放行,不静默丢图
+    const imgSan = sanitizeChatImages(body.images)
+    const images = imgSan.images
+    if (Array.isArray(body.images) && body.images.length > 0 && images.length === 0) {
+      return {
+        status: 'error',
+        text: `图片没能收进来:${imgSan.rejected.join(';') || '格式不支持'}`,
+        model: '',
+        durationMs: Date.now() - startedAt,
+        webLookup: notRequested
+      }
+    }
     // 带了引用就允许「只发代码不发问题」,这时给一句通用问法当题目 ——
     // 光甩几段代码过去,模型不知道该讲哪一面。先用保底账探一下有没有引用,
-    // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs)
+    // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs);
+    // 只发图不发字也行 —— 图本身就是问题,给一句看图兜底问法
     const hasRefs = sanitizeCodeRefs(body.codeRefs).length > 0
-    if (!question && !hasRefs) {
+    if (!question && !hasRefs && images.length === 0) {
       return {
         status: 'error',
         text: '先输入一句话再发送',
@@ -85,12 +102,36 @@ export function registerChatIpc(): void {
         webLookup: notRequested
       }
     }
-    const questionText = question || '讲讲选中的这段代码'
+    const questionText =
+      question || (images.length > 0 ? '看看这张图片,说说你看到了什么' : '讲讲选中的这段代码')
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const attachment = sanitizeAttachment(body.context)
     // 思考模式(第一百一十五锤):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
     const thinking = body.thinking === true
     const requested = hasSearchIntent(questionText)
+    // 图片入口的能力闸:带图先问模型认不认图 —— 渲染层置灰和这里拦截用同一把尺 imageGate;
+    // 纯文本模型直接拦下说人话,绝不把图悄悄扔了当纯文字发
+    if (images.length > 0) {
+      const gate = imageGate(
+        await probeChatVision(await loadAiConfig(userDataDir())),
+        images.length
+      )
+      if (!gate.allow) {
+        return {
+          status: 'error',
+          text: gate.reason ?? '当前模型看不了图片',
+          model: '',
+          durationMs: Date.now() - startedAt,
+          webLookup: notRequested
+        }
+      }
+      if (gate.hint) sendAgentStep(event, requestId, gate.hint)
+      if (imgSan.rejected.length > 0)
+        sendAgentStep(event, requestId, `有图片没带进来:${imgSan.rejected.join(';')}`)
+    }
+    // 翻文件模式跟图片不对付(第一百五十二锤):带图这轮强制不翻,垫句灰字说清楚
+    const agentOn = body.agent === true && images.length === 0
+    if (body.agent === true && !agentOn) sendAgentStep(event, requestId, '这一轮带图片,没有翻文件')
 
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
@@ -141,21 +182,48 @@ export function registerChatIpc(): void {
 
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
     // 闲聊底座 = 内核 + 聊天切片;翻文件开着时无工具切片不挂(翻文件切片由 agent 路自己追加)
-    const systemPrompt = withPersonalization(
-      buildChatSystem({ agent: body.agent === true }),
-      resolved.style
-    )
+    const systemPrompt = withPersonalization(buildChatSystem({ agent: agentOn }), resolved.style)
     // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
     const cap = thinking
       ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS
       : resolved.budgets.replyTokens
-    // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
-    // 固定开销 = 人设+附件+本轮问题+联网资料,历史预算从剩余座位里划
-    const fixedTokens =
+    // 图片优先让路(第一百五十二锤):预算规划给每张图定缩到的尺寸与估算 token,
+    // 估算并进固定开销 —— 历史和代码引用自然从剩余座位里划,不另开一本账;
+    // 装不下就报人话错误,绝不静默丢图
+    let sendImages = images
+    let imageTokens = 0
+    const baseFixedTokens =
       estimateTokens(systemPrompt) +
       estimateTokens(attachment ? buildAttachmentText(attachment) : '') +
       estimateTokens(questionText) +
       estimateTokens(webMaterial ? webMaterial.material : '')
+    if (images.length > 0) {
+      const plan = planImageBudget({
+        ctxTokens: resolved.ctx,
+        replyTokens: cap,
+        otherTokens: baseFixedTokens,
+        images: images.map((img) => ({ width: img.width, height: img.height }))
+      })
+      if (!plan.ok) {
+        return {
+          status: 'error',
+          text: plan.reason,
+          model: '',
+          durationMs: Date.now() - startedAt,
+          webLookup: meta
+        }
+      }
+      imageTokens = plan.items.reduce((sum, it) => sum + it.tokens, 0)
+      sendImages = images.map((img, i) => {
+        const seat = plan.items[i]
+        return seat.width === img.width && seat.height === img.height
+          ? img
+          : shrinkChatImage(img, seat.width, seat.height)
+      })
+    }
+    // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
+    // 固定开销 = 人设+附件+本轮问题+联网资料+图片,历史预算从剩余座位里划
+    const fixedTokens = baseFixedTokens + imageTokens
     const memory = planChatMemory({
       body,
       provider: resolved.provider,
@@ -169,8 +237,7 @@ export function registerChatIpc(): void {
     // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
     // 剩下的折成字符才是引用能带的量;穷保底、富封顶,额度跟着用户设的上下文走
     const otherTokens =
-      fixedTokens +
-      estimateThreadTokens(body.agent === true ? memory.planned.messages : plainHistory)
+      fixedTokens + estimateThreadTokens(agentOn ? memory.planned.messages : plainHistory)
     const refsBudget = codeRefsBudget({
       contextTokens: resolved.ctx,
       otherTokens,
@@ -189,11 +256,12 @@ export function registerChatIpc(): void {
         webMaterial,
         codeRefs,
         resolved.teaching,
-        summary
+        summary,
+        sendImages
       )
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
-    if (body.agent === true) {
+    if (agentOn) {
       const agentRoot =
         typeof body.rootPath === 'string' && body.rootPath.trim() !== '' ? body.rootPath : ''
       if (agentRoot === '') {

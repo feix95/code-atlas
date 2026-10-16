@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import { TAG } from '@shared/promptTags'
 import { collectHistoryRounds, CHAT_HISTORY_SEND_MAX } from '@shared/chatHistory'
+import type { ChatImage } from '@shared/chatImage'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
@@ -96,7 +97,8 @@ export function useAiChat(
   adopt: (userText: string, answer: string) => void
   /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
   compact: () => void
-  send: (question: string, refs?: ChatCodeRef[]) => void
+  /** 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二锤),允许只发图不发字 */
+  send: (question: string, refs?: ChatCodeRef[], images?: ChatImage[]) => void
   cancel: () => void
 } {
   const [messages, setMessages] = useState<ChatMessage[]>(() => [])
@@ -254,11 +256,12 @@ export function useAiChat(
     }
   }, [])
 
-  function send(question: string, refs?: ChatCodeRef[]): void {
+  function send(question: string, refs?: ChatCodeRef[], images?: ChatImage[]): void {
     const q = question.trim()
-    // 带引用的允许「只发代码不发问题」:主进程会给一句兜底问法(光甩代码过去没题目,说不清要讲哪面)
+    // 带引用的允许「只发代码不发问题」,带图也一样:图本身就是问题,主进程会给兜底问法
     const useRefs = refs && refs.length > 0 ? refs : undefined
-    if ((!q && !useRefs) || busyRef.current) return
+    const useImages = images && images.length > 0 ? images : undefined
+    if ((!q && !useRefs && !useImages) || busyRef.current) return
     const requestId = crypto.randomUUID()
     idRef.current = requestId
     busyRef.current = true
@@ -266,7 +269,15 @@ export function useAiChat(
     const botKey = requestId
     setMessages((prev) => [
       ...prev,
-      { key: `${requestId}-u`, role: 'user', text: q, state: 'done', web: null, refs: useRefs },
+      {
+        key: `${requestId}-u`,
+        role: 'user',
+        text: q,
+        state: 'done',
+        web: null,
+        refs: useRefs,
+        images: useImages
+      },
       { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }
     ])
     void (async () => {
@@ -282,6 +293,7 @@ export function useAiChat(
           conversationId: conversationIdRef.current,
           context: contextRef.current,
           codeRefs: useRefs,
+          images: useImages,
           thinking: thinkingRef.current,
           agent: agentOn || undefined,
           rootPath: rootPath ?? undefined,

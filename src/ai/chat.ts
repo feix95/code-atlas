@@ -13,8 +13,13 @@ import { CURRENT_QUESTION_PREFIX, CURRENT_QUESTION_SUFFIX } from '../shared/chat
 import { teachingSlice } from './prompts.ts'
 import type { TeachingLevel } from '../shared/personalization.ts'
 import type { AgentChatMessage } from './agent.ts'
+import type { ChatContentPart, ChatImage } from '../shared/chatImage.ts'
 
-type PlainChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+type PlainChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  /** 纯文本是字符串;带图的用户消息是 OpenAI 多模态分段数组(第一百五十二锤) */
+  content: string | ChatContentPart[]
+}
 
 /** 自由聊天历史窗口的上限(单位:消息条数):最多 6 条,按「完整问答对」两头收拢(见 sanitizeHistory),
  * 实际就是最近 3 对问答 —— 历史只垫底,把上下文留给附件资料和本轮问题。
@@ -212,7 +217,9 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
   /** 讲解深度(教学三档,提示词体系重写第二批):聊天场景也吃 —— off 档就是「不教学不出术语表」 */
   teaching: TeachingLevel,
   /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
-  summary?: string
+  summary?: string,
+  /** 这轮带的图片(第一百五十二锤):只挂在最后一条用户消息上变成多模态分段;不带图时一切照旧 */
+  images?: ChatImage[]
 ): Array<PlainChatMessage | H> {
   // 当前问题只包 <current_question> 标签本体;联网资料、参考资料指路都跟在标签后面,
   // agent 链取问题时按标签一剥就是干净原文
@@ -244,7 +251,20 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
     ...(codeRefs.length > 0
       ? [{ role: 'user' as const, content: buildCodeRefsText(codeRefs) }]
       : []),
-    { role: 'user', content: tail }
+    {
+      role: 'user' as const,
+      // 有图时收尾消息是多模态分段:文字在前,图片按序排后;没图就还是纯字符串,老路径零变化
+      content:
+        images && images.length > 0
+          ? [
+              { type: 'text' as const, text: tail },
+              ...images.map((img) => ({
+                type: 'image_url' as const,
+                image_url: { url: img.dataUrl }
+              }))
+            ]
+          : tail
+    }
   ]
   return mergeConsecutiveMessages(messages)
 }
@@ -283,12 +303,20 @@ function isPlainMessage(message: AgentChatMessage): message is PlainChatMessage 
   return message.role !== 'tool' && !('tool_calls' in message)
 }
 
-/** 相邻同角色的纯文字消息合并成一条:附件+首问、历史断层都不会出现"连续两条 user"的怪形态 */
+/** 相邻同角色的纯文字消息合并成一条:附件+首问、历史断层都不会出现"连续两条 user"的怪形态;
+ *  带图的消息(content 是分段数组)不跟谁合并 —— 保持多模态形状原样收尾 */
 function mergeConsecutiveMessages<M extends AgentChatMessage>(messages: M[]): M[] {
   const merged: M[] = []
   for (const msg of messages) {
     const last = merged[merged.length - 1]
-    if (last && last.role === msg.role && isPlainMessage(last) && isPlainMessage(msg))
+    if (
+      last &&
+      last.role === msg.role &&
+      isPlainMessage(last) &&
+      isPlainMessage(msg) &&
+      typeof last.content === 'string' &&
+      typeof msg.content === 'string'
+    )
       last.content = `${last.content}\n\n${msg.content}`
     else merged.push(isPlainMessage(msg) ? { ...msg } : msg)
   }

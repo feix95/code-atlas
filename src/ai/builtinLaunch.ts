@@ -1,0 +1,362 @@
+// ── 内置引擎「拉起来直到就绪」这一棒 ──
+// 从 builtin.ts 拆出来的启动域:spawn llama-server、接管 stdout/stderr、
+// 轮询 /health 到就绪、问 /v1/models 拿模型名、就绪后探一轮视觉能力(/props)。
+// 还有启动域的纯函数:加载进度解析、GPU 层数报告、热身估价小账本。
+// 生命周期/收尸/单飞闸门仍归 builtin.ts;引擎单例状态经 BuiltinLaunchHost 注入,
+// 本文件不 import builtin.ts,避免互相绕圈。
+
+import { spawn, type ChildProcess } from 'node:child_process'
+import type { ModelStatus, VisionSupport } from '../shared/types.ts'
+import { normalizeContextSize, PROBE_HEALTH_MS, PROBE_MODELS_MS } from '../shared/aiDefaults.ts'
+import { addDevLog } from '../shared/devlog.ts'
+import { fetchWithTimeout } from './http.ts'
+import { findMmprojFor } from './mmproj.ts'
+import { probeBuiltinVision } from './visionProbe.ts'
+
+/** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
+export const BUILTIN_PORT = 8766
+const POLL_INTERVAL_MS = 1000
+/** 热身多久没好开始温柔提醒(第七十二锤,小葵拍板):绝不掐进程 —— 大模型从机械盘
+ * 搬进显存两三分钟是常事,掐表只会杀死健康的加载;等不等由用户手里的「取消」说了算 */
+const WARMUP_NUDGE_MS = 5 * 60_000
+
+/** 用户按了取消/卸下时,挂起的启动等待收到的一句话(不是故障,是「先不用了」) */
+export const CANCEL_MESSAGE = '加载取消了:想用的时候再问一句,它会重新热身'
+
+/** 进程型失败专用错误:带退出码,验尸/保险丝判定时好认(普通 Error = 没起成/spawn 层失败) */
+export class EngineExitError extends Error {
+  exitCode: number | null
+  constructor(exitCode: number | null, message: string) {
+    super(message)
+    this.name = 'EngineExitError'
+    this.exitCode = exitCode
+  }
+}
+
+/**
+ * 启动时要借道的 builtin.ts 单例状态与播报口。
+ * 引擎子进程/启动参数账/叫停标记都记在 builtin.ts 那边,这里只经口子读写。
+ */
+export interface BuiltinLaunchHost {
+  /** spawn 出来的子进程回登到模块单例 */
+  setChild(child: ChildProcess | null): void
+  /** 引擎还在跑吗(health 轮询的退出条件) */
+  isEngineRunning(): boolean
+  /** 用户/系统正在主动叫停(exit 监听据此闭嘴) */
+  isStopping(): boolean
+  /** 新一轮启动清掉上次的叫停账 */
+  resetStopping(): void
+  /** 记下这次实际喂给引擎的 -c 档位与 --mmproj 路径(对账账本) */
+  markStarted(ctxSize: number, mmprojPath: string): void
+  /** 状态栏播报(loading/ready/error) */
+  announce(status: ModelStatus): void
+  /** 组一份内置 provider 的状态卡(与 builtin.ts 同一工厂) */
+  status(
+    state: ModelStatus['state'],
+    modelName: string,
+    sizeBytes: number | null,
+    progress?: number | null,
+    message?: string,
+    estimated?: boolean,
+    vision?: VisionSupport
+  ): ModelStatus
+  /** 模型文件的展示信息(名字/块头/失踪提醒) */
+  idleFacts(modelPath: string): {
+    modelName: string
+    sizeBytes: number | null
+    message?: string
+  }
+  /** 引擎 PID 落档/销档(强杀孤儿收尸用) */
+  writeEnginePidFile(pid: number): void
+  clearEnginePidFileFor(pid: number | undefined): void
+  /** 热身账本读写(builtin.ts 管 userData 目录;估价基准/入账) */
+  readWarmupMs(modelPath: string): number | null
+  recordWarmupMs(modelPath: string, ms: number): void
+}
+
+// ── 热身估价(纯函数;账本读写经 host 走 builtin.ts 的 userData 目录)──
+
+/**
+ * 热身太久的温柔提醒(纯函数,自测覆盖):5 分钟还没好才开口,一句话管理预期,
+ * 绝不吓唬也绝不催命 —— 去留是用户手里「取消」的事,不是闹钟的事。
+ */
+export function warmupNudgeMessage(elapsedMs: number): string | undefined {
+  return elapsedMs >= WARMUP_NUDGE_MS
+    ? '这次热身有点久:大模型第一次要从硬盘整个搬一遍,慢是正常的;不想等就点「取消」,搬完它自己会说'
+    : undefined
+}
+
+/** 热身估价公式:已用时 ÷ 最近样本均值 → 百分比,1~95 封顶(纯函数,自测覆盖)。
+ * 没账可查回 null(界面转圈);宁慢勿快 —— 封顶 95,没真就绪绝不谎报到手。
+ */
+export function estimateLoadProgress(elapsedMs: number, lastMs: number | null): number | null {
+  if (lastMs === null || !Number.isFinite(lastMs) || lastMs <= 0) return null
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 1
+  return Math.max(1, Math.min(95, Math.floor((elapsedMs / lastMs) * 100)))
+}
+
+/**
+ * 从 /health 的 503 响应体里抠加载进度。llama.cpp 新版给
+ * {"error":{"message":"Loading model","progress":0.42}},老版啥都不给。
+ * 0~1 当比例 ×100,1~100 当百分数,出了范围或不是数 = 拿不到(纯函数,自测覆盖)。
+ */
+export function parseLoadProgress(body: unknown): number | null {
+  const raw =
+    typeof body === 'number'
+      ? body
+      : body !== null && typeof body === 'object'
+        ? ((body as { progress?: unknown }).progress ??
+          (body as { error?: { progress?: unknown } }).error?.progress)
+        : undefined
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null
+  if (raw <= 1) return raw * 100
+  if (raw <= 100) return raw
+  return null
+}
+
+export interface GpuOffloadReport {
+  offloaded: number
+  total: number
+}
+
+export function parseGpuOffloadReport(line: string): GpuOffloadReport | null {
+  const hit = line.match(/offloaded\s+(\d+)\s*\/\s*(\d+)\s+layers?\s+to\s+GPU/i)
+  if (!hit) return null
+  const offloaded = Number(hit[1])
+  const total = Number(hit[2])
+  if (
+    !Number.isInteger(offloaded) ||
+    !Number.isInteger(total) ||
+    total <= 0 ||
+    offloaded < 0 ||
+    offloaded > total
+  )
+    return null
+  return { offloaded, total }
+}
+
+export function gpuOffloadWarning(report: GpuOffloadReport | null): string | undefined {
+  if (report === null || report.offloaded >= report.total) return undefined
+  return `模型只有 ${report.offloaded}/${report.total} 层放进显卡,其余要在内存里跑,吐字会明显变慢。关掉占显存的程序后点「卸下」再重载,或把「模型上下文」调小。`
+}
+
+/** 就绪后问服务加载了哪个模型(llama-server 以模型文件名作为模型 id) */
+async function fetchModelId(baseUrl: string): Promise<string> {
+  const modelsRes = await fetchWithTimeout(`${baseUrl}/models`, PROBE_MODELS_MS)
+  if (!modelsRes.ok) {
+    throw new Error(`内置模型已就绪,但拿不到模型信息(${modelsRes.status}),再点一次试试`)
+  }
+  const data = (await modelsRes.json()) as { data?: Array<{ id?: string }> }
+  const model = data.data?.[0]?.id ?? ''
+  if (!model) throw new Error('内置模型已就绪,但报告不出模型名,再点一次试试')
+  return model
+}
+
+/**
+ * 拉起 llama-server 并等它就绪:spawn → /health 轮询(503 带进度就报真数,
+ * 没报按热身账本估一条)→ /v1/models 拿模型名 → /props 探视觉能力 → 报 ready。
+ * skipMmproj = 保险丝重拉:上次带投影仪把自己拉死了,这次摘掉按纯文本跑,
+ * 就绪播报捎一句人话说明。
+ */
+export async function launchBuiltinServer(
+  host: BuiltinLaunchHost,
+  serverPath: string,
+  modelPath: string,
+  baseUrl: string,
+  contextSize: number,
+  skipMmproj = false
+): Promise<{ baseUrl: string; model: string }> {
+  const ctxSize = normalizeContextSize(contextSize)
+  // 视觉能力锤:模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
+  // 没带就按纯文本跑。记进对账账本 —— 旁边增删 mmproj 后下次提问对账重启
+  const mmproj = skipMmproj ? null : findMmprojFor(modelPath)
+  host.markStarted(ctxSize, mmproj ?? '')
+  host.resetStopping() // 新的一轮启动:上次「主动叫停」的标记就地清账
+  const facts = host.idleFacts(modelPath)
+  const startedAt = Date.now()
+  const lastWarmupMs = host.readWarmupMs(modelPath)
+  // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
+  addDevLog(
+    'system',
+    `启动内置引擎:${serverPath} · 模型 ${modelPath} · 上下文 ${ctxSize} · 全层上显卡(-ngl 999) · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)${mmproj ? ` · 视觉投影仪(--mmproj ${mmproj})` : ''}`
+  )
+  const child = spawn(
+    serverPath,
+    [
+      '-m',
+      modelPath,
+      '--port',
+      String(BUILTIN_PORT),
+      '--host',
+      '127.0.0.1',
+      '-c',
+      String(ctxSize),
+      '-ngl',
+      '999',
+      // --jinja(第一百二十八锤):让引擎用模型自带的对话模板,工具调用(agent 的
+      // 翻文件)靠它才开得了;chat_template_kwargs 的思考开关也走这条路。换模型后生效
+      '--jinja',
+      ...(mmproj ? ['--mmproj', mmproj] : [])
+    ],
+    {
+      windowsHide: true,
+      // 第八十七锤:stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  )
+  host.setChild(child)
+  // 引擎活着档就在(收尸盲区修复):spawn 成功落 PID,app 被强杀留下的孤儿下次照档收尸;
+  // 闭包记死这个 pid —— 模块级 child 会被 stopBuiltinServer 置空或被新引擎换岗
+  const spawnedPid = child.pid
+  if (spawnedPid !== undefined) host.writeEnginePidFile(spawnedPid)
+  let latestGpuOffload: GpuOffloadReport | null = null
+  const captureEngineLine = (line: string): void => {
+    if (!line.trim()) return
+    addDevLog('engine', line)
+    latestGpuOffload = parseGpuOffloadReport(line) ?? latestGpuOffload
+  }
+  // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
+  // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
+  const feedEngineStream = (stream: NodeJS.ReadableStream | null): void => {
+    if (!stream) return
+    let leftover = ''
+    stream.on('data', (chunk: Buffer) => {
+      leftover += chunk.toString('utf8')
+      const lines = leftover.split(/\r\n|\r|\n/)
+      leftover = lines.pop() ?? ''
+      for (const line of lines) captureEngineLine(line)
+    })
+    stream.on('end', () => captureEngineLine(leftover))
+  }
+  feedEngineStream(child.stdout)
+  feedEngineStream(child.stderr)
+  const announceLoading = (realProgress: number | null): void => {
+    const elapsed = Date.now() - startedAt
+    const est = realProgress ?? estimateLoadProgress(elapsed, lastWarmupMs)
+    host.announce(
+      host.status(
+        'loading',
+        facts.modelName,
+        facts.sizeBytes,
+        est,
+        warmupNudgeMessage(elapsed),
+        est !== null && realProgress === null
+      )
+    )
+  }
+  announceLoading(null)
+
+  // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误;
+  // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,验尸时好认
+  const exitError = new Promise<never>((_, reject) => {
+    child.once('exit', (code) => {
+      host.clearEnginePidFileFor(spawnedPid)
+      addDevLog(
+        'system',
+        host.isStopping()
+          ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})`
+          : `引擎启动就退出了(退出码 ${code ?? '未知'})`
+      )
+      reject(
+        new EngineExitError(
+          code ?? null,
+          host.isStopping()
+            ? CANCEL_MESSAGE
+            : `内置模型程序启动失败就退出了(退出码 ${code ?? '未知'}):常见原因是程序路径没指对、模型文件损坏,或端口被占用`
+        )
+      )
+    })
+    child.once('error', (err) => {
+      addDevLog('system', `引擎没法启动:${err.message}`)
+      const msg =
+        (err as NodeJS.ErrnoException).code === 'ENOENT'
+          ? '找不到 llama-server 程序:去「AI 设置」重新选一下程序路径'
+          : `内置模型程序没法启动:${err.message}`
+      reject(new Error(msg))
+    })
+  })
+
+  const healthUrl = baseUrl.replace(/\/v1$/, '') + '/health'
+  const ready = (async () => {
+    // 不设闹钟(第七十二锤):进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
+    // 2 分钟的硬超时只会掐死健康的加载;真死锁交给用户手里的「取消」
+    while (host.isEngineRunning()) {
+      try {
+        const res = await fetchWithTimeout(healthUrl, PROBE_HEALTH_MS)
+        if (res.ok) break // 200 = 模型加载完毕
+        if (res.status === 503) {
+          // 还在加载:服务报了进度就用真数,没报就按上次耗时估一条,每秒往前走
+          const body = await res.text().catch(() => '')
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(body)
+          } catch {
+            parsed = null
+          }
+          announceLoading(parseLoadProgress(parsed))
+        }
+      } catch {
+        // 还没开始监听端口,继续等;估价也照走,别让百分比卡在原地
+        announceLoading(null)
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+    }
+    if (!host.isEngineRunning())
+      throw new EngineExitError(null, '内置模型进程提前退出了,检查路径和模型文件')
+
+    // 热身真耗时入账:下次同一模型的估价就有据可依
+    host.recordWarmupMs(modelPath, Date.now() - startedAt)
+    addDevLog(
+      'system',
+      `引擎就绪:模型加载完成,耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`
+    )
+
+    // 就绪后问它加载了哪个模型;刚就绪就断线的话给人话兜底
+    let model: string
+    try {
+      model = await fetchModelId(baseUrl)
+    } catch (err) {
+      throw err instanceof Error && err.message.includes('内置模型')
+        ? err
+        : new Error('内置模型刚就绪就没了响应,再点一次试试')
+    }
+    const offloadWarning = gpuOffloadWarning(latestGpuOffload)
+    if (offloadWarning) addDevLog('system', offloadWarning)
+    // 就绪后问一轮 /props:modalities.vision 是引擎自己报的能力账,状态栏标签认它
+    const vision = await probeBuiltinVision(baseUrl)
+    // 降级重拉成功的要跟人讲清楚:眼睛没装上,现在按纯文本跑着
+    const readyNote = [offloadWarning, skipMmproj ? '视觉文件加载失败,已按纯文本启动' : null]
+      .filter((s): s is string => typeof s === 'string' && s.length > 0)
+      .join(';')
+    host.announce(
+      host.status('ready', model, facts.sizeBytes, 100, readyNote || undefined, false, vision)
+    )
+
+    // 就绪之后再夭折(跑着跑着崩了):状态栏如实报故障,下次提问会自动重新拉起;
+    // 用户主动卸下的不算,走 stopping 标记闭嘴
+    child.once('exit', (code) => {
+      host.clearEnginePidFileFor(spawnedPid)
+      addDevLog(
+        'system',
+        host.isStopping()
+          ? `引擎已停止(主动叫停,退出码 ${code ?? '未知'})`
+          : `引擎中途退出了(退出码 ${code ?? '未知'})`
+      )
+      if (!host.isStopping()) {
+        host.announce(
+          host.status(
+            'error',
+            model,
+            facts.sizeBytes,
+            null,
+            `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`
+          )
+        )
+      }
+    })
+    return { baseUrl, model }
+  })()
+
+  // 谁先出结果听谁的:就绪 or 进程夭折
+  return Promise.race([ready, exitError])
+}

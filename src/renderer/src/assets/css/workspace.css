@@ -746,6 +746,24 @@
   font-size: var(--font-xxs);
 }
 
+/* 用户气泡里的图片痕(第一百五十二锤):他发过什么图,缩略图排一排回看时对得上 */
+.msg-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.msg-img {
+  max-width: 10rem;
+  max-height: 10rem;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
 .status-dot {
   display: inline-block;
   width: 0.4375rem;

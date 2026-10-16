@@ -13,6 +13,9 @@ import { FreeChatComposer } from './FreeChatComposer'
 import { AssistantBubble } from './FreeChatBubble'
 import { FileNoteText, MatchListCard } from './FreeChatNotes'
 import { REF_ONLY_QUESTION, type AiChatApi, type ChatMessage } from '../useAiChat'
+import type { ChatImage } from '@shared/chatImage'
+import { useModelVision } from '../useModelVision'
+import { useChatImages } from '../useChatImages'
 import { AiSetupContext } from '../aiSetupContext'
 import { INLINE_ICON_SIZE } from '../inputMetrics'
 
@@ -82,6 +85,9 @@ export function FreeChatPanel({
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const draftRefs = refs ?? []
+  // 图片附件(第一百五十二锤):能力账订阅 + 待发图片账本;拒收/清账的灰字走 chat.note
+  const vision = useModelVision()
+  const chatImages = useChatImages(vision, chat.note)
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
@@ -126,18 +132,18 @@ export function FreeChatPanel({
     retryCtxRef.current = {
       messages: chat.messages,
       forceBottom,
-      send: (text: string, sendRefs?: ChatCodeRef[]) => {
+      send: (text: string, sendRefs?: ChatCodeRef[], sendImages?: ChatImage[]) => {
         if (setup && setup.configured !== true) {
           if (setup.configured === false) setup.openSettings()
           return
         }
-        chat.send(text, sendRefs)
+        chat.send(text, sendRefs, sendImages)
       }
     }
   })
   const retryFrom = useCallback((idx: number): void => {
     const { messages, send, forceBottom: fb } = retryCtxRef.current
-    // 重答的应该是最新这个问题:从这条回答往前找最近的用户提问,引用原样带上再问一遍
+    // 重答的应该是最新这个问题:从这条回答往前找最近的用户提问,引用和图片都原样带上再问一遍
     let prev: ChatMessage | undefined
     for (let i = idx - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
@@ -147,7 +153,7 @@ export function FreeChatPanel({
     }
     if (!prev) return
     fb()
-    send(prev.text || REF_ONLY_QUESTION, prev.refs)
+    send(prev.text || (prev.images?.length ? '' : REF_ONLY_QUESTION), prev.refs, prev.images)
   }, [])
 
   // 重试只挂在最后一条回答上,历史回答不翻烧饼。这份账一轮渲染算一次 —— 原先写在
@@ -206,6 +212,7 @@ export function FreeChatPanel({
       chat={chat}
       refs={draftRefs}
       onRemoveRef={onRemoveRef}
+      chatImages={chatImages}
       onWillSend={forceBottom}
     />
   )
@@ -213,56 +220,54 @@ export function FreeChatPanel({
   return (
     <div
       className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
-      onDragOver={
-        onDropNode || onDropRef
-          ? (e) => {
-              const types = e.dataTransfer.types
-              const accept =
-                (onDropNode !== undefined && types.includes(DRAG_MIME_NODE)) ||
-                (onDropRef !== undefined && types.includes(DRAG_MIME_REF))
-              if (!accept) return
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'copy'
-              setDragOver(true)
-            }
-          : undefined
-      }
-      onDragLeave={
-        onDropNode || onDropRef
-          ? (e) => {
-              if (e.currentTarget.contains(e.relatedTarget as Node)) return
-              setDragOver(false)
-            }
-          : undefined
-      }
-      onDrop={
-        onDropNode || onDropRef
-          ? (e) => {
-              setDragOver(false)
-              // 先认选段(自带正文):预览里选中一段拖过来的,直接挂引用不用读盘
-              const rawRef = e.dataTransfer.getData(DRAG_MIME_REF)
-              if (rawRef && onDropRef) {
-                e.preventDefault()
-                try {
-                  const ref = JSON.parse(rawRef) as DragRefPayload
-                  if (ref.relPath && ref.code) onDropRef(ref)
-                } catch {
-                  // 不是咱家的货,不接
-                }
-                return
-              }
-              const raw = e.dataTransfer.getData(DRAG_MIME_NODE)
-              if (!raw || !onDropNode) return
-              e.preventDefault()
-              try {
-                const node = JSON.parse(raw) as DragNodePayload
-                if (node.relPath) onDropNode(node.kind, node.relPath)
-              } catch {
-                // 不是咱家的货,不接
-              }
-            }
-          : undefined
-      }
+      onDragOver={(e) => {
+        const types = e.dataTransfer.types
+        // 三种货都接:内里的引用/文件节点照旧,系统拖来的文件(Files)是图片附件的路
+        const accept =
+          (onDropNode !== undefined && types.includes(DRAG_MIME_NODE)) ||
+          (onDropRef !== undefined && types.includes(DRAG_MIME_REF)) ||
+          types.includes('Files')
+        if (!accept) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
+        setDragOver(false)
+      }}
+      onDrop={(e) => {
+        setDragOver(false)
+        // 先认选段(自带正文):预览里选中一段拖过来的,直接挂引用不用读盘
+        const rawRef = e.dataTransfer.getData(DRAG_MIME_REF)
+        if (rawRef && onDropRef) {
+          e.preventDefault()
+          try {
+            const ref = JSON.parse(rawRef) as DragRefPayload
+            if (ref.relPath && ref.code) onDropRef(ref)
+          } catch {
+            // 不是咱家的货,不接
+          }
+          return
+        }
+        const raw = e.dataTransfer.getData(DRAG_MIME_NODE)
+        if (raw && onDropNode) {
+          e.preventDefault()
+          try {
+            const node = JSON.parse(raw) as DragNodePayload
+            if (node.relPath) onDropNode(node.kind, node.relPath)
+          } catch {
+            // 不是咱家的货,不接
+          }
+          return
+        }
+        // 系统拖来的文件:图片收编进待发账(校验/拒收话术全在 addFiles 一把尺里)
+        const files = Array.from(e.dataTransfer.files ?? [])
+        if (files.length > 0) {
+          e.preventDefault()
+          void chatImages.addFiles(files)
+        }
+      }}
     >
       {/* 顶行:薄得几乎不存在 —— 只留新对话(参考 chip 摘了,资料跟着选中项走树里看得见) */}
       <div className="fc-topline">
@@ -336,6 +341,20 @@ export function FreeChatPanel({
                   return (
                     <div key={m.key} className="message user">
                       {m.text}
+                      {/* 这轮带的图片:缩略图跟在自己话后面,回看时知道当时给模型看了什么 */}
+                      {m.images && m.images.length > 0 && (
+                        <div className="msg-imgs">
+                          {m.images.map((img) => (
+                            <img
+                              key={img.id}
+                              className="msg-img"
+                              src={img.dataUrl}
+                              alt={img.name}
+                              data-tip={`${img.name} · ${img.width}×${img.height}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                       {/* 这轮引用过哪几段:自己发的话里留下痕迹,回看时知道当时给的是什么 */}
                       {m.refs && m.refs.length > 0 && (
                         <div className="msg-refs">

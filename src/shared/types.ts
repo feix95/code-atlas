@@ -2,6 +2,7 @@
 
 import type { PersonalizationConfig } from './personalization.ts'
 import type { CloudVendorId } from './cloudVendors.ts'
+import type { ChatImage } from './chatImage.ts'
 
 /** 全树速览给节点配的一句大白话标签(规则引擎现场算,不劳烦 AI) */
 export interface NodeSummary {
@@ -279,6 +280,9 @@ export interface ChatTarget {
  * 模型状态栏的心跳(第七十锤):主进程随状态变化广播 'atlas:model-status',
  * 渲染层常驻底栏展示。progress 只在服务真报了数时给值,拿不到就是 null —— 绝不编进度。
  */
+/** 模型看图的户口本:vision=能看图片 text-only=只能读文字 unknown=还没问到/认不出(缺省) */
+export type VisionSupport = 'vision' | 'text-only' | 'unknown'
+
 export interface ModelStatus {
   provider: AiProviderKind
   /** idle=还没叫醒(懒加载,没提问不启动) loading=热身中 ready=就绪 error=出岔子 unreachable=外接服务没连上 */
@@ -293,6 +297,8 @@ export interface ModelStatus {
   estimated?: boolean
   /** 出岔子或需要引导时的一句话(给人看的) */
   message?: string
+  /** 视觉能力(内置引擎就绪后问 /props、LM Studio 看条目 type、在线 API 按名字认);缺省=unknown,不为探测拉起引擎 */
+  vision?: VisionSupport
 }
 
 /**
@@ -475,6 +481,11 @@ export interface AiChatRequest {
   /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一锤);没有就是 undefined */
   codeRefs?: ChatCodeRef[]
   /**
+   * 这轮带的图片(第一百五十二锤):JPG/PNG 的 data URL,主进程会洗白+按预算缩图,
+   * 纯文本模型直接拒收。最多 CHAT_IMAGES_MAX 张;没有就是 undefined。
+   */
+  images?: ChatImage[]
+  /**
    * 思考模式开关(第一百一十五锤):true = 允许模型先想一遍,思考过程展示给用户;
    * 缺省 false = 一句话解释这类快问快答,别让思考白烧字数。只有内置引擎吃这个开关
    * (外接服务由它们自己的设置管)。
@@ -553,6 +564,8 @@ export interface ChatMessage {
   web: WebLookupMeta | null
   /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
   refs?: ChatCodeRef[]
+  /** 发这条消息时带的图片(第一百五十二锤):留着画缩略图,重试要原样带上;只在内存,不落盘不进日志 */
+  images?: ChatImage[]
 }
 
 /** 联网查询进行中/结束时的实时播报(主进程 → 渲染进程),按 requestId 对号入座 */
@@ -592,9 +605,10 @@ export interface FeatureLocateResult {
 /**
  * 代码预览的读文件结果(第一百一十锤):只给「够看懂」的一段,超了如实标 truncated。
  * 二进制/超大各有专门状态,让界面说人话 —— 绝不硬塞一屏乱码。
+ * image = 后缀是 JPG/PNG 且内容验过魔数:界面直接看图,不走文本那套。
  */
 export interface FilePreviewResult {
-  status: 'ok' | 'binary' | 'too-big'
+  status: 'ok' | 'binary' | 'too-big' | 'image'
   /** status='ok' 时的正文(全文,只做过换行归一) */
   text: string
   /** 文件真实总行数(ok 时才有) */
@@ -607,6 +621,18 @@ export interface FilePreviewResult {
    * 缺省 = 这份不上色(超闸 / 语言不认识 / 解析出错),界面照常白字,绝不是出错。
    */
   colors?: number[][][]
+  /** status='image' 时的图片账:dataUrl 是整张图(mime 按字节嗅出来的,不以后缀为准) */
+  image?: FilePreviewImage
+}
+
+/** 图片预览带上界面的那笔账:宽高读不出(截断/畸形)老实回 null,不拿 0 冒充 */
+export interface FilePreviewImage {
+  dataUrl: string
+  mime: 'image/png' | 'image/jpeg'
+  width: number | null
+  height: number | null
+  /** 文件真实字节数(信息条报体积用) */
+  bytes: number
 }
 
 /** 文件写盘回执(预览编辑锤):mtimeMs 给文件监视器对账 —— 对上这个时间的 watch 事件是我们自己写的,吞掉 */

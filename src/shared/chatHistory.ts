@@ -45,6 +45,8 @@ export interface HistorySourceMessage {
   role: 'user' | 'assistant' | 'note'
   state?: string
   text?: string
+  /** 这轮附带的图片(第一百五十二锤):历史只记「附过几张图」一句话,图片本体不进历史 */
+  images?: readonly unknown[]
 }
 
 /**
@@ -70,19 +72,25 @@ export function collectHistoryRounds(
     const answer = answerAt > i ? messages[answerAt] : undefined
     roundEnd = i
     const qText = question.text?.trim() ?? ''
+    // 附过图的那轮在历史里留一句话交代(第一百五十二锤):图片本体是 data URL,
+    // 绝不进历史 —— 不然一轮旧图就把小模型的上下文吃干抹净
+    const imageCount = question.images?.length ?? 0
+    const imageMark =
+      imageCount > 0 ? `(这一轮附了 ${imageCount} 张图片,图片本身不在当前上下文里)` : ''
+    const qContent = imageMark ? (qText ? `${qText}\n${imageMark}` : imageMark) : qText
     if (
       question.state !== 'done' ||
-      !qText ||
-      seenQuestions.has(qText) ||
+      !qContent ||
+      seenQuestions.has(qContent) ||
       !answer ||
       answer.state !== 'done' ||
       !answer.text?.trim()
     )
       continue
-    seenQuestions.add(qText)
+    seenQuestions.add(qContent)
     rounds.push(
       { role: 'assistant', content: answer.text.trim() },
-      { role: 'user', content: qText }
+      { role: 'user', content: qContent }
     )
   }
   return rounds.reverse().slice(-maxMessages)

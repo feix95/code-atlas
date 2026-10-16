@@ -1,0 +1,102 @@
+/* ── 图片预览(图片预览锤):JPG/PNG 签的正文 ──
+   适应窗口 = 舞台 flex 居中、图等比缩进可视区;100% = 图按原始尺寸撑开,舞台自己滚 */
+.image-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.image-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--canvas-tint);
+}
+
+.image-stage-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-stage.is-actual .image-stage-btn {
+  cursor: zoom-out;
+  margin: auto; /* 图比舞台小时仍居中;比舞台大时撑出滚动条 */
+}
+
+.image-figure {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.image-stage.is-actual .image-figure {
+  max-width: none;
+  max-height: none;
+}
+
+/* 解码中的转圈钉在舞台中央,不跟着内容滚走 */
+.image-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-md);
+  pointer-events: none;
+}
+
+/* 底栏信息条:文件名 + 宽×高 + 体积 + 模式钮,报得出才报 */
+.image-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+
+.image-info-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* 模式切换钮:文字标签直报当前档;开态(100%)走 --sash-hi 功能强调色 */
+.image-zoom-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--muted-2);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.image-zoom-btn:hover:not(:disabled) {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
+.image-zoom-btn[aria-pressed='true'] {
+  color: var(--sash-hi);
+}

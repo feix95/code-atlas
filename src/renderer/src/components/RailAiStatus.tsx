@@ -310,6 +310,13 @@ function AiStatusPanel({
       : status.provider === 'cloud' && cfg
         ? `上下文 ${cfg.cloud.contextSize.toLocaleString()}`
         : ''
+  // 能力标签(视觉能力锤):视觉/纯文本两粒,unknown 不挂 —— 没问到就别说
+  const visionTag =
+    status?.vision === 'vision'
+      ? { label: '视觉', tip: '这个模型能看图片' }
+      : status?.vision === 'text-only'
+        ? { label: '纯文本', tip: '这个模型只能读文字,图片附件会被禁用' }
+        : null
   // 反馈槽:测试结果优先(它更新),没测过才落引擎消息;异常消息配 ✕,其余纯文字
   const broken = status?.state === 'error' || status?.state === 'unreachable'
   const feedback: { ico: 'spin' | 'ok' | 'bad' | 'none'; text: string; tip?: string } | null = probe
@@ -337,7 +344,7 @@ function AiStatusPanel({
               {head.text}
             </span>
           </div>
-          {(status.modelName || metaExtra) && (
+          {(status.modelName || metaExtra || visionTag) && (
             <div className="ai-pop-meta">
               {status.modelName && (
                 <span className="ai-pop-name mono" data-tip={status.modelName}>
@@ -346,6 +353,12 @@ function AiStatusPanel({
               )}
               {status.modelName && metaExtra && <span aria-hidden="true">·</span>}
               {metaExtra && <span>{metaExtra}</span>}
+              {(status.modelName || metaExtra) && visionTag && <span aria-hidden="true">·</span>}
+              {visionTag && (
+                <span className="ai-pop-cap" data-tip={visionTag.tip}>
+                  {visionTag.label}
+                </span>
+              )}
             </div>
           )}
         </>

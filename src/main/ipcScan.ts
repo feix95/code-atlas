@@ -6,7 +6,8 @@ import { searchNames } from '../scanner/searchNames.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
-import { isBinaryFile } from '../shared/fileKinds.ts'
+import { isBinaryFile, isImageFile } from '../shared/fileKinds.ts'
+import { readImagePreview } from './imagePreview.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { highlightSource } from '../highlight/index.ts'
@@ -119,6 +120,11 @@ export function registerScanIpc(): void {
         throw new Error(`这个路径不是一个文件:${relPath}`)
       }
       const name = relPath.split('/').pop() ?? relPath
+      // 图片先走图片支路(图片后缀仍在 BINARY_EXTS 里,先判它才有「直接看图」这条路):
+      // 超谢客线回 too-big、魔数对不上回 binary、验过回 image 带 dataUrl
+      if (isImageFile(name)) {
+        return readImagePreview({ absPath, relPath, sizeBytes: stat.size })
+      }
       // 后缀一看就是二进制/媒体的,连读都不用读
       if (isBinaryFile(name)) {
         return {

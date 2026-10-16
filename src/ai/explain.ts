@@ -1,6 +1,7 @@
 // 讲解请求底座:SSE 流式读取 / token 账 / 思考段剥离 / 看门狗超时 / 半截话注脚,
 // 到 explainWithMessages(多轮)与 explainWithModel(单轮)两个入口。
 import type { AiStreamStats, AiUsage, AiExplainResult, ChatTarget } from '../shared/types.ts'
+import { contentTextLen, type ChatMessageContent } from '../shared/chatImage.ts'
 import { detectRepetitionTail, truncateAtRepetition } from './repetition.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import {
@@ -209,7 +210,7 @@ export function timeoutText(): string {
  */
 export async function explainWithMessages(
   config: ChatTarget,
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: ChatMessageContent }>,
   onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
   maxTokens = 500,
@@ -219,7 +220,8 @@ export async function explainWithMessages(
   }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
-  const promptChars = messages.reduce((sum, m) => sum + m.content.length, 0)
+  // 日志只记字数:带图的消息 content 是分段数组,dataUrl 绝不落账 —— 折算成占位字
+  const promptChars = messages.reduce((sum, m) => sum + contentTextLen(m.content), 0)
   addDevLog(
     'request',
     `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}${opts?.allowThinking ? ' · 思考模式' : ''}`
@@ -261,7 +263,7 @@ export async function explainWithMessages(
 
 async function explainWithMessagesCore(
   config: ChatTarget,
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: ChatMessageContent }>,
   onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
   maxTokens = 500,

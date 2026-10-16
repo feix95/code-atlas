@@ -9,6 +9,7 @@
 // 2. 路径一律走项目内的相对路径,主进程拼绝对路径前还有 joinRoot 二道岗
 // 3. 缰绳:轮数封顶 + 同一样东西不许翻第二遍,防止小模型原地转圈烧锅
 import type { AiStreamStats, AiUsage, ChatTarget } from '../shared/types.ts'
+import type { ChatContentPart } from '../shared/chatImage.ts'
 import { splitThinking, sseEvents, type ToolCallDelta } from './index.ts'
 import { postChatCompletions } from './http.ts'
 import { detectRepetitionTail } from './repetition.ts'
@@ -70,7 +71,7 @@ export function emergencySlim(
     const m = messages[i]
     if (
       m.role === 'user' &&
-      !(m as { content: string }).content.startsWith(AGENT_REMINDER_PREFIX)
+      (typeof m.content !== 'string' || !m.content.startsWith(AGENT_REMINDER_PREFIX))
     ) {
       questionIdx = i
       break
@@ -409,7 +410,11 @@ export function buildAgentReminder(question: string): string {
 export function stripLastAgentReminder(messages: AgentChatMessage[]): AgentChatMessage[] {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
-    if (m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX)) {
+    if (
+      m.role === 'user' &&
+      typeof m.content === 'string' &&
+      m.content.startsWith(AGENT_REMINDER_PREFIX)
+    ) {
       return [...messages.slice(0, i), ...messages.slice(i + 1)]
     }
   }
@@ -437,9 +442,10 @@ export interface AgentRawAssistant {
   }>
 }
 
-/** agent 循环里的一条对话消息(比普通聊天多了 tool 两种形态) */
+/** agent 循环里的一条对话消息(比普通聊天多了 tool 两种形态);
+ *  user 的 content 可以是多模态分段数组(第一百五十二锤,带图轮);数组形态不跟别的消息合并 */
 export type AgentChatMessage =
-  | { role: 'system' | 'user' | 'assistant'; content: string }
+  | { role: 'system' | 'user' | 'assistant'; content: string | ChatContentPart[] }
   | AgentRawAssistant
   | { role: 'tool'; tool_call_id: string; content: string }
 

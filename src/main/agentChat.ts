@@ -101,7 +101,8 @@ export async function runAgentChat(input: {
   for (let i = baseMessages.length - 1; i >= 0; i--) {
     const m = baseMessages[i]
     if (m.role === 'user') {
-      currentQuestion = stripCurrentQuestionAnchor(m.content)
+      // 带图那轮的 content 是分段数组(agent 在带图时被强制关掉,本不该走到这);兜底取文字段
+      currentQuestion = stripCurrentQuestionAnchor(typeof m.content === 'string' ? m.content : '')
       break
     }
   }
@@ -259,7 +260,12 @@ export async function runAgentChat(input: {
         round.status === 'error' &&
         !reminderFailsafe &&
         (round.httpStatus === 400 || round.httpStatus === 404 || round.httpStatus === 422) &&
-        messages.some((m) => m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))
+        messages.some(
+          (m) =>
+            m.role === 'user' &&
+            typeof m.content === 'string' &&
+            m.content.startsWith(AGENT_REMINDER_PREFIX)
+        )
       ) {
         reminderFailsafe = true
         skipNudgeOnce = true
@@ -267,7 +273,12 @@ export async function runAgentChat(input: {
           0,
           messages.length,
           ...messages.filter(
-            (m) => !(m.role === 'user' && m.content.startsWith(AGENT_REMINDER_PREFIX))
+            (m) =>
+              !(
+                m.role === 'user' &&
+                typeof m.content === 'string' &&
+                m.content.startsWith(AGENT_REMINDER_PREFIX)
+              )
           )
         )
         sendAgentStep(event, requestId, '这个模型不太习惯多出来的小纸条,撤掉重答')

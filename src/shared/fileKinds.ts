@@ -111,6 +111,30 @@ export const BINARY_EXTS = new Set([
  */
 export const DOC_EXTS = new Set(['.md', '.markdown', '.txt', '.rst', '.adoc'])
 
+/**
+ * 预览能直接看的图片后缀(小写含点):唯一名单。
+ * 这些后缀仍在 BINARY_EXTS 里 —— 内容确实是字节流;预览层先判图片、再判二进制,
+ * 才有「直接看图」这条路。只收 sniffImage 认得的两种:PNG / JPEG。
+ */
+export const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg'])
+
+/** 按文件名判断是不是预览可直接看的图片(无后缀/.foo 这类隐藏文件一律不算) */
+export function isImageFile(name: string): boolean {
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return false
+  return IMAGE_EXTS.has(name.slice(dot).toLowerCase())
+}
+
+/** 图片后缀 → MIME;名单外的后缀回 null,不许冒充 */
+export function imageMimeOf(name: string): 'image/png' | 'image/jpeg' | null {
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return null
+  const ext = name.slice(dot).toLowerCase()
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  return null
+}
+
 /** 按文件名判断是不是二进制/媒体文件(svg 是文本,不算;无后缀/.gitignore 这类隐藏文件也不算) */
 export function isBinaryFile(name: string): boolean {
   const dot = name.lastIndexOf('.')
