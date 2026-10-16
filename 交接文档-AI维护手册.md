@@ -12,6 +12,7 @@
 - 发布流程: 推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿, 人工确认后正式发布; 升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`; 新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。
 - 模型列表只呈现客观事实: 大小/时间/模态/下载量从 Hugging Face 原样拉取, 筛选交用户; 唯一允许的软件判断是"本机无法运行"的兜底标记。模型下载走双源(HF 直连 → hf-mirror 镜像), 支持断点续传, 完成后自动写入 AI 配置。
 - 自测不访问真实网络: 联网场景一律 mock 注入——本地与 CI 网络可达性不同, 依赖真实网络的测试无法在两边同时稳定通过。typecheck 仅覆盖 src/ 不覆盖 scripts/, 自测脚本参数须跟随签名变更。
+- AI 需亲自审查的截图与临时产物写入 `E:\my-projects\tmp\`, 审查完毕即清理; 不得写入 `.planning/` 等被 .gitignore 忽略的目录——文件工具读不到被忽略文件, 会造成"跑了自测但没看过图"的假验收。
 
 ## UI 改动自查清单(CSS/布局改动提交前执行)
 
