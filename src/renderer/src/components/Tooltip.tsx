@@ -33,10 +33,10 @@ interface TipPos {
   arrow: number
 }
 
-/** 悬停多久才亮提示:读元素的 --tip-delay token(tokens.css 给默认 0.3s,
- *  VS Code 悬停件同档);某个钮要更慢的亮相,在它自己的 CSS 里局部改这变量。
- *  变量读不出来/写坏了回 300ms 兜底 */
-const FALLBACK_DELAY_MS = 300
+/** 悬停多久才亮提示:读元素的 --tip-delay token(tokens.css 全场统一 1s);
+ *  个别元素要不同延迟,在它自己的 CSS 里局部改这变量。
+ *  变量读不出来/写坏了回 1000ms 兜底(与 token 同值) */
+const FALLBACK_DELAY_MS = 1000
 
 function tipDelayOf(el: HTMLElement, view: Window): number {
   const raw = view.getComputedStyle(el).getPropertyValue('--tip-delay').trim()
@@ -175,18 +175,9 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
       if (doc.body.classList.contains('is-tab-dragging')) return
       const t = readTip(el)
       if (!t) return
-      const delay = tipDelayOf(el, view)
-      const lit = tipRef.current
-      // 已亮着 → 接力两条:默认档(≤0.3s)散兵互接照旧;同组游走也即时换手 ——
-      // 组的慢档延迟只管「进组第一颗」,组内串门不收不等。
-      // 组外散兵调大 --tip-delay = 声明「我要慢」:先收摊,老实等满它的延迟
-      const sameGroup = lit !== null && t.group !== null && t.group === lit.group
-      if (lit !== null && (delay <= FALLBACK_DELAY_MS || sameGroup)) show(t)
-      else if (lit !== null) {
-        hide()
-        cur = el
-        timer = view.setTimeout(() => show(t), delay)
-      } else timer = view.setTimeout(() => show(t), delay)
+      // 已亮着 → 即时换手(VS Code 同款):延迟只管「从无到有的第一颗」,串门不收不等
+      if (tipRef.current !== null) show(t)
+      else timer = view.setTimeout(() => show(t), tipDelayOf(el, view))
     }
 
     const onOver = (e: MouseEvent): void => {

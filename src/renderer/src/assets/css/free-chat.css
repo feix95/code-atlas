@@ -687,9 +687,8 @@
   padding: 0.375rem var(--space-3);
 }
 
-/* 新对话:顶行右上角的小幽灵钮,毁档动作待在角落;悬停提示走慢档(1s),别扫过就嚷嚷 */
+/* 新对话:顶行右上角的小幽灵钮,毁档动作待在角落 */
 .fc-newchat {
-  --tip-delay: var(--tip-delay-slow);
   margin-left: auto;
   flex: none;
   display: inline-flex;
