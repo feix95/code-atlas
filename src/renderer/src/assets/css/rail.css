@@ -81,8 +81,15 @@
    rail 宽 1u、钮 0.75u 居中 ⇒ 钮左缘 = 0.125u;钮顶沿距窗底 0.875u
    (0.125u 底距 + 0.75u 钮高),卡底再让一条 ~0.15u 的缝。
    Esc/点外/滚轮收起。
-   两列版式:左槽 0.8125rem 起放图标(点/✓/✕/转圈),文字列 1.8125rem 统一左缘;
-   信息区一整块不切割,底栏一根 hairline 隔开 —— 全卡只有一条线 */
+   版式(2026-10-18 小葵定):左缘一条线 0.8125rem —— 标题 / 身份行 / 底栏文字链同线;
+   右缘认「字缘」不认框线(光学校准 optical alignment):三排文字墨迹的右缘对齐同一条竖线,
+   框的内衬各算各的。锚点 = 卡片内缘 − 0.9375rem(底栏右留 0.5rem + 按钮右内衬 0.375rem + 1px 框):
+   · 头部(纯文字,零内衬)右侧留 0.9375rem − 1px:状态词再外溢 1px 做视觉补偿 ——
+     上下两排的药丸/按钮轮廓向外扩,纯文字贴同一条线会显偏左(2026-10-18 小葵定,试过对比)
+   · 身份行(药丸右衬 0.375rem)右侧留 0.5625rem
+   · 底栏(描边钮)右侧留 0.5rem
+   状态圆点随标题尾走(名字后面);反馈行文字贴左缘、结论图标随文尾。
+   信息区一整块不切割,底栏一根 hairline 隔开 —— 全卡只有一条左线 + 一条字缘线 */
 .ai-status-pop {
   position: fixed;
   left: calc(var(--u) * 0.125);
@@ -103,7 +110,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.625rem 0.8125rem 0.375rem;
+  /* 右侧 = 字缘锚点 − 1px:状态词是纯文字,贴着药丸/按钮的外扩轮廓会显偏左,
+     补 1px 光学校准(2026-10-18 小葵定) */
+  padding: 0.625rem calc(0.9375rem - 1px) 0.375rem 0.8125rem;
 }
 
 /* 圆点只做四色助理:绿=可用(已验证)/绿闪烁=进行中(热身、忙)/红=异常/灰=未启用;
@@ -163,12 +172,13 @@
   color: var(--danger);
 }
 
-/* 身份行进文字列:与标题同一条左缘;单行打住,模型名超长先省略 */
+/* 身份行:与标题、底栏同一条左缘;右侧 0.5625rem —— 扣掉药丸右衬 0.375rem 后,
+   药丸里的字右缘落在全卡字缘线上 */
 .ai-pop-meta {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 0 0.8125rem 0.5rem 1.8125rem;
+  padding: 0 0.5625rem 0.5rem 0.8125rem;
   color: var(--muted-2);
   font-size: var(--font-xs);
   white-space: nowrap;
@@ -182,19 +192,24 @@
   color: var(--muted);
 }
 
-/* 能力小标签(视觉能力锤):「视觉」/「纯文本」一小粒,药丸描边不抢戏 */
+/* 能力小标签(视觉能力锤,2026-10-18 小葵定):浅中性面层底、不描边 ——
+   描边是"可点击"的语汇,留给底下的真按钮;非交互标签用低强调填充(对齐 Material
+   badge / HIG badge 的做法:badge 是信息性的,用 tonal 底不画框)。
+   钉右端:药丸里的字右缘落在全卡字缘线上(见浮层头注释里的光学校准账) */
 .ai-pop-cap {
   flex: none;
+  margin-left: auto;
   padding: 0.0625rem 0.375rem;
-  border: 1px solid var(--line);
+  border: 0;
+  background: var(--accent-soft);
   border-radius: var(--radius-pill);
   color: var(--muted);
   font-size: var(--font-xxs);
   line-height: var(--lh-130);
 }
 
-/* 反馈槽:测试结果与引擎消息共用;图标站左槽、文字站文字列;
-   图标担色(✓绿/✕红),文字保持墨色——结论在头部红过一次,这里只说原因;
+/* 反馈槽:测试结果与引擎消息共用;文字贴全卡左缘(文字必须对齐,图标让位),
+   结论图标(✓绿/✕红/转圈)改随文字尾巴走;文字保持墨色——结论在头部红过一次,这里只说原因;
    状态行一律单行省略,全文交给 tooltip */
 .ai-pop-probe {
   display: flex;
@@ -259,7 +274,9 @@
 
 /* 底栏:左边带路的文字链(日志钉最左),右边干活的描边钮 ——
    与未配置卡同一套规矩:导航永居左、动作永居右。
-   左缘 0.8125rem 与正文文字列对齐;右缘与上下同为 0.5rem,描边钮离右边/底边等距 */
+   左侧 0.8125rem 对齐全卡左缘;右侧 0.5rem(2026-10-18 小葵定:整排更贴右缘),
+   钮的字缘(内衬 0.375rem + 1px 框)落在全卡字缘线上,与状态词、视觉药丸同一竖线
+   (光学校准:对齐字,不对齐框);描边钮底边仍 0.5rem,离底边等距的老规矩只管上下 */
 .ai-pop-actions {
   display: flex;
   align-items: center;
@@ -268,6 +285,8 @@
   border-top: 1px solid var(--line-soft);
 }
 
+/* 干活的描边钮:横向内衬 0.375rem(2026-10-18 小葵定,线框贴字更紧,与视觉药丸同一档);
+   纵向 0.1875rem 不动,保住可点击高度 */
 .ai-pop-act {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -275,7 +294,7 @@
   color: var(--text-strong);
   font-size: var(--font-xs);
   font-family: inherit;
-  padding: 0.1875rem 0.625rem;
+  padding: 0.1875rem 0.375rem;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -286,11 +305,11 @@
   color: var(--muted-2);
   cursor: default;
 }
-/* 未配置卡的唯一主张:文字加粗表达权重,不用实心;压右端。
+/* 未配置卡的「设置 AI」:只是压右端的普通描边钮 —— 字重/字号与卸下/换模型等
+   同类按钮统一,不加粗(2026-10-18 小葵定);
    描边沿用 .ai-pop-act 的「平时浅线、悬停加深」,不另设深色线 */
 .ai-pop-act.is-call {
   margin-left: auto;
-  font-weight: var(--font-w-semi);
 }
 
 /* 带路的文字链:注意力权重最低 —— 用最浅灰,悬停才加深;
@@ -300,11 +319,12 @@
   gap: 0.625rem;
 }
 
-/* 干活的描边钮组:压右端;无动作时整组不出现,左边只留导航链 */
+/* 干活的描边钮组:压右端;无动作时整组不出现,左边只留导航链。
+   钮距 0.375rem(2026-10-18 小葵定:两钮挨得更紧) */
 .ai-pop-acts {
   margin-left: auto;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.375rem;
 }
 .ai-pop-nav {
   border: 0;
