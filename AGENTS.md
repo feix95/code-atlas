@@ -27,6 +27,7 @@
 2. 启动前执行 `Remove-Item env:ELECTRON_RUN_AS_NODE`。原因: Devin 注入该变量会使 electron 按纯 node 运行(`electron.app` 为 undefined)。
 3. 确认 5173 端口已释放再启动; 启动后验证 vite 监听端口确为 5173。
 4. 小葵自行运行 dev 时禁止重复启动; 改动完成后主动重启 dev 实例。
+5. 宿主(OpenCode/Devin)服务重启会回收它的后台 shell, 后台跑 dev 活不过重启: 需要跨重启存活时, 在 PowerShell 里先 `Remove-Item env:ELECTRON_RUN_AS_NODE`, 再用 `Start-Process npm.cmd -ArgumentList 'run','dev','--','--remoteDebuggingPort=9222' -WorkingDirectory <worktree> -WindowStyle Hidden -RedirectStandardOutput <日志> -RedirectStandardError <错误日志>` 分离启动。禁止用 cmd 的 `set VAR= &&` 写法: 空格会被吃进变量值, ELECTRON_RUN_AS_NODE 又变成"有值", Electron 按纯 node 跑, `electron.app` 为 undefined(今晚实测崩于此)。
 
 ## 文档索引
 
