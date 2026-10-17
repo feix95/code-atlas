@@ -688,11 +688,9 @@ function App(): React.JSX.Element {
     fileLinks,
     addPreviewRef,
     removePreviewRef,
-    handleDropNode,
     handleDropRef
   } = usePreviewRefs({
     result,
-    folder,
     notes,
     chat,
     chatRef,
@@ -782,7 +780,6 @@ function App(): React.JSX.Element {
         openPreview={openPreview}
         addPreviewRef={addPreviewRef}
         removePreviewRef={removePreviewRef}
-        handleDropNode={handleDropNode}
         handleDropRef={handleDropRef}
         onRenameFile={handleRenameFile}
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}

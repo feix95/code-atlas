@@ -22,6 +22,8 @@ export const TAG = {
   contextAttachment: { open: '<context_attachment>', close: '</context_attachment>' },
   /** 用户从代码预览选中要探针讲解的代码段 */
   codeRefs: { open: '<code_refs>', close: '</code_refs>' },
+  /** 用户拖/选进来的文件原文(对齐 Claude Code 的 @文件) */
+  attachedFiles: { open: '<attached_files>', close: '</attached_files>' },
   /** 功能定位的项目地图 */
   projectMap: { open: '<project_map>', close: '</project_map>' },
   /** 文件夹讲解的清单证据 */

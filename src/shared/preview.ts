@@ -4,8 +4,6 @@
 // 「座位表排全文」,病根除了,闸一起退役;只剩一道谢客线挡几百 MB 的日志怪。
 // 二进制 / 超大文件在 IPC 层就被挡住,走不到这儿。
 
-import { CODE_REF_CHARS_MAX } from './aiDefaults.ts'
-
 /** 超过这个体积的文本文件不预览:纯文本揣内存里不重,但几百 MB 的日志怪别请进门 */
 export const PREVIEW_MAX_BYTES = 10 * 1024 * 1024
 
@@ -71,50 +69,4 @@ export function looksBinary(head: Uint8Array): boolean {
     if (byte === 0) return true
   }
   return false
-}
-
-/** 整份代码挂去对话的那笔账 + 钮上怎么说(第一百一十四锤补2) */
-export interface WholeFileRefPlan {
-  /** 额度没满,点得动 */
-  canAdd: boolean
-  /** 真正挂到输入框上的正文 */
-  code: string
-  startLine: number
-  endLine: number
-  /** 钮上写什么 */
-  label: string
-  /** 悬停说明:老实交代带什么、不带什么 */
-  title: string
-}
-
-/**
- * 把「眼前这份代码」算成一条引用(纯函数,自测覆盖)。
- * 一轮的引用额度是三边共读的同一个数(单段 2000 字),整份超了只带开头 ——
- * 裁法跟主进程 sanitizeCodeRefs 一致(截断后留省略号),所以送出去的和界面上说的是同一件事。
- * 行号报的是「真正带上了第 1-N 行」,不是文件的最后一行 —— 引用卡上的行号不许撒谎。
- * 全文预览后文件本身总是齐的,带不完整份只剩「额度不够」这一个来由。
- */
-export function planWholeFileRef(input: {
-  text: string
-  refLimit: number
-  canAddRef: boolean
-  charCap?: number
-}): WholeFileRefPlan {
-  const cap = input.charCap ?? CODE_REF_CHARS_MAX
-  const byCap = input.text.length > cap
-  const kept = byCap ? input.text.slice(0, cap) : input.text
-  // 恰好切在换行符上时,别把没带上的下一行也算进来
-  const tail = kept.endsWith('\n') ? kept.slice(0, -1) : kept
-  return {
-    canAdd: input.canAddRef,
-    code: byCap ? `${kept}……` : kept,
-    startLine: 1,
-    endLine: tail.split('\n').length,
-    label: !input.canAddRef ? '引用已满' : byCap ? '引用开头一段' : '引用全文',
-    title: !input.canAddRef
-      ? `一轮最多引用 ${input.refLimit} 段,想换新的先删掉一段`
-      : byCap
-        ? `这份代码比一轮的引用额度大,只带开头 ${cap} 字`
-        : '把这份代码整个引用到右栏对话框,接着就能问小探针'
-  }
 }

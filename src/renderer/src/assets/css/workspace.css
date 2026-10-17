@@ -746,6 +746,26 @@
   font-size: var(--font-xxs);
 }
 
+/* 用户气泡里的文件痕(文件附件锤):他带过什么文件,回看时对得上 */
+.msg-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.msg-file {
+  max-width: 16rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+  font-size: var(--font-xxs);
+}
+
 /* 用户气泡里的图片痕(第一百五十二锤):他发过什么图,缩略图排一排回看时对得上 */
 .msg-imgs {
   display: flex;

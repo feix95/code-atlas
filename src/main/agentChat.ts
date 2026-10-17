@@ -14,6 +14,7 @@ import {
 import { type IpcMainInvokeEvent } from 'electron'
 import {
   AGENT_MAX_ROUNDS,
+  AGENT_READ_LIMIT_MAX,
   AGENT_REMINDER_MIN_TOOL_CALLS,
   AGENT_REMINDER_PREFIX,
   AGENT_WEB_ADDENDUM,
@@ -63,6 +64,13 @@ import type {
  * 不再拿石头砸自己的脚。
  */
 const noToolEngines = new Set<string>()
+
+/** 翻页行数参数收编(宽松):数字/数字字符串都认,不合法就回保底 */
+function asLineCount(v: unknown, fallback: number): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.max(1, Math.trunc(v))
+  if (typeof v === 'string' && /^\d+$/.test(v.trim())) return Math.max(1, Number(v.trim()))
+  return fallback
+}
 
 /**
  * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
@@ -402,6 +410,12 @@ export async function runAgentChat(input: {
         callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string'
           ? call.args.keyword.trim().slice(0, 200)
           : ''
+      // read_file 的翻页参数(对齐 Claude Code 的 Read):1 起行号 + 行数,宽松收编
+      const readOffset = callName === TOOL_NAMES.readFile ? asLineCount(call.args?.offset, 1) : 1
+      const readLimit =
+        callName === TOOL_NAMES.readFile
+          ? asLineCount(call.args?.limit, AGENT_READ_LIMIT_MAX)
+          : AGENT_READ_LIMIT_MAX
       const rawQuery = call.args?.query
       const requestedPath =
         callName === TOOL_NAMES.requestDirectoryAccess
@@ -455,14 +469,18 @@ export async function runAgentChat(input: {
       }
       // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
       const rootKey = selectedRoot?.rootId ?? ''
+      // 防打转键:search 带上关键词、read_file 带上 offset(翻页读同一文件的下一段不是重复翻)、
+      // web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
       const key =
         callName === TOOL_NAMES.searchContent
           ? toolCallKey(callName, `${rootKey}:${relPath}#${keyword}`)
-          : callName === TOOL_NAMES.webSearch
-            ? toolCallKey(callName, query ?? '')
-            : callName === TOOL_NAMES.requestDirectoryAccess
-              ? toolCallKey(callName, requestedPath ?? '')
-              : toolCallKey(callName, `${rootKey}:${relPath}`)
+          : callName === TOOL_NAMES.readFile
+            ? toolCallKey(callName, `${rootKey}:${relPath}#${readOffset}`)
+            : callName === TOOL_NAMES.webSearch
+              ? toolCallKey(callName, query ?? '')
+              : callName === TOOL_NAMES.requestDirectoryAccess
+                ? toolCallKey(callName, requestedPath ?? '')
+                : toolCallKey(callName, `${rootKey}:${relPath}`)
       const stepTarget =
         callName === TOOL_NAMES.searchContent
           ? keyword
@@ -504,7 +522,11 @@ export async function runAgentChat(input: {
               ? await agentSearchContent((selectedRoot as { path: string }).path, relPath, keyword)
               : callName === TOOL_NAMES.webSearch
                 ? await agentWebSearch(query ?? '', input.tavilyKey)
-                : await agentReadFile((selectedRoot as { path: string }).path, relPath, readChars)
+                : await agentReadFile((selectedRoot as { path: string }).path, relPath, {
+                    offset: readOffset,
+                    limit: readLimit,
+                    maxChars: readChars
+                  })
       if (exec.ok && selectedRoot?.external)
         exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
       // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——

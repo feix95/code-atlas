@@ -58,7 +58,6 @@ export function TabBody({
   openPreview,
   addPreviewRef,
   removePreviewRef,
-  handleDropNode,
   handleDropRef,
   settingsWorkspaceName,
   settingsSectionReq,
@@ -96,7 +95,6 @@ export function TabBody({
   openPreview: (relPath: string) => void
   addPreviewRef: (ref: ChatCodeRef) => void
   removePreviewRef: (index: number) => void
-  handleDropNode: (kind: 'file' | 'folder', relPath: string) => Promise<void>
   /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
   handleDropRef: (ref: ChatCodeRef) => void
   // 设置页签的口粮(app 级,不吃工作区):rail 齿轮/AI 状态浮层都能开,没开项目也能用
@@ -232,7 +230,6 @@ export function TabBody({
           chat={chat}
           refs={previewRefs}
           onRemoveRef={removePreviewRef}
-          onDropNode={handleDropNode}
           onDropRef={handleDropRef}
           rootPath={result.rootPath}
           fileLinks={fileLinks}

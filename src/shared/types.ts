@@ -3,6 +3,7 @@
 import type { PersonalizationConfig } from './personalization.ts'
 import type { CloudVendorId } from './cloudVendors.ts'
 import type { ChatImage } from './chatImage.ts'
+import type { ChatFileAttachment } from './chatFiles.ts'
 import type { ModelLaunchSettings } from './launchSettings.ts'
 import type { EngineBackendChoice } from './engineCatalog.ts'
 
@@ -493,6 +494,12 @@ export interface AiChatRequest {
   /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一锤);没有就是 undefined */
   codeRefs?: ChatCodeRef[]
   /**
+   * 用户拖/选进来的文件(文件附件锤,对齐 Claude Code 的 @文件):正文随这轮消息
+   * 进上下文,主进程会洗白 + 按预算按行截断(行账明写在提示词里)。最多 CHAT_FILES_MAX
+   * 个;没有就是 undefined。图片走 images 那条链,不进这里。
+   */
+  files?: ChatFileAttachment[]
+  /**
    * 这轮带的图片(第一百五十二锤):JPG/PNG 的 data URL,主进程会洗白+按预算缩图,
    * 纯文本模型直接拒收。最多 CHAT_IMAGES_MAX 张;没有就是 undefined。
    */
@@ -576,6 +583,8 @@ export interface ChatMessage {
   web: WebLookupMeta | null
   /** 发这条消息时带的引用代码(第一百一十一锤):重试要原样带上,不然重答的题就换了 */
   refs?: ChatCodeRef[]
+  /** 发这条消息时带的文件附件(文件附件锤):重试要原样带上;只在内存,不落盘不进日志 */
+  files?: ChatFileAttachment[]
   /** 发这条消息时带的图片(第一百五十二锤):留着画缩略图,重试要原样带上;只在内存,不落盘不进日志 */
   images?: ChatImage[]
 }

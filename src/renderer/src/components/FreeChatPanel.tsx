@@ -17,15 +17,18 @@ import { REF_ONLY_QUESTION, type AiChatApi, type ChatMessage } from '../useAiCha
 import type { ChatImage } from '@shared/chatImage'
 import { useModelVision } from '../useModelVision'
 import { useChatImages } from '../useChatImages'
+import { partitionAttachFiles, useChatFiles } from '../useChatFiles'
 import { AiSetupContext } from '../aiSetupContext'
 import { INLINE_ICON_SIZE } from '../inputMetrics'
+import { fileAttachRangeLabel } from '@shared/chatFiles'
+import type { ChatFileAttachment } from '@shared/chatFiles'
 
 /**
  * 自由对话面板(对话页改版定稿):开放式聊天,问题不限于当前文件,页签叫「自由对话」。
  * 顶行薄条:右「新对话」小幽灵钮(参考资料 chip 已摘——资料跟着选中项走,树里看得见,
  * 不再单独立牌;附件照旧随每轮请求喂给模型,只是不再报幕)。
  * 空场 = 衬线问候 + 居中胶囊舱 + 建议 chips;聊开了舱沉底栏,回答不装框不带头像。
- * 输入舱 = 一行胶囊:「+」能力菜单(思考/翻文件/联网拨钮)| 内嵌引用原子+文字 | 发送/停一停圆钮。
+ * 输入舱 = 一行胶囊:「+」能力菜单(添加附件/思考/翻文件/联网)| 内嵌文件/引用原子+文字 | 发送/停一停圆钮。
  * 思考行 = 脑图标 + 流光「正在思考」+弹跳点,想完收成「想了 Xs ▸」可点开看过程。
  * 本轮动过联网就在消息下方挂程序记账的状态标签。
  * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
@@ -64,7 +67,6 @@ export function FreeChatPanel({
   refs,
   onRemoveRef,
   suggestions,
-  onDropNode,
   onDropRef,
   rootPath,
   fileLinks,
@@ -76,9 +78,7 @@ export function FreeChatPanel({
   onRemoveRef?: (index: number) => void
   /** 随对话演进的推荐问题(第一百一十二锤):传了就一直挂着,不传就退回开场示例 */
   suggestions?: string[]
-  /** 拖文件进聊天挂引用(第一百二十五锤):传了才接拖拽;文件夹/读不了的由 App 端垫灰字指路 */
-  onDropNode?: (kind: 'file' | 'folder', relPath: string) => void
-  /** 拖来的图片读盘用(拖拽分流):不传时图片退回挂引用老路垫灰字 */
+  /** 拖来的文件读盘走 rootPath(文件附件锤):树里拖文件当附件读原文,拖图片进待发图 */
   rootPath?: string
   /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
   onDropRef?: (ref: ChatCodeRef) => void
@@ -92,6 +92,7 @@ export function FreeChatPanel({
   // 图片附件(第一百五十二锤):能力账订阅 + 待发图片账本;拒收/清账的灰字走 chat.note
   const vision = useModelVision()
   const chatImages = useChatImages(vision, chat.note)
+  const chatFiles = useChatFiles(chat.note)
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
   // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
@@ -136,18 +137,23 @@ export function FreeChatPanel({
     retryCtxRef.current = {
       messages: chat.messages,
       forceBottom,
-      send: (text: string, sendRefs?: ChatCodeRef[], sendImages?: ChatImage[]) => {
+      send: (
+        text: string,
+        sendRefs?: ChatCodeRef[],
+        sendImages?: ChatImage[],
+        sendFiles?: ChatFileAttachment[]
+      ) => {
         if (setup && setup.configured !== true) {
           if (setup.configured === false) setup.openSettings()
           return
         }
-        chat.send(text, sendRefs, sendImages)
+        chat.send(text, sendRefs, sendImages, sendFiles)
       }
     }
   })
   const retryFrom = useCallback((idx: number): void => {
     const { messages, send, forceBottom: fb } = retryCtxRef.current
-    // 重答的应该是最新这个问题:从这条回答往前找最近的用户提问,引用和图片都原样带上再问一遍
+    // 重答的应该是最新这个问题:从这条回答往前找最近的用户提问
     let prev: ChatMessage | undefined
     for (let i = idx - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
@@ -157,7 +163,13 @@ export function FreeChatPanel({
     }
     if (!prev) return
     fb()
-    send(prev.text || (prev.images?.length ? '' : REF_ONLY_QUESTION), prev.refs, prev.images)
+    // 重答的应该是最新这个问题:引用/图片/文件都原样带上再问一遍
+    send(
+      prev.text || (prev.images?.length || prev.files?.length ? '' : REF_ONLY_QUESTION),
+      prev.refs,
+      prev.images,
+      prev.files
+    )
   }, [])
 
   // 重试只挂在最后一条回答上,历史回答不翻烧饼。这份账一轮渲染算一次 —— 原先写在
@@ -191,7 +203,7 @@ export function FreeChatPanel({
     else setNewBeat((c) => c + 1)
   }, [chat.messages])
 
-  /** 示例问题点了直接发,跟输入框发送走同一条流程;小探针忙着回上一题就不接 */
+  /** 示例问题点了直接发,跟输入框发送走同一条流程;常驻的引用/文件跟着一起带;小探针忙着回上一题就不接 */
   function sendExample(q: string): void {
     if (chat.busy) return
     if (setup && setup.configured !== true) {
@@ -199,7 +211,7 @@ export function FreeChatPanel({
       return
     }
     forceBottom()
-    chat.send(q, draftRefs)
+    chat.send(q, draftRefs, undefined, chatFiles.files)
   }
 
   /** 推荐问题 chips:空场吃开场示例,预览模式吃随对话演进的推荐;总闸关了谁都不出 */
@@ -217,6 +229,7 @@ export function FreeChatPanel({
       refs={draftRefs}
       onRemoveRef={onRemoveRef}
       chatImages={chatImages}
+      chatFiles={chatFiles}
       onWillSend={forceBottom}
     />
   )
@@ -226,9 +239,9 @@ export function FreeChatPanel({
       className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
       onDragOver={(e) => {
         const types = e.dataTransfer.types
-        // 三种货都接:内里的引用/文件节点照旧,系统拖来的文件(Files)是图片附件的路
+        // 三种货都接:内里的引用/文件节点照旧,系统拖来的文件(Files)是附件那条路
         const accept =
-          (onDropNode !== undefined && types.includes(DRAG_MIME_NODE)) ||
+          (rootPath !== undefined && types.includes(DRAG_MIME_NODE)) ||
           (onDropRef !== undefined && types.includes(DRAG_MIME_REF)) ||
           types.includes('Files')
         if (!accept) return
@@ -255,29 +268,32 @@ export function FreeChatPanel({
           return
         }
         const raw = e.dataTransfer.getData(DRAG_MIME_NODE)
-        if (raw && onDropNode) {
+        if (raw && rootPath !== undefined) {
           e.preventDefault()
           try {
             const node = JSON.parse(raw) as DragNodePayload
-            if (node.relPath) {
-              const name = node.relPath.split('/').pop() ?? node.relPath
-              // 文件树拖来的图片走图片附件正门(拖拽分流):读盘 → 待发账,不再当文本挂引用
-              if (rootPath && node.kind === 'file' && isImageFile(name)) {
-                void chatImages.addFromRelPath(rootPath, node.relPath)
-              } else {
-                onDropNode(node.kind, node.relPath)
-              }
+            if (node.kind === 'folder') {
+              chat.note('文件夹带不进来——点开它,把里面的文件拖进来就行')
+              return
             }
+            if (!node.relPath) return
+            const name = node.relPath.split('/').pop() ?? node.relPath
+            // 拖拽分流(文件附件锤,对齐 Claude Code 的 @文件):图片走图片链;
+            // 其余文本文件当文件附件读原文(读不了的由账本自己垫灰字)
+            if (isImageFile(name)) void chatImages.addFromRelPath(rootPath, node.relPath)
+            else void chatFiles.addFromRelPath(rootPath, node.relPath)
           } catch {
             // 不是咱家的货,不接
           }
           return
         }
-        // 系统拖来的文件:图片收编进待发账(校验/拒收话术全在 addFiles 一把尺里)
-        const files = Array.from(e.dataTransfer.files ?? [])
-        if (files.length > 0) {
+        // 系统拖来的文件:按类分流 —— 图片进待发图,其余当文件附件读原文(两把尺各自收编)
+        const dropped = Array.from(e.dataTransfer.files ?? [])
+        if (dropped.length > 0) {
           e.preventDefault()
-          void chatImages.addFiles(files)
+          const parts = partitionAttachFiles(dropped)
+          if (parts.images.length > 0) void chatImages.addFiles(parts.images)
+          if (parts.files.length > 0) void chatFiles.addFiles(parts.files)
         }
       }}
     >
@@ -353,6 +369,20 @@ export function FreeChatPanel({
                   return (
                     <div key={m.key} className="message user">
                       {m.text}
+                      {/* 这轮带的文件:文件名跟在自己话后面,回看时知道当时给模型读了什么 */}
+                      {m.files && m.files.length > 0 && (
+                        <div className="msg-files">
+                          {m.files.map((f) => (
+                            <span
+                              key={f.id}
+                              className="msg-file mono"
+                              data-tip={`${f.relPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
+                            >
+                              {f.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {/* 这轮带的图片:缩略图跟在自己话后面,回看时知道当时给模型看了什么 */}
                       {m.images && m.images.length > 0 && (
                         <div className="msg-imgs">
@@ -442,7 +472,7 @@ export function FreeChatPanel({
         {chat.messages.length > 0 && composerEl}
         <p className="fc-tip">
           回车发送 · Shift+回车换行
-          {onDropNode || onDropRef ? ' · 拖文件或选中的代码进来挂引用,图片直接进待发区' : ''}
+          {onDropRef || rootPath ? ' · 拖文件进来读原文,选中的代码挂引用,图片进待发区' : ''}
         </p>
       </div>
     </div>
