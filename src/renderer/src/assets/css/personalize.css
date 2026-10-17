@@ -25,17 +25,6 @@
   border-color: var(--chrome-muted);
 }
 
-/* 整行竖排(自定义指令):控件占满宽度,不跟文案抢行 */
-.cfg-row-stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.625rem;
-}
-
-.cfg-row-stack .cfg-copy p {
-  max-width: none;
-}
-
 .cfg-textarea {
   width: 100%;
   min-height: 5.25rem;
@@ -293,24 +282,6 @@
 
 .cfg-switch.is-on span {
   transform: translateX(1.125rem);
-}
-
-/* 隐私条(Obsidian 式:不染色,卡内纯文字行 + 文字链开详情) */
-.cfg-privacy {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.625rem 0.125rem;
-  color: var(--chrome-muted);
-  border-top: 1px solid var(--line);
-  font-size: var(--font-sm);
-}
-
-.cfg-privacy-more {
-  padding: 0 0.125rem 0.75rem;
-  color: var(--chrome-muted);
-  font-size: var(--font-sm);
-  line-height: var(--lh-160);
 }
 
 /* 在线 API 首次启用的隐私确认:卡内描边块,说明三条 + 右下两钮 */

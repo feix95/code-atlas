@@ -28,7 +28,7 @@
   align-items: center;
   gap: 0.5rem 1rem;
   padding: 0.625rem 1rem;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line);
   font-size: var(--font-sm);
   color: var(--chrome-muted);
 }
@@ -64,7 +64,7 @@
   padding: 0;
 }
 .shelf-item + .shelf-item {
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid var(--line);
 }
 /* 滚动窗口(2026-09-18 小葵定):货架再长也不超一屏 —— 列表(含「加载更多」)在窗里滚。
    滚动区住在内框里,圆角裁切由内框管;padding-right 给滚动条左侧留一点空,
@@ -242,7 +242,7 @@
 }
 .shelf-files-pad {
   padding: var(--space-1) var(--space-4) var(--space-2);
-  border-top: 1px dashed var(--line-soft);
+  border-top: 1px dashed var(--line);
 }
 @media (prefers-reduced-motion: reduce) {
   .shelf-files {
@@ -257,7 +257,7 @@
   gap: var(--space-1) var(--space-4);
   margin: 0 0 var(--space-2);
   padding: var(--space-1) 0 var(--space-2);
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line);
 }
 .shelf-profile-item {
   display: flex;

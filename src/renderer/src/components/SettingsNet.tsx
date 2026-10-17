@@ -1,19 +1,14 @@
 import type { AiConfig } from '@shared/types'
-import { TreeIcon } from './Icons'
-import { CfgRow } from './CfgRow'
+import { CfgQ, CfgRow } from './CfgRow'
 import { TavilyKeyField } from './TavilyKeyField.tsx'
 
-/** 「联网与隐私」页:联网搜索开关 / Tavily Key / 数据范围渐进披露(纯展示,状态在 SettingsPage) */
+/** 「联网与隐私」页:联网搜索开关 / Tavily Key;数据范围说明收进标题旁的悬停(渐进披露) */
 export function SettingsNet({
   config,
-  onConfigChange,
-  privacyOpen,
-  setPrivacyOpen
+  onConfigChange
 }: {
   config: AiConfig | null
   onConfigChange: (next: AiConfig) => void
-  privacyOpen: boolean
-  setPrivacyOpen: React.Dispatch<React.SetStateAction<boolean>>
 }): React.JSX.Element {
   return (
     <div className="cfg-pane">
@@ -24,7 +19,19 @@ export function SettingsNet({
           </CfgRow>
         ) : (
           <>
-            <CfgRow label="联网搜索" hint="查询公开资料修正回答；仅发送搜索词。">
+            <CfgRow
+              label={
+                <>
+                  联网搜索
+                  <CfgQ
+                    tip={
+                      '仅发送检索词；关闭后完全离线。\n查询链：Tavily → DuckDuckGo → 中文维基百科 → 英文维基百科；单次 5 秒超时，未命中回退本地推测。'
+                    }
+                  />
+                </>
+              }
+              hint="查询公开资料修正回答；仅发送搜索词。"
+            >
               <button
                 type="button"
                 role="switch"
@@ -43,24 +50,6 @@ export function SettingsNet({
               value={config.tavilyKey ?? ''}
               onChange={(v) => onConfigChange({ ...config, tavilyKey: v })}
             />
-            {/* 隐私条(Obsidian 式):不染色纯文字行,「数据范围」文字链开查询链详情 */}
-            <div className="cfg-privacy">
-              <TreeIcon name="shield" size={12} mono />
-              仅发送检索词；关闭后完全离线。
-              <button
-                type="button"
-                className="cfg-linklike"
-                onClick={() => setPrivacyOpen(!privacyOpen)}
-              >
-                {privacyOpen ? '收起' : '数据范围'}
-              </button>
-            </div>
-            {privacyOpen && (
-              <div className="cfg-privacy-more">
-                查询链：Tavily → DuckDuckGo → 中文维基百科 → 英文维基百科；单次 5
-                秒超时，未命中回退本地推测。
-              </div>
-            )}
           </>
         )}
       </div>

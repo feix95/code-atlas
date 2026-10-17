@@ -7,24 +7,43 @@ import {
 } from '@shared/launchSettings'
 import { formatGB } from '@shared/contextBill'
 import type { AiConfig } from '@shared/types'
-import { CfgQ, CfgRow } from './CfgRow'
+import { CfgRow } from './CfgRow'
 import { LaunchAdvancedPanel } from './LaunchAdvancedPanel.tsx'
 
-/** 机器行:RTX 5060 Ti · 显存 16 GB · 空闲 15 GB · 内存 32 GB */
-function machineLine(m: MachineProfile): string {
-  const gpu = m.gpuName
-    ? `${m.gpuName} · 显存 ${formatGB(m.vramBytes ?? 0)}${m.vramFreeBytes != null ? ` · 空闲 ${formatGB(m.vramFreeBytes)}` : ''}`
-    : '没认出显卡'
-  return `${gpu} · 内存 ${formatGB(m.ramBytes)}`
+/** 事实行两段料:领词(名称)+ 规格串 —— 排版层级由样式层定,这里只拆料 */
+interface FactParts {
+  lead: string
+  meta: string
 }
 
-/** 模型行:模型名 · 13.4 GB · MoE · 带视觉文件 */
-function modelLine(info: LaunchPlanInfo): string {
-  const parts: string[] = []
-  if (info.modelBytes != null) parts.push(formatGB(info.modelBytes))
-  if (info.isMoe) parts.push('MoE')
-  parts.push(info.mmprojFile ? '带视觉文件' : '无视觉文件')
-  return `${info.modelName ?? '未知模型'} · ${parts.join(' · ')}`
+/** 机器家底:显卡名 + 显存/空闲/内存规格 */
+function machineFact(m: MachineProfile): FactParts {
+  const specs: string[] = []
+  if (m.gpuName) {
+    specs.push(`显存 ${formatGB(m.vramBytes ?? 0)}`)
+    if (m.vramFreeBytes != null) specs.push(`空闲 ${formatGB(m.vramFreeBytes)}`)
+  }
+  specs.push(`内存 ${formatGB(m.ramBytes)}`)
+  return { lead: m.gpuName ?? '没认出显卡', meta: specs.join(' · ') }
+}
+
+/** 模型户口:模型名 + 体积/MoE/视觉文件规格 */
+function modelFact(info: LaunchPlanInfo): FactParts {
+  const specs: string[] = []
+  if (info.modelBytes != null) specs.push(formatGB(info.modelBytes))
+  if (info.isMoe) specs.push('MoE')
+  specs.push(info.mmprojFile ? '带视觉文件' : '无视觉文件')
+  return { lead: info.modelName ?? '未知模型', meta: specs.join(' · ') }
+}
+
+/** 事实行:名称墨色半粗领读,规格灰字小一号跟随 —— 层级纯靠字色字号,不加框线 */
+function factLine(parts: FactParts): React.JSX.Element {
+  return (
+    <p className="lp-line">
+      <span className="lp-lead">{parts.lead}</span>
+      <span className="lp-meta"> · {parts.meta}</span>
+    </p>
+  )
 }
 
 const VERDICT_LABEL: Record<string, string> = {
@@ -47,8 +66,8 @@ function withLaunch(config: AiConfig, modelPath: string, s: ModelLaunchSettings)
 }
 
 /**
- * 「本机运行方案」(智能启动锤):把启动方案摊给用户看 —— 机器家底、
- * 模型户口、装得下结论、每条妥协理由;底下「高级设置」面板可逐项手动指定。
+ * 「本机运行方案」(智能启动锤):折叠行 —— 行面只留一句说明与结论戳(装得下/有点挤/装不下);
+ * 机器家底、模型户口、每条妥协理由收在展开体里。底下「高级设置」是同款折叠行,可逐项手动指定。
  * modelPath/上下文档位/草稿一变就重新问主进程要预览;取数期间照旧显示旧方案不闪 loading。
  */
 export function LaunchPlanCard({
@@ -115,57 +134,58 @@ export function LaunchPlanCard({
     if (config) onConfigChange(withLaunch(config, modelPath, s))
   }
 
+  // 状态行文案:折叠行的说明位随状态换一句话,行高全场不变
+  const stateDesc =
+    card.status === 'loading'
+      ? '正在测算运行方案……'
+      : card.status === 'no-model'
+        ? '选择模型文件后，这里会给出运行方案。'
+        : card.status === 'error'
+          ? '运行方案暂时算不出来，不影响实际启动。'
+          : '模型文件读取失败，请确认文件是否存在。'
+
   return (
-    <CfgRow
-      label={
-        <>
-          本机运行方案
-          <CfgQ tip="启动前测算当前模型的运行方案；装不下时自动调低配置。" />
-        </>
-      }
-      stacked
-    >
-      <div>
-        {card.status === 'loading' && <p className="cfg-note lp-note">正在测算运行方案……</p>}
-        {card.status === 'no-model' && (
-          <p className="cfg-note lp-note">选择模型文件后，这里会给出运行方案。</p>
-        )}
-        {card.status === 'error' && (
-          <p className="cfg-note lp-note">运行方案暂时算不出来，不影响实际启动。</p>
-        )}
-        {readyInfo && (
-          <>
-            <p className="lp-line">{machineLine(readyInfo.machine)}</p>
-            <p className="lp-line">{modelLine(readyInfo)}</p>
-            {readyInfo.plan ? (
-              <>
-                <p className={`cfg-note lp-verdict is-${readyInfo.plan.estimate.verdict}`}>
-                  {VERDICT_LABEL[readyInfo.plan.estimate.verdict] ?? '未知'}
-                </p>
-                <ul className="lp-reasons">
-                  {readyInfo.plan.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-                {readyInfo.extraArgs && (
-                  <p className="cfg-note lp-note">专家参数:{readyInfo.extraArgs.join(' ')}</p>
-                )}
-              </>
-            ) : (
-              <p className="cfg-note lp-note">模型文件读取失败，请确认文件是否存在。</p>
+    <>
+      <div className="cfg-divider" />
+      {readyInfo?.plan ? (
+        <details className="cfg-fold">
+          <summary className="cfg-fold-summary">
+            <div className="cfg-copy">
+              <label>本机运行方案</label>
+              <p>启动前测算当前模型的运行方案；装不下时自动调低配置。</p>
+            </div>
+            <span className={`cfg-note lp-verdict is-${readyInfo.plan.estimate.verdict}`}>
+              {VERDICT_LABEL[readyInfo.plan.estimate.verdict] ?? '未知'}
+            </span>
+          </summary>
+          <div className="cfg-fold-body">
+            {factLine(machineFact(readyInfo.machine))}
+            {factLine(modelFact(readyInfo))}
+            <ul className="lp-reasons">
+              {readyInfo.plan.reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+            {readyInfo.extraArgs && (
+              <p className="cfg-note lp-note">专家参数:{readyInfo.extraArgs.join(' ')}</p>
             )}
-          </>
-        )}
-        {/* 高级设置:草稿一改立刻重算预览;改了什么随上层防抖写回存档。
-            没选模型/还没取回已存账时面板禁态摆着,提示在上面的状态行里 */}
-        <LaunchAdvancedPanel
-          draft={draftForPath ?? {}}
-          autoParams={readyInfo?.autoParams ?? null}
-          hasMmproj={!!readyInfo?.mmprojFile}
-          disabled={!config || !modelPath.trim() || !draftForPath}
-          onChange={commitDraft}
-        />
-      </div>
-    </CfgRow>
+          </div>
+        </details>
+      ) : (
+        <CfgRow label="本机运行方案" hint={stateDesc}>
+          <span />
+        </CfgRow>
+      )}
+      <div className="cfg-divider" />
+      {/* 高级设置:草稿一改立刻重算预览;改了什么随上层防抖写回存档。
+          没选模型/还没取回已存账时面板禁态摆着,提示在上面的状态行里 */}
+      <LaunchAdvancedPanel
+        draft={draftForPath ?? {}}
+        autoParams={readyInfo?.autoParams ?? null}
+        hasMmproj={!!readyInfo?.mmprojFile}
+        disabled={!config || !modelPath.trim() || !draftForPath}
+        onChange={commitDraft}
+      />
+    </>
   )
 }

@@ -201,7 +201,7 @@ export function registerModelIpc(): void {
       return {
         level: 'missing',
         title: '文件不存在',
-        detail: '这个路径找不到文件:检查一下盘符和文件名',
+        detail: '检查一下盘符和文件名',
         sizeBytes: null
       }
     }

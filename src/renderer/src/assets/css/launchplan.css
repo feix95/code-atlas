@@ -1,5 +1,5 @@
-/* 「本机运行方案」(智能启动锤):设置页里把启动方案摊成几行小字,结论用账单同款色。
-   内容直接坐在设置行左轴上,不再自带卡框(2026-10-17 拆框:框垫会把内容推离全页左轴)。
+/* 「本机运行方案」(智能启动锤)展开体:机器家底/模型户口两级字阶,理由清单灰字;
+   行面本体是 cfg-fold 折叠行(骨架在 settings.css),结论戳住 summary 右端。
    字号口径对齐设置页:标题 14.5px 半粗(--text)、正文 13px(chrome-ink)、说明 12.5px(chrome-muted) */
 .lp-line {
   margin: 0;
@@ -8,28 +8,41 @@
   line-height: var(--lh-150);
 }
 
-.lp-line + .lp-line {
-  margin-top: 0.375rem;
+/* 事实行两级字阶:名称墨色半粗领读,规格灰字小一号跟随 —— 只用字色字号分层,不加框线 */
+.lp-lead {
+  color: var(--text);
+  font-weight: var(--font-w-semi);
+}
+
+.lp-meta {
+  color: var(--chrome-muted);
+  font-size: 0.78125rem;
+}
+
+/* 事实行与后续小块的呼吸缝:两行事实紧贴成组,注记接理由列表 */
+.lp-line + .lp-line,
+.lp-line + .lp-note,
+.lp-reasons + .lp-note {
+  margin-top: var(--space-2);
 }
 
 .lp-verdict {
   display: inline-block;
-  margin-top: var(--space-2);
+  flex-shrink: 0;
   padding: 0 var(--space-2);
   border-radius: var(--radius-pill);
   border: 1px solid currentColor;
   text-align: left;
 }
 
-/* 面板内辅助说明(方案注记/字段提示):12.5px 灰,与控制件留 6px 缝 */
-.lp-note,
-.lp-hint {
+/* 方案注记(加载中/错误/专家参数):12.5px 灰,左轴对齐 */
+.lp-note {
   font-size: 0.78125rem;
   text-align: left;
 }
 
 .lp-reasons {
-  margin: var(--space-2) 0 0;
+  margin: var(--space-3) 0 0;
   padding-left: var(--space-4);
   color: var(--chrome-muted);
   font-size: 0.78125rem;
@@ -40,28 +53,7 @@
   margin-top: 0.375rem;
 }
 
-/* 高级设置:折叠面板与逐项控件(沿用 settings 系 cfg-* 控件,这里只补布局与徽标) */
-.lp-adv {
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--line-soft);
-  padding-top: var(--space-3);
-}
-
-.lp-adv-summary {
-  cursor: pointer;
-  color: var(--text);
-  font-size: 0.90625rem;
-  font-weight: var(--font-w-semi);
-  line-height: var(--lh-150);
-  user-select: none;
-  outline: none;
-}
-
-.lp-adv-summary:focus-visible {
-  box-shadow: 0 0 0 0.2rem var(--focus-ring);
-  border-radius: var(--radius-sm);
-}
-
+/* 方案细节收进折叠行(cfg-fold):机器家底/模型户口/理由清单都在展开体里 */
 .lp-badge {
   margin-left: var(--space-2);
   padding: 0 var(--space-2);
@@ -71,82 +63,37 @@
   font-size: var(--font-xs);
 }
 
-.lp-adv-body {
-  margin-top: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.lp-field > label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--text);
-  font-size: 0.90625rem;
-  font-weight: var(--font-w-semi);
-}
-
-.lp-field-ctl {
-  margin-top: 0.375rem;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .lp-num {
   width: 6rem;
 }
 
 .lp-extra {
-  width: 100%;
+  width: 14.375rem;
   font-family: var(--mono);
 }
 
-.lp-hint {
-  margin-top: 0.375rem;
-}
-
-/* 面板尾部注记(如「下载失败…」):与上方区块拉开一档,不跟字段提示连排 */
-.lp-tail {
-  margin-top: var(--space-4);
-}
-
 .lp-reset {
-  align-self: flex-start;
+  margin-left: auto;
 }
 
-/* 推理引擎面板(第 4 期):推荐条 / 进度条 / 后端清单(沿用 cfg-* 控件与 tokens) */
-.eng-banner {
-  margin-top: var(--space-3);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--chrome-ink);
-  font-size: 0.78125rem;
-  line-height: var(--lh-150);
-}
-
-.eng-progress {
-  margin-top: var(--space-3);
+/* 推理引擎(第 4 期):行格式与全页一致 —— 状态挂右栏,安装进度就地住在行里 */
+.eng-install {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
 .eng-bar {
-  flex: 1;
   height: 0.6rem;
   border-radius: var(--radius-pill);
   background: var(--chrome-float);
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--line);
   overflow: hidden;
+}
+
+.eng-install .eng-bar {
+  width: 7rem;
+  flex: 0 0 auto;
 }
 
 .eng-bar-fill {
@@ -156,39 +103,16 @@
   transition: width 0.2s var(--ease-smooth, ease);
 }
 
-.eng-list {
-  list-style: none;
-  margin: var(--space-3) 0 var(--space-4);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.eng-item {
-  border-top: 1px solid var(--line-soft);
-  padding-top: var(--space-2);
-}
-
-.eng-item-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.eng-item-head > b {
-  color: var(--text);
-  font-size: 0.90625rem;
-  font-weight: var(--font-w-semi);
-}
-
 .eng-state {
-  margin-left: auto;
-  margin-right: var(--space-2);
   font-size: var(--font-xs);
   color: var(--chrome-muted);
 }
 
 .eng-state.is-in {
   color: var(--green);
+}
+
+/* 推荐安装:功能蓝,与安装进度条同一色系 */
+.eng-state.is-want {
+  color: var(--sash-hi);
 }

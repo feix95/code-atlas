@@ -45,7 +45,7 @@ export function SettingsAppearance({
   return (
     <div className="cfg-pane">
       <div className="cfg-panel">
-        <CfgRow label="外观模式">
+        <CfgRow label="外观模式" hint="跟随系统，或固定为浅色/深色。">
           <select
             className="cfg-select"
             aria-label="外观模式"

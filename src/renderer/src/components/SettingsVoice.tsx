@@ -31,7 +31,7 @@ export function SettingsVoice({
         </CfgRow>
       ) : (
         <>
-          <CfgRow label="语气">
+          <CfgRow label="语气" hint="设置 AI 回复的说话方式。">
             <select
               className="cfg-select"
               aria-label="语气"
@@ -61,24 +61,32 @@ export function SettingsVoice({
             </select>
           </CfgRow>
           <div className="cfg-divider" />
-          <CfgRow stacked label="自定义指令">
-            {/* 字数计数贴输入框右下角(不占行名版面);底下留一块垫,长文写到末行不被计数盖住 */}
-            <div className="cfg-ta-wrap">
-              <textarea
-                className="cfg-textarea"
-                rows={5}
-                maxLength={CUSTOM_MAX}
-                value={personal.custom}
-                spellCheck={false}
-                aria-label="自定义指令"
-                placeholder="例：先给结论，术语用中文。"
-                onChange={(e) => updatePersonal({ custom: e.target.value })}
-              />
-              <span className="cfg-ta-count">
-                {personal.custom.length}/{CUSTOM_MAX}
-              </span>
+          <details className="cfg-fold">
+            <summary className="cfg-fold-summary">
+              <div className="cfg-copy">
+                <label>自定义指令</label>
+                <p>对 AI 的额外要求，每次对话都生效。</p>
+              </div>
+            </summary>
+            <div className="cfg-fold-body">
+              {/* 字数计数贴输入框右下角(不占行名版面);底下留一块垫,长文写到末行不被计数盖住 */}
+              <div className="cfg-ta-wrap">
+                <textarea
+                  className="cfg-textarea"
+                  rows={5}
+                  maxLength={CUSTOM_MAX}
+                  value={personal.custom}
+                  spellCheck={false}
+                  aria-label="自定义指令"
+                  placeholder="例：先给结论，术语用中文。"
+                  onChange={(e) => updatePersonal({ custom: e.target.value })}
+                />
+                <span className="cfg-ta-count">
+                  {personal.custom.length}/{CUSTOM_MAX}
+                </span>
+              </div>
             </div>
-          </CfgRow>
+          </details>
           <div className="cfg-divider" />
           {/* 推荐问题总闸:自由聊天和文件预览 AI 卡两头的推荐问题一把抓;拨一下立刻生效落盘 */}
           <CfgRow label="推荐问题" hint="自动提供相关问题建议。">

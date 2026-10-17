@@ -7,7 +7,7 @@ import {
   parseExtraArgs,
   type ModelLaunchSettings
 } from '@shared/launchSettings'
-import { CfgQ } from './CfgRow'
+import { CfgQ, CfgRow } from './CfgRow'
 
 /** 数手动调整了几项(徽标用):override 每字段算一项,专家命令行非空算一项 */
 function overrideCount(s: ModelLaunchSettings): number {
@@ -51,18 +51,35 @@ export function LaunchAdvancedPanel({
   const [layersText, setLayersText] = useState('')
 
   return (
-    <details className="lp-adv">
-      <summary className="lp-adv-summary">
-        高级设置
-        {count > 0 && <span className="lp-badge">已手动调整 {count} 项</span>}
+    <details className="cfg-fold">
+      <summary className="cfg-fold-summary">
+        <div className="cfg-copy">
+          <label>
+            高级设置
+            {count > 0 && <span className="lp-badge">已手动调整 {count} 项</span>}
+          </label>
+          <p>逐项微调启动参数；默认全自动。</p>
+        </div>
+        <button
+          type="button"
+          className="cfg-btn lp-reset"
+          disabled={disabled || count === 0}
+          onClick={(e) => {
+            e.preventDefault()
+            setLayersText('')
+            onChange({})
+          }}
+        >
+          全部恢复自动
+        </button>
       </summary>
-      <div className="lp-adv-body">
-        <div className="lp-field">
-          <label htmlFor="lp-layers-mode">显卡层数</label>
-          <div className="lp-field-ctl">
+      <div className="cfg-fold-body">
+        <div className="cfg-divider" />
+        <CfgRow label="显卡层数" hint="放到显卡上的模型层数；越多越快，越占显存。">
+          <div className="cfg-ctl">
             <select
-              id="lp-layers-mode"
               className="cfg-select"
+              aria-label="显卡层数"
               disabled={disabled}
               value={layersManual ? 'manual' : 'auto'}
               onChange={(e) => {
@@ -99,65 +116,56 @@ export function LaunchAdvancedPanel({
               />
             )}
           </div>
-          <p className="cfg-note lp-hint">放到显卡上的模型层数；越多越快，越占显存。</p>
-        </div>
-
-        <div className="lp-field">
-          <label htmlFor="lp-kv">缓存格式</label>
-          <div className="lp-field-ctl">
-            <select
-              id="lp-kv"
-              className="cfg-select"
-              disabled={disabled}
-              value={ov.kvCache ?? 'auto'}
-              onChange={(e) => {
-                if (e.target.value === 'auto') {
-                  const next = { ...ov }
-                  delete next.kvCache
-                  onChange({ ...draft, overrides: next })
-                } else setOv({ kvCache: e.target.value as 'f16' | 'q8_0' })
-              }}
-            >
-              <option value="auto">自动，{autoHint(autoParams, 'kvCache', (v) => v)}</option>
-              <option value="f16">f16，精度最好</option>
-              <option value="q8_0">q8_0，省一半显存</option>
-            </select>
-          </div>
-          <p className="cfg-note lp-hint">缓存精度；q8_0 省显存，可能轻微影响输出质量。</p>
-        </div>
-
-        <div className="lp-field">
-          <label htmlFor="lp-fa">Flash Attention</label>
-          <div className="lp-field-ctl">
-            <select
-              id="lp-fa"
-              className="cfg-select"
-              disabled={disabled}
-              value={ov.flashAttn ?? 'auto'}
-              onChange={(e) => {
-                if (e.target.value === 'auto') {
-                  const next = { ...ov }
-                  delete next.flashAttn
-                  onChange({ ...draft, overrides: next })
-                } else setOv({ flashAttn: 'on' })
-              }}
-            >
-              <option value="auto">
-                自动，{autoHint(autoParams, 'flashAttn', (v) => (v === 'on' ? '开' : '关'))}
-              </option>
-              <option value="on">开</option>
-            </select>
-          </div>
-          <p className="cfg-note lp-hint">更省显存、更快的注意力算法；部分老模型可能不兼容。</p>
-        </div>
+        </CfgRow>
+        <div className="cfg-divider" />
+        <CfgRow label="缓存格式" hint="缓存精度；q8_0 省显存，可能轻微影响输出质量。">
+          <select
+            className="cfg-select"
+            aria-label="缓存格式"
+            disabled={disabled}
+            value={ov.kvCache ?? 'auto'}
+            onChange={(e) => {
+              if (e.target.value === 'auto') {
+                const next = { ...ov }
+                delete next.kvCache
+                onChange({ ...draft, overrides: next })
+              } else setOv({ kvCache: e.target.value as 'f16' | 'q8_0' })
+            }}
+          >
+            <option value="auto">自动，{autoHint(autoParams, 'kvCache', (v) => v)}</option>
+            <option value="f16">f16，精度最好</option>
+            <option value="q8_0">q8_0，省一半显存</option>
+          </select>
+        </CfgRow>
+        <div className="cfg-divider" />
+        <CfgRow label="Flash Attention" hint="更省显存、更快的注意力算法；部分老模型可能不兼容。">
+          <select
+            className="cfg-select"
+            aria-label="Flash Attention"
+            disabled={disabled}
+            value={ov.flashAttn ?? 'auto'}
+            onChange={(e) => {
+              if (e.target.value === 'auto') {
+                const next = { ...ov }
+                delete next.flashAttn
+                onChange({ ...draft, overrides: next })
+              } else setOv({ flashAttn: 'on' })
+            }}
+          >
+            <option value="auto">
+              自动，{autoHint(autoParams, 'flashAttn', (v) => (v === 'on' ? '开' : '关'))}
+            </option>
+            <option value="on">开</option>
+          </select>
+        </CfgRow>
 
         {hasMmproj && (
-          <div className="lp-field">
-            <label htmlFor="lp-mmproj">视觉文件放哪</label>
-            <div className="lp-field-ctl">
+          <>
+            <div className="cfg-divider" />
+            <CfgRow label="视觉文件放哪" hint="视觉文件的位置；放内存省约 1.3GB 显存，看图变慢。">
               <select
-                id="lp-mmproj"
                 className="cfg-select"
+                aria-label="视觉文件放哪"
                 disabled={disabled}
                 value={ov.mmprojOffload === undefined ? 'auto' : ov.mmprojOffload ? 'gpu' : 'cpu'}
                 onChange={(e) => {
@@ -177,19 +185,23 @@ export function LaunchAdvancedPanel({
                 <option value="gpu">放显卡，看图快</option>
                 <option value="cpu">放内存，省显存</option>
               </select>
-            </div>
-            <p className="cfg-note lp-hint">视觉文件的位置；放内存省约 1.3GB 显存，看图变慢。</p>
-          </div>
+            </CfgRow>
+          </>
         )}
 
-        <div className="lp-field">
-          <label htmlFor="lp-extra">
-            额外命令行参数
-            <CfgQ tip={`仅支持以下参数：${EXTRA_ARGS_ALLOWED.join('  ')}`} />
-          </label>
-          <div className="lp-field-ctl">
+        <div className="cfg-divider" />
+        <CfgRow
+          label={
+            <>
+              额外命令行参数
+              <CfgQ tip={`仅支持以下参数：${EXTRA_ARGS_ALLOWED.join('  ')}`} />
+            </>
+          }
+          hint="追加到启动参数末尾；无效参数不会生效。"
+        >
+          <div className="cfg-ctlcol">
             <input
-              id="lp-extra"
+              aria-label="额外命令行参数"
               className="cfg-input lp-extra"
               type="text"
               spellCheck={false}
@@ -201,20 +213,7 @@ export function LaunchAdvancedPanel({
             />
             {!extra.ok && <p className="cfg-note is-missing">✕ {extra.reason}</p>}
           </div>
-          <p className="cfg-note lp-hint">追加到启动参数末尾；无效参数不会生效。</p>
-        </div>
-
-        <button
-          type="button"
-          className="cfg-btn lp-reset"
-          disabled={disabled || count === 0}
-          onClick={() => {
-            setLayersText('')
-            onChange({})
-          }}
-        >
-          全部恢复自动
-        </button>
+        </CfgRow>
       </div>
     </details>
   )

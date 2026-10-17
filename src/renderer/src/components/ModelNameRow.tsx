@@ -20,43 +20,49 @@ export function ModelNameRow({
   listModels: () => Promise<void>
 }): React.JSX.Element {
   return (
-    <CfgRow label="模型名" hint="从服务读取的模型列表中选择，也可手动填写。">
-      <div className="cfg-ctlcol">
-        <div className="cfg-file">
-          {models.length > 0 ? (
-            <select
-              className="cfg-select"
-              aria-label="模型名"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-            >
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-              {!models.includes(value) && <option value={value} hidden />}
-            </select>
-          ) : (
-            <input
-              className="cfg-input"
-              value={value}
-              placeholder="点「读取模型」自动填充"
-              spellCheck={false}
-              aria-label="模型名"
-              onChange={(e) => onChange(e.target.value)}
-            />
-          )}
-          <button
-            type="button"
-            className="cfg-btn"
-            onClick={() => void listModels()}
-            disabled={modelsBusy}
+    <CfgRow
+      label="模型名"
+      hint={
+        modelsNote ? (
+          <span className="cfg-hint is-warn">{modelsNote}</span>
+        ) : (
+          '从服务读取，也可手动填写。'
+        )
+      }
+    >
+      <div className="cfg-file">
+        {models.length > 0 ? (
+          <select
+            className="cfg-select"
+            aria-label="模型名"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
           >
-            {modelsBusy ? '连接中……' : '读取模型'}
-          </button>
-        </div>
-        {modelsNote && <p className="cfg-note is-warn">{modelsNote}</p>}
+            {models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            {!models.includes(value) && <option value={value} hidden />}
+          </select>
+        ) : (
+          <input
+            className="cfg-input"
+            value={value}
+            placeholder="点「读取模型」自动填充"
+            spellCheck={false}
+            aria-label="模型名"
+            onChange={(e) => onChange(e.target.value)}
+          />
+        )}
+        <button
+          type="button"
+          className="cfg-btn"
+          onClick={() => void listModels()}
+          disabled={modelsBusy}
+        >
+          {modelsBusy ? '连接中……' : '读取模型'}
+        </button>
       </div>
     </CfgRow>
   )
