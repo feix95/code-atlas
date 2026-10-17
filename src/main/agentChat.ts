@@ -48,7 +48,7 @@ import { sanitizeWebQuery } from '../ai/weblookup.ts'
 import { AGENT_FILES_ADDENDUM, SLICE_NO_TOOLS } from '../ai/prompts.ts'
 import { flattenToolMessages } from '../ai/chatThread.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { sanitizeExternalDirectoryPath } from './agentAccess.ts'
+import { sanitizeExternalAbsPath } from './agentAccess.ts'
 import type {
   AgentSearchMatch,
   AiChatResult,
@@ -405,7 +405,11 @@ export async function runAgentChat(input: {
           ? ''
           : callName === TOOL_NAMES.searchContent && call.args?.relPath === undefined
             ? ''
-            : sanitizeAgentRelPath(call.args?.relPath)
+            : callName === TOOL_NAMES.readFile &&
+                call.args?.relPath === undefined &&
+                selectedRoot?.kind === 'file'
+              ? ''
+              : sanitizeAgentRelPath(call.args?.relPath)
       const keyword =
         callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string'
           ? call.args.keyword.trim().slice(0, 200)
@@ -419,7 +423,7 @@ export async function runAgentChat(input: {
       const rawQuery = call.args?.query
       const requestedPath =
         callName === TOOL_NAMES.requestDirectoryAccess
-          ? sanitizeExternalDirectoryPath(call.args?.path)
+          ? sanitizeExternalAbsPath(call.args?.path)
           : null
       // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
       const query = callName === TOOL_NAMES.webSearch ? sanitizeWebQuery(rawQuery) : null
@@ -528,7 +532,10 @@ export async function runAgentChat(input: {
                     maxChars: readChars
                   })
       if (exec.ok && selectedRoot?.external)
-        exec.text = `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
+        exec.text =
+          selectedRoot.kind === 'file'
+            ? `临时授权文件 ${selectedRoot.rootId}(${selectedRoot.path}) 的读取结果:\n${exec.text}`
+            : `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
       // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
       // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
       exec.text = wrapToolResult(exec.text)

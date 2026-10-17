@@ -299,16 +299,25 @@ export type PlannedChatFile = ChatFileAttachment & {
   shownEndLine: number
   /** 有没有没带进来的部分 */
   truncated: boolean
+  /** 拖入即授权的文件门卡编号(主进程发牌成功才有):截断注记凭它给续读指引 */
+  rootId?: string
 }
 
 /** 截断注记(对齐 Claude Code 的「truncated + 续读路径」):续读指引只在翻文件开着、
- *  且文件就在项目里(有 relPath)时给 —— 没有工具或没有路径时,说了也是空头支票 */
+ *  且拿得到钥匙时给 —— 项目内文件走 relPath;系统拖入的文件走拖入即授权的
+ *  rootId(relPath 传空字符串)。没工具或没钥匙时说了也是空头支票,照实说不在上下文里 */
 function buildFileTruncatedNote(file: PlannedChatFile, agentOn: boolean): string {
   const range = `第 1-${file.shownEndLine} 行 / 共 ${file.totalLines} 行`
-  const body =
-    agentOn && file.relPath
-      ? `文件太长,只带了 ${range};要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 offset=${file.shownEndLine + 1} 再读;先找某段内容就先用 ${TOOL_NAMES.searchContent} 搜关键词`
-      : `文件太长,只带了开头 ${file.shownEndLine} 行 / 共 ${file.totalLines} 行,后面的部分不在当前上下文里`
+  const readBack = !agentOn
+    ? null
+    : file.rootId
+      ? `要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 rootId=${file.rootId}、relPath 传空字符串、offset=${file.shownEndLine + 1} 再读`
+      : file.relPath
+        ? `要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 offset=${file.shownEndLine + 1} 再读;先找某段内容就先用 ${TOOL_NAMES.searchContent} 搜关键词`
+        : null
+  const body = readBack
+    ? `文件太长,只带了 ${range};${readBack}`
+    : `文件太长,只带了开头 ${file.shownEndLine} 行 / 共 ${file.totalLines} 行,后面的部分不在当前上下文里`
   return `${TAG.programNote.open}${body}${TAG.programNote.close}`
 }
 

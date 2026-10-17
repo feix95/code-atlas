@@ -413,7 +413,7 @@ export function FreeChatComposer({
             <span
               key={f.id}
               className="fc-file"
-              data-tip={`${f.relPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
+              data-tip={`${f.relPath ?? f.absPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
             >
               <TreeIcon name="doc" size={12} mono />
               <span className="fc-file-text mono">{f.name}</span>

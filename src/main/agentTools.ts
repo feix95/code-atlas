@@ -17,25 +17,36 @@ import {
 import { webSearchDetailed } from '../ai/weblookup.ts'
 import { isBinaryFile } from '../shared/fileKinds.ts'
 import { CH } from '../shared/ipcChannels.ts'
-import {
-  AgentDirectoryAccess,
-  joinAuthorizedRoot,
-  sanitizeExternalDirectoryPath
-} from './agentAccess.ts'
+import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalAbsPath } from './agentAccess.ts'
+import { TOOL_NAMES } from '../shared/agentTools.ts'
 import type { AgentSearchCard, AgentSearchMatch, AiDeltaPayload } from '../shared/types.ts'
 
+/** 本进程的授权账本:项目外目录(申请制)和拖入即授权的单个文件共用一本账 */
 export const agentDirectoryAccess = new AgentDirectoryAccess()
+
+/** rootPath 授权的根是不是「单个文件」(拖入即授权的文件门卡):是它的话,
+ *  列名单/搜索/带子路径的读都不适用,喂准确话术回去,别让它原地打转 */
+async function isSingleFileRoot(rootPath: string): Promise<boolean> {
+  const info = await fs.stat(rootPath).catch(() => null)
+  return info?.isFile() === true
+}
 
 // ── 翻文件模式(agent,第一百二十八锤)的后厨 ──
 // 模型自己喊「看看这个文件夹 / 读这个文件」,主进程是唯一动手的那只手:
-// 只有两件只读工具,路径全走 joinRoot 沙盒,越界/二进制/超大文件一律拒,
-// 拒的话术当「工具结果」喂回给模型让它自己换路,循环绝不因为一次碰壁就断。
+// 只有看文件的三件只读工具(列名单/读文件/搜内容),路径全走 joinRoot 沙盒,
+// 越界/二进制/超大文件一律拒,拒的话术当「工具结果」喂回给模型让它自己换路,
+// 循环绝不因为一次碰壁就断。
 
 /** list_files 的执行手:递归列文件/文件夹名单(只捡名字),条数和深度都有缰绳 */
 export async function agentListFiles(
   rootPath: string,
   relPath: string
 ): Promise<{ ok: boolean; text: string; hint?: string }> {
+  if (await isSingleFileRoot(rootPath))
+    return {
+      ok: false,
+      text: `这个 rootId 授权的是一份单个文件,列不了名单;要看它的内容用 ${TOOL_NAMES.readFile}(relPath 传空字符串)`
+    }
   let abs: string
   try {
     abs = await joinAuthorizedRoot(rootPath, relPath)
@@ -119,6 +130,13 @@ export async function agentSearchContent(
   try {
     abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
+    if (await isSingleFileRoot(rootPath))
+      return {
+        ok: false,
+        text: `这个 rootId 授权的是一份单个文件,搜不了内容;要看它的内容用 ${TOOL_NAMES.readFile}(relPath 传空字符串)`,
+        matches: [],
+        matchesTruncated: false
+      }
     return {
       ok: false,
       text: `路径越界了(不在项目内):${relPath}`,
@@ -260,6 +278,11 @@ export async function agentReadFile(
   try {
     abs = await joinAuthorizedRoot(rootPath, relPath)
   } catch {
+    if (await isSingleFileRoot(rootPath))
+      return {
+        ok: false,
+        text: `这个 rootId 授权的是一份单个文件:读它把 relPath 传空字符串,offset/limit 翻页照常用`
+      }
     return { ok: false, text: `路径越界了(不在项目内):${relPath}` }
   }
   const stat = await fs.stat(abs).catch(() => null)
@@ -285,7 +308,7 @@ export async function agentRequestDirectoryAccess(
   event: IpcMainInvokeEvent,
   rawPath: unknown
 ): Promise<{ ok: boolean; text: string; hint?: string; rootId?: string }> {
-  const requested = sanitizeExternalDirectoryPath(rawPath)
+  const requested = sanitizeExternalAbsPath(rawPath)
   if (requested === null)
     return { ok: false, text: '目录路径不合法:只能申请用户明确点名的绝对文件夹路径' }
   const canonical = await fs.realpath(requested).catch(() => null)

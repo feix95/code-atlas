@@ -11,7 +11,7 @@ import {
   sendResetDelta
 } from './aiEvidence.ts'
 import { runAgentChat } from './agentChat.ts'
-import { sendAgentStep } from './agentTools.ts'
+import { agentDirectoryAccess, sendAgentStep } from './agentTools.ts'
 import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from './chatMemory.ts'
 import { estimateThreadTokens, toPlainHistory } from '../ai/chatThread.ts'
 import { imageGate, planImageBudget, sanitizeChatImages } from '../shared/chatImage.ts'
@@ -259,12 +259,20 @@ export function registerChatIpc(): void {
         otherTokens: baseFixedTokens + imageTokens,
         files: files.map((f) => ({ text: f.text, totalLines: f.totalLines }))
       })
-      const plannedFiles: PlannedChatFile[] = files.map((f, i) => ({
-        ...f,
-        text: plan[i].text,
-        shownEndLine: plan[i].shownEndLine,
-        truncated: plan[i].truncated
-      }))
+      // 拖入即授权(第一百五十三锤):系统拖/选进来的文件凭它的绝对路径换本次运行的
+      // 只读门卡,截断的正文就有续读的钥匙;拿不到门卡(文件没了/不是文件)就照实说,
+      // 绝不开空头支票
+      const plannedFiles: PlannedChatFile[] = []
+      for (const [i, f] of files.entries()) {
+        const granted = f.absPath ? await agentDirectoryAccess.grantFile(f.absPath) : null
+        plannedFiles.push({
+          ...f,
+          text: plan[i].text,
+          shownEndLine: plan[i].shownEndLine,
+          truncated: plan[i].truncated,
+          rootId: granted?.rootId
+        })
+      }
       filesBlock = buildFileAttachmentsText(plannedFiles, { agentOn })
       fileTokens = estimateTokens(filesBlock)
     }

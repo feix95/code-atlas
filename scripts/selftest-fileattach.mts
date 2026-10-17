@@ -148,6 +148,25 @@ function main(): void {
   assert.equal(clean.files[0].relPath, 'docs/note.txt', '正常相对路径保留')
   assert.equal(clean.files[0].id, 'i', 'id 原样认账')
 
+  // 绝对路径(拖入即授权的凭据):形状对了保留;脏了只丢字段,文件本身照收
+  const absOk = sanitizeChatFiles([
+    goodFile({ id: 'j', absPath: 'C:\\Users\\me\\notes\\long.txt' })
+  ])
+  assert.equal(
+    absOk.files[0].absPath,
+    'C:\\Users\\me\\notes\\long.txt',
+    '系统拖入的绝对路径保留(主进程要靠它发续读门卡)'
+  )
+  const absBad = sanitizeChatFiles([goodFile({ id: 'k', absPath: 'relative\\note.txt' })])
+  assert.equal(absBad.files[0].absPath, undefined, '相对样式的路径字段丢掉')
+  assert.equal(absBad.files.length, 1, '文件本身照收')
+  const absDirty = sanitizeChatFiles([
+    goodFile({ id: 'l', absPath: 'C:\\a\0b.txt' }),
+    goodFile({ id: 'm', absPath: `C:\\${'x'.repeat(1100)}.txt` })
+  ])
+  assert.equal(absDirty.files[0].absPath, undefined, '带 NUL 的路径丢掉')
+  assert.equal(absDirty.files[1].absPath, undefined, '超长的路径丢掉')
+
   // ── 4. fileAttachRangeLabel:界面上的行账不许撒谎 ──
   assert.equal(fileAttachRangeLabel(goodFile()), '共 2 行', '整份就报总数')
   assert.equal(
@@ -210,6 +229,41 @@ function main(): void {
     { agentOn: true }
   )
   assert.ok(!cutAgentNoPath.includes('offset='), '系统拖进来的没路径,也给不了续读指引 —— 照实说')
+
+  // 拖入即授权的文件门卡(rootId):系统拖进来且主进程发到牌时,续读指引带编号 + 空路径
+  const cutGranted = buildFileAttachmentsText(
+    [
+      {
+        ...goodFile({ absPath: 'C:\\outside\\long.txt', rootId: 'external_4' }),
+        shownEndLine: 2,
+        truncated: true,
+        totalLines: 500
+      }
+    ],
+    { agentOn: true }
+  )
+  assert.ok(
+    cutGranted.includes('rootId=external_4') && cutGranted.includes('relPath 传空字符串'),
+    '拖入即授权:续读指引带门卡编号和空路径的说法'
+  )
+  assert.ok(cutGranted.includes('offset=3'), '拖入即授权:接着读的 offset 照给')
+
+  const cutGrantedNoAgent = buildFileAttachmentsText(
+    [
+      {
+        ...goodFile({ absPath: 'C:\\outside\\long.txt', rootId: 'external_4' }),
+        shownEndLine: 2,
+        truncated: true,
+        totalLines: 500
+      }
+    ],
+    { agentOn: false }
+  )
+  assert.ok(!cutGrantedNoAgent.includes('rootId='), '没开翻文件:门卡编号也不提')
+  assert.ok(
+    cutGrantedNoAgent.includes('后面的部分不在当前上下文里'),
+    '没开翻文件:照实说,不开空头支票'
+  )
 
   // ── 6. 消息装配:文件块垫在引用后、问题前,相邻合并成一条 ──
   const msgs = buildFreeChatMessages(

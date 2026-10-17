@@ -215,12 +215,14 @@ ${原结果开头一段,换行压平}……<program_note>这条是早先翻看�
 
 [list_files 执行手]
 - 路径越界了(不在项目内):${relPath}
+- 单文件门卡: 这个 rootId 授权的是一份单个文件,列不了名单;要看它的内容用 read_file(relPath 传空字符串)
 - 这个文件夹里什么都没列出来(${locked} 个子项打不开)
 - 这个文件夹是空的
 - 尾巴注记: 名单太长,只列了前 ${N} 个 / ${N} 个子文件夹打不开,跳过了
 
 [search_content 执行手]
 - 路径越界了(不在项目内):${relPath}
+- 单文件门卡: 这个 rootId 授权的是一份单个文件,搜不了内容;要看它的内容用 read_file(relPath 传空字符串)
 - 打不开或不存在:${relPath}
 - ${relPath} 不是文件夹;搜内容要给文件夹路径(整个项目就传空字符串),单个文件直接用 read_file 读它
 - 没搜到时: 在 ${范围} 里没搜到「${keyword}」,文件路径和内容都没对上的(翻了 ${N} 个文本文件)。可能真没有,也可能藏在二进制/超大的文件里,或者换个更短的关键词再试${可选:(文件夹太大,只扫了前 ${N} 个文件,没扫完)}
@@ -229,6 +231,7 @@ ${原结果开头一段,换行压平}……<program_note>这条是早先翻看�
 
 [read_file 执行手]
 - 路径越界了(不在项目内):${relPath}
+- 单文件门卡: 这个 rootId 授权的是一份单个文件:读它把 relPath 传空字符串,offset/limit 翻页照常用
 - 打不开或不存在:${relPath}
 - ${relPath} 是个文件夹不是文件;要看里面有什么,用 list_files 列名单
 - ${relPath} 是二进制文件,读不了文本内容;这类文件只能看名字猜用途
@@ -254,6 +257,8 @@ ${原结果开头一段,换行压平}……<program_note>这条是早先翻看�
 
 [临时目录结果前缀] 外部目录翻出的结果头顶会垫一句(同样在 <tool_result> 里):
 临时目录 ${rootId}(${真实路径}) 内的结果:
+[拖入即授权的单个文件翻出的结果] 前缀改说:
+临时授权文件 ${rootId}(${真实路径}) 的读取结果:
 ```
 
 ### src/ai/weblookup.ts :: 联网资料包裹头(查到的资料喂给模型时的开场)
@@ -661,7 +666,8 @@ ${代码}
 ### src/ai/chat.ts :: buildFileAttachmentsText(用户拖/选了文件时,对齐 Claude Code 的 @文件)
 
 // 文件附件块垫在引用代码后、当前问题前;每份文件头顶行账,截断的正文尾巴垫 <program_note>。
-// 续读指引只在翻文件开着、且文件在项目里(有 relPath)时给 —— 没有工具或没有路径时说空话没意义。
+// 续读指引只在翻文件开着且拿得到钥匙时给 —— 项目内文件走 relPath;系统拖入的文件走
+// 拖入即授权的 rootId(relPath 传空字符串)。没有工具或没有钥匙时说空话没意义。
 
 ```text
 [附件块 · user 消息]
@@ -670,7 +676,8 @@ ${代码}
 
 --- ${name}${relPath ? ` (${relPath})` : ''} · ${全 M 行 / 第 1-N 行 / 共 M 行} ---
 ${文件正文(按行裁到预算)}
-[截断时尾巴,二选一]
+[截断时尾巴,三选一]
+<program_note>文件太长,只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 rootId=${R}、relPath 传空字符串、offset=${N+1} 再读</program_note>
 <program_note>文件太长,只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 offset=${N+1} 再读;先找某段内容就先用 search_content 搜关键词</program_note>
 <program_note>文件太长,只带了开头 ${N} 行 / 共 ${M} 行,后面的部分不在当前上下文里</program_note>
 </attached_files>
@@ -877,7 +884,7 @@ ${旧摘要正文}
 [对话压缩史料单条超长(src/shared/compact.ts)]: ……<program_note>后半截省略</program_note>
 [猜测证据片段超长(src/ai/index.ts clipPreview)]: <program_note>后面还有内容,只取了开头</program_note>
 [git diff 超长(src/git/index.ts)]: ……<program_note>改动太大,只取了前面一部分</program_note>
-[文件附件超长(src/ai/chat.ts)]: <program_note>文件太长,只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 offset=${N+1} 再读;先找某段内容就先用 search_content 搜关键词</program_note>(没开翻文件或文件不在项目里时改说「文件太长,只带了开头 ${N} 行 / 共 ${M} 行,后面的部分不在当前上下文里」)
+[文件附件超长(src/ai/chat.ts)]: <program_note>文件太长,只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 rootId=${R}、relPath 传空字符串、offset=${N+1} 再读(系统拖入的文件,拖入即授权后才有本变体)</program_note>;项目内文件改说「文件太长,只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 offset=${N+1} 再读;先找某段内容就先用 search_content 搜关键词」;没开翻文件或没钥匙时改说「文件太长,只带了开头 ${N} 行 / 共 ${M} 行,后面的部分不在当前上下文里」
 [agent 读文件分页截断(src/ai/agent.ts sliceAgentRead)]: <program_note>只带了第 ${X}-${Y} 行 / 共 ${Z} 行;要接着读后面的部分,用 read_file 带 offset=${Y+1} 再读;先找某段内容就先用 search_content 搜关键词</program_note>;单行裁断时: <program_note>第 ${N} 行太长,只带了开头一部分</program_note>
 [agent 工具结果压纸条(src/ai/agent.ts)]: 见上面「压缩占位纸条」
 ```

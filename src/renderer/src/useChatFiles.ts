@@ -17,6 +17,8 @@ import { formatSize } from '@shared/fsMessages'
  * 跟图片不一样:文字模型也能读文件,所以没有能力闸;发送后不清空 ——
  * 文件像引用原子一样常驻输入框、每轮都带上,要换就点 ×。
  * 文件树拖来的只有 relPath,由 addFromRelPath 走 readPreview 读盘,不另开秤。
+ * 系统拖/选进来的另留本机绝对路径(absPath),主进程凭它发本次运行的续读门卡(拖入即授权);
+ * 拿不到路径的(剪切板/网页来源)照旧只读这一轮,不给假承诺。
  */
 export interface ChatFilesApi {
   files: ChatFileAttachment[]
@@ -33,6 +35,17 @@ export function partitionAttachFiles(files: Iterable<File>): { images: File[]; f
   const rest: File[] = []
   for (const f of files) (isImageFile(f.name) ? images : rest).push(f)
   return { images, files: rest }
+}
+
+/** 系统文件对象 → 本机绝对路径(拖入即授权的凭据);拿不到(剪切板/网页来源)或样子
+ *  不对就回 undefined —— 那种文件照旧只能读这一轮,不给续读的假承诺 */
+function fileAbsPath(file: File): string | undefined {
+  try {
+    const path = window.atlas.getPathForFile(file).trim()
+    return /^([a-zA-Z]:[\\/]|\\\\|\/)/.test(path) ? path : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** 文件 → 收编好的 ChatFileAttachment(正文裁到行边界);不合格就回一句拒收的人话 */
@@ -55,6 +68,7 @@ async function fileToChatFile(file: File): Promise<ChatFileAttachment | string> 
   return {
     id: crypto.randomUUID(),
     name,
+    absPath: fileAbsPath(file),
     text: cut.text,
     totalLines: clip.totalLines,
     size: file.size

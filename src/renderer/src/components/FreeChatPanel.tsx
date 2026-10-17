@@ -376,7 +376,7 @@ export function FreeChatPanel({
                             <span
                               key={f.id}
                               className="msg-file mono"
-                              data-tip={`${f.relPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
+                              data-tip={`${f.relPath ?? f.absPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
                             >
                               {f.name}
                             </span>
