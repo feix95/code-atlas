@@ -93,7 +93,7 @@ function main(): void {
   assert.ok(!t1.args.includes('-ctk'), '还没轮到降黑板')
   assert.equal(t1.estimate.verdict, 'ok')
   assert.ok(
-    t1.reasons.some((r) => r.includes('视觉文件放在内存')),
+    t1.reasons.some((r) => r.includes('视觉文件放入内存')),
     '得说清楚投影仪为什么放内存'
   )
 
@@ -182,7 +182,7 @@ function main(): void {
   assert.equal(ovMm.params.mmprojOffload, false)
   assert.ok(ovMm.args.includes('--no-mmproj-offload'))
   assert.ok(
-    !ovMm.reasons.some((r) => r.includes('视觉文件放在内存')),
+    !ovMm.reasons.some((r) => r.includes('视觉文件放入内存')),
     '用户自己选的放内存,梯子不抢功'
   )
 
@@ -232,14 +232,14 @@ function main(): void {
   )
   assert.equal(t3.params.contextSize, 8192, '上面这个计划确实降过档')
 
-  // ── 11. 就绪播报摘句:上下文降了 > 投影仪放内存 > 黑板降格 ──
+  // ── 11. 就绪播报摘句:上下文降了 > 投影仪放内存 > 缓存降格 ──
   assert.ok(planCaveat(t3, 16384)!.includes('上下文'), '砍了上下文先说它')
   assert.ok(planCaveat(t1, 16384)!.includes('视觉文件'), '投影仪放内存报这个')
   assert.equal(planCaveat(planLaunch(baseInput({})), 16384), null, '没妥协没话说')
   const q8Only = planLaunch(baseInput({ machine: M8, modelBytes: 5 * GB, requestedContext: 8192 }))
   // 5GB 8GB 卡 ctx 8192: rung0=5+1+0.6=6.6 ok? estimateKvBytes(8192, 5GB)=8192*128K=1GB → 6.6 ≤ 7.36 → rung0
   if (q8Only.params.kvCache === 'q8_0') {
-    assert.ok(planCaveat(q8Only, 8192)!.includes('黑板'))
+    assert.ok(planCaveat(q8Only, 8192)!.includes('缓存'))
   } else {
     assert.equal(planCaveat(q8Only, 8192), null)
   }

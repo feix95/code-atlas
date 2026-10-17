@@ -97,16 +97,16 @@ export function EngineBackendPanel({
       label={
         <>
           推理引擎
-          <CfgQ tip="跑本地模型的引擎:按这台机器自动推荐,装一次终身受益;手动选也行,自带引擎永远兜底。" />
+          <CfgQ tip="运行本地模型的推理引擎；按机器自动推荐，自带引擎始终可用。" />
         </>
       }
       stacked
     >
-      <div className="lp-card eng-panel">
-        {state.status === 'loading' && <p className="cfg-note lp-note">正在盘点引擎……</p>}
+      <div>
+        {state.status === 'loading' && <p className="cfg-note lp-note">正在检查引擎……</p>}
         {state.status === 'error' && (
           <p className="cfg-note lp-note">
-            引擎状态查不到;不影响设置,真用时引擎会自己定位。
+            引擎状态读取失败，不影响使用。
             <button type="button" className="cfg-btn" onClick={() => void refresh()}>
               重试
             </button>
@@ -114,20 +114,15 @@ export function EngineBackendPanel({
         )}
         {info && (
           <>
-            <p className="lp-line">
-              {info.active
-                ? `${info.active.label}${info.active.version ? `(${info.active.version})` : ''}`
-                : '没有可用引擎'}
-              {info.active?.kind === 'installed' && ' · 正在使用'}
-              {info.active?.kind === 'vendor' && ' · 正在使用(自带)'}
-              {info.active?.kind === 'custom' && ' · 正在使用(自指路径)'}
+            <p className="lp-line" data-tip={info.active?.version ?? undefined}>
+              {info.active ? `${info.active.label} · 正在使用` : '没有可用引擎'}
             </p>
             {/* 推荐安装条:只挂横幅不自动下载,点「安装」才走网 */}
             {wantInstall && !installing && (
               <div className="eng-banner">
                 <span>
-                  推荐安装{ENGINE_CATALOG[wantInstall].displayName}引擎(约{' '}
-                  {approxDownloadMB(wantInstall)} MB,看图和生成都会快不少)
+                  推荐安装{ENGINE_CATALOG[wantInstall].displayName}引擎，约{' '}
+                  {approxDownloadMB(wantInstall)}MB
                 </span>
                 <button
                   type="button"
@@ -207,16 +202,16 @@ export function EngineBackendPanel({
                   {BACKEND_PREFERENCE.map((b) => (
                     <option key={b} value={b}>
                       {ENGINE_CATALOG[b].displayName}
-                      {info.installed.includes(b) ? '' : '(未安装)'}
+                      {info.installed.includes(b) ? '' : '，未安装'}
                     </option>
                   ))}
                 </select>
               </div>
-              <p className="cfg-note lp-hint">
-                选「自动」按机器挑最快的;手动选了没装的会先顶上能用的,装好自动换。
-              </p>
+              <p className="cfg-note lp-hint">自动选择这台机器最快的引擎。</p>
             </div>
-            <p className="cfg-note lp-hint">下载失败或没网时,也能在高级选项里自指引擎程序路径。</p>
+            <p className="cfg-note lp-hint lp-tail">
+              下载失败或无网络时，可在高级选项手动指定引擎路径。
+            </p>
           </>
         )}
       </div>

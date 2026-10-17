@@ -31,8 +31,8 @@ function asset(file: string, bytes: number, sha256: string): EngineAsset {
 export const ENGINE_CATALOG: Record<EngineBackend, EngineBackendInfo> = {
   cuda: {
     id: 'cuda',
-    displayName: 'CUDA 加速(N 卡)',
-    oneLine: 'N 卡专用,看图和出字都最快;约 550MB,装一次终身受益。',
+    displayName: 'CUDA 加速',
+    oneLine: 'NVIDIA 显卡专用，速度最快；约 550MB。',
     assets: [
       asset(
         `llama-${ENGINE_TAG}-bin-win-cuda-13.4-x64.zip`,
@@ -49,7 +49,7 @@ export const ENGINE_CATALOG: Record<EngineBackend, EngineBackendInfo> = {
   vulkan: {
     id: 'vulkan',
     displayName: 'Vulkan 通用加速',
-    oneLine: '各家显卡都能用,比 CUDA 慢一点但稳妥;约 31MB。',
+    oneLine: '各家显卡通用，比 CUDA 稍慢；约 31MB。',
     assets: [
       asset(
         `llama-${ENGINE_TAG}-bin-win-vulkan-x64.zip`,
@@ -61,7 +61,7 @@ export const ENGINE_CATALOG: Record<EngineBackend, EngineBackendInfo> = {
   cpu: {
     id: 'cpu',
     displayName: 'CPU 兼容模式',
-    oneLine: '没有显卡也能跑,只是慢;约 19MB,兜底用。',
+    oneLine: '无显卡时可用，速度最慢；约 19MB。',
     assets: [
       asset(
         `llama-${ENGINE_TAG}-bin-win-cpu-x64.zip`,

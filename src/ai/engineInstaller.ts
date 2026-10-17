@@ -79,7 +79,7 @@ async function downloadOne(
       out.on('error', rej)
     })
     if (done !== expectedBytes) {
-      throw new Error(`下载没下全(收到 ${done} 字节,应为 ${expectedBytes}),请重试`)
+      throw new Error(`下载不完整，收到 ${done} 字节，应为 ${expectedBytes} 字节，请重试`)
     }
   } finally {
     out.destroy()
@@ -163,7 +163,7 @@ async function installBackendInner(
     const free = fsInfo.bfree * fsInfo.bsize
     if (free < totalBytes * DISK_HEADROOM) {
       throw new Error(
-        `磁盘空间不够(需要约 ${Math.ceil((totalBytes * DISK_HEADROOM) / 1_000_000_000)} GB),请清理后重试`
+        `磁盘空间不足，需要约 ${Math.ceil((totalBytes * DISK_HEADROOM) / 1_000_000_000)} GB，请清理后重试`
       )
     }
     const doneBytes = new Array<number>(info.assets.length).fill(0)
@@ -184,13 +184,13 @@ async function installBackendInner(
       throwAbort(signal)
     }
     const exe = findExtractedExe(extractDir)
-    if (!exe) throw new Error('安装包里没找到 llama-server.exe,包可能变了;请反馈给开发者')
+    if (!exe) throw new Error('安装包里没有 llama-server.exe，请反馈给开发者')
     report('check')
     if (!(await checkExeRuns(exe))) {
       throw new Error(
         backend === 'cuda'
-          ? '这台机器不能用 CUDA 引擎(驱动或运行库不匹配);已清理,请改用 Vulkan 或 CPU 引擎'
-          : '引擎装上了但跑不起来,已清理;请反馈给开发者'
+          ? '这台机器无法运行 CUDA 引擎，驱动或运行库不匹配，请改用 Vulkan 或 CPU 引擎'
+          : '引擎安装成功但无法运行，请反馈给开发者'
       )
     }
     // 原子落位:同卷 rename 一下就好;已有旧安装先清掉再让位
@@ -199,7 +199,7 @@ async function installBackendInner(
     renameSync(extractDir, finalDir)
     // 发行包 exe 在根目录(spike 验过);万一包结构变了多套一层,照实报错不硬猜
     if (!existsSync(engineExeFor(userDataDir, backend))) {
-      throw new Error('安装落位后找不到 llama-server.exe,包结构可能变了;请反馈给开发者')
+      throw new Error('安装完成后找不到 llama-server.exe，请反馈给开发者')
     }
     report('done')
     return { dir: finalDir }
@@ -224,7 +224,7 @@ export function listInstalled(userDataDir: string): EngineBackend[] {
 
 /** 卸一颗引擎:整目录端走;正在装的时候不许卸(装完的目录还没落位也清不掉 .tmp 里的半成品,由取消管) */
 export async function removeBackend(userDataDir: string, backend: EngineBackend): Promise<void> {
-  if (inFlight.has(backend)) throw new Error('这颗引擎正在安装,先取消安装再删')
+  if (inFlight.has(backend)) throw new Error('这颗引擎正在安装，请先取消安装再删除')
   rmSync(engineDirFor(userDataDir, backend), { recursive: true, force: true })
 }
 

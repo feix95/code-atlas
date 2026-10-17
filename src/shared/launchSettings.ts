@@ -177,12 +177,12 @@ export type ExtraArgsResult = { ok: true; args: string[] } | { ok: false; reason
  */
 export function parseExtraArgs(text: string): ExtraArgsResult {
   if (text.length > EXTRA_ARGS_MAX) {
-    return { ok: false, reason: `太长了(最多 ${EXTRA_ARGS_MAX} 字,现在是 ${text.length} 字)` }
+    return { ok: false, reason: `太长了，最多 ${EXTRA_ARGS_MAX} 字` }
   }
   const trimmed = text.trim()
   if (!trimmed) return { ok: true, args: [] }
   const badChar = trimmed.match(SHELL_META)
-  if (badChar) return { ok: false, reason: `含有不允许的符号「${badChar[0]}」` }
+  if (badChar) return { ok: false, reason: `含有不支持的符号 ${badChar[0]}` }
   const tokens = trimmed.split(/\s+/)
   const args: string[] = []
   for (let i = 0; i < tokens.length; i++) {
@@ -193,17 +193,17 @@ export function parseExtraArgs(text: string): ExtraArgsResult {
     }
     if (VALUE_FLAGS.has(t)) {
       const v = tokens[i + 1]
-      if (v === undefined) return { ok: false, reason: `${t} 需要一个值` }
+      if (v === undefined) return { ok: false, reason: `参数 ${t} 缺少值` }
       // 值不许是另一个旗;负数(-1/-0.5)放行
       if (v.startsWith('-') && !/^-\d/.test(v)) {
-        return { ok: false, reason: `${t} 后面要跟一个值,不是参数 ${v}` }
+        return { ok: false, reason: `${t} 的值不能是参数 ${v}` }
       }
       args.push(t, v)
       i++
       continue
     }
-    if (t.startsWith('-')) return { ok: false, reason: `不允许的参数:${t}` }
-    return { ok: false, reason: `参数和值要成对写,「${t}」前头没有旗` }
+    if (t.startsWith('-')) return { ok: false, reason: `不支持参数 ${t}` }
+    return { ok: false, reason: `参数和值要成对写，${t} 前缺少参数名` }
   }
   return { ok: true, args }
 }

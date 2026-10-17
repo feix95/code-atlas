@@ -95,7 +95,7 @@ export interface LaunchPlanInfo {
   isMoe: boolean
   mmprojFile: string | null
   plan: LaunchPlan | null
-  /** 全自动档的对照参数:高级面板里「自动(当前推荐:…)」照它写 */
+  /** 全自动档的对照参数:高级面板里「自动，当前推荐 …」照它写 */
   autoParams: LaunchParams | null
   /** 这个模型已存的高级启动账(没有 = null,全自动) */
   saved: ModelLaunchSettings | null
@@ -176,15 +176,12 @@ export function planLaunch(input: LaunchPlanInput): LaunchPlan {
   const isMoe = (input.shape?.expertCount ?? 0) > 1
   const reasons: string[] = []
 
-  // 机器行:谁的家底、多大、拿出多少给模型
+  // 机器行:只报显存预算(显卡名与总量已由方案卡上方的机器行显示,不复述)
   if (m.gpuName || m.gpuVendor === 'nvidia' || m.gpuVendor === 'amd' || m.gpuVendor === 'intel') {
-    const free = m.vramFreeBytes != null ? `(空闲 ${formatGB(m.vramFreeBytes)})` : ''
     const budget = (m.vramFreeBytes ?? m.vramBytes ?? 0) * VRAM_BUDGET_RATIO
-    reasons.push(
-      `认出显卡:${m.gpuName ?? '未名'},显存 ${formatGB(m.vramBytes ?? 0)}${free} · 内存 ${formatGB(m.ramBytes)},拿出 ${formatGB(budget)} 给模型用`
-    )
+    reasons.push(`可分配给模型的显存预算 ${formatGB(budget)}`)
   } else {
-    reasons.push(`没认出显卡:按内存 ${formatGB(m.ramBytes)} 算账,模型全在内存里跑`)
+    reasons.push('没认出显卡，模型将在内存中运行')
   }
 
   const hasGpu = m.vramBytes != null
@@ -262,20 +259,18 @@ export function planLaunch(input: LaunchPlanInput): LaunchPlan {
 
   // 每处妥协一句人话(手动指定的字段是用户自己的主意,不归账到梯子头上)
   if (input.mmprojBytes != null && !params.mmprojOffload && ov.mmprojOffload === undefined) {
-    reasons.push(
-      `视觉文件放在内存里:显存只空出 ${formatGB(m.vramFreeBytes ?? m.vramBytes ?? 0)} 上下,把它塞进显卡会挤爆;看图慢一点,聊天不受影响`
-    )
+    reasons.push('视觉文件放入内存运行，看图变慢，聊天不受影响')
   }
   if (params.kvCache === 'q8_0' && ov.kvCache === undefined) {
-    reasons.push('黑板(KV 缓存)改成 q8_0 存,再开 flash-attn:省约一半显存,代价是长材料稍微钝一点')
+    reasons.push('缓存改用 q8_0 并开启 Flash Attention，省约一半显存，长文本响应稍慢')
   }
   if (params.contextSize < input.requestedContext && ov.contextSize === undefined) {
     reasons.push(
-      `上下文从 ${input.requestedContext} 调到 ${params.contextSize}:显存实在挤,先保证跑得起`
+      `上下文从 ${input.requestedContext} 调到 ${params.contextSize}，显存不足，先保证可运行`
     )
   }
   if (isMoe && check.verdict === 'tight') {
-    reasons.push('这是 MoE 模型:装不下的专家会放内存里跑,慢一点但起得来')
+    reasons.push('MoE 模型，放不下的专家层使用内存运行，速度偏慢')
   }
   const overriddenNames = (
     [
@@ -289,7 +284,7 @@ export function planLaunch(input: LaunchPlanInput): LaunchPlan {
     .filter(([k]) => ov[k] !== undefined)
     .map(([, label]) => label)
   if (overriddenNames.length > 0) {
-    reasons.push(`${overriddenNames.join('、')}是你手动指定的,方案照原样用`)
+    reasons.push(`${overriddenNames.join('、')}为手动指定，自动调整不会覆盖`)
   }
   reasons.push(verdictLine('gpu', check.verdict, check.needBytes, check.budgetBytes))
 
@@ -325,23 +320,23 @@ function verdictLine(
   budgetBytes: number
 ): string {
   if (scope === 'ram') {
-    if (verdict === 'ok') return '内存账:装得下,全在内存里跑'
-    if (verdict === 'tight') return '内存账:有点挤,跑得动但别多开别的软件'
-    return '内存账:装不下,换更小的模型再试'
+    if (verdict === 'ok') return '内存足够，可以运行'
+    if (verdict === 'tight') return '内存偏紧，可以运行，建议关闭其他应用'
+    return '内存不足，无法运行，请选择更小的模型'
   }
   if (verdict === 'ok')
-    return `显存账:约 ${formatGB(needBytes)},预算 ${formatGB(budgetBytes)} —— 装得下`
+    return `显存需求 ${formatGB(needBytes)}，预算 ${formatGB(budgetBytes)}，可以运行`
   if (verdict === 'tight')
-    return `显存账:约 ${formatGB(needBytes)},比预算 ${formatGB(budgetBytes)} 多一点 —— 挤不下的挪内存,跑得动`
-  return `显存账:约 ${formatGB(needBytes)},预算只有 ${formatGB(budgetBytes)} —— 装不下,建议调小上下文或换更小的模型`
+    return `显存需求 ${formatGB(needBytes)}，超出预算 ${formatGB(budgetBytes)}，超出部分使用内存`
+  return `显存需求 ${formatGB(needBytes)}，预算 ${formatGB(budgetBytes)}，装不下；请调小上下文或更换更小的模型`
 }
 
-/** 就绪播报要用的那句「妥协说明」:上下文降了 > 投影仪在内存 > 黑板降格,都没有就 null */
+/** 就绪播报要用的那句「妥协说明」:上下文降了 > 投影仪在内存 > 缓存降格,都没有就 null */
 export function planCaveat(plan: LaunchPlan, requestedContext: number): string | null {
   if (plan.params.contextSize < requestedContext)
-    return `上下文调到 ${plan.params.contextSize}(显存不够)`
-  if (plan.mmprojUsed && !plan.params.mmprojOffload) return '视觉文件放在内存里跑,看图会慢一点'
-  if (plan.params.kvCache === 'q8_0') return '黑板已换省显存的格式'
+    return `上下文调整为 ${plan.params.contextSize}，显存不足`
+  if (plan.mmprojUsed && !plan.params.mmprojOffload) return '视觉文件在内存运行，看图会变慢'
+  if (plan.params.kvCache === 'q8_0') return '缓存已换省显存的格式'
   return null
 }
 

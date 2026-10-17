@@ -10,10 +10,10 @@ import type { AiConfig } from '@shared/types'
 import { CfgQ, CfgRow } from './CfgRow'
 import { LaunchAdvancedPanel } from './LaunchAdvancedPanel.tsx'
 
-/** 机器行:RTX 5060 Ti · 显存 16 GB(空闲 15 GB) · 内存 32 GB */
+/** 机器行:RTX 5060 Ti · 显存 16 GB · 空闲 15 GB · 内存 32 GB */
 function machineLine(m: MachineProfile): string {
   const gpu = m.gpuName
-    ? `${m.gpuName} · 显存 ${formatGB(m.vramBytes ?? 0)}${m.vramFreeBytes != null ? `(空闲 ${formatGB(m.vramFreeBytes)})` : ''}`
+    ? `${m.gpuName} · 显存 ${formatGB(m.vramBytes ?? 0)}${m.vramFreeBytes != null ? ` · 空闲 ${formatGB(m.vramFreeBytes)}` : ''}`
     : '没认出显卡'
   return `${gpu} · 内存 ${formatGB(m.ramBytes)}`
 }
@@ -47,7 +47,7 @@ function withLaunch(config: AiConfig, modelPath: string, s: ModelLaunchSettings)
 }
 
 /**
- * 「本机运行方案」卡(智能启动锤):把启动方案摊给用户看 —— 机器家底、
+ * 「本机运行方案」(智能启动锤):把启动方案摊给用户看 —— 机器家底、
  * 模型户口、装得下结论、每条妥协理由;底下「高级设置」面板可逐项手动指定。
  * modelPath/上下文档位/草稿一变就重新问主进程要预览;取数期间照旧显示旧方案不闪 loading。
  */
@@ -120,20 +120,18 @@ export function LaunchPlanCard({
       label={
         <>
           本机运行方案
-          <CfgQ tip="启动前把这台机器的家底和模型户口过一遍算盘:显卡摆层交给引擎自动安排,装不下时会写明怎么省。" />
+          <CfgQ tip="启动前测算当前模型的运行方案；装不下时自动调低配置。" />
         </>
       }
       stacked
     >
-      <div className="lp-card">
-        {card.status === 'loading' && <p className="cfg-note lp-note">正在量机器家底……</p>}
+      <div>
+        {card.status === 'loading' && <p className="cfg-note lp-note">正在测算运行方案……</p>}
         {card.status === 'no-model' && (
-          <p className="cfg-note lp-note">先在上面选好模型文件,这里会算出它在这台机器上怎么跑。</p>
+          <p className="cfg-note lp-note">选择模型文件后，这里会给出运行方案。</p>
         )}
         {card.status === 'error' && (
-          <p className="cfg-note lp-note">
-            方案算不出来,不影响实际启动;真跑的时候引擎会自己再算一次。
-          </p>
+          <p className="cfg-note lp-note">运行方案暂时算不出来，不影响实际启动。</p>
         )}
         {readyInfo && (
           <>
@@ -154,7 +152,7 @@ export function LaunchPlanCard({
                 )}
               </>
             ) : (
-              <p className="cfg-note lp-note">模型文件读不到,方案出不来;请检查文件还在不在。</p>
+              <p className="cfg-note lp-note">模型文件读取失败，请确认文件是否存在。</p>
             )}
           </>
         )}

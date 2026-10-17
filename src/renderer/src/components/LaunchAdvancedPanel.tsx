@@ -14,7 +14,7 @@ function overrideCount(s: ModelLaunchSettings): number {
   return Object.keys(s.overrides ?? {}).length + (s.extraArgs?.trim() ? 1 : 0)
 }
 
-/** 「自动(当前推荐:X)」的 X:对照自动方案的参数翻成人话 */
+/** 「自动，当前推荐 X」的 X:对照自动方案的参数翻成人话 */
 function autoHint(
   auto: LaunchParams | null,
   field: keyof LaunchParams,
@@ -22,7 +22,7 @@ function autoHint(
 ): string {
   if (!auto) return ''
   const v = auto[field]
-  return `当前推荐:${label(String(v))}`
+  return `当前推荐 ${label(String(v))}`
 }
 
 export function LaunchAdvancedPanel({
@@ -76,7 +76,7 @@ export function LaunchAdvancedPanel({
                 }
               }}
             >
-              <option value="auto">自动(引擎按显存自己摆层)</option>
+              <option value="auto">自动</option>
               <option value="manual">手动指定</option>
             </select>
             {layersManual && (
@@ -87,7 +87,7 @@ export function LaunchAdvancedPanel({
                 max={999}
                 step={1}
                 disabled={disabled}
-                aria-label="显卡层数(0-999)"
+                aria-label="显卡层数，范围 0 到 999"
                 value={typeof ov.gpuLayers === 'number' ? String(ov.gpuLayers) : ''}
                 onChange={(e) => {
                   setLayersText(e.target.value)
@@ -99,9 +99,7 @@ export function LaunchAdvancedPanel({
               />
             )}
           </div>
-          <p className="cfg-note lp-hint">
-            摆多少层模型到显卡上;0 = 全放内存,越大越吃显存跑得越快。
-          </p>
+          <p className="cfg-note lp-hint">放到显卡上的模型层数；越多越快，越占显存。</p>
         </div>
 
         <div className="lp-field">
@@ -120,12 +118,12 @@ export function LaunchAdvancedPanel({
                 } else setOv({ kvCache: e.target.value as 'f16' | 'q8_0' })
               }}
             >
-              <option value="auto">自动({autoHint(autoParams, 'kvCache', (v) => v)})</option>
-              <option value="f16">f16(精度最好)</option>
-              <option value="q8_0">q8_0(省一半显存)</option>
+              <option value="auto">自动，{autoHint(autoParams, 'kvCache', (v) => v)}</option>
+              <option value="f16">f16，精度最好</option>
+              <option value="q8_0">q8_0，省一半显存</option>
             </select>
           </div>
-          <p className="cfg-note lp-hint">上下文记忆用什么格式存;q8_0 省显存,精度略微下降。</p>
+          <p className="cfg-note lp-hint">缓存精度；q8_0 省显存，可能轻微影响输出质量。</p>
         </div>
 
         <div className="lp-field">
@@ -145,14 +143,12 @@ export function LaunchAdvancedPanel({
               }}
             >
               <option value="auto">
-                自动({autoHint(autoParams, 'flashAttn', (v) => (v === 'on' ? '开' : '关'))})
+                自动，{autoHint(autoParams, 'flashAttn', (v) => (v === 'on' ? '开' : '关'))}
               </option>
               <option value="on">开</option>
             </select>
           </div>
-          <p className="cfg-note lp-hint">
-            更快的注意力算法,长上下文更省显存;个别老模型开了反而出错。
-          </p>
+          <p className="cfg-note lp-hint">更省显存、更快的注意力算法；部分老模型可能不兼容。</p>
         </div>
 
         {hasMmproj && (
@@ -173,26 +169,23 @@ export function LaunchAdvancedPanel({
                 }}
               >
                 <option value="auto">
-                  自动(
+                  自动，
                   {autoHint(autoParams, 'mmprojOffload', (v) =>
                     v === 'true' ? '放显卡' : '放内存'
                   )}
-                  )
                 </option>
-                <option value="gpu">放显卡(看图快)</option>
-                <option value="cpu">放内存(省显存)</option>
+                <option value="gpu">放显卡，看图快</option>
+                <option value="cpu">放内存，省显存</option>
               </select>
             </div>
-            <p className="cfg-note lp-hint">
-              看图零件的住处;放内存省约 1.3GB 显存,但认一张图慢十倍。
-            </p>
+            <p className="cfg-note lp-hint">视觉文件的位置；放内存省约 1.3GB 显存，看图变慢。</p>
           </div>
         )}
 
         <div className="lp-field">
           <label htmlFor="lp-extra">
             额外命令行参数
-            <CfgQ tip={`白名单内才收:${EXTRA_ARGS_ALLOWED.join('  ')};含 | 的正则暂不支持`} />
+            <CfgQ tip={`仅支持以下参数：${EXTRA_ARGS_ALLOWED.join('  ')}`} />
           </label>
           <div className="lp-field-ctl">
             <input
@@ -202,13 +195,13 @@ export function LaunchAdvancedPanel({
               spellCheck={false}
               autoComplete="off"
               disabled={disabled}
-              placeholder="如 -t 6 -b 1024(留空不加)"
+              placeholder="如 -t 6 -b 1024，留空不加"
               value={draft.extraArgs ?? ''}
               onChange={(e) => onChange({ ...draft, extraArgs: e.target.value })}
             />
             {!extra.ok && <p className="cfg-note is-missing">✕ {extra.reason}</p>}
           </div>
-          <p className="cfg-note lp-hint">直接追加在启动参数末尾,同名旗后写赢;非法整段不生效。</p>
+          <p className="cfg-note lp-hint">追加到启动参数末尾；无效参数不会生效。</p>
         </div>
 
         <button
