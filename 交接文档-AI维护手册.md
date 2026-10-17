@@ -64,7 +64,7 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - `npm run test:workspace` 校验请求生命周期; 新旧任务乱序返回时不得覆盖内容或提前结束新任务等待态。
 - worktree 验收须隔离 Electron 的 userData、sessionData、crashDumps 及 TEMP/TMP/npm 缓存; 不得复用日常配置或终止其他实例的模型进程。
 - 单纯浏览文件不得触发 AI 预测; 规则推荐不依赖模型, AI 预测仅在用户主动完成讲解后运行。
-- `npm run test:journey` 须在 `npm run build` 后运行: 真实 Electron 操作验收, 配置与截图仅写入已忽略的 `.planning/journey/`; AI 回答、故障与延迟使用测试替身, 不代表真实模型质量已验收。真实新用户完成时间、系统缩放档位、真实模型回答质量仍需独立验收。
+- `npm run test:journey` 须在 `npm run build` 后运行, 且运行前必须先停掉 dev 实例: 双实例同跑会互抢窗口焦点, 悬停提示类断言会间歇失败。真实 Electron 操作验收, 配置与截图仅写入已忽略的 `.planning/journey/`; AI 回答、故障与延迟使用测试替身, 不代表真实模型质量已验收。真实新用户完成时间、系统缩放档位、真实模型回答质量仍需独立验收。
 - 在线 API(provider `cloud`): 服务商预设只在 src/shared/cloudVendors.ts 的 `CLOUD_VENDORS` 增删, 地址必须取自官方文档; Key 落盘必须经 src/ai/secretCodec.ts(主进程注入 safeStorage; 仅系统加密不可用时退回明文), 禁止绕过它直接写入 ai-config.json; 未确认隐私(`cloud.consented`)不得发请求; 不做状态轮询请求(按次计费), 上下文不探测、只用设置档位; 内置引擎专属请求字段(`timings` 闸门)不得发给在线 API。
 - dev 模式内置引擎不随仓库分发: 按 `.github/workflows/release.yml` 的 `LLAMA_TAG` 从 llama.cpp release 下载至 `vendor/llama-cpp/`, 或从本机其他检出复制; 亦可在设置中改用 LM Studio, 基础导览不依赖 AI。
 
