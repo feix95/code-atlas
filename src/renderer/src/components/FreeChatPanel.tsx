@@ -95,11 +95,11 @@ export function FreeChatPanel({
   const chatFiles = useChatFiles(chat.note)
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
-  // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,只让箭头跳一下报信
+  // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,浮出箭头报个位。
+  // 箭头浮出时轻弹一次报信;流式期间保持安静 —— 逐段重放弹跳动画会变成高频闪动(小葵案)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
-  const [newBeat, setNewBeat] = useState(0)
 
   function onMessagesScroll(): void {
     const el = scrollRef.current
@@ -182,7 +182,9 @@ export function FreeChatPanel({
     return undefined
   }, [chat.messages])
 
-  // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就让箭头 key 变一变、蹦一下。
+  // 流式增量每补一段,消息数组就换一次新引用;粘着底部就压到底,不在底就什么都不做 ——
+  // 原先这里会让箭头 key 变一变、蹦一下报信,但流式下每段增量都触发重挂,0.45s 弹跳动画
+  // 被每秒打断几十次重放,成了高频闪动(小葵案);报信的活儿改由浮出那一次轻弹承担。
   // 面板挂载后的第一轮是「认门」:同一场对话从别的分支重挂过来(点绿字跳预览最常见),
   // 按滚动记忆回到用户刚才的位置;真新对话(指纹对不上)才滚到最新
   const restoredRef = useRef(false)
@@ -200,7 +202,6 @@ export function FreeChatPanel({
       return
     }
     if (atBottomRef.current) el.scrollTop = el.scrollHeight
-    else setNewBeat((c) => c + 1)
   }, [chat.messages])
 
   /** 示例问题点了直接发,跟输入框发送走同一条流程;常驻的引用/文件跟着一起带;小探针忙着回上一题就不接 */
@@ -436,7 +437,6 @@ export function FreeChatPanel({
         </div>
         {showJump && (
           <button
-            key={newBeat}
             type="button"
             className="chat-jump"
             onClick={jumpToLatest}
