@@ -9,6 +9,7 @@ import type {
 import { TAG } from '@shared/promptTags'
 import { collectHistoryRounds, CHAT_HISTORY_SEND_MAX } from '@shared/chatHistory'
 import type { ChatImage } from '@shared/chatImage'
+import type { ChatFileAttachment } from '@shared/chatFiles'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
@@ -97,8 +98,16 @@ export function useAiChat(
   adopt: (userText: string, answer: string) => void
   /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
   compact: () => void
-  /** 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二锤),允许只发图不发字 */
-  send: (question: string, refs?: ChatCodeRef[], images?: ChatImage[]) => void
+  /**
+   * 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二锤);files = 这轮带的文件附件
+   * (文件附件锤,对齐 Claude Code 的 @文件);允许只发图/只发文件不发字
+   */
+  send: (
+    question: string,
+    refs?: ChatCodeRef[],
+    images?: ChatImage[],
+    files?: ChatFileAttachment[]
+  ) => void
   cancel: () => void
 } {
   const [messages, setMessages] = useState<ChatMessage[]>(() => [])
@@ -256,12 +265,18 @@ export function useAiChat(
     }
   }, [])
 
-  function send(question: string, refs?: ChatCodeRef[], images?: ChatImage[]): void {
+  function send(
+    question: string,
+    refs?: ChatCodeRef[],
+    images?: ChatImage[],
+    files?: ChatFileAttachment[]
+  ): void {
     const q = question.trim()
-    // 带引用的允许「只发代码不发问题」,带图也一样:图本身就是问题,主进程会给兜底问法
+    // 带引用/文件允许「只发资料不发问题」,带图也一样:图和文件本身就是问题,主进程会给兜底问法
     const useRefs = refs && refs.length > 0 ? refs : undefined
     const useImages = images && images.length > 0 ? images : undefined
-    if ((!q && !useRefs && !useImages) || busyRef.current) return
+    const useFiles = files && files.length > 0 ? files : undefined
+    if ((!q && !useRefs && !useImages && !useFiles) || busyRef.current) return
     const requestId = crypto.randomUUID()
     idRef.current = requestId
     busyRef.current = true
@@ -276,6 +291,7 @@ export function useAiChat(
         state: 'done',
         web: null,
         refs: useRefs,
+        files: useFiles,
         images: useImages
       },
       { key: botKey, role: 'assistant', text: '', state: 'busy', web: null }
@@ -293,6 +309,7 @@ export function useAiChat(
           conversationId: conversationIdRef.current,
           context: contextRef.current,
           codeRefs: useRefs,
+          files: useFiles,
           images: useImages,
           thinking: thinkingRef.current,
           agent: agentOn || undefined,

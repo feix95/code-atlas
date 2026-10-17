@@ -70,7 +70,6 @@ export function SettingsPage({
   const [scale, setScale] = useState(() => window.atlas.getUiScale())
   const [saveError, setSaveError] = useState<string | null>(null)
   // 当前分类的户口已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航账本
-  const [privacyOpen, setPrivacyOpen] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   // 模型清单带着来源户口:LM Studio 与在线 API 各读各的,切来源后旧清单不串台
   const [models, setModels] = useState<{ provider: AiProviderKind; ids: string[] }>({
@@ -413,14 +412,7 @@ export function SettingsPage({
               onChatSuggestionsChange={onChatSuggestionsChange}
             />
           )}
-          {page === 'net' && (
-            <SettingsNet
-              config={config}
-              onConfigChange={commitConfig}
-              privacyOpen={privacyOpen}
-              setPrivacyOpen={setPrivacyOpen}
-            />
-          )}
+          {page === 'net' && <SettingsNet config={config} onConfigChange={commitConfig} />}
           {page === 'about' && <SettingsAbout appVersion={appVersion} />}
         </div>
       </div>

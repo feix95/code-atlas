@@ -4,7 +4,7 @@ import { PROVIDER_OPTIONS } from '@shared/aiSetup'
 import type { ContextBill } from '@shared/contextBill'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { TreeIcon } from './Icons'
-import { CfgQ, CfgRow } from './CfgRow'
+import { CfgRow } from './CfgRow'
 import { CloudConsent } from './CloudConsent.tsx'
 import { EngineBackendPanel } from './EngineBackendPanel.tsx'
 import { LaunchPlanCard } from './LaunchPlanCard.tsx'
@@ -138,26 +138,30 @@ export function SettingsModel({
           ) : isBuiltin ? (
             <>
               <div className="cfg-divider" />
-              <CfgRow label="模型文件" hint="本地推理使用的 GGUF 模型文件。">
-                <div className="cfg-ctlcol">
-                  <div className="cfg-file">
-                    <span className="cfg-file-name" data-tip={modelPath.trim() || undefined}>
-                      {modelPath.trim() ? fileBasename(modelPath) : '未选择'}
-                    </span>
-                    <button
-                      type="button"
-                      id="cfg-model-path"
-                      className="cfg-btn"
-                      onClick={() => void pickModel()}
-                    >
-                      浏览…
-                    </button>
-                  </div>
-                  {modelPath.trim() && fitNote && fitNote.level === 'missing' && (
-                    <p className="cfg-note is-missing">
+              <CfgRow
+                label="模型文件"
+                hint={
+                  modelPath.trim() && fitNote && fitNote.level === 'missing' ? (
+                    <span className="cfg-hint is-missing">
                       ✕ {fitNote.title}：{fitNote.detail}
-                    </p>
-                  )}
+                    </span>
+                  ) : (
+                    '本地推理使用的 GGUF 模型文件。'
+                  )
+                }
+              >
+                <div className="cfg-file">
+                  <span className="cfg-file-name" data-tip={modelPath.trim() || undefined}>
+                    {modelPath.trim() ? fileBasename(modelPath) : '未选择'}
+                  </span>
+                  <button
+                    type="button"
+                    id="cfg-model-path"
+                    className="cfg-btn"
+                    onClick={() => void pickModel()}
+                  >
+                    浏览…
+                  </button>
                 </div>
               </CfgRow>
               {/* 智能启动锤:这台机器会怎么跑当前模型,摊成一张卡;
@@ -171,73 +175,63 @@ export function SettingsModel({
               {/* 引擎后端管理(第 4 期):推荐 + 一键安装 + 手动选择 */}
               <EngineBackendPanel config={config} onConfigChange={onConfigChange} />
               <div className="cfg-divider" />
-              <CfgRow
-                label={
-                  <>
-                    模型货架
-                    <CfgQ tip="热门模型榜单；按机器规模筛选，可直接下载。" />
-                  </>
-                }
-              >
+              <CfgRow label="模型货架" hint="热门模型榜单；按机器规模筛选，可直接下载。">
                 <button type="button" className="cfg-btn" onClick={() => setShelfOpen(true)}>
                   <TreeIcon name="sparkles" size={13} mono />
                   打开模型货架
                 </button>
               </CfgRow>
               <div className="cfg-divider" />
-              <CfgRow label="上下文窗口">
-                <div className="cfg-ctlcol">
-                  <div className="cfg-ctx">
-                    <input
-                      className="cfg-input cfg-ctx-input"
-                      autoComplete="off"
-                      inputMode="numeric"
-                      value={contextRaw}
-                      placeholder="留空自动探测"
-                      aria-label="上下文窗口"
-                      onChange={(e) => {
-                        // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
-                        setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
-                      }}
-                      onBlur={onContextBlur}
-                    />
-                    <select
-                      className="cfg-select"
-                      aria-label="上下文预设"
-                      value={ctxSelectValue}
-                      onChange={(e) => {
-                        if (e.target.value === 'auto') setContextRaw('')
-                        else if (e.target.value !== '__custom')
-                          commitContextValue(Number(e.target.value))
-                      }}
-                    >
-                      <option value="auto">自动</option>
-                      {contextNotches.map((n) => (
-                        <option key={n} value={n}>
-                          {n / 1024}k
-                        </option>
-                      ))}
-                      {/* 手填的非档位值:下拉显示空白,不占选项位 */}
-                      <option value="__custom" hidden />
-                    </select>
-                  </div>
-                  {ctxBill && <p className={`cfg-note is-${ctxBill.level}`}>{ctxBill.text}</p>}
+              <CfgRow
+                label="上下文窗口"
+                hint={
+                  ctxBill ? (
+                    <span className={`cfg-hint is-${ctxBill.level}`}>{ctxBill.text}</span>
+                  ) : (
+                    '模型一次能记住的 token 上限；留空自动探测。'
+                  )
+                }
+              >
+                <div className="cfg-ctx">
+                  <input
+                    className="cfg-input cfg-ctx-input"
+                    autoComplete="off"
+                    inputMode="numeric"
+                    value={contextRaw}
+                    placeholder="留空自动探测"
+                    aria-label="上下文窗口"
+                    onChange={(e) => {
+                      // 第八十九锤:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
+                      setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
+                    }}
+                    onBlur={onContextBlur}
+                  />
+                  <select
+                    className="cfg-select"
+                    aria-label="上下文预设"
+                    value={ctxSelectValue}
+                    onChange={(e) => {
+                      if (e.target.value === 'auto') setContextRaw('')
+                      else if (e.target.value !== '__custom')
+                        commitContextValue(Number(e.target.value))
+                    }}
+                  >
+                    <option value="auto">自动</option>
+                    {contextNotches.map((n) => (
+                      <option key={n} value={n}>
+                        {n / 1024}k
+                      </option>
+                    ))}
+                    {/* 手填的非档位值:下拉显示空白,不占选项位 */}
+                    <option value="__custom" hidden />
+                  </select>
                 </div>
               </CfgRow>
             </>
           ) : (
             <>
               <div className="cfg-divider" />
-              <CfgRow
-                label={
-                  <>
-                    服务地址
-                    <CfgQ
-                      tip={`代码将上传至该服务器；在 LM Studio 启用「开发者」服务，默认地址 ${DEFAULT_LMSTUDIO_BASE_URL}。`}
-                    />
-                  </>
-                }
-              >
+              <CfgRow label="服务地址" hint="代码将上传至该服务器；需开启「开发者」服务。">
                 <input
                   className="cfg-input cfg-url-input"
                   value={config.lmstudio.baseUrl}

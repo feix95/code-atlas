@@ -11,6 +11,7 @@ import {
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
   AGENT_SEARCH_MAX_PATH_HITS,
+  sliceAgentRead,
   type AgentStreamEvent
 } from '../ai/agent.ts'
 import { webSearchDetailed } from '../ai/weblookup.ts'
@@ -248,11 +249,12 @@ export async function agentSearchContent(
   }
 }
 
-/** read_file 的执行手:读文本文件,超长只读开头一段并注明,绝不静默截断 */
+/** read_file 的执行手(对齐 Claude Code 的 Read):读文本文件,每行带行号;
+ *  offset/limit 支持翻页,超长按行截断并注明,绝不静默截断 */
 export async function agentReadFile(
   rootPath: string,
   relPath: string,
-  maxChars: number
+  read: { offset: number; limit: number; maxChars: number }
 ): Promise<{ ok: boolean; text: string; hint?: string }> {
   let abs: string
   try {
@@ -276,14 +278,7 @@ export async function agentReadFile(
   const raw = await fs.readFile(abs, 'utf8').catch(() => null)
   if (raw === null) return { ok: false, text: `读 ${relPath} 时出了岔子(权限或编码),读不了` }
   if (raw.length === 0) return { ok: true, text: `${relPath} 是个空文件` }
-  if (raw.length > maxChars) {
-    return {
-      ok: true,
-      text: `${raw.slice(0, maxChars)}\n……(文件太长,只读了开头约 ${maxChars} 字,全文共 ${raw.length} 字)`,
-      hint: `读了开头 ${maxChars} 字 / 全文 ${raw.length} 字`
-    }
-  }
-  return { ok: true, text: raw, hint: `全文 ${raw.length} 字` }
+  return sliceAgentRead(raw, read)
 }
 
 export async function agentRequestDirectoryAccess(

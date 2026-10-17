@@ -1,10 +1,9 @@
-// 预览引用与文件链接:选段挂卡、拖文件挂整份、AI 提到的绿字点开跳行、右键菜单。
+// 预览引用与文件链接:选段挂卡、AI 提到的绿字点开跳行、右键菜单。
 // 对外全靠 ref 传话(openFileLink 身份稳定),账本本体住在这个钩子里。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, ScanResult } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
-import { planWholeFileRef } from '@shared/preview'
 import type { NoteMap } from '@shared/notes'
 import { openFilePathMenuFor } from './components/filePathMenuStore'
 import { collectRelPaths, findFile } from './scanTreeTools'
@@ -13,7 +12,6 @@ import type { PaneGroup } from './paneTabs'
 
 export function usePreviewRefs(deps: {
   result: ScanResult | null
-  folder: string | null
   notes: NoteMap
   chat: AiChatApi
   chatRef: React.RefObject<AiChatApi>
@@ -26,7 +24,6 @@ export function usePreviewRefs(deps: {
 }) {
   const {
     result,
-    folder,
     notes,
     chat,
     chatRef,
@@ -141,42 +138,6 @@ export function usePreviewRefs(deps: {
     addPreviewRef(ref)
   }
 
-  // 拖文件进聊天挂引用(第一百二十五锤):读一份 → 按「整份引用」的账裁好 → 挂卡;
-  // 文件夹和读不了的垫灰字指路,不装死。引用额度满了也照实说
-  async function handleDropNode(kind: 'file' | 'folder', relPath: string): Promise<void> {
-    if (!result || !folder) return
-    if (kind === 'folder') {
-      chat.note('文件夹挂不上引用——点它一下,就能给探针换参考资料')
-      return
-    }
-    if (previewRefs.length >= CODE_REFS_MAX) {
-      chat.note(`一轮最多引用 ${CODE_REFS_MAX} 段,想换新的先摘一段`)
-      return
-    }
-    const f = findFile(result.tree, relPath)
-    if (!f) return
-    try {
-      const res = await window.atlas.readPreview(folder, relPath)
-      if (res.status !== 'ok') {
-        chat.note(res.reason)
-        return
-      }
-      const plan = planWholeFileRef({ text: res.text, refLimit: CODE_REFS_MAX, canAddRef: true })
-      if (plan.code.trim() === '') {
-        chat.note('这个文件是空的,挂了也没东西可讲')
-        return
-      }
-      addPreviewRef({
-        relPath: f.relPath,
-        startLine: plan.startLine,
-        endLine: plan.endLine,
-        code: plan.code
-      })
-    } catch {
-      chat.note('这个文件读不了(可能被系统占用),挂不上引用')
-    }
-  }
-
   return {
     previewRefs,
     setPreviewRefs,
@@ -184,7 +145,6 @@ export function usePreviewRefs(deps: {
     fileLinks,
     addPreviewRef,
     removePreviewRef,
-    handleDropNode,
     handleDropRef
   }
 }

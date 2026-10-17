@@ -5,7 +5,6 @@ import assert from 'node:assert/strict'
 import {
   clipPreview,
   looksBinary,
-  planWholeFileRef,
   PREVIEW_MAX_BYTES,
   visibleLineRange
 } from '../src/shared/preview.ts'
@@ -138,35 +137,8 @@ function main(): void {
     '刚好到上限不算太长'
   )
 
-  // ── 10. 整份引用(第一百一十四锤补2):钮上的话和真要送出去的东西,必须是同一件事 ──
-  const whole = { text: 'a\nb\nc', refLimit: 6, canAddRef: true, charCap: 2000 }
-  const full = planWholeFileRef(whole)
-  assert.equal(full.label, '引用全文', '带得完整份就直说全文')
-  assert.equal(full.code, 'a\nb\nc', '正文原样带走,一个字节不多不少')
-  assert.equal(full.endLine, 3, '三行就是三行')
-  assert.equal(full.canAdd, true, '额度没满点得动')
-
-  // 超额度:只带开头,末尾留省略号(跟主进程同一套裁法),行号报到「真带上了第几行」
-  const clipped = planWholeFileRef({ ...whole, text: 'a\nb\nc\nd\ne', charCap: 5 })
-  assert.equal(clipped.label, '引用开头一段', '带不完整份就不许说「全文」')
-  assert.equal(clipped.code, 'a\nb\nc……', '前 5 字 + 省略号')
-  assert.equal(clipped.code.length, 7, '裁法跟主进程一致:额度 5 字,加省略号就是 7 个字')
-  assert.equal(clipped.endLine, 3, '行号只报到真带上的那一行,后面两行不算')
-  assert.ok(
-    clipped.title.includes('5') && clipped.title.includes('额度'),
-    '悬停说明要交代额度这个来由'
-  )
-
-  // 正好切在换行符上:没带上的下一行不许算进行号
-  const onBreak = planWholeFileRef({ ...whole, text: 'aa\nbb\ncc', charCap: 6 })
-  assert.equal(onBreak.code, 'aa\nbb\n……', '切在换行符上')
-  assert.equal(onBreak.endLine, 2, '切在换行符上时,没带上的第三行不算进来')
-
-  // 额度用满:点不动,而且照实说满在哪儿
-  const full6 = planWholeFileRef({ ...whole, canAddRef: false })
-  assert.equal(full6.canAdd, false, '额度满了就是不可点')
-  assert.equal(full6.label, '引用已满', '钮上直说满了,不装作没反应')
-  assert.ok(full6.title.includes('6'), '悬停说明报出额度数')
+  // ── 10. 整份引用已退役(文件附件锤):拖文件改走 <attached_files> 附件,
+  // planWholeFileRef 连同自测一起摘除;新口径见 selftest-fileattach ──
 
   // ── 12. 文档缩放夹紧(Ctrl+滚轮这锤):系数不许飞出档外,脏值回 100% ──
   assert.equal(clampDocZoom(1.5), 1.5, '档内原样')
@@ -177,7 +149,7 @@ function main(): void {
 
   console.log('✅ 代码预览自测全部通过')
   console.log(
-    '   全文不裁 · 换行归一 · 空文件 · 谢客线量级 · 可视区账(顶部/中部/防御/短文件/行高兜底) · 二进制嗅探 · 选区几何与浮钮文案 · 整份引用的账'
+    '   全文不裁 · 换行归一 · 空文件 · 谢客线量级 · 可视区账(顶部/中部/防御/短文件/行高兜底) · 二进制嗅探 · 选区几何与浮钮文案'
   )
 }
 

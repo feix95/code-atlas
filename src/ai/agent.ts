@@ -36,6 +36,9 @@ export const AGENT_MAX_DEPTH = 12
 /** read_file 拒收的体积上限:再大的文件就该让用户挑一段引用,别整读 */
 export const AGENT_FILE_MAX_BYTES = 5 * 1024 * 1024
 
+/** read_file 单次最多读几行(对齐 Claude Code 的 2000 行默认):想读更多就带 offset 翻页 */
+export const AGENT_READ_LIMIT_MAX = 2000
+
 /**
  * 单次读文件的字数额度,看锅下菜:锅小少读点,锅大放宽到 12000 字。
  * 16384 的锅 → 5461 字;8192 → 2731(触底保护前);4096 → 2000(触底);32768 往上 → 12000(封顶)。
@@ -44,6 +47,65 @@ export const AGENT_FILE_MAX_BYTES = 5 * 1024 * 1024
  */
 export function agentReadChars(contextTokens: number): number {
   return Math.min(12000, Math.max(2000, Math.floor(contextTokens / 3)))
+}
+
+/** read_file 一次读出的成品:带行号的正文 + 行账;ok:false = offset 跑到文件外面了 */
+export interface AgentReadSlice {
+  ok: boolean
+  text: string
+  hint?: string
+}
+
+/**
+ * read_file 的行号正文与截断注记(纯函数,自测覆盖;对齐 Claude Code 的 Read 行为):
+ * 从 offset 行(1 起)开始、最多 limit 行,每行前置「行号+制表符」;
+ * 再受 maxChars 字数额度二道掐(小模型的保险丝)。截断时尾巴垫 program_note,
+ * 明写「只带了第 X-Y 行 / 共 Z 行」和接着读的 offset —— 模型能自己翻页,绝不静默截断。
+ */
+export function sliceAgentRead(
+  raw: string,
+  input: { offset: number; limit: number; maxChars: number }
+): AgentReadSlice {
+  const lines = raw.split('\n')
+  const totalLines =
+    lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+  const offset = Math.max(1, Math.floor(input.offset) || 1)
+  if (offset > totalLines)
+    return {
+      ok: false,
+      text: `文件只有 ${totalLines} 行,offset=${offset} 跑到文件外面了;offset 从 1 起数`
+    }
+  const limit = Math.max(
+    1,
+    Math.min(AGENT_READ_LIMIT_MAX, Math.floor(input.limit) || AGENT_READ_LIMIT_MAX)
+  )
+  const maxChars = Math.max(1, Math.floor(input.maxChars) || 1)
+  const kept: string[] = []
+  let used = 0
+  let end = offset - 1
+  let hardCut = false
+  for (let n = offset; n <= totalLines && kept.length < limit; n += 1) {
+    const numbered = `${n}\t${lines[n - 1]}`
+    const cost = kept.length === 0 ? numbered.length : numbered.length + 1
+    if (used + cost > maxChars) break
+    used += cost
+    kept.push(numbered)
+    end = n
+  }
+  if (kept.length === 0) {
+    // 第一行自己就超额度(压缩成一行的怪文件):把它裁断带上,别让模型空手而归
+    kept.push(`${offset}\t${lines[offset - 1]}`.slice(0, Math.max(1, maxChars - 1)) + '…')
+    end = offset
+    hardCut = true
+  }
+  let text = kept.join('\n')
+  if (end < totalLines) {
+    text += `\n${TAG.programNote.open}只带了第 ${offset}-${end} 行 / 共 ${totalLines} 行;要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 offset=${end + 1} 再读;先找某段内容就先用 ${TOOL_NAMES.searchContent} 搜关键词${TAG.programNote.close}`
+  } else if (hardCut) {
+    // 行数上"带完了",但这行本身被额度裁断 —— 也要照实说,不静默
+    text += `\n${TAG.programNote.open}第 ${offset} 行太长,只带了开头一部分${TAG.programNote.close}`
+  }
+  return { ok: true, text, hint: `读了第 ${offset}-${end} 行 / 共 ${totalLines} 行` }
 }
 
 /** 账面换算:约几个字算一个 token。代码偏 4 字一个,中文偏 2 字一个,取 3 打粗账 */
@@ -199,11 +261,13 @@ export const AGENT_TOOLS_LOCAL = [
     type: 'function',
     function: {
       name: TOOL_NAMES.readFile,
-      description: '读取一个文本文件。',
+      description: '读取文本文件,每行带行号;很长时用 offset/limit 分段读。',
       parameters: {
         type: 'object',
         properties: {
           relPath: { type: 'string', description: '根内文件路径' },
+          offset: { type: 'integer', description: '第几行开始读(1 起)' },
+          limit: { type: 'integer', description: '最多读几行(默认 2000)' },
           rootId: { type: 'string' }
         },
         required: ['relPath']

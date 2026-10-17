@@ -15,6 +15,7 @@ import { sendAgentStep } from './agentTools.ts'
 import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from './chatMemory.ts'
 import { estimateThreadTokens, toPlainHistory } from '../ai/chatThread.ts'
 import { imageGate, planImageBudget, sanitizeChatImages } from '../shared/chatImage.ts'
+import { planFileAttachments, sanitizeChatFiles } from '../shared/chatFiles.ts'
 import { shrinkChatImage } from './imageShrink.ts'
 import { probeChatVision } from './modelStatus.ts'
 import type { AgentChatMessage } from '../ai/agent.ts'
@@ -33,6 +34,7 @@ import {
   explainWithMessages,
   isContextOverflow,
   buildAttachmentText,
+  buildFileAttachmentsText,
   sanitizeAttachment,
   sanitizeCodeRefs,
   buildFreeChatMessages,
@@ -40,7 +42,8 @@ import {
   resolveWebLookupMeta,
   hasSearchIntent,
   STYLE_SAMPLE_SYSTEM,
-  STYLE_SAMPLE_QUESTION
+  STYLE_SAMPLE_QUESTION,
+  type PlannedChatFile
 } from '../ai/index.ts'
 import { webLookupDetailed, webLookup } from '../ai/weblookup.ts'
 import { loadAiConfig } from '../ai/config.ts'
@@ -88,12 +91,25 @@ export function registerChatIpc(): void {
         webLookup: notRequested
       }
     }
-    // 带了引用就允许「只发代码不发问题」,这时给一句通用问法当题目 ——
+    // 文件附件(对齐 Claude Code 的 @文件):同图片一个口径先洗白收编 ——
+    // 数量/形状都验过;带了文件却一个都没进来的,直接说清为什么不放行,不静默丢文件
+    const fileSan = sanitizeChatFiles(body.files)
+    const files = fileSan.files
+    if (Array.isArray(body.files) && body.files.length > 0 && files.length === 0) {
+      return {
+        status: 'error',
+        text: `文件没能收进来:${fileSan.rejected.join(';') || '读不出内容'}`,
+        model: '',
+        durationMs: Date.now() - startedAt,
+        webLookup: notRequested
+      }
+    }
+    // 带引用/文件就允许「只发资料不发问题」,这时给一句通用问法当题目 ——
     // 光甩几段代码过去,模型不知道该讲哪一面。先用保底账探一下有没有引用,
     // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs);
-    // 只发图不发字也行 —— 图本身就是问题,给一句看图兜底问法
+    // 只发图、只发文件都不发字也行 —— 图和文件本身就是题目,给一句兜底问法
     const hasRefs = sanitizeCodeRefs(body.codeRefs).length > 0
-    if (!question && !hasRefs && images.length === 0) {
+    if (!question && !hasRefs && images.length === 0 && files.length === 0) {
       return {
         status: 'error',
         text: '先输入一句话再发送',
@@ -103,7 +119,14 @@ export function registerChatIpc(): void {
       }
     }
     const questionText =
-      question || (images.length > 0 ? '看看这张图片,说说你看到了什么' : '讲讲选中的这段代码')
+      question ||
+      (files.length > 0
+        ? images.length > 0
+          ? '看看带进来的图片和文件,说说里面是什么'
+          : '看看带进来的文件,说说里面是什么'
+        : images.length > 0
+          ? '看看这张图片,说说你看到了什么'
+          : '讲讲选中的这段代码')
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const attachment = sanitizeAttachment(body.context)
     // 思考模式(第一百一十五锤):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
@@ -130,8 +153,12 @@ export function registerChatIpc(): void {
         sendAgentStep(event, requestId, `有图片没带进来:${imgSan.rejected.join(';')}`)
     }
     // 翻文件模式跟图片不对付(第一百五十二锤):带图这轮强制不翻,垫句灰字说清楚
+    // (文件附件是纯文本,跟翻文件不冲突,两者可以一起用 —— 附件截断时探针还能顺着 offset 续读)
     const agentOn = body.agent === true && images.length === 0
     if (body.agent === true && !agentOn) sendAgentStep(event, requestId, '这一轮带图片,没有翻文件')
+    // 有文件没带进来的(部分被拒):垫句灰字照实说,别装无事发生
+    if (files.length > 0 && fileSan.rejected.length > 0)
+      sendAgentStep(event, requestId, `有文件没带进来:${fileSan.rejected.join(';')}`)
 
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
@@ -221,9 +248,29 @@ export function registerChatIpc(): void {
           : shrinkChatImage(img, seat.width, seat.height)
       })
     }
+    // 文件附件(对齐 Claude Code 的 @文件):整份装得下就整份带,装不下按行截断,
+    // 行账明写给模型;额度跟着上下文走(穷保底、富封顶),和图片/引用同一个预算口径
+    let filesBlock: string | null = null
+    let fileTokens = 0
+    if (files.length > 0) {
+      const plan = planFileAttachments({
+        ctxTokens: resolved.ctx,
+        replyTokens: cap,
+        otherTokens: baseFixedTokens + imageTokens,
+        files: files.map((f) => ({ text: f.text, totalLines: f.totalLines }))
+      })
+      const plannedFiles: PlannedChatFile[] = files.map((f, i) => ({
+        ...f,
+        text: plan[i].text,
+        shownEndLine: plan[i].shownEndLine,
+        truncated: plan[i].truncated
+      }))
+      filesBlock = buildFileAttachmentsText(plannedFiles, { agentOn })
+      fileTokens = estimateTokens(filesBlock)
+    }
     // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
-    // 固定开销 = 人设+附件+本轮问题+联网资料+图片,历史预算从剩余座位里划
-    const fixedTokens = baseFixedTokens + imageTokens
+    // 固定开销 = 人设+附件+本轮问题+联网资料+图片+文件,历史预算从剩余座位里划
+    const fixedTokens = baseFixedTokens + imageTokens + fileTokens
     const memory = planChatMemory({
       body,
       provider: resolved.provider,
@@ -257,7 +304,8 @@ export function registerChatIpc(): void {
         codeRefs,
         resolved.teaching,
         summary,
-        sendImages
+        sendImages,
+        filesBlock ?? undefined
       )
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了

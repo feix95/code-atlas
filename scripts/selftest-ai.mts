@@ -2184,10 +2184,13 @@ async function main(): Promise<void> {
   // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
   // OpenAI tools 协议骨架(type/function/parameters/required 一个不能少)的实测下限是
   // 1159 字 —— 就算把 copy L 没覆盖的 web_search query 参数说明也摘掉也只到 1082。
-  // 逐字稿不能动,秤先放在实测值上,压回 1000 需要砍稿子或砍参数说明
+  // 逐字稿不能动,秤先放在实测值上,压回 1000 需要砍稿子或砍参数说明。
+  // 文件附件锤(对齐 Claude Code)又加了 read_file 的 offset/limit 两个整数参数:
+  // 协议骨架本身就要 +55 字(裸参数都不带描述的极限),加上最精简的说明共实测 1318,
+  // 压回 1200 已不可能;秤挪到 1320,继续待 lead 定夺要不要砍说明文字。
   assert.ok(
-    toolsJson <= 1200,
-    `四件工具说明书 JSON ≤1200 字(原红线 1000 与逐字稿冲突,待 lead 定夺),实测 ${toolsJson}`
+    toolsJson <= 1320,
+    `四件工具说明书 JSON ≤1320 字(1200 → 1320:read_file 加 offset/limit 分页参数的硬成本;待 lead 定夺),实测 ${toolsJson}`
   )
 
   console.log('✅ AI 人话解释自测全部通过')

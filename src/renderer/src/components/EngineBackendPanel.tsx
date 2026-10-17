@@ -1,9 +1,8 @@
-// 「推理引擎」面板(第 4 期):机器推荐 + 一键安装(带进度)+ 手动选择。
-// 默认全自动 —— 推荐的后端没装就挂一条「推荐安装」;装了哪个用哪个,
-// 自指程序路径(高级用法)仍然最大。任何下载都要用户点了「安装」才走。
-import { useEffect, useRef, useState } from 'react'
+// 「推理引擎」面板(第 4 期):行格式与全页统一 —— 一行标题一行注解,右栏放操作;
+// 推荐的后端在行内标「推荐安装」;装了哪个用哪个,自指程序路径(高级用法)仍然最大。
+// 任何下载都要用户点了「安装」才走。
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
-  approxDownloadMB,
   BACKEND_PREFERENCE,
   ENGINE_CATALOG,
   type EngineBackend,
@@ -23,7 +22,7 @@ const STAGE_LABEL: Record<string, string> = {
 
 type PanelState = { status: 'loading' | 'error' } | { status: 'ready'; info: EngineStateInfo }
 
-/** 「推理引擎」管理面板:推荐条 + 三后端清单 + 手动选择下拉 */
+/** 「推理引擎」管理:状态注解 + 引擎选择下拉 + 三后端行内安装/删除 */
 export function EngineBackendPanel({
   config,
   onConfigChange
@@ -66,7 +65,7 @@ export function EngineBackendPanel({
       ...config,
       builtin: { ...config.builtin, backend: b === 'auto' ? undefined : b }
     })
-    // 选了还没装的后端 → engineState 的 wantInstall 会推「推荐安装」条
+    // 选了还没装的后端 → engineState 的 wantInstall 会在该行标「推荐安装」
     void refresh()
   }
 
@@ -92,129 +91,114 @@ export function EngineBackendPanel({
   const installing = progress ?? info?.installing ?? null
   const wantInstall = info?.wantInstall ?? null
 
+  // 行注解:状态一句话(检查中/出错/在用);版本串只在悬停里兜底展示
+  const rowHint: React.ReactNode =
+    state.status === 'loading' ? (
+      '正在检查引擎……'
+    ) : state.status === 'error' ? (
+      '引擎状态读取失败，不影响使用。'
+    ) : info?.active ? (
+      <>
+        本地推理引擎；
+        <span data-tip={info.active.version ?? undefined}>正在使用 {info.active.label}</span>。
+      </>
+    ) : (
+      '本地推理引擎；当前没有可用引擎。'
+    )
+
   return (
-    <CfgRow
-      label={
-        <>
-          推理引擎
-          <CfgQ tip="运行本地模型的推理引擎；按机器自动推荐，自带引擎始终可用。" />
-        </>
-      }
-      stacked
-    >
-      <div>
-        {state.status === 'loading' && <p className="cfg-note lp-note">正在检查引擎……</p>}
-        {state.status === 'error' && (
-          <p className="cfg-note lp-note">
-            引擎状态读取失败，不影响使用。
-            <button type="button" className="cfg-btn" onClick={() => void refresh()}>
-              重试
-            </button>
-          </p>
-        )}
-        {info && (
+    <>
+      <div className="cfg-divider" />
+      <CfgRow
+        label={
           <>
-            <p className="lp-line" data-tip={info.active?.version ?? undefined}>
-              {info.active ? `${info.active.label} · 正在使用` : '没有可用引擎'}
-            </p>
-            {/* 推荐安装条:只挂横幅不自动下载,点「安装」才走网 */}
-            {wantInstall && !installing && (
-              <div className="eng-banner">
-                <span>
-                  推荐安装{ENGINE_CATALOG[wantInstall].displayName}引擎，约{' '}
-                  {approxDownloadMB(wantInstall)}MB
-                </span>
-                <button
-                  type="button"
-                  className="cfg-btn eng-install"
-                  onClick={() => void install(wantInstall)}
-                >
-                  安装
-                </button>
-              </div>
-            )}
-            {installing && (
-              <div className="eng-progress">
-                <div className="eng-bar">
-                  <div className="eng-bar-fill" style={{ width: `${installing.percent}%` }} />
-                </div>
-                <span className="cfg-note">
-                  {STAGE_LABEL[installing.stage] ?? installing.stage} · {installing.percent}%
-                </span>
-                <button
-                  type="button"
-                  className="cfg-btn"
-                  onClick={() => void window.atlas.engineInstallCancel(installing.backend)}
-                >
-                  取消
-                </button>
-              </div>
-            )}
-            {installErr && <p className="cfg-note is-missing">✕ {installErr}</p>}
-            <ul className="eng-list">
-              {BACKEND_PREFERENCE.map((b) => {
-                const installed = info.installed.includes(b)
-                const busy = installing?.backend === b
-                return (
-                  <li key={b} className="eng-item">
-                    <div className="eng-item-head">
-                      <b>{ENGINE_CATALOG[b].displayName}</b>
-                      <span className={`eng-state ${installed ? 'is-in' : ''}`}>
-                        {installed ? '已安装' : '未安装'}
-                      </span>
-                      {!installed && (
-                        <button
-                          type="button"
-                          className="cfg-btn"
-                          disabled={busy || installing !== null}
-                          onClick={() => void install(b)}
-                        >
-                          安装
-                        </button>
-                      )}
-                      {installed && (
-                        <button
-                          type="button"
-                          className="cfg-btn"
-                          disabled={installing !== null}
-                          onClick={() => void remove(b)}
-                        >
-                          删除
-                        </button>
-                      )}
-                    </div>
-                    <p className="cfg-note lp-hint">{ENGINE_CATALOG[b].oneLine}</p>
-                  </li>
-                )
-              })}
-            </ul>
-            <div className="lp-field">
-              <label htmlFor="eng-choice">引擎选择</label>
-              <div className="lp-field-ctl">
-                <select
-                  id="eng-choice"
-                  className="cfg-select"
-                  disabled={!config || installing !== null}
-                  value={backendChoice(config?.builtin.backend)}
-                  onChange={(e) => setBackend(e.target.value as EngineBackendChoice)}
-                >
-                  <option value="auto">自动(推荐)</option>
-                  {BACKEND_PREFERENCE.map((b) => (
-                    <option key={b} value={b}>
-                      {ENGINE_CATALOG[b].displayName}
-                      {info.installed.includes(b) ? '' : '，未安装'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="cfg-note lp-hint">自动选择这台机器最快的引擎。</p>
-            </div>
-            <p className="cfg-note lp-hint lp-tail">
-              下载失败或无网络时，可在高级选项手动指定引擎路径。
-            </p>
+            推理引擎
+            <CfgQ tip="下载失败或无网络时，可在高级选项手动指定引擎路径。" />
           </>
+        }
+        hint={installErr ? <span className="cfg-hint is-bad">✕ {installErr}</span> : rowHint}
+      >
+        {state.status === 'error' ? (
+          <button type="button" className="cfg-btn" onClick={() => void refresh()}>
+            重试
+          </button>
+        ) : info ? (
+          <select
+            className="cfg-select"
+            aria-label="引擎选择"
+            disabled={!config || installing !== null}
+            value={backendChoice(config?.builtin.backend)}
+            onChange={(e) => setBackend(e.target.value as EngineBackendChoice)}
+          >
+            <option value="auto">自动(推荐)</option>
+            {BACKEND_PREFERENCE.map((b) => (
+              <option key={b} value={b}>
+                {ENGINE_CATALOG[b].displayName}
+                {info.installed.includes(b) ? '' : '，未安装'}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span />
         )}
-      </div>
-    </CfgRow>
+      </CfgRow>
+      {info &&
+        BACKEND_PREFERENCE.map((b) => {
+          const installed = info.installed.includes(b)
+          const busy = installing?.backend === b
+          const recommended = !installed && b === wantInstall
+          return (
+            <Fragment key={b}>
+              <div className="cfg-divider" />
+              <CfgRow label={ENGINE_CATALOG[b].displayName} hint={ENGINE_CATALOG[b].oneLine}>
+                {busy && installing ? (
+                  <div className="eng-install">
+                    <div className="eng-bar">
+                      <div className="eng-bar-fill" style={{ width: `${installing.percent}%` }} />
+                    </div>
+                    <span className="cfg-note">
+                      {STAGE_LABEL[installing.stage] ?? installing.stage} · {installing.percent}%
+                    </span>
+                    <button
+                      type="button"
+                      className="cfg-btn"
+                      onClick={() => void window.atlas.engineInstallCancel(b)}
+                    >
+                      取消
+                    </button>
+                  </div>
+                ) : (
+                  <div className="cfg-ctl">
+                    <span
+                      className={`eng-state${installed ? ' is-in' : recommended ? ' is-want' : ''}`}
+                    >
+                      {installed ? '已安装' : recommended ? '推荐安装' : '未安装'}
+                    </span>
+                    {installed ? (
+                      <button
+                        type="button"
+                        className="cfg-btn"
+                        disabled={installing !== null}
+                        onClick={() => void remove(b)}
+                      >
+                        删除
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="cfg-btn"
+                        disabled={installing !== null}
+                        onClick={() => void install(b)}
+                      >
+                        安装
+                      </button>
+                    )}
+                  </div>
+                )}
+              </CfgRow>
+            </Fragment>
+          )
+        })}
+    </>
   )
 }

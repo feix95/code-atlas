@@ -199,6 +199,13 @@ async function main(): Promise<void> {
   assert.ok(readTool.function.parameters.properties.rootId, 'read_file 能带临时目录编号')
   assert.ok(searchTool.function.parameters.properties.rootId, 'search_content 能带临时目录编号')
   assert.ok(searchTool.function.parameters.properties.relPath, 'search_content 的范围参数可选')
+  // read_file 翻页参数(对齐 Claude Code 的 Read):offset/limit 可选项,续读靠它
+  assert.ok(readTool.function.parameters.properties.offset, 'read_file 能带 offset 从某一行接着读')
+  assert.ok(readTool.function.parameters.properties.limit, 'read_file 能带 limit 限定行数')
+  assert.ok(
+    readTool.function.description.includes('行号'),
+    'read_file 的描述说清每行带行号(模型要靠它对行账)'
+  )
 
   // web_search 的必填是搜索词 query;source 分流已随统一源队列退役(2026-09-17:Tavily→DDG→维基)
   const webTool = AGENT_TOOLS.find((t) => t.function.name === 'web_search')!
