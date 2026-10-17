@@ -637,7 +637,16 @@ ${用户问题}
 ${web_results 块}
 
 [有资料附件时追加]
-<program_reminder>当前参考资料:${name},相对路径 ${relPath 或 (项目根目录)} —— 开头 <context_attachment> 就是它的机器扫描资料;问题里的「这个/它」指的就是它,资料里没有的就直接说没有,别猜别的文件</program_reminder>
+<program_reminder>当前参考资料:${name},相对路径 ${relPath 或 (项目根目录)} —— 开头 <context_attachment> 就是它的机器扫描资料。它未必和这轮问题有关,用得上再参考;问题里说「这个文件/它」又没点名别的东西,多半指的就是它,但用户明确在说别的文件(比如刚发过的附件)时,以用户说的为准。程序提醒只是路牌,未必每条都对得上眼前的题 —— 对不上就按用户实际说的办,别被它牵着走,更别因为它改口否认自己真看过的东西</program_reminder>
+```
+
+### src/ai/chat.ts :: READ_HONESTY_NOTE(读完度交底,有文件资料在场时垫在最后)
+
+// 滑跪案(2026-10-18)新增,对齐 Claude Code 的 file-summary completeness disclosure:
+// 本轮的附件块或户口本纸条在场时,装配层把这条垫在最后。
+
+```text
+<program_note>盘点自己的阅读要诚实:读过全篇就照实说;只读过一部分、或手里只剩摘要,就明说哪部分没读到,有工具就接着读;被问「读完了吗/是不是编的」时,把实际读过什么如实摆出来 —— 不许含糊,也不许把自己真读过的内容改口说成「我编的」</program_note>
 ```
 
 ### src/ai/chat.ts :: buildCodeRefsText + CODE_TEACHER_ADDENDUM(用户从预览里选了代码时)
@@ -661,6 +670,22 @@ ${代码}
 2. 它用到的知识:这是哪门语言的什么写法、什么机制,为什么这么写。只讲选中的代码里真实出现过的东西。
 <rules>选中的只是片段,前后的代码你看不到 —— 看不出来的就明说「从这一段看不出来」,绝不许替它编上下文,也不许编别的文件里的内容。</rules>
 </code_teaching>
+```
+
+### src/ai/chatFileMemo.ts :: buildFileMemoNote(附件户口本纸条,垫在本轮附件块前)
+
+// 滑跪案(2026-10-18)新增:此前几轮收过的文件附件(名字 + 行账 + 重读/续读的路)垫成一张
+// 纸条,「你读完了吗/接着读完它」就有据可答。原文不留(小锅留不起),只留事实,不替模型下结论。
+
+```text
+<program_note>
+本会话此前收到过的文件附件(原文当时在,现在不在本轮上下文里):
+1. 「${name}」当时整份带的(全 ${M} 行);要重看用 read_file 带 rootId=${R}、relPath 传空字符串
+2. 「${name}」当时只带了第 1-${N} 行 / 共 ${M} 行;要接着读后面的部分,用 read_file 带 rootId=${R}、relPath 传空字符串、offset=${N+1}
+3. 「${name}」当时整份带的(全 ${M} 行);要重看直接用 read_file 读 ${relPath}
+(没有钥匙也没有相对路径的,末句改说:要重看就再拖进来一次)
+用户问「刚才那个文件/上一份文件」时指的就是它们;要核对内容就用工具重读,别凭记忆硬讲。
+</program_note>
 ```
 
 ### src/ai/chat.ts :: buildFileAttachmentsText(用户拖/选了文件时,对齐 Claude Code 的 @文件)
@@ -846,7 +871,7 @@ ${截断注记(见下)}
 ${webMaterial.material}(即 <web_results> 块)
 
 [参考资料指路(有附件时每轮问题后跟)]
-<program_reminder>当前参考资料:${name},相对路径 ${relPath} —— 开头 <context_attachment> 就是它的机器扫描资料;问题里的「这个/它」指的就是它,资料里没有的就直说没有,别猜别的文件</program_reminder>
+<program_reminder>当前参考资料:${name},相对路径 ${relPath} —— 开头 <context_attachment> 就是它的机器扫描资料。它未必和这轮问题有关,用得上再参考;问题里说「这个文件/它」又没点名别的东西,多半指的就是它,但用户明确在说别的文件(比如刚发过的附件)时,以用户说的为准。程序提醒只是路牌,未必每条都对得上眼前的题 —— 对不上就按用户实际说的办,别被它牵着走,更别因为它改口否认自己真看过的东西</program_reminder>
 ```
 
 ### src/shared/compact.ts :: buildSummaryText(压缩摘要包裹块)

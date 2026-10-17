@@ -638,6 +638,12 @@ async function main(): Promise<void> {
   assert.ok(freeMsgs[3]?.content.includes('你是谁'), '当前问题收尾')
   // 资料提示贴着问题走(小葵报的案):附件隔着几轮历史小模型就忘了,问题尾要跟一句「当前参考资料是谁」
   assert.ok(freeMsgs[3]?.content.includes('当前参考资料:components'), '问题尾要带当前参考资料提示')
+  assert.ok(
+    freeMsgs[3]?.content.includes('未必和这轮问题有关') &&
+      freeMsgs[3]?.content.includes('以用户说的为准'),
+    '滑跪案:资料提示改软口径(未必有关、以用户说的为准),不再把「它」钉死'
+  )
+  assert.ok(freeMsgs[3]?.content.includes('程序提醒只是路牌'), '滑跪案:路牌可无视也并进资料提示')
 
   const bareMsgs = buildFreeChatMessages(
     '小探针人设',

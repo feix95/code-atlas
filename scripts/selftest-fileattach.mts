@@ -11,7 +11,11 @@ import {
   sanitizeChatFiles,
   type ChatFileAttachment
 } from '../src/shared/chatFiles.ts'
-import { buildFileAttachmentsText, buildFreeChatMessages } from '../src/ai/chat.ts'
+import {
+  buildFileAttachmentsText,
+  buildFreeChatMessages,
+  READ_HONESTY_NOTE
+} from '../src/ai/chat.ts'
 import { sliceAgentRead } from '../src/ai/agent.ts'
 import { TAG } from '../src/shared/promptTags.ts'
 
@@ -263,6 +267,17 @@ function main(): void {
   assert.ok(
     cutGrantedNoAgent.includes('后面的部分不在当前上下文里'),
     '没开翻文件:照实说,不开空头支票'
+  )
+
+  // 读完度交底(滑跪案):文件资料在场时垫的那条,交底 + 防假道歉都要在
+  assert.ok(
+    READ_HONESTY_NOTE.startsWith(TAG.programNote.open) &&
+      READ_HONESTY_NOTE.endsWith(TAG.programNote.close),
+    '交底注记包 program_note'
+  )
+  assert.ok(
+    READ_HONESTY_NOTE.includes('读过全篇就照实说') && READ_HONESTY_NOTE.includes('改口说成'),
+    '交底与防假道歉两件都在'
   )
 
   // ── 6. 消息装配:文件块垫在引用后、问题前,相邻合并成一条 ──

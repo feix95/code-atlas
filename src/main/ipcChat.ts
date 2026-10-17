@@ -14,6 +14,8 @@ import { runAgentChat } from './agentChat.ts'
 import { agentDirectoryAccess, sendAgentStep } from './agentTools.ts'
 import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from './chatMemory.ts'
 import { estimateThreadTokens, toPlainHistory } from '../ai/chatThread.ts'
+import { sanitizeConversationId } from '../ai/chatSessions.ts'
+import { buildFileMemoNote, createChatFileMemoStore } from '../ai/chatFileMemo.ts'
 import { imageGate, planImageBudget, sanitizeChatImages } from '../shared/chatImage.ts'
 import { planFileAttachments, sanitizeChatFiles } from '../shared/chatFiles.ts'
 import { shrinkChatImage } from './imageShrink.ts'
@@ -35,6 +37,7 @@ import {
   isContextOverflow,
   buildAttachmentText,
   buildFileAttachmentsText,
+  READ_HONESTY_NOTE,
   sanitizeAttachment,
   sanitizeCodeRefs,
   buildFreeChatMessages,
@@ -61,6 +64,9 @@ import type {
   AiHistoryMessage,
   WebLookupMeta
 } from '../shared/types.ts'
+
+/** 附件户口本(滑跪案这锤):最近带过的文件附件记在内存里,下一轮垫成纸条(详见 ai/chatFileMemo.ts) */
+const chatFileMemo = createChatFileMemoStore()
 
 export function registerChatIpc(): void {
   // 自由对话:独立通道、独立人设(Atlas 小探针)。当前选中对象的资料以「附件」身份
@@ -249,9 +255,14 @@ export function registerChatIpc(): void {
       })
     }
     // 文件附件(对齐 Claude Code 的 @文件):整份装得下就整份带,装不下按行截断,
-    // 行账明写给模型;额度跟着上下文走(穷保底、富封顶),和图片/引用同一个预算口径
+    // 行账明写给模型;额度跟着上下文走(穷保底、富封顶),和图片/引用同一个预算口径。
+    // 附件户口本(滑跪案这锤):先取此前收过的文件纸条垫在本轮资料前,再把这轮的附件记进账
+    const memoConversationId = sanitizeConversationId(body.conversationId)
+    const memoEntries = chatFileMemo
+      .peek(memoConversationId)
+      .filter((m) => !files.some((f) => f.name === m.name))
+    const memoNote = buildFileMemoNote(memoEntries)
     let filesBlock: string | null = null
-    let fileTokens = 0
     if (files.length > 0) {
       const plan = planFileAttachments({
         ctxTokens: resolved.ctx,
@@ -273,9 +284,22 @@ export function registerChatIpc(): void {
           rootId: granted?.rootId
         })
       }
+      chatFileMemo.update(
+        memoConversationId,
+        plannedFiles.map((f) => ({
+          name: f.name,
+          relPath: f.relPath,
+          rootId: f.rootId,
+          shownEndLine: f.shownEndLine,
+          totalLines: f.totalLines
+        }))
+      )
       filesBlock = buildFileAttachmentsText(plannedFiles, { agentOn })
-      fileTokens = estimateTokens(filesBlock)
     }
+    const attachLayers = [memoNote, filesBlock].filter((x): x is string => x !== null)
+    const attachBlock =
+      attachLayers.length > 0 ? [...attachLayers, READ_HONESTY_NOTE].join('\n\n') : null
+    const fileTokens = attachBlock ? estimateTokens(attachBlock) : 0
     // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
     // 固定开销 = 人设+附件+本轮问题+联网资料+图片+文件,历史预算从剩余座位里划
     const fixedTokens = baseFixedTokens + imageTokens + fileTokens
@@ -313,7 +337,7 @@ export function registerChatIpc(): void {
         resolved.teaching,
         summary,
         sendImages,
-        filesBlock ?? undefined
+        attachBlock ?? undefined
       )
     // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
