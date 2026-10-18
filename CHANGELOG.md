@@ -464,3 +464,4 @@
 - docs: AGENTS.md 补 dev 分离启动——宿主服务重启会回收后台 shell,跨重启保活须用 Start-Process 分离启动;另记 cmd「set VAR=」后接 && 的空格坑(空格被吃进变量值,复现 ELECTRON_RUN_AS_NODE 红线)
 - feat(ui): 自由对话内容中轴限宽 38rem→45rem(720px,与设置页同宽);hero/内容栏/chips/输入舱共用 --fc-col-w token
 - feat(settings): 设置页模型卡下拉框收成短/中两档宽(8rem/10rem);选项文案全改裸值,「当前推荐 X」「未安装」等尾巴退役,对齐 LM Studio 口径
+- docs(handbook): 清理 Devin 专属表述——AGENTS.md 改称「宿主 Agent」,需求规格与代码注释摘除 Devin 字样
