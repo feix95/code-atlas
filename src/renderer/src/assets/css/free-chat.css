@@ -1,6 +1,11 @@
 /* 自由对话页样式:整页网页式布局(顶行/hero空场/内容栏/一行胶囊舱/+菜单/思考行/扁平回答)。
    从 ai-chat.css 拆出,纯搬家不改行为;AI 共用件(空态/通知卡/讲解卡/兜底网)仍在 ai-chat.css。 */
 
+/* ── 对话页中轴户口:hero/内容栏/chips/输入舱共用一把限宽尺,微调改一处,不散落硬编码 ── */
+:root {
+  --fc-col-w: 45rem; /* 中轴限宽(720px @16px 根字号;与设置页 .cfg-pane 同宽) */
+}
+
 /* ── AI 对话 Tab ── */
 
 .chat-shell {
@@ -23,7 +28,7 @@
 .fc-hero {
   margin: auto;
   width: 100%;
-  max-width: 38rem;
+  max-width: var(--fc-col-w);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -45,7 +50,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
-  width: min(38rem, 100%);
+  width: min(var(--fc-col-w), 100%);
 }
 
 .fc-hero .fc-chips {
@@ -93,7 +98,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  width: min(38rem, 100%);
+  width: min(var(--fc-col-w), 100%);
   margin: 0 auto;
   padding: var(--space-4) var(--space-4) 0.25rem;
 }
@@ -219,7 +224,7 @@
  * 满五行封顶,右上角出拨杆,拨上去多撑五行(共十行),舱内自己滚 */
 .chat-input {
   position: relative;
-  width: min(38rem, 100%);
+  width: min(var(--fc-col-w), 100%);
   border: 1px solid var(--line);
   border-radius: 1.375rem;
   background: var(--surface);
