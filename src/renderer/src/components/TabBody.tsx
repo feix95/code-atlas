@@ -132,7 +132,7 @@ export function TabBody({
       />
     )
   }
-  // 关系图谱:资源管理器的图形视图,规格见 docs/to-do list《关系图谱-实施方案.md》
+  // 关系图谱:资源管理器的图形视图,规格见 docs/archive《关系图谱-实施方案.md》
   if (tab.kind === 'graph') {
     return (
       <GraphView

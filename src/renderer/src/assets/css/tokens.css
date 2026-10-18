@@ -32,7 +32,7 @@
   --font-display: 1.625rem;
   --font-title: 1.75rem;
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
-  /* ── UI v3 比例布局(规格:docs/to-do list/UI重构-v3-比例布局)──
+  /* ── UI v3 比例布局(规格:docs/archive/UI重构-v3-比例布局)──
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
   --u: 2.5rem; /* chrome 比例基准;JS 侧同值在 shared/uiScale.ts CHROME_U_REM */
   /* 树行层级缩进/级(小葵实测:原 1.125rem 减半定稿) */

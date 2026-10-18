@@ -465,3 +465,4 @@
 - feat(ui): 自由对话内容中轴限宽 38rem→45rem(720px,与设置页同宽);hero/内容栏/chips/输入舱共用 --fc-col-w token
 - feat(settings): 设置页模型卡下拉框收成短/中两档宽(8rem/10rem);选项文案全改裸值,「当前推荐 X」「未安装」等尾巴退役,对齐 LM Studio 口径
 - docs(handbook): 清理 Devin 专属表述——AGENTS.md 改称「宿主 Agent」,需求规格与代码注释摘除 Devin 字样
+- docs(todo): 历史需求整体归档——docs/to-do list 全部移入新建 docs/archive,原文件夹清空只收未完成需求;交接文档与代码注释引用路径同步
