@@ -68,6 +68,7 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - `npm run test:journey` 须在 `npm run build` 后运行, 且运行前必须先停掉 dev 实例: 双实例同跑会互抢窗口焦点, 悬停提示类断言会间歇失败。真实 Electron 操作验收, 配置与截图仅写入已忽略的 `.planning/journey/`; AI 回答、故障与延迟使用测试替身, 不代表真实模型质量已验收。真实新用户完成时间、系统缩放档位、真实模型回答质量仍需独立验收。
 - 在线 API(provider `cloud`): 服务商预设只在 src/shared/cloudVendors.ts 的 `CLOUD_VENDORS` 增删, 地址必须取自官方文档; Key 落盘必须经 src/ai/secretCodec.ts(主进程注入 safeStorage; 仅系统加密不可用时退回明文), 禁止绕过它直接写入 ai-config.json; 未确认隐私(`cloud.consented`)不得发请求; 不做状态轮询请求(按次计费), 上下文不探测、只用设置档位; 内置引擎专属请求字段(`timings` 闸门)不得发给在线 API。
 - dev 模式内置引擎不随仓库分发: 按 `.github/workflows/release.yml` 的 `LLAMA_TAG` 从 llama.cpp release 下载至 `vendor/llama-cpp/`, 或从本机其他检出复制; 亦可在设置中改用 LM Studio, 基础导览不依赖 AI。
+- 拖入即授权(文件续读): 系统拖/选进来的文件凭本机绝对路径换本次运行的只读门卡(主进程 realpath 验真、只发单个文件; 内存账本, 关应用即失效); 截断正文的续读注记带 rootId, 模型可用 read_file(relPath 传空字符串)续读; 文件树拖入走项目内 relPath, 不占门卡; 单文件门卡不支持列名单搜内容。另有会话级附件户口本: 最近收到的文件(名字/行账/续读钥匙)以纸条垫进下一轮, 「刚才那个文件」类追问有据可答。
 
 ## 文档维护
 

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import { ROOT_FONT_BASE_PX, clampUiScale } from '../shared/uiScale.ts'
 import { readNumPref, writeNumPref } from '../shared/localPrefs.ts'
@@ -145,6 +145,14 @@ const atlasApi = {
   /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话,不硬塞乱码) */
   readPreview: (rootPath: string, relPath: string): Promise<FilePreviewResult> =>
     ipcRenderer.invoke(CH.readPreview, rootPath, relPath),
+  /** 系统拖/选进来的文件对象 → 它的本机绝对路径(拖入即授权的凭据);拿不到就回空串 */
+  getPathForFile: (file: File): string => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
   depGraph: (rootPath: string): Promise<DepGraphResult> =>
     ipcRenderer.invoke(CH.depGraph, rootPath),
   // ── 文件编辑与监视(预览编辑锤) ──

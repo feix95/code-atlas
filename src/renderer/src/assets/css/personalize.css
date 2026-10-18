@@ -25,6 +25,15 @@
   border-color: var(--chrome-muted);
 }
 
+/* 下拉宽度两档(整列排成工整的表格):短档 = 参数值,中档 = 词组名;同一列只许出现这两档 */
+.cfg-select-sm {
+  width: 8rem;
+}
+
+.cfg-select-md {
+  width: 10rem;
+}
+
 .cfg-textarea {
   width: 100%;
   min-height: 5.25rem;

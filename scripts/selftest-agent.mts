@@ -3,6 +3,9 @@
 // 要等真模型联调;这边的每一条都是循环翻车的地基。
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   AGENT_KEEP_RECENT_TOOLS,
   AGENT_LIST_MAX_ENTRIES,
@@ -59,8 +62,9 @@ import {
   AgentDirectoryAccess,
   PROJECT_AGENT_ROOT,
   isPathInside,
+  joinAuthorizedRoot,
   sanitizeAgentRootId,
-  sanitizeExternalDirectoryPath
+  sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 
@@ -77,11 +81,11 @@ async function main(): Promise<void> {
   assert.equal(sanitizeAgentRelPath('C:/Windows/system32'), null, '盘符注入拒收')
   assert.equal(sanitizeAgentRelPath('/etc/passwd'), null, '绝对路径拒收')
   assert.equal(sanitizeAgentRelPath('.\\..\\secrets'), null, '反斜杠版上跳也拒收')
-  assert.equal(sanitizeExternalDirectoryPath('src'), null, '外部目录申请不收相对路径')
+  assert.equal(sanitizeExternalAbsPath('src'), null, '外部路径申请不收相对路径')
   assert.equal(
-    sanitizeExternalDirectoryPath('C:\\outside\\demo'),
+    sanitizeExternalAbsPath('C:\\outside\\demo'),
     'C:\\outside\\demo',
-    '外部目录申请只收洗净的绝对路径'
+    '外部路径只收洗净的绝对路径'
   )
   assert.equal(sanitizeAgentRootId(undefined), PROJECT_AGENT_ROOT, '不传目录编号默认项目根')
   assert.equal(sanitizeAgentRootId('external_2'), 'external_2', '临时目录编号格式放行')
@@ -89,20 +93,20 @@ async function main(): Promise<void> {
   const access = new AgentDirectoryAccess()
   assert.deepEqual(
     access.resolve('E:\\project', undefined),
-    { rootId: PROJECT_AGENT_ROOT, path: 'E:\\project', external: false },
+    { rootId: PROJECT_AGENT_ROOT, path: 'E:\\project', external: false, kind: 'dir' },
     '默认只指向当前项目'
   )
   assert.equal(access.resolve('E:\\project', 'external_1'), null, '没授权的临时编号打不开')
   const granted = access.grant('D:\\shared\\demo')
   assert.deepEqual(
     granted,
-    { rootId: 'external_1', path: 'D:\\shared\\demo' },
+    { rootId: 'external_1', path: 'D:\\shared\\demo', kind: 'dir' },
     '首个同意目录拿到本次运行的一号门卡'
   )
   assert.deepEqual(access.grant('D:\\shared\\demo'), granted, '同一目录重复同意复用原门卡')
   assert.deepEqual(
     access.resolve('E:\\project', 'external_1'),
-    { rootId: 'external_1', path: 'D:\\shared\\demo', external: true },
+    { rootId: 'external_1', path: 'D:\\shared\\demo', external: true, kind: 'dir' },
     '同意后的编号只解到对应目录'
   )
   assert.equal(access.resolve('E:\\project', 'external_2'), null, '猜别的编号仍打不开')
@@ -117,6 +121,43 @@ async function main(): Promise<void> {
     '同盘相邻目录不是授权范围'
   )
   assert.equal(isPathInside('D:\\shared\\demo', 'C:\\Windows\\a.ts'), false, '跨盘目标不是授权范围')
+
+  // 文件门卡(拖入即授权):只发真实存在的单个文件;编号解得到,穿沙盒读得到
+  const grantSandbox = await mkdtemp(join(tmpdir(), 'atlas-file-grant-'))
+  try {
+    const notePath = join(grantSandbox, 'long-note.txt')
+    await writeFile(notePath, '第一行\n第二行\n第三行\n', 'utf8')
+    const realNote = await realpath(notePath)
+    assert.equal(await access.grantFile('relative\\note.txt'), null, '相对路径发不出文件门卡')
+    assert.equal(await access.grantFile(grantSandbox), null, '文件夹走目录授权那条,不发文件门卡')
+    assert.equal(
+      await access.grantFile(join(grantSandbox, 'missing.txt')),
+      null,
+      '不存在的文件发不出门卡'
+    )
+    const fileGrant = await access.grantFile(notePath)
+    assert.ok(fileGrant, '真是文件才发门卡')
+    assert.deepEqual(
+      fileGrant,
+      { rootId: 'external_2', path: realNote, kind: 'file' },
+      '门卡记的是 realpath 后的绝对路径'
+    )
+    assert.deepEqual(await access.grantFile(notePath), fileGrant, '同一文件重复授权复用原门卡')
+    assert.deepEqual(
+      access.resolve('E:\\project', 'external_2'),
+      { rootId: 'external_2', path: realNote, external: true, kind: 'file' },
+      '文件门卡编号只解到那份文件'
+    )
+    assert.equal(
+      await joinAuthorizedRoot(realNote, ''),
+      realNote,
+      '穿沙盒:relPath 空串直达文件本体'
+    )
+    await assert.rejects(joinAuthorizedRoot(realNote, 'x.txt'), '穿沙盒:带子路径越不过去')
+    await assert.rejects(joinAuthorizedRoot(realNote, '../x'), '穿沙盒:上跳越不过去')
+  } finally {
+    await rm(grantSandbox, { recursive: true, force: true })
+  }
 
   // ── 2. 读文件额度:看锅下菜,穷有底富有顶(第一百三十七锤放宽一档,压缩接客) ──
   assert.equal(agentReadChars(4096), 2000, '小锅触底:一段也保 2000 字')
@@ -904,7 +945,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    '✅ agent 纯逻辑自测:路径安检 / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
+    '✅ agent 纯逻辑自测:路径安检 / 文件门卡(拖入即授权) / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
   )
 }
 

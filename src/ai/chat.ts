@@ -234,9 +234,13 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
     : ''
   // 资料提示贴着问题走(小葵报的案):附件虽垫在最前,中间隔着几轮历史,小模型就忘了它的
   // 存在,问「这个呢?」开始瞎猜文件名。每轮问题后面跟一张「当前参考资料是谁」的程序提醒,
-  // 让近因偏置替我们干活 —— 详版资料照旧在开头,这里只报名字指路
+  // 让近因偏置替我们干活 —— 详版资料照旧在开头,这里只报名字指路。
+  // 滑跪案(2026-10-18)改软口径:老文案把「它」硬钉在当前参考资料上,用户追问「刚才那个
+  // 文件」时模型被这句牵着走,把上一轮的真回答误判成幻觉 —— 对齐 Claude Code 的
+  // 「may or may not be related」:只报未必有关、多半是它、以用户说的为准。
+  // 「程序插话只是路牌」这条也并进这张提醒(常驻切片顶防反弹秤,只在用得着的场景垫)
   const refHint = attachment
-    ? `\n\n${TAG.programReminder.open}当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头 ${TAG.contextAttachment.open} 就是它的机器扫描资料;问题里的「这个/它」指的就是它,资料里没有的就直说没有,别猜别的文件${TAG.programReminder.close}`
+    ? `\n\n${TAG.programReminder.open}当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头 ${TAG.contextAttachment.open} 就是它的机器扫描资料。它未必和这轮问题有关,用得上再参考;问题里说「这个文件/它」又没点名别的东西,多半指的就是它,但用户明确在说别的文件(比如刚发过的附件)时,以用户说的为准。程序提醒只是路牌,未必每条都对得上眼前的题 —— 对不上就按用户实际说的办,别被它牵着走,更别因为它改口否认自己真看过的东西${TAG.programReminder.close}`
     : ''
   // 注意力锚(答旧题修复·刀三,2.0 换成 XML):历史洗干净后旧问题都是干净短句,当前问题后面
   // 却粘着联网资料/参考资料指路话,小模型按「长得最像待答问题」作答就会偏 —— 包一对显式标签,
@@ -299,16 +303,25 @@ export type PlannedChatFile = ChatFileAttachment & {
   shownEndLine: number
   /** 有没有没带进来的部分 */
   truncated: boolean
+  /** 拖入即授权的文件门卡编号(主进程发牌成功才有):截断注记凭它给续读指引 */
+  rootId?: string
 }
 
 /** 截断注记(对齐 Claude Code 的「truncated + 续读路径」):续读指引只在翻文件开着、
- *  且文件就在项目里(有 relPath)时给 —— 没有工具或没有路径时,说了也是空头支票 */
+ *  且拿得到钥匙时给 —— 项目内文件走 relPath;系统拖入的文件走拖入即授权的
+ *  rootId(relPath 传空字符串)。没工具或没钥匙时说了也是空头支票,照实说不在上下文里 */
 function buildFileTruncatedNote(file: PlannedChatFile, agentOn: boolean): string {
   const range = `第 1-${file.shownEndLine} 行 / 共 ${file.totalLines} 行`
-  const body =
-    agentOn && file.relPath
-      ? `文件太长,只带了 ${range};要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 offset=${file.shownEndLine + 1} 再读;先找某段内容就先用 ${TOOL_NAMES.searchContent} 搜关键词`
-      : `文件太长,只带了开头 ${file.shownEndLine} 行 / 共 ${file.totalLines} 行,后面的部分不在当前上下文里`
+  const readBack = !agentOn
+    ? null
+    : file.rootId
+      ? `要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 rootId=${file.rootId}、relPath 传空字符串、offset=${file.shownEndLine + 1} 再读`
+      : file.relPath
+        ? `要接着读后面的部分,用 ${TOOL_NAMES.readFile} 带 offset=${file.shownEndLine + 1} 再读;先找某段内容就先用 ${TOOL_NAMES.searchContent} 搜关键词`
+        : null
+  const body = readBack
+    ? `文件太长,只带了 ${range};${readBack}`
+    : `文件太长,只带了开头 ${file.shownEndLine} 行 / 共 ${file.totalLines} 行,后面的部分不在当前上下文里`
   return `${TAG.programNote.open}${body}${TAG.programNote.close}`
 }
 
@@ -337,6 +350,14 @@ export function buildFileAttachmentsText(
     TAG.attachedFiles.close
   ].join('\n')
 }
+
+/**
+ * 读完度交底(滑跪案,对齐 Claude Code 的 file-summary completeness disclosure):
+ * 只要有文件资料在场(本轮的附件块或户口本纸条),就在装配层垫最后一条 ——
+ * 总结/回答前先交代实际读了多少;没读全就明说,能接着读就动手补;
+ * 不许含糊,也不许把自己真读过的内容改口说成「编的」(红口白牙的假道歉比嘴硬更坏)。
+ */
+export const READ_HONESTY_NOTE = `${TAG.programNote.open}盘点自己的阅读要诚实:读过全篇就照实说;只读过一部分、或手里只剩摘要,就明说哪部分没读到,有工具就接着读;被问「读完了吗/是不是编的」时,把实际读过什么如实摆出来 —— 不许含糊,也不许把自己真读过的内容改口说成「我编的」${TAG.programNote.close}`
 
 /**
  * 带引用时给探针加的人设(第一百一十一锤,提示词体系重写第二批换新稿):先讲这段在干什么,再讲它用到的知识。

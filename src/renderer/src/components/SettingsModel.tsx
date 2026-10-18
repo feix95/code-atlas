@@ -92,7 +92,7 @@ export function SettingsModel({
         <>
           <CfgRow label="AI 来源" hint="设置 AI 模型的加载方式。">
             <select
-              className="cfg-select"
+              className="cfg-select cfg-select-sm"
               aria-label="AI 来源"
               value={consentPending ? 'cloud' : config.provider}
               onChange={(e) => {
@@ -207,7 +207,7 @@ export function SettingsModel({
                     onBlur={onContextBlur}
                   />
                   <select
-                    className="cfg-select"
+                    className="cfg-select cfg-select-sm"
                     aria-label="上下文预设"
                     value={ctxSelectValue}
                     onChange={(e) => {

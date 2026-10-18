@@ -124,17 +124,16 @@ export function EngineBackendPanel({
           </button>
         ) : info ? (
           <select
-            className="cfg-select"
+            className="cfg-select cfg-select-md"
             aria-label="引擎选择"
             disabled={!config || installing !== null}
             value={backendChoice(config?.builtin.backend)}
             onChange={(e) => setBackend(e.target.value as EngineBackendChoice)}
           >
-            <option value="auto">自动(推荐)</option>
+            <option value="auto">自动</option>
             {BACKEND_PREFERENCE.map((b) => (
               <option key={b} value={b}>
                 {ENGINE_CATALOG[b].displayName}
-                {info.installed.includes(b) ? '' : '，未安装'}
               </option>
             ))}
           </select>

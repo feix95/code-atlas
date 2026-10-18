@@ -181,7 +181,6 @@ export function LaunchPlanCard({
           没选模型/还没取回已存账时面板禁态摆着,提示在上面的状态行里 */}
       <LaunchAdvancedPanel
         draft={draftForPath ?? {}}
-        autoParams={readyInfo?.autoParams ?? null}
         hasMmproj={!!readyInfo?.mmprojFile}
         disabled={!config || !modelPath.trim() || !draftForPath}
         onChange={commitDraft}

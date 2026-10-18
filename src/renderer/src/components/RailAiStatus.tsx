@@ -1,6 +1,6 @@
 // rail 底槽的 AI 状态钮(UI v3 §6.1):图形形状区分就绪/加载/未连接等状态,图标颜色随主题。
 // 点击弹浮层(锚位:贴钮上方往右弹,Windows 系统托盘/Discord 同款),Esc/点外/滚轮收起。
-// 浮层版式(v4 重设计):头=圆点+供应商真名(在线 API 带服务商)+状态词,
+// 浮层版式(v4 重设计,2026-10-18 小葵定稿):头=供应商真名+状态圆点(随名字尾)+状态词,
 // 身份行=模型名+大小/上下文档位,反馈槽=测试结论与引擎消息共用一行,
 // 底栏=左带路文字链(日志钉最左、AI 设置次之)、右干活描边钮(测试连接/装卸/换模型)。
 // 诚实线:在线 API 没测过只说「已配置」;已在 AI 设置页时该链原名置灰。
@@ -335,8 +335,8 @@ function AiStatusPanel({
       {status && head ? (
         <>
           <div className="ai-pop-head">
-            <span className={`ai-pop-dot is-${head.dot}`} aria-hidden="true" />
             <span className="ai-pop-who">{providerName}</span>
+            <span className={`ai-pop-dot is-${head.dot}`} aria-hidden="true" />
             <span
               className={`ai-pop-state${head.dot === 'bad' ? ' is-error' : ''}`}
               data-tip={head.tip}
@@ -353,7 +353,6 @@ function AiStatusPanel({
               )}
               {status.modelName && metaExtra && <span aria-hidden="true">·</span>}
               {metaExtra && <span>{metaExtra}</span>}
-              {(status.modelName || metaExtra) && visionTag && <span aria-hidden="true">·</span>}
               {visionTag && (
                 <span className="ai-pop-cap" data-tip={visionTag.tip}>
                   {visionTag.label}
@@ -373,21 +372,21 @@ function AiStatusPanel({
           data-tip={feedback.tip}
           role={feedback.ico === 'bad' ? 'alert' : 'status'}
         >
-          <span
-            className={`ai-pop-pico${feedback.ico === 'ok' ? ' is-ok' : ''}${feedback.ico === 'bad' ? ' is-bad' : ''}`}
-            aria-hidden="true"
-          >
-            {feedback.ico === 'spin' ? (
-              <span className="ai-pop-spin" />
-            ) : feedback.ico === 'ok' ? (
-              '✓'
-            ) : feedback.ico === 'bad' ? (
-              '✕'
-            ) : (
-              ''
-            )}
-          </span>
           <span className="ai-pop-probe-text">{feedback.text}</span>
+          {feedback.ico !== 'none' && (
+            <span
+              className={`ai-pop-pico${feedback.ico === 'ok' ? ' is-ok' : ''}${feedback.ico === 'bad' ? ' is-bad' : ''}`}
+              aria-hidden="true"
+            >
+              {feedback.ico === 'spin' ? (
+                <span className="ai-pop-spin" />
+              ) : feedback.ico === 'ok' ? (
+                '✓'
+              ) : (
+                '✕'
+              )}
+            </span>
+          )}
         </div>
       )}
       <div className="ai-pop-actions">

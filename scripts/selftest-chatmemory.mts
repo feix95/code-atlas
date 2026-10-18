@@ -12,6 +12,12 @@ import {
   toTurnRecord
 } from '../src/ai/chatThread.ts'
 import { createChatSessionStore, sanitizeConversationId } from '../src/ai/chatSessions.ts'
+import {
+  buildFileMemoNote,
+  createChatFileMemoStore,
+  sanitizeFileMemo
+} from '../src/ai/chatFileMemo.ts'
+import { TAG } from '../src/shared/promptTags.ts'
 import { buildFreeChatMessages, sanitizeHistory } from '../src/ai/chat.ts'
 import { droppedRoundsNotice, planChatMemory, rememberAgentTurn } from '../src/main/chatMemory.ts'
 
@@ -411,6 +417,82 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
     plain.map((m) => m.role),
     ['system', 'user', 'assistant', 'user']
   )
+}
+
+// ── 附件户口本(滑跪案):纸条记账、洗形、拼条 —— 「你读完了吗/接着读完它」的据 ──
+{
+  const store = createChatFileMemoStore({ sessionsMax: 2, filesMax: 2 })
+  const note = (name: string, totalLines: number, shownEndLine: number, rootId?: string) => ({
+    name,
+    totalLines,
+    shownEndLine,
+    rootId
+  })
+  store.update('c1', [note('a.md', 100, 100, 'external_1')])
+  assert.equal(store.peek('c1')[0].name, 'a.md')
+  store.update('c1', [note('b.md', 50, 20, 'external_2')])
+  assert.deepEqual(
+    store.peek('c1').map((f) => f.name),
+    ['b.md', 'a.md'],
+    '新文件排最前,旧纸条还留着'
+  )
+  store.update('c1', [note('a.md', 100, 100, 'external_1')])
+  assert.deepEqual(
+    store.peek('c1').map((f) => f.name),
+    ['a.md', 'b.md'],
+    '同名以最新为准,不重复占位'
+  )
+  store.update('c1', [note('c.md', 9, 9)])
+  store.update('c1', [note('d.md', 9, 9)])
+  assert.deepEqual(
+    store.peek('c1').map((f) => f.name),
+    ['d.md', 'c.md'],
+    '封顶后只留最近几张'
+  )
+  store.update('c1', [])
+  assert.equal(store.peek('c1').length, 2, '没带附件的轮不清旧账')
+  store.update('', [note('x', 1, 1)])
+  assert.equal(store.peek('').length, 0, '没编号不记账')
+  const capped = createChatFileMemoStore({ sessionsMax: 2, filesMax: 2 })
+  capped.update('a', [note('a.md', 1, 1)])
+  capped.update('b', [note('b.md', 1, 1)])
+  capped.update('c', [note('c.md', 1, 1)])
+  assert.equal(capped.peek('a').length, 0, '最久没用的会话被忘掉')
+
+  // 洗形:坏条目整条丢;行账钳进范围;假格式的钥匙与越界路径丢掉
+  assert.equal(sanitizeFileMemo(null), null)
+  assert.equal(sanitizeFileMemo({ name: '  ', totalLines: 3 }), null)
+  assert.equal(sanitizeFileMemo({ name: 'x', totalLines: 0 }), null)
+  const washed = sanitizeFileMemo({
+    name: ' x.md ',
+    totalLines: 30,
+    shownEndLine: 999,
+    rootId: 'external_007',
+    relPath: '..\\bad'
+  })
+  assert.ok(washed)
+  assert.equal(washed.shownEndLine, 30, '行账钳到总行数')
+  assert.equal(washed.rootId, undefined, '假格式的钥匙丢掉')
+  assert.equal(washed.relPath, undefined, '越界样式的路径丢掉')
+
+  // 拼条:整份/半份/相对路径三种说法齐活
+  const full = buildFileMemoNote([
+    { name: 'a.md', totalLines: 100, shownEndLine: 100, rootId: 'external_1' }
+  ])
+  assert.ok(full && full.startsWith(TAG.programNote.open), '纸条包 program_note')
+  assert.ok(full.includes('整份带的') && full.includes('rootId=external_1'), '整份的纸条给重看的路')
+  const partial = buildFileMemoNote([
+    { name: 'b.md', totalLines: 50, shownEndLine: 20, rootId: 'external_2' }
+  ])
+  assert.ok(
+    partial.includes('只带了第 1-20 行 / 共 50 行') && partial.includes('offset=21'),
+    '没读完的纸条给续读的 offset'
+  )
+  const pathOnly = buildFileMemoNote([
+    { name: 'c.md', totalLines: 50, shownEndLine: 50, relPath: 'docs/c.md' }
+  ])
+  assert.ok(pathOnly.includes('docs/c.md'), '项目内文件用相对路径指路')
+  assert.equal(buildFileMemoNote([]), null, '没纸条不垫话')
 }
 
 console.log('selftest-chatmemory ok')

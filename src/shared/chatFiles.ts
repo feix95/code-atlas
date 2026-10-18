@@ -4,6 +4,8 @@
  * 全是纯函数 —— 渲染层与主进程共用同一把尺子,自测一把全摁住。
  * 路线概要:文件拖/选进来 = 内容进这一轮消息(当资料,不是指令);装不下按行截断,
  * 行账(第 1-N 行 / 共 M 行)明写在提示词里;翻文件开着时探针可带 offset 自己续读。
+ * 系统拖/选进来的另带本机绝对路径(absPath),主进程凭它发本次运行的只读门卡
+ * (拖入即授权),截断的长文件就有续读的钥匙;文件树拖来的走 relPath,不占门卡。
  */
 
 /** 一轮最多带几个文件(和图片同一个口径):小模型上下文有限,一份文件就占不少座 */
@@ -16,12 +18,17 @@ export const CHAT_FILE_CHARS_MAX = 20000
 export const FILE_TOTAL_CHARS_MIN = 6000
 export const FILE_TOTAL_CHARS_MAX = 20000
 
+/** absPath 字段(拖入即授权的凭据)的长度护栏:只做形状约束,真正的授权在翻文件沙盒口二道拦 */
+export const ABS_PATH_MAX_CHARS = 1024
+
 /** 一份已收编的文件附件:id 给界面认账;text 是裁过行边界的正文 */
 export interface ChatFileAttachment {
   id: string
   name: string
   /** 项目内相对路径(文件树拖进来的才有);系统拖进来的没有,探针也就没法顺着它续读 */
   relPath?: string
+  /** 系统拖/选进来的文件在本机的绝对路径(拖入即授权的凭据);文件树拖来的没有 */
+  absPath?: string
   /** 文件正文(已按 CHAT_FILE_CHARS_MAX 裁到行边界) */
   text: string
   /** 文件真实总行数(整份的账,不因裁剪变小) */
@@ -174,12 +181,25 @@ export function sanitizeChatFiles(raw: unknown): SanitizedChatFiles {
       !/^[a-zA-Z]:/.test(relPathRaw)
         ? relPathRaw
         : undefined
+    // 绝对路径只做形状约束(盘符/UNC/斜杠开头);真正的授权在翻文件沙盒口
+    // (realpath + 必须是单个文件)二道拦 —— 和 relPath 同一条口径,这里不是安全边界
+    const absPathRaw = typeof o.absPath === 'string' ? o.absPath.trim() : ''
+    const absPath =
+      absPathRaw !== '' &&
+      absPathRaw.length <= ABS_PATH_MAX_CHARS &&
+      !absPathRaw.includes('\0') &&
+      (/^[a-zA-Z]:[\\/]/.test(absPathRaw) ||
+        absPathRaw.startsWith('\\\\') ||
+        absPathRaw.startsWith('/'))
+        ? absPathRaw
+        : undefined
     const size =
       typeof o.size === 'number' && Number.isFinite(o.size) && o.size >= 0 ? Math.floor(o.size) : 0
     files.push({
       id: typeof o.id === 'string' && o.id !== '' ? o.id : crypto.randomUUID(),
       name,
       relPath,
+      absPath,
       text: text.length > CHAT_FILE_CHARS_MAX ? text.slice(0, CHAT_FILE_CHARS_MAX) : text,
       totalLines,
       size
