@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { FilePreviewImage } from '@shared/types'
+import type { RenameOutcome } from '@shared/fileRename'
 import { formatSize } from '@shared/fsMessages'
 import { useImageViewport } from '../useImageViewport'
 import type { ImageSize } from '@shared/imageZoom'
+import { ImageFileName } from './ImageFileName'
 import { ImageInfoMeta } from './ImageInfoMeta'
 import { ImageZoomControl } from './ImageZoomControl'
 import { Notice } from './Notice'
@@ -20,15 +22,17 @@ function metaSize(image: FilePreviewImage): ImageSize | null {
 /**
  * 图片预览:JPG/PNG 文件签的正文。
  * 默认适应窗口(小图不放大);Ctrl+滚轮以光标为中心缩放;拖拽平移;
- * 双击图片在适应窗口 / 100% 之间切换;底栏百分比单击选档、双击输入。
- * 不碰代码那套只读/引用/折行。
+ * 双击图片在适应窗口 / 100% 之间切换;底栏百分比单击选档、双击输入;
+ * 底栏文件名双击改主名(扩展名保留)。不碰代码那套只读/引用/折行。
  */
 export function ImagePreview({
   fileName,
-  image
+  image,
+  onRename
 }: {
   fileName: string
   image: FilePreviewImage
+  onRename?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   const [phase, setPhase] = useState<ImagePhase>('loading')
   const [natural, setNatural] = useState<ImageSize | null>(() => metaSize(image))
@@ -93,9 +97,7 @@ export function ImagePreview({
         )}
       </div>
       <div className="image-info">
-        <span className="image-info-name" data-tip={fileName}>
-          {fileName}
-        </span>
+        <ImageFileName fileName={fileName} onRename={onRename} />
         <ImageInfoMeta image={image} dims={dims} sizeText={formatSize(image.bytes)} />
         <ImageZoomControl
           percent={zoomPercent}

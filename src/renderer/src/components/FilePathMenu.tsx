@@ -121,7 +121,8 @@ function FilePathMenuCard({
   }, [draft, note])
 
   // 编辑态的两条边界:Esc 只取消(菜单自己会关,这里先记账别让失焦误存)、点菜单外先结账再收摊。
-  // 都挂在 window 捕获期:必须比 useMenuDismiss 的 document 捕获期更早,否则菜单先卸载就来不及了
+  // 都挂在 window 捕获期:必须比 useMenuDismiss 的 document 捕获期更早,否则菜单先卸载就来不及了。
+  // pointerdown 与 mousedown 都听:看图舞台 preventDefault 后浏览器不发 mousedown。
   useEffect(() => {
     if (!editing) return
     const view = doc.defaultView
@@ -129,15 +130,17 @@ function FilePathMenuCard({
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') settledRef.current = true
     }
-    const onMouseDown = (e: MouseEvent): void => {
+    const onOutsideDown = (e: Event): void => {
       if (isDomNode(e.target) && cardRef.current?.contains(e.target)) return
       commitDraft()
     }
     view.addEventListener('keydown', onKeyDown, true)
-    view.addEventListener('mousedown', onMouseDown, true)
+    view.addEventListener('pointerdown', onOutsideDown, true)
+    view.addEventListener('mousedown', onOutsideDown, true)
     return () => {
       view.removeEventListener('keydown', onKeyDown, true)
-      view.removeEventListener('mousedown', onMouseDown, true)
+      view.removeEventListener('pointerdown', onOutsideDown, true)
+      view.removeEventListener('mousedown', onOutsideDown, true)
     }
   }, [editing, doc, commitDraft])
 

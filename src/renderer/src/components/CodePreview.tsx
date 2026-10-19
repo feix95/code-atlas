@@ -311,17 +311,21 @@ export function CodePreview({
       )}
       {/* 图片签(图片预览锤):JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
           image 账没带回来(不该发生)就老实按 reason 说明 */}
-      {!err &&
-        result?.status === 'image' &&
-        (result.image ? (
-          <ImagePreview
-            key={file.relPath}
-            fileName={file.relPath.split(/[\\/]/).pop() ?? file.relPath}
-            image={result.image}
-          />
-        ) : (
-          <p className="code-pane-note">{result.reason || '这张图片的信息没带回来,预览不了'}</p>
-        ))}
+      {!err && result?.status === 'image' && (
+        <>
+          {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
+          {result.image ? (
+            <ImagePreview
+              key={file.relPath}
+              fileName={file.relPath.split(/[\\/]/).pop() ?? file.relPath}
+              image={result.image}
+              onRename={onRenameFile ? requestRename : undefined}
+            />
+          ) : (
+            <p className="code-pane-note">{result.reason || '这张图片的信息没带回来,预览不了'}</p>
+          )}
+        </>
+      )}
       {!err && result?.status === 'ok' && (
         <>
           {copiedAll && <p className="code-pane-note">全文已复制到剪贴板</p>}

@@ -485,3 +485,4 @@
 - refactor(ui): 聊天页底色改用 --canvas-tint,与关系图谱画布同源; 自输入舱「添加附件」去掉悬停提示与提示文案计算; UI 工作台选框抓手改用恒白 token,暗色主题下不再跟着面板变黑
 - docs(core): 合进 main 改为本地合并并 push、不强制 PR,push 后 CI 在 main 验收; workflow 去掉 pull_request 仅监听 main push; AGENTS 与交接文档同步并删冗收口
 - feat(ui): 图片预览支持适应窗口、Ctrl+滚轮对准光标缩放与拖拽平移;底栏百分比单击选档、双击输入,按住像素块查看文件头信息
+- feat(ui): 看图底栏文件名同款芯片并可双击改主名;点预览可关掉右键与缩放菜单,根因是看图 preventDefault 吞掉 mousedown

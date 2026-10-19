@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IMAGE_ZOOM_PRESETS, parseImageZoomPercent } from '@shared/imageZoom'
+import { useMenuDismiss } from '../useMenuDismiss'
 
 /** 单击与双击拆开:等这一阵,没等到第二次点击才弹出档位菜单 */
 const CLICK_WAIT_MS = 280
@@ -24,8 +25,13 @@ export function ImageZoomControl({
   const skipBlurRef = useRef(false)
   const [mode, setMode] = useState<ZoomCtlMode>('idle')
   const [draft, setDraft] = useState('')
+  const [doc, setDoc] = useState<Document | null>(null)
 
   const close = useCallback((): void => setMode('idle'), [])
+
+  useLayoutEffect(() => {
+    setDoc(wrapRef.current?.ownerDocument ?? document)
+  }, [])
 
   useEffect(() => {
     const win = wrapRef.current?.ownerDocument.defaultView
@@ -34,31 +40,7 @@ export function ImageZoomControl({
     }
   }, [])
 
-  useEffect(() => {
-    if (mode !== 'menu') return
-    const el = wrapRef.current
-    const doc = el?.ownerDocument
-    if (!el || !doc) return
-    const onDown = (e: MouseEvent): void => {
-      if (e.target instanceof Node && el.contains(e.target)) return
-      close()
-    }
-    const onWheel = (e: WheelEvent): void => {
-      if (e.target instanceof Node && el.contains(e.target)) return
-      close()
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') close()
-    }
-    doc.addEventListener('mousedown', onDown, true)
-    doc.addEventListener('wheel', onWheel, true)
-    doc.addEventListener('keydown', onKey, true)
-    return () => {
-      doc.removeEventListener('mousedown', onDown, true)
-      doc.removeEventListener('wheel', onWheel, true)
-      doc.removeEventListener('keydown', onKey, true)
-    }
-  }, [mode, close])
+  useMenuDismiss(mode === 'menu', close, '.image-zoom-ctl', doc ?? undefined)
 
   function clearClickTimer(): void {
     const win = wrapRef.current?.ownerDocument.defaultView
@@ -85,7 +67,7 @@ export function ImageZoomControl({
     e.preventDefault()
     if (disabled) return
     clearClickTimer()
-    setDraft(String(percent))
+    setDraft(`${percent}%`)
     setMode('edit')
   }
 
@@ -108,6 +90,7 @@ export function ImageZoomControl({
         <input
           className="image-zoom-input"
           value={draft}
+          size={Math.max(draft.length, 1)}
           aria-label="输入缩放百分比"
           inputMode="numeric"
           spellCheck={false}

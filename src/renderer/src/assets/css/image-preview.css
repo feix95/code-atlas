@@ -65,12 +65,26 @@
 }
 
 .image-info-name {
-  color: var(--text);
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.image-info-name .image-zoom-btn,
+.image-info-name .image-zoom-input {
+  text-align: left;
+}
+
+.image-info-name .image-zoom-btn {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
-  flex: 1;
+}
+
+.image-info-ext {
+  flex-shrink: 0;
+  color: var(--muted);
 }
 
 /* 底栏深色块:像素/体积与缩放百分比同款 */
@@ -78,6 +92,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-3);
   flex-shrink: 0;
   padding: var(--space-1) var(--space-2);
@@ -87,23 +102,30 @@
 }
 
 .image-info-meta {
+  margin-left: auto;
   cursor: pointer;
   user-select: none;
 }
 
-.image-info-peek {
+/* 弹出层贴齐芯片内缘,宽距与底块同一盒 */
+.image-info-peek,
+.image-zoom-menu {
   position: absolute;
+  left: 0;
   right: 0;
   bottom: calc(100% + var(--space-1));
   z-index: var(--z-dropdown);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop);
+}
+
+.image-info-peek {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
   background: var(--canvas-tint);
-  box-shadow: var(--shadow-pop);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -111,7 +133,7 @@
 .image-info-peek-row {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .image-info-peek-label {
@@ -127,18 +149,25 @@
 .image-zoom-input {
   border: 0;
   padding: 0;
+  margin: 0;
+  min-width: 0;
   background: transparent;
-  color: var(--muted-2);
   font-family: inherit;
   font-size: var(--font-xs);
+  line-height: inherit;
+  text-align: center;
 }
 
 .image-zoom-btn {
   cursor: pointer;
 }
 
-.image-zoom-btn:hover:not(:disabled) {
+.image-zoom-btn:hover:not(:disabled),
+.image-zoom-btn[aria-expanded='true'] {
   color: var(--accent-bright);
+}
+
+.image-zoom-btn:hover:not(:disabled) {
   background: var(--hover);
 }
 
@@ -146,28 +175,17 @@
   cursor: default;
 }
 
-.image-zoom-btn[aria-expanded='true'] {
+/* 只中和控件默认行为,花皮仍走 .image-chip;强调色只在输入态,不绑菜单展开 */
+.image-zoom-input {
+  field-sizing: content;
+  width: auto;
+  outline: none;
   color: var(--sash-hi);
 }
 
-.image-zoom-input {
-  width: 3.25rem;
-  color: var(--text);
-  background: var(--hover);
-  outline: none;
-}
-
 .image-zoom-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + var(--space-1));
-  z-index: var(--z-dropdown);
-  min-width: 100%;
   padding: var(--space-1);
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-pop);
 }
 
 .image-zoom-opt {
@@ -175,12 +193,12 @@
   width: 100%;
   border: 0;
   border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
   background: transparent;
   color: var(--muted);
   font-family: inherit;
   font-size: var(--font-xs);
-  text-align: right;
+  text-align: center;
   cursor: pointer;
 }
 
