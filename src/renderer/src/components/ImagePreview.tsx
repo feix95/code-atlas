@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { FilePreviewImage } from '@shared/types'
 import type { RenameOutcome } from '@shared/fileRename'
 import { formatSize } from '@shared/fsMessages'
@@ -6,7 +6,7 @@ import { useImageViewport } from '../useImageViewport'
 import type { ImageSize } from '@shared/imageZoom'
 import { ImageFileName } from './ImageFileName'
 import { ImageInfoMeta } from './ImageInfoMeta'
-import { ImageZoomControl } from './ImageZoomControl'
+import { ImageZoomControl, type ImageZoomMenu } from './ImageZoomControl'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
@@ -23,7 +23,8 @@ function metaSize(image: FilePreviewImage): ImageSize | null {
  * 图片预览:JPG/PNG 文件签的正文。
  * 默认适应窗口(小图不放大);Ctrl+滚轮以光标为中心缩放;拖拽平移;
  * 双击图片在适应窗口 / 100% 之间切换;底栏百分比单击选档、双击输入;
- * 底栏文件名双击改主名(扩展名保留)。不碰代码那套只读/引用/折行。
+ * 图片上右键在光标处弹出同一份缩放档位菜单;底栏文件名双击改主名(扩展名保留)。
+ * 不碰代码那套只读/引用/折行。
  */
 export function ImagePreview({
   fileName,
@@ -46,10 +47,22 @@ export function ImagePreview({
     onPointerDown,
     onDoubleClick
   } = useImageViewport(natural)
+  const [zoomMenu, setZoomMenu] = useState<ImageZoomMenu>({ kind: 'closed' })
+  const openChipMenu = useCallback((): void => {
+    if (phase !== 'ready') return
+    setZoomMenu({ kind: 'chip' })
+  }, [phase])
+  const closeZoomMenu = useCallback((): void => setZoomMenu({ kind: 'closed' }), [])
   const dims =
     image.width !== null && image.height !== null ? `${image.width} × ${image.height} 像素` : null
   const stageClass =
     'image-stage' + (canPan ? ' is-pannable' : '') + (isPanning ? ' is-panning' : '')
+
+  function onStageContextMenu(e: React.MouseEvent<HTMLDivElement>): void {
+    e.preventDefault()
+    if (phase !== 'ready') return
+    setZoomMenu({ kind: 'cursor', x: e.clientX, y: e.clientY })
+  }
 
   return (
     <div className="image-pane">
@@ -58,6 +71,7 @@ export function ImagePreview({
         className={stageClass}
         onPointerDown={onPointerDown}
         onDoubleClick={onDoubleClick}
+        onContextMenu={onStageContextMenu}
       >
         {phase === 'error' ? (
           <Notice kind="warn">
@@ -102,6 +116,9 @@ export function ImagePreview({
         <ImageZoomControl
           percent={zoomPercent}
           disabled={phase !== 'ready'}
+          menu={zoomMenu}
+          onMenuOpen={openChipMenu}
+          onMenuClose={closeZoomMenu}
           onPick={setZoomPercent}
         />
       </div>

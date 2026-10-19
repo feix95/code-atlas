@@ -188,6 +188,18 @@
   background: var(--surface);
 }
 
+.image-zoom-menu.is-at-cursor {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: max-content;
+  min-width: 3.25rem;
+}
+
+.image-zoom-menu.is-at-cursor .image-zoom-opt {
+  padding: var(--space-1) var(--space-2);
+}
+
 .image-zoom-opt {
   display: block;
   width: 100%;

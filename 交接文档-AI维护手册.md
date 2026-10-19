@@ -65,7 +65,7 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - 页签模型: 文件签绑死文件(一文件一签, 重开只激活旧签, 点文件不动其他页签, 点文件夹只选中不开签); 自由对话/图谱/设置为单例签, 由 rail 入口开合; 无跟随、无钉住。
 - 文件树备注: 编辑入口只在文件树与聊天绿字文件链接的右键菜单里, 菜单内就地长出输入框(回车保存、Esc 取消不写盘、失焦保存、空稿不误删, 「清除备注」独立成行); 悬停提示优先级为备注覆盖引擎摘要, 清掉备注自动回到摘要; 备注正文写入与读档都把换行/制表/控制符折叠为单空格(防伪造提示第二行), 单行、上限 100 字; 备注文本不进任何提示词。
 - 文件预览看片开关: 「排版显示」(仅 md 系有)/「只读」/「自动换行」三颗全是全局偏好, 账本在 src/renderer/src/codePrefs.ts(localStorage, 子窗经 storage 事件对齐), 一拨所有已开签就地翻面、新开签与重启都继承; 开关读数换算只走 src/renderer/src/viewState.ts(viewFlags/subscribeViewFlags/applyViewFlags), 禁止在组件里另拼读数; 菜单开关行协议见 contextMenuStore.ts 的 switchOn。改动须跑 selftest-viewstate。
-- JPG/PNG 文件签看图: 默认适应窗口(小图不放大)、Ctrl+滚轮(含触控板捏合)以光标为中心缩放、拖拽平移; 双击图片在适应窗口 / 100% 间切换; 底栏百分比单击弹出 25% 一档的上拉菜单(150% 到 25%)、双击可输入; 按住像素/体积块看文件头信息(格式/色深/透明/渐进式), 松开即收; 底栏文件名同款芯片, 双击改主名(扩展名保留, 通道走 CodePreview onRenameFile / renameTextFile)。缩放按页签记, 禁止写入 docZoom 或 uiScale。变换公式只走 src/shared/imageZoom.ts, 文件头字段走 src/shared/imageMeta.ts。改动须跑 selftest-image 与 selftest-imagezoom; 改名通道须跑 selftest-fileedit。
+- JPG/PNG 文件签看图: 默认适应窗口(小图不放大)、Ctrl+滚轮(含触控板捏合)以光标为中心缩放、拖拽平移; 双击图片在适应窗口 / 100% 间切换; 底栏百分比单击弹出 25% 一档的上拉菜单(150% 到 25%)、双击可输入,图片上右键在光标处弹出同一份菜单(点外关闭); 按住像素/体积块看文件头信息(格式/色深/透明/渐进式), 松开即收; 底栏文件名同款芯片, 双击改主名(扩展名保留, 通道走 CodePreview onRenameFile / renameTextFile)。缩放按页签记, 禁止写入 docZoom 或 uiScale。变换公式只走 src/shared/imageZoom.ts, 文件头字段走 src/shared/imageMeta.ts。改动须跑 selftest-image 与 selftest-imagezoom; 改名通道须跑 selftest-fileedit。
 - 页签撕窗: 页签拖出窗外或右键「移到新窗口」= 撕成无边框独立子窗(自绘标题栏+完整页签带+分屏正文, 拖边缩放); 同进程子窗+Portal 共享应用基座, 签的正房活 DOM 整体搬家; ×/关窗连签销户(Chrome 语义), 子窗拖空自动关, 主窗拖空留空板不关; 拖回主窗/跨窗落点为后续里程碑。
 - 全盘浏览、复杂分屏不属于新手主路径, 不得抢占首次打开的主入口。
 - 不写入无意义缓存: AI 回答、榜单等结果仅驻留内存, 不落盘、不实现持久缓存; `userData/models/` 为用户主动下载的模型, 属功能本体不在此列。
