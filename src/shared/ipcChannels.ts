@@ -38,7 +38,6 @@ export const CH = {
   analyzeFile: 'atlas:analyze-file',
   readPreview: 'atlas:read-preview',
   depGraph: 'atlas:dep-graph',
-  locateFeature: 'atlas:locate-feature',
   // ── 模型货架与下载 ──
   modelShelf: 'atlas:model-shelf',
   modelFiles: 'atlas:model-files',
@@ -67,8 +66,6 @@ export const CH = {
   /** 主进程 → 渲染层推送:引擎安装进度(stage + percent) */
   engineInstallProgress: 'atlas:engine-install-progress',
   // ── AI 请求与流 ──
-  aiExplainFile: 'atlas:ai-explain-file',
-  aiExplainFolder: 'atlas:ai-explain-folder',
   aiChat: 'atlas:ai-chat',
   aiCompact: 'atlas:ai-compact',
   aiStyleSample: 'atlas:ai-style-sample',
@@ -76,10 +73,6 @@ export const CH = {
   aiDelta: 'atlas:ai-delta',
   aiCancel: 'atlas:ai-cancel',
   webLookup: 'atlas:web-lookup',
-  // ── Git ──
-  gitChanges: 'atlas:git-changes',
-  gitExplainChange: 'atlas:git-explain-change',
-  gitReport: 'atlas:git-report',
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',

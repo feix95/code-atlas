@@ -1,6 +1,6 @@
 /**
  * 布局两格的存档户口(P2-4):左栏宽 + 左右分栏比。
- * 从 App.tsx 体内搬出来,和 shelfPrefs/paneKinds/recents/chatPrefs 做邻居;
+ * 从 App.tsx 体内搬出来,和 shelfPrefs/paneKinds/recents 做邻居;
  * 存的值跟着功能走,读写骨架走 shared/localPrefs。
  */
 import { readFlagPref, readNumPref, writeFlagPref, writeNumPref } from '../../shared/localPrefs.ts'

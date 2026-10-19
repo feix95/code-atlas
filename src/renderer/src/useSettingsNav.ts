@@ -23,7 +23,7 @@ export function useSettingsNav({
 }: {
   /** 全局激活组(跨主窗/子窗唯一);它落在主窗且激活签是设置页才算设置模式 */
   activeGroup: PaneGroup | null
-  openSingletonTab: (kind: 'settings' | 'graph' | 'overview' | 'chat' | 'uiworkbench') => void
+  openSingletonTab: (kind: 'settings' | 'graph' | 'chat' | 'uiworkbench') => void
   sidebarCollapsed: boolean
   toggleSidebarCollapsed: () => void
 }): {

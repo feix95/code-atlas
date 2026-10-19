@@ -1,11 +1,9 @@
-// 页签正文的房间分配:概览(文件/文件夹/项目,跟树里选中走)/小探针对话/代码预览/图谱/设置,
-// 按页签品类各就各位。文件签天生钉在自己的文件上,关掉签就是它的终点。
+// 页签正文的房间分配:自由对话/代码预览/图谱/设置/瞄一眼,按页签品类各就各位。
+// 文件签天生钉在自己的文件上,关掉签就是它的终点。
 import type {
   AiConfig,
   ChatCodeRef,
   DepGraphResult,
-  FileStructure,
-  GitChangesResult,
   ScanDirNode,
   ScanFileNode,
   ScanResult
@@ -13,18 +11,11 @@ import type {
 import type { FileLinkTarget } from '@shared/fileLinks'
 import type { RenameOutcome } from '@shared/fileRename'
 import { CODE_REFS_MAX } from '@shared/aiDefaults'
-import type { NoteEntry, NoteMap } from '@shared/notes'
-import { buildCrumbs, findFile } from '../scanTreeTools'
+import { findFile } from '../scanTreeTools'
 import type { PaneTab } from '../paneTabs'
-import { useAiAsk, type AiTurn } from '../useAiAsk'
 import type { AiChatApi } from '../useAiChat'
-import { usePresetQuestions } from '../usePresetQuestions'
-import { DetailHeader } from './DetailHeader'
-import { FileOverview } from './FileOverview'
-import { FolderOverview } from './FolderOverview'
 import { FreeChatPanel } from './FreeChatPanel'
 import { CodePreview } from './CodePreview'
-import { ProjectOverview } from './ProjectOverview'
 import { SettingsPage, type SectionKey } from './SettingsPage'
 import { GraphView } from './GraphView'
 import { UiWorkbench } from './uiWorkbench/UiWorkbench'
@@ -32,28 +23,15 @@ import { UiWorkbench } from './uiWorkbench/UiWorkbench'
 export function TabBody({
   tab,
   result,
-  notes,
   previewRefs,
   previewJump,
-  selectedFile,
-  selectedFolder,
-  structure,
-  analyzing,
-  analyzeNote,
   graph,
   graphLoading,
   graphNote,
-  gitInfo,
-  setGitInfo,
-  gitLoading,
-  chatSuggestionsOn,
   chat,
   fileLinks,
-  goAskInChat,
   handleLoadGraph,
   expandLazy,
-  jumpTo,
-  saveNote,
   openPreview,
   addPreviewRef,
   removePreviewRef,
@@ -61,35 +39,21 @@ export function TabBody({
   settingsWorkspaceName,
   settingsSectionReq,
   onAiConfigSaved,
-  onChatSuggestionsChange,
   onSettingsSection,
   onRenameFile
 }: {
   tab: PaneTab
   result: ScanResult | null
-  notes: NoteMap
   previewRefs: ChatCodeRef[]
   previewJump: { line: number; seq: number } | null
-  selectedFile: ScanFileNode | null
-  selectedFolder: ScanDirNode | null
-  structure: FileStructure | null
-  analyzing: boolean
-  analyzeNote: { text: string; kind: 'info' | 'error' } | null
   graph: DepGraphResult | null
   graphLoading: boolean
   graphNote: string | null
-  gitInfo: GitChangesResult | null
-  setGitInfo: React.Dispatch<React.SetStateAction<GitChangesResult | null>>
-  gitLoading: boolean
-  chatSuggestionsOn: boolean
   chat: AiChatApi
   fileLinks: FileLinkTarget | null
-  goAskInChat: (node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null) => void
   handleLoadGraph: () => Promise<void>
   /** 按需扫描 lazy 目录(App 的 handleExpandLazy),关系图谱进入未扫描目录时用 */
   expandLazy: (relPath: string) => Promise<ScanDirNode | null>
-  jumpTo: (relPath: string) => void
-  saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
   addPreviewRef: (ref: ChatCodeRef) => void
   removePreviewRef: (index: number) => void
@@ -99,7 +63,6 @@ export function TabBody({
   settingsWorkspaceName: string | null
   settingsSectionReq: { section: SectionKey; seq: number } | undefined
   onAiConfigSaved: (config: AiConfig) => void
-  onChatSuggestionsChange: (v: boolean) => void
   /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
   onSettingsSection: (key: SectionKey) => void
   /** 内联标题改名通道(内联标题改名锤):预览/瞄签都能用,账本认签认 scopeRoot */
@@ -149,8 +112,6 @@ export function TabBody({
     return (
       <SettingsPage
         workspaceName={settingsWorkspaceName}
-        chatSuggestionsOn={chatSuggestionsOn}
-        onChatSuggestionsChange={onChatSuggestionsChange}
         sectionReq={settingsSectionReq}
         onAiConfigSaved={onAiConfigSaved}
         onSettingsSection={onSettingsSection}
@@ -161,62 +122,6 @@ export function TabBody({
   if (tab.kind === 'uiworkbench') return <UiWorkbench />
   if (!result) return null
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
-  if (tab.kind === 'overview') {
-    // 概览单例签:左侧树选中谁就显示谁的概览;什么都没选 = 项目导览(概览页签的零状态)
-    if (selectedFolder) {
-      return (
-        <FolderOverviewPage
-          key={selectedFolder.relPath || '(root)'}
-          dir={selectedFolder}
-          result={result}
-          gitInfo={gitInfo}
-          onJump={jumpTo}
-          onRefreshed={setGitInfo}
-          note={notes[selectedFolder.relPath] ?? null}
-          onNoteSave={saveNote}
-          onGoChat={(turn) => goAskInChat(selectedFolder, turn)}
-        />
-      )
-    }
-    if (selectedFile) {
-      return (
-        <FileOverviewPage
-          key={selectedFile.relPath}
-          file={selectedFile}
-          result={result}
-          structure={structure}
-          analyzing={analyzing}
-          analyzeNote={analyzeNote}
-          graph={graph}
-          graphLoading={graphLoading}
-          graphNote={graphNote}
-          onLoadGraph={() => void handleLoadGraph()}
-          onJump={jumpTo}
-          gitInfo={gitInfo}
-          gitLoading={gitLoading}
-          note={notes[selectedFile.relPath] ?? null}
-          onNoteSave={saveNote}
-          suggestionsOn={chatSuggestionsOn}
-          onGoChat={(turn) => goAskInChat(selectedFile, turn)}
-          onPreview={() => openPreview(selectedFile.relPath)}
-        />
-      )
-    }
-    return (
-      <ProjectOverview
-        key={result.rootPath}
-        result={result}
-        graph={graph}
-        graphLoading={graphLoading}
-        graphNote={graphNote}
-        onLoadGraph={() => void handleLoadGraph()}
-        onJump={jumpTo}
-        onReadFile={openPreview}
-        gitInfo={gitInfo}
-        onRefreshed={setGitInfo}
-      />
-    )
-  }
   if (tab.kind === 'chat') {
     // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四锤的老规矩)
     // (小探针飞出时这张页签连卡带正房一起隐去,走不到这儿 —— 见渲染处 act 判定)
@@ -229,7 +134,6 @@ export function TabBody({
           onDropRef={handleDropRef}
           rootPath={result.rootPath}
           fileLinks={fileLinks}
-          suggestionsOn={chatSuggestionsOn}
         />
       </div>
     )
@@ -259,183 +163,6 @@ export function TabBody({
   )
 }
 
-/**
- * 概览页签的正文(文件版):讲解卡 + 结构清单 + 关系卡,头顶一条轻头部(面包屑/徽章/备注)。
- * 内页 Tab 已退役 —— 「聊天」是独立的品类页签,概览想聊天就喊一声把探针页签点亮。
- * key = 页签/文件身份:换文件整个重挂,AI 助手跟着换目标,旧请求就地取消。
- */
-export function FileOverviewPage({
-  file,
-  result,
-  structure,
-  analyzing,
-  analyzeNote,
-  graph,
-  graphLoading,
-  graphNote,
-  onLoadGraph,
-  onJump,
-  gitInfo,
-  gitLoading,
-  note,
-  onNoteSave,
-  suggestionsOn,
-  onGoChat,
-  onPreview
-}: {
-  file: ScanFileNode
-  result: ScanResult
-  structure: FileStructure | null
-  analyzing: boolean
-  analyzeNote: { text: string; kind: 'info' | 'error' } | null
-  graph: DepGraphResult | null
-  graphLoading: boolean
-  graphNote: string | null
-  onLoadGraph: () => void
-  /** 关系卡跳转 */
-  onJump: (relPath: string) => void
-  gitInfo: GitChangesResult | null
-  gitLoading: boolean
-  /** 小葵的手动备注(第九十八锤) */
-  note: NoteEntry | null
-  onNoteSave: (relPath: string, text: string) => void
-  /** 推荐问题总闸(设置里的「推荐问题」):关了概览 AI 卡不出预设题,烧模型的预测也一并歇 */
-  suggestionsOn: boolean
-  /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
-  onGoChat: (turn: AiTurn | null) => void
-  onPreview: () => void
-}): React.JSX.Element {
-  // AI 解释:概览卡,证据优先的单问单答,绝不自动开跑
-  const ai = useAiAsk((requestId, question) =>
-    window.atlas.aiExplainFile(
-      result.rootPath,
-      file.relPath,
-      file.language?.id ?? '',
-      requestId,
-      question ?? undefined,
-      note?.text
-    )
-  )
-  // 预设问题三层预测(第一百零九锤):规则秒出,AI 按文件证据定制,失败不惊动;总闸关了全歇
-  const presets = usePresetQuestions({
-    rootPath: result.rootPath,
-    file,
-    note: note?.text,
-    enabled: suggestionsOn,
-    allowAi: ai.turns.some((turn) => turn.state === 'done')
-  })
-
-  const crumbs = buildCrumbs(result.rootName, result.rootPath, file.relPath)
-  const gitChange = gitInfo?.changes.find((c) => c.relPath === file.relPath)
-  const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
-  if (file.language) badges.push({ label: file.language.name, tone: 'blue' })
-  if (gitChange) {
-    const tone =
-      gitChange.kind === 'deleted' ? 'red' : gitChange.kind === 'added' ? 'green' : 'blue'
-    const label: Record<string, string> = {
-      added: 'git 新增',
-      modified: 'git 修改',
-      deleted: 'git 删除',
-      renamed: 'git 重命名',
-      untracked: 'git 新文件'
-    }
-    badges.push({ label: label[gitChange.kind], tone })
-  } else if (gitInfo && !gitLoading) {
-    badges.push({ label: '无未提交改动', tone: 'muted' })
-  }
-
-  return (
-    <div className="detail-page">
-      <DetailHeader
-        crumbs={crumbs}
-        iconName={file.summary?.icon ?? 'file'}
-        title={file.name}
-        subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
-        note={note}
-        onNoteSave={(text) => onNoteSave(file.relPath, text)}
-        badges={badges}
-      />
-      <div className="detail-body">
-        <FileOverview
-          file={file}
-          noteText={note?.text}
-          presets={presets.questions}
-          structure={structure}
-          analyzing={analyzing}
-          analyzeNote={analyzeNote}
-          graph={graph}
-          graphLoading={graphLoading}
-          graphNote={graphNote}
-          onLoadGraph={onLoadGraph}
-          ai={ai}
-          onGoChat={onGoChat}
-          onJump={onJump}
-          onPreview={onPreview}
-        />
-      </div>
-    </div>
-  )
-}
-
-/** 概览页签的正文(文件夹版):静态目录概览为主,讲解卡在页面里;聊天是独立的品类页签 */
-export function FolderOverviewPage({
-  dir,
-  result,
-  gitInfo,
-  onJump,
-  onRefreshed,
-  note,
-  onNoteSave,
-  onGoChat
-}: {
-  dir: ScanDirNode
-  result: ScanResult
-  gitInfo: GitChangesResult | null
-  onJump: (relPath: string) => void
-  onRefreshed: (result: GitChangesResult) => void
-  /** 小葵的手动备注(第九十八锤) */
-  note: NoteEntry | null
-  onNoteSave: (relPath: string, text: string) => void
-  /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
-  onGoChat: (turn: AiTurn | null) => void
-}): React.JSX.Element {
-  const ai = useAiAsk((requestId, question) =>
-    window.atlas.aiExplainFolder(result.rootPath, dir.relPath, requestId, question ?? undefined)
-  )
-
-  const badges: Array<{ label: string; tone: 'blue' | 'green' | 'amber' | 'red' | 'muted' }> = []
-  if (dir.relPath === '') badges.push({ label: '项目根', tone: 'blue' })
-  if (dir.lazy) badges.push({ label: '未扫描', tone: 'amber' })
-  else if (dir.truncated) badges.push({ label: '不完整', tone: 'amber' })
-  else badges.push({ label: '已扫描', tone: 'green' })
-
-  return (
-    <div className="detail-page">
-      <DetailHeader
-        crumbs={buildCrumbs(result.rootName, result.rootPath, dir.relPath)}
-        iconName="folder"
-        title={dir.name || result.rootName}
-        subtitle={dir.summary?.text ?? '文件夹'}
-        note={note}
-        onNoteSave={(text) => onNoteSave(dir.relPath, text)}
-        badges={badges}
-      />
-      <div className="detail-body">
-        <FolderOverview
-          dir={dir}
-          noteText={note?.text}
-          ai={ai}
-          onGoChat={onGoChat}
-          gitInfo={gitInfo}
-          rootPath={result.rootPath}
-          onJump={onJump}
-          onRefreshed={onRefreshed}
-        />
-      </div>
-    </div>
-  )
-}
-
 /** 还没有亮着的页签时的底板:大 logo + 一句指路 */
 export function PaneEmptyBoard(): React.JSX.Element {
   return (
@@ -445,7 +172,7 @@ export function PaneEmptyBoard(): React.JSX.Element {
       </span>
       <p className="pane-empty-title">还没有打开的页签</p>
       <p className="pane-empty-hint">
-        在左侧文件树点一个文件就开预览;功能页(概览/小探针/图谱/UI 工作台/设置)在左侧图标栏开
+        在左侧文件树里点文件或文件夹开始阅读;自由对话、关系图谱、UI 工作台、设置在左侧图标栏开
       </p>
     </div>
   )

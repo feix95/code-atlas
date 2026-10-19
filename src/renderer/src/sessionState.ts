@@ -12,7 +12,6 @@ import { KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds.ts'
 const SESSION_KEY = 'atlas.session'
 
 const KNOWN_KINDS: readonly PaneKind[] = [
-  'overview',
   'chat',
   'preview',
   'graph',

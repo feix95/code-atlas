@@ -8,8 +8,6 @@ import {
   buildExplainPrompt,
   buildFolderPrompt,
   buildGuessPrompt,
-  buildReportPrompt,
-  buildDiffPrompt,
   extractHeaderComment,
   buildBinaryPrompt,
   buildLocatePrompt,
@@ -2385,22 +2383,9 @@ async function main(): Promise<void> {
   )
 
   // ── 提示词体系 2.0 · XML 资料包裹总点检(小葵定稿):一切外来内容进标签,程序插话也有皮 ──
-  // 数据块:附件/引用/摘要旧已规范;文件夹清单/项目地图/干活账本/diff/联网资料新上
+  // 数据块:附件/引用/摘要旧已规范;文件夹清单/项目地图新上
   assert.ok(fp.includes('<folder_contents>'), '文件夹清单要包 folder_contents 标签')
   assert.ok(locatePrompt.includes('<project_map>'), '项目地图要包 project_map 标签')
-  assert.ok(
-    buildReportPrompt({
-      branch: 'main',
-      changes: [],
-      stats: { additions: 0, deletions: 0 },
-      recentSubjects: []
-    }).includes('<change_log>'),
-    '干活账本要包 change_log 标签'
-  )
-  assert.ok(
-    buildDiffPrompt({ relPath: 'a.ts', kind: 'modified', diff: '-x\n+y' }).includes('<diff>'),
-    'diff 要包 diff 标签'
-  )
   // 程序插话:提醒卡/逼卷令/质检闸统一 program_reminder;重复工具提醒包 program_note
   assert.ok(
     buildAgentReminder('这个文件在哪').includes('<program_reminder>'),

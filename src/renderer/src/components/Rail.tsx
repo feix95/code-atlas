@@ -1,4 +1,4 @@
-// 第 2 层最左的图标列(UI v3 第 6 节):图谱 → 概览 → 自由对话 → UI 工作台 → 设置,底端 AI 状态。
+// 第 2 层最左的图标列(UI v3 第 6 节):图谱 → 自由对话 → UI 工作台 → 设置,底端 AI 状态。
 // UI 工作台不吃工作区(设计的是用户自己的 app 界面),没开项目也能点。
 // 列宽 1u(= 顶栏高),与顶栏同底同色;图标 ~0.425u,点击区 ~0.75u。
 // 图谱本体还没实现(规格见《项目结构图谱》),点开一张单例占位页签;
@@ -12,7 +12,6 @@ const RAIL_ICON = 25.3125
 export function Rail({
   hasWorkspace,
   onGraph,
-  onOverview,
   onChat,
   onUiWorkbench,
   onSettings
@@ -20,7 +19,6 @@ export function Rail({
   hasWorkspace: boolean
   /** 关系图谱:开/聚焦单例页签 */
   onGraph: () => void
-  onOverview: () => void
   onChat: () => void
   onUiWorkbench: () => void
   onSettings: () => void
@@ -37,17 +35,6 @@ export function Rail({
         aria-label="关系图谱"
       >
         <TreeIcon name="view" size={RAIL_ICON} mono />
-      </button>
-      <button
-        type="button"
-        className="rail-btn"
-        disabled={!hasWorkspace}
-        onClick={onOverview}
-        data-tip="概览"
-        data-tip-side="right"
-        aria-label="概览"
-      >
-        <TreeIcon name="navigation" size={RAIL_ICON} mono />
       </button>
       <button
         type="button"

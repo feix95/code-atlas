@@ -3,7 +3,6 @@ import type {
   DepGraphResult,
   DriveInfo,
   FileStructure,
-  GitChangesResult,
   ScanDirNode,
   ScanFileNode,
   ScanResult
@@ -11,8 +10,7 @@ import type {
 import { refreshNotesForScan, saveNotes, upsertNote, type NoteMap } from '@shared/notes'
 import type { SearchNameHit } from '@shared/searchNames'
 import { isAiConfigured } from '@shared/aiSetup'
-import { sanitizePersonalization, type TeachingLevel } from '@shared/personalization'
-import { AiSetupContext, TeachingContext } from './aiSetupContext'
+import { AiSetupContext } from './aiSetupContext'
 import { buildFileAttachment, buildFolderAttachment } from './chatContext'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import { FilePathMenu } from './components/FilePathMenu'
@@ -41,7 +39,6 @@ import {
   type RecentProject
 } from './recents'
 import { useAiChat } from './useAiChat'
-import { loadChatSuggestionsOn, saveChatSuggestionsOn } from './chatPrefs'
 import { useSidebarSash } from './useSidebarSash'
 import { useZoomKeys } from './useZoomKeys'
 import { useWorkspaceSearch } from './useWorkspaceSearch'
@@ -113,25 +110,13 @@ function App(): React.JSX.Element {
   const [selectedFile, setSelectedFile] = useState<ScanFileNode | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<ScanDirNode | null>(null)
   const [structure, setStructure] = useState<FileStructure | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
   // 结构分析的票号:连点两个文件时,慢的旧响应回来不许盖新的账
   const analyzeSeq = useRef(0)
   const requests = useRef(createRequestScope())
-  // 结构分析的提示分两色:info 随口一说(灰),error 真出事(红) —— 信号灯口径
-  const [analyzeNote, setAnalyzeNote] = useState<{ text: string; kind: 'info' | 'error' } | null>(
-    null
-  )
   const [graph, setGraph] = useState<DepGraphResult | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphNote, setGraphNote] = useState<string | null>(null)
-  // 项目 git 总账:开图后顺手查一份(本地 git 命令,不耗模型),修改建议 Tab 和右栏 git 门共用
-  const [gitInfo, setGitInfo] = useState<GitChangesResult | null>(null)
-  const [gitLoading, setGitLoading] = useState(false)
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
-  // 讲解深度(教学三档):跟着 AI 配置走;档位一换,讲解钩子就把按旧档讲的旧账清掉
-  const [teaching, setTeaching] = useState<TeachingLevel>('brief')
-  // 推荐问题总闸(聊天偏好,存本机):关了聊天框上面和预览 AI 卡下面的推荐都不出,两处模型预测也一并省掉
-  const [chatSuggestionsOn, setChatSuggestionsOn] = useState(loadChatSuggestionsOn)
   // 分级扫描:正被点开探测的目录 relPath + 探测失败的人话提示
   const [expanding, setExpanding] = useState<string | null>(null)
   const expandingRef = useRef(false)
@@ -202,9 +187,7 @@ function App(): React.JSX.Element {
     const isCurrent = requests.current.begin('scan')
     expandingRef.current = false
     analyzeSeq.current += 1
-    setAnalyzing(false)
     setGraphLoading(false)
-    setGitLoading(false)
     setFolder(dir)
     setPathDraft(dir)
     dismissPathHint()
@@ -217,12 +200,10 @@ function App(): React.JSX.Element {
     setRevealPaths(new Set())
     setPreviewRefs([])
     setStructure(null)
-    setAnalyzeNote(null)
     setGraph(null)
     setGraphNote(null)
     setExpanding(null)
     setTreeNote(null)
-    setGitInfo(null)
     setNotes({})
     // 新工作区 = 新的浏览上下文:搜索词和清单一起清空(§7.2:词一清树就回来)
     clearSearch()
@@ -239,20 +220,7 @@ function App(): React.JSX.Element {
       setRecents(rememberRecentProject(root))
       // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
       if (root !== folder) pushNav({ folder: root, file: null, dir: null })
-      // git 总账顺手收一遍(本地 git 命令,不耗模型):失败就当没有,不算错误不弹红
       setScanning(false)
-      setGitLoading(true)
-      void window.atlas
-        .gitChanges(root)
-        .then((info) => {
-          if (isCurrent()) setGitInfo(info)
-        })
-        .catch(() => {
-          if (isCurrent()) setGitInfo(null)
-        })
-        .finally(() => {
-          if (isCurrent()) setGitLoading(false)
-        })
       return scanned
     } catch (err) {
       if (isCurrent()) setError(cleanErrMsg(err))
@@ -274,7 +242,6 @@ function App(): React.JSX.Element {
       .then((c) => {
         if (!alive) return
         setAiConfigured(isAiConfigured(c))
-        setTeaching(sanitizePersonalization(c.personalization).teaching)
       })
       .catch(() => {
         if (alive) setAiConfigured(false)
@@ -330,37 +297,19 @@ function App(): React.JSX.Element {
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
-    setAnalyzing(false)
     openFileTab(file)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
-    if (!file.language) {
-      setAnalyzeNote({
-        text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。',
-        kind: 'info'
-      })
-      return
-    }
-    setAnalyzing(true)
-    setAnalyzeNote(null)
+    // 本地结构分析照旧自动跑(不耗模型):结果给自由对话附件当证据;失败静静放过
+    if (!file.language) return
     try {
       // 路径契约:renderer 只回传 (rootPath, relPath),拼绝对路径是主进程的事
       if (!result) return
       const fs = await window.atlas.analyzeFile(result.rootPath, file.relPath, file.language.id)
       if (seq !== analyzeSeq.current) return // 用户已经点了别的文件,这份旧账作废
-      if (fs) {
-        setStructure(fs)
-      } else {
-        setAnalyzeNote({
-          text: '暂时不能列出这个文件的内部结构。可以直接查看文件内容,或让 AI 解释。',
-          kind: 'info'
-        })
-      }
-    } catch (err) {
-      if (seq !== analyzeSeq.current) return
-      setAnalyzeNote({ text: cleanErrMsg(err), kind: 'error' })
-    } finally {
-      if (seq === analyzeSeq.current) setAnalyzing(false)
+      if (fs) setStructure(fs)
+    } catch {
+      // 结构分析是锦上添花,失败不惊动界面
     }
   }
 
@@ -368,16 +317,14 @@ function App(): React.JSX.Element {
   // 聊天中点文件夹照旧只换资料不抢台(公用场垫句灰字)
   function selectDir(node: ScanDirNode): void {
     analyzeSeq.current += 1
-    setAnalyzing(false)
     if (node.relPath === '') {
-      showProjectGuide()
+      clearSelection()
       return
     }
     pushNav({ folder, file: null, dir: node.relPath })
     setSelectedFolder(node)
     setSelectedFile(null)
     setStructure(null)
-    setAnalyzeNote(null)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, node.relPath)))
   }
 
@@ -399,36 +346,15 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 关系卡/概览推荐点路径跳转:在扫描树里按 relPath 找到文件节点,走同一条开签链路;
-  // 文件找不到再找目录:功能定位指中「整个功能住在这个文件夹」时也能跳
-  function jumpTo(relPath: string): void {
-    if (!result) return
-    const found = findFile(result.tree, relPath)
-    if (found) {
-      void openFile(found)
-      return
-    }
-    const dir = findDir(result.tree, relPath)
-    if (dir) selectDir(dir)
-  }
-
   // 点文件夹名称:只选中;展开/收起是箭头的活,扫描只由展开触发。
   // (selectDir 在上面)
 
-  // 后退/前进回到「没选中」的一站:选中清空;开着的话概览签自动回项目导览(它的零状态)
+  // 后退/前进回到「没选中」的一站:选中清空
   function clearSelection(): void {
     analyzeSeq.current += 1
-    setAnalyzing(false)
     setSelectedFolder(null)
     setSelectedFile(null)
     setStructure(null)
-    setAnalyzeNote(null)
-  }
-
-  function showProjectGuide(): void {
-    if (!result) return
-    clearSelection()
-    pushNav({ folder: result.rootPath, file: null, dir: null })
   }
 
   // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
@@ -438,10 +364,8 @@ function App(): React.JSX.Element {
     requests.current.reset()
     analyzeSeq.current += 1
     expandingRef.current = false
-    setAnalyzing(false)
     setScanning(false)
     setGraphLoading(false)
-    setGitLoading(false)
     pushNav({ folder: null, file: null, dir: null })
     clearSelection()
     setGroups([])
@@ -456,7 +380,6 @@ function App(): React.JSX.Element {
     setGraphNote(null)
     setExpanding(null)
     setTreeNote(null)
-    setGitInfo(null)
     dismissPathHint()
     setNotes({})
     clearSearch()
@@ -616,7 +539,6 @@ function App(): React.JSX.Element {
     resetPaneTabs,
     openFileTab,
     openSingletonTab,
-    goAskInChat,
     moveTab,
     activateTab,
     closeTab,
@@ -630,7 +552,6 @@ function App(): React.JSX.Element {
     closeHostGroups
   } = usePaneTabs({
     result,
-    chat,
     openAuxWindow: () => openAuxWindow()?.id ?? null,
     setRevealPaths
   })
@@ -732,28 +653,15 @@ function App(): React.JSX.Element {
       <TabBody
         tab={t}
         result={result}
-        notes={notes}
         previewRefs={previewRefs}
         previewJump={previewJump}
-        selectedFile={selectedFile}
-        selectedFolder={selectedFolder}
-        structure={structure}
-        analyzing={analyzing}
-        analyzeNote={analyzeNote}
         graph={graph}
         graphLoading={graphLoading}
         graphNote={graphNote}
-        gitInfo={gitInfo}
-        setGitInfo={setGitInfo}
-        gitLoading={gitLoading}
-        chatSuggestionsOn={chatSuggestionsOn}
         chat={chat}
         fileLinks={fileLinks}
-        goAskInChat={goAskInChat}
         handleLoadGraph={handleLoadGraph}
         expandLazy={handleExpandLazy}
-        jumpTo={jumpTo}
-        saveNote={saveNote}
         openPreview={openPreview}
         addPreviewRef={addPreviewRef}
         removePreviewRef={removePreviewRef}
@@ -762,14 +670,7 @@ function App(): React.JSX.Element {
         settingsWorkspaceName={folder ? (folder.split(/[\\/]/).pop() ?? null) : null}
         settingsSectionReq={settingsReq}
         onSettingsSection={setSettingsSection}
-        onAiConfigSaved={(c) => {
-          setAiConfigured(isAiConfigured(c))
-          setTeaching(sanitizePersonalization(c.personalization).teaching)
-        }}
-        onChatSuggestionsChange={(v) => {
-          setChatSuggestionsOn(v)
-          saveChatSuggestionsOn(v)
-        }}
+        onAiConfigSaved={(c) => setAiConfigured(isAiConfigured(c))}
       />
     )
   }
@@ -795,158 +696,154 @@ function App(): React.JSX.Element {
         isOnAiSettings: settingsMode && settingsSection === 'ai'
       }}
     >
-      <TeachingContext.Provider value={teaching}>
-        <div
-          className={`app${sidebarCollapsed ? ' is-side-collapsed' : ''}`}
-          // 侧栏宽挂 CSS 变量:侧栏本体和顶栏左段(分界线的上行段)同认这一份,
-          // 拖 sash 时两边永远对齐;rem 值 = 基准宽 ÷ (16 × uiScale)
-          style={
-            {
-              '--sidebar-w': `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem`
-            } as React.CSSProperties
-          }
-        >
-          {revived && (
-            <div className="revive-note" role="alert">
-              画面刚才断了一次,已经自动接上 ——
-              正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
-            </div>
-          )}
-          <AppTopBar
-            scanning={scanning}
-            hasWorkspace={result !== null}
-            fileNavOff={sidebarFace !== 'files'}
-            sidebarShown={!sidebarCollapsed}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={toggleSidebarCollapsed}
-            nav={nav}
-            goNav={goNav}
-            handleRefresh={handleRefresh}
-            refreshing={refreshing}
-            filter={searchQuery}
-            onFilterChange={setSearchQuery}
-            tabs={
-              // 页签带跟着主窗名下的组走(子窗的签在子窗自己带里),不看工作区:
-              // 首页开的单例签(设置)也要能点能 ×
-              mainGroups.length > 0 ? (
-                <TopBarTabs
-                  groups={mainGroups}
-                  visibleOfGroup={visibleOfGroup}
-                  flashTabId={flashTabId}
-                  activateTab={activateTab}
-                  closeTab={closeTab}
-                  closeTabsInGroup={closeTabsInGroup}
-                  moveTab={moveTab}
-                  setDropMark={setDropMark}
-                  onTabDragEnd={onTabDragEnd}
-                  onDetachTab={onDetachTab}
-                  onRevealInTree={revealTabInTree}
-                  workspaceRoot={result?.rootPath ?? null}
-                  paneSplit={paneSplit}
-                />
-              ) : null
-            }
-          />
-
-          {/* 第 2 层:rail | 侧栏 | 内容区,全在顶栏之下。
-              侧栏常驻(§7.1 不存在空侧栏):没开工作区时树区 = 「这台电脑」盘符列表 */}
-          <div className="app-body">
-            <Rail
-              hasWorkspace={result !== null && !scanning}
-              onGraph={() => openSingletonTab('graph')}
-              onOverview={() => openSingletonTab('overview')}
-              onChat={() => openSingletonTab('chat')}
-              onUiWorkbench={() => openSingletonTab('uiworkbench')}
-              onSettings={() => openSettings()}
-            />
-            {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
-                不是卸载 —— 展开态的滚动/勾选都留得住 */}
-            <WorkspaceSidebar
-              result={result}
-              notes={notes}
-              selectedFile={selectedFile}
-              selectedFolder={selectedFolder}
-              expanding={expanding}
-              revealPaths={revealPaths}
-              onOpenFile={openFile}
-              onSelectDir={selectDir}
-              handleExpandLazy={handleExpandLazy}
-              saveNote={saveNote}
-              openPreview={openPreview}
-              treeNote={treeNote}
-              search={searchPanel}
-              onOpenSearchFile={(hit) => void openSearchFile(hit)}
-              onOpenSearchDir={openSearchDir}
-              folder={folder}
-              scanning={scanning}
-              pathDraft={pathDraft}
-              pathHint={pathHint}
-              pathShaking={pathShaking}
-              pathInputRef={pathInputRef}
-              setPathDraft={setPathDraft}
-              dismissPathHint={dismissPathHint}
-              goPath={goPath}
-              setPathShaking={setPathShaking}
-              recents={recents}
-              onOpenWorkspace={(path) => void scanPath(path)}
-              onTogglePin={togglePinRecent}
-              onRemoveRecent={removeRecent}
-              sidebarWidth={sidebarWidth}
-              onSashPointerDown={onSashPointerDown}
-              onSashPointerMove={onSashPointerMove}
-              endSashDrag={endSashDrag}
-              onSashDoubleClick={onSashDoubleClick}
-              onSashKeyDown={onSashKeyDown}
-              drives={drives}
-              drivesNote={drivesNote}
-              driveRefreshNonce={driveRefreshNonce}
-              onGoHome={goHome}
-              sidebarFace={sidebarFace}
-              settingsSection={settingsSection}
-              onSettingsSection={openSettings}
-              onOpenBrowseFile={openBrowseFile}
-            />
-            {result && !scanning ? (
-              // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
-              <main className="workspace">
-                <section className="detail">{paneGroupsEl}</section>
-              </main>
-            ) : scanning || error ? (
-              // 扫描中/失败:这两种状态优先于页签房;其余情况(含没开项目)一律进签区,
-              // 空签组自然落 PaneEmptyBoard 空板
-              <ScanOrError
-                scanning={scanning}
-                error={error}
-                onRetry={() => (folder ? void scanPath(folder) : void handlePick())}
-                onPick={() => void handlePick()}
-                onGoHome={goHome}
-              />
-            ) : (
-              // 没开工作区也能有房:单例签(设置/图谱)孤零零一张签也要正文区
-              <main className="workspace">
-                <section className="detail">{paneGroupsEl}</section>
-              </main>
-            )}
+      <div
+        className={`app${sidebarCollapsed ? ' is-side-collapsed' : ''}`}
+        // 侧栏宽挂 CSS 变量:侧栏本体和顶栏左段(分界线的上行段)同认这一份,
+        // 拖 sash 时两边永远对齐;rem 值 = 基准宽 ÷ (16 × uiScale)
+        style={
+          {
+            '--sidebar-w': `${(sidebarWidth / (ROOT_FONT_BASE_PX * uiScale)).toFixed(4)}rem`
+          } as React.CSSProperties
+        }
+      >
+        {revived && (
+          <div className="revive-note" role="alert">
+            画面刚才断了一次,已经自动接上 —— 正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
           </div>
+        )}
+        <AppTopBar
+          scanning={scanning}
+          hasWorkspace={result !== null}
+          fileNavOff={sidebarFace !== 'files'}
+          sidebarShown={!sidebarCollapsed}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={toggleSidebarCollapsed}
+          nav={nav}
+          goNav={goNav}
+          handleRefresh={handleRefresh}
+          refreshing={refreshing}
+          filter={searchQuery}
+          onFilterChange={setSearchQuery}
+          tabs={
+            // 页签带跟着主窗名下的组走(子窗的签在子窗自己带里),不看工作区:
+            // 首页开的单例签(设置)也要能点能 ×
+            mainGroups.length > 0 ? (
+              <TopBarTabs
+                groups={mainGroups}
+                visibleOfGroup={visibleOfGroup}
+                flashTabId={flashTabId}
+                activateTab={activateTab}
+                closeTab={closeTab}
+                closeTabsInGroup={closeTabsInGroup}
+                moveTab={moveTab}
+                setDropMark={setDropMark}
+                onTabDragEnd={onTabDragEnd}
+                onDetachTab={onDetachTab}
+                onRevealInTree={revealTabInTree}
+                workspaceRoot={result?.rootPath ?? null}
+                paneSplit={paneSplit}
+              />
+            ) : null
+          }
+        />
 
-          {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
-          <TooltipHost />
-          <Toast toast={toast} />
-          {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
-          <FilePathMenu />
-          {/* 通用右键菜单(全局单例,第二台):选区「引用到对话」这类不对着文件的右键走这儿 */}
-          <ContextMenu />
+        {/* 第 2 层:rail | 侧栏 | 内容区,全在顶栏之下。
+              侧栏常驻(§7.1 不存在空侧栏):没开工作区时树区 = 「这台电脑」盘符列表 */}
+        <div className="app-body">
+          <Rail
+            hasWorkspace={result !== null && !scanning}
+            onGraph={() => openSingletonTab('graph')}
+            onChat={() => openSingletonTab('chat')}
+            onUiWorkbench={() => openSingletonTab('uiworkbench')}
+            onSettings={() => openSettings()}
+          />
+          {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
+                不是卸载 —— 展开态的滚动/勾选都留得住 */}
+          <WorkspaceSidebar
+            result={result}
+            notes={notes}
+            selectedFile={selectedFile}
+            selectedFolder={selectedFolder}
+            expanding={expanding}
+            revealPaths={revealPaths}
+            onOpenFile={openFile}
+            onSelectDir={selectDir}
+            handleExpandLazy={handleExpandLazy}
+            saveNote={saveNote}
+            openPreview={openPreview}
+            treeNote={treeNote}
+            search={searchPanel}
+            onOpenSearchFile={(hit) => void openSearchFile(hit)}
+            onOpenSearchDir={openSearchDir}
+            folder={folder}
+            scanning={scanning}
+            pathDraft={pathDraft}
+            pathHint={pathHint}
+            pathShaking={pathShaking}
+            pathInputRef={pathInputRef}
+            setPathDraft={setPathDraft}
+            dismissPathHint={dismissPathHint}
+            goPath={goPath}
+            setPathShaking={setPathShaking}
+            recents={recents}
+            onOpenWorkspace={(path) => void scanPath(path)}
+            onTogglePin={togglePinRecent}
+            onRemoveRecent={removeRecent}
+            sidebarWidth={sidebarWidth}
+            onSashPointerDown={onSashPointerDown}
+            onSashPointerMove={onSashPointerMove}
+            endSashDrag={endSashDrag}
+            onSashDoubleClick={onSashDoubleClick}
+            onSashKeyDown={onSashKeyDown}
+            drives={drives}
+            drivesNote={drivesNote}
+            driveRefreshNonce={driveRefreshNonce}
+            onGoHome={goHome}
+            sidebarFace={sidebarFace}
+            settingsSection={settingsSection}
+            onSettingsSection={openSettings}
+            onOpenBrowseFile={openBrowseFile}
+          />
+          {result && !scanning ? (
+            // 资源管理器式双栏:左边目录树,右边当前选中项;两边各自独立滚动
+            <main className="workspace">
+              <section className="detail">{paneGroupsEl}</section>
+            </main>
+          ) : scanning || error ? (
+            // 扫描中/失败:这两种状态优先于页签房;其余情况(含没开项目)一律进签区,
+            // 空签组自然落 PaneEmptyBoard 空板
+            <ScanOrError
+              scanning={scanning}
+              error={error}
+              onRetry={() => (folder ? void scanPath(folder) : void handlePick())}
+              onPick={() => void handlePick()}
+              onGoHome={goHome}
+            />
+          ) : (
+            // 没开工作区也能有房:单例签(设置/图谱)孤零零一张签也要正文区
+            <main className="workspace">
+              <section className="detail">{paneGroupsEl}</section>
+            </main>
+          )}
         </div>
 
-        {/* 撕窗子窗(页签撕窗锤):壳本体在 AuxWindows 组件,
+        {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
+        <TooltipHost />
+        <Toast toast={toast} />
+        {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
+        <FilePathMenu />
+        {/* 通用右键菜单(全局单例,第二台):选区「引用到对话」这类不对着文件的右键走这儿 */}
+        <ContextMenu />
+      </div>
+
+      {/* 撕窗子窗(页签撕窗锤):壳本体在 AuxWindows 组件,
             Portal 渲染进子窗 document —— 同一棵 React 树,活的签的正房整体搬家 */}
-        <AuxWindows
-          auxWins={auxWins}
-          groups={groups}
-          tabArea={tabArea}
-          onRequestClose={closeAuxWindow}
-        />
-      </TeachingContext.Provider>
+      <AuxWindows
+        auxWins={auxWins}
+        groups={groups}
+        tabArea={tabArea}
+        onRequestClose={closeAuxWindow}
+      />
     </AiSetupContext.Provider>
   )
 }

@@ -26,16 +26,13 @@ import type {
   BrowseEntry,
   DepGraphResult,
   DriveInfo,
-  FeatureLocateResult,
   FileStructure,
   FileChangedPayload,
   FilePreviewResult,
-  GitChangesResult,
   ModelContextInfo,
   ModelFitVerdict,
   ModelStatus,
   RenameFileResult,
-  ScanDirNode,
   ScanResult,
   DevLogEntry
 } from '../shared/types.ts'
@@ -200,22 +197,6 @@ const atlasApi = {
   aiTestTavily: (key: string): Promise<TavilyProbeResult> =>
     ipcRenderer.invoke(CH.aiTestTavily, key),
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke(CH.aiPickFile),
-  aiExplainFile: (
-    rootPath: string,
-    relPath: string,
-    languageId: string,
-    requestId?: string,
-    question?: string,
-    note?: string
-  ): Promise<AiExplainResult> =>
-    ipcRenderer.invoke(CH.aiExplainFile, rootPath, relPath, languageId, requestId, question, note),
-  aiExplainFolder: (
-    rootPath: string,
-    relPath: string,
-    requestId?: string,
-    question?: string
-  ): Promise<AiExplainResult> =>
-    ipcRenderer.invoke(CH.aiExplainFolder, rootPath, relPath, requestId, question),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke(CH.aiChat, req),
   /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
@@ -231,24 +212,6 @@ const atlasApi = {
     ipcRenderer.on(CH.aiChatLookup, listener)
     return () => ipcRenderer.removeListener(CH.aiChatLookup, listener)
   },
-  gitChanges: (rootPath: string): Promise<GitChangesResult> =>
-    ipcRenderer.invoke(CH.gitChanges, rootPath),
-  gitExplainChange: (
-    rootPath: string,
-    relPath: string,
-    requestId?: string
-  ): Promise<AiExplainResult> =>
-    ipcRenderer.invoke(CH.gitExplainChange, rootPath, relPath, requestId),
-  /** AI 干活报告:整轮改动翻成大白话审计,流式增量走 atlas:ai-delta,按 requestId 对号 */
-  gitReport: (rootPath: string, requestId?: string): Promise<AiExplainResult> =>
-    ipcRenderer.invoke(CH.gitReport, rootPath, requestId),
-  /** 功能定位:「这个功能在哪」—— 扫描树递给主进程当地图,带路人指路,防编造校验在主进程 */
-  locateFeature: (
-    tree: ScanDirNode,
-    question: string,
-    requestId?: string
-  ): Promise<FeatureLocateResult> =>
-    ipcRenderer.invoke(CH.locateFeature, tree, question, requestId),
   /** 掐掉还在生成的讲解:换了讲解目标/关掉卡片时喊一声,模型立刻空出来 */
   aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke(CH.aiCancel, requestId),
   /** 联网查证(默认关):只把「名字」交给主进程去查公开资料,渲染进程不碰网络 */

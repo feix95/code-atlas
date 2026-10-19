@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createRequestScope } from '../src/renderer/src/requestScope.ts'
-import { guideEntries, isTreePartial } from '../src/shared/scanCoverage.ts'
+import { isTreePartial } from '../src/shared/scanCoverage.ts'
 import { isAiConfigured } from '../src/shared/aiSetup.ts'
 import { findFile, renameFileNode } from '../src/renderer/src/scanTreeTools.ts'
 import type { AiConfig, ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
@@ -119,31 +119,6 @@ function dir(
     file('README.md', 'README.md')
   ])
   assert.equal(isTreePartial(tree), false)
-}
-
-{
-  const children: ScanTreeNode[] = [
-    file('b.ts', 'b.ts'),
-    dir('z-dir', 'z-dir', []),
-    file('a.ts', 'a.ts'),
-    dir('a-dir', 'a-dir', [])
-  ]
-  const tree = dir('root', '', children)
-  const sorted = guideEntries(tree)
-  assert.deepEqual(
-    sorted.map((n) => n.name),
-    ['a-dir', 'z-dir', 'a.ts', 'b.ts']
-  )
-  assert.deepEqual(
-    children.map((n) => n.name),
-    ['b.ts', 'z-dir', 'a.ts', 'a-dir'],
-    '原数组不许被排序动过'
-  )
-  assert.deepEqual(
-    sorted.map((n) => n.relPath),
-    ['a-dir', 'z-dir', 'a.ts', 'b.ts'],
-    '排序只换顺序,relPath 原样'
-  )
 }
 
 // ── 内联标题改名:renameFileNode 换名重排 ──

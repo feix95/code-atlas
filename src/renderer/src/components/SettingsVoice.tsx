@@ -9,19 +9,15 @@ import {
 import type { AiConfig } from '@shared/types'
 import { CfgRow } from './CfgRow'
 
-/** 「AI 设置」页的「回复风格」卡:语气 / 讲解深度 / 自定义指令 / 推荐问题(纯展示) */
+/** 「AI 设置」页的「回复风格」卡:语气 / 讲解深度 / 自定义指令(纯展示) */
 export function SettingsVoice({
   config,
   personal,
-  updatePersonal,
-  chatSuggestionsOn,
-  onChatSuggestionsChange
+  updatePersonal
 }: {
   config: AiConfig | null
   personal: PersonalizationConfig
   updatePersonal: (patch: Partial<PersonalizationConfig>) => void
-  chatSuggestionsOn: boolean
-  onChatSuggestionsChange: (v: boolean) => void
 }): React.JSX.Element {
   return (
     <>
@@ -87,20 +83,6 @@ export function SettingsVoice({
               </div>
             </div>
           </details>
-          <div className="cfg-divider" />
-          {/* 推荐问题总闸:自由聊天和文件预览 AI 卡两头的推荐问题一把抓;拨一下立刻生效落盘 */}
-          <CfgRow label="推荐问题" hint="自动提供相关问题建议。">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={chatSuggestionsOn}
-              aria-label="推荐问题"
-              className={`cfg-switch${chatSuggestionsOn ? ' is-on' : ''}`}
-              onClick={() => onChatSuggestionsChange(!chatSuggestionsOn)}
-            >
-              <span />
-            </button>
-          </CfgRow>
         </>
       )}
     </>

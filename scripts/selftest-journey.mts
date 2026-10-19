@@ -56,7 +56,7 @@ cp.execFile = function(file, ...args) {
 }
 globalThis.fetch = async () => { throw new Error('Journey forbids network requests') }
 net.fetch = globalThis.fetch
-const state = globalThis.__journey = { configured:false, mode:'success', calls:{}, partial:false, holdGit:false, holdGraph:false, releases:[] }
+const state = globalThis.__journey = { configured:false, calls:{}, partial:false, holdGraph:false, releases:[] }
 const originalHandle = ipcMain.handle.bind(ipcMain)
 ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...args) => {
   state.calls[channel] = (state.calls[channel] || 0) + 1
@@ -65,20 +65,12 @@ ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...
     lmstudio:{baseUrl:'http://127.0.0.1:1/v1',model:'test-only',apiKey:''},
     cloud:{vendor:'deepseek',baseUrl:'https://api.deepseek.com',model:'',apiKey:'',contextSize:131072,consented:false}, webLookup:false
   }
-  if (channel === 'atlas:ai-explain-file') {
-    if (!state.configured) throw new Error('Unexpected AI request while browsing')
-    const mode = state.mode
-    if (mode === 'delay') await new Promise(resolve => state.releases.push(resolve))
-    return { status:mode === 'error' ? 'error':'supported', text:mode === 'error' ? '测试连接失败，请重试。':'测试回复：这是测试夹具里的 main.ts。',model:'test-only',durationMs:0 }
-  }
-  if (channel === 'atlas:ai-cancel') return
   if (channel === 'atlas:model-status-get' && state.configured) return { provider:'lmstudio',state:'ready',modelName:'test-only',sizeBytes:null,progress:null }
   if (channel === 'atlas:dep-graph' && state.holdGraph) {
     await new Promise(resolve => state.releases.push(resolve))
     return {rootPath:args[0],nodes:[],edges:[],hubs:[{relPath:'old-project-only.ts',languageId:'typescript',inCount:8,outCount:0}],stats:{analyzed:0,externalCount:0,unresolved:[],skipped:0},durationMs:0}
   }
   const result = await handler(event, ...args)
-  if (channel === 'atlas:git-changes' && state.holdGit) await new Promise(resolve => state.releases.push(resolve))
   if (channel === 'atlas:scan-folder' && state.partial) return {...result,tree:{...result.tree,truncated:true}}
   return result
 })
@@ -125,39 +117,14 @@ try {
     }, channel)
   const shot = (name: string) => page.screenshot({ path: join(run, 'shots', `${name}.png`) })
   const open = async (folder: string) => {
-    const leaf =
-      folder
-        .replace(/[\\/]+$/, '')
-        .split(/[\\/]/)
-        .pop() ?? ''
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(folder)
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).press('Enter')
-    // 页签改版:开工作区不再自动开签。地址栏落到新路径 = 扫描已起跑(旧工作区同帧卸载),
-    // 此后 main.workspace 只会在扫完才回来 —— 两个等待排队用,别指望第一个等扫描
-    await page.waitForFunction((expected) => {
-      const el = document.querySelector('input[aria-label="文件夹路径"]')
-      return el instanceof HTMLInputElement && el.value.endsWith(expected)
-    }, leaf)
+    // 页签改版:开工作区不再自动开签,开图也不自动开页签。扫描一开 result 就置空
+    // (正文换 ScanOrError),扫完 main.workspace 才回来 —— 这个等待本身即「扫描完成」信号
     await page.locator('main.workspace').waitFor()
-    // 概览签是手动开的单例(rail 钮在扫描期间禁用,click 自动等到能点)
-    await page.getByRole('button', { name: '概览', exact: true }).click()
-    await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
   }
   // 欢迎主页已退役:没开工作区的起始态 = 空签板(大 logo +「还没有打开的页签」)
   const home = () => page.getByText('还没有打开的页签', { exact: true }).waitFor()
-  const overview = async () => {
-    // 回项目导览 = 树根行清选中(概览签的零状态就是导览页)+ rail 开/聚焦概览签
-    await page.locator('.tree > .tree-branch > .tree-row.is-dir > .tree-main').click()
-    await page.getByRole('button', { name: '概览', exact: true }).click()
-    await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
-  }
-  const selectMain = async () => {
-    await overview()
-    await page.locator('.guide-child').filter({ hasText: 'main.ts' }).click()
-    // 点文件 = 开/激活它的文件签;概览签的选中已换成 main.ts —— 切回概览签看文件概览
-    await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
-    await page.getByRole('button', { name: '查看文件内容', exact: true }).waitFor()
-  }
   await home()
   // UI v3(B7):没工作区时顶栏搜索框置灰(深搜要有工作区根)
   assert.ok(
@@ -277,7 +244,6 @@ try {
     ),
     'double-clicked drive must become the workspace root'
   )
-  await control({ holdGit: true })
   await open(project)
   // 页签改版(小葵拍板):树里点文件 = 开绑死它的文件签 —— 一文件一张,
   // 重开同一文件只激活不生第二张;点文件夹只选中不开签;已有页签一概不动
@@ -294,7 +260,7 @@ try {
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   assert.equal(
     await page.locator('.tabbar-tab').count(),
-    3,
+    2,
     're-clicking an open file must not spawn a duplicate tab'
   )
   assert.equal(
@@ -308,7 +274,7 @@ try {
   await page.locator('.tree-row.is-dir .tree-main').filter({ hasText: 'src' }).first().click()
   assert.equal(
     await page.locator('.tabbar-tab').count(),
-    3,
+    2,
     'clicking a folder must not open a tab'
   )
   // 选项区开关(只读):代码文件的菜单只有「只读/自动换行」,没有 md 才有的「排版显示」;
@@ -392,7 +358,7 @@ try {
     .locator('.tabbar-tab')
     .filter({ has: auxPage.locator('.tabbar-name').getByText('package.json', { exact: true }) })
     .waitFor()
-  assert.equal(await page.locator('.tabbar-tab').count(), 2, 'torn tab must leave the main strip')
+  assert.equal(await page.locator('.tabbar-tab').count(), 1, 'torn tab must leave the main strip')
   // realm 探针:子窗里点一张签要能激活 —— React 合成事件必须够得着外文书(forein document)
   // 里渲染的 Portal 子树;这条断了,子窗里所有交互都是死的
   await auxPage.locator('.tabbar-tab').first().click()
@@ -406,7 +372,7 @@ try {
   assert.equal(electron.windows().length, 1, 'closing aux window must leave only the main window')
   assert.equal(
     await page.locator('.tabbar-tab').count(),
-    2,
+    1,
     'closed aux window must take its tabs with it'
   )
   const treeIconStyle = await page.locator('.tree-icon svg').first().getAttribute('style')
@@ -418,7 +384,7 @@ try {
     null,
     'non-tree icons must not use the colored tint class'
   )
-  await shot('guide')
+  await shot('tree-notes')
   // 悬停轻提示(全场唯一户口):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
   // 统一从树区右缘(sash 拖杆线)弹出,不压上下行的字;鼠标一走气泡收摊
   const tipRow = page.locator('.tree:not(.search-results) .tree-main[data-tip]').first()
@@ -507,9 +473,6 @@ try {
   await shot('ws-menu')
   await page.keyboard.press('Escape')
   await page.locator('.ws-menu').waitFor({ state: 'hidden' })
-  assert.equal(await calls('atlas:ai-explain-file'), 0)
-  await release()
-  await control({ holdGit: false })
   // UI v3(B7):顶栏深搜——词一进,树区整体换成结果清单;文件命中补探父链后开预览页签;
   // 空账照实说;文件夹命中打开为工作区(地址栏同一条路);清空词文件树原样回来
   const searchBox = page.getByRole('searchbox', { name: '搜索文件', exact: true })
@@ -560,7 +523,8 @@ try {
   await searchBox.fill('src')
   await page.locator('.search-results .tree-row.is-dir').waitFor()
   await page.locator('.search-results .tree-row.is-dir').click()
-  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  // 目录命中 = 把它当工作区打开:重扫期间正文换 ScanOrError,扫完 main.workspace 才回来
+  await page.locator('main.workspace').waitFor()
   assert.ok(
     (await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()).endsWith(
       'src'
@@ -1256,18 +1220,15 @@ try {
   )
   await page.getByRole('button', { name: '关闭 UI 工作台', exact: true }).click()
   await page.locator('.ui-workbench').waitFor({ state: 'detached' })
-  await overview()
-  await page.getByRole('button', { name: /读项目说明/ }).click()
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   await page
     .locator('.cm-editor')
     .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
-  await selectMain()
-  await page.waitForTimeout(800)
-  assert.equal(await calls('atlas:ai-explain-file'), 0, 'Browsing must not start AI predictions')
   await shot('file-unconfigured')
-  await page.locator('.ai-card').getByRole('button', { name: '设置 AI', exact: true }).click()
-  // UI v3(B6):「设置 AI」直达开设置页签并切到「AI 设置」页(不是弹窗了)
+  // UI v3(B6):AI 状态浮层的「设置 AI」直达开设置页签并切到「AI 设置」页(不是弹窗了)
+  await page.getByRole('button', { name: /AI 状态/ }).click()
+  await page.locator('.ai-status-pop').getByRole('button', { name: '设置 AI', exact: true }).click()
   await page.locator('.cfg-page').waitFor()
   await page.locator('#cfg-model-path').waitFor()
   await page.waitForTimeout(200)
@@ -1279,11 +1240,6 @@ try {
   await shot('setup')
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
   await page.locator('.cfg-page').waitFor({ state: 'hidden' })
-  // 关签接力到左邻签(页签模型规矩):点回概览签(点签名不点签心,免得误中尾部的 ×),
-  // 文件讲解卡照旧在
-  await page.locator('.tabbar-tab').filter({ hasText: '概览' }).locator('.tabbar-name').click()
-  await page.getByRole('button', { name: '查看文件内容', exact: true }).click()
-  await page.locator('.cm-line').filter({ hasText: 'export const start' }).waitFor()
   // 回归:预览带超长单行的文件不得把内容区顶出视口 —— 超宽内容靠 min-content 传染链
   // 顶穿 .workspace/.detail,右组分屏曾被挤出屏幕;.workspace/.content 已补 min-width:0 断链
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'wide.ts' }).dblclick()
@@ -1300,22 +1256,33 @@ try {
   await page.getByRole('button', { name: '返回首页', exact: true }).click()
   await home()
   await open(join(run, 'empty'))
-  await page.locator('.guide-empty').waitFor()
-  assert.equal(await page.locator('.guide-start-link').count(), 0)
+  // 空目录 = 一个签都没开:空签板顶上(开工作区不再自动开签)
+  await home()
   await control({ partial: true })
   await open(project)
-  await page.locator('.guide-orientation .notice-warn').waitFor()
-  assert.equal(await page.locator('.guide-orientation .chip').count(), 0)
+  // 分级扫描没探完:侧栏页脚如实说「部分已扫描」(旧「项目导览」的预警条随概览板块退役)
+  await page.locator('.sidebar-footer').getByText('部分已扫描').waitFor()
   await control({ partial: false, holdGraph: true })
-  await page.locator('.guide-more summary').click()
-  await page.getByRole('button', { name: /分析文件关系/ }).click()
+  // 关系分析挂在半路时换工作区:单例签不随工作区关闭,但迟到的旧项目图必须被丢弃,
+  // 不许落进还开着的图谱签里
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor()
   await open(join(run, 'second'))
   await release()
-  await control({ holdGraph: false, configured: true })
-  assert.ok(!(await page.locator('.guide-body').innerText()).includes('old-project-only.ts'))
+  await control({ holdGraph: false })
+  await page.waitForTimeout(200)
+  assert.equal(
+    await page.locator('.tabbar-tab').filter({ hasText: '关系图谱' }).count(),
+    1,
+    'singleton tabs must survive a workspace switch'
+  )
+  assert.ok(
+    !(await page.locator('.graph-view').innerText()).includes('old-project-only.ts'),
+    'a stale graph from the previous project must never reach the graph tab'
+  )
   await page.reload()
-  // 会话复现(Obsidian 式):重开不回首页,还原关门前的工作区+页签 —— 应停在 second 的导览
-  await page.getByRole('heading', { name: '项目导览', exact: true }).waitFor()
+  // 会话复现(Obsidian 式):重开不回首页,还原关门前的工作区 —— 应停在 second
+  await page.locator('.sidebar-footer').waitFor()
   assert.ok(
     (await page.getByRole('textbox', { name: '文件夹路径', exact: true }).inputValue()).endsWith(
       'second'
@@ -1323,35 +1290,19 @@ try {
     'reload must restore the last workspace (session replay)'
   )
   await open(project)
-  await selectMain()
-  await page.locator('.ai-card').getByRole('button', { name: '解释这个文件', exact: true }).click()
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   await page
-    .locator('.ai-card')
-    .getByText('测试回复：这是测试夹具里的 main.ts。', { exact: true })
+    .locator('.cm-editor')
+    .filter({ hasText: 'This application helps organize tasks.' })
     .waitFor()
-  await shot('ai-fixture-success')
-  await control({ mode: 'error' })
-  await selectMain()
-  await page.locator('.ai-card').getByRole('button', { name: '解释这个文件', exact: true }).click()
-  await page.locator('.ai-card').getByRole('button', { name: '重试', exact: true }).waitFor()
-  await page.locator('.ai-card').getByRole('button', { name: 'AI 设置', exact: true }).waitFor()
-  await control({ mode: 'delay' })
-  await page.locator('.ai-card').getByRole('button', { name: '重试', exact: true }).click()
-  await page.getByRole('button', { name: '取消分析', exact: true }).click()
-  await page.locator('.ai-card .badge').filter({ hasText: '已取消' }).waitFor()
-  await release()
-  await page.waitForTimeout(100)
-  assert.ok((await calls('atlas:ai-cancel')) > 0)
-  assert.match(await page.locator('.ai-card .badge').innerText(), /已取消/)
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark'
   })
   await shot('file-dark')
   assert.deepEqual(errors, [], 'Renderer must not report errors')
   console.log(
-    'Journey passed: real scanning/reading/navigation/setup/recovery, mocked AI success/error/cancel, delayed Git and stale graph.'
+    'Journey passed: real scanning/reading/navigation/setup/recovery, mocked delayed and stale graph.'
   )
-  console.log('AI responses are test fixtures; model quality is not verified.')
   console.log(`Local screenshots: ${join(run, 'shots')}`)
 } finally {
   await electron.close()
