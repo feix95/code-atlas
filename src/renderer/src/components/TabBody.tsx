@@ -33,7 +33,6 @@ export function TabBody({
   tab,
   result,
   notes,
-  noteEditRequest,
   previewRefs,
   previewJump,
   selectedFile,
@@ -69,7 +68,6 @@ export function TabBody({
   tab: PaneTab
   result: ScanResult | null
   notes: NoteMap
-  noteEditRequest: string | null
   previewRefs: ChatCodeRef[]
   previewJump: { line: number; seq: number } | null
   selectedFile: ScanFileNode | null
@@ -176,7 +174,6 @@ export function TabBody({
           onRefreshed={setGitInfo}
           note={notes[selectedFolder.relPath] ?? null}
           onNoteSave={saveNote}
-          autoOpenNote={noteEditRequest === selectedFolder.relPath}
           onGoChat={(turn) => goAskInChat(selectedFolder, turn)}
         />
       )
@@ -199,7 +196,6 @@ export function TabBody({
           gitLoading={gitLoading}
           note={notes[selectedFile.relPath] ?? null}
           onNoteSave={saveNote}
-          autoOpenNote={noteEditRequest === selectedFile.relPath}
           suggestionsOn={chatSuggestionsOn}
           onGoChat={(turn) => goAskInChat(selectedFile, turn)}
           onPreview={() => openPreview(selectedFile.relPath)}
@@ -283,7 +279,6 @@ export function FileOverviewPage({
   gitLoading,
   note,
   onNoteSave,
-  autoOpenNote,
   suggestionsOn,
   onGoChat,
   onPreview
@@ -304,8 +299,6 @@ export function FileOverviewPage({
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
-  /** 树上右键「写/编辑备注」:头部自动展开编辑框 */
-  autoOpenNote?: boolean
   /** 推荐问题总闸(设置里的「推荐问题」):关了概览 AI 卡不出预设题,烧模型的预测也一并歇 */
   suggestionsOn: boolean
   /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
@@ -360,7 +353,6 @@ export function FileOverviewPage({
         subtitle={file.summary?.text ?? (file.language ? `${file.language.name} 文件` : '文件')}
         note={note}
         onNoteSave={(text) => onNoteSave(file.relPath, text)}
-        autoOpenNote={autoOpenNote}
         badges={badges}
       />
       <div className="detail-body">
@@ -394,7 +386,6 @@ export function FolderOverviewPage({
   onRefreshed,
   note,
   onNoteSave,
-  autoOpenNote,
   onGoChat
 }: {
   dir: ScanDirNode
@@ -405,8 +396,6 @@ export function FolderOverviewPage({
   /** 小葵的手动备注(第九十八锤) */
   note: NoteEntry | null
   onNoteSave: (relPath: string, text: string) => void
-  /** 树上右键「写/编辑备注」:头部自动展开编辑框 */
-  autoOpenNote?: boolean
   /** 「去追问」:点亮 Atlas 小探针页签,并把卡里解释好的一轮带上,那边接着往下问 */
   onGoChat: (turn: AiTurn | null) => void
 }): React.JSX.Element {
@@ -429,7 +418,6 @@ export function FolderOverviewPage({
         subtitle={dir.summary?.text ?? '文件夹'}
         note={note}
         onNoteSave={(text) => onNoteSave(dir.relPath, text)}
-        autoOpenNote={autoOpenNote}
         badges={badges}
       />
       <div className="detail-body">

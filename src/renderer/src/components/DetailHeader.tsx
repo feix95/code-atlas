@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { NoteEntry } from '@shared/notes'
 import { useFlashFlag } from '../useFlashFlag'
 import { NotePen, TreeIcon } from './Icons'
@@ -31,7 +31,6 @@ export function DetailHeader({
   subtitle,
   note,
   onNoteSave,
-  autoOpenNote,
   badges
 }: {
   crumbs: Crumb[]
@@ -43,23 +42,12 @@ export function DetailHeader({
   note?: NoteEntry | null
   /** 传了才显示备注入口;空串 = 删除备注 */
   onNoteSave?: (text: string) => void
-  /** 树上右键「写/编辑备注」时置真:头部自动展开编辑框(第一百零二锤) */
-  autoOpenNote?: boolean
   badges?: Array<{ label: string; tone: BadgeTone }>
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   // 小笔写字动画(第一百零九锤补):保存/清删的瞬间磕一下
   const [tapping, flashTapping] = useFlashFlag(350)
-  // 右键菜单的「写/编辑备注」落到这里:置真就自动展开编辑框,每次挂载只应一次
-  const autoOpenedRef = useRef(false)
-  useEffect(() => {
-    if (autoOpenNote && !autoOpenedRef.current && onNoteSave) {
-      autoOpenedRef.current = true
-      setDraft(note?.text ?? '')
-      setEditing(true)
-    }
-  }, [autoOpenNote, note, onNoteSave])
 
   function openEditor(): void {
     setDraft(note?.text ?? '')

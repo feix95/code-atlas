@@ -444,6 +444,53 @@ try {
     0,
     'tree rows must not render gray annotation text'
   )
+  // 备注(锤一):树上右键 → 写备注就地长输入框 → 回车保存 → 悬停提示只显示备注正文;
+  // 清除备注后,悬停提示自动恢复引擎摘要
+  const noteTarget = page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' })
+  const summaryTip = await noteTarget.getAttribute('data-tip')
+  assert.ok(summaryTip, 'README.md must start with an engine summary tip')
+  await noteTarget.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '写备注', exact: true }).click()
+  const noteInput = page.locator('.file-path-menu-input')
+  await noteInput.waitFor()
+  // 中文输入法选字时的回车是「上屏」,不许触发保存
+  await noteInput.fill('合成中的字')
+  await noteInput.evaluate((el) => {
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true })
+    )
+  })
+  assert.ok(await noteInput.isVisible(), 'composing Enter must not save')
+  await noteInput.fill('这是我对 README 的备注')
+  await noteInput.press('Enter')
+  await page.locator('.file-path-menu').waitFor({ state: 'detached' })
+  await page
+    .locator('.tree-row.is-file')
+    .filter({ hasText: 'README.md' })
+    .locator('.tree-note-mark')
+    .waitFor()
+  assert.equal(
+    await noteTarget.getAttribute('data-tip'),
+    '这是我对 README 的备注',
+    'note must replace summary tip'
+  )
+  await noteTarget.hover()
+  await bubble.waitFor()
+  assert.equal(
+    (await bubble.textContent())?.trim(),
+    '这是我对 README 的备注',
+    'tooltip must show only the note body'
+  )
+  await page.mouse.move(12, 320)
+  await bubble.waitFor({ state: 'detached' })
+  await noteTarget.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '清除备注', exact: true }).click()
+  await page.locator('.file-path-menu').waitFor({ state: 'detached' })
+  assert.equal(
+    await noteTarget.getAttribute('data-tip'),
+    summaryTip,
+    'summary tip must come back after removing the note'
+  )
   // UI v3(B5):workspace 卡 ⇅ 菜单——浮层成行、↓ 键盘高亮、行首 pin 两态、Esc 收摊
   await page.getByRole('button', { name: '展开工作区菜单', exact: true }).click()
   await page.locator('.ws-menu').waitFor()

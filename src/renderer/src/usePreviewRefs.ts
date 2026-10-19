@@ -19,21 +19,10 @@ export function usePreviewRefs(deps: {
   groups: PaneGroup[]
   activeGroup: PaneGroup | null
   markFlash: (id: string) => void
-  editNoteFromTree: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
 }) {
-  const {
-    result,
-    notes,
-    chat,
-    chatRef,
-    openPreview,
-    groups,
-    activeGroup,
-    markFlash,
-    editNoteFromTree,
-    saveNote
-  } = deps
+  const { result, notes, chat, chatRef, openPreview, groups, activeGroup, markFlash, saveNote } =
+    deps
 
   // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;换预览文件即清
   const [previewRefs, setPreviewRefs] = useState<ChatCodeRef[]>([])
@@ -81,13 +70,15 @@ export function usePreviewRefs(deps: {
   // 身份一个用到底,fileLinks 的 useMemo 不用陪着 notes 每次换新
   const noteMenuRef = useRef<{
     hasNote: (relPath: string) => boolean
-    onEdit: (relPath: string) => void
+    text: (relPath: string) => string
+    onSave: (relPath: string, text: string) => void
     onRemove: (relPath: string) => void
-  }>({ hasNote: () => false, onEdit: () => {}, onRemove: () => {} })
+  }>({ hasNote: () => false, text: () => '', onSave: () => {}, onRemove: () => {} })
   useEffect(() => {
     noteMenuRef.current = {
       hasNote: (relPath) => notes[relPath] !== undefined,
-      onEdit: (relPath) => editNoteFromTree(relPath),
+      text: (relPath) => notes[relPath]?.text ?? '',
+      onSave: (relPath, text) => saveNote(relPath, text),
       onRemove: (relPath) => saveNote(relPath, '')
     }
   })
@@ -99,7 +90,8 @@ export function usePreviewRefs(deps: {
       openFilePathMenuFor(cur.rootPath, relPath, x, y, doc, {
         note: {
           hasNote: nm.hasNote(relPath),
-          onEdit: () => nm.onEdit(relPath),
+          text: nm.text(relPath),
+          onSave: (text) => nm.onSave(relPath, text),
           onRemove: () => nm.onRemove(relPath)
         }
       })

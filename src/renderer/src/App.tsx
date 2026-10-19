@@ -105,8 +105,6 @@ function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   // 手动备注(第九十八锤):本项目 relPath → 小葵的一句话;存本机,存上限有孤儿清收
   const [notes, setNotes] = useState<NoteMap>({})
-  // 树上右键「写/编辑备注」(第一百零二锤):指向要弹编辑框的 relPath
-  const [noteEditRequest, setNoteEditRequest] = useState<string | null>(null)
 
   // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
   const [revealPaths, setRevealPaths] = useState<Set<string>>(new Set())
@@ -474,25 +472,6 @@ function App(): React.JSX.Element {
     })
   }
 
-  // 树上右键「写/编辑备注」(第一百零二锤):先选中节点、开概览签(备注编辑框住在概览头部),
-  // 再点名要弹编辑框的 relPath
-  function editNoteFromTree(relPath: string): void {
-    if (!result) return
-    const f = findFile(result.tree, relPath)
-    if (f) {
-      void openFile(f)
-      openSingletonTab('overview')
-      setNoteEditRequest(relPath)
-      return
-    }
-    const d = findDir(result.tree, relPath)
-    if (d) {
-      selectDir(d)
-      openSingletonTab('overview')
-      setNoteEditRequest(relPath)
-    }
-  }
-
   // 「预览文件」入口(文件行右键/概览「查看文件内容」/图谱打开):选中 + 开文件签。
   // 文件已选中就只点亮签 —— 双击总伴着单击,别把导航账记重了
   function openPreview(relPath: string): void {
@@ -698,7 +677,6 @@ function App(): React.JSX.Element {
     groups,
     activeGroup,
     markFlash,
-    editNoteFromTree,
     saveNote
   })
 
@@ -755,7 +733,6 @@ function App(): React.JSX.Element {
         tab={t}
         result={result}
         notes={notes}
-        noteEditRequest={noteEditRequest}
         previewRefs={previewRefs}
         previewJump={previewJump}
         selectedFile={selectedFile}
@@ -894,7 +871,6 @@ function App(): React.JSX.Element {
               onOpenFile={openFile}
               onSelectDir={selectDir}
               handleExpandLazy={handleExpandLazy}
-              editNoteFromTree={editNoteFromTree}
               saveNote={saveNote}
               openPreview={openPreview}
               treeNote={treeNote}

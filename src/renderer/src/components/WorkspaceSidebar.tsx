@@ -30,7 +30,6 @@ export function WorkspaceSidebar({
   onOpenFile,
   onSelectDir,
   handleExpandLazy,
-  editNoteFromTree,
   saveNote,
   openPreview,
   treeNote,
@@ -78,7 +77,6 @@ export function WorkspaceSidebar({
   /** 点文件夹:只选中,不开签(App 的 selectDir) */
   onSelectDir: (node: ScanDirNode) => void
   handleExpandLazy: (relPath: string) => Promise<ScanDirNode | null>
-  editNoteFromTree: (relPath: string) => void
   saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
   treeNote: string | null
@@ -319,7 +317,7 @@ export function WorkspaceSidebar({
                 onSelectFile={(_relPath, file) => void onOpenFile(file)}
                 onSelectFolder={onSelectDir}
                 onExpandLazy={(relPath) => void handleExpandLazy(relPath)}
-                onNoteEdit={editNoteFromTree}
+                onNoteSave={saveNote}
                 onNoteRemove={(relPath) => saveNote(relPath, '')}
                 onPreviewFile={openPreview}
               />
