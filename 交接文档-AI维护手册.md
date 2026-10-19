@@ -9,7 +9,7 @@
 - 排版归 prettier 独家管; 大扫除 commit 登记在 .git-blame-ignore-revs, blame 可忽略排版噪音。
 - 本地提交闸门: pre-commit 跑 lint-staged(只对暂存文件跑 prettier --write 与 eslint --fix), pre-push 跑 typecheck; 钩子由 husky 管理, `npm install` 经 `prepare` 自动装。
 - 依赖漏洞扫描跑 CI 的独立 audit job(`npm run audit`, 只卡 high 及以上): 脚本必须写死官方源 `--registry=https://registry.npmjs.org`, 本机镜像不实现 advisory 接口; 禁止并入 `npm test` 或任何自测脚本, 自测不访问真实网络。
-- 分支同步: 每完成一次「把某分支合并到 main」, 必须随即把 main 的最新提交反向同步到 UI-creator 与当前工作分支, 本地与远端都要, 让三分支同指一个提交; 原因: 分支落后于 main 会让人在旧基线上开发, 合并时夹带历史提交或起冲突。
+- 分支同步: 每完成一次「把某分支合并到 main」(由小葵提 PR 并确认合并), 必须随即把 main 的最新提交反向同步到 UI-creator 与当前工作分支, 本地与远端都要, 让三分支同指一个提交; 原因: 分支落后于 main 会让人在旧基线上开发, 合并时夹带历史提交或起冲突。
 - 界面文案标准: 高效、简洁、直白、清晰、专业; 不出现用户看不懂的术语。
 - 单文件行数上限: src/ 内单文件不超过 1000 行, 超限文件登记于 selftest-filesize 白名单、行数只降不升; 向大文件追加代码前先评估另立小文件; 拆分单独成锤——纯搬家不改行为、每锤全绿、拆出块按职责归位(共享逻辑进 shared/、界面件进 components/ 等)。
 - 发布流程: 推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿, 人工确认后正式发布; 升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`; 新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。

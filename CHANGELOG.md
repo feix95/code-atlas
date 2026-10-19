@@ -473,3 +473,4 @@
 - chore(ci): 工作流 action 升到 v7(actions/checkout、actions/setup-node), 摆脱已弃用的 Node 20 runtime
 - docs(handbook): 新增分支同步约定, 合并到 main 后须把 main 反向同步回 UI-creator 与当前工作分支(本地与远端), 三分支同指一个提交
 - docs(handbook): 红线 2 补充口径——纯文档或工程配置类改动经 CI 全绿后可径直合并, 不再逐次请示
+- docs(handbook): 红线 2 改为 main 合并权归小葵独占——AI 禁止主动提 PR, 也不为小改动单开 PR, 改动攒到小葵提 PR 时一并走
