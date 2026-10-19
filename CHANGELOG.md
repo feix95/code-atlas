@@ -470,3 +470,4 @@
 - chore(ci): 接 husky 本地提交闸门(pre-commit 跑 lint-staged 只格式化暂存文件、pre-push 跑 typecheck)与 CI 独立 audit job;audit 脚本写死官方源,只卡 high 及以上
 - chore(ci): 新增 .gitattributes 把 .husky 钩子固定为 LF, 不再受 core.autocrlf 影响
 - docs(handbook): 新增「已知取舍」一节, 记录 electron-builder 链 8 个 moderate 漏洞需 alpha 大版本才能修、故暂不修
+- chore(ci): 工作流 action 升到 v7(actions/checkout、actions/setup-node), 摆脱已弃用的 Node 20 runtime
