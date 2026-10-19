@@ -7,6 +7,8 @@
 - 路径契约: 节点仅存储 relPath; 主进程统一经 shared/paths 的 joinRoot 拼接绝对路径。
 - IPC 收发必须配对: `send/sendSync` 对应 `ipcMain.on`, `invoke` 对应 `ipcMain.handle`; 配对错误导致消息静默丢弃且无报错。selftest-appearance 含通道对账校验。
 - 排版归 prettier 独家管; 大扫除 commit 登记在 .git-blame-ignore-revs, blame 可忽略排版噪音。
+- 本地提交闸门: pre-commit 跑 lint-staged(只对暂存文件跑 prettier --write 与 eslint --fix), pre-push 跑 typecheck; 钩子由 husky 管理, `npm install` 经 `prepare` 自动装。
+- 依赖漏洞扫描跑 CI 的独立 audit job(`npm run audit`, 只卡 high 及以上): 脚本必须写死官方源 `--registry=https://registry.npmjs.org`, 本机镜像不实现 advisory 接口; 禁止并入 `npm test` 或任何自测脚本, 自测不访问真实网络。
 - 界面文案标准: 高效、简洁、直白、清晰、专业; 不出现用户看不懂的术语。
 - 单文件行数上限: src/ 内单文件不超过 1000 行, 超限文件登记于 selftest-filesize 白名单、行数只降不升; 向大文件追加代码前先评估另立小文件; 拆分单独成锤——纯搬家不改行为、每锤全绿、拆出块按职责归位(共享逻辑进 shared/、界面件进 components/ 等)。
 - 发布流程: 推送 `v*` tag → Actions 自动运行全部自测并将安装包发布至 GitHub Releases 草稿, 人工确认后正式发布; 升级内置引擎仅修改 release.yml 的 `LLAMA_TAG`; 新增语言支持必须同步 electron-builder.yml 的 wasm filter 清单(selftest-wasmpaths 会校验)。
