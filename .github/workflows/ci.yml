@@ -1,10 +1,9 @@
-# 每次推代码/来 PR,GitHub 免费帮跑一遍全套自测——哪锤改坏了当场报警
+# 推 main 到远端后跑全套自测(合并后闸);哪锤改坏了当场报警,本地合进 main 前仍须自测全绿
 name: CI
 
 on:
   push:
     branches: [main]
-  pull_request:
 
 jobs:
   check:
