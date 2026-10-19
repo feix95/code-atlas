@@ -466,3 +466,4 @@
 - feat(settings): 设置页模型卡下拉框收成短/中两档宽(8rem/10rem);选项文案全改裸值,「当前推荐 X」「未安装」等尾巴退役,对齐 LM Studio 口径
 - docs(handbook): 清理 Devin 专属表述——AGENTS.md 改称「宿主 Agent」,需求规格与代码注释摘除 Devin 字样
 - docs(todo): 历史需求整体归档——docs/to-do list 全部移入新建 docs/archive,原文件夹清空只收未完成需求;交接文档与代码注释引用路径同步
+- chore(deps): 清掉依赖树 4 个 high 漏洞源头——npm audit fix 升 undici/source-map-js/http-cache-semantics 等传递依赖,brace-expansion 由 5.0.9 顶到 5.0.12;生产依赖本无漏洞,余下 8 个 moderate 只在 electron-builder 链、需 alpha 大版本才能修故不动
