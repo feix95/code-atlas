@@ -1,5 +1,5 @@
-/* ── 图片预览(图片预览锤):JPG/PNG 签的正文 ──
-   适应窗口 = 舞台 flex 居中、图等比缩进可视区;100% = 图按原始尺寸撑开,舞台自己滚 */
+/* ── 图片预览:JPG/PNG 签的正文 ──
+   舞台 overflow:hidden;图按原像素排,translate + scale 做适应/缩放/平移 */
 .image-pane {
   display: flex;
   flex-direction: column;
@@ -11,41 +11,33 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
+  overflow: hidden;
   background: var(--canvas-tint);
+  touch-action: none;
+  user-select: none;
 }
 
-.image-stage-btn {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: zoom-in;
-  max-width: 100%;
-  max-height: 100%;
+.image-stage.is-pannable {
+  cursor: grab;
 }
 
-.image-stage.is-actual .image-stage-btn {
-  cursor: zoom-out;
-  margin: auto; /* 图比舞台小时仍居中;比舞台大时撑出滚动条 */
+.image-stage.is-panning {
+  cursor: grabbing;
 }
 
 .image-figure {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.image-stage.is-actual .image-figure {
   max-width: none;
   max-height: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 
-/* 解码中的转圈钉在舞台中央,不跟着内容滚走 */
+/* 解码中的转圈钉在舞台中央,不跟着内容走 */
 .image-wait {
   position: absolute;
   inset: 0;
@@ -58,8 +50,9 @@
   pointer-events: none;
 }
 
-/* 底栏信息条:文件名 + 宽×高 + 体积 + 模式钮,报得出才报 */
+/* 底栏信息条:文件名 + 宽×高 + 体积 + 缩放钮 */
 .image-info {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -68,6 +61,7 @@
   color: var(--muted);
   font-size: var(--font-xs);
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .image-info-name {
@@ -76,19 +70,70 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  flex: 1;
 }
 
-/* 模式切换钮:文字标签直报当前档;开态(100%)走 --sash-hi 功能强调色 */
-.image-zoom-btn {
-  margin-left: auto;
+/* 底栏深色块:像素/体积与缩放百分比同款 */
+.image-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   flex-shrink: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+}
+
+.image-info-meta {
+  cursor: pointer;
+  user-select: none;
+}
+
+.image-info-peek {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-1));
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.image-info-peek-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.image-info-peek-label {
+  color: var(--muted-2);
+}
+
+/* 缩放控件:单击上拉档位、双击原地输入;外壳走 .image-chip */
+.image-zoom-ctl {
+  gap: 0;
+}
+
+.image-zoom-btn,
+.image-zoom-input {
+  border: 0;
+  padding: 0;
   background: transparent;
   color: var(--muted-2);
   font-family: inherit;
   font-size: var(--font-xs);
+}
+
+.image-zoom-btn {
   cursor: pointer;
 }
 
@@ -97,6 +142,53 @@
   background: var(--hover);
 }
 
-.image-zoom-btn[aria-pressed='true'] {
+.image-zoom-btn:disabled {
+  cursor: default;
+}
+
+.image-zoom-btn[aria-expanded='true'] {
+  color: var(--sash-hi);
+}
+
+.image-zoom-input {
+  width: 3.25rem;
+  color: var(--text);
+  background: var(--hover);
+  outline: none;
+}
+
+.image-zoom-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-1));
+  z-index: var(--z-dropdown);
+  min-width: 100%;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop);
+}
+
+.image-zoom-opt {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  text-align: right;
+  cursor: pointer;
+}
+
+.image-zoom-opt:hover {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
+.image-zoom-opt.is-current {
   color: var(--sash-hi);
 }

@@ -599,6 +599,12 @@ export interface FilePreviewImage {
   mime: 'image/png' | 'image/jpeg'
   width: number | null
   height: number | null
+  /** 每个通道的位数;读不出 = null */
+  bitDepth: number | null
+  /** 是否带透明;读不出 = null。JPEG 无透明,为 false */
+  transparent: boolean | null
+  /** JPEG 是否渐进式;PNG = null */
+  progressive: boolean | null
   /** 文件真实字节数(信息条报体积用) */
   bytes: number
 }

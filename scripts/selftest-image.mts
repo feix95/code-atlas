@@ -3,14 +3,14 @@
 // 样本字节全在内存里构造,仓库里不放任何二进制图片。
 import assert from 'node:assert/strict'
 import { IMAGE_EXTS, isImageFile, imageMimeOf } from '../src/shared/fileKinds.ts'
-import { sniffImage } from '../src/shared/imageMeta.ts'
+import { imageInfoFacts, sniffImage } from '../src/shared/imageMeta.ts'
 import { imageResultFromBytes, readImagePreview } from '../src/main/imagePreview.ts'
 import { IMAGE_PREVIEW_MAX_BYTES } from '../src/shared/preview.ts'
 
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 
-/** 造一张内存里的最小 PNG:签名 + IHDR 段头(宽 2 × 高 3) */
-function pngBytes(width: number, height: number): Uint8Array {
+/** 造一张内存里的最小 PNG:签名 + IHDR 段头(宽 2 × 高 3);colorType 默认 6=RGBA */
+function pngBytes(width: number, height: number, colorType = 6): Uint8Array {
   return new Uint8Array([
     ...PNG_SIG,
     0x00,
@@ -30,7 +30,7 @@ function pngBytes(width: number, height: number): Uint8Array {
     (height >>> 8) & 0xff,
     height & 0xff,
     0x08,
-    0x06,
+    colorType,
     0x00,
     0x00,
     0x00,
@@ -41,8 +41,8 @@ function pngBytes(width: number, height: number): Uint8Array {
   ])
 }
 
-/** 造一段内存里的最小 JPEG:SOI + APP0 + SOF0(宽 64 × 高 32) + EOI */
-function jpegBytes(width: number, height: number): Uint8Array {
+/** 造一段内存里的最小 JPEG:SOI + APP0 + SOF(默认 SOF0 基线) + EOI */
+function jpegBytes(width: number, height: number, sof = 0xc0): Uint8Array {
   return new Uint8Array([
     0xff,
     0xd8,
@@ -52,7 +52,7 @@ function jpegBytes(width: number, height: number): Uint8Array {
     0x10, // APP0 段,长度 16(含长度字段自身 2 字节)
     ...new Array(14).fill(0x00),
     0xff,
-    0xc0, // SOF0
+    sof,
     0x00,
     0x11, // 段长 17
     0x08, // 精度
@@ -87,19 +87,42 @@ async function main(): Promise<void> {
   const png = pngBytes(2, 3)
   assert.deepEqual(
     sniffImage(png),
-    { mime: 'image/png', width: 2, height: 3 },
-    'PNG 魔数对、IHDR 量出宽高'
+    {
+      mime: 'image/png',
+      width: 2,
+      height: 3,
+      bitDepth: 8,
+      transparent: true,
+      progressive: null
+    },
+    'PNG 魔数对、IHDR 量出宽高;RGBA 报有透明'
   )
+  const rgb = pngBytes(2, 3, 2)
+  assert.equal(sniffImage(rgb)?.transparent, false, '真彩无 tRNS 不算透明')
   // 只剩签名(后面被截断):认得出是 PNG,但宽高读不出 → null,不拿 0 冒充
   assert.deepEqual(
     sniffImage(new Uint8Array(PNG_SIG)),
-    { mime: 'image/png', width: null, height: null },
+    {
+      mime: 'image/png',
+      width: null,
+      height: null,
+      bitDepth: null,
+      transparent: null,
+      progressive: null
+    },
     'PNG 只剩签名:宽高 null 不报错'
   )
   // 签名对但 IHDR 段头也被截了(短于 24 字节)
   assert.deepEqual(
     sniffImage(png.slice(0, 20)),
-    { mime: 'image/png', width: null, height: null },
+    {
+      mime: 'image/png',
+      width: null,
+      height: null,
+      bitDepth: null,
+      transparent: null,
+      progressive: null
+    },
     'PNG 截在 IHDR 中间:宽高 null'
   )
 
@@ -107,9 +130,18 @@ async function main(): Promise<void> {
   const jpeg = jpegBytes(64, 32)
   assert.deepEqual(
     sniffImage(jpeg),
-    { mime: 'image/jpeg', width: 64, height: 32 },
-    'JPEG 扫到 SOF0 量出宽高'
+    {
+      mime: 'image/jpeg',
+      width: 64,
+      height: 32,
+      bitDepth: 8,
+      transparent: false,
+      progressive: false
+    },
+    'JPEG 扫到 SOF0 量出宽高;基线非渐进、无透明'
   )
+  const progressive = jpegBytes(64, 32, 0xc2)
+  assert.equal(sniffImage(progressive)?.progressive, true, 'SOF2 报渐进式')
   // 没有 SOF 段的 JPEG(SOI+APP0+EOI):魔数对,宽高 null
   const noSof = new Uint8Array([
     0xff,
@@ -124,7 +156,14 @@ async function main(): Promise<void> {
   ])
   assert.deepEqual(
     sniffImage(noSof),
-    { mime: 'image/jpeg', width: null, height: null },
+    {
+      mime: 'image/jpeg',
+      width: null,
+      height: null,
+      bitDepth: null,
+      transparent: false,
+      progressive: null
+    },
     'JPEG 没扫到 SOF:宽高 null'
   )
 
@@ -142,6 +181,9 @@ async function main(): Promise<void> {
   assert.equal(ok.image?.width, 2, '宽带上')
   assert.equal(ok.image?.height, 3, '高带上')
   assert.equal(ok.image?.bytes, png.byteLength, '体积报实数')
+  assert.equal(ok.image?.bitDepth, 8, '色深带上')
+  assert.equal(ok.image?.transparent, true, 'RGBA 透明带上')
+  assert.equal(ok.image?.progressive, null, 'PNG 没有渐进式字段')
   assert.ok(ok.image?.dataUrl.startsWith('data:image/png;base64,'), 'dataUrl 是 base64 的 png')
   // base64 解回去的字节必须与原样一致(dataUrl 不撒谎)
   const b64 = ok.image!.dataUrl.slice('data:image/png;base64,'.length)
@@ -151,6 +193,26 @@ async function main(): Promise<void> {
   assert.equal(jpg.status, 'image', '真 JPEG 回 image')
   assert.equal(jpg.image?.mime, 'image/jpeg', 'JPEG 的 MIME')
   assert.equal(jpg.image?.width, 64, 'JPEG 宽')
+  assert.equal(jpg.image?.progressive, false, '基线 JPEG 不是渐进式')
+  assert.deepEqual(
+    imageInfoFacts(sniffImage(png)!),
+    [
+      { label: '格式', value: 'PNG' },
+      { label: '色深', value: '8 位' },
+      { label: '透明', value: '有' }
+    ],
+    'PNG 面板条目'
+  )
+  assert.deepEqual(
+    imageInfoFacts(sniffImage(jpeg)!),
+    [
+      { label: '格式', value: 'JPEG' },
+      { label: '色深', value: '8 位' },
+      { label: '透明', value: '无' },
+      { label: '渐进式', value: '否' }
+    ],
+    'JPEG 面板条目'
+  )
 
   // 改名冒充:后缀是 .png,内容是文本 → binary,理由说人话
   const fake = imageResultFromBytes('fake.png', new TextEncoder().encode('我是文本'))

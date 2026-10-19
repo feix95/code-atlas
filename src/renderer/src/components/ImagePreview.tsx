@@ -1,20 +1,27 @@
 import { useState } from 'react'
 import type { FilePreviewImage } from '@shared/types'
 import { formatSize } from '@shared/fsMessages'
+import { useImageViewport } from '../useImageViewport'
+import type { ImageSize } from '@shared/imageZoom'
+import { ImageInfoMeta } from './ImageInfoMeta'
+import { ImageZoomControl } from './ImageZoomControl'
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'
 
 /** 图片解码的两档账:字节进 <img> 后,要么上屏要么报错,没有中间态 */
 type ImagePhase = 'loading' | 'ready' | 'error'
 
-/** 看图两档:适应窗口(默认,整图居中)/ 100% 原尺寸(可滚动) */
-type ImageZoom = 'fit' | 'actual'
+function metaSize(image: FilePreviewImage): ImageSize | null {
+  if (image.width === null || image.height === null) return null
+  if (image.width <= 0 || image.height <= 0) return null
+  return { width: image.width, height: image.height }
+}
 
 /**
- * 图片预览(图片预览锤):JPG/PNG 文件签的正文。
- * 默认适应窗口居中看整张;点图或点底栏模式钮在「适应窗口 / 100%」间切换,
- * 100% 下撑出滚动条看原尺寸。底栏信息条报文件名、宽×高(读不出就不说)、体积。
- * 图片不碰代码那套 —— 只读锁/引用/折行一概不出场。
+ * 图片预览:JPG/PNG 文件签的正文。
+ * 默认适应窗口(小图不放大);Ctrl+滚轮以光标为中心缩放;拖拽平移;
+ * 双击图片在适应窗口 / 100% 之间切换;底栏百分比单击选档、双击输入。
+ * 不碰代码那套只读/引用/折行。
  */
 export function ImagePreview({
   fileName,
@@ -24,41 +31,59 @@ export function ImagePreview({
   image: FilePreviewImage
 }): React.JSX.Element {
   const [phase, setPhase] = useState<ImagePhase>('loading')
-  const [zoom, setZoom] = useState<ImageZoom>('fit')
+  const [natural, setNatural] = useState<ImageSize | null>(() => metaSize(image))
+  const {
+    stageRef,
+    view,
+    isPanning,
+    canPan,
+    zoomPercent,
+    setZoomPercent,
+    onPointerDown,
+    onDoubleClick
+  } = useImageViewport(natural)
   const dims =
     image.width !== null && image.height !== null ? `${image.width} × ${image.height} 像素` : null
-  const zoomTip =
-    zoom === 'fit' ? '现在是适应窗口,点一下看 100% 原尺寸' : '现在是 100% 原尺寸,点一下适应窗口'
-
-  function toggleZoom(): void {
-    setZoom((z) => (z === 'fit' ? 'actual' : 'fit'))
-  }
+  const stageClass =
+    'image-stage' + (canPan ? ' is-pannable' : '') + (isPanning ? ' is-panning' : '')
 
   return (
     <div className="image-pane">
-      <div className={`image-stage${zoom === 'actual' ? ' is-actual' : ''}`}>
+      <div
+        ref={stageRef}
+        className={stageClass}
+        onPointerDown={onPointerDown}
+        onDoubleClick={onDoubleClick}
+      >
         {phase === 'error' ? (
           <Notice kind="warn">
             这张图片打不开 —— 文件可能已损坏,或内容不是有效的 JPG/PNG 编码
           </Notice>
         ) : (
-          <button
-            type="button"
-            className="image-stage-btn"
-            aria-label={zoomTip}
-            data-tip={zoomTip}
-            onClick={toggleZoom}
-          >
-            <img
-              className="image-figure"
-              src={image.dataUrl}
-              alt={fileName}
-              draggable={false}
-              hidden={phase !== 'ready'}
-              onLoad={() => setPhase('ready')}
-              onError={() => setPhase('error')}
-            />
-          </button>
+          <img
+            className="image-figure"
+            src={image.dataUrl}
+            alt={fileName}
+            draggable={false}
+            hidden={phase !== 'ready'}
+            width={natural?.width}
+            height={natural?.height}
+            style={
+              natural
+                ? {
+                    transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`
+                  }
+                : undefined
+            }
+            onLoad={(e) => {
+              const img = e.currentTarget
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setNatural({ width: img.naturalWidth, height: img.naturalHeight })
+              }
+              setPhase('ready')
+            }}
+            onError={() => setPhase('error')}
+          />
         )}
         {phase === 'loading' && (
           <div className="image-wait">
@@ -71,18 +96,12 @@ export function ImagePreview({
         <span className="image-info-name" data-tip={fileName}>
           {fileName}
         </span>
-        {dims && <span>{dims}</span>}
-        <span>{formatSize(image.bytes)}</span>
-        <button
-          type="button"
-          className="image-zoom-btn"
-          aria-pressed={zoom === 'actual'}
-          aria-label={zoomTip}
-          data-tip={zoomTip}
-          onClick={toggleZoom}
-        >
-          {zoom === 'fit' ? '适应窗口' : '100%'}
-        </button>
+        <ImageInfoMeta image={image} dims={dims} sizeText={formatSize(image.bytes)} />
+        <ImageZoomControl
+          percent={zoomPercent}
+          disabled={phase !== 'ready'}
+          onPick={setZoomPercent}
+        />
       </div>
     </div>
   )

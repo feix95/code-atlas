@@ -34,6 +34,9 @@ export function imageResultFromBytes(name: string, buf: Uint8Array): FilePreview
       mime: meta.mime,
       width: meta.width,
       height: meta.height,
+      bitDepth: meta.bitDepth,
+      transparent: meta.transparent,
+      progressive: meta.progressive,
       bytes: buf.byteLength
     }
   }
