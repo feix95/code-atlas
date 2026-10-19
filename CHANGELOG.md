@@ -471,3 +471,5 @@
 - chore(ci): 新增 .gitattributes 把 .husky 钩子固定为 LF, 不再受 core.autocrlf 影响
 - docs(handbook): 新增「已知取舍」一节, 记录 electron-builder 链 8 个 moderate 漏洞需 alpha 大版本才能修、故暂不修
 - chore(ci): 工作流 action 升到 v7(actions/checkout、actions/setup-node), 摆脱已弃用的 Node 20 runtime
+- docs(handbook): 新增分支同步约定, 合并到 main 后须把 main 反向同步回 UI-creator 与当前工作分支(本地与远端), 三分支同指一个提交
+- docs(handbook): 红线 2 补充口径——纯文档或工程配置类改动经 CI 全绿后可径直合并, 不再逐次请示

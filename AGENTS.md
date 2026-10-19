@@ -5,7 +5,7 @@
 ## 红线
 
 1. AI 配置 `ai-config.json` 位于系统用户目录, 禁止移入仓库; 大模型与推理引擎置于 `vendor/`(已忽略)。
-2. push 到 main、merge 回 main 必须经小葵验证确认; worktree/分支上完成的任务全绿后主动 commit 到branch。
+2. push 到 main、merge 回 main 必须经小葵验证确认(纯文档或工程配置类改动经 CI 全绿后可径直合并, 不必逐次请示); worktree/分支上完成的任务全绿后主动 commit 到branch。
 3. 同一功能调试期禁止 commit: 连续修改只改代码与跑自测, 小葵确认无问题后一次性 commit + push(其确认即 push 许可)。原因: 避免半成品逐次进入历史。
 4. commit message 禁止附加工具署名(`Generated with ...`、`Co-Authored-By: ...` 等)。
 5. 每个 commit 必须在 CHANGELOG.md 末尾同步追加一行, 随该 commit 一起提交(纯补记 CHANGELOG 的 commit 除外); 格式见交接文档「提交规范」。
@@ -38,4 +38,5 @@
 | 改 src/ai/ 下提示词或 prompt 相关自测 | 交接文档「提示词体系」                 |
 | 写 commit message / CHANGELOG 条目    | 交接文档「提交规范」                   |
 | 发布、升级内置引擎、新增语言支持      | 交接文档「开发约定」发布流程条         |
+| 合并分支到 main、同步分支             | 交接文档「开发约定」分支同步条         |
 | 修改本文件或交接文档                  | 交接文档「文档维护」                   |
