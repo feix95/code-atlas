@@ -5,7 +5,7 @@
 ## 红线
 
 1. AI 配置 `ai-config.json` 位于系统用户目录, 禁止移入仓库; 大模型与推理引擎置于 `vendor/`(已忽略)。
-2. main 的合并权归小葵独占: 只有小葵明确说「合并到 main」时才执行合并与推送; AI 禁止主动提 PR, 也不为小改动单独开 PR —— 改动直接 commit 到当前工作分支, 攒到小葵提 PR 时一并走; worktree/分支上完成的任务全绿后主动 commit 到branch。
+2. 一切 git 写操作(commit / push / pull / 提 PR / 合并 main)归小葵发令, 禁止自行执行: 工作区积攒成规模的定稿改动、或已转战其他目标时, 简短提醒一次待提交清单而不逐条催促; 小葵说「可以 commit」时按交接文档「提交规范」的分批条提交, 说「可以合进 main」时再执行合并并按「分支同步」条拉齐三分支。
 3. 同一功能调试期禁止 commit: 连续修改只改代码与跑自测, 小葵确认无问题后一次性 commit + push(其确认即 push 许可)。原因: 避免半成品逐次进入历史。
 4. commit message 禁止附加工具署名(`Generated with ...`、`Co-Authored-By: ...` 等)。
 5. 每个 commit 必须在 CHANGELOG.md 末尾同步追加一行, 随该 commit 一起提交(纯补记 CHANGELOG 的 commit 除外); 格式见交接文档「提交规范」。

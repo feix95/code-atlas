@@ -474,3 +474,4 @@
 - docs(handbook): 新增分支同步约定, 合并到 main 后须把 main 反向同步回 UI-creator 与当前工作分支(本地与远端), 三分支同指一个提交
 - docs(handbook): 红线 2 补充口径——纯文档或工程配置类改动经 CI 全绿后可径直合并, 不再逐次请示
 - docs(handbook): 红线 2 改为 main 合并权归小葵独占——AI 禁止主动提 PR, 也不为小改动单开 PR, 改动攒到小葵提 PR 时一并走
+- docs(handbook): 红线 2 改为一切 git 写操作归小葵发令——AI 禁止自行 commit / push / pull / 提 PR; 积攒成批定稿改动或已转战其他目标时提醒一次, 收到发令后按主题分批提交
