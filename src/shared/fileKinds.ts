@@ -118,6 +118,13 @@ export const DOC_EXTS = new Set(['.md', '.markdown', '.txt', '.rst', '.adoc'])
  */
 export const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg'])
 
+/**
+ * 预览能直接播的音频后缀(小写含点):唯一名单。
+ * 这些后缀仍在 BINARY_EXTS 里;预览层先判图片、再判音频、再判二进制。
+ * 只收 Chromium <audio> 稳播的两种:MP3 / WAV。
+ */
+export const AUDIO_EXTS = new Set(['.mp3', '.wav'])
+
 /** 按文件名判断是不是预览可直接看的图片(无后缀/.foo 这类隐藏文件一律不算) */
 export function isImageFile(name: string): boolean {
   const dot = name.lastIndexOf('.')
@@ -135,6 +142,23 @@ export function imageMimeOf(name: string): 'image/png' | 'image/jpeg' | null {
   return null
 }
 
+/** 按文件名判断是不是预览可直接播的音频(无后缀/.foo 这类隐藏文件一律不算) */
+export function isAudioFile(name: string): boolean {
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return false
+  return AUDIO_EXTS.has(name.slice(dot).toLowerCase())
+}
+
+/** 音频后缀 → MIME;名单外的后缀回 null,不许冒充 */
+export function audioMimeOf(name: string): 'audio/mpeg' | 'audio/wav' | null {
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return null
+  const ext = name.slice(dot).toLowerCase()
+  if (ext === '.mp3') return 'audio/mpeg'
+  if (ext === '.wav') return 'audio/wav'
+  return null
+}
+
 /** 按文件名判断是不是二进制/媒体文件(svg 是文本,不算;无后缀/.gitignore 这类隐藏文件也不算) */
 export function isBinaryFile(name: string): boolean {
   const dot = name.lastIndexOf('.')
@@ -143,9 +167,9 @@ export function isBinaryFile(name: string): boolean {
 }
 
 /**
- * 预览页签肯收的文件:能直接看的图,或不当二进制的文本/代码。
- * 其余点开只给一句提示、不开签(名单仍以 BINARY_EXTS / IMAGE_EXTS 为准)。
+ * 预览页签肯收的文件:能直接看的图、能直接播的音频,或不当二进制的文本/代码。
+ * 其余点开只给一句提示、不开签(名单仍以 BINARY_EXTS / IMAGE_EXTS / AUDIO_EXTS 为准)。
  */
 export function canPreviewFile(name: string): boolean {
-  return isImageFile(name) || !isBinaryFile(name)
+  return isImageFile(name) || isAudioFile(name) || !isBinaryFile(name)
 }

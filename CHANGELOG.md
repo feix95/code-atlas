@@ -489,3 +489,4 @@
 - docs(core): AGENTS.md 去掉「已推送禁止重写历史」与 KERNEL_CORE 两条红线
 - feat(ui): 图片上右键在光标处弹出同一份缩放档位菜单,底栏百分比仍从芯片上拉
 - feat(ui): 点不能预览的类型不开签,底部 Toast「此文件类型不支持预览」约 1 秒
+- feat(ui): MP3/WAV 文件签走 atlas-media 流式播放;进度条钉死是协议缺 Content-Length

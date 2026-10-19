@@ -1,0 +1,114 @@
+/* ── 音频预览:MP3/WAV 签的正文 ──
+   舞台居中自家播放条;底栏复用看图 .image-info / .image-chip */
+
+.audio-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.audio-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--canvas-tint);
+}
+
+.audio-stage audio {
+  /* 1px 裁掉,别写成 0×0:Chromium 对零尺寸媒体可能不推进 currentTime */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.audio-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-md);
+}
+
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(36rem, 100%);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.audio-play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--canvas-tint);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.audio-play:hover {
+  border-color: var(--sash-hi);
+  color: var(--sash-hi);
+}
+
+.audio-play svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentColor;
+}
+
+.audio-seek {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: linear-gradient(to right, var(--sash-hi) var(--p, 0%), var(--line) var(--p, 0%))
+    center / 100% 0.25rem no-repeat;
+  cursor: pointer;
+}
+
+.audio-seek:disabled {
+  cursor: default;
+}
+
+.audio-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--switch-knob);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.audio-seek:hover::-webkit-slider-thumb {
+  border-color: var(--sash-hi);
+}
+
+.audio-clock {
+  flex: 0 0 auto;
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}

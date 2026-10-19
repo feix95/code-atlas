@@ -10,6 +10,7 @@ import {
 } from './appShell.ts'
 import { registerIpc } from './registerIpc.ts'
 import { registerAuxWindowIpc } from './auxWindows.ts'
+import { installAudioMediaProtocol, registerAudioMediaScheme } from './audioMediaProtocol.ts'
 import { app, globalShortcut, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
@@ -51,6 +52,8 @@ async function cleanupOldCrashDumps(userDataDir: string): Promise<void> {
 // 软件渲染(Skia)的每一帧都不经过显卡驱动,透明窗从此跟驱动打嗝绝缘。
 // 咱家是文本/列表界面,没有视频大图要喂,软件合成的代价付得起。必须在 app 就绪前调用。
 app.disableHardwareAcceleration()
+// 音频预览自定义协议必须在 ready 前登记特权,否则 <audio src> 当普通未知 scheme 拒载
+registerAudioMediaScheme()
 // 第四案(软件渲染版照样隐身)补刀:凶手不在显卡,在 Windows 合成器那一层。
 // 两道开关都冲着「无声断供」去:
 // ① Chromium 的原生窗口遮挡计算在 Windows 上有老毛病,会把没被遮住的窗误判成
@@ -64,6 +67,7 @@ app.on('will-quit', () => {
 })
 
 function startApp(): void {
+  installAudioMediaProtocol()
   createWindow()
   registerIpc()
   createTray()

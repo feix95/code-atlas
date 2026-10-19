@@ -6,8 +6,9 @@ import { searchNames } from '../scanner/searchNames.ts'
 import { annotateSummaries } from '../summarizer/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { buildDependencyGraph } from '../depgraph/index.ts'
-import { isBinaryFile, isImageFile } from '../shared/fileKinds.ts'
+import { isAudioFile, isBinaryFile, isImageFile } from '../shared/fileKinds.ts'
 import { readImagePreview } from './imagePreview.ts'
+import { readAudioPreview } from './audioPreview.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '../shared/preview.ts'
 import { highlightSource } from '../highlight/index.ts'
@@ -124,6 +125,9 @@ export function registerScanIpc(): void {
       // 超谢客线回 too-big、魔数对不上回 binary、验过回 image 带 dataUrl
       if (isImageFile(name)) {
         return readImagePreview({ absPath, relPath, sizeBytes: stat.size })
+      }
+      if (isAudioFile(name)) {
+        return readAudioPreview({ absPath, relPath, sizeBytes: stat.size })
       }
       // 后缀一看就是二进制/媒体的,连读都不用读
       if (isBinaryFile(name)) {

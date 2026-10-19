@@ -3,6 +3,7 @@ import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types
 import { friendlyErr } from '../errText'
 import { Notice } from './Notice'
 import { ImagePreview } from './ImagePreview'
+import { AudioPreview } from './AudioPreview'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
@@ -306,9 +307,11 @@ export function CodePreview({
           正在读文件……
         </div>
       )}
-      {!err && result && result.status !== 'ok' && result.status !== 'image' && (
-        <p className="code-pane-note">{result.reason}</p>
-      )}
+      {!err &&
+        result &&
+        result.status !== 'ok' &&
+        result.status !== 'image' &&
+        result.status !== 'audio' && <p className="code-pane-note">{result.reason}</p>}
       {/* 图片签(图片预览锤):JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
           image 账没带回来(不该发生)就老实按 reason 说明 */}
       {!err && result?.status === 'image' && (
@@ -323,6 +326,23 @@ export function CodePreview({
             />
           ) : (
             <p className="code-pane-note">{result.reason || '这张图片的信息没带回来,预览不了'}</p>
+          )}
+        </>
+      )}
+      {!err && result?.status === 'audio' && (
+        <>
+          {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
+          {result.audio ? (
+            <AudioPreview
+              key={file.relPath}
+              rootPath={rootPath}
+              relPath={file.relPath}
+              fileName={file.relPath.split(/[\\/]/).pop() ?? file.relPath}
+              audio={result.audio}
+              onRename={onRenameFile ? requestRename : undefined}
+            />
+          ) : (
+            <p className="code-pane-note">{result.reason || '这支音频的信息没带回来,预览不了'}</p>
           )}
         </>
       )}

@@ -134,7 +134,9 @@ export function useChatFiles(
             ? `「${name}」太大(超过 ${formatSize(PREVIEW_MAX_BYTES)}),没带进来`
             : res.status === 'image'
               ? `「${name}」是图片,拖进来会进图片那条路`
-              : res.reason || readFailed
+              : res.status === 'audio'
+                ? `「${name}」是音频,不能当文本附件带进来`
+                : res.reason || readFailed
       )
       return
     }

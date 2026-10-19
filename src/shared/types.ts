@@ -574,9 +574,10 @@ export interface AiHistoryMessage {
  * 代码预览的读文件结果(第一百一十锤):只给「够看懂」的一段,超了如实标 truncated。
  * 二进制/超大各有专门状态,让界面说人话 —— 绝不硬塞一屏乱码。
  * image = 后缀是 JPG/PNG 且内容验过魔数:界面直接看图,不走文本那套。
+ * audio = 后缀是 MP3/WAV 且内容验过魔数:界面走协议流播放,不走文本那套。
  */
 export interface FilePreviewResult {
-  status: 'ok' | 'binary' | 'too-big' | 'image'
+  status: 'ok' | 'binary' | 'too-big' | 'image' | 'audio'
   /** status='ok' 时的正文(全文,只做过换行归一) */
   text: string
   /** 文件真实总行数(ok 时才有) */
@@ -591,6 +592,8 @@ export interface FilePreviewResult {
   colors?: number[][][]
   /** status='image' 时的图片账:dataUrl 是整张图(mime 按字节嗅出来的,不以后缀为准) */
   image?: FilePreviewImage
+  /** status='audio' 时的音频账:字节流走 atlas-media,这里只带 MIME 和体积 */
+  audio?: FilePreviewAudio
 }
 
 /** 图片预览带上界面的那笔账:宽高读不出(截断/畸形)老实回 null,不拿 0 冒充 */
@@ -606,6 +609,12 @@ export interface FilePreviewImage {
   /** JPEG 是否渐进式;PNG = null */
   progressive: boolean | null
   /** 文件真实字节数(信息条报体积用) */
+  bytes: number
+}
+
+/** 音频预览带上界面的那笔账:时长交给 <audio> metadata,这里只报种类和体积 */
+export interface FilePreviewAudio {
+  mime: 'audio/mpeg' | 'audio/wav'
   bytes: number
 }
 
