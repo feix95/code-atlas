@@ -1,5 +1,5 @@
 /* ── UI v3 顶栏(第 1 层 · 整行盖头)────────────────────────
-   规格户口:docs/to-do list/UI重构-v3-比例布局;1u = var(--u) = 顶栏高 = rail 宽。
+   规格户口:docs/archive/UI重构-v3-比例布局;1u = var(--u) = 顶栏高 = rail 宽。
    顶栏死空间可拖窗,但走手动搬窗引擎(windowDrag.ts),不铺 app-region:drag ——
    原生拖拽面会被 Windows Aero Shake 盯上(摇窗最小化其它窗),程序级挪窗天然免疫 */
 

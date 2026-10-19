@@ -447,7 +447,7 @@ export function FreeChatComposer({
               </button>
             </span>
           ))}
-          {/* 内嵌引用原子(小葵拍板,Devin 式):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
+          {/* 内嵌引用原子(小葵拍板):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
           {draftRefs.map((r, i) => (
             <span
               key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}

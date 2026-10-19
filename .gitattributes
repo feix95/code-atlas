@@ -1,0 +1,2 @@
+# husky 钩子是 sh 脚本, 行尾必须保持 LF(core.autocrlf=true 的检出会把它们转成 CRLF)
+.husky/** text eol=lf

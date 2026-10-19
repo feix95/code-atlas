@@ -464,3 +464,10 @@
 - docs: AGENTS.md 补 dev 分离启动——宿主服务重启会回收后台 shell,跨重启保活须用 Start-Process 分离启动;另记 cmd「set VAR=」后接 && 的空格坑(空格被吃进变量值,复现 ELECTRON_RUN_AS_NODE 红线)
 - feat(ui): 自由对话内容中轴限宽 38rem→45rem(720px,与设置页同宽);hero/内容栏/chips/输入舱共用 --fc-col-w token
 - feat(settings): 设置页模型卡下拉框收成短/中两档宽(8rem/10rem);选项文案全改裸值,「当前推荐 X」「未安装」等尾巴退役,对齐 LM Studio 口径
+- docs(handbook): 清理 Devin 专属表述——AGENTS.md 改称「宿主 Agent」,需求规格与代码注释摘除 Devin 字样
+- docs(todo): 历史需求整体归档——docs/to-do list 全部移入新建 docs/archive,原文件夹清空只收未完成需求;交接文档与代码注释引用路径同步
+- chore(deps): 清掉依赖树 4 个 high 漏洞源头——npm audit fix 升 undici/source-map-js/http-cache-semantics 等传递依赖,brace-expansion 由 5.0.9 顶到 5.0.12;生产依赖本无漏洞,余下 8 个 moderate 只在 electron-builder 链、需 alpha 大版本才能修故不动
+- chore(ci): 接 husky 本地提交闸门(pre-commit 跑 lint-staged 只格式化暂存文件、pre-push 跑 typecheck)与 CI 独立 audit job;audit 脚本写死官方源,只卡 high 及以上
+- chore(ci): 新增 .gitattributes 把 .husky 钩子固定为 LF, 不再受 core.autocrlf 影响
+- docs(handbook): 新增「已知取舍」一节, 记录 electron-builder 链 8 个 moderate 漏洞需 alpha 大版本才能修、故暂不修
+- chore(ci): 工作流 action 升到 v7(actions/checkout、actions/setup-node), 摆脱已弃用的 Node 20 runtime
