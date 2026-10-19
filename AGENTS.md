@@ -9,8 +9,6 @@
 3. 同一功能调试期禁止 commit: 连续修改只改代码与跑自测, 小葵确认无问题后一次性 commit + push(其确认即 push 许可)。原因: 避免半成品逐次进入历史。
 4. commit message 禁止附加工具署名(`Generated with ...`、`Co-Authored-By: ...` 等)。
 5. 每个 commit 必须在 CHANGELOG.md 末尾同步追加一行, 随该 commit 一起提交(纯补记 CHANGELOG 的 commit 除外); 格式见交接文档「提交规范」。
-6. 已推送的 commit 禁止重写历史。
-7. `KERNEL_CORE`(src/ai/prompts.ts)为小葵逐字定稿, 禁止擅自改动。
 
 ## 验证命令
 
