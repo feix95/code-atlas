@@ -178,8 +178,6 @@
   --blue: #0078d4;
   /* sash 悬停/聚焦/拖动中的粗蓝条(§7 给定真值):明暗两主题同款,不随主题换色 */
   --sash-hi: #4cadff;
-  --git-add: #1a7f37;
-  --git-rename: #9a6700;
   --hover: rgba(0, 0, 0, 0.05);
   --selected-bg: rgba(0, 0, 0, 0.08);
   --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.18);
@@ -232,8 +230,6 @@
   --danger-soft: #3a2226;
   --danger-line: #63393e;
   --blue: #55a8e8; /* §6.1 AI 状态弧的暗色真值 */
-  --git-add: #3fb950;
-  --git-rename: #d29922;
   --hover: rgba(255, 255, 255, 0.07);
   --selected-bg: rgba(255, 255, 255, 0.13);
   --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.45);

@@ -4,8 +4,7 @@ import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
 import { TreeIcon } from './Icons'
 import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
 import { REF_ONLY_QUESTION, type AiChatApi } from '../useAiChat'
-import { CHAT_IMAGES_MAX, type ChatImage } from '@shared/chatImage'
-import { CHAT_FILES_MAX } from '@shared/chatFiles'
+import { type ChatImage } from '@shared/chatImage'
 import { fileAttachRangeLabel } from '@shared/chatFiles'
 import type { ChatImagesApi } from '../useChatImages'
 import { partitionAttachFiles, type ChatFilesApi } from '../useChatFiles'
@@ -284,18 +283,6 @@ export function FreeChatComposer({
     if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
   }, [draft, expanded, lineCount])
   const capped = lineCount >= INPUT_CAP_LINES || expanded
-  // 合并入口(添加附件)的悬停话:先交代拦路的(能力闸/满额),最后才是正常说明
-  const attachTip = chatImages.gate.reason
-    ? `${chatImages.gate.reason};选文件照常能加`
-    : chatFiles.files.length >= CHAT_FILES_MAX && chatImages.images.length >= CHAT_IMAGES_MAX
-      ? `文件最多带 ${CHAT_FILES_MAX} 个、图片最多带 ${CHAT_IMAGES_MAX} 张 —— 都带满了,先摘掉一些`
-      : chatFiles.files.length >= CHAT_FILES_MAX
-        ? `文件最多带 ${CHAT_FILES_MAX} 个;图片还能加`
-        : chatImages.images.length >= CHAT_IMAGES_MAX
-          ? `图片最多带 ${CHAT_IMAGES_MAX} 张;文件还能加`
-          : chatImages.gate.hint
-            ? `${chatImages.gate.hint};图片走看图,文件让探针读原文`
-            : '图片走看图,文件让探针读原文(直接拖进来也行)'
 
   return (
     <form
@@ -364,11 +351,10 @@ export function FreeChatComposer({
             <span className="fc-sw" aria-hidden="true" />
           </button>
           {/* 添加附件(文件附件锤,对齐 Claude Code 的 @文件):图片/文件共用一个口,挑完按类分流
-              —— 图片走看图那条链,其余文本文件读原文;纯文本模型文件照收,图片会被拒,悬停先交代 */}
+              —— 图片走看图那条链,其余文本文件读原文;纯文本模型文件照收,图片会被拒,加的时候会弹灰字说明 */}
           <button
             type="button"
             className="fc-mrow"
-            data-tip={attachTip}
             onClick={() => {
               setMenuOpen(false)
               attachInputRef.current?.click()

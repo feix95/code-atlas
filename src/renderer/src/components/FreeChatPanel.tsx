@@ -66,26 +66,20 @@ export function FreeChatPanel({
   chat,
   refs,
   onRemoveRef,
-  suggestions,
   onDropRef,
   rootPath,
-  fileLinks,
-  suggestionsOn
+  fileLinks
 }: {
   chat: AiChatApi
   /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
   refs?: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
-  /** 随对话演进的推荐问题(第一百一十二锤):传了就一直挂着,不传就退回开场示例 */
-  suggestions?: string[]
   /** 拖来的文件读盘走 rootPath(文件附件锤):树里拖文件当附件读原文,拖图片进待发图 */
   rootPath?: string
   /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
   onDropRef?: (ref: ChatCodeRef) => void
   /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
   fileLinks?: FileLinkTarget | null
-  /** 推荐问题总闸(聊天偏好):关了推荐和开场示例都不出,只剩「新对话」按钮 */
-  suggestionsOn: boolean
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const draftRefs = refs ?? []
@@ -215,14 +209,8 @@ export function FreeChatPanel({
     chat.send(q, draftRefs, undefined, chatFiles.files)
   }
 
-  /** 推荐问题 chips:空场吃开场示例,预览模式吃随对话演进的推荐;总闸关了谁都不出 */
-  const chipList = suggestionsOn
-    ? chat.messages.length === 0
-      ? (suggestions ?? CHAT_EXAMPLES)
-      : !chat.busy && suggestions
-        ? suggestions
-        : []
-    : []
+  /** 开场示例 chips:只在一条消息都还没有时挂着;聊起来就收摊,不再推荐 */
+  const chipList = chat.messages.length === 0 ? CHAT_EXAMPLES : []
 
   const composerEl = (
     <FreeChatComposer
@@ -459,15 +447,6 @@ export function FreeChatPanel({
               </button>
             )}
           </p>
-        )}
-        {chat.messages.length > 0 && chipList.length > 0 && (
-          <div className="fc-chips">
-            {chipList.map((q) => (
-              <button key={q} type="button" className="fc-chip" onClick={() => sendExample(q)}>
-                {q}
-              </button>
-            ))}
-          </div>
         )}
         {chat.messages.length > 0 && composerEl}
         <p className="fc-tip">

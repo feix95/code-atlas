@@ -13,7 +13,6 @@ import {
 } from '../shared/aiDefaults.ts'
 import { postChatCompletions } from './http.ts'
 import { formatUsage } from '../shared/aiText.ts'
-import { buildExplainSystem } from './prompts.ts'
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>
@@ -482,12 +481,14 @@ async function explainWithMessagesCore(
   }
 }
 
-/** 单轮讲解的老入口:人设 + 一条证据消息。追问等多轮场景直接用 explainWithMessages */
+/**
+ * 单轮问答入口:人设 + 一条消息。多轮场景直接用 explainWithMessages。
+ * 人设必传 —— 文件/文件夹讲解底座已随概览板块退役,这里不再兜一个没人认领的默认人设。
+ */
 export async function explainWithModel(
   config: ChatTarget,
   prompt: string,
-  // 默认人设 = 文件讲解底座 + 默认「精简」教学档(提示词体系重写第二批:原 SYSTEM_PROMPT 已拆进 prompts.ts)
-  system: string = buildExplainSystem('brief', 'file'),
+  system: string,
   onDelta?: (text: string, stats?: AiStreamStats) => void,
   signal?: AbortSignal,
   maxTokens = 500,

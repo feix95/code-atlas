@@ -161,41 +161,6 @@ export interface DepGraphResult {
   durationMs: number
 }
 
-/** git 改动清单里的一个文件 */
-export interface GitChange {
-  relPath: string
-  /** 重命名前的旧路径(仅 kind = renamed 时有) */
-  oldPath?: string
-  kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
-  /** 这次改动是否已进暂存区(untracked 恒为 false) */
-  staged: boolean
-  /** 新增行数;二进制文件为 -1 */
-  additions: number
-  /** 删除行数;二进制文件为 -1 */
-  deletions: number
-  /** 二进制文件:git 没法逐行对比 */
-  binary: boolean
-}
-
-/** 项目当前的 git 改动总览:谁动了、动了多少行 */
-export interface GitChangesResult {
-  rootPath: string
-  /** false = 这个文件夹不在 git 仓库里,changes 为空,靠界面提示 */
-  isGitRepo: boolean
-  /** 当前分支名;仓库还没有任何提交时为"(还没有提交)" */
-  branch: string
-  changes: GitChange[]
-  stats: {
-    /** 有改动的文件数 */
-    changed: number
-    /** 全部新增行合计(二进制不计) */
-    additions: number
-    /** 全部删除行合计(二进制不计) */
-    deletions: number
-  }
-  durationMs: number
-}
-
 /**
  * AI 服务的三种来源:LM Studio(外部)、内置模型(llama-server 子进程)、在线 API(付费云服务)。
  * 对上层业务它们是同一种服务 —— 都收敛成 ChatTarget(baseURL + 模型名)。
@@ -603,24 +568,6 @@ export interface AiChatLookupPayload {
 export interface AiHistoryMessage {
   role: 'user' | 'assistant'
   content: string
-}
-
-/** 功能定位的一个命中:带路人指的文件/文件夹 + 一句大白话理由 */
-export interface FeatureHit {
-  relPath: string
-  reason: string
-  /** 带路人自报的把握 0~100;只是排序参考,不是保证 */
-  confidence?: number
-}
-
-/** 功能定位结果:hits 为空 = 带路人老实说指不了,text 是给人看的说明 */
-export interface FeatureLocateResult {
-  status: 'supported' | 'unsupported' | 'error' | 'cancelled'
-  hits: FeatureHit[]
-  /** supported 时是补充说明(可为空);unsupported/error/cancelled 时是给人看的人话 */
-  text: string
-  model: string
-  durationMs: number
 }
 
 /**

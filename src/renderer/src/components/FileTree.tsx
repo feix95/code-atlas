@@ -57,10 +57,9 @@ function TreeRow({
 
   if (node.type === 'file') {
     const note = notes?.[node.relPath]
-    // 注释小灰字退役:行内只留「有备注」的笔帽小标,话本身挪进悬停提示(右侧出)
-    const tip = [note ? `我的备注:${note.text}` : '', node.summary?.text ?? '']
-      .filter(Boolean)
-      .join('\n')
+    // 注释小灰字退役:行内只留「有备注」的笔帽小标,话本身挪进悬停提示(右侧出)。
+    // 备注盖住引擎摘要:有备注只看备注,备注删掉后摘要自动回来
+    const tip = note ? note.text : (node.summary?.text ?? '')
     // 缩进吃 --tree-indent token(rem 记账),跟着根字号一起缩放
     return (
       <div
@@ -102,14 +101,16 @@ function TreeRow({
 
   const dir = node
   const dirNote = notes?.[dir.relPath]
-  // 注释小灰字退役:摘要/备注/子项数都挪进悬停提示;琥珀警示徽章仍常亮(留个心眼不藏进悬停)
-  const dirTip = [
-    dirNote ? `我的备注:${dirNote.text}` : '',
-    dir.summary?.text ?? '',
-    !dir.lazy && dir.children.length > 0 ? `${dir.children.length} 个子项` : ''
-  ]
-    .filter(Boolean)
-    .join('\n')
+  // 注释小灰字退役:摘要/备注/子项数都挪进悬停提示;琥珀警示徽章仍常亮(留个心眼不藏进悬停)。
+  // 备注盖住整条提示:有备注只看备注,备注删掉后摘要和子项数自动回来
+  const dirTip = dirNote
+    ? dirNote.text
+    : [
+        dir.summary?.text ?? '',
+        !dir.lazy && dir.children.length > 0 ? `${dir.children.length} 个子项` : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
 
   // 展开/收起(UI v3 §7 摘三角:单击文件夹行 = 选中+展开一体,行首不再摆箭头);
   // 没探过的目录,点行才是触发扫描的唯一入口
@@ -221,8 +222,8 @@ interface FileTreeProps {
   onSelectFile: (relPath: string, file: ScanFileNode) => void
   onSelectFolder: (node: ScanDirNode) => void
   onExpandLazy: (relPath: string) => void
-  /** 右键「写/编辑备注」的原料(菜单统一走全局):App 负责选中节点并弹详情页的编辑框 */
-  onNoteEdit?: (relPath: string) => void
+  /** 右键「写/编辑备注」落盘口(编辑框就地长在菜单里,不再跳概览页) */
+  onNoteSave?: (relPath: string, text: string) => void
   /** 右键「清除备注」的原料 */
   onNoteRemove?: (relPath: string) => void
   /** 右键「预览文件」的原料(第一百一十锤):开/激活预览页签 */
@@ -239,7 +240,7 @@ export function FileTree({
   onSelectFile,
   onSelectFolder,
   onExpandLazy,
-  onNoteEdit,
+  onNoteSave,
   onNoteRemove,
   onPreviewFile
 }: FileTreeProps): React.JSX.Element {
@@ -254,7 +255,7 @@ export function FileTree({
   }, [selectedPath, revealPaths])
 
   /** 右键统一走全局文件菜单(菜单统一大锤):带路两件 + 预览(文件) + 备注系列,
-   *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/收摊/反馈都是全局那张的事 */
+   *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/收摊/反馈/编辑框都是全局那张的事 */
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
     if (!rootPath) return
     e.preventDefault()
@@ -267,10 +268,11 @@ export function FileTree({
       e.currentTarget.ownerDocument,
       {
         preview: isFile && onPreviewFile ? () => onPreviewFile(node.relPath) : undefined,
-        note: onNoteEdit
+        note: onNoteSave
           ? {
               hasNote: notes?.[node.relPath] !== undefined,
-              onEdit: () => onNoteEdit(node.relPath),
+              text: notes?.[node.relPath]?.text ?? '',
+              onSave: (text) => onNoteSave(node.relPath, text),
               onRemove: onNoteRemove ? () => onNoteRemove(node.relPath) : undefined
             }
           : undefined

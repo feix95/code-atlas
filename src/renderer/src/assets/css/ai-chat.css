@@ -1,24 +1,4 @@
-/* ── 空状态:现状 + 原因 + 下一步 ── */
-
-.empty-state {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-  padding: var(--space-7) var(--space-5);
-  text-align: center;
-  color: var(--muted);
-}
-
-.empty-title {
-  color: var(--text-strong);
-  font-size: var(--font-base);
-  font-weight: var(--font-w-strong);
-}
-
-.empty-hint {
-  font-size: var(--font-md);
-  color: var(--muted);
-}
+/* AI 相关小件样式:信号灯信息条、流式光标、渲染兜底网 —— 概览板块退役后只剩这些 */
 
 /* ── 信号灯三级信息条:灰=随口一说 · 琥珀=留个心眼 · 红=真出事 ── */
 
@@ -49,91 +29,6 @@
   background: var(--danger-soft);
 }
 
-/* ── AI 助手卡 ── */
-
-.ai-card {
-  overflow: hidden;
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent-soft), var(--surface) 55%);
-}
-
-.ai-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: 0.625rem var(--space-3);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.ai-title {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--accent-bright);
-  font-size: var(--font-md);
-  font-weight: var(--font-w-strong);
-}
-
-.ai-title .spark {
-  color: var(--accent-bright);
-  font-size: var(--font-base);
-}
-
-.ai-card-body {
-  padding: var(--space-3);
-}
-
-.ai-card-body p {
-  margin: 0 0 0.625rem;
-  color: var(--muted);
-  font-size: var(--font-md);
-  line-height: var(--lh-165);
-}
-
-.ai-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: var(--space-2);
-}
-
-.prompt-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: var(--space-2);
-}
-
-/* 预设问题 chips 归辅助色管:跟主操作按钮(主题色)拉开层级,换辅助色一眼可见 */
-.prompt {
-  padding: 0.3125rem 0.5rem;
-  color: var(--secondary-deep);
-  border: 1px solid color-mix(in srgb, var(--secondary) 45%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--secondary) 9%, var(--surface));
-  font-size: var(--font-sm);
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    color var(--dur-2) var(--ease-smooth),
-    border-color var(--dur-2) var(--ease-smooth),
-    background var(--dur-2) var(--ease-smooth);
-}
-
-.prompt:hover {
-  color: var(--text-strong);
-  border-color: var(--secondary);
-  background: var(--secondary);
-}
-
-.prompt:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 /* 流式输出光标:一闪一闪,表示正在打字 */
 .stream-caret {
   display: inline-block;
@@ -146,42 +41,6 @@
   50% {
     opacity: 0;
   }
-}
-
-.explain {
-  margin-top: var(--space-2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.explain-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.explain-title {
-  font-size: var(--font-md);
-  font-weight: var(--font-w-bold);
-}
-
-.explain-note {
-  font-size: var(--font-md);
-  color: var(--muted);
-}
-
-.explain-text {
-  font-size: var(--font-md);
-  line-height: var(--lh-175);
-  background: var(--surface-soft);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
 }
 
 /* 渲染兜底网(2026-09-13 隐身案):某块内容画崩时垫的人话卡。

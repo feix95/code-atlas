@@ -1,7 +1,6 @@
-// 扫描树纯工具:子树嫁接/统计累加/按 relPath 找节点/面包屑/父目录链。
+// 扫描树纯工具:子树嫁接/统计累加/按 relPath 找节点/父目录链。
 // 全是纯函数;路径契约照旧 —— 只认 relPath,不手拼绝对路径。
 import type { ScanDirNode, ScanFileNode, ScanResult, ScanTreeNode } from '@shared/types'
-import type { Crumb } from './components/DetailHeader'
 
 // 分级扫描:把点开探测到的子树接进地图。沿 relPath 一路浅拷贝(其余节点原样复用),落到目标就换内容
 export function spliceSubtree(root: ScanDirNode, relPath: string, sub: ScanDirNode): ScanDirNode {
@@ -136,14 +135,6 @@ export function findDir(node: ScanTreeNode, relPath: string): ScanDirNode | null
     }
   }
   return null
-}
-
-/** 面包屑分段:rootName + relPath 的每一层;最后一段由调用方自己标成当前 */
-export function buildCrumbs(rootName: string, rootPath: string, relPath: string): Crumb[] {
-  const crumbs: Crumb[] = [{ label: rootName, title: rootPath }]
-  const parts = relPath === '' ? [] : relPath.split('/')
-  for (const part of parts) crumbs.push({ label: part, title: relPath })
-  return crumbs
 }
 
 /** 从树根下钻到目标文件的父目录链(reveal 联动用):这些目录要在树里强制展开。

@@ -29,9 +29,7 @@ export function SettingsAi({
   commitContextValue,
   ctxBill,
   personal,
-  updatePersonal,
-  chatSuggestionsOn,
-  onChatSuggestionsChange
+  updatePersonal
 }: {
   config: AiConfig | null
   onConfigChange: (next: AiConfig) => void
@@ -54,8 +52,6 @@ export function SettingsAi({
   ctxBill: ContextBill | null
   personal: PersonalizationConfig
   updatePersonal: (patch: Partial<PersonalizationConfig>) => void
-  chatSuggestionsOn: boolean
-  onChatSuggestionsChange: (v: boolean) => void
 }): React.JSX.Element {
   return (
     <div className="cfg-pane">
@@ -85,13 +81,7 @@ export function SettingsAi({
       </div>
       <h3 className="cfg-subhead">回复风格</h3>
       <div className="cfg-panel">
-        <SettingsVoice
-          config={config}
-          personal={personal}
-          updatePersonal={updatePersonal}
-          chatSuggestionsOn={chatSuggestionsOn}
-          onChatSuggestionsChange={onChatSuggestionsChange}
-        />
+        <SettingsVoice config={config} personal={personal} updatePersonal={updatePersonal} />
       </div>
     </div>
   )

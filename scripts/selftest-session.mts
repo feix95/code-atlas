@@ -47,10 +47,10 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
       tabs: [
         {
           id: 'tab:1',
-          kind: 'overview',
+          kind: 'graph',
           relPath: '',
-          name: '概览',
-          icon: 'navigation'
+          name: '关系图谱',
+          icon: 'view'
         },
         {
           id: 'tab:2',
@@ -125,6 +125,24 @@ check('parseSession:旧档里的 viewMode/readOnly 不再读(看片开关是全�
   assert.equal(h?.groups[0].tabs.length, 3, '水合照旧,签面干净')
 })
 
+check('parseSession:旧档里的概览签被丢弃,同组其余签照常还原', () => {
+  const s = parseSession({
+    v: 1,
+    folder: 'C:\\a',
+    groups: [
+      {
+        tabs: [
+          { kind: 'overview', relPath: '', name: '概览', icon: 'navigation' },
+          { kind: 'chat', relPath: '', name: '自由对话', icon: 'bot' }
+        ]
+      }
+    ]
+  })
+  assert.ok(s, '存档整体照认,不因一张退役签作废')
+  assert.equal(s.groups[0].tabs.length, 1, '概览签退役后旧存档里它被丢掉')
+  assert.equal(s.groups[0].tabs[0].kind, 'chat', '同组其余签照常还原')
+})
+
 check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', () => {
   const s: SessionState = {
     v: 1,
@@ -135,7 +153,7 @@ check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', (
         on: true,
         tabs: [
           { kind: 'preview', relPath: 'gone.ts', name: 'gone.ts', icon: 'ts' }, // 文件没了
-          { kind: 'overview', relPath: '', name: '概览', icon: 'navigation' },
+          { kind: 'graph', relPath: '', name: '关系图谱', icon: 'view' },
           {
             kind: 'preview',
             relPath: 'src/b.ts',

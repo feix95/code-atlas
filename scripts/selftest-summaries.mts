@@ -1,12 +1,5 @@
 import assert from 'node:assert/strict'
 import { annotateSummaries } from '../src/summarizer/index.ts'
-import { findCategory, LOCATE_CATEGORIES } from '../src/shared/locateCategories.ts'
-import {
-  DEFAULT_PRESET_QUESTIONS,
-  parsePredictedQuestions,
-  rulePresetQuestions
-} from '../src/shared/presetQuestions.ts'
-import { FOLLOW_UP_QUESTIONS, ruleChatSuggestions } from '../src/shared/chatSuggestions.ts'
 import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 let fileSeq = 0
@@ -276,134 +269,9 @@ async function main(): Promise<void> {
   assert.equal(textOf(titledTxt), 'doc 文档：随手记', 'txt 有标题也算文档')
   assert.equal(textOf(plainMd), 'doc 文档', '没标题的 md 照旧范畴词')
 
-  // ── 13. 类目直找(第一百零八锤):点了词条必须真有结果,且理由可查证 ──
-  const catTree: ScanDirNode = {
-    type: 'directory',
-    name: 'proj',
-    relPath: '',
-    children: [
-      {
-        type: 'file',
-        name: 'index.ts',
-        relPath: 'index.ts',
-        ext: '.ts',
-        language: TS
-      } as ScanFileNode,
-      {
-        type: 'directory',
-        name: 'config',
-        relPath: 'config',
-        children: [
-          {
-            type: 'file',
-            name: 'app.json',
-            relPath: 'config/app.json',
-            ext: '.json'
-          } as ScanFileNode
-        ]
-      },
-      {
-        type: 'directory',
-        name: 'tests',
-        relPath: 'tests',
-        children: [
-          {
-            type: 'file',
-            name: 'a.test.ts',
-            relPath: 'tests/a.test.ts',
-            ext: '.ts',
-            language: TS
-          } as ScanFileNode
-        ]
-      },
-      { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md' } as ScanFileNode
-    ]
-  }
-  annotateSummaries(catTree)
-  const entryHit = findCategory(catTree, '入口')
-  assert.ok(
-    entryHit.hits.some((h) => h.relPath === 'index.ts'),
-    `入口要找到 index.ts,实际:${JSON.stringify(entryHit.hits)}`
-  )
-  const configHit = findCategory(catTree, '配置')
-  assert.ok(
-    configHit.hits.some((h) => h.relPath === 'config') && configHit.total >= 2,
-    `配置要找到 config 目录和 app.json,实际:${JSON.stringify(configHit)}`
-  )
-  const testHit = findCategory(catTree, '测试')
-  assert.ok(
-    testHit.hits.some((h) => h.relPath === 'tests/a.test.ts'),
-    `测试要找到考卷,实际:${JSON.stringify(testHit.hits)}`
-  )
-  const docHit = findCategory(catTree, '文档')
-  assert.ok(
-    docHit.hits.some((h) => h.relPath === 'README.md'),
-    `文档要找到 README,实际:${JSON.stringify(docHit.hits)}`
-  )
-  const emptyHit = findCategory(catTree, '打包产物')
-  assert.equal(emptyHit.total, 0, '没有对应东西就老实报 0,不硬凑')
-  for (const c of LOCATE_CATEGORIES) findCategory(catTree, c.label) // 十个词条全跑一遍,不许抛
-
-  // ── 14. 预设问题三层预测·规则层(第一百零九锤):按类别出题,认不出回万金油 ──
-  assert.deepEqual(
-    rulePresetQuestions({ name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }).slice(
-      0,
-      1
-    ),
-    ['它测的是哪个模块？'],
-    '测试文件出测试专属题'
-  )
-  assert.ok(
-    rulePresetQuestions({ name: 'tsconfig.json', icon: 'config', text: '编译配置' }).includes(
-      '动哪一项会影响什么？'
-    ),
-    '配置文件出配置专属题'
-  )
-  assert.ok(
-    rulePresetQuestions({ name: '.env.local', icon: 'key', text: '配置开关' }).includes(
-      '该提交它还是忽略它？'
-    ),
-    '密钥文件出安全专属题'
-  )
-  assert.ok(
-    rulePresetQuestions({ name: 'README.md', icon: 'doc', text: '文档' }).includes(
-      '信息过时了吗？'
-    ),
-    '文档出文档专属题'
-  )
-  assert.deepEqual(
-    rulePresetQuestions({ name: 'zzz.xyz' }),
-    DEFAULT_PRESET_QUESTIONS,
-    '认不出的文件回万金油四问,永不空场'
-  )
-
-  // ── 15. 预览对话的推荐问题(第一百一十二锤):聊没聊过分流 + 模型出的题过筛 ──
-  assert.deepEqual(
-    ruleChatSuggestions(false, { name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
-    rulePresetQuestions({ name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
-    '没聊过:跟概览页一个规矩,按文件类别出题'
-  )
-  assert.deepEqual(
-    ruleChatSuggestions(true, { name: 'a.test.ts', icon: 'test', text: '测试：验证代码对不对' }),
-    FOLLOW_UP_QUESTIONS,
-    '聊过一轮:换追问真言,顺着对话往下问'
-  )
-  assert.equal(FOLLOW_UP_QUESTIONS.length, 3, '追问真言也是三条,和推荐位齐')
-  assert.deepEqual(
-    parsePredictedQuestions('1. 这个函数为什么这么写\n2) 能举个例子吗\n3、这里有什么坑'),
-    ['这个函数为什么这么写', '能举个例子吗', '这里有什么坑'],
-    '编号/括号/顿号开头的题都要剥得干净'
-  )
-  assert.deepEqual(
-    parsePredictedQuestions(`- 短\n* 够长的一个问题\n${'很'.repeat(50)}`),
-    ['够长的一个问题'],
-    '太短和太长都扔掉'
-  )
-  assert.deepEqual(parsePredictedQuestions(''), [], '空回复回空表,不硬凑')
-
   console.log('✅ 全树速览自测全部通过')
   console.log(
-    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典 · 类目直找 · 预设问题规则层 · 预览对话推荐问题'
+    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典'
   )
 }
 

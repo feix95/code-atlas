@@ -1,7 +1,7 @@
 // 页签系统(小葵的页签模型·文件签版):文件签绑死文件、单例签绑死品类,
 // 分组/拖放分屏/关闭接力照旧。选中的文件、扫描结果、公用对话场这些外来户由调用方递进来。
-import { useCallback, useRef, useState } from 'react'
-import type { ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
+import { useCallback, useState } from 'react'
+import type { ScanFileNode, ScanResult } from '@shared/types'
 import { isFileKind, isSingletonKind, KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds'
 import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
@@ -16,19 +16,16 @@ import {
   type PaneGroup,
   type PaneTab
 } from './paneTabs'
-import type { AiChatApi } from './useAiChat'
-import type { AiTurn } from './useAiAsk'
 
 const FLASH_TAB_MS = 1_200 // 需要指路时页签闪一下(比如挂引用时提示探针签在哪)
 
 export function usePaneTabs(deps: {
   result: ScanResult | null
-  chat: AiChatApi
   /** 开一扇撕窗子窗(页签撕窗锤):返回 frameName 户口;null = 窗口开不出,签别挪 */
   openAuxWindow: () => string | null
   setRevealPaths: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
-  const { result, chat, openAuxWindow, setRevealPaths } = deps
+  const { result, openAuxWindow, setRevealPaths } = deps
 
   // 右栏页签(小葵的页签模型·文件签版):文件签 = 绑死某个文件的预览,同一文件只此一张;
   // 单例签 = 概览/小探针/图谱/设置,每品类全应用只此一张。树里点文件只开签不换签
@@ -181,34 +178,6 @@ export function usePaneTabs(deps: {
     const tab = singletonTab(kind)
     const group = ensureGroup()
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
-  }
-
-  // 概览 AI 卡的「去追问」(小葵拍的):不是跳过去重问一遍,是把卡里解释好的一轮原样搬进
-  // 公用对话当垫底,追问才接得上。同一轮只搬一次;解释还在写/探针正答话就先垫句灰字,
-  // 等消停了再点一次;还没解释过就光跳页签 —— 那边带着文件资料,想问啥直接问
-  const adoptedTurnsRef = useRef<Set<string>>(new Set())
-  function goAskInChat(node: ScanFileNode | ScanDirNode | null, turn: AiTurn | null): void {
-    openSingletonTab('chat')
-    if (!turn) return
-    if (turn.state === 'busy') {
-      chat.note('概览的解释还在写,等它写完再点一次「去追问」,整段搬过来')
-      return
-    }
-    if (chat.busy) {
-      chat.note('探针正答着话,这句答完再点一次「去追问」,解释就搬得过来')
-      return
-    }
-    if (turn.state !== 'done' || turn.text.trim() === '' || adoptedTurnsRef.current.has(turn.key))
-      return
-    adoptedTurnsRef.current.add(turn.key)
-    // 问句没点名(通用解释)就替它把对象写上:对话里翻账本不用猜讲的是谁
-    const fallback =
-      node === null
-        ? '解释一下当前选中的对象'
-        : node.type === 'file'
-          ? `解释一下 ${node.name}`
-          : `用大白话讲讲 ${node.name || '项目根目录'} 这个文件夹`
-    chat.adopt(turn.question ?? fallback, turn.text)
   }
 
   // 挪页签(拖拽/页签右键「挪组」):toGroup='sibling' 去另一组(单组时=拆一组,默认落右,
@@ -427,7 +396,6 @@ export function usePaneTabs(deps: {
     resetPaneTabs,
     openFileTab,
     openSingletonTab,
-    goAskInChat,
     moveTab,
     activateTab,
     closeTab,

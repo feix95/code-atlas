@@ -1,6 +1,6 @@
 // 模型货架的筛选偏好(2026-09-18,小葵报「筛选状态不保存,下次打开又是默认」):
 // 存 localStorage —— 界面的事,每台机器自己一套,不进 AI 配置文件。
-// 照 chatPrefs 的家规:坏档/缺字段当没配过,回默认,不炸界面(读写骨架走 shared/localPrefs)。
+// 照本机偏好档的家规:坏档/缺字段当没配过,回默认,不炸界面(读写骨架走 shared/localPrefs)。
 
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 

@@ -49,16 +49,11 @@ export type { SectionKey }
  */
 export function SettingsPage({
   workspaceName: _workspaceName, // 侧栏卡片摘除后暂无人读;props 户口保留,侧栏导航要用
-  chatSuggestionsOn,
-  onChatSuggestionsChange,
   sectionReq,
   onAiConfigSaved,
   onSettingsSection
 }: {
   workspaceName: string | null
-  /** 推荐问题总闸(聊天偏好,App 端持有存档):这里只管拨开关,拨一下立刻生效落盘 */
-  chatSuggestionsOn: boolean
-  onChatSuggestionsChange: (v: boolean) => void
   /** 「AI 设置」直达/侧栏导航点击:入口每点一次 seq +1,页内切到指定页(首屏也有用) */
   sectionReq?: { section: SectionKey; seq: number }
   onAiConfigSaved?: (config: AiConfig) => void
@@ -408,8 +403,6 @@ export function SettingsPage({
               ctxBill={ctxLine}
               personal={personal}
               updatePersonal={updatePersonal}
-              chatSuggestionsOn={chatSuggestionsOn}
-              onChatSuggestionsChange={onChatSuggestionsChange}
             />
           )}
           {page === 'net' && <SettingsNet config={config} onConfigChange={commitConfig} />}
