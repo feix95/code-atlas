@@ -6,19 +6,8 @@ import {
   setActivityProvider
 } from './modelStatus.ts'
 import { net, type IpcMainInvokeEvent } from 'electron'
-import { promises as fs } from 'node:fs'
+import { budgetsForContext, probeContextSize, resolveContextSize } from '../ai/index.ts'
 import {
-  explainWithModel,
-  explainWithMessages,
-  budgetsForContext,
-  probeContextSize,
-  buildRefineMessages,
-  hasWebLookupSignal,
-  WEB_SIGNAL_INSTRUCTION,
-  resolveContextSize
-} from '../ai/index.ts'
-import {
-  webLookup,
   HttpStatusError,
   WEB_LOOKUP_TIMEOUT_MS,
   type LookupTransport,
@@ -30,10 +19,8 @@ import { ensureBuiltinServer } from '../ai/builtin.ts'
 import {
   buildPersonalizationPrompt,
   sanitizePersonalization,
-  withPersonalization,
   type TeachingLevel
 } from '../shared/personalization.ts'
-import { buildExplainSystem, TEACHING_DEEP_MIN_CTX, TEACHING_DEGRADED_NOTE } from '../ai/prompts.ts'
 import { CH } from '../shared/ipcChannels.ts'
 import type {
   AiChatLookupPayload,
@@ -44,161 +31,12 @@ import type {
   ChatTarget
 } from '../shared/types.ts'
 
-/**
- * 用户点名的问题(来自 AI 面板的预设问题/输入框):追加到证据后面,
- * 让模型围绕问题作答,而不是每次都做全面介绍。不传则保持原行为。
- */
-function withQuestion(prompt: string, question: unknown): string {
-  if (typeof question !== 'string') return prompt
-  const q = question.trim()
-  if (!q) return prompt
-  return `${prompt}\n\n<user_question>\n${q}\n</user_question>\n请直接围绕 <user_question> 里的问题回答(结合上面给出的文件信息),不要泛泛做全面介绍。`
-}
-
-/** 还在生成中的讲解请求,按 requestId 登记:渲染进程换了讲解目标,旧的就地掐掉,不让过气的生成占着模型排队 */
+/** 还在生成中的请求,按 requestId 登记:渲染进程换了目标,旧的就地掐掉,不让过气的生成占着模型排队 */
 export const explainAborters = new Map<string, AbortController>()
 
-/** 干活报告的签名缓存:同一份改动集(账本+最近提交主题一样)不重复烧模型,最多留 20 份 */
-export const reportCache = new Map<string, AiExplainResult>()
-
 /**
- * 讲解通道的共用出口:证据优先,单问单答。question 是用户点名的问题(预设/输入框),
- * 追加到证据后面让模型围绕问题作答;lookupName(只传名字,绝不传路径)给着且开关开着时,
- * 首次讲解走联网增强:先正常讲,答案带「需要联网确认」信号才查公开资料并修正。
- * (自由聊天不在这里 —— 它有自己的 atlas:ai-chat 通道和人设,不往这条路上堆条件。)
- */
-/**
- * 「详细」档的锅线判定(提示词体系重写第二批):teaching 选了 deep 但模型上下文
- * 低于 TEACHING_DEEP_MIN_CTX 时,实际按 brief 装配 —— 锅装不下源码节选,硬按详细档
- * 讲只会挤出半截答案。degraded = true 时,讲解结果正文顶上垫一行程序备注(逐字稿 M)。
- * 聊天/diff/报告不吃这套 —— 只有讲解主路(respondWithEvidence 这一路)降档。
- */
-export function effectiveTeaching(resolved: { teaching: TeachingLevel; ctx: number }): {
-  teaching: TeachingLevel
-  degraded: boolean
-} {
-  const degraded = resolved.teaching === 'deep' && resolved.ctx < TEACHING_DEEP_MIN_CTX
-  return { teaching: degraded ? 'brief' : resolved.teaching, degraded }
-}
-
-export async function respondWithEvidence(
-  event: IpcMainInvokeEvent,
-  requestId: unknown,
-  question: unknown,
-  evidence: string,
-  system: string | undefined,
-  resolved: {
-    target: ChatTarget
-    webLookup: boolean
-    budgets: { replyTokens: number }
-    style: string
-    ctx: number
-    teaching: TeachingLevel
-    tavilyKey?: string
-  },
-  lookupName?: string
-): Promise<AiExplainResult> {
-  const onDelta = makeDeltaSender(event, requestId)
-  const hasQuestion = typeof question === 'string' && question.trim() !== ''
-  const { teaching, degraded } = effectiveTeaching(resolved)
-  // 人设口径保持原样:给了就用给的(调用方已按同一个 effectiveTeaching 装配),
-  // 没给就是文件讲解官那一套;个性化一律叠在最上面
-  const persona = withPersonalization(
-    system ?? buildExplainSystem(teaching, 'file'),
-    resolved.style
-  )
-  // 降档灰字:只在真讲出来了( supported )的结果顶上垫 —— 报错/取消的文本不是讲解,垫上就成了假话
-  const withDegradedNote = (res: AiExplainResult): AiExplainResult =>
-    degraded && res.status === 'supported'
-      ? { ...res, text: `${TEACHING_DEGRADED_NOTE}\n\n${res.text}` }
-      : res
-  if (resolved.webLookup && lookupName && !hasQuestion) {
-    // 联网那条老规矩没变:没人设时它本来就用导游那一套(和普通流不同,别一起改)
-    return withDegradedNote(
-      await explainWithWebLookup(
-        event,
-        requestId,
-        evidence,
-        withPersonalization(system ?? buildExplainSystem(teaching, 'folder'), resolved.style),
-        lookupName,
-        resolved.target,
-        onDelta,
-        resolved.budgets.replyTokens,
-        resolved.tavilyKey
-      )
-    )
-  }
-  return withDegradedNote(
-    await explainWithCancel(requestId, (signal) =>
-      explainWithModel(
-        resolved.target,
-        withQuestion(evidence, hasQuestion ? question : undefined),
-        persona,
-        onDelta,
-        signal,
-        resolved.budgets.replyTokens,
-        {
-          onRestart: () => sendResetDelta(event, requestId)
-        }
-      )
-    )
-  )
-}
-
-/**
- * 联网增强的讲解:先安静地讲一遍(答案里可能带信号词),带信号就查公开资料、
- * 流式输出修正版;没信号/查不到/修正失败,都老老实实回落到本地推测的版本。
- */
-async function explainWithWebLookup(
-  event: IpcMainInvokeEvent,
-  requestId: unknown,
-  evidence: string,
-  system: string,
-  lookupName: string,
-  target: ChatTarget,
-  onDelta: ((text: string) => void) | undefined,
-  replyTokens: number,
-  tavilyKey?: string
-): Promise<AiExplainResult> {
-  const first = await explainWithCancel(requestId, (signal) =>
-    explainWithModel(
-      target,
-      evidence + WEB_SIGNAL_INSTRUCTION,
-      system,
-      undefined,
-      signal,
-      replyTokens
-    )
-  )
-  if (first.status !== 'supported' || !hasWebLookupSignal(first.text)) return first
-  const material = await webLookup(lookupName, {
-    fetchText: electronFetchText,
-    postJson: electronPostJson,
-    tavilyKey
-  }).catch(() => '')
-  if (!material) {
-    // 查不到(没网/超时/太冷门):剥掉信号词,加上一句人话交代,回退本地推测
-    const fallback = first.text.replace(/「?需要联网确认」?/g, '').trimEnd()
-    return { ...first, text: `${fallback}\n\n(联网没查到这个,上面是本地推测。)` }
-  }
-  const refined = await explainWithCancel(requestId, (signal) =>
-    explainWithMessages(
-      target,
-      buildRefineMessages(system, evidence, first.text, material),
-      onDelta,
-      signal,
-      replyTokens,
-      {
-        onRestart: () => sendResetDelta(event, requestId)
-      }
-    )
-  )
-  return refined.status === 'supported' ? refined : first
-}
-
-/**
- * 带取消的讲解执行:requestId 对号入座。
- * 自动讲解时代用户会连点文件,旧生成必须能被掐断,模型才能马上讲下一个。
+ * 带取消的执行:requestId 对号入座。
+ * 用户会连点、连问,旧生成必须能被掐断,模型才能马上干下一个。
  */
 export async function explainWithCancel(
   requestId: unknown,
@@ -209,39 +47,13 @@ export async function explainWithCancel(
   }
   const aborter = new AbortController()
   explainAborters.set(requestId, aborter)
-  announceActivityBusy(lastActivityProvider) // 嵌套讲解中途接续时,把「忙」续上
+  announceActivityBusy(lastActivityProvider) // 先把「忙」立起来,免得模型还没出声状态栏就闪回就绪
   try {
     return await run(aborter.signal)
   } finally {
     explainAborters.delete(requestId)
-    // 只有最后一桩活收工才回「就绪」;嵌套讲解(web 查证两段式)中途不许闪
+    // 只有最后一桩活收工才回「就绪」:并发几路请求时,先收工的不许让状态栏闪一下
     if (explainAborters.size === 0) announceActivityIdle()
-  }
-}
-
-/** 读文件开头 64KB 当「内容片段」;含 空字节 = 二进制,返回 null */
-export async function readTextPreview(absPath: string): Promise<string | null> {
-  const handle = await fs.open(absPath, 'r')
-  try {
-    const buf = Buffer.alloc(64 * 1024)
-    const { bytesRead } = await handle.read(buf, 0, buf.length, 0)
-    const chunk = buf.subarray(0, bytesRead)
-    if (chunk.includes(0)) return null
-    return chunk.toString('utf8')
-  } finally {
-    await handle.close()
-  }
-}
-
-/** 读文件头 64 字节给魔数识别用;只在 readTextPreview 已经成功打开过文件后调用,不另外兜错误 */
-export async function readHeader(absPath: string, bytes = 64): Promise<Buffer> {
-  const handle = await fs.open(absPath, 'r')
-  try {
-    const buf = Buffer.alloc(bytes)
-    const { bytesRead } = await handle.read(buf, 0, buf.length, 0)
-    return buf.subarray(0, bytesRead)
-  } finally {
-    await handle.close()
   }
 }
 
@@ -290,11 +102,11 @@ export const electronGetJson: LookupGetTransport = async (url, headers) => {
 }
 
 /**
- * 三个讲解通道共用的前置:把当前 AI 配置收敛成 ChatTarget,顺手把模型上下文摸清
- * (手动档优先,没填就向模型服务探测,再不行退回保守默认)—— 各路预算按它按比例算。
+ * 模型请求共用的前置(自由对话与「试一句」都走这里):把当前 AI 配置收敛成 ChatTarget,
+ * 顺手把模型上下文摸清(手动档优先,没填就向模型服务探测,再不行退回保守默认)—— 各路预算按它按比例算。
  * 选了内置模型就顺手把 llama-server 子进程拉起来(首次用 AI 才启动,不拖慢打开速度);
  * 没配好不抛异常,返回人话错误让界面原样展示。
- * webLookup = 用户开没开「联网查证」(默认关):开着且讲解认不出品牌时才联网。
+ * webLookup = 用户开没开「联网查证」(默认关):开着且自由对话这轮点了联网才去查。
  */
 export async function resolveChatTargetOrError(): Promise<
   | {

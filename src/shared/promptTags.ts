@@ -24,24 +24,8 @@ export const TAG = {
   codeRefs: { open: '<code_refs>', close: '</code_refs>' },
   /** 用户拖/选进来的文件原文(对齐 Claude Code 的 @文件) */
   attachedFiles: { open: '<attached_files>', close: '</attached_files>' },
-  /** 功能定位的项目地图 */
-  projectMap: { open: '<project_map>', close: '</project_map>' },
-  /** 文件夹讲解的清单证据 */
-  folderContents: { open: '<folder_contents>', close: '</folder_contents>' },
-  /** 文件内容预览片段 */
-  filePreview: { open: '<file_preview>', close: '</file_preview>' },
-  /** 代码节选(文件开头一段) */
-  sourceExcerpt: { open: '<source_excerpt>', close: '</source_excerpt>' },
-  /** 项目主人手写备注 */
-  ownerNote: { open: '<owner_note>', close: '</owner_note>' },
-  /** 文件开头注释 */
-  headerComment: { open: '<header_comment>', close: '</header_comment>' },
   /** 联网查到的公开资料 */
   webResults: { open: '<web_results>', close: '</web_results>' },
-  /** git 单文件改动 diff */
-  diff: { open: '<diff>', close: '</diff>' },
-  /** 干活报告的整轮改动账本 */
-  changeLog: { open: '<change_log>', close: '</change_log>' },
   /** 人设分节:能力边界 */
   capabilities: { open: '<capabilities>', close: '</capabilities>' },
   /** 人设分节:联网守则 */

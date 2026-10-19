@@ -479,3 +479,4 @@
 - fix(ui): 备注正文写入与读档都折叠换行/制表/控制符为单空格, 防备注内容伪造文件树悬停提示的第二行
 - docs(todo): 新增「概览板块删减重构」需求清单(四锤分批、保留清单、验收标准与外部复核结论)
 - refactor(ui): 概览板块整体退役——项目/文件/文件夹概览、git 门与改动账、功能定位带路人、AI 讲解卡与推荐问题整条线一并删除, 对应 IPC 通道、preload 桥接、git 与讲解提示词、专属类型、概览样式与自测同步清走; 页签改版后开项目不再自动开任何页签, 右侧落空签板; 自由对话、关系图谱、文件树 tooltip 与备注编辑(已迁入右键菜单)、文件结构分析等被复用能力原样保留; 推荐问题总闸删除后空对话的开场示例常驻显示
+- refactor(ai): 清走讲解与功能定位的死代码——删 explainPrompt/guessPrompts/locate/locateCategories 四个整文件与 FeatureHit 类型, 摘掉 aiEvidence 的讲解主干(respondWithEvidence/联网讲解分支/读文件片段)与 prompts 的讲解底座加教学常量, 8 个只服务讲解的提示词标签退役; 保留 KERNEL_CORE 与聊天切片一字未动; explainWithModel 的人设由默认值改为必传, 自测同步收敛

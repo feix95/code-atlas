@@ -570,14 +570,6 @@ export interface AiHistoryMessage {
   content: string
 }
 
-/** 功能定位的一个命中:带路人指的文件/文件夹 + 一句大白话理由 */
-export interface FeatureHit {
-  relPath: string
-  reason: string
-  /** 带路人自报的把握 0~100;只是排序参考,不是保证 */
-  confidence?: number
-}
-
 /**
  * 代码预览的读文件结果(第一百一十锤):只给「够看懂」的一段,超了如实标 truncated。
  * 二进制/超大各有专门状态,让界面说人话 —— 绝不硬塞一屏乱码。
