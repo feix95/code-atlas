@@ -72,6 +72,10 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - dev 模式内置引擎不随仓库分发: 按 `.github/workflows/release.yml` 的 `LLAMA_TAG` 从 llama.cpp release 下载至 `vendor/llama-cpp/`, 或从本机其他检出复制; 亦可在设置中改用 LM Studio, 基础导览不依赖 AI。
 - 拖入即授权(文件续读): 系统拖/选进来的文件凭本机绝对路径换本次运行的只读门卡(主进程 realpath 验真、只发单个文件; 内存账本, 关应用即失效); 截断正文的续读注记带 rootId, 模型可用 read_file(relPath 传空字符串)续读; 文件树拖入走项目内 relPath, 不占门卡; 单文件门卡不支持列名单搜内容。另有会话级附件户口本: 最近收到的文件(名字/行账/续读钥匙)以纸条垫进下一轮, 「刚才那个文件」类追问有据可答。
 
+## 已知取舍
+
+- 依赖漏洞取舍: 余 8 个 moderate 全在 electron-builder 链(app-builder-lib / dmg-builder / @electron/get / global-agent / roarr / sprintf-js), 唯一修复版本是 27.0.0-alpha 故暂不修; 漏洞闸门只卡 high 及以上, 生产依赖 0 漏洞。
+
 ## 文档维护
 
 - 本文件与 AGENTS.md 由 AI 会话维护, 小葵审定, 随仓库进 git 分发; 撰写规则以全局记忆「项目文档撰写规则」为准。

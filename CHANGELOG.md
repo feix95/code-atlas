@@ -469,3 +469,4 @@
 - chore(deps): 清掉依赖树 4 个 high 漏洞源头——npm audit fix 升 undici/source-map-js/http-cache-semantics 等传递依赖,brace-expansion 由 5.0.9 顶到 5.0.12;生产依赖本无漏洞,余下 8 个 moderate 只在 electron-builder 链、需 alpha 大版本才能修故不动
 - chore(ci): 接 husky 本地提交闸门(pre-commit 跑 lint-staged 只格式化暂存文件、pre-push 跑 typecheck)与 CI 独立 audit job;audit 脚本写死官方源,只卡 high 及以上
 - chore(ci): 新增 .gitattributes 把 .husky 钩子固定为 LF, 不再受 core.autocrlf 影响
+- docs(handbook): 新增「已知取舍」一节, 记录 electron-builder 链 8 个 moderate 漏洞需 alpha 大版本才能修、故暂不修
