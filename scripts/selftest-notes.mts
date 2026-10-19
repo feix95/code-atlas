@@ -5,6 +5,7 @@ import {
   notesStorageKey,
   parseNotes,
   pruneNotesAgainstTree,
+  sanitizeNoteText,
   upsertNote
 } from '../src/shared/notes.ts'
 import type { NoteMap } from '../src/shared/notes.ts'
@@ -90,9 +91,19 @@ function main(): void {
   // ── 5. 存储键归一化:同一项目不裂成两份 ──
   assert.equal(notesStorageKey('E:\\A\\B'), notesStorageKey('e:/a/b/'), '大小写和斜杠方向归一')
 
+  // ── 6. 正文净化:换行/制表/控制符折叠成单空格,防伪造悬停提示第二行 ──
+  assert.equal(sanitizeNoteText('第一行\n第二行'), '第一行 第二行', '换行折叠成空格')
+  assert.equal(sanitizeNoteText('a\t\tb'), 'a b', '制表符折叠成单空格')
+  assert.equal(sanitizeNoteText('a\r\nb'), 'a b', '回车换行一起折成一个空格')
+  assert.equal(sanitizeNoteText('  x  \u0000y  '), 'x y', '首尾空白去掉、控制符折叠')
+  const injected = parseNotes({ n: { text: '真备注\n假第二行', t: 1 } })
+  assert.equal(injected['n']?.text, '真备注 假第二行', '旧存档读入也净化')
+  const upserted = upsertNote({}, 'n', '备注\n第二行', 1)
+  assert.equal(upserted['n']?.text, '备注 第二行', '写入路径同样净化')
+
   console.log('✅ 手动备注自测全部通过')
   console.log(
-    '   parse 垃圾回收 · 截断与上限 · upsert 增改删 · 孤儿清收(懒/截断不误删) · 存储键归一化'
+    '   parse 垃圾回收 · 截断与上限 · 正文净化 · upsert 增改删 · 孤儿清收(懒/截断不误删) · 存储键归一化'
   )
 }
 

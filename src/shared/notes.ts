@@ -10,6 +10,20 @@ import { readPref, writePref } from './localPrefs.ts'
 export const NOTES_MAX = 200
 /** 一句话备注的字数上限:超了截断,别让备注长成作文 */
 export const NOTE_MAX_CHARS = 100
+
+/**
+ * 备注正文净化:换行、制表符、其余控制符折叠为单个空格,再压掉连续空格。
+ * 文件树的悬停提示用 \n 分行,不清洗的话备注正文能凭空伪造出第二行;
+ * 读旧存档、写新备注两条路都走这里,垃圾不留在库里。
+ */
+export function sanitizeNoteText(raw: string): string {
+  const folded = Array.from(raw, (ch) => {
+    const code = ch.codePointAt(0) ?? 0
+    // C0 控制符与 DEL(含换行、回车、制表)一律折叠成空格
+    return code < 0x20 || code === 0x7f ? ' ' : ch
+  }).join('')
+  return folded.replace(/ {2,}/g, ' ').trim().slice(0, NOTE_MAX_CHARS)
+}
 const KEY_PREFIX = 'atlas.notes:'
 
 export interface NoteEntry {
@@ -46,7 +60,7 @@ export function parseNotes(raw: unknown): NoteMap {
       v['t'] <= 0
     )
       continue
-    const text = v['text'].trim().slice(0, NOTE_MAX_CHARS)
+    const text = sanitizeNoteText(v['text'])
     if (text === '') continue
     entries.push({ relPath, entry: { text, t: v['t'] } })
   }
@@ -58,7 +72,7 @@ export function parseNotes(raw: unknown): NoteMap {
 
 /** 增/改/删一条(纯函数,自测覆盖):text 空串 = 删除;其余更新正文并盖新时间戳,超量淘汰最旧 */
 export function upsertNote(map: NoteMap, relPath: string, text: string, ts: number): NoteMap {
-  const trimmed = text.trim().slice(0, NOTE_MAX_CHARS)
+  const trimmed = sanitizeNoteText(text)
   const kept = Object.entries(map).filter(([k]) => k !== relPath)
   if (trimmed !== '') kept.push([relPath, { text: trimmed, t: ts }])
   kept.sort((a, b) => b[1].t - a[1].t)
