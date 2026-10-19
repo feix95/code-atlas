@@ -237,7 +237,9 @@ body.is-sash-dragging .pane-sash::after {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  /* 页面底色并入画布面:与关系图谱同一源头(--graph-bg 就是 --canvas-tint);
+     输入舱与气泡仍压在 --surface/--surface-soft 上,层级关系不变 */
+  background: var(--canvas-tint);
 }
 
 /* 徽章:状态用色各就各位 */

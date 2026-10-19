@@ -9,6 +9,9 @@
   --uwb-layer-indent: 1rem; /* 图层树每一级的缩进 */
   /* 底板比面板深一档,白画板从底上浮出来 */
   --uwb-backdrop: #e6e6e6;
+  /* 选框抓手恒白(Figma 惯例):不随主题翻面,深色下靠 --sash-hi 描边立住;
+     原先借用 --chrome-surface,暗色主题里抓手会跟面板一起变黑 */
+  --uwb-handle-fill: #ffffff;
   /* 标尺配色(drawRuler 从计算样式读取) */
   --uwb-ruler-bg: var(--chrome-panel);
   --uwb-ruler-range: var(--chrome-hover);
@@ -310,7 +313,7 @@
 .uwb-corner-handle,
 .uwb-edge-handle,
 .uwb-endpoint-handle {
-  fill: var(--chrome-surface);
+  fill: var(--uwb-handle-fill);
   stroke: var(--sash-hi);
   stroke-width: 1.5px;
 }

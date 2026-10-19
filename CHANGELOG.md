@@ -482,3 +482,4 @@
 - refactor(ai): 清走讲解与功能定位的死代码——删 explainPrompt/guessPrompts/locate/locateCategories 四个整文件与 FeatureHit 类型, 摘掉 aiEvidence 的讲解主干(respondWithEvidence/联网讲解分支/读文件片段)与 prompts 的讲解底座加教学常量, 8 个只服务讲解的提示词标签退役; 保留 KERNEL_CORE 与聊天切片一字未动; explainWithModel 的人设由默认值改为必传, 自测同步收敛
 - docs: 概览退役后同步全部文档——README 改写简介/安装步骤/AI 开关/功能列表并补「文件树备注」, 交接文档更新页签模型与备注契约、清掉讲解与 git 相关标签、记录提示词清理范围与两条已知取舍, 提示词对照文档删去已退役的讲解/定位/改动翻译原文并校正模块路径, 需求清单移入 docs/archive 并标已完成
 - docs: 提示词对照文档清掉历史案底并去重——删去校对落款与「已删/已下线」两条历史档, 两处撞车的「五」编号顺成一到七, 与第五节重复的六段包裹原文只留一份
+- refactor(ui): 聊天页底色改用 --canvas-tint,与关系图谱画布同源; 自输入舱「添加附件」去掉悬停提示与提示文案计算; UI 工作台选框抓手改用恒白 token,暗色主题下不再跟着面板变黑
