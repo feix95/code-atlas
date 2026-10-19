@@ -141,3 +141,11 @@ export function isBinaryFile(name: string): boolean {
   if (dot <= 0) return false // 无后缀或隐藏文件(如 .gitignore)不当二进制
   return BINARY_EXTS.has(name.slice(dot).toLowerCase())
 }
+
+/**
+ * 预览页签肯收的文件:能直接看的图,或不当二进制的文本/代码。
+ * 其余点开只给一句提示、不开签(名单仍以 BINARY_EXTS / IMAGE_EXTS 为准)。
+ */
+export function canPreviewFile(name: string): boolean {
+  return isImageFile(name) || !isBinaryFile(name)
+}

@@ -2,7 +2,7 @@
 // 后缀可以改名冒充,字节不会撒谎,每条岔路都得钉死在账上。
 // 样本字节全在内存里构造,仓库里不放任何二进制图片。
 import assert from 'node:assert/strict'
-import { IMAGE_EXTS, isImageFile, imageMimeOf } from '../src/shared/fileKinds.ts'
+import { IMAGE_EXTS, isImageFile, imageMimeOf, canPreviewFile } from '../src/shared/fileKinds.ts'
 import { imageInfoFacts, sniffImage } from '../src/shared/imageMeta.ts'
 import { imageResultFromBytes, readImagePreview } from '../src/main/imagePreview.ts'
 import { IMAGE_PREVIEW_MAX_BYTES } from '../src/shared/preview.ts'
@@ -75,6 +75,13 @@ async function main(): Promise<void> {
   assert.equal(isImageFile('d.gif'), false, 'gif 不在预览名单,仍走二进制')
   assert.equal(isImageFile('noext'), false, '没后缀不算')
   assert.equal(isImageFile('.png'), false, '隐藏文件式的名字不算(没有主名)')
+  assert.equal(canPreviewFile('a.ts'), true, '源码能开预览签')
+  assert.equal(canPreviewFile('a.png'), true, 'png 能开预览签')
+  assert.equal(canPreviewFile('logo.svg'), true, 'svg 当文本预览')
+  assert.equal(canPreviewFile('Makefile'), true, '无后缀当文本预览')
+  assert.equal(canPreviewFile('shot.psd'), false, 'psd 不开预览签')
+  assert.equal(canPreviewFile('a.pdf'), false, 'pdf 不开预览签')
+  assert.equal(canPreviewFile('a.gif'), false, 'gif 不开预览签')
 
   // ── 2. 后缀 → MIME:名单外的后缀回 null,不许冒充 ──
   assert.equal(imageMimeOf('a.png'), 'image/png', 'png → image/png')

@@ -7,7 +7,8 @@ import { readPref, writePref } from '../../shared/localPrefs.ts'
 import type { ScanDirNode } from '@shared/types'
 import { findDir, findFile } from './scanTreeTools.ts'
 import { nextTabId, type PaneGroup, type PaneTab } from './paneTabs.ts'
-import { KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds.ts'
+import { canPreviewFile } from '../../shared/fileKinds.ts'
+import { KIND_ICONS, KIND_LABELS, isFileKind, type PaneKind } from './paneKinds.ts'
 
 const SESSION_KEY = 'atlas.session'
 
@@ -138,12 +139,15 @@ export function hydrateSession(
   const groups: PaneGroup[] = []
   let activeGroupId: string | null = null
   for (const sg of s.groups) {
-    const live = sg.tabs.filter(
-      (t) =>
+    const live = sg.tabs.filter((t) => {
+      // 不能预览的类型(psd/pdf 这类)旧档里若还挂着文件签,还原时扔掉,别再弹出预览页
+      if (isFileKind(t.kind) && !canPreviewFile(t.name)) return false
+      return (
         t.relPath === '' ||
         t.scopeRoot !== undefined || // peek 的读根是盘符,不归工作区树验
         (tree !== null && (findFile(tree, t.relPath) !== null || findDir(tree, t.relPath) !== null))
-    )
+      )
+    })
     if (live.length === 0) continue
     const tabs: PaneTab[] = live.map((t) => ({
       id: nextTabId(),

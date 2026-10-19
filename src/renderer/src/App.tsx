@@ -52,11 +52,14 @@ import { useNavStack } from './useNavStack'
 import { usePreviewRefs } from './usePreviewRefs'
 import { useFlashFlag, useFlashValue } from './useFlashFlag'
 import { useWindowMaximized } from './useWindowMaximized'
+import { canPreviewFile } from '@shared/fileKinds'
 import { findDir, findFile, mergeStats, spliceSubtree, dirChainOf } from './scanTreeTools'
 
 /** 轻提示各养各的体感时长(P2-6 具名):不共用一张表,但每个数都得有名有姓 */
 const REVIVED_MS = 15_000 // 复活横幅:画面断了被主进程重接回来,弹十几秒人话再自己退场
 const PATH_HINT_MS = 5_000 // 空路径点了「前往」的气泡提示
+const PREVIEW_BLOCKED_MS = 1_000 // 不能预览的类型点开:底部 Toast 停留约一秒
+const PREVIEW_BLOCKED_TEXT = '此文件类型不支持预览'
 
 function App(): React.JSX.Element {
   // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
@@ -289,15 +292,24 @@ function App(): React.JSX.Element {
   /**
    * 树里点文件(小葵拍的规矩·页签改版):选中它 + 开一张绑死它的文件预览签
    * (同一文件只此一张,已开就点亮领过去);已有页签一概不动。
+   * 不能预览的类型(psd/pdf 这类)只选中、不开签,底部 Toast 说一声。
    * 本地结构分析照旧自动跑(不耗模型)。
    */
+  function openFileTabIfPreviewable(file: ScanFileNode, scopeRoot?: string): void {
+    if (!canPreviewFile(file.name)) {
+      showToast(PREVIEW_BLOCKED_TEXT, PREVIEW_BLOCKED_MS)
+      return
+    }
+    openFileTab(file, scopeRoot)
+  }
+
   async function openFile(file: ScanFileNode): Promise<void> {
     const seq = ++analyzeSeq.current
     pushNav({ folder, file: file.relPath, dir: null })
     setSelectedFile(file)
     setSelectedFolder(null)
     setStructure(null)
-    openFileTab(file)
+    openFileTabIfPreviewable(file)
     if (result) setRevealPaths(new Set(dirChainOf(result.tree, file.relPath)))
 
     // 本地结构分析照旧自动跑(不耗模型):结果给自由对话附件当证据;失败静静放过
@@ -402,7 +414,7 @@ function App(): React.JSX.Element {
     const f = findFile(result.tree, relPath)
     if (!f) return
     if (selectedFile?.relPath !== relPath) void openFile(f)
-    else openFileTab(f)
+    else openFileTabIfPreviewable(f)
   }
 
   // 页签右键「在文件列表中显示当前文件」(阅读模式这锤):回侧栏树里选中它 +
@@ -460,7 +472,7 @@ function App(): React.JSX.Element {
   // 读根记在页签的 scopeRoot 上(浏览树的盘根),文件节点是浏览账现捏的最小件
   function openBrowseFile(scopeRoot: string, file: { name: string; relPath: string }): void {
     const dot = file.name.lastIndexOf('.')
-    openFileTab(
+    openFileTabIfPreviewable(
       {
         type: 'file',
         name: file.name,

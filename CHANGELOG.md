@@ -488,3 +488,4 @@
 - feat(ui): 看图底栏文件名同款芯片并可双击改主名;点预览可关掉右键与缩放菜单,根因是看图 preventDefault 吞掉 mousedown
 - docs(core): AGENTS.md 去掉「已推送禁止重写历史」与 KERNEL_CORE 两条红线
 - feat(ui): 图片上右键在光标处弹出同一份缩放档位菜单,底栏百分比仍从芯片上拉
+- feat(ui): 点不能预览的类型不开签,底部 Toast「此文件类型不支持预览」约 1 秒

@@ -188,8 +188,8 @@ check('hydrateSession:无工作区只有 app 级房间能活;全死回 null', ()
           { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts' },
           {
             kind: 'peek',
-            relPath: 'Windows/x.dll',
-            name: 'x.dll',
+            relPath: 'Windows/readme.txt',
+            name: 'readme.txt',
             icon: 'file',
             scopeRoot: 'C:\\'
           }
@@ -204,6 +204,40 @@ check('hydrateSession:无工作区只有 app 级房间能活;全死回 null', ()
 
   const dead: SessionState = { v: 1, folder: null, sel: null, groups: [] }
   assert.equal(hydrateSession(dead, null), null, '一张都活不了就不硬摆')
+})
+
+check('hydrateSession:不能预览的文件签扔掉,即便树上还活着', () => {
+  const withPsd: ScanDirNode = {
+    ...tree,
+    children: [
+      ...tree.children,
+      { type: 'file', name: 'shot.psd', relPath: 'shot.psd', ext: '.psd' }
+    ]
+  }
+  const s: SessionState = {
+    v: 1,
+    folder: 'C:\\work\\demo',
+    sel: null,
+    groups: [
+      {
+        tabs: [
+          { kind: 'preview', relPath: 'shot.psd', name: 'shot.psd', icon: 'file' },
+          { kind: 'preview', relPath: 'a.ts', name: 'a.ts', icon: 'ts' },
+          {
+            kind: 'peek',
+            relPath: 'x.dll',
+            name: 'x.dll',
+            icon: 'file',
+            scopeRoot: 'C:\\'
+          }
+        ]
+      }
+    ]
+  }
+  const h = hydrateSession(s, withPsd)
+  assert.ok(h)
+  assert.equal(h.groups[0].tabs.length, 1, 'psd 与 dll 都不入账')
+  assert.equal(h.groups[0].tabs[0].name, 'a.ts', '能预览的文件签照常还原')
 })
 
 check('serializeSession:激活指针没指到任何签时,on 不落、还原兜底末张', () => {
