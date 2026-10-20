@@ -490,3 +490,4 @@
 - feat(ui): 图片上右键在光标处弹出同一份缩放档位菜单,底栏百分比仍从芯片上拉
 - feat(ui): 点不能预览的类型不开签,底部 Toast「此文件类型不支持预览」约 1 秒
 - feat(ui): MP3/WAV 文件签走 atlas-media 流式播放;进度条钉死是协议缺 Content-Length
+- chore: 整理 ref 灵感池;删除 icon/概念/ui-v3 旧参考,风格参考视频和图片挪到 ref 根目录
