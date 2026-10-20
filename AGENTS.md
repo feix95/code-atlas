@@ -14,7 +14,7 @@
 
 - 模块完成后按序全绿再交: `npm run typecheck` → `npm run lint` → `npm test` → `npm run build` → `npm run test:journey`。
 - 纯样式/微调类的小改动不必每步跑全链, 等 commit 前跑一次全套即可; 中途只跑与改动直接相关的检查。
-- commit 前必须跑 `npm run format`: CI 的 `npm run format:check` 为硬闸, 格式漂移即红灯。
+- 合进 main 前必须跑 `npm run format`: CI 的 `npm run format:check` 为硬闸, 格式漂移即红灯。
 - 新增自测脚本必须登记进 package.json 的 `test` 命令链: 本地 `npm test` 与 CI 只执行链内脚本, 漏挂即静默漏测。
 
 ## 启动 dev(`npm run dev`)
@@ -25,7 +25,7 @@
 2. 启动前执行 `Remove-Item env:ELECTRON_RUN_AS_NODE`。原因: 宿主 Agent 可能注入该变量, 使 electron 按纯 node 运行(`electron.app` 为 undefined)。
 3. 确认 5173 端口已释放再启动; 启动后验证 vite 监听端口确为 5173。
 4. 小葵自行运行 dev 时禁止重复启动; 改动完成后主动重启 dev 实例。
-5. 宿主 Agent 服务重启会回收它的后台 shell, 后台跑 dev 活不过重启: 需要跨重启存活时, 在 PowerShell 里先 `Remove-Item env:ELECTRON_RUN_AS_NODE`, 再用 `Start-Process npm.cmd -ArgumentList 'run','dev','--','--remoteDebuggingPort=9222' -WorkingDirectory <worktree> -WindowStyle Hidden -RedirectStandardOutput <日志> -RedirectStandardError <错误日志>` 分离启动。禁止用 cmd 的 `set VAR= &&` 写法: 空格会被吃进变量值, ELECTRON_RUN_AS_NODE 又变成"有值", Electron 按纯 node 跑, `electron.app` 为 undefined(今晚实测崩于此)。
+5. 宿主 Agent 服务重启会回收它的后台 shell, 后台跑 dev 活不过重启: 需要跨重启存活时, 在 PowerShell 里先 `Remove-Item env:ELECTRON_RUN_AS_NODE`, 再用 `Start-Process npm.cmd -ArgumentList 'run','dev','--','--remoteDebuggingPort=9222' -WorkingDirectory <worktree> -WindowStyle Hidden -RedirectStandardOutput <日志> -RedirectStandardError <错误日志>` 分离启动。禁止用 cmd 的 `set VAR= &&` 写法: 空格会被吃进变量值, ELECTRON_RUN_AS_NODE 又变成"有值", Electron 按纯 node 跑, `electron.app` 为 undefined。
 
 ## 文档索引
 
