@@ -18,7 +18,9 @@ export interface ContextMenuItem {
   switchOn?: boolean
   /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它。
    *  开关行会收到拨完之后的新读数(菜单不收摊可连拨,别用打开时抓的旧值取反) */
-  run: (nextOn?: boolean) => void | string | Promise<string | null | void>
+  run?: (nextOn?: boolean) => void | string | Promise<string | null | void>
+  /** 二级列表:点了这行就地展开(菜单不收摊),子行点完才收摊 */
+  children?: Array<{ label: string; run: () => void }>
 }
 
 /** 分区小标题:不可点的一行小灰字,告诉人下面几行是同一类东西 */

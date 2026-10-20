@@ -213,7 +213,8 @@ export const MiniMD = memo(function MiniMD({
   caret,
   fileLinks,
   title,
-  onRenameTitle
+  onRenameTitle,
+  bare
 }: {
   text: string
   caret?: boolean
@@ -222,13 +223,17 @@ export const MiniMD = memo(function MiniMD({
   title?: string
   /** 内联标题改名通道(内联标题改名锤):喂了标题才可点改名;不传 = 标题只展示 */
   onRenameTitle?: (base: string) => Promise<RenameOutcome>
+  /** 裸渲染:不出 .md 外壳(对照稿按块渲染时,外壳由外层容器统一给) */
+  bare?: boolean
 }): React.JSX.Element {
+  const blocks = renderBlocks(parseMarkdown(text), fileLinks, { n: 0 })
+  if (bare) return <>{blocks}</>
   return (
     <div className="md">
       {title !== undefined && title !== '' && (
         <InlineTitle title={title} onRename={onRenameTitle} />
       )}
-      {renderBlocks(parseMarkdown(text), fileLinks, { n: 0 })}
+      {blocks}
       {caret && <span className="stream-caret">▌</span>}
     </div>
   )

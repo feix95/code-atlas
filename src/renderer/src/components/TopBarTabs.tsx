@@ -107,6 +107,7 @@ export function TopBarTabs({
   onTabDragEnd,
   onDetachTab,
   onRevealInTree,
+  onTranslate,
   workspaceRoot,
   paneSplit
 }: {
@@ -133,6 +134,8 @@ export function TopBarTabs({
   onDetachTab?: (id: string) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里指出来(App 的活) */
   onRevealInTree?: (id: string) => void
+  /** 右键菜单「翻译成…」:开译文镜像签并自动分屏(App 的活) */
+  onTranslate?: (tab: PaneTab, lang: string) => void
   /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
   workspaceRoot?: string | null
   /** 第一组分屏列占内容宽的比例(usePaneTabs 的账本,顶部条带认同一份) */
@@ -520,6 +523,7 @@ export function TopBarTabs({
               onMoveTab={moveTab}
               onDetachTab={onDetachTab}
               onRevealInTree={onRevealInTree}
+              onTranslate={onTranslate}
               workspaceRoot={workspaceRoot}
               dragSourceId={drag?.id ?? null}
               gapIndex={

@@ -7,6 +7,17 @@ import { AudioPreview } from './AudioPreview'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
+import { InlineTitle } from './InlineTitle'
+import { LinkedMdView } from './LinkedMdView'
+import { splitMdBlocks } from '@shared/mdBlocks'
+import {
+  hoveredBlockOf,
+  isMdLinked,
+  mdFileKey,
+  setHoveredBlock,
+  subscribeMdHover
+} from '../mdHoverLink'
+import { registerMdScroll } from '../mdScrollSync'
 import { openContextMenu } from './contextMenuStore'
 import { SourceEditor } from './SourceEditor'
 import type { FileLinkTarget } from '@shared/fileLinks'
@@ -184,6 +195,20 @@ export function CodePreview({
   // 排版关或非 md 都是裸源码编辑器(只读照常生效)
   const reading = canMd && flags.render && flags.readOnly
   const live = canMd && flags.render && !flags.readOnly
+  // 对照联动:这份文件开着翻译镜像时,阅读稿切成同号的块视图;悬停同一段两边一起亮
+  const mdKey = mdFileKey(rootPath, file.relPath)
+  const linkedMd = useSyncExternalStore(subscribeMdHover, () => isMdLinked(mdKey))
+  const linkedHovered = useSyncExternalStore(subscribeMdHover, () => hoveredBlockOf(mdKey))
+  const sourceBlocks = useMemo(
+    () => (reading && linkedMd ? splitMdBlocks(text) : []),
+    [reading, linkedMd, text]
+  )
+  // 滚动联动:原文栏在滚时,译文栏按同一块号跟到同一高度(只认滚动,不认单纯移鼠标)
+  useEffect(() => {
+    const el = codeViewRef.current
+    if (!reading || !linkedMd || sourceBlocks.length === 0 || el === null) return
+    return registerMdScroll(mdKey, 'source', el)
+  }, [reading, linkedMd, sourceBlocks.length, mdKey])
   // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
@@ -363,12 +388,28 @@ export function CodePreview({
               <article className="code-reading">
                 {/* 内联标题(Obsidian 同款):文件名掐尾去扩展名,摆正文顶上;
                     接了改名通道就能点进去改(live/阅读同一条) */}
-                <MiniMD
-                  text={text}
-                  fileLinks={fileLinks ?? undefined}
-                  title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
-                  onRenameTitle={onRenameFile ? requestRename : undefined}
-                />
+                {sourceBlocks.length > 0 ? (
+                  <>
+                    <InlineTitle
+                      title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
+                      onRename={onRenameFile ? requestRename : undefined}
+                    />
+                    <LinkedMdView
+                      blocks={sourceBlocks}
+                      texts={sourceBlocks.map((b) => b.text)}
+                      hovered={linkedHovered}
+                      onHover={(block) => setHoveredBlock(mdKey, block)}
+                      fileLinks={fileLinks ?? undefined}
+                    />
+                  </>
+                ) : (
+                  <MiniMD
+                    text={text}
+                    fileLinks={fileLinks ?? undefined}
+                    title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
+                    onRenameTitle={onRenameFile ? requestRename : undefined}
+                  />
+                )}
               </article>
             </div>
           ) : (

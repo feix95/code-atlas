@@ -19,6 +19,7 @@ import { CodePreview } from './CodePreview'
 import { SettingsPage, type SectionKey } from './SettingsPage'
 import { GraphView } from './GraphView'
 import { UiWorkbench } from './uiWorkbench/UiWorkbench'
+import { TranslationView } from './TranslationView'
 
 export function TabBody({
   tab,
@@ -121,6 +122,17 @@ export function TabBody({
   // UI 工作台:不吃工作区,和设置一样拦在 result 闸之前
   if (tab.kind === 'uiworkbench') return <UiWorkbench />
   if (!result) return null
+  // 翻译镜像签:虚拟内容,读根仍是当前工作区;只读,不落盘
+  if (tab.kind === 'translate') {
+    return (
+      <TranslationView
+        key={tab.id}
+        rootPath={result.rootPath}
+        relPath={tab.relPath}
+        lang={tab.lang ?? 'zh-CN'}
+      />
+    )
+  }
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'chat') {
     // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四锤的老规矩)

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   closeContextMenu,
   currentContextMenu,
@@ -22,6 +22,10 @@ import { MENU_ICON_SIZE } from '../inputMetrics'
 
 /** 菜单的估尺寸:宽窄一条,高按行数算(一项一行约 34px);贴窗口边时按它往里收,别弹出窗外 */
 const MENU_W = 200
+/** 二级菜单估宽:语种名最长「中文（简体）」,10rem 够摆 */
+const SUB_W = 190
+/** 父行右缘到二级菜单左缘的缝:让开一级菜单的 4px 内边距,再留 2px 视觉缝 */
+const SUB_GAP = 6
 /** 窄身档的估宽(compact 菜单,比如输入框的复制/粘贴两行) */
 const MENU_W_COMPACT = 96
 const ROW_H = 34
@@ -96,11 +100,16 @@ function ContextMenuCard({
   const [lingering, setLingering] = useState<{ index: number; text: string } | null>(null)
   /** 开关行被拨过之后的当前读数(行号记账):各开关互相独立,菜单自己翻面,不等外面重开 */
   const [flipped, setFlipped] = useState<Record<number, boolean>>({})
+  /** 展开的二级菜单(父行号);同一张菜单只开一路 */
+  const [expanded, setExpanded] = useState<number | null>(null)
+  /** 二级菜单的落点(视口坐标,贴着父行右侧;右边挤不下翻左侧) */
+  const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
   const rowH = request.compact ? ROW_H_COMPACT : ROW_H
   const entryH = (it: (typeof request.items)[number]): number =>
     it === MENU_SEP ? SEP_H : isMenuHeading(it) ? HEADING_H : rowH
-  const menuH =
+  const baseH =
     request.items.reduce((h, it) => h + entryH(it), 0) + (request.compact ? CHROME_COMPACT : CHROME)
+  const menuH = baseH
   const pos = clampedPosition(
     request.x,
     request.y,
@@ -109,6 +118,28 @@ function ContextMenuCard({
     request.compact ? MENU_W_COMPACT : MENU_W,
     request.preferRight === true
   )
+
+  /** 二级菜单贴着父行右侧出生;右边挤不下就翻到左侧,上下同样往里收 */
+  function clampSub(row: HTMLElement, rows: number): { left: number; top: number } {
+    const view = doc.defaultView ?? window
+    const rect = row.getBoundingClientRect()
+    const h = rows * rowH + CHROME
+    const fitsRight = rect.right + SUB_GAP + SUB_W + EDGE <= view.innerWidth
+    const left = fitsRight ? rect.right + SUB_GAP : Math.max(EDGE, rect.left - SUB_W - SUB_GAP)
+    return {
+      left,
+      top: Math.max(EDGE, Math.min(rect.top, view.innerHeight - h - EDGE))
+    }
+  }
+
+  function openSub(index: number, row: HTMLElement): void {
+    const item = request.items[index]
+    if (item === undefined || item === MENU_SEP || isMenuHeading(item)) return
+    const rows = item.children?.length ?? 0
+    if (rows === 0) return
+    setExpanded(index)
+    setSubPos(clampSub(row, rows))
+  }
   return (
     <div
       className={`file-path-menu${request.compact ? ' is-compact' : ''}`}
@@ -128,52 +159,92 @@ function ContextMenuCard({
         }
         const isSwitch = item.switchOn !== undefined
         const switchOn = flipped[i] ?? item.switchOn === true
+        const hasSub = item.children !== undefined && item.children.length > 0
         return (
-          <button
-            key={i}
-            type="button"
-            role={isSwitch ? 'menuitemcheckbox' : 'menuitem'}
-            aria-checked={isSwitch ? switchOn : undefined}
-            className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
-            /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
+          <Fragment key={i}>
+            <button
+              type="button"
+              role={isSwitch ? 'menuitemcheckbox' : 'menuitem'}
+              aria-checked={isSwitch ? switchOn : undefined}
+              aria-expanded={hasSub ? expanded === i : undefined}
+              className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
+              /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
                data-tip 会白挂;aria-disabled 是 ARIA 菜单模式的推荐写法,行仍可悬停读提示,
                点击由下方 item.disabled 闸手动拦(键盘 Enter 也走同一闸) */
-            aria-disabled={item.disabled || undefined}
-            data-tip={item.tip}
-            onClick={() => {
-              if (item.disabled) return
-              if (isSwitch) {
-                setFlipped((f) => ({ ...f, [i]: !switchOn }))
-                void item.run(!switchOn)
-                return
-              }
-              void Promise.resolve(item.run()).then((feedback) => {
-                if (typeof feedback !== 'string' || feedback === '') {
-                  closeContextMenu()
+              aria-disabled={item.disabled || undefined}
+              data-tip={item.tip}
+              aria-haspopup={hasSub ? 'menu' : undefined}
+              onPointerEnter={(e) => {
+                if (hasSub) openSub(i, e.currentTarget)
+                else if (expanded !== null) setExpanded(null)
+              }}
+              onClick={(e) => {
+                if (item.disabled) return
+                if (hasSub) {
+                  openSub(i, e.currentTarget)
                   return
                 }
-                setLingering({ index: i, text: feedback })
-                window.setTimeout(closeContextMenu, LINGER_MS)
-              })
-            }}
-          >
-            {item.icon !== undefined && (
-              <span className="fpm-ic" aria-hidden="true">
-                <TreeIcon name={item.icon} size={MENU_ICON_SIZE} mono />
+                if (isSwitch) {
+                  setFlipped((f) => ({ ...f, [i]: !switchOn }))
+                  void item.run?.(!switchOn)
+                  return
+                }
+                void Promise.resolve(item.run?.()).then((feedback) => {
+                  if (typeof feedback !== 'string' || feedback === '') {
+                    closeContextMenu()
+                    return
+                  }
+                  setLingering({ index: i, text: feedback })
+                  window.setTimeout(closeContextMenu, LINGER_MS)
+                })
+              }}
+            >
+              {item.icon !== undefined && (
+                <span className="fpm-ic" aria-hidden="true">
+                  <TreeIcon name={item.icon} size={MENU_ICON_SIZE} mono />
+                </span>
+              )}
+              <span className="fpm-label">
+                {lingering?.index === i ? lingering.text : item.label}
               </span>
-            )}
-            <span className="fpm-label">
-              {lingering?.index === i ? lingering.text : item.label}
-            </span>
-            {isSwitch && (
-              <span
-                className={`cfg-switch fpm-switch${switchOn ? ' is-on' : ''}`}
-                aria-hidden="true"
+              {isSwitch && (
+                <span
+                  className={`cfg-switch fpm-switch${switchOn ? ' is-on' : ''}`}
+                  aria-hidden="true"
+                >
+                  <span />
+                </span>
+              )}
+              {hasSub && (
+                <span className="fpm-more" aria-hidden="true">
+                  ▸
+                </span>
+              )}
+            </button>
+            {hasSub && expanded === i && subPos !== null && (
+              <div
+                className="file-path-menu fpm-flyout"
+                role="menu"
+                aria-label={item.label}
+                style={{ left: subPos.left, top: subPos.top }}
               >
-                <span />
-              </span>
+                {item.children?.map((child, ci) => (
+                  <button
+                    key={ci}
+                    type="button"
+                    role="menuitem"
+                    className="file-path-menu-item"
+                    onClick={() => {
+                      closeContextMenu()
+                      child.run()
+                    }}
+                  >
+                    <span className="fpm-label">{child.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
-          </button>
+          </Fragment>
         )
       })}
     </div>

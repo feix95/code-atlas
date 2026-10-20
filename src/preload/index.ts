@@ -13,6 +13,7 @@ import type {
   EngineStateInfo
 } from '../shared/engineCatalog.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
+import type { TranslateEvent, TranslateStartRequest } from '../shared/translateTypes.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -216,6 +217,19 @@ const atlasApi = {
   aiCancel: (requestId: string): Promise<void> => ipcRenderer.invoke(CH.aiCancel, requestId),
   /** 联网查证(默认关):只把「名字」交给主进程去查公开资料,渲染进程不碰网络 */
   webLookup: (query: string): Promise<string> => ipcRenderer.invoke(CH.webLookup, query),
+  /** 文件翻译:原文由渲染层递过去,逐块译文走 atlas:translate-event 推回 */
+  translateStart: (
+    req: TranslateStartRequest
+  ): Promise<{ ok: boolean; total?: number; error?: string }> =>
+    ipcRenderer.invoke(CH.translateStart, req),
+  translateCancel: (requestId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(CH.translateCancel, requestId),
+  onTranslateEvent: (callback: (payload: TranslateEvent) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: TranslateEvent): void =>
+      callback(payload)
+    ipcRenderer.on(CH.translateEvent, listener)
+    return () => ipcRenderer.removeListener(CH.translateEvent, listener)
+  },
   /** 订阅 AI 流式增量;返回退订函数,组件卸载时调用,防止泄漏监听 */
   onAiDelta: (callback: (payload: AiDeltaPayload) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void =>

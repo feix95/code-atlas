@@ -18,7 +18,8 @@ const KNOWN_KINDS: readonly PaneKind[] = [
   'graph',
   'settings',
   'peek',
-  'uiworkbench'
+  'uiworkbench',
+  'translate'
 ]
 
 /** 存档里的一张页签:字段名照抄 PaneTab;on = 这组正亮着的那张(用标记不用序号,掉签后不错位) */
@@ -28,6 +29,8 @@ export interface SessionTab {
   name: string
   icon: string
   scopeRoot?: string
+  /** 翻译签的目标语种;其余品类不填 */
+  lang?: string
   on?: boolean
 }
 
@@ -66,6 +69,7 @@ export function serializeSession(
         name: t.name,
         icon: t.icon,
         scopeRoot: t.scopeRoot,
+        lang: t.lang,
         on: t.id === g.activeId ? true : undefined
       }))
     }))
@@ -90,6 +94,7 @@ function parseTab(raw: unknown): SessionTab | null {
     icon,
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
+    lang: typeof t['lang'] === 'string' && t['lang'] !== '' ? t['lang'] : undefined,
     // 旧档里的 viewMode/readOnly 不再读:看片开关已收进全局偏好(codePrefs),与签无关
     on: t['on'] === true ? true : undefined
   }
@@ -155,7 +160,8 @@ export function hydrateSession(
       relPath: t.relPath,
       name: t.name,
       icon: t.icon,
-      scopeRoot: t.scopeRoot
+      scopeRoot: t.scopeRoot,
+      lang: t.lang
     }))
     const onIdx = live.findIndex((t) => t.on)
     const group: PaneGroup = {

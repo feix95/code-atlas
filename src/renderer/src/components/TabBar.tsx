@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
+import { canReadingMode } from '../paneTabs'
+import { TRANSLATE_LANGS } from '@shared/translateLangs'
 import { applyViewFlags, viewFlags } from '../viewState'
 import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
 import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
@@ -58,6 +60,7 @@ export function TabBar({
   onMoveTab,
   onDetachTab,
   onRevealInTree,
+  onTranslate,
   workspaceRoot,
   dragSourceId,
   gapIndex,
@@ -86,6 +89,8 @@ export function TabBar({
   onDetachTab?: (id: string) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
   onRevealInTree?: (id: string) => void
+  /** 右键菜单「翻译成…」:开一张译文镜像签(只对 md 系文件签摆这一行) */
+  onTranslate?: (tab: TabBarTab, lang: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
   workspaceRoot?: string | null
   /** 正被 pointer 引擎拎着的页签 id:本组走活序滑动、别家条带拿它判缝归属 */
@@ -216,6 +221,19 @@ export function TabBar({
           run: () => toggleCodeWrap()
         }
       )
+    }
+
+    // 翻译(只对工作区里的 md 预览签摆):选语种 → 开一张并排的译文镜像签。
+    // peek 签的读根不是工作区,译文页按工作区读会读错,先不摆
+    if (t.kind === 'preview' && onTranslate && canReadingMode(t.relPath)) {
+      items.push(MENU_SEP, {
+        label: '翻译成…',
+        icon: 'sparkles',
+        children: TRANSLATE_LANGS.map((l) => ({
+          label: l.label,
+          run: () => onTranslate(t, l.code)
+        }))
+      })
     }
 
     if (onDetachTab)

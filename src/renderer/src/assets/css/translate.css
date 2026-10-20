@@ -1,0 +1,137 @@
+/* 翻译镜像页签 + 原文/译文悬停对照(样式与行为分开:对号在 mdBlocks,渲染在 LinkedMdView) */
+
+.trans-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+}
+
+/* 页首状态行:小、浅、低调 —— 只报进度与出口,不抢正文 */
+.trans-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 1.9rem;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+  color: var(--chrome-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.trans-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trans-status.is-error {
+  color: var(--danger);
+}
+
+.trans-lang {
+  flex: none;
+  padding: 0 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xxs);
+  color: var(--chrome-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.3;
+}
+
+.trans-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.trans-act {
+  padding: 0.1rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: transparent;
+  color: var(--chrome-muted);
+  font-family: inherit;
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+}
+
+.trans-act:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--chrome-ink) 8%, transparent);
+  color: var(--chrome-ink);
+}
+
+.trans-act:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.trans-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4) var(--space-6);
+}
+
+.trans-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.trans-placeholder-text {
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* 对照块:块与块之间留出可悬停的缝;悬停时原文与译文同号块一起亮 */
+.md-linked .md-block {
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-2) var(--ease-smooth);
+}
+
+.md-linked .md-block.is-linked-hover {
+  background: color-mix(in srgb, var(--sash-hi) 16%, transparent);
+}
+
+/* 未翻好的块:一条浅色骨架,先占住位置,不闪不抖 */
+.md-block-skeleton {
+  height: 1rem;
+  margin: 0.45rem 0;
+  border-radius: var(--radius-xxs);
+  background: color-mix(in srgb, var(--chrome-ink) 7%, transparent);
+}
+
+.md-block.is-pending .md-block-skeleton:nth-child(even) {
+  width: 78%;
+}
+
+/* 页签右键菜单的二级列表(翻译语种):就地展开,行距与一级一致 */
+.fpm-more {
+  margin-left: auto;
+  padding-left: 0.35rem;
+  color: var(--chrome-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+/* 二级菜单:复用一级菜单皮肤,贴父行右侧出生(落点由 ContextMenu 按视口钳) */
+.fpm-flyout {
+  padding: 0.25rem;
+}
+
+/* 菜单内容多时(页签菜单 + 展开的语种)允许内部滚动,不怼出窗口 */
+.file-path-menu {
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}

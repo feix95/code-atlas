@@ -73,6 +73,11 @@ export const CH = {
   aiDelta: 'atlas:ai-delta',
   aiCancel: 'atlas:ai-cancel',
   webLookup: 'atlas:web-lookup',
+  // ── 文件翻译(镜像页签) ──
+  translateStart: 'atlas:translate-start',
+  translateCancel: 'atlas:translate-cancel',
+  /** 主进程 → 渲染层推送:翻译计划 / 逐块译文 / 完成 / 失败 */
+  translateEvent: 'atlas:translate-event',
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',

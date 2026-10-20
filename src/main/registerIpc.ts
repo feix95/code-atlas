@@ -5,6 +5,7 @@ import { registerChatIpc } from './ipcChat.ts'
 import { registerEditIpc } from './ipcEdit.ts'
 import { registerLaunchPlanIpc } from './ipcLaunchPlan.ts'
 import { registerEngineIpc } from './ipcEngine.ts'
+import { registerTranslateIpc } from './ipcTranslate.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -14,4 +15,5 @@ export function registerIpc(): void {
   registerEditIpc()
   registerLaunchPlanIpc()
   registerEngineIpc()
+  registerTranslateIpc()
 }

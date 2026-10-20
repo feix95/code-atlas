@@ -28,6 +28,8 @@ export interface PaneTab {
   /** 「瞄一眼」文件签(peek)的读根:盘符下钻不归工作区,
    *  CodePreview 读文件走 joinRoot(scopeRoot, relPath);工作区文件签不填 */
   scopeRoot?: string
+  /** 翻译签的目标语种代号(见 shared/translateLangs);其余品类不填 */
+  lang?: string
 }
 
 /**
