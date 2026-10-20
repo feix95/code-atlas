@@ -20,6 +20,14 @@
 - AI 产生的临时文件、截图、调试脚本一律写入仓库外、与 `worktrees/` 并列的 `tmp/`(绝对路径见全局记忆), 审查完毕即清理; 不得写入仓库内被忽略的目录——文件工具读不到被忽略文件, 会造成"跑了自测但没看过图"的假验收。
 - dev 里改完源码页面行为没变(或报旧值错误): 先在 PowerShell 执行 `(Get-Item <文件>).LastWriteTime = Get-Date` 触发监听, 仍不见效再重启 dev。原因: 刷新页面不会重新编译, Vite 只在文件监听事件上失效模块缓存; 监听漏事件时旧模块会一直服役。
 
+## 代码地图(graphify)
+
+- 查代码结构与关系: 先跑 `graphify query "<问题>"`(查关系用 `graphify path`, 查概念用 `graphify explain`), 子图不够再读源码。原因: 图返回的是相关子图, 比全仓 grep 小一个数量级。
+- 图只在本机 `graphify-out/`(已 gitignore), 每个 worktree 各一份, 不随仓库分发; commit 与 merge 后由 husky 钩子增量重建, 日志在 `~/.cache/graphify-rebuild.log`。纯代码走 AST, 零 token。
+- 全量重建: 清空 `graphify-out/`(保留 `.graphify_python` 与 `cost.json`)后按 graphify skill 的流程重跑。命中不存在的文件、大批文件改名或删除、社区名整体错位时, 必须全量重建而不是增量。
+- 已知边界: graphify 不解析 CSS, 样式层查不到, 直接读 `src/renderer/src/assets/css/`; 文档只进结构节点(标题与章节), 图片不进图; 需要文档语义层时单独跑语义抽取。
+- 已知坑: 文件名含 `tokens` 的非散文文件会被当凭据库跳过(设计 token 的 CSS 会误伤); 并行 AST 抽取在 Windows 需脚本带 `if __name__ == "__main__":` 保护, 否则自动回退串行; 中途中断会留下 `.graphify_chunk_*.json`, 下次语义合并会一并吃掉, 重建前先清; 增量重建会重排社区编号, 部分社区名按枢纽回退。
+
 ## UI 改动自查清单(CSS/布局改动提交前执行)
 
 小葵术语口径: "icon 大小"指 svg 图标本体尺寸; "padding"指图标下可视底块; "可点击区域"指鼠标响应范围; 说"padding 调到 X"默认可点击区域同步对齐到新范围。
@@ -64,6 +72,7 @@ commit message 与 CHANGELOG.md 均使用 Conventional Commits 单行格式: `<t
 - 核心用户为不读代码的项目主人。主路径: 打开项目 → 文件树点文件开预览页签看内容; 基础浏览不依赖 AI。打开项目不自动开任何页签, 右侧落空签板并给一句引导(在左侧文件树里选文件或文件夹开始阅读)。
 - 文件引用成链约定(src/shared/fileLinks.ts): 文件名写在正文或行内代码里都可以; 带后缀、文件在扫描树里、名字全项目唯一(重名请写完整相对路径)时, 阅读模式自动变成可点击链接; 对不上登记的保持普通文字。
 - 页签模型: 文件签绑死文件(一文件一签, 重开只激活旧签, 点文件不动其他页签, 点文件夹只选中不开签); 点 canPreviewFile 为假的类型(二进制/媒体, JPG/PNG/MP3/WAV 除外)不开签, 底部 Toast「此文件类型不支持预览」约 1 秒; 自由对话/图谱/设置为单例签, 由 rail 入口开合; 无跟随、无钉住。
+- 页签拖拽落点: 本组内走活序滑动(被拖签跟手、邻居滑一格); 跨组只画插入线, 目标条带页签原位不动、不预缩空位(VS Code 口径, 预览尺寸与落定尺寸不会打架)。判定只认被拖签的投影中心与拖拽起始时的中线快照, 不认裸指针; 队尾落点等于可见签数, 不额外留格。几何只走 src/renderer/src/tabDragGeometry.ts。改动须跑 selftest-tabdraggeometry。
 - 文件树备注: 编辑入口只在文件树与聊天绿字文件链接的右键菜单里, 菜单内就地长出输入框(回车保存、Esc 取消不写盘、失焦保存、空稿不误删, 「清除备注」独立成行); 悬停提示优先级为备注覆盖引擎摘要, 清掉备注自动回到摘要; 备注正文写入与读档都把换行/制表/控制符折叠为单空格(防伪造提示第二行), 单行、上限 100 字; 备注文本不进任何提示词。
 - 文件预览显示开关: 「排版显示」(仅 md 系有)/「只读」/「自动换行」三颗全是全局偏好, 偏好存储在 src/renderer/src/codePrefs.ts(localStorage, 子窗经 storage 事件对齐), 一拨所有已开签就地翻面、新开签与重启都继承; 开关读数换算只走 src/renderer/src/viewState.ts(viewFlags/subscribeViewFlags/applyViewFlags), 禁止在组件里另拼读数; 菜单开关行协议见 contextMenuStore.ts 的 switchOn。改动须跑 selftest-viewstate。
 - JPG/PNG 文件签看图: 默认适应窗口(小图不放大)、Ctrl+滚轮(含触控板捏合)以光标为中心缩放、拖拽平移; 双击图片在适应窗口 / 100% 间切换; 底栏百分比单击弹出 25% 一档的上拉菜单(150% 到 25%)、双击可输入,图片上右键在光标处弹出同一份菜单(点外关闭); 按住像素/体积块看文件头信息(格式/色深/透明/渐进式), 松开即收; 底栏文件名同款芯片, 双击改主名(扩展名保留, 通道走 CodePreview onRenameFile / renameTextFile)。缩放按页签记, 禁止写入 docZoom 或 uiScale。变换公式只走 src/shared/imageZoom.ts, 文件头字段走 src/shared/imageMeta.ts。改动须跑 selftest-image 与 selftest-imagezoom; 改名通道须跑 selftest-fileedit。

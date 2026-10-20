@@ -502,3 +502,4 @@
 - chore: 提交 graphify 的 post-commit / post-merge 钩子,commit 与 merge 后自动更新代码图
 - fix(ui): 翻译镜像页底色改用 --canvas-tint,与正常预览同档
 - fix(ui): 页签跨组拖拽不再预缩让位、只画插入线,落点判定改用被拖签投影中心与起始中线快照,让位尺寸与判定范围对齐视觉;落点几何抽到 tabDragGeometry.ts 并挂 test:tabdrag
+- docs(core): 交接文档新增代码地图(graphify)的查询口径、全量重建时机与已知坑,产品契约补页签拖拽落点规则
