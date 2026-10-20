@@ -494,3 +494,6 @@
 - chore: .gitignore 忽略 graphify-out;提交 .cursor/rules/graphify.mdc 作为 Cursor 图查询规则
 - docs(core): AGENTS.md 把 format 闸口改到合进 main 前,并去掉 cmd 空格坑的当场复述
 - chore: 灵感池目录 ref 重命名为 reference
+- feat(ui): 工作区菜单路径悬停慢速滚到末尾、移开快速归位,装得下的短路径不动
+- feat(ui): 工作区菜单底边可向下拖高,拉到条目总量为止不留空白,双击恢复默认
+- refactor(ui): 工作区菜单样式拆出 workspace-menu.css,workspace.css 回到行数闸门内
