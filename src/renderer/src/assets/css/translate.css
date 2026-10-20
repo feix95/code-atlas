@@ -5,7 +5,8 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface);
+  /* 内容面走画布底(--canvas-tint),与 .preview-chat / MD 预览同档;勿用 --surface(面板档,暗色偏亮且彩色主题会泛色) */
+  background: var(--canvas-tint);
 }
 
 /* 页首状态行:小、浅、低调 —— 只报进度与出口,不抢正文 */

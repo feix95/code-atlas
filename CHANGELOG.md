@@ -500,3 +500,4 @@
 - feat(ui): md 页签右键可翻成 8 种语言,译文镜像向右分屏逐段上屏,按段悬停同亮淡蓝底,两侧滚动按段联动对齐
 - docs(core): 对齐提交与验收口径,注释和自测改用行业术语
 - chore: 提交 graphify 的 post-commit / post-merge 钩子,commit 与 merge 后自动更新代码图
+- fix(ui): 翻译镜像页底色改用 --canvas-tint,与正常预览同档
