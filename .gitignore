@@ -21,3 +21,6 @@ inspiration/ui-ref-02.jpg
 # AI 排案草稿(本地会话记录,不进公开仓库)
 .planning/
 test-results/
+
+# graphify 本地知识图(缓存与导出,不进公开仓库)
+graphify-out/
