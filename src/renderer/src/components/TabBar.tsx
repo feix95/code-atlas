@@ -23,15 +23,15 @@ export interface TabBarTab {
 /**
  * 页签条(小葵的页签模型·文件签版):一张页签 = 图标 + 名字 + 悬停才出现的 ×。
  * 文件签脸就是文件名;单例签挂品类名牌。拖拽走 TopBarTabs 的 pointer 引擎:
- * 这里只上报 pointerdown 和画让位缝 —— 被拖的签全程保持原样(产品裁定),
- * 缝用 margin 过渡撑开(VS Code 式让位手感)。
+ * 这里只上报 pointerdown 和画插入线 —— 被拖的签全程保持原样(产品裁定),
+ * 别家条带页签原位不动,落点只由一条插入线预告(VS Code 同款)。
  * 中键点页签 = 关闭。右键菜单走全局通用 ContextMenu(Obsidian 式分组,组间细线)。
  * 页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
  * (顶栏死空间/日志窗头条共用同一套)。
  */
 /** 本组条带内的活序滑动账(Chromium 桌面模型):被拖签真身 translateX 跟指针滑,
    邻居在落点序号变化时 translateX 滑进腾出的格子 —— 条带全程满编,没有缝没有线;
-   别家条带拿不到它(那边仍走 margin 缝+插入线预览) */
+   别家条带拿不到它(那边页签不动,只画插入线) */
 export interface TabSlide {
   /** 被拖签 id(本组必有) */
   srcId: string
@@ -64,7 +64,6 @@ export function TabBar({
   workspaceRoot,
   dragSourceId,
   gapIndex,
-  gapWidth,
   slide,
   onTabPointerDown
 }: {
@@ -93,12 +92,11 @@ export function TabBar({
   onTranslate?: (tab: TabBarTab, lang: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
   workspaceRoot?: string | null
-  /** 正被 pointer 引擎拎着的页签 id:本组走活序滑动、别家条带拿它判缝归属 */
+  /** 正被 pointer 引擎拎着的页签 id:本组走活序滑动、别家条带拿它排除源签后算插入线 */
   dragSourceId: string | null
-  /** 落点缝的序号(按剔除被拖签后的可见序):缝 = 那张签的 margin-left 撑开;
-      只递别家条带,本组滑动模型不撑缝 */
+  /** 插入线的落点序号(按剔除被拖签后的可见序):只给别家条带画线;
+      本组走活序滑动,不画线(源签真身自己就是占位的那个) */
   gapIndex: number | null
-  gapWidth: number
   /** 本组活序滑动账(只在被拖签的家这条带递):null = 不走滑动模型 */
   slide: TabSlide | null
   /** 页签 pointerdown 上报给引擎:按住够阈值它来接管成拖拽会话 */
@@ -303,17 +301,13 @@ export function TabBar({
     openContextMenu({ x: e.clientX, y: e.clientY, doc, items })
   }
 
-  // 落点缝的落法:缝序号按「剔除被拖签」的可见序 —— 缝前那张签吃 margin-left,
-  // 缝在末尾时最后一张吃 margin-right(空白带本来就是空地,但划道缝更明确)。
-  // margin 缝只在别家条带唱戏:本组走活序滑动,源签真身自己就是占位的那个
+  // 插入线的落点:序号按「剔除被拖签」的可见序。线寄生在「它要跟在后面的那张签」
+  // 的尾巴缘上,队首缝换宿主到首签前缘。别家条带页签原位不动,线是唯一的落点提示
   const effTabs = dragSourceId ? tabs.filter((t) => t.id !== dragSourceId) : tabs
   const srcIdx = dragSourceId ? tabs.findIndex((t) => t.id === dragSourceId) : -1
   const gapOn = gapIndex !== null && srcIdx === -1
-  const gapAnchor = gapOn ? effTabs[gapIndex] : undefined
-  const gapTail = gapOn && !gapAnchor ? effTabs[effTabs.length - 1] : undefined
-  // 插入线宿主(Obsidian 式):钉在「它要跟在后面的那张签」的尾巴缘上,签被 flex
-  // 挤着换位置线跟着走 —— 全局坐标在 margin 动画下会漂,寄生签身上视觉=真实恒成立;
-  // 缝在队首时寄生首签的前缘
+  // 插入线宿主(Obsidian 式):钉在「它要跟在后面的那张签」的尾巴缘上,签换位置线
+  // 跟着走 —— 全局坐标会漂,寄生在签身上视觉=真实恒成立;落在队首时寄生首签前缘
   const markHost = gapOn ? (effTabs[gapIndex - 1] ?? effTabs[0]) : undefined
   const markBefore = gapIndex === 0
   // 活序滑动的落点序号:指针不在本带(slide.idx=null)视为回家 —— 邻居全滑回原位
@@ -360,8 +354,6 @@ export function TabBar({
               // 冻结态:签宽锁成关签前实测值(flex-basis 定死,不再分摊),
               // 空白全推给 .tabbar-blank 吃 —— × 原地不动,连点不漂
               ...(frozenW !== null ? { flex: `0 0 ${frozenW}px` } : {}),
-              ...(t.id === gapAnchor?.id ? { marginLeft: gapWidth } : {}),
-              ...(t.id === gapTail?.id ? { marginRight: gapWidth } : {}),
               ...(tx !== 0 ? { transform: `translateX(${tx}px)` } : {})
             }}
             onPointerDown={(e) => onTabPointerDown(e, t)}

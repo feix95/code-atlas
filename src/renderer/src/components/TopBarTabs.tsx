@@ -7,10 +7,12 @@
 // 页签拖拽是手搓 pointer 引擎(不吃 HTML5 DnD —— 原生幻影带黑框、没有让位动画):
 // 按住位移超阈值开拖 → 本组条带内走 Chromium 活序模型(源签真身 translateX
 // 跟指针滑,邻居按落点序号滑动补位,条带全程满编);指针离开本带/悬到别家条带
-// 则替身胶囊现身跟光标,别家条带用 margin 缝+插入线预告落点;悬到正文区按
-// 中心/边缘判分屏许诺;窗外松手拆出新子窗。
+// 则替身胶囊现身跟光标,别家条带只画插入线预告落点、页签原位不动(VS Code 同款:
+// 不预缩位置,预览尺寸与实际尺寸不会打架);悬到正文区按中心/边缘判分屏许诺;
+// 窗外松手拆出新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
+import { dragCenterX, insertIndexAt } from '../tabDragGeometry'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -393,8 +395,16 @@ export function TopBarTabs({
           cx <= s.right + STRIP_BLEED_X
         ) {
           const mids = s.groupId === srcGroupId ? s.mids.filter((m) => m.id !== t.id) : s.mids
-          let index = mids.findIndex((m) => m.mid > cx)
-          if (index < 0) index = mids.length
+          // 判定看被拖签的投影中心,不是裸指针:抓在签的哪一头会差出小半张签宽。
+          // 本组用真身宽,别家条带用胶囊实宽 —— 胶囊收窄过,中心才跟眼睛对得上
+          const probeW =
+            s.groupId === srcGroupId
+              ? rect.width
+              : (chipRef.current?.getBoundingClientRect().width ?? rect.width)
+          const index = insertIndexAt(
+            mids.map((m) => m.mid),
+            dragCenterX(cx, grabDx, probeW)
+          )
           zone = { type: 'strip', groupId: s.groupId, index }
           setGap((prev) =>
             prev && prev.groupId === s.groupId && prev.index === index
@@ -529,7 +539,6 @@ export function TopBarTabs({
               gapIndex={
                 gap !== null && gap.groupId === g.id && g.id !== dragSrcGroupId ? gap.index : null
               }
-              gapWidth={drag?.width ?? 0}
               slide={
                 drag !== null && drag.phase === 'drag' && g.id === dragSrcGroupId
                   ? {
