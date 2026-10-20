@@ -493,3 +493,4 @@
 - chore: 整理 ref 灵感池;删除 icon/概念/ui-v3 旧参考,风格参考视频和图片挪到 ref 根目录
 - chore: .gitignore 忽略 graphify-out;提交 .cursor/rules/graphify.mdc 作为 Cursor 图查询规则
 - docs(core): AGENTS.md 把 format 闸口改到合进 main 前,并去掉 cmd 空格坑的当场复述
+- chore: 灵感池目录 ref 重命名为 reference
