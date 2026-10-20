@@ -1,6 +1,6 @@
 // 全树速览:文件夹一扫完,给树里每个节点配一句大白话标签。
-// 词条三档规矩(第九十二锤,按外部 AI 会诊定稿的《词条撰写执行规则》执行):
-//   档位1  类型标签+文件名已说清 → 不写字(留空);只有黑话后缀给 2~4 字范畴词(如 .md → 文档)
+// 词条三档规矩(第九十二批,按外部 AI 会诊定稿的《词条撰写执行规则》执行):
+//   档位1  类型标签+文件名已说清 → 不写字(留空);只有非常用后缀给 2~4 字范畴词(如 .md → 文档)
 //   档位2  身份唯一、无风险     → 只说"是什么",≤14 字,禁人物拟人,比喻只许空间/容器
 //   档位3  动错会出事           → "是什么 + 该怎么处理",≤20 字,"不要手动改"统一措辞(sticky:重复不降噪)
 // 状态类(空/锁定/未展开/截断)单走第五节规矩:像日志播报,比喻全免。
@@ -93,14 +93,14 @@ const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
   { re: /\.config\./, summary: { icon: 'gear', text: '配置文件' } }
 ]
 
-// 「程序入口」候选语言:户口本里 category==='code' 的都算,
+// 「程序入口」候选语言:登记表里 category==='code' 的都算,
 // 但脚本/查询/界面类不算 —— main.sql 不是入口,index.vue 是组件不是入口
 const CODE_LANG_EXCLUDES = new Set(['shell', 'powershell', 'sql', 'vue', 'svelte'])
 const CODE_LANG_IDS = new Set(
   LANGUAGES.filter((l) => l.category === 'code' && !CODE_LANG_EXCLUDES.has(l.id)).map((l) => l.id)
 )
 
-// ── 文件:后缀范畴词(档位1:只给黑话后缀配 2~4 字范畴词,不写句子) ──
+// ── 文件:后缀范畴词(档位1:只给非常用后缀配 2~4 字范畴词,不写句子) ──
 const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
   '.md': { icon: 'doc', text: '文档' },
   '.markdown': { icon: 'doc', text: '文档' },
@@ -195,13 +195,13 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { icon: 'entry', text: '入口：程序多半从这儿开始跑' }
   }
 
-  // 文档读开头(第一百锤):有真标题就亮真名,别再笼统一句「文档」
+  // 文档读开头(第一百批):有真标题就亮真名,别再笼统一句「文档」
   if (file.docTitle) {
     const t = file.docTitle.length > 16 ? `${file.docTitle.slice(0, 16)}…` : file.docTitle
     return { icon: 'doc', text: `文档：${t}` }
   }
 
-  // 词根词典(第九十九锤):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
+  // 词根词典(第九十九批):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
   // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
   const byWords = translateName(file.name)
   if (byWords) return { icon: 'code', text: byWords }
@@ -217,7 +217,7 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   return { icon: 'file', text: '没有后缀，无法判断类型' }
 }
 
-// ── 目录:名字习惯字典(档位2正脸直说,≤14 字,无人物拟人) ──
+// ── 目录:名字习惯字典(档位2直述,≤14 字,无人物拟人) ──
 const DIR_SUMMARIES: Record<string, NodeSummary> = {
   src: { icon: 'code', text: '项目全部源代码' },
   source: { icon: 'code', text: '项目全部源代码' },
@@ -360,7 +360,7 @@ function summarizeDir(
     return { icon: 'lock', text: '系统保护目录，无法查看，不影响使用' }
   }
 
-  // 状态播报:真探过且空就是空,哪怕名字叫 config 也不许喊"配置间"绰号
+  // 状态播报:真探过且空就是空,哪怕名字叫 config 也不许喊"配置间"别名
   if (!node.lazy && fileCount === 0 && directDirs === 0) {
     return { icon: 'folder', text: '空的，还没有内容' }
   }
@@ -378,7 +378,7 @@ function summarizeDir(
     return byName
   }
 
-  // 词根词典(第九十九锤):业务起的名(scanner/summarizer)按词根给个身份词
+  // 词根词典(第九十九批):业务起的名(scanner/summarizer)按词根给个身份词
   const dirWords = translateName(node.name)
   if (dirWords) return { icon: 'folder', text: dirWords }
 
@@ -435,7 +435,7 @@ function tallyDir(node: ScanDirNode): DirTally {
       if (lang) tally.byLang.set(lang, (tally.byLang.get(lang) ?? 0) + 1)
     } else {
       tally.directDirs++
-      const sub = tallyDir(child) // 先给子目录打标签,顺带收它的家底
+      const sub = tallyDir(child) // 先给子目录打标签,顺带收其子树合计
       tally.fileCount += sub.fileCount
       for (const [lang, count] of sub.byLang)
         tally.byLang.set(lang, (tally.byLang.get(lang) ?? 0) + count)

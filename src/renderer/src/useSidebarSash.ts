@@ -10,7 +10,7 @@ import {
   saveSidebarWidth
 } from './layoutPrefs'
 
-// 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值,户口在 layoutPrefs),下次打开还是自己调好的样子
+// 左栏宽度:分割条拖多宽记进 localStorage(存 100% 缩放下的基准值,登记在 layoutPrefs),下次打开还是自己调好的样子
 export const MIN_SIDEBAR_WIDTH = 240
 
 // 树再宽也不能把右栏挤没:右栏保底 360px 看分析内容

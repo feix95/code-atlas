@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { RenameOutcome } from '@shared/fileRename'
 
 /**
- * 可改名的内联标题(内联标题改名锤·Obsidian inline title):
+ * 可改名的内联标题(内联标题改名批次·Obsidian inline title):
  * 平时一行大字,点进去原地变输入框 —— Enter/失焦提交,Esc 取消;
  * 提交期间输入框锁住等回执,成败都由调用方(RenameOutcome)发话。
  * onRename 缺席 = 纯展示(聊天消息里的 MiniMD 等老用法,点着也没戏)。

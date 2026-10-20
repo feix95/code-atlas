@@ -62,7 +62,7 @@ const PREVIEW_BLOCKED_MS = 1_000 // 不能预览的类型点开:底部 Toast 停
 const PREVIEW_BLOCKED_TEXT = '此文件类型不支持预览'
 
 function App(): React.JSX.Element {
-  // 画面心跳(救生圈2.0,白屏案后搬家):从 main.tsx(React 树外)挪进树内 ——
+  // 画面心跳(救生圈2.0,白屏案后迁移):从 main.tsx(React 树外)挪进树内 ——
   // 树活着心跳才跳;哪天渲染期异常把整棵树卸了(2026-09-13 的 MiniMD 隐身案就是),
   // 本 effect 的清账函数停掉 rAF,主进程看门狗 10 秒内发现心跳停摆,自动整页重挂救回。
   // StrictMode 下挂两遍也安全:每个实例只取消自己的那一跳。
@@ -79,13 +79,13 @@ function App(): React.JSX.Element {
     handle = requestAnimationFrame(beat)
     return () => cancelAnimationFrame(handle)
   }, [])
-  // 首页盘符列表(第六十锤):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
+  // 首页盘符列表(第六十批):一开就是「这台电脑」,只问有哪些盘,点哪个盘扫哪个
   const [drives, setDrives] = useState<DriveInfo[] | null>(null)
   const [drivesNote, setDrivesNote] = useState<string | null>(null)
   const [driveRefreshNonce, setDriveRefreshNonce] = useState(0)
   const { toast, showToast } = useToast()
   const { refreshing, runRefresh } = useRefreshFeedback(showToast)
-  // 最近打开的项目(第八十一锤):存 localStorage,开过谁就记谁,首页一排卡片点回去
+  // 最近打开的项目(第八十一批):存 localStorage,开过谁就记谁,首页一排卡片点回去
   const [recents, setRecents] = useState<RecentProject[]>(() => readRecentProjects())
   const [folder, setFolder] = useState<string | null>(null)
   // 地址栏草稿:跟着已打开的路径走,也能随手改成别的直接回车开图
@@ -103,7 +103,7 @@ function App(): React.JSX.Element {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // 手动备注(第九十八锤):本项目 relPath → 小葵的一句话;存本机,存上限有孤儿清收
+  // 手动备注(第九十八批):本项目 relPath → 小葵的一句话;存本机,存上限有孤儿清收
   const [notes, setNotes] = useState<NoteMap>({})
 
   // reveal 联动:激活页签/跳转目标在树里的父目录链,这些目录强制展开 + 滚到可见
@@ -132,7 +132,7 @@ function App(): React.JSX.Element {
     clear: clearSearch
   } = useWorkspaceSearch(result?.rootPath ?? null)
 
-  // 激活页签指向的文件节点(页签只存 relPath,树是户口本;重扫后节点没了就渲染兜底)
+  // 激活页签指向的文件节点(页签只存 relPath,树是登记表;重扫后节点没了就渲染兜底)
   // —— 预览页签改版后不再自带聊天,聊天上下文只认树里选中的对象,这个派生退役了
   // 公用场的聊天上下文:跟着选中的文件/文件夹走;什么都没选就聊项目根 —— 探针随时都在,不挑时候
   const chatContext = useMemo(() => {
@@ -162,7 +162,7 @@ function App(): React.JSX.Element {
     return () => document.body.classList.remove('is-maximized')
   }, [maximized])
 
-  // 开屏列盘符,之后每回退回首页(含 logo 回家)都重列一遍(第八十一锤):
+  // 开屏列盘符,之后每回退回首页(含 logo 回家)都重列一遍(第八十一批):
   // app 开着的时候插的 U 盘、拔的移动盘,回家永远见得到;重列期间老列表照常摆着,不闪空
   useEffect(() => {
     if (folder) return
@@ -219,9 +219,9 @@ function App(): React.JSX.Element {
       setPathDraft(root)
       // 备注跟上新树:顺带清孤儿(垃圾不越攒越多),再写回本机
       setNotes(refreshNotesForScan(root, scanned.tree))
-      // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一锤)
+      // 画成了一张图才算「打开过」:记进最近列表,下次首页一点就回(第八十一批)
       setRecents(rememberRecentProject(root))
-      // 换了地方就是新的一站(第八十三锤);同路径的刷新不算搬家,不记
+      // 换了地方就是新的一站(第八十三批);同路径的刷新不算迁移,不记
       if (root !== folder) pushNav({ folder: root, file: null, dir: null })
       setScanning(false)
       return scanned
@@ -290,7 +290,7 @@ function App(): React.JSX.Element {
   }
 
   /**
-   * 树里点文件(小葵拍的规矩·页签改版):选中它 + 开一张绑死它的文件预览签
+   * 树里点文件(产品页签规则·页签改版):选中它 + 开一张绑死它的文件预览签
    * (同一文件只此一张,已开就点亮领过去);已有页签一概不动。
    * 不能预览的类型(psd/pdf 这类)只选中、不开签,底部 Toast 说一声。
    * 本地结构分析照旧自动跑(不耗模型)。
@@ -325,7 +325,7 @@ function App(): React.JSX.Element {
     }
   }
 
-  // 树里点文件夹(小葵拍板·页签改版):只选中,不开页签 —— 箭头管展开,点名字不触发扫描;
+  // 树里点文件夹(产品裁定·页签改版):只选中,不开页签 —— 箭头管展开,点名字不触发扫描;
   // 聊天中点文件夹照旧只换资料不抢台(公用场垫句灰字)
   function selectDir(node: ScanDirNode): void {
     analyzeSeq.current += 1
@@ -369,7 +369,7 @@ function App(): React.JSX.Element {
     setStructure(null)
   }
 
-  // logo = 回「这台电脑」(第八十锤,小葵拍板):开到多深的项目,一点就退回选盘首页;
+  // logo = 回「这台电脑」(第八十批,产品裁定):开到多深的项目,一点就退回选盘首页;
   // 上次开的路径留在输入框里,想回这个项目点「前往」就行。没开项目时按钮自己变灰
   function goHome(): void {
     if (!folder) return
@@ -397,7 +397,7 @@ function App(): React.JSX.Element {
     clearSearch()
   }
 
-  // 存一条手动备注(第九十八锤):空串 = 删除;上限和淘汰在 shared/notes 里管
+  // 存一条手动备注(第九十八批):空串 = 删除;上限和淘汰在 shared/notes 里管
   function saveNote(relPath: string, text: string): void {
     if (!folder) return
     setNotes((prev) => {
@@ -417,7 +417,7 @@ function App(): React.JSX.Element {
     else openFileTabIfPreviewable(f)
   }
 
-  // 页签右键「在文件列表中显示当前文件」(阅读模式这锤):回侧栏树里选中它 +
+  // 页签右键「在文件列表中显示当前文件」(阅读模式本批):回侧栏树里选中它 +
   // 展开父链滚过去;侧栏收着就先掀开 —— 定位的反馈只有看得见才算数。
   // 子窗里的签点这项,动的是主窗侧栏(树只有那儿有)
   function revealTabInTree(id: string): void {
@@ -432,7 +432,7 @@ function App(): React.JSX.Element {
     setRevealPaths(new Set(dirChainOf(result.tree, t.relPath)))
   }
 
-  // 记一站(第八十三锤)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
+  // 记一站(第八十三批)的定义挪去了 scanPath 之前(声明顺序给 lint 让路)
 
   // 最近列表 ✕ 即删(UI v3 §7.1:删了就是删了,旧撤销横幅链路退役),pin 钮同理即写账
   function removeRecent(path: string): void {
@@ -450,7 +450,7 @@ function App(): React.JSX.Element {
   }
 
   // 文件命中 = 开预览页签(走现有逻辑)。深搜到的可能住在「还没探」的目录里:
-  // 沿父链逐层探开(handleExpandLazy 返回新子树,本地账本手动接,不等 React 回合),
+  // 沿父链逐层探开(handleExpandLazy 返回新子树,本地状态手动接,不等 React 回合),
   // 链探完节点就进树了;链上有探不开的也只是预览兜底说句实话,不装死
   async function openSearchFile(hit: SearchNameHit): Promise<void> {
     if (!result) return
@@ -459,7 +459,7 @@ function App(): React.JSX.Element {
     for (let i = 0; i < parts.length - 1; i++) {
       const dirRel = parts.slice(0, i + 1).join('/')
       const node = findDir(tree, dirRel)
-      if (!node) break // 父链在账本上断了:探不动了,剩下的交给预览兜底说实话
+      if (!node) break // 父链在状态表上断了:探不动了,剩下的交给预览兜底说实话
       if (!node.lazy) continue
       const sub = await handleExpandLazy(dirRel)
       if (!sub) return // 探这一层失败了:treeNote 已挂实话,不再往下硬闯
@@ -484,7 +484,7 @@ function App(): React.JSX.Element {
   }
 
   // 分级扫描:点开还没探的目录,只探这一层,子树和统计接进现有地图。
-  // 返回探到的子树 —— 深搜结果点开文件时,父链逐层探开要靠这个账本走下一步
+  // 返回探到的子树 —— 深搜结果点开文件时,父链逐层探开要靠这个状态表走下一步
   async function handleExpandLazy(relPath: string): Promise<ScanDirNode | null> {
     if (!result || expandingRef.current) return null
     expandingRef.current = true
@@ -533,8 +533,8 @@ function App(): React.JSX.Element {
   } = useSidebarSash()
   // Ctrl+滚轮/键盘 ±0 缩放界面(浏览器惯例):走 setUiScale 原路
   useZoomKeys(() => {})
-  // 撕窗子窗户口(页签撕窗锤):window.open 同进程子窗 + Portal 渲染坑位。
-  // 死在页签账本上头 —— 撕签要它能开窗,窗死了要它名下的组销户
+  // 独立子窗口标识(页签独立窗口):window.open 同进程子窗 + Portal 渲染坑位。
+  // 死在页签状态上头 —— 拆签要它能开窗,窗死了要它名下的组关闭并清理
   const { auxWins, openAuxWindow, closeAuxWindow, onAuxGone } = useAuxWindows()
   const {
     groups,
@@ -568,7 +568,7 @@ function App(): React.JSX.Element {
     openAuxWindow: () => openAuxWindow()?.id ?? null,
     setRevealPaths
   })
-  // 子窗死讯 → 它名下的签连组销户(Chrome 语义:关窗即关签)
+  // 子窗死讯 → 它名下的签连带关闭并清理该组(Chrome 语义:关窗即关签)
   useEffect(() => {
     onAuxGone(closeHostGroups)
   }, [onAuxGone, closeHostGroups])
@@ -614,8 +614,8 @@ function App(): React.JSX.Element {
     saveNote
   })
 
-  // 内联标题改名(内联标题改名锤):编排本体在 useFileRename,
-  // 这里只递账本 —— 树/选中/备注/引用/页签户口一次换清新路径
+  // 内联标题改名(内联标题改名批次):编排本体在 useFileRename,
+  // 这里只递状态表 —— 树/选中/备注/引用/页签登记一次换清新路径
   const handleRenameFile = useFileRename({
     result,
     selectedFile,
@@ -644,7 +644,7 @@ function App(): React.JSX.Element {
     scanPath
   })
 
-  // 页签区通用接线包:主窗和每扇子窗吃的是同一副药(户口过滤后各自的组)
+  // 页签区通用接线包:主窗和每扇子窗吃的是同一副药(登记过滤后各自的组)
   const tabArea: TabAreaProps = {
     visibleOfGroup,
     flashTabId,
@@ -841,7 +841,7 @@ function App(): React.JSX.Element {
           )}
         </div>
 
-        {/* 悬停轻提示(全场唯一户口):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
+        {/* 悬停轻提示(全场唯一登记):认 data-tip 属性,fixed 挂 body 不吃侧栏 overflow */}
         <TooltipHost />
         <Toast toast={toast} />
         {/* 文件路径右键菜单(全局单例):绿字文件链接上右键弹「复制完整路径」,只复制不打开 */}
@@ -850,8 +850,8 @@ function App(): React.JSX.Element {
         <ContextMenu />
       </div>
 
-      {/* 撕窗子窗(页签撕窗锤):壳本体在 AuxWindows 组件,
-            Portal 渲染进子窗 document —— 同一棵 React 树,活的签的正房整体搬家 */}
+      {/* 独立子窗(页签独立窗口):壳本体在 AuxWindows 组件,
+            Portal 渲染进子窗 document —— 同一棵 React 树,活的签的页签活 DOM整体迁移 */}
       <AuxWindows
         auxWins={auxWins}
         groups={groups}

@@ -124,7 +124,7 @@ export function registerModelIpc(): void {
       webLookup: c.webLookup === true,
       // Tavily Key(可选,2026-09-17):设置页填了才进档;saveAiConfig 里会洗(trim,空白当没填)
       tavilyKey: typeof c.tavilyKey === 'string' ? c.tavilyKey : undefined,
-      // 个性化(第一百一十三锤)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
+      // 个性化(第一百一十三批)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
       personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
       contextSize:
@@ -151,7 +151,7 @@ export function registerModelIpc(): void {
     return saved
   })
 
-  // ── 模型状态栏(第七十锤):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
+  // ── 模型状态栏(第七十批):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
   ipcMain.handle(CH.modelStatusGet, async (): Promise<ModelStatus> => {
     const config = await loadAiConfig(userDataDir())
     if (config.provider === 'builtin') {
@@ -188,7 +188,7 @@ export function registerModelIpc(): void {
     }
   })
 
-  // 量尺(第七十三锤):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
+  // 适配估算(第七十三批):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
   ipcMain.handle(CH.modelFitCheck, async (_event, modelPath: unknown): Promise<ModelFitVerdict> => {
     if (typeof modelPath !== 'string' || !modelPath.trim()) {
       return { level: 'empty', title: '', detail: '', sizeBytes: null }
@@ -206,7 +206,7 @@ export function registerModelIpc(): void {
       }
     }
     const spec = await queryMachineSpec()
-    // 上下文缓存跟着配置走(第八十六锤):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
+    // 上下文缓存跟着配置走(第八十六批):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
     const config = await loadAiConfig(userDataDir())
     const ctx =
       typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN
@@ -215,7 +215,7 @@ export function registerModelIpc(): void {
     return { ...judgeModelFit(sizeBytes, spec.ramBytes, spec.vramBytes, ctx), sizeBytes }
   })
 
-  // 模型档案(上下文档位的账本):出厂上下文上限、层数头数、机器家底,一次端给设置页;
+  // 模型档案(上下文档位的状态表):出厂上下文上限、层数头数、机器规格,一次端给设置页;
   // 档案翻不出来各条目就是 null,设置页自己退到粗估,不报错不拦人
   ipcMain.handle(
     CH.modelContextInfo,
@@ -239,8 +239,8 @@ export function registerModelIpc(): void {
     }
   )
 
-  // 渲染层的报错小纸条:window.onerror / unhandledrejection 抓到的都送进后台账本 ——
-  // 渲染层就算当场断气,主进程的账本还活着,下回排查有现场可看
+  // 渲染层的报错小注记:window.onerror / unhandledrejection 抓到的都送进后台状态表 ——
+  // 渲染层就算当场断气,主进程的状态表还活着,下回排查有现场可看
   ipcMain.on(CH.rendererError, (_event, text: unknown) => {
     if (typeof text === 'string' && text.trim()) {
       console.log(`[renderer] 页面报错:${text.slice(0, 300)}`)

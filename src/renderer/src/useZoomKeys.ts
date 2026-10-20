@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react'
 import { clampUiScale } from '@shared/uiScale'
 
-const STEP = 0.05 // 一档 5%,与设置页 ± 钮同户口
+const STEP = 0.05 // 一档 5%,与设置页 ± 钮同登记
 
 /** 往一扇窗上装缩放键(主窗挂 window,子窗壳挂自己的窗):返回拆装函数 */
 export function installZoomKeys(win: Window, onChange: (scale: number) => void): () => void {

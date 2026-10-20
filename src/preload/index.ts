@@ -38,13 +38,13 @@ import type {
   DevLogEntry
 } from '../shared/types.ts'
 
-// 界面缩放(第四十七锤起换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
+// 界面缩放(第四十七批起换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
 // 会把整个渲染坐标系缩一顿,无边框自绘窗的「鼠标判定」和「视觉框」就对不上:
 // 设置面板 × 视觉上正对着却点不中、拖边热区跑出窗框、设置页比窗还大,三个连环 bug 同这个根。
 // 现在改成改根字号:html 的 font-size = 16px × 系数,布局/字号/图标全挂 rem 跟着变,
 // 没有第二套坐标系,鼠标坐标和视觉永远 1:1。存 localStorage,页面脚本跑之前就定好,不会先小后大闪一下。
 // 超出范围的旧存档贴边处理(不再静默跳回 100%,用户调过 180% 就给他 180%)
-// 档位/基准/夹紧的户口在 shared/uiScale.ts:设置页滑块和侧栏 rem 换算同认那一份
+// 档位/基准/夹紧的登记在 shared/uiScale.ts:设置页滑块和侧栏 rem 换算同认那一份
 const UI_SCALE_KEY = 'atlas.ui-scale'
 
 function applyRootFont(factor: number): void {
@@ -63,7 +63,7 @@ applyRootFont(readUiScale())
 
 // 首帧信号:连跑两个动画帧 = 合成器真的画出了画面,主进程收到才敢露窗。
 // 这是露窗链的主保险 —— 无边框模式下 ready-to-show 在部分高缩放屏上永不触发
-// (第三十六锤补实测),不能指望它;主进程另备 3 秒看门狗兜底,窗口绝不永久隐身
+// (第三十六批补实测),不能指望它;主进程另备 3 秒看门狗兜底,窗口绝不永久隐身
 requestAnimationFrame(() => {
   requestAnimationFrame(() => ipcRenderer.send(CH.firstFrame))
 })
@@ -112,7 +112,7 @@ const atlasApi = {
   /** 手动搬窗(send 配 on,顶栏死空间/页签尾空白/日志窗头条共用):
       start=按下点的屏幕坐标(最大化会先还原落位),move=光标的绝对屏幕坐标 —
       不报增量:主进程按「基线矩形+总位移」回放,躲开 150% 缩放下 bounds 逐写逐长。
-      host = 目标窗户口(frameName):子窗里的事件经主窗渲染层代发,sender 恒是主窗,
+      host = 目标窗口标识(frameName):子窗里的事件经主窗渲染层代发,sender 恒是主窗,
       不传它主进程会错挪主窗 */
   windowDragStart: (x: number, y: number, host?: string): void => {
     ipcRenderer.send(CH.windowDragStart, x, y, host)
@@ -153,11 +153,11 @@ const atlasApi = {
   },
   depGraph: (rootPath: string): Promise<DepGraphResult> =>
     ipcRenderer.invoke(CH.depGraph, rootPath),
-  // ── 文件编辑与监视(预览编辑锤) ──
+  // ── 文件编辑与监视(预览编辑批次) ──
   /** 把文本写进项目内文件;返回写后 mtime,给文件监视器对自激账 */
   saveFile: (rootPath: string, relPath: string, text: string): Promise<{ mtimeMs: number }> =>
     ipcRenderer.invoke(CH.saveFile, rootPath, relPath, text),
-  /** 内联标题改名:只递新主名(不含扩展名),扩展名保留;返回新户口(relPath/name)给渲染层换账 */
+  /** 内联标题改名:只递新主名(不含扩展名),扩展名保留;返回新登记(relPath/name)给渲染层换账 */
   renameFile: (rootPath: string, relPath: string, newBase: string): Promise<RenameFileResult> =>
     ipcRenderer.invoke(CH.renameFile, rootPath, relPath, newBase),
   /** 盯一个打开中的文件:外面有人动它就推 fileChanged;ok=false = 文件读不到,监视降级 */
@@ -172,7 +172,7 @@ const atlasApi = {
     ipcRenderer.on(CH.fileChanged, listener)
     return () => ipcRenderer.removeListener(CH.fileChanged, listener)
   },
-  // 模型货架:实时榜(双源拉取+本机家底)+ 仓库文件清单
+  // 模型货架:实时榜(双源拉取+本机规格)+ 仓库文件清单
   modelShelf: (): Promise<ShelfResult> => ipcRenderer.invoke(CH.modelShelf),
   modelFiles: (repoId: string): Promise<RepoFile[]> => ipcRenderer.invoke(CH.modelFiles, repoId),
   // 一键到位:点文件 → 断点续传下载 → 自动填 AI 配置;进度走事件推送
@@ -200,10 +200,10 @@ const atlasApi = {
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke(CH.aiPickFile),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke(CH.aiChat, req),
-  /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
+  /** /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
   aiCompact: (req: AiCompactRequest): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiCompact, req),
-  /** 试一句(第一百一十三锤):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
+  /** 试一句(第一百一十三批):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
   aiStyleSample: (personalization: unknown, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiStyleSample, personalization, requestId),
   /** 订阅自由对话的联网状态播报(查询中/查到/没查到);返回退订函数 */
@@ -237,7 +237,7 @@ const atlasApi = {
     ipcRenderer.on(CH.aiDelta, listener)
     return () => ipcRenderer.removeListener(CH.aiDelta, listener)
   },
-  // ── 模型状态栏(第七十锤):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
+  // ── 模型状态栏(第七十批):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
   modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke(CH.modelStatusGet),
   modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke(CH.modelEject),
   /** 主动装载内置模型(叫醒引擎热身);外接模型的装载归 LM Studio 管 */
@@ -258,13 +258,13 @@ const atlasApi = {
     ipcRenderer.on(CH.modelStatus, listener)
     return () => ipcRenderer.removeListener(CH.modelStatus, listener)
   },
-  /** 量尺(第七十三锤):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
+  /** 适配估算(第七十三批):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
   modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> =>
     ipcRenderer.invoke(CH.modelFitCheck, modelPath),
-  /** 模型档案(上下文档位的账本):出厂上限 + 层数头数 + 机器家底,一次端齐;翻不到回 null */
+  /** 模型档案(上下文档位的状态表):出厂上限 + 层数头数 + 机器规格,一次端齐;翻不到回 null */
   modelContextInfo: (modelPath: string): Promise<ModelContextInfo | null> =>
     ipcRenderer.invoke(CH.modelContextInfo, modelPath),
-  /** 本机运行方案(智能启动锤):机器家底 + 当前内置模型的启动计划,只读不算命;
+  /** 本机运行方案(智能启动批次):机器规格 + 当前内置模型的启动计划,只读不算命;
       draft 传了按草稿预览(不动存档) */
   aiLaunchPlan: (draft?: ModelLaunchSettings | null): Promise<LaunchPlanInfo | null> =>
     ipcRenderer.invoke(CH.aiLaunchPlan, draft),
@@ -288,7 +288,7 @@ const atlasApi = {
     ipcRenderer.on(CH.rendererRevived, listener)
     return () => ipcRenderer.removeListener(CH.rendererRevived, listener)
   },
-  /** 报错小纸条:渲染层抓到的 JS 错误送进后台账本(主进程的账本不随渲染层陪葬) */
+  /** 报错小注记:渲染层抓到的 JS 错误送进后台状态表(主进程的状态表不随渲染层销毁) */
   reportRendererError: (text: string): void => {
     ipcRenderer.send(CH.rendererError, text)
   },
@@ -296,13 +296,13 @@ const atlasApi = {
   frameHeartbeat: (): void => {
     ipcRenderer.send(CH.frameHeartbeat)
   },
-  // ── 撕窗子窗(页签撕窗锤):子窗 document 是 about:blank 白窗没有 preload,
+  // ── 独立子窗(页签独立窗口):子窗 document 是 about:blank 白窗没有 preload,
   // 窗口操作由主窗渲染层代发 —— 渲染进子窗的 Portal 组件跑的还是主 realm,
   // 按钮回调里拿到的 window.atlas 就是这桥。主进程按 frameName 认窗 ──
   auxWindowOp: (frameName: string, op: AuxWindowOp): void => {
     ipcRenderer.send(CH.auxWindowOp, { frameName, op })
   },
-  // ── Developer 日志(第八十七锤):拉旧账 / 清账 / 开窗 / 订阅新账 ──
+  // ── Developer 日志(第八十七批):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke(CH.devLogPull),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke(CH.devLogClear),
   devLogsOpen: (): Promise<void> => ipcRenderer.invoke(CH.devLogOpen),

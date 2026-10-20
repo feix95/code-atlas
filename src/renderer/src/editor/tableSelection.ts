@@ -28,7 +28,7 @@ import {
   writeGrid
 } from './tableGridOps.ts'
 
-/** 选区装机的收摊函数(替身被拆时摘掉 document 级监听) */
+/** 选区装机的清理函数(替身被拆时摘掉 document 级监听) */
 export const selectionTeardown = new WeakMap<Element, () => void>()
 
 /** 取事件目标所在的格子坐标;不在本表格内返回 null(鸭式判断:子窗是独立 realm) */

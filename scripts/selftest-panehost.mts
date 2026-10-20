@@ -1,5 +1,5 @@
-// 组户口纯函数自测(页签撕窗锤):moveTabToHost/dropHostGroups/groupsForHost/groupHost ——
-// 撕签换窗的账本规则全在这儿,纯函数不碰 DOM 不碰 electron,秒跑。
+// 组登记纯函数自测(页签独立窗口):moveTabToHost/dropHostGroups/groupsForHost/groupHost ——
+// 拆签换窗的状态表规则全在这儿,纯函数不碰 DOM 不碰 electron,秒跑。
 import assert from 'node:assert/strict'
 import {
   dropHostGroups,
@@ -30,12 +30,12 @@ const grp = (id: string, tabs: PaneTab[], host?: string, activeId?: string | nul
   host
 })
 
-check('groupHost:没填户口就是主窗,填了认填的', () => {
+check('groupHost:没填登记就是主窗,填了认填的', () => {
   assert.equal(groupHost(grp('g1', [tab('t1')])), MAIN_HOST)
   assert.equal(groupHost(grp('g2', [tab('t1')], 'aux-1')), 'aux-1')
 })
 
-check('groupsForHost:按户口分窝,主窗的子窗的各归各', () => {
+check('groupsForHost:按登记分窝,主窗的子窗的各归各', () => {
   const groups = [
     grp('g1', [tab('t1')]),
     grp('g2', [tab('t2')], 'aux-1'),
@@ -52,7 +52,7 @@ check('groupsForHost:按户口分窝,主窗的子窗的各归各', () => {
   assert.equal(groupsForHost(groups, 'aux-9').length, 0)
 })
 
-check('moveTabToHost:挪去新窗户口,现立新组,签过去激活', () => {
+check('moveTabToHost:挪去新窗口标识,现立新组,签过去激活', () => {
   const groups = [grp('g1', [tab('t1'), tab('t2')])]
   const moved = moveTabToHost(groups, 't2', 'aux-1')
   assert.ok(moved, '找得到签就动账')
@@ -70,7 +70,7 @@ check('moveTabToHost:挪去新窗户口,现立新组,签过去激活', () => {
   )
   assert.equal(dst.activeId, 't2', '挪来的签点亮')
   assert.equal(moved!.activeGroupId, dst.id, '聚焦跟到新组')
-  // 原账本不被改(纯函数)
+  // 原状态表不被改(纯函数)
   assert.equal(groups[0].tabs.length, 2, '不入账改动')
 })
 
@@ -92,7 +92,7 @@ check('moveTabToHost:源组搬空自己消亡(子窗拖空 → 壳层自裁的�
   assert.equal(
     moved.groups.some((g) => g.id === 'g2'),
     false,
-    '搬空的 aux 组销户'
+    '搬空的 aux 组关闭并清理'
   )
   assert.equal(moved.groups.length, 1)
 })
@@ -103,12 +103,12 @@ check('moveTabToHost:抽走激活签,源组激活指针落到末张', () => {
   assert.equal(moved.groups.find((g) => g.id === 'g1')!.activeId, 't1', '激活接力末张')
 })
 
-check('moveTabToHost:找不到签回 null,账本不动', () => {
+check('moveTabToHost:找不到签回 null,状态表不动', () => {
   const groups = [grp('g1', [tab('t1')])]
   assert.equal(moveTabToHost(groups, 'ghost', 'aux-1'), null)
 })
 
-check('dropHostGroups:只清指定户口的组,别家一根毛不动', () => {
+check('dropHostGroups:只清指定登记的组,别家一根毛不动', () => {
   const groups = [
     grp('g1', [tab('t1')]),
     grp('g2', [tab('t2')], 'aux-1'),
@@ -121,4 +121,4 @@ check('dropHostGroups:只清指定户口的组,别家一根毛不动', () => {
   )
 })
 
-console.log('✅ 组户口自测全绿')
+console.log('✅ 组登记自测全绿')

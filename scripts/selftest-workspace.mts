@@ -142,7 +142,7 @@ function dir(
 }
 
 {
-  // 根级文件 + 树里没这个人 → 回 null,树里的户口一个不动
+  // 根级文件 + 树里没这个人 → 回 null,树里的登记一个不动
   const tree = dir('root', '', [file('top.md', 'top.md'), file('z.md', 'z.md')])
   const hit = renameFileNode(tree, 'top.md', 'a.md')
   assert.ok(hit !== null)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * 「亮一下→自己退场」小状态机(P2-1 收的公共件,全 app 的瞬时反馈一枚户口):
+ * 「亮一下→自己退场」小状态机(P2-1 收的公共件,全 app 的瞬时反馈一枚登记):
  * flash(value, ms) 亮出这个值,ms 后自动退回 idle;连按重新计时;
  * 组件卸载自动清闸,不留「幽灵亮」。返回 [当前值, 点亮, 手动熄灭]。
  * 布尔版见 useFlashFlag;各场景只养自己的时长常量,不共用一份体感表。

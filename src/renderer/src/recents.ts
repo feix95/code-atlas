@@ -1,7 +1,7 @@
-// ── 第八十一锤:最近打开的项目 ──
+// ── 第八十一批:最近打开的项目 ──
 // 首页给一排「最近打开」:项目名 + 路径 + 上次时间,点一下直接重新画图,小 ✕ 能删。
 // 存 localStorage(atlas.recent-projects)—— 界面的事每台机器自己一套,不进 AI 配置也不进仓库。
-// 老账本是垃圾怎么办:parseRecentProjects 只认干净的,垃圾整条扔、超长掐头,绝不炸首页。
+// 老状态表是垃圾怎么办:parseRecentProjects 只认干净的,垃圾整条扔、超长掐头,绝不炸首页。
 
 import { readPref, writePref } from '../../shared/localPrefs.ts'
 
@@ -20,7 +20,7 @@ export interface RecentProject {
   pin?: number
 }
 
-/** 账本封顶:未 pin 条目只留最近 RECENTS_MAX 条;pin 条目不淘汰(仅手动 unpin 回流)。
+/** 状态表封顶:未 pin 条目只留最近 RECENTS_MAX 条;pin 条目不淘汰(仅手动 unpin 回流)。
  *  垃圾防御另上一道总闸:整本账最多 40 条,再多掐尾 */
 const LEDGER_HARD_CAP = 40
 function capLedger(list: RecentProject[]): RecentProject[] {

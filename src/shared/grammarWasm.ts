@@ -1,5 +1,5 @@
-// ── tree-sitter 语法账:一本账,高亮和体检都从这里查 ──
-// 语法 id = tree-sitter-wasms 包里的语法名;语言户口本的 id → 语法 id 的桥也在这,
+// ── tree-sitter 语法账:同一数据源,高亮和体检都从这里查 ──
+// 语法 id = tree-sitter-wasms 包里的语法名;语言登记表的 id → 语法 id 的桥也在这,
 // 两边不许再各养一本(从前 highlight/analyzer 各抄一份 GRAMMAR_FILES,新增语法要改两处)。
 // 新增语法时同步 electron-builder.yml 的 wasm filter —— selftest-wasmpaths 会拦,别等它拦。
 
@@ -22,7 +22,7 @@ export const GRAMMAR_WASM: Record<string, string> = {
 }
 
 /**
- * 语言户口本的 id(shared/languages.ts)→ 语法 id。
+ * 语言登记表的 id(shared/languages.ts)→ 语法 id。
  * TS/JS 四族共用 tsx 超集语法(和体检模块一个思路);csharp 语法包叫 c_sharp;
  * shell 借 bash 语法(.zsh 也沾光)。没收录的语言 = 没语法,老实白字/不体检。
  */

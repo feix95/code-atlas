@@ -4,7 +4,7 @@
  * 遍历沿用扫描器的忽略名单与 MAX_DEPTH/MAX_NODES 保护闸(src/scanner/searchNames.ts)。
  */
 
-/** 结果上限【小葵点头】:超出只回前 N 条,界面在清单末尾垫提示 */
+/** 结果上限【产品确认】:超出只回前 N 条,界面在清单末尾垫提示 */
 export const SEARCH_NAMES_MAX = 200
 
 export interface SearchNameHit {

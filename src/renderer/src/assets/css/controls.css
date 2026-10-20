@@ -1,4 +1,4 @@
-/* 通用控件(拆自 chrome.css,纯搬家):焦点环全场常灭 + .btn/.btn-primary/.btn-ghost/.icon-btn + .path-hint 气泡 */
+/* 通用控件(拆自 chrome.css,纯迁移):焦点环全场常灭 + .btn/.btn-primary/.btn-ghost/.icon-btn + .path-hint 气泡 */
 /* 焦点描边全场常灭:Electron 会把鼠标点过的钮误判成键盘焦点,
    深色环时隐时现属视觉噪音(同 win-btn 旧案判决);键盘焦点的提示
    改用各组件自己的非描边手段(rail 灰块、× 显形、sash 高亮线) */
@@ -48,7 +48,7 @@
 }
 
 /* 实心按钮平涂、不叠阴影:受光线+厚度边那套只在近灰皮上成立,
-   彩色/近黑 accent 上要么隐形要么变味,索性全摘(2026-09-22 小葵拍板) */
+   彩色/近黑 accent 上要么隐形要么变味,索性全摘(2026-09-22 产品裁定) */
 .btn-primary {
   color: var(--accent-ink);
   border-color: var(--accent-line);

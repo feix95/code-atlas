@@ -49,7 +49,7 @@ function normalizeCloud(raw: Record<string, unknown>, apiKey: string): AiCloudSe
   }
 }
 
-/** 默认走内置引擎(2026-09-18 小葵定:新用户开箱即内置,配模型货架挑一个下载
+/** 默认走内置引擎(2026-09-18 产品定:新用户开箱即内置,配模型货架挑一个下载
  *  正好凑成第一步);模型路径留空 = 还没下模型,界面引导去货架。联网查证默认关,说话方式是全默认 */
 export function defaultAiConfig(): AiConfig {
   return {
@@ -126,7 +126,7 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
         typeof parsed.contextSize === 'number' && parsed.contextSize >= CONTEXT_SIZE_MIN
           ? parsed.contextSize
           : undefined,
-      // 说话方式(第一百一十三锤):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
+      // 说话方式(第一百一十三批):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
       personalization: sanitizePersonalization(parsed.personalization)
     }
   } catch {
@@ -197,7 +197,7 @@ export function resolveAiTarget(
     }
     return {
       ok: true,
-      // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四锤)
+      // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四批)
       target: {
         baseUrl: builtinRuntime.baseUrl,
         model: builtinRuntime.model,

@@ -14,7 +14,7 @@ interface DragState {
   frame: HTMLElement
 }
 
-/** 取 :root 上的动效 token(回弹曲线/时长走全局账,不在这里写死) */
+/** 取 :root 上的动效 token(回弹曲线/时长走全局 token,不在这里写死) */
 function motionToken(doc: Document, name: string, fallback: string): string {
   const win = doc.defaultView
   const v = win?.getComputedStyle(doc.documentElement).getPropertyValue(name).trim()

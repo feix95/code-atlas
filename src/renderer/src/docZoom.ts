@@ -1,4 +1,4 @@
-// 文档字号缩放的渲染端户口(Ctrl+滚轮这锤):localStorage 存档 + 订阅广播。
+// 文档字号缩放的渲染端登记(Ctrl+滚轮本批):localStorage 存档 + 订阅广播。
 // 同进程模块单例 —— 子窗 Portal 共享同一个 JS heap,一处滚轮全场预览一起换档;
 // localStorage 按 origin 共享,主窗/子窗读写同一格存档,不需要 IPC。
 import { useSyncExternalStore } from 'react'

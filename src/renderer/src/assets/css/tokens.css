@@ -44,7 +44,7 @@
   --font-ui-small: var(--font-md);
   --font-ui-medium: var(--font-ml);
   --font-ui-large: 1.25rem;
-  /* 框架色槽(浅色,小葵吸管色号;铁律:不透明实色,禁透明度叠色) */
+  /* 框架色槽(浅色,小葵吸管色号;硬约束:不透明实色,禁透明度叠色) */
   --chrome-topbar: #ededed; /* 顶栏整行 + rail 底,同色 */
   --chrome-panel: #f6f6f6; /* 侧栏/文件树/workspace 卡填充 */
   --chrome-hover: #d7d7d7; /* 悬停件/搜索框底 */
@@ -54,7 +54,7 @@
   --chrome-ink-strong: #141414; /* 激活页签标题 */
   --chrome-surface: #ffffff; /* 激活页签/内容面 */
   --chrome-muted: #8a8a8a; /* 占位灰字(搜索框/路径框 hint) */
-  /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有户口才叫正经档 ── */
+  /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有登记才叫正经档 ── */
   --font-w-regular: 400;
   --font-w-medium: 500;
   --font-w-semi: 600;
@@ -96,9 +96,9 @@
   --z-tip: 100;
   /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
   --focus-ring: 0 0 0 0.1875rem;
-  /* 阴影阶(小葵定:全仓投影唯一出处,升档 = 浮得越高):
+  /* 阴影阶(产品定:全仓投影唯一出处,升档 = 浮得越高):
      sm = 贴地小件(开关钮/选中段/卡片架);tip = 悬停气泡(小面积高浓度);
-     pop = 浮层菜单弹层,亮暗双档,户口在主题色区;accent 系 = 主题色染的强调投影;
+     pop = 浮层菜单弹层,亮暗双档,登记在主题色区;accent 系 = 主题色染的强调投影;
      inset 系 = 内阴影(受光线/发丝线),不是投影 */
   --shadow-sm: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.14);
   --shadow-tip: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.18);
@@ -126,7 +126,7 @@
   --traffic-green: #28c840;
   --traffic-yellow: #ffbd2e;
   --traffic-red: #ff5f57;
-  /* 开关钮 / 选中 chip(2026-09-18 小葵设计稿):亮暗两套都成立的写真值,走户口不调色板 */
+  /* 开关钮 / 选中 chip(2026-09-18 小葵设计稿):亮暗两套都成立的写真值,走登记不调色板 */
   --switch-knob: #ffffff;
   --chip-on-bg: #dde3e7;
   --chip-on-ink: #1d2226;
@@ -137,7 +137,7 @@
   /* 正文非等宽字栈(live 档排版对齐阅读档用):与 body 同一份,别两处各写各的 */
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', var(--cjk), sans-serif;
   /* ── 色板(浅色,Obsidian 无色阶)──
-     灰阶真值户口在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
+     灰阶真值登记在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
      外观系统 achro 回落和石墨种子色都查那本 —— 这边是同款写真的首帧兜底,两边必须一致 */
   --window: #f6f6f6;
   /* 画布底色:内容白,框架层(--window)垫侧栏/顶栏/页签条 */
@@ -146,7 +146,7 @@
   --secondary-deep: #4c4c4c; /* 辅助色的文字安全档 */
   --surface: #ffffff;
   --surface-soft: #f6f6f6;
-  /* 边缘线统一档(小葵定稿):所有边线/分隔线/框线一个色,line-soft 同值合并,
+  /* 边缘线统一档(产品定稿):所有边线/分隔线/框线一个色,line-soft 同值合并,
      兼当浅底用的几处(settings 分组底)随之一档深 */
   --line: #d0d0d0;
   --line-soft: #d0d0d0;
@@ -160,7 +160,7 @@
   /* accent 的亮档:当字色/细线用(实心块上另有 accent-ink),浅色下即纯黑 */
   --accent-bright: #000000;
   --accent-hover: #000000;
-  /* 实心主题色件上的字色:第七十九锤起由 appearance 按派生主题色的对比度自动翻深浅,
+  /* 实心主题色件上的字色:第七十九批起由 appearance 按派生主题色的对比度自动翻深浅,
      亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
   --accent-ink: #ffffff;
   --accent-soft: rgba(0, 0, 0, 0.06);
@@ -195,7 +195,7 @@
 }
 
 /* 暗色 token:不再看系统的脸色,外观系统挂 data-theme='dark' 才进场
-   (灰阶真值户口同在 shared/appearancePalette.ts 的 dark 档,两边必须一致) */
+   (灰阶真值登记同在 shared/appearancePalette.ts 的 dark 档,两边必须一致) */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --window: #282828;
@@ -233,7 +233,7 @@
   --hover: rgba(255, 255, 255, 0.07);
   --selected-bg: rgba(255, 255, 255, 0.13);
   --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.45);
-  /* 暗色下的开关钮:户口仍在 token 区,只换暗色真值 */
+  /* 暗色下的开关钮:登记仍在 token 区,只换暗色真值 */
   --switch-knob: #e5eaed;
   /* v3 框架色槽暗色(B9 定稿,VS Code Dark+ 惯例):框架比内容亮一档、悬停再亮一档、
      字色同 --text/--text-strong;彩色主题下 topbar/panel/surface 三槽被外观系统
@@ -266,7 +266,7 @@
   box-sizing: border-box;
 }
 
-/* 界面缩放约定(第四十七锤起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
+/* 界面缩放约定(第四十七批起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
    布局/字号/图标全挂 rem 跟着变,点击坐标和视觉永远 1:1 —— 不再借用浏览器缩放坐标系。
    两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;②窗壳的圆角和描边是「窗」的装饰 */
 html,
@@ -275,7 +275,7 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   height: 100%;
-  /* 实底窗(全窗实底化):body 直接铺画布色 —— 窗户口 backgroundColor 只兜首帧,
+  /* 实底窗(全窗实底化):body 直接铺画布色 —— 窗口标识 backgroundColor 只兜首帧,
      之后的每一像素都由这里拍板;自定义染色档也跟得动,不留色差缝 */
   background: var(--canvas-tint);
 }
@@ -301,7 +301,7 @@ body {
   background: var(--canvas-tint);
 }
 
-/* ── 全局轻提示(TooltipHost,全场唯一户口):黑底白字圆角小尾巴。
+/* ── 全局轻提示(TooltipHost,全场唯一登记):黑底白字圆角小尾巴。
    absolute 锚 .app(透明窗合成器裁根层 fixed 件,浮层必须落 .app 里);
    .app 的 overflow:hidden 顺手把气泡收进窗框圆角;pointer-events 永不吃鼠标;
    data-side 由 JS 写,小尾巴转 45° 方块贴在朝目标那一侧 --arrow 位上 ── */

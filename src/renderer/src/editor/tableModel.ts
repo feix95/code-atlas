@@ -3,7 +3,7 @@ import type { MdAlign } from '../../../shared/markdown.ts'
 
 // ── 模型:源码 ↔ 中间账 ──
 
-/** 表格模型:表头格 + 对齐户口 + 数据行;格内是源码文本(含 \| 转义) */
+/** 表格模型:表头格 + 对齐登记 + 数据行;格内是源码文本(含 \| 转义) */
 export interface TableModel {
   head: string[]
   aligns: MdAlign[]
@@ -13,7 +13,7 @@ export interface TableModel {
 /**
  * 管道行拆格:掐掉可选的头尾外管,按未转义 | 切开,逐格修边。
  * `a\|b` 里的 \| 是格内文字不当分隔,原样保留在格子里。
- * lezer 对空格不发 TableCell 节点,按 | 数格才能让空列户口不丢。
+ * lezer 对空格不发 TableCell 节点,按 | 数格才能让空列登记不丢。
  */
 export function splitRowCells(line: string): string[] {
   let s = line.trim()
@@ -64,7 +64,7 @@ const escapeCell = (t: string): string => t.replace(/\r?\n/g, ' ').replace(/(?<!
 const sepCellOf = (a: MdAlign): string =>
   a === 'center' ? ':---:' : a === 'right' ? '---:' : '---'
 
-/** 模型 → 规范 GFM 源码(整表重写入口;对齐户口写回分隔行) */
+/** 模型 → 规范 GFM 源码(整表重写入口;对齐登记写回分隔行) */
 export function serializeTable(m: TableModel): string {
   const cols = m.head.length
   const row = (cells: string[]): string =>

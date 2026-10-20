@@ -1,4 +1,4 @@
-// 启动方案装配间(智能启动锤):把「机器探头 + 文件户口 + 结构档案」三份 I/O 收齐,
+// 启动方案装配间(智能启动批次):把「机器探头 + 文件登记 + 结构档案」三份 I/O 收齐,
 // 交给 shared/launchPlan.ts 的纯算盘出方案。启动器(builtinLaunch)和设置卡(ipcLaunchPlan)共用。
 import { statSync } from 'node:fs'
 import { planLaunch } from '../shared/launchPlan.ts'

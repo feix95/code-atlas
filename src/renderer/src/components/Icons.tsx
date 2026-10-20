@@ -128,7 +128,7 @@ export function NotePen({
   )
 }
 
-/** 顶栏线稿图标家族(第一百零三锤);默认去色吃 currentColor,按需可选彩色稿 */
+/** 顶栏线稿图标家族(第一百零三批);默认去色吃 currentColor,按需可选彩色稿 */
 export function IconArrowLeft({
   size = 14,
   mono = true,
@@ -516,7 +516,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M15 6a6 6 0 0 1 3 6" />
     </>
   ),
-  // .json 花括号(v5 新户口):summarizer 发 'data',以前一直落文件兜底
+  // .json 花括号(v5 新登记):summarizer 发 'data',以前一直落文件兜底
   data: (
     <>
       <path d="M9 3.5c-2.2 0-3 1.1-3 2.8v3c0 1.2-.9 1.9-2 2.2 1.1.3 2 1 2 2.2v3c0 1.7.8 2.8 3 2.8" />
@@ -524,7 +524,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
     </>
   ),
-  // 齿轮(v5 新户口,Lucide settings):设置钮 + *.config.*/config 目录的 '⚙️' 统一改发 'gear'
+  // 齿轮(v5 新登记,Lucide settings):设置钮 + *.config.*/config 目录的 '⚙️' 统一改发 'gear'
   gear: (
     <>
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -534,7 +534,7 @@ const BOOK: Record<string, React.ReactNode> = {
   // 选区首尾的一对角括号(Lucide brackets 拆半):一正一反,读作「从这里开始 / 到这里结束」
   markStart: <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />,
   markEnd: <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />,
-  // 思考模式(第一百一十八锤):小葵给的参考图是颗脑子,线稿照脑回的双瓣画
+  // 思考模式(第一百一十八批):小葵给的参考图是颗脑子,线稿照脑回的双瓣画
   brain: (
     <>
       <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
@@ -544,7 +544,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" />
     </>
   ),
-  // 发送(第一百一十八锤):小葵点名要「向上的箭头」
+  // 发送(第一百一十八批):产品指定要「向上的箭头」
   arrowUp: (
     <>
       <path d="M12 19V5" />
@@ -568,7 +568,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M3 21l7-7" />
     </>
   ),
-  // 翻文件(第一百二十八锤):文件夹上搁一枚放大镜 —— 自己动手翻项目
+  // 翻文件(第一百二十八批):文件夹上搁一枚放大镜 —— 自己动手翻项目
   folderSearch: (
     <>
       <path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
@@ -720,7 +720,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
-  // 眯眼(小葵点的小眼睛,2026-09-17):睁眼看得见 Key,眯眼看不见
+  // 眯眼(产品指定的小眼睛,2026-09-17):睁眼看得见 Key,眯眼看不见
   eyeOff: (
     <>
       <path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.1 3.9" />
@@ -764,7 +764,7 @@ const BOOK: Record<string, React.ReactNode> = {
   ),
   // 裸对勾(不带圈):预设卡角上的「选中了」小标记
   checkBare: <path d="M20 6 9 17l-5-5" />,
-  // ── UI v3 框架件(小葵供稿,lucide 线稿;框架图标一律 mono 吃 currentColor,不给户口色)──
+  // ── UI v3 框架件(小葵供稿,lucide 线稿;框架图标一律 mono 吃 currentColor,不给登记色)──
   // 搜索框放大镜(lucide search,规格 §5.3)
   search: (
     <>
@@ -795,7 +795,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M6 4v4" />
     </>
   ),
-  // 实时预览(md 三档锤,lucide pencil-line):一支笔一道线 = 边写边出效果
+  // 实时预览(md 三档批次,lucide pencil-line):一支笔一道线 = 边写边出效果
   penLine: (
     <>
       <path d="M12 20h9" />

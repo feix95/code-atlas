@@ -1,11 +1,11 @@
 /**
- * 智能启动方案(模型启动规划锤):给定机器家底 + 模型户口,算出 llama-server 的启动参数。
+ * 智能启动方案(模型启动规划批次):给定机器规格 + 模型登记,算出 llama-server 的启动参数。
  * 规矩来自真机实测(RTX 5060 Ti 16GB + Gemma-4-26B MoE):
  *   - 显卡摆层一律交给引擎内置的 --fit 自动安排;硬塞 -ngl 999 会关掉自动摆层,
  *     Vulkan 后端在分配视觉投影仪缓冲时当场 OOM 崩掉(ErrorOutOfDeviceMemory)。
  *   - 装不下就按梯子降档:①视觉文件放内存 → ②KV 黑板改 q8_0 + 开 flash-attn → ③上下文砍半。
  *   - --n-cpu-moe 99 手动全放内存实测慢 3~4 倍,绝不自动选。
- * 纯账本:不碰文件/进程/Electron,I/O 一律在 src/ai 侧。
+ * 纯状态表:不碰文件/进程/Electron,I/O 一律在 src/ai 侧。
  */
 import type { GgufShape } from './types.ts'
 import type { ModelLaunchSettings } from './launchSettings.ts'
@@ -30,7 +30,7 @@ const MIN_PLANNED_CONTEXT = 8192
 
 export type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'unknown'
 
-/** 机器家底:机器探头(machineProbe)查出来喂给规划器 */
+/** 机器规格:机器探头(machineProbe)查出来喂给规划器 */
 export interface MachineProfile {
   ramBytes: number
   /** 显存总量;没认出显卡为 null */

@@ -1,6 +1,6 @@
 // 联网查证(可选,默认关):讲解认不出某个软件/品牌时,拿「名字」去免费公开源查资料。
-// 只在主进程用 —— 渲染进程不许直接发网络请求,这是本项目的铁律。
-// 源队列(2026-09-17 小葵定序):Tavily(用户自己填了 Key 才上场)→ DuckDuckGo 免注册
+// 只在主进程用 —— 渲染进程不许直接发网络请求,这是本项目的硬约束。
+// 源队列(2026-09-17 产品定序):Tavily(用户自己填了 Key 才启用)→ DuckDuckGo 免注册
 // HTML(免 Key,但非官方承诺,页面结构可能变)→ 中文维基 → 英文维基 —— 真搜索引擎
 // 优先,百科垫底。Tavily 是官方 API 合同(免费档每月 1000 次),Key 存用户配置文件,
 // 绝不写进代码。都查不到就返回空串,调用方回退本地推测,绝不报错炸掉。
@@ -147,7 +147,7 @@ export interface WebSearchHit {
   source: string
 }
 
-// ── Tavily 源(2026-09-17 小葵拍板接进队首):官方 API,免费档每月 1000 次,Key 用户自备 ──
+// ── Tavily 源(2026-09-17 产品裁定接进队首):官方 API,免费档每月 1000 次,Key 用户自备 ──
 
 /** Tavily 搜索的官方入口(写死,不跟别的源混) */
 export const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
@@ -194,7 +194,7 @@ async function searchTavilyHits(
   return parseTavilyResults(raw)
 }
 
-// ── Key 体检(2026-09-17 小葵拍板):设置里点「测一下」,真打一次官方接口验货 ──
+// ── Key 体检(2026-09-17 产品裁定):设置里点「测一下」,真打一次官方接口验货 ──
 // 2026-09-17 二次改造(小葵提议):从实搜一次改打 /usage —— 零搜索额度成本,
 // 200 本身就证明 Key 有效,还白送本月用量;真搜索通不通,平时聊天调 web_search 立见分晓。
 
@@ -218,7 +218,7 @@ export async function probeTavilyKey(
   } catch (err) {
     if (err instanceof HttpStatusError)
       return { verdict: tavilyVerdictFromStatus(err.status), status: err.status }
-    // 超时/断网/DNS 不通/代理撂挑子:不是 Key 的锅,老实说「没连上」
+    // 超时/断网/DNS 不通/代理失败:不是 Key 的问题,老实说「没连上」
     return { verdict: 'unreachable' }
   }
 }
@@ -226,7 +226,7 @@ export async function probeTavilyKey(
 /**
  * 维基命中的相关性把关(纯函数,自测覆盖):维基搜索是字面检索,操作性/组合
  * 问题常配回一堆弱关联条目(问「永结无间 卸载残留」给你 WhatsApp 和糖果传奇),
- * 而按序兜底的链条一看「有结果」就收工,真正能答的真搜索引擎轮不上场。把关
+ * 而按序兜底的链条一看「有结果」就收工,真正能答的真搜索引擎轮不到。把关
  * 规则:查询按空格切段(≥2 字才算数),任何一段在任一命中的标题或摘要里出现
  * 才算相关 —— 一段都对不上就当没查到,让后面的源接手。
  * 只把关维基,不过问 DDG:DDG 是真搜索引擎,自带错别字纠错和相关性排序
@@ -309,7 +309,7 @@ async function searchDuckDuckGoHits(
 }
 
 /**
- * 搜索器,按序兜底(2026-09-17 小葵定序):Tavily(填了 Key 才上场)→ DuckDuckGo →
+ * 搜索器,按序兜底(2026-09-17 产品定序):Tavily(填了 Key 才启用)→ DuckDuckGo →
  * 维基中文 → 维基英文 —— 真搜索引擎优先(操作题、新鲜事、概念全能接),百科垫底
  * (维基的干净摘要只在前面全灭时兜)。全都失败/为空返回 []
  */
@@ -397,7 +397,7 @@ export function htmlToText(html: string): string {
   return stripHtmlTags(noBlocks)
 }
 
-/** web_search 抓正文的家数与每家字数:摘要清单为主(优先看标题),正文只抓第一条、裁到 500 字垫底 —— 锅小,别让大坨网页正文挤掉正经资料 */
+/** web_search 抓正文的家数与每家字数:摘要清单为主(优先看标题),正文只抓第一条、裁到 500 字垫底 —— 上下文偏小,别让大段网页正文挤掉有效资料 */
 export const WEB_SEARCH_PAGE_COUNT = 1
 export const WEB_PAGE_TEXT_MAX_CHARS = 500
 
@@ -412,7 +412,7 @@ export async function fetchPageText(
   return htmlToText(html).slice(0, maxChars)
 }
 
-/** 联网搜索的战果缓存:同一个搜索词这场会话只搜一次(讲解查询和 web_search 共用一本账) */
+/** 联网搜索的战果缓存:同一个搜索词这场会话只搜一次(讲解查询和 web_search 共用同一数据源) */
 const webSearchCache = new Map<string, WebLookupOutcome>()
 
 /**

@@ -5,7 +5,7 @@ import { sniffImage } from '@shared/imageMeta'
 import { IMAGE_PREVIEW_MAX_BYTES } from '@shared/preview'
 
 /**
- * 待发图片的小账本(第一百五十二锤):四个入口(「+」菜单选文件、剪贴板粘贴、
+ * 待发图片的小状态表(第一百五十二批):四个入口(「+」菜单选文件、剪贴板粘贴、
  * 从系统拖文件进来、从文件树拖图片进来)都汇到 addFiles —— 同一份校验口径:只收 JPG/PNG(魔数验,不认后缀)、
  * 单张不超上限、最多 3 张;收进来的先压长边到 1024 再入账(保持原格式)。
  * 能力闸:纯文本模型一律拒收并垫灰字;能力中途变成纯文本时,待发图片自动清掉并报一声。
@@ -86,7 +86,7 @@ export function useChatImages(
   const visionRef = useRef(vision)
   const noteRef = useRef(note)
   const imagesRef = useRef(images)
-  // ref 只能在渲染外更新(React 规矩):账本会话内顺手镜像,addFiles/清账都读 ref 不看旧快照
+  // ref 只能在渲染外更新(React 规矩):状态表会话内顺手镜像,addFiles/清账都读 ref 不看旧快照
   useEffect(() => {
     visionRef.current = vision
     noteRef.current = note
@@ -122,7 +122,7 @@ export function useChatImages(
     }
   }
 
-  /** 文件树拖来的图片:readPreview 读盘验身份(谢客线/越界/错误话术全复用它), 图片数据转成标准 File 再汇进 addFiles */
+  /** 文件树拖来的图片:readPreview 读盘验身份(拒绝路径/越界/错误话术全复用它), 图片数据转成标准 File 再汇进 addFiles */
   async function addFromRelPath(rootPath: string, relPath: string): Promise<void> {
     const gateNow = imageGate(visionRef.current, 1)
     if (!gateNow.allow) {

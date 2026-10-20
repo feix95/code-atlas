@@ -1,12 +1,12 @@
-// 会话级附件户口本(滑跪案这锤):原文留不起(小锅),但「本会话收过哪些文件附件、
+// 会话级附件登记表(附件追问本批):原文留不起(上下文预算紧),但「本会话收过哪些文件附件、
 // 带到的哪段、重读/续读走哪条路」留得起 —— 每轮组装时垫成一张 program_note,
 // 「你读完了吗/接着读完它」就有据可答。
 // 对齐 Claude Code 的 file-already-in-context(原文一直留在对话里),按我们的体型
-// 缩水成纸条:只说事实(当时带了什么),不替模型下结论(读了没由它照实盘点)。
+// 缩水成注记:只说事实(当时带了什么),不替模型下结论(读了没由它照实盘点)。
 // 纯内存、不落盘(「不写入无意义缓存」契约),按会话编号分账,关应用即失效。
 import { TAG } from '../shared/promptTags.ts'
 
-/** 一张附件纸条:名字 + 当时的行账 + 重读/续读的路(钥匙或相对路径) */
+/** 一张附件注记:名字 + 当时的行账 + 重读/续读的路(钥匙或相对路径) */
 export interface AttachedFileMemo {
   name: string
   /** 项目内相对路径(文件树拖入的才有) */
@@ -21,15 +21,15 @@ export interface AttachedFileMemo {
 
 export interface ChatFileMemoStore {
   peek: (conversationId: string) => readonly AttachedFileMemo[]
-  /** 新带的文件记账(空清单不动账:没带附件的轮不清旧纸条) */
+  /** 新带的文件记账(空清单不动账:没带附件的轮不清旧注记) */
   update: (conversationId: string, items: readonly AttachedFileMemo[]) => void
   clear: (conversationId: string) => void
 }
 
-/** 单个会话最多留几张纸条:再往回的文件基本没人追 */
+/** 单个会话最多留几张注记:再往回的文件基本没人追 */
 export const FILE_MEMO_MAX = 3
 
-/** 一张纸条的洗形(纯函数,自测覆盖):名字空/行账烂的整条丢;钥匙只认格式,路径只认规矩 */
+/** 一张注记的洗形(纯函数,自测覆盖):名字空/行账烂的整条丢;钥匙只认格式,路径只认规矩 */
 export function sanitizeFileMemo(raw: unknown): AttachedFileMemo | null {
   if (typeof raw !== 'object' || raw === null) return null
   const o = raw as Record<string, unknown>
@@ -67,7 +67,7 @@ export function createChatFileMemoStore(
         if (clean) fresh.push(clean)
       }
       if (fresh.length === 0) return
-      // 同名文件以最新一轮为准:新纸条顶掉旧同名,再按「最近在前」封顶
+      // 同名文件以最新一轮为准:新注记顶掉旧同名,再按「最近在前」封顶
       const kept = (sessions.get(conversationId) ?? []).filter(
         (old) => !fresh.some((f) => f.name === old.name)
       )
@@ -84,7 +84,7 @@ export function createChatFileMemoStore(
   }
 }
 
-/** 纸条 → 垫给模型的 program_note(纯函数,自测覆盖);没纸条回 null,不垫空话 */
+/** 注记 → 垫给模型的 program_note(纯函数,自测覆盖);没注记回 null,不垫空话 */
 export function buildFileMemoNote(memo: readonly AttachedFileMemo[]): string | null {
   if (memo.length === 0) return null
   const lines = memo.map((f, i) => {

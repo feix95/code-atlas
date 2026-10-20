@@ -1,5 +1,5 @@
-// 上下文档位账本的自测:GGUF 档案头解析(该抓的抓/该跳的跳/坏账认得清)、
-// 黑板精算与粗估、账单各档位的人话结论 —— 账本报错一个数,用户就被骗着塞爆一次内存。
+// 上下文档位状态表的自测:GGUF 档案头解析(该抓的抓/该跳的跳/坏账认得清)、
+// 黑板精算与粗估、账单各档位的人话结论 —— 状态表报错一个数,用户就被骗着塞爆一次内存。
 // 纯函数 + 内存里手搓的迷你 GGUF 头,不碰任何真文件。
 import assert from 'node:assert/strict'
 import { parseGgufHeader } from '../src/shared/gguf.ts'
@@ -171,9 +171,9 @@ function main(): void {
   )
   assert.equal(mixed.status, 'ok')
   if (mixed.status !== 'ok') throw new Error('unreachable')
-  assert.equal(mixed.shape.contextLength, 131072, '户口页点名谁就读谁的键')
+  assert.equal(mixed.shape.contextLength, 131072, '登记页点名谁就读谁的键')
   assert.equal(mixed.shape.blockCount, 48)
-  // 没写户口页的:用前缀里字段最全的那份推断
+  // 没写登记页的:用前缀里字段最全的那份推断
   const noArch = parseGgufHeader(
     new GgufBuilder().u32('mamba.context_length', 2048).u32('mamba.block_count', 24).build()
   )
@@ -202,7 +202,7 @@ function main(): void {
   assert.equal(kvBytesFromShape(8192, { ...FULL_SHAPE, headCount: null }), null, '档案缺条目算不出')
   assert.equal(kvBytesFromShape(Number.NaN, FULL_SHAPE), null, 'NaN 不算账')
 
-  // ── 4. 粗估兜底(和量尺同一套分档,老断言搬家过来) ──
+  // ── 4. 粗估兜底(和适配估算同一套分档,老断言迁移过来) ──
   assert.equal(estimateKvBytes(4096, 14.26 * GB), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
   assert.equal(estimateKvBytes(4096, 6 * GB), 4096 * 128 * 1024, '4~8GB 减半')
   assert.equal(estimateKvBytes(4096, 2 * GB), 4096 * 64 * 1024, '<4GB 再减半')
@@ -232,7 +232,7 @@ function main(): void {
     'unknown',
     '没模型没法算账'
   )
-  assert.equal(bill({}).startsWith('按 8192 tokens 算:'), true, '手动档开头报账基数')
+  assert.equal(bill({}).startsWith('按 8192 tokens 算:'), true, '手动档开头记账基数')
   assert.ok(bill({}).includes('照模型结构精算'), '有档案就说明是精算')
   assert.ok(bill({}).includes('整个进显卡'), '绰绰有余就报稳')
   const tight = formatContextBill({

@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron } from 'playwright'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const base = join(root, '.planning', 'journey')
+// 测试产物不写仓库: 默认系统临时目录, AI 验收时用 CODE_ATLAS_TMP 指到共享 tmp。
+const tempRoot = process.env.CODE_ATLAS_TMP ?? tmpdir()
+const base = join(tempRoot, 'code-atlas-journey')
 await mkdir(base, { recursive: true })
 const run = await mkdtemp(join(base, 'run-'))
 for (const name of [
@@ -28,7 +31,7 @@ await writeFile(
   '# Sample project\nThis application helps organize tasks.\n'
 )
 await writeFile(join(project, 'src/main.ts'), 'export const start = () => 1\n')
-// 表格 + hr 是 Live Preview 块级装饰的户口 —— 缺了它们,块装饰禁令的崩网在 journey 里探不到
+// 表格 + hr 是 Live Preview 块级装饰的登记 —— 缺了它们,块装饰禁令的覆盖缺口在 journey 里探不到
 await writeFile(
   join(project, 'docs/guide.md'),
   '# Getting started\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n'
@@ -139,7 +142,7 @@ try {
   assert.equal(electron.windows().length, 1, 'Development entry must not open a bubble')
   await shot('home')
   // 界面缩放键盘档(网页惯例,文档缩放改版):Ctrl+= 放大一档(105%),Ctrl+0 归 100%;
-  // 落盘走 setUiScale 原路。Ctrl+滚轮的户口已让给文档字号(docZoom),预览处实测见后文。
+  // 落盘走 setUiScale 原路。Ctrl+滚轮的登记已让给文档字号(docZoom),预览处实测见后文。
   await page.keyboard.down('Control')
   await page.keyboard.press('=')
   await page.keyboard.up('Control')
@@ -150,7 +153,7 @@ try {
   await page.keyboard.up('Control')
   await page.waitForFunction(() => document.documentElement.style.fontSize === '16px')
   // UI v3(B8):侧栏「这台电脑」可下钻——单击盘符/目录原地展开(懒加载纯浏览),
-  // 单击文件开「瞄一眼」预览签(scopeRoot=盘根,不进工作区账本),双击盘根开为工作区
+  // 单击文件开「瞄一眼」预览签(scopeRoot=盘根,不进工作区状态表),双击盘根开为工作区
   const firstDrive = page.locator('.tree > .tree-branch > .tree-row.is-dir .tree-main').first()
   await firstDrive.click()
   const winBranch = page
@@ -169,8 +172,8 @@ try {
     .filter({ has: page.locator('.tabbar-name').getByText(peekName, { exact: true }) })
   await peekTab.waitFor()
   assert.equal(await peekTab.count(), 1, 'browse file must open a peek preview tab')
-  // 文档缩放(文档字号这锤):Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
-  // 量 .cm-content 的 computed font-size(编辑锤:正文户口搬进了 CodeMirror,旧 .code-text 退役)
+  // 文档缩放(文档字号本批):Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
+  // 量 .cm-content 的 computed font-size(编辑批次:正文登记搬进了 CodeMirror,旧 .code-text 退役)
   // —— --doc-zoom 乘进去的就是它,真账不量 CSS 变量
   const codeView = page.locator('.code-view').first()
   const codeText = codeView.locator('.cm-content').first()
@@ -245,7 +248,7 @@ try {
     'double-clicked drive must become the workspace root'
   )
   await open(project)
-  // 页签改版(小葵拍板):树里点文件 = 开绑死它的文件签 —— 一文件一张,
+  // 页签改版(产品裁定):树里点文件 = 开绑死它的文件签 —— 一文件一张,
   // 重开同一文件只激活不生第二张;点文件夹只选中不开签;已有页签一概不动
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   await page
@@ -278,7 +281,7 @@ try {
     'clicking a folder must not open a tab'
   )
   // 选项区开关(只读):代码文件的菜单只有「只读/自动换行」,没有 md 才有的「排版显示」;
-  // 点开关不收摊、状态当场翻面,页头锁钮同步,锁住后键入被拒收;再点一次解锁(不留状态给后面的步骤)
+  // 点开关不关闭、状态当场翻面,页头锁钮同步,锁住后键入被拒收;再点一次解锁(不留状态给后面的步骤)
   const lockTab = page
     .locator('.tabbar-tab')
     .filter({ has: page.locator('.tabbar-name').getByText('package.json', { exact: true }) })
@@ -307,7 +310,7 @@ try {
     lockedText,
     'a read-only tab must reject typing'
   )
-  // 全局账验证:锁是在 package.json 签上拨的,别的签读数跟着翻 ——
+  // 全局偏好验证:锁是在 package.json 签上拨的,别的签读数跟着翻 ——
   // README 签菜单里「只读」已开,正文页头锁钮也是锁态(右键不激活签,正文断言前先点回)
   const readmeTab = page
     .locator('.tabbar-tab')
@@ -341,8 +344,8 @@ try {
     editableText,
     'an unlocked tab must accept typing'
   )
-  // 页签撕窗(M1):右键「移到新窗口」= 签撕去同进程子窗 —— 子窗带自绘标题栏和
-  // 自己的页签带,主窗名下签数减一;关子窗连签销户(Chrome 语义),窗数回原
+  // 页签拆出独立窗口(M1):右键「移到新窗口」= 签拆去同进程子窗 —— 子窗带自绘标题栏和
+  // 自己的页签带,主窗名下签数减一;关子窗连带关闭并清理该签(Chrome 语义),窗数回原
   const tearTab = page
     .locator('.tabbar-tab')
     .filter({ has: page.locator('.tabbar-name').getByText('package.json', { exact: true }) })
@@ -363,7 +366,7 @@ try {
   // 里渲染的 Portal 子树;这条断了,子窗里所有交互都是死的
   await auxPage.locator('.tabbar-tab').first().click()
   await auxPage.locator('.tabbar-tab.is-active').waitFor({ timeout: 5_000 })
-  // 关子窗(标题栏 × 经主 realm 代发 IPC):连签销户,窗数回原。
+  // 关子窗(标题栏 × 经主 realm 代发 IPC):连带关闭并清理该签,窗数回原。
   // close 事件要先挂上再点 —— 窗关得快,点后挂监听会扑空
   await Promise.all([
     auxPage.waitForEvent('close', { timeout: 8_000 }),
@@ -385,8 +388,8 @@ try {
     'non-tree icons must not use the colored tint class'
   )
   await shot('tree-notes')
-  // 悬停轻提示(全场唯一户口):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
-  // 统一从树区右缘(sash 拖杆线)弹出,不压上下行的字;鼠标一走气泡收摊
+  // 悬停轻提示(全场唯一登记):树行小灰字退役 → 摘要挪进 #2c2c2c 圆角气泡,
+  // 统一从树区右缘(sash 拖杆线)弹出,不压上下行的字;鼠标一走气泡关闭
   const tipRow = page.locator('.tree:not(.search-results) .tree-main[data-tip]').first()
   // 窗口拉宽保证右侧摆得下:窄窗翻面是正当行为,这里要锁的是「右缘(sash 线)出」
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -410,7 +413,7 @@ try {
     0,
     'tree rows must not render gray annotation text'
   )
-  // 备注(锤一):树上右键 → 写备注就地长输入框 → 回车保存 → 悬停提示只显示备注正文;
+  // 备注(第一批):树上右键 → 写备注就地长输入框 → 回车保存 → 悬停提示只显示备注正文;
   // 清除备注后,悬停提示自动恢复引擎摘要
   const noteTarget = page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' })
   const summaryTip = await noteTarget.getAttribute('data-tip')
@@ -457,7 +460,7 @@ try {
     summaryTip,
     'summary tip must come back after removing the note'
   )
-  // UI v3(B5):workspace 卡 ⇅ 菜单——浮层成行、↓ 键盘高亮、行首 pin 两态、Esc 收摊
+  // UI v3(B5):workspace 卡 ⇅ 菜单——浮层成行、↓ 键盘高亮、行首 pin 两态、Esc 关闭
   await page.getByRole('button', { name: '展开工作区菜单', exact: true }).click()
   await page.locator('.ws-menu').waitFor()
   const menuRow = page.locator('.ws-menu .wsm-row').first()
@@ -482,7 +485,7 @@ try {
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
   await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
-  // md 系文件签默认 Live Preview(md 三档锤):容器是 .cm-editor,上妆后标题记号藏起只剩大字;
+  // md 系文件签默认 Live Preview(md 三档批次):容器是 .cm-editor,上妆后标题记号藏起只剩大字;
   // 块级替身也要现身(表格/hr 走 compute 出账 —— 走插件出账是 CM6 禁令,一报就崩)
   await page.locator('.cm-editor').filter({ hasText: 'Getting started' }).waitFor()
   await page.locator('.cm-live-table .md-table').waitFor()

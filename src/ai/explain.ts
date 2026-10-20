@@ -23,13 +23,13 @@ interface ChatStreamChunk {
   choices?: Array<{
     delta?: { content?: string; reasoning_content?: string; tool_calls?: ToolCallDelta[] }
   }>
-  /** llama-server timings_per_token(第八十四锤):已读提示词/已吐 token/吐字速度 */
+  /** llama-server timings_per_token(第八十四批):已读提示词/已吐 token/吐字速度 */
   timings?: { prompt_n?: number; predicted_n?: number; predicted_per_second?: number }
   /** OpenAI 习惯的收尾账(llama-server / LM Studio 都可能给) */
   usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
-/** 流式一帧里的工具调用碎片(第一百三十四锤):参数按 index 分组、arguments 逐段拼 */
+/** 流式一帧里的工具调用碎片(第一百三十四批):参数按 index 分组、arguments 逐段拼 */
 export interface ToolCallDelta {
   index?: number
   id?: string
@@ -85,7 +85,7 @@ export interface SseEvent {
  * 解析 OpenAI 流式(SSE)响应体,逐帧吐出「新增文本 + token 账」。
  * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
  * timings/usage 帧照常转发(llama-server 吐字帧里捎 timings,收尾捎 usage)。
- * 工具调用碎片照原样转发(agent 的流式循环自己按 index 拼,第一百三十四锤)。
+ * 工具调用碎片照原样转发(agent 的流式循环自己按 index 拼,第一百三十四批)。
  */
 export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<SseEvent> {
   const reader = res.body?.getReader()
@@ -93,7 +93,7 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
   const decoder = new TextDecoder()
   let buffer = ''
   let writing = false
-  // 用户取消的铃:abort 掐不掐得进读队列看引擎心情,铃是保底(第八十五锤)
+  // 用户取消的铃:abort 掐不掐得进读队列看引擎心情,铃是保底(第八十五批)
   const abortBell = new Promise<'abort'>((resolve) => {
     if (!signal) return
     if (signal.aborted) resolve('abort')
@@ -153,11 +153,11 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
   }
 }
 
-// 看门狗四档的户口都在 shared/aiDefaults.ts(AI_HEADERS/AI_BODY/AI_STREAM_FIRST_FRAME/AI_STREAM_IDLE):
-// 首帧前的耐心对齐响应头 = 两分钟(第八十五锤:30 秒静默掐读是小葵冤案的帮凶)
+// 看门狗四档的登记都在 shared/aiDefaults.ts(AI_HEADERS/AI_BODY/AI_STREAM_FIRST_FRAME/AI_STREAM_IDLE):
+// 首帧前的耐心对齐响应头 = 两分钟(第八十五批:30 秒静默掐读是小葵冤案的帮凶)
 
 /**
- * 把回复里的思考区拆出来(纯函数,自测覆盖,第一百一十五锤)。
+ * 把回复里的思考区拆出来(纯函数,自测覆盖,第一百一十五批)。
  * 有的服务把思考装进单独的 reasoning_content 字段(llama-server 就这样);有的直接把
  * <think>…</think> 掺在正文里(LM Studio 的部分后端)。后者在这里拆干净:
  * 有收尾标签 → 标签里是思考、后面是正文;没写收尾(半截话/字数烧尽)→ 全算思考。
@@ -204,7 +204,7 @@ export function timeoutText(): string {
  * 一旦没动静立刻掐断 —— 绝不无限挂死,也不把慢模型的正常输出拦腰砍断。
  * signal = 外部取消(用户换了讲解目标):立刻掐,不让过气的生成占着模型排队。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
- * 第八十七锤:所有模型请求都过这一道 —— 起止都在后台日志里报账(只记元数据:
+ * 第八十七批:所有模型请求都过这一道 —— 起止都在后台日志里记账(只记元数据:
  * 消息条数、提示词字数、token 账、耗时,问题内容一个字不落账)。
  */
 export async function explainWithMessages(
@@ -215,7 +215,7 @@ export async function explainWithMessages(
   maxTokens = 500,
   opts?: {
     allowThinking?: boolean
-    /** 复读机重答前的收尾令(第一百四十三锤):聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void
+    /** 复读机重答前的收尾令(第一百四十三批):聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void
   }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
@@ -226,7 +226,7 @@ export async function explainWithMessages(
     `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}${opts?.allowThinking ? ' · 思考模式' : ''}`
   )
   let result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
-  // 复读机保险丝(第一百四十三锤):模型嘴皮子抽筋了 —— 发收尾令收回已吐的字,重答一遍;
+  // 复读机保险丝(第一百四十三批):模型嘴皮子抽筋了 —— 发收尾令收回已吐的字,重答一遍;
   // 重答还犯就截到打转起点,附注脚交卷,绝不把一屏望不到头的循环原样递给用户
   if (result.repetitionDetected) {
     addDevLog('request', '复读机警报:回答在原地打转,掐掉重说一遍')
@@ -283,18 +283,18 @@ async function explainWithMessagesCore(
         model: config.model,
         messages,
         temperature: CHAT_TEMPERATURE,
-        // 反重复采样(第一百四十三锤):复读机防线的引擎侧闸门,只对内置引擎发 ——
+        // 反重复采样(第一百四十三批):复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),
         max_tokens: maxTokens,
         stream: Boolean(onDelta),
-        // 思考开关(第一百一十五锤):只对内置引擎发 —— 它认 chat_template_kwargs,
+        // 思考开关(第一百一十五批):只对内置引擎发 —— 它认 chat_template_kwargs,
         // 能让思考型模型(Qwen3.5 这类)跳过 <think> 直接答题;外接服务不认识这个
         // 字段,有的还会报错,所以外接的一律不塞,思考与否由它们自己的设置管
         ...(!opts?.allowThinking && config.timings
           ? { chat_template_kwargs: { enable_thinking: false } }
           : {}),
-        // 内置引擎(llama-server)才塞的旗子(第八十四锤):流里报 token 账,预处理进度看得见。
+        // 内置引擎(llama-server)才塞的旗子(第八十四批):流里报 token 账,预处理进度看得见。
         // 外接服务不认识这些字段,不塞,行为一分不变
         ...(config.timings
           ? { timings_per_token: true, stream_options: { include_usage: true } }
@@ -352,7 +352,7 @@ async function explainWithMessagesCore(
           usage
         }
       }
-      // 非流式没有逐帧监工的机会,交卷前整篇查一次尾巴(第一百四十三锤):犯没犯都由上层定夺
+      // 非流式没有逐帧监工的机会,交卷前整篇查一次尾巴(第一百四十三批):犯没犯都由上层定夺
       return {
         status: 'supported',
         text: content,
@@ -367,7 +367,7 @@ async function explainWithMessagesCore(
     // 流式:逐帧喂给 onDelta(正文 + 思考 + token 账),全文攒到最后一起返回。
     // 「没动静」的看守交棒给 sseEvents 自己(首帧/帧间两档);用户取消也由它插铃保底
     let lastStats: AiStreamStats | undefined
-    // 复读机监工(第一百四十三锤):尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
+    // 复读机监工(第一百四十三批):尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
     let looped = false
     for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
@@ -411,7 +411,7 @@ async function explainWithMessagesCore(
     full = streamSplit.answer
     if (!full.trim()) {
       if (reasoningFull) {
-        // 只想了没写出来:思考照实交(界面会折叠展示),别把锅甩给上下文
+        // 只想了没写出来:思考照实交(界面会折叠展示),别把失败归咎给上下文不足
         return {
           status: 'supported',
           text: reasoningFull,
@@ -439,7 +439,7 @@ async function explainWithMessagesCore(
       repetitionDetected: looped
     }
   } catch (err) {
-    // 第八十五锤:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
+    // 第八十五批:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
     const isAbort = err instanceof Error && err.name === 'AbortError'
     const idle = err instanceof StreamIdleError ? err : null
     const userCancelled = signal?.aborted === true

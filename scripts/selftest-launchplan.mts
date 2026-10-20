@@ -74,7 +74,7 @@ function main(): void {
   assert.equal(plan.estimate.verdict, 'ok', '8GB 模型 16GB 卡装得下')
   assert.equal(plan.rung, 0)
 
-  // ── 2. args 铁律:auto 绝不出 -ngl,显式层数才出 ──
+  // ── 2. args 硬约束:auto 绝不出 -ngl,显式层数才出 ──
   assert.ok(!plan.args.includes('-ngl'), 'auto 层数不出 -ngl(--fit 靠缺省生效)')
   const forced = planLaunch(baseInput({ overrides: { gpuLayers: 20 } }))
   assert.deepEqual(
@@ -161,7 +161,7 @@ function main(): void {
   const noGpuBig = planLaunch(baseInput({ machine: NO_GPU, modelBytes: 30 * GB }))
   assert.equal(noGpuBig.estimate.verdict, 'too-big', '30GB 模型 32GB 内存装不下')
 
-  // ── 7. AMD 卡走同一本账(vendor 不当门槛) ──
+  // ── 7. AMD 卡走同同一数据源(vendor 不当门槛) ──
   const amd = planLaunch(
     baseInput({
       machine: { ...M8, gpuName: 'AMD Radeon RX 7800 XT', gpuVendor: 'amd' },
@@ -228,7 +228,7 @@ function main(): void {
   assert.notEqual(
     bookkeepingContextSize(16384),
     t3.params.contextSize,
-    '账本键与用户档一致,不许记成计划降后的数'
+    '状态表键与用户档一致,不许记成计划降后的数'
   )
   assert.equal(t3.params.contextSize, 8192, '上面这个计划确实降过档')
 

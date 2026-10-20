@@ -1,9 +1,9 @@
-// 后台日志账本(第八十七锤,Developer 日志窗口的库房)。
-// 纯模块:不 import electron —— 主进程、AI 模块、自测脚本都从这里进同一本账。
+// 后台日志状态表(第八十七批,Developer 日志窗口的库房)。
+// 纯模块:不 import electron —— 主进程、AI 模块、自测脚本都从这里进同同一数据源。
 // 只是个环形缓冲,进程退出就清空,不落盘 —— 后台日志是给现场排障用的,不是档案。
 import type { DevLogEntry, DevLogSource } from './types.ts'
 
-/** 账本容量:llama-server 加载一个大模型能吐几百行,留 2000 条足够回溯 */
+/** 状态表容量:llama-server 加载一个大模型能吐几百行,留 2000 条足够回溯 */
 export const DEVLOG_MAX = 2000
 
 /** 单条上限:llama.cpp 的进度条用回车刷屏,一行能拖出去老长,掐头留尾 */
@@ -29,7 +29,7 @@ export function splitDevLogLines(chunk: string): string[] {
 export interface DevLogRing {
   /** 现在账上有多少条 */
   count(): number
-  /** 全部存档,按记账顺序(旧→新);给出去的是拷贝,外面改不动账本 */
+  /** 全部存档,按记账顺序(旧→新);给出去的是拷贝,外面改不动状态表 */
   snapshot(): DevLogEntry[]
   /** 记一笔(自动按行拆);每记一条都喊一声监听者 */
   add(source: DevLogSource, text: string): void
@@ -60,7 +60,7 @@ export function createDevLogRing(max = DEVLOG_MAX): DevLogRing {
 /** 新条目监听者:主进程注册广播员,每记一笔就往日志窗口推一条 */
 let onAdd: ((entry: DevLogEntry) => void) | null = null
 
-/** 全局一本账:整个 app 就这一份后台日志 */
+/** 全局同一数据源:整个 app 就这一份后台日志 */
 const theLedger = createDevLogRing()
 
 /** 主进程注册广播员(先前的不再喊);返回注销函数 */
@@ -71,7 +71,7 @@ export function setDevLogListener(fn: ((entry: DevLogEntry) => void) | null): ()
   }
 }
 
-/** 记一笔后台日志(全局账本入口) */
+/** 记一笔后台日志(全局状态入口) */
 export function addDevLog(source: DevLogSource, text: string): void {
   theLedger.add(source, text)
 }

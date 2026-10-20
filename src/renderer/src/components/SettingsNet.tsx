@@ -44,7 +44,7 @@ export function SettingsNet({
               </button>
             </CfgRow>
             <div className="cfg-divider" />
-            {/* Tavily 搜索 Key(可选,2026-09-17 小葵拍板):填了源队列 Tavily 打头,不填走免费链。
+            {/* Tavily 搜索 Key(可选,2026-09-17 产品裁定):填了源队列 Tavily 打头,不填走免费链。
                 眼睛、体检、黄字提醒都住在 TavilyKeyField 里 */}
             <TavilyKeyField
               value={config.tavilyKey ?? ''}

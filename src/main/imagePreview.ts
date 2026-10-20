@@ -1,5 +1,5 @@
-// ── 图片预览支路(图片预览锤):ipcScan 的 readPreview 配套小文件 ──
-// 后缀是 JPG/PNG 的文件走这里:先谢客线,再读盘验魔数 —— 后缀可以改名冒充,
+// ── 图片预览支路(图片预览批次):ipcScan 的 readPreview 配套小文件 ──
+// 后缀是 JPG/PNG 的文件走这里:先拒绝路径,再读盘验魔数 —— 后缀可以改名冒充,
 // 字节不会撒谎;验过才回 'image',dataUrl 里的 MIME 按字节嗅出来的写。
 
 import { promises as fs } from 'node:fs'
@@ -43,7 +43,7 @@ export function imageResultFromBytes(name: string, buf: Uint8Array): FilePreview
 }
 
 /**
- * 图片支路的异步半截:谢客线 + 读盘(读盘报错沿用 accessDeniedMessage 口径)。
+ * 图片支路的异步半截:拒绝路径 + 读盘(读盘报错沿用 accessDeniedMessage 口径)。
  * absPath 必须由 joinRoot 拼好递进来 —— 这里不管路径,只管字节。
  */
 export async function readImagePreview(opts: {

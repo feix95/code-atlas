@@ -6,7 +6,7 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['node_modules', 'out', 'dist', '.planning'] },
+  { ignores: ['node_modules', 'out', 'dist'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,

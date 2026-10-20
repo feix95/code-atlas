@@ -1,5 +1,5 @@
-// Developer 后台日志自测(第八十七锤):环形账本滚动、引擎输出按行拆、超长掐中留头尾、
-// 时间话术、来源标签、监听广播 —— 账本模块是纯的,不碰 electron 直接打。
+// Developer 后台日志自测(第八十七批):环形缓冲滚动、引擎输出按行拆、超长掐中留头尾、
+// 时间话术、来源标签、监听广播 —— 状态表模块是纯的,不碰 electron 直接打。
 import assert from 'node:assert/strict'
 import {
   DEVLOG_MAX,
@@ -65,7 +65,7 @@ check('createDevLogRing:add 自动拆行编号;满 2000 丢最旧的,编号不�
   assert.ok(ring.snapshot()[4].id > ring.snapshot()[0].id, '编号单调递增')
 })
 
-check('createDevLogRing:空白行不占容量;snapshot 是拷贝,外面改不动账本', () => {
+check('createDevLogRing:空白行不占容量;snapshot 是拷贝,外面改不动状态表', () => {
   const ring = createDevLogRing(10)
   ring.add('system', '\n  \n')
   assert.equal(ring.count(), 0)
@@ -101,7 +101,7 @@ check('devLogSourceName:三个来源三个标签,不认识的落「应用」', (
   assert.equal(devLogSourceName('system'), '应用')
 })
 
-check('全局容量口径:默认账本 2000 条,llama.cpp 加载大模型也装得下', () => {
+check('全局容量口径:默认状态表 2000 条,llama.cpp 加载大模型也装得下', () => {
   assert.equal(DEVLOG_MAX, 2000)
 })
 

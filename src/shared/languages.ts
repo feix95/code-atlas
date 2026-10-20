@@ -1,4 +1,4 @@
-// 语言识别的"户口本":每种语言的名字、后缀、特殊文件名。
+// 语言识别的"登记表":每种语言的名字、后缀、特殊文件名。
 // 识别 = 后缀速查优先,认不出再读内容嗅探(见 index.ts)。
 export type LanguageCategory = 'code' | 'config' | 'style' | 'doc' | 'text'
 

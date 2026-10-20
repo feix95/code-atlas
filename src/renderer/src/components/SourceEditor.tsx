@@ -1,4 +1,4 @@
-// 源码编辑器(预览编辑锤·锤2):所有文本文件的源码档 = 一台 CodeMirror 6 编辑器。
+// 源码编辑器(预览编辑批次·第2批):所有文本文件的源码档 = 一台 CodeMirror 6 编辑器。
 // 只管一件事:把文件摊开给你改,停手 1 秒自动落盘。
 // 分色用主进程 tree-sitter 的老账(换字先让旧色跟着挪,存盘后重算换新);
 // 选区引用/直拖沿用老规矩,右键菜单同一份;跳行/折行/文档缩放照吃老开关。
@@ -19,7 +19,7 @@ import {
 } from '../editor/cmSetup'
 import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 
-/** 停手多久自动落盘(小葵拍板:约 1 秒防抖) */
+/** 停手多久自动落盘(产品裁定:约 1 秒防抖) */
 const AUTOSAVE_MS = 1000
 /** 存盘失败后的缓行重试间隔(文件被临时占用这类缓一会儿自己能好) */
 const RETRY_MS = 5000
@@ -60,7 +60,7 @@ export function SourceEditor({
   onTextChange: (text: string) => void
   /** 编辑内的 Alt+Z 扳动折行:跟页头那颗钮走同一个开关 */
   onToggleWrap: () => void
-  /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执 */
+  /** 内联标题改名通道(内联标题改名批次):递新主名进回调,拿 RenameOutcome 回执 */
   onRenameFile?: (base: string) => Promise<RenameOutcome>
   jump?: { line: number; seq: number } | null
 }): React.JSX.Element {
@@ -97,7 +97,7 @@ export function SourceEditor({
     const host = hostRef.current
     if (!host) return
     let dirty = false
-    /** 在路上的那笔保存:收摊时拿它串行接尾班,保证最后文稿盖过中间稿 */
+    /** 在路上的那笔保存:关闭时拿它串行接收尾保存,保证最后文稿盖过中间稿 */
     let inFlight: Promise<void> | null = null
     let retries = 0
     let disposed = false
@@ -182,7 +182,7 @@ export function SourceEditor({
           readOnly,
           // 内联标题(Obsidian inline title):文件名掐尾去扩展名,与阅读档 MiniMD title 同配方
           liveTitle: live ? fileBaseName(relPath.split(/[\\/]/).pop() ?? '') : undefined,
-          /* 内联标题改名通道(内联标题改名锤):改名前先把账结清 —— 在路上的保存等它落袋,
+          /* 内联标题改名通道(内联标题改名批次):改名前先把账结清 —— 在路上的保存等它落袋,
              脏文稿先落盘;不然改名后旧路径会被迟到的自动保存「复活」成第二个文件。
              存不进去就别让改(改了内存稿会丢)。重挂前的空窗期把 relPath 就地换账,
              万一这缝里又来一笔写盘,直接去新路径 */
@@ -262,7 +262,7 @@ export function SourceEditor({
               return false // 字本身的拖拽归 CM 管,咱只搭车塞暗号
             },
             onToggleWrap: () => propsRef.current.onToggleWrap(),
-            // Ctrl+S:把等着的防抖掐掉,自动保存立刻来一笔(在路上时按了也不慌,尾班接着排)
+            // Ctrl+S:把等着的防抖掐掉,自动保存立刻来一笔(在路上时按了也不慌,收尾保存接着排)
             onSaveNow: () => {
               if (timer) {
                 clearTimeout(timer)
@@ -279,7 +279,7 @@ export function SourceEditor({
     // 挂载即校一次分色:重开签/切档回来时,盘上的文稿和手里一致就给最新色
     refreshColors()
 
-    /** 尾班落盘:收摊/关窗前的最后一笔 —— 有在路的就串行接尾(最终稿盖过中间稿),没有在路的直接写 */
+    /** 收尾写盘:关闭/关窗前的最后一笔 —— 有在路的就串行接尾(最终稿盖过中间稿),没有在路的直接写 */
     const flush = (): void => {
       if (!dirty) return
       const p = propsRef.current

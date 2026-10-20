@@ -1,5 +1,5 @@
-// 翻文件模式(agent)纯逻辑的自测(第一百二十八锤):工具表、路径安检、额度、
-// 防打转的缰绳、token 总账。只测算得出来的东西 —— 真翻文件的执行手在主进程,
+// 翻文件模式(agent)纯逻辑的自测(第一百二十八批):工具表、路径安检、额度、
+// 防循环护栏、token 总账。只测算得出来的东西 —— 真翻文件的执行手在主进程,
 // 要等真模型联调;这边的每一条都是循环翻车的地基。
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   assert.equal(
     sanitizeExternalAbsPath('C:\\outside\\demo'),
     'C:\\outside\\demo',
-    '外部路径只收洗净的绝对路径'
+    '外部路径只收规范化绝对路径'
   )
   assert.equal(sanitizeAgentRootId(undefined), PROJECT_AGENT_ROOT, '不传目录编号默认项目根')
   assert.equal(sanitizeAgentRootId('external_2'), 'external_2', '临时目录编号格式放行')
@@ -101,9 +101,9 @@ async function main(): Promise<void> {
   assert.deepEqual(
     granted,
     { rootId: 'external_1', path: 'D:\\shared\\demo', kind: 'dir' },
-    '首个同意目录拿到本次运行的一号门卡'
+    '首个同意目录拿到本次运行的一号授权令牌'
   )
-  assert.deepEqual(access.grant('D:\\shared\\demo'), granted, '同一目录重复同意复用原门卡')
+  assert.deepEqual(access.grant('D:\\shared\\demo'), granted, '同一目录重复同意复用原授权令牌')
   assert.deepEqual(
     access.resolve('E:\\project', 'external_1'),
     { rootId: 'external_1', path: 'D:\\shared\\demo', external: true, kind: 'dir' },
@@ -122,31 +122,31 @@ async function main(): Promise<void> {
   )
   assert.equal(isPathInside('D:\\shared\\demo', 'C:\\Windows\\a.ts'), false, '跨盘目标不是授权范围')
 
-  // 文件门卡(拖入即授权):只发真实存在的单个文件;编号解得到,穿沙盒读得到
+  // 文件授权令牌(拖入即授权):只发真实存在的单个文件;编号解得到,穿沙盒读得到
   const grantSandbox = await mkdtemp(join(tmpdir(), 'atlas-file-grant-'))
   try {
     const notePath = join(grantSandbox, 'long-note.txt')
     await writeFile(notePath, '第一行\n第二行\n第三行\n', 'utf8')
     const realNote = await realpath(notePath)
-    assert.equal(await access.grantFile('relative\\note.txt'), null, '相对路径发不出文件门卡')
-    assert.equal(await access.grantFile(grantSandbox), null, '文件夹走目录授权那条,不发文件门卡')
+    assert.equal(await access.grantFile('relative\\note.txt'), null, '相对路径发不出文件授权令牌')
+    assert.equal(await access.grantFile(grantSandbox), null, '文件夹走目录授权那条,不发文件授权令牌')
     assert.equal(
       await access.grantFile(join(grantSandbox, 'missing.txt')),
       null,
-      '不存在的文件发不出门卡'
+      '不存在的文件发不出授权令牌'
     )
     const fileGrant = await access.grantFile(notePath)
-    assert.ok(fileGrant, '真是文件才发门卡')
+    assert.ok(fileGrant, '真是文件才发授权令牌')
     assert.deepEqual(
       fileGrant,
       { rootId: 'external_2', path: realNote, kind: 'file' },
-      '门卡记的是 realpath 后的绝对路径'
+      '授权令牌记的是 realpath 后的绝对路径'
     )
-    assert.deepEqual(await access.grantFile(notePath), fileGrant, '同一文件重复授权复用原门卡')
+    assert.deepEqual(await access.grantFile(notePath), fileGrant, '同一文件重复授权复用原授权令牌')
     assert.deepEqual(
       access.resolve('E:\\project', 'external_2'),
       { rootId: 'external_2', path: realNote, external: true, kind: 'file' },
-      '文件门卡编号只解到那份文件'
+      '文件授权令牌编号只解到那份文件'
     )
     assert.equal(
       await joinAuthorizedRoot(realNote, ''),
@@ -159,11 +159,11 @@ async function main(): Promise<void> {
     await rm(grantSandbox, { recursive: true, force: true })
   }
 
-  // ── 2. 读文件额度:看锅下菜,穷有底富有顶(第一百三十七锤放宽一档,压缩接客) ──
-  assert.equal(agentReadChars(4096), 2000, '小锅触底:一段也保 2000 字')
-  assert.equal(agentReadChars(16384), 5461, '16384 的锅读约 5461 字')
-  assert.equal(agentReadChars(32768), 10922, '32768 的锅读约 10922 字')
-  assert.equal(agentReadChars(65536), 12000, '大锅封顶:最多 12000 字')
+  // ── 2. 读文件额度:按上下文窗口缩放,有下限有上限(第一百三十七批放宽一档,压缩接客) ──
+  assert.equal(agentReadChars(4096), 2000, '小上下文达下限:一段也保 2000 字')
+  assert.equal(agentReadChars(16384), 5461, '16384 token 上下文读约 5461 字')
+  assert.equal(agentReadChars(32768), 10922, '32768 token 上下文读约 10922 字')
+  assert.equal(agentReadChars(65536), 12000, '大上下文封顶:最多 12000 字')
 
   // ── 3. 工具参数清洗:arguments 是字符串 JSON、直接对象、坏账三种都接得住 ──
   assert.deepEqual(parseToolArgs('{"relPath":"src"}'), { relPath: 'src' }, '字符串 JSON 解析')
@@ -209,18 +209,18 @@ async function main(): Promise<void> {
 
   // 工具名总账(shared/agentTools):名单、词表、认名闸三样互相对得上 —— 多一件少一件当场拦
   const registered = Object.values(TOOL_NAMES)
-  assert.equal(registered.length, 5, '户口本登记五件工具')
+  assert.equal(registered.length, 5, '登记表登记五件工具')
   assert.deepEqual(
     AGENT_TOOLS.map((t) => t.function.name).sort(),
     [...registered].sort(),
-    '发给模型的工具表全部出自户口本'
+    '发给模型的工具表全部出自登记表'
   )
   assert.deepEqual(
     Object.keys(TOOL_STEP_WORDS).sort(),
     [...registered].sort(),
-    '播报词表和户口本同一份名单'
+    '播报词表和登记表同一份名单'
   )
-  for (const name of registered) assert.equal(asToolName(name), name, `户口本能认出 ${name}`)
+  for (const name of registered) assert.equal(asToolName(name), name, `登记表能认出 ${name}`)
   assert.equal(asToolName('delete_file'), null, '不认识的工具名拒收(写文件工具不存在)')
   assert.equal(asToolName(''), null, '空名拒收')
 
@@ -303,7 +303,7 @@ async function main(): Promise<void> {
   assert.deepEqual(mergeUsage(undefined, { promptTokens: 9 }), { promptTokens: 9 }, '空账并入实账')
   assert.equal(mergeUsage(undefined, undefined), undefined, '两轮都没账就是没账')
 
-  // ── 9. 缰绳的数:轮数封顶、名单封顶、搜索封顶、守则垫在人设后 ──
+  // ── 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后 ──
   assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 12, '轮数封顶得是个讲道理的数')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
@@ -318,9 +318,9 @@ async function main(): Promise<void> {
     '切片要交代项目内用相对路径、项目外先申请'
   )
   assert.ok(AGENT_FILES_ADDENDUM.includes('search_content'), '切片要教模型用搜索找内容')
-  assert.equal(AGENT_REMINDER_MIN_TOOL_CALLS, 3, '提醒卡缰绳门槛:本场工具调用满 3 次才垫卡')
+  assert.equal(AGENT_REMINDER_MIN_TOOL_CALLS, 3, '提醒卡触发门槛:本场工具调用满 3 次才垫卡')
 
-  // ── 10. 流式工具调用碎片的拼装(第一百三十四锤):参数逐段续、多调用按 index 分组 ──
+  // ── 10. 流式工具调用碎片的拼装(第一百三十四批):参数逐段续、多调用按 index 分组 ──
   const assembled = assembleToolCalls([
     { index: 0, id: 'call_a', function: { name: 'list_files', arguments: '' } },
     { index: 0, function: { arguments: '{"relPath":"s' } },
@@ -340,7 +340,7 @@ async function main(): Promise<void> {
   const [noArgs] = assembleToolCalls([{ index: 0, id: 'c', function: { name: 'list_files' } }])
   assert.equal(noArgs.args, null, '一个字参数都没给的,args 为 null 走「参数不合法」的喂回')
 
-  // ── 11. 上下文自动压缩(第一百三十七锤):锅快满时旧资料变纸条,近的留原样 ──
+  // ── 11. 上下文自动压缩(第一百三十七批):上下文将满时旧资料变注记,近的留原样 ──
   const longContent = 'A'.repeat(2000)
   const shortContent = 'B'.repeat(100)
   const conversation: AgentChatMessage[] = [
@@ -398,7 +398,7 @@ async function main(): Promise<void> {
   const budget = agentPromptBudget(16384, 2048)
   assert.ok(
     budget >= 8000 && budget <= 20000,
-    '16384 的锅扣完答案额度再打八折,警戒线是个讲道理的数'
+    '16384 token 上下文扣完答案额度再打八折,警戒线是个讲道理的数'
   )
   assert.equal(
     compressAgentMessages(conversation, Number.MAX_SAFE_INTEGER),
@@ -407,12 +407,12 @@ async function main(): Promise<void> {
   )
   const squeezed = compressAgentMessages(conversation, 100)
   assert.ok(squeezed, '超了预算:要动手压缩')
-  assert.equal(squeezed!.compressedCount, 2, '四条工具结果里,两条长的旧账压成纸条')
+  assert.equal(squeezed!.compressedCount, 2, '四条工具结果里,两条长的旧账压成注记')
   assert.deepEqual(squeezed!.freedCallIds, ['c1', 'c2'], '被压的 id 上报名单,主进程好解锁重读')
   const squeezedTools = squeezed!.messages.filter((m) => m.role === 'tool')
-  assert.ok(squeezedTools[0].content.includes('占位纸条'), '旧账第一条换成了纸条')
-  assert.ok(squeezedTools[0].content.includes('2000'), '纸条注明原文约多少字')
-  assert.ok(squeezedTools[1].content.includes('占位纸条'), '旧账第二条同样换成纸条')
+  assert.ok(squeezedTools[0].content.includes('占位注记'), '旧账第一条换成了注记')
+  assert.ok(squeezedTools[0].content.includes('2000'), '注记注明原文约多少字')
+  assert.ok(squeezedTools[1].content.includes('占位注记'), '旧账第二条同样换成注记')
   assert.equal(squeezedTools[2].content, longContent, '倒数第二条留原样:最新的资料模型正要用')
   assert.equal(squeezedTools[3].content, shortContent, '最新一条留原样')
   assert.deepEqual(squeezed!.messages[0], conversation[0], '人设不碰')
@@ -436,7 +436,7 @@ async function main(): Promise<void> {
     '留原样的条数得是个讲道理的数'
   )
 
-  // ── 12. 工具能力探测的判别(第一百四十锤):只认「请求被拒 + 点名工具」的错 ──
+  // ── 12. 工具能力探测的判别(第一百四十批):只认「请求被拒 + 点名工具」的错 ──
   assert.equal(
     looksLikeToolsUnsupported(400, '{"error":"tools is not supported by this model"}'),
     true,
@@ -456,7 +456,7 @@ async function main(): Promise<void> {
   assert.equal(looksLikeToolsUnsupported(500, 'tools error'), false, '500 是服务端自己呛到:不冒领')
   assert.equal(looksLikeToolsUnsupported(200, 'tools'), false, '200 根本不是错误:不认')
 
-  // ── 13. 本轮问题的提醒卡(LLM 优化锤):每轮垫、垫前撤,问题原话封顶 200 字 ──
+  // ── 13. 本轮问题的提醒卡(LLM 优化批次):每轮垫、垫前撤,问题原话封顶 200 字 ──
   const reminder = buildAgentReminder('  「忙」这个字出现在哪些文件,要具体到行号  ')
   assert.ok(reminder.startsWith(AGENT_REMINDER_PREFIX), '提醒卡带固定前缀,撤卡和兜底都靠它认')
   assert.ok(reminder.includes('「忙」这个字出现在哪些文件'), '问题原话要原样引用进卡里')
@@ -466,7 +466,7 @@ async function main(): Promise<void> {
   const clipped = buildAgentReminder(longQuestion)
   assert.ok(
     clipped.length < AGENT_REMINDER_MAX_CHARS + AGENT_REMINDER_PREFIX.length + 60,
-    '超长问题要截到封顶附近,纸条不许自己变成大坨'
+    '超长问题要截到封顶附近,注记不许自己变成大坨'
   )
   assert.ok(clipped.includes('……'), '截断处带省略号示意')
   assert.ok(
@@ -533,7 +533,7 @@ async function main(): Promise<void> {
   assert.ok(AGENT_FILES_ADDENDUM.includes('不翻第二遍'), '切片要有「不翻第二遍」的规矩')
   assert.ok(AGENT_FILES_ADDENDUM.includes('别提「工具」'), '切片要让模型说人话,别提工具')
 
-  // ── 16. web_search 的三道闸(联网锤):搜索词安检 / 内网闸 / 正文剥壳 ──
+  // ── 16. web_search 的三道闸(联网批次):搜索词安检 / 内网闸 / 正文剥壳 ──
   assert.equal(
     sanitizeWebQuery('  Claude Code\nskills 在哪  '),
     'Claude Code skills 在哪',
@@ -571,14 +571,14 @@ async function main(): Promise<void> {
   assert.equal(
     WEB_SEARCH_PAGE_COUNT,
     1,
-    'web_search 默认只抓一条正文:摘要清单为主,别让大坨正文挤锅'
+    'web_search 默认只抓一条正文:摘要清单为主,别让大段正文挤占上下文'
   )
   assert.ok(
     WEB_PAGE_TEXT_MAX_CHARS >= 400 && WEB_PAGE_TEXT_MAX_CHARS <= 800,
     '每条正文的字数是个讲道理的数(瘦身后的轻量档)'
   )
 
-  // ── 16b. 维基相关性把关(联网验收锤):弱关联垃圾不许截胡,真命中的放行 ──
+  // ── 16b. 维基相关性把关(联网验收批次):弱关联垃圾不许截胡,真命中的放行 ──
   const hit = (title: string, snippet: string): WebSearchHit => ({
     title,
     snippet,
@@ -654,7 +654,7 @@ async function main(): Promise<void> {
   assert.deepEqual(parseTavilyResults('不是 JSON'), [], '坏 JSON = 空清单,让兜底链接着走')
   assert.deepEqual(parseTavilyResults('{"results": null}'), [], 'results 缺失 = 空清单')
 
-  // ── 19. 紧急瘦身(压缩那案的兜底):爆锅时整段裁旧账,只保 system 和最新真问题 ──
+  // ── 19. 紧急瘦身(压缩那案的兜底):上下文溢出时整段裁旧账,只保 system 和最新真问题 ──
   const fat: AgentChatMessage[] = [
     { role: 'system', content: '人设' },
     { role: 'user', content: '旧问题一' },
@@ -817,13 +817,13 @@ async function main(): Promise<void> {
     '判据一的提醒要点名工具、许它说真没有'
   )
   assert.ok(SALVAGE_CITE_NUDGE.includes('具体文件'), '判据二的提醒要逼到具体文件')
-  // 纠错消息自报家门(2026-09-17 小葵定):小模型老把程序插话当用户催促,以为用户不满意让它重来
+  // 纠错消息自报家门(2026-09-17 产品定):小模型老把程序插话当用户催促,以为用户不满意让它重来
   assert.ok(SALVAGE_SEARCH_NUDGE.includes('不是用户说话'), '判据一的提醒要亮明程序身份')
   assert.ok(
     SALVAGE_CITE_NUDGE.includes('不用重新理解问题'),
     '判据二的提醒要说明只是补信息,不用重想'
   )
-  assert.ok(SALVAGE_NUDGE_MAX === 1, '补救提醒封顶一次:宁可答案差点,不让用户干等转圈')
+  assert.ok(SALVAGE_NUDGE_MAX === 1, '补救提醒封顶一次:宁可答案差点,不让用户空等循环')
 
   // ── 21. 翻文件切片的指路分工 + 工具说明瘦身后的口径(提示词体系重写第二批,逐字稿 D/L)──
   // 旧 SOP 段落(固定三步走/验货)随新稿退役:切片现在按「想干什么 → 用哪个工具」分工,
@@ -867,7 +867,7 @@ async function main(): Promise<void> {
   )
   assert.ok(blacklistedSystem.includes('翻文件开关'), '要指路输入框旁的翻文件开关')
 
-  // ── 23. 流式轮次的封板令(第一百五十一锤):边说边喊工具时,已吐的话封口保留 ──
+  // ── 23. 流式轮次的封板令(第一百五十一批):边说边喊工具时,已吐的话封口保留 ──
   // 假模型服务按问题里的 mode 出三种牌:talk = 纯说话;work = 先说话再喊工具;
   // silent = 一个字不说直接喊工具。验证:work 发封板令不发回滚,另外两种都不发
   const sealServer = createServer((req, res) => {
@@ -945,7 +945,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    '✅ agent 纯逻辑自测:路径安检 / 文件门卡(拖入即授权) / 额度 / 参数清洗 / 缰绳 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
+    '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
   )
 }
 

@@ -33,7 +33,7 @@ function pasteGridFromCell(
   return true
 }
 
-/** 每个编辑格的收摊函数(替身被拆时按户口清监听器) */
+/** 每个编辑格的清理函数(替身被拆时按登记清监听器) */
 export const cellTeardown = new WeakMap<Element, () => void>()
 
 export function attachCellEditing(view: EditorView, cell: HTMLElement, src: HTMLElement): void {
@@ -80,7 +80,7 @@ export function attachCellEditing(view: EditorView, cell: HTMLElement, src: HTML
     commit()
   })
 
-  // 光标挪位(focus/mouseup/keyup 三条路)刷新记号掀开态;blur 全收摊
+  // 光标挪位(focus/mouseup/keyup 三条路)刷新记号掀开态;blur 全部关闭
   src.addEventListener('focus', () => {
     markWidgetFocused(view)
     refreshActiveMarks(src)
@@ -122,10 +122,10 @@ export function attachCellEditing(view: EditorView, cell: HTMLElement, src: HTML
   })
 
   // CM 对 contentDOM 的 mousedown 会 preventDefault,点格外不会自然失焦 ——
-  // 聚焦时在 document capture 挂收摊哨,点到格外先 blur(监听器随 blur 自摘)
+  // 聚焦时在 document capture 挂清理钩子,点到格外先 blur(监听器随 blur 自摘)
   const closeOnOutside = (e: MouseEvent): void => {
     const t = e.target
-    // 表格内部的点击(换格、Shift 扩选、点边框)交给表格自己,只有点到表格外才收摊
+    // 表格内部的点击(换格、Shift 扩选、点边框)交给表格自己,只有点到表格外才关闭
     if (t instanceof Node && cell.closest('.cm-live-table')?.contains(t)) return
     src.blur()
   }

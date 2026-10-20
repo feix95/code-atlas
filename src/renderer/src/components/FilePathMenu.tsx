@@ -49,14 +49,14 @@ function clampedPosition(
   }
 }
 
-/** realm 铁律:子窗里的节点不是主窗 Node 的实例,只按 nodeType 认,不用 instanceof */
+/** 渲染域隔离:子窗里的节点不是主窗 Node 的实例,只按 nodeType 认,不用 instanceof */
 function isDomNode(value: unknown): value is Node {
   return typeof value === 'object' && value !== null && 'nodeType' in value
 }
 
 export function FilePathMenu(): React.JSX.Element | null {
   const request = useSyncExternalStore(subscribeFilePathMenu, currentFilePathMenu)
-  // realm 铁律:主窗和每个子窗各挂一台本组件 —— 挂载后从锚点元素认领自家 document,
+  // 渲染域隔离:主窗和每个子窗各挂一台本组件 —— 挂载后从锚点元素认领自家 document,
   // 只画「在本 document 里被右键叫出来」的那张菜单
   const anchorRef = useRef<HTMLSpanElement | null>(null)
   const [doc, setDoc] = useState<Document | null>(null)
@@ -65,7 +65,7 @@ export function FilePathMenu(): React.JSX.Element | null {
   }, [])
   const mine = request !== null && doc !== null && request.doc === doc
 
-  // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,收摊
+  // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,关闭
   useMenuDismiss(mine, closeFilePathMenu, '.file-path-menu', doc ?? undefined)
 
   return (
@@ -120,7 +120,7 @@ function FilePathMenuCard({
     closeFilePathMenu()
   }, [draft, note])
 
-  // 编辑态的两条边界:Esc 只取消(菜单自己会关,这里先记账别让失焦误存)、点菜单外先结账再收摊。
+  // 编辑态的两条边界:Esc 只取消(菜单自己会关,这里先记账别让失焦误存)、点菜单外先结账再关闭。
   // 都挂在 window 捕获期:必须比 useMenuDismiss 的 document 捕获期更早,否则菜单先卸载就来不及了。
   // pointerdown 与 mousedown 都听:看图舞台 preventDefault 后浏览器不发 mousedown。
   useEffect(() => {
@@ -181,7 +181,7 @@ function FilePathMenuCard({
               timerRef.current = window.setTimeout(closeFilePathMenu, FAIL_LINGER_MS)
               return
             }
-            // 反馈停一拍再收摊,让用户亲眼看到「已复制」,不是菜单凭空消失
+            // 反馈停一拍再关闭,让用户亲眼看到「已复制」,不是菜单凭空消失
             timerRef.current = window.setTimeout(closeFilePathMenu, COPY_LINGER_MS)
           })
         }}

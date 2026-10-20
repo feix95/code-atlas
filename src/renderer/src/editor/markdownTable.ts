@@ -8,7 +8,7 @@
  *  - DOM 选区落进替身且 ignoreEvent()=true → 外层 CM 直接忽略选区变化,
  *    contenteditable 格子里的光标/蓝底选中自成孤岛,不会掀装饰桌。
  *  - CM 对 contentDOM 的 mousedown 会 preventDefault,点格外不会自然失焦 ——
- *    收摊要靠 document capture 阶段抢先 blur。
+ *    关闭要靠 document capture 阶段抢先 blur。
  */
 import { WidgetType, type EditorView } from '@codemirror/view'
 import type { MdAlign } from '../../../shared/markdown.ts'
@@ -98,13 +98,13 @@ export class TableWidget extends WidgetType {
     return true
   }
   destroy(dom: HTMLElement): void {
-    // 替身被拆时格子的收摊哨随 DOM 一起死 —— 按户口逐个摘掉
+    // 替身被拆时格子的清理钩子随 DOM 一起死 —— 按登记逐个摘掉
     dom.querySelectorAll('.cm-live-cell-src').forEach((el) => cellTeardown.get(el)?.())
     selectionTeardown.get(dom)?.()
   }
 }
 
-/** 造一个编辑格:td/th + 常驻 contenteditable 源码格(dataset.raw 是源码户口) */
+/** 造一个编辑格:td/th + 常驻 contenteditable 源码格(dataset.raw 是源码登记) */
 function makeCell(view: EditorView, tag: 'th' | 'td', raw: string, align: MdAlign): HTMLElement {
   const cell = view.dom.ownerDocument.createElement(tag)
   cell.dataset.raw = raw

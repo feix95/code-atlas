@@ -24,10 +24,10 @@ import { SettingsAi } from './SettingsAi.tsx'
 import { SettingsAppearance } from './SettingsAppearance.tsx'
 import { SettingsNet } from './SettingsNet.tsx'
 
-// 界面大小范围/上下文合法范围的户口在 shared(uiScale.ts / aiDefaults.ts):
+// 界面大小范围/上下文合法范围的登记在 shared(uiScale.ts / aiDefaults.ts):
 // 滑块档位、preload 根字号引擎、引擎 -c 归一化,三面同认一份
 
-// 第八十九锤:模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
+// 第八十九批:模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
 // 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
 
 /** 上下文输入框的落账规则:空串 = 交回自动探测(undefined);数字夹进合法范围 */
@@ -43,12 +43,12 @@ export type { SectionKey }
  * 设置页(UI v3 §6:SettingsDialog 弹窗退役,改成 rail 齿轮开的单例页签):
  * 左侧栏一项 = 右侧一整页(Obsidian 式,滚动翻节已退役),页键与导航共用 SectionKey。
  * 即改即存 —— Obsidian/VS Code 同款:控件每拨一下当场生效并落盘,
- * 文本输入的连击走 300ms 防抖聚成一笔;没有草稿账本、没有页脚确认。
+ * 文本输入的连击走 300ms 防抖聚成一笔;没有草稿状态表、没有页脚确认。
  * 页签被 × 掉/切走时组件卸载,没跑完的防抖落盘在卸载前冲线。
  * 页签本体由 PaneGroups 保活层托管(只藏不拆):切走再回来,页面状态原样还在。
  */
 export function SettingsPage({
-  workspaceName: _workspaceName, // 侧栏卡片摘除后暂无人读;props 户口保留,侧栏导航要用
+  workspaceName: _workspaceName, // 侧栏卡片摘除后暂无人读;props 登记保留,侧栏导航要用
   sectionReq,
   onAiConfigSaved,
   onSettingsSection
@@ -64,9 +64,9 @@ export function SettingsPage({
   const [config, setConfig] = useState<AiConfig | null>(null)
   const [scale, setScale] = useState(() => window.atlas.getUiScale())
   const [saveError, setSaveError] = useState<string | null>(null)
-  // 当前分类的户口已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航账本
+  // 当前分类的登记已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航状态表
   const [dragValue, setDragValue] = useState<number | null>(null)
-  // 模型清单带着来源户口:LM Studio 与在线 API 各读各的,切来源后旧清单不串台
+  // 模型清单带着来源登记:LM Studio 与在线 API 各读各的,切来源后旧清单不串台
   const [models, setModels] = useState<{ provider: AiProviderKind; ids: string[] }>({
     provider: 'lmstudio',
     ids: []
@@ -75,23 +75,23 @@ export function SettingsPage({
   const [modelsBusy, setModelsBusy] = useState(false)
   const [shelfOpen, setShelfOpen] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
-  // 量尺结果(第七十三锤):模型文件路径一变就问主进程「这台机器带得动吗」
+  // 适配估算结果(第七十三批):模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({
     path: '',
     verdict: null
   })
-  // 上下文档位的账本原料(救生圈这锤):模型档案 + 机器家底,带着取数时的路径对号,
+  // 上下文档位的状态表原料(救生圈本批):模型档案 + 机器规格,带着取数时的路径对号,
   // 路径一换旧结论自动作废 —— 不用在 effect 里手动清,也躲开「effect 里同步 setState」的坑
   const [ctxInfoFetched, setCtxInfoFetched] = useState<{
     path: string
     info: ModelContextInfo | null
   }>({ path: '', info: null })
-  // 第八十九锤:上下文框的打字串(纯字符串,和存档里的数字分开管,失焦才归账)
+  // 第八十九批:上下文框的打字串(纯字符串,和存档里的数字分开管,失焦才归账)
   const [contextRaw, setContextRaw] = useState<string>('')
-  // 当前页户口:侧栏导航发 sectionReq 翻页,这里只认 seq 切页
+  // 当前页登记:侧栏导航发 sectionReq 翻页,这里只认 seq 切页
   const [page, setPage] = useState<SectionKey>('appearance')
 
-  // ── 即改即存:防抖聚笔的落盘账本 ──
+  // ── 即改即存:防抖聚笔的落盘状态表 ──
   // configRef 永远装最新配置;pendingSave 记「还有没写完的笔」;
   // 连击 300ms 聚成一笔写盘,卸载时冲线 —— 下笔即生效,磁盘不挨打。
   const configRef = useRef<AiConfig | null>(config)
@@ -112,7 +112,7 @@ export function SettingsPage({
       .then((c) => {
         configRef.current = c
         setConfig(c)
-        // 第八十九锤:读档落定上下文框的初始字(打字串和存档数字分开管)
+        // 第八十九批:读档落定上下文框的初始字(打字串和存档数字分开管)
         setContextRaw(c.contextSize === undefined ? '' : String(c.contextSize))
       })
       .catch(() => {})
@@ -136,7 +136,7 @@ export function SettingsPage({
       .catch(() => {})
   }, [])
 
-  // 量尺(第七十三锤) + 模型档案(档位账本):模型路径一变就都问一遍;
+  // 适配估算(第七十三批) + 模型档案(档位状态表):模型路径一变就都问一遍;
   // 结果带着路径入库,显示时按「取数路径 === 当前路径」对号,换人/清空自动失效
   const modelPath = config?.builtin.modelPath ?? ''
   useEffect(() => {
@@ -225,7 +225,7 @@ export function SettingsPage({
     }
   }, [])
 
-  // ── 上下文档位 + 黑板账单(2026-09-13 小葵拍的板)──
+  // ── 上下文档位 + 黑板账单(2026-09-13 产品裁定)──
   // 档位走程序员老规矩 2 的幂(4k/8k/16k/…);最大档照模型出厂上限封顶,翻不出档案按 64k 兜底;
   // 输入框自由填写照旧,两边随时互通;账单跟着框里现在的数实时算,扛不住当场喊。
   const contextNotches = useMemo(
@@ -248,7 +248,7 @@ export function SettingsPage({
     [ctxInfo, committedCtx]
   )
   // 黑板账的展示口径照稿子短句式(「✓ 16k 可运行(模型 3.2 GB,内存充足)」):
-  // 判定照旧走 ctxBill 精算,行上只摆档名 + 结论 + 括号真家底,不摊流水账
+  // 判定照旧走 ctxBill 精算,行上只摆档名 + 结论 + 括号真规格,不摊流水账
   const ctxLine = useMemo((): ContextBill | null => {
     if (!ctxBill || !ctxInfo) return ctxBill
     const label = committedCtx === undefined ? '自动' : `${committedCtx / 1024}k`
@@ -356,7 +356,7 @@ export function SettingsPage({
 
   const scaleShown = dragValue ?? scale
 
-  // 说话方式(第一百一十三锤):存档里没有就是全默认 —— 界面照默认摆
+  // 说话方式(第一百一十三批):存档里没有就是全默认 —— 界面照默认摆
   const personal = config?.personalization ?? DEFAULT_PERSONALIZATION
   function updatePersonal(patch: Partial<PersonalizationConfig>): void {
     if (!config) return

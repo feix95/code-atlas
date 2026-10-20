@@ -1,5 +1,5 @@
 // 会话复现(Obsidian 式):关机前的工作区 + 页签布局(组分屏/激活签/文件签脸)记进本机,
-// 下次开 app 原样摆回。存 localStorage —— 和 recents/layoutPrefs 一个户口。
+// 下次开 app 原样摆回。存 localStorage —— 和 recents/layoutPrefs 一个登记。
 // 序列化/解析/水合全是纯函数(自测好喂);存档垃圾整条扔,绝不炸启动。
 // 不存的:对话内容(纯内存账)、settingsReq 这类一次性请求。
 // 旧存档里的 pinned 字段直接忽略:文件签天生绑文件,老钉签落成正常文件签。
@@ -50,7 +50,7 @@ export interface SessionState {
 
 // ── 写账 ──
 
-/** 把活账本压成存档(纯函数):激活签/激活组换成 on 标记 —— 还原时有签掉了也不指错 */
+/** 把活状态表压成存档(纯函数):激活签/激活组换成 on 标记 —— 还原时有签掉了也不指错 */
 export function serializeSession(
   folder: string | null,
   groups: PaneGroup[],
@@ -95,7 +95,7 @@ function parseTab(raw: unknown): SessionTab | null {
     scopeRoot:
       typeof t['scopeRoot'] === 'string' && t['scopeRoot'] !== '' ? t['scopeRoot'] : undefined,
     lang: typeof t['lang'] === 'string' && t['lang'] !== '' ? t['lang'] : undefined,
-    // 旧档里的 viewMode/readOnly 不再读:看片开关已收进全局偏好(codePrefs),与签无关
+    // 旧档里的 viewMode/readOnly 不再读:预览显示开关已收进全局偏好(codePrefs),与签无关
     on: t['on'] === true ? true : undefined
   }
 }
@@ -129,7 +129,7 @@ export function saveSession(s: SessionState): void {
   writePref(SESSION_KEY, s)
 }
 
-// ── 水合:存档 → 活账本 ──
+// ── 水合:存档 → 活状态表 ──
 
 /**
  * 存档 → 页签组(纯函数):id 换新发号;relPath 指向工作区的签要验货 ——

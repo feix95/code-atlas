@@ -1,4 +1,4 @@
-// 内联标题改名(内联标题改名锤):Obsidian 式点标题改文件名,三处同吃一本账 ——
+// 内联标题改名(内联标题改名批次):Obsidian 式点标题改文件名,三处同吃同一数据源 ——
 // 标题显示(fileBaseName)、提交前轻校验(fileBaseError)、改名回执(RenameOutcome)。
 // 权威校验在主进程 renameTextFile;这里供渲染层就地挡一眼 + 主进程复核,两边同一份口径。
 
@@ -43,7 +43,7 @@ export function fileBaseError(base: string): string | null {
 }
 
 /**
- * 改名回执(渲染层口径):ok 带新户口(relPath 以 '/' 分隔、name 含扩展名),
+ * 改名回执(渲染层口径):ok 带新登记(relPath 以 '/' 分隔、name 含扩展名),
  * 不然带一句人话报错 —— 标题编辑件按它决定收不收官、提示条亮什么字。
  */
 export type RenameOutcome =

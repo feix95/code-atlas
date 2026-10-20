@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     const bomOut = await fs.readFile(join(root, 'bom.md'))
     assert.deepEqual([...bomOut.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'BOM 应保留且只有一份')
 
-    // 越界/非文件/巨物 三道闸
+    // 越界/非文件/巨型文件 三道闸
     await assert.rejects(() => saveTextFile(root, '../outside.txt', 'x'), /越界|不合法/)
     await fs.mkdir(join(root, 'dir'), { recursive: true })
     await assert.rejects(() => saveTextFile(root, 'dir', 'x'), /不是一个文件/)
@@ -71,12 +71,12 @@ async function main(): Promise<void> {
     await sleep(400)
     assert.equal(signals.length, 2, '第二次外部改写也应通报')
 
-    // 双户口:同一文件两张签 → remove 一次还活着,再 remove 才收工
+    // 双登记:同一文件两张签 → remove 一次还活着,再 remove 才收工
     registry.add(root, 'a.ts', absA)
     registry.remove(absA)
-    assert.equal(registry.size, 1, '减一口户口监工还在')
+    assert.equal(registry.size, 1, '减一份登记监工还在')
     registry.remove(absA)
-    assert.equal(registry.size, 0, '户口归零监工收工')
+    assert.equal(registry.size, 0, '登记归零监工收工')
 
     // 收工后再改不许通报
     signals.length = 0
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     // 挂在不存在的文件上:老实回 false,不抛不崩
     assert.equal(registry.add(root, 'ghost.ts', join(root, 'ghost.ts')), false)
 
-    // ── 三、内联标题改名:renameTextFile 准入与换户口 ──
+    // ── 三、内联标题改名:renameTextFile 准入与换登记 ──
     // 基础名/扩展名分家(内联标题显示的配方)
     assert.equal(fileBaseName('notes.md'), 'notes')
     assert.equal(fileBaseName('archive.tar.gz'), 'archive.tar')
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     assert.ok(fileBaseError('name.') !== null)
     assert.ok(fileBaseError('..') !== null)
 
-    // 根级改名:内容原样带走,旧名消失,回执报新户口
+    // 根级改名:内容原样带走,旧名消失,回执报新登记
     await fs.writeFile(join(root, 'old.md'), '# 正文\n')
     const rn = await renameTextFile(root, 'old.md', 'new')
     assert.equal(rn.relPath, 'new.md')
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     const rnExt = await renameTextFile(root, 'Doc.MD', 'Note')
     assert.equal(rnExt.name, 'Note.MD')
 
-    // 主名里带点是合法户口:archive.tar.gz 的主名是 archive.tar
+    // 主名里带点是合法登记:archive.tar.gz 的主名是 archive.tar
     await fs.writeFile(join(root, 'archive.tar.gz'), 'z')
     const rnDot = await renameTextFile(root, 'archive.tar.gz', 'my.pack')
     assert.equal(rnDot.name, 'my.pack.gz')
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     await assert.rejects(() => renameTextFile(root, 'taker.md', 'taken'), /已经存在/)
     await assert.rejects(() => renameTextFile(root, 'taker.md', 'asdir'), /已经存在/)
 
-    // 非法名字/坏户口逐一拦
+    // 非法名字/坏登记逐一拦
     await assert.rejects(() => renameTextFile(root, 'taker.md', ''), /不能是空的/)
     await assert.rejects(() => renameTextFile(root, 'taker.md', 'a/b'), /不认的字符/)
     await assert.rejects(() => renameTextFile(root, 'taker.md', 'dot.'), /结尾/)
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
     const rnCase = await renameTextFile(root, 'new.md', 'NEW')
     assert.equal(rnCase.name, 'NEW.md')
 
-    // 监视户口迁移:挂监工 → 改名迁户口 → 改名本身不响,
+    // 监视登记迁移:挂监工 → 改名迁登记 → 改名本身不响,
     // 之后外部动新路径照常通报(且报的是新 relPath)
     signals.length = 0
     const absM = join(root, 'm.ts')
@@ -161,17 +161,17 @@ async function main(): Promise<void> {
     const mv = await renameTextFile(root, 'm.ts', 'm2')
     registry.move(absM, join(root, 'm2.ts'), 'm2.ts', mv.mtimeMs)
     await sleep(400)
-    assert.equal(signals.length, 0, `改名迁户口不该通报(收到 ${signals.length} 条)`)
+    assert.equal(signals.length, 0, `改名迁登记不该通报(收到 ${signals.length} 条)`)
     await fs.writeFile(join(root, 'm2.ts'), 'const m = 2\n')
     await sleep(400)
-    assert.equal(signals.length, 1, '迁户口后外部改写应通报')
+    assert.equal(signals.length, 1, '迁登记后外部改写应通报')
     assert.equal(signals[0].relPath, 'm2.ts')
     registry.dispose()
 
     console.log('✅ 文件编辑地基自测全部通过')
     console.log('   saveFile:UTF-8 回写 · CRLF/BOM 保真 · 越界/目录/超闸全拦')
-    console.log('   watchFile:外部改写通报 · 自家人写盘不响 · 户口计数 · 删除通报')
-    console.log('   renameFile:同目录改名 · 扩展名保留 · 撞名/非法/越界全拦 · 监视户口迁移')
+    console.log('   watchFile:外部改写通报 · 自家人写盘不响 · 登记计数 · 删除通报')
+    console.log('   renameFile:同目录改名 · 扩展名保留 · 撞名/非法/越界全拦 · 监视登记迁移')
   } finally {
     registry.dispose()
     await fs.rm(parent, { recursive: true, force: true })

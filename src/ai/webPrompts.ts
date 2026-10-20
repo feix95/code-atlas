@@ -1,4 +1,4 @@
-// 联网查证的问题端:挑搜索词、把程序真做过的动作收敛成账本 —— 全是纯函数,不发请求。
+// 联网查证的问题端:挑搜索词、把程序真做过的动作收敛成状态表 —— 全是纯函数,不发请求。
 import type { ChatContextAttachment, WebLookupMeta } from '../shared/types.ts'
 
 /**
@@ -20,7 +20,7 @@ export function pickWebLookupQuery(
 }
 
 /**
- * 把程序真实执行过的联网动作收敛成状态账本:
+ * 把程序真实执行过的联网动作收敛成状态状态表:
  * material = null 表示查询本身失败(网络/超时);'' 表示查完了但没有可用资料;
  * 有内容才是 completed,并把命中的来源记进去。模型的自述不参与记账。
  */

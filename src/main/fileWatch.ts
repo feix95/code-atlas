@@ -1,4 +1,4 @@
-// 「打开的文件被外面动了」哨兵(预览编辑锤):一张打开的文件签一个监工,盯文件本体。
+// 「打开的文件被外面动了」哨兵(预览编辑批次):一张打开的文件签一个监工,盯文件本体。
 // 真机实验结论(Node 24/Windows):file 级 fs.watch 扛得住原子替换/删除重建,
 // dir 级反而多吃 .tmp 噪音 —— 所以盯文件不盯目录。
 // 三不原则:不辨事件型(rename/change 一视同仁)、不重复报(防抖 + 按 mtime 判真变)、
@@ -17,7 +17,7 @@ export interface FileWatchSignal {
 
 interface WatchEntry {
   watcher: FSWatcher
-  /** 同一个文件可能被主窗/子窗的签同时开着,按户口计数,归零才收监工 */
+  /** 同一个文件可能被主窗/子窗的签同时开着,按登记计数,归零才收监工 */
   refs: number
   rootPath: string
   relPath: string
@@ -60,7 +60,7 @@ export class FileWatchRegistry {
       return false
     }
     watcher.on('error', () => {
-      // 句柄被打死(盘被拔等):摘掉这条户口,下次 add 再立新监工
+      // 句柄被打死(盘被拔等):摘掉这条登记,下次 add 再立新监工
       this.drop(absPath)
     })
     this.entries.set(absPath, {
@@ -90,8 +90,8 @@ export class FileWatchRegistry {
   }
 
   /**
-   * 自家人改名(内联标题改名锤):户口迁去新路径 —— 老监工收摊,新路径上立同等户口的监工。
-   * lastSeen 记上改名后的 mtime:换户口头一回事件对上账本吞掉,不误报「外面动了」;
+   * 自家人改名(内联标题改名批次):登记迁去新路径 —— 老监工关闭,新路径上立同等登记的监工。
+   * lastSeen 记上改名后的 mtime:换登记头一回事件对上状态表吞掉,不误报「外面动了」;
    * 新路径立不起监工(读不到等)就空着手回来,与 add 回 false 的降级同口径。
    */
   move(oldAbs: string, newAbs: string, newRelPath: string, mtimeMs: number): void {
@@ -134,7 +134,7 @@ export class FileWatchRegistry {
     const entry = this.entries.get(absPath)
     if (!entry) return
     const stat = await fs.stat(absPath).catch(() => null)
-    // stat 悬空期间户口可能已迁/已收(自家人改名等):旧账不再报,免谎报「被删」
+    // stat 悬空期间登记可能已迁/已收(自家人改名等):旧账不再报,免谎报「被删」
     if (this.entries.get(absPath) !== entry) return
     const mtimeMs = stat?.isFile() ? stat.mtimeMs : null
     if (mtimeMs !== null) {

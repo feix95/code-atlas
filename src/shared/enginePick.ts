@@ -1,4 +1,4 @@
-// 引擎挑哪颗(第 4 期):按机器家底给新手推荐最顺的后端,按用户选择与已装清单
+// 引擎挑哪颗(第 4 期):按机器规格给新手推荐最顺的后端,按用户选择与已装清单
 // 定最终用哪颗。纯函数,机器探头喂进来的 MachineProfile + 已装名单 → 决定。
 import {
   BACKEND_PREFERENCE,
@@ -16,7 +16,7 @@ export interface BackendRecommendation {
   reason: string
 }
 
-/** 机器家底 → 最顺的后端(只看「理论上谁最快」,不看装没装) */
+/** 机器规格 → 最顺的后端(只看「理论上谁最快」,不看装没装) */
 export function recommendBackend(machine: MachineProfile): BackendRecommendation {
   if (machine.gpuVendor === 'nvidia') {
     // 算力问得到才把关:老 nvidia-smi 查不出 compute_cap 时先信 CUDA(装完跑不动会退到 Vulkan)

@@ -29,9 +29,9 @@ import {
   type BuiltinLaunchHost
 } from './builtinLaunch.ts'
 
-// 上下文缓存(KV)的估算搬去 shared/contextBill.ts 了(档位账本跟滑块共用一份);
-// 启动那摊(spawn/health 轮询/热身账本/能力探测)搬去 ai/builtinLaunch.ts ——
-// 这里转一手,老朋友(量尺/自测/main 进程)照旧从 builtin 进
+// 上下文缓存(KV)的估算搬去 shared/contextBill.ts 了(档位状态表跟滑块共用一份);
+// 启动那摊(spawn/health 轮询/热身状态表/能力探测)搬去 ai/builtinLaunch.ts ——
+// 这里转一手,老朋友(适配估算/自测/main 进程)照旧从 builtin 进
 export { estimateKvBytes }
 export {
   warmupNudgeMessage,
@@ -60,7 +60,7 @@ let engineOomSeen = false
 /** 当前引擎是按哪份「高级启动账」拉起的(改账重启对账用) */
 let startedLaunchSig = ''
 
-// ── 第七十锤:模型状态播报 ──
+// ── 第七十批:模型状态播报 ──
 // 引擎在干嘛(没叫醒/热身到百分之几/就绪/出岔子)由这里记账并喊给状态栏。
 // progress 只在 /health 真报了数时给值,拿不到就 null,绝不编百分比。
 
@@ -101,26 +101,26 @@ function builtinStatus(
   }
 }
 
-// ── 热身估价小账本(第七十一锤起,第七十五锤改滚动三条)──
+// ── 热身估价小状态表(第七十一批起,第七十五批改滚动三条)──
 // 这版引擎(build 10786)加载期间 /health 不带进度、日志不打印,真百分比三头都拿不到。
 // 但同一台电脑同一个模型,热身耗时相当稳 —— 记下成功热身的耗时,下次按「已用时÷均值」
 // 画一条有据的估,封顶 95%(没真就绪绝不报 100),标「约」字;头一回没账就转圈。
 // 只记确认加载成功的那次(取消/半路死掉的不入账);每模型滚动留最近 3 次 —— 开机第一次
 // 冷读慢、之后热读快,均值把运气摊薄,坏运气只占三分之一话语权,换盘挪模型三轮就淡出去。
-// 账本存 userData/model-warmup.json,这是应用自己的小账本,不碰项目文件。
+// 状态表存 userData/model-warmup.json,这是应用自己的小状态表,不碰项目文件。
 // (估价/提醒的纯函数在 builtinLaunch.ts;目录注入与读写留这边 —— 引擎 PID 档共用同一目录)
 
-/** 应用数据目录(userData),main 进程启动时注入;热身账本与引擎 PID 档都落这里 */
+/** 应用数据目录(userData),main 进程启动时注入;热身状态表与引擎 PID 档都落这里 */
 let warmupDir: string | null = null
 
 export function setBuiltinWarmupDir(dir: string): void {
   warmupDir = dir
 }
 
-/** 一本账最多记最近几次成功热身 */
+/** 同一数据源最多记最近几次成功热身 */
 const WARMUP_SAMPLES = 3
 
-/** 账本原始内容 → 某模型的最近热身样本(纯函数,自测覆盖)。
+/** 状态表原始内容 → 某模型的最近热身样本(纯函数,自测覆盖)。
  * 老格式(单个数)自动当一次历史;脏账(<1 秒/非数)剔除;只认最近 3 条;全脏回 null */
 export function parseWarmupSamples(raw: unknown, modelPath: string): number[] | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -139,7 +139,7 @@ export function averageWarmup(samples: number[]): number | null {
   return Math.round(samples.reduce((sum, ms) => sum + ms, 0) / samples.length)
 }
 
-/** 账本更新:某模型刚热身完,入一笔,只留最近 3 次(纯函数,自测覆盖;垃圾输入就地开新账) */
+/** 状态表更新:某模型刚热身完,入一笔,只留最近 3 次(纯函数,自测覆盖;垃圾输入就地开新账) */
 export function nextWarmupStore(
   raw: unknown,
   modelPath: string,
@@ -171,12 +171,12 @@ function recordWarmupMs(modelPath: string, ms: number): void {
   writeJsonFile(file, nextWarmupStore(raw, modelPath, ms))
 }
 
-// ── 提前量尺(第七十三锤)──
+// ── 提前适配估算(第七十三批)──
 // 选模型那一刻就拿「模型块头」比「机器尺寸」,带不动当场说,不让用户白等一场。
 
 const GB = 1024 ** 3
 
-/** 机器的家底:内存多大、显存多大(NVIDIA 卡能问到,问不到就 null,只按内存量尺) */
+/** 机器的规格:内存多大、显存多大(NVIDIA 卡能问到,问不到就 null,只按内存适配估算) */
 export interface MachineSpec {
   ramBytes: number
   vramBytes: number | null
@@ -195,7 +195,7 @@ export function parseNvidiaSmi(line: string): { name: string; vramBytes: number 
 
 let machineSpecCache: MachineSpec | undefined // undefined = 还没问过
 
-/** 问一次机器家底(显存走 nvidia-smi,N/A 显卡老实回 null);同一进程只问一遍 */
+/** 问一次机器规格(显存走 nvidia-smi,N/A 显卡老实回 null);同一进程只问一遍 */
 export async function queryMachineSpec(): Promise<MachineSpec> {
   if (machineSpecCache !== undefined) return machineSpecCache
   const ramBytes = os.totalmem()
@@ -212,7 +212,7 @@ export async function queryMachineSpec(): Promise<MachineSpec> {
       gpuName = hit.name
     }
   } catch {
-    // 没装 N 卡或没这命令:不硬编显存,量尺退回只看内存
+    // 没装 N 卡或没这命令:不硬编显存,适配估算退回只看内存
   }
   const spec: MachineSpec = { ramBytes, vramBytes, gpuName }
   machineSpecCache = spec
@@ -226,11 +226,11 @@ export interface ModelFitVerdictPure {
 }
 
 /**
- * 量尺公式(纯函数,自测覆盖):模型块头 vs 显存+内存。
+ * 适配估算公式(纯函数,自测覆盖):模型块头 vs 显存+内存。
  * 有显存:≤90% 显存 = 全进卡(最快);再往上挤到「显存+一半内存」= 能跑但落内存会慢;
  * 超过 = 必然靠硬盘硬扛,直接劝退。没问到显存:只看内存,权重超过内存七成就算挤。
  */
-// GGUF 档案读取搬进了 modelShape.ts(ipcModel / launchPlanner / 本文件三处共用),re-export 保住老户口
+// GGUF 档案读取搬进了 modelShape.ts(ipcModel / launchPlanner / 本文件三处共用),re-export 保住老登记
 export { readModelShape } from './modelShape.ts'
 
 export function judgeModelFit(
@@ -240,7 +240,7 @@ export function judgeModelFit(
   contextTokens = DEFAULT_CONTEXT_SIZE
 ): ModelFitVerdictPure {
   if (vramBytes !== null && vramBytes > 0) {
-    // 第八十六锤:显存是权重 + 上下文缓存一起抢的,量尺把缓存估进去再说话
+    // 第八十六批:显存是权重 + 上下文缓存一起抢的,适配估算把缓存估进去再说话
     const kv = estimateKvBytes(contextTokens, modelBytes)
     const need = modelBytes + kv
     if (need <= vramBytes * MODEL_FIT_VRAM_RATIO) {
@@ -264,7 +264,7 @@ export function judgeModelFit(
       detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条`
     }
   }
-  // 纯内存跑(问不到显存,A/老卡):量尺只答装不装得下,缓存不另估 —— 内存机型本身就慢,
+  // 纯内存跑(问不到显存,A/老卡):适配估算只答装不装得下,缓存不另估 —— 内存机型本身就慢,
   // 缓存那点开销改变不了结论,别拿估出来的数字吓人
   if (modelBytes <= ramBytes * MODEL_FIT_RAM_OK_RATIO) {
     return {
@@ -289,8 +289,8 @@ export function judgeModelFit(
 }
 
 /**
- * 引擎「启动就死」的验尸报告(纯函数,自测覆盖):分清撑死、上下文填爆、还是文件坏了,
- * 不再一句「可能太大」糊弄所有人。撑死要拿量尺的数字说话;上下文嫌疑只在手动填大了时点。
+ * 引擎「启动就死」的退出诊断报告(纯函数,自测覆盖):分清内存耗尽退出、上下文填爆、还是文件坏了,
+ * 不再一句「可能太大」糊弄所有人。内存耗尽退出要拿适配估算的数字说话;上下文嫌疑只在手动填大了时点。
  */
 export function autopsyExitMessage(
   exitCode: number | null,
@@ -298,7 +298,7 @@ export function autopsyExitMessage(
   manualContext: number | null
 ): string {
   if (fit.level === 'too-big') {
-    return `模型在这台机器上装不下,引擎一启动就撑死了(退出码 ${exitCode ?? '未知'})。${fit.detail}`
+    return `模型在这台机器上装不下,引擎一启动就内存耗尽退出了(退出码 ${exitCode ?? '未知'})。${fit.detail}`
   }
   if (manualContext !== null && manualContext >= 32768) {
     return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'})。最常见的两个原因:①设置里「模型上下文」填得太大(当前 ${manualContext})—— 清空它,回到自动探测;②模型文件损坏 —— 重新下一个`
@@ -306,7 +306,7 @@ export function autopsyExitMessage(
   return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'}):常见原因是模型文件损坏或被别的程序占用,重新选一个模型文件试试`
 }
 
-/** 引擎「启动就死」的专用错误:带着退出码,验尸时好认 */
+/** 引擎「启动就死」的专用错误:带着退出码,退出诊断时好认 */
 function announceBuiltin(status: ModelStatus): void {
   lastStatus = status
   try {
@@ -353,9 +353,9 @@ export function builtinIdleFacts(modelPath: string): {
   }
 }
 
-/** 内置模型当前能不能看图(图片附件闸用,第一百五十二锤):
+/** 内置模型当前能不能看图(图片附件闸用,第一百五十二批):
  *  跑着/就绪的引擎自己报过账最可信(/props 探测的实话);没起或还在加载时,
- *  按模型旁的 mmproj 户口判意图 —— 有投影仪就是奔着视觉去的,文件在但引擎还没带上它
+ *  按模型旁的 mmproj 登记判意图 —— 有投影仪就是奔着视觉去的,文件在但引擎还没带上它
  *  会由 builtinNeedsRestart 重启补齐;没模型文件可判时老实说 unknown */
 export function builtinVisionSupport(modelPath: string): VisionSupport {
   const live = lastStatus
@@ -368,7 +368,7 @@ export function builtinVisionSupport(modelPath: string): VisionSupport {
 /** 内置模型的「还没叫醒」状态(状态栏查询与配置保存后复位用) */
 export function builtinIdleStatus(modelPath: string): ModelStatus {
   const facts = builtinIdleFacts(modelPath)
-  // 引擎没起时按 mmproj 户口认能力:有投影仪→视觉,没有→纯文本(拿不准的留 unknown)
+  // 引擎没起时按 mmproj 登记认能力:有投影仪→视觉,没有→纯文本(拿不准的留 unknown)
   const vision =
     modelPath.trim() === '' ? 'unknown' : findMmprojFor(modelPath) !== null ? 'vision' : 'text-only'
   return builtinStatus('idle', facts.modelName, facts.sizeBytes, null, facts.message, false, vision)
@@ -501,7 +501,7 @@ async function tasklistImage(pid: number): Promise<string> {
 // listen —— 死在加载阶段的孤儿永远收不到尸,白占十几 GB 显存内存,下次再拉一份
 // 就是双倍账单(2026-09-18 全机卡死案的放大器)。
 // 治法:spawn 成功就把 child.pid 落盘(userData/engine-running.json);引擎一退就删档。
-// app 被强杀时档和引擎一起留下 —— 下次启动照档验尸:PID 活着且映像名是
+// app 被强杀时档和引擎一起留下 —— 下次启动照档退出诊断:PID 活着且映像名是
 // llama-server.exe 才收;不在或被别的程序复用只清档不动手,绝不误杀。
 
 function enginePidPath(): string | null {
@@ -587,7 +587,7 @@ export async function reapOrphanServer(): Promise<OrphanReapResult> {
 }
 
 /**
- * 单飞闸门(纯函数,自测覆盖,第一百三十六锤):同一时刻只放一个任务进场,
+ * 单飞闸门(纯函数,自测覆盖,第一百三十六批):同一时刻只放一个任务进场,
  * 后到的调用直接等同一份承诺 —— 哪怕参数不同(引擎一个 app 只养一份,
  * 后到的就地等第一份,不自己再拉)。任务收场(成或败)闸门自动放行。
  * 修的病:两个请求同秒到达时,旧的「先检查后启动」两头都看见引擎没起,
@@ -670,8 +670,8 @@ const startBuiltinSingleFlight = createSingleFlight(
       const target = await readyPromise
       return target
     } catch (err) {
-      // 保险丝(视觉能力锤):带了 --mmproj、引擎却「自己退了」型失败 → 投影仪跟模型
-      // 对不上账,摘掉它按纯文本重拉一次;只兜这一次,第二次仍失败照常验尸上报,
+      // 保险丝(视觉能力批次):带了 --mmproj、引擎却「自己退了」型失败 → 投影仪跟模型
+      // 对不上账,摘掉它按纯文本重拉一次;只兜这一次,第二次仍失败照常退出诊断上报,
       // 别把模型损坏/显存不够这类真错吞掉。用户主动叫停的不降级。
       const engineExited = err instanceof EngineExitError
       let finalErr = err
@@ -697,7 +697,7 @@ const startBuiltinSingleFlight = createSingleFlight(
         try {
           return await readyPromise
         } catch (retryErr) {
-          finalErr = retryErr // 降级重拉也挂了:落回下面的验尸/上报,人话照实说
+          finalErr = retryErr // 降级重拉也挂了:落回下面的退出诊断/上报,人话照实说
         }
       }
       // 保险丝(第 4 期):installed 引擎一启动就退(驱动/运行库对不上),顺着优先级链
@@ -726,7 +726,7 @@ const startBuiltinSingleFlight = createSingleFlight(
         try {
           return await readyPromise
         } catch (fallbackErr) {
-          finalErr = fallbackErr // 退路也走死:落回验尸/上报
+          finalErr = fallbackErr // 退路也走死:落回退出诊断/上报
         }
       }
       // 启动失败:清干净现场,下次再试能重新拉起;用户主动叫停的算「还没叫醒」,真出错的才报故障
@@ -736,7 +736,7 @@ const startBuiltinSingleFlight = createSingleFlight(
           builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE)
         )
       } else {
-        // 验尸(第七十三锤):启动就死的,拿量尺分清「撑死/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
+        // 退出诊断(第七十三批):启动就死的,拿适配估算分清「内存耗尽退出/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
         if (finalErr instanceof EngineExitError) {
           const spec = await queryMachineSpec()
           finalErr.message = autopsyExitMessage(
@@ -761,7 +761,7 @@ const startBuiltinSingleFlight = createSingleFlight(
 /**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
  * 已在跑就直接复用;没跑就走单飞闸门拉起(同秒并发的第二个请求等同一份,
- * 绝不双生,第一百三十六锤):收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
+ * 绝不双生,第一百三十六批):收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
  * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填按默认(shared/aiDefaults)。
  * 引擎优先用 app 自带的,用户只管选模型文件。
  * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面;状态栏同步收到播报。

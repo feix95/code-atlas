@@ -7,7 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { CH } from '../shared/ipcChannels.ts'
 
-/** 视图名户口:?view= 参数和渲染入口(main.tsx)的分诊表对账 —— 主窗不带参,默认页就是它 */
+/** 视图名登记:?view= 参数和渲染入口(main.tsx)的分诊表对账 —— 主窗不带参,默认页就是它 */
 export const VIEWS = {
   devlogs: 'devlogs'
 } as const
@@ -39,7 +39,7 @@ export interface RevealWatchdog {
 /**
  * 露窗三保险上弦:ready-to-show 快路 +(可选)渲染层双 rAF 首帧信号 + 无条件看门狗,
  * 多路抢跑,谁都不许当唯一依靠 —— 无边框模式下 ready-to-show 在部分高缩放屏上
- * 永不触发(第三十六锤补实测),不能指望它;窗口绝不永久隐身。
+ * 永不触发(第三十六批补实测),不能指望它;窗口绝不永久隐身。
  * via 报给定制口的三档:'ready-to-show' / 'first-frame' / 'watchdog-Ns'。
  */
 export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {}): void {
@@ -81,7 +81,7 @@ export async function pickPathDialog(
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }
 
-/** 开发模式加载 Vite 开发服务器,打包后加载本地文件;?view= 分诊认 VIEWS 户口(不传 = 主窗) */
+/** 开发模式加载 Vite 开发服务器,打包后加载本地文件;?view= 分诊认 VIEWS 登记(不传 = 主窗) */
 export function loadView(win: BrowserWindow, view?: ViewName): void {
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     if (view === undefined) {

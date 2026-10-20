@@ -1,4 +1,4 @@
-// 代码预览取数规矩的自测(第一百一十锤起):裁剪账目要准,界面上说的话才不撒谎;
+// 代码预览取数规矩的自测(第一百一十批起):裁剪账目要准,界面上说的话才不撒谎;
 // 全文预览后重心挪到虚拟滚动的可视区账 —— 起止行算错一行,屏幕上就是错位的代码。
 // 纯函数,不碰任何系统东西 —— 跑起来就是几行字符串的事。
 import assert from 'node:assert/strict'
@@ -29,8 +29,8 @@ function main(): void {
   // ── 3. 空文件:零行零字,不是一行空 ──
   assert.equal(clipPreview('').totalLines, 0, '空文件没有行')
 
-  // ── 4. 谢客线:10 MB 量级 —— 纯文本揣得住,日志怪进不来 ──
-  assert.ok(PREVIEW_MAX_BYTES >= 5 * 1024 * 1024, '谢客线放宽到 MB 量级(全文预览配得上)')
+  // ── 4. 拒绝路径:10 MB 量级 —— 纯文本揣得住,日志怪进不来 ──
+  assert.ok(PREVIEW_MAX_BYTES >= 5 * 1024 * 1024, '拒绝路径放宽到 MB 量级(全文预览配得上)')
   assert.ok(PREVIEW_MAX_BYTES <= 64 * 1024 * 1024, '但也不能大到把内存当仓库')
 
   // ── 5. 可视区账(虚拟滚动的心脏):起止行怎么算都不能错 ──
@@ -84,7 +84,7 @@ function main(): void {
   )
   assert.equal(looksBinary(new Uint8Array([])), false, '空的一段不冤枉')
 
-  // ── 7. 选区几何(第一百一十四锤):首尾标记、左缘竖线、浮钮锚点 ──
+  // ── 7. 选区几何(第一百一十四批):首尾标记、左缘竖线、浮钮锚点 ──
   assert.equal(selectionGeometry([]), null, '一行都没有就不画标记')
   const oneLine = selectionGeometry([{ left: 40, top: 100, right: 180, bottom: 118 }])
   assert.ok(oneLine, '单行选区要算得出来')
@@ -115,7 +115,7 @@ function main(): void {
     '零高选区竖线给最小可见高度'
   )
 
-  // ── 8. 浮钮文案(第一百一十四锤):额度满了说额度,选太长了照实说会截断 ──
+  // ── 8. 浮钮文案(第一百一十四批):额度满了说额度,选太长了照实说会截断 ──
   const base = {
     canAddRef: true,
     refLimit: 6,
@@ -137,10 +137,10 @@ function main(): void {
     '刚好到上限不算太长'
   )
 
-  // ── 10. 整份引用已退役(文件附件锤):拖文件改走 <attached_files> 附件,
+  // ── 10. 整份引用已退役(文件附件批次):拖文件改走 <attached_files> 附件,
   // planWholeFileRef 连同自测一起摘除;新口径见 selftest-fileattach ──
 
-  // ── 12. 文档缩放夹紧(Ctrl+滚轮这锤):系数不许飞出档外,脏值回 100% ──
+  // ── 12. 文档缩放夹紧(Ctrl+滚轮本批):系数不许飞出档外,脏值回 100% ──
   assert.equal(clampDocZoom(1.5), 1.5, '档内原样')
   assert.equal(clampDocZoom(0), 1, '零/负/NaN 回 100%')
   assert.equal(clampDocZoom(NaN), 1, 'NaN 也回 100%')
@@ -149,7 +149,7 @@ function main(): void {
 
   console.log('✅ 代码预览自测全部通过')
   console.log(
-    '   全文不裁 · 换行归一 · 空文件 · 谢客线量级 · 可视区账(顶部/中部/防御/短文件/行高兜底) · 二进制嗅探 · 选区几何与浮钮文案'
+    '   全文不裁 · 换行归一 · 空文件 · 拒绝路径量级 · 可视区账(顶部/中部/防御/短文件/行高兜底) · 二进制嗅探 · 选区几何与浮钮文案'
   )
 }
 

@@ -1,4 +1,4 @@
-/** 译文任务的渲染层账本:一次翻译一份,只在内存里活着(不落盘,重启即丢)。
+/** 译文任务的渲染层状态表:一次翻译一份,只在内存里活着(不落盘,重启即丢)。
  * 主进程按块推送,这里按块记账;页签重新挂载时从账上取,不重开任务。 */
 import type { TranslateBlockKind, TranslateEvent } from '@shared/translateTypes'
 

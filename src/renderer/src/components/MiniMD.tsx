@@ -5,12 +5,12 @@ import type { RenameOutcome } from '@shared/fileRename'
 import { InlineTitle } from './InlineTitle'
 
 /**
- * 迷你 Markdown 渲染(第一百零七锤起;阅读模式锤拆成 解析/描画 两层):
+ * 迷你 Markdown 渲染(第一百零七批起;阅读模式批次拆成 解析/描画 两层):
  * 语法拆解在 src/shared/markdown.ts(纯数据 AST,能进自测),这里只把 AST 画成 React 元素。
  * 刻意手写小解析器而不是上重型库:渲染成 React 元素,不碰 dangerouslySetInnerHTML,
  * 模型/文件吐什么都不会变成可执行内容。
  *
- * 文件链接:传了 fileLinks 时,普通文字里对上户口的文件引用画成可点的链接;
+ * 文件链接:传了 fileLinks 时,普通文字里对上登记的文件引用画成可点的链接;
  * 行内代码整段恰是一个文件引用也画成链接(整段判定,不扫子串);
  * 围栏代码块里的字一律不动 —— 那是在展示代码,不是在递文件。
  */
@@ -40,7 +40,7 @@ function fileLinkBtn(
   )
 }
 
-/** 一段纯文本里对上户口的文件引用画成可点链接;key 走共享计数器,谁先算完谁先领号 */
+/** 一段纯文本里对上登记的文件引用画成可点链接;key 走共享计数器,谁先算完谁先领号 */
 function fileNodes(t: string, links: FileLinkTarget | undefined, kc: { n: number }): ReactNode[] {
   if (!links) return [t]
   const spans = findFileLinks(t, links.index)
@@ -221,7 +221,7 @@ export const MiniMD = memo(function MiniMD({
   fileLinks?: FileLinkTarget
   /** 文档内联标题(阅读模式喂文件名);不传不摆 */
   title?: string
-  /** 内联标题改名通道(内联标题改名锤):喂了标题才可点改名;不传 = 标题只展示 */
+  /** 内联标题改名通道(内联标题改名批次):喂了标题才可点改名;不传 = 标题只展示 */
   onRenameTitle?: (base: string) => Promise<RenameOutcome>
   /** 裸渲染:不出 .md 外壳(对照稿按块渲染时,外壳由外层容器统一给) */
   bare?: boolean

@@ -1,4 +1,4 @@
-// 预览编辑锤的 IPC 台:saveFile / watchFile / unwatchFile 三条 invoke 配 handle;
+// 预览编辑批次的 IPC 台:saveFile / watchFile / unwatchFile 三条 invoke 配 handle;
 // fileChanged 是主进程主动推的事件 —— 同一个文件可能同时被主窗/子窗的签开着,
 // 一律全员广播,渲染层自己对账(只对打开中的文件有反应)。
 import { BrowserWindow, ipcMain } from 'electron'
@@ -33,8 +33,8 @@ export function registerEditIpc(): void {
     }
   )
 
-  // 文件改名(内联标题改名锤):改完顺手给监视器迁户口,老路径上的监工跟着挪去新路径,
-  // 不然旧户口的下一跳事件会谎报「文件被删了」
+  // 文件改名(内联标题改名批次):改完顺手给监视器迁登记,老路径上的监工跟着挪去新路径,
+  // 不然旧登记的下一跳事件会谎报「文件被删了」
   ipcMain.handle(
     CH.renameFile,
     async (_event, rootPath: unknown, relPath: unknown, newBase: unknown) => {

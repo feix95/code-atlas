@@ -10,20 +10,20 @@ import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '@shared/preview'
 import { formatSize } from '@shared/fsMessages'
 
 /**
- * 待发文件的小账本(文件附件锤,对齐 Claude Code 的 @文件):三个入口
+ * 待发文件的小状态表(文件附件批次,对齐 Claude Code 的 @文件):三个入口
  * (「+」菜单「添加附件」选文件、从系统拖文件进来、从文件树拖文件进来)都汇到 addFiles ——
  * 同一份校验口径:只收文本文件(后缀名单先挡纯二进制,开头字节有 NUL 再挡一道)、
  * 单份不超 10MB、最多 3 个;收进来的正文按行裁到静态上限,行账(第 1-N 行 / 共 M 行)留给界面和模型看。
  * 跟图片不一样:文字模型也能读文件,所以没有能力闸;发送后不清空 ——
  * 文件像引用原子一样常驻输入框、每轮都带上,要换就点 ×。
  * 文件树拖来的只有 relPath,由 addFromRelPath 走 readPreview 读盘,不另开秤。
- * 系统拖/选进来的另留本机绝对路径(absPath),主进程凭它发本次运行的续读门卡(拖入即授权);
+ * 系统拖/选进来的另留本机绝对路径(absPath),主进程凭它发本次运行的续读授权令牌(拖入即授权);
  * 拿不到路径的(剪切板/网页来源)照旧只读这一轮,不给假承诺。
  */
 export interface ChatFilesApi {
   files: ChatFileAttachment[]
   addFiles: (files: Iterable<File>) => Promise<void>
-  /** 文件树拖来的文件(只有 relPath):读盘 → 收编进同一本账 */
+  /** 文件树拖来的文件(只有 relPath):读盘 → 收编进同同一数据源 */
   addFromRelPath: (rootPath: string, relPath: string) => Promise<void>
   removeFile: (id: string) => void
   clear: () => void
@@ -82,7 +82,7 @@ export function useChatFiles(
   const [files, setFiles] = useState<ChatFileAttachment[]>([])
   const noteRef = useRef(note)
   const filesRef = useRef(files)
-  // ref 只能在渲染外更新(React 规矩):账本会话内顺手镜像,addFiles/删账都读 ref 不看旧快照
+  // ref 只能在渲染外更新(React 规矩):状态表会话内顺手镜像,addFiles/删账都读 ref 不看旧快照
   useEffect(() => {
     noteRef.current = note
     filesRef.current = files
@@ -109,7 +109,7 @@ export function useChatFiles(
     }
   }
 
-  /** 文件树拖来的文件:readPreview 读盘验身份(谢客线/越界/错误话术全复用它), 收编进同一本账 */
+  /** 文件树拖来的文件:readPreview 读盘验身份(拒绝路径/越界/错误话术全复用它), 收编进同同一数据源 */
   async function addFromRelPath(rootPath: string, relPath: string): Promise<void> {
     const name = relPath.split('/').pop() ?? relPath
     if (filesRef.current.length >= CHAT_FILES_MAX) {

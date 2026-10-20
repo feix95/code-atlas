@@ -21,23 +21,23 @@ import { AgentDirectoryAccess, joinAuthorizedRoot, sanitizeExternalAbsPath } fro
 import { TOOL_NAMES } from '../shared/agentTools.ts'
 import type { AgentSearchCard, AgentSearchMatch, AiDeltaPayload } from '../shared/types.ts'
 
-/** 本进程的授权账本:项目外目录(申请制)和拖入即授权的单个文件共用一本账 */
+/** 本进程的授权状态表:项目外目录(申请制)和拖入即授权的单个文件共用同一数据源 */
 export const agentDirectoryAccess = new AgentDirectoryAccess()
 
-/** rootPath 授权的根是不是「单个文件」(拖入即授权的文件门卡):是它的话,
+/** rootPath 授权的根是不是「单个文件」(拖入即授权的文件授权令牌):是它的话,
  *  列名单/搜索/带子路径的读都不适用,喂准确话术回去,别让它原地打转 */
 async function isSingleFileRoot(rootPath: string): Promise<boolean> {
   const info = await fs.stat(rootPath).catch(() => null)
   return info?.isFile() === true
 }
 
-// ── 翻文件模式(agent,第一百二十八锤)的后厨 ──
+// ── 翻文件模式(agent,第一百二十八批)的后厨 ──
 // 模型自己喊「看看这个文件夹 / 读这个文件」,主进程是唯一动手的那只手:
 // 只有看文件的三件只读工具(列名单/读文件/搜内容),路径全走 joinRoot 沙盒,
 // 越界/二进制/超大文件一律拒,拒的话术当「工具结果」喂回给模型让它自己换路,
 // 循环绝不因为一次碰壁就断。
 
-/** list_files 的执行手:递归列文件/文件夹名单(只捡名字),条数和深度都有缰绳 */
+/** list_files 的执行手:递归列文件/文件夹名单(只捡名字),条数和深度都有护栏 */
 export async function agentListFiles(
   rootPath: string,
   relPath: string
@@ -105,11 +105,11 @@ export async function agentListFiles(
 }
 
 /**
- * search_content 的执行手(第一百三十九锤):在项目(或某个子文件夹)里按关键词搜,
+ * search_content 的执行手(第一百三十九批):在项目(或某个子文件夹)里按关键词搜,
  * 文件路径和文本文件内容都算,大小写不敏感。内容命中报「文件:行号:那行原文」;
  * 路径命中(文件路径里含关键词,找安装位置类问题的证据)单独记,输出时排最前,
  * 二进制/超大的文件名字对上也照收 —— 名字就是证据,不用翻开看。
- * 缰绳:忽略名单/符号链接/深度跟 list_files 同一份;二进制和超 5MB 的文件内容不读;
+ * 循环护栏:忽略名单/符号链接/深度跟 list_files 同一份;二进制和超 5MB 的文件内容不读;
  * 扫的文件数、内容命中条数、路径命中条数各自到量就收,照实注明「没搜完」——
  * 绝不让一个关键词把机器烧干。
  * 除喂模型的 text 外,还把结构化命中(matches)一并交回:主进程拿它走旁路推给
@@ -351,7 +351,7 @@ export async function agentRequestDirectoryAccess(
 }
 
 /**
- * web_search 的执行手(联网锤):搜索 + 第一条正文节选。源队列在 weblookup.ts 纯函数层
+ * web_search 的执行手(联网批次):搜索 + 第一条正文节选。源队列在 weblookup.ts 纯函数层
  * (Tavily 有 Key 打头 → DDG → 维基中 → 维基英),三道闸(搜索词安检/内网闸/防上当声明)
  * 也都扎在那边,这边只管跑和报。查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
  */
@@ -382,7 +382,7 @@ export function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text
 }
 
 /**
- * 命中清单卡走旁路(LLM 优化锤):search_content 搜到的结构化命中直接推给界面画卡,
+ * 命中清单卡走旁路(LLM 优化批次):search_content 搜到的结构化命中直接推给界面画卡,
  * 每条「文件:行号:原文」原样到用户眼前、可点跳转 —— 不再让小模型当抄写员,
  * 一条不丢、行号一个不错。只走内存通道,零落盘。
  */
@@ -396,7 +396,7 @@ export function sendAgentMatches(
   event.sender.send(CH.aiDelta, payload)
 }
 
-/** agent 流式轮次的增量转发(第一百三十四锤):思考/正文逐帧推给界面,token 账同帧喂状态条 */
+/** agent 流式轮次的增量转发(第一百三十四批):思考/正文逐帧推给界面,token 账同帧喂状态条 */
 export function sendAgentDelta(
   event: IpcMainInvokeEvent,
   requestId: string,
@@ -409,6 +409,6 @@ export function sendAgentDelta(
   if (ev.reset) payload.reset = true
   if (ev.seal) payload.seal = true
   event.sender.send(CH.aiDelta, payload)
-  // 引擎肯报账,状态条的「忙」就跟着报数(和普通聊天同一待遇)
+  // 引擎回报用量,状态条的「忙」就跟着报数(和普通聊天同一待遇)
   if (ev.stats) announceActivityBusy(lastActivityProvider, ev.stats)
 }

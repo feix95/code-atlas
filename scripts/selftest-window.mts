@@ -1,4 +1,4 @@
-// 窗口尺寸记事本自测(第七十八锤):存档的认读、贴屏落位的各种旧世界,全用假屏幕数据
+// 窗口尺寸记事本自测(第七十八批):存档的认读、贴屏落位的各种旧世界,全用假屏幕数据
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -225,7 +225,7 @@ class FakeMainPanelWindow extends EventEmitter {
 }
 
 check(
-  'MainPanelController:初始露着但最小化记成不在屏;restore/show/hide/minimize 事件翻账本',
+  'MainPanelController:初始露着但最小化记成不在屏;restore/show/hide/minimize 事件翻状态表',
   () => {
     const win = new FakeMainPanelWindow()
     win.visible = true
@@ -244,7 +244,7 @@ check(
     win.restore()
     assert.equal(controller.isShown(), true)
     win.emit('closed')
-    assert.equal(controller.isShown(), false, 'closed 事件 → 账本清零')
+    assert.equal(controller.isShown(), false, 'closed 事件 → 状态表清零')
   }
 )
 

@@ -1,4 +1,4 @@
-// 个性化(说话方式)的自测(第一百一十三锤,一百一十八锤补改为「语气+自订指令」两件套):
+// 个性化(说话方式)的自测(第一百一十三批,一百一十八批次补改为「语气+自订指令」两件套):
 // 拼出来的提示词要准,「默认档不垫语气」的口径要钉死。纯函数,不碰配置读写也不碰界面。
 import assert from 'node:assert/strict'
 import {
@@ -18,7 +18,7 @@ function withPatch(patch: Partial<PersonalizationConfig>): PersonalizationConfig
 }
 
 function main(): void {
-  // ── 1. 默认档不垫语气(第一百五十一锤小葵定):全默认时风格段是空串,人设一字不加 ──
+  // ── 1. 默认档不垫语气(第一百五十一批产品定):全默认时风格段是空串,人设一字不加 ──
   assert.equal(
     buildPersonalizationPrompt(DEFAULT_PERSONALIZATION),
     '',
@@ -71,7 +71,7 @@ function main(): void {
   assert.ok(!longCustom.includes('很'.repeat(CUSTOM_MAX + 1)), '超长的部分要裁掉')
 
   // ── 4. 顺序就是结构:人设 → 风格段(<style_preference> 里语气在前、自订指令在后、收尾划线)──
-  // 2.0 换了内核:旧铁律尾引用的「不编造/不假装干过活」已不在内核,尾巴整个删掉;
+  // 2.0 换了内核:旧硬约束尾引用的「不编造/不假装干过活」已不在内核,尾巴整个删掉;
   // 风格段收尾改垫一句「以上只改你说话的方式」,把自订指令的权力圈回说话方式上
   const styled = withPersonalization(
     '人设在此',
@@ -151,7 +151,7 @@ function main(): void {
   )
 
   // ── 7. 界面按这张表排控件:数量变了说明有人动过,提醒一句 ──
-  assert.equal(TONE_OPTIONS.length, 4, '语气四档(默认 + 小葵定的三档人设)')
+  assert.equal(TONE_OPTIONS.length, 4, '语气四档(默认 + 产品定的三档人设)')
   for (const t of TONE_OPTIONS) assert.ok(t.label && t.hint, '每档都要有档名和介绍(参考图的两行式)')
   assert.equal(TEACHING_OPTIONS.length, 3, '讲解深度三档(简洁/精简/详细)')
   for (const t of TEACHING_OPTIONS)

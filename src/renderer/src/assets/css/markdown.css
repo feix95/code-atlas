@@ -1,4 +1,4 @@
-/* ── 阅读档疏密户口:排版间距变量集中在这,微调改一处,不散落硬编码 ── */
+/* ── 阅读档疏密登记:排版间距变量集中在这,微调改一处,不散落硬编码 ── */
 :root {
   --md-reading-lh: 1.75; /* 正文行高(中文长文舒适档 1.7–1.8) */
   --md-li-gap: 0.4em; /* 列表条目之间的缝 */
@@ -9,7 +9,7 @@
   --md-cell-pad-y: 0.5em; /* 表格单元格上下内边距 */
 }
 
-/* ── 迷你 Markdown(第一百零七锤):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
+/* ── 迷你 Markdown(第一百零七批):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
 .md {
   white-space: normal;
   line-height: var(--lh-170);
@@ -148,7 +148,7 @@
   color: var(--muted);
 }
 
-/* ── 阅读模式锤补齐:表格 / 待办 / callout / 高亮 / 内联标题 ── */
+/* ── 阅读模式批次补齐:表格 / 待办 / callout / 高亮 / 内联标题 ── */
 
 /* 管道表格(GFM):栏宽吃满可读列,塞不下时表内横滚,绝不撑爆栏 */
 .md-table-wrap {
@@ -197,7 +197,7 @@
   font-weight: var(--font-w-semi);
 }
 
-/* ── 阅读档疏密排版(数值户口在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动) ── */
+/* ── 阅读档疏密排版(数值登记在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动) ── */
 
 .code-reading .md {
   line-height: var(--md-reading-lh);
@@ -296,7 +296,7 @@
   line-height: 1.111;
 }
 
-/* 内联标题可改名(内联标题改名锤):能改的标题悬停给文本光标;
+/* 内联标题可改名(内联标题改名批次):能改的标题悬停给文本光标;
    输入框吃标题同一身皮,Obsidian 同款素脸——无边线无底纹,只多一个光标 */
 .md-title[role='button'] {
   cursor: text;
@@ -323,7 +323,7 @@
   text-decoration: underline;
 }
 
-/* 聊天里的文件链接:对上户口的文件引用变可点,与行内代码同款药丸皮
+/* 聊天里的文件链接:对上登记的文件引用变可点,与行内代码同款药丸皮
  * (字号/内边距/圆角/底色一套量),只靠强调色字+点状下划线示可点;
  * 点了左边开预览,带行号的直达那一行。围栏代码块里的路径不变链接 */
 .md-file-link {
@@ -487,7 +487,7 @@
   align-items: center;
 }
 
-/* 对话的小动作排(第一百零七锤,一百一十八锤补):和 token 账同一行贴右边;
+/* 对话的小动作排(第一百零七批,一百一十八批次补):和 token 账同一行贴右边;
  * 没有账目时自己单独一行;「已复制」小提示浮在按钮上方 */
 .msg-actions {
   position: relative;
@@ -518,7 +518,7 @@
   display: block;
 }
 
-/* 复制成功的小提示(第一百零七锤补):浮在按钮排上方,1 秒内自己走,不挤按钮 */
+/* 复制成功的小提示(第一百零七批补):浮在按钮排上方,1 秒内自己走,不挤按钮 */
 .msg-copied {
   position: absolute;
   bottom: calc(100% + 2px);
@@ -529,7 +529,7 @@
   pointer-events: none;
 }
 
-/* 小笔写字动画(第一百零九锤补):保存瞬间以笔尖为轴轻磕一下,笔迹从笔尖划出淡出 */
+/* 小笔写字动画(第一百零九批补):保存瞬间以笔尖为轴轻磕一下,笔迹从笔尖划出淡出 */
 @media (prefers-reduced-motion: no-preference) {
   .note-pen.is-tapping {
     /* 轴心=笔尖(pencil-line 24 栅格稿的笔尖约在 12%,87%);用百分比写,图标缩放不用跟着改 */
@@ -565,7 +565,7 @@
   }
 }
 
-/* ── Live Preview 装饰(md 三档锤)──
+/* ── Live Preview 装饰(md 三档批次)──
    标题行量级/行高与阅读档同一份(.code-reading .md-hN 的写真照抄),
    字号相对 scroller 基字号走 —— Ctrl+滚轮的 --doc-zoom 天然全场同步 */
 .cm-host .cm-live-h1,
@@ -607,7 +607,7 @@
   line-height: 1.5;
 }
 
-/* setext 下划线(===/---)收摊:字号行高压零,行还在(能点进去卸妆) */
+/* setext 下划线(===/---)关闭:字号行高压零,行还在(能点进去卸妆) */
 .cm-host .cm-live-setext {
   font-size: 0;
   line-height: 0;
@@ -940,11 +940,11 @@
   padding: var(--space-4) 0 30vh;
 }
 
-/* 内联标题替身:装饰件落在文档首行之上、滚动跟着正文走,直接吃 .md-title 皮(不另立户口);
+/* 内联标题替身:装饰件落在文档首行之上、滚动跟着正文走,直接吃 .md-title 皮(不另立登记);
    但 .md-title 的 margin-bottom 必须换成 padding —— margin 不在 border-box 内,
    CM 行高账量不到它(量块高走 getBoundingClientRect),替身之下所有行的记账位置
    会比 DOM 矮一截:点击标题下半截穿透到下一行,卸妆永远不触发(小葵踩过的坑);
-   padding 在盒内量得到,视觉间距分毫不动、账本归位 */
+   padding 在盒内量得到,视觉间距分毫不动、状态表归位 */
 .code-view.is-live .cm-content .md-title {
   margin-bottom: 0;
   padding-bottom: 0.6em;

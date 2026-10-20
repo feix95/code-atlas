@@ -14,7 +14,7 @@ import {
 import { queryMachineSpec } from './builtin.ts'
 import { fetchWithTimeout } from './http.ts'
 
-// 拉货源的户口在 shared/modelShelf.ts(HF_HOSTS):主源直连,备源国内镜像,下载那边同认一份
+// 拉货源的登记在 shared/modelShelf.ts(HF_HOSTS):主源直连,备源国内镜像,下载那边同认一份
 
 /** 货架一次拉几行 */
 export const SHELF_LIMIT = 60
@@ -38,7 +38,7 @@ async function fetchFromHost(host: string, timeoutMs: number): Promise<unknown> 
 export async function fetchModelShelf(): Promise<ShelfResult> {
   if (cache && Date.now() - cache.at < SHELF_CACHE_MS) return cache.result
 
-  // 先试直连(短超时,连不上别拖累界面),失败换镜像 —— 两档耐心户口在 shared/modelShelf
+  // 先试直连(短超时,连不上别拖累界面),失败换镜像 —— 两档耐心登记在 shared/modelShelf
   let raw: unknown
   let source: ShelfResult['source'] = 'huggingface'
   try {

@@ -155,7 +155,7 @@ const QUERIES: Record<string, string> = {
 /**
  * 本模块支持的 AST 分析语言 → 语法 wasm 文件(export 给打包清单自测对账用)。
  * 不养自己的名单:有提取规则的语言,经 LANG_TO_GRAMMAR 过桥去语法账 GRAMMAR_WASM 取件
- * (QUERIES 里哪门语言在 LANG_TO_GRAMMAR 没户口,取件当场是 undefined,自测立刻报警)。
+ * (QUERIES 里哪门语言在 LANG_TO_GRAMMAR 没登记,取件当场是 undefined,自测立刻报警)。
  */
 export const GRAMMAR_FILES: Record<string, string> = Object.fromEntries(
   Object.keys(QUERIES).map((id) => [id, GRAMMAR_WASM[LANG_TO_GRAMMAR[id]!]!])

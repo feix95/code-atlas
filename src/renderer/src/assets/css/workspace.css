@@ -90,7 +90,7 @@
   height: calc(var(--u) * 0.6875);
 }
 
-/* 菜单开关钮不挂全局焦点环(点击后持焦会留一圈深色描边,小葵拍板常灭) */
+/* 菜单开关钮不挂全局焦点环(点击后持焦会留一圈深色描边,产品裁定常灭) */
 .ws-menu-btn:focus,
 .ws-menu-btn:focus-visible {
   outline: none;
@@ -215,7 +215,7 @@
   font-size: var(--font-xxs);
 }
 
-/* ── 代码预览(第一百一十锤):左栏的只读文本窗 ──
+/* ── 代码预览(第一百一十批):左栏的只读文本窗 ──
    只摆纯文本 + 行号,不描语法色;等宽字、不折行,横向自己滚 */
 .code-pane {
   display: flex;
@@ -257,7 +257,7 @@
   background: var(--canvas-tint);
 }
 
-/* 虚拟滚动(全文预览这锤):轨道撑出全文行程(高度由组件按 总行数×行高 算),
+/* 虚拟滚动(全文预览本批):轨道撑出全文行程(高度由组件按 总行数×行高 算),
    可视段(.code-row)整体平移到滚动位置 —— 元素永远只有一屏,滚动条是全文的 */
 .code-track {
   position: relative;
@@ -299,16 +299,16 @@
   color: var(--text);
 }
 
-/* ── 选区美术(第一百一十四锤;折行版换户口)──
+/* ── 选区美术(第一百一十四批;折行版换登记)──
    选中色改吃分屏拖边那套 token:底色/竖线走 --drop-mark(30% 透明 sash-hi),
-   首尾角括号走 --sash-hi 实色 —— 「进了引用功能」的蓝和拖分屏的蓝是同一条血。
+   首尾角括号走 --sash-hi 实色 —— 「进了引用功能」的蓝和拖分屏的蓝是同一强调色。
    只作用于代码正文,别的面板保持系统默认。 */
 .code-text::selection {
   background: var(--drop-mark);
   color: inherit;
 }
 
-/* ── 折行模式(折行版这锤)──
+/* ── 折行模式(折行版本批)──
    行块化 + 自然折行;行号是行块左槽的 ::before —— CSS 生成内容进不了 DOM 文本,
    选区、复制、引用全文都沾不到数字。--gc 是行号位数(组件按总行数喂,ch 单位一位一格)。 */
 .code-text.is-wrap {
@@ -341,7 +341,7 @@
   border-right: 1px solid var(--line);
 }
 
-/* 预览头读↔写单钮:纯图标小方钮,开/关靠图标换脸(不靠底色,小葵拍板);
+/* 预览头读↔写单钮:纯图标小方钮,开/关靠图标换脸(不靠底色,产品裁定);
    折行钮已退役进页签右键菜单(渐进披露) */
 .code-mode-btn {
   flex-shrink: 0;
@@ -372,7 +372,7 @@
   cursor: default;
 }
 
-/* ── 阅读模式(阅读模式这锤):md 系签的渲染态 —— MiniMD 排版进「可读栏」:
+/* ── 阅读模式(阅读模式本批):md 系签的渲染态 —— MiniMD 排版进「可读栏」:
    宽窗时栏有上限居中、两边留呼吸;窄窗时栏跟着缩、四周固定留白不贴边。
    正文比聊天气泡里的 .md 放大一档 —— 这儿是整页阅读,不是塞进气泡里扫一眼 ── */
 .code-view.is-reading {
@@ -434,7 +434,7 @@
   color: var(--tok-symbol);
 }
 
-/* ── 源码编辑器(预览编辑锤):CodeMirror 6 在 .code-view.is-editing 里自己管滚动 ──
+/* ── 源码编辑器(预览编辑批次):CodeMirror 6 在 .code-view.is-editing 里自己管滚动 ──
    外层 .code-view 只留个框(不再 overflow:auto)—— cm-scroller 内部虚拟渲染,
    滚动条、行号槽、折行全归编辑器管;字号公式与旧 .code-text 同一份(--doc-zoom 照吃) */
 .code-view.is-editing {
@@ -484,7 +484,7 @@
   min-width: 3ch;
 }
 
-/* 选中底色跟引用功能同一条血(--drop-mark):drawSelection 画的是装饰层,两套类名都喂 */
+/* 选中底色跟引用功能同一强调色(--drop-mark):drawSelection 画的是装饰层,两套类名都喂 */
 /* CM 内置主题的选区色选择器带 6 层类名(聚焦淡紫 #d7d4f0 / 失焦灰),普通覆写压不住,必须 !important;
    选区层默认画在正文之下,会被围栏代码块等实心行底挡住,改抬到正文之上(30% 透明,不盖字) */
 .cm-host .cm-scroller > .cm-selectionLayer {
@@ -506,7 +506,7 @@
   background: var(--drop-mark) !important;
 }
 
-/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」;走 sash-hi 实色(分屏拖边同一条血) */
+/* 首尾角括号:一正一反,读作「从这里开始 / 到这里结束」;走 sash-hi 实色(分屏拖边同一强调色) */
 .code-mark {
   position: fixed;
   z-index: var(--z-code-mark);
@@ -553,7 +553,7 @@
   font-size: var(--font-xxs);
 }
 
-/* 用户气泡里的文件痕(文件附件锤):他带过什么文件,回看时对得上 */
+/* 用户气泡里的文件痕(文件附件批次):他带过什么文件,回看时对得上 */
 .msg-files {
   display: flex;
   flex-wrap: wrap;
@@ -573,7 +573,7 @@
   font-size: var(--font-xxs);
 }
 
-/* 用户气泡里的图片痕(第一百五十二锤):他发过什么图,缩略图排一排回看时对得上 */
+/* 用户气泡里的图片痕(第一百五十二批):他发过什么图,缩略图排一排回看时对得上 */
 .msg-imgs {
   display: flex;
   flex-wrap: wrap;
@@ -626,7 +626,7 @@
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background var(--dur-2) var(--ease-smooth);
-  /* 轻量虚拟化(第九十六锤):视口外的行让浏览器跳过渲染,展开 node_modules 这类
+  /* 轻量虚拟化(第九十六批):视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
   contain-intrinsic-size: auto calc(var(--u) * 0.6);
@@ -636,7 +636,7 @@
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六锤摘遮罩,底色不再染色) */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六批摘遮罩,底色不再染色) */
 .tree-row.is-selected {
   background: var(--selected-bg);
 }

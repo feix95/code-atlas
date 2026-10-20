@@ -19,7 +19,7 @@ import { TOOL_NAMES } from '../shared/agentTools.ts'
 
 type PlainChatMessage = {
   role: 'system' | 'user' | 'assistant'
-  /** 纯文本是字符串;带图的用户消息是 OpenAI 多模态分段数组(第一百五十二锤) */
+  /** 纯文本是字符串;带图的用户消息是 OpenAI 多模态分段数组(第一百五十二批) */
   content: string | ChatContentPart[]
 }
 
@@ -31,7 +31,7 @@ const CHAT_HISTORY_MAX = 6
 const CHAT_HISTORY_CONTENT_MAX = 500
 
 /** 渲染进程传来的历史先洗干净:只收 user/assistant 两条腿,条数和单条长度都封顶,防提示词被撑爆。
- * 超长截断的那条要打「不用续写」的标注(LLM 优化锤):半截没说完的话是小模型最爱的续写钩子,
+ * 超长截断的那条要打「不用续写」的标注(LLM 优化批次):半截没说完的话是小模型最爱的续写钩子,
  * 不打招呼它会倾向把旧清单接着编完,而不是回答新问题。
  * 窗口方向(2026-09-17 修「小探针回复以前问过的问题」):从尾巴上取最近几条,两头口径必须
  * 都是「留最近」—— 老代码从头取前 5 条,把刚聊完的一轮整个扔掉,窗口还常停在一个没被回答的
@@ -71,7 +71,7 @@ export function sanitizeHistory(history: unknown): AiHistoryMessage[] {
   }))
 }
 
-// 附件正文上限的户口在 shared/aiDefaults.ts(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,这里洗附件按它验
+// 附件正文上限的登记在 shared/aiDefaults.ts(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,这里洗附件按它验
 
 /**
  * 渲染进程传来的资料附件先洗干净:形状不对一律当 null(没附件),字段全收成
@@ -110,17 +110,17 @@ export function sanitizeAttachment(context: unknown): ChatContextAttachment | nu
  * 渲染进程传来的引用代码先洗干净:形状不对的条目整条扔,条数按 CODE_REFS_MAX 截,
  * 单段和总量都有字数上限(超了截断并标省略号)。引用是「一段代码」,不许多到把上下文吃光。
  */
-/** 这轮引用的动态额度(第一百二十六锤):总量和单段各一个数,界面话术与主进程裁剪共用 */
+/** 这轮引用的动态额度(第一百二十六批):总量和单段各一个数,界面话术与主进程裁剪共用 */
 export interface CodeRefsBudget {
   perRefChars: number
   totalChars: number
 }
 
 /**
- * 引用的动态账本(第一百二十六锤):额度跟着用户设的上下文窗口走,不再拍死。
- * 锅里先给「人设+附件+历史+问题」(otherTokens)和回答(含思考预留)留足座位,
- * 剩下的折成字符才是引用能带的量。穷有保底(旧材料让路也不许引用饿死),富有封顶
- * (喂太饱小模型会懵)。字符↔token 按 estimateTokens 的保守口径:一个字算一个 token。
+ * 引用的动态状态表(第一百二十六批):额度跟着用户设的上下文窗口走,不再拍死。
+ * 上下文窗口先给「人设+附件+历史+问题」(otherTokens)和回答(含思考预留)预留配额,
+ * 剩下的折成字符才是引用能带的量。设下限(旧材料让路也不许引用饿死),设上限
+ * (上下文过载小模型会失稳)。字符↔token 按 estimateTokens 的保守口径:一个字算一个 token。
  */
 export function codeRefsBudget(input: {
   contextTokens: number
@@ -220,11 +220,11 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
   codeRefs: ChatCodeRef[],
   /** 讲解深度(教学三档,提示词体系重写第二批):聊天场景也吃 —— off 档就是「不教学不出术语表」 */
   teaching: TeachingLevel,
-  /** 手动压缩的早前对话摘要(第一百四十二锤):垫在附件后面、历史前面,当背景记忆 */
+  /** 手动压缩的早前对话摘要(第一百四十二批):垫在附件后面、历史前面,当背景记忆 */
   summary?: string,
-  /** 这轮带的图片(第一百五十二锤):只挂在最后一条用户消息上变成多模态分段;不带图时一切照旧 */
+  /** 这轮带的图片(第一百五十二批):只挂在最后一条用户消息上变成多模态分段;不带图时一切照旧 */
   images?: ChatImage[],
-  /** 这轮带的文件附件块(文件附件锤):垫在引用代码后、当前问题前;没有就是 undefined */
+  /** 这轮带的文件附件块(文件附件批次):垫在引用代码后、当前问题前;没有就是 undefined */
   filesBlock?: string
 ): Array<PlainChatMessage | H> {
   // 当前问题只包 <current_question> 标签本体;联网资料、参考资料指路都跟在标签后面,
@@ -235,12 +235,12 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
   // 资料提示贴着问题走(小葵报的案):附件虽垫在最前,中间隔着几轮历史,小模型就忘了它的
   // 存在,问「这个呢?」开始瞎猜文件名。每轮问题后面跟一张「当前参考资料是谁」的程序提醒,
   // 让近因偏置替我们干活 —— 详版资料照旧在开头,这里只报名字指路。
-  // 滑跪案(2026-10-18)改软口径:老文案把「它」硬钉在当前参考资料上,用户追问「刚才那个
+  // 附件追问(2026-10-18)改软口径:老文案把「它」硬钉在当前参考资料上,用户追问「刚才那个
   // 文件」时模型被这句牵着走,把上一轮的真回答误判成幻觉 —— 对齐 Claude Code 的
   // 「may or may not be related」:只报未必有关、多半是它、以用户说的为准。
-  // 「程序插话只是路牌」这条也并进这张提醒(常驻切片顶防反弹秤,只在用得着的场景垫)
+  // 「程序插话只是参考提示」这条也并进这张提醒(常驻切片顶防回弹,只在用得着的场景垫)
   const refHint = attachment
-    ? `\n\n${TAG.programReminder.open}当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头 ${TAG.contextAttachment.open} 就是它的机器扫描资料。它未必和这轮问题有关,用得上再参考;问题里说「这个文件/它」又没点名别的东西,多半指的就是它,但用户明确在说别的文件(比如刚发过的附件)时,以用户说的为准。程序提醒只是路牌,未必每条都对得上眼前的题 —— 对不上就按用户实际说的办,别被它牵着走,更别因为它改口否认自己真看过的东西${TAG.programReminder.close}`
+    ? `\n\n${TAG.programReminder.open}当前参考资料:${attachment.name},相对路径 ${attachment.relPath || '(项目根目录)'} —— 开头 ${TAG.contextAttachment.open} 就是它的机器扫描资料。它未必和这轮问题有关,用得上再参考;问题里说「这个文件/它」又没点名别的东西,多半指的就是它,但用户明确在说别的文件(比如刚发过的附件)时,以用户说的为准。程序提醒只是参考提示,未必每条都对得上眼前的题 —— 对不上就按用户实际说的办,别被它牵着走,更别因为它改口否认自己真看过的东西${TAG.programReminder.close}`
     : ''
   // 注意力锚(答旧题修复·刀三,2.0 换成 XML):历史洗干净后旧问题都是干净短句,当前问题后面
   // 却粘着联网资料/参考资料指路话,小模型按「长得最像待答问题」作答就会偏 —— 包一对显式标签,
@@ -303,7 +303,7 @@ export type PlannedChatFile = ChatFileAttachment & {
   shownEndLine: number
   /** 有没有没带进来的部分 */
   truncated: boolean
-  /** 拖入即授权的文件门卡编号(主进程发牌成功才有):截断注记凭它给续读指引 */
+  /** 拖入即授权的文件授权令牌编号(主进程发牌成功才有):截断注记凭它给续读指引 */
   rootId?: string
 }
 
@@ -352,15 +352,15 @@ export function buildFileAttachmentsText(
 }
 
 /**
- * 读完度交底(滑跪案,对齐 Claude Code 的 file-summary completeness disclosure):
- * 只要有文件资料在场(本轮的附件块或户口本纸条),就在装配层垫最后一条 ——
+ * 读完度交底(附件追问,对齐 Claude Code 的 file-summary completeness disclosure):
+ * 只要有文件资料在场(本轮的附件块或登记表注记),就在装配层垫最后一条 ——
  * 总结/回答前先交代实际读了多少;没读全就明说,能接着读就动手补;
  * 不许含糊,也不许把自己真读过的内容改口说成「编的」(红口白牙的假道歉比嘴硬更坏)。
  */
 export const READ_HONESTY_NOTE = `${TAG.programNote.open}盘点自己的阅读要诚实:读过全篇就照实说;只读过一部分、或手里只剩摘要,就明说哪部分没读到,有工具就接着读;被问「读完了吗/是不是编的」时,把实际读过什么如实摆出来 —— 不许含糊,也不许把自己真读过的内容改口说成「我编的」${TAG.programNote.close}`
 
 /**
- * 带引用时给探针加的人设(第一百一十一锤,提示词体系重写第二批换新稿):先讲这段在干什么,再讲它用到的知识。
+ * 带引用时给探针加的人设(第一百一十一批,提示词体系重写第二批换新稿):先讲这段在干什么,再讲它用到的知识。
  * 名词小课堂不再自带 —— 由讲解深度的教学切片(prompts.ts)接管;治「说了等于没说」和「替代码编上下文」两种病。
  */
 export const CODE_TEACHER_ADDENDUM = `${TAG.codeTeaching.open}

@@ -1,7 +1,7 @@
 // ── 内置引擎「拉起来直到就绪」这一棒 ──
 // 从 builtin.ts 拆出来的启动域:spawn llama-server、接管 stdout/stderr、
 // 轮询 /health 到就绪、问 /v1/models 拿模型名、就绪后探一轮视觉能力(/props)。
-// 还有启动域的纯函数:加载进度解析、GPU 层数报告、热身估价小账本。
+// 还有启动域的纯函数:加载进度解析、GPU 层数报告、热身估价小状态表。
 // 生命周期/收尸/单飞闸门仍归 builtin.ts;引擎单例状态经 BuiltinLaunchHost 注入,
 // 本文件不 import builtin.ts,避免互相绕圈。
 
@@ -23,14 +23,14 @@ import { probeBuiltinVision } from './visionProbe.ts'
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 export const BUILTIN_PORT = 8766
 const POLL_INTERVAL_MS = 1000
-/** 热身多久没好开始温柔提醒(第七十二锤,小葵拍板):绝不掐进程 —— 大模型从机械盘
+/** 热身多久没好开始温柔提醒(第七十二批,产品裁定):绝不掐进程 —— 大模型从机械盘
  * 搬进显存两三分钟是常事,掐表只会杀死健康的加载;等不等由用户手里的「取消」说了算 */
 const WARMUP_NUDGE_MS = 5 * 60_000
 
 /** 用户按了取消/卸下时,挂起的启动等待收到的一句话(不是故障,是「先不用了」) */
 export const CANCEL_MESSAGE = '加载取消了:想用的时候再问一句,它会重新热身'
 
-/** 进程型失败专用错误:带退出码,验尸/保险丝判定时好认(普通 Error = 没起成/spawn 层失败) */
+/** 进程型失败专用错误:带退出码,退出诊断/保险丝判定时好认(普通 Error = 没起成/spawn 层失败) */
 export class EngineExitError extends Error {
   exitCode: number | null
   constructor(exitCode: number | null, message: string) {
@@ -53,7 +53,7 @@ export interface BuiltinLaunchHost {
   isStopping(): boolean
   /** 新一轮启动清掉上次的叫停账 */
   resetStopping(): void
-  /** 记下这次实际喂给引擎的 -c 档位、--mmproj 路径与高级启动账签名(对账账本) */
+  /** 记下这次实际喂给引擎的 -c 档位、--mmproj 路径与高级启动账签名(对账状态表) */
   markStarted(ctxSize: number, mmprojPath: string, launchSig: string): void
   /** 状态栏播报(loading/ready/error) */
   announce(status: ModelStatus): void
@@ -76,14 +76,14 @@ export interface BuiltinLaunchHost {
   /** 引擎 PID 落档/销档(强杀孤儿收尸用) */
   writeEnginePidFile(pid: number): void
   clearEnginePidFileFor(pid: number | undefined): void
-  /** 热身账本读写(builtin.ts 管 userData 目录;估价基准/入账) */
+  /** 热身状态表读写(builtin.ts 管 userData 目录;估价基准/入账) */
   readWarmupMs(modelPath: string): number | null
   recordWarmupMs(modelPath: string, ms: number): void
   /** 引擎日志里见了显存不够的记号(保险丝据此换「显存不够」那句人话) */
   noteEngineOom(seen: boolean): void
 }
 
-// ── 热身估价(纯函数;账本读写经 host 走 builtin.ts 的 userData 目录)──
+// ── 热身估价(纯函数;状态表读写经 host 走 builtin.ts 的 userData 目录)──
 
 /**
  * 热身太久的温柔提醒(纯函数,自测覆盖):5 分钟还没好才开口,一句话管理预期,
@@ -168,7 +168,7 @@ export function engineLogHasOom(line: string): boolean {
 
 /**
  * 拉起 llama-server 并等它就绪:出启动方案 → spawn → /health 轮询(503 带进度就报真数,
- * 没报按热身账本估一条)→ /v1/models 拿模型名 → /props 探视觉能力 → 报 ready。
+ * 没报按热身状态表估一条)→ /v1/models 拿模型名 → /props 探视觉能力 → 报 ready。
  * skipMmproj = 保险丝重拉:上次带投影仪把自己拉死了,这次摘掉按纯文本跑,
  * 就绪播报捎一句人话说明。
  */
@@ -193,10 +193,10 @@ export async function launchBuiltinServer(
   const engineLabel = opts.engineLabel
   const engineNote = opts.engineNote
   const ctxSize = normalizeContextSize(contextSize)
-  // 视觉能力锤:模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
-  // 没带就按纯文本跑。记进对账账本 —— 旁边增删 mmproj 后下次提问对账重启
+  // 视觉能力批次:模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
+  // 没带就按纯文本跑。记进对账状态表 —— 旁边增删 mmproj 后下次提问对账重启
   const mmproj = skipMmproj ? null : findMmprojFor(modelPath)
-  // 智能启动锤:机器家底 + 模型户口过一遍纯算盘,出本轮启动参数;用户在「高级」里
+  // 智能启动批次:机器规格 + 模型登记过一遍纯算盘,出本轮启动参数;用户在「高级」里
   // 指定过的字段原样进算盘,梯子不碰。显卡层数默认交给引擎 --fit 自动摆层。
   const { plan } = await buildLaunchPlan(modelPath, ctxSize, mmproj, launch?.overrides)
   // 专家命令行:白名单解析,合法的排在方案参数之后(后写赢);非法整段丢弃只留日志,不拦启动
@@ -205,7 +205,7 @@ export async function launchBuiltinServer(
   if (launch?.extraArgs && !extra.ok) {
     addDevLog('system', `专家参数被拒:${extra.reason} —— 按自动方案启动`)
   }
-  // 对账账本永远记「用户要的档」:计划把上下文调小时账上仍按用户档记,
+  // 对账状态表永远记「用户要的档」:计划把上下文调小时账上仍按用户档记,
   // 不然下一轮对不上账,引擎被反复重启(自测钉死这条约定)
   host.markStarted(bookkeepingContextSize(contextSize), mmproj ?? '', launchSignature(launch))
   host.resetStopping() // 新的一轮启动:上次「主动叫停」的标记就地清账
@@ -213,7 +213,7 @@ export async function launchBuiltinServer(
   const facts = host.idleFacts(modelPath)
   const startedAt = Date.now()
   const lastWarmupMs = host.readWarmupMs(modelPath)
-  // 第八十七锤:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
+  // 第八十七批:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
   addDevLog(
     'system',
     `启动内置引擎:${engineLabel ? `${engineLabel}(${serverPath})` : serverPath} · 模型 ${modelPath} · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)${mmproj ? ` · 视觉投影仪(--mmproj ${mmproj})` : ''} · 方案参数:${plan.args.join(' ') || '(引擎默认)'}${extraArgs.length ? ` · 专家参数:${extraArgs.join(' ')}` : ''}`
@@ -229,7 +229,7 @@ export async function launchBuiltinServer(
       String(BUILTIN_PORT),
       '--host',
       '127.0.0.1',
-      // --jinja(第一百二十八锤):让引擎用模型自带的对话模板,工具调用(agent 的
+      // --jinja(第一百二十八批):让引擎用模型自带的对话模板,工具调用(agent 的
       // 翻文件)靠它才开得了;chat_template_kwargs 的思考开关也走这条路。换模型后生效
       '--jinja',
       ...(mmproj ? ['--mmproj', mmproj] : []),
@@ -241,7 +241,7 @@ export async function launchBuiltinServer(
     ],
     {
       windowsHide: true,
-      // 第八十七锤:stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
+      // 第八十七批:stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
       stdio: ['ignore', 'pipe', 'pipe']
     }
   )
@@ -257,7 +257,7 @@ export async function launchBuiltinServer(
     latestGpuOffload = parseGpuOffloadReport(line) ?? latestGpuOffload
     if (engineLogHasOom(line)) host.noteEngineOom(true)
   }
-  // 引擎吐的每一行原话都进账本:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
+  // 引擎吐的每一行原话都进状态表:llama.cpp 把日志几乎全写在 stderr(模型结构、显存分配、
   // 加载耗时……),stdout 偶尔也有;两个管道都接,进度条的回车刷新按行拆开
   const feedEngineStream = (stream: NodeJS.ReadableStream | null): void => {
     if (!stream) return
@@ -289,7 +289,7 @@ export async function launchBuiltinServer(
   announceLoading(null)
 
   // 子进程半路夭折(路径不对、缺 DLL、端口被占)→ 挂起的等待直接收到人话错误;
-  // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,验尸时好认
+  // 是用户自己按的取消/卸下就说「取消了」,别吓人。带退出码的专用错误,退出诊断时好认
   const exitError = new Promise<never>((_, reject) => {
     child.once('exit', (code) => {
       host.clearEnginePidFileFor(spawnedPid)
@@ -320,7 +320,7 @@ export async function launchBuiltinServer(
 
   const healthUrl = baseUrl.replace(/\/v1$/, '') + '/health'
   const ready = (async () => {
-    // 不设闹钟(第七十二锤):进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
+    // 不设闹钟(第七十二批):进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
     // 2 分钟的硬超时只会掐死健康的加载;真死锁交给用户手里的「取消」
     while (host.isEngineRunning()) {
       try {

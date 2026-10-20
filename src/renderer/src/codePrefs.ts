@@ -1,13 +1,13 @@
-// 代码预览的看片开关:三颗全是全局一档(localStorage,重启不失忆)——
+// 代码预览的预览显示开关:三颗全是全局一档(localStorage,重启不失忆)——
 //   自动换行(默认开):关掉回到长行横向滚动。超行数闸的文件折行摁不动,
 //     这个偏好只是「想要不要」,给不给是行数闸说了算(见 CodePreview 的 WRAP_MAX_LINES)。
 //   只读锁(默认关):开了所有文本文件预览一律拒收改字。
 //   排版显示(默认开):只对 md 系文件有生(闸在 viewState 的 canRender),开了走渲染态。
-// 拨口三处共一本账:页签右键菜单的开关行、预览头锁钮、编辑器 Alt+Z ——
+// 拨口三处共同一数据源:页签右键菜单的开关行、预览头锁钮、编辑器 Alt+Z ——
 // 一拨全部已开的预览签就地翻面,新开的签与重启后都继承。
 //
-// 账本挂成可订阅小 store:get 读快照、subscribe 挂听写变化、set/toggle 是唯一写口。
-// 撕出去的子窗是同一份 localStorage 的另一个 realm:那边翻账喊不动本窗 listeners,
+// 状态表挂成可订阅小 store:get 读快照、subscribe 挂听写变化、set/toggle 是唯一写口。
+// 拆出去的子窗是同一份 localStorage 的另一个 realm:那边翻账喊不动本窗 listeners,
 // 靠 storage 事件回流对齐(删键 = 回默认)。
 
 import { readFlagPref, writeFlagPref } from '../../shared/localPrefs.ts'
@@ -16,7 +16,7 @@ export const CODE_WRAP_KEY = 'atlas.codeWrap'
 export const PREVIEW_READONLY_KEY = 'atlas.previewReadOnly'
 export const PREVIEW_RENDER_KEY = 'atlas.previewRender'
 
-/** 一颗开关旗的小账本:内存读数 + localStorage 落盘 + 订阅广播 + 跨 realm 回流 */
+/** 一颗开关旗的小状态表:内存读数 + localStorage 落盘 + 订阅广播 + 跨 realm 回流 */
 function flagPref(
   key: string,
   fallback: boolean

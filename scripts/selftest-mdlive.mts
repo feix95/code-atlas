@@ -17,7 +17,7 @@ import {
 } from '../src/renderer/src/editor/tableGrid.ts'
 
 /**
- * Live Preview 装饰清单自测(md 三档锤):
+ * Live Preview 装饰清单自测(md 三档批次):
  * 对 planLiveDecosForText 出的「装饰清单」对账 —— 每条清单都会落成 CM 装饰,
  * 清单对 = 脸上对。核心口径:光标不在的地方上妆,光标所在的块卸妆露源码。
  */
@@ -118,11 +118,11 @@ function main(): void {
   plan = planLiveDecosForText(text, text.indexOf('苹果'), text.indexOf('苹果'))
   lacks(plan, ofType('table'), '在场表格不换装')
 
-  // ── 五、下划线标题(Setext):本体行上妆,=== 行收摊 ──
+  // ── 五、下划线标题(Setext):本体行上妆,=== 行关闭 ──
   text = '标题字\n===\n\n正文\n'
   plan = planLiveDecosForText(text, text.length, text.length)
   has(plan, (d) => d.t === 'line' && d.from === 0 && d.cls === 'cm-live-h1', 'setext 标题行皮')
-  has(plan, (d) => d.t === 'line' && d.cls === 'cm-live-setext', '=== 行收摊成零高')
+  has(plan, (d) => d.t === 'line' && d.cls === 'cm-live-setext', '=== 行关闭成零高')
 
   // ── 六、裸 URL 与图片:Autolink 本体不藏,图片记号收 ──
   text = '<https://x.y> 和 ![图](p.png)\n\n尾\n'
@@ -139,7 +139,7 @@ function main(): void {
   assert.deepEqual(splitRowCells('| 名 | 价 |'), ['名', '价'], '常规两格掐边')
   assert.deepEqual(splitRowCells('| a | b'), ['a', 'b'], '缺尾管尾段也是格')
   assert.deepEqual(splitRowCells('| a\\|b | c |'), ['a\\|b', 'c'], '转义竖线不断格')
-  assert.deepEqual(splitRowCells('|  | x |'), ['', 'x'], '空格格户口不丢')
+  assert.deepEqual(splitRowCells('|  | x |'), ['', 'x'], '空格格登记不丢')
   assert.deepEqual(splitRowCells('a | b | c'), ['a', 'b', 'c'], '无外管也切')
 
   const model = tableModelFromSource('| a | b |\n| --- | ---: |\n| 1 | 2 |')
@@ -152,7 +152,7 @@ function main(): void {
   assert.deepEqual(
     tableModelFromSource('| a | b |\n| :---: | --- |')?.aligns,
     ['center', 'left'],
-    '居中对齐户口进账'
+    '居中对齐登记进账'
   )
 
   // 序列化:对齐写回分隔行;裸 | 转义、换行压空格护行格结构
@@ -249,7 +249,7 @@ function main(): void {
 
   console.log('✅ Live Preview 装饰清单自测全部通过')
   console.log(
-    '   标题行皮/记号卸妆 · 行内五件 · 列表三态 · 引用/围栏/hr/表格 · setext 收摊 · 表格模型 · 格子选区与剪贴板'
+    '   标题行皮/记号卸妆 · 行内五件 · 列表三态 · 引用/围栏/hr/表格 · setext 关闭 · 表格模型 · 格子选区与剪贴板'
   )
 }
 

@@ -6,7 +6,7 @@ import { TAG } from '@shared/promptTags'
  * 自由对话的「资料附件」构建器:从扫描树里现场整理当前选中对象的资料。
  * 附件只是参考信息挂件,不是对话历史 —— 每次发请求都带当下最新的这份,
  * 切换对象时旧资料不会混进新对话。
- * 附件正文上限的户口在 shared/aiDefaults(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,
+ * 附件正文上限的登记在 shared/aiDefaults(ATTACHMENT_DETAILS_MAX):渲染层整理时按它截,
  * 主进程洗附件按它验,一把尺。
  */
 

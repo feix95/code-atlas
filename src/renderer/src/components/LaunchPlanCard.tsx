@@ -16,7 +16,7 @@ interface FactParts {
   meta: string
 }
 
-/** 机器家底:显卡名 + 显存/空闲/内存规格 */
+/** 机器规格:显卡名 + 显存/空闲/内存规格 */
 function machineFact(m: MachineProfile): FactParts {
   const specs: string[] = []
   if (m.gpuName) {
@@ -27,7 +27,7 @@ function machineFact(m: MachineProfile): FactParts {
   return { lead: m.gpuName ?? '没认出显卡', meta: specs.join(' · ') }
 }
 
-/** 模型户口:模型名 + 体积/MoE/视觉文件规格 */
+/** 模型登记:模型名 + 体积/MoE/视觉文件规格 */
 function modelFact(info: LaunchPlanInfo): FactParts {
   const specs: string[] = []
   if (info.modelBytes != null) specs.push(formatGB(info.modelBytes))
@@ -66,8 +66,8 @@ function withLaunch(config: AiConfig, modelPath: string, s: ModelLaunchSettings)
 }
 
 /**
- * 「本机运行方案」(智能启动锤):折叠行 —— 行面只留一句说明与结论戳(装得下/有点挤/装不下);
- * 机器家底、模型户口、每条妥协理由收在展开体里。底下「高级设置」是同款折叠行,可逐项手动指定。
+ * 「本机运行方案」(智能启动批次):折叠行 —— 行面只留一句说明与结论戳(装得下/有点挤/装不下);
+ * 机器规格、模型登记、每条妥协理由收在展开体里。底下「高级设置」是同款折叠行,可逐项手动指定。
  * modelPath/上下文档位/草稿一变就重新问主进程要预览;取数期间照旧显示旧方案不闪 loading。
  */
 export function LaunchPlanCard({

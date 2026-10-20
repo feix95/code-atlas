@@ -1,6 +1,6 @@
-// ── 撕窗子窗桥(页签撕窗锤)──
+// ── 独立子窗桥(页签独立窗口)──
 // 子窗 = 主窗渲染层 window.open 开出来的同进程子窗(about:blank 白窗),
-// 页签的活的 DOM 由 React Portal 渲染进它的 document —— 户口在渲染层,
+// 页签的活的 DOM 由 React Portal 渲染进它的 document —— 登记在渲染层,
 // 主进程只管两件小事:
 //   1) 放行白名单:只有 aux- 前缀 frameName 的 window.open 才许成窗,而且无边框;
 //   2) 窗口操作代发:子窗没有 preload 没有 window.atlas,缩放/关闭由主窗渲染层
@@ -86,7 +86,7 @@ export function installAuxWindowBridge(mainWindow: BrowserWindow): void {
     child.on('closed', () => {
       if (auxRegistry.get(name) === child) auxRegistry.delete(name)
     })
-    addDevLog('system', `撕窗子窗「${name}」上岗`)
+    addDevLog('system', `独立子窗「${name}」上岗`)
   })
 }
 
@@ -122,4 +122,4 @@ export function registerAuxWindowIpc(getMainWindow: () => BrowserWindow | null):
   })
 }
 
-// 退场不用专账:子窗跟主窗同进程,主窗一关它们天然陪葬;注册表随进程销毁不欠谁。
+// 退场不用专账:子窗跟主窗同进程,主窗一关它们一并销毁;注册表随进程销毁不欠谁。

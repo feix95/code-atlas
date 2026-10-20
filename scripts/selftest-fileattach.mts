@@ -1,4 +1,4 @@
-// 文件附件锤自测(对齐 Claude Code 的 @文件):按行裁剪/动态预算/收编洗白/装配块/翻页读取,
+// 文件附件批次自测(对齐 Claude Code 的 @文件):按行裁剪/动态预算/收编洗白/装配块/翻页读取,
 // 一把全摁住。跑法:node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-fileattach.mts
 // 样本全在内存里,不碰盘不碰网。
 import assert from 'node:assert/strict'
@@ -63,35 +63,35 @@ function main(): void {
   assert.equal(exact.text, 'aa\nbb', '刚好塞满就停手')
   assert.equal(exact.shownEndLine, 2, '两行')
 
-  // ── 2. planFileAttachments:穷保底、富封顶、小文件省下的座位顺延 ──
+  // ── 2. planFileAttachments:穷保底、富封顶、小文件省下的配额顺延 ──
   assert.deepEqual(
     planFileAttachments({ ctxTokens: 20000, replyTokens: 1000, otherTokens: 1000, files: [] }),
     [],
     '没文件就没账'
   )
 
-  // 大锅:总量封在静态上限,单份超不到顶
+  // 大上下文窗口:总量封在静态上限,单份超不到顶
   const rich = planFileAttachments({
     ctxTokens: 100000,
     replyTokens: 2000,
     otherTokens: 3000,
     files: [{ text: 'x'.repeat(60000), totalLines: 1 }]
   })
-  assert.equal(rich.length, 1, '一份文件一份座位')
-  assert.ok(rich[0].text.length <= CHAT_FILE_CHARS_MAX, '再大的锅,单份也不超静态上限')
+  assert.equal(rich.length, 1, '一份文件一份配额')
+  assert.ok(rich[0].text.length <= CHAT_FILE_CHARS_MAX, '再大的上下文窗口,单份也不超静态上限')
   assert.equal(rich[0].truncated, true, '裁了就要报')
 
-  // 小锅:保底 6000 照给(和引用账一个口径)
+  // 小上下文:保底 6000 照给(和引用额度一个口径)
   const poor = planFileAttachments({
     ctxTokens: 4096,
     replyTokens: 1000,
     otherTokens: 3500,
     files: [{ text: 'y'.repeat(20000), totalLines: 1 }]
   })
-  assert.ok(poor[0].text.length <= 6000, '穷有保底:顶天 6000')
+  assert.ok(poor[0].text.length <= 6000, '设下限:顶天 6000')
   assert.ok(poor[0].text.length > 0, '保底不许保出个空手')
 
-  // 公平分座:小文件省下的座位顺延给后面的大文件
+  // 公平分座:小文件省下的配额顺延给后面的大文件
   const fair = planFileAttachments({
     ctxTokens: 19000,
     replyTokens: 1000,
@@ -159,7 +159,7 @@ function main(): void {
   assert.equal(
     absOk.files[0].absPath,
     'C:\\Users\\me\\notes\\long.txt',
-    '系统拖入的绝对路径保留(主进程要靠它发续读门卡)'
+    '系统拖入的绝对路径保留(主进程要靠它发续读授权令牌)'
   )
   const absBad = sanitizeChatFiles([goodFile({ id: 'k', absPath: 'relative\\note.txt' })])
   assert.equal(absBad.files[0].absPath, undefined, '相对样式的路径字段丢掉')
@@ -234,7 +234,7 @@ function main(): void {
   )
   assert.ok(!cutAgentNoPath.includes('offset='), '系统拖进来的没路径,也给不了续读指引 —— 照实说')
 
-  // 拖入即授权的文件门卡(rootId):系统拖进来且主进程发到牌时,续读指引带编号 + 空路径
+  // 拖入即授权的文件授权令牌(rootId):系统拖进来且主进程发到牌时,续读指引带编号 + 空路径
   const cutGranted = buildFileAttachmentsText(
     [
       {
@@ -248,7 +248,7 @@ function main(): void {
   )
   assert.ok(
     cutGranted.includes('rootId=external_4') && cutGranted.includes('relPath 传空字符串'),
-    '拖入即授权:续读指引带门卡编号和空路径的说法'
+    '拖入即授权:续读指引带令牌编号和空路径的说法'
   )
   assert.ok(cutGranted.includes('offset=3'), '拖入即授权:接着读的 offset 照给')
 
@@ -263,13 +263,13 @@ function main(): void {
     ],
     { agentOn: false }
   )
-  assert.ok(!cutGrantedNoAgent.includes('rootId='), '没开翻文件:门卡编号也不提')
+  assert.ok(!cutGrantedNoAgent.includes('rootId='), '没开翻文件:令牌编号也不提')
   assert.ok(
     cutGrantedNoAgent.includes('后面的部分不在当前上下文里'),
     '没开翻文件:照实说,不开空头支票'
   )
 
-  // 读完度交底(滑跪案):文件资料在场时垫的那条,交底 + 防假道歉都要在
+  // 读完度交底(附件追问):文件资料在场时垫的那条,交底 + 防假道歉都要在
   assert.ok(
     READ_HONESTY_NOTE.startsWith(TAG.programNote.open) &&
       READ_HONESTY_NOTE.endsWith(TAG.programNote.close),

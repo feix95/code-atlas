@@ -14,7 +14,7 @@ export const TOOL_NAMES = {
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES]
 
-/** 模型喊回来的名字 → 户口本上的名字;不认识的回 null(主进程按「没有这个工具」拒) */
+/** 模型喊回来的名字 → 登记表上的名字;不认识的回 null(主进程按「没有这个工具」拒) */
 export function asToolName(name: string): ToolName | null {
   return (Object.values(TOOL_NAMES) as string[]).includes(name) ? (name as ToolName) : null
 }

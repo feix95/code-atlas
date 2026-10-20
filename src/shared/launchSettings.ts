@@ -1,6 +1,6 @@
-// 每个模型的「高级启动」户口(智能启动锤第三期):override 存档/清洗、
+// 每个模型的「高级启动」登记(智能启动批次第三期):override 存档/清洗、
 // 专家命令行解析、重启对账签名。纯函数,不碰文件/进程,渲染层与主进程共用一份。
-// 规矩:默认全自动(什么都不存);用户指定过的字段按模型文件各自记一本账,换模型不串门。
+// 规矩:默认全自动(什么都不存);用户指定过的字段按模型文件各自记同一数据源,换模型不串门。
 
 /** 用户可指定的启动字段(LaunchOverrides 去掉 contextSize —— 上下文归「上下文窗口」独管,不两头记账) */
 export interface LaunchFieldOverrides {
@@ -22,7 +22,7 @@ const EXTRA_ARGS_MAX = 300
 /** 原型链雷区:这些键进对象会污染原型,一律拒收 */
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
-/** 模型路径 → 账本键:统一反斜杠 + 小写(Windows 大小写不敏感,A/B 盘符混写也认同一本账) */
+/** 模型路径 → 状态表键:统一反斜杠 + 小写(Windows 大小写不敏感,A/B 盘符混写也认同同一数据源) */
 export function normalizeModelPathKey(p: string): string {
   return p.trim().replace(/\//g, '\\').toLowerCase()
 }

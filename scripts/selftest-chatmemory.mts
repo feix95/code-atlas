@@ -233,11 +233,11 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   const toolTexts = squeezed.messages.flatMap((m) => (m.role === 'tool' ? [m.content] : []))
   assert.ok(
     toolTexts[0].includes('早先翻看的资料') && toolTexts[0].includes('src/a.ts'),
-    '最旧的工具原文被换成占位纸条,点明翻的是什么'
+    '最旧的工具原文被换成占位注记,点明翻的是什么'
   )
   assert.ok(
     toolTexts[0].includes('允许重读') && toolTexts[0].includes('原文约'),
-    '纸条写明原文长度并允许重读'
+    '注记写明原文长度并允许重读'
   )
   assert.equal(toolTexts[toolTexts.length - 1], bigResult('src/c.ts'), '最近一轮的工具原文原样保留')
   assert.ok(
@@ -327,7 +327,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.equal(
     smallTierHistoryBudget({ contextTokens: 4096, fixedTokens: 4000, replyTokens: 1024 }),
     1024,
-    '锅再挤也有保底'
+    '上下文再紧也有保底'
   )
   const flat = flattenToolMessages([
     { role: 'user', content: '问' },
@@ -419,7 +419,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   )
 }
 
-// ── 附件户口本(滑跪案):纸条记账、洗形、拼条 —— 「你读完了吗/接着读完它」的据 ──
+// ── 附件登记表(附件追问):注记记账、洗形、拼条 —— 「你读完了吗/接着读完它」的据 ──
 {
   const store = createChatFileMemoStore({ sessionsMax: 2, filesMax: 2 })
   const note = (name: string, totalLines: number, shownEndLine: number, rootId?: string) => ({
@@ -434,7 +434,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.deepEqual(
     store.peek('c1').map((f) => f.name),
     ['b.md', 'a.md'],
-    '新文件排最前,旧纸条还留着'
+    '新文件排最前,旧注记还留着'
   )
   store.update('c1', [note('a.md', 100, 100, 'external_1')])
   assert.deepEqual(
@@ -479,20 +479,20 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   const full = buildFileMemoNote([
     { name: 'a.md', totalLines: 100, shownEndLine: 100, rootId: 'external_1' }
   ])
-  assert.ok(full && full.startsWith(TAG.programNote.open), '纸条包 program_note')
-  assert.ok(full.includes('整份带的') && full.includes('rootId=external_1'), '整份的纸条给重看的路')
+  assert.ok(full && full.startsWith(TAG.programNote.open), '注记包 program_note')
+  assert.ok(full.includes('整份带的') && full.includes('rootId=external_1'), '整份的注记给重看的路')
   const partial = buildFileMemoNote([
     { name: 'b.md', totalLines: 50, shownEndLine: 20, rootId: 'external_2' }
   ])
   assert.ok(
     partial.includes('只带了第 1-20 行 / 共 50 行') && partial.includes('offset=21'),
-    '没读完的纸条给续读的 offset'
+    '没读完的注记给续读的 offset'
   )
   const pathOnly = buildFileMemoNote([
     { name: 'c.md', totalLines: 50, shownEndLine: 50, relPath: 'docs/c.md' }
   ])
   assert.ok(pathOnly.includes('docs/c.md'), '项目内文件用相对路径指路')
-  assert.equal(buildFileMemoNote([]), null, '没纸条不垫话')
+  assert.equal(buildFileMemoNote([]), null, '没注记不垫话')
 }
 
 console.log('selftest-chatmemory ok')

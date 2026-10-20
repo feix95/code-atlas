@@ -1,4 +1,4 @@
-// ── 第一百一十三锤:个性化(说话方式)──
+// ── 第一百一十三批:个性化(说话方式)──
 // 用户想让 AI 怎么跟他说话:整体语气 + 一段自订指令。
 // 这里只管两件纯事:拼成提示词、把脏存档洗干净 —— 不碰配置读写,不碰界面。
 //
@@ -6,7 +6,7 @@
 // 再单独包 <custom_request> —— 标签里是用户偏好,改说法不改事实;诚实边界由内核统管,
 // 不再单独垫尾巴(2.0 内核已含「如实相告、承认不确定」)。
 
-/** 整体语气(第一百一十八锤补,小葵定的三档人设;第一百五十一锤加回「默认」档):
+/** 整体语气(第一百一十八批补,产品定的三档人设;第一百五十一批加回「默认」档):
  * 默认 = 不垫任何语气人设,模型原汁原味;友善 / 专业 / 幽默 才是真的垫人设 */
 export type ToneKey = 'default' | 'friendly' | 'professional' | 'humorous'
 
@@ -31,7 +31,7 @@ export const TONE_OPTIONS: Array<{ key: ToneKey; label: string; hint: string }> 
   { key: 'humorous', label: '幽默', hint: '轻松且直白' }
 ]
 
-/** 讲解深度三档(AI 提示词体系重写第一批,小葵定的档名和介绍):档位的提示词文本(教学切片)住在 ai/prompts.ts,不进风格段 —— 讲法和语气是两路 */
+/** 讲解深度三档(AI 提示词体系重写第一批,产品定的档名和介绍):档位的提示词文本(教学切片)住在 ai/prompts.ts,不进风格段 —— 讲法和语气是两路 */
 export const TEACHING_OPTIONS: Array<{ key: TeachingLevel; label: string; hint: string }> = [
   { key: 'off', label: '简洁', hint: '只说是干什么的' },
   { key: 'brief', label: '精简', hint: '先骨架，带名词小课堂' },
@@ -45,7 +45,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationConfig = {
 }
 
 const TONE_LINES: Record<Exclude<ToneKey, 'default'>, string> = {
-  // 三档人设的 prompt 都是小葵逐字定的(提示词体系重写第二批换的新稿),改一个字先问她;
+  // 三档人设的 prompt 都是产品逐字定的(提示词体系重写第二批换的新稿),改一个字须经产品确认;
   // 「默认」档不住这里:它代表不垫语气,buildPersonalizationPrompt 里直接跳过
   friendly:
     '你说话友善、温暖、健谈,像跟好朋友聊天:语气自然有温度,会关心对方、记得细节、顺着情绪接话。健谈但不啰嗦,适当展开想法,让对话流动。用温和的玩笑和鼓励拉近距离;对方开心就一起高兴,低落时先接住情绪。不说教、不冷冰冰。',

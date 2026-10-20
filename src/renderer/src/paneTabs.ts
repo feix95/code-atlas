@@ -1,4 +1,4 @@
-// 右栏页签的户口本:页签/页签组两个账本格式,发号器与比例夹子。
+// 右栏页签的登记表:页签/页签组两个状态表格式,发号器与比例夹子。
 import type { PaneKind } from './paneKinds'
 
 /**
@@ -40,13 +40,13 @@ export interface PaneGroup {
   id: string
   tabs: PaneTab[]
   activeId: string | null
-  /** 寄居窗口(页签撕窗锤):undefined/'main' = 主窗;'aux-N' = 撕出去的子窗。
-   *  户口挂组不挂签:组才是分屏/渲染单元,签的户口跟着它所在的组走;
+  /** 寄居窗口(页签独立窗口):undefined/'main' = 主窗;'aux-N' = 拆出去的子窗。
+   *  登记挂组不挂签:组才是分屏/渲染单元,签的登记跟着它所在的组走;
    *  存档不落这个字段 —— 子窗布局不记,重开时子窗的签一律回主窗 */
   host?: string
 }
 
-/** 主窗户口名:host 缺省就是它(所有老账本/存档天然主窗) */
+/** 主窗登记名:host 缺省就是它(所有老状态表/存档天然主窗) */
 export const MAIN_HOST = 'main'
 
 /** 组的寄居窗口名(纯函数):没填就是主窗 */
@@ -60,9 +60,9 @@ export function groupsForHost(groups: PaneGroup[], host: string): PaneGroup[] {
 }
 
 /**
- * 把页签挪进目标窗口的组(纯函数,撕窗的唯一换账通道):
+ * 把页签挪进目标窗口的组(纯函数,拆出独立窗口的唯一换账通道):
  * 目标窗已有组就落第一组末尾,没有就现立;源组搬空自己消亡,激活指针落到新组。
- * 返回 null = 没找到这张签,账本原样。
+ * 返回 null = 没找到这张签,状态表原样。
  */
 export function moveTabToHost(
   groups: PaneGroup[],
@@ -91,7 +91,7 @@ export function moveTabToHost(
   return { groups: kept, activeGroupId: dst.id }
 }
 
-/** 某扇窗名下的组整窝清掉(纯函数):子窗被关 = 它名下的签连组一起销户 */
+/** 某扇窗名下的组整窝清掉(纯函数):子窗被关 = 它名下的签连组一起关闭并清理 */
 export function dropHostGroups(groups: PaneGroup[], host: string): PaneGroup[] {
   return groups.filter((g) => groupHost(g) !== host)
 }

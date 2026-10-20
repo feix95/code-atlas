@@ -3,7 +3,7 @@
  * 只导出组件)。模块级单例:全 app 同时最多一张菜单,链接按钮只管喊「开」。
  */
 
-/** 备注系列动作(菜单统一大锤,小葵拍的:对着文件右键 = 复制路径/资源管理器/写备注三件套):
+/** 备注系列动作(菜单统一批次,产品裁定:对着文件右键 = 复制路径/资源管理器/写备注三件套):
  *  树菜单、聊天绿字链接,一处规格两家共用。
  *  编辑框就地长在菜单里,所以这里给的是「现有正文 + 落盘口」,不再需要外部弹窗。 */
 export interface FilePathNoteActions {
@@ -21,7 +21,7 @@ export interface FilePathMenuRequest {
   x: number
   y: number
   relPath: string
-  /** 菜单开在哪个 document(realm 铁律):主窗和每个子窗各挂一台菜单,各认各的请求 */
+  /** 菜单开在哪个 document(渲染域隔离):主窗和每个子窗各挂一台菜单,各认各的请求 */
   doc: Document
   /** 复制完整路径:成功返回绝对路径;失败返回 null(菜单里说人话,不弹错误框) */
   copy: () => Promise<string | null>
@@ -74,7 +74,7 @@ export function openFilePathMenuFor(
   })
 }
 
-/** 收摊(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
+/** 关闭(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
 export function closeFilePathMenu(): void {
   menuRequest = null
   emit()

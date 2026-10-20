@@ -109,7 +109,7 @@ export function tavilyUsageText(usage: TavilyUsageInfo): string {
 /**
  * 状态码 → 结论(纯函数,自测覆盖):照 Tavily 官方文档的分档 ——
  * 401 说「Key 错或没给」;432/433 是额度/账单限额用完(Key 本身没错);429 请求太频繁;
- * 5xx 是它自己出问题。连都没连上(超时/断网/DNS 不通)走 unreachable,那不是 Key 的锅。
+ * 5xx 是它自己出问题。连都没连上(超时/断网/DNS 不通)走 unreachable,那不是 Key 的问题。
  */
 export function tavilyVerdictFromStatus(status: number): TavilyProbeVerdict {
   if (status >= 200 && status < 300) return 'ok'

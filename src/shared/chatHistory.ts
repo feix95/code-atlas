@@ -1,5 +1,5 @@
 /**
- * 自由聊天的历史账本(答旧题修复锤):渲染层和自测共用同一份口径。
+ * 自由聊天的历史状态表(答旧题修复批次):渲染层和自测共用同一份口径。
  * 病根:以前渲染层按「条」收历史,报错/取消轮的提问一发出就永久是 done、照样入史,
  * 它的回答却被过滤 —— 历史里留下一道「问了从没被答」的悬空旧问题,沉到历史中间;
  * 合并逻辑再把旧问题和下一问粘成一条,小模型看见「连问两件事只有一条回答」,
@@ -45,7 +45,7 @@ export interface HistorySourceMessage {
   role: 'user' | 'assistant' | 'note'
   state?: string
   text?: string
-  /** 这轮附带的图片(第一百五十二锤):历史只记「附过几张图」一句话,图片本体不进历史 */
+  /** 这轮附带的图片(第一百五十二批):历史只记「附过几张图」一句话,图片本体不进历史 */
   images?: readonly unknown[]
 }
 
@@ -72,7 +72,7 @@ export function collectHistoryRounds(
     const answer = answerAt > i ? messages[answerAt] : undefined
     roundEnd = i
     const qText = question.text?.trim() ?? ''
-    // 附过图的那轮在历史里留一句话交代(第一百五十二锤):图片本体是 data URL,
+    // 附过图的那轮在历史里留一句话交代(第一百五十二批):图片本体是 data URL,
     // 绝不进历史 —— 不然一轮旧图就把小模型的上下文吃干抹净
     const imageCount = question.images?.length ?? 0
     const imageMark =

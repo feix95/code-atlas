@@ -4,8 +4,8 @@
  * 全是纯函数 —— 渲染层与主进程共用同一把尺子,自测一把全摁住。
  * 路线概要:文件拖/选进来 = 内容进这一轮消息(当资料,不是指令);装不下按行截断,
  * 行账(第 1-N 行 / 共 M 行)明写在提示词里;翻文件开着时探针可带 offset 自己续读。
- * 系统拖/选进来的另带本机绝对路径(absPath),主进程凭它发本次运行的只读门卡
- * (拖入即授权),截断的长文件就有续读的钥匙;文件树拖来的走 relPath,不占门卡。
+ * 系统拖/选进来的另带本机绝对路径(absPath),主进程凭它发本次运行的只读授权令牌
+ * (拖入即授权),截断的长文件就有续读的钥匙;文件树拖来的走 relPath,不占授权令牌。
  */
 
 /** 一轮最多带几个文件(和图片同一个口径):小模型上下文有限,一份文件就占不少座 */
@@ -14,7 +14,7 @@ export const CHAT_FILES_MAX = 3
 /** 单份文件的静态上限(单位:字符):渲染层先按它裁到行边界,主进程也守这条线 */
 export const CHAT_FILE_CHARS_MAX = 20000
 
-/** 一轮里所有文件的动态预算:穷有保底、富有封顶(和引用账同一口径) */
+/** 一轮里所有文件的动态预算:设下限与上限(和引用账同一口径) */
 export const FILE_TOTAL_CHARS_MIN = 6000
 export const FILE_TOTAL_CHARS_MAX = 20000
 
@@ -78,7 +78,7 @@ export function clipTextToLines(text: string, maxChars: number): FileTextClip {
   return { text: lines.slice(0, kept).join('\n'), shownEndLine: kept, truncated: true }
 }
 
-/** 每份文件分到的座位与裁好后的正文 */
+/** 每份文件分到的配额与裁好后的正文 */
 export interface FileBudgetItem {
   text: string
   shownEndLine: number
@@ -87,14 +87,14 @@ export interface FileBudgetItem {
 
 /**
  * 文件预算规划(纯函数,自测覆盖):一轮带的所有文件共享一个动态总额度 ——
- * 免费座位折成字符(保守口径:一个字算一个 token),穷有保底(6000)、富有封顶(20000)。
- * 分座按「剩余座位 / 剩余人数」走:小文件省下的座位顺延给后面的大文件;
+ * 可用配额折成字符(保守口径:一个字算一个 token),设下限(6000)、设上限(20000)。
+ * 分座按「剩余配额 / 剩余人数」走:小文件省下的配额顺延给后面的大文件;
  * 单份文件另受静态上限(20000)约束。截断只裁到行边界,绝不静默丢内容(注记由装配层写)。
  */
 export function planFileAttachments(input: {
   ctxTokens: number
   replyTokens: number
-  /** 已排定的固定开销(人设+资料+问题+联网+图片),文件不许抢它们的座 */
+  /** 已排定的固定开销(人设+资料+问题+联网+图片),文件不许占用其配额 */
   otherTokens: number
   files: Array<{ text: string; totalLines: number }>
 }): FileBudgetItem[] {

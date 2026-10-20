@@ -11,7 +11,7 @@ const GGH = 0x46554747 // 'GGUF' little-endian
 const GGUF_STRING = 8
 const GGUF_ARRAY = 9
 
-/** 键名是「架构名.字段名」两段:字段后缀 → GgufShape 户口(架构名由键前缀决定) */
+/** 键名是「架构名.字段名」两段:字段后缀 → GgufShape 登记(架构名由键前缀决定) */
 const FIELD_SUFFIXES: Record<string, keyof Omit<GgufShape, 'architecture'>> = {
   '.context_length': 'contextLength',
   '.block_count': 'blockCount',
@@ -271,7 +271,7 @@ export function parseGgufHeader(buf: Buffer): GgufParseResult {
     for (let i = 0; i < kvCount; i++) {
       const key = readString(r)
       const type = r.u32()
-      // general.architecture 是户口页,先登记但不进字段兜
+      // general.architecture 是登记页,先登记但不进字段兜
       if (key === 'general.architecture' && type === GGUF_STRING) {
         archName = readString(r)
         continue
@@ -322,7 +322,7 @@ export function parseGgufHeader(buf: Buffer): GgufParseResult {
     headCount: winner?.headCount ?? null,
     kvHeadCount: winner?.kvHeadCount ?? null,
     embeddingLength: winner?.embeddingLength ?? null,
-    // 户口页写谁就是谁;没写但兜里有货就报那个前缀(推断出来的)
+    // 登记页写谁就是谁;没写但兜里有货就报那个前缀(推断出来的)
     architecture:
       archName ?? (winner ? (bagOrder.find((n) => bags.get(n) === winner) ?? null) : null),
     expertCount: winner?.expertCount ?? null,

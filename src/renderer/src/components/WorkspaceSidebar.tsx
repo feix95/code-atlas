@@ -80,7 +80,7 @@ export function WorkspaceSidebar({
   saveNote: (relPath: string, text: string) => void
   openPreview: (relPath: string) => void
   treeNote: string | null
-  /** 顶栏搜索词的深搜账本(UI v3 §7.2):非 null = 树区整体换成结果清单;
+  /** 顶栏搜索词的深搜状态表(UI v3 §7.2):非 null = 树区整体换成结果清单;
       null = 没词/没工作区,文件树原样站岗 */
   search: {
     q: string
@@ -103,11 +103,11 @@ export function WorkspaceSidebar({
   dismissPathHint: () => void
   goPath: () => Promise<void>
   setPathShaking: React.Dispatch<React.SetStateAction<boolean>>
-  /** 工作区菜单(§7.1):recents 账本原样进,菜单内部分 pin/历史两区 */
+  /** 工作区菜单(§7.1):recents 状态表原样进,菜单内部分 pin/历史两区 */
   recents: RecentProject[]
   /** 菜单里点条目:直接进入该工作区(= 输路径回车的同一动作) */
   onOpenWorkspace: (path: string) => void
-  /** 行首 pin 钮:pin ↔ unpin,账本在 App 层写 */
+  /** 行首 pin 钮:pin ↔ unpin,状态表在 App 层写 */
   onTogglePin: (path: string) => void
   /** 行尾 × 即删(无撤销) */
   onRemoveRecent: (path: string) => void

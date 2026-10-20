@@ -1,5 +1,5 @@
-// 设置导航的共享户口(Obsidian 式侧栏接管):分类键与条目表收在这里,
-// 侧栏(WorkspaceSidebar)和页面(SettingsPage)两边认同一本账。
+// 设置导航的共享登记(Obsidian 式侧栏接管):分类键与条目表收在这里,
+// 侧栏(WorkspaceSidebar)和页面(SettingsPage)两边认同同一数据源。
 // 左侧一项 = 右侧一整页(不滚动翻节):键同时是页键。
 
 export type SectionKey = 'appearance' | 'ai' | 'net' | 'about'

@@ -1,7 +1,7 @@
-// 第八十七锤:Developer 日志窗口 —— LM Studio 同款的后台透明度。
-// 引擎原话(llama-server 吐的每一行)、请求报账(提问/完成/token 账/耗时)、应用记账
-// (启动/就绪/退出/收尸)全在这一本账里。独立小窗,主窗干活它旁观。
-// 隐私线:账本只记元数据和引擎输出,用户问了什么、材料里有什么,一个字不进账。
+// 第八十七批:Developer 日志窗口 —— LM Studio 同款的后台透明度。
+// 引擎输出(llama-server 吐的每一行)、请求用量(提问/完成/token 账/耗时)、应用记账
+// (启动/就绪/退出/收尸)全在这同一数据源里。独立小窗,主窗干活它旁观。
+// 隐私线:状态表只记元数据和引擎输出,用户问了什么、材料里有什么,一个字不进账。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DevLogEntry, DevLogSource } from '../../shared/types.ts'
 import { DEVLOG_MAX, devLogSourceName, formatDevLogTime } from '../../shared/devlog.ts'
@@ -107,7 +107,7 @@ export function DevLogsPage(): React.JSX.Element {
       >
         <span className="devlog-title">
           Developer 日志
-          <small>引擎原话 · 请求报账 · 应用记账 —— 只记元数据,问题内容不进账</small>
+          <small>引擎输出 · 请求用量 · 应用记账 —— 只记元数据,问题内容不进账</small>
         </span>
         <span className="devlog-count mono">
           {filtered.length === entries.length
@@ -165,7 +165,7 @@ export function DevLogsPage(): React.JSX.Element {
         {filtered.length === 0 ? (
           <p className="devlog-empty">
             {entries.length === 0
-              ? '账本干干净净 —— 等引擎吐第一行字(首次用 AI 时它才会醒)'
+              ? '状态表干干净净 —— 等引擎吐第一行字(首次用 AI 时它才会醒)'
               : '没有对得上筛子的行:换个来源或换个词试试'}
           </p>
         ) : (

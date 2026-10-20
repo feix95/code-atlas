@@ -32,9 +32,9 @@ import type { ChatFileAttachment } from '@shared/chatFiles'
  * 思考行 = 脑图标 + 流光「正在思考」+弹跳点,想完收成「想了 Xs ▸」可点开看过程。
  * 本轮动过联网就在消息下方挂程序记账的状态标签。
  * 示例问题点了直接发(和手动输入同一条路),不是仅有的问法。
- * 第一百一十一锤:预览模式下左栏选中的代码以引用原子躺在舱内文字流里,和问题一起发出去。
- * 拆分户口:胶囊舱 → FreeChatComposer;回答气泡+思考行 → FreeChatBubble;
- * 程序递话/命中卡 → FreeChatNotes(纯搬家不改行为)。
+ * 第一百一十一批:预览模式下左栏选中的代码以引用原子躺在舱内文字流里,和问题一起发出去。
+ * 拆分登记:胶囊舱 → FreeChatComposer;回答气泡+思考行 → FreeChatBubble;
+ * 程序递话/命中卡 → FreeChatNotes(纯迁移不改行为)。
  */
 
 const CHAT_EXAMPLES = [
@@ -71,25 +71,25 @@ export function FreeChatPanel({
   fileLinks
 }: {
   chat: AiChatApi
-  /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
+  /** 已引用的代码段(第一百一十一批):预览模式下由左栏选中攒出来 */
   refs?: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
-  /** 拖来的文件读盘走 rootPath(文件附件锤):树里拖文件当附件读原文,拖图片进待发图 */
+  /** 拖来的文件读盘走 rootPath(文件附件批次):树里拖文件当附件读原文,拖图片进待发图 */
   rootPath?: string
-  /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
+  /** 预览里选中的一段拖进来挂引用(选中直拖批次):ref 正文自包含,不用读盘 */
   onDropRef?: (ref: ChatCodeRef) => void
-  /** 文件链接(索引 + 点击去处):AI 提到对上户口的文件就变可点,点了左边开预览;不传就纯文字 */
+  /** 文件链接(索引 + 点击去处):AI 提到对上登记的文件就变可点,点了左边开预览;不传就纯文字 */
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const draftRefs = refs ?? []
-  // 图片附件(第一百五十二锤):能力账订阅 + 待发图片账本;拒收/清账的灰字走 chat.note
+  // 图片附件(第一百五十二批):能力账订阅 + 待发图片状态;拒收/清账的灰字走 chat.note
   const vision = useModelVision()
   const chatImages = useChatImages(vision, chat.note)
   const chatFiles = useChatFiles(chat.note)
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
-  // 粘底跟滚(第六十一锤):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,浮出箭头报个位。
+  // 粘底跟滚(第六十一批):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,浮出箭头报个位。
   // 箭头浮出时轻弹一次报信;流式期间保持安静 —— 逐段重放弹跳动画会变成高频闪动(小葵案)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
@@ -123,7 +123,7 @@ export function FreeChatPanel({
     setShowJump(false)
   }
 
-  // 重试回调的稳定三件套(隐身案这锤):消息列表、发话器、回底函数每轮渲染都是新身份,
+  // 重试回调的稳定三件套(隐身案本批):消息列表、发话器、回底函数每轮渲染都是新身份,
   // 直接进闭包的话,每条气泡拿到的 onRetry 都不一样,刚上的 memo 当场破功 —— 请进 ref,
   // retryFrom 从此一个身份用到底。
   const retryCtxRef = useRef({ messages: chat.messages, send: chat.send, forceBottom })
@@ -168,7 +168,7 @@ export function FreeChatPanel({
 
   // 重试只挂在最后一条回答上,历史回答不翻烧饼。这份账一轮渲染算一次 —— 原先写在
   // map 里,每条消息都把整个数组复制一遍倒着找,消息一多、流式一刷就是 O(n²),
-  // 聊久了主线程越扛越沉(外援指认的沉疴,这锤拆掉)
+  // 聊久了主线程越扛越沉(外援指认的沉疴,本批拆掉)
   const lastAssistantKey = useMemo(() => {
     for (let i = chat.messages.length - 1; i >= 0; i--) {
       if (chat.messages[i].role === 'assistant') return chat.messages[i].key
@@ -209,7 +209,7 @@ export function FreeChatPanel({
     chat.send(q, draftRefs, undefined, chatFiles.files)
   }
 
-  /** 开场示例 chips:只在一条消息都还没有时挂着;聊起来就收摊,不再推荐 */
+  /** 开场示例 chips:只在一条消息都还没有时挂着;聊起来就关闭,不再推荐 */
   const chipList = chat.messages.length === 0 ? CHAT_EXAMPLES : []
 
   const composerEl = (
@@ -267,8 +267,8 @@ export function FreeChatPanel({
             }
             if (!node.relPath) return
             const name = node.relPath.split('/').pop() ?? node.relPath
-            // 拖拽分流(文件附件锤,对齐 Claude Code 的 @文件):图片走图片链;
-            // 其余文本文件当文件附件读原文(读不了的由账本自己垫灰字)
+            // 拖拽分流(文件附件批次,对齐 Claude Code 的 @文件):图片走图片链;
+            // 其余文本文件当文件附件读原文(读不了的由状态表自己垫灰字)
             if (isImageFile(name)) void chatImages.addFromRelPath(rootPath, node.relPath)
             else void chatFiles.addFromRelPath(rootPath, node.relPath)
           } catch {
@@ -324,8 +324,8 @@ export function FreeChatPanel({
             <div className="fc-col">
               {chat.messages.map((m, idx) => {
                 if (m.role === 'note') {
-                  // 程序垫的灰字条(第一百二十四锤):像旁边有人递了份新材料,不装成谁说的话。
-                  // 探针干活的步骤(第一百四十一锤)走时间线小样:左对齐带点,和居中的通知灰字分开
+                  // 程序垫的灰字条(第一百二十四批):像旁边有人递了份新材料,不装成谁说的话。
+                  // 探针干活的步骤(第一百四十一批)走时间线小样:左对齐带点,和居中的通知灰字分开
                   if (m.kind === 'step') {
                     return (
                       <div key={m.key} className="chat-note is-step" role="status">
@@ -333,11 +333,11 @@ export function FreeChatPanel({
                       </div>
                     )
                   }
-                  // 命中清单卡(LLM 优化锤):搜索的完整命中程序直接摆卡,可点跳行
+                  // 命中清单卡(LLM 优化批次):搜索的完整命中程序直接摆卡,可点跳行
                   if (m.kind === 'matches' && m.matches) {
                     return <MatchListCard key={m.key} card={m.matches} fileLinks={fileLinks} />
                   }
-                  // 压缩摘要卡(第一百四十二锤):旧对话的提炼成果,点开看全文,不用的时候收着不占地
+                  // 压缩摘要卡(第一百四十二批):旧对话的提炼成果,点开看全文,不用的时候收着不占地
                   if (m.kind === 'summary') {
                     return (
                       <details key={m.key} className="chat-note is-summary" role="status">

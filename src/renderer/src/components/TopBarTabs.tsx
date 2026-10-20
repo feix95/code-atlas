@@ -8,7 +8,7 @@
 // 按住位移超阈值开拖 → 本组条带内走 Chromium 活序模型(源签真身 translateX
 // 跟指针滑,邻居按落点序号滑动补位,条带全程满编);指针离开本带/悬到别家条带
 // 则替身胶囊现身跟光标,别家条带用 margin 缝+插入线预告落点;悬到正文区按
-// 中心/边缘判分屏许诺;窗外松手撕新子窗。
+// 中心/边缘判分屏许诺;窗外松手拆出新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { TreeIcon } from './Icons'
@@ -23,9 +23,9 @@ const STRIP_BLEED_X = 6
 const STRIP_BLEED_TOP = 4
 const STRIP_BLEED_BOTTOM = 8
 /** 正文区边缘分屏带的横向占比(封顶 120px):贴到亮半边提示 —— VS Code 同款手势 */
-/** 定向拆半屏的判定带:正文左右各 1/3 宽、全高都算数(小葵定的手感:拖到三分之一就亮蓝) */
+/** 定向拆半屏的判定带:正文左右各 1/3 宽、全高都算数(产品定的手感:拖到三分之一就亮蓝) */
 const SPLIT_EDGE_THIRD = 1 / 3
-/** 芯片松手后的淡出时长(拖出窗撕新子窗那条路) */
+/** 芯片松手后的淡出时长(拖出窗拆出新子窗那条路) */
 const CHIP_FADE_MS = 140
 /** 沉降飞行时长:芯片飞回落点长成页签(与 CSS is-settle 的过渡时长对齐) */
 const CHIP_SETTLE_MS = 210
@@ -42,7 +42,7 @@ interface SettleRect {
   height: number
 }
 
-/** 拖拽芯片的呈现账本:替身长什么样、抓握偏移、跟到哪儿、是不是正在淡出 */
+/** 拖拽芯片的呈现状态:替身长什么样、抓握偏移、跟到哪儿、是不是正在淡出 */
 interface TabDragState {
   id: string
   icon: string
@@ -76,7 +76,7 @@ interface StripSnap {
   bottom: number
   /** 内层 .tabbar 的左缘(视口坐标):插入线的 x 按它折回带内坐标 */
   barLeft: number
-  /** 各页签的横向户口(视口坐标):中线判插序,左右缘算插入线的落点 */
+  /** 各页签的横向登记(视口坐标):中线判插序,左右缘算插入线的落点 */
   mids: { id: string; left: number; mid: number; right: number }[]
 }
 
@@ -88,7 +88,7 @@ interface BodySnap {
   bottom: number
 }
 
-/** 当前落点:页签带插队 / 正文分屏(中心或左右缘) / 窗外(撕新子窗) / 无处(松手不动作) */
+/** 当前落点:页签带插队 / 正文分屏(中心或左右缘) / 窗外(拆出新子窗) / 无处(松手不动作) */
 type DragZone =
   | { type: 'strip'; groupId: string; index: number }
   | { type: 'pane'; groupId: string; zone: 'center' | 'left' | 'right' }
@@ -128,9 +128,9 @@ export function TopBarTabs({
   setDropMark: React.Dispatch<
     React.SetStateAction<{ groupId: string; zone: 'center' | 'left' | 'right' } | null>
   >
-  /** 拖出本窗松手(页签撕窗锤:撕去新子窗,语义由 App 定,这里只报是谁) */
+  /** 拖出本窗松手(页签独立窗口:拆去新子窗,语义由 App 定,这里只报是谁) */
   onTabDragEnd: (id: string) => void
-  /** 右键菜单「移到新窗口」:不拖也撕,所有签一视同仁 */
+  /** 右键菜单「移到新窗口」:不拖也可拆出,所有签一视同仁 */
   onDetachTab?: (id: string) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里指出来(App 的活) */
   onRevealInTree?: (id: string) => void
@@ -138,7 +138,7 @@ export function TopBarTabs({
   onTranslate?: (tab: PaneTab, lang: string) => void
   /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
   workspaceRoot?: string | null
-  /** 第一组分屏列占内容宽的比例(usePaneTabs 的账本,顶部条带认同一份) */
+  /** 第一组分屏列占内容宽的比例(usePaneTabs 的状态表,顶部条带认同一份) */
   paneSplit: number
 }): React.JSX.Element {
   // 第一组条带宽 = paneSplit × 内容列宽。用页签区宽当分母折回:
@@ -171,7 +171,7 @@ export function TopBarTabs({
   /** 页签 pointerdown 入场:先记起点,位移够阈值才升级成拖拽会话。
       监听挂 window(不捕获也收得到全部指针事件)—— 捕获得等确认开拖才上,
       不然 click 会被路由回页签,页签里的 × 钮整个失灵(亲历坑,别往回改)。
-      realm 铁律(页签撕窗锤):Portal 渲染进子窗的页签住在另一个 document,
+      渲染域隔离(页签独立窗口):Portal 渲染进子窗的页签住在另一个 document,
       监听/查询/视口量一律走 el.ownerDocument —— 挂全局 window 上子窗的拖拽全聋 */
   function beginTabDrag(e: React.PointerEvent<HTMLDivElement>, t: TabBarTab): void {
     if (e.button !== 0 || drag) return
@@ -233,7 +233,7 @@ export function TopBarTabs({
       }
       if (z.type === 'pane') {
         if (z.zone === 'center') {
-          // 中心松手:只认「别组页签挪来并组」;单组中心不动作(拆分走左右缘 —— 小葵拍板)
+          // 中心松手:只认「别组页签挪来并组」;单组中心不动作(拆分走左右缘 —— 产品裁定)
           if (srcGroupId !== z.groupId) moveTab(t.id, 'sibling', null)
         } else {
           moveTab(t.id, 'sibling', null, z.zone)
@@ -302,7 +302,7 @@ export function TopBarTabs({
 
     const move = (ev: PointerEvent): void => {
       // 失焦期间窗外松手会吃掉 pointerup(事件转给别家窗):按键早没了
-      // 却还在收 move = 松手被吞了,按取消收摊 —— Alt+Tab 切走/截图工具抢焦点同病
+      // 却还在收 move = 松手被吞了,按取消关闭 —— Alt+Tab 切走/截图工具抢焦点同病
       if ((ev.buttons & 1) === 0) {
         cancel()
         return
@@ -312,12 +312,12 @@ export function TopBarTabs({
       if (!started) {
         if (Math.abs(cx - e.clientX) + Math.abs(cy - e.clientY) < DRAG_START_PX) return
         started = true
-        // 此刻才捕获:窗外坐标还能继续报(拖出窗撕新窗指望它),
+        // 此刻才捕获:窗外坐标还能继续报(拖出窗拆出新窗指望它),
         // 而此前 × 钮/右键的 click 走正常派发,不受影响
         el.setPointerCapture(ev.pointerId)
         captured = true
         doc.body.classList.add('is-tab-dragging')
-        // 主动收摊:按住没动的那 300ms 里提示可能已经合法亮过,捕获一上 mouseout 全拐回源签
+        // 主动关闭:按住没动的那 300ms 里提示可能已经合法亮过,捕获一上 mouseout 全回退到源签
         // (relatedTarget 还在宿内→tooltip 永远收不到「离开」),不喊一声它就冻在屏上陪完整个拖拽
         doc.dispatchEvent(new CustomEvent('atlas:tab-drag-start'))
         view.addEventListener('keydown', onKey)
@@ -451,7 +451,7 @@ export function TopBarTabs({
       swallowClick()
       const z = zone
       if (z.type === 'outside') {
-        // 拖出窗撕新窗:不走沉降(窗外没落点),原地淡出交账
+        // 拖出窗拆出新窗:不走沉降(窗外没落点),原地淡出交账
         onTabDragEnd(t.id)
         setGap(null)
         setDropMark(null)
@@ -480,8 +480,8 @@ export function TopBarTabs({
       if (ev.key === 'Escape') cancel()
     }
 
-    // 窗被切走/藏起 = 这趟拖拽作废(小葵拍板:只有本窗点着才算在拖):
-    // blur/藏起走 cancel 飞回;还没过拖拽阈值的按下同样收摊(cancel 内部按 started 分流)
+    // 窗被切走/藏起 = 这趟拖拽作废(产品裁定:只有本窗点着才算在拖):
+    // blur/藏起走 cancel 飞回;还没过拖拽阈值的按下同样关闭(cancel 内部按 started 分流)
     const onVisChange = (): void => {
       if (doc.visibilityState === 'hidden') cancel()
     }

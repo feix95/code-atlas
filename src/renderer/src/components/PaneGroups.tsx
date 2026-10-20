@@ -58,7 +58,7 @@ export function PaneGroups({
             <div
               className="pane-group"
               /* 占比用 flex 缩写传:.pane-group 的 CSS 是 flex:1(basis 钉死 0%),
-                 内联 width 会被 flex 布局无视 —— 拖分割条账本在变、画面纹丝不动(小葵报的案)。
+                 内联 width 会被 flex 布局无视 —— 拖分割条状态表在变、画面纹丝不动(小葵报的案)。
                  第一组 0 0 定死占比,第二组照旧 flex:1 吃剩余 */
               style={
                 groups.length === 2 && gi === 0
@@ -69,7 +69,7 @@ export function PaneGroups({
             >
               <div className="pane-body" data-group-id={g.id}>
                 {act && act.kind !== 'settings' ? (
-                  // 每组正房只住一个房间(VS Code 的克制);设置签走下面的保活层
+                  // 每组页签活 DOM只住一个房间(VS Code 的克制);设置签走下面的保活层
                   renderTabBody(act)
                 ) : !act ? (
                   // 这组没有亮着的页签(还没开签/全关光):大 logo 底板

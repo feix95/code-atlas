@@ -7,7 +7,7 @@
 export type PaneKind =
   'chat' | 'preview' | 'graph' | 'settings' | 'peek' | 'uiworkbench' | 'translate'
 
-/** 单例签的名牌户口(文件签的名/图标来自文件自己,不从这里领) */
+/** 单例签的名牌登记(文件签的名/图标来自文件自己,不从这里领) */
 export const KIND_LABELS: Record<PaneKind, string> = {
   chat: '自由对话',
   preview: '文件预览',

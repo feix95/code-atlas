@@ -19,7 +19,7 @@ interface BoundaryState {
 /** 渲染期崩溃的兜底网(2026-09-13 隐身案第二课)。
  * 以前任何一个组件渲染炸了,React 就把整棵树卸了 —— 透明窗一白屏就是整窗隐身,
  * 用户连「程序还在」都看不出来。现在每一层网接住自己范围的错:窗还在、话说明白、
- * 能就地重试;错误原样上报后台账本,根因照追不误。 */
+ * 能就地重试;错误原样上报后台状态表,根因照追不误。 */
 export class ErrorBoundary extends Component<BoundaryProps, BoundaryState> {
   state: BoundaryState = { broken: false }
 

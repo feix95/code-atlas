@@ -1,7 +1,7 @@
 /* ── 设置页(Obsidian 风格稿定版):左侧栏一项 = 右侧一整页;
    版式语言:扁平底、分组灰卡外露小标题、卡内行发丝线、左文右控一条轴。
-   说明灰字走 --chrome-muted(= 稿子 --faint 的亮暗真值);控件样式户口在 personalize.css。
-   即改即存:控件一拨当场生效并落盘,没有草稿账本也没有页脚 —— Obsidian/VS Code 同款。
+   说明灰字走 --chrome-muted(= 稿子 --faint 的亮暗真值);控件样式登记在 personalize.css。
+   即改即存:控件一拨当场生效并落盘,没有草稿状态表也没有页脚 —— Obsidian/VS Code 同款。
    颜色全走语义 token,亮暗自动换装 */
 
 /* 页签正文房间:填满整个 pane-body,左目录右内容在 .cfg-body 里分栏 */
@@ -211,7 +211,7 @@
 }
 
 /* 行间发丝线:统一 border-top 一像素画法(zoom×DPI 双重缩放下,底块 height:1px 会渲染得
-   比 border 粗且虚);颜色只认 --line 一个户口 */
+   比 border 粗且虚);颜色只认 --line 一个登记 */
 .cfg-divider {
   border-top: 1px solid var(--line);
 }

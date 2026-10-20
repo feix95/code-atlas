@@ -32,7 +32,7 @@ console.log('── 开发态(resourcesPath 没有或没货)→ 回退 node_modu
       engine.includes('web-tree-sitter'),
     '引擎路径指向 node_modules 的 web-tree-sitter'
   )
-  ok(existsSync(engine), '引擎 wasm 真实存在(dev 家底在)')
+  ok(existsSync(engine), '引擎 wasm 真实存在(dev 依赖在)')
   ok(grammars.includes('tree-sitter-wasms'), '字典目录指向 node_modules 的 tree-sitter-wasms')
   ok(existsSync(grammars), '字典目录真实存在')
 
@@ -82,7 +82,7 @@ console.log('── 行李清单对账:两家用到的语法字典,electron-buil
     `两家用到的 ${allFiles.size} 个语法字典全在打包清单里${missing.length ? `(缺:${missing.join('、')})` : ''}`
   )
 
-  // 语法总账自洽:户口本→语法的桥,每个目的地在语法账里都有行李;两家用的件都是账上的
+  // 语法总账自洽:登记表→语法的桥,每个目的地在语法账里都有行李;两家用的件都是账上的
   const badBridges = Object.entries(LANG_TO_GRAMMAR).filter(
     ([, g]) => GRAMMAR_WASM[g] === undefined
   )
@@ -98,12 +98,12 @@ console.log('── 行李清单对账:两家用到的语法字典,electron-buil
     `两家用的字典全在语法账上${offLedger.length ? `(账外:${offLedger.join('、')})` : ''}`
   )
 
-  // dev 家底也在:node_modules 里这些文件真实存在,不然自测跑不了真解析
+  // dev 依赖也在:node_modules 里这些文件真实存在,不然自测跑不了真解析
   const grammarsDir = grammarWasmDir({ resourcesPath: undefined, cwd: CWD })
   const absentOnDisk = [...allFiles].filter((file) => !existsSync(join(grammarsDir, file)))
   ok(
     absentOnDisk.length === 0,
-    `dev 家底 ${allFiles.size} 件字典真实在盘上${absentOnDisk.length ? `(缺:${absentOnDisk.join('、')})` : ''}`
+    `dev 依赖 ${allFiles.size} 件字典真实在盘上${absentOnDisk.length ? `(缺:${absentOnDisk.join('、')})` : ''}`
   )
 }
 

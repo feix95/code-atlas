@@ -3,10 +3,10 @@
 // 摆整齐说人话;唯一掺的判断是「带不动」标记,那是保护小白别白下 40GB 的兜底,不评好坏。
 // 数据一次拉内存里用,缓存几分钟,不落盘 —— 不给用户电脑留任何货架垃圾。
 
-/** 拉回来的整单(榜单 + 本机家底 + 实际用的源);类型住 shared,preload/渲染层引它不拉运行时依赖 */
+/** 拉回来的整单(榜单 + 本机规格 + 实际用的源);类型住 shared,preload/渲染层引它不拉运行时依赖 */
 export interface ShelfResult {
   entries: ShelfEntry[]
-  /** 本机家底(渲染层标「带不动」用) */
+  /** 本机规格(渲染层标「带不动」用) */
   spec: ShelfMachineSpec
   /** 实际用了哪个源(调试/界面小灰字「数据来自镜像」用) */
   source: 'huggingface' | 'mirror'
@@ -47,7 +47,7 @@ export interface ShelfEntry {
   license: string | null
 }
 
-/** 货架准入(2026-09-18 小葵定):不是文本打底的一律过滤 —— 产品只要文字/工具调用/视觉三样,
+/** 货架准入(2026-09-18 产品定):不是文本打底的一律过滤 —— 产品只要文字/工具调用/视觉三样,
  *  语音/向量/视频/分类这些 llama-server 当聊天模型跑不了的,不上架。
  *  白名单 = 任务标签直接命中;HF 大量 GGUF 量化仓不标 pipeline_tag(榜单 60 条里 44 条没标),
  *  tags 里有 conversational(带聊天模板)或白名单任务标签的也算文本打底,别把能跑的误杀。
@@ -87,7 +87,7 @@ export function parseParamScale(name: string): string | null {
   return `${Number.isInteger(max) ? max : max.toFixed(1)}B`
 }
 
-/** 本机家底(判定带不带得动用) */
+/** 本机规格(判定带不带得动用) */
 export interface ShelfMachineSpec {
   ramBytes: number
   /** 独显显存字节;认不出 = null(不影响判定,内存也兜得住,只是可能慢) */
@@ -122,7 +122,7 @@ export function sanitizeShelfEntry(raw: unknown): ShelfEntry | null {
   if (typeof raw !== 'object' || raw === null) return null
   const m = raw as Record<string, unknown>
   if (typeof m.id !== 'string' || m.id === '') return null
-  // 准入过滤(2026-09-18 小葵定):不是文本打底的直接不进货架,列表里根本见不着
+  // 准入过滤(2026-09-18 产品定):不是文本打底的直接不进货架,列表里根本见不着
   if (!isChatCapable(m)) return null
   const ggufObj =
     typeof m.gguf === 'object' && m.gguf !== null ? (m.gguf as Record<string, unknown>) : null
@@ -191,7 +191,7 @@ export function judgeRun(fileSizeBytes: number | null, spec: ShelfMachineSpec): 
   return 'yes'
 }
 
-/** 判定的两个词(界面原话,2026-09-18 小葵拍板走专业简短风);no 是硬拦前的事实陈述,tight 是提醒 */
+/** 判定的两个词(界面原话,2026-09-18 产品裁定走专业简短风);no 是硬拦前的事实陈述,tight 是提醒 */
 export function runVerdictLabel(verdict: RunVerdict): string {
   if (verdict === 'no') return '超出内存预算'
   if (verdict === 'tight') return '接近内存预算'

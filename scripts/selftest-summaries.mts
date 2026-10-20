@@ -77,7 +77,7 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 3. 档位1:类型标签已说清的不写字;黑话后缀给范畴词;诚实话兜底 ──
+  // ── 3. 档位1:类型标签已说清的不写字;非常用后缀给范畴词;诚实话兜底 ──
   const entry = file('index.ts', TS)
   const cssFile = file('index.css', CSS) // css 不是代码语言,不该被当成入口
   const kt = file('mystery.kt', KOTLIN)
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(entry).includes('入口'), '代码语言的 index.ts 是入口(档位2,真信息)')
   assert.ok(textOf(cssFile).includes('样式'), 'index.css → 范畴词「样式」')
   assert.equal(kt.summary, undefined, '任意 .kt:名字查不出词,老实闭嘴')
-  assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」(第九十九锤)')
+  assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」(第九十九批)')
   assert.equal(textOf(docMd), 'doc 文档', '.md → 范畴词「文档」')
   assert.equal(photo.summary, undefined, '.png 家喻户晓,沉默名单不写字')
   assert.equal(silentTxt.summary, undefined, '.txt 沉默名单不写字')
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(unknownExt).includes('未知类型'), '陌生后缀诚实说未知')
   assert.ok(textOf(noExt).includes('没有后缀'), '无后缀诚实说')
 
-  // ── 4. 目录名字典:正脸直说 ≤14 字,无人物拟人;风险目录带 sticky ──
+  // ── 4. 目录名字典:直述 ≤14 字,无人物拟人;风险目录带 sticky ──
   const src = dir('src', [file('a.ts', TS)])
   const insp = dir('inspiration', [file('idea.md')])
   const vendor = dir('vendor', [file('lib.so')])
@@ -163,14 +163,14 @@ async function main(): Promise<void> {
   assert.ok(textOf(empty).includes('空的，还没有内容'), '空目录像日志一样播报')
   assert.ok(textOf(drawers).includes('只含子文件夹，3 个'), '只有子目录要说清结构')
 
-  // ── 7. 根节点聚合:子孙家底全算进来;目录个个有标签,档位1文件可留空 ──
+  // ── 7. 根节点聚合:子孙合计全算进来;目录个个有标签,档位1文件可留空 ──
   const root = dir('code-atlas', [
     dir('src', [file('a.ts', TS), file('b.ts', TS), file('index.ts', TS)]),
     dir('docs', [file('guide.md'), file('faq.md')]),
     file('package.json')
   ])
   annotateSummaries(root)
-  assert.ok(textOf(root).includes('6 个文件'), '根的家底要含全部子孙(3+2+1)')
+  assert.ok(textOf(root).includes('6 个文件'), '根的合计要含全部子孙(3+2+1)')
   assert.ok(textOf(root).includes('TypeScript'), '根的主语言要看全部子孙')
   assert.ok(textOf(root.children[0]).includes('项目全部源代码'), '子目录各自有标签')
   const allDirsTagged = (n: ScanDirNode): boolean =>
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     `被锁的空目录要说系统保护,实际:${textOf(locked)}`
   )
 
-  // ── 9. 事实压过绰号 + 残账说"至少":空抽屉不喊绰号,截断的家底不报成总数 ──
+  // ── 9. 事实压过别名 + 残账说"至少":空目录不用别名,截断合计不报成总数 ──
   const emptyConfig = dir('config')
   annotateSummaries(dir('proj', [emptyConfig]))
   assert.ok(
@@ -209,7 +209,7 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [cutRoot]))
   assert.ok(
     textOf(cutRoot).includes('至少 3 个文件'),
-    `截断的家底要说「至少」,实际:${textOf(cutRoot)}`
+    `截断合计要说「至少」,实际:${textOf(cutRoot)}`
   )
 
   const cutNotes = dir('notes', [file('a.md'), file('b.md'), file('c.md')], { truncated: true })
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
     '风险句保留 sticky 标记'
   )
 
-  // ── 11. 词根词典(第九十九锤):名字拆词查表,业务起的名也有身份 ──
+  // ── 11. 词根词典(第九十九批):名字拆词查表,业务起的名也有身份 ──
   const scannerFile = file('scanner.ts', TS)
   const gitFile = file('GitFileStatus.tsx')
   const askHook = file('useAiAsk.ts', TS)
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [genericApp]))
   assert.equal(genericApp.summary, undefined, 'App.tsx 只剩「应用」空话,老实闭嘴')
 
-  // ── 12. 文档读开头(第一百锤):有真标题亮真名,标题过长掐头留省略号 ──
+  // ── 12. 文档读开头(第一百批):有真标题亮真名,标题过长掐头留省略号 ──
   const titledDoc = file('a.md', undefined, '安装指南')
   const longDoc = file('b.md', undefined, '这是一个特别特别特别长的文档标题超出了预算')
   const titledTxt = file('c.txt', undefined, '随手记')
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
 
   console.log('✅ 全树速览自测全部通过')
   console.log(
-    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录正脸 · scripts 报数 · 家底聚合 · 未展开占位 · 锁定目录 · 事实压绰号 · 残账至少 · 风险句标记 · 词根词典'
+    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录直述 · scripts 报数 · 子树汇总 · 未展开占位 · 锁定目录 · 事实压过别名 · 残账至少 · 风险句标记 · 词根词典'
   )
 }
 

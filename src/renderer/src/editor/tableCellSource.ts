@@ -105,7 +105,7 @@ export function placeCaretAtEnd(el: HTMLElement): void {
   sel.addRange(r)
 }
 
-/** 光标进了哪几层记号就掀开哪几层的定界符(离场时全收摊) */
+/** 光标进了哪几层记号就掀开哪几层的定界符(离场时全部关闭) */
 export function refreshActiveMarks(src: HTMLElement): void {
   src.querySelectorAll('.cm-live-cell-wrap.active').forEach((w) => w.classList.remove('active'))
   const sel = src.ownerDocument?.defaultView?.getSelection()

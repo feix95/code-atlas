@@ -1,6 +1,6 @@
-// 撕窗子窗的渲染层户口(页签撕窗锤):window.open 开同进程子窗(about:blank 白窗),
+// 独立子窗的渲染层登记(页签独立窗口):window.open 开同进程子窗(about:blank 白窗),
 // 页签的活 DOM 由 React Portal 渲染进它的 document —— Obsidian/VSCode 同款路线,
-// 一棵 React 树,多个渲染出口;签的正房整个搬家,流式回答/滚动位/草稿全活。
+// 一棵 React 树,多个渲染出口;签的页签活 DOM整体迁移,流式回答/滚动位/草稿全活。
 import { useCallback, useRef, useState } from 'react'
 
 /** 一扇子窗的手柄:id = frameName(主进程认窗用);container = Portal 的渲染坑位 */
@@ -13,7 +13,7 @@ export interface AuxWindowHandle {
 let auxSeq = 0
 
 /**
- * 把主窗的样式家底克隆进子窗 document:vite 注入的 <style> 和外链样式表全数照抄。
+ * 把主窗的样式基线克隆进子窗 document:vite 注入的 <style> 和外链样式表全数照抄。
  * 新窗是 about:blank 白窗,不抄样式就是个裸奔页面。
  */
 function cloneStyles(targetDoc: Document): void {

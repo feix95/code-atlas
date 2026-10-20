@@ -50,7 +50,7 @@ function main(): void {
   )
   assert.equal(findFileLinks('先跑 main 再说', index).length, 0, '普通裸词不认')
 
-  // ── 7. 模型编的路径对不上户口:普通文字,绝不给死链接 ──
+  // ── 7. 模型编的路径对不上登记:普通文字,绝不给死链接 ──
   assert.equal(findFileLinks('去 src/ghost/file.ts:1 看', index).length, 0, '不存在的路径不认')
 
   // ── 8. 大小写和反斜杠跑偏照样认,规范写法还给回来 ──
@@ -103,7 +103,7 @@ function main(): void {
   assert.equal(findFileLinks('', index).length, 0)
   assert.equal(findFileLinks('src/ai/index.ts:1', buildFileLinkIndex([])).length, 0)
 
-  // ── 16. resolveFileRef:行内代码整段判定,对上户口才认 ──
+  // ── 16. resolveFileRef:行内代码整段判定,对上登记才认 ──
   const ref = resolveFileRef('src/ai/index.ts:291', index)
   assert.equal(ref?.relPath, 'src/ai/index.ts')
   assert.equal(ref?.line, 291)

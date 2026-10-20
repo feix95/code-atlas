@@ -126,7 +126,7 @@ export async function resolveChatTargetOrError(): Promise<
   if (config.provider === 'builtin') {
     try {
       // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话;
-      // 是否手动填的也带过去 —— 引擎启动就死时,验尸话能点名「上下文填太大」
+      // 是否手动填的也带过去 —— 引擎启动就死时,退出诊断文案能点名「上下文填太大」
       runtime = await ensureBuiltinServer(
         config.builtin,
         config.contextSize,
@@ -138,10 +138,10 @@ export async function resolveChatTargetOrError(): Promise<
   }
   const resolved = resolveAiTarget(config, runtime)
   if (!resolved.ok) return { error: resolved.message }
-  // 过了这关就是真要使唤模型了:状态栏进「忙」(第八十四锤)
+  // 过了这关就是真要使唤模型了:状态栏进「忙」(第八十四批)
   setActivityProvider(config.provider)
   announceActivityBusy(config.provider)
-  // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的锅归它自己管,
+  // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的上下文窗口归它自己管,
   // 一律只信探测(存档里给内置填的旧数隐身不管事),探测不到按默认窗口兜底
   const ctx = resolveContextSize(
     config.provider,
@@ -165,7 +165,7 @@ export async function resolveChatTargetOrError(): Promise<
 }
 
 /**
- * 流式回滚令(第一百四十三锤):复读机重答前发给界面,把这条请求已吐的字收回。
+ * 流式回滚令(第一百四十三批):复读机重答前发给界面,把这条请求已吐的字收回。
  * 按 requestId 对号入座;没带 id(非流式调用方)本来就无字可收,发不发都一样。
  */
 export function sendResetDelta(event: IpcMainInvokeEvent, requestId: unknown): void {
@@ -190,7 +190,7 @@ export function makeDeltaSender(
       : { id: requestId, text }
     if (stats) payload.stats = stats
     event.sender.send(CH.aiDelta, payload)
-    // 引擎肯报账,状态栏的「忙」就跟着报数(第八十四锤)
+    // 引擎回报用量,状态栏的「忙」就跟着报数(第八十四批)
     if (stats) announceActivityBusy(lastActivityProvider, stats)
   }
 }

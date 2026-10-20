@@ -1,6 +1,6 @@
-// 内联标题改名(内联标题改名锤):主进程换完盘上户口,这边一排账全换新路径 ——
-// 扫描树节点(换名重排)、文件签户口、选中态、备注、引用段,一次结清不丢账。
-// 外来户(树/选中/备注/引用/页签账本)由调用方递进来,本体只是编排。
+// 内联标题改名(内联标题改名批次):主进程换完盘上登记,这边一排账全换新路径 ——
+// 扫描树节点(换名重排)、文件签登记、选中态、备注、引用段,一次结清不丢账。
+// 外来户(树/选中/备注/引用/页签状态)由调用方递进来,本体只是编排。
 import { saveNotes, type NoteMap } from '@shared/notes'
 import type { RenameOutcome } from '@shared/fileRename'
 import type { ChatCodeRef, ScanFileNode, ScanResult } from '@shared/types'
@@ -37,7 +37,7 @@ export function useFileRename(deps: {
   } = deps
 
   // 瞄签读根在浏览树(scopeRoot):树账不还、页签账照还;
-  // 户口认 (relPath, scopeRoot) 两件,与开签对账同口径
+  // 登记认 (relPath, scopeRoot) 两件,与开签对账同口径
   return async (tab, base) => {
     const scopeRoot = tab.kind === 'peek' ? tab.scopeRoot : (result?.rootPath ?? null)
     if (!scopeRoot) return { ok: false, error: '这个项目还没打开' }

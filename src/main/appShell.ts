@@ -29,13 +29,13 @@ import { armRevealWatchdog, loadView, VIEWS, WEB_PREFS } from './atlasWindow.ts'
 import { trackWindowBackground, windowCanvasColor } from './windowTheme.ts'
 import { CH } from '../shared/ipcChannels.ts'
 
-// ── Developer 日志窗口(第八十七锤):模型后台原话亮出来看 ──
+// ── Developer 日志窗口(第八十七批):模型后台原话亮出来看 ──
 // 独立小窗(frameless,和主窗一个实底壳),渲染层用 ?view=devlogs 分支画日志页。
-// 引擎的每一行原话、每笔请求报账,广播员推给所有窗口,这窗常驻收听。
+// 引擎的每一行原话、每笔请求用量,广播员推给所有窗口,这窗常驻收听。
 
 let devLogWindow: BrowserWindow | null = null
 
-// ── 托盘常驻与单实例(桌宠托管第一锤,2026-09-18)──
+// ── 托盘常驻与单实例(桌宠托管第一批,2026-09-18)──
 // 收起模式的地基:主窗引用提升到模块级,托盘和 second-instance 都要够得着它。
 export let mainWindowRef: BrowserWindow | null = null
 export let mainPanelController: MainPanelController | null = null
@@ -44,7 +44,7 @@ let tray: Tray | null = null
 // 不立旗的话关窗=收起,窗口永远走不到销毁那一步
 let quitting = false
 
-// 界面缩放系数的主进程账本(UI 重构 v3·§2.2):窗口记事本记「100% 基准值」,
+// 界面缩放系数的主进程状态表(UI 重构 v3·§2.2):窗口记事本记「100% 基准值」,
 // 落盘/落窗都要拿它换算。渲染层 setUiScale 落盘后走 atlas:ui-scale-sync 报进来;
 // 初值取上次存档里记的 scale —— 应用关着的时候缩放不可能变,这个值就是准的
 let currentUiScale = 1
@@ -80,7 +80,7 @@ function buildTrayMenu(): Menu {
   ])
 }
 
-/** 主面板露面状态一翻账就重摆菜单:别让人对着过期文案点菜 */
+/** 主面板露面状态一翻账就重摆菜单:别让人点选过期菜单项 */
 function refreshTrayMenu(): void {
   if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu())
 }
@@ -126,7 +126,7 @@ export function openDevLogWindow(): void {
 }
 
 export function createWindow(): void {
-  // ── 第七十八锤:窗口尺寸记事本 ──
+  // ── 第七十八批:窗口尺寸记事本 ──
   // 上回把窗拉到多大、搁在哪儿,这回开窗就照旧;最大化单独记一票,还原时先落回上次的
   // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
   // 存档先过安检再落窗:垃圾存档走默认,旧存档对着现在的屏幕贴边夹紧(换屏/改分辨率
@@ -160,7 +160,7 @@ export function createWindow(): void {
     minWidth: WINDOW_MIN_WIDTH,
     minHeight: WINDOW_MIN_HEIGHT,
     title: 'CodeAtlas',
-    // 实底壳(全窗实底化,小葵拍板):frame:false 摘系统框,底色钉成画布同色 —
+    // 实底壳(全窗实底化,产品裁定):frame:false 摘系统框,底色钉成画布同色 —
     // 透明合成那套圆角悬浮壳退役,窗缘就是实色直角,影子交回系统描。
     // 「窗隐身」的老病根还在档案里:show:false 时 ready-to-show 在 4K + 150% 缩放屏上
     // 可能永不触发 —— 露窗不指望它,走下面的三保险链(first-frame + 看门狗)。
@@ -171,11 +171,11 @@ export function createWindow(): void {
     webPreferences: WEB_PREFS
   })
   trackWindowBackground(mainWindow)
-  // 主窗引用上提(桌宠托管第一锤):托盘、second-instance 都要够得着它
+  // 主窗引用上提(桌宠托管第一批):托盘、second-instance 都要够得着它
   mainWindowRef = mainWindow
   mainPanelController = new MainPanelController(mainWindow)
   mainPanelController.onShownChange = refreshTrayMenu
-  // 撕窗子窗桥(页签撕窗锤):渲染层 window.open 开同进程子窗 ——
+  // 独立子窗桥(页签独立窗口):渲染层 window.open 开同进程子窗 ——
   // 白名单放行 + 无边框定形 + frameName 注册表(供 auxWindowOp 代发窗口操作)
   installAuxWindowBridge(mainWindow)
 
@@ -214,7 +214,7 @@ export function createWindow(): void {
   mainWindow.on('close', (event) => {
     if (stateSaveTimer) clearTimeout(stateSaveTimer)
     persistWindowState()
-    // 收起模式(桌宠托管第一锤):点关闭 = 藏进托盘,程序继续跑、聊天继续在线、
+    // 收起模式(桌宠托管第一批):点关闭 = 藏进托盘,程序继续跑、聊天继续在线、
     // 任务栏和 Alt+Tab 里都不再有主窗。真退出只走托盘「退出」—— 它先立 quitting
     // 旗再 quit,close 事件看见旗才放行销毁
     if (!quitting) {
@@ -240,12 +240,12 @@ export function createWindow(): void {
       console.log(`[window] 露窗方式:${via}`)
     }
   })
-  // 3) 加载完主动催一帧:万一合成器还醒着,别让它干等
+  // 3) 加载完主动催一帧:万一合成器还醒着,别让它空等
   // 「接回横幅」:救生圈动过手(reload 完/GPU 重启完)就捎个信,让页面弹一句人话
   let revivePending = false
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.invalidate()
-    // 顺手把模型状态问一轮:状态栏一开屏就有真话可说,不用干等轮询
+    // 顺手把模型状态问一轮:状态栏一开屏就有真话可说,不必空等轮询
     void refreshModelStatus().catch(() => {})
     if (revivePending) {
       revivePending = false
@@ -254,7 +254,7 @@ export function createWindow(): void {
   })
   // 救生圈(2026-09-13 小葵两次报案:「界面凭空消失,后台还开着」)。这窗是透明无边框的,
   // 渲染层一崩或 GPU 进程一打嗝重启,窗口就整窗透明 —— 看着像消失,其实进程全活着。
-  // 渲染层真崩:记进后台账本(账本住主进程,渲染层死了也活着),reload 把页面重挂回来。
+  // 渲染层真崩:记进后台状态表(状态表住主进程,渲染层死了也活着),reload 把页面重挂回来。
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit') return
     console.log(`[window] 渲染层断了(${details.reason}),自动重接`)
@@ -284,7 +284,7 @@ export function createWindow(): void {
   mainWindow.on('closed', () => {
     app.removeListener('child-process-gone', onGpuGone)
   })
-  // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔,让后台账本有话可查(不动手,等它自己醒)
+  // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔,让后台状态表有话可查(不动手,等它自己醒)
   mainWindow.webContents.on('unresponsive', () => {
     console.log('[window] 渲染层没响应了一阵')
     addDevLog('system', '画面卡住了一阵(渲染层没响应) —— 记一笔备查')
@@ -303,9 +303,9 @@ export function createWindow(): void {
   }, 5_000)
   // ── 救生圈 2.0(第五案实测定性后立):隐身的真身是「渲染进程活着,画面管线却永久
   // 停摆」——实测这种状态下重画/藏亮/改尺寸全都叫不醒,唯一有效的解药是整页重挂
-  // (重载后画面 100% 复活)。所以不再干等它自己醒:渲染层用 rAF 每秒报一跳
+  // (重载后画面 100% 复活)。所以不再空等它自己醒:渲染层用 rAF 每秒报一跳
   // 「画面循环还在转」;窗明明露着、心跳却停了 10 秒以上,主进程直接 reload 重挂管线,
-  // 自动满血,不用小葵按任何键。心跳同时是常驻取证:rAF 停没停,后台账本里看得见。
+  // 自动满血,不用小葵按任何键。心跳同时是常驻取证:rAF 停没停,后台状态表里看得见。
   // 只认主窗发的跳(日志窗共用同一个渲染入口,别让它替主窗保平安)。
   let lastFrameBeat = Date.now()
   const onFrameBeat = (event: Electron.IpcMainEvent): void => {

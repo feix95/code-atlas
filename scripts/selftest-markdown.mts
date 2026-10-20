@@ -1,5 +1,5 @@
-// 迷你 Markdown 解析器的自测(阅读模式锤):解析层是纯数据 AST(src/shared/markdown.ts),
-// 直接把块树对账本 —— 表格/嵌套列表/待办/callout/段落合并这些新来的语法,
+// 迷你 Markdown 解析器的自测(阅读模式批次):解析层是纯数据 AST(src/shared/markdown.ts),
+// 直接把块树对状态表 —— 表格/嵌套列表/待办/callout/段落合并这些新来的语法,
 // 拆错一格树账就当场对不上。纯函数,不碰系统。
 import assert from 'node:assert/strict'
 import { parseInline, parseMarkdown, type MdBlock, type MdList } from '../src/shared/markdown.ts'
@@ -14,7 +14,7 @@ function types(blocks: MdBlock[]): string[] {
 }
 
 function main(): void {
-  // ── 1. 表格:头 + 分隔 + 数据行,对齐户口照分隔行 ──
+  // ── 1. 表格:头 + 分隔 + 数据行,对齐登记照分隔行 ──
   const tbl = blocksOf('| 项 | 说 | 数 |\n|----|:--:|---:|\n| a | **粗** | 1 |\n| b | c | 2 |')
   assert.deepEqual(types(tbl), ['table'], '一张表占一个块')
   const t0 = tbl[0]

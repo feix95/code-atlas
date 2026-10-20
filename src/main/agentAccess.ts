@@ -6,17 +6,17 @@ export const PROJECT_AGENT_ROOT = 'project'
 const EXTERNAL_ROOT_PREFIX = 'external_'
 const MAX_EXTERNAL_PATH_CHARS = 1024
 
-/** 授权根的品种:目录(申请制)或单个文件(拖入即授权的文件门卡) */
+/** 授权根的品种:目录(申请制)或单个文件(拖入即授权的文件授权令牌) */
 export type AgentRootKind = 'dir' | 'file'
 
-/** 一张发出去的授权门卡:编号 + 真实路径 + 品种 */
+/** 一张发出去的授权令牌:编号 + 真实路径 + 品种 */
 export interface AgentGrantedRoot {
   rootId: string
   path: string
   kind: AgentRootKind
 }
 
-/** 外部路径的净身尺(目录申请和文件门卡共用):只收洗净的绝对路径,其余一律 null */
+/** 外部路径的路径规范化(目录申请和文件授权令牌共用):只收规范化绝对路径,其余一律 null */
 export function sanitizeExternalAbsPath(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const value = raw.trim()
@@ -52,8 +52,8 @@ export function sanitizeAgentRootId(raw: unknown): string | null {
 }
 
 /**
- * 本次运行的授权账本:外部目录(模型申请、用户弹窗同意)与外部单个文件
- * (拖入即授权 —— 用户亲手拖进对话的文件)共用同一种门卡编号,只存内存,关应用即失效。
+ * 本次运行的授权状态表:外部目录(模型申请、用户弹窗同意)与外部单个文件
+ * (拖入即授权 —— 用户亲手拖进对话的文件)共用同一种令牌编号,只存内存,关应用即失效。
  * resolve 只管把编号解成真实路径;越界拦截仍由 joinAuthorizedRoot 二道把关。
  */
 export class AgentDirectoryAccess {
@@ -78,7 +78,7 @@ export class AgentDirectoryAccess {
     return this.upsert(path, 'dir')
   }
 
-  /** 文件门卡(拖入即授权):只收真实存在的单个文件;目录、不存在、形状不对一律不发卡 */
+  /** 文件授权令牌(拖入即授权):只收真实存在的单个文件;目录、不存在、形状不对一律不发令牌 */
   async grantFile(rawPath: unknown): Promise<AgentGrantedRoot | null> {
     const requested = sanitizeExternalAbsPath(rawPath)
     if (requested === null) return null
@@ -101,7 +101,7 @@ export class AgentDirectoryAccess {
     return root ? { rootId, path: root.path, external: true, kind: root.kind } : null
   }
 
-  /** 同一条真实路径重复授权复用原门卡(Windows 下不区分大小写) */
+  /** 同一条真实路径重复授权复用原授权令牌(Windows 下不区分大小写) */
   private upsert(path: string, kind: AgentRootKind): AgentGrantedRoot {
     const key = process.platform === 'win32' ? path.toLowerCase() : path
     const existingId = this.ids.get(key)

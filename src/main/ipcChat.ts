@@ -65,14 +65,14 @@ import type {
   WebLookupMeta
 } from '../shared/types.ts'
 
-/** 附件户口本(滑跪案这锤):最近带过的文件附件记在内存里,下一轮垫成纸条(详见 ai/chatFileMemo.ts) */
+/** 附件登记表(附件追问本批):最近带过的文件附件记在内存里,下一轮垫成注记(详见 ai/chatFileMemo.ts) */
 const chatFileMemo = createChatFileMemoStore()
 
 export function registerChatIpc(): void {
   // 自由对话:独立通道、独立人设(Atlas 小探针)。当前选中对象的资料以「附件」身份
   // 垫在最前面,仅供参考,不进历史 —— 换对象不带旧资料,旧对话也不污染新对象。
   // 用户点名要联网(联网/搜搜/查查…)且开关开着,程序先按名字真查一份资料再开答;
-  // 查询的每一步状态(查着了/没查到/没开开关)都以程序账本为准回传,模型说了不算。
+  // 查询的每一步状态(查着了/没查到/没开开关)都以程序状态表为准回传,模型说了不算。
   ipcMain.handle(CH.aiChat, async (event, req: unknown): Promise<AiChatResult> => {
     const startedAt = Date.now()
     const notRequested: WebLookupMeta = {
@@ -84,7 +84,7 @@ export function registerChatIpc(): void {
     }
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>
     const question = typeof body.question === 'string' ? body.question.trim() : ''
-    // 图片附件(第一百五十二锤):先洗白收编 —— 数量/格式/魔数/大小都验过。
+    // 图片附件(第一百五十二批):先洗白收编 —— 数量/格式/魔数/大小都验过。
     // 带了图却一张没进来的,直接说清为什么不放行,不静默丢图
     const imgSan = sanitizeChatImages(body.images)
     const images = imgSan.images
@@ -112,7 +112,7 @@ export function registerChatIpc(): void {
     }
     // 带引用/文件就允许「只发资料不发问题」,这时给一句通用问法当题目 ——
     // 光甩几段代码过去,模型不知道该讲哪一面。先用保底账探一下有没有引用,
-    // 真正按这轮的锅裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs);
+    // 真正按本轮上下文窗口裁额度,要等模型服务和思考开关都落定之后(见下方 codeRefs);
     // 只发图、只发文件都不发字也行 —— 图和文件本身就是题目,给一句兜底问法
     const hasRefs = sanitizeCodeRefs(body.codeRefs).length > 0
     if (!question && !hasRefs && images.length === 0 && files.length === 0) {
@@ -135,7 +135,7 @@ export function registerChatIpc(): void {
           : '讲讲选中的这段代码')
     const requestId = typeof body.requestId === 'string' ? body.requestId : ''
     const attachment = sanitizeAttachment(body.context)
-    // 思考模式(第一百一十五锤):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
+    // 思考模式(第一百一十五批):界面开关说了算;开着就允许模型先想一遍,思考过程展示给用户
     const thinking = body.thinking === true
     const requested = hasSearchIntent(questionText)
     // 图片入口的能力闸:带图先问模型认不认图 —— 渲染层置灰和这里拦截用同一把尺 imageGate;
@@ -158,7 +158,7 @@ export function registerChatIpc(): void {
       if (imgSan.rejected.length > 0)
         sendAgentStep(event, requestId, `有图片没带进来:${imgSan.rejected.join(';')}`)
     }
-    // 翻文件模式跟图片不对付(第一百五十二锤):带图这轮强制不翻,垫句灰字说清楚
+    // 翻文件模式跟图片不对付(第一百五十二批):带图这轮强制不翻,垫句灰字说清楚
     // (文件附件是纯文本,跟翻文件不冲突,两者可以一起用 —— 附件截断时探针还能顺着 offset 续读)
     const agentOn = body.agent === true && images.length === 0
     if (body.agent === true && !agentOn) sendAgentStep(event, requestId, '这一轮带图片,没有翻文件')
@@ -168,7 +168,7 @@ export function registerChatIpc(): void {
 
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) {
-      // 模型服务都没通,查询自然也没发生:如实记成 failed,不让账本装无事发生
+      // 模型服务都没通,查询自然也没发生:如实记成 failed,不让状态表装无事发生
       const meta: WebLookupMeta = requested
         ? { requested: true, enabled: false, attempted: false, state: 'failed', sources: [] }
         : notRequested
@@ -216,12 +216,12 @@ export function registerChatIpc(): void {
     const meta = resolveWebLookupMeta(requested, enabled, outcome)
     // 闲聊底座 = 内核 + 聊天切片;翻文件开着时无工具切片不挂(翻文件切片由 agent 路自己追加)
     const systemPrompt = withPersonalization(buildChatSystem({ agent: agentOn }), resolved.style)
-    // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五锤)
+    // 开思考就多给一笔推理额度:思考段也算在 max_tokens 里,不加额度思考就把答案吃光(第一百一十五批)
     const cap = thinking
       ? resolved.budgets.replyTokens + THINKING_EXTRA_TOKENS
       : resolved.budgets.replyTokens
-    // 图片优先让路(第一百五十二锤):预算规划给每张图定缩到的尺寸与估算 token,
-    // 估算并进固定开销 —— 历史和代码引用自然从剩余座位里划,不另开一本账;
+    // 图片优先让路(第一百五十二批):预算规划给每张图定缩到的尺寸与估算 token,
+    // 估算并进固定开销 —— 历史和代码引用自然从剩余配额里划,不另开同一数据源;
     // 装不下就报人话错误,绝不静默丢图
     let sendImages = images
     let imageTokens = 0
@@ -256,7 +256,7 @@ export function registerChatIpc(): void {
     }
     // 文件附件(对齐 Claude Code 的 @文件):整份装得下就整份带,装不下按行截断,
     // 行账明写给模型;额度跟着上下文走(穷保底、富封顶),和图片/引用同一个预算口径。
-    // 附件户口本(滑跪案这锤):先取此前收过的文件纸条垫在本轮资料前,再把这轮的附件记进账
+    // 附件登记表(附件追问本批):先取此前收过的文件注记垫在本轮资料前,再把这轮的附件记进账
     const memoConversationId = sanitizeConversationId(body.conversationId)
     const memoEntries = chatFileMemo
       .peek(memoConversationId)
@@ -270,8 +270,8 @@ export function registerChatIpc(): void {
         otherTokens: baseFixedTokens + imageTokens,
         files: files.map((f) => ({ text: f.text, totalLines: f.totalLines }))
       })
-      // 拖入即授权(第一百五十三锤):系统拖/选进来的文件凭它的绝对路径换本次运行的
-      // 只读门卡,截断的正文就有续读的钥匙;拿不到门卡(文件没了/不是文件)就照实说,
+      // 拖入即授权(第一百五十三批):系统拖/选进来的文件凭它的绝对路径换本次运行的
+      // 只读授权令牌,截断的正文就有续读的钥匙;拿不到授权令牌(文件没了/不是文件)就照实说,
       // 绝不开空头支票
       const plannedFiles: PlannedChatFile[] = []
       for (const [i, f] of files.entries()) {
@@ -301,7 +301,7 @@ export function registerChatIpc(): void {
       attachLayers.length > 0 ? [...attachLayers, READ_HONESTY_NOTE].join('\n\n') : null
     const fileTokens = attachBlock ? estimateTokens(attachBlock) : 0
     // 对话记忆:按模型档位规划历史(小模型档按预算装会话线程,大模型档保持旧行为);
-    // 固定开销 = 人设+附件+本轮问题+联网资料+图片+文件,历史预算从剩余座位里划
+    // 固定开销 = 人设+附件+本轮问题+联网资料+图片+文件,历史预算从剩余配额里划
     const fixedTokens = baseFixedTokens + imageTokens + fileTokens
     const memory = planChatMemory({
       body,
@@ -313,7 +313,7 @@ export function registerChatIpc(): void {
     const plainHistory = toPlainHistory(memory.planned.messages)
     const droppedNotice = droppedRoundsNotice(memory.planned)
     if (droppedNotice) sendAgentStep(event, requestId, droppedNotice)
-    // 引用的动态账(第一百二十六锤):锅里先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
+    // 引用的动态账(第一百二十六批):上下文窗口先给人设+附件+历史+问题留座,回答(含思考预留)也占座,
     // 剩下的折成字符才是引用能带的量;穷保底、富封顶,额度跟着用户设的上下文走
     const otherTokens =
       fixedTokens + estimateThreadTokens(agentOn ? memory.planned.messages : plainHistory)
@@ -324,7 +324,7 @@ export function registerChatIpc(): void {
     })
     const codeRefs = sanitizeCodeRefs(body.codeRefs, refsBudget)
     const questionText2 = question || (codeRefs.length > 0 ? '讲讲选中的这段代码' : questionText)
-    // 手动压缩的早前对话摘要(第一百四十二锤):/compact 之后每次请求都带,垫在历史前面当背景记忆
+    // 手动压缩的早前对话摘要(第一百四十二批):/compact 之后每次请求都带,垫在历史前面当背景记忆
     const summary = sanitizeCompactSummary(body.summary)
     const assembleMessages = <H extends AgentChatMessage = AiHistoryMessage>(chatHistory: H[]) =>
       buildFreeChatMessages(
@@ -339,7 +339,7 @@ export function registerChatIpc(): void {
         sendImages,
         attachBlock ?? undefined
       )
-    // 翻文件模式(agent,第一百二十八锤):开关开着就走工具循环 —— 模型自己喊看哪,
+    // 翻文件模式(agent,第一百二十八批):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (agentOn) {
       const agentRoot =
@@ -421,7 +421,7 @@ export function registerChatIpc(): void {
     }
   })
 
-  // /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成一份要点摘要,
+  // /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成一份要点摘要,
   // 渲染进程拦下 /compact 后走这条专属通道。流式增量照走 atlas:ai-delta 按 requestId 对号,
   // 「停一停」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
   ipcMain.handle(CH.aiCompact, async (event, req: unknown): Promise<AiExplainResult> => {
@@ -466,7 +466,7 @@ export function registerChatIpc(): void {
     }
   })
 
-  // 试一句(第一百一十三锤):设置页改完说话方式,拿草稿当场念一段听效果。
+  // 试一句(第一百一十三批):设置页改完说话方式,拿草稿当场念一段听效果。
   // 关键在「草稿」二字 —— 走的是传进来的那份个性化,不是存档里的那份,
   // 所以还没点「应用更改」也能试,试完不满意直接退回,不用先存再改。
   ipcMain.handle(

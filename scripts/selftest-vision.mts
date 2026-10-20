@@ -1,4 +1,4 @@
-// ── 视觉能力锤自测:纯函数全摊平 ──
+// ── 视觉能力批次自测:纯函数全摊平 ──
 // 跑法: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-vision.mts
 // 覆盖:
 //   pickMmproj(ai/mmproj.ts)        —— 无/单个/多只候选、大小写、前缀并列、精度序、字母序
@@ -211,4 +211,4 @@ assert.equal(sameModelStatus(base, { ...base, vision: 'unknown' }), true)
 assert.equal(sameModelStatus(base, { ...base }), true)
 assert.equal(sameModelStatus(null, base), false)
 
-console.log('✅ 视觉能力锤自测全部通过')
+console.log('✅ 视觉能力批次自测全部通过')

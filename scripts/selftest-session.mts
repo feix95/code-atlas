@@ -76,11 +76,11 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
   assert.equal(back.sel, 'src/b.ts')
   assert.equal(back.groups.length, 2)
   assert.equal(back.groups[0].tabs[1].on, true)
-  assert.equal('viewMode' in back.groups[0].tabs[1], false, '看片档位不再跟签走')
+  assert.equal('viewMode' in back.groups[0].tabs[1], false, '预览显示档位不再跟签走')
   assert.equal('readOnly' in back.groups[0].tabs[1], false, '只读锁不再跟签走')
 })
 
-check('parseSession:旧档里的 viewMode/readOnly 不再读(看片开关是全局偏好),多余字段不碍事', () => {
+check('parseSession:旧档里的 viewMode/readOnly 不再读(预览显示开关是全局偏好),多余字段不碍事', () => {
   const s = parseSession({
     v: 1,
     folder: 'C:\\a',

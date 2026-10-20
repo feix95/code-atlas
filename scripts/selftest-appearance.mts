@@ -1,4 +1,4 @@
-// 配色字色自适应自测(第七十九锤):用户色给满自由后,实心主题色件上的字色归 pickAccentInk 管 ——
+// 配色字色自适应自测(第七十九批):用户色给满自由后,实心主题色件上的字色归 pickAccentInk 管 ——
 // 谁对比高听谁的。预设的既有字色不许漂;极深极浅色必须翻对字。
 import assert from 'node:assert/strict'
 import { hexToHsl, hslLuminance, pickAccentInk } from '../src/renderer/src/appearance.ts'
@@ -49,7 +49,7 @@ check('小葵的绿(#7dba32)明度带内不夹,压深字', () => {
   assert.equal(pickAccentInk(h, s, l), INK_DARK)
 })
 
-// ── 外观搬家(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘 ──
+// ── 外观迁移(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘 ──
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -234,4 +234,4 @@ check('IPC 通道对账:preload 与主进程两边收发一一配对', () => {
   assert.deepEqual(orphans, [], `这些通道两边对不上:\n${orphans.join('\n')}`)
 })
 
-console.log('✅ 配色字色自适应 + 外观搬家 + IPC 通道对账自测全绿')
+console.log('✅ 配色字色自适应 + 外观迁移 + IPC 通道对账自测全绿')

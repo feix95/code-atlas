@@ -32,7 +32,7 @@ import {
   splitThinking
 } from '../src/ai/index.ts'
 import { isBinaryFile } from '../src/shared/fileKinds.ts'
-// 提示词体系重写(第二批):人设常量搬家到 prompts.ts,断言打到组装产物上
+// 提示词体系重写(第二批):人设常量迁移到 prompts.ts,断言打到组装产物上
 import {
   AGENT_FILES_ADDENDUM,
   buildChatSystem,
@@ -134,13 +134,13 @@ function lmConfig(model: string, baseUrl = 'http://127.0.0.1:1234/v1'): AiConfig
 }
 
 async function main(): Promise<void> {
-  // ── 0. 标签户口(shared/promptTags):每个标签开闭成对、派生常量都出自这张表 ──
+  // ── 0. 标签登记(shared/promptTags):每个标签开闭成对、派生常量都出自这张表 ──
   for (const [key, tag] of Object.entries(TAG)) {
     assert.ok(tag.open.startsWith('<') && tag.open.endsWith('>'), `${key} 的开标签要是 <...> 形`)
     assert.equal(tag.close, `</${tag.open.slice(1)}`, `${key} 的闭标签要和开标签同名`)
   }
-  assert.equal(CURRENT_QUESTION_PREFIX, `${TAG.currentQuestion.open}\n`, '当前问题前缀从户口派生')
-  assert.equal(COMPACT_SUMMARY_TAG, TAG.compressedSummary.open, '压缩摘要标签从户口派生')
+  assert.equal(CURRENT_QUESTION_PREFIX, `${TAG.currentQuestion.open}\n`, '当前问题前缀从登记派生')
+  assert.equal(COMPACT_SUMMARY_TAG, TAG.compressedSummary.open, '压缩摘要标签从登记派生')
 
   // ── 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装 ──
   // 提示词体系重写(第二批):断言打到组装产物上,不再钉某个常量文本
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
     clean[1]?.content.startsWith(`${longText.slice(0, 500)}……`),
     '超长历史要截断(500 字 + 省略号)'
   )
-  // 截断标注(LLM 优化锤):半截话是小模型最爱的续写钩子,得打招呼「不用接着写」
+  // 截断标注(LLM 优化批次):半截话是小模型最爱的续写钩子,得打招呼「不用接着写」
   assert.ok(clean[1]?.content.includes('不用接着写'), '截断的历史要打「不用接着写」的标注')
   assert.ok(clean[1]!.content.length > 500 + 2, '标注是附在截断条目上的,内容本体不变')
   assert.ok(
@@ -228,7 +228,7 @@ async function main(): Promise<void> {
   assert.equal(ragged[ragged.length - 1]?.content, '第5答', '留在窗口里的是最近一轮的答案')
   assert.ok(!ragged.some((m) => m.content === '第6问'), '悬空的旧问题(没被回答过的)要摘掉')
 
-  // ── 答旧题修复锤(2026-09-18):历史按「轮」成对收集,悬空旧问题整轮扔 ──
+  // ── 答旧题修复批次(2026-09-18):历史按「轮」成对收集,悬空旧问题整轮扔 ──
   // 报错轮:提问一发出就永久 done,回答却是 error —— 整轮都不许进历史
   const errRound = collectHistoryRounds(
     [
@@ -462,9 +462,9 @@ async function main(): Promise<void> {
   assert.ok(
     freeMsgs[3]?.content.includes('未必和这轮问题有关') &&
       freeMsgs[3]?.content.includes('以用户说的为准'),
-    '滑跪案:资料提示改软口径(未必有关、以用户说的为准),不再把「它」钉死'
+    '附件追问:资料提示改软口径(未必有关、以用户说的为准),不再把「它」钉死'
   )
-  assert.ok(freeMsgs[3]?.content.includes('程序提醒只是路牌'), '滑跪案:路牌可无视也并进资料提示')
+  assert.ok(freeMsgs[3]?.content.includes('程序提醒只是参考提示'), '附件追问:参考提示可忽略也并进资料提示')
 
   const bareMsgs = buildFreeChatMessages(
     '小探针人设',
@@ -482,7 +482,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!bareMsgs.some((m) => m.content.includes('当前参考资料')), '没附件也不垫资料提示')
 
-  // ── 引用代码清洗(第一百一十一锤):条数/字数都封顶,垃圾条目整条扔 ──
+  // ── 引用代码清洗(第一百一十一批):条数/字数都封顶,垃圾条目整条扔 ──
   assert.deepEqual(sanitizeCodeRefs(null), [], '不是数组就当没引用')
   assert.deepEqual(sanitizeCodeRefs([null, '乱传的', 7]), [], '垃圾条目整条扔')
   assert.deepEqual(
@@ -529,13 +529,13 @@ async function main(): Promise<void> {
   )
   assert.ok(refLong[0]?.code.endsWith('……'), '截断了要有省略号,不许装完整')
 
-  // 引用的动态账(第一百二十六锤):额度跟锅走 —— 穷有保底,富有封顶,单段不抢全量
+  // 引用的动态账(第一百二十六批):额度随上下文窗口 —— 设下限,设上限,单段不抢全量
   const poor = codeRefsBudget({ contextTokens: 8192, otherTokens: 5000, replyTokens: 1024 })
-  assert.equal(poor.totalChars, CODE_REFS_TOTAL_CHARS_MAX, '锅再穷,总量也保底')
-  assert.equal(poor.perRefChars, CODE_REF_CHARS_MAX, '锅再穷,单段也保底')
+  assert.equal(poor.totalChars, CODE_REFS_TOTAL_CHARS_MAX, '上下文再紧,总量也保底')
+  assert.equal(poor.perRefChars, CODE_REF_CHARS_MAX, '上下文再紧,单段也保底')
   const rich = codeRefsBudget({ contextTokens: 131072, otherTokens: 3000, replyTokens: 1024 })
-  assert.equal(rich.totalChars, CODE_REFS_TOTAL_CHARS_CEILING, '锅再富,总量也有顶')
-  assert.ok(rich.perRefChars > CODE_REF_CHARS_MAX, '锅大了单段跟着涨')
+  assert.equal(rich.totalChars, CODE_REFS_TOTAL_CHARS_CEILING, '上下文再宽,总量也有顶')
+  assert.ok(rich.perRefChars > CODE_REF_CHARS_MAX, '上下文变大单段跟着涨')
   const mid = codeRefsBudget({ contextTokens: 16384, otherTokens: 6000, replyTokens: 1024 })
   assert.ok(
     mid.totalChars >= CODE_REFS_TOTAL_CHARS_MAX && mid.totalChars <= CODE_REFS_TOTAL_CHARS_CEILING,
@@ -626,7 +626,7 @@ async function main(): Promise<void> {
   assert.ok(pickWebLookupQuery('帮我查查', null).length <= 60, '查询词封顶 60 字')
   assert.equal(pickWebLookupQuery('帮我查查', null), '', '剥完啥都不剩就给空串,别拿垃圾去查')
 
-  // 联网状态账本:程序做了什么就是什么,六种状态各有归属
+  // 联网状态状态表:程序做了什么就是什么,六种状态各有归属
   assert.equal(
     resolveWebLookupMeta(false, true, { kind: 'skipped' }).state,
     'not_requested',
@@ -710,10 +710,10 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 3.8 Tavily 打头(2026-09-17 小葵定序):填了 Key 走官方 API,免费源一次都不跑 ──
+  // ── 3.8 Tavily 打头(2026-09-17 产品定序):填了 Key 走官方 API,免费源一次都不跑 ──
   {
     let getCalls = 0
-    const found = await webLookupDetailed('傲梅官网 联网锤', {
+    const found = await webLookupDetailed('傲梅官网 联网批次', {
       fetchText: async () => {
         getCalls++
         throw new Error('抓正文这一脚允许失败,免费源压根不该轮到')
@@ -725,7 +725,7 @@ async function main(): Promise<void> {
           'Bearer tvly-test-key',
           'Key 走认证头,不进 URL 免得进日志'
         )
-        assert.equal((body as { query: string }).query, '傲梅官网 联网锤', '搜索词原样进 body')
+        assert.equal((body as { query: string }).query, '傲梅官网 联网批次', '搜索词原样进 body')
         return JSON.stringify({
           results: [{ title: '傲梅', url: 'https://www.aomei.com', content: '备份软件厂商' }]
         })
@@ -854,14 +854,14 @@ async function main(): Promise<void> {
   assert.ok(!isBinaryFile('.gitignore'), '隐藏文件不算二进制')
   assert.ok(!isBinaryFile('Makefile'), '无后缀不算二进制')
 
-  // ── 5. 配置读写往返(新双 Provider 格式)+ 老格式自动搬家 ──
+  // ── 5. 配置读写往返(新双 Provider 格式)+ 老格式自动迁移 ──
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
   try {
     const fallback = defaultAiConfig()
     assert.equal(
       fallback.provider,
       'builtin',
-      '默认 Provider 应为内置(2026-09-18 小葵定:新用户开箱即内置)'
+      '默认 Provider 应为内置(2026-09-18 产品定:新用户开箱即内置)'
     )
     assert.equal(
       fallback.lmstudio.baseUrl,
@@ -895,7 +895,7 @@ async function main(): Promise<void> {
     assert.equal(loaded.tavilyKey, 'tvly-abc123def', '重新读回 Tavily Key')
     assert.equal(defaultAiConfig().webLookup, false, '联网查证默认必须是关')
 
-    // 手动上下文(第七十锤补的存取):填了要能存能读,清空 = 回自动探测
+    // 手动上下文(第七十批补的存取):填了要能存能读,清空 = 回自动探测
     const withCtx = await saveAiConfig(dir, {
       provider: 'lmstudio',
       lmstudio: { baseUrl: 'http://127.0.0.1:1234/v1', model: 'm', apiKey: '' },
@@ -1078,7 +1078,7 @@ async function main(): Promise<void> {
     assert.ok(!reaperSection.includes('.kill('), '收尸段不许终止任何进程')
   }
 
-  // ── 6.5 单飞闸门(第一百三十六锤):并发的第二个调用等同一份,绝不各起各的 ──
+  // ── 6.5 单飞闸门(第一百三十六批):并发的第二个调用等同一份,绝不各起各的 ──
   {
     let spawns = 0
     let releaseGate: (v: string) => void = () => {}
@@ -1214,7 +1214,7 @@ async function main(): Promise<void> {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 
-  // ── 7½. 思考模式(第一百一十五锤):开关、思考流的拆账、掺标签的正文的账 ──
+  // ── 7½. 思考模式(第一百一十五批):开关、思考流的拆账、掺标签的正文的账 ──
   // 没写收尾的 <think> 全算思考;拆完正文里不留半个标签
   const st1 = splitThinking('<think>先看看题目</think>答案是 4')
   assert.equal(st1.reasoning, '先看看题目', '收尾标签里的算思考')
@@ -1338,7 +1338,7 @@ async function main(): Promise<void> {
     '错误信息要提示检查模型服务'
   )
 
-  // ── 10. 模型上下文自适应(第六十九锤):探测解析 / 预算公式 / 撞墙特征 ──
+  // ── 10. 模型上下文自适应(第六十九批):探测解析 / 预算公式 / 撞墙特征 ──
   const lmPayload = JSON.stringify({
     data: [
       { id: 'other-model', max_context_length: 8192 },
@@ -1399,16 +1399,16 @@ async function main(): Promise<void> {
     Math.floor(DEFAULT_CONTEXT_SIZE * 0.55),
     '离谱输入退回保守默认'
   )
-  // 默认窗口是主进程/渲染层/引擎三边共用的一个数(shared/aiDefaults):值本身 + 引擎量尺认它
+  // 默认窗口是主进程/渲染层/引擎三边共用的一个数(shared/aiDefaults):值本身 + 引擎适配估算认它
   assert.equal(DEFAULT_CONTEXT_SIZE, 16384, '默认上下文窗口 = 16384')
   assert.ok(
     judgeModelFit(14 * 1024 ** 3, 32 * 1024 ** 3, 16 * 1024 ** 3).detail.includes(
       String(DEFAULT_CONTEXT_SIZE)
     ),
-    '量尺不传上下文时按共享默认算,不许各写各的数'
+    '适配估算不传上下文时按共享默认算,不许各写各的数'
   )
 
-  // ── 11. 模型状态栏(第七十锤):进度解析不打诳语 + LM Studio 状态映射 ──
+  // ── 11. 模型状态栏(第七十批):进度解析不虚报 + LM Studio 状态映射 ──
   assert.equal(parseLoadProgress({ progress: 0.3525 }), 35.25, 'llama.cpp 新版:0~1 按比例 ×100')
   assert.equal(
     parseLoadProgress({ error: { message: 'Loading model', progress: 0.42 } }),
@@ -1417,7 +1417,7 @@ async function main(): Promise<void> {
   )
   assert.equal(parseLoadProgress({ progress: 87 }), 87, '1~100 直接当百分数')
   assert.equal(parseLoadProgress({ progress: 1 }), 100, '1 当 100% 收尾')
-  assert.equal(parseLoadProgress({ progress: 0 }), 0, '0 就是刚开锅')
+  assert.equal(parseLoadProgress({ progress: 0 }), 0, '0 就是刚开始加载')
   assert.equal(parseLoadProgress({ progress: 150 }), null, '出了范围宁可不给数')
   assert.equal(parseLoadProgress({ progress: 'x' }), null, '不是数不给数')
   assert.equal(parseLoadProgress({}), null, '老版引擎啥都不报 = null,界面转圈')
@@ -1475,12 +1475,12 @@ async function main(): Promise<void> {
   )
   assert.equal(parseLmStudioModelState(null, 'q').state, 'idle', '垃圾回复别炸')
 
-  // ── 12. 热身估价进度(第七十一锤):数是估的,但估得有据、封顶诚实 ──
+  // ── 12. 热身估价进度(第七十一批):数是估的,但估得有据、封顶诚实 ──
   assert.equal(estimateLoadProgress(5000, 10_000), 50, '已用时÷上次耗时,一半就是 50%')
-  assert.equal(estimateLoadProgress(0, 10_000), 1, '刚开锅给 1%,别顶着 0 吓人')
+  assert.equal(estimateLoadProgress(0, 10_000), 1, '刚开始加载给 1%,避免进度停在 0')
   assert.equal(estimateLoadProgress(99_999, 10_000), 95, '封顶 95:没真就绪绝不谎报 100')
   assert.equal(estimateLoadProgress(5000, null), null, '头一回没账 = 转圈,不硬估')
-  assert.equal(estimateLoadProgress(5000, 0), null, '账本里的 0 秒不可信')
+  assert.equal(estimateLoadProgress(5000, 0), null, '状态表里的 0 秒不可信')
   assert.equal(estimateLoadProgress(5000, -3), null, '负数账不可信')
   assert.equal(estimateLoadProgress(4996, 10_000), 49, '向下取整,宁可少报不虚报')
 
@@ -1496,7 +1496,7 @@ async function main(): Promise<void> {
     '老格式单个数自动当一次历史,不用删档'
   )
   assert.equal(parseWarmupSamples(warmupRaw, '没记过的.gguf'), null, '没记过就是没记过')
-  assert.equal(parseWarmupSamples('垃圾', 'x'), null, '垃圾账本回 null')
+  assert.equal(parseWarmupSamples('垃圾', 'x'), null, '垃圾状态表回 null')
   assert.deepEqual(
     parseWarmupSamples({ x: [5, 20_000, 30_000] }, 'x'),
     [20_000, 30_000],
@@ -1534,8 +1534,8 @@ async function main(): Promise<void> {
   assert.equal(averageWarmup([150_000, 30_000, 30_000]), 70_000, '一冷两热,均值落在中间')
   assert.equal(averageWarmup([1000, 1500]), 1250, '均值四舍五入到毫秒')
 
-  // ── 13. 热身不掐表(第七十二锤):5 分钟后温柔提醒,绝不催命 ──
-  assert.equal(warmupNudgeMessage(0), undefined, '刚开锅不提醒')
+  // ── 13. 热身不掐表(第七十二批):5 分钟后温柔提醒,绝不催命 ──
+  assert.equal(warmupNudgeMessage(0), undefined, '刚开始加载不提醒')
   assert.equal(warmupNudgeMessage(4 * 60_000 + 59_000), undefined, '差一秒到五分钟也不提醒')
   assert.ok(warmupNudgeMessage(5 * 60_000)?.includes('取消'), '到点开口:提醒里得告诉人「取消」在哪')
   assert.ok(
@@ -1543,7 +1543,7 @@ async function main(): Promise<void> {
     '等半小时也还是同一句善意提醒,不升级不恐吓'
   )
 
-  // ── 14. 提前量尺(第七十三锤):选模型那一刻就分「装得下/有点挤/装不下」──
+  // ── 14. 提前适配估算(第七十三批):选模型那一刻就分「装得下/有点挤/装不下」──
   const G = 1024 ** 3
   assert.equal(
     parseNvidiaSmi('NVIDIA GeForce RTX 5060 Ti, 16311 MiB')?.vramBytes,
@@ -1559,7 +1559,7 @@ async function main(): Promise<void> {
   assert.equal(parseNvidiaSmi('AMD Radeon, N/A MiB'), null, 'N/A 显存不可信')
 
   // 小葵的实机(32GB 内存 + 16GB 4060Ti 级显存,14.26GB 模型):全进卡,绿灯
-  // 第八十六锤:量尺把上下文缓存算进去 —— 小葵的 14.26GB vs 16GB 从绿翻黄(权重+缓存超出九成线)
+  // 第八十六批:适配估算把上下文缓存算进去 —— 小葵的 14.26GB vs 16GB 从绿翻黄(权重+缓存超出九成线)
   assert.equal(
     judgeModelFit(Math.round(14.26 * G), 32 * G, 16 * G).level,
     'tight',
@@ -1611,13 +1611,13 @@ async function main(): Promise<void> {
     '红灯细节要给出换多大模型的建议'
   )
 
-  // 验尸:撑死拿量尺数字说话;上下文填大了点它名;都不是才说文件坏
+  // 退出诊断:内存耗尽退出拿适配估算数字说话;上下文填大了点它名;都不是才说文件坏
   const fitBig = judgeModelFit(20 * G, 16 * G, 8 * G)
-  assert.ok(autopsyExitMessage(3, fitBig, null).includes('装不下'), '撑死:验尸话点明装不下')
-  assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '验尸话保留退出码')
+  assert.ok(autopsyExitMessage(3, fitBig, null).includes('装不下'), '内存耗尽退出:退出诊断文案点明装不下')
+  assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '退出诊断文案保留退出码')
   assert.ok(
     autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'),
-    '撑死优先于上下文嫌疑'
+    '内存耗尽退出优先于上下文嫌疑'
   )
   const ctxMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, 131072)
   assert.ok(
@@ -1631,7 +1631,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
 
-  // ── 第八十五锤:超时话术按现场分流 + 半截必留(纯函数) ──
+  // ── 第八十五批:超时话术按现场分流 + 半截必留(纯函数) ──
   assert.ok(halfNote('disconnect').includes('连接断了'), '断线注脚说断线')
   assert.ok(halfNote('watchdog').includes('等太久'), '掐断注脚说等太久')
   assert.ok(halfNote('stall').includes('卡住'), '卡住注脚说卡住')
@@ -1693,7 +1693,7 @@ async function main(): Promise<void> {
     'LM Studio:旧数加探测失败,一样兜底不认旧数'
   )
 
-  // ── 第八十六锤:KV 缓存估算(纯函数) ──
+  // ── 第八十六批:KV 缓存估算(纯函数) ──
   assert.equal(estimateKvBytes(4096, 14.26 * G), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
   assert.equal(estimateKvBytes(4096, 6 * G), 4096 * 128 * 1024, '4~8GB 减半')
   assert.equal(estimateKvBytes(4096, 2 * G), 4096 * 64 * 1024, '<4GB 再减半')
@@ -1717,7 +1717,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!teachingSlice('deep').includes('不搞教学'), '详细档不串 off 的「不搞教学」')
 
-  // ── 体积红线(小葵点名的防反弹秤):装配产物不许再胖回去 ──
+  // ── 体积红线(产品指定的防回弹):装配产物不许再胖回去 ──
   assert.ok(
     chatSystem.length <= 900,
     `闲聊底座(无工具)≤900 字(2.0 内核+标签口径后放宽,实测 ${chatSystem.length})`
@@ -1737,7 +1737,7 @@ async function main(): Promise<void> {
   // OpenAI tools 协议骨架(type/function/parameters/required 一个不能少)的实测下限是
   // 1159 字 —— 就算把 copy L 没覆盖的 web_search query 参数说明也摘掉也只到 1082。
   // 逐字稿不能动,秤先放在实测值上,压回 1000 需要砍稿子或砍参数说明。
-  // 文件附件锤(对齐 Claude Code)又加了 read_file 的 offset/limit 两个整数参数:
+  // 文件附件批次(对齐 Claude Code)又加了 read_file 的 offset/limit 两个整数参数:
   // 协议骨架本身就要 +55 字(裸参数都不带描述的极限),加上最精简的说明共实测 1318,
   // 压回 1200 已不可能;秤挪到 1320,继续待 lead 定夺要不要砍说明文字。
   assert.ok(
@@ -1747,7 +1747,7 @@ async function main(): Promise<void> {
 
   console.log('✅ AI 人话解释自测全部通过')
 
-  // ── 第八十四锤:流式 token 账(纯函数) ──
+  // ── 第八十四批:流式 token 账(纯函数) ──
   // extractStreamStats:timings 帧(读材料段)
   void (() => {
     const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 0 } }, 'reading')
@@ -1824,9 +1824,9 @@ async function main(): Promise<void> {
     assert.equal(formatUsage({}), '')
   })()
   console.log(
-    '   自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网账本) · 二进制判断 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 教学三档切片 · 模型状态栏(进度不打诳语/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/量尺与验尸)'
+    '   自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网状态表) · 二进制判断 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 教学三档切片 · 模型状态栏(进度不虚报/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/适配估算与退出诊断)'
   )
-  // ── 提示词体系 2.0 · XML 资料包裹总点检(小葵定稿):一切外来内容进标签,程序插话也有皮 ──
+  // ── 提示词体系 2.0 · XML 资料包裹总点检(产品定稿):一切外来内容进标签,程序插话也有皮 ──
   // 数据块:附件/引用/摘要旧已规范
   // 程序插话:提醒卡/逼卷令/质检闸统一 program_reminder;重复工具提醒包 program_note
   assert.ok(
@@ -1838,7 +1838,7 @@ async function main(): Promise<void> {
     '逼卷令和质检闸都是 program_reminder'
   )
   assert.ok(REPEAT_NUDGE.includes('<program_note>'), '重复翻看提醒是 program_note')
-  // 工具结果统一包裹:wrapToolResult 是唯一出口,压缩纸条也要带皮
+  // 工具结果统一包裹:wrapToolResult 是唯一出口,压缩注记也要带皮
   const wrapped = wrapToolResult('文件内容原文')
   assert.ok(
     wrapped.startsWith('<tool_result>') && wrapped.endsWith('</tool_result>'),
@@ -1857,12 +1857,12 @@ async function main(): Promise<void> {
   assert.ok(stubbed !== null, '超预算要能压')
   assert.ok(
     stubbed?.messages[2]?.content.includes('<tool_result>'),
-    '占位纸条也要带 tool_result 皮'
+    '占位注记也要带 tool_result 皮'
   )
-  assert.ok(stubbed?.messages[2]?.content.includes('占位纸条'), '占位纸条要自述来历')
+  assert.ok(stubbed?.messages[2]?.content.includes('占位注记'), '占位注记要自述来历')
   assert.ok(stripToolResult(wrapped) === '文件内容原文', '剥工具结果皮要还原原文')
 
-  // ── 第一百四十二锤:/compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列) ──
+  // ── 第一百四十二批:/compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列) ──
   // isCompactCommand:整句就是 /compact 才算,大小写不拘;后面跟了字的不算
   assert.equal(isCompactCommand('/compact'), true, '光杆 /compact 要认')
   assert.equal(isCompactCommand('  /Compact  '), true, '首尾空白和大小写不拘')
@@ -1953,7 +1953,7 @@ async function main(): Promise<void> {
     '没摘要不留空块'
   )
 
-  // ── 15. 复读机防线(第一百四十三锤):探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 ──
+  // ── 15. 复读机防线(第一百四十三批):探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 ──
   // 15a. 探测器:该抓的抓、该放的放(只查尾巴 —— 后面还在往下写的重复不算)
   assert.equal(
     detectRepetitionTail('今天天气不错,我们出门逛逛,顺路买了点菜。'),

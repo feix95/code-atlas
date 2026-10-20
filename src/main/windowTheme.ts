@@ -1,5 +1,5 @@
-// 实底窗的画布色户口(全窗实底化):所有窗子的 backgroundColor 跟渲染层 --canvas-tint
-// 同源(appearancePrefs.canvasColorOf 一本账)。建窗时定一次底色,之后两条路追着换 ——
+// 实底窗的画布色登记(全窗实底化):所有窗子的 backgroundColor 跟渲染层 --canvas-tint
+// 同源(appearancePrefs.canvasColorOf 同一数据源)。建窗时定一次底色,之后两条路追着换 ——
 // 设置页「应用更改」走 appearanceSave 存档落盘后刷新;外观是 auto 档时,系统深浅色
 // 一翻脸也刷新。账簿自动收口:窗关了从登记处除名,不留死窗引用。
 

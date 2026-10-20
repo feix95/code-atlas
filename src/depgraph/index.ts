@@ -245,7 +245,7 @@ const RESOLVERS: Record<string, ImportResolver> = {
   rust: resolveRustImport
 }
 
-/** JS/TS 的候选后缀:不养自己的名单 —— 凡走 JS 翻译器的语言,户口本后缀全算(.mts/.cts 不漏) */
+/** JS/TS 的候选后缀:不养自己的名单 —— 凡走 JS 翻译器的语言,登记表后缀全算(.mts/.cts 不漏) */
 const JS_EXTS = LANGUAGES.filter((l) => RESOLVERS[l.id] === resolveJsImport).flatMap(
   (l) => l.extensions ?? []
 )

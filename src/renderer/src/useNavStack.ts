@@ -1,4 +1,4 @@
-// 后退/前进(第八十三锤):浏览过的位置串成一条线,游标挪到哪站就把界面摆回哪站。
+// 后退/前进(第八十三批):浏览过的位置串成一条线,游标挪到哪站就把界面摆回哪站。
 // 跳转要调动扫描/选中/页签三路兵马 —— 那些都在调用方手里,经 deps 递进来。
 import { useRef, useState } from 'react'
 import type { ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
@@ -19,7 +19,7 @@ export function useNavStack(deps: {
 }) {
   const { folder, result, scanning, scanPath, goHome, openFile, selectDir, clearSelection } = deps
 
-  // 后退/前进(第八十三锤):浏览过的位置(首页/项目/选中的文件文件夹)串成一条线,按钮挪游标
+  // 后退/前进(第八十三批):浏览过的位置(首页/项目/选中的文件文件夹)串成一条线,按钮挪游标
   const [nav, setNav] = useState<{ stack: NavLocation[]; index: number }>(() => ({
     stack: [{ folder: null, file: null, dir: null }],
     index: 0
@@ -27,7 +27,7 @@ export function useNavStack(deps: {
   // 后退/前进跳转途中记录器闭嘴:恢复旧位置引发的一串选中不许再记新账
   const navTravelingRef = useRef(false)
 
-  // 记一站(第八十三锤):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
+  // 记一站(第八十三批):开项目/选文件/选文件夹/回家时喊一声;后退前进途中有铃铛拦着,自动闭嘴
   function pushNav(loc: NavLocation): void {
     if (navTravelingRef.current) return
     setNav((prev) => pushNavLocation(prev.stack, prev.index, loc))

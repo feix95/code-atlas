@@ -1,4 +1,4 @@
-/* ── 模型上下文自适应(第六十九锤):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
+/* ── 模型上下文自适应(第六十九批):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
 import type { AiProviderKind, ChatTarget } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'
@@ -107,7 +107,7 @@ export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens
 
 /**
  * 上下文认主:手动填的「模型上下文」只属于内置引擎 —— 它是真参数,
- * 直接喂给引擎的 -c;LM Studio 的锅归 LM Studio 管,App 一律只信探测,存档里的手填数不看
+ * 直接喂给引擎的 -c;LM Studio 的上下文窗口归 LM Studio 管,App 一律只信探测,存档里的手填数不看
  * (不然设置页藏了字段,旧数还隐身管事)。探测失败(接口没开全/版本老)按默认窗口兜底。
  * 在线 API 探测不到,调用方传入的是设置里选的档(cloud.contextSize),同样按手动数当真。
  */

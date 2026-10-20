@@ -1,5 +1,5 @@
-// 机器探头(智能启动锤):为启动方案摸清机器家底 —— 内存、显卡名/厂商、显存总量与「此刻空闲」。
-// 规矩:静态户口(内存/显卡名/显存总量)查一次缓存住;空闲显存每次现查(它一直在变)。
+// 机器探头(智能启动批次):为启动方案摸清机器规格 —— 内存、显卡名/厂商、显存总量与「此刻空闲」。
+// 规矩:静态登记(内存/显卡名/显存总量)查一次缓存住;空闲显存每次现查(它一直在变)。
 // 任何一步失败都不抛异常,查不到就给 null —— 启动方案宁可按内存算账也不许被探头绊倒。
 import { execFile } from 'node:child_process'
 import os from 'node:os'
@@ -7,7 +7,7 @@ import type { GpuVendor, MachineProfile } from '../shared/launchPlan.ts'
 
 const CMD_TIMEOUT_MS = 15_000
 
-/** nvidia-smi CSV 行 → 家底;"名, 总, 空闲" 三段;nounits 模式是裸数字,带单位的会跟 MiB,都接 */
+/** nvidia-smi CSV 行 → 规格;"名, 总, 空闲" 三段;nounits 模式是裸数字,带单位的会跟 MiB,都接 */
 export function parseNvidiaSmiProfile(
   line: string
 ): { gpuName: string; vramBytes: number; vramFreeBytes: number } | null {
@@ -83,7 +83,7 @@ interface GpuStatic {
 
 let gpuStaticCache: GpuStatic | undefined
 
-/** 静态户口:先问 nvidia-smi(总量+名字一次拿),不认卡再退回 WMI 拿名字(显存问不到就老实给 null) */
+/** 静态登记:先问 nvidia-smi(总量+名字一次拿),不认卡再退回 WMI 拿名字(显存问不到就老实给 null) */
 async function probeGpuStatic(): Promise<GpuStatic> {
   const nv = await runCommand('nvidia-smi', [
     '--query-gpu=name,memory.total,memory.free',
@@ -92,7 +92,7 @@ async function probeGpuStatic(): Promise<GpuStatic> {
   if (nv.ok) {
     const parsed = parseNvidiaSmiProfile(nv.stdout.split('\n')[0] ?? '')
     if (parsed) {
-      // 算力+驱动版本单独问一趟:老 nvidia-smi 没 compute_cap 字段,问砸了也不影响户口
+      // 算力+驱动版本单独问一趟:老 nvidia-smi 没 compute_cap 字段,问砸了也不影响登记
       const caps = await runCommand('nvidia-smi', [
         '--query-gpu=compute_cap,driver_version',
         '--format=csv,noheader'
@@ -143,7 +143,7 @@ async function probeGpuStatic(): Promise<GpuStatic> {
   }
 }
 
-/** 机器家底快照:内存现取,显卡户口用缓存,空闲显存每次现查;永不抛异常 */
+/** 机器规格快照:内存现取,显卡登记用缓存,空闲显存每次现查;永不抛异常 */
 export async function queryMachineProfile(): Promise<MachineProfile> {
   try {
     if (!gpuStaticCache) gpuStaticCache = await probeGpuStatic()

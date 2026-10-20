@@ -106,7 +106,7 @@ export function AppTopBar({
   const fitted = useFittedPlaceholder(searchRef, !hasWorkspace)
   return (
     // 顶栏死空间拖窗/双击最大化走手动引擎:原生 app-region:drag 会吃 Windows
-    // Aero Shake(摇窗最小化其它窗,小葵点名要哑火);可交互件(按钮/输入框/
+    // Aero Shake(摇窗最小化其它窗,产品指定要哑火);可交互件(按钮/输入框/
     // 页签带)一律不接管,各自的点击与页签拖拽照常
     <header
       className="topbar"

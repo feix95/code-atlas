@@ -14,7 +14,7 @@ interface TreeRowProps {
   depth: number
   /** 本项目的手动备注表:备注过的行亮小葵自己的话,压过引擎一句话 */
   notes?: NoteMap
-  /** 右键菜单(第一百零二锤起,现统一走全局文件菜单):把节点报给 App 层换动作 */
+  /** 右键菜单(第一百零二批起,现统一走全局文件菜单):把节点报给 App 层换动作 */
   onRowContextMenu?: (e: React.MouseEvent, node: ScanTreeNode) => void
   selectedPath: string | null
   /** 正在点开探测的目录 relPath(分级扫描转圈提示) */
@@ -72,7 +72,7 @@ function TreeRow({
           draggable
           data-reveal-file={node.relPath}
           onDragStart={(e) => {
-            // 拖拽挂引用(第一百二十五锤):带上类型,文件夹到了对面好指路
+            // 拖拽挂引用(第一百二十五批):带上类型,文件夹到了对面好指路
             e.dataTransfer.setData(
               DRAG_MIME_NODE,
               JSON.stringify({ kind: 'file', relPath: node.relPath })
@@ -153,8 +153,8 @@ function TreeRow({
             e.dataTransfer.effectAllowed = 'copy'
           }}
           onClick={() => {
-            // 单击左键 = 选中 + 展开/收起一把抓(小葵点名);没探过的顺势扫描。
-            // 主文件夹例外(第一百三十五锤):点根 = 选中 + 保证展开,永不收起 ——
+            // 单击左键 = 选中 + 展开/收起一把抓(产品指定);没探过的顺势扫描。
+            // 主文件夹例外(第一百三十五批):点根 = 选中 + 保证展开,永不收起 ——
             // 收起根节点整棵树缩成光杆,没有使用价值,点它的人只想要项目概况;
             // 真想收根节点,键盘左箭头那条路还在
             onSelectFolder(dir)
@@ -211,9 +211,9 @@ function TreeRow({
 
 interface FileTreeProps {
   root: ScanDirNode
-  /** 项目根(导向菜单用,菜单统一大锤):复制完整路径/资源管理器显示,得知道扫描根才拼得出绝对路径 */
+  /** 项目根(导向菜单用,菜单统一批次):复制完整路径/资源管理器显示,得知道扫描根才拼得出绝对路径 */
   rootPath?: string
-  /** 本项目手动备注表(第九十八锤);不传就只亮引擎一句话 */
+  /** 本项目手动备注表(第九十八批);不传就只亮引擎一句话 */
   notes?: NoteMap
   selectedPath: string | null
   expandingPath: string | null
@@ -226,7 +226,7 @@ interface FileTreeProps {
   onNoteSave?: (relPath: string, text: string) => void
   /** 右键「清除备注」的原料 */
   onNoteRemove?: (relPath: string) => void
-  /** 右键「预览文件」的原料(第一百一十锤):开/激活预览页签 */
+  /** 右键「预览文件」的原料(第一百一十批):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
 }
 
@@ -254,8 +254,8 @@ export function FileTree({
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedPath, revealPaths])
 
-  /** 右键统一走全局文件菜单(菜单统一大锤):带路两件 + 预览(文件) + 备注系列,
-   *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/收摊/反馈/编辑框都是全局那张的事 */
+  /** 右键统一走全局文件菜单(菜单统一批次):带路两件 + 预览(文件) + 备注系列,
+   *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/关闭/反馈/编辑框都是全局那张的事 */
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
     if (!rootPath) return
     e.preventDefault()
@@ -283,7 +283,7 @@ export function FileTree({
   return (
     <>
       <div className="tree-scroll" ref={scrollRef}>
-        {/* 悬停提示组户口(文件树算一个整体):行间游走即时接力不收摊,进组第一颗按慢档亮 */}
+        {/* 悬停提示组登记(文件树算一个整体):行间游走即时接力不关闭,进组第一颗按慢档亮 */}
         <div className="tree" data-tip-group="filetree">
           <TreeRow
             node={root}

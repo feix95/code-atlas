@@ -1,4 +1,4 @@
-// 看片开关自测:全局偏好(排版显示 × 只读) → 文件读数的换算;账在 codePrefs(localStorage)
+// 预览显示开关自测:全局偏好(排版显示 × 只读) → 文件读数的换算;账在 codePrefs(localStorage)
 import assert from 'node:assert/strict'
 
 // codePrefs 模块装载时就要读 localStorage:node 里没有,先垫个内存假档再动态 import。

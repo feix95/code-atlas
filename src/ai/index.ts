@@ -5,7 +5,7 @@
 // 拆分后这里只留出口:实现按域分进同目录子模块,老调用方照旧从这里进。
 
 /**
- * 「试一句」的固定人设与题目(第一百一十三锤):设置页里改完说话方式,当场听一遍效果。
+ * 「试一句」的固定人设与题目(第一百一十三批):设置页里改完说话方式,当场听一遍效果。
  * 挑一段极小的代码当题目 —— 一口气能听出语气、要不要分点、用不用表情三件事。
  */
 export const STYLE_SAMPLE_SYSTEM =
@@ -15,7 +15,7 @@ export const STYLE_SAMPLE_QUESTION = '讲讲这一段:\nfor (const f of files) {
 /** 拿不到真实上下文时的默认:和内置引擎的默认窗口同一个数(数住在 shared/aiDefaults),转出去给老调用方 */
 export { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 
-// 「上下文装不下」嗅探 + HTTP 错误人话翻译的户口搬进了 ai/http.ts(请求底座批);
+// 「上下文装不下」嗅探 + HTTP 错误人话翻译的登记搬进了 ai/http.ts(请求底座批);
 // 转一手 re-export,老朋友(main/自测)照旧从这里进
 export { isContextOverflow, friendlyHttpError } from './http.ts'
 export { estimateTokens } from '../shared/aiText.ts'

@@ -1,5 +1,5 @@
 // 外观系统:亮暗模式 + 配色预设 + 自定义主题色/辅助色。
-// 偏好存主进程的 appearance.json(2026-09-16 起从 localStorage 搬家 —— 那份按端口分仓、
+// 偏好存主进程的 appearance.json(2026-09-16 起从 localStorage 迁移 —— 那份按端口分仓、
 // 端口一挤就出厂设置的存档方式退役;首启自动把 localStorage 旧档收编进新家)。
 // 生效方式:模式往 <html> 上挂 data-theme 切换样式表里的两套 token;
 // 自定义色在启动时算出一族同色系的 token 写到 :root 内联样式上,压过样式表默认值。
@@ -17,7 +17,7 @@ import { hexToHsl, hslCss, neutralFor } from '../../shared/appearancePalette.ts'
 // 类型与预设表对外照旧从这里出(既有 import 不用动),本体住在 shared
 export type { Appearance, AppearanceMode, AppearancePreset }
 export { COLOR_PRESETS }
-// 色算真值户口已挪 shared/appearancePalette(主进程定窗底色也要用);自测的老 import 面不动
+// 色算真值登记已挪 shared/appearancePalette(主进程定窗底色也要用);自测的老 import 面不动
 export { hexToHsl, hslCss }
 
 export const APPEARANCE_KEY = 'atlas.appearance'
@@ -141,7 +141,7 @@ function paintSurfaces(root: CSSStyleDeclaration, dark: boolean, h: number, s: n
   const achro = s < 8
   const pal = neutralFor(dark)
   if (dark) {
-    // 分寸(小葵拍板):只留一丝色调 —— 饱和度封顶 12~15、明度比石墨灰再压一档
+    // 分寸(产品裁定):只留一丝色调 —— 饱和度封顶 12~15、明度比石墨灰再压一档
     const surfSat = Math.min(s * 0.28, 12)
     root.setProperty('--window', achro ? pal.window : hslCss(h, surfSat, 14))
     root.setProperty('--canvas-tint', achro ? pal.canvasTint : hslCss(h, Math.min(s * 0.35, 15), 9))
@@ -208,9 +208,9 @@ export function applyAppearance(a: Appearance): void {
   const [h, s, l] = hexToHsl(accentHex)
   const [h2, s2, l2] = hexToHsl(secondaryHex)
 
-  // 第七十六锤:遮罩摘除 —— --accent-soft / --selected-bg 回归中性面板,主题色不再整面染色,
-  // 只上动作件和细边/细条;第七十七锤补刀:画布雾也转中性,主题色只活在动作件上。
-  // 第七十九锤(小葵拍板):自定义彻底放开 —— 色相、饱和度给满,明度不再按亮暗主题分带,
+  // 第七十六批:遮罩摘除 —— --accent-soft / --selected-bg 回归中性面板,主题色不再整面染色,
+  // 只上动作件和细边/细条;第七十七批补刀:画布雾也转中性,主题色只活在动作件上。
+  // 第七十九批(产品裁定):自定义彻底放开 —— 色相、饱和度给满,明度不再按亮暗主题分带,
   // 亮暗同带 5~95(极深极浅都听用户的)。原来「明度安全带」保的是按钮上固定字色的可读性,
   // 现在改由 --accent-ink 承担:按派生出的主题色算对比度,深墨/白自动翻,色自由、字不糊。
   // 预设档(石墨 + 手动叠了自定义色的组合)仍走配档逻辑,长相一分不变;
@@ -263,7 +263,7 @@ export function applyAppearance(a: Appearance): void {
     return
   }
 
-  // 预设档:沿用 76 锤前的配档逻辑(明度带按亮暗分),保证三套皮肤和从前长得一样
+  // 预设档:沿用第76批前的配档逻辑(明度带按亮暗分),保证三套皮肤和从前长得一样
   const sat = clamp(s, 30, 85)
   const sat2 = clamp(s2, 25, 80)
   const achro = s < 8

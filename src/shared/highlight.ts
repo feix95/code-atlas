@@ -30,8 +30,8 @@ export type HlKind = (typeof HL_KINDS)[number]
 export const HL_MAX_CHARS = 1_000_000
 
 /**
- * 后缀 → 语法语言:不养自己的名单 —— 从语言户口本(shared/languages.ts)倒查,
- * 凡户口本语言在 LANG_TO_GRAMMAR(shared/grammarWasm.ts)有语法,它的后缀全映射过去
+ * 后缀 → 语法语言:不养自己的名单 —— 从语言登记表(shared/languages.ts)倒查,
+ * 凡登记表语言在 LANG_TO_GRAMMAR(shared/grammarWasm.ts)有语法,它的后缀全映射过去
  * (.zsh→bash、.cts→tsx 自动收编,不用想起这还有一张表)。
  * 没语法的语言(md、scss、vue…)老实白字,宁缺毋滥;支持面仍比体检模块宽
  * (json/css/html/bash/yaml/toml 是语法包白捡的)。

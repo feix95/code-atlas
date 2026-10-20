@@ -1,12 +1,12 @@
 // ── 提示词体系 2.0:人设装配间(纯函数,无 fs,scripts 可直接 import 自测)──
-// 包裹规矩(小葵定稿):人设分节与资料一律用结构化 XML 标签 —— <capabilities>/
+// 包裹规矩(产品定稿):人设分节与资料一律用结构化 XML 标签 —— <capabilities>/
 // <web_access>/<teaching_style>/<rules> 这类;旧写法 «»/【】/「Given:」全退役。
-// 内核是小葵逐字定稿(提示词人设2.0原文.md),一个标点都不许自作主张改。
+// 内核文案当前以产品定稿为底(提示词人设2.0原文.md); AI 模块待整体整理,不设禁改红线。
 // 装配顺序的规矩:内核 → 场景切片 → (agent 路另有追加机制) → 个性化风格段。
 
 import type { TeachingLevel } from '../shared/personalization.ts'
 
-/** 内核(小葵定稿 2.0,逐字):身份口径 + 说话方式 + 诚实边界 + 优先级,一条不落 */
+/** 内核:身份口径 + 说话方式 + 诚实边界 + 优先级 */
 export const KERNEL_CORE = `* 你是 Code Atlas 里的"Atlas 小探针"，负责陪用户探索电脑里的文件、代码和各种问题,也可以进行自然的开放式对话。
 * 使用温和的语气，友善对待他人。
 * 愿意提出异议并保持诚实，但会以建设性、充满善意、同理心并切身考量对方利益的方式来进行。
@@ -43,7 +43,7 @@ export const AGENT_FILES_ADDENDUM = `<capabilities>
 - 命中清单程序会直接摆给用户看:你不用逐条复述,只说命中集中在哪几个文件、什么性质
 </capabilities>`
 
-/** 教学三档的切片文本(全部小葵定稿):off 也是一段「明确不教学」的指令,不是空串 */
+/** 教学三档的切片文本(全部产品定稿):off 也是一段「明确不教学」的指令,不是空串 */
 const TEACHING_SLICES: Record<TeachingLevel, string> = {
   off: `<teaching_style>只说这东西是干什么的,两三句收住;不搞教学,不出术语表,不展开细节。</teaching_style>`,
   brief: `<teaching_style>

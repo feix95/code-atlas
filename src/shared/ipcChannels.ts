@@ -22,7 +22,7 @@ export const CH = {
   // ── 外观与缩放 ──
   appearanceGetSync: 'atlas:appearance-get-sync',
   appearanceSave: 'atlas:appearance-save',
-  /** 窗口内 DOM CustomEvent 名(非 IPC):缩放变了,预览字号跟着量尺 */
+  /** 窗口内 DOM CustomEvent 名(非 IPC):缩放变了,预览字号跟随适配估算 */
   uiScaleChanged: 'atlas:ui-scale',
   /** 缩放落盘后报主进程(send 配 on):窗口尺寸记事本按「100% 基准值 × 系数」记账要用 */
   uiScaleSync: 'atlas:ui-scale-sync',
@@ -56,7 +56,7 @@ export const CH = {
   modelLoad: 'atlas:model-load',
   modelFitCheck: 'atlas:model-fit-check',
   modelContextInfo: 'atlas:model-context-info',
-  // 智能启动锤:本机运行方案(机器家底 + 当前内置模型的启动计划,只读)
+  // 智能启动批次:本机运行方案(机器规格 + 当前内置模型的启动计划,只读)
   aiLaunchPlan: 'atlas:ai-launch-plan',
   // 引擎后端管理(第 4 期):状态查询/一键安装/取消/卸载;进度走 push 通道
   engineState: 'atlas:engine-state',
@@ -81,7 +81,7 @@ export const CH = {
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
-  // ── 文件编辑与监视(预览编辑锤 / 内联标题改名锤) ──
+  // ── 文件编辑与监视(预览编辑批次 / 内联标题改名批次) ──
   saveFile: 'atlas:save-file',
   renameFile: 'atlas:rename-file',
   watchFile: 'atlas:watch-file',
@@ -89,7 +89,7 @@ export const CH = {
   /** 主进程 → 渲染层推送:打开中的文件被外部改了(全员广播,各窗自己对账) */
   fileChanged: 'atlas:file-changed',
   // ── 桌宠 ──
-  // 撕窗子窗(页签撕窗锤):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
+  // 独立子窗(页签独立窗口):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗
   auxWindowOp: 'atlas:aux-window-op',
   // ── 共享自由对话与气泡 ──

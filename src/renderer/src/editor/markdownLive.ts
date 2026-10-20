@@ -1,5 +1,5 @@
 /**
- * Live Preview 装饰引擎(md 三档锤):
+ * Live Preview 装饰引擎(md 三档批次):
  * 同一份源码,光标不在的地方「上妆」成渲染效果,光标所在的语法块「卸妆」露源码 ——
  * 对标 Obsidian 的 Live Preview。
  *
@@ -42,7 +42,7 @@ export interface LiveRange {
   to: number
 }
 
-/** ATX 标题:# ~ ######;下划线标题单独认(它的横线行要整行收摊) */
+/** ATX 标题:# ~ ######;下划线标题单独认(它的横线行要整行关闭) */
 const RE_ATX = /^ATXHeading([1-6])$/
 
 /** 光标选区跟语法块交不交差:交差 = 这个块正在卸妆期,记号不藏 */
@@ -326,10 +326,10 @@ class HrWidget extends WidgetType {
   }
 }
 
-/** live 档的内联标题户口(cmSetup 装配时喂文件名,缺省 '' = 不摆) */
+/** live 档的内联标题登记(cmSetup 装配时喂文件名,缺省 '' = 不摆) */
 export const liveTitle = Facet.define<string, string>({ combine: (v) => v[0] ?? '' })
 
-/** live 档的标题改名通道(内联标题改名锤):cmSetup 喂回调,缺省 = 标题只展示不可改 */
+/** live 档的标题改名通道(内联标题改名批次):cmSetup 喂回调,缺省 = 标题只展示不可改 */
 export const liveRename = Facet.define<
   ((base: string) => Promise<RenameOutcome>) | undefined,
   ((base: string) => Promise<RenameOutcome>) | undefined
@@ -385,7 +385,7 @@ class TitleWidget extends WidgetType {
           input.disabled = true
           renamed = (await rename(v)).ok
         }
-        // 取消/失败:退回大字;成功则户口换账、编辑器重挂,这里不用还原
+        // 取消/失败:退回大字;成功则登记换账、编辑器重挂,这里不用还原
         if (!renamed) el.textContent = title
       }
       input.onkeydown = (ev) => {
@@ -477,7 +477,7 @@ export function liveDecoSet(
   return Decoration.set(ranges, true)
 }
 
-/** 编辑器侧组装:整份文档 → 清单 → 装饰集(头上再叠一颗内联标题替身,有户口才摆) */
+/** 编辑器侧组装:整份文档 → 清单 → 装饰集(头上再叠一颗内联标题替身,有登记才摆) */
 function buildLiveDecos(state: EditorState): DecorationSet {
   const doc = state.doc
   // 焦点在表格等块替身里时,编辑器选区是过期的旧光标,当作「光标不在任何块里」

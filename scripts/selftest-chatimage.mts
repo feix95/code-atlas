@@ -1,4 +1,4 @@
-// 图片附件锤自测(第一百五十二锤):图片的估算/预算/能力闸/收编/消息装配/历史标记,一把全摁住。
+// 图片附件批次自测(第一百五十二批):图片的估算/预算/能力闸/收编/消息装配/历史标记,一把全摁住。
 // 跑法: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-chatimage.mts
 // 样本字节全在内存里构造,仓库里不放任何二进制图片;不碰盘不碰网。
 import assert from 'node:assert/strict'
@@ -90,12 +90,12 @@ function makeImage(
   return { id: `id-${name}`, name, mime, dataUrl: toDataUrl(mime, bytes), width: w, height: h }
 }
 
-// ── estimateImageTokens:28px 块口径,64 地板价,宁高勿低 ──
-assert.equal(estimateImageTokens(128, 128), 64, '小图吃地板价 64(5×5 块=25 < 64)')
+// ── estimateImageTokens:28px 块口径,64 下限,宁高勿低 ──
+assert.equal(estimateImageTokens(128, 128), 64, '小图吃下限 64(5×5 块=25 < 64)')
 assert.equal(estimateImageTokens(28, 28), 64, '一块图也是 64')
 assert.equal(estimateImageTokens(1024, 768), 37 * 28, '1024×768 → 37×28=1036')
 assert.equal(estimateImageTokens(1025, 768), 37 * 28, '多 1px 也多占一块(向上取整)')
-assert.equal(estimateImageTokens(0, 0), 64, '坏尺寸按 1px 算,地板价兜底')
+assert.equal(estimateImageTokens(0, 0), 64, '坏尺寸按 1px 算,下限兜底')
 assert.equal(estimateImageTokens(4096, 4096), 147 * 147, '4K 大图 21609 个块')
 
 // ── imageGate:纯文本拦,视觉放,拿不准放行带提醒 ──
@@ -110,7 +110,7 @@ assert.equal(unknownGate.hint, '没法确认这个模型能不能看图')
 assert.deepEqual(imageGate(undefined, 1).allow, true, '没报能力 = unknown 口径')
 assert.deepEqual(imageGate('text-only', 0), { allow: true }, '不带图不用过闸')
 
-// ── planImageBudget:16K 锅(16384),人设+问题约 1000,回答预留 512 ──
+// ── planImageBudget:16K 上下文窗口(16384),人设+问题约 1000,回答预留 512 ──
 const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
 
 // 一张大图(4096²,原生约 21609):上限 min(8192, 14872)=8192,缩到能坐进 8192
@@ -118,7 +118,7 @@ const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
   const plan = planImageBudget({ ...CTX16K, images: [{ width: 4096, height: 4096 }] })
   assert.ok(plan.ok, '一张大图在 16K 下坐得下')
   assert.equal(plan.items.length, 1)
-  assert.ok(plan.items[0].tokens <= 8192, `估算 ${plan.items[0].tokens} 不超座位 8192`)
+  assert.ok(plan.items[0].tokens <= 8192, `估算 ${plan.items[0].tokens} 不超配额 8192`)
   assert.ok(Math.max(plan.items[0].width, plan.items[0].height) <= 4096, '只缩不放大')
   assert.ok(Math.max(plan.items[0].width, plan.items[0].height) >= 256, '不缩穿底线')
 }
@@ -160,7 +160,7 @@ const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
   assert.deepEqual([plan.items[0].width, plan.items[0].height], [512, 512], '装得下的图一寸不缩')
 }
 
-// 极端:固定开销把锅占满,连地板价都装不下 → ok:false 说人话
+// 极端:固定开销把上下文占满,连下限都装不下 → ok:false 说人话
 {
   const full = planImageBudget({
     ctxTokens: 16384,
@@ -168,17 +168,17 @@ const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
     otherTokens: 16200,
     images: [{ width: 512, height: 512 }]
   })
-  assert.equal(full.ok, false, '锅满了直接拒,不静默丢图')
-  if (!full.ok) assert.match(full.reason, /调大|裁小|座位/)
+  assert.equal(full.ok, false, '上下文已满直接拒,不静默丢图')
+  if (!full.ok) assert.match(full.reason, /调大|裁小|配额/)
 }
 {
   const tight = planImageBudget({
     ctxTokens: 16384,
     replyTokens: 512,
-    otherTokens: 15850, // 剩 22 个座位:连一张图 64 地板价都装不下
+    otherTokens: 15850, // 剩 22 个配额:连一张图 64 下限都装不下
     images: [{ width: 100, height: 100 }]
   })
-  assert.equal(tight.ok, false, '22 个座位装不下一张图 → 拒')
+  assert.equal(tight.ok, false, '22 个配额装不下一张图 → 拒')
 }
 // 空列表直接过
 assert.deepEqual(planImageBudget({ ...CTX16K, images: [] }), { ok: true, items: [] })
@@ -390,4 +390,4 @@ assert.equal(
   assert.equal(hist[0].content, '(这一轮附了 1 张图片,图片本身不在当前上下文里)')
 }
 
-console.log('✅ 图片附件锤自测全部通过')
+console.log('✅ 图片附件批次自测全部通过')

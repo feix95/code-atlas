@@ -13,7 +13,7 @@ import type { ChatFileAttachment } from '@shared/chatFiles'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
 
-// ChatMessage/ChatMsgState 户口在 shared/types.ts —— 转一手,老朋友照旧从这里进
+// ChatMessage/ChatMsgState 登记在 shared/types.ts —— 转一手,老朋友照旧从这里进
 export type { ChatMessage, ChatMsgState } from '@shared/types'
 
 /**
@@ -21,10 +21,10 @@ export type { ChatMessage, ChatMsgState } from '@shared/types'
  * 各走各的通道、各记各的账 —— 解释是证据优先的单问单答,这边是带历史的真聊天。
  * 消息只有用户和探针两种;资料附件每次发请求单独带上,绝不混进消息列表,
  * 这样换文件时旧资料自动消失,旧对话也不污染新对象。
- * 探针的联网账本(web)以主进程回传为准:边查边收实时播报,收尾以结果里的账本为准。
+ * 探针的联网状态表(web)以主进程回传为准:边查边收实时播报,收尾以结果里的状态表为准。
  */
 
-/** /compact 压缩完保留最近几条原文(第一百四十二锤):摘要垫底 + 这几条原文,衔接不断片 */
+/** /compact 压缩完保留最近几条原文(第一百四十二批):摘要垫底 + 这几条原文,衔接不断片 */
 const COMPACT_KEEP_RECENT = 4
 
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
@@ -41,7 +41,7 @@ function findSummary(messages: ChatMessage[]): string | null {
 }
 
 /**
- * /compact 的压缩史料(第一百四十二锤):全量的对话记录,不受 HISTORY_MAX 限制 ——
+ * /compact 的压缩史料(第一百四十二批):全量的对话记录,不受 HISTORY_MAX 限制 ——
  * 正是要把「将被扔掉的老对话」交给模型提炼;旧摘要卡转写成打标签的一条,再压时融进新摘要。
  */
 function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
@@ -62,15 +62,15 @@ function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
   return out
 }
 
-/** 思考开关存档的 localStorage 键(第一百一十五锤)。
+/** 思考开关存档的 localStorage 键(第一百一十五批)。
  *  键名是横杠系:全仓别的键走 'atlas.*' 点号系,这俩是早期定的老键,
  *  改名会弄丢已存档的开关状态 —— 命名风格不统一是已知差异,为存档兼容刻意保留(P2-4 补注) */
 const THINKING_KEY = 'atlas-freechat-thinking'
 
-/** 翻文件(agent)开关的 localStorage 键(第一百二十八锤)。命名同上,刻意保留 */
+/** 翻文件(agent)开关的 localStorage 键(第一百二十八批)。命名同上,刻意保留 */
 const AGENT_KEY = 'atlas-freechat-agent'
 
-/** 历史按「轮」成对收集(答旧题修复锤):只收一问一答都落地的完整轮,报错/取消/半截的
+/** 历史按「轮」成对收集(答旧题修复批次):只收一问一答都落地的完整轮,报错/取消/半截的
  * 整轮扔,悬空旧问题不再沉进历史勾着小模型答旧题。纯逻辑住 shared/chatHistory.ts,
  * 渲染层与自测共用同一份口径;发得宽(CHAT_HISTORY_SEND_MAX),取舍交给主进程按模型档位定 */
 function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
@@ -84,21 +84,21 @@ export function useAiChat(
 ): {
   messages: ChatMessage[]
   busy: boolean
-  /** 思考模式开关(第一百一十五锤):开着 = 允许模型先想一遍,思考过程折叠展示 */
+  /** 思考模式开关(第一百一十五批):开着 = 允许模型先想一遍,思考过程折叠展示 */
   thinking: boolean
   setThinking: (on: boolean) => void
-  /** 翻文件模式开关(第一百二十八锤):开着 = 允许小探针自己列名单/读文件(只读) */
+  /** 翻文件模式开关(第一百二十八批):开着 = 允许小探针自己列名单/读文件(只读) */
   agent: boolean
   setAgent: (on: boolean) => void
-  /** 程序垫一条灰字(第一百二十四锤):如「探针正答着话」,不进历史、不发给模型 */
+  /** 程序垫一条灰字(第一百二十四批):如「探针正答着话」,不进历史、不发给模型 */
   note: (text: string) => void
-  /** 开新对话(第一百二十七锤):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
+  /** 开新对话(第一百二十七批):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
   newChat: () => void
-  /** /compact 手动压缩(第一百四十二锤):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
+  /** /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
   compact: () => void
   /**
-   * 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二锤);files = 这轮带的文件附件
-   * (文件附件锤,对齐 Claude Code 的 @文件);允许只发图/只发文件不发字
+   * 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二批);files = 这轮带的文件附件
+   * (文件附件批次,对齐 Claude Code 的 @文件);允许只发图/只发文件不发字
    */
   send: (
     question: string,
@@ -124,7 +124,7 @@ export function useAiChat(
   const conversationIdRef = useRef(crypto.randomUUID())
   const messagesRef = useRef(messages)
   messagesRef.current = messages
-  // 附件的活户口径:发请求时取当下渲染的这份,用户切换选中对象后自动带新的
+  // 附件的活登记径:发请求时取当下渲染的这份,用户切换选中对象后自动带新的
   const contextRef = useRef(context)
   contextRef.current = context
 
@@ -133,7 +133,7 @@ export function useAiChat(
     () =>
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
-        // agent 流式的回滚令(第一百三十四锤):已吐的字是垃圾/脏稿(打转、思考标签掺字),
+        // agent 流式的回滚令(第一百三十四批):已吐的字是垃圾/脏稿(打转、思考标签掺字),
         // 把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
         if (payload.reset) {
           setMessages((prev) =>
@@ -141,7 +141,7 @@ export function useAiChat(
           )
           return
         }
-        // agent 流式的封板令(第一百五十一锤):本轮说出口的话是正经输出(「我去翻翻 xx」),
+        // agent 流式的封板令(第一百五十一批):本轮说出口的话是正经输出(「我去翻翻 xx」),
         // 不能抹掉 —— 当前气泡封口完工保留,另起一个新气泡接下一轮的话和思考。
         // 新气泡沿用原 key(botKey),最终答案收尾才找得到它;封口气泡换新 key,别撞车
         if (payload.seal) {
@@ -189,7 +189,7 @@ export function useAiChat(
           })
           return
         }
-        // 命中清单卡(LLM 优化锤):search_content 的结构化命中走旁路直递,程序自己画卡
+        // 命中清单卡(LLM 优化批次):search_content 的结构化命中走旁路直递,程序自己画卡
         // —— 一条不丢、行号一个不错,可点跳预览。和步骤灰字一样只给人看,不进对话历史
         if (payload.matches) {
           const card = payload.matches
@@ -231,7 +231,7 @@ export function useAiChat(
   )
 
   // 联网状态实时播报:查着/没查着都是程序说了算,收到就先挂在 busy 消息上
-  // (最终以请求结果里带的账本为准,这边只是让"正在联网查询…"立刻冒出来)
+  // (最终以请求结果里带的状态表为准,这边只是让"正在联网查询…"立刻冒出来)
   useEffect(
     () =>
       window.atlas.onChatLookup((payload) => {
@@ -297,7 +297,7 @@ export function useAiChat(
     void (async () => {
       try {
         // 历史取发送前的消息(不含本轮),当前问题单独走 question 字段;
-        // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆(第一百四十二锤);
+        // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆(第一百四十二批);
         const summary = findSummary(messagesRef.current)
         const agentOn = agentRef.current
         const req: AiChatRequest = {
@@ -362,7 +362,7 @@ export function useAiChat(
   }
 
   /**
-   * /compact 手动压缩(第一百四十二锤):输入框拦下命令后走这条。
+   * /compact 手动压缩(第一百四十二批):输入框拦下命令后走这条。
    * 生成中显示成一个正在回答的气泡(流式增量照糊上去),成功后气泡当场变身摘要卡 ——
    * 旧对话(含上一代摘要)全数交给模型提炼,只留最近几条原文,之后的请求靠 summary 字段
    * 把摘要带给模型。没聊过东西就不劳烦模型,垫一句灰字了事。
@@ -450,7 +450,7 @@ export function useAiChat(
   }
 
   function newChat(): void {
-    // 探针还在答就先掐话头,别让旧对话的残响落进新账本
+    // 探针还在答就先掐话头,别让旧对话的残响落进新状态表
     if (idRef.current) void window.atlas.aiCancel(idRef.current)
     idRef.current = ''
     busyRef.current = false

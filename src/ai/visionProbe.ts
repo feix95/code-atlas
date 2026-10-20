@@ -1,4 +1,4 @@
-// ── 视觉能力探测(视觉能力锤):各家怎么报「能不能看图」一本账 ──
+// ── 视觉能力探测(视觉能力批次):各家怎么报「能不能看图」同一数据源 ──
 // llama-server:就绪后问 /props 的 modalities.vision(布尔)
 // LM Studio:/api/v0/models 条目的 type === 'vlm' / 'llm'
 // 在线 API:没有查询口,按模型名认(shared/visionModels.ts)

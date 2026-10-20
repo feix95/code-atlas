@@ -14,10 +14,10 @@ import { MENU_ICON_SIZE } from '../inputMetrics'
 /**
  * 通用右键菜单(第二台全局单例):不是「对着文件」的右键菜单走这儿 ——
  * 调用方报坐标 + 行项清单,皮肤复用 file-path-menu 那一套(全 app 右键菜单一个规格)。
- * 行项的 run 返回字符串时,那一行先亮出这句反馈(「已复制 ✓」式)停一拍再收摊。
+ * 行项的 run 返回字符串时,那一行先亮出这句反馈(「已复制 ✓」式)停一拍再关闭。
  * 行项清单里插 MENU_SEP = 组间一道细线(Obsidian 式分组);item.icon 走 TreeIcon 行内图;
- * { heading } = 分区小标题;item.switchOn = 开关行(复用设置页 .cfg-switch,点了不收摊)。
- * realm 铁律:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
+ * { heading } = 分区小标题;item.switchOn = 开关行(复用设置页 .cfg-switch,点了不关闭)。
+ * 渲染域隔离:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
  */
 
 /** 菜单的估尺寸:宽窄一条,高按行数算(一项一行约 34px);贴窗口边时按它往里收,别弹出窗外 */
@@ -39,7 +39,7 @@ const HEADING_H = 26
 const CHROME = 10
 const CHROME_COMPACT = 6
 const EDGE = 8
-/** 菜单和光标之间的空隙:一个汉字宽(约两个字节,小葵点名的距离感) */
+/** 菜单和光标之间的空隙:一个汉字宽(约两个字节,产品指定的距离感) */
 const CURSOR_GAP = 12
 /** 行内反馈停一拍的时长:让人亲眼看到结果,不是菜单凭空消失 */
 const LINGER_MS = 900
@@ -68,7 +68,7 @@ function clampedPosition(
 
 export function ContextMenu(): React.JSX.Element | null {
   const request = useSyncExternalStore(subscribeContextMenu, currentContextMenu)
-  // realm 铁律:挂载后从锚点元素认领自家 document,只画「在本 document 里被右键叫出来」的那张菜单
+  // 渲染域隔离:挂载后从锚点元素认领自家 document,只画「在本 document 里被右键叫出来」的那张菜单
   const anchorRef = useRef<HTMLSpanElement | null>(null)
   const [doc, setDoc] = useState<Document | null>(null)
   useLayoutEffect(() => {
@@ -76,7 +76,7 @@ export function ContextMenu(): React.JSX.Element | null {
   }, [])
   const mine = request !== null && doc !== null && request.doc === doc
 
-  // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,收摊
+  // 菜单开着时的三条退路:点菜单外面、滚动内容、按 Esc —— 都是「用户不要了」,关闭
   useMenuDismiss(mine, closeContextMenu, '.file-path-menu', doc ?? undefined)
 
   return (

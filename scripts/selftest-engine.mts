@@ -1,6 +1,6 @@
 // ── 引擎后端自测(第 4 期)─────────────────────────────────────────
 // 跑法:npm run test:engine
-// 钉死的账:engineCatalog 户口完整(每包有真 sha256/大小,URL 对得上钉的版本);
+// 钉死的账:engineCatalog 登记完整(每包有真 sha256/大小,URL 对得上钉的版本);
 // recommendBackend / resolveEngineChoice 的推荐与退路矩阵;安装器的纯函数件
 // (进度折算、zip 条目安检、verifyAndExtract 的错 sha/截短/zip-slip 拒收);
 // config 的 backend 落盘口径;builtin 对账键把 backend 算进签名。
@@ -59,7 +59,7 @@ const M = (over: Partial<MachineProfile>): MachineProfile => ({
   ...over
 })
 
-// ── 目录户口完整性 ──────────────────────────────────────────────
+// ── 目录登记完整性 ──────────────────────────────────────────────
 console.log('── 引擎目录完整性')
 {
   for (const b of ['cuda', 'vulkan', 'cpu'] as const) {

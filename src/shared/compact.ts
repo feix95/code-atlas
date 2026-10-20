@@ -1,5 +1,5 @@
 /**
- * /compact 手动压缩命令(第一百四十二锤):把早前的对话提炼成一份要点摘要,
+ * /compact 手动压缩命令(第一百四十二批):把早前的对话提炼成一份要点摘要,
  * 之后的每次请求都带着这份摘要走 —— 旧对话不再被「只带最近几条」的规矩悄悄扔掉,
  * 长聊不断片。纯逻辑都住这里:命令识别、历史清洗、压缩提示词拼装、摘要洗消,
  * 渲染进程(拦命令)、主进程(调模型)、自测三边共用同一份口径。
@@ -7,7 +7,7 @@
 import type { AiHistoryMessage } from './types.ts'
 import { TAG } from './promptTags.ts'
 
-/** 聊天输入框认的压缩命令(小葵拍的板:只认英文这一个写法,大小写不拘) */
+/** 聊天输入框认的压缩命令(产品裁定:只认英文这一个写法,大小写不拘) */
 export const COMPACT_COMMAND = '/compact'
 
 /** 输入框里这句话是不是「压缩」命令:整句就是 /compact 才算,后面跟了字的不算 */
@@ -16,7 +16,7 @@ export function isCompactCommand(text: string): boolean {
 }
 
 /** 摘要的自报家门:历史里认这个标签开头,知道这条是压缩出来的摘要(再压时融进新摘要)。
- *  标签名的唯一户口在 shared/promptTags.ts,这里是老调用方的转接口 */
+ *  标签名的唯一登记在 shared/promptTags.ts,这里是老调用方的转接口 */
 export const COMPACT_SUMMARY_TAG = TAG.compressedSummary.open
 
 /** 压缩员的专属人设:只记聊过的内容,不寒暄不编造 */

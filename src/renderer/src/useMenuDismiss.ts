@@ -49,7 +49,7 @@ export function useMenuDismiss(
   open: boolean,
   close: () => void,
   insideSelector?: string,
-  doc: Document = document // realm 铁律:菜单开在哪个 document,监听就挂哪个
+  doc: Document = document // 渲染域隔离:菜单开在哪个 document,监听就挂哪个
 ): void {
   useEffect(() => {
     if (!open) return

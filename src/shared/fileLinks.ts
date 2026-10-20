@@ -1,5 +1,5 @@
 /**
- * 聊天文件链接的检测器:AI 回答里提到的文件,凡是能在扫描树里对上户口的,
+ * 聊天文件链接的检测器:AI 回答里提到的文件,凡是能在扫描树里对上登记的,
  * 标出来给界面画成可点的链接(点了左边开预览);对不上的(模型编的)当普通文字,
  * 绝不给用户一个点了没反应的死链接。
  *
@@ -96,7 +96,7 @@ export function findFileLinks(text: string, index: FileLinkIndex): FileLinkSpan[
   let m: RegExpExecArray | null
   while ((m = FILE_TOKEN_RE.exec(text)) !== null) {
     let base = m[1]
-    // 结尾的句点/斜杠多半是句子标点("见 src/x.ts." 的那颗点),摘掉再查户口
+    // 结尾的句点/斜杠多半是句子标点("见 src/x.ts." 的那颗点),摘掉再查登记
     base = base.replace(/[./]+$/, '')
     if (base === '') continue
     const lineRaw = m[2]
@@ -126,7 +126,7 @@ export function findFileLinks(text: string, index: FileLinkIndex): FileLinkSpan[
 /**
  * 行内代码的整段判定:整段文字掐头去尾后恰好是一个文件引用才认 ——
  * 不做子串扫描(`import a from './a.ts'` 这种带着别的字的不凑热闹)。
- * 归一化、按名/按路径户口、:行号 解析与 findFileLinks 同一套规矩。
+ * 归一化、按名/按路径登记、:行号 解析与 findFileLinks 同一套规矩。
  */
 export function resolveFileRef(
   text: string,

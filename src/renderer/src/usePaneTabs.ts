@@ -23,7 +23,7 @@ const FLASH_TAB_MS = 1_200 // 需要指路时页签闪一下(比如挂引用时�
 
 export function usePaneTabs(deps: {
   result: ScanResult | null
-  /** 开一扇撕窗子窗(页签撕窗锤):返回 frameName 户口;null = 窗口开不出,签别挪 */
+  /** 开一扇独立子窗(页签独立窗口):返回 frameName 登记;null = 窗口开不出,签别挪 */
   openAuxWindow: () => string | null
   setRevealPaths: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
@@ -45,15 +45,15 @@ export function usePaneTabs(deps: {
   // 刚被点名的页签(比如挂了引用要指给用户看探针签在哪):轻强调一下,不弹窗不出声
   const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
 
-  // 自由对话的公用场(第一百二十四锤的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
+  // 自由对话的公用场(第一百二十四批的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
   // 换文件、换文件夹、切页签,聊天记录都活着
   // 激活组 = 用户最后点的那组:新签开在这组,另一组不被打扰
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
   // 可见清单:页签栏照全量画(桌宠藏签那套已随形态机一起拆)
   const visibleOfGroup = useCallback((g: PaneGroup | null) => g?.tabs ?? [], [])
 
-  // 撕窗(Obsidian 式):页签挪进新开的同进程子窗 —— 组挂 host 户口,
-  // 签的正房由 Portal 渲染进子窗 document,流式回答/滚动位/草稿全活着搬家
+  // 拆出独立窗口(Obsidian 式):页签挪进新开的同进程子窗 —— 组挂 host 登记,
+  // 签的页签活 DOM由 Portal 渲染进子窗 document,流式回答/滚动位/草稿状态保持迁移
   const detachTabToWindow = useCallback(
     (id: string): void => {
       const hostId = openAuxWindow()
@@ -65,17 +65,17 @@ export function usePaneTabs(deps: {
     },
     [openAuxWindow, groups]
   )
-  // 页签拖出窗外松手 = 撕去新窗;子窗里的签拖出子窗同样再开一扇(Chrome 语义)
+  // 页签拖出窗外松手 = 拆去新窗;子窗里的签拖出子窗同样再开一扇(Chrome 语义)
   const onTabDragEnd = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
-  // 页签右键「移到新窗口」= 不拖也撕,所有签一视同仁
+  // 页签右键「移到新窗口」= 不拖也可拆出,所有签一视同仁
   const onDetachTab = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
 
-  // 子窗死了(pagehide 上报):它名下的签连组一起销户 —— Chrome 语义,关窗即关签
+  // 子窗死了(pagehide 上报):它名下的签连组一起关闭并清理 —— Chrome 语义,关窗即关签
   const closeHostGroups = useCallback((hostId: string): void => {
     setGroups((prev) => dropHostGroups(prev, hostId))
   }, [])
 
-  // 单例签造牌:名和图标从品类户口领
+  // 单例签造牌:名和图标从品类登记领
   function singletonTab(kind: PaneKind): PaneTab {
     return { id: nextTabId(), kind, relPath: '', name: KIND_LABELS[kind], icon: KIND_ICONS[kind] }
   }
@@ -94,9 +94,9 @@ export function usePaneTabs(deps: {
 
   // 开一张新图/回家时页签重置:换一个空组,等文件签上岗。
   // 工作区外的账不带走 —— 单例签与盘符下钻的瞄签挪进新组继续开着;
-  // 撕去子窗的签按户口分窝还原,别把子窗的签卷回主窗
+  // 拆去子窗的签按登记分窝还原,别把子窗的签卷回主窗
   function resetPaneTabs(): void {
-    // 译文签绑的是旧工作区的文件与译文:换区一起收摊,在跑的任务掐断
+    // 译文签绑的是旧工作区的文件与译文:换区一起关闭,在跑的任务掐断
     cancelAllTranslations()
     setGroups((prev) => {
       const byHost = new Map<string, PaneTab[]>()
@@ -130,7 +130,7 @@ export function usePaneTabs(deps: {
   }
 
   // 一张组都没有时立个空组:首页点开设置、盘符下钻瞄文件,孤零零一张签也立得起来。
-  // 新组立主窗:子窗的组只由撕窗一条道出生(moveTabToHost 现立)
+  // 新组立主窗:子窗的组只由拆出独立窗口一条道出生(moveTabToHost 现立)
   function ensureGroup(): PaneGroup {
     if (activeGroup) return activeGroup
     const fresh: PaneGroup = { id: `pane:${nextTabId()}`, tabs: [], activeId: null }
@@ -139,7 +139,7 @@ export function usePaneTabs(deps: {
     return fresh
   }
 
-  // 需要指路时给页签一点轻强调(小葵点的,别做得太静默):不弹窗、不出声,签卡上闪一下
+  // 需要指路时给页签一点轻强调(产品指定的,别做得太静默):不弹窗、不出声,签卡上闪一下
   function markFlash(id: string): void {
     flashTab(id, FLASH_TAB_MS)
   }
@@ -151,7 +151,7 @@ export function usePaneTabs(deps: {
     }
   }
 
-  // 文件签(小葵拍板):树里点文件就开它。同一文件全应用只此一张 ——
+  // 文件签(产品裁定):树里点文件就开它。同一文件全应用只此一张 ——
   // 已开就领过去点亮(在哪组点亮哪组),没开就在激活组末尾新开;已有页签一概不动。
   // scopeRoot 只给盘符下钻(读根不是工作区,品类记 peek)
   function openFileTab(file: ScanFileNode, scopeRoot?: string): void {
@@ -247,7 +247,7 @@ export function usePaneTabs(deps: {
     const sameHost = groups.filter((g) => groupHost(g) === fromHost)
     let dstId = from.id
     if (toGroup === 'sibling') {
-      // 「另一组」只认同一扇窗名下的:跨窗换户口是撕窗的事(moveTabToHost)
+      // 「另一组」只认同一扇窗名下的:跨窗换登记是拆出独立窗口的事(moveTabToHost)
       const other = sameHost.find((g) => g.id !== from.id) ?? null
       if (other) {
         dstId = other.id
@@ -276,7 +276,7 @@ export function usePaneTabs(deps: {
       const idx = src.tabs.findIndex((t) => t.id === id)
       const moved = src.tabs.splice(idx, 1)[0]
       // 抽走的正好是源组正亮着的那张:激活指针当场落回剩下的页签(末张露出当新顶牌,
-      // 小葵拍的扑克牌逻辑) —— 不落的话指针成死引用,组里明明还有牌,正文却亮空底板
+      // 产品裁定的激活签回退规则) —— 不落的话指针成死引用,组里明明还有签,正文却亮空底板
       if (src.activeId === id) {
         src.activeId = src.tabs.length > 0 ? src.tabs[src.tabs.length - 1].id : null
       }
@@ -391,8 +391,8 @@ export function usePaneTabs(deps: {
     }
   }
 
-  // 文件改名(内联标题改名锤):开着的文件签就地换户口 —— relPath/名牌换新的,
-  // 档位/组位一概不动;户口认 (relPath, scopeRoot) 两件,与开签对账同口径
+  // 文件改名(内联标题改名批次):开着的文件签就地换登记 —— relPath/名牌换新的,
+  // 档位/组位一概不动;登记认 (relPath, scopeRoot) 两件,与开签对账同口径
   function renameFileTab(
     scopeRoot: string | undefined,
     oldRelPath: string,
@@ -424,7 +424,7 @@ export function usePaneTabs(deps: {
     if (e.button !== 0) return
     e.preventDefault()
     const bar = e.currentTarget
-    const body = bar.ownerDocument.body // realm 铁律:子窗里的分割条挂子窗 body
+    const body = bar.ownerDocument.body // 渲染域隔离:子窗里的分割条挂子窗 body
     bar.setPointerCapture(e.pointerId)
     body.classList.add('is-sash-dragging')
     const move = (ev: PointerEvent): void => {

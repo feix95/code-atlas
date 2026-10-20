@@ -33,21 +33,21 @@ const COPIED_ALL_MS = 2000
 const WRAP_ICON_SIZE = 19.2
 /**
  * 折行模式的行数闸(老规矩留档):虚拟滚动时代折行要全量上 DOM 才有的闸,
- * 编辑器自己就是虚拟渲染,闸现在只当「巨型文件默认不折行」的保守口味。
+ * 编辑器自己就是虚拟渲染,闸现在只当「巨型文件默认不折行」的保守策略。
  */
 const WRAP_MAX_LINES = 5000
 /** 滚轮一格的像素门槛 / 碎步账的保鲜期(Ctrl+滚轮文档缩放用,和界面缩放滚轮同脾气) */
 const WHEEL_NOTCH = 100
 const WHEEL_ACC_TTL_MS = 400
 
-// realm 铁律:预览签被拖进子窗后,选区/事件都活在子窗 document 里 ——
+// 渲染域隔离:预览签被拖进子窗后,选区/事件都活在子窗 document 里 ——
 // 一律经元素的 ownerDocument 这族取,别摸全局 window(那是主窗的,子窗里选不中、监不到)
 function viewOf(el: HTMLElement | null): Window | null {
   return el?.ownerDocument.defaultView ?? null
 }
 
 /**
- * 代码预览/编辑(预览编辑锤·锤2):树上右键「预览文件」后,左栏装这扇文本窗。
+ * 代码预览/编辑(预览编辑批次·第2批):树上右键「预览文件」后,左栏装这扇文本窗。
  * 源码档 = CodeMirror 6 编辑器:所有文本文件打开就能改,停手 1 秒自动落盘;
  * 行号/撤销/选区/搜索键位全是编辑器自带的。分色仍吃主进程 tree-sitter 的段落账,
  * 存盘后重算换新;选区引用(右键菜单/直拖)照老规矩,角标美术随新引擎退役。
@@ -73,14 +73,14 @@ export function CodePreview({
   onAddRef: (ref: ChatCodeRef) => void
   /** 跳到第几行(聊天里的文件链接点的):正文载入后滚过去,行号越界夹到文件边缘;seq 变了再跳一次 */
   jump?: { line: number; seq: number } | null
-  /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上户口的文件名渲染成可点链接 */
+  /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上登记的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
-  /** 内联标题改名通道(内联标题改名锤):递新主名进回调,拿 RenameOutcome 回执;
+  /** 内联标题改名通道(内联标题改名批次):递新主名进回调,拿 RenameOutcome 回执;
       不传 = 标题只展示(live/阅读两档共用) */
   onRenameFile?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   const codeViewRef = useRef<HTMLDivElement>(null)
-  // ── 换文件就地复位(隐身案这锤):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
+  // ── 换文件就地复位(隐身案本批):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
   //    所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂,绝不串台 ──
   /** 读文件这笔账:读到什么/出什么错,记在哪个文件名下 */
   const [loadedAt, setLoadedAt] = useState<{
@@ -127,7 +127,7 @@ export function CodePreview({
   )
 
   /**
-   * 内联标题改名通道(内联标题改名锤):回执一到,读稿/草稿的账就地换成新路径 ——
+   * 内联标题改名通道(内联标题改名批次):回执一到,读稿/草稿的账就地换成新路径 ——
    * 等 App 换完扫描树与页签,file.relPath 落到新值,两边正好接上,
    * 不闪「正在读文件」;败了把报错挂上提示条(账跟着文件名,换文件自动消)。
    */
@@ -153,10 +153,10 @@ export function CodePreview({
     [onRenameFile, file.relPath, patchUi]
   )
   /**
-   * 折行开关(全局默认开这锤):一个开关管所有文件,存 localStorage 重启不失忆;
-   * 超行数闸的文件摁不动(巨物默认不折行的保守口味)。
+   * 折行开关(全局默认开本批):一个开关管所有文件,存 localStorage 重启不失忆;
+   * 超行数闸的文件摁不动(巨型文件默认不折行的保守策略)。
    */
-  // 折行账读全局可订阅小账本(页签右键菜单也能拨这颗开关,不止本件的 Alt+Z)
+  // 折行账读全局可订阅小状态表(页签右键菜单也能拨这颗开关,不止本件的 Alt+Z)
   const wrapOn = useSyncExternalStore(subscribeCodeWrap, getCodeWrapOn)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -178,15 +178,15 @@ export function CodePreview({
   }, [rootPath, file.relPath])
 
   const diskText = result?.status === 'ok' ? result.text : ''
-  /** 分色账(预览分色这锤):主进程按行给好的段落;没有 = 这份不上色,白字照常 */
+  /** 分色账(预览分色本批):主进程按行给好的段落;没有 = 这份不上色,白字照常 */
   const colors = result?.status === 'ok' ? result.colors : undefined
   /** 编辑器手里的最新文稿:没动过字 = 盘上那份,动过 = 编辑稿 */
   const text = editAt?.file === file.relPath ? editAt.text : diskText
-  /** 行数闸用打开时的行数(编辑中跨线的概率低,巨物保守口味不跟着抖) */
+  /** 行数闸用打开时的行数(编辑中跨线的概率低,巨型文件保守策略不跟着抖) */
   const total = useMemo(() => (diskText === '' ? 0 : diskText.split('\n').length), [diskText])
   const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
   const wrap = wrapAllowed && wrapOn
-  // 看片开关(排版显示 × 只读)是全局一档:账在 codePrefs,拨一下所有签就地翻面 ——
+  // 预览显示开关(排版显示 × 只读)是全局一档:账在 codePrefs,拨一下所有签就地翻面 ——
   // 订阅只为触发重渲,读数照旧走 viewFlags 换算口
   useSyncExternalStore(subscribeViewFlags, getViewFlagsBits)
   const flags = viewFlags(file.relPath)
@@ -209,10 +209,10 @@ export function CodePreview({
     if (!reading || !linkedMd || sourceBlocks.length === 0 || el === null) return
     return registerMdScroll(mdKey, 'source', el)
   }, [reading, linkedMd, sourceBlocks.length, mdKey])
-  // 文档字号缩放(Ctrl+滚轮这锤):系数落 --doc-zoom,正文各行 font-size 乘它
+  // 文档字号缩放(Ctrl+滚轮本批):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
-  // Ctrl+滚轮 = 文档字号缩放(docZoom,小葵定的分工:界面缩放只吃键盘 +/-/0)。
+  // Ctrl+滚轮 = 文档字号缩放(docZoom,产品定的分工:界面缩放只吃键盘 +/-/0)。
   // 监听器挂预览元素本身 —— 天然 realm-safe(子窗签的滚轮事件在子窗文档里转,沾不到全局 window);
   // 碎步积累成整档才翻、隔久清账,触控板捏合在 Chromium 里也报 ctrl+wheel,捏合白捡。
   // 编辑器里滚轮事件照冒泡上来(cm-scroller → code-view),缩放对编辑态一样灵。
@@ -245,7 +245,7 @@ export function CodePreview({
     []
   )
 
-  /** 折行开关的巨物闸:行数超闸的文件摁不动(全局账本唯一写口在 codePrefs,
+  /** 折行开关的大文件闸门:行数超闸的文件摁不动(全局状态唯一写口在 codePrefs,
       页签右键菜单那条路不设闸 —— 菜单拨的是「想要不要」,给不给闸说了算) */
   const toggleWrap = useCallback((): void => {
     if (!wrapAllowed) return
@@ -323,7 +323,7 @@ export function CodePreview({
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
       {/* 页头栏:文件读成了才立,右对齐一颗只读锁钮;文件名不摆 ——
           签条上已有名字。阅读档的内联标题是文档正文的title,跟页头 chrome 不冲突。
-          折行钮退役进页签右键菜单(渐进披露),快捷键 Alt+Z 和全局账照旧 */}
+          折行钮退役进页签右键菜单(渐进披露),快捷键 Alt+Z 和全局偏好照旧 */}
       {result?.status === 'ok' && <div className="code-pane-head">{lockBtn}</div>}
       {err && <Notice kind="error">{err}</Notice>}
       {!err && !result && (
@@ -337,7 +337,7 @@ export function CodePreview({
         result.status !== 'ok' &&
         result.status !== 'image' &&
         result.status !== 'audio' && <p className="code-pane-note">{result.reason}</p>}
-      {/* 图片签(图片预览锤):JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
+      {/* 图片签(图片预览批次):JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
           image 账没带回来(不该发生)就老实按 reason 说明 */}
       {!err && result?.status === 'image' && (
         <>
@@ -414,7 +414,7 @@ export function CodePreview({
             </div>
           ) : (
             /* 实时预览/源码档:同一台 CodeMirror 编辑器,live 档位多挂 markdown 语法树+上妆管线;
-               key 带档位 —— 切档重立编辑器,老编辑器的落盘尾班先把最新稿保下来 */
+               key 带档位 —— 切档重立编辑器,老编辑器的收尾写盘先把最新稿保下来 */
             <div
               className={`code-view is-editing${live ? ' is-live' : ''}`}
               ref={codeViewRef}

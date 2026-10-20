@@ -1,8 +1,8 @@
-// ── 后缀总账:「什么后缀算什么类」一本账 ──
+// ── 后缀总账:「什么后缀算什么类」同一数据源 ──
 // parser/ai/scanner/summarizer 都从这里查,不许再各养一本名单 ——
 // 两本名单必漂移(漂移现场:BINARY_EXTS 曾在 parser/ai 各养一本,漏了 .docx/.gguf 等
 // 几十个后缀,预览把二进制当文本读出一屏乱码)。
-// 语言户口本(语言→后缀)在 shared/languages.ts;语法 wasm 账在 shared/grammarWasm.ts。
+// 语言登记表(语言→后缀)在 shared/languages.ts;语法 wasm 账在 shared/grammarWasm.ts。
 
 /**
  * 已知二进制/媒体后缀(小写含点):内容必是字节流,读不出文本。

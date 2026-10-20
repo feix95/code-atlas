@@ -58,7 +58,7 @@ import type {
 } from '../shared/types.ts'
 
 /**
- * 翻文件模式里「不认工具调用」的引擎黑名单(第一百四十锤,只记会话内存,零落盘):
+ * 翻文件模式里「不认工具调用」的引擎黑名单(第一百四十批,只记会话内存,零落盘):
  * 键 = baseUrl|模型名。有的外接服务(甚至不带工具模板的模型文件)收到 tools 字段
  * 直接甩 400,循环还没起步就断 —— 摔过一跤的记下来,下次直接按普通对话回答,
  * 不再拿石头砸自己的脚。
@@ -74,7 +74,7 @@ function asLineCount(v: unknown, fallback: number): number {
 
 /**
  * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
- * 直到模型交出不带工具调用的正文答案。缰绳三根:轮数封顶(到顶后撤掉工具表
+ * 直到模型交出不带工具调用的正文答案。护栏三项:轮数封顶(到顶后撤掉工具表
  * 逼它交卷)、同一样东西不许翻第二遍、每轮之间都听用户的取消。
  * 模型不会喊工具也没关系:第一轮就交正文,当普通回答返回 —— 不装 agent 空转。
  */
@@ -93,7 +93,7 @@ export async function runAgentChat(input: {
   webLookup: WebLookupMeta
   /** 联网查证开着 = 工具表里多一件 web_search,人设后面多垫一段上网守则 */
   webSearchEnabled: boolean
-  /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 小葵定) */
+  /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 产品定) */
   tavilyKey?: string
   /** 顺利交卷时回报本轮的工具往来(assistant 的 tool_calls + tool 结果,不含提问和提醒/质检插话)和最终答案:会话记忆靠它记档 */
   onTurnComplete?: (trace: AgentChatMessage[], answer: string) => void
@@ -137,20 +137,20 @@ export async function runAgentChat(input: {
   }
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
-  // 提醒卡门槛和质检闸前置的共同账本:本场实际执行成功的工具调用次数
+  // 提醒卡门槛和质检闸前置的共同状态表:本场实际执行成功的工具调用次数
   // (参数不合法被拒、防打转被拦的都不算 —— 没真翻过就别拿提醒卡烦它)
   let toolCallsExecuted = 0
-  // 质检闸的账本:本场真执行过 search_content 没有、搜到的文件路径(答案引用对账用)、
+  // 质检闸的状态表:本场真执行过 search_content 没有、搜到的文件路径(答案引用对账用)、
   // 已经拦了几次(封顶两次,掰不过来就随它交卷)
   let searchUsed = false
   const searchHitPaths = new Set<string>()
   let salvageNudges = 0
-  // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成纸条时,按它解锁重读
+  // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
-  // 封板账(第一百五十一锤):中间轮的话一旦封成独立气泡,思考过程也按轮各归各 ——
+  // 封板账(第一百五十一批):中间轮的话一旦封成独立气泡,思考过程也按轮各归各 ——
   // 早轮的思考已经随流躺在各自封口气泡里,结果里只回最后一轮的;没封过板照旧回全场总账
   let lastRoundReasoning: string | undefined
   let sealedAny = false
@@ -158,11 +158,11 @@ export async function runAgentChat(input: {
   let rounds = 0
   // 兜底降级后的重答轮不算「轮数烧完」,别把逼卷令也塞进去
   let skipNudgeOnce = false
-  // 提醒卡兜底只许用一次:撤卡重答还 4xx 就不是卡的锅了,照实报错
+  // 提醒卡兜底只许用一次:撤卡重答还 4xx 就不是提醒卡的问题,照实报错
   let reminderFailsafe = false
   // 复读机兜底也只许用一次:重说还打转就截断交卷,不无限跟它耗
   let repetitionRetried = false
-  // 紧急瘦身也只许用一次:裁旧账重试还爆,就是这锅真装不下,照实报错
+  // 紧急瘦身也只许用一次:裁旧账重试还爆,就是上下文确实装不下,照实报错
   let slimRetried = false
   addDevLog(
     'request',
@@ -170,7 +170,7 @@ export async function runAgentChat(input: {
   )
   for (;;) {
     if (signal.aborted) return agentResult(input, 'cancelled', '', usage, resultReasoning())
-    // 锅快满了先腾地方(第一百三十八锤):早先翻看的大段原文提炼成占位纸条,
+    // 上下文将满先腾地方(第一百三十八批):早先翻看的大段原文提炼成占位注记,
     // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
     const compressed = compressAgentMessages(messages, promptBudget)
     if (compressed) {
@@ -182,11 +182,11 @@ export async function runAgentChat(input: {
       sendAgentStep(
         event,
         requestId,
-        `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位纸条 —— 要重温随时能再翻`
+        `对话快记满了,把较早翻看的 ${compressed.compressedCount} 样旧资料提炼成了占位注记 —— 要重温随时能再翻`
       )
       addDevLog(
         'request',
-        `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了纸条,腾出约 ${compressed.freedCallIds.length} 处重读权`
+        `翻文件第 ${rounds + 1} 轮前压缩:${compressed.compressedCount} 条旧资料成了注记,腾出约 ${compressed.freedCallIds.length} 处重读权`
       )
     }
     const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
@@ -208,7 +208,7 @@ export async function runAgentChat(input: {
     })
     lastRoundReasoning = round.status === 'ok' ? round.reasoning : undefined
     if (round.status !== 'ok') {
-      // 复读机兜底(第一百四十三锤):流式尾巴连着打转 —— agentRound 已发 reset 令收回
+      // 复读机兜底(第一百四十三批):流式尾巴连着打转 —— agentRound 已发 reset 令收回
       // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
       // 绝不把一屏望不到头的循环递给用户
       if (round.status === 'repetition') {
@@ -232,7 +232,7 @@ export async function runAgentChat(input: {
         input.onTurnComplete?.(turnTrace, text)
         return agentResult(input, 'supported', text, usage, resultReasoning())
       }
-      // 兜底(第一百四十锤):引擎不认工具调用(甩 400/404/422 还点名 tools)——
+      // 兜底(第一百四十批):引擎不认工具调用(甩 400/404/422 还点名 tools)——
       // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
       // 普通请求再出错照实报给用户
       if (
@@ -289,17 +289,17 @@ export async function runAgentChat(input: {
               )
           )
         )
-        sendAgentStep(event, requestId, '这个模型不太习惯多出来的小纸条,撤掉重答')
+        sendAgentStep(event, requestId, '这个模型不太习惯多出来的小注记,撤掉重答')
         continue
       }
-      // 紧急瘦身兜底:轮间的纸条压缩是保养,服务直接甩「上下文装不下」拒收时只有整段裁旧账能救 ——
+      // 紧急瘦身兜底:轮间的注记压缩是保养,服务直接甩「上下文装不下」拒收时只有整段裁旧账能救 ——
       // 只保 system 和最新真问题(400 拒收时模型一个字没吐,重试不重影);只兜一次,再爆就照实报错
       if (round.status === 'error' && isContextOverflow(round.text) && !slimRetried) {
         slimRetried = true
         const slimmed = emergencySlim(messages)
         if (slimmed) {
           messages.splice(0, messages.length, ...slimmed.messages)
-          // 旧账清了,防打转的账本跟着清:被裁掉结果的旧工具调用,模型要重温得允许重翻
+          // 旧账清了,防打转的状态表跟着清:被裁掉结果的旧工具调用,模型要重温得允许重翻
           doneCalls.clear()
           callIdToKey.clear()
           skipNudgeOnce = true
@@ -545,7 +545,7 @@ export async function runAgentChat(input: {
         requestId,
         agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint)
       )
-      // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化锤):结构化命中走旁路,
+      // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化批次):结构化命中走旁路,
       // 用户看到的是程序摆的完整清单,不用模型转手抄写
       if (
         callName === TOOL_NAMES.searchContent &&
@@ -559,16 +559,16 @@ export async function runAgentChat(input: {
           items: exec.matches,
           truncated: exec.matchesTruncated === true
         })
-        // 质检闸的对账本:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
+        // 质检闸的对状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
         for (const m of exec.matches) searchHitPaths.add(m.relPath)
       }
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
     }
     messages.push(...toolResults)
     turnTrace.push(...toolResults)
-    // 每轮工具结果后垫提醒卡(LLM 优化锤):撤掉上一张再垫新的,对话里永远只挂
+    // 每轮工具结果后垫提醒卡(LLM 优化批次):撤掉上一张再垫新的,对话里永远只挂
     // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事。
-    // 缰绳门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
+    // 触发门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
     // 资料还少的头几轮垫卡只会稀释注意力;撤卡照旧每轮先撤,保证不攒
     messages.splice(0, messages.length, ...stripLastAgentReminder(messages))
     if (toolCallsExecuted >= AGENT_REMINDER_MIN_TOOL_CALLS) {

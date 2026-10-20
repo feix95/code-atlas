@@ -1,7 +1,7 @@
-// 撕窗子窗的壳(页签撕窗锤):同一棵 React 树渲染进子窗 document 的整套外壳 ——
+// 独立子窗的壳(页签独立窗口):同一棵 React 树渲染进子窗 document 的整套外壳 ——
 // 自绘标题栏(拖窗区 + 窗控三键,操作经主 realm 代发 IPC 按 frameName 认窗)、
-// 完整页签带 + 分屏正文(主窗同款组件,户口过滤后递进来)、本窗自己的 TooltipHost。
-// 空壳即死:名下签全挪走/关光那刻,这扇窗自己收摊(Chrome 语义;主窗不在此列,它是工作台)。
+// 完整页签带 + 分屏正文(主窗同款组件,登记过滤后递进来)、本窗自己的 TooltipHost。
+// 空壳即死:名下签全挪走/关光那刻,这扇窗自己关闭(Chrome 语义;主窗不在此列,它是工作台)。
 import { useEffect } from 'react'
 import type { PaneGroup, PaneTab } from '../paneTabs'
 import { syncAuxChrome, type AuxWindowHandle } from '../useAuxWindows'
@@ -55,7 +55,7 @@ export function AuxWindowShell({
   /** 这扇窗名下的组(App 已按 host 过滤好) */
   groups: PaneGroup[]
   tabArea: TabAreaProps
-  /** 名下签全没了自己收摊:让 App 调 closeAuxWindow 关窗 */
+  /** 名下签全没了自己关闭:让 App 调 closeAuxWindow 关窗 */
   onRequestClose: () => void
 }): React.JSX.Element {
   const doc = aux.win.document
@@ -82,7 +82,7 @@ export function AuxWindowShell({
       <div
         className="aux-strip"
         onDoubleClick={(e) => {
-          // .tabbar-blank 自己有双击最大化的户口(hostNameOf 报窗),别重复 toggle
+          // .tabbar-blank 自己有双击最大化的登记(hostNameOf 报窗),别重复 toggle
           if ((e.target as HTMLElement).closest('.tabbar-tab, .win-btn, .tabbar-blank')) return
           window.atlas.auxWindowOp(aux.id, 'toggleMaximize')
         }}

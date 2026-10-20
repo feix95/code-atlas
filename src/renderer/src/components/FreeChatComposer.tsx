@@ -20,7 +20,7 @@ import {
  * 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/停一停;
  * 写到两行起往上长,控件自然落到第二行;满五行封顶出拨杆,拨上去多撑五行。
  * 空场时整颗舱挂在 hero 居中,聊开了沉到底栏 —— 同一颗舱两处坐席。
- * 从 FreeChatPanel 拆出,纯搬家不改行为:草稿/菜单/斜杠补全/弹性长高都是舱自己的家务。
+ * 从 FreeChatPanel 拆出,纯迁移不改行为:草稿/菜单/斜杠补全/弹性长高都是舱自己的家务。
  */
 
 /** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
@@ -37,12 +37,12 @@ export function FreeChatComposer({
   onWillSend
 }: {
   chat: AiChatApi
-  /** 已引用的代码段(第一百一十一锤):预览模式下由左栏选中攒出来 */
+  /** 已引用的代码段(第一百一十一批):预览模式下由左栏选中攒出来 */
   refs: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
-  /** 待发图片账本(第一百五十二锤):选文件/粘贴/拖入都汇进它,能力闸也在它手里 */
+  /** 待发图片状态(第一百五十二批):选文件/粘贴/拖入都汇进它,能力闸也在它手里 */
   chatImages: ChatImagesApi
-  /** 待发文件账本(文件附件锤,对齐 Claude Code 的 @文件):选文件/拖入都汇进它 */
+  /** 待发文件状态(文件附件批次,对齐 Claude Code 的 @文件):选文件/拖入都汇进它 */
   chatFiles: ChatFilesApi
   /** 发送/压缩前先回底:自己的话自己得看见,发出去这一眼不被上翻状态挡住 */
   onWillSend: () => void
@@ -50,9 +50,9 @@ export function FreeChatComposer({
   const setup = useContext(AiSetupContext)
   const draftRefs = refs
   const [draft, setDraft] = useState('')
-  // 高度拨杆(小葵点名):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
+  // 高度拨杆(产品指定):到五行才亮,拨上去多撑五行空白,拨回来;文字退回五行内自动归位
   const [expanded, setExpanded] = useState(false)
-  // 「+」能力菜单:思考/翻文件两个开关收进这颗钮里;点舱外任何地方收摊
+  // 「+」能力菜单:思考/翻文件两个开关收进这颗钮里;点舱外任何地方关闭
   const [menuOpen, setMenuOpen] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   // 「添加附件」的隐藏文件筐(图片/文件共用一个口):菜单点了它弹系统选择框,挑完按类分流
@@ -123,7 +123,7 @@ export function FreeChatComposer({
       return
     }
     const q = draft.trim()
-    // /compact 手动压缩命令(第一百四十二锤):不当问题发,拦下来直接压缩;
+    // /compact 手动压缩命令(第一百四十二批):不当问题发,拦下来直接压缩;
     // 忙着回答时不接,跟发消息一个规矩
     if (isCompactCommand(q)) {
       if (chat.busy) return
@@ -162,7 +162,7 @@ export function FreeChatComposer({
     }
   }
 
-  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八锤补);
+  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八批补);
    *  斜杠补全开着时,键盘先伺候面板:上下挑、回车/Tab 选定(不是发消息)、Esc 只收面板 */
   function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Escape' && menuOpen) {
@@ -248,7 +248,7 @@ export function FreeChatComposer({
       .catch(() => open(''))
   }
 
-  // 弹性长高的账(小葵点名):空 = 一行;有一到四行长到几行;五行封顶,
+  // 弹性长高的账(产品指定):空 = 一行;有一到四行长到几行;五行封顶,
   // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位。
   // 防抖(小葵报的病):文字卡在换行临界点时,打一个字涨两行、删一个字缩一行,舱来回蹦。
   // 治法是「涨快缩慢」:涨按实际行数,缩要富余 —— 量行宽时右侧多留一截,
@@ -267,15 +267,15 @@ export function FreeChatComposer({
     const padY = Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom)
     const multi = lineCount >= 2
     el.style.height = 'auto'
-    // 统一量尺:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
+    // 统一适配估算:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
     el.style.paddingRight = multi ? BAR_RESERVE : ''
     const realLines = Math.max(1, Math.round(el.scrollHeight / line))
-    // 收缩判定:在统一量尺上再加一截富余,连富余都省出来还是一行,才真缩
+    // 收缩判定:在统一适配估算上再加一截富余,连富余都省出来还是一行,才真缩
     el.style.paddingRight = multi ? `calc(${BAR_RESERVE} + ${COLLAPSE_SLACK})` : COLLAPSE_SLACK
     const slackLines = Math.max(1, Math.round(el.scrollHeight / line))
     el.style.paddingRight = ''
     const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
-    // 十行锁死(小葵点名):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
+    // 十行锁死(产品指定):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
     el.style.height = `${
       (expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)) + padY
     }px`
@@ -350,7 +350,7 @@ export function FreeChatComposer({
             联网查询
             <span className="fc-sw" aria-hidden="true" />
           </button>
-          {/* 添加附件(文件附件锤,对齐 Claude Code 的 @文件):图片/文件共用一个口,挑完按类分流
+          {/* 添加附件(文件附件批次,对齐 Claude Code 的 @文件):图片/文件共用一个口,挑完按类分流
               —— 图片走看图那条链,其余文本文件读原文;纯文本模型文件照收,图片会被拒,加的时候会弹灰字说明 */}
           <button
             type="button"
@@ -394,7 +394,7 @@ export function FreeChatComposer({
               if (parts.files.length > 0) void chatFiles.addFiles(parts.files)
             }}
           />
-          {/* 待发文件原子(文件附件锤):文件名+行账躺在文字流里,× 移除;常驻,每轮都带上 */}
+          {/* 待发文件原子(文件附件批次):文件名+行账躺在文字流里,× 移除;常驻,每轮都带上 */}
           {chatFiles.files.map((f) => (
             <span
               key={f.id}
@@ -414,7 +414,7 @@ export function FreeChatComposer({
               </button>
             </span>
           ))}
-          {/* 待发图片缩略原子(第一百五十二锤):和引用原子一个排面,× 可键盘删 */}
+          {/* 待发图片缩略原子(第一百五十二批):和引用原子一个排面,× 可键盘删 */}
           {chatImages.images.map((img: ChatImage) => (
             <span
               key={img.id}
@@ -433,7 +433,7 @@ export function FreeChatComposer({
               </button>
             </span>
           ))}
-          {/* 内嵌引用原子(小葵拍板):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
+          {/* 内嵌引用原子(产品裁定):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
           {draftRefs.map((r, i) => (
             <span
               key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
@@ -506,7 +506,7 @@ export function FreeChatComposer({
               if (parts.images.length > 0) void chatImages.addFiles(parts.images)
               if (parts.files.length > 0) void chatFiles.addFiles(parts.files)
             }}
-            // 点输入区 = 要打字了,「+」菜单顺手收摊(点在舱内的外点判定管不到这层)
+            // 点输入区 = 要打字了,「+」菜单顺手关闭(点在舱内的外点判定管不到这层)
             onFocus={() => setMenuOpen(false)}
           />
         </div>

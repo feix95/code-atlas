@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * 全局轻提示(全局规矩「只定义一次」):全场悬停提示的唯一户口。
+ * 全局轻提示(全局规矩「只定义一次」):全场悬停提示的唯一登记。
  * 元素挂 data-tip="文案" 即得(多行用 \n);data-tip-side 指方位,默认 bottom;
  * data-tip-anchor="选择器" 可改锚到内部元素(如文件名末端,不贴行尾)。
  * data-tip-group="组名" 挂在元素或祖先上 = 圈成「提示组」:组是一片区域不是一个点,
- * 成员间游走即时接力(自定义大延迟也吃),行间缝/组内空白不收摊;进组第一颗才按自己的延迟亮。
+ * 成员间游走即时接力(自定义大延迟也吃),行间缝/组内空白不关闭;进组第一颗才按自己的延迟亮。
  * 气泡 position:absolute 渲染在 .app 内(JSX 原位)——这扇窗是透明玻璃窗,
  * Chromium 会把「不在不透明面内」的根层 fixed 件裁掉不画(命中测试活着、像素为零),
  * 浮层一律走 absolute+锚 .app(与 ws-menu 等浮层同一条已验证的路);
@@ -16,12 +16,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 type TipSide = 'right' | 'left' | 'bottom' | 'top'
 
 interface TipTarget {
-  /** 每次亮相自增:key 挂它,气泡换目标就重挂载重量尺寸 */
+  /** 每次亮相自增:key 挂它,气泡换目标就重挂载重适配估算寸 */
   id: number
   el: HTMLElement
   text: string
   side: TipSide
-  /** 提示组户口(元素或祖先的 data-tip-group);空串/没挂 = null 散兵 */
+  /** 提示组登记(元素或祖先的 data-tip-group);空串/没挂 = null 散兵 */
   group: string | null
 }
 
@@ -117,7 +117,7 @@ function placeTip(r: DOMRect, b: DOMRect, want: TipSide, view: Window): TipPos {
 let tipSeq = 0
 
 /**
- * 一台提示台只管一个 document(页签撕窗锤·realm 铁律):主窗一台,每扇子窗
+ * 一台提示台只管一个 document(页签独立窗口·渲染域隔离):主窗一台,每扇子窗
  * 在自己的 .app 里再挂一台 —— Portal 渲染的组件跑的还是主 realm,监听挂全局
  * document 会只听见主窗的动静,子窗里的悬停提示就聋了。
  */
@@ -128,7 +128,7 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
   const tipRef = useRef<TipTarget | null>(null)
   const view = doc.defaultView ?? window
 
-  // 气泡挂载时量尺寸算落位(setState 在 ref 回调里写是官方认可的测量姿势)。
+  // 气泡挂载时适配估算寸算落位(setState 在 ref 回调里写是官方认可的测量姿势)。
   // key=tip.id → 换目标就重挂载重测量;卸载回调也走这里,归 null。
   const bubbleCb = useCallback(
     (b: HTMLDivElement | null) => {
@@ -197,7 +197,7 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
     const onOut = (e: MouseEvent): void => {
       // 在宿主内部移动(child→child)不算离开;relatedTarget 出了宿主才收
       if (cur && e.relatedTarget instanceof Node && cur.contains(e.relatedTarget)) return
-      // 出了宿主还在同组区域内(行间缝):不收摊,留给下一颗接力
+      // 出了宿主还在同组区域内(行间缝):不关闭,留给下一颗接力
       const rt = e.relatedTarget
       if (
         tipRef.current?.group != null &&
@@ -217,7 +217,7 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
       else if (!tipRef.current) setTip(null)
     }
 
-    // 滚动/点按/按键/切窗都收摊:目标一旦位移或交互,悬着的提示就是陈账
+    // 滚动/点按/按键/切窗都关闭:目标一旦位移或交互,悬着的提示就是陈账
     doc.addEventListener('mouseover', onOver)
     doc.addEventListener('mouseout', onOut)
     doc.addEventListener('focusin', onFocus)
@@ -226,7 +226,7 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
     doc.addEventListener('mousedown', hide)
     doc.addEventListener('wheel', hide, true)
     // 页签拖拽开工清场:按住页签熬满延迟刚亮、紧跟着拖起来的那颗提示靠它收
-    // (捕获期 mouseout 全被拐回源签,常规收摊链路在拖拽里是聋的)
+    // (捕获期 mouseout 全部回退到源签,常规关闭链路在拖拽中收不到事件)
     doc.addEventListener('atlas:tab-drag-start', hide)
     view.addEventListener('blur', hide)
     const onKey = (e: KeyboardEvent): void => {

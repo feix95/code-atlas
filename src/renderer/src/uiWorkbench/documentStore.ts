@@ -1,5 +1,5 @@
 // 工作台设计文档的渲染端仓库:页面列表(每页 = 画布底色 + 画板尺寸 + 节点列表)+ 当前页 + 当前选中。
-// 模块单例 + 订阅(同 artboardPrefsStore 的做法),切页签、撕成子窗都不丢;
+// 模块单例 + 订阅(同 artboardPrefsStore 的做法),切页签、拆成子窗都不丢;
 // 暂只在内存里,关掉软件即清空(保存方案是以后的步骤)。
 // 节点修改一律经 dispatch(NodeAction,作用于当前页),与撤销 / AI 修改共用同一入口;页面级修改走 docActions 的 page 系列。
 // 撤销模型:快照式历史(@shared/uiWorkbench/history)。手势(beginBatch~endBatch)收成一步;

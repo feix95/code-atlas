@@ -1,7 +1,7 @@
 /**
- * 迷你 Markdown 解析器(阅读模式锤起):把手写 md 拆成纯数据 AST,
+ * 迷你 Markdown 解析器(阅读模式批次起):把手写 md 拆成纯数据 AST,
  * 渲染交给 MiniMD.tsx —— 解析与描画分家,这里不碰 React、不碰 DOM,
- * 自测可以直接把 AST 对账本,不必过浏览器。
+ * 自测可以直接把 AST 对状态表,不必过浏览器。
  *
  * 块级:围栏代码、#~#### 标题、hr、无序/有序/嵌套/待办列表、> 引用(多行合并)、
  *      > [!type] callout、| 管道表格(对齐)、段落(相邻行合并,CommonMark 语义)。
@@ -126,7 +126,7 @@ function splitCells(line: string): string[] {
     .map((c) => c.trim())
 }
 
-/** 分隔行的对齐户口::--: 居中、--: 右、其余左 */
+/** 分隔行的对齐登记::--: 居中、--: 右、其余左 */
 function sepAligns(line: string): MdAlign[] {
   return splitCells(line).map((c) => {
     const l = c.startsWith(':')
@@ -180,7 +180,7 @@ function foldList(items: RawListItem[]): MdList {
   return build(items[0]?.indent ?? 0)
 }
 
-/** callout 类型名 → 色板户口(Obsidian 常见档名映射) */
+/** callout 类型名 → 色板登记(Obsidian 常见档名映射) */
 const CALLOUT_KIND: Record<string, MdCalloutKind> = {
   note: 'note',
   info: 'note',

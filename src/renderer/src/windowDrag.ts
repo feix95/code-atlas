@@ -4,7 +4,7 @@
  * 为什么手搓而不是 app-region:drag:
  *  - 原生拖拽走系统标题栏通道,Windows 的 Aero Shake(摇窗最小化其它窗)会介入,
  *    点住快速晃鼠标就误伤全屏窗口;程序级 setBounds 移动系统不认作标题栏拖拽,
- *    Shake 天然哑火(小葵点名 Obsidian 同款表现)。代价:没有系统贴边吸附预览。
+ *    Shake 天然哑火(产品指定 Obsidian 同款表现)。代价:没有系统贴边吸附预览。
  *  - 页签尾空白那块地本来也铺不了 drag(右键菜单+拖放落点会被吞)。
  *
  * 协议:位移攒够 4px 阈值才算拖(免得最大化下点一下就把窗还原);过阈值时报
@@ -14,9 +14,9 @@
  * 指针捕获让光标甩出窗也能继续跟手。
  */
 /**
- * 事件发生在哪扇窗(页签撕窗锤):元素的 ownerDocument 户口 ——
+ * 事件发生在哪扇窗(页签独立窗口):元素的 ownerDocument 登记 ——
  * 子窗的 window.name 就是 frameName('aux-N'),主窗是空串。
- * 手动搬窗引擎在子窗里照常跑:报坐标时捎上这户口,主进程才挪得对窗。
+ * 手动搬窗引擎在子窗里照常跑:报坐标时捎上这登记,主进程才挪得对窗。
  */
 export function hostNameOf(el: HTMLElement): string | undefined {
   const name = el.ownerDocument.defaultView?.name ?? ''

@@ -6,7 +6,7 @@ import {
 } from './modelShelf.ts'
 
 /**
- * 上下文档位的账本(纯函数,自测覆盖):滑块的档、黑板的账、大白话的结论都在这里算,
+ * 上下文档位的状态表(纯函数,自测覆盖):滑块的档、黑板的账、大白话的结论都在这里算,
  * 设置页拖一下滑块就得重新报一次价,所以必须快 —— 全是算术,不发请求不读文件。
  */
 
@@ -33,7 +33,7 @@ export function kvBytesFromShape(contextTokens: number, shape: GgufShape): numbe
 }
 
 /**
- * 黑板粗估(档案翻不出来时的兜底,和量尺同一套分档):≥8GB 按 64 层大模型算每 token
+ * 黑板粗估(档案翻不出来时的兜底,和适配估算同一套分档):≥8GB 按 64 层大模型算每 token
  * 256KB,4~8GB 减半,更小的再减半 —— 宁可粗,不可无;账单的话里会标明是估的。
  */
 export function estimateKvBytes(contextTokens: number, modelBytes: number): number {
@@ -47,7 +47,7 @@ export interface ContextBill {
   text: string
 }
 
-/** 字节数 → 「x.x GB」人话(整 GB 省小数):上下文黑板和内置量尺(builtin)共用一把尺 */
+/** 字节数 → 「x.x GB」人话(整 GB 省小数):上下文黑板和内置适配估算(builtin)共用一把尺 */
 export function formatGB(bytes: number): string {
   return `${(bytes / GB).toFixed(1).replace(/\.0$/, '')} GB`
 }
@@ -90,7 +90,7 @@ export function formatContextBill(opts: {
     }
     return {
       level: 'too-big',
-      text: `${head}${total},连显存 ${formatGB(opts.vramBytes)} 带内存一起匀也紧张 —— 这么配引擎可能当场撑死,画面跟着整个断掉;把上下文调小几档`
+      text: `${head}${total},连显存 ${formatGB(opts.vramBytes)} 带内存一起匀也紧张 —— 这么配引擎可能当场内存耗尽退出,画面跟着整个断掉;把上下文调小几档`
     }
   }
   // 问不到显存:只拿内存说话
@@ -105,6 +105,6 @@ export function formatContextBill(opts: {
   }
   return {
     level: 'too-big',
-    text: `${head}${total},内存 ${formatGB(opts.ramBytes)} 匀不开 —— 这么配引擎可能当场撑死,画面跟着整个断掉;把上下文调小几档`
+    text: `${head}${total},内存 ${formatGB(opts.ramBytes)} 匀不开 —— 这么配引擎可能当场内存耗尽退出,画面跟着整个断掉;把上下文调小几档`
   }
 }

@@ -58,7 +58,7 @@ export function TabBody({
   openPreview: (relPath: string) => void
   addPreviewRef: (ref: ChatCodeRef) => void
   removePreviewRef: (index: number) => void
-  /** 预览里选中的一段拖进来挂引用(选中直拖锤):ref 正文自包含,不用读盘 */
+  /** 预览里选中的一段拖进来挂引用(选中直拖批次):ref 正文自包含,不用读盘 */
   handleDropRef: (ref: ChatCodeRef) => void
   // 设置页签的口粮(app 级,不吃工作区):rail 齿轮/AI 状态浮层都能开,没开项目也能用
   settingsWorkspaceName: string | null
@@ -66,7 +66,7 @@ export function TabBody({
   onAiConfigSaved: (config: AiConfig) => void
   /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
   onSettingsSection: (key: SectionKey) => void
-  /** 内联标题改名通道(内联标题改名锤):预览/瞄签都能用,账本认签认 scopeRoot */
+  /** 内联标题改名通道(内联标题改名批次):预览/瞄签都能用,状态表认签认 scopeRoot */
   onRenameFile?: (tab: PaneTab, base: string) => Promise<RenameOutcome>
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
@@ -135,8 +135,8 @@ export function TabBody({
   }
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
   if (tab.kind === 'chat') {
-    // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四锤的老规矩)
-    // (小探针飞出时这张页签连卡带正房一起隐去,走不到这儿 —— 见渲染处 act 判定)
+    // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(第一百二十四批的老规矩)
+    // (小探针飞出时这张页签连卡带页签活 DOM一起隐去,走不到这儿 —— 见渲染处 act 判定)
     return (
       <div className="preview-chat soft-in">
         <FreeChatPanel
@@ -150,7 +150,7 @@ export function TabBody({
       </div>
     )
   }
-  // 预览页签:纯源码窗(小葵拍板的拆分) —— 想边看代码边聊,把探针页签拖去另一组拼一屏
+  // 预览页签:纯源码窗(产品裁定的拆分) —— 想边看代码边聊,把探针页签拖去另一组拼一屏
   if (file) {
     return (
       <CodePreview

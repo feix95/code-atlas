@@ -1,4 +1,4 @@
-// 图片预览的自测(图片预览锤):后缀名单、魔数验身、宽高量取、分支判定 ——
+// 图片预览的自测(图片预览批次):后缀名单、魔数验身、宽高量取、分支判定 ——
 // 后缀可以改名冒充,字节不会撒谎,每条岔路都得钉死在账上。
 // 样本字节全在内存里构造,仓库里不放任何二进制图片。
 import assert from 'node:assert/strict'
@@ -232,7 +232,7 @@ async function main(): Promise<void> {
   assert.equal(mislabeled.status, 'image', '后缀标错的真图照样看')
   assert.equal(mislabeled.image?.mime, 'image/jpeg', 'MIME 按字节报,不按后缀报')
 
-  // ── 7. 谢客线:超线的图片在进 readImagePreview 时被 too-big 挡回(不碰盘) ──
+  // ── 7. 拒绝路径:超线的图片在进 readImagePreview 时被 too-big 挡回(不碰盘) ──
   const tooBig = await readImagePreview({
     absPath: 'E:/这条路根本不存在/不会真去读.png',
     relPath: 'huge.png',

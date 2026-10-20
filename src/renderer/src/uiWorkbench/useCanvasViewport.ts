@@ -1,6 +1,6 @@
 // UI 工作台画布视口:视口尺寸监测 + 首帧适配 + 滚轮缩放平移 + 鼠标在画布上时的缩放快捷键。
 // 交互对照 Figma:Ctrl+滚轮以鼠标为中心缩放、滚轮平移(Shift 横向)、Ctrl+0 回 100%、Ctrl +/− 缩放、Shift+1 适配。
-// 监听挂在画布所在窗口上(页签可撕成子窗,子窗是另一个 window)。
+// 监听挂在画布所在窗口上(页签可拆成子窗,子窗是另一个 window)。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RectBox } from '../../../shared/uiWorkbench/geometry.ts'
 import {

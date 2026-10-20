@@ -3,7 +3,7 @@
 // 每轮结束记成 TurnRecord。下一轮请求按「问 + 答」对账,对上的轮拿回完整工具往来,
 // 对不上的(重试/过户/压缩后)退回纯文字 —— 渲染层永远是「有哪些轮」的权威,会话只负责加料。
 // 装不下时的次序(JetBrains《The Complexity Trap》的观察遮蔽):
-// 话原样留,先把最旧的大段工具原文换成占位纸条,还不够再丢最旧的整轮,最后才动最近一轮。
+// 话原样留,先把最旧的大段工具原文换成占位注记,还不够再丢最旧的整轮,最后才动最近一轮。
 import type { AiHistoryMessage } from '../shared/types.ts'
 import { TAG } from '../shared/promptTags.ts'
 import { estimateTokens } from '../shared/aiText.ts'
@@ -83,7 +83,7 @@ export function estimateThreadTokens(messages: readonly AgentChatMessage[]): num
   return tokens
 }
 
-/** 历史里的工具调用 id 加轮次前缀:跨轮的 call_0 不撞车,本轮的防打转账本不会被旧 id 误解锁 */
+/** 历史里的工具调用 id 加轮次前缀:跨轮的 call_0 不撞车,本轮的防打转状态表不会被旧 id 误解锁 */
 function withTurnPrefix(trace: readonly AgentChatMessage[], turnIndex: number): AgentChatMessage[] {
   const tag = (id: string): string => `h${turnIndex}_${id}`
   return trace.map((m) => {
@@ -94,7 +94,7 @@ function withTurnPrefix(trace: readonly AgentChatMessage[], turnIndex: number): 
   })
 }
 
-/** 旧工具结果换成占位纸条:点明翻的是什么、原文多长、允许重读;短结果不值得动 */
+/** 旧工具结果换成占位注记:点明翻的是什么、原文多长、允许重读;短结果不值得动 */
 function maskTrace(trace: readonly AgentChatMessage[]): AgentChatMessage[] {
   const labels = new Map<string, string>()
   for (const m of trace) {
@@ -109,7 +109,7 @@ function maskTrace(trace: readonly AgentChatMessage[]): AgentChatMessage[] {
     const label = labels.get(m.tool_call_id) ?? '早先的工具调用'
     return {
       ...m,
-      content: `${TAG.toolResult.open}\n「${label}」${head}……${TAG.programNote.open}这条是早先翻看的资料,对话锅快满了,已清理成占位纸条;原文约 ${inner.length} 字。要重温就再调一次工具重读,允许重读${TAG.programNote.close}\n${TAG.toolResult.close}`
+      content: `${TAG.toolResult.open}\n「${label}」${head}……${TAG.programNote.open}这条是早先翻看的资料,对话上下文将满,已清理成占位注记;原文约 ${inner.length} 字。要重温就再调一次工具重读,允许重读${TAG.programNote.close}\n${TAG.toolResult.close}`
     }
   })
 }
@@ -197,7 +197,7 @@ export function planChatHistory(input: {
   return planSmallTierHistory(input)
 }
 
-/** 小模型档历史预算(纯函数,自测覆盖):锅里扣掉固定开销和回答预留后剩余座位的几成,不低于保底 */
+/** 小模型档历史预算(纯函数,自测覆盖):上下文窗口扣掉固定开销和回答预留后剩余配额的几成,不低于保底 */
 export function smallTierHistoryBudget(input: {
   contextTokens: number
   fixedTokens: number

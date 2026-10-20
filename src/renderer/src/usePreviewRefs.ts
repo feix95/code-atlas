@@ -1,5 +1,5 @@
 // 预览引用与文件链接:选段挂卡、AI 提到的绿字点开跳行、右键菜单。
-// 对外全靠 ref 传话(openFileLink 身份稳定),账本本体住在这个钩子里。
+// 对外全靠 ref 传话(openFileLink 身份稳定),状态表本体住在这个钩子里。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatCodeRef, ScanResult } from '@shared/types'
 import { buildFileLinkIndex, type FileLinkTarget } from '@shared/fileLinks'
@@ -24,12 +24,12 @@ export function usePreviewRefs(deps: {
   const { result, notes, chat, chatRef, openPreview, groups, activeGroup, markFlash, saveNote } =
     deps
 
-  // 预览里选中的代码段(第一百一十一锤):挂到右栏输入框上,和问题一起发;换预览文件即清
+  // 预览里选中的代码段(第一百一十一批):挂到右栏输入框上,和问题一起发;换预览文件即清
   const [previewRefs, setPreviewRefs] = useState<ChatCodeRef[]>([])
   // 聊天文件链接的跳行目标:点了带行号的链接,预览窗滚到那一行;seq 计数让同一行连点也能再跳
   const [previewJump, setPreviewJump] = useState<{ line: number; seq: number } | null>(null)
   const jumpSeqRef = useRef(0)
-  // 文件链接索引:扫描树一变就重建,AI 提到的文件拿它查户口;查得到的才画成可点链接
+  // 文件链接索引:扫描树一变就重建,AI 提到的文件拿它查登记;查得到的才画成可点链接
   const fileLinkIndex = useMemo(
     () => (result ? buildFileLinkIndex(collectRelPaths(result.tree)) : null),
     [result]
@@ -66,7 +66,7 @@ export function usePreviewRefs(deps: {
   )
 
   // 文件链接上下文:索引 + 点击去处 + 右键菜单;没扫出树(还在首页)就没有链接这回事。
-  // 备注三件套的活口(菜单统一大锤):每次渲染同步最新账,菜单回调经 ref 取用 ——
+  // 备注三件套的活口(菜单统一批次):每次渲染同步最新账,菜单回调经 ref 取用 ——
   // 身份一个用到底,fileLinks 的 useMemo 不用陪着 notes 每次换新
   const noteMenuRef = useRef<{
     hasNote: (relPath: string) => boolean
@@ -106,7 +106,7 @@ export function usePreviewRefs(deps: {
     [fileLinkIndex, openFileLink, openFileLinkMenu]
   )
 
-  // 引用一段选中代码(第一百一十一锤):额度满了就不收(浮钮那边也会说清)
+  // 引用一段选中代码(第一百一十一批):额度满了就不收(浮钮那边也会说清)
   function addPreviewRef(ref: ChatCodeRef): void {
     setPreviewRefs((prev) => (prev.length >= CODE_REFS_MAX ? prev : [...prev, ref]))
     // 引用卡如今住在探针页签的输入框上(预览拆了伴聊):闪一下那张页签,告诉用户挂哪儿了
@@ -121,7 +121,7 @@ export function usePreviewRefs(deps: {
     setPreviewRefs((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // 选中的代码段拖进聊天挂引用(选中直拖锤):ref 正文自包含,不用读盘;额度满了垫灰字照实说
+  // 选中的代码段拖进聊天挂引用(选中直拖批次):ref 正文自包含,不用读盘;额度满了垫灰字照实说
   function handleDropRef(ref: ChatCodeRef): void {
     if (previewRefs.length >= CODE_REFS_MAX) {
       chat.note(`一轮最多引用 ${CODE_REFS_MAX} 段,想换新的先摘一段`)

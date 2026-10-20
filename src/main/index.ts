@@ -71,11 +71,11 @@ function startApp(): void {
   createWindow()
   registerIpc()
   createTray()
-  // 撕窗子窗通道(页签撕窗锤):子窗是 window.open 的同进程白窗,
+  // 独立子窗通道(页签独立窗口):子窗是 window.open 的同进程白窗,
   // 窗口操作由主窗渲染层按 frameName 代发,桥在 installAuxWindowBridge(createWindow 里上弦)
   registerAuxWindowIpc(() => mainWindowRef)
 
-  // 后台日志广播员上岗(第八十七锤):每记一笔就推给所有窗口(日志窗口常驻收听)
+  // 后台日志广播员上岗(第八十七批):每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send(CH.devLog, entry)
@@ -85,9 +85,9 @@ function startApp(): void {
 
   // 内置引擎的状态播报员上岗:引擎一动(热身/进度/就绪/出岔子/被卸下)就广播给状态栏
   setBuiltinStatusAnnouncer(broadcastModelStatus)
-  // 热身耗时小账本安家 userData:模型上次热身多久,下次估价进度就有据可依
+  // 热身耗时小状态表安家 userData:模型上次热身多久,下次估价进度就有据可依
   setBuiltinWarmupDir(userDataDir())
-  // 机器家底提前问一遍(显存走 nvidia-smi):引擎万一启动就死,验尸话张口就来,不现场等
+  // 机器规格提前问一遍(显存走 nvidia-smi):引擎万一启动就死,退出诊断文案张口就来,不现场等
   void queryMachineSpec().catch(() => {})
 
   // 开场两件家务:上次异常退出留下的内置模型孤儿就地收尸(不占内存不堵端口);
@@ -101,7 +101,7 @@ function startApp(): void {
   })
 }
 
-// ── 单实例锁(桌宠托管第一锤;当年双实例 GPU 缓存大战的老伤疤,别再揭一次)──
+// ── 单实例锁(桌宠托管第一批;当年双实例 GPU 缓存大战的老伤疤,别再揭一次)──
 // 抢不到锁 = 已经有一个 CodeAtlas 在跑:本实例一个窗都不建,悄悄退场。
 // 已在跑的实例通过 second-instance 收到敲门:把主窗带焦点唤回前台。
 app.on('before-quit', () => {
@@ -130,7 +130,7 @@ app.on('will-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // Windows / Linux:所有窗口都没了才退出。收起模式(桌宠托管第一锤)下关窗只是
+  // Windows / Linux:所有窗口都没了才退出。收起模式(桌宠托管第一批)下关窗只是
   // 藏进托盘、窗口不销毁,这个事件不触发 —— 真退出走托盘「退出」,走到这儿时
   // quit 已在进行,再喊一声无害
   if (process.platform !== 'darwin') app.quit()

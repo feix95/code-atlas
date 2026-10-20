@@ -4,22 +4,22 @@
  * 文件路径专用那套在 filePathMenuStore,这里收「不是对着文件」的右键菜单(选区引用等)。
  */
 
-/** 菜单里的一行:run 返回字符串的话,该行短暂亮出这句反馈再收摊(「已复制」那一挂) */
+/** 菜单里的一行:run 返回字符串的话,该行短暂亮出这句反馈再关闭(「已复制」那一挂) */
 export interface ContextMenuItem {
   label: string
   /** 不可用的行摆着但点不动(比如引用额度满了,把原因写进 label) */
   disabled?: boolean
   /** 悬停轻提示(data-tip) */
   tip?: string
-  /** 行内图标(TreeIcon 户口名):带图标档的菜单(Obsidian 式页签菜单)才摆,窄身档不带 */
+  /** 行内图标(TreeIcon 登记名):带图标档的菜单(Obsidian 式页签菜单)才摆,窄身档不带 */
   icon?: string
-  /** 开关行:有值 = 行尾画一颗开关(true=开),点一下拨动且菜单不收摊,让人亲眼看到状态翻面;
+  /** 开关行:有值 = 行尾画一颗开关(true=开),点一下拨动且菜单不关闭,让人亲眼看到状态翻面;
    *  开关画面由菜单自己翻(各开关互相独立),run 只管把账改掉 */
   switchOn?: boolean
-  /** 点了干啥;返回字符串 = 该行先亮这句话再收摊;返回 Promise 同理会等它。
-   *  开关行会收到拨完之后的新读数(菜单不收摊可连拨,别用打开时抓的旧值取反) */
+  /** 点了干啥;返回字符串 = 该行先亮这句话再关闭;返回 Promise 同理会等它。
+   *  开关行会收到拨完之后的新读数(菜单不关闭可连拨,别用打开时抓的旧值取反) */
   run?: (nextOn?: boolean) => void | string | Promise<string | null | void>
-  /** 二级列表:点了这行就地展开(菜单不收摊),子行点完才收摊 */
+  /** 二级列表:点了这行就地展开(菜单不关闭),子行点完才关闭 */
   children?: Array<{ label: string; run: () => void }>
 }
 
@@ -39,7 +39,7 @@ export function isMenuHeading(entry: ContextMenuEntry): entry is ContextMenuHead
 export interface ContextMenuRequest {
   x: number
   y: number
-  /** 菜单开在哪个 document(realm 铁律):主窗和每个子窗各挂一台菜单,各认各的请求 */
+  /** 菜单开在哪个 document(渲染域隔离):主窗和每个子窗各挂一台菜单,各认各的请求 */
   doc: Document
   items: ContextMenuEntry[]
   /** 窄身档:行项少的菜单(两三行)别按通用宽度撑开,贴着字宽摆 */
@@ -57,7 +57,7 @@ export function openContextMenu(request: ContextMenuRequest): void {
   emit()
 }
 
-/** 收摊(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
+/** 关闭(点菜单外面 / 滚动 / Esc / 动作完的自动关,都走这儿) */
 export function closeContextMenu(): void {
   menuRequest = null
   emit()

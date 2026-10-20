@@ -1,4 +1,4 @@
-// 文件写盘(预览编辑锤):渲染层给文件写字的唯一口子,主进程把门。
+// 文件写盘(预览编辑批次):渲染层给文件写字的唯一口子,主进程把门。
 // 准入闸与 readPreview 同口径:越界走 joinRoot 拦、目录不接、体积超闸不写;
 // 行尾与 BOM 跟原文件走(只读头部一小段认账),落盘不许悄悄换血。
 import { promises as fs } from 'node:fs'
@@ -69,10 +69,10 @@ export async function saveTextFile(
 }
 
 /**
- * 文件改名(内联标题改名锤):渲染层只递「新主名」,扩展名照旧保留 ——
+ * 文件改名(内联标题改名批次):渲染层只递「新主名」,扩展名照旧保留 ——
  * Obsidian 的 inline title 同款口径,标题那一行只管主名这一截。
  * 只在同目录内换名,不挪窝;目标已存在(文件/文件夹都算)老实报错,绝不顶替。
- * 返回新户口(relPath + 含扩展名的全名 + 改后 mtime 给监视器换账)。
+ * 返回新登记(relPath + 含扩展名的全名 + 改后 mtime 给监视器换账)。
  */
 export async function renameTextFile(
   rootPath: unknown,
@@ -103,7 +103,7 @@ export async function renameTextFile(
   }
 
   const newAbs = join(dirname(absPath), newName)
-  // 撞名闸:目标是另一个户口才拦;只是换大小写的自己人(Windows 不分大小写)放行
+  // 撞名闸:目标是另一个登记才拦;只是换大小写的自己人(Windows 不分大小写)放行
   if (newAbs.toLowerCase() !== absPath.toLowerCase()) {
     const clash = await fs.stat(newAbs).catch(() => null)
     if (clash) {

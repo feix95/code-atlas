@@ -1,4 +1,4 @@
-// 扫描中/打开失败的整屏状态(纯搬家自 App):扫描进度卡与错误卡各管一半,
+// 扫描中/打开失败的整屏状态(纯迁移自 App):扫描进度卡与错误卡各管一半,
 // App 只留「画哪一屏」的分支,不再端着两份长 JSX。
 import { Notice } from './Notice'
 import { ProgressDots } from './ProgressDots'

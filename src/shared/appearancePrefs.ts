@@ -30,7 +30,7 @@ export const COLOR_PRESETS: Array<{
   accent: string
   secondary: string
 }> = [
-  // accent/secondary 即暗色样式表真值(户口在 shared/appearancePalette 的 seed):
+  // accent/secondary 即暗色样式表真值(登记在 shared/appearancePalette 的 seed):
   // 进自定义档时种子是它俩,保证「自定义默认」和石墨像素级一致
   {
     key: 'default',
@@ -89,8 +89,8 @@ export function resolveAppearanceStartup(opts: {
   return { value: defaultAppearance(), migrate: false }
 }
 
-/** 窗口实底色的同源户口(全窗实底化):外观 + 当前亮暗 → 此刻 --canvas-tint 该是什么色。
- *  渲染层刷画布、主进程定 BrowserWindow.backgroundColor,两边共用这一本账 ——
+/** 窗口实底色的同源登记(全窗实底化):外观 + 当前亮暗 → 此刻 --canvas-tint 该是什么色。
+ *  渲染层刷画布、主进程定 BrowserWindow.backgroundColor,两边共用这同一数据源 ——
  *  公式必须和渲染层 appearance.ts 里 paintSurfaces 的 canvas-tint 行逐字一致。 */
 export function canvasColorOf(a: Appearance, dark: boolean): string {
   const pal = neutralFor(dark)

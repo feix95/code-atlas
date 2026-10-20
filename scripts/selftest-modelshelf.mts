@@ -81,7 +81,7 @@ console.log('── 量化等级:文件名解析 + 技术翻译,认不出 null �
   ok(parseQuantNote('model-Q9_custom.gguf') === null, '认不出的档位(Q9) → null,不硬猜')
 }
 
-console.log('── 货架准入:不是文本打底的一律过滤(2026-09-18 小葵定)──')
+console.log('── 货架准入:不是文本打底的一律过滤(2026-09-18 产品定)──')
 {
   ok(isChatCapable({ pipeline_tag: 'text-generation' }), '文本生成 → 上架')
   ok(isChatCapable({ pipeline_tag: 'image-text-to-text' }), '图文 → 上架(视觉是产品能力)')
@@ -150,7 +150,7 @@ console.log('── 带不动判定:内存预算 = 总内存 × 0.7,贴线提醒
   ok(judgeRun(12 * GB, spec16) === 'no', '16G 内存跑 12G 模型 → 带不动')
   ok(judgeRun(null, spec16) === 'yes', '大小未知 → 不拦,老实不拦')
   ok(judgeRun(4 * GB, { ramBytes: 0, vramBytes: null }) === 'yes', '内存拿不到 → 不拦')
-  ok(runVerdictLabel('no') === '超出内存预算', 'no 的一句话(2026-09-18 小葵拍板专业简短风)')
+  ok(runVerdictLabel('no') === '超出内存预算', 'no 的一句话(2026-09-18 产品裁定专业简短风)')
   ok(runVerdictLabel('tight') === '接近内存预算', 'tight 的一句话,跟 no 对仗')
   ok(runVerdictLabel('yes') === '', 'yes 不带话,不啰嗦')
 }

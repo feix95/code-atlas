@@ -2,7 +2,7 @@
 // 跑法:npm run test:launchsettings
 // 钉死的账:launchSettings.ts 的账簿净化(白名单字段、空账不留、最多 64 本按写入先后
 // 挤旧的、原型链污染防住);parseExtraArgs 专家参数白名单解析;launchSignature 对账签名
-// 稳定且与字段顺序无关;config.ts 落盘→读回账本原样,老配置(没 launch 字段)照常加载。
+// 稳定且与字段顺序无关;config.ts 落盘→读回状态表原样,老配置(没 launch 字段)照常加载。
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -174,7 +174,7 @@ console.log('── 按模型取账 / 对账签名')
     modelPath: 'F:\\Models\\A.GGUF',
     launch: { 'f:\\models\\a.gguf': { overrides: { kvCache: 'q8_0' as const } } }
   }
-  check('大小写/正反斜杠都对上同一本账', launchFor(builtin)?.overrides.kvCache === 'q8_0')
+  check('大小写/正反斜杠都对上同同一数据源', launchFor(builtin)?.overrides.kvCache === 'q8_0')
   check('别的模型取不到账', launchFor({ ...builtin, modelPath: 'f:\\models\\other.gguf' }) === null)
   check('没账 = null', launchFor({ serverPath: '', modelPath: 'f:\\x.gguf' }) === null)
 }

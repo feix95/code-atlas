@@ -102,7 +102,7 @@ export function registerScanIpc(): void {
     }
   )
 
-  // 代码预览读文件(第一百一十锤):右键「预览文件」用的那条通道。
+  // 代码预览读文件(第一百一十批):右键「预览文件」用的那条通道。
   // 路径契约同 analyze-file —— 收 (rootPath, relPath),绝对路径只经 joinRoot 解析,
   // relPath 越界(.. 上跳、盘符注入)在这儿被拦。守卫三道:二进制不受理、超大不受理、
   // 能读的也只给前一段(行数/字数双封顶),账目如实回给界面,绝不静默腰斩。
@@ -122,7 +122,7 @@ export function registerScanIpc(): void {
       }
       const name = relPath.split('/').pop() ?? relPath
       // 图片先走图片支路(图片后缀仍在 BINARY_EXTS 里,先判它才有「直接看图」这条路):
-      // 超谢客线回 too-big、魔数对不上回 binary、验过回 image 带 dataUrl
+      // 超拒绝路径回 too-big、魔数对不上回 binary、验过回 image 带 dataUrl
       if (isImageFile(name)) {
         return readImagePreview({ absPath, relPath, sizeBytes: stat.size })
       }
@@ -161,7 +161,7 @@ export function registerScanIpc(): void {
         }
       }
       const clip = clipPreview(buf.toString('utf8'))
-      // 预览分色(这锤):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
+      // 预览分色(本批):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
       // 解析出错都老实回 null —— 界面白字照常,分色永远不拖累预览本身。
       const colors = await highlightSource(clip.text, name)
       return {

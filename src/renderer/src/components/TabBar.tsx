@@ -8,7 +8,7 @@ import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
 import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 import { hostNameOf, startWindowDrag } from '../windowDrag'
 
-/** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话账本那些私事) */
+/** 页签条对外的页签形状(App 的 PaneTab 投影,这里不关心对话状态那些私事) */
 export interface TabBarTab {
   id: string
   kind: PaneKind
@@ -23,7 +23,7 @@ export interface TabBarTab {
 /**
  * 页签条(小葵的页签模型·文件签版):一张页签 = 图标 + 名字 + 悬停才出现的 ×。
  * 文件签脸就是文件名;单例签挂品类名牌。拖拽走 TopBarTabs 的 pointer 引擎:
- * 这里只上报 pointerdown 和画让位缝 —— 被拖的签全程保持原样(小葵拍板),
+ * 这里只上报 pointerdown 和画让位缝 —— 被拖的签全程保持原样(产品裁定),
  * 缝用 margin 过渡撑开(VS Code 式让位手感)。
  * 中键点页签 = 关闭。右键菜单走全局通用 ContextMenu(Obsidian 式分组,组间细线)。
  * 页签尾空白的拖窗走 windowDrag.ts 的手动搬窗引擎
@@ -85,7 +85,7 @@ export function TabBar({
     atIndex: number | null,
     splitSide?: 'left' | 'right'
   ) => void
-  /** 右键菜单「移到新窗口」:不拖也撕(页签撕窗锤),所有页签一视同仁 */
+  /** 右键菜单「移到新窗口」:不拖也可拆出(页签独立窗口),所有页签一视同仁 */
   onDetachTab?: (id: string) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
   onRevealInTree?: (id: string) => void
@@ -111,7 +111,7 @@ export function TabBar({
    * 锁的是关闭前一刻的实测宽(getBoundingClientRect),不是 CSS 理论值。
    */
   const [frozenW, setFrozenW] = useState<number | null>(null)
-  // 解冻回弹动画的户口:进行中的补帧在再关签/重进带时先取消,别让旧动画顶着新冻结跑
+  // 解冻回弹动画的登记:进行中的补帧在再关签/重进带时先取消,别让旧动画顶着新冻结跑
   const releaseAnims = useRef<Animation[]>([])
 
   function freezeAndClose(id: string, tabEl: HTMLElement): void {
@@ -158,11 +158,11 @@ export function TabBar({
   }, [frozenW])
 
   /**
-   * 页签右键菜单(Obsidian 式分组,阅读模式这锤):走全局通用菜单,
+   * 页签右键菜单(Obsidian 式分组,阅读模式本批):走全局通用菜单,
    * 组间一道细线;行内图标,状态类选项画开关。菜单行按签品类现拼:
    * 单例签没有文件动作和选项区;非 md 文件签不摆「排版显示」(没有这一维);
    * peek 签没有树定位。
-   * realm 铁律:doc 记进请求,菜单开在子窗时它自己窗内那台接活。
+   * 渲染域隔离:doc 记进请求,菜单开在子窗时它自己窗内那台接活。
    */
   function openTabMenu(e: React.MouseEvent, t: TabBarTab): void {
     e.preventDefault()
@@ -194,7 +194,7 @@ export function TabBar({
     }
 
     // 选项区(文件签常驻):三个互相独立的开关全是全局一档 —— 排版显示(只有 md 系有这一维,
-    // 别的文件不摆)、只读(所有文件通吃)、自动换行(Alt+Z 走同一份全局账)。
+    // 别的文件不摆)、只读(所有文件通吃)、自动换行(Alt+Z 走同一份全局偏好)。
     // 拨一颗 = 全局偏好翻面,所有已开的签就地跟随;读数换算只走 viewState
     if (isFile) {
       const flags = viewFlags(t.relPath)
@@ -405,7 +405,7 @@ export function TabBar({
         )
       })}
       {/* 页签卡之间的空白:拖页签扫到这 = 落本组末尾(引擎按中线序判,空白不用自己接);
-          左键按住拖 = 手动搬窗(等价原生 drag 面,主窗子窗都吃这套 —— 引擎报户口),
+          左键按住拖 = 手动搬窗(等价原生 drag 面,主窗子窗都吃这套 —— 引擎报登记),
           双击 = 最大化/还原 */}
       <div
         className="tabbar-blank"

@@ -1,4 +1,4 @@
-// 自由对话的图片附件(第一百五十二锤):类型、能力闸、token 估算、预算规划、收编洗白。
+// 自由对话的图片附件(第一百五十二批):类型、能力闸、token 估算、预算规划、收编洗白。
 // 全是纯函数 —— 渲染层与主进程共用同一把尺子,自测一把全摁住。
 import { sniffImage, type ImageMime } from './imageMeta.ts'
 import { IMAGE_PREVIEW_MAX_BYTES } from './preview.ts'
@@ -34,7 +34,7 @@ export type ChatMessageContent = string | ChatContentPart[]
 /**
  * 图片 token 的保守估算(纯函数,自测覆盖):模型无关的 Qwen-VL 式 28px 块口径 ——
  * 按 28 像素见方切块,一块记一个视觉 token,刻意宁高勿低(真实编码器常为 14px 块再压半,
- * 算下来比这个低);64 是地板价,图再小也占读图开销。只用来掐预算,不是精确账。
+ * 算下来比这个低);64 是下限,图再小也占读图开销。只用来掐预算,不是精确账。
  */
 export function estimateImageTokens(width: number, height: number): number {
   const w = Math.max(1, Math.ceil(width))
@@ -64,7 +64,7 @@ export function imageGate(
   return { allow: true, hint: '没法确认这个模型能不能看图' }
 }
 
-/** 预算规划给每张图定的座位:缩到的像素尺寸 + 估算 token 数 */
+/** 预算规划给每张图定的配额:缩到的像素尺寸 + 估算 token 数 */
 export interface ImageBudgetItem {
   width: number
   height: number
@@ -74,8 +74,8 @@ export interface ImageBudgetItem {
 export type ImageBudgetPlan = { ok: true; items: ImageBudgetItem[] } | { ok: false; reason: string }
 
 /** 单张图按自己的份子钱缩尺寸:装得下就原样,装不下按面积比例缩(token 跟块数走 ≈ 跟面积走);
- *  28px 块取整会让估算略高于份子 —— 每轮把长边再砍一块(28px)直到坐进座位或触底 256,
- *  触底还装不下就按 256 报账,交给总额检查判 ok:false,不许静默丢图 */
+ *  28px 块取整会让估算略高于份子 —— 每轮把长边再砍一块(28px)直到纳入配额或达下限 256,
+ *  到下限仍装不下就按 256 计入,交给总额检查判 ok:false,不许静默丢图 */
 function fitImageToShare(width: number, height: number, shareTokens: number): ImageBudgetItem {
   const native = estimateImageTokens(width, height)
   if (native <= shareTokens) return { width, height, tokens: native }
@@ -101,14 +101,14 @@ function fitImageToShare(width: number, height: number, shareTokens: number): Im
 
 /**
  * 图片预算规划(纯函数,自测覆盖):图片总占用封顶 = 上下文的 50%,且不得挤到
- * 「人设+附件+问题+回答预留」没座位(otherTokens+replyTokens 先扣完再看剩多少)。
- * 每张图均分座位,放不下的按面积缩;缩到 256 长边还塞不进就 ok:false 给人话原因,
+ * 「人设+附件+问题+回答预留」没配额(otherTokens+replyTokens 先扣完再看剩多少)。
+ * 每张图均分配额,放不下的按面积缩;缩到 256 长边还塞不进就 ok:false 给人话原因,
  * 让调用方报错 —— 不许静默丢图。
  */
 export function planImageBudget(input: {
   ctxTokens: number
   replyTokens: number
-  /** 已排定的固定开销(人设+附件+问题+联网资料),图片不许抢它们的座 */
+  /** 已排定的固定开销(人设+附件+问题+联网资料),图片不许占用其配额 */
   otherTokens: number
   images: Array<{ width: number; height: number }>
 }): ImageBudgetPlan {
@@ -120,7 +120,7 @@ export function planImageBudget(input: {
   if (seatCap <= 0) {
     return {
       ok: false,
-      reason: '上下文连图片的座位都没有了(人设和材料已经占满):把模型上下文调大,或少带点材料再发'
+      reason: '上下文连图片的配额都没有了(人设和材料已经占满):把模型上下文调大,或少带点材料再发'
     }
   }
   const share = Math.max(1, Math.floor(seatCap / input.images.length))

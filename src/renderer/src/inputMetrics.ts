@@ -4,7 +4,7 @@
  */
 export const INPUT_CAP_LINES = 5
 export const INPUT_EXPAND_LINES = 10
-/** 拨杆(展开/收合)那颗小箭头的尺寸:两窗同款岗,同一本账 */
+/** 拨杆(展开/收合)那颗小箭头的尺寸:两窗同款岗,同同一数据源 */
 export const INPUT_TOGGLE_ICON_SIZE = 12
 
 /** 输入栏右侧三颗圆钮(思考/翻文件/发送)图标旋钮:共享一个大小,跟别处分组互不相关 */
@@ -16,5 +16,5 @@ export const INLINE_ICON_SIZE = 12
 /** 右键菜单行内图标的尺寸(通用 ContextMenu 一档):比行字略大、不占行高 */
 export const MENU_ICON_SIZE = 14
 
-/** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和撕窗子窗同一颗钮,同一本账 */
+/** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和独立子窗同一颗钮,同同一数据源 */
 export const WIN_ICON_SIZE = 18
