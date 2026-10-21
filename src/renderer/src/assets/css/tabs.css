@@ -232,6 +232,28 @@
   transform: translate(-50%, -50%);
 }
 
+/* 跨窗落点浮层:插入线/正文亮边由来源窗 Portal 进目标窗 document,
+   坐标已是目标窗局部坐标。颜色与窗内插入线、分屏拖边同一套 token */
+.tab-drop-line {
+  position: fixed;
+  z-index: var(--z-menu);
+  width: 3px;
+  height: calc(var(--u) * 0.55);
+  border-radius: var(--radius-pill);
+  background: var(--drop-mark);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tab-drop-body {
+  position: fixed;
+  z-index: var(--z-menu);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 2px var(--sash-hi);
+  background: color-mix(in srgb, var(--sash-hi) 6%, transparent);
+  pointer-events: none;
+}
+
 /* 拖拽替身芯片:fixed 浮层跟光标(页签带 overflow:hidden 裁得掉行内位移)。
    Edge 式紧凑小胶囊:深色底、图标+名贴内容收、四角圆角,不再背整页签的壳 */
 .tabbar-tab.is-chip {

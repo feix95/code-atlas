@@ -78,6 +78,22 @@ export function moveTabToHost(
   tabId: string,
   host: string
 ): { groups: PaneGroup[]; activeGroupId: string } | null {
+  return moveTabToGroupAt(groups, tabId, null, host, null)
+}
+
+/**
+ * 把页签挪进指定组(纯函数,跨窗拖拽落账):`targetGroupId` 为空或已失效时
+ * 落该 host 第一张非空组,一张都没有就现立一组。`atIndex` 为空 = 追加到末尾,
+ * 否则插到剔除被拖签后的第几位(跨窗条带快照天然不含被拖签)。
+ * 源组搬空自己消亡;同组内插先摘后插,序号按摘后数组算。
+ */
+export function moveTabToGroupAt(
+  groups: PaneGroup[],
+  tabId: string,
+  targetGroupId: string | null,
+  host: string,
+  atIndex: number | null
+): { groups: PaneGroup[]; activeGroupId: string } | null {
   const from = groups.find((g) => g.tabs.some((t) => t.id === tabId))
   if (!from) return null
   const next = groups.map((g) => ({ ...g, tabs: [...g.tabs] }))
@@ -87,14 +103,18 @@ export function moveTabToHost(
   if (src.activeId === tabId) {
     src.activeId = src.tabs.length > 0 ? src.tabs[src.tabs.length - 1].id : null
   }
-  let dst = next.find((g) => groupHost(g) === host && g.tabs.length > 0)
+  let dst = targetGroupId ? next.find((g) => g.id === targetGroupId) : undefined
+  if (!dst) dst = next.find((g) => groupHost(g) === host && g.tabs.length > 0)
   if (!dst) {
     dst = { id: `pane:${nextTabId()}`, tabs: [], activeId: null, host }
     next.push(dst)
   }
-  dst.tabs.push(moved)
+  // 目标组建在哪儿以它自己的登记为准;新立的组才用调用方给的 host
+  const targetHost = groupHost(dst)
+  const at = atIndex === null || atIndex > dst.tabs.length ? dst.tabs.length : Math.max(0, atIndex)
+  dst.tabs.splice(at, 0, moved)
   dst.activeId = moved.id
-  dst.host = host
+  dst.host = targetHost === MAIN_HOST ? undefined : targetHost
   // 搬空的组消亡(主窗拖空 = 回空底板,子窗拖空 = 子窗自动关,两边都不留死组)
   const kept = next.filter((g) => g.tabs.length > 0)
   return { groups: kept, activeGroupId: dst.id }

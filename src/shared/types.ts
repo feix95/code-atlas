@@ -518,6 +518,21 @@ export interface AiChatResult extends AiExplainResult {
  * 子窗 document 是 about:blank 白窗,没有 preload 也没有 window.atlas。 */
 export type AuxWindowOp = 'minimize' | 'toggleMaximize' | 'close' | 'focus'
 
+/**
+ * 一扇窗内容区的屏幕矩形(DIP):跨窗拖页签命中用。
+ * frameName 与页签组 host 同一登记(主窗 'main' / 子窗 'aux-N');
+ * 放主进程算不用 window.screenX —— 后者含无边框窗的隐形边框,会偏 8px。
+ */
+export interface AuxWindowRect {
+  frameName: string
+  x: number
+  y: number
+  width: number
+  height: number
+  /** 最小化/隐藏的窗不参与落点 */
+  visible: boolean
+}
+
 /** 自由对话一条消息的出险状态:busy 生成中 / done 完工 / error 出错 / cancelled 被掐 */
 export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'
 

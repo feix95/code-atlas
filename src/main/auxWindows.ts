@@ -7,12 +7,15 @@
 //      经 atlas:aux-window-op 代发,这边按 frameName 从注册表找窗执行。
 import { ipcMain, screen, shell, BrowserWindow } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
-import type { AuxWindowOp } from '../shared/types.ts'
+import type { AuxWindowRect, AuxWindowOp } from '../shared/types.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { trackWindowBackground, windowCanvasColor } from './windowTheme.ts'
 
 /** frameName 白名单前缀:渲染层 useAuxWindows 发号(aux-1/aux-2/...),主进程只认它 */
 const AUX_PREFIX = 'aux-'
+
+/** 主窗在页签登记里的名字(与渲染层 MAIN_HOST 同值;主进程不引渲染层模块,故本地登记) */
+const MAIN_FRAME = 'main'
 
 /** frameName → BrowserWindow 注册表:did-create-window 记进来,closed 清账 */
 const auxRegistry = new Map<string, BrowserWindow>()
@@ -99,7 +102,14 @@ export function registerAuxWindowIpc(getMainWindow: () => BrowserWindow | null):
     const main = getMainWindow()
     if (!main || main.isDestroyed() || event.sender !== main.webContents) return
     const p = payload as { frameName?: unknown; op?: unknown } | null
-    if (!p || !isAuxFrame(p.frameName as string | undefined)) return
+    if (!p || typeof p.frameName !== 'string') return
+    // 跨窗拖回主窗:frameName='main' 只认 focus —— 主窗的窗控按钮走自己的通道,
+    // 这里只借同一条桥把主窗提到前台(renderer 的 window.focus() 在 Electron 里不保证生效)
+    if (p.frameName === MAIN_FRAME) {
+      if (p.op === 'focus') main.focus()
+      return
+    }
+    if (!isAuxFrame(p.frameName)) return
     const win = auxRegistry.get(p.frameName as string)
     if (!win || win.isDestroyed()) return
     switch (p.op as AuxWindowOp) {
@@ -119,6 +129,30 @@ export function registerAuxWindowIpc(getMainWindow: () => BrowserWindow | null):
       default:
         break
     }
+  })
+
+  // 跨窗拖页签的落点基准:一次返回主窗 + 全部子窗的内容区矩形。
+  // 用 getContentBounds 不用 window.screenX —— 后者含无边框窗隐形边框(实测偏 8px)。
+  // 坐标系是 DIP,与渲染层 pointer 事件的 screenX/screenY 同一套。
+  ipcMain.handle(CH.auxWindowRects, (event): AuxWindowRect[] => {
+    const main = getMainWindow()
+    if (!main || main.isDestroyed() || event.sender !== main.webContents) return []
+    const rects: AuxWindowRect[] = []
+    const push = (win: BrowserWindow, frameName: string): void => {
+      if (win.isDestroyed()) return
+      const b = win.getContentBounds()
+      rects.push({
+        frameName,
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+        visible: win.isVisible() && !win.isMinimized()
+      })
+    }
+    push(main, MAIN_FRAME)
+    for (const [name, win] of auxRegistry) push(win, name)
+    return rects
   })
 }
 

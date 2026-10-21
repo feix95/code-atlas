@@ -24,6 +24,7 @@ import type {
   AiDeltaPayload,
   AiExplainResult,
   AuxWindowOp,
+  AuxWindowRect,
   BrowseEntry,
   DepGraphResult,
   DriveInfo,
@@ -302,6 +303,8 @@ const atlasApi = {
   auxWindowOp: (frameName: string, op: AuxWindowOp): void => {
     ipcRenderer.send(CH.auxWindowOp, { frameName, op })
   },
+  /** 跨窗拖页签:取主窗 + 各子窗的内容区矩形(DIP),拖拽开始时问一次 */
+  auxWindowRects: (): Promise<AuxWindowRect[]> => ipcRenderer.invoke(CH.auxWindowRects),
   // ── Developer 日志(第八十七批):拉旧账 / 清账 / 开窗 / 订阅新账 ──
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke(CH.devLogPull),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke(CH.devLogClear),

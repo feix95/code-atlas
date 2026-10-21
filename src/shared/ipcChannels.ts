@@ -92,6 +92,8 @@ export const CH = {
   // 独立子窗(页签独立窗口):主窗渲染层替子窗发窗口操作 —— 子窗 document 是
   // about:blank 白窗没有 preload,缩放/关闭由主 realm 代发,主进程按 frameName 认窗
   auxWindowOp: 'atlas:aux-window-op',
+  /** 跨窗拖页签:取所有窗内容区矩形(invoke 配 handle),拖拽开始时问一次 */
+  auxWindowRects: 'atlas:aux-window-rects',
   // ── 共享自由对话与气泡 ──
 
   // ── Developer 日志 ──

@@ -13,6 +13,7 @@ import {
   dropHostGroups,
   groupHost,
   MAIN_HOST,
+  moveTabToGroupAt,
   moveTabToHost,
   nextTabId,
   type PaneDropMark,
@@ -67,6 +68,24 @@ export function usePaneTabs(deps: {
   const onTabDragEnd = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
   // 页签右键「移到新窗口」= 不拖也可拆出,所有签一视同仁
   const onDetachTab = useCallback((id: string) => detachTabToWindow(id), [detachTabToWindow])
+
+  /**
+   * 跨窗拖拽落账(页签跨窗口):落到目标窗指定组的指定位置。
+   * groupId 为空 = 目标窗没有可落组,由纯函数现立;atIndex 为空 = 追加到末尾。
+   */
+  function moveTabToHostAt(
+    id: string,
+    host: string,
+    groupId: string | null,
+    atIndex: number | null
+  ): void {
+    const moved = moveTabToGroupAt(groups, id, groupId, host, atIndex)
+    if (!moved) return
+    setGroups(moved.groups)
+    setActiveGroupId(moved.activeGroupId)
+    const tab = groups.flatMap((g) => g.tabs).find((t) => t.id === id)
+    if (tab) revealTab(tab)
+  }
 
   // 子窗死了(pagehide 上报):它名下的签连组一起关闭并清理 —— Chrome 语义,关窗即关签
   const closeHostGroups = useCallback((hostId: string): void => {
@@ -457,6 +476,7 @@ export function usePaneTabs(deps: {
     openTranslationTab,
     openSingletonTab,
     moveTab,
+    moveTabToHostAt,
     activateTab,
     closeTab,
     closeTabsInGroup,

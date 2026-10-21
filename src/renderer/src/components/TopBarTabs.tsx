@@ -11,8 +11,30 @@
 // 不预缩位置,预览尺寸与实际尺寸不会打架);悬到正文区按中心/边缘判分屏许诺;
 // 窗外松手拆出新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { PaneDropMark, PaneGroup, PaneTab } from '../paneTabs'
-import { dragCenterX, insertIndexAt, isWithinStripBand } from '../tabDragGeometry'
+import { createPortal } from 'react-dom'
+import type { AuxWindowRect } from '@shared/types'
+import { type PaneDropMark, type PaneGroup, type PaneTab } from '../paneTabs'
+import {
+  DETACH_MAGNETISM_PX,
+  dragCenterX,
+  insertIndexAt,
+  isWithinStripBand,
+  STRIP_BLEED_BOTTOM,
+  STRIP_BLEED_TOP,
+  STRIP_BLEED_X
+} from '../tabDragGeometry'
+import {
+  bodyAtPoint,
+  gapIndexAt,
+  gapLeftAt,
+  snapshotDragWindows,
+  stripAtPoint,
+  windowAtPoint,
+  type BodySnap,
+  type DragWindowRef,
+  type StripSnap,
+  type WindowSnap
+} from '../tabDragWindows'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -20,13 +42,6 @@ import { TabBar, type TabBarTab } from './TabBar'
 const WIN_CTL_U = 3
 /** 按住位移阈值:超了才算拖,普通点按照旧走 onClick 激活页签 */
 const DRAG_START_PX = 4
-/** 页签带判定的出血量:光标擦到条带边缘/组间细柱上也还算悬在带上 */
-const STRIP_BLEED_X = 6
-const STRIP_BLEED_TOP = 4
-const STRIP_BLEED_BOTTOM = 8
-/** 拆窗磁性带:条带贴着窗口顶边,指针离条带这么近就仍算在带上(只重排不拆窗)。
-    口径同 Chromium 的 detach magnetism,数值放大一档 —— 我们的条带顶边就是窗口顶边 */
-const DETACH_MAGNETISM_PX = 32
 /** 正文区边缘分屏带的横向占比(封顶 120px):贴到亮半边提示 —— VS Code 同款手势 */
 /** 定向拆半屏的判定带:正文左右各 1/3 宽、全高都算数(产品定的手感:拖到三分之一就亮蓝) */
 const SPLIT_EDGE_THIRD = 1 / 3
@@ -74,31 +89,26 @@ interface TabDragState {
   willDetach: boolean
 }
 
-/** 一条页签带的几何快照:拖动开始时量一次 —— 让位动画期间 DOM 一直在动,不能逐帧问它 */
-interface StripSnap {
-  groupId: string
-  left: number
-  right: number
-  top: number
-  bottom: number
-  /** 内层 .tabbar 的左缘(视口坐标):插入线的 x 按它折回带内坐标 */
-  barLeft: number
-  /** 各页签的横向登记(视口坐标):中线判插序,左右缘算插入线的落点 */
-  mids: { id: string; left: number; mid: number; right: number }[]
+/** 跨窗落点的呈现账:目标窗 document 由 dragWindows 现查,这里只记局部坐标 */
+interface CrossTarget {
+  host: string
+  kind: 'strip' | 'body'
+  /** 指针在目标窗里的局部坐标(芯片跟手用) */
+  x: number
+  y: number
+  /** 条带落点:插入线的横坐标与中线 y */
+  lineX: number | null
+  lineY: number | null
+  /** 正文落点:整块正文的局部矩形(亮边提示) */
+  body: { left: number; top: number; width: number; height: number } | null
 }
 
-interface BodySnap {
-  groupId: string
-  left: number
-  right: number
-  top: number
-  bottom: number
-}
-
-/** 当前落点:页签带插队 / 正文左右缘分屏 / 窗外(拆出新子窗) / 无处(松手不动作) */
+/** 当前落点:本窗页签带插队 / 本窗正文分屏 / 别窗条带 / 别窗正文 / 所有窗外 / 无处 */
 type DragZone =
   | { type: 'strip'; groupId: string; index: number }
   | { type: 'pane'; groupId: string; zone: 'left' | 'right' }
+  | { type: 'host-strip'; host: string; groupId: string; index: number }
+  | { type: 'host-body'; host: string; groupId: string | null }
   | { type: 'outside' }
   | { type: 'none' }
 
@@ -116,7 +126,10 @@ export function TopBarTabs({
   onRevealInTree,
   onTranslate,
   workspaceRoot,
-  paneSplit
+  paneSplit,
+  host,
+  dragWindows,
+  onMoveTabToHostAt
 }: {
   groups: PaneGroup[]
   visibleOfGroup: (g: PaneGroup | null) => PaneTab[]
@@ -145,6 +158,17 @@ export function TopBarTabs({
   workspaceRoot?: string | null
   /** 第一组分屏列占内容宽的比例(usePaneTabs 的状态表,顶部条带认同一份) */
   paneSplit: number
+  /** 本页签带所在窗的登记名(主窗 'main' / 子窗 'aux-N'):跨窗判定要认自己是谁 */
+  host: string
+  /** 全部可参与落点的窗(主窗 + 各子窗):拖拽开始时量快照 */
+  dragWindows: readonly DragWindowRef[]
+  /** 跨窗落账:落到目标窗指定组指定位置(本窗内的移动仍走 moveTab) */
+  onMoveTabToHostAt: (
+    id: string,
+    host: string,
+    groupId: string | null,
+    atIndex: number | null
+  ) => void
 }): React.JSX.Element {
   // 第一组条带宽 = paneSplit × 内容列宽。用页签区宽当分母折回:
   //   条带宽 = 占比 × (页签区宽 + 窗控宽)
@@ -153,6 +177,8 @@ export function TopBarTabs({
   const [drag, setDrag] = useState<TabDragState | null>(null)
   // 落点缝开在哪条带、第几个空位(index 按「剔除被拖签」后的可见序数);
   const [gap, setGap] = useState<{ groupId: string; index: number } | null>(null)
+  // 跨窗落点:目标窗局部坐标 + 插入线/正文亮边的几何(渲染时 Portal 进目标窗)
+  const [cross, setCross] = useState<CrossTarget | null>(null)
   const chipRef = useRef<HTMLDivElement>(null)
 
   // born:芯片以紧凑胶囊态隐形上墙,量出内容宽高 → enter 把矩形改成源页签大小
@@ -189,9 +215,36 @@ export function TopBarTabs({
     const srcGroupId = groups.find((g) => g.tabs.some((x) => x.id === t.id))?.id ?? null
     let started = false
     let captured = false
+    // 全部窗的局部几何 + 屏幕矩形:按下就量一次(IPC 很快,拖拽不等它;
+    // 没回来前只认本窗,回来再补全目标窗)
+    let windowSnaps: WindowSnap[] = []
     let snaps: StripSnap[] = []
     let bodies: BodySnap[] = []
     let zone: DragZone = { type: 'none' }
+
+    const refreshSnaps = (rects: readonly AuxWindowRect[]): void => {
+      windowSnaps = snapshotDragWindows(dragWindows, rects, host)
+      const own = windowSnaps.find((w) => w.host === host)
+      snaps = own?.strips ?? []
+      bodies = own?.bodies ?? []
+    }
+    refreshSnaps([])
+    void window.atlas
+      .auxWindowRects()
+      .then((rects) => {
+        // 拖拽已开始:只补目标窗。源窗快照必须保持开拖那一刻 ——
+        // 活序滑动会逐帧改 DOM 坐标,这时回读会把邻居的位移当成原位
+        if (!started) {
+          refreshSnaps(rects)
+          return
+        }
+        windowSnaps = snapshotDragWindows(dragWindows, rects, host).map((w) =>
+          w.host === host ? { ...w, strips: snaps, bodies } : w
+        )
+      })
+      .catch((err: unknown) => {
+        window.atlas.reportRendererError(`跨窗拖拽取窗口矩形失败: ${String(err)}`)
+      })
 
     // 吞掉拖完那次 click:指针捕获把所有事件都路由给原页签,松手会补发 click ——
     // 不吞的话拖完还顺手激活了它(VS Code 同款处理)
@@ -221,6 +274,12 @@ export function TopBarTabs({
       setDrag(null)
       setGap(null)
       setDropMark(null)
+      setCross(null)
+    }
+
+    /** 跨窗落账后把目标窗带到前台(Chrome 同款);主窗也走主进程 focus,renderer 的 window.focus() 不保证生效 */
+    const focusHost = (targetHost: string): void => {
+      window.atlas.auxWindowOp(targetHost, 'focus')
     }
 
     const commitZone = (z: DragZone): void => {
@@ -236,7 +295,19 @@ export function TopBarTabs({
         moveTab(t.id, z.groupId === srcGroupId ? null : 'sibling', at === -1 ? null : at)
         return
       }
-      if (z.type === 'pane') moveTab(t.id, 'sibling', null, z.zone)
+      if (z.type === 'pane') {
+        moveTab(t.id, 'sibling', null, z.zone)
+        return
+      }
+      if (z.type === 'host-strip') {
+        onMoveTabToHostAt(t.id, z.host, z.groupId, z.index)
+        focusHost(z.host)
+        return
+      }
+      if (z.type === 'host-body') {
+        onMoveTabToHostAt(t.id, z.host, z.groupId, null)
+        focusHost(z.host)
+      }
     }
 
     // 落点 → 沉降矩形(视口坐标):芯片飞过去长成页签的那一格;
@@ -314,39 +385,7 @@ export function TopBarTabs({
         // (relatedTarget 还在宿内→tooltip 永远收不到「离开」),不喊一声它就冻在屏上陪完整个拖拽
         doc.dispatchEvent(new CustomEvent('atlas:tab-drag-start'))
         view.addEventListener('keydown', onKey)
-        // 几何快照只量一次:让位动画一开,DOM 坐标逐帧在变,问它要账会被晃点;
-        // 只量本窗(doc)里的带和正文 —— 别家窗的条带不归这次拖拽管
-        snaps = Array.from(doc.querySelectorAll<HTMLElement>('.topbar-strip')).map((s, i) => {
-          const r = s.getBoundingClientRect()
-          return {
-            groupId: groups[i]?.id ?? '',
-            left: r.left,
-            right: r.right,
-            top: r.top,
-            bottom: r.bottom,
-            barLeft:
-              s.querySelector<HTMLElement>('.tabbar')?.getBoundingClientRect().left ?? r.left,
-            mids: Array.from(s.querySelectorAll<HTMLElement>('.tabbar-tab')).map((te) => {
-              const tr = te.getBoundingClientRect()
-              return {
-                id: te.dataset.tabId ?? '',
-                left: tr.left,
-                mid: (tr.left + tr.right) / 2,
-                right: tr.right
-              }
-            })
-          }
-        })
-        bodies = Array.from(doc.querySelectorAll<HTMLElement>('.pane-body')).map((b) => {
-          const r = b.getBoundingClientRect()
-          return {
-            groupId: b.dataset.groupId ?? '',
-            left: r.left,
-            right: r.right,
-            top: r.top,
-            bottom: r.bottom
-          }
-        })
+        // 几何快照在按下时就量好了(见 refreshSnaps);让位动画一开 DOM 逐帧在变,不能逐帧回读
         const ownSnap = snaps.find((s) => s.groupId === srcGroupId)
         setDrag({
           id: t.id,
@@ -370,87 +409,137 @@ export function TopBarTabs({
         })
         return
       }
-      // ── 落点判定:出窗且离开磁性带 → 页签带 → 正文区 → 无处 ──
-      // 条带贴着窗口顶边:不设磁性带的话指针向上几像素就出窗,会被判成拆窗
+      // ── 本窗内:原逻辑一点不改 ──
       const outOfWindow = cx < 0 || cy < 0 || cx >= view.innerWidth || cy >= view.innerHeight
-      const bandOf = (s: StripSnap): boolean =>
-        isWithinStripBand(
-          cx,
-          cy,
-          {
-            left: s.left,
-            right: s.right,
-            top: s.top,
-            bottom: s.bottom,
-            bleedTop: STRIP_BLEED_TOP,
-            bleedBottom: STRIP_BLEED_BOTTOM,
-            bleedX: STRIP_BLEED_X
-          },
-          DETACH_MAGNETISM_PX
-        )
-      const willDetach = outOfWindow && !snaps.some(bandOf)
-      setDrag((d) => (d ? { ...d, x: cx, y: cy, willDetach } : d))
-      if (willDetach) {
-        zone = { type: 'outside' }
-        setGap(null)
-        setDropMark(null)
+      setDrag((d) => (d ? { ...d, x: cx, y: cy, willDetach: false } : d))
+      if (!outOfWindow) {
+        setCross(null)
+        const bandOf = (s: StripSnap): boolean =>
+          isWithinStripBand(
+            cx,
+            cy,
+            {
+              left: s.left,
+              right: s.right,
+              top: s.top,
+              bottom: s.bottom,
+              bleedTop: STRIP_BLEED_TOP,
+              bleedBottom: STRIP_BLEED_BOTTOM,
+              bleedX: STRIP_BLEED_X
+            },
+            DETACH_MAGNETISM_PX
+          )
+        let hit = false
+        for (const s of snaps) {
+          if (bandOf(s)) {
+            const mids = s.groupId === srcGroupId ? s.mids.filter((m) => m.id !== t.id) : s.mids
+            // 判定看被拖签的投影中心,不是裸指针:抓在签的哪一头会差出小半张签宽。
+            // 本组用真身宽,别家条带用胶囊实宽 —— 胶囊收窄过,中心才跟眼睛对得上
+            const probeW =
+              s.groupId === srcGroupId
+                ? rect.width
+                : (chipRef.current?.getBoundingClientRect().width ?? rect.width)
+            const index = insertIndexAt(
+              mids.map((m) => m.mid),
+              dragCenterX(cx, grabDx, probeW)
+            )
+            zone = { type: 'strip', groupId: s.groupId, index }
+            setGap((prev) =>
+              prev && prev.groupId === s.groupId && prev.index === index
+                ? prev
+                : { groupId: s.groupId, index }
+            )
+            setDropMark(null)
+            hit = true
+            break
+          }
+        }
+        if (!hit) {
+          for (const b of bodies) {
+            if (!b.groupId) continue
+            const groupId = b.groupId
+            if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) continue
+            const relX = (cx - b.left) / (b.right - b.left)
+            const srcGroup = groups.find((g) => g.id === srcGroupId)
+            // 正文只许诺分屏,不接收页签:挪组一律走目标页签带(落到带末尾即可),
+            // 同一动作只留一种反馈 —— 正文再亮一块蓝就变成两套视觉说一件事
+            if (relX <= SPLIT_EDGE_THIRD || relX >= 1 - SPLIT_EDGE_THIRD) {
+              // 左右三分之一带 = 定向拆半屏(全高都算):单组且拆了不空才许诺,免得画空头支票
+              if (groups.length === 1 && srcGroup && srcGroup.tabs.length > 1) {
+                const side = relX < 0.5 ? 'left' : 'right'
+                zone = { type: 'pane', groupId, zone: side }
+                setDropMark((prev) =>
+                  prev?.groupId === groupId && prev.zone === side ? prev : { groupId, zone: side }
+                )
+                hit = true
+              }
+            }
+            break // 光标只可能落在这一块正文里,命中与否都不必再看别块
+          }
+        }
+        if (!hit) {
+          zone = { type: 'none' }
+          setGap(null)
+          setDropMark(null)
+        } else if (zone.type !== 'strip') {
+          setGap(null)
+        }
         return
       }
-      let hit = false
-      for (const s of snaps) {
-        if (bandOf(s)) {
-          const mids = s.groupId === srcGroupId ? s.mids.filter((m) => m.id !== t.id) : s.mids
-          // 判定看被拖签的投影中心,不是裸指针:抓在签的哪一头会差出小半张签宽。
-          // 本组用真身宽,别家条带用胶囊实宽 —— 胶囊收窄过,中心才跟眼睛对得上
-          const probeW =
-            s.groupId === srcGroupId
-              ? rect.width
-              : (chipRef.current?.getBoundingClientRect().width ?? rect.width)
-          const index = insertIndexAt(
-            mids.map((m) => m.mid),
-            dragCenterX(cx, grabDx, probeW)
-          )
-          zone = { type: 'strip', groupId: s.groupId, index }
-          setGap((prev) =>
-            prev && prev.groupId === s.groupId && prev.index === index
-              ? prev
-              : { groupId: s.groupId, index }
-          )
-          setDropMark(null)
-          hit = true
-          break
-        }
+
+      // ── 跨窗:按屏幕坐标找目标窗,再换算成目标窗局部坐标套同一套判定 ──
+      setGap(null)
+      setDropMark(null)
+      // 后开的窗优先命中:Electron 不暴露窗口 z 序,子窗通常晚于父窗/旧子窗打开,
+      // 反过来喂给 windowAtPoint 是重叠时最接近「看到哪扇就落哪扇」的近似
+      const hitWindow = windowAtPoint([...windowSnaps].reverse(), ev.screenX, ev.screenY, host)
+      if (!hitWindow) {
+        zone = { type: 'outside' }
+        setCross(null)
+        setDrag((d) => (d ? { ...d, willDetach: true } : d))
+        return
       }
-      if (!hit) {
-        for (const b of bodies) {
-          if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) continue
-          const relX = (cx - b.left) / (b.right - b.left)
-          const srcGroup = groups.find((g) => g.id === srcGroupId)
-          // 正文只许诺分屏,不接收页签:挪组一律走目标页签带(落到带末尾即可),
-          // 同一动作只留一种反馈 —— 正文再亮一块蓝就变成两套视觉说一件事
-          if (relX <= SPLIT_EDGE_THIRD || relX >= 1 - SPLIT_EDGE_THIRD) {
-            // 左右三分之一带 = 定向拆半屏(全高都算):单组且拆了不空才许诺,免得画空头支票
-            if (groups.length === 1 && srcGroup && srcGroup.tabs.length > 1) {
-              const side = relX < 0.5 ? 'left' : 'right'
-              zone = { type: 'pane', groupId: b.groupId, zone: side }
-              setDropMark((prev) =>
-                prev?.groupId === b.groupId && prev.zone === side
-                  ? prev
-                  : { groupId: b.groupId, zone: side }
-              )
-              hit = true
-            }
+      const { snap, localX, localY } = hitWindow
+      const strip = stripAtPoint(snap.strips, localX, localY)
+      if (strip) {
+        const probeW = chipRef.current?.getBoundingClientRect().width ?? rect.width
+        const index = gapIndexAt(strip, localX, grabDx, probeW)
+        const lineX = gapLeftAt(strip, index)
+        const lineY = (strip.top + strip.bottom) / 2
+        zone = { type: 'host-strip', host: snap.host, groupId: strip.groupId, index }
+        setCross({ host: snap.host, kind: 'strip', x: localX, y: localY, lineX, lineY, body: null })
+        return
+      }
+      const body = bodyAtPoint(snap.bodies, localX, localY)
+      if (body) {
+        zone = { type: 'host-body', host: snap.host, groupId: body.groupId }
+        setCross({
+          host: snap.host,
+          kind: 'body',
+          x: localX,
+          y: localY,
+          lineX: null,
+          lineY: null,
+          body: {
+            left: body.left,
+            top: body.top,
+            width: body.right - body.left,
+            height: body.bottom - body.top
           }
-          break // 光标只可能落在这一块正文里,命中与否都不必再看别块
-        }
+        })
+        return
       }
-      if (!hit) {
-        zone = { type: 'none' }
-        setGap(null)
-        setDropMark(null)
-      } else if (zone.type !== 'strip') {
-        setGap(null)
-      }
+      // 落进目标窗但不在条带/正文(侧栏、窗控、空白):也算并入该窗第一组,别让人白拖
+      zone = { type: 'host-body', host: snap.host, groupId: null }
+      setCross({
+        host: snap.host,
+        kind: 'body',
+        x: localX,
+        y: localY,
+        lineX: null,
+        lineY: null,
+        body: null
+      })
     }
 
     const up = (): void => {
@@ -463,8 +552,29 @@ export function TopBarTabs({
         onTabDragEnd(t.id)
         setGap(null)
         setDropMark(null)
+        setCross(null)
         setDrag((d) => (d ? { ...d, leaving: true } : d))
         // 淡出计时按 id 守卫:淡出内开新拖,别误杀新会话的芯片
+        view.setTimeout(
+          () => setDrag((d) => (d && d.id === t.id && d.leaving ? null : d)),
+          CHIP_FADE_MS
+        )
+        return
+      }
+      if (z.type === 'host-strip' || z.type === 'host-body') {
+        // 目标窗在拖拽途中被关:数据不动,按取消收场(别把签塞进死窗)
+        const alive = dragWindows.some((w) => w.host === z.host && !w.win.closed)
+        if (!alive) {
+          setCross(null)
+          finishWithSettle({ type: 'none' }, false)
+          return
+        }
+        // 跨窗落账:目标窗不在本 React Portal 里长沉降动画,交账后原地淡出
+        commitZone(z)
+        setGap(null)
+        setDropMark(null)
+        setCross(null)
+        setDrag((d) => (d ? { ...d, leaving: true } : d))
         view.setTimeout(
           () => setDrag((d) => (d && d.id === t.id && d.leaving ? null : d)),
           CHIP_FADE_MS
@@ -481,6 +591,7 @@ export function TopBarTabs({
       swallowClick()
       // 取消 = 飞回源位,不交账(Esc / 系统打断同一待遇)
       setGap(null)
+      setCross(null)
       finishWithSettle({ type: 'none' }, false)
     }
 
@@ -510,6 +621,52 @@ export function TopBarTabs({
   // 芯片隐身条件:活序滑动中真身亲自跟指针,替身胶囊退场(opacity 渐隐,带内带外换手不闪)
   const chipHidden =
     drag !== null && drag.phase === 'drag' && gap !== null && gap.groupId === dragSrcGroupId
+  // 跨窗目标窗的 document:芯片和插入线用 Portal 画进它,坐标已是那扇窗的局部坐标
+  const crossWin = cross ? (dragWindows.find((w) => w.host === cross.host)?.win ?? null) : null
+  const crossBody = crossWin && !crossWin.closed ? crossWin.document.body : null
+  const chipX = cross ? cross.x : (drag?.x ?? 0)
+  const chipY = cross ? cross.y : (drag?.y ?? 0)
+  const chipEl = drag ? (
+    <div
+      ref={chipRef}
+      className={`tabbar-tab is-chip${drag.phase === 'drag' ? ' is-morph' : ''}${
+        drag.phase === 'settle' ? ' is-settle is-tablook' : ''
+      }${drag.phase === 'enter' ? ' is-tablook' : ''}${drag.leaving ? ' is-leaving' : ''}${
+        drag.phase === 'drag' && drag.willDetach ? ' is-detach' : ''
+      }`}
+      style={
+        drag.phase === 'born'
+          ? { left: drag.srcLeft, top: drag.srcTop, width: 'auto', opacity: 0 }
+          : drag.phase === 'enter'
+            ? {
+                left: drag.srcLeft,
+                top: drag.srcTop,
+                width: drag.width,
+                height: drag.height
+              }
+            : drag.phase === 'settle' && drag.settle
+              ? {
+                  left: drag.settle.left,
+                  top: drag.settle.top,
+                  width: drag.settle.width,
+                  height: drag.settle.height
+                }
+              : {
+                  left: chipX - drag.grabDx,
+                  top: chipY - drag.grabDy,
+                  width: drag.compactW,
+                  height: drag.compactH,
+                  ...(chipHidden ? { opacity: 0 } : {})
+                }
+      }
+      aria-hidden="true"
+    >
+      <span className="tabbar-icon" aria-hidden="true">
+        <TreeIcon name={drag.icon} mono />
+      </span>
+      <span className="tabbar-name">{drag.name}</span>
+    </div>
+  ) : null
 
   return (
     <>
@@ -518,6 +675,7 @@ export function TopBarTabs({
           {gi > 0 && <div className="topbar-split" aria-hidden="true" />}
           <div
             className="topbar-strip"
+            data-group-id={g.id}
             style={groups.length === 2 && gi === 0 ? { flex: `0 0 ${firstBasis}` } : undefined}
           >
             <TabBar
@@ -556,52 +714,44 @@ export function TopBarTabs({
           </div>
         </Fragment>
       ))}
+      {/* 跨窗落点浮层:插入线 / 正文亮边,直接 Portal 进目标窗 body。
+          坐标是目标窗局部坐标,pointer-events 全让,不挡命中判定 */}
+      {crossBody &&
+        cross &&
+        cross.kind === 'strip' &&
+        cross.lineX !== null &&
+        createPortal(
+          <i
+            className="tab-drop-line"
+            style={{ left: cross.lineX, top: cross.lineY ?? 0 }}
+            aria-hidden="true"
+          />,
+          crossBody
+        )}
+      {crossBody &&
+        cross &&
+        cross.kind === 'body' &&
+        cross.body &&
+        createPortal(
+          <div
+            className="tab-drop-body"
+            style={{
+              left: cross.body.left,
+              top: cross.body.top,
+              width: cross.body.width,
+              height: cross.body.height
+            }}
+            aria-hidden="true"
+          />,
+          crossBody
+        )}
       {/* 拖拽替身芯片:fixed 浮层(.tabbar overflow:hidden 会裁掉行内位移的替身),
           抓握偏移让芯片像被指尖拎着;pointer-events 全让,别挡底下落点判定。
           生命周期:born 隐形量紧凑宽 → enter 克隆页签模样出生 →
           drag 收成胶囊跟光标(is-morph 只管尺寸/配色,位置零延迟跟手)→
-          settle 飞回落点长回页签(is-settle 连位置一起过渡,落地帧换真身) */}
-      {drag && (
-        <div
-          ref={chipRef}
-          className={`tabbar-tab is-chip${drag.phase === 'drag' ? ' is-morph' : ''}${
-            drag.phase === 'settle' ? ' is-settle is-tablook' : ''
-          }${drag.phase === 'enter' ? ' is-tablook' : ''}${drag.leaving ? ' is-leaving' : ''}${
-            drag.phase === 'drag' && drag.willDetach ? ' is-detach' : ''
-          }`}
-          style={
-            drag.phase === 'born'
-              ? { left: drag.srcLeft, top: drag.srcTop, width: 'auto', opacity: 0 }
-              : drag.phase === 'enter'
-                ? {
-                    left: drag.srcLeft,
-                    top: drag.srcTop,
-                    width: drag.width,
-                    height: drag.height
-                  }
-                : drag.phase === 'settle' && drag.settle
-                  ? {
-                      left: drag.settle.left,
-                      top: drag.settle.top,
-                      width: drag.settle.width,
-                      height: drag.settle.height
-                    }
-                  : {
-                      left: drag.x - drag.grabDx,
-                      top: drag.y - drag.grabDy,
-                      width: drag.compactW,
-                      height: drag.compactH,
-                      ...(chipHidden ? { opacity: 0 } : {})
-                    }
-          }
-          aria-hidden="true"
-        >
-          <span className="tabbar-icon" aria-hidden="true">
-            <TreeIcon name={drag.icon} mono />
-          </span>
-          <span className="tabbar-name">{drag.name}</span>
-        </div>
-      )}
+          settle 飞回落点长回页签(is-settle 连位置一起过渡,落地帧换真身)。
+          跨窗时 Portal 进目标窗,坐标换成目标窗局部坐标 */}
+      {drag && (crossBody ? createPortal(chipEl, crossBody) : chipEl)}
     </>
   )
 }

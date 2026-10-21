@@ -553,6 +553,7 @@ function App(): React.JSX.Element {
     openTranslationTab,
     openSingletonTab,
     moveTab,
+    moveTabToHostAt,
     activateTab,
     closeTab,
     closeTabsInGroup,
@@ -574,6 +575,12 @@ function App(): React.JSX.Element {
   }, [onAuxGone, closeHostGroups])
   // 主窗名下的组 vs 各子窗名下的组:两边各画各的页签带和分屏
   const mainGroups = groupsForHost(groups, MAIN_HOST)
+  // 跨窗拖页签的窗口清单:主窗在前,子窗按打开顺序;矩形由主进程按窗口现取。
+  // 主窗零组时也要在清单里 —— 拖回主窗靠正文兜底落点现立一组
+  const dragWindows = [
+    { host: MAIN_HOST, win: window },
+    ...auxWins.map((a) => ({ host: a.id, win: a.win }))
+  ]
   // 设置导航中枢:模式判定、侧栏收起态进出账、分类跳转请求都收在钩里(useSettingsNav)
   const {
     sidebarFace,
@@ -652,9 +659,11 @@ function App(): React.JSX.Element {
     closeTab,
     closeTabsInGroup,
     moveTab,
+    onMoveTabToHostAt: moveTabToHostAt,
     setDropMark,
     onTabDragEnd,
     onDetachTab,
+    dragWindows,
     revealTabInTree,
     workspaceRoot: result?.rootPath ?? null,
     paneSplit,
@@ -743,6 +752,9 @@ function App(): React.JSX.Element {
             mainGroups.length > 0 ? (
               <TopBarTabs
                 groups={mainGroups}
+                host={MAIN_HOST}
+                dragWindows={dragWindows}
+                onMoveTabToHostAt={moveTabToHostAt}
                 visibleOfGroup={visibleOfGroup}
                 flashTabId={flashTabId}
                 activateTab={activateTab}

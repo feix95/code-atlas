@@ -20,6 +20,15 @@ export function insertIndexAt(centers: readonly number[], cursorX: number): numb
   return centers.length
 }
 
+/** 条带判定出血量:光标擦到条带边缘/组间细柱上也算悬在带上 */
+export const STRIP_BLEED_X = 6
+export const STRIP_BLEED_TOP = 4
+export const STRIP_BLEED_BOTTOM = 8
+
+/** 拆窗磁性带:条带贴着窗口顶边,指针离条带这么近就仍算在带上(只重排不拆窗)。
+    口径同 Chromium 的 detach magnetism,数值放大一档 —— 我们的条带顶边就是窗口顶边 */
+export const DETACH_MAGNETISM_PX = 32
+
 /** 条带矩形(视口坐标)+ 各向出血量 */
 export interface StripBand {
   left: number

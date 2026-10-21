@@ -13,6 +13,7 @@ import { ContextMenu } from './ContextMenu'
 import { TreeIcon } from './Icons'
 import { WIN_ICON_SIZE } from '../inputMetrics'
 import { installZoomKeys } from '../useZoomKeys'
+import type { DragWindowRef } from '../tabDragWindows'
 
 /** 页签区那套接线的主窗/子窗通用包:两边吃的 props 一模一样,打包传不重抄 */
 export interface TabAreaProps {
@@ -31,6 +32,15 @@ export interface TabAreaProps {
   setDropMark: React.Dispatch<React.SetStateAction<PaneDropMark | null>>
   onTabDragEnd: (id: string) => void
   onDetachTab: (id: string) => void
+  /** 跨窗落账:落到目标窗指定组指定位置 */
+  onMoveTabToHostAt: (
+    id: string,
+    host: string,
+    groupId: string | null,
+    atIndex: number | null
+  ) => void
+  /** 全部可参与落点的窗(主窗 + 各子窗) */
+  dragWindows: readonly DragWindowRef[]
   /** 页签右键「在文件列表中显示当前文件」:回主窗侧栏树里指出来 */
   revealTabInTree: (id: string) => void
   /** 工作区根(文件动作拼路径的底;peek 签自带 scopeRoot 不看它) */
@@ -85,21 +95,28 @@ export function AuxWindowShell({
           window.atlas.auxWindowOp(aux.id, 'toggleMaximize')
         }}
       >
-        <TopBarTabs
-          groups={groups}
-          visibleOfGroup={tabArea.visibleOfGroup}
-          flashTabId={tabArea.flashTabId}
-          activateTab={tabArea.activateTab}
-          closeTab={tabArea.closeTab}
-          closeTabsInGroup={tabArea.closeTabsInGroup}
-          moveTab={tabArea.moveTab}
-          setDropMark={tabArea.setDropMark}
-          onTabDragEnd={tabArea.onTabDragEnd}
-          onDetachTab={tabArea.onDetachTab}
-          onRevealInTree={tabArea.revealTabInTree}
-          workspaceRoot={tabArea.workspaceRoot}
-          paneSplit={tabArea.paneSplit}
-        />
+        {/* 必须先包一层 .topbar-tabs:第一组条带的 firstBasis 按「页签区宽」算,
+            少了这层百分比会落到整窗宽上,再补 3u 窗控宽就多出一截,和正文分割线错位 */}
+        <div className="topbar-tabs">
+          <TopBarTabs
+            groups={groups}
+            host={aux.id}
+            dragWindows={tabArea.dragWindows}
+            onMoveTabToHostAt={tabArea.onMoveTabToHostAt}
+            visibleOfGroup={tabArea.visibleOfGroup}
+            flashTabId={tabArea.flashTabId}
+            activateTab={tabArea.activateTab}
+            closeTab={tabArea.closeTab}
+            closeTabsInGroup={tabArea.closeTabsInGroup}
+            moveTab={tabArea.moveTab}
+            setDropMark={tabArea.setDropMark}
+            onTabDragEnd={tabArea.onTabDragEnd}
+            onDetachTab={tabArea.onDetachTab}
+            onRevealInTree={tabArea.revealTabInTree}
+            workspaceRoot={tabArea.workspaceRoot}
+            paneSplit={tabArea.paneSplit}
+          />
+        </div>
         {/* 窗控三键吃主窗 .win-ctl/.win-btn 全家:同款 1u 方格 + 同款 TreeIcon */}
         <div className="win-ctl">
           <button
