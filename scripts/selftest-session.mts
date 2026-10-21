@@ -80,50 +80,53 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
   assert.equal('readOnly' in back.groups[0].tabs[1], false, '只读锁不再跟签走')
 })
 
-check('parseSession:旧档里的 viewMode/readOnly 不再读(预览显示开关是全局偏好),多余字段不碍事', () => {
-  const s = parseSession({
-    v: 1,
-    folder: 'C:\\a',
-    groups: [
-      {
-        tabs: [
-          {
-            kind: 'preview',
-            relPath: 'a.ts',
-            name: 'a.ts',
-            icon: 'ts',
-            readOnly: true,
-            viewMode: 'reading'
-          },
-          {
-            kind: 'preview',
-            relPath: 'src/b.ts',
-            name: 'b.ts',
-            icon: 'ts',
-            readOnly: 'yes',
-            viewMode: 'nonsense'
-          },
-          {
-            kind: 'preview',
-            relPath: 'a.ts',
-            name: 'a.ts',
-            icon: 'ts',
-            viewMode: 'live',
-            lastEditMode: 'source'
-          }
-        ]
-      }
-    ]
-  })
-  assert.ok(s)
-  assert.equal(s.groups[0].tabs.length, 3, '老字段不连累签,全部照常还原')
-  for (const t of s.groups[0].tabs) {
-    assert.equal('viewMode' in t, false, '档位字段不再上账')
-    assert.equal('readOnly' in t, false, '只读字段不再上账')
+check(
+  'parseSession:旧档里的 viewMode/readOnly 不再读(预览显示开关是全局偏好),多余字段不碍事',
+  () => {
+    const s = parseSession({
+      v: 1,
+      folder: 'C:\\a',
+      groups: [
+        {
+          tabs: [
+            {
+              kind: 'preview',
+              relPath: 'a.ts',
+              name: 'a.ts',
+              icon: 'ts',
+              readOnly: true,
+              viewMode: 'reading'
+            },
+            {
+              kind: 'preview',
+              relPath: 'src/b.ts',
+              name: 'b.ts',
+              icon: 'ts',
+              readOnly: 'yes',
+              viewMode: 'nonsense'
+            },
+            {
+              kind: 'preview',
+              relPath: 'a.ts',
+              name: 'a.ts',
+              icon: 'ts',
+              viewMode: 'live',
+              lastEditMode: 'source'
+            }
+          ]
+        }
+      ]
+    })
+    assert.ok(s)
+    assert.equal(s.groups[0].tabs.length, 3, '老字段不连累签,全部照常还原')
+    for (const t of s.groups[0].tabs) {
+      assert.equal('viewMode' in t, false, '档位字段不再上账')
+      assert.equal('readOnly' in t, false, '只读字段不再上账')
+    }
+    const h = hydrateSession(s, tree)
+    assert.equal(h?.groups[0].tabs.length, 3, '水合照旧,签面干净')
   }
-  const h = hydrateSession(s, tree)
-  assert.equal(h?.groups[0].tabs.length, 3, '水合照旧,签面干净')
-})
+)
 
 check('parseSession:旧档里的概览签被丢弃,同组其余签照常还原', () => {
   const s = parseSession({

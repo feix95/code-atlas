@@ -507,3 +507,4 @@
 - fix(ui): 页签拖出窗口加 32px 磁性带,条带附近上下漂移只重排不拆窗,出带才挂窗口预告并允许拆出新窗
 - feat(ui): 页签可在主窗与多个子窗之间拖拽合并,目标条带按插入线落位、目标正文追加到该窗第一组;空主窗正文落点现立一组,跨窗几何抽到 tabDragWindows.ts 并挂 test:tabdragwindows
 - fix(ui): 子窗双栏页签带补 .topbar-tabs 容器,第一组宽度按页签区算,与正文分割线对齐
+- chore: Prettier 统一 selftest-agent / selftest-ai / selftest-session 三个历史脚本的换行

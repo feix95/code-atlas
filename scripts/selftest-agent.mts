@@ -129,7 +129,11 @@ async function main(): Promise<void> {
     await writeFile(notePath, '第一行\n第二行\n第三行\n', 'utf8')
     const realNote = await realpath(notePath)
     assert.equal(await access.grantFile('relative\\note.txt'), null, '相对路径发不出文件授权令牌')
-    assert.equal(await access.grantFile(grantSandbox), null, '文件夹走目录授权那条,不发文件授权令牌')
+    assert.equal(
+      await access.grantFile(grantSandbox),
+      null,
+      '文件夹走目录授权那条,不发文件授权令牌'
+    )
     assert.equal(
       await access.grantFile(join(grantSandbox, 'missing.txt')),
       null,

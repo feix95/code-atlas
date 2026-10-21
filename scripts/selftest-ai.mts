@@ -464,7 +464,10 @@ async function main(): Promise<void> {
       freeMsgs[3]?.content.includes('以用户说的为准'),
     '附件追问:资料提示改软口径(未必有关、以用户说的为准),不再把「它」钉死'
   )
-  assert.ok(freeMsgs[3]?.content.includes('程序提醒只是参考提示'), '附件追问:参考提示可忽略也并进资料提示')
+  assert.ok(
+    freeMsgs[3]?.content.includes('程序提醒只是参考提示'),
+    '附件追问:参考提示可忽略也并进资料提示'
+  )
 
   const bareMsgs = buildFreeChatMessages(
     '小探针人设',
@@ -1613,7 +1616,10 @@ async function main(): Promise<void> {
 
   // 退出诊断:内存耗尽退出拿适配估算数字说话;上下文填大了点它名;都不是才说文件坏
   const fitBig = judgeModelFit(20 * G, 16 * G, 8 * G)
-  assert.ok(autopsyExitMessage(3, fitBig, null).includes('装不下'), '内存耗尽退出:退出诊断文案点明装不下')
+  assert.ok(
+    autopsyExitMessage(3, fitBig, null).includes('装不下'),
+    '内存耗尽退出:退出诊断文案点明装不下'
+  )
   assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '退出诊断文案保留退出码')
   assert.ok(
     autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'),
