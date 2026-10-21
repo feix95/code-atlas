@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import { scanDirectory } from '../src/scanner/index.ts'
 import { analyzeSource } from '../src/analyzer/index.ts'
@@ -43,6 +43,11 @@ async function main(): Promise<void> {
     assert.ok(!relPath.includes('\\'), `relPath 分隔符必须是 '/':${relPath}`)
   }
   assert.equal(result.tree.relPath, '', '根节点 relPath 应为空字符串')
+  assert.equal(
+    joinRoot(result.rootPath, ''),
+    resolve(result.rootPath),
+    '相对路径为空 = 目标就是根本身'
+  )
 
   // 3. 全链路:joinRoot → stat → 读 → AST,对三个靶子逐一走一遍
   for (const relPath of targets) {

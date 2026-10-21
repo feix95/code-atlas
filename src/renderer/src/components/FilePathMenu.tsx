@@ -16,12 +16,13 @@ import {
 import { useMenuDismiss } from '../useMenuDismiss'
 
 /**
- * 文件路径右键菜单(全 app 就这一张:文件树 / 聊天绿字链接 / 预览器头部 / 参考资料,共用):
+ * 文件路径右键菜单(全 app 就这一张:文件树 / 这台电脑浏览树 / 聊天绿字链接,共用):
  * 右键弹出的小菜单,统一规格——
  * 1. 复制完整路径(盘符开头那种)进剪贴板;
  * 2. 在文件资源管理器中显示(资源管理器弹出、文件选中高亮);
- * 3. 可选段:预览文件(文件树给)、备注系列(写/编辑备注就地长输入框,有备注再带清除)。
- * 带路两件只「带路」不「开门」:开不开文件、怎么开,交给用户看到真实文件后自己决定。
+ * 3. 可选段:预览文件(文件)、打开为工作区(文件夹)、
+ *    备注系列(写/编辑备注就地长输入框,有备注再带清除;这台电脑不摆,还没开项目)。
+ * 带路两件只「带路」不「开门」;「打开为工作区」是文件夹专属的换根,走地址栏同一条扫描路。
  *
  * 菜单是自绘的(暗色主题一个皮肤,不弹系统白菜单),全局单例:挂在 App 根部一次,
  * 各处的链接按钮只管喊 openFilePathMenu 报坐标,不用每处自己养一份菜单状态。
@@ -92,6 +93,7 @@ function FilePathMenuCard({
 }): React.JSX.Element {
   const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle')
   const [revealFail, setRevealFail] = useState<string | null>(null)
+  const [openFail, setOpenFail] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const timerRef = useRef<number | null>(null)
@@ -157,6 +159,7 @@ function FilePathMenuCard({
   const rows =
     2 +
     (request.preview ? 1 : 0) +
+    (request.openWorkspace ? 1 : 0) +
     (note ? 1 : 0) +
     (note !== null && note.hasNote && note.onRemove ? 1 : 0)
   const height = rows * ROW_H + 10 + (editing ? EDITOR_ROW_H - ROW_H : 0)
@@ -205,6 +208,27 @@ function FilePathMenuCard({
       >
         {revealFail ?? '在文件资源管理器中显示'}
       </button>
+      {request.openWorkspace && (
+        <button
+          type="button"
+          role="menuitem"
+          className={`file-path-menu-item${openFail !== null ? ' is-fail' : ''}`}
+          onClick={() => {
+            if (openFail !== null) return
+            void request.openWorkspace?.().then((msg) => {
+              if (msg) {
+                setOpenFail(msg)
+                timerRef.current = window.setTimeout(closeFilePathMenu, FAIL_LINGER_MS)
+                return
+              }
+              closeFilePathMenu()
+            })
+          }}
+          data-tip={request.relPath}
+        >
+          {openFail ?? '打开为工作区'}
+        </button>
+      )}
       {request.preview && (
         <button
           type="button"

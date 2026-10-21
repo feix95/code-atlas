@@ -3,6 +3,11 @@
  * 只导出组件)。模块级单例:全 app 同时最多一张菜单,链接按钮只管喊「开」。
  */
 
+/** 已开工作区的文件树用:子文件夹才给「打开为工作区」。树根已经是工作区;这台电脑浏览树不走这道闸(盘符根也要摆)。 */
+export function canOpenAsWorkspace(isDirectory: boolean, relPath: string): boolean {
+  return isDirectory && relPath !== ''
+}
+
 /** 备注系列动作(菜单统一批次,产品裁定:对着文件右键 = 复制路径/资源管理器/写备注三件套):
  *  树菜单、聊天绿字链接,一处规格两家共用。
  *  编辑框就地长在菜单里,所以这里给的是「现有正文 + 落盘口」,不再需要外部弹窗。 */
@@ -30,6 +35,8 @@ export interface FilePathMenuRequest {
   reveal: () => Promise<string | null>
   /** 可选:预览动作(文件树给;聊天链接不给就不摆这一项) */
   preview?: () => void
+  /** 可选:打开为工作区(文件树子文件夹 / 这台电脑浏览树文件夹给;成功返回 null,失败返回人话) */
+  openWorkspace?: () => Promise<string | null>
   /** 备注系列,可选:不传就只有两件带路的老两项 */
   note?: FilePathNoteActions
 }
@@ -46,7 +53,7 @@ export function openFilePathMenu(request: FilePathMenuRequest): void {
 /**
  * 一站式开菜单:知道扫描根的调用方(树/聊天链接/参考资料)传 (rootPath, relPath)
  * 加鼠标坐标就行,复制/显现两个动作都在这儿接好,不用每处自己拼闭包;
- * extras 里想要预览、备注系列就带上 —— 全 app 就这一张文件右键菜单,一份实现四处共用
+ * extras 里想要预览、打开为工作区、备注系列就带上 —— 全 app 就这一张文件右键菜单,一份实现四处共用
  */
 export function openFilePathMenuFor(
   rootPath: string,
@@ -54,8 +61,14 @@ export function openFilePathMenuFor(
   x: number,
   y: number,
   doc: Document,
-  extras?: { preview?: () => void; note?: FilePathNoteActions }
+  extras?: {
+    preview?: () => void
+    note?: FilePathNoteActions
+    /** 绝对路径由主进程 joinRoot 解析后再回传,界面层不手拼 */
+    openWorkspace?: (absPath: string) => void
+  }
 ): void {
+  const openAbs = extras?.openWorkspace
   openFilePathMenu({
     x,
     y,
@@ -70,6 +83,14 @@ export function openFilePathMenuFor(
       return r.ok ? null : (r.message ?? '没打开成')
     },
     preview: extras?.preview,
+    openWorkspace: openAbs
+      ? async () => {
+          const r = await window.atlas.resolveFilePath(rootPath, relPath)
+          if (!r.ok || r.path === undefined) return r.message ?? '没打开成'
+          openAbs(r.path)
+          return null
+        }
+      : undefined,
     note: extras?.note
   })
 }

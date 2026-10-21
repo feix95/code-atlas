@@ -3,7 +3,7 @@ import type { ScanDirNode, ScanFileNode, ScanTreeNode } from '@shared/types'
 import { DRAG_MIME_NODE } from '@shared/dragTypes'
 import type { NoteMap } from '@shared/notes'
 import { NotePen, TreeIcon } from './Icons'
-import { openFilePathMenuFor } from './filePathMenuStore'
+import { canOpenAsWorkspace, openFilePathMenuFor } from './filePathMenuStore'
 
 /** 文件树图标总控:本树内所有 icon(文件/文件夹)共享这一个尺寸,改这里全场生效;
  *  只管这棵树,跟其他区域的图标尺寸互不相干。UI v3 §7 ≈1.1rem = 18px@100% */
@@ -228,6 +228,8 @@ interface FileTreeProps {
   onNoteRemove?: (relPath: string) => void
   /** 右键「预览文件」的原料(第一百一十批):开/激活预览页签 */
   onPreviewFile?: (relPath: string) => void
+  /** 右键「打开为工作区」:子文件夹才走,绝对路径已由主进程 joinRoot 解析 */
+  onOpenWorkspace?: (absPath: string) => void
 }
 
 export function FileTree({
@@ -242,7 +244,8 @@ export function FileTree({
   onExpandLazy,
   onNoteSave,
   onNoteRemove,
-  onPreviewFile
+  onPreviewFile,
+  onOpenWorkspace
 }: FileTreeProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -254,7 +257,7 @@ export function FileTree({
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedPath, revealPaths])
 
-  /** 右键统一走全局文件菜单(菜单统一批次):带路两件 + 预览(文件) + 备注系列,
+  /** 右键统一走全局文件菜单(菜单统一批次):带路两件 + 预览(文件) + 打开为工作区(子文件夹) + 备注系列,
    *  一份实现四处共用 —— 树只管报「在谁身上、鼠标在哪」,菜单的贴边/关闭/反馈/编辑框都是全局那张的事 */
   function handleRowContextMenu(e: React.MouseEvent, node: ScanTreeNode): void {
     if (!rootPath) return
@@ -268,6 +271,10 @@ export function FileTree({
       e.currentTarget.ownerDocument,
       {
         preview: isFile && onPreviewFile ? () => onPreviewFile(node.relPath) : undefined,
+        openWorkspace:
+          canOpenAsWorkspace(!isFile, node.relPath) && onOpenWorkspace
+            ? (absPath) => onOpenWorkspace(absPath)
+            : undefined,
         note: onNoteSave
           ? {
               hasNote: notes?.[node.relPath] !== undefined,

@@ -81,6 +81,8 @@ export const CH = {
   // ── 文件路径工具 ──
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',
+  /** 树文件夹右键「打开为工作区」:joinRoot 出绝对路径,确认是目录后交给扫描,不写剪贴板 */
+  resolveFilePath: 'atlas:resolve-file-path',
   // ── 文件编辑与监视(预览编辑批次 / 内联标题改名批次) ──
   saveFile: 'atlas:save-file',
   renameFile: 'atlas:rename-file',

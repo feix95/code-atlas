@@ -7,6 +7,7 @@ import type { DriveInfo } from '@shared/types'
 import { driveCapacity, driveKindName } from '../driveMeta'
 import { useDriveBrowser, type BrowseDir, type BrowseNode } from '../useDriveBrowser'
 import { TreeIcon } from './Icons'
+import { openFilePathMenuFor } from './filePathMenuStore'
 
 /** 与 FileTree 同一颗图标旋钮(§7 ≈1.1rem) */
 const BROWSE_ICON_SIZE = 18
@@ -71,6 +72,31 @@ export function DriveBrowser({
   )
 }
 
+/** 浏览树右键:喊全场那张路径菜单。盘符根 relPath 为空,复制/显现/打开为工作区都认「目标就是根本身」。 */
+function openBrowsePathMenu(
+  e: React.MouseEvent,
+  drive: DriveInfo,
+  node: { type: 'file' | 'directory'; name: string; relPath: string },
+  onOpenWorkspace: (absPath: string) => void,
+  onOpenFile: (scopeRoot: string, file: { name: string; relPath: string }) => void
+): void {
+  e.preventDefault()
+  openFilePathMenuFor(
+    drive.root,
+    node.relPath,
+    e.clientX,
+    e.clientY,
+    e.currentTarget.ownerDocument,
+    {
+      preview:
+        node.type === 'file'
+          ? () => onOpenFile(drive.root, { name: node.name, relPath: node.relPath })
+          : undefined,
+      openWorkspace: node.type === 'directory' ? (absPath) => onOpenWorkspace(absPath) : undefined
+    }
+  )
+}
+
 /** 还没点过的盘没有树账:现捏一个门面行(点开才当真去列第一层) */
 function freshRootFor(d: DriveInfo): BrowseDir {
   return {
@@ -119,6 +145,7 @@ function BrowseDirRow({
           data-tip-side="right"
           onClick={() => void toggleDir(drive, root.relPath)}
           onDoubleClick={() => onOpenWorkspace(root.absPath)}
+          onContextMenu={(e) => openBrowsePathMenu(e, drive, root, onOpenWorkspace, onOpenFile)}
         >
           <span className="tree-icon" aria-hidden="true">
             {root.loading ? (
@@ -192,6 +219,7 @@ function BrowseChildRow({
           data-tip={node.absPath}
           data-tip-side="right"
           onClick={() => onOpenFile(drive.root, { name: node.name, relPath: node.relPath })}
+          onContextMenu={(e) => openBrowsePathMenu(e, drive, node, onOpenWorkspace, onOpenFile)}
         >
           <span className="tree-icon" aria-hidden="true">
             <TreeIcon name="file" size={BROWSE_ICON_SIZE} mono={false} />

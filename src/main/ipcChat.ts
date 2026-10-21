@@ -22,7 +22,7 @@ import { shrinkChatImage } from './imageShrink.ts'
 import { probeChatVision } from './modelStatus.ts'
 import type { AgentChatMessage } from '../ai/agent.ts'
 import { clipboard, ipcMain, shell } from 'electron'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { THINKING_EXTRA_TOKENS } from '../shared/aiDefaults.ts'
 import {
   buildCompactMessages,
@@ -510,12 +510,7 @@ export function registerChatIpc(): void {
   // 右键文件链接复制完整路径:只往剪贴板写一个字符串,不开文件不执行任何东西 ——
   // 找到真文件后「开不开、怎么开」完全留给用户自己决定。路径照契约走 joinRoot 解析
   ipcMain.handle(CH.copyFilePath, (_event, rootPath: unknown, relPath: unknown) => {
-    if (
-      typeof rootPath !== 'string' ||
-      rootPath === '' ||
-      typeof relPath !== 'string' ||
-      relPath === ''
-    ) {
+    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string') {
       return { ok: false as const, message: '路径信息不完整,复制不了' }
     }
     try {
@@ -530,12 +525,7 @@ export function registerChatIpc(): void {
   // 右键文件链接「在文件资源管理器中显示」:把资源管理器拉到文件面前、选中高亮,
   // 照样不开文件不执行任何东西 —— 到家门口为止,开不开门用户自己定
   ipcMain.handle(CH.revealFilePath, (_event, rootPath: unknown, relPath: unknown) => {
-    if (
-      typeof rootPath !== 'string' ||
-      rootPath === '' ||
-      typeof relPath !== 'string' ||
-      relPath === ''
-    ) {
+    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string') {
       return { ok: false as const, message: '路径信息不完整,打不开' }
     }
     try {
@@ -546,6 +536,24 @@ export function registerChatIpc(): void {
       return { ok: true as const }
     } catch (err) {
       return { ok: false as const, message: err instanceof Error ? err.message : '打不开文件夹' }
+    }
+  })
+
+  // 树文件夹右键「打开为工作区」:只负责 joinRoot + 确认是目录,不扫不换根。
+  // 解析失败留在当前工作区(菜单上说人话);成功才把绝对路径交给地址栏那条扫描路。
+  ipcMain.handle(CH.resolveFilePath, (_event, rootPath: unknown, relPath: unknown) => {
+    if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string') {
+      return { ok: false as const, message: '路径信息不完整,打不开' }
+    }
+    try {
+      const abs = joinRoot(rootPath, relPath)
+      if (!existsSync(abs))
+        return { ok: false as const, message: '这个文件夹好像已经不在了,可能被移动或删除过' }
+      if (!statSync(abs).isDirectory())
+        return { ok: false as const, message: '这是一个文件,不是文件夹' }
+      return { ok: true as const, path: abs }
+    } catch (err) {
+      return { ok: false as const, message: err instanceof Error ? err.message : '打不开' }
     }
   })
 }

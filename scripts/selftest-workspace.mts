@@ -3,6 +3,7 @@ import { createRequestScope } from '../src/renderer/src/requestScope.ts'
 import { isTreePartial } from '../src/shared/scanCoverage.ts'
 import { isAiConfigured } from '../src/shared/aiSetup.ts'
 import { findFile, renameFileNode } from '../src/renderer/src/scanTreeTools.ts'
+import { canOpenAsWorkspace } from '../src/renderer/src/components/filePathMenuStore.ts'
 import type { AiConfig, ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
 
 {
@@ -186,6 +187,14 @@ function cfg(
   assert.equal(isAiConfigured(cfg('lmstudio', '', 'file:///tmp/v1', 'qwen')), false)
   assert.equal(isAiConfigured(cfg('lmstudio', '', 'http://127.0.0.1:1234/v1', 'qwen')), true)
   assert.equal(isAiConfigured(cfg('lmstudio', '', 'https://api.example.com/v1', 'qwen')), true)
+}
+
+{
+  assert.equal(canOpenAsWorkspace(true, 'src'), true)
+  assert.equal(canOpenAsWorkspace(true, 'src/renderer'), true)
+  assert.equal(canOpenAsWorkspace(true, ''), false, '树根已经是工作区,不摆这项')
+  assert.equal(canOpenAsWorkspace(false, 'src/main.ts'), false, '文件没有打开为工作区')
+  assert.equal(canOpenAsWorkspace(false, ''), false)
 }
 
 console.log('工作区请求生命周期自测全部通过')

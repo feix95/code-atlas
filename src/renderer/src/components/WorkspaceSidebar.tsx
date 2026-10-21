@@ -338,6 +338,7 @@ export function WorkspaceSidebar({
                 onNoteSave={saveNote}
                 onNoteRemove={(relPath) => saveNote(relPath, '')}
                 onPreviewFile={openPreview}
+                onOpenWorkspace={onOpenWorkspace}
               />
             )
           ) : (
