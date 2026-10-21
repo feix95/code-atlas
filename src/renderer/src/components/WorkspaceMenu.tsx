@@ -130,8 +130,6 @@ function WorkspaceRow({
         type="button"
         className="wsm-del"
         aria-label={`从列表删掉 ${project.p}`}
-        data-tip="从列表删掉,不动磁盘上的文件夹"
-        data-tip-side="right"
         onClick={() => onRemove(project.p)}
       >
         ×
