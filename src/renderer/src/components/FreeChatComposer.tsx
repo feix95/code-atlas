@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AiConfig, ChatCodeRef } from '@shared/types'
 import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
 import { TreeIcon } from './Icons'
-import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
+import { openTextEditMenu } from './textEditMenu'
 import { REF_ONLY_QUESTION, type AiChatApi } from '../useAiChat'
 import { type ChatImage } from '@shared/chatImage'
 import { fileAttachRangeLabel } from '@shared/chatFiles'
@@ -203,49 +203,9 @@ export function FreeChatComposer({
     sendDraft()
   }
 
-  /**
-   * 输入框右键编辑菜单:Electron 没有原生编辑菜单,按预览选区同款规格自己摆一张。
-   * 选中态在开菜单前定格(右键落点即光标位);粘贴先探剪贴板,空的就把行摆灰。
-   */
+  /** 输入框右键编辑菜单(复制/粘贴)走共用实现,和 workspace 路径栏同一套 */
   function onDraftContextMenu(e: React.MouseEvent<HTMLTextAreaElement>): void {
-    e.preventDefault()
-    const el = e.currentTarget
-    const doc = el.ownerDocument
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    const picked = draft.slice(start, end)
-    const x = e.clientX
-    const y = e.clientY
-    /** 在右键落点插字/删字:受控组件走 setDraft,光标摁到插完的位置接着写 */
-    const splice = (inserted: string): void => {
-      const next = draft.slice(0, start) + inserted + draft.slice(end)
-      setDraft(next)
-      el.focus()
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = start + inserted.length
-      })
-    }
-    const buildItems = (clip: string): ContextMenuItem[] => [
-      {
-        label: '复制',
-        disabled: !picked,
-        run: () =>
-          navigator.clipboard
-            .writeText(picked)
-            .then(() => {
-              el.focus()
-              return '已复制 ✓'
-            })
-            .catch(() => '没复制成,剪贴板被顶住了')
-      },
-      { label: '粘贴', disabled: clip === '', run: () => splice(clip) }
-    ]
-    const open = (clip: string): void =>
-      openContextMenu({ x, y, doc, compact: true, preferRight: true, items: buildItems(clip) })
-    void navigator.clipboard
-      .readText()
-      .then(open)
-      .catch(() => open(''))
+    openTextEditMenu({ event: e, value: draft, setValue: setDraft })
   }
 
   // 弹性长高的账(产品指定):空 = 一行;有一到四行长到几行;五行封顶,

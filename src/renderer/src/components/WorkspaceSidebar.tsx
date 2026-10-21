@@ -11,6 +11,7 @@ import { isTreePartial } from '@shared/scanCoverage'
 import { menuWorkspaceRows, type RecentProject } from '../recents'
 import { useMenuDismiss } from '../useMenuDismiss'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
+import { openTextEditMenu } from './textEditMenu'
 import { DriveBrowser } from './DriveBrowser'
 import { FileTree } from './FileTree'
 import { SearchResults } from './SearchResults'
@@ -180,6 +181,21 @@ export function WorkspaceSidebar({
     }
     if (e.key === 'Escape') setPathDraft(folder ?? '')
   }
+
+  /** 路径输入框右键:复制/粘贴走和自由对话输入舱同一张菜单 */
+  function onPathContextMenu(e: React.MouseEvent<HTMLInputElement>): void {
+    // 右键菜单和左侧的工作区历史菜单不同台,收掉旧的再摆
+    setMenuOpen(false)
+    setMenuHi(-1)
+    openTextEditMenu({
+      event: e,
+      value: pathDraft,
+      setValue: (next) => {
+        setPathDraft(next)
+        dismissPathHint()
+      }
+    })
+  }
   const settingsMode = sidebarFace === 'settings'
   return (
     <>
@@ -219,6 +235,8 @@ export function WorkspaceSidebar({
                   dismissPathHint()
                 }}
                 onKeyDown={onCardKeyDown}
+                onDoubleClick={(e) => e.currentTarget.select()}
+                onContextMenu={onPathContextMenu}
               />
               <button
                 type="button"

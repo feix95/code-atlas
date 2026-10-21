@@ -509,3 +509,4 @@
 - fix(ui): 子窗双栏页签带补 .topbar-tabs 容器,第一组宽度按页签区算,与正文分割线对齐
 - chore: Prettier 统一 selftest-agent / selftest-ai / selftest-session 三个历史脚本的换行
 - chore: 移除 graphify 的 Cursor 规则、husky 钩子与文档口径
+- feat(ui): 路径栏与对话输入框共用右键剪切复制粘贴全选菜单,路径栏双击全选
