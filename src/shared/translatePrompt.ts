@@ -33,3 +33,44 @@ export function translateSystemPrompt(lang: TranslateLang): string {
 export function translateUserPrompt(text: string): string {
   return `<source_markdown>\n${text}\n</source_markdown>`
 }
+
+/** 内联标题专用:阅读档顶上那行文件主名,不是路径、必须译成目标语。 */
+export function translateTitleSystemPrompt(lang: TranslateLang): string {
+  return [
+    '<translation_task>',
+    `  <target_language>${lang.enName}</target_language>`,
+    '  <objective>Translate the document title in the user message into the target language. It is a human-readable heading shown above the article, derived from the file base name; it is not a file path.</objective>',
+    '  <rules>',
+    '    <rule id="1">Translate into natural language of the target language. Treat hyphen, underscore, and camelCase as word separators. Short, all-caps, or coined names still get a natural equivalent; do not keep the source spelling because it looks like an identifier.</rule>',
+    '    <rule id="2">Return a single line of title text. Do not add a file extension, quotation marks, markdown, parentheses, or explanations.</rule>',
+    '    <rule id="3">Do not add, remove, summarize, or expand meaning beyond the title itself.</rule>',
+    '  </rules>',
+    '  <output_format>',
+    '    <requirement>Return only the translated title.</requirement>',
+    '    <requirement>Do not wrap the answer in a code fence or XML tags.</requirement>',
+    '  </output_format>',
+    '</translation_task>'
+  ].join('\n')
+}
+
+export function translateTitleUserPrompt(title: string): string {
+  return `<source_title>\n${title}\n</source_title>`
+}
+
+/** 标题译文收口:只留第一行,剥成对引号。空串 = 模型没给可用标题。 */
+export function titleLineOf(raw: string): string {
+  const line = raw.trim().split(/\r?\n/, 1)[0]?.trim() ?? ''
+  if (line.length < 2) return line
+  const pairs: Array<[string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ['「', '」'],
+    ['『', '』']
+  ]
+  for (const [open, close] of pairs) {
+    if (line.startsWith(open) && line.endsWith(close)) {
+      return line.slice(open.length, line.length - close.length).trim()
+    }
+  }
+  return line
+}

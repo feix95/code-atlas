@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { TRANSLATE_LANGS, translateLang } from '../src/shared/translateLangs.ts'
-import { translateSystemPrompt, translateUserPrompt } from '../src/shared/translatePrompt.ts'
+import {
+  titleLineOf,
+  translateSystemPrompt,
+  translateTitleSystemPrompt,
+  translateTitleUserPrompt,
+  translateUserPrompt
+} from '../src/shared/translatePrompt.ts'
 
 const zh = translateLang('zh-CN')
 assert.ok(zh)
@@ -33,6 +39,25 @@ const user = translateUserPrompt(body)
 assert.match(user, /^<source_markdown>\n/)
 assert.match(user, /<\/source_markdown>$/)
 assert.ok(user.includes(body))
+
+// 内联标题:另开一份手册,不当文件路径,必须译
+const titlePrompt = translateTitleSystemPrompt(zh)
+assert.match(titlePrompt, /^<translation_task>/)
+assert.match(titlePrompt, /<\/translation_task>$/)
+assert.match(titlePrompt, /<target_language>Simplified Chinese<\/target_language>/)
+assert.match(titlePrompt, /human-readable heading/i)
+assert.match(titlePrompt, /not a file path/i)
+assert.match(titlePrompt, /camelCase/i)
+assert.equal(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(titlePrompt), false)
+assert.equal(/you are/i.test(titlePrompt), false)
+const titleUser = translateTitleUserPrompt('SKILL')
+assert.match(titleUser, /^<source_title>\n/)
+assert.match(titleUser, /<\/source_title>$/)
+assert.ok(titleUser.includes('SKILL'))
+assert.equal(titleLineOf('  「スキル」  \nnote'), 'スキル')
+assert.equal(titleLineOf('"Guide"'), 'Guide')
+assert.equal(titleLineOf('README'), 'README')
+assert.equal(titleLineOf(''), '')
 
 // 八种语种都用纯英文语言名,且互不相同
 assert.equal(TRANSLATE_LANGS.length, 8)

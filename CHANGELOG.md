@@ -514,3 +514,4 @@
 - chore: CI 在打向 main 的 PR 上跑全套自测作为合进前闸,push main 仍跑挡住直推
 - feat(ui): 译文签右键「翻译成…」可原地换语种,当前语种打勾,换走时掐断旧任务;命名规则抽到 translationTabName 并挂 test:translatetab
 - fix(ui): 译文页套上阅读档可读栏,标题字号与行宽跟预览页对齐
+- feat(ui): 译文页补上与预览页同款内联标题,文件主名单独送模型翻译且不占块号

@@ -13,6 +13,8 @@ export interface TranslateJob {
   kinds: TranslateBlockKind[]
   /** 每块译文;空串 = 还没翻好 */
   texts: string[]
+  /** 内联标题:开任务时是原文主名,模型译好后换成译文;空串 = 不摆 */
+  title: string
   doneCount: number
   error: string | null
 }
@@ -70,6 +72,10 @@ function onEvent(payload: TranslateEvent): void {
     })
     return
   }
+  if (payload.type === 'title') {
+    commit({ ...job, title: payload.text })
+    return
+  }
   if (payload.type === 'block') {
     const texts = job.texts.slice()
     texts[payload.index] = payload.text
@@ -96,6 +102,7 @@ export function startTranslate(input: {
   relPath: string
   lang: string
   text: string
+  title: string
 }): void {
   ensureListening()
   const key = translateKey(input.rootPath, input.relPath, input.lang)
@@ -111,12 +118,13 @@ export function startTranslate(input: {
     total: 0,
     kinds: [],
     texts: [],
+    title: input.title,
     doneCount: 0,
     error: null
   })
 
   void window.atlas
-    .translateStart({ requestId, text: input.text, lang: input.lang })
+    .translateStart({ requestId, text: input.text, lang: input.lang, title: input.title })
     .then((res) => {
       if (!res.ok) {
         keyByRequest.delete(requestId)
@@ -135,6 +143,7 @@ export function restartTranslate(input: {
   relPath: string
   lang: string
   text: string
+  title: string
 }): void {
   const key = translateKey(input.rootPath, input.relPath, input.lang)
   const job = jobs.get(key)

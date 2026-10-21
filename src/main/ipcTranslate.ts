@@ -4,10 +4,22 @@ import { ipcMain } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import { splitMdBlocks } from '../shared/mdBlocks.ts'
 import { translateLang } from '../shared/translateLangs.ts'
-import { translateSystemPrompt, translateUserPrompt } from '../shared/translatePrompt.ts'
+import {
+  titleLineOf,
+  translateSystemPrompt,
+  translateTitleSystemPrompt,
+  translateTitleUserPrompt,
+  translateUserPrompt
+} from '../shared/translatePrompt.ts'
 import type { TranslateEvent, TranslateStartRequest } from '../shared/translateTypes.ts'
+import type { AiExplainResult, ChatTarget } from '../shared/types.ts'
 import { explainWithMessages } from '../ai/explain.ts'
 import { resolveChatTargetOrError } from './aiEvidence.ts'
+
+/** 标题就几个词,封顶免得模型借机写注释 */
+const TITLE_REPLY_CAP = 80
+/** 与 fileRename 基础名上限同档,IPC 边界再卡一次 */
+const TITLE_MAX_CHARS = 120
 
 /** 正在跑的任务:requestId → 掐断开关 */
 const jobs = new Map<string, AbortController>()
@@ -25,7 +37,9 @@ function cleanTranslated(raw: string): string {
     const fenced = /^```[a-zA-Z]*\n([\s\S]*?)\n```$/.exec(text)
     if (fenced) text = fenced[1].trim()
     const wrapped =
-      /^<(source_markdown|translation|output|result)[^>]*>\n?([\s\S]*?)\n?<\/\1>$/i.exec(text)
+      /^<(source_markdown|source_title|translation|output|result)[^>]*>\n?([\s\S]*?)\n?<\/\1>$/i.exec(
+        text
+      )
     if (wrapped) text = wrapped[2].trim()
     if (text === before) break
   }
@@ -38,7 +52,31 @@ function sanitize(raw: unknown): TranslateStartRequest | null {
   if (typeof r.requestId !== 'string' || r.requestId === '') return null
   if (typeof r.text !== 'string' || r.text.trim() === '') return null
   if (typeof r.lang !== 'string' || r.lang === '') return null
-  return { requestId: r.requestId, text: r.text, lang: r.lang }
+  let title: string | undefined
+  if (typeof r.title === 'string') {
+    const t = r.title.trim()
+    if (t !== '') title = t.slice(0, TITLE_MAX_CHARS)
+  }
+  return { requestId: r.requestId, text: r.text, lang: r.lang, title }
+}
+
+async function translateOnce(
+  target: ChatTarget,
+  system: string,
+  user: string,
+  signal: AbortSignal,
+  cap: number
+): Promise<AiExplainResult> {
+  const messages = [
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user }
+  ]
+  let res = await explainWithMessages(target, messages, undefined, signal, cap)
+  // 小模型偶尔空回/抽风:同一段再试一次
+  if (res.status === 'error' && !signal.aborted) {
+    res = await explainWithMessages(target, messages, undefined, signal, cap)
+  }
+  return res
 }
 
 export function registerTranslateIpc(): void {
@@ -71,6 +109,23 @@ export function registerTranslateIpc(): void {
     void (async () => {
       try {
         const system = translateSystemPrompt(lang)
+        // 内联标题单独翻、不占块号;翻砸了不拖死正文(渲染层已用原文主名占着)
+        if (req.title) {
+          const titleRes = await translateOnce(
+            resolved.target,
+            translateTitleSystemPrompt(lang),
+            translateTitleUserPrompt(req.title),
+            controller.signal,
+            TITLE_REPLY_CAP
+          )
+          if (controller.signal.aborted) return
+          if (titleRes.status !== 'error' && titleRes.status !== 'cancelled') {
+            const line = titleLineOf(cleanTranslated(titleRes.text))
+            if (line !== '') {
+              send({ requestId: req.requestId, type: 'title', text: line })
+            }
+          }
+        }
         for (const block of blocks) {
           if (controller.signal.aborted) return
           // 代码块与 HTML 块不送模型;frontmatter 要翻(只翻值,提示词里交代)
@@ -84,27 +139,13 @@ export function registerTranslateIpc(): void {
             })
             continue
           }
-          const messages = [
-            { role: 'system' as const, content: system },
-            { role: 'user' as const, content: translateUserPrompt(block.text) }
-          ]
-          let res = await explainWithMessages(
+          const res = await translateOnce(
             resolved.target,
-            messages,
-            undefined,
+            system,
+            translateUserPrompt(block.text),
             controller.signal,
             replyCapFor(block.text)
           )
-          // 小模型偶尔空回/抽风:同一块再试一次,别为一次抖动丢掉前面几十块的成果
-          if (res.status === 'error' && !controller.signal.aborted) {
-            res = await explainWithMessages(
-              resolved.target,
-              messages,
-              undefined,
-              controller.signal,
-              replyCapFor(block.text)
-            )
-          }
           if (controller.signal.aborted) return
           if (res.status === 'error' || res.status === 'cancelled') {
             send({

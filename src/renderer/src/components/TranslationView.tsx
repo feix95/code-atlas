@@ -1,6 +1,7 @@
 // 翻译镜像页签的正文:只读、虚拟(不落盘);译文按块陆续上屏,骨架先占位。
 // 顶部一条浅色状态行只报进度与出口(取消/重译/复制),不抢正文的注意力。
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { fileBaseName } from '@shared/fileRename'
 import { splitMdBlocks } from '@shared/mdBlocks'
 import { translateLang } from '@shared/translateLangs'
 import {
@@ -21,6 +22,7 @@ import {
 } from '../translateStore'
 import { registerMdScroll } from '../mdScrollSync'
 import { bindDocZoomWheel, useDocZoom } from '../docZoom'
+import { InlineTitle } from './InlineTitle'
 import { LinkedMdView } from './LinkedMdView'
 
 export function TranslationView({
@@ -63,10 +65,12 @@ export function TranslationView({
     return () => unlinkMdFile(fileKey)
   }, [fileKey])
 
+  const displayTitle = fileBaseName(relPath.split(/[\\/]/).pop() ?? '')
+
   useEffect(() => {
     if (!source || source.text === '') return
-    startTranslate({ rootPath, relPath, lang, text: source.text })
-  }, [source, rootPath, relPath, lang])
+    startTranslate({ rootPath, relPath, lang, text: source.text, title: displayTitle })
+  }, [source, rootPath, relPath, lang, displayTitle])
 
   const blocks = useMemo(() => (source ? splitMdBlocks(source.text) : []), [source])
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -84,6 +88,7 @@ export function TranslationView({
     return bindDocZoomWheel(el)
   }, [])
   const texts = job?.texts ?? []
+  const shownTitle = job?.title || displayTitle
   const label = translateLang(lang)?.label ?? lang
   const total = job?.total ?? 0
   const done = job?.doneCount ?? 0
@@ -127,7 +132,15 @@ export function TranslationView({
             <button
               type="button"
               className="trans-act"
-              onClick={() => restartTranslate({ rootPath, relPath, lang, text: source.text })}
+              onClick={() =>
+                restartTranslate({
+                  rootPath,
+                  relPath,
+                  lang,
+                  text: source.text,
+                  title: displayTitle
+                })
+              }
             >
               重新翻译
             </button>
@@ -143,6 +156,7 @@ export function TranslationView({
         style={{ '--doc-zoom': docZoom } as React.CSSProperties}
       >
         <article className="code-reading">
+          {shownTitle !== '' && <InlineTitle title={shownTitle} />}
           {source === null ? (
             <div className="trans-placeholder">
               <div className="md-block-skeleton" aria-hidden="true" />

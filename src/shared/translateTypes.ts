@@ -7,6 +7,8 @@ export interface TranslateStartRequest {
   text: string
   /** 目标语种代号(见 translateLangs) */
   lang: string
+  /** 内联标题原文(掐尾去扩展名);不传或空串 = 不翻不摆 */
+  title?: string
 }
 
 /** 块的处理方式:prose 送模型翻,code/meta 原样保留 */
@@ -18,6 +20,11 @@ export type TranslateEvent =
       type: 'plan'
       total: number
       kinds: TranslateBlockKind[]
+    }
+  | {
+      requestId: string
+      type: 'title'
+      text: string
     }
   | {
       requestId: string
