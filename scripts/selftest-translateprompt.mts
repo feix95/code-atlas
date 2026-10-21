@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { TRANSLATE_LANGS, translateLang } from '../src/shared/translateLangs.ts'
 import {
   titleLineOf,
+  translateDocSystemPrompt,
+  translateDocUserPrompt,
   translateSystemPrompt,
   translateTitleSystemPrompt,
   translateTitleUserPrompt,
@@ -69,5 +71,22 @@ assert.equal(
   ),
   true
 )
+
+// 文档族入口:不设人设、不复用 source_markdown、rst 要保留标记
+{
+  const plain = translateDocSystemPrompt(zh, 'plaintext')
+  const markup = translateDocSystemPrompt(zh, 'markup')
+  assert.match(plain, /^<translation_task>/)
+  assert.equal(/you are/i.test(plain), false)
+  assert.equal(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(plain), false)
+  assert.match(plain, /URLs, file paths, version numbers/i)
+  assert.match(plain, /source_plaintext tags/)
+  assert.equal(plain.includes('source_markdown'), false)
+  assert.match(markup, /directives, roles, anchors/i)
+  const user = translateDocUserPrompt('hello')
+  assert.match(user, /^<source_plaintext>\n/)
+  assert.match(user, /<\/source_plaintext>$/)
+  assert.ok(user.includes('hello'))
+}
 
 console.log('translateprompt: 全部通过')

@@ -124,7 +124,13 @@ export function startTranslate(input: {
   })
 
   void window.atlas
-    .translateStart({ requestId, text: input.text, lang: input.lang, title: input.title })
+    .translateStart({
+      requestId,
+      text: input.text,
+      lang: input.lang,
+      relPath: input.relPath,
+      title: input.title
+    })
     .then((res) => {
       if (!res.ok) {
         keyByRequest.delete(requestId)

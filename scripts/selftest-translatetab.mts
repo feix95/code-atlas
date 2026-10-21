@@ -19,3 +19,8 @@ check('translationTabName:Windows 分隔符也认,目录不进签脸', () => {
 check('translationTabName:不认识的语种代号原样兜底', () => {
   assert.equal(translationTabName('a.md', 'xx'), 'a.md · xx')
 })
+
+check('translationTabName:文档族同样只认文件名', () => {
+  assert.equal(translationTabName('docs/notes.txt', 'zh-CN'), 'notes.txt · 中文（简体）')
+  assert.equal(translationTabName('book.asciidoc', 'ja'), 'book.asciidoc · 日本語')
+})

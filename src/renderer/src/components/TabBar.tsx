@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { TreeIcon } from './Icons'
 import { isFileKind, type PaneKind } from '../paneKinds'
-import { canReadingMode } from '../paneTabs'
+import { canTranslate } from '@shared/translateGate'
 import { TRANSLATE_LANGS } from '@shared/translateLangs'
 import { applyViewFlags, viewFlags } from '../viewState'
 import { getCodeWrapOn, toggleCodeWrap } from '../codePrefs'
@@ -228,7 +228,7 @@ export function TabBar({
     // 译文页按工作区读会读错,先不摆
     if (
       onTranslate &&
-      (t.kind === 'translate' || (t.kind === 'preview' && canReadingMode(t.relPath)))
+      (t.kind === 'translate' || (t.kind === 'preview' && canTranslate(t.relPath)))
     ) {
       items.push(MENU_SEP, {
         label: '翻译成…',

@@ -2,8 +2,9 @@
 // 顶部一条浅色状态行只报进度与出口(取消/重译/复制),不抢正文的注意力。
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { fileBaseName } from '@shared/fileRename'
-import { splitMdBlocks } from '@shared/mdBlocks'
+import { splitTranslateBlocks } from '@shared/translateBlocks'
 import { translateLang } from '@shared/translateLangs'
+import { usesPlainTranslateView } from '@shared/translateGate'
 import {
   hoveredBlockOf,
   linkMdFile,
@@ -24,6 +25,7 @@ import { registerMdScroll } from '../mdScrollSync'
 import { bindDocZoomWheel, useDocZoom } from '../docZoom'
 import { InlineTitle } from './InlineTitle'
 import { LinkedMdView } from './LinkedMdView'
+import { LinkedPlainView } from './LinkedPlainView'
 
 export function TranslationView({
   rootPath,
@@ -72,7 +74,11 @@ export function TranslationView({
     startTranslate({ rootPath, relPath, lang, text: source.text, title: displayTitle })
   }, [source, rootPath, relPath, lang, displayTitle])
 
-  const blocks = useMemo(() => (source ? splitMdBlocks(source.text) : []), [source])
+  const blocks = useMemo(
+    () => (source ? splitTranslateBlocks(source.text, relPath) : []),
+    [source, relPath]
+  )
+  const plain = usesPlainTranslateView(relPath)
   const bodyRef = useRef<HTMLDivElement>(null)
   const docZoom = useDocZoom()
   // 滚动联动:译文栏在滚时,原文栏按同一块号跟到同一高度(和原文侧登记在同一个文件账上)
@@ -165,6 +171,13 @@ export function TranslationView({
             </div>
           ) : source.error ? (
             <p className="trans-placeholder-text">{source.error}</p>
+          ) : plain ? (
+            <LinkedPlainView
+              blocks={blocks}
+              texts={texts}
+              hovered={hovered}
+              onHover={(block) => setHoveredBlock(fileKey, block)}
+            />
           ) : (
             <LinkedMdView
               blocks={blocks}

@@ -107,6 +107,17 @@
   background: color-mix(in srgb, var(--sash-hi) 16%, transparent);
 }
 
+/* 文档族对照:段内换行原样,字号/行宽吃 .code-reading,不走 MiniMD */
+.md-linked .md-plain {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* 未翻好的块:一条浅色骨架,先占住位置,不闪不抖 */
 .md-block-skeleton {
   height: 1rem;

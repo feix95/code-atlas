@@ -57,6 +57,43 @@ export function translateTitleUserPrompt(title: string): string {
   return `<source_title>\n${title}\n</source_title>`
 }
 
+/** 文档族(.txt / .rst / .adoc / .asciidoc)专用:禁止拿 source_markdown 去包纯文本。 */
+export function translateDocSystemPrompt(
+  lang: TranslateLang,
+  family: 'plaintext' | 'markup'
+): string {
+  const markupRules =
+    family === 'markup'
+      ? [
+          '    <rule id="2">Preserve markup, indentation, directives, roles, anchors, and literal blocks exactly. Translate only the human-language words; do not rewrite the syntax.</rule>'
+        ]
+      : [
+          '    <rule id="2">Preserve line breaks and spacing inside the block. Do not turn the block into Markdown or add markup that is absent from the source.</rule>'
+        ]
+  return [
+    '<translation_task>',
+    `  <target_language>${lang.enName}</target_language>`,
+    '  <objective>Translate the plain-text block in the user message into the target language.</objective>',
+    '  <rules>',
+    '    <rule id="1">Translate natural language. Do not translate or modify URLs, file paths, version numbers, or pure identifiers.</rule>',
+    ...markupRules,
+    '    <rule id="3">Do not add, remove, summarize, or expand content. Never add parentheses, annotations, alternative terms, or explanations that are absent from the source; if the source has no parentheses, the output must contain none.</rule>',
+    '    <rule id="4">Use standard technical terminology. Keep product names, protocol names, and API names in their original form, without parenthetical glosses.</rule>',
+    '  </rules>',
+    '  <output_format>',
+    '    <requirement>Return only the translated text block.</requirement>',
+    '    <requirement>Do not wrap the whole answer in a code fence.</requirement>',
+    '    <requirement>Do not output source_plaintext tags or any XML tag from these instructions.</requirement>',
+    '    <requirement>Do not add explanations, prefaces, notes, or labels.</requirement>',
+    '  </output_format>',
+    '</translation_task>'
+  ].join('\n')
+}
+
+export function translateDocUserPrompt(text: string): string {
+  return `<source_plaintext>\n${text}\n</source_plaintext>`
+}
+
 /** 标题译文收口:只留第一行,剥成对引号。空串 = 模型没给可用标题。 */
 export function titleLineOf(raw: string): string {
   const line = raw.trim().split(/\r?\n/, 1)[0]?.trim() ?? ''

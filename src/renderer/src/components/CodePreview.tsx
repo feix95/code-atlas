@@ -9,7 +9,9 @@ import { TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import { InlineTitle } from './InlineTitle'
 import { LinkedMdView } from './LinkedMdView'
-import { splitMdBlocks } from '@shared/mdBlocks'
+import { LinkedPlainView } from './LinkedPlainView'
+import { splitTranslateBlocks } from '@shared/translateBlocks'
+import { usesPlainTranslateView } from '@shared/translateGate'
 import {
   hoveredBlockOf,
   isMdLinked,
@@ -191,20 +193,22 @@ export function CodePreview({
   // 排版关或非 md 都是裸源码编辑器(只读照常生效)
   const reading = canMd && flags.render && flags.readOnly
   const live = canMd && flags.render && !flags.readOnly
-  // 对照联动:这份文件开着翻译镜像时,阅读稿切成同号的块视图;悬停同一段两边一起亮
+  // 对照联动:开着翻译镜像时切成同号块视图。md 仍要阅读档;文档族没有阅读档,有镜像就切。
   const mdKey = mdFileKey(rootPath, file.relPath)
   const linkedMd = useSyncExternalStore(subscribeMdHover, () => isMdLinked(mdKey))
   const linkedHovered = useSyncExternalStore(subscribeMdHover, () => hoveredBlockOf(mdKey))
+  const linkedPlain = linkedMd && usesPlainTranslateView(file.relPath)
+  const showLinked = linkedMd && (reading || linkedPlain)
   const sourceBlocks = useMemo(
-    () => (reading && linkedMd ? splitMdBlocks(text) : []),
-    [reading, linkedMd, text]
+    () => (showLinked ? splitTranslateBlocks(text, file.relPath) : []),
+    [showLinked, text, file.relPath]
   )
   // 滚动联动:原文栏在滚时,译文栏按同一块号跟到同一高度(只认滚动,不认单纯移鼠标)
   useEffect(() => {
     const el = codeViewRef.current
-    if (!reading || !linkedMd || sourceBlocks.length === 0 || el === null) return
+    if (!showLinked || sourceBlocks.length === 0 || el === null) return
     return registerMdScroll(mdKey, 'source', el)
-  }, [reading, linkedMd, sourceBlocks.length, mdKey])
+  }, [showLinked, sourceBlocks.length, mdKey])
   // 文档字号缩放(Ctrl+滚轮本批):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
@@ -213,7 +217,7 @@ export function CodePreview({
     const view = codeViewRef.current
     if (!view) return
     return bindDocZoomWheel(view)
-  }, [result, reading])
+  }, [result, reading, linkedPlain])
 
   useEffect(
     () => () => {
@@ -387,6 +391,29 @@ export function CodePreview({
                     onRenameTitle={onRenameFile ? requestRename : undefined}
                   />
                 )}
+              </article>
+            </div>
+          ) : linkedPlain && sourceBlocks.length > 0 ? (
+            /* 文档族对照:没有阅读档,有镜像时原文切到与译文同号的纯文本块视图 */
+            <div
+              className="code-view is-reading"
+              ref={codeViewRef}
+              tabIndex={0}
+              style={{ '--doc-zoom': docZoom } as React.CSSProperties}
+              aria-label={`${file.relPath} 的对照阅读,全文可滚;按 Ctrl+A 复制全文`}
+              onContextMenu={onReadContextMenu}
+            >
+              <article className="code-reading">
+                <InlineTitle
+                  title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
+                  onRename={onRenameFile ? requestRename : undefined}
+                />
+                <LinkedPlainView
+                  blocks={sourceBlocks}
+                  texts={sourceBlocks.map((b) => b.text)}
+                  hovered={linkedHovered}
+                  onHover={(block) => setHoveredBlock(mdKey, block)}
+                />
               </article>
             </div>
           ) : (

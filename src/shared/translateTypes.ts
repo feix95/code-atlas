@@ -7,6 +7,8 @@ export interface TranslateStartRequest {
   text: string
   /** 目标语种代号(见 translateLangs) */
   lang: string
+  /** 源文件相对路径:主进程按它选切块函数和提示词 */
+  relPath: string
   /** 内联标题原文(掐尾去扩展名);不传或空串 = 不翻不摆 */
   title?: string
 }

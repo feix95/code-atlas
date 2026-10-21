@@ -2,10 +2,13 @@
 // 渲染层已经把原文读好了(走 read-preview),这里不碰文件系统。
 import { ipcMain } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
-import { splitMdBlocks } from '../shared/mdBlocks.ts'
+import { splitTranslateBlocks } from '../shared/translateBlocks.ts'
+import { translateFamilyOf } from '../shared/translateGate.ts'
 import { translateLang } from '../shared/translateLangs.ts'
 import {
   titleLineOf,
+  translateDocSystemPrompt,
+  translateDocUserPrompt,
   translateSystemPrompt,
   translateTitleSystemPrompt,
   translateTitleUserPrompt,
@@ -37,7 +40,7 @@ function cleanTranslated(raw: string): string {
     const fenced = /^```[a-zA-Z]*\n([\s\S]*?)\n```$/.exec(text)
     if (fenced) text = fenced[1].trim()
     const wrapped =
-      /^<(source_markdown|source_title|translation|output|result)[^>]*>\n?([\s\S]*?)\n?<\/\1>$/i.exec(
+      /^<(source_markdown|source_plaintext|source_title|translation|output|result)[^>]*>\n?([\s\S]*?)\n?<\/\1>$/i.exec(
         text
       )
     if (wrapped) text = wrapped[2].trim()
@@ -52,12 +55,13 @@ function sanitize(raw: unknown): TranslateStartRequest | null {
   if (typeof r.requestId !== 'string' || r.requestId === '') return null
   if (typeof r.text !== 'string' || r.text.trim() === '') return null
   if (typeof r.lang !== 'string' || r.lang === '') return null
+  if (typeof r.relPath !== 'string' || r.relPath === '') return null
   let title: string | undefined
   if (typeof r.title === 'string') {
     const t = r.title.trim()
     if (t !== '') title = t.slice(0, TITLE_MAX_CHARS)
   }
-  return { requestId: r.requestId, text: r.text, lang: r.lang, title }
+  return { requestId: r.requestId, text: r.text, lang: r.lang, relPath: r.relPath, title }
 }
 
 async function translateOnce(
@@ -85,11 +89,13 @@ export function registerTranslateIpc(): void {
     if (!req) return { ok: false, error: '翻译请求不完整' }
     const lang = translateLang(req.lang)
     if (!lang) return { ok: false, error: '这个目标语种还没登记' }
+    const family = translateFamilyOf(req.relPath)
+    if (family === null) return { ok: false, error: '这份文件不能翻译' }
 
     const resolved = await resolveChatTargetOrError()
     if ('error' in resolved) return { ok: false, error: resolved.error }
 
-    const blocks = splitMdBlocks(req.text)
+    const blocks = splitTranslateBlocks(req.text, req.relPath)
     if (blocks.length === 0) return { ok: false, error: '这份文件没有可翻译的内容' }
 
     const controller = new AbortController()
@@ -108,7 +114,14 @@ export function registerTranslateIpc(): void {
 
     void (async () => {
       try {
-        const system = translateSystemPrompt(lang)
+        const system =
+          family === 'plaintext' || family === 'markup'
+            ? translateDocSystemPrompt(lang, family)
+            : translateSystemPrompt(lang)
+        const userOf =
+          family === 'plaintext' || family === 'markup'
+            ? translateDocUserPrompt
+            : translateUserPrompt
         // 内联标题单独翻、不占块号;翻砸了不拖死正文(渲染层已用原文主名占着)
         if (req.title) {
           const titleRes = await translateOnce(
@@ -142,7 +155,7 @@ export function registerTranslateIpc(): void {
           const res = await translateOnce(
             resolved.target,
             system,
-            translateUserPrompt(block.text),
+            userOf(block.text),
             controller.signal,
             replyCapFor(block.text)
           )
