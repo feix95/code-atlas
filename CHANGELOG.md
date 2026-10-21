@@ -523,3 +523,4 @@
 - docs(ui): 补文档族翻译需求,把对照译文扩到 txt/rst/adoc
 - docs(core): 补地基重构待办需求
 - feat(ui): 对照译文扩到 txt/rst/adoc/asciidoc,程序文件碰巧叫 txt 的不出菜单;切块与提示词按文件族分流并挂自测
+- refactor(ui): Live Preview 样式拆出 markdown-live.css,markdown.css 回到行数闸门内
