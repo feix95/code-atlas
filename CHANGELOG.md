@@ -510,3 +510,4 @@
 - chore: Prettier 统一 selftest-agent / selftest-ai / selftest-session 三个历史脚本的换行
 - chore: 移除 graphify 的 Cursor 规则、husky 钩子与文档口径
 - feat(ui): 路径栏与对话输入框共用右键剪切复制粘贴全选菜单,路径栏双击全选
+- chore: 升级 vite 到 7.3.7,修复 launch-editor 高危漏洞闸
