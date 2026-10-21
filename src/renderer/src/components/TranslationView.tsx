@@ -20,6 +20,7 @@ import {
   translateKey
 } from '../translateStore'
 import { registerMdScroll } from '../mdScrollSync'
+import { bindDocZoomWheel, useDocZoom } from '../docZoom'
 import { LinkedMdView } from './LinkedMdView'
 
 export function TranslationView({
@@ -69,12 +70,19 @@ export function TranslationView({
 
   const blocks = useMemo(() => (source ? splitMdBlocks(source.text) : []), [source])
   const bodyRef = useRef<HTMLDivElement>(null)
+  const docZoom = useDocZoom()
   // 滚动联动:译文栏在滚时,原文栏按同一块号跟到同一高度(和原文侧登记在同一个文件账上)
   useEffect(() => {
     const el = bodyRef.current
     if (el === null || blocks.length === 0) return
     return registerMdScroll(fileKey, key, el)
   }, [fileKey, key, blocks.length])
+  // Ctrl+滚轮字号与阅读档同一本账:译文栏自己也能捏合/滚轮换档
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el === null) return
+    return bindDocZoomWheel(el)
+  }, [])
   const texts = job?.texts ?? []
   const label = translateLang(lang)?.label ?? lang
   const total = job?.total ?? 0
@@ -129,23 +137,29 @@ export function TranslationView({
           </button>
         </span>
       </div>
-      <div className="trans-body" ref={bodyRef}>
-        {source === null ? (
-          <div className="trans-placeholder">
-            <div className="md-block-skeleton" aria-hidden="true" />
-            <div className="md-block-skeleton" aria-hidden="true" />
-            <div className="md-block-skeleton" aria-hidden="true" />
-          </div>
-        ) : source.error ? (
-          <p className="trans-placeholder-text">{source.error}</p>
-        ) : (
-          <LinkedMdView
-            blocks={blocks}
-            texts={texts}
-            hovered={hovered}
-            onHover={(block) => setHoveredBlock(fileKey, block)}
-          />
-        )}
+      <div
+        className="trans-body"
+        ref={bodyRef}
+        style={{ '--doc-zoom': docZoom } as React.CSSProperties}
+      >
+        <article className="code-reading">
+          {source === null ? (
+            <div className="trans-placeholder">
+              <div className="md-block-skeleton" aria-hidden="true" />
+              <div className="md-block-skeleton" aria-hidden="true" />
+              <div className="md-block-skeleton" aria-hidden="true" />
+            </div>
+          ) : source.error ? (
+            <p className="trans-placeholder-text">{source.error}</p>
+          ) : (
+            <LinkedMdView
+              blocks={blocks}
+              texts={texts}
+              hovered={hovered}
+              onHover={(block) => setHoveredBlock(fileKey, block)}
+            />
+          )}
+        </article>
       </div>
     </div>
   )

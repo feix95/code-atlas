@@ -79,7 +79,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-3) var(--space-4) var(--space-6);
+  /* 与 .code-view.is-reading 同配方:栏边距 + 底部呼吸,内层再吃 .code-reading 可读栏 */
+  padding: var(--space-4) var(--space-6) 30vh;
 }
 
 .trans-placeholder {

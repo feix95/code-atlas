@@ -24,8 +24,7 @@ import type { FileLinkTarget } from '@shared/fileLinks'
 import { applyViewFlags, getViewFlagsBits, subscribeViewFlags, viewFlags } from '../viewState'
 import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
-import { getDocZoom, setDocZoom, useDocZoom } from '../docZoom'
-import { DOC_ZOOM_STEP } from '@shared/docZoom'
+import { bindDocZoomWheel, useDocZoom } from '../docZoom'
 
 /** 「一闪而过」小开关的亮灯时长:整条复制提示停久一点 */
 const COPIED_ALL_MS = 2000
@@ -36,9 +35,6 @@ const WRAP_ICON_SIZE = 19.2
  * 编辑器自己就是虚拟渲染,闸现在只当「巨型文件默认不折行」的保守策略。
  */
 const WRAP_MAX_LINES = 5000
-/** 滚轮一格的像素门槛 / 碎步账的保鲜期(Ctrl+滚轮文档缩放用,和界面缩放滚轮同脾气) */
-const WHEEL_NOTCH = 100
-const WHEEL_ACC_TTL_MS = 400
 
 // 渲染域隔离:预览签被拖进子窗后,选区/事件都活在子窗 document 里 ——
 // 一律经元素的 ownerDocument 这族取,别摸全局 window(那是主窗的,子窗里选不中、监不到)
@@ -212,30 +208,11 @@ export function CodePreview({
   // 文档字号缩放(Ctrl+滚轮本批):系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
-  // Ctrl+滚轮 = 文档字号缩放(docZoom,产品定的分工:界面缩放只吃键盘 +/-/0)。
-  // 监听器挂预览元素本身 —— 天然 realm-safe(子窗签的滚轮事件在子窗文档里转,沾不到全局 window);
-  // 碎步积累成整档才翻、隔久清账,触控板捏合在 Chromium 里也报 ctrl+wheel,捏合白捡。
-  // 编辑器里滚轮事件照冒泡上来(cm-scroller → code-view),缩放对编辑态一样灵。
+  // Ctrl+滚轮 = 文档字号缩放:监听器挂预览元素本身,子窗 realm-safe;编辑器滚轮照冒泡上来。
   useEffect(() => {
     const view = codeViewRef.current
     if (!view) return
-    let acc = 0
-    let last = 0
-    const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY
-      const now = performance.now()
-      if (now - last > WHEEL_ACC_TTL_MS) acc = 0
-      last = now
-      acc += dy
-      const steps = Math.trunc(acc / WHEEL_NOTCH)
-      if (steps === 0) return
-      acc -= steps * WHEEL_NOTCH
-      setDocZoom(getDocZoom() - steps * DOC_ZOOM_STEP) // 向下滚(deltaY>0)= 缩小
-    }
-    view.addEventListener('wheel', onWheel, { passive: false })
-    return () => view.removeEventListener('wheel', onWheel)
+    return bindDocZoomWheel(view)
   }, [result, reading])
 
   useEffect(
