@@ -20,14 +20,6 @@
 - AI 产生的临时文件、截图、调试脚本一律写入仓库外、与 `worktrees/` 并列的 `tmp/`(绝对路径见全局记忆), 审查完毕即清理; 不得写入仓库内被忽略的目录——文件工具读不到被忽略文件, 会造成"跑了自测但没看过图"的假验收。
 - dev 里改完源码页面行为没变(或报旧值错误): 先在 PowerShell 执行 `(Get-Item <文件>).LastWriteTime = Get-Date` 触发监听, 仍不见效再重启 dev。原因: 刷新页面不会重新编译, Vite 只在文件监听事件上失效模块缓存; 监听漏事件时旧模块会一直服役。
 
-## 代码地图(graphify)
-
-- 查代码结构与关系: 先跑 `graphify query "<问题>"`(查关系用 `graphify path`, 查概念用 `graphify explain`), 子图不够再读源码。原因: 图返回的是相关子图, 比全仓 grep 小一个数量级。
-- 图只在本机 `graphify-out/`(已 gitignore), 每个 worktree 各一份, 不随仓库分发; commit 与 merge 后由 husky 钩子增量重建, 日志在 `~/.cache/graphify-rebuild.log`。纯代码走 AST, 零 token。
-- 全量重建: 清空 `graphify-out/`(保留 `.graphify_python` 与 `cost.json`)后按 graphify skill 的流程重跑。命中不存在的文件、大批文件改名或删除、社区名整体错位时, 必须全量重建而不是增量。
-- 已知边界: graphify 不解析 CSS, 样式层查不到, 直接读 `src/renderer/src/assets/css/`; 文档只进结构节点(标题与章节), 图片不进图; 需要文档语义层时单独跑语义抽取。
-- 已知坑: 文件名含 `tokens` 的非散文文件会被当凭据库跳过(设计 token 的 CSS 会误伤); 并行 AST 抽取在 Windows 需脚本带 `if __name__ == "__main__":` 保护, 否则自动回退串行; 中途中断会留下 `.graphify_chunk_*.json`, 下次语义合并会一并吃掉, 重建前先清; 增量重建会重排社区编号, 部分社区名按枢纽回退。
-
 ## UI 改动自查清单(CSS/布局改动提交前执行)
 
 小葵术语口径: "icon 大小"指 svg 图标本体尺寸; "padding"指图标下可视底块; "可点击区域"指鼠标响应范围; 说"padding 调到 X"默认可点击区域同步对齐到新范围。

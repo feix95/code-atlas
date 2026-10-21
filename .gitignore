@@ -21,5 +21,4 @@ inspiration/ui-ref-02.jpg
 # 本地测试输出
 test-results/
 
-# graphify 本地知识图(缓存与导出,不进公开仓库)
-graphify-out/
+

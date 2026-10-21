@@ -24,12 +24,6 @@
 4. 热更新能生效的小改动不重启; 需要重新拉起时由 AI 主动重启。跑全链前必须先停掉现有 dev, 测完再拉起。小葵自行运行的 dev 禁止再开第二个实例。
 5. 宿主 Agent 服务重启会回收其后台 shell: 需要跨重启存活时, 在已清除 `ELECTRON_RUN_AS_NODE` 的 PowerShell 里用 `Start-Process npm.cmd -ArgumentList 'run','dev','--','--remoteDebuggingPort=9222' -WorkingDirectory <worktree> -WindowStyle Hidden -RedirectStandardOutput <日志> -RedirectStandardError <错误日志>` 分离启动。禁止用 cmd 的 `set VAR= &&` 写法(空格会吃进变量值)。
 
-## 代码地图(graphify)
-
-- 回答代码结构、文件关系或架构问题前, 必须先跑 `graphify query "<问题>"`; 查符号关系用 `graphify path "<A>" "<B>"`, 查概念用 `graphify explain "<概念>"`, 读完图再按需读源码。`GRAPH_REPORT.md` 只在需要全局架构时读。
-- 派发探索代码的子代理时, 必须把上一条原样写进子代理提示词。
-- 改动代码后跑 `graphify update .`(AST 更新, 不调用大模型)。commit 与 merge 后分别由 `.husky/post-commit`、`.husky/post-merge` 自动执行同样的更新, 日志在用户目录 `.cache/graphify-rebuild.log`; 重装 hook 后必须重新去掉 linked worktree 跳过段, 否则 worktree 内不触发更新。
-
 ## 文件落位
 
 - 临时文件、截图、调试脚本写入仓库外、与 `worktrees/` 并列的 `tmp/`(绝对路径见全局记忆); 用完清理; 禁止写进仓库内被忽略的目录。跑 `test:journey` 前设 `$env:CODE_ATLAS_TMP` 指向该 `tmp/`。
@@ -47,5 +41,4 @@
 | 写 commit message / CHANGELOG 条目    | 交接文档「提交规范」                       |
 | 发布、升级内置引擎、新增语言支持      | 交接文档「开发约定」发布流程条             |
 | 合并分支到 main、同步分支             | 交接文档「开发约定」合进 main 与分支同步条 |
-| 重建代码地图、查询指向不存在的文件    | 交接文档「代码地图(graphify)」             |
 | 修改本文件或交接文档                  | 交接文档「文档维护」                       |
