@@ -19,3 +19,32 @@ export function insertIndexAt(centers: readonly number[], cursorX: number): numb
   }
   return centers.length
 }
+
+/** 条带矩形(视口坐标)+ 各向出血量 */
+export interface StripBand {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  bleedTop: number
+  bleedBottom: number
+  bleedX: number
+}
+
+/**
+ * 指针是否还在条带的磁性带内(Chromium 的 detach magnetism):带内一律算「还在条带上」,
+ * 只重排、不拆窗。条带贴着窗口顶边,不设这道带的话指针向上几像素就出窗、被误判成拆窗。
+ */
+export function isWithinStripBand(
+  pointX: number,
+  pointY: number,
+  strip: StripBand,
+  magnetism: number
+): boolean {
+  return (
+    pointY >= strip.top - strip.bleedTop - magnetism &&
+    pointY <= strip.bottom + strip.bleedBottom + magnetism &&
+    pointX >= strip.left - strip.bleedX &&
+    pointX <= strip.right + strip.bleedX
+  )
+}

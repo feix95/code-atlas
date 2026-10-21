@@ -267,6 +267,12 @@
     opacity 0.12s ease-out;
 }
 
+/* 出窗且离开条带磁性带:松手就拆新窗 —— 胶囊挂一圈窗口预告。
+   功能强调色统一走 --sash-hi,与分屏拖边同一套 */
+.tabbar-tab.is-chip.is-detach {
+  box-shadow: 0 0 0 2px var(--sash-hi);
+}
+
 /* is-settle(沉降相):连 left/top 一起过渡 —— 芯片飞进落点缝长成页签;
    落地帧 React 换上真身无缝接力(矩形按缝口快照算的) */
 .tabbar-tab.is-chip.is-settle {

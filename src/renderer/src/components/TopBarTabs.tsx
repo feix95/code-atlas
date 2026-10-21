@@ -12,7 +12,7 @@
 // 窗外松手拆出新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PaneDropMark, PaneGroup, PaneTab } from '../paneTabs'
-import { dragCenterX, insertIndexAt } from '../tabDragGeometry'
+import { dragCenterX, insertIndexAt, isWithinStripBand } from '../tabDragGeometry'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
 
@@ -24,6 +24,9 @@ const DRAG_START_PX = 4
 const STRIP_BLEED_X = 6
 const STRIP_BLEED_TOP = 4
 const STRIP_BLEED_BOTTOM = 8
+/** 拆窗磁性带:条带贴着窗口顶边,指针离条带这么近就仍算在带上(只重排不拆窗)。
+    口径同 Chromium 的 detach magnetism,数值放大一档 —— 我们的条带顶边就是窗口顶边 */
+const DETACH_MAGNETISM_PX = 32
 /** 正文区边缘分屏带的横向占比(封顶 120px):贴到亮半边提示 —— VS Code 同款手势 */
 /** 定向拆半屏的判定带:正文左右各 1/3 宽、全高都算数(产品定的手感:拖到三分之一就亮蓝) */
 const SPLIT_EDGE_THIRD = 1 / 3
@@ -67,6 +70,8 @@ interface TabDragState {
   phase: ChipPhase
   settle?: SettleRect
   leaving: boolean
+  /** 指针已出窗且离开条带磁性带:松手就拆新窗,胶囊此时挂窗口预告样式 */
+  willDetach: boolean
 }
 
 /** 一条页签带的几何快照:拖动开始时量一次 —— 让位动画期间 DOM 一直在动,不能逐帧问它 */
@@ -360,13 +365,32 @@ export function TopBarTabs({
           slideMinL: ownSnap?.mids[0]?.left ?? rect.left,
           slideMaxR: ownSnap?.mids[ownSnap.mids.length - 1]?.right ?? rect.right,
           phase: 'born',
-          leaving: false
+          leaving: false,
+          willDetach: false
         })
         return
       }
-      setDrag((d) => (d ? { ...d, x: cx, y: cy } : d))
-      // ── 落点判定:窗外 → 页签带 → 正文区 → 无处 ──
-      if (cx < 0 || cy < 0 || cx >= view.innerWidth || cy >= view.innerHeight) {
+      // ── 落点判定:出窗且离开磁性带 → 页签带 → 正文区 → 无处 ──
+      // 条带贴着窗口顶边:不设磁性带的话指针向上几像素就出窗,会被判成拆窗
+      const outOfWindow = cx < 0 || cy < 0 || cx >= view.innerWidth || cy >= view.innerHeight
+      const bandOf = (s: StripSnap): boolean =>
+        isWithinStripBand(
+          cx,
+          cy,
+          {
+            left: s.left,
+            right: s.right,
+            top: s.top,
+            bottom: s.bottom,
+            bleedTop: STRIP_BLEED_TOP,
+            bleedBottom: STRIP_BLEED_BOTTOM,
+            bleedX: STRIP_BLEED_X
+          },
+          DETACH_MAGNETISM_PX
+        )
+      const willDetach = outOfWindow && !snaps.some(bandOf)
+      setDrag((d) => (d ? { ...d, x: cx, y: cy, willDetach } : d))
+      if (willDetach) {
         zone = { type: 'outside' }
         setGap(null)
         setDropMark(null)
@@ -374,12 +398,7 @@ export function TopBarTabs({
       }
       let hit = false
       for (const s of snaps) {
-        if (
-          cy >= s.top - STRIP_BLEED_TOP &&
-          cy <= s.bottom + STRIP_BLEED_BOTTOM &&
-          cx >= s.left - STRIP_BLEED_X &&
-          cx <= s.right + STRIP_BLEED_X
-        ) {
+        if (bandOf(s)) {
           const mids = s.groupId === srcGroupId ? s.mids.filter((m) => m.id !== t.id) : s.mids
           // 判定看被拖签的投影中心,不是裸指针:抓在签的哪一头会差出小半张签宽。
           // 本组用真身宽,别家条带用胶囊实宽 —— 胶囊收窄过,中心才跟眼睛对得上
@@ -547,7 +566,9 @@ export function TopBarTabs({
           ref={chipRef}
           className={`tabbar-tab is-chip${drag.phase === 'drag' ? ' is-morph' : ''}${
             drag.phase === 'settle' ? ' is-settle is-tablook' : ''
-          }${drag.phase === 'enter' ? ' is-tablook' : ''}${drag.leaving ? ' is-leaving' : ''}`}
+          }${drag.phase === 'enter' ? ' is-tablook' : ''}${drag.leaving ? ' is-leaving' : ''}${
+            drag.phase === 'drag' && drag.willDetach ? ' is-detach' : ''
+          }`}
           style={
             drag.phase === 'born'
               ? { left: drag.srcLeft, top: drag.srcTop, width: 'auto', opacity: 0 }
