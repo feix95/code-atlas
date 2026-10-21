@@ -1,0 +1,220 @@
+/* 自由对话输入舱附件原子、发送钮与斜杠补全(从 free-chat.css 拆出:纯迁移,不改行为) */
+
+/* 内嵌引用原子:图标+底色小块,躺在文字流里,光标顶头退格删整颗 */
+.fc-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  max-width: 100%;
+  padding: 0.0625rem 0.25rem 0.0625rem 0.3125rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--muted) 10%, var(--surface));
+  color: var(--text);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+.fc-ref-ic {
+  flex: none;
+  color: var(--muted);
+}
+
+.fc-ref-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-xs);
+}
+
+.fc-ref-x {
+  flex: none;
+  padding: 0 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.fc-ref-x:hover {
+  color: var(--danger);
+}
+
+/* 待发文件原子(文件附件批次):文件名躺在文字流里,与引用原子同一排面;常驻,每轮都带上 */
+.fc-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  max-width: 100%;
+  padding: 0.0625rem 0.25rem 0.0625rem 0.3125rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--muted) 10%, var(--surface));
+  color: var(--text);
+  font-size: var(--font-sm);
+  line-height: var(--lh-150);
+}
+
+.fc-file-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-xs);
+}
+
+.fc-file-x {
+  flex: none;
+  padding: 0 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.fc-file-x:hover {
+  color: var(--danger);
+}
+
+/* 待发图片原子(第一百五十二批):缩略图小块+×,与引用原子同一排面躺在文字流里 */
+.fc-img {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  padding: 0.125rem;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--muted) 10%, var(--surface));
+  line-height: var(--lh-100);
+}
+
+.fc-img-thumb {
+  width: 2rem;
+  height: 2rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  display: block;
+}
+
+.fc-img-x {
+  flex: none;
+  padding: 0 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.fc-img-x:hover {
+  color: var(--danger);
+}
+
+/* 发送/停一停:同一配额换岗 —— 平时实心墨圆白箭头,忙着换成同款墨圆白方块 */
+.fc-send {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text-strong);
+  color: var(--surface);
+  cursor: pointer;
+}
+
+.fc-send:hover {
+  background: var(--text);
+}
+
+.fc-send:disabled {
+  background: color-mix(in srgb, var(--muted) 28%, var(--surface));
+  color: var(--muted);
+  cursor: default;
+}
+
+.fc-sq {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 2px;
+  background: var(--surface);
+}
+
+/* 展开/收合的拨杆:钉在容器右上角;满五行才渲染,这里只管摆位 */
+.composer-expand {
+  position: absolute;
+  top: 0.4375rem;
+  right: 0.4375rem;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.composer-expand:hover {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--text);
+}
+
+/* 斜杠命令补全(打 / 浮出的命令清单):钉在输入舱正上方,和舱口留出一段固定空隙;
+ * 每行 = 等宽命令名 + 一句说明。皮相照设置页下拉那一套(圆角/边线/浮影/选中底) */
+.slash-palette {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 16rem;
+  max-width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0.375rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slash-item:hover {
+  background: var(--hover);
+}
+
+.slash-item.is-active {
+  background: var(--selected-bg);
+}
+
+.slash-name {
+  flex: none;
+  font-family: var(--mono);
+}
+
+.slash-desc {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
