@@ -3,8 +3,8 @@ import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 /** size 的语义:100% 缩放下的 px;落 svg 时换算成 rem,图标(含线宽)随界面缩放档一起涨缩 */
 const iconRem = (px: number): string => `${(px / ROOT_FONT_BASE_PX).toFixed(4)}rem`
 
-/* ── 文件树图标配色(图标册 v5):文件/文件夹辨识色只用于文件树与盘符下钻;
- *  其他界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。 ── */
+/* ── 文件/文件夹辨识色(图标册 v5):文件树、盘符浏览、搜索命中同一套 ICON_COLORS;
+ *  其余界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。 ── */
 const ICON_COLORS: Record<string, string> = {
   file: '#8fa8cc',
   folder: '#eab75c',
@@ -503,8 +503,32 @@ const BOOK: Record<string, React.ReactNode> = {
   ),
   copy: (
     <>
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </>
+  ),
+  // 剪切(lucide scissors):文本编辑菜单
+  scissors: (
+    <>
+      <circle cx="6" cy="6" r="3" />
+      <path d="M8.12 8.12 12 12" />
+      <path d="M20 4 8.12 15.88" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M14.8 14.8 20 20" />
+    </>
+  ),
+  // 粘贴(lucide clipboard):文本编辑菜单;clip 是回形针,这块才是剪贴板
+  clipboard: (
+    <>
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </>
+  ),
+  // 全选(lucide square-check):文本编辑菜单
+  squareCheck: (
+    <>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="m16 9-5.5 5.5L8 12" />
     </>
   ),
   gitbranch: (
@@ -858,7 +882,7 @@ const BOOK: Record<string, React.ReactNode> = {
 }
 
 /** 按册画图:查无此图时老实回「文件」底样,不空手;strokeWidth 供个别图加粗(发送箭头);
- *  默认去色吃 currentColor;仅文件树/盘符浏览明确传 mono=false 保留类型辨识色 */
+ *  默认去色吃 currentColor;文件树/盘符浏览/搜索命中传 mono=false,吃同一套 ICON_COLORS */
 export function TreeIcon({
   name,
   size = 13,

@@ -9,13 +9,15 @@ import {
 } from './contextMenuStore'
 import { useMenuDismiss } from '../useMenuDismiss'
 import { TreeIcon } from './Icons'
-import { MENU_ICON_SIZE } from '../inputMetrics'
+import { MENU_ICON_ONLY_SIZE, MENU_ICON_SIZE } from '../inputMetrics'
 
 /**
  * 通用右键菜单(第二台全局单例):不是「对着文件」的右键菜单走这儿 ——
  * 调用方报坐标 + 行项清单,皮肤复用 file-path-menu 那一套(全 app 右键菜单一个规格)。
  * 行项的 run 返回字符串时,那一行先亮出这句反馈(「已复制 ✓」式)停一拍再关闭。
  * 行项清单里插 MENU_SEP = 组间一道细线(Obsidian 式分组);item.icon 走 TreeIcon 行内图;
+ * iconOnly = 纯图标方钮竖排,悬停向右展开露出文字(输入框编辑菜单);
+ * compact = 窄身文字档(导出格式那挂);
  * { heading } = 分区小标题;item.switchOn = 开关行(复用设置页 .cfg-switch,点了不关闭)。
  * 渲染域隔离:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
  */
@@ -26,21 +28,29 @@ const MENU_W = 200
 const SUB_W = 190
 /** 父行右缘到二级菜单左缘的缝:让开一级菜单的 4px 内边距,再留 2px 视觉缝 */
 const SUB_GAP = 6
-/** 窄身档的估宽(compact 菜单,比如输入框的复制/粘贴两行) */
+/** 窄身档的估宽(compact 菜单,比如导出格式那挂) */
 const MENU_W_COMPACT = 96
+/** 纯图标档收起估宽:方钮 2.25rem + 内边距 + 1px 边框×2,100% 缩放下约 46px */
+const MENU_W_ICON_ONLY = 46
+/** 纯图标档展开估宽:给「剪切」等两字标签 + 反馈句留空,贴右边时用来决定往哪边长 */
+const MENU_W_ICON_EXPANDED = 256
 const ROW_H = 34
 /** 窄身档的行高(行高 1.2 + 上下边距各 0.25rem ≈ 24px,和 is-compact 的 CSS 账对得上) */
 const ROW_H_COMPACT = 24
+/** 纯图标档的方钮边长(2.25rem,100% 缩放下 36px) */
+const ROW_H_ICON_ONLY = 36
 /** 组间细线在估高里的份额:1px 线 + 上下各 ~3px 外距 */
 const SEP_H = 7
 /** 分区小标题行的估高:小字一行 + 上下透气 */
 const HEADING_H = 26
-/** 外框一圈的厚度(边框 + 内边距)在估高里的份额:通用档 10px,窄身档 6px */
+/** 外框一圈的厚度(边框 + 内边距)在估高里的份额:通用档 10px,窄身档 6px,纯图标档 8px */
 const CHROME = 10
 const CHROME_COMPACT = 6
+const CHROME_ICON_ONLY = 10
 const EDGE = 8
-/** 菜单和光标之间的空隙:一个汉字宽(约两个字节,产品指定的距离感) */
-const CURSOR_GAP = 12
+/** 菜单相对光标的空隙:横向约两个汉字,纵向一个汉字 */
+const CURSOR_GAP_X = 24
+const CURSOR_GAP_Y = 12
 /** 行内反馈停一拍的时长:让人亲眼看到结果,不是菜单凭空消失 */
 const LINGER_MS = 900
 
@@ -51,18 +61,22 @@ function clampedPosition(
   view: Window,
   menuW: number,
   preferRight: boolean
-): { left: number; top: number } {
+): { left: number; top: number; pinBottom: number | null } {
   if (preferRight) {
-    // 正右侧出生:框以光标为高线居中,左缘隔空一个汉字;右边挤不下就翻到光标左边
-    const fitsRight = x + CURSOR_GAP + menuW + EDGE <= view.innerWidth
+    // 鼠标右上角出生:钉住菜单底缘在光标上方一个汉字,左缘在光标右边约两个汉字;
+    // 底缘用 CSS bottom 钉,不靠估高,真实高度往上长。右边挤不下翻左,上边挤不下翻下。
+    const fitsRight = x + CURSOR_GAP_X + menuW + EDGE <= view.innerWidth
+    const fitsAbove = y - CURSOR_GAP_Y - menuH >= EDGE
     return {
-      left: fitsRight ? x + CURSOR_GAP : Math.max(EDGE, x - menuW - CURSOR_GAP),
-      top: Math.max(EDGE, Math.min(y - menuH / 2, view.innerHeight - menuH - EDGE))
+      left: fitsRight ? x + CURSOR_GAP_X : Math.max(EDGE, x - menuW - CURSOR_GAP_X),
+      top: fitsAbove ? 0 : Math.min(y + CURSOR_GAP_Y, view.innerHeight - menuH - EDGE),
+      pinBottom: fitsAbove ? view.innerHeight - y + CURSOR_GAP_Y : null
     }
   }
   return {
     left: Math.max(EDGE, Math.min(x, view.innerWidth - menuW - EDGE)),
-    top: Math.max(EDGE, Math.min(y, view.innerHeight - menuH - EDGE))
+    top: Math.max(EDGE, Math.min(y, view.innerHeight - menuH - EDGE)),
+    pinBottom: null
   }
 }
 
@@ -104,20 +118,25 @@ function ContextMenuCard({
   const [expanded, setExpanded] = useState<number | null>(null)
   /** 二级菜单的落点(视口坐标,贴着父行右侧;右边挤不下翻左侧) */
   const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
-  const rowH = request.compact ? ROW_H_COMPACT : ROW_H
+  const iconOnly = request.iconOnly === true
+  const rowH = iconOnly ? ROW_H_ICON_ONLY : request.compact ? ROW_H_COMPACT : ROW_H
+  const chrome = iconOnly ? CHROME_ICON_ONLY : request.compact ? CHROME_COMPACT : CHROME
+  const menuW = iconOnly ? MENU_W_ICON_ONLY : request.compact ? MENU_W_COMPACT : MENU_W
   const entryH = (it: (typeof request.items)[number]): number =>
     it === MENU_SEP ? SEP_H : isMenuHeading(it) ? HEADING_H : rowH
-  const baseH =
-    request.items.reduce((h, it) => h + entryH(it), 0) + (request.compact ? CHROME_COMPACT : CHROME)
+  const baseH = request.items.reduce((h, it) => h + entryH(it), 0) + chrome
   const menuH = baseH
+  const view = doc.defaultView ?? window
   const pos = clampedPosition(
     request.x,
     request.y,
     menuH,
-    doc.defaultView ?? window,
-    request.compact ? MENU_W_COMPACT : MENU_W,
+    view,
+    menuW,
     request.preferRight === true
   )
+  /** 右边不够展开就钉住右缘往左长,图标列位置不动 */
+  const expandLeft = iconOnly && pos.left + MENU_W_ICON_EXPANDED + EDGE > view.innerWidth
 
   /** 二级菜单贴着父行右侧出生;右边挤不下就翻到左侧,上下同样往里收 */
   function clampSub(row: HTMLElement, rows: number): { left: number; top: number } {
@@ -142,8 +161,13 @@ function ContextMenuCard({
   }
   return (
     <div
-      className={`file-path-menu${request.compact ? ' is-compact' : ''}`}
-      style={{ left: pos.left, top: pos.top }}
+      className={`file-path-menu${iconOnly ? ' is-icon-only' : request.compact ? ' is-compact' : ''}${expandLeft ? ' is-expand-left' : ''}`}
+      style={{
+        ...(expandLeft
+          ? { right: view.innerWidth - pos.left - menuW, left: 'auto' }
+          : { left: pos.left }),
+        ...(pos.pinBottom !== null ? { top: 'auto', bottom: pos.pinBottom } : { top: pos.top })
+      }}
       role="menu"
     >
       {request.items.map((item, i) => {
@@ -160,6 +184,7 @@ function ContextMenuCard({
         const isSwitch = item.switchOn !== undefined
         const switchOn = flipped[i] ?? item.switchOn === true
         const hasSub = item.children !== undefined && item.children.length > 0
+        const caption = lingering?.index === i ? lingering.text : item.label
         return (
           <Fragment key={i}>
             <button
@@ -201,12 +226,14 @@ function ContextMenuCard({
             >
               {item.icon !== undefined && (
                 <span className="fpm-ic" aria-hidden="true">
-                  <TreeIcon name={item.icon} size={MENU_ICON_SIZE} mono />
+                  <TreeIcon
+                    name={item.icon}
+                    size={iconOnly ? MENU_ICON_ONLY_SIZE : MENU_ICON_SIZE}
+                    mono
+                  />
                 </span>
               )}
-              <span className="fpm-label">
-                {lingering?.index === i ? lingering.text : item.label}
-              </span>
+              <span className="fpm-label">{caption}</span>
               {isSwitch && (
                 <span
                   className={`cfg-switch fpm-switch${switchOn ? ' is-on' : ''}`}

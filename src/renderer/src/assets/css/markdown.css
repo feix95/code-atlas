@@ -360,7 +360,7 @@
   box-shadow: var(--shadow-pop);
 }
 
-/* 窄身档:行项少的菜单(输入框复制/粘贴那挂)贴着字宽摆,不按 12rem 撑开;
+/* 窄身档:行项少的菜单(导出格式那挂)贴着字宽摆,不按 12rem 撑开;
    字号吃 --font-md,和输入框文字同一个 token(尺寸小葵逐数定的) */
 .file-path-menu.is-compact {
   min-width: 3.75rem;
@@ -371,6 +371,76 @@
   padding: 0.25rem;
   font-size: var(--font-md);
   line-height: 1.2;
+}
+
+/* 纯图标窄条:收起只露方钮,悬停/聚焦/反馈时瞬间切到图标+文字,不走过渡。 */
+.file-path-menu.is-icon-only {
+  --icon-only-tile: 2.25rem;
+  min-width: 0;
+  width: max-content;
+  max-width: calc(var(--icon-only-tile) + var(--space-1) * 2 + 2px);
+  padding: var(--space-1);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.file-path-menu.is-icon-only:hover,
+.file-path-menu.is-icon-only:focus-within,
+.file-path-menu.is-icon-only:has(.is-ok) {
+  max-width: 16rem;
+}
+
+.file-path-menu.is-icon-only .file-path-menu-item {
+  width: max-content;
+  height: var(--icon-only-tile);
+  padding: 0;
+  justify-content: flex-start;
+  gap: 0;
+  border-radius: var(--radius-sm);
+}
+
+.file-path-menu.is-icon-only .fpm-ic {
+  width: var(--icon-only-tile);
+  height: var(--icon-only-tile);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--chrome-ink);
+}
+
+.file-path-menu.is-icon-only .fpm-label {
+  flex: none;
+  padding-right: 0.625rem;
+  opacity: 0;
+}
+
+.file-path-menu.is-icon-only:hover .fpm-label,
+.file-path-menu.is-icon-only:focus-within .fpm-label,
+.file-path-menu.is-icon-only:has(.is-ok) .fpm-label {
+  opacity: 1;
+}
+
+.file-path-menu.is-icon-only .file-path-menu-item:hover:not([aria-disabled='true']),
+.file-path-menu.is-icon-only .file-path-menu-item:focus-visible:not([aria-disabled='true']) {
+  background: var(--chrome-hover);
+  color: inherit;
+}
+
+.file-path-menu.is-icon-only .file-path-menu-item:hover .fpm-ic,
+.file-path-menu.is-icon-only .file-path-menu-item:focus-visible .fpm-ic {
+  color: var(--chrome-ink);
+}
+
+.file-path-menu.is-icon-only .file-path-menu-item[aria-disabled='true'] .fpm-ic {
+  color: var(--muted-2);
+}
+
+.file-path-menu.is-icon-only .file-path-menu-item.is-ok .fpm-ic {
+  color: var(--green);
 }
 
 .file-path-menu-item {

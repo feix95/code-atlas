@@ -15,6 +15,8 @@ export const MSG_ACTION_ICON_SIZE = 13
 export const INLINE_ICON_SIZE = 12
 /** 右键菜单行内图标的尺寸(通用 ContextMenu 一档):比行字略大、不占行高 */
 export const MENU_ICON_SIZE = 14
+/** 纯图标菜单的图标尺寸(对照视觉参考 icon-only;线宽走 TreeIcon 默认 2) */
+export const MENU_ICON_ONLY_SIZE = 17
 
 /** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和独立子窗同一颗钮,同同一数据源 */
 export const WIN_ICON_SIZE = 18

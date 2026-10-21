@@ -11,7 +11,7 @@ export interface ContextMenuItem {
   disabled?: boolean
   /** 悬停轻提示(data-tip) */
   tip?: string
-  /** 行内图标(TreeIcon 登记名):带图标档的菜单(Obsidian 式页签菜单)才摆,窄身档不带 */
+  /** 行内图标(TreeIcon 登记名):带图标档与纯图标档才摆,窄身文字档不带 */
   icon?: string
   /** 开关行:有值 = 行尾画一颗开关(true=开),点一下拨动且菜单不关闭,让人亲眼看到状态翻面;
    *  开关画面由菜单自己翻(各开关互相独立),run 只管把账改掉 */
@@ -44,7 +44,9 @@ export interface ContextMenuRequest {
   items: ContextMenuEntry[]
   /** 窄身档:行项少的菜单(两三行)别按通用宽度撑开,贴着字宽摆 */
   compact?: boolean
-  /** 生在光标正右侧(垂直居中对光标、左缘隔空一个汉字):贴着输入区的小菜单顺手位 */
+  /** 纯图标档:方钮竖排,悬停整栏向右展开露出文字(输入框剪切复制粘贴全选) */
+  iconOnly?: boolean
+  /** 生在光标右上角(左缘约两个汉字、底缘一个汉字):输入框编辑菜单的顺手位 */
   preferRight?: boolean
 }
 

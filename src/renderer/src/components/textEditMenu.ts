@@ -1,10 +1,10 @@
 /**
- * 文本输入框的右键编辑菜单(复制/粘贴)。
+ * 文本输入框的右键编辑菜单(剪切/复制/粘贴/全选)。
  * 自由对话输入舱与 workspace 路径栏共用:Electron 没有原生编辑菜单,
- * 这里统一摆一张窄身菜单,选中态在开菜单前定格(右键落点即光标位)。
+ * 这里统一摆一张可展开的纯图标菜单(悬停向右长出文字),选中态在开菜单前定格。
  */
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import { openContextMenu, type ContextMenuItem } from './contextMenuStore'
+import { MENU_SEP, openContextMenu, type ContextMenuEntry } from './contextMenuStore'
 
 type TextControl = HTMLInputElement | HTMLTextAreaElement
 
@@ -36,9 +36,10 @@ export function openTextEditMenu<T extends TextControl>({
   const splice = (inserted: string): void => {
     applyEdit(value.slice(0, start) + inserted + value.slice(end), start + inserted.length)
   }
-  const buildItems = (clip: string): ContextMenuItem[] => [
+  const buildItems = (clip: string): ContextMenuEntry[] => [
     {
       label: '剪切',
+      icon: 'scissors',
       disabled: !picked,
       run: () =>
         navigator.clipboard
@@ -51,6 +52,7 @@ export function openTextEditMenu<T extends TextControl>({
     },
     {
       label: '复制',
+      icon: 'copy',
       disabled: !picked,
       run: () =>
         navigator.clipboard
@@ -61,9 +63,16 @@ export function openTextEditMenu<T extends TextControl>({
           })
           .catch(() => '没复制成,剪贴板被顶住了')
     },
-    { label: '粘贴', disabled: clip === '', run: () => splice(clip) },
+    {
+      label: '粘贴',
+      icon: 'clipboard',
+      disabled: clip === '',
+      run: () => splice(clip)
+    },
+    MENU_SEP,
     {
       label: '全选',
+      icon: 'squareCheck',
       disabled: value === '',
       run: () => {
         el.focus()
@@ -76,7 +85,7 @@ export function openTextEditMenu<T extends TextControl>({
       x,
       y,
       doc: el.ownerDocument,
-      compact: true,
+      iconOnly: true,
       preferRight: true,
       items: buildItems(clip)
     })
