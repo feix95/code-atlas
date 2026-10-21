@@ -26,6 +26,8 @@
 @import './css/drawers.css';
 @import './css/home.css';
 @import './css/settings.css';
+@import './css/settings-controls.css';
+@import './css/settings-modal.css';
 @import './css/launchplan.css';
 @import './css/personalize.css';
 @import './css/statusbar.css';

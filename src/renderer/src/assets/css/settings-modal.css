@@ -1,0 +1,137 @@
+/* 设置页模型货架弹层(从 settings.css 拆出:纯迁移,不改行为) */
+
+/* ── 模型货架弹层:遮罩 + 居中卡(Obsidian 社区插件浏览器式),真货架面板装在里面 ── */
+.shelf-mask {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.shelf-modal {
+  width: 35rem;
+  max-width: calc(100vw - 4rem);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas-tint);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+
+.shelf-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.shelf-modal-head b {
+  color: var(--text);
+  font-size: 0.90625rem;
+  font-weight: var(--font-w-semi);
+}
+
+.shelf-close {
+  width: 1.625rem;
+  height: 1.625rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--chrome-muted);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  cursor: pointer;
+}
+
+.shelf-close:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* 面板装进弹层:它自己的滚动窗接管高度,弹层只提供外框;
+   原内嵌版面的 margin(顶距/右侧让位)在弹层里全部归零、四周对称留气 */
+.shelf-modal .shelf {
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+}
+
+.shelf-modal .shelf-name {
+  font-family: var(--mono);
+  font-size: 0.78125rem;
+}
+
+.shelf-modal .shelf-sub {
+  font-size: 0.71875rem;
+  color: var(--chrome-muted);
+}
+
+/* 内嵌模式的圆角大内框在弹层里归零:筛选栏/列表直接坐弹层底,发丝线归位 */
+.shelf-modal .shelf-frame {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.shelf-modal .shelf-toolbar {
+  font-size: 0.75rem;
+}
+
+/* 稿子的列表盒(.modal-list):横向 16px 内缩,行间发丝线不通到弹层边;
+   行垫 12/2 = 稿子 .mrow 的呼吸 */
+.shelf-modal .shelf-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 0.25rem 1rem;
+}
+
+.shelf-modal .shelf-row {
+  padding: 0.75rem 0.125rem;
+}
+
+/* 弹层里的下载/选中钮回中性白底描边(稿子的 .btn);「使用中」类绿章保色 */
+.shelf-modal .shelf-dl-btn {
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.375rem;
+  background: var(--canvas-tint);
+  color: var(--text);
+  font-size: 0.78125rem;
+}
+
+.shelf-modal .shelf-dl-btn:hover {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
+.shelf-modal .shelf-dl-done {
+  border: 1px solid var(--green-line);
+  border-radius: 0.375rem;
+  padding: 0 0.75rem;
+  height: 1.875rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 底脚一行灰字稿注:榜单排序以外的选型提醒 */
+.shelf-modal-foot {
+  padding: 0.625rem 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.71875rem;
+  color: var(--chrome-muted);
+}

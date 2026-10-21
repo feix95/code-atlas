@@ -528,3 +528,4 @@
 - refactor(ui): free-chat.css 按职责拆出输入舱、附件原子、思考行、灰字条
 - refactor(ui): ui-workbench.css 按职责拆出选中覆盖层、属性面板、左侧栏
 - refactor(ui): workspace.css 按职责拆出预览、编辑器、文件树
+- refactor(ui): settings.css 按职责拆出控件行、模型货架弹层
