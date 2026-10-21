@@ -6,7 +6,7 @@ import type { SearchNameHit } from '../../../shared/searchNames.ts'
 import { SEARCH_NAMES_MAX } from '../../../shared/searchNames.ts'
 import { TreeIcon } from './Icons'
 
-/** 与 FileTree 同一颗图标旋钮(文件树外一律单色) */
+/** 与 FileTree 同一颗图标旋钮;着色走 TreeIcon 的 ICON_COLORS,不另起一套 */
 const HIT_ICON_SIZE = 18
 
 export function SearchResults({
@@ -53,7 +53,7 @@ export function SearchResults({
                     <TreeIcon
                       name={hit.kind === 'directory' ? 'folder' : 'file'}
                       size={HIT_ICON_SIZE}
-                      mono
+                      mono={false}
                     />
                   </span>
                   <span className="tree-name">{hit.name}</span>
