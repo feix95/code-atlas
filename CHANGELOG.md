@@ -511,3 +511,4 @@
 - chore: 移除 graphify 的 Cursor 规则、husky 钩子与文档口径
 - feat(ui): 路径栏与对话输入框共用右键剪切复制粘贴全选菜单,路径栏双击全选
 - chore: 升级 vite 到 7.3.7,修复 launch-editor 高危漏洞闸
+- chore: CI 在打向 main 的 PR 上跑全套自测作为合进前闸,push main 仍跑挡住直推

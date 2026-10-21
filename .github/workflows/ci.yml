@@ -1,7 +1,9 @@
-# 推 main 到远端后跑全套自测(合并后闸);哪锤改坏了当场报警,本地合进 main 前仍须自测全绿
+# PR 打向 main 时跑全套自测,作为合进前检查闸;push main 仍跑,挡住不经 PR 直推。不含 test:journey;本地合进 main 前仍须自测全绿
 name: CI
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 
