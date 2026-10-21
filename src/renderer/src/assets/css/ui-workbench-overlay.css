@@ -1,0 +1,129 @@
+/* UI 工作台选中覆盖层、框选与绘制光标(从 ui-workbench.css 拆出:纯迁移,不改行为) */
+
+/* 选中覆盖层:示意线条与手柄一律功能蓝,不进设计数值;本体不拦指针,仅手柄热区可点 */
+.uwb-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.uwb-sel {
+  fill: none;
+  stroke: var(--sash-hi);
+  stroke-width: 1.5px;
+}
+
+.uwb-radius-handle,
+.uwb-knob,
+.uwb-corner-handle,
+.uwb-edge-handle,
+.uwb-endpoint-handle {
+  fill: var(--uwb-handle-fill);
+  stroke: var(--sash-hi);
+  stroke-width: 1.5px;
+}
+
+.uwb-corner-handle,
+.uwb-edge-handle {
+  pointer-events: all;
+}
+
+.uwb-radius-handle {
+  pointer-events: all;
+}
+
+.uwb-endpoint-handle {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.uwb-endpoint-handle:hover {
+  fill: var(--sash-hi);
+}
+
+.uwb-radius-handle:hover {
+  fill: var(--sash-hi);
+}
+
+.uwb-knob-stem {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+  opacity: 0;
+}
+
+.uwb-knob {
+  opacity: 0;
+}
+
+.uwb-knob-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: grab;
+}
+
+.uwb-knob-zone:hover .uwb-knob,
+.uwb-knob-zone:hover .uwb-knob-stem,
+.uwb-overlay.is-knob-live .uwb-knob,
+.uwb-overlay.is-knob-live .uwb-knob-stem {
+  opacity: 1;
+}
+
+/* 对齐引导线:拖动吸附命中时贯穿两边的细线(Figma 红线 / PS 洋红线的本色版) */
+.uwb-guide {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+}
+
+/* 间距标注:线段 + 端点短横 + 数值,与对齐引导线同色 */
+.uwb-gap-line {
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+}
+
+.uwb-gap-label {
+  fill: var(--sash-hi);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-medium);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+
+/* 框选选框:功能蓝虚线 + 浅蓝底(Figma 同款视觉语言),手势示意不进设计数值 */
+.uwb-marquee {
+  fill: color-mix(in srgb, var(--sash-hi) 12%, transparent);
+  stroke: var(--sash-hi);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+
+/* 多选态属性面板:数量卡 + 一句可用操作提示 */
+.uwb-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.uwb-multi-hint {
+  color: var(--muted-2);
+  font-size: 0.75rem;
+}
+
+.uwb-viewport.is-tool-rect,
+.uwb-viewport.is-tool-line {
+  cursor: crosshair;
+}
+
+/* 绘制工具(矩形/直线)下按住空格平移时抓手优先(后于 is-tool-* 生效) */
+.uwb-viewport.is-tool-rect.is-pan-ready,
+.uwb-viewport.is-tool-line.is-pan-ready {
+  cursor: grab;
+}
+
+.uwb-viewport.is-tool-rect.is-pan-panning,
+.uwb-viewport.is-tool-line.is-pan-panning {
+  cursor: grabbing;
+}

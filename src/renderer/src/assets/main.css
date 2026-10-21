@@ -34,3 +34,6 @@
 @import './css/modelshelf.css';
 @import './css/graph.css';
 @import './css/ui-workbench.css';
+@import './css/ui-workbench-overlay.css';
+@import './css/ui-workbench-inspector.css';
+@import './css/ui-workbench-sidebar.css';

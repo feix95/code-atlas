@@ -1,0 +1,183 @@
+/* UI 工作台右侧属性面板(从 ui-workbench.css 拆出:纯迁移,不改行为) */
+
+.uwb-export {
+  margin-right: auto;
+}
+
+.uwb-inspector {
+  flex-shrink: 0;
+  width: var(--uwb-inspector-w);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome-panel);
+  border-left: 1px solid var(--line);
+}
+
+.uwb-inspector-head {
+  flex-shrink: 0;
+  height: var(--u);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-zoom {
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.uwb-inspector-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* 属性面板分区 */
+.uwb-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.uwb-section-title {
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+}
+
+.uwb-select {
+  width: 100%;
+}
+
+.uwb-field-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.uwb-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.uwb-field-label,
+.uwb-field-unit {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+/* 数值框标签可拖拽调值(PS 式):悬停即左右拖拽光标,不选中文字 */
+.uwb-field-label.is-scrub {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.uwb-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 0 var(--space-2);
+}
+
+/* 宽高行内的 ghost 图标钮(对调 / 存删预设);aria-disabled 保留悬停读 data-tip 的能力 */
+.uwb-field-btn {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  color: var(--muted-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.uwb-field-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.uwb-field-btn:focus-visible {
+  outline: 1.5px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+.uwb-field-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.uwb-field-btn[aria-disabled='true']:hover {
+  color: var(--muted-2);
+  background: transparent;
+}
+
+/* 当前尺寸已是我的预设:书签钮用功能强调色,一眼看出已存 */
+.uwb-field-btn.is-saved {
+  color: var(--sash-hi);
+}
+
+/* 填充/描边为空态:占位说明文字 */
+.uwb-field-empty {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+}
+
+/* 颜色框里的色板:与输入框同高,内衬取色块 */
+.uwb-swatch {
+  flex: none;
+  align-self: center;
+  width: 2rem;
+  height: 1.875rem;
+  padding: var(--space-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  cursor: pointer;
+}
+
+.uwb-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.uwb-swatch::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--radius-xs);
+}
+
+.uwb-swatch:focus-visible {
+  outline: 1.5px solid var(--sash-hi);
+  outline-offset: 1px;
+}
+
+/* 属性行内的下拉(描边线型):与数值框平分行宽 */
+.uwb-field-row > .uwb-select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 样式分区:命名输入框占满行宽(cfg-input 自带固定宽,这里压回弹性) */
+.uwb-style-name {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
