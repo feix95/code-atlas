@@ -7,6 +7,9 @@
 @import './css/toast.css';
 @import './css/auxwin.css';
 @import './css/workspace.css';
+@import './css/workspace-preview.css';
+@import './css/workspace-editor.css';
+@import './css/workspace-tree.css';
 @import './css/tree-note.css';
 @import './css/workspace-menu.css';
 @import './css/translate.css';

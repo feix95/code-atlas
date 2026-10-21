@@ -527,3 +527,4 @@
 - refactor(ui): markdown.css 按职责拆出右键菜单皮肤、Live Preview 表格、文件树小笔动画,聊天动作样式归入 ai-chat.css
 - refactor(ui): free-chat.css 按职责拆出输入舱、附件原子、思考行、灰字条
 - refactor(ui): ui-workbench.css 按职责拆出选中覆盖层、属性面板、左侧栏
+- refactor(ui): workspace.css 按职责拆出预览、编辑器、文件树

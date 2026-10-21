@@ -1,0 +1,156 @@
+/* 文件树、扫描状态点与深搜结果(从 workspace.css 拆出:纯迁移,不改行为) */
+
+.status-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-right: 0.3125rem;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* 还有没探完的目录:琥珀点,提醒但不是错 */
+.status-dot.is-amber {
+  background: var(--amber);
+}
+
+/* 探测失败等人话提示:贴在树栏底部 */
+.tree-toast {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px dashed var(--danger-line);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-md);
+  color: var(--danger);
+}
+
+/* ── 目录树:箭头管展开,名字管选中 ── */
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  /* 行高 0.6u(§7 的 0.75u 实测偏疏,小葵连压两档定稿):紧凑档,图标字仍从容 */
+  height: calc(var(--u) * 0.6);
+  margin: 1px 0;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-2) var(--ease-smooth);
+  /* 轻量虚拟化(第九十六批):视口外的行让浏览器跳过渲染,展开 node_modules 这类
+     几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto calc(var(--u) * 0.6);
+}
+
+.tree-row:hover {
+  background: var(--hover);
+}
+
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六批摘遮罩,底色不再染色) */
+.tree-row.is-selected {
+  background: var(--selected-bg);
+}
+
+/* 懒加载探测中的小圈圈(§7 摘三角后挂在图标位) */
+.tree-spin {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border: 2px solid var(--accent-line);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tree-spin {
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tree-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 100%;
+  padding: 0 0.125rem 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  /* 文件名 ≈0.95rem(§7 按图推算):比 UI 中档字大一档 */
+  font-size: 0.95rem;
+  font-family: inherit;
+  text-align: left;
+  /* 树行悬停不出小手(小葵实测):行内容就是「文本」,鼠标保持箭头;
+     可点与否由 hover 底色表达,不靠光标形状 */
+  cursor: default;
+}
+
+.tree-row.is-selected .tree-main {
+  color: var(--accent-bright);
+}
+
+.tree-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  /* 图标跟随行字色(Obsidian 换皮):常规 muted、选中亮档,不再单独压暗 */
+  color: inherit;
+}
+
+.tree-icon svg {
+  display: block;
+}
+
+.tree-name {
+  /* 60% 上限随小灰字退役:名字吃到行右缘为止,只给徽章/笔帽标让座(flex 0 0 auto 先占),其余空间全归名字 */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 文件名不再单独染色(Obsidian 无色皮):树行字统一 muted,只有选中行整行提亮 */
+
+/* 一句大白话摘要:次要文字,挤了就省略 */
+.tree-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+
+/* 备注标(注释小灰字退役后):行内只留小笔帽做「有备注」记号,话本体在悬停提示里 */
+.tree-note-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-2);
+}
+
+/* ── 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
+.search-results .sr-state {
+  margin: var(--space-2) var(--space-1);
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+}
+
+/* 树上徽章:琥珀=留个心眼(未扫描/不完整),红色永远不进树 */
+.tree-badge {
+  flex: 0 0 auto;
+  font-size: var(--font-xxs);
+  color: var(--amber);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-pill);
+  padding: 0 0.375rem;
+}

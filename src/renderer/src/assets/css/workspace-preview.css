@@ -1,0 +1,220 @@
+/* 代码预览、阅读档与分色(从 workspace.css 拆出:纯迁移,不改行为) */
+
+/* ── 代码预览(第一百一十批):左栏的只读文本窗 ──
+   只摆纯文本 + 行号,不描语法色;等宽字、不折行,横向自己滚 */
+.code-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.code-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  flex-shrink: 0;
+}
+
+.code-pane-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+
+/* 只载入了开头一段 / 读不了:琥珀色是「留个心眼」,不是出错 */
+.code-pane-note.is-warn {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* 正文区:行号钉在左边不跟横向滚动跑,纵横向都自己滚 */
+.code-view {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) 0 var(--space-4);
+  background: var(--canvas-tint);
+}
+
+/* 虚拟滚动(全文预览本批):轨道撑出全文行程(高度由组件按 总行数×行高 算),
+   可视段(.code-row)整体平移到滚动位置 —— 元素永远只有一屏,滚动条是全文的 */
+.code-track {
+  position: relative;
+  min-width: max-content;
+}
+
+.code-row {
+  display: flex;
+  align-items: flex-start;
+  will-change: transform;
+}
+
+/* --doc-zoom:Ctrl+滚轮的文档字号系数,挂在 .code-view 上继承进来;
+   字号吃它不进 getComputedStyle 缺的账 —— 量出来的行高天然是真值,虚拟滚动不用打补丁 */
+.code-gutter,
+.code-text {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
+  line-height: var(--lh-160);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-raise);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--muted-2);
+  text-align: right;
+  user-select: none;
+  background: var(--canvas-tint);
+  border-right: 1px solid var(--line);
+}
+
+.code-text {
+  padding: 0 var(--space-3);
+  color: var(--text);
+}
+
+/* ── 选区美术(第一百一十四批;折行版换登记)──
+   选中色改吃分屏拖边那套 token:底色/竖线走 --drop-mark(30% 透明 sash-hi),
+   首尾角括号走 --sash-hi 实色 —— 「进了引用功能」的蓝和拖分屏的蓝是同一强调色。
+   只作用于代码正文,别的面板保持系统默认。 */
+.code-text::selection {
+  background: var(--drop-mark);
+  color: inherit;
+}
+
+/* ── 折行模式(折行版本批)──
+   行块化 + 自然折行;行号是行块左槽的 ::before —— CSS 生成内容进不了 DOM 文本,
+   选区、复制、引用全文都沾不到数字。--gc 是行号位数(组件按总行数喂,ch 单位一位一格)。 */
+.code-text.is-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-left: 0;
+}
+
+.code-text.is-wrap .code-line {
+  display: block;
+  position: relative;
+  min-height: calc(1em * var(--lh-160));
+  /* 悬挂缩进:续行比行首再多缩进 2ch —— 首段 text-indent 拉回行号旁的旧起点,
+     折下来的续行落在 +2ch 处,一眼认出「这是同一行折下来的」 */
+  padding-left: calc(var(--gc, 4ch) + 2rem + 2ch);
+  text-indent: -2ch;
+}
+
+.code-text.is-wrap .code-line::before {
+  content: attr(data-line);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: calc(var(--gc, 4ch) + 1.25rem);
+  padding-right: 0.5rem;
+  text-align: right;
+  color: var(--muted-2);
+  border-right: 1px solid var(--line);
+}
+
+/* 预览头读↔写单钮:纯图标小方钮,开/关靠图标换脸(不靠底色,产品裁定);
+   折行钮已退役进页签右键菜单(渐进披露) */
+.code-mode-btn {
+  flex-shrink: 0;
+  /* 右缘往回收 4px(小葵手感):不靠贴边,留一丝呼吸 */
+  margin-right: var(--space-1);
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.code-mode-btn:hover:not(:disabled) {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
+.code-mode-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── 阅读模式(阅读模式本批):md 系签的渲染态 —— MiniMD 排版进「可读栏」:
+   宽窗时栏有上限居中、两边留呼吸;窄窗时栏跟着缩、四周固定留白不贴边。
+   正文比聊天气泡里的 .md 放大一档 —— 这儿是整页阅读,不是塞进气泡里扫一眼 ── */
+.code-view.is-reading {
+  padding: var(--space-4) var(--space-6) 30vh;
+}
+
+.code-reading {
+  max-width: 46rem;
+  margin-inline: auto;
+  font-size: calc(var(--font-base) * var(--doc-zoom, 1));
+  color: var(--text);
+}
+
+/* 渲染态的标题档比气泡里的 .md 放一档;围栏代码块字略收,密度对齐阅读页;
+   各级字号都乘 --doc-zoom,Ctrl+滚轮时标题正文同比例缩放 */
+/* 阅读档标题量级住在 markdown.css(同特异性下它后加载,写这边必被盖死) */
+
+.code-reading .md-pre {
+  font-size: 0.9em;
+}
+
+/* 阅读档行内代码直接吃 .md code 的药丸皮肤(淡底+哑灰+等宽),
+   这边没有要推翻的档 —— 染色退役案后,红只留给真状态 */
+
+/* 选中底色跟代码正文喝同一碗 --drop-mark:引用那套蓝,阅读档里也一样 */
+.code-reading ::selection {
+  background: var(--drop-mark);
+}
+
+/* ── 分色角色(2026-09-14):变量两套主题各给一份(上面),这儿只管对号入座 ── */
+.tok-ctl {
+  color: var(--tok-ctl);
+}
+.tok-kw {
+  color: var(--tok-kw);
+}
+.tok-str {
+  color: var(--tok-str);
+}
+.tok-com {
+  color: var(--tok-com);
+}
+.tok-num {
+  color: var(--tok-num);
+}
+.tok-fn {
+  color: var(--tok-fn);
+}
+.tok-type {
+  color: var(--tok-type);
+}
+.tok-var {
+  color: var(--tok-var);
+}
+.tok-regex {
+  color: var(--tok-regex);
+}
+.tok-symbol {
+  color: var(--tok-symbol);
+}
