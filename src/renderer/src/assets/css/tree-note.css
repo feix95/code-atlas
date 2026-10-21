@@ -1,0 +1,37 @@
+/* 文件树备注小笔动画(从 markdown.css 拆出:纯迁移,不改行为) */
+
+/* 小笔写字动画(第一百零九批补):保存瞬间以笔尖为轴轻磕一下,笔迹从笔尖划出淡出 */
+@media (prefers-reduced-motion: no-preference) {
+  .note-pen.is-tapping {
+    /* 轴心=笔尖(pencil-line 24 栅格稿的笔尖约在 12%,87%);用百分比写,图标缩放不用跟着改 */
+    transform-origin: 12% 87%;
+    animation: pen-tap 0.35s var(--ease-smooth);
+  }
+
+  .note-pen .note-pen-trail {
+    opacity: 0;
+  }
+
+  .note-pen.is-tapping .note-pen-trail {
+    stroke-dasharray: 8;
+    stroke-dashoffset: 8;
+    animation: pen-trail 0.35s ease-out;
+  }
+}
+
+@keyframes pen-tap {
+  30% {
+    transform: rotate(12deg) translateY(1px);
+  }
+}
+
+@keyframes pen-trail {
+  40% {
+    opacity: 1;
+    stroke-dashoffset: 8;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}

@@ -1,0 +1,230 @@
+/* Live Preview 表格编辑(从 markdown-live.css 拆出:纯迁移,不改行为) */
+
+/* 表格替身:块级占位,内层全吃 .md 同款的 .md-table 皮;
+   认不出表格的烂摊源码退回等宽块,别装成功 */
+.cm-host .cm-live-table {
+  position: relative;
+  padding: 0.3em 0;
+}
+
+/* ── 格内编辑(Obsidian 式):格子常驻 contenteditable「装饰源码」——
+   定界符以 display:none 留在 DOM,textContent 恒等于源码;
+   光标进了哪层记号,哪层 .cm-live-cell-wrap 掀定界符 ── */
+.cm-live-cell-src {
+  display: block;
+  min-height: 1em;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+  user-select: text;
+  border-radius: var(--radius-xxs);
+}
+.cm-live-cell-delim {
+  display: none;
+}
+.cm-live-cell-wrap.active {
+  background: var(--accent-soft);
+  border-radius: var(--radius-xxs);
+}
+.cm-live-cell-wrap.active .cm-live-cell-delim {
+  display: inline;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+/* 多格选区(Obsidian 同款):浅蓝铺底 + 蓝框罩住整片矩形;蓝统一走拖分屏同一组 --sash-hi,
+   自身不吃事件(点击穿透到格子)。外框 tabindex=-1 收键盘,不画焦点环 */
+.cm-live-table:focus {
+  outline: none;
+}
+.cm-live-cell-sel {
+  position: absolute;
+  z-index: var(--z-raise);
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--sash-hi) 60%, transparent);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--sash-hi) 10%, transparent);
+  pointer-events: none;
+}
+
+/* 控件层:铺满表格的透明罩,自身不吃事件;抓手/加号各自开口 */
+.cm-live-table-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* 外侧透明感应带:尺寸由 JS 按热区常量写入;只负责把鼠标事件送回表格容器 */
+.cm-live-grip-zone {
+  position: absolute;
+  pointer-events: auto;
+}
+.cm-live-grip,
+.cm-live-edge-add {
+  pointer-events: none; /* 隐身时不吃点击:透明控件也是命中目标,会截胡边缘卸妆 */
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease-smooth);
+  user-select: none;
+}
+
+/* ⠿ 抓手:行左缘/列顶缘,悬停对位现身,按住变抓握 */
+.cm-live-grip {
+  color: var(--muted);
+  font-size: 0.85em;
+  line-height: 1;
+  padding: 0.15em 0.1em;
+  cursor: grab;
+}
+.cm-live-grip.is-on {
+  pointer-events: auto;
+  opacity: 0.85;
+}
+.cm-live-grip:active {
+  cursor: grabbing;
+}
+.cm-live-grip-row {
+  left: 0;
+  transform: translate(-100%, -50%); /* 让到表格左缘外的页边槽里 */
+}
+.cm-live-grip-col {
+  top: 0;
+  transform: translate(-50%, -60%) rotate(90deg); /* 半探出表格上缘;点阵横放(3×2),行抓手竖放(2×3) */
+}
+.cm-live-grip.is-dragging {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 拖拽中被拎起的整行/整列:蓝框 + 外缘蓝标签(Obsidian 同款),蓝统一走拖分屏同一组 token */
+.cm-live-drag-frame {
+  position: absolute;
+  z-index: var(--z-raise);
+  border: 1px solid var(--sash-hi);
+  border-radius: var(--radius-xxs);
+  pointer-events: none;
+}
+.cm-live-drag-tab {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sash-hi);
+  background: var(--drop-mark);
+  color: var(--text);
+  font-size: 0.85em;
+  line-height: 1;
+}
+.cm-live-drag-tab::before {
+  content: '⠿';
+  display: block;
+}
+.cm-live-drag-col > .cm-live-drag-tab {
+  left: -1px;
+  right: -1px;
+  bottom: 100%;
+  height: 1.2em;
+  border-bottom: 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+}
+.cm-live-drag-col > .cm-live-drag-tab::before {
+  transform: rotate(90deg);
+}
+.cm-live-drag-row > .cm-live-drag-tab {
+  top: -1px;
+  bottom: -1px;
+  right: 100%;
+  width: 1.2em;
+  border-right: 0;
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+}
+
+/* 边缘 ＋:底缘加行/右缘加列,悬停表格隐约现身(渐进式披露) */
+.cm-live-edge-add {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xxs);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  padding: 0 var(--space-2);
+  cursor: pointer;
+}
+.cm-live-table:hover .cm-live-edge-add {
+  pointer-events: auto;
+  opacity: 0.55;
+}
+.cm-live-edge-add:hover {
+  opacity: 1 !important;
+  color: var(--accent-bright);
+  border-color: var(--sash-hi);
+}
+.cm-live-edge-row {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.cm-live-edge-col {
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+/* 拖拽插位线:行拖横线、列拖竖线,主题色 */
+.cm-live-drop-line {
+  position: absolute;
+  pointer-events: none;
+  background: var(--sash-hi); /* 与分屏拖边同一条蓝;比选框线(1px)粗,读作「落点」 */
+  border-radius: var(--radius-xxs);
+  z-index: var(--z-raise);
+}
+.cm-live-drop-row {
+  left: 0;
+  right: 0;
+  height: 3px;
+  transform: translateY(-50%);
+}
+.cm-live-drop-col {
+  top: 0;
+  width: 3px; /* 高度与顶边由 JS 按表格实际范围写入 */
+  transform: translateX(-50%);
+}
+
+/* 表格右键菜单:吃 file-path-menu 同款皮(fixed + pop 影 + 线圆角) */
+.cm-live-table-menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  min-width: 8rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+.cm-live-table-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-xxs);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-md);
+  line-height: var(--lh-150);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-live-table-menu-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+.cm-live-table-menu-sep {
+  height: 1px;
+  margin: 0.1875rem 0.375rem;
+  background: var(--line);
+}

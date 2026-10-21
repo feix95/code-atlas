@@ -7,6 +7,7 @@
 @import './css/toast.css';
 @import './css/auxwin.css';
 @import './css/workspace.css';
+@import './css/tree-note.css';
 @import './css/workspace-menu.css';
 @import './css/translate.css';
 @import './css/image-preview.css';
@@ -23,6 +24,8 @@
 @import './css/statusbar.css';
 @import './css/devlog.css';
 @import './css/markdown.css';
+@import './css/file-path-menu.css';
+@import './css/markdown-live-table.css';
 @import './css/markdown-live.css';
 @import './css/modelshelf.css';
 @import './css/graph.css';

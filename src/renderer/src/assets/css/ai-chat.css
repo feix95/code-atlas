@@ -91,3 +91,51 @@
   padding: 1.25rem 1.5rem;
   font-size: var(--font-sm);
 }
+
+/* 收尾的「本次 · 读 x 吐 y」行要能和复制/重试同排:横排、中线对齐 */
+.chat-stats.chat-usage {
+  display: flex;
+  align-items: center;
+}
+
+/* 对话的小动作排(第一百零七批,一百一十八批次补):和 token 账同一行贴右边;
+ * 没有账目时自己单独一行;「已复制」小提示浮在按钮上方 */
+.msg-actions {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  margin-left: 0.625rem;
+}
+
+.msg-action {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.msg-action:hover {
+  color: var(--accent-bright);
+  background: var(--hover);
+}
+
+.msg-action svg {
+  display: block;
+}
+
+/* 复制成功的小提示(第一百零七批补):浮在按钮排上方,1 秒内自己走,不挤按钮 */
+.msg-copied {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
