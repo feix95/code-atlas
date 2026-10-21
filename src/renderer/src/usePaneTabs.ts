@@ -16,6 +16,7 @@ import {
   moveTabToGroupAt,
   moveTabToHost,
   nextTabId,
+  translationTabName,
   type PaneDropMark,
   type PaneGroup,
   type PaneTab
@@ -190,7 +191,6 @@ export function usePaneTabs(deps: {
   // 原文留在原组,镜像优先落到另一组;只有一组就当场向右拆一组。
   function openTranslationTab(source: PaneTab, lang: string): void {
     if (source.relPath === '') return
-    const label = translateLang(lang)?.label ?? lang
     const mine = (t: PaneTab): boolean =>
       t.kind === 'translate' && t.relPath === source.relPath && t.lang === lang
     const owner = groups.find((g) => g.tabs.some(mine))
@@ -205,7 +205,7 @@ export function usePaneTabs(deps: {
       id: nextTabId(),
       kind: 'translate',
       relPath: source.relPath,
-      name: `${source.name} · ${label}`,
+      name: translationTabName(source.relPath, lang),
       icon: KIND_ICONS.translate,
       lang
     }
@@ -232,6 +232,42 @@ export function usePaneTabs(deps: {
       )
     })
     setActiveGroupId(spawned.id)
+  }
+
+  // 译文签就地换语种(页签右键「翻译成…」):同一张签换 lang 与名牌,组位/分屏一概不动。
+  // 目标语种已经有同源译文签 = 同一份内容不摆两张,领过去并关掉当前这张;
+  // 旧语种还在跑的任务掐断(关签同款),已译完的留在账上当缓存,切回来直接看。
+  function changeTranslationLang(tabId: string, lang: string): void {
+    const owner = groups.find((g) => g.tabs.some((t) => t.id === tabId))
+    const tab = owner?.tabs.find((t) => t.id === tabId)
+    if (!owner || !tab || tab.kind !== 'translate' || tab.lang === lang) return
+    if (translateLang(lang) === null) return
+    const duplicate = groups
+      .flatMap((g) => g.tabs)
+      .find(
+        (t) =>
+          t.kind === 'translate' && t.id !== tabId && t.relPath === tab.relPath && t.lang === lang
+      )
+    if (duplicate) {
+      closeTab(tabId)
+      activateTab(duplicate.id)
+      return
+    }
+    if (result && tab.lang !== undefined) {
+      cancelTranslate(translateKey(result.rootPath, tab.relPath, tab.lang))
+    }
+    patchGroup(owner.id, (g) => ({
+      ...g,
+      tabs: g.tabs.map((t) =>
+        t.id === tabId ? { ...t, lang, name: translationTabName(t.relPath, lang) } : t
+      )
+    }))
+  }
+
+  /** 页签右键「翻译成…」的唯一入口:预览签开/聚焦译文镜像签,译文签就地换语种 */
+  function translateTab(source: PaneTab, lang: string): void {
+    if (source.kind === 'translate') changeTranslationLang(source.id, lang)
+    else openTranslationTab(source, lang)
   }
 
   // 单例签(rail/菜单入口):全应用每品类只此一张 —— 已开就领过去点亮,没开在激活组新开
@@ -473,7 +509,7 @@ export function usePaneTabs(deps: {
     setDropMark,
     resetPaneTabs,
     openFileTab,
-    openTranslationTab,
+    translateTab,
     openSingletonTab,
     moveTab,
     moveTabToHostAt,

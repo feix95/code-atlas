@@ -550,7 +550,7 @@ function App(): React.JSX.Element {
     setDropMark,
     resetPaneTabs,
     openFileTab,
-    openTranslationTab,
+    translateTab,
     openSingletonTab,
     moveTab,
     moveTabToHostAt,
@@ -765,7 +765,7 @@ function App(): React.JSX.Element {
                 onTabDragEnd={onTabDragEnd}
                 onDetachTab={onDetachTab}
                 onRevealInTree={revealTabInTree}
-                onTranslate={(tab, lang) => openTranslationTab(tab, lang)}
+                onTranslate={translateTab}
                 workspaceRoot={result?.rootPath ?? null}
                 paneSplit={paneSplit}
               />

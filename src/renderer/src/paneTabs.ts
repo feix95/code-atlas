@@ -1,4 +1,5 @@
 // 右栏页签的登记表:页签/页签组两个状态表格式,发号器与比例夹子。
+import { translateLang } from '../../shared/translateLangs.ts'
 import type { PaneKind } from './paneKinds'
 
 /**
@@ -30,6 +31,16 @@ export interface PaneTab {
   scopeRoot?: string
   /** 翻译签的目标语种代号(见 shared/translateLangs);其余品类不填 */
   lang?: string
+}
+
+/**
+ * 译文签名牌(纯函数):源文件名 + 目标语种中文名。开镜像签与就地换语种共用这一份,
+ * 脸只认文件名(目录不进签脸);不认识的语种代号原样摆出来兜底。
+ */
+export function translationTabName(relPath: string, lang: string): string {
+  const sep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'))
+  const base = relPath.slice(sep + 1) || relPath
+  return `${base} · ${translateLang(lang)?.label ?? lang}`
 }
 
 /**

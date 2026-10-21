@@ -89,7 +89,8 @@ function ensureListening(): void {
   window.atlas.onTranslateEvent(onEvent)
 }
 
-/** 开一份翻译;同一份(路径+语种)已经在跑或已完成就不再开第二次 */
+/** 开一份翻译;同一份(路径+语种)正在跑或已完成就不再开第二次。
+ *  取消过的照样能重开(换语种再切回来会走到这儿) */
 export function startTranslate(input: {
   rootPath: string
   relPath: string
@@ -99,7 +100,7 @@ export function startTranslate(input: {
   ensureListening()
   const key = translateKey(input.rootPath, input.relPath, input.lang)
   const existing = jobs.get(key)
-  if (existing && existing.status !== 'error') return
+  if (existing && (existing.status === 'running' || existing.status === 'done')) return
 
   const requestId = `tr:${++seq}`
   keyByRequest.set(requestId, key)

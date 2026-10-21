@@ -18,6 +18,8 @@ export interface TabBarTab {
   relPath: string
   /** peek 签的读根(盘符下钻):复制路径/资源管理器按它拼绝对路径 */
   scopeRoot?: string
+  /** 译文签的当前目标语种(菜单里给当前语种打勾);其余品类不填 */
+  lang?: string
 }
 
 /**
@@ -88,7 +90,7 @@ export function TabBar({
   onDetachTab?: (id: string) => void
   /** 右键菜单「在文件列表中显示当前文件」:回侧栏树里选中+展开父链(工作区签才有) */
   onRevealInTree?: (id: string) => void
-  /** 右键菜单「翻译成…」:开一张译文镜像签(只对 md 系文件签摆这一行) */
+  /** 右键菜单「翻译成…」:预览签开/聚焦译文镜像签,译文签就地换语种(只对 md 系预览签与译文签摆这一行) */
   onTranslate?: (tab: TabBarTab, lang: string) => void
   /** 工作区根(文件动作的拼路径底):peek 签自带 scopeRoot,不看这里 */
   workspaceRoot?: string | null
@@ -221,14 +223,18 @@ export function TabBar({
       )
     }
 
-    // 翻译(只对工作区里的 md 预览签摆):选语种 → 开一张并排的译文镜像签。
-    // peek 签的读根不是工作区,译文页按工作区读会读错,先不摆
-    if (t.kind === 'preview' && onTranslate && canReadingMode(t.relPath)) {
+    // 翻译(预览签:选语种 → 开一张并排的译文镜像签;译文签:就地换语种,不新开签)。
+    // 译文签的当前语种在子菜单里打勾。peek 签的读根不是工作区,
+    // 译文页按工作区读会读错,先不摆
+    if (
+      onTranslate &&
+      (t.kind === 'translate' || (t.kind === 'preview' && canReadingMode(t.relPath)))
+    ) {
       items.push(MENU_SEP, {
         label: '翻译成…',
         icon: 'sparkles',
         children: TRANSLATE_LANGS.map((l) => ({
-          label: l.label,
+          label: l.code === t.lang ? `${l.label} ✓` : l.label,
           run: () => onTranslate(t, l.code)
         }))
       })
