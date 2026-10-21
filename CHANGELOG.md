@@ -520,3 +520,4 @@
 - feat(ui): 顶栏搜索命中图标改走文件树同一套着色,不再强制单色
 - chore: .gitignore 忽略 docs/archive 归档文档
 - fix(ui): 工作区菜单删除钮去掉「从列表删掉,不动磁盘上的文件夹」悬停提示
+- docs(ui): 补文档族翻译需求,把对照译文扩到 txt/rst/adoc
