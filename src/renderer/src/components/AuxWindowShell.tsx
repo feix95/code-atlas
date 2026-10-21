@@ -3,7 +3,7 @@
 // 完整页签带 + 分屏正文(主窗同款组件,登记过滤后递进来)、本窗自己的 TooltipHost。
 // 空壳即死:名下签全挪走/关光那刻,这扇窗自己关闭(Chrome 语义;主窗不在此列,它是工作台)。
 import { useEffect } from 'react'
-import type { PaneGroup, PaneTab } from '../paneTabs'
+import type { PaneDropMark, PaneGroup, PaneTab } from '../paneTabs'
 import { syncAuxChrome, type AuxWindowHandle } from '../useAuxWindows'
 import { TopBarTabs } from './TopBarTabs'
 import { PaneGroups } from './PaneGroups'
@@ -28,9 +28,7 @@ export interface TabAreaProps {
     atIndex: number | null,
     splitSide?: 'left' | 'right'
   ) => void
-  setDropMark: React.Dispatch<
-    React.SetStateAction<{ groupId: string; zone: 'center' | 'left' | 'right' } | null>
-  >
+  setDropMark: React.Dispatch<React.SetStateAction<PaneDropMark | null>>
   onTabDragEnd: (id: string) => void
   onDetachTab: (id: string) => void
   /** 页签右键「在文件列表中显示当前文件」:回主窗侧栏树里指出来 */
@@ -39,7 +37,7 @@ export interface TabAreaProps {
   workspaceRoot: string | null
   paneSplit: number
   setActiveGroupId: React.Dispatch<React.SetStateAction<string | null>>
-  dropMark: { groupId: string; zone: 'center' | 'left' | 'right' } | null
+  dropMark: PaneDropMark | null
   onPaneSashDown: (e: React.PointerEvent<HTMLDivElement>) => void
   applyPaneSplit: (v: number) => void
   renderTabBody: (tab: PaneTab) => React.ReactNode

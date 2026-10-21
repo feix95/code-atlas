@@ -11,7 +11,7 @@
 // 不预缩位置,预览尺寸与实际尺寸不会打架);悬到正文区按中心/边缘判分屏许诺;
 // 窗外松手拆出新子窗。
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { PaneGroup, PaneTab } from '../paneTabs'
+import type { PaneDropMark, PaneGroup, PaneTab } from '../paneTabs'
 import { dragCenterX, insertIndexAt } from '../tabDragGeometry'
 import { TreeIcon } from './Icons'
 import { TabBar, type TabBarTab } from './TabBar'
@@ -90,10 +90,10 @@ interface BodySnap {
   bottom: number
 }
 
-/** 当前落点:页签带插队 / 正文分屏(中心或左右缘) / 窗外(拆出新子窗) / 无处(松手不动作) */
+/** 当前落点:页签带插队 / 正文左右缘分屏 / 窗外(拆出新子窗) / 无处(松手不动作) */
 type DragZone =
   | { type: 'strip'; groupId: string; index: number }
-  | { type: 'pane'; groupId: string; zone: 'center' | 'left' | 'right' }
+  | { type: 'pane'; groupId: string; zone: 'left' | 'right' }
   | { type: 'outside' }
   | { type: 'none' }
 
@@ -127,9 +127,7 @@ export function TopBarTabs({
     atIndex: number | null,
     splitSide?: 'left' | 'right'
   ) => void
-  setDropMark: React.Dispatch<
-    React.SetStateAction<{ groupId: string; zone: 'center' | 'left' | 'right' } | null>
-  >
+  setDropMark: React.Dispatch<React.SetStateAction<PaneDropMark | null>>
   /** 拖出本窗松手(页签独立窗口:拆去新子窗,语义由 App 定,这里只报是谁) */
   onTabDragEnd: (id: string) => void
   /** 右键菜单「移到新窗口」:不拖也可拆出,所有签一视同仁 */
@@ -233,14 +231,7 @@ export function TopBarTabs({
         moveTab(t.id, z.groupId === srcGroupId ? null : 'sibling', at === -1 ? null : at)
         return
       }
-      if (z.type === 'pane') {
-        if (z.zone === 'center') {
-          // 中心松手:只认「别组页签挪来并组」;单组中心不动作(拆分走左右缘 —— 产品裁定)
-          if (srcGroupId !== z.groupId) moveTab(t.id, 'sibling', null)
-        } else {
-          moveTab(t.id, 'sibling', null, z.zone)
-        }
-      }
+      if (z.type === 'pane') moveTab(t.id, 'sibling', null, z.zone)
     }
 
     // 落点 → 沉降矩形(视口坐标):芯片飞过去长成页签的那一格;
@@ -264,11 +255,6 @@ export function TopBarTabs({
         const b = bodies.find((x) => x.groupId === z.groupId)
         if (!b) return null
         const stripTop = s ? s.bottom - rect.height : rect.top
-        if (z.zone === 'center' && s) {
-          // 挪去现成的另一组:落那条带的末尾
-          const endX = s.mids.length > 0 ? s.mids[s.mids.length - 1].right + 2 : s.barLeft + 10
-          return { left: endX, top: stripTop, width: rect.width, height: rect.height }
-        }
         // 单组拆栏(左右缘):新组还没长出来,用正文矩形 + paneSplit 推新条带在顶栏的落点 —
         // 左缘拆 = 新组在左,右缘 = 新组在右
         const bw = b.right - b.left
@@ -421,6 +407,8 @@ export function TopBarTabs({
           if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) continue
           const relX = (cx - b.left) / (b.right - b.left)
           const srcGroup = groups.find((g) => g.id === srcGroupId)
+          // 正文只许诺分屏,不接收页签:挪组一律走目标页签带(落到带末尾即可),
+          // 同一动作只留一种反馈 —— 正文再亮一块蓝就变成两套视觉说一件事
           if (relX <= SPLIT_EDGE_THIRD || relX >= 1 - SPLIT_EDGE_THIRD) {
             // 左右三分之一带 = 定向拆半屏(全高都算):单组且拆了不空才许诺,免得画空头支票
             if (groups.length === 1 && srcGroup && srcGroup.tabs.length > 1) {
@@ -433,15 +421,6 @@ export function TopBarTabs({
               )
               hit = true
             }
-          } else if (srcGroupId !== b.groupId) {
-            // 中段三分之一 = 中心许诺:只对别组画「挪到这一组」;自家组中心不画饼
-            zone = { type: 'pane', groupId: b.groupId, zone: 'center' }
-            setDropMark((prev) =>
-              prev?.groupId === b.groupId && prev.zone === 'center'
-                ? prev
-                : { groupId: b.groupId, zone: 'center' }
-            )
-            hit = true
           }
           break // 光标只可能落在这一块正文里,命中与否都不必再看别块
         }

@@ -132,19 +132,8 @@ body.is-sash-dragging .pane-sash::after {
   position: relative;
 }
 
-/* 拖页签悬在别组正文中心:许诺「松手挪到这一组」(拆半屏只走左右缘)。
-   Obsidian 式画法:整片 drop-mark 半透明蓝铺底,无描边无字 */
-.pane-drop-hint {
-  position: absolute;
-  inset: 8%;
-  z-index: var(--z-pane-hint);
-  border-radius: var(--radius-sm);
-  background: var(--drop-mark);
-  pointer-events: none;
-}
-
 /* 拖到正文左右三分之一带:贴近的那半边亮定向分屏许诺(「拆到左/右半屏」),
-   同款整片透明蓝、贴齐屏缘,跟中心框不分家 */
+   整片透明蓝、贴齐屏缘。正文不接收页签,所以没有「挪进本组」的中心框 */
 .pane-drop-edge {
   position: absolute;
   top: 0;

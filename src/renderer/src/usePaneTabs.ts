@@ -15,6 +15,7 @@ import {
   MAIN_HOST,
   moveTabToHost,
   nextTabId,
+  type PaneDropMark,
   type PaneGroup,
   type PaneTab
 } from './paneTabs'
@@ -36,12 +37,9 @@ export function usePaneTabs(deps: {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   // 左右两组的比例(左边占多少),分割条拖完记进本机
   const [paneSplit, setPaneSplit] = useState(loadPaneSplit)
-  // 拖页签时的落点标记:正悬在哪个组正文的哪个区 —— 中心(拆两栏/挪组)或左右缘(定向拆半屏)。
+  // 拖页签时的落点标记:正悬在哪个组正文的左右缘 —— 只用于定向拆半屏。
   // 指针拖拽引擎(TopBarTabs)只在松手有动作时才设它,PaneGroups 见标记就亮提示,不用二次判
-  const [dropMark, setDropMark] = useState<{
-    groupId: string
-    zone: 'center' | 'left' | 'right'
-  } | null>(null)
+  const [dropMark, setDropMark] = useState<PaneDropMark | null>(null)
   // 刚被点名的页签(比如挂了引用要指给用户看探针签在哪):轻强调一下,不弹窗不出声
   const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
 
