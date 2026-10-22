@@ -3,10 +3,11 @@
 import { useCallback, useState } from 'react'
 import type { ScanFileNode, ScanResult } from '@shared/types'
 import { isFileKind, isSingletonKind, KIND_ICONS, KIND_LABELS, type PaneKind } from './paneKinds'
-import { translateLang } from '@shared/translateLangs'
-import { cancelAllTranslations, cancelTranslate, translateKey } from './translateStore'
+import { cancelAllTranslations } from './translateStore'
 import { loadPaneSplit, savePaneSplit } from './layoutPrefs'
 import { useFlashValue } from './useFlashFlag'
+import { createTabCloser } from './paneTabClose'
+import { createTranslationActions } from './paneTabTranslation'
 import { dirChainOf } from './scanTreeTools'
 import {
   clampPaneSplit,
@@ -16,7 +17,7 @@ import {
   moveTabToGroupAt,
   moveTabToHost,
   nextTabId,
-  translationTabName,
+  resetWorkspaceGroups,
   type PaneDropMark,
   type PaneGroup,
   type PaneTab
@@ -117,26 +118,9 @@ export function usePaneTabs(deps: {
     // 译文签绑的是旧工作区的文件与译文:换区一起关闭,在跑的任务掐断
     cancelAllTranslations()
     setGroups((prev) => {
-      const byHost = new Map<string, PaneTab[]>()
-      for (const g of prev) {
-        const keep = g.tabs.filter((t) => t.kind !== 'preview' && t.kind !== 'translate')
-        if (keep.length > 0)
-          byHost.set(groupHost(g), [...(byHost.get(groupHost(g)) ?? []), ...keep])
-      }
-      const next: PaneGroup[] = [...byHost.entries()].map(([host, tabs]) => ({
-        id: `pane:${nextTabId()}`,
-        tabs,
-        activeId: tabs[tabs.length - 1].id,
-        host: host === MAIN_HOST ? undefined : host
-      }))
-      const mainGroup: PaneGroup = next.find((g) => groupHost(g) === MAIN_HOST) ?? {
-        id: `pane:${nextTabId()}`,
-        tabs: [],
-        activeId: null
-      }
-      if (!next.some((g) => groupHost(g) === MAIN_HOST)) next.unshift(mainGroup)
-      setActiveGroupId(mainGroup.id)
-      return next
+      const reset = resetWorkspaceGroups(prev)
+      setActiveGroupId(reset.activeGroupId)
+      return reset.groups
     })
   }
 
@@ -185,89 +169,6 @@ export function usePaneTabs(deps: {
     const tab = fileTab(file, scopeRoot)
     const group = ensureGroup()
     patchGroup(group.id, (g) => ({ ...g, tabs: [...g.tabs, tab], activeId: tab.id }))
-  }
-
-  // 翻译镜像签(与原文并排):同一(文件+语种)全应用只一张;
-  // 原文留在原组,镜像优先落到另一组;只有一组就当场向右拆一组。
-  function openTranslationTab(source: PaneTab, lang: string): void {
-    if (source.relPath === '') return
-    const mine = (t: PaneTab): boolean =>
-      t.kind === 'translate' && t.relPath === source.relPath && t.lang === lang
-    const owner = groups.find((g) => g.tabs.some(mine))
-    if (owner) {
-      const slot = owner.tabs.find(mine)
-      if (!slot) return
-      setActiveGroupId(owner.id)
-      patchGroup(owner.id, (g) => ({ ...g, activeId: slot.id }))
-      return
-    }
-    const mirror: PaneTab = {
-      id: nextTabId(),
-      kind: 'translate',
-      relPath: source.relPath,
-      name: translationTabName(source.relPath, lang),
-      icon: KIND_ICONS.translate,
-      lang
-    }
-    const from = groups.find((g) => g.tabs.some((t) => t.id === source.id)) ?? activeGroup
-    const host = from ? groupHost(from) : MAIN_HOST
-    const other = groups.find((g) => groupHost(g) === host && g.id !== from?.id) ?? null
-    if (other) {
-      patchGroup(other.id, (g) => ({ ...g, tabs: [...g.tabs, mirror], activeId: mirror.id }))
-      setActiveGroupId(other.id)
-      return
-    }
-    const spawned: PaneGroup = {
-      id: `pane:${nextTabId()}`,
-      tabs: [],
-      activeId: null,
-      host: host === MAIN_HOST ? undefined : host
-    }
-    setGroups((prev) => {
-      const idx = from ? prev.findIndex((g) => g.id === from.id) : prev.length - 1
-      const at = Math.max(0, idx + 1)
-      const next = [...prev.slice(0, at), spawned, ...prev.slice(at)]
-      return next.map((g) =>
-        g.id === spawned.id ? { ...g, tabs: [mirror], activeId: mirror.id } : g
-      )
-    })
-    setActiveGroupId(spawned.id)
-  }
-
-  // 译文签就地换语种(页签右键「翻译成…」):同一张签换 lang 与名牌,组位/分屏一概不动。
-  // 目标语种已经有同源译文签 = 同一份内容不摆两张,领过去并关掉当前这张;
-  // 旧语种还在跑的任务掐断(关签同款),已译完的留在账上当缓存,切回来直接看。
-  function changeTranslationLang(tabId: string, lang: string): void {
-    const owner = groups.find((g) => g.tabs.some((t) => t.id === tabId))
-    const tab = owner?.tabs.find((t) => t.id === tabId)
-    if (!owner || !tab || tab.kind !== 'translate' || tab.lang === lang) return
-    if (translateLang(lang) === null) return
-    const duplicate = groups
-      .flatMap((g) => g.tabs)
-      .find(
-        (t) =>
-          t.kind === 'translate' && t.id !== tabId && t.relPath === tab.relPath && t.lang === lang
-      )
-    if (duplicate) {
-      closeTab(tabId)
-      activateTab(duplicate.id)
-      return
-    }
-    if (result && tab.lang !== undefined) {
-      cancelTranslate(translateKey(result.rootPath, tab.relPath, tab.lang))
-    }
-    patchGroup(owner.id, (g) => ({
-      ...g,
-      tabs: g.tabs.map((t) =>
-        t.id === tabId ? { ...t, lang, name: translationTabName(t.relPath, lang) } : t
-      )
-    }))
-  }
-
-  /** 页签右键「翻译成…」的唯一入口:预览签开/聚焦译文镜像签,译文签就地换语种 */
-  function translateTab(source: PaneTab, lang: string): void {
-    if (source.kind === 'translate') changeTranslationLang(source.id, lang)
-    else openTranslationTab(source, lang)
   }
 
   // 单例签(rail/菜单入口):全应用每品类只此一张 —— 已开就领过去点亮,没开在激活组新开
@@ -358,92 +259,6 @@ export function usePaneTabs(deps: {
     revealTab(t)
   }
 
-  /** 关掉译文镜像签 = 掐断这次翻译,别让主进程对着没人看的页签空转 */
-  function stopTranslationOf(tab: PaneTab): void {
-    if (tab.kind !== 'translate' || tab.lang === undefined || !result) return
-    cancelTranslate(translateKey(result.rootPath, tab.relPath, tab.lang))
-  }
-
-  function closeTab(id: string): void {
-    const owner = groups.find((g) => g.tabs.some((t) => t.id === id))
-    if (!owner) return
-    const closing = owner.tabs.find((t) => t.id === id)
-    if (closing) stopTranslationOf(closing)
-    // 无工作区的孤组关空(首页上开的设置/图谱签):组一起清场,首页回前台 ——
-    // 「页签都关掉了」的空底板是给工作区留的,家里没树可点,留它就是个死胡同
-    if (owner.tabs.length === 1 && groups.length === 1 && !result) {
-      setGroups([])
-      setActiveGroupId(null)
-      return
-    }
-    const vis = visibleOfGroup(owner)
-    const idx = vis.findIndex((t) => t.id === id)
-    const nextVis = vis.filter((t) => t.id !== id)
-    const wasActive = owner.activeId === id
-    // 关空了这组:组消亡,聚焦挪去剩下的组(至少留一组当底板)
-    if (owner.tabs.length === 1 && groups.length > 1) {
-      const survivors = groups.filter((g) => g.id !== owner.id)
-      setGroups(survivors)
-      setActiveGroupId(survivors[0]?.id ?? null)
-      return
-    }
-    // 关的是激活页签:右邻优先接力,左邻兜底,全空回底板(VS Code 同款)
-    const nextActiveId = wasActive
-      ? (nextVis[idx]?.id ?? nextVis[idx - 1]?.id ?? null)
-      : owner.activeId
-    patchGroup(owner.id, (g) => ({
-      ...g,
-      tabs: g.tabs.filter((t) => t.id !== id),
-      activeId: nextActiveId
-    }))
-    if (wasActive && nextActiveId) {
-      const next = owner.tabs.find((t) => t.id === nextActiveId)
-      if (next) revealTab(next)
-    }
-  }
-
-  /**
-   * 批量关签(右键菜单「关其他/关右侧/关全部」):一单算清再落账 ——
-   * 不能循环调 closeTab:同一批里每个调用读的都是同一份渲染前快照,
-   * 关到激活签时后到的调用会把 activeId 写回已被关掉的死签。
-   */
-  function closeTabsInGroup(groupId: string, ids: readonly string[]): void {
-    const owner = groups.find((g) => g.id === groupId)
-    if (!owner || ids.length === 0) return
-    const kill = new Set(ids)
-    owner.tabs.filter((t) => kill.has(t.id)).forEach(stopTranslationOf)
-    const nextTabs = owner.tabs.filter((t) => !kill.has(t.id))
-    // 整组关空:口径同 closeTab —— 独组且无工作区时清场回首页;
-    // 多组时组消亡、焦点挪给头组;独组但有工作区留张空底板
-    if (nextTabs.length === 0) {
-      if (groups.length === 1 && !result) {
-        setGroups([])
-        setActiveGroupId(null)
-        return
-      }
-      const survivors = groups.filter((g) => g.id !== owner.id)
-      if (survivors.length > 0) {
-        setGroups(survivors)
-        setActiveGroupId(survivors[0].id)
-        return
-      }
-      patchGroup(owner.id, (g) => ({ ...g, tabs: [], activeId: null }))
-      return
-    }
-    // 激活签被杀:可见序右邻优先接力,右侧全灭收最末(与 closeTab 同款接力规矩)
-    const actIdx = owner.tabs.findIndex((t) => t.id === owner.activeId)
-    const killedActive = owner.activeId !== null && kill.has(owner.activeId)
-    const rightNeighbor = owner.tabs.slice(actIdx + 1).find((t) => !kill.has(t.id))
-    const nextActiveId = killedActive
-      ? (rightNeighbor?.id ?? nextTabs[nextTabs.length - 1].id)
-      : owner.activeId
-    patchGroup(owner.id, (g) => ({ ...g, tabs: nextTabs, activeId: nextActiveId }))
-    if (killedActive && nextActiveId) {
-      const next = nextTabs.find((t) => t.id === nextActiveId)
-      if (next) revealTab(next)
-    }
-  }
-
   // 文件改名(内联标题改名批次):开着的文件签就地换登记 —— relPath/名牌换新的,
   // 档位/组位一概不动;登记认 (relPath, scopeRoot) 两件,与开签对账同口径
   function renameFileTab(
@@ -494,6 +309,27 @@ export function usePaneTabs(deps: {
     bar.addEventListener('pointermove', move)
     bar.addEventListener('pointerup', up)
   }
+
+  // 关签与翻译的编排各在自家模块:这里把状态表与本钩子的动作递过去,返回值照旧点名
+  const { closeTab, closeTabsInGroup } = createTabCloser({
+    groups,
+    result,
+    visibleOfGroup,
+    setGroups,
+    setActiveGroupId,
+    patchGroup,
+    revealTab
+  })
+  const { translateTab } = createTranslationActions({
+    groups,
+    activeGroup,
+    result,
+    setGroups,
+    setActiveGroupId,
+    patchGroup,
+    closeTab,
+    activateTab
+  })
 
   return {
     groups,

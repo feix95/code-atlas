@@ -136,6 +136,34 @@ export function dropHostGroups(groups: PaneGroup[], host: string): PaneGroup[] {
   return groups.filter((g) => groupHost(g) !== host)
 }
 
+/**
+ * 换工作区时的页签重置(纯函数):文件签与译文签随旧工作区关闭,单例签与盘符瞄签
+ * 按各自窗口分窝带走 —— 拆去子窗的签别卷回主窗;主窗永远留一组当底板。
+ */
+export function resetWorkspaceGroups(prev: PaneGroup[]): {
+  groups: PaneGroup[]
+  activeGroupId: string
+} {
+  const byHost = new Map<string, PaneTab[]>()
+  for (const g of prev) {
+    const keep = g.tabs.filter((t) => t.kind !== 'preview' && t.kind !== 'translate')
+    if (keep.length > 0) byHost.set(groupHost(g), [...(byHost.get(groupHost(g)) ?? []), ...keep])
+  }
+  const next: PaneGroup[] = [...byHost.entries()].map(([host, tabs]) => ({
+    id: `pane:${nextTabId()}`,
+    tabs,
+    activeId: tabs[tabs.length - 1].id,
+    host: host === MAIN_HOST ? undefined : host
+  }))
+  const mainGroup: PaneGroup = next.find((g) => groupHost(g) === MAIN_HOST) ?? {
+    id: `pane:${nextTabId()}`,
+    tabs: [],
+    activeId: null
+  }
+  if (!next.some((g) => groupHost(g) === MAIN_HOST)) next.unshift(mainGroup)
+  return { groups: next, activeGroupId: mainGroup.id }
+}
+
 // 页签 id / 分组 id 共用一个发号器
 let tabSeq = 0
 export function nextTabId(): string {
