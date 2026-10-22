@@ -537,3 +537,4 @@
 - refactor(ui): 页签拖拽的松手沉降拆出独立模块,会话钩子回落到行数闸门内
 - refactor(ui): 自由对话拆出滚动账、拖入分流、消息列表、输入舱原子与 AI 状态面板
 - refactor(ui): CodePreview 的按文件记账拆出 usePreviewDoc
+- refactor(ui): 设置页拆出即改即存与上下文账单,左栏地址栏卡独立成件,货架样式拆出展开区与下载控件

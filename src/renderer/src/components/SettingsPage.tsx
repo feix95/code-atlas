@@ -1,13 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AiConfig, AiProviderKind, ModelContextInfo, ModelFitVerdict } from '@shared/types'
-import {
-  CONTEXT_NOTCHES,
-  FALLBACK_CONTEXT_CAP,
-  formatContextBill,
-  formatGB,
-  type ContextBill
-} from '@shared/contextBill'
-import { CONTEXT_SIZE_MAX, CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE } from '@shared/aiDefaults'
 import { DEFAULT_PERSONALIZATION, type PersonalizationConfig } from '@shared/personalization'
 import { CH } from '@shared/ipcChannels'
 import type { SectionKey } from '../settingsNav'
@@ -19,6 +11,8 @@ import {
   type Appearance
 } from '../appearance'
 import { friendlyErr } from '../errText'
+import { useConfigAutosave } from '../useConfigAutosave'
+import { useContextBill } from '../useContextBill'
 import { SettingsAbout } from './SettingsAbout.tsx'
 import { SettingsAi } from './SettingsAi.tsx'
 import { SettingsAppearance } from './SettingsAppearance.tsx'
@@ -30,12 +24,7 @@ import { SettingsNet } from './SettingsNet.tsx'
 // 第八十九批:模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
 // 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
 
-/** 上下文输入框的落账规则:空串 = 交回自动探测(undefined);数字夹进合法范围 */
-function clampContextSize(raw: string): number | undefined {
-  const digits = raw.replace(/[^0-9]/g, '')
-  if (digits === '') return undefined
-  return Math.max(CONTEXT_SIZE_MIN, Math.min(CONTEXT_SIZE_MAX, Number(digits)))
-}
+/** 上下文输入框的落账规则在 useContextBill */
 
 export type { SectionKey }
 
@@ -61,9 +50,8 @@ export function SettingsPage({
   onSettingsSection?: (key: SectionKey) => void
 }): React.JSX.Element {
   const [appearance, setAppearance] = useState<Appearance>(loadAppearance)
-  const [config, setConfig] = useState<AiConfig | null>(null)
+  const { config, applyConfig, commitConfig, saveError } = useConfigAutosave(onAiConfigSaved)
   const [scale, setScale] = useState(() => window.atlas.getUiScale())
-  const [saveError, setSaveError] = useState<string | null>(null)
   // 当前分类的登记已上交 App(settingsSection):本页只领 sectionReq 跳转命令,自己不养导航状态表
   const [dragValue, setDragValue] = useState<number | null>(null)
   // 模型清单带着来源登记:LM Studio 与在线 API 各读各的,切来源后旧清单不串台
@@ -75,48 +63,51 @@ export function SettingsPage({
   const [modelsBusy, setModelsBusy] = useState(false)
   const [shelfOpen, setShelfOpen] = useState(false)
   const [appVersion, setAppVersion] = useState<string | null>(null)
-  // 适配估算结果(第七十三批):模型文件路径一变就问主进程「这台机器带得动吗」
+  // 适配估算结果:模型文件路径一变就问主进程「这台机器带得动吗」
   const [fitCheck, setFitCheck] = useState<{ path: string; verdict: ModelFitVerdict | null }>({
     path: '',
     verdict: null
   })
-  // 上下文档位的状态表原料(救生圈本批):模型档案 + 机器规格,带着取数时的路径对号,
+  // 上下文档位的状态表原料:模型档案 + 机器规格,带着取数时的路径对号,
   // 路径一换旧结论自动作废 —— 不用在 effect 里手动清,也躲开「effect 里同步 setState」的坑
   const [ctxInfoFetched, setCtxInfoFetched] = useState<{
     path: string
     info: ModelContextInfo | null
   }>({ path: '', info: null })
-  // 第八十九批:上下文框的打字串(纯字符串,和存档里的数字分开管,失焦才归账)
-  const [contextRaw, setContextRaw] = useState<string>('')
   // 当前页登记:侧栏导航发 sectionReq 翻页,这里只认 seq 切页
   const [page, setPage] = useState<SectionKey>('appearance')
 
-  // ── 即改即存:防抖聚笔的落盘状态表 ──
-  // configRef 永远装最新配置;pendingSave 记「还有没写完的笔」;
-  // 连击 300ms 聚成一笔写盘,卸载时冲线 —— 下笔即生效,磁盘不挨打。
-  const configRef = useRef<AiConfig | null>(config)
-  const pendingSave = useRef(false)
-  const saveTimer = useRef<number | null>(null)
+  // 模型路径一变就重问适配估算与模型档案;显示时按「取数路径 === 当前路径」对号,换人/清空自动失效
+  const modelPath = config?.builtin.modelPath ?? ''
+  const fitNote = fitCheck.path === modelPath ? fitCheck.verdict : null
+  const ctxInfo = ctxInfoFetched.path === modelPath ? ctxInfoFetched.info : null
+
+  // ── 上下文档位 + 黑板账单(2026-09-13 产品裁定)──
+  const {
+    contextRaw,
+    setContextRaw,
+    seedContextRaw,
+    contextNotches,
+    ctxLine,
+    commitContextValue,
+    onContextBlur
+  } = useContextBill({ config, ctxInfo, commitConfig })
+
+  // ── 即改即存:防抖聚笔的落盘状态表(在 useConfigAutosave)──
   const appearanceRef = useRef(appearance)
   const scaleRef = useRef(scale)
-  // 卸载冲线那一笔也要把存档回喊给 App:回调本身可能换过届,走 ref 拿最新一届
-  const onSavedRef = useRef(onAiConfigSaved)
-  useEffect(() => {
-    onSavedRef.current = onAiConfigSaved
-  }, [onAiConfigSaved])
 
   // AI 配置只读一次存档;之后每一次改动都即改即存(commitConfig)
   useEffect(() => {
     void window.atlas
       .aiConfigGet()
       .then((c) => {
-        configRef.current = c
-        setConfig(c)
-        // 第八十九批:读档落定上下文框的初始字(打字串和存档数字分开管)
-        setContextRaw(c.contextSize === undefined ? '' : String(c.contextSize))
+        applyConfig(c)
+        // 读档落定上下文框的初始字(打字串和存档数字分开管)
+        seedContextRaw(c.contextSize)
       })
       .catch(() => {})
-  }, [])
+  }, [applyConfig, seedContextRaw])
 
   // 「AI 设置」直达/侧栏导航点击:入口每点一次 req.seq +1,页内切到指定页(单例签,
   // 签早开着也能再领到这页)
@@ -136,9 +127,8 @@ export function SettingsPage({
       .catch(() => {})
   }, [])
 
-  // 适配估算(第七十三批) + 模型档案(档位状态表):模型路径一变就都问一遍;
+  // 适配估算 + 模型档案:模型路径一变就都问一遍;
   // 结果带着路径入库,显示时按「取数路径 === 当前路径」对号,换人/清空自动失效
-  const modelPath = config?.builtin.modelPath ?? ''
   useEffect(() => {
     if (!modelPath.trim()) return
     let alive = true
@@ -158,32 +148,6 @@ export function SettingsPage({
       alive = false
     }
   }, [modelPath])
-  const fitNote = fitCheck.path === modelPath ? fitCheck.verdict : null
-  const ctxInfo = ctxInfoFetched.path === modelPath ? ctxInfoFetched.info : null
-
-  const flushConfigSave = useCallback(async (): Promise<void> => {
-    if (!pendingSave.current || !configRef.current) return
-    pendingSave.current = false
-    try {
-      const saved = await window.atlas.aiConfigSave(configRef.current)
-      onAiConfigSaved?.(saved)
-      setSaveError(null)
-    } catch (err) {
-      setSaveError(friendlyErr(err))
-    }
-  }, [onAiConfigSaved])
-
-  /** 控件唯一改账口:新配置立刻进界面,落盘走防抖 */
-  const commitConfig = useCallback(
-    (next: AiConfig): void => {
-      configRef.current = next
-      setConfig(next)
-      pendingSave.current = true
-      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
-      saveTimer.current = window.setTimeout(() => void flushConfigSave(), 300)
-    },
-    [flushConfigSave]
-  )
 
   // 外观同理:拨一下就 applyAppearance(界面)+ saveAppearance(落盘),没有草稿账
   const updateAppearance = useCallback((patch: Partial<Appearance>): void => {
@@ -210,75 +174,12 @@ export function SettingsPage({
     return () => window.removeEventListener(CH.uiScaleChanged, onUiScale)
   }, [])
 
-  // 卸载冲线:没跑完的防抖落盘补写;缩放补一发幂等 setUiScale,防万一中途断在半档上
+  // 卸载冲线:缩放补一发幂等 setUiScale,防万一中途断在半档上(配置落盘冲线在 useConfigAutosave)
   useEffect(() => {
     return () => {
-      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
-      if (pendingSave.current && configRef.current) {
-        pendingSave.current = false
-        void window.atlas
-          .aiConfigSave(configRef.current)
-          .then((saved) => onSavedRef.current?.(saved))
-          .catch(() => {})
-      }
       window.atlas.setUiScale(scaleRef.current)
     }
   }, [])
-
-  // ── 上下文档位 + 黑板账单(2026-09-13 产品裁定)──
-  // 档位走程序员老规矩 2 的幂(4k/8k/16k/…);最大档照模型出厂上限封顶,翻不出档案按 64k 兜底;
-  // 输入框自由填写照旧,两边随时互通;账单跟着框里现在的数实时算,扛不住当场喊。
-  const contextNotches = useMemo(
-    () => CONTEXT_NOTCHES.filter((n) => n <= (ctxInfo?.nativeContext ?? FALLBACK_CONTEXT_CAP)),
-    [ctxInfo]
-  )
-  const committedCtx = clampContextSize(contextRaw)
-  const ctxBill = useMemo(
-    () =>
-      ctxInfo
-        ? formatContextBill({
-            contextTokens: committedCtx ?? DEFAULT_CONTEXT_SIZE,
-            isAuto: committedCtx === undefined,
-            modelBytes: ctxInfo.sizeBytes,
-            shape: ctxInfo.shape,
-            ramBytes: ctxInfo.ramBytes,
-            vramBytes: ctxInfo.vramBytes
-          })
-        : null,
-    [ctxInfo, committedCtx]
-  )
-  // 黑板账的展示口径照稿子短句式(「✓ 16k 可运行(模型 3.2 GB,内存充足)」):
-  // 判定照旧走 ctxBill 精算,行上只摆档名 + 结论 + 括号真规格,不摊流水账
-  const ctxLine = useMemo((): ContextBill | null => {
-    if (!ctxBill || !ctxInfo) return ctxBill
-    const label = committedCtx === undefined ? '自动' : `${committedCtx / 1024}k`
-    const model = ctxInfo.sizeBytes !== null ? formatGB(ctxInfo.sizeBytes) : '?'
-    switch (ctxBill.level) {
-      case 'ok':
-        return { level: 'ok', text: `✓ ${label} 可运行(模型 ${model}，内存充足)` }
-      case 'tight':
-        return { level: 'tight', text: `! ${label} 偏紧(模型 ${model}，贴近内存上限)` }
-      case 'too-big':
-        return { level: 'too-big', text: `✕ ${label} 带不动(模型 ${model}，超出内存上限)` }
-      default:
-        return { level: 'unknown', text: `… 读不到模型档案，${label} 的黑板账算不了` }
-    }
-  }, [ctxBill, ctxInfo, committedCtx])
-  function commitContextValue(v: number): void {
-    setContextRaw(String(v))
-    if (config && config.contextSize !== v) {
-      commitConfig({ ...config, contextSize: v })
-    }
-  }
-
-  /** 上下文输入框失焦落账:数字归到合法范围,空串交回自动探测;框里当场改字,眼见为实 */
-  function onContextBlur(): void {
-    const committed = clampContextSize(contextRaw)
-    setContextRaw(committed === undefined ? '' : String(committed))
-    if (config && config.contextSize !== committed) {
-      commitConfig({ ...config, contextSize: committed })
-    }
-  }
 
   /** 滑条松手落账:预览值 → setUiScale 落盘 + 广播,滑杆读数指回真值 */
   function commitDrag(): void {
@@ -343,8 +244,7 @@ export function SettingsPage({
    *  这儿重读一遍,让界面账对着新现实 */
   function onShelfModelReady(): void {
     void window.atlas.aiConfigGet().then((c) => {
-      configRef.current = c
-      setConfig(c)
+      applyConfig(c)
       onAiConfigSaved?.(c)
     })
   }
