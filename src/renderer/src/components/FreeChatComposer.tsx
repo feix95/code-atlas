@@ -1,26 +1,24 @@
 import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
-import type { AiConfig, ChatCodeRef } from '@shared/types'
+import type { ChatCodeRef } from '@shared/types'
 import { COMPACT_COMMAND, isCompactCommand } from '@shared/compact'
 import { TreeIcon } from './Icons'
 import { openTextEditMenu } from './textEditMenu'
 import { REF_ONLY_QUESTION, type AiChatApi } from '../useAiChat'
-import { type ChatImage } from '@shared/chatImage'
-import { fileAttachRangeLabel } from '@shared/chatFiles'
-import type { ChatImagesApi } from '../useChatImages'
 import { partitionAttachFiles, type ChatFilesApi } from '../useChatFiles'
+import type { ChatImagesApi } from '../useChatImages'
 import { AiSetupContext } from '../aiSetupContext'
-import {
-  CHAT_ACTION_ICON_SIZE,
-  INPUT_CAP_LINES,
-  INPUT_EXPAND_LINES,
-  INPUT_TOGGLE_ICON_SIZE
-} from '../inputMetrics'
+import { CHAT_ACTION_ICON_SIZE, INPUT_TOGGLE_ICON_SIZE } from '../inputMetrics'
+import { ComposerAtoms } from './ComposerAtoms'
+import { CapabilityMenu, SlashPalette } from './ComposerOverlays'
+import { useComposerAutosize } from '../useComposerAutosize'
+import { useWebLookupToggle } from '../useWebLookupToggle'
 
 /**
  * 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/停一停;
  * 写到两行起往上长,控件自然落到第二行;满五行封顶出拨杆,拨上去多撑五行。
  * 空场时整颗舱挂在 hero 居中,聊开了沉到底栏 —— 同一颗舱两处坐席。
- * 从 FreeChatPanel 拆出,纯迁移不改行为:草稿/菜单/斜杠补全/弹性长高都是舱自己的家务。
+ * 拆分登记:待发原子 → ComposerAtoms;两块浮层 → ComposerOverlays;
+ * 弹性长高 → useComposerAutosize;联网开关 → useWebLookupToggle。
  */
 
 /** 斜杠命令清单(输入框打 / 浮出的补全卡):命令名 + 一句话说明;新命令往这儿加一行就成 */
@@ -37,12 +35,12 @@ export function FreeChatComposer({
   onWillSend
 }: {
   chat: AiChatApi
-  /** 已引用的代码段(第一百一十一批):预览模式下由左栏选中攒出来 */
+  /** 已引用的代码段:预览模式下由左栏选中攒出来 */
   refs: ChatCodeRef[]
   onRemoveRef?: (index: number) => void
-  /** 待发图片状态(第一百五十二批):选文件/粘贴/拖入都汇进它,能力闸也在它手里 */
+  /** 待发图片状态:选文件/粘贴/拖入都汇进它,能力闸也在它手里 */
   chatImages: ChatImagesApi
-  /** 待发文件状态(文件附件批次,对齐 Claude Code 的 @文件):选文件/拖入都汇进它 */
+  /** 待发文件状态(对齐 Claude Code 的 @文件):选文件/拖入都汇进它 */
   chatFiles: ChatFilesApi
   /** 发送/压缩前先回底:自己的话自己得看见,发出去这一眼不被上翻状态挡住 */
   onWillSend: () => void
@@ -57,6 +55,9 @@ export function FreeChatComposer({
   const formRef = useRef<HTMLFormElement>(null)
   // 「添加附件」的隐藏文件筐(图片/文件共用一个口):菜单点了它弹系统选择框,挑完按类分流
   const attachInputRef = useRef<HTMLInputElement>(null)
+  const { inputRef, lineCount, capped } = useComposerAutosize(draft, expanded, setExpanded)
+  const { webOn, toggleWeb } = useWebLookupToggle()
+
   useEffect(() => {
     if (!menuOpen) return
     const doc = formRef.current?.ownerDocument ?? document
@@ -66,40 +67,7 @@ export function FreeChatComposer({
     doc.addEventListener('mousedown', onPointerDown)
     return () => doc.removeEventListener('mousedown', onPointerDown)
   }, [menuOpen])
-  // 「+」菜单里的联网开关 = 设置页「联网查证」总闸的快捷位:读一份当前配置存 ref,
-  // 拨一下就把整份配置 + webLookup 翻转存回去,返回什么就以什么为准
-  const [webOn, setWebOn] = useState(false)
-  const cfgRef = useRef<AiConfig | null>(null)
-  useEffect(() => {
-    let alive = true
-    void window.atlas
-      .aiConfigGet()
-      .then((c) => {
-        if (!alive) return
-        cfgRef.current = c
-        setWebOn(c.webLookup === true)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [])
-  function toggleWeb(): void {
-    const cur = cfgRef.current
-    if (!cur) return
-    const next = !webOn
-    setWebOn(next)
-    void window.atlas
-      .aiConfigSave({ ...cur, webLookup: next })
-      .then((c) => {
-        cfgRef.current = c
-        setWebOn(c.webLookup === true)
-      })
-      .catch(() => setWebOn(!next))
-  }
-  // 现在文字占了几行(按实际渲染量出来的,换行/自动折行都算);一行 = 单行胶囊
-  const [lineCount, setLineCount] = useState(1)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+
   // 斜杠命令补全(打 / 浮出的命令清单):Esc 关面板只是藏起来,输入框内容不动;
   // 内容一变(draft 易手)就重新能冒头 —— 关掉后接着打字照样过滤
   const [slashDismissed, setSlashDismissed] = useState(false)
@@ -123,8 +91,7 @@ export function FreeChatComposer({
       return
     }
     const q = draft.trim()
-    // /compact 手动压缩命令(第一百四十二批):不当问题发,拦下来直接压缩;
-    // 忙着回答时不接,跟发消息一个规矩
+    // /compact 手动压缩命令:不当问题发,拦下来直接压缩;忙着回答时不接,跟发消息一个规矩
     if (isCompactCommand(q)) {
       if (chat.busy) return
       onWillSend()
@@ -133,8 +100,7 @@ export function FreeChatComposer({
       if (expanded) setExpanded(false)
       return
     }
-    // 挂了引用就允许空着发,带图/带文件也一样(图和文件本身就是题目,主进程给兜底问法):
-    // 不让他对着空气发呆,也不让空舱空发
+    // 挂了引用就允许空着发,带图/带文件也一样(图和文件本身就是题目,主进程给兜底问法)
     const pendingImages = chatImages.images
     const pendingFiles = chatFiles.files
     const text = q || (draftRefs.length > 0 ? REF_ONLY_QUESTION : '')
@@ -162,7 +128,7 @@ export function FreeChatComposer({
     }
   }
 
-  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送(第一百一十八批补);
+  /** 回车发送,Shift+回车换行;输入法选词的那下回车不是发送;
    *  斜杠补全开着时,键盘先伺候面板:上下挑、回车/Tab 选定(不是发消息)、Esc 只收面板 */
   function onDraftKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === 'Escape' && menuOpen) {
@@ -208,42 +174,6 @@ export function FreeChatComposer({
     openTextEditMenu({ event: e, value: draft, setValue: setDraft })
   }
 
-  // 弹性长高的账(产品指定):空 = 一行;有一到四行长到几行;五行封顶,
-  // 拨杆拨上去多给五行(共十行),超出的舱内自己滚;文字退回五行内拨杆自动归位。
-  // 防抖(小葵报的病):文字卡在换行临界点时,打一个字涨两行、删一个字缩一行,舱来回蹦。
-  // 治法是「涨快缩慢」:涨按实际行数,缩要富余 —— 量行宽时右侧多留一截,
-  // 文字连这一截都省出来才准缩回一行。另外单行/多行两种布局的行宽不一样
-  // (单行舱文字让着按钮排,多行舱铺满),量行数时给多行舱补上按钮排的地盘,
-  // 两种布局按同一个尺度量,免得「多行里量着放得下、缩回单行立刻又放不下」来回打架。
-  const BAR_RESERVE = '13rem' // 单行舱右侧按钮排的地盘(俩图标胶囊+发送钮,忙时还有「停一停」,往宽了备)
-  const COLLAPSE_SLACK = '4rem' // 缩回一行的富余:比按钮排还宽出这么多才缩
-  useEffect(() => {
-    const el = inputRef.current
-    if (!el) return
-    const cs = getComputedStyle(el)
-    const line = Number.parseFloat(cs.lineHeight) || 24
-    // border-box 账:style.height 写的是含内边距的总高 —— 漏加 padding 的话
-    // 文字盒被 padding 吃掉一截,overflow:hidden 上下裁字(UI 放得越大裁得越狠)
-    const padY = Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom)
-    const multi = lineCount >= 2
-    el.style.height = 'auto'
-    // 统一适配估算:多行舱里临时把右侧按按钮排地盘收窄,量出来的行数和单行舱一个尺度
-    el.style.paddingRight = multi ? BAR_RESERVE : ''
-    const realLines = Math.max(1, Math.round(el.scrollHeight / line))
-    // 收缩判定:在统一适配估算上再加一截富余,连富余都省出来还是一行,才真缩
-    el.style.paddingRight = multi ? `calc(${BAR_RESERVE} + ${COLLAPSE_SLACK})` : COLLAPSE_SLACK
-    const slackLines = Math.max(1, Math.round(el.scrollHeight / line))
-    el.style.paddingRight = ''
-    const shown = realLines >= 2 ? realLines : slackLines >= 2 ? 2 : 1
-    // 十行锁死(产品指定):展开就是十行高,内容超了右侧滚条翻看,舱绝不跟着内容再长
-    el.style.height = `${
-      (expanded ? INPUT_EXPAND_LINES * line : Math.min(shown * line, INPUT_CAP_LINES * line)) + padY
-    }px`
-    setLineCount(shown)
-    if (expanded && realLines < INPUT_CAP_LINES) setExpanded(false)
-  }, [draft, expanded, lineCount])
-  const capped = lineCount >= INPUT_CAP_LINES || expanded
-
   return (
     <form
       ref={formRef}
@@ -252,80 +182,27 @@ export function FreeChatComposer({
     >
       {/* 斜杠命令补全:打 / 浮在输入舱上方,上下键挑、回车/Tab 选定、Esc 收掉、鼠标点也算数 */}
       {slashOpen && (
-        <div className="slash-palette" id="slash-palette" role="listbox" aria-label="斜杠命令">
-          {slashMatches.map((c, i) => (
-            <button
-              key={c.name}
-              type="button"
-              role="option"
-              id={`slash-opt-${c.name.slice(1)}`}
-              aria-selected={i === slashActive}
-              className={`slash-item${i === slashActive ? ' is-active' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onMouseEnter={() => setSlashIndex(i)}
-              onClick={() => pickSlash(c.name)}
-            >
-              <span className="slash-name">{c.name}</span>
-              <span className="slash-desc">{c.desc}</span>
-            </button>
-          ))}
-        </div>
+        <SlashPalette
+          matches={slashMatches}
+          active={slashActive}
+          onHover={setSlashIndex}
+          onPick={pickSlash}
+        />
       )}
-      {/* 「+」能力菜单:思考/翻文件/联网三个开关 + 添加附件(动作放最下、离「+」钮最近),iOS 拨钮式;点舱外或 Esc 收 */}
+      {/* 「+」能力菜单:思考/翻文件/联网三个开关 + 添加附件,点舱外或 Esc 收 */}
       {menuOpen && (
-        <div className="fc-menu" role="menu" aria-label="能力开关">
-          <button
-            type="button"
-            className={`fc-mrow${chat.thinking ? ' is-on' : ''}`}
-            onClick={() => chat.setThinking(!chat.thinking)}
-            aria-pressed={chat.thinking}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="brain" size={14} mono />
-            </span>
-            思考模式
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`fc-mrow${chat.agent ? ' is-on' : ''}`}
-            onClick={() => chat.setAgent(!chat.agent)}
-            aria-pressed={chat.agent}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="folderSearch" size={14} mono />
-            </span>
-            自己翻文件
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`fc-mrow${webOn ? ' is-on' : ''}`}
-            onClick={toggleWeb}
-            aria-pressed={webOn}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="globe" size={14} mono />
-            </span>
-            联网查询
-            <span className="fc-sw" aria-hidden="true" />
-          </button>
-          {/* 添加附件(文件附件批次,对齐 Claude Code 的 @文件):图片/文件共用一个口,挑完按类分流
-              —— 图片走看图那条链,其余文本文件读原文;纯文本模型文件照收,图片会被拒,加的时候会弹灰字说明 */}
-          <button
-            type="button"
-            className="fc-mrow"
-            onClick={() => {
-              setMenuOpen(false)
-              attachInputRef.current?.click()
-            }}
-          >
-            <span className="fc-mi">
-              <TreeIcon name="clip" size={14} mono />
-            </span>
-            添加附件
-          </button>
-        </div>
+        <CapabilityMenu
+          thinking={chat.thinking}
+          agent={chat.agent}
+          webOn={webOn}
+          onToggleThinking={(on) => chat.setThinking(on)}
+          onToggleAgent={(on) => chat.setAgent(on)}
+          onToggleWeb={toggleWeb}
+          onPickAttach={() => {
+            setMenuOpen(false)
+            attachInputRef.current?.click()
+          }}
+        />
       )}
       <div className="fc-line">
         <button
@@ -354,82 +231,12 @@ export function FreeChatComposer({
               if (parts.files.length > 0) void chatFiles.addFiles(parts.files)
             }}
           />
-          {/* 待发文件原子(文件附件批次):文件名+行账躺在文字流里,× 移除;常驻,每轮都带上 */}
-          {chatFiles.files.map((f) => (
-            <span
-              key={f.id}
-              className="fc-file"
-              data-tip={`${f.relPath ?? f.absPath ?? f.name} · ${fileAttachRangeLabel(f)}`}
-            >
-              <TreeIcon name="doc" size={12} mono />
-              <span className="fc-file-text mono">{f.name}</span>
-              <button
-                type="button"
-                className="fc-file-x"
-                onClick={() => chatFiles.removeFile(f.id)}
-                aria-label={`移除文件 ${f.name}`}
-                data-tip="移除这个文件"
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-          {/* 待发图片缩略原子(第一百五十二批):和引用原子一个排面,× 可键盘删 */}
-          {chatImages.images.map((img: ChatImage) => (
-            <span
-              key={img.id}
-              className="fc-img"
-              data-tip={`${img.name} · ${img.width}×${img.height}`}
-            >
-              <img className="fc-img-thumb" src={img.dataUrl} alt={img.name} />
-              <button
-                type="button"
-                className="fc-img-x"
-                onClick={() => chatImages.removeImage(img.id)}
-                aria-label={`移除图片 ${img.name}`}
-                data-tip="移除这张图片"
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-          {/* 内嵌引用原子(产品裁定):图标+底色躺在文字流里,光标顶头退格删最后一颗 */}
-          {draftRefs.map((r, i) => (
-            <span
-              key={`${r.relPath}-${r.startLine}-${r.endLine}-${i}`}
-              className="fc-ref"
-              data-tip={`${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-            >
-              <svg
-                className="fc-ref-ic"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
-                <path d="m10 8-3 3 3 3" />
-                <path d="m14 14 3-3-3-3" />
-              </svg>
-              <span className="fc-ref-text mono">
-                {r.relPath.split('/').pop()}:{r.startLine}-{r.endLine}
-              </span>
-              <button
-                type="button"
-                className="fc-ref-x"
-                onClick={() => onRemoveRef?.(i)}
-                aria-label={`移除引用 ${r.relPath} 第 ${r.startLine}-${r.endLine} 行`}
-                data-tip="移除这段引用"
-              >
-                ✕
-              </button>
-            </span>
-          ))}
+          <ComposerAtoms
+            chatFiles={chatFiles}
+            chatImages={chatImages}
+            refs={draftRefs}
+            onRemoveRef={onRemoveRef}
+          />
           <textarea
             ref={inputRef}
             value={draft}
@@ -456,8 +263,7 @@ export function FreeChatComposer({
             }}
             onKeyDown={onDraftKeyDown}
             onContextMenu={onDraftContextMenu}
-            // 粘贴剪贴板文件(图片走图片链;复制的文本文件走文件链,两把尺各自收编):
-            // 纯文本粘贴照旧走默认行为,一个字不动
+            // 粘贴剪贴板文件(图片走图片链;复制的文本文件走文件链):纯文本粘贴照旧走默认行为
             onPaste={(e) => {
               const files = Array.from(e.clipboardData?.files ?? [])
               if (files.length === 0) return
@@ -466,7 +272,7 @@ export function FreeChatComposer({
               if (parts.images.length > 0) void chatImages.addFiles(parts.images)
               if (parts.files.length > 0) void chatFiles.addFiles(parts.files)
             }}
-            // 点输入区 = 要打字了,「+」菜单顺手关闭(点在舱内的外点判定管不到这层)
+            // 点输入区 = 要打字了,「+」菜单顺手关闭
             onFocus={() => setMenuOpen(false)}
           />
         </div>
