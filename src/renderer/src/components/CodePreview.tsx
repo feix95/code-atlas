@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { ChatCodeRef, FilePreviewResult, ScanFileNode } from '@shared/types'
-import { friendlyErr } from '../errText'
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import type { ChatCodeRef, ScanFileNode } from '@shared/types'
 import { Notice } from './Notice'
 import { ImagePreview } from './ImagePreview'
 import { AudioPreview } from './AudioPreview'
@@ -27,9 +26,8 @@ import { applyViewFlags, getViewFlagsBits, subscribeViewFlags, viewFlags } from 
 import { fileBaseName, type RenameOutcome } from '@shared/fileRename'
 import { getCodeWrapOn, subscribeCodeWrap, toggleCodeWrap } from '../codePrefs'
 import { bindDocZoomWheel, useDocZoom } from '../docZoom'
+import { usePreviewDoc } from '../usePreviewDoc'
 
-/** 「一闪而过」小开关的亮灯时长:整条复制提示停久一点 */
-const COPIED_ALL_MS = 2000
 /** 头部折行/模式开关图标(19.2px = 1.2rem) */
 const WRAP_ICON_SIZE = 19.2
 /**
@@ -78,110 +76,26 @@ export function CodePreview({
   onRenameFile?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   const codeViewRef = useRef<HTMLDivElement>(null)
-  // ── 换文件就地复位(隐身案本批):App 不再挂 key={relPath} 强制重挂,复位收编进组件 ——
-  //    所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂,绝不串台 ──
-  /** 读文件这笔账:读到什么/出什么错,记在哪个文件名下 */
-  const [loadedAt, setLoadedAt] = useState<{
-    file: string
-    result: FilePreviewResult | null
-    err: string | null
-  }>({
-    file: '',
-    result: null,
-    err: null
-  })
-  const result = loadedAt.file === file.relPath ? loadedAt.result : null
-  const err = loadedAt.file === file.relPath ? loadedAt.err : null
-  /** 「已复制」一闪而过小开关 + 改名报错条的账 */
-  const [uiAt, setUiAt] = useState<{
-    file: string
-    copiedAll: boolean
-    renameErr: string | null
-  }>({
-    file: '',
-    copiedAll: false,
-    renameErr: null
-  })
-  const copiedAll = uiAt.file === file.relPath && uiAt.copiedAll
-  const renameErr = uiAt.file === file.relPath ? uiAt.renameErr : null
-  /** 改小开关:只动当前文件的账;换了文件才姗姗来迟的开关(迟到定时器),当没看见 */
-  const patchUi = useCallback(
-    (patch: Partial<{ copiedAll: boolean; renameErr: string | null }>): void => {
-      setUiAt((prev) => (prev.file === file.relPath ? { ...prev, ...patch } : prev))
-    },
-    [file.relPath]
-  )
+  // ── 按文件记账(读稿/编辑稿/提示/改名回执)全在 usePreviewDoc ──
+  const {
+    result,
+    err,
+    diskText,
+    colors,
+    text,
+    total,
+    copiedAll,
+    renameErr,
+    onTextChange,
+    requestRename,
+    copyAll
+  } = usePreviewDoc({ rootPath, relPath: file.relPath, onRenameFile })
   /**
-   * 编辑中的最新文稿(state 账):编辑器一打字就更新,切阅读档时按它渲染 ——
-   * 每键一渲的账很轻(顶栏两颗钮 + 一层框,编辑器自身不重立);
-   * 按文件名记账,别份文件的稿子绝不冒名顶替。
-   */
-  const [editAt, setEditAt] = useState<{ file: string; text: string } | null>(null)
-  const onTextChange = useCallback(
-    (t: string): void => {
-      setEditAt({ file: file.relPath, text: t })
-    },
-    [file.relPath]
-  )
-
-  /**
-   * 内联标题改名通道(内联标题改名批次):回执一到,读稿/草稿的账就地换成新路径 ——
-   * 等 App 换完扫描树与页签,file.relPath 落到新值,两边正好接上,
-   * 不闪「正在读文件」;败了把报错挂上提示条(账跟着文件名,换文件自动消)。
-   */
-  const requestRename = useCallback(
-    async (base: string): Promise<RenameOutcome> => {
-      if (!onRenameFile) return { ok: false, error: '改名通道没接上' }
-      const r = await onRenameFile(base)
-      if (r.ok) {
-        setLoadedAt((prev) =>
-          prev.file === file.relPath
-            ? { file: r.relPath, result: prev.result, err: prev.err }
-            : prev
-        )
-        setEditAt((prev) =>
-          prev?.file === file.relPath ? { file: r.relPath, text: prev.text } : prev
-        )
-        patchUi({ renameErr: null })
-      } else {
-        patchUi({ renameErr: r.error })
-      }
-      return r
-    },
-    [onRenameFile, file.relPath, patchUi]
-  )
-  /**
-   * 折行开关(全局默认开本批):一个开关管所有文件,存 localStorage 重启不失忆;
+   * 折行开关(全局默认开):一个开关管所有文件,存 localStorage 重启不失忆;
    * 超行数闸的文件摁不动(巨型文件默认不折行的保守策略)。
    */
   // 折行账读全局可订阅小状态表(页签右键菜单也能拨这颗开关,不止本件的 Alt+Z)
   const wrapOn = useSyncExternalStore(subscribeCodeWrap, getCodeWrapOn)
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // 路径契约:renderer 只回传 (rootPath, relPath),绝对路径是主进程的事。
-  // 账记在文件名下:新文件还没回话时,旧文件的内容一秒都不冒名顶替
-  useEffect(() => {
-    let alive = true
-    window.atlas
-      .readPreview(rootPath, file.relPath)
-      .then((res) => {
-        if (alive) setLoadedAt({ file: file.relPath, result: res, err: null })
-      })
-      .catch((e) => {
-        if (alive) setLoadedAt({ file: file.relPath, result: null, err: friendlyErr(e) })
-      })
-    return () => {
-      alive = false
-    }
-  }, [rootPath, file.relPath])
-
-  const diskText = result?.status === 'ok' ? result.text : ''
-  /** 分色账(预览分色本批):主进程按行给好的段落;没有 = 这份不上色,白字照常 */
-  const colors = result?.status === 'ok' ? result.colors : undefined
-  /** 编辑器手里的最新文稿:没动过字 = 盘上那份,动过 = 编辑稿 */
-  const text = editAt?.file === file.relPath ? editAt.text : diskText
-  /** 行数闸用打开时的行数(编辑中跨线的概率低,巨型文件保守策略不跟着抖) */
-  const total = useMemo(() => (diskText === '' ? 0 : diskText.split('\n').length), [diskText])
   const wrapAllowed = total > 0 && total <= WRAP_MAX_LINES
   const wrap = wrapAllowed && wrapOn
   // 预览显示开关(排版显示 × 只读)是全局一档:账在 codePrefs,拨一下所有签就地翻面 ——
@@ -219,13 +133,6 @@ export function CodePreview({
     return bindDocZoomWheel(view)
   }, [result, reading, linkedPlain])
 
-  useEffect(
-    () => () => {
-      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-    },
-    []
-  )
-
   /** 折行开关的大文件闸门:行数超闸的文件摁不动(全局状态唯一写口在 codePrefs,
       页签右键菜单那条路不设闸 —— 菜单拨的是「想要不要」,给不给闸说了算) */
   const toggleWrap = useCallback((): void => {
@@ -245,15 +152,7 @@ export function CodePreview({
     }
     if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
     e.preventDefault()
-    if (text === '') return
-    void navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        patchUi({ copiedAll: true })
-        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-        copiedTimerRef.current = setTimeout(() => patchUi({ copiedAll: false }), COPIED_ALL_MS)
-      })
-      .catch(() => {})
+    copyAll(text)
   }
 
   /** 阅读模式的右键:渲染态里没有行号账,选中了就给「复制选中段」一口 */
