@@ -534,3 +534,4 @@
 - refactor(ui): App.tsx 按职责拆出应用外壳、工作区扫描、文件动作与画面韧性钩子
 - refactor(ui): 页签拖拽拆出类型、落点判定、落账与会话钩子,TabBar 右键菜单拆出条目编排
 - refactor(ui): usePaneTabs 拆出关签接力、译文动作与换区重置
+- refactor(ui): 页签拖拽的松手沉降拆出独立模块,会话钩子回落到行数闸门内

@@ -1,6 +1,7 @@
 // 页签拖拽的类型与手感常量:会话、落点判定、页签带三处共用一份。
 import type { PaneDropMark } from './paneTabs'
 import type { AuxWindowRect } from '@shared/types'
+import type { TabBarTab } from './components/TabBar'
 
 /** 窗控三键总宽 3u(每钮 1u):页签区右端比内容列右端短这么一截,对齐账里要补回来 */
 export const WIN_CTL_U = 3
@@ -99,3 +100,16 @@ export interface SourceRect {
 
 /** 一次窗口矩形请求的回执类型(主进程给的无边框窗内容矩形) */
 export type WindowRects = readonly AuxWindowRect[]
+
+/** 页签拖拽会话对外露的状态与入口(实现在 useTabDragSession) */
+export interface TabDragSession {
+  drag: TabDragState | null
+  gap: { groupId: string; index: number } | null
+  cross: CrossTarget | null
+  chipRef: React.RefObject<HTMLDivElement | null>
+  beginTabDrag: (e: React.PointerEvent<HTMLDivElement>, t: TabBarTab) => void
+  /** 被拖签的家在哪条带(null = 还没开拖) */
+  dragSrcGroupId: string | null
+  /** 活序滑动中真身亲自跟指针,替身胶囊退场 */
+  chipHidden: boolean
+}
