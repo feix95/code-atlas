@@ -15,6 +15,22 @@
   min-height: 0;
 }
 
+/* 对话页字号缩放(Ctrl+滚轮):只覆写内容区(消息 + 输入舱)用到的字号 token,值抄自 tokens.css ——
+   CSS 变量在声明处就算死,想在 :root 挂一个乘数再让子树改是行不通的,只能就近覆写。
+   顶行「新对话」属于界面件,保持原尺寸;改 tokens.css 的这几档字号时,这里要同步。
+   乘数由 FreeChatPanel 内联写入 --fc-zoom;token 本身已是 rem,界面缩放照样在底层生效 */
+.chat-shell.free-chat .chat-messages,
+.chat-shell.free-chat .chat-bottom {
+  --font-xxs: calc(0.625rem * var(--fc-zoom, 1));
+  --font-xs: calc(0.6875rem * var(--fc-zoom, 1));
+  --font-sm: calc(0.75rem * var(--fc-zoom, 1));
+  --font-md: calc(0.8125rem * var(--fc-zoom, 1));
+  --font-base: calc(0.875rem * var(--fc-zoom, 1));
+  --font-ml: calc(0.9375rem * var(--fc-zoom, 1));
+  --font-lg: calc(1rem * var(--fc-zoom, 1));
+  --font-display: calc(1.625rem * var(--fc-zoom, 1));
+}
+
 /* 拖文件悬停的亮框(第一百二十五批):松手就挂上,不用文案教 */
 .chat-shell.free-chat.is-dragover {
   outline: 2px dashed var(--secondary);
@@ -38,7 +54,7 @@
   margin: 0 0 1.5rem;
   font-family: Georgia, 'Songti SC', 'SimSun', serif;
   font-weight: 400;
-  font-size: 1.625rem;
+  font-size: var(--font-display);
   letter-spacing: -0.01em;
   color: var(--text-strong);
 }

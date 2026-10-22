@@ -18,6 +18,7 @@ import type { ChatImage } from '@shared/chatImage'
 import { useModelVision } from '../useModelVision'
 import { useChatImages } from '../useChatImages'
 import { partitionAttachFiles, useChatFiles } from '../useChatFiles'
+import { bindChatZoomWheel, useChatZoom } from '../docZoom'
 import { AiSetupContext } from '../aiSetupContext'
 import { INLINE_ICON_SIZE } from '../inputMetrics'
 import { fileAttachRangeLabel } from '@shared/chatFiles'
@@ -87,6 +88,9 @@ export function FreeChatPanel({
   const vision = useModelVision()
   const chatImages = useChatImages(vision, chat.note)
   const chatFiles = useChatFiles(chat.note)
+  // 对话页字号(Ctrl+滚轮):单独一本账,只乘聊天内容的字号 token,不碰界面缩放
+  const chatZoom = useChatZoom()
+  const shellRef = useRef<HTMLDivElement | null>(null)
   // 拖拽悬停的亮框提示:松手就挂上,不用文案教
   const [dragOver, setDragOver] = useState(false)
   // 粘底跟滚(第六十一批):消息区自己滚;贴着底部看就跟滚,上翻过就不抢滚动条,浮出箭头报个位。
@@ -94,6 +98,13 @@ export function FreeChatPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
+
+  // Ctrl+滚轮挂在对话页根节点上:消息区和输入舱都算,普通滚轮不受影响
+  useEffect(() => {
+    const el = shellRef.current
+    if (!el) return
+    return bindChatZoomWheel(el)
+  }, [])
 
   function onMessagesScroll(): void {
     const el = scrollRef.current
@@ -198,6 +209,12 @@ export function FreeChatPanel({
     if (atBottomRef.current) el.scrollTop = el.scrollHeight
   }, [chat.messages])
 
+  // 换档后原本贴着底部就继续贴底:字号放大把行程拉长,scrollTop 留在原处会看着「浮上去」
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight
+  }, [chatZoom])
+
   /** 示例问题点了直接发,跟输入框发送走同一条流程;常驻的引用/文件跟着一起带;小探针忙着回上一题就不接 */
   function sendExample(q: string): void {
     if (chat.busy) return
@@ -225,7 +242,9 @@ export function FreeChatPanel({
 
   return (
     <div
+      ref={shellRef}
       className={`chat-shell free-chat${dragOver ? ' is-dragover' : ''}`}
+      style={{ '--fc-zoom': chatZoom } as React.CSSProperties}
       onDragOver={(e) => {
         const types = e.dataTransfer.types
         // 三种货都接:内里的引用/文件节点照旧,系统拖来的文件(Files)是附件那条路

@@ -529,3 +529,4 @@
 - refactor(ui): ui-workbench.css 按职责拆出选中覆盖层、属性面板、左侧栏
 - refactor(ui): workspace.css 按职责拆出预览、编辑器、文件树
 - refactor(ui): settings.css 按职责拆出控件行、模型货架弹层
+- feat(ui): 自由对话支持 Ctrl+滚轮单独缩放消息与输入舱字号,新开 atlas.chatZoom 存档,不影响界面缩放与预览字号
