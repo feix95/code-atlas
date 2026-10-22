@@ -6,171 +6,48 @@
 // 列表分页:默认 20 条 + 「加载更多」;筛选/排序存 localStorage,下次打开照旧。
 // 信息量(2026-09-18 产品定):参数量级/收藏/底座/协议/量化翻译全上 —— 这 app 本来就是看文件的,
 // 货架的信息量不能寒酸;全是 API 原样事实,解析不出就不显示。
-// 动效(GSAP 点睛两处):下载百分比数字滚动 / 展开清单错落淡入;
+// 动效(GSAP 点睛两处):下载百分比数字滚动(在 ShelfRow)/ 展开清单错落淡入(在本文件);
 // 全部尊重系统「减少动态效果」,关了动画功能一分不变。高度过渡归 CSS,GSAP 不碰布局属性。
-import { useCallback, useEffect, useRef, useState } from 'react'
+// 数据侧住在 useModelShelf,单行渲染住在 ShelfRow。
+import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ProgressDots } from './ProgressDots.tsx'
-import {
-  formatGgufSize,
-  type ModelDownloadProgress,
-  type RepoFile,
-  type ShelfEntry,
-  type ShelfQuery
-} from '../../../shared/modelShelf.ts'
-import {
-  applyShelfQuery,
-  formatDownloads,
-  formatRelativeDays,
-  judgeRun,
-  MODEL_FIT_RAM_MAX_RATIO,
-  runVerdictLabel
-} from '../../../shared/modelShelf.ts'
+import { applyShelfQuery, type ShelfQuery } from '../../../shared/modelShelf.ts'
 import { loadShelfPrefs, saveShelfPrefs, type ShelfPrefs } from '../shelfPrefs.ts'
+import { useModelShelf } from '../useModelShelf.ts'
+import { ShelfRow } from './ShelfRow.tsx'
 
 gsap.registerPlugin(useGSAP)
 
 /** 一屏先画几行;「加载更多」每次多画的行数(榜单总量 60,数据已在内存,翻页零请求) */
 const PAGE_SIZE = 20
 
-/** 状态章的悬停大白话:专业词上章,人话兜底 —— 判定口径(内存 × 系数预算)在这儿说清,
- *  系数跟判定函数同一份登记(shared/modelShelf 的 MODEL_FIT_*),调了不会文案对不上账 */
-const VERDICT_TIPS: Record<'no' | 'tight', string> = {
-  no: `模型体积超出这台机器的可用内存预算(总内存 × ${MODEL_FIT_RAM_MAX_RATIO}，给系统留活路)，下载了也加载不起来`,
-  tight: '接近内存预算上限，能跑但可能偏慢'
-}
-
-/** 副行小字(名字下方那行):下载量 + 收藏 + 更新时间(2026-09-18 起收藏也上 —— 数据早拉了,别浪费) */
-function shelfSubLine(entry: ShelfEntry): string {
-  const parts = [
-    `${formatDownloads(entry.downloads)} 次下载`,
-    `${formatDownloads(entry.likes)} 收藏`
-  ]
-  if (entry.lastModified) parts.push(`${formatRelativeDays(entry.lastModified)}更新`)
-  return parts.join(' · ')
-}
-
-/** 下载百分比的数字滚动:GSAP 接管计数 span 的文本,React 只递 value,两边不打架。
- *  进度事件来一次滚一次,中途新值从旧动画的当前位置续滚(不回跳);
- *  系统关了动画就直接写死数字,一分不少 */
-function AnimatedNumber({
-  value,
-  suffix = ''
-}: {
-  value: number
-  suffix?: string
-}): React.JSX.Element {
-  const spanRef = useRef<HTMLSpanElement>(null)
-  const shownRef = useRef(value)
-  const tweenRef = useRef<gsap.core.Tween | null>(null)
-  useEffect(() => {
-    const el = spanRef.current
-    if (!el) return
-    const write = (v: number): void => {
-      el.textContent = `${Math.round(v)}${suffix}`
-    }
-    if (shownRef.current === value) {
-      write(value)
-      return
-    }
-    tweenRef.current?.kill()
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      shownRef.current = value
-      write(value)
-      return
-    }
-    const proxy = { val: shownRef.current }
-    tweenRef.current = gsap.to(proxy, {
-      val: value,
-      duration: 0.5,
-      ease: 'power1.out',
-      onUpdate: () => {
-        shownRef.current = proxy.val
-        write(proxy.val)
-      }
-    })
-    return () => {
-      tweenRef.current?.kill()
-      tweenRef.current = null
-    }
-  }, [value, suffix])
-  return <span ref={spanRef} className="shelf-dl-pct" />
-}
-
-interface ShelfState {
-  entries: ShelfEntry[]
-  ramBytes: number
-}
-
-/** 下载中的那单(进度条用);donePath = 刚下完的(显示「已就位」) */
-interface DownloadState {
-  repoId: string
-  filePath: string
-  receivedBytes: number
-  totalBytes: number | null
-  donePath: string | null
-}
-
 export function ModelShelfPanel({
   onModelReady
 }: {
   onModelReady?: (finalPath: string) => void
 }): React.JSX.Element {
-  const [shelf, setShelf] = useState<ShelfState | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  /** 挂载就要拉货,初始 loading 即 true,不在 effect 里同步 set(会级联渲染) */
-  const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [files, setFiles] = useState<Record<string, RepoFile[]>>({})
-  const [filesLoading, setFilesLoading] = useState(false)
+  const {
+    shelf,
+    error,
+    loading,
+    retryShelf,
+    expanded,
+    toggleRepo,
+    files,
+    filesLoading,
+    download,
+    startDownload,
+    cancelDownload
+  } = useModelShelf(onModelReady)
   // 筛选偏好:从 localStorage 起步(下次打开照旧),每改一次落一次档
   const [maxGb, setMaxGb] = useState<number | null>(() => loadShelfPrefs().maxGb)
   const [sortBy, setSortBy] = useState<ShelfQuery['sortBy']>(() => loadShelfPrefs().sortBy)
   const [desc, setDesc] = useState(() => loadShelfPrefs().desc)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [download, setDownload] = useState<DownloadState | null>(null)
   // GSAP 动效的作用域:面板根节点(展开淡入在这棵树里找目标)
   const panelRef = useRef<HTMLDivElement>(null)
-  // 拉货序号:点「再试一次」作废在飞的旧请求,慢回来的旧响应不许覆盖新状态
-  const shelfSeqRef = useRef(0)
-  const mountedRef = useRef(true)
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
-
-  /** 发榜单请求(挂载第一拉和断网重试共用):序号作废旧请求,慢回来的旧响应不许覆盖新状态 */
-  const fetchShelf = useCallback(() => {
-    const seq = ++shelfSeqRef.current
-    window.atlas
-      .modelShelf()
-      .then((r) => {
-        if (mountedRef.current && seq === shelfSeqRef.current) {
-          setShelf({ entries: r.entries, ramBytes: r.spec.ramBytes })
-        }
-      })
-      .catch(() => {
-        if (mountedRef.current && seq === shelfSeqRef.current) {
-          setError('榜单没拉下来，可能是网络不通。检查网络后再试一次。')
-        }
-      })
-      .finally(() => {
-        if (mountedRef.current && seq === shelfSeqRef.current) setLoading(false)
-      })
-  }, [])
-
-  useEffect(() => {
-    fetchShelf()
-  }, [fetchShelf])
-
-  /** 「再试一次」:先把状态拨回「进行中」再发请求(挂载那轮不用,初始就是 loading) */
-  const retryShelf = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    fetchShelf()
-  }, [fetchShelf])
 
   /** 改筛选的统一入口:内存生效 + 落档 + 分页回到第一页 */
   function applyPrefs(next: ShelfPrefs): void {
@@ -181,72 +58,7 @@ export function ModelShelfPanel({
     saveShelfPrefs(next)
   }
 
-  // 下载进度:主进程边下边喊,这儿只管画;finalPath 到了 = 完成,报给设置页自动填路径
-  useEffect(() => {
-    const off = window.atlas.onModelDownloadProgress((p: ModelDownloadProgress) => {
-      if (p.finalPath) {
-        setDownload((prev) => (prev ? { ...prev, donePath: p.finalPath } : prev))
-        onModelReady?.(p.finalPath)
-      } else if (!p.error && !p.cancelled) {
-        setDownload((prev) =>
-          prev ? { ...prev, receivedBytes: p.receivedBytes, totalBytes: p.totalBytes } : prev
-        )
-      }
-    })
-    return off
-  }, [onModelReady])
-
-  const startDownload = useCallback((repoId: string, filePath: string) => {
-    setDownload({ repoId, filePath, receivedBytes: 0, totalBytes: null, donePath: null })
-    window.atlas.modelDownloadStart(repoId, filePath).catch(() => {
-      // 失败/取消:进度事件里已带人话,这里把行上状态松开
-      setDownload(null)
-    })
-  }, [])
-
-  const cancelDownload = useCallback(() => {
-    void window.atlas.modelDownloadCancel()
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    window.atlas
-      .modelShelf()
-      .then((r) => {
-        if (!alive) return
-        setShelf({ entries: r.entries, ramBytes: r.spec.ramBytes })
-      })
-      .catch(() => {
-        if (alive) setError('货架没拉下来：网络不通，或者两个数据源都在打盹。检查一下网络再重试。')
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const toggleRepo = useCallback(
-    (repoId: string) => {
-      if (expanded === repoId) {
-        setExpanded(null)
-        return
-      }
-      setExpanded(repoId)
-      if (!files[repoId]) {
-        setFilesLoading(true)
-        window.atlas
-          .modelFiles(repoId)
-          .then((list) => setFiles((prev) => ({ ...prev, [repoId]: list })))
-          .catch(() => setFiles((prev) => ({ ...prev, [repoId]: [] })))
-          .finally(() => setFilesLoading(false))
-      }
-    },
-    [expanded, files]
-  )
-
-  // ── GSAP 点睛(数字滚动在 AnimatedNumber 里,这是另一处)──
+  // ── GSAP 点睛(数字滚动在 ShelfRow 里,这是另一处)──
   // 展开清单错落淡入:高度过渡归 CSS(grid-rows),GSAP 只管内容逐项浮现;
   //   首版 4px/0.25s 被高度变化整个掩盖(小葵实测看不见),8px/0.3s 才从过渡里透出来
   useGSAP(
@@ -353,151 +165,20 @@ export function ModelShelfPanel({
         {/* 列表连同「加载更多」一起放进滚动窗口:货架再长也不超一屏,筛选栏永远在场 */}
         <div className="shelf-scroll">
           <ul className="shelf-list">
-            {visible.map((entry) => {
-              const verdict = judgeRun(entry.ggufTotalBytes, {
-                ramBytes: shelf?.ramBytes ?? 0,
-                vramBytes: null
-              })
-              const isOpen = expanded === entry.id
-              return (
-                <li
-                  key={entry.id}
-                  className={`shelf-item${verdict === 'no' ? ' is-unrunnable' : ''}${isOpen ? ' is-expanded' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="shelf-row"
-                    onClick={() => toggleRepo(entry.id)}
-                    aria-expanded={isOpen}
-                  >
-                    <span className="shelf-main">
-                      <span className="shelf-name" data-tip={entry.id}>
-                        {entry.id}
-                        {entry.paramScale !== null && (
-                          <span className="shelf-params">{entry.paramScale}</span>
-                        )}
-                      </span>
-                      <span className="shelf-sub">{shelfSubLine(entry)}</span>
-                    </span>
-                    <span className="shelf-verdict-slot">
-                      {verdict !== 'yes' && (
-                        <span
-                          className={`shelf-verdict is-${verdict}`}
-                          data-tip={VERDICT_TIPS[verdict]}
-                        >
-                          {runVerdictLabel(verdict)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="shelf-size">{formatGgufSize(entry.ggufTotalBytes)}</span>
-                    <i className={`shelf-chevron${isOpen ? ' is-open' : ''}`} aria-hidden="true" />
-                  </button>
-                  {/* 常驻渲染 + is-open 切换:高度交给 CSS grid-rows 过渡;收起时 inert,里面的按钮聚焦不到。
-                      inner 是纯裁剪层(零 padding 零边框),呼吸和分隔都住 pad —— 不然收起漏一条「乱码」 */}
-                  <div className={`shelf-files${isOpen ? ' is-open' : ''}`} inert={!isOpen}>
-                    <div className="shelf-files-inner">
-                      <div className="shelf-files-pad">
-                        <dl className="shelf-profile">
-                          {entry.baseModel !== null && (
-                            <div className="shelf-profile-item">
-                              <dt className="shelf-profile-label">底座模型</dt>
-                              <dd className="shelf-profile-value" data-tip={entry.baseModel}>
-                                {entry.baseModel}
-                              </dd>
-                            </div>
-                          )}
-                          {entry.license !== null && (
-                            <div className="shelf-profile-item">
-                              <dt className="shelf-profile-label">开源协议</dt>
-                              <dd className="shelf-profile-value">{entry.license}</dd>
-                            </div>
-                          )}
-                          <div className="shelf-profile-item">
-                            <dt className="shelf-profile-label">收藏</dt>
-                            <dd className="shelf-profile-value">{formatDownloads(entry.likes)}</dd>
-                          </div>
-                          {entry.ggufTotalBytes !== null && entry.ggufTotalBytes > 0 && (
-                            <div className="shelf-profile-item">
-                              <dt className="shelf-profile-label">模型总大小</dt>
-                              <dd className="shelf-profile-value">
-                                {formatGgufSize(entry.ggufTotalBytes)}
-                              </dd>
-                            </div>
-                          )}
-                        </dl>
-                        {filesLoading && (
-                          <p className="shelf-note is-soft">正在看这个仓库里有什么文件……</p>
-                        )}
-                        {!filesLoading && (files[entry.id]?.length ?? 0) === 0 && (
-                          <p className="shelf-note is-soft">
-                            这个仓库里没认出可以直接下载的模型文件。
-                          </p>
-                        )}
-                        {(files[entry.id] ?? []).map((f) => {
-                          const active =
-                            download && download.repoId === entry.id && download.filePath === f.path
-                              ? download
-                              : null
-                          const donePath = active?.donePath ?? null
-                          const pct =
-                            active !== null &&
-                            donePath === null &&
-                            active.totalBytes !== null &&
-                            active.totalBytes > 0
-                              ? Math.min(
-                                  100,
-                                  Math.round((active.receivedBytes / active.totalBytes) * 100)
-                                )
-                              : null
-                          return (
-                            <div key={f.path} className="shelf-file-row">
-                              <span className="shelf-file-path" data-tip={f.path}>
-                                {f.path}
-                              </span>
-                              {f.quantNote !== null && (
-                                <span className="shelf-quant">{f.quantNote}</span>
-                              )}
-                              <span className="shelf-meta">{formatGgufSize(f.sizeBytes)}</span>
-                              {donePath !== null ? (
-                                <span className="shelf-dl-done">✓ 已下载，配置已自动指向它</span>
-                              ) : active !== null ? (
-                                <>
-                                  {pct !== null ? (
-                                    <AnimatedNumber value={pct} suffix="%" />
-                                  ) : (
-                                    <span className="shelf-dl-pct">
-                                      {formatGgufSize(active.receivedBytes)}
-                                    </span>
-                                  )}
-                                  <span className="shelf-dl-bar" aria-hidden="true">
-                                    <i style={{ width: `${pct ?? 5}%` }} />
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="shelf-dl-btn"
-                                    onClick={cancelDownload}
-                                  >
-                                    取消
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="shelf-dl-btn"
-                                  onClick={() => startDownload(entry.id, f.path)}
-                                >
-                                  下载并使用
-                                </button>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
+            {visible.map((entry) => (
+              <ShelfRow
+                key={entry.id}
+                entry={entry}
+                ramBytes={shelf?.ramBytes ?? 0}
+                isOpen={expanded === entry.id}
+                onToggle={() => toggleRepo(entry.id)}
+                files={files[entry.id] ?? []}
+                filesLoading={filesLoading}
+                download={download}
+                onDownload={startDownload}
+                onCancel={cancelDownload}
+              />
+            ))}
           </ul>
 
           {hiddenCount > 0 && (

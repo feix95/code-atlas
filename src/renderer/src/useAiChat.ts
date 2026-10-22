@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import type {
-  AiChatRequest,
-  AiHistoryMessage,
-  ChatCodeRef,
-  ChatContextAttachment,
-  ChatMessage
-} from '@shared/types'
-import { TAG } from '@shared/promptTags'
-import { collectHistoryRounds, CHAT_HISTORY_SEND_MAX } from '@shared/chatHistory'
+import type { AiChatRequest, ChatCodeRef, ChatContextAttachment, ChatMessage } from '@shared/types'
 import type { ChatImage } from '@shared/chatImage'
 import type { ChatFileAttachment } from '@shared/chatFiles'
 import { readFlagPref, writeFlagPref } from '@shared/localPrefs'
 import { friendlyErr } from './errText'
+import { applyChatDelta } from './chatStream'
+import {
+  buildCompactHistory,
+  buildHistory,
+  COMPACT_KEEP_RECENT,
+  findSummary
+} from './chatTranscript'
 
 // ChatMessage/ChatMsgState 登记在 shared/types.ts —— 转一手,老朋友照旧从这里进
 export type { ChatMessage, ChatMsgState } from '@shared/types'
@@ -24,43 +23,8 @@ export type { ChatMessage, ChatMsgState } from '@shared/types'
  * 探针的联网状态表(web)以主进程回传为准:边查边收实时播报,收尾以结果里的状态表为准。
  */
 
-/** /compact 压缩完保留最近几条原文(第一百四十二批):摘要垫底 + 这几条原文,衔接不断片 */
-const COMPACT_KEEP_RECENT = 4
-
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
 export const REF_ONLY_QUESTION = '讲讲选中的这段代码'
-
-/** 找最新一张摘要卡(从后往前找):压缩过就有,每次发请求都当背景记忆带上 */
-function findSummary(messages: ChatMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const m = messages[i]
-    if (m.role === 'note' && m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '')
-      return m.text
-  }
-  return null
-}
-
-/**
- * /compact 的压缩史料(第一百四十二批):全量的对话记录,不受 HISTORY_MAX 限制 ——
- * 正是要把「将被扔掉的老对话」交给模型提炼;旧摘要卡转写成打标签的一条,再压时融进新摘要。
- */
-function buildCompactHistory(messages: ChatMessage[]): AiHistoryMessage[] {
-  const out: AiHistoryMessage[] = []
-  for (const m of messages) {
-    if (m.role === 'note') {
-      if (m.kind === 'summary' && m.state === 'done' && m.text.trim() !== '') {
-        out.push({
-          role: 'user',
-          content: `${TAG.compressedSummary.open}\n旧摘要,一并融进新摘要:\n${m.text}\n${TAG.compressedSummary.close}`
-        })
-      }
-      continue
-    }
-    if (m.state !== 'done' || m.text.trim() === '') continue
-    out.push({ role: m.role, content: m.text })
-  }
-  return out
-}
 
 /** 思考开关存档的 localStorage 键(第一百一十五批)。
  *  键名是横杠系:全仓别的键走 'atlas.*' 点号系,这俩是早期定的老键,
@@ -70,12 +34,7 @@ const THINKING_KEY = 'atlas-freechat-thinking'
 /** 翻文件(agent)开关的 localStorage 键(第一百二十八批)。命名同上,刻意保留 */
 const AGENT_KEY = 'atlas-freechat-agent'
 
-/** 历史按「轮」成对收集(答旧题修复批次):只收一问一答都落地的完整轮,报错/取消/半截的
- * 整轮扔,悬空旧问题不再沉进历史勾着小模型答旧题。纯逻辑住 shared/chatHistory.ts,
- * 渲染层与自测共用同一份口径;发得宽(CHAT_HISTORY_SEND_MAX),取舍交给主进程按模型档位定 */
-function buildHistory(messages: ChatMessage[]): AiChatRequest['history'] {
-  return collectHistoryRounds(messages, CHAT_HISTORY_SEND_MAX)
-}
+/** 历史按「轮」成对收集的口径住在 chatTranscript(渲染层与自测共用同一份) */
 
 export function useAiChat(
   context: ChatContextAttachment | null,
@@ -129,103 +88,12 @@ export function useAiChat(
   contextRef.current = context
 
   // 流式增量:只认当前请求的 id,边生成边往 busy 的探针消息上糊
+  // (reset/seal/step/matches/正文的归账规矩住在 chatStream)
   useEffect(
     () =>
       window.atlas.onAiDelta((payload) => {
         if (!idRef.current || payload.id !== idRef.current) return
-        // agent 流式的回滚令(第一百三十四批):已吐的字是垃圾/脏稿(打转、思考标签掺字),
-        // 把已吐的正文收回,思考块照旧留着 —— 答案等下一轮重讲
-        if (payload.reset) {
-          setMessages((prev) =>
-            prev.map((m) => (m.role === 'assistant' && m.state === 'busy' ? { ...m, text: '' } : m))
-          )
-          return
-        }
-        // agent 流式的封板令(第一百五十一批):本轮说出口的话是正经输出(「我去翻翻 xx」),
-        // 不能抹掉 —— 当前气泡封口完工保留,另起一个新气泡接下一轮的话和思考。
-        // 新气泡沿用原 key(botKey),最终答案收尾才找得到它;封口气泡换新 key,别撞车
-        if (payload.seal) {
-          setMessages((prev) => {
-            let at = -1
-            for (let i = prev.length - 1; i >= 0; i -= 1) {
-              if (prev[i].role === 'assistant' && prev[i].state === 'busy') {
-                at = i
-                break
-              }
-            }
-            const busyMsg = at >= 0 ? prev[at] : undefined
-            // 没吐正经字就没什么可封的(光攒了思考块的话留在这条继续攒)
-            if (!busyMsg || busyMsg.text.trim() === '') return prev
-            const sealed: ChatMessage = { ...busyMsg, key: crypto.randomUUID(), state: 'done' }
-            const fresh: ChatMessage = {
-              key: busyMsg.key,
-              role: 'assistant',
-              text: '',
-              state: 'busy',
-              web: null
-            }
-            return [...prev.slice(0, at), sealed, fresh, ...prev.slice(at + 1)]
-          })
-          return
-        }
-        // 翻文件模式的工具步骤播报:垫一条灰字(排在正在回答的气泡前面),
-        // 只给人看,不进对话历史 —— 模型干了什么,用户一眼有数
-        if (payload.step) {
-          setMessages((prev) => {
-            const note: ChatMessage = {
-              key: crypto.randomUUID(),
-              role: 'note',
-              text: payload.step!.text,
-              state: 'done',
-              web: null,
-              kind: 'step'
-            }
-            const last = prev[prev.length - 1]
-            const at =
-              last && last.role === 'assistant' && last.state === 'busy'
-                ? prev.length - 1
-                : prev.length
-            return [...prev.slice(0, at), note, ...prev.slice(at)]
-          })
-          return
-        }
-        // 命中清单卡(LLM 优化批次):search_content 的结构化命中走旁路直递,程序自己画卡
-        // —— 一条不丢、行号一个不错,可点跳预览。和步骤灰字一样只给人看,不进对话历史
-        if (payload.matches) {
-          const card = payload.matches
-          setMessages((prev) => {
-            const note: ChatMessage = {
-              key: crypto.randomUUID(),
-              role: 'note',
-              text: '',
-              state: 'done',
-              web: null,
-              kind: 'matches',
-              matches: card
-            }
-            const last = prev[prev.length - 1]
-            const at =
-              last && last.role === 'assistant' && last.state === 'busy'
-                ? prev.length - 1
-                : prev.length
-            return [...prev.slice(0, at), note, ...prev.slice(at)]
-          })
-          return
-        }
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.role === 'assistant' && m.state === 'busy'
-              ? {
-                  ...m,
-                  text: m.text + payload.text,
-                  reasoning: payload.reasoning
-                    ? (m.reasoning ?? '') + payload.reasoning
-                    : m.reasoning,
-                  stats: payload.stats ?? m.stats
-                }
-              : m
-          )
-        )
+        setMessages((prev) => applyChatDelta(prev, payload))
       }),
     []
   )
