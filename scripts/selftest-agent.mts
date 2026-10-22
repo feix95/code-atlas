@@ -24,11 +24,15 @@ import {
   SALVAGE_CITE_NUDGE,
   SALVAGE_NUDGE_MAX,
   SALVAGE_SEARCH_NUDGE,
+  WEB_SALVAGE_NUDGE,
+  WEB_SALVAGE_NUDGE_MAX,
   agentPromptBudget,
   agentReadChars,
   agentRound,
   agentStepText,
   answerCitesAnyHit,
+  answerCitesAnyWebResult,
+  answerLooksLikeWebGiveUp,
   assembleToolCalls,
   buildAgentReminder,
   compressAgentMessages,
@@ -36,6 +40,7 @@ import {
   estimateMessagesTokens,
   extractToolCalls,
   findAnswerGap,
+  findWebAnswerGap,
   isFindQuestion,
   looksLikeToolsUnsupported,
   mergeUsage,
@@ -49,12 +54,15 @@ import {
 // 翻文件切片(提示词体系重写第二批):旧 AGENT_ADDENDUM 的逐字稿新家,守口径断言都打它
 import { AGENT_FILES_ADDENDUM, buildChatSystem, SLICE_NO_TOOLS } from '../src/ai/prompts.ts'
 import {
+  TAVILY_MAX_RESULTS,
+  WEB_HIT_SNIPPET_MAX_CHARS,
   WEB_PAGE_TEXT_MAX_CHARS,
   WEB_SEARCH_PAGE_COUNT,
   htmlToText,
   isPublicHttpUrl,
   parseTavilyResults,
   sanitizeWebQuery,
+  webSearchDetailed,
   wikiHitsRelevant,
   type WebSearchHit
 } from '../src/ai/weblookup.ts'
@@ -581,6 +589,11 @@ async function main(): Promise<void> {
     WEB_PAGE_TEXT_MAX_CHARS >= 400 && WEB_PAGE_TEXT_MAX_CHARS <= 800,
     '每条正文的字数是个讲道理的数(瘦身后的轻量档)'
   )
+  assert.equal(TAVILY_MAX_RESULTS, 8, 'Tavily 一次拿 8 条:官方页、社区帖、评测都摆上桌')
+  assert.ok(
+    WEB_HIT_SNIPPET_MAX_CHARS >= 300 && WEB_HIT_SNIPPET_MAX_CHARS <= 800,
+    '单条摘要留一截就够判断讲什么,别让一家独占上下文'
+  )
 
   // ── 16b. 维基相关性把关(联网验收批次):弱关联垃圾不许截胡,真命中的放行 ──
   const hit = (title: string, snippet: string): WebSearchHit => ({
@@ -627,6 +640,18 @@ async function main(): Promise<void> {
   assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
   assert.ok(
+    AGENT_WEB_ADDENDUM.includes('只写公开的主体'),
+    '搜索词只写主体:防止把对话里别的产品名拼进去'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('2-3 条短查询'), '复杂问题要拆成多条短查询')
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('只搜一轮就说没查到不算查过'),
+    '明确只搜一轮不算查过:小模型最容易在这里偷懒'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('标题和链接'), '结果里带链接,模型才知道能引用哪条')
+  assert.ok(WEB_SALVAGE_NUDGE.includes('这不算查过'), '补救提醒要直说只搜一轮不算查过')
+  assert.equal(WEB_SALVAGE_NUDGE_MAX, 1, '联网纠错只拦一次,掰不过来就尊重结论')
+  assert.ok(
     !AGENT_FILES_ADDENDUM.includes('web_search'),
     '没开联网时切片不提 web_search:模型连有这工具都不该知道'
   )
@@ -642,7 +667,8 @@ async function main(): Promise<void> {
         {
           title: 'AOMEI <b>Backup</b>',
           url: 'https://www.aomei.com/',
-          content: 'backup &amp; restore software'
+          content: 'backup &amp; restore software',
+          published_date: '2026-10-01'
         },
         { title: '', url: 'https://no-title.example/' },
         { title: '缺链接', url: '   ' },
@@ -655,8 +681,114 @@ async function main(): Promise<void> {
   assert.equal(tavilyOk[0]?.title, 'AOMEI Backup', '标题的 HTML 标记剥干净')
   assert.equal(tavilyOk[0]?.snippet, 'backup & restore software', '摘要剥 HTML 实体')
   assert.equal(tavilyOk[0]?.source, 'Tavily', '来源记账是 Tavily')
+  assert.equal(tavilyOk[0]?.published, '2026-10-01', '发布时间源给了就带上')
   assert.deepEqual(parseTavilyResults('不是 JSON'), [], '坏 JSON = 空清单,让兜底链接着走')
   assert.deepEqual(parseTavilyResults('{"results": null}'), [], 'results 缺失 = 空清单')
+
+  // ── 18b. 联网质检闸:只搜一轮就说没查到 = 拦下换词再搜 ──
+  const webTitles = ['OpenCode Go 套餐评测', 'OpenCode 社区评价']
+  const webUrls = [
+    'https://www.cnblogs.com/funkygod/p/20612762',
+    'https://www.reddit.com/r/opencodeCLI/comments/1s40z4p/'
+  ]
+  assert.equal(
+    answerLooksLikeWebGiveUp('很抱歉,搜索结果没有直接命中这个项目的信息。'),
+    true,
+    '「没有直接命中」要认出是放弃交卷'
+  )
+  assert.equal(
+    answerLooksLikeWebGiveUp('目前我无法直接给你一个好或差评,但可以这样判断。'),
+    true,
+    '「无法直接」也是放弃交卷的口风'
+  )
+  assert.equal(
+    answerLooksLikeWebGiveUp('OpenCode Go 是每月 10 美元的订阅。'),
+    false,
+    '正常回答不误判'
+  )
+  assert.equal(
+    answerCitesAnyWebResult(
+      '可以看 https://www.cnblogs.com/funkygod/p/20612762 这篇评测。',
+      webTitles,
+      webUrls
+    ),
+    true,
+    '答案里有完整链接 = 引用过结果'
+  )
+  assert.equal(
+    answerCitesAnyWebResult('cnblogs.com 上有篇评测写得很细。', webTitles, webUrls),
+    true,
+    '只写裸域名也算引用'
+  )
+  assert.equal(
+    answerCitesAnyWebResult('OpenCode Go 套餐评测提到每月 10 美元。', webTitles, webUrls),
+    true,
+    '写到结果标题也算引用'
+  )
+  assert.equal(
+    findWebAnswerGap({
+      webSearchCalls: 1,
+      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
+      titles: webTitles,
+      urls: webUrls
+    }),
+    true,
+    '只搜一轮就说没查到 = 要拦'
+  )
+  assert.equal(
+    findWebAnswerGap({
+      webSearchCalls: 2,
+      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
+      titles: webTitles,
+      urls: webUrls
+    }),
+    false,
+    '换过词搜了两次,尊重它的结论'
+  )
+  assert.equal(
+    findWebAnswerGap({
+      webSearchCalls: 1,
+      answer: '很抱歉,没有查到公开资料。',
+      titles: [],
+      urls: []
+    }),
+    true,
+    '第一次颗粒无收也要给它一次换词机会'
+  )
+  assert.equal(
+    findWebAnswerGap({
+      webSearchCalls: 1,
+      answer: 'cnblogs.com 上有篇评测,说每月 10 美元。',
+      titles: webTitles,
+      urls: webUrls
+    }),
+    false,
+    '答案已经引用了结果,不再拦'
+  )
+
+  // ── 18c. 喂给模型的材料要带链接和发布时间(模型能判断来源、能引用) ──
+  const material = await webSearchDetailed('selftest-web-material-2026', {
+    tavilyKey: 'tvly-selftest',
+    postJson: async () =>
+      JSON.stringify({
+        results: [
+          {
+            title: '官方 Go 套餐',
+            url: 'https://opencode.ai/zh/go',
+            content: '每月 10 美元,包含一批开放模型。',
+            published_date: '2026-10-01'
+          }
+        ]
+      }),
+    fetchText: async () => '<html><body><p>正文第一段</p></body></html>'
+  })
+  assert.equal(material.hits.length, 1, '命中清单留在结果里,给质检闸对账')
+  assert.ok(
+    material.material.includes('[官方 Go 套餐](https://opencode.ai/zh/go)'),
+    '每条结果都要带可点链接'
+  )
+  assert.ok(material.material.includes('2026-10-01'), '发布时间要带上,判断新鲜度用')
+  assert.ok(material.material.includes('正文第一段'), '第一条正文节选照旧垫底')
 
   // ── 19. 紧急瘦身(压缩那案的兜底):上下文溢出时整段裁旧账,只保 system 和最新真问题 ──
   const fat: AgentChatMessage[] = [
@@ -949,7 +1081,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
+    '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸、上网守则与联网纠错闸 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
   )
 }
 

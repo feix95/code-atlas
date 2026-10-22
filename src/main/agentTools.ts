@@ -358,7 +358,12 @@ export async function agentRequestDirectoryAccess(
 export async function agentWebSearch(
   query: string,
   tavilyKey: string | undefined
-): Promise<{ ok: boolean; text: string; hint?: string }> {
+): Promise<{
+  ok: boolean
+  text: string
+  hint?: string
+  webResults?: Array<{ title: string; url: string }>
+}> {
   const found = await webSearchDetailed(query, {
     fetchText: electronFetchText,
     postJson: electronPostJson,
@@ -371,7 +376,12 @@ export async function agentWebSearch(
       hint: '没查到'
     }
   }
-  return { ok: true, text: found.material, hint: found.sources.join('、') }
+  return {
+    ok: true,
+    text: found.material,
+    hint: found.sources.join('、'),
+    webResults: found.hits.map((h) => ({ title: h.title, url: h.url }))
+  }
 }
 
 /** 每翻一样就往界面播一句大白话(挂在流式增量通道上,渲染层认 step 字段) */

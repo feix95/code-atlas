@@ -23,6 +23,8 @@ import {
   SALVAGE_CITE_NUDGE,
   SALVAGE_NUDGE_MAX,
   SALVAGE_SEARCH_NUDGE,
+  WEB_SALVAGE_NUDGE,
+  WEB_SALVAGE_NUDGE_MAX,
   agentPromptBudget,
   agentReadChars,
   agentRound,
@@ -32,6 +34,7 @@ import {
   extractToolCalls,
   emergencySlim,
   findAnswerGap,
+  findWebAnswerGap,
   isFindQuestion,
   mergeUsage,
   sanitizeAgentRelPath,
@@ -145,6 +148,11 @@ export async function runAgentChat(input: {
   let searchUsed = false
   const searchHitPaths = new Set<string>()
   let salvageNudges = 0
+  // 联网质检闸的状态表:本场真正搜过几轮、结果标题/链接(答案引用对账用)、已经纠错几次
+  let webSearchCalls = 0
+  const webResultTitles: string[] = []
+  const webResultUrls: string[] = []
+  let webSalvageNudges = 0
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
@@ -382,6 +390,32 @@ export async function runAgentChat(input: {
           continue
         }
       }
+      // 联网质检闸:只搜了一轮、结果对不上就说没查到 —— 拦一次,让它换短词重搜。
+      // 换过词(两次以上)或答案已经引用结果链接的,尊重它的结论,不拦
+      if (
+        useTools &&
+        webSearchCalls > 0 &&
+        webSalvageNudges < WEB_SALVAGE_NUDGE_MAX &&
+        rounds < AGENT_MAX_ROUNDS &&
+        findWebAnswerGap({
+          webSearchCalls,
+          answer: text,
+          titles: webResultTitles,
+          urls: webResultUrls
+        })
+      ) {
+        webSalvageNudges += 1
+        skipNudgeOnce = true
+        messages.push(raw)
+        messages.push({ role: 'user', content: WEB_SALVAGE_NUDGE })
+        sendResetDelta(event, requestId)
+        sendAgentStep(
+          event,
+          requestId,
+          '这题要联网,它只搜了一轮就说没查到 —— 程序拦下,让它换词再搜'
+        )
+        continue
+      }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       input.onTurnComplete?.(turnTrace, text)
       return agentResult(input, 'supported', text, usage, resultReasoning())
@@ -517,6 +551,7 @@ export async function runAgentChat(input: {
         matches?: AgentSearchMatch[]
         matchesTruncated?: boolean
         rootId?: string
+        webResults?: Array<{ title: string; url: string }>
       } =
         callName === TOOL_NAMES.requestDirectoryAccess
           ? await agentRequestDirectoryAccess(event, requestedPath)
@@ -536,6 +571,21 @@ export async function runAgentChat(input: {
           selectedRoot.kind === 'file'
             ? `临时授权文件 ${selectedRoot.rootId}(${selectedRoot.path}) 的读取结果:\n${exec.text}`
             : `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
+      // 联网账:搜过几轮、命中哪些标题/链接(交卷时质检闸要对账);日志只记搜索词和条数,
+      // 不记网页正文 —— 下次出现「搜出来全是别家产品」时,先看它到底拿什么词去搜的
+      if (callName === TOOL_NAMES.webSearch) {
+        webSearchCalls += 1
+        if (exec.ok && exec.webResults) {
+          for (const hit of exec.webResults) {
+            webResultTitles.push(hit.title)
+            webResultUrls.push(hit.url)
+          }
+        }
+        addDevLog(
+          'request',
+          `联网搜索「${query ?? ''}」· ${exec.ok ? `命中 ${exec.webResults?.length ?? 0} 条` : '没查到'}`
+        )
+      }
       // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
       // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
       exec.text = wrapToolResult(exec.text)
