@@ -39,6 +39,7 @@ import { builtinDataDir } from './builtinDataDir.ts'
 import { autopsyExitMessage, judgeModelFit } from './modelFit.ts'
 import { queryMachineSpec } from './machineSpec.ts'
 import { createSingleFlight } from './singleFlight.ts'
+import { settingsKey } from './builtinKey.ts'
 
 // ── 老登记转手(实现在各专属模块,这里保住 import 路径)──
 export { estimateKvBytes } from '../shared/contextBill.ts'
@@ -97,11 +98,8 @@ export function isBuiltinRunning(): boolean {
   return child !== null && child.exitCode === null
 }
 
-/** 对账键(导出给自测):程序路径|模型|引擎后端|高级启动账签名 —— 任何一项变了重启才算数 */
-export function settingsKey(settings: AiBuiltinSettings): string {
-  // 高级启动账 + 引擎后端选择都进对账键:改了任何一项 = 设置变了,要重启才作数
-  return `${settings.serverPath.trim()}|${settings.modelPath.trim()}|${settings.backend ?? 'auto'}|${launchSignature(launchFor(settings))}`
-}
+/** 对账键住在 builtinKey.ts;转手老登记(自测与 main 进程照旧从 builtin 进) */
+export { settingsKey } from './builtinKey.ts'
 
 /** 设置有变(换了模型文件或引擎路径)而旧进程还在跑:得重启才作数。
  *  模型旁的 mmproj 增删也算 —— 引擎还按旧参数跑着,下次提问该按新参数重拉 */
@@ -326,22 +324,16 @@ export async function ensureBuiltinServer(
  * (那边不 import 本文件,引擎单例仍归这里记账,不互相绕圈)。
  */
 const launchHost: BuiltinLaunchHost = {
-  setChild: (c) => {
-    child = c
-  },
+  setChild: (c) => (child = c),
   isEngineRunning: isBuiltinRunning,
   isStopping: () => stopping,
-  resetStopping: () => {
-    stopping = false
-  },
+  resetStopping: () => (stopping = false),
   markStarted: (ctxSize, mmprojPath, launchSig) => {
     startedCtx = ctxSize
     startedMmproj = mmprojPath
     startedLaunchSig = launchSig
   },
-  noteEngineOom: (seen) => {
-    engineOomSeen = seen
-  },
+  noteEngineOom: (seen) => (engineOomSeen = seen),
   announce: announceBuiltin,
   status: builtinStatus,
   idleFacts: builtinIdleFacts,

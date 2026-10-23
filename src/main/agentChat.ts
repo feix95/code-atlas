@@ -1,30 +1,12 @@
 import { announceActivityBusy, lastActivityProvider } from './modelStatus.ts'
 import { sendResetDelta } from './aiEvidence.ts'
-import {
-  agentDirectoryAccess,
-  agentListFiles,
-  agentReadFile,
-  agentRequestDirectoryAccess,
-  agentSearchContent,
-  agentWebSearch,
-  sendAgentDelta,
-  sendAgentMatches,
-  sendAgentStep
-} from './agentTools.ts'
+import { sendAgentDelta, sendAgentStep } from './agentTools.ts'
 import { type IpcMainInvokeEvent } from 'electron'
 import {
   AGENT_MAX_ROUNDS,
-  AGENT_READ_LIMIT_MAX,
   AGENT_REMINDER_MIN_TOOL_CALLS,
-  AGENT_REMINDER_PREFIX,
-  AGENT_WEB_ADDENDUM,
-  ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
-  SALVAGE_CITE_NUDGE,
-  SALVAGE_NUDGE_MAX,
-  SALVAGE_SEARCH_NUDGE,
-  WEB_SALVAGE_NUDGE,
-  WEB_SALVAGE_NUDGE_MAX,
+  ROUND_CAP_NUDGE,
   agentPromptBudget,
   agentReadChars,
   agentRound,
@@ -32,33 +14,20 @@ import {
   buildAgentReminder,
   compressAgentMessages,
   extractToolCalls,
-  emergencySlim,
-  findAnswerGap,
-  findWebAnswerGap,
-  isFindQuestion,
   mergeUsage,
-  sanitizeAgentRelPath,
   stripLastAgentReminder,
-  toolCallKey,
   wrapToolResult,
   type AgentChatMessage
 } from '../ai/agent.ts'
-import { asToolName, TOOL_NAMES } from '../shared/agentTools.ts'
+import { TOOL_NAMES } from '../shared/agentTools.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
-import { isContextOverflow } from '../ai/index.ts'
-import { truncateAtRepetition } from '../ai/repetition.ts'
-import { sanitizeWebQuery } from '../ai/weblookup.ts'
-import { AGENT_FILES_ADDENDUM, SLICE_NO_TOOLS } from '../ai/prompts.ts'
-import { flattenToolMessages } from '../ai/chatThread.ts'
 import { addDevLog } from '../shared/devlog.ts'
-import { sanitizeExternalAbsPath } from './agentAccess.ts'
-import type {
-  AgentSearchMatch,
-  AiChatResult,
-  AiUsage,
-  ChatTarget,
-  WebLookupMeta
-} from '../shared/types.ts'
+import { applyAgentPersona, buildAgentAddendum, flattenAgentMessages } from './agentPersona.ts'
+import { handleAgentFailure, type AgentGuardFlags } from './agentFallback.ts'
+import { prepareAgentCall } from './agentCallArgs.ts'
+import { runAgentTool } from './agentRunTool.ts'
+import { reviewAgentAnswer } from './agentSignoff.ts'
+import type { AiChatResult, AiUsage, ChatTarget, WebLookupMeta } from '../shared/types.ts'
 
 /**
  * 翻文件模式里「不认工具调用」的引擎黑名单(第一百四十批,只记会话内存,零落盘):
@@ -68,18 +37,14 @@ import type {
  */
 const noToolEngines = new Set<string>()
 
-/** 翻页行数参数收编(宽松):数字/数字字符串都认,不合法就回保底 */
-function asLineCount(v: unknown, fallback: number): number {
-  if (typeof v === 'number' && Number.isFinite(v)) return Math.max(1, Math.trunc(v))
-  if (typeof v === 'string' && /^\d+$/.test(v.trim())) return Math.max(1, Number(v.trim()))
-  return fallback
-}
-
 /**
  * 翻文件模式的工具循环:模型喊工具 → 主进程沙盒里执行 → 结果喂回 → 循环,
  * 直到模型交出不带工具调用的正文答案。护栏三项:轮数封顶(到顶后撤掉工具表
  * 逼它交卷)、同一样东西不许翻第二遍、每轮之间都听用户的取消。
  * 模型不会喊工具也没关系:第一轮就交正文,当普通回答返回 —— 不装 agent 空转。
+ *
+ * 分工:参数安检住 agentCallArgs,单次执行住 agentRunTool,人设装配住 agentPersona,
+ * 「这轮没成」的兜底阶梯住 agentFallback;本文件只留循环与账本。
  */
 export async function runAgentChat(input: {
   event: IpcMainInvokeEvent
@@ -122,22 +87,12 @@ export async function runAgentChat(input: {
   let engineNoTools = noToolEngines.has(engineKey)
   if (engineNoTools) {
     sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
-    messages.splice(0, messages.length, ...flattenToolMessages(messages))
+    flattenAgentMessages(messages)
   }
   // 人设后面垫翻文件切片(prompts.ts 的逐字稿):教它现在有什么手脚;
   // 联网查证开着再垫一段上网守则(模型这才知道有 web_search)。拆除兜底认同一把尺子,别拆岔了
-  // (旧 AGENT_ADDENDUM 自带开头的 \n\n,新切片没带 —— 在这里拼进去,摘除时 endsWith+slice 连分隔符一起裁)
-  const addendum = `\n\n${AGENT_FILES_ADDENDUM}${input.webSearchEnabled ? AGENT_WEB_ADDENDUM : ''}`
-  const systemIdx = messages.findIndex((m) => m.role === 'system')
-  if (systemIdx >= 0) {
-    const sysContent = (messages[systemIdx] as { content: string }).content
-    // 黑名单引擎也得给句准话:agent 底座(buildChatSystem({agent:true}))里没有「没手脚」切片,
-    // 什么都不垫,模型会照旧吹自己翻过项目 —— 改垫无工具切片,明说本轮没有翻文件能力
-    messages[systemIdx] = {
-      role: 'system',
-      content: engineNoTools ? `${sysContent}\n\n${SLICE_NO_TOOLS}` : `${sysContent}${addendum}`
-    }
-  }
+  const addendum = buildAgentAddendum(input.webSearchEnabled)
+  applyAgentPersona(messages, { addendum, engineNoTools })
   const readChars = agentReadChars(ctx)
   const doneCalls = new Set<string>()
   // 提醒卡门槛和质检闸前置的共同状态表:本场实际执行成功的工具调用次数
@@ -156,6 +111,13 @@ export async function runAgentChat(input: {
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
+  // 各道兜底「用过了」的账本(兜底阶梯在 agentFallback)
+  const flags: AgentGuardFlags = {
+    repetitionRetried: false,
+    reminderFailsafe: false,
+    slimRetried: false,
+    skipNudgeOnce: false
+  }
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
   // 封板账(第一百五十一批):中间轮的话一旦封成独立气泡,思考过程也按轮各归各 ——
@@ -164,14 +126,6 @@ export async function runAgentChat(input: {
   let sealedAny = false
   const resultReasoning = (): string | undefined => (sealedAny ? lastRoundReasoning : reasoningAll)
   let rounds = 0
-  // 兜底降级后的重答轮不算「轮数烧完」,别把逼卷令也塞进去
-  let skipNudgeOnce = false
-  // 提醒卡兜底只许用一次:撤卡重答还 4xx 就不是提醒卡的问题,照实报错
-  let reminderFailsafe = false
-  // 复读机兜底也只许用一次:重说还打转就截断交卷,不无限跟它耗
-  let repetitionRetried = false
-  // 紧急瘦身也只许用一次:裁旧账重试还爆,就是上下文确实装不下,照实报错
-  let slimRetried = false
   addDevLog(
     'request',
     `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`
@@ -199,9 +153,9 @@ export async function runAgentChat(input: {
     }
     const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
     // 逼卷令只在「真烧完了轮数」时发;引擎天生不支持工具或刚兜底降级的,发这话是驴唇不对马嘴
-    if (rounds >= AGENT_MAX_ROUNDS && !skipNudgeOnce)
+    if (rounds >= AGENT_MAX_ROUNDS && !flags.skipNudgeOnce)
       messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
-    skipNudgeOnce = false
+    flags.skipNudgeOnce = false
     rounds += 1
     const round = await agentRound(target, messages, {
       signal,
@@ -216,116 +170,25 @@ export async function runAgentChat(input: {
     })
     lastRoundReasoning = round.status === 'ok' ? round.reasoning : undefined
     if (round.status !== 'ok') {
-      // 复读机兜底(第一百四十三批):流式尾巴连着打转 —— agentRound 已发 reset 令收回
-      // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
-      // 绝不把一屏望不到头的循环递给用户
-      if (round.status === 'repetition') {
-        if (!repetitionRetried) {
-          repetitionRetried = true
-          skipNudgeOnce = true // 重答这轮不算「轮数烧完」,别把逼卷令也捎上
-          sendAgentStep(event, requestId, '回答说到半截开始原地打转,掐掉重说一遍')
-          continue
-        }
-        const text = (truncateAtRepetition(round.text) ?? round.text).trim()
-        if (text === '') {
-          return agentResult(
-            input,
-            'error',
-            '模型连着两回都说到一半原地打转 —— 换个问法重新问问看',
-            usage,
-            resultReasoning()
-          )
-        }
-        sendAgentStep(event, requestId, '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你')
-        input.onTurnComplete?.(turnTrace, text)
-        return agentResult(input, 'supported', text, usage, resultReasoning())
-      }
-      // 兜底(第一百四十批):引擎不认工具调用(甩 400/404/422 还点名 tools)——
-      // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
-      // 普通请求再出错照实报给用户
-      if (
-        round.status === 'error' &&
-        round.toolsUnsupported === true &&
-        useTools &&
-        !engineNoTools
-      ) {
-        noToolEngines.add(engineKey)
-        engineNoTools = true
-        skipNudgeOnce = true
-        messages.splice(0, messages.length, ...flattenToolMessages(messages))
-        sendAgentStep(
-          event,
-          requestId,
-          '这个模型不支持自己翻文件(工具调用),这轮先按普通对话回答 —— 想用翻文件模式,得换个支持工具调用的模型'
-        )
-        const sysIdx = messages.findIndex((m) => m.role === 'system')
-        if (sysIdx >= 0) {
-          let sysContent = (messages[sysIdx] as { content: string }).content
-          if (sysContent.endsWith(addendum)) sysContent = sysContent.slice(0, -addendum.length)
-          // 切片摘走后,人设里什么能力声明都没剩 —— 补一段「没手脚」切片,别让它空口吹翻过项目。
-          // includes 保险:起手黑名单分支理论上和这里互斥,但万一已经垫过就不重复加
-          if (!sysContent.includes(SLICE_NO_TOOLS))
-            sysContent = `${sysContent}\n\n${SLICE_NO_TOOLS}`
-          messages[sysIdx] = { role: 'system', content: sysContent }
-        }
+      const decision = handleAgentFailure({
+        round,
+        messages,
+        addendum,
+        useTools,
+        engineNoTools,
+        flags,
+        doneCalls,
+        callIdToKey
+      })
+      if (decision.kind === 'retry') {
+        if (decision.blacklistEngine) noToolEngines.add(engineKey)
+        engineNoTools = decision.engineNoTools
+        sendAgentStep(event, requestId, decision.step)
         continue
       }
-      // 提醒卡兜底:个别外接引擎不认「tool 结果后面跟 user 消息」的形态,甩 4xx ——
-      // 撤掉提醒卡退回无卡形态重答一轮(只兜一次);再错就照实报给用户,不跟它耗
-      if (
-        round.status === 'error' &&
-        !reminderFailsafe &&
-        (round.httpStatus === 400 || round.httpStatus === 404 || round.httpStatus === 422) &&
-        messages.some(
-          (m) =>
-            m.role === 'user' &&
-            typeof m.content === 'string' &&
-            m.content.startsWith(AGENT_REMINDER_PREFIX)
-        )
-      ) {
-        reminderFailsafe = true
-        skipNudgeOnce = true
-        messages.splice(
-          0,
-          messages.length,
-          ...messages.filter(
-            (m) =>
-              !(
-                m.role === 'user' &&
-                typeof m.content === 'string' &&
-                m.content.startsWith(AGENT_REMINDER_PREFIX)
-              )
-          )
-        )
-        sendAgentStep(event, requestId, '这个模型不太习惯多出来的小注记,撤掉重答')
-        continue
-      }
-      // 紧急瘦身兜底:轮间的注记压缩是保养,服务直接甩「上下文装不下」拒收时只有整段裁旧账能救 ——
-      // 只保 system 和最新真问题(400 拒收时模型一个字没吐,重试不重影);只兜一次,再爆就照实报错
-      if (round.status === 'error' && isContextOverflow(round.text) && !slimRetried) {
-        slimRetried = true
-        const slimmed = emergencySlim(messages)
-        if (slimmed) {
-          messages.splice(0, messages.length, ...slimmed.messages)
-          // 旧账清了,防打转的状态表跟着清:被裁掉结果的旧工具调用,模型要重温得允许重翻
-          doneCalls.clear()
-          callIdToKey.clear()
-          skipNudgeOnce = true
-          sendAgentStep(
-            event,
-            requestId,
-            `对话把模型的脑容量撑爆了:把翻看前的旧账整段清掉(约 ${slimmed.dropped} 条),保住你最新的问题,重答一遍`
-          )
-          continue
-        }
-      }
-      return agentResult(
-        input,
-        round.status === 'cancelled' ? 'cancelled' : 'error',
-        round.text,
-        usage,
-        resultReasoning()
-      )
+      if (decision.step) sendAgentStep(event, requestId, decision.step)
+      if (decision.status === 'supported') input.onTurnComplete?.(turnTrace, decision.text)
+      return agentResult(input, decision.status, decision.text, usage, resultReasoning())
     }
     usage = mergeUsage(usage, round.usage)
     if (round.reasoning)
@@ -353,67 +216,29 @@ export async function runAgentChat(input: {
           resultReasoning()
         )
       }
-      // 质检闸(救敷衍):找位置题的答案交卷前过两道判据 —— 一次文件都没搜过(逼它先搜)、
-      // 搜到了东西却一个具体文件都不引用(逼它把文件写进答案,答案里可点跳转的链接全靠这个)。
-      // 拦下重答(先收回已吐的字再垫补救提醒),封顶两次,掰不过来就随它交卷,不无限跟它耗;
-      // 轮数已烧完的逼卷轮不拦 —— 那轮它没工具可调,拦了也白拦
-      // 前置条件(提示词体系重写第二批):本场一个工具调用都没发生过就直接放行,连 no-search 也不拦 ——
-      // 模型一口答出来的题(概念题、闲聊),质检闸没资格逼它先翻文件
-      if (
-        useTools &&
-        toolCallsExecuted > 0 &&
-        salvageNudges < SALVAGE_NUDGE_MAX &&
-        rounds < AGENT_MAX_ROUNDS
-      ) {
-        const gap = findAnswerGap({
-          isFindQuestion: isFindQuestion(currentQuestion),
-          searchUsed,
-          hitPaths: [...searchHitPaths],
-          answer: text
-        })
-        if (gap) {
-          salvageNudges += 1
-          skipNudgeOnce = true
-          messages.push(raw)
-          messages.push({
-            role: 'user',
-            content: gap === 'no-search' ? SALVAGE_SEARCH_NUDGE : SALVAGE_CITE_NUDGE
-          })
-          sendResetDelta(event, requestId)
-          sendAgentStep(
-            event,
-            requestId,
-            gap === 'no-search'
-              ? '这题是找东西,它一次文件都没搜就想交卷 —— 程序拦下,让它先搜再答'
-              : '答案里没落到具体文件 —— 程序拦下,让它把搜到的文件写进答案再交'
-          )
-          continue
-        }
-      }
-      // 联网质检闸:只搜了一轮、结果对不上就说没查到 —— 拦一次,让它换短词重搜。
-      // 换过词(两次以上)或答案已经引用结果链接的,尊重它的结论,不拦
-      if (
-        useTools &&
-        webSearchCalls > 0 &&
-        webSalvageNudges < WEB_SALVAGE_NUDGE_MAX &&
-        rounds < AGENT_MAX_ROUNDS &&
-        findWebAnswerGap({
-          webSearchCalls,
-          answer: text,
-          titles: webResultTitles,
-          urls: webResultUrls
-        })
-      ) {
-        webSalvageNudges += 1
-        skipNudgeOnce = true
+      // 质检闸(救敷衍)与联网质检闸:判据与话术住 agentSignoff,这里只管拦下重答的账
+      const nudge = reviewAgentAnswer({
+        answer: text,
+        question: currentQuestion,
+        useTools,
+        toolCallsExecuted,
+        searchUsed,
+        hitPaths: [...searchHitPaths],
+        webSearchCalls,
+        webTitles: webResultTitles,
+        webUrls: webResultUrls,
+        salvageNudges,
+        webSalvageNudges,
+        rounds
+      })
+      if (nudge) {
+        if (nudge.kind === 'file') salvageNudges += 1
+        else webSalvageNudges += 1
+        flags.skipNudgeOnce = true
         messages.push(raw)
-        messages.push({ role: 'user', content: WEB_SALVAGE_NUDGE })
+        messages.push({ role: 'user', content: nudge.nudge })
         sendResetDelta(event, requestId)
-        sendAgentStep(
-          event,
-          requestId,
-          '这题要联网,它只搜了一轮就说没查到 —— 程序拦下,让它换词再搜'
-        )
+        sendAgentStep(event, requestId, nudge.step)
         continue
       }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
@@ -426,113 +251,22 @@ export async function runAgentChat(input: {
     const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
     for (const call of calls) {
       if (signal.aborted) break
-      const callName = asToolName(call.name)
-      const isFileTool =
-        callName === TOOL_NAMES.readFile ||
-        callName === TOOL_NAMES.listFiles ||
-        callName === TOOL_NAMES.searchContent
-      const selectedRoot = isFileTool
-        ? agentDirectoryAccess.resolve(rootPath, call.args?.rootId)
-        : null
-      const relPath =
-        callName === TOOL_NAMES.webSearch || callName === TOOL_NAMES.requestDirectoryAccess
-          ? ''
-          : callName === TOOL_NAMES.searchContent && call.args?.relPath === undefined
-            ? ''
-            : callName === TOOL_NAMES.readFile &&
-                call.args?.relPath === undefined &&
-                selectedRoot?.kind === 'file'
-              ? ''
-              : sanitizeAgentRelPath(call.args?.relPath)
-      const keyword =
-        callName === TOOL_NAMES.searchContent && typeof call.args?.keyword === 'string'
-          ? call.args.keyword.trim().slice(0, 200)
-          : ''
-      // read_file 的翻页参数(对齐 Claude Code 的 Read):1 起行号 + 行数,宽松收编
-      const readOffset = callName === TOOL_NAMES.readFile ? asLineCount(call.args?.offset, 1) : 1
-      const readLimit =
-        callName === TOOL_NAMES.readFile
-          ? asLineCount(call.args?.limit, AGENT_READ_LIMIT_MAX)
-          : AGENT_READ_LIMIT_MAX
-      const rawQuery = call.args?.query
-      const requestedPath =
-        callName === TOOL_NAMES.requestDirectoryAccess
-          ? sanitizeExternalAbsPath(call.args?.path)
-          : null
-      // web_search 的搜索词走自己的安检(隐私闸):空词/超长/带路径样的一律拒收
-      const query = callName === TOOL_NAMES.webSearch ? sanitizeWebQuery(rawQuery) : null
-      const queryMissing =
-        callName === TOOL_NAMES.webSearch &&
-        (typeof rawQuery !== 'string' || rawQuery.trim() === '')
-      if (
-        !callName ||
-        relPath === null ||
-        (isFileTool && selectedRoot === null) ||
-        (callName === TOOL_NAMES.searchContent && keyword === '') ||
-        (callName === TOOL_NAMES.requestDirectoryAccess && requestedPath === null) ||
-        (callName === TOOL_NAMES.webSearch && query === null)
-      ) {
-        const why = !callName
-          ? '没有这个工具'
-          : isFileTool && selectedRoot === null
-            ? '目录编号无效或尚未获准,项目外目录要先申请'
-            : callName === TOOL_NAMES.requestDirectoryAccess
-              ? '要给用户明确点名的绝对文件夹路径(path)'
-              : callName === TOOL_NAMES.webSearch
-                ? queryMissing
-                  ? '要给搜索词(query),写概念词、软件名或短的公开问题'
-                  : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
-                : callName === TOOL_NAMES.searchContent
-                  ? '要给关键词(keyword),如 500 或 DWELL_MS'
-                  : '路径不合法,要用所选根目录内的相对路径'
-        const badTarget =
-          callName === TOOL_NAMES.webSearch
-            ? String(rawQuery ?? '(没给搜索词)')
-            : callName === TOOL_NAMES.requestDirectoryAccess
-              ? String(call.args?.path ?? '(没给目录)')
-              : String(
-                  call.args?.keyword ?? call.args?.relPath ?? call.args?.rootId ?? '(没给参数)'
-                )
+      const prep = prepareAgentCall(call, rootPath)
+      if (!prep.ok) {
         sendAgentStep(
           event,
           requestId,
-          agentStepText(callName ?? TOOL_NAMES.listFiles, badTarget, 'error', why)
+          agentStepText(prep.name ?? TOOL_NAMES.listFiles, prep.badTarget, 'error', prep.why)
         )
         toolResults.push({
           role: 'tool',
           tool_call_id: call.id,
-          content: wrapToolResult(`参数不合法:${why}`)
+          content: wrapToolResult(`参数不合法:${prep.why}`)
         })
         continue
       }
-      // 防打转键:search 带上关键词、web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
-      const rootKey = selectedRoot?.rootId ?? ''
-      // 防打转键:search 带上关键词、read_file 带上 offset(翻页读同一文件的下一段不是重复翻)、
-      // web_search 带上搜索词 —— 同一范围搜「500」和「DWELL_MS」是两笔账
-      const key =
-        callName === TOOL_NAMES.searchContent
-          ? toolCallKey(callName, `${rootKey}:${relPath}#${keyword}`)
-          : callName === TOOL_NAMES.readFile
-            ? toolCallKey(callName, `${rootKey}:${relPath}#${readOffset}`)
-            : callName === TOOL_NAMES.webSearch
-              ? toolCallKey(callName, query ?? '')
-              : callName === TOOL_NAMES.requestDirectoryAccess
-                ? toolCallKey(callName, requestedPath ?? '')
-                : toolCallKey(callName, `${rootKey}:${relPath}`)
-      const stepTarget =
-        callName === TOOL_NAMES.searchContent
-          ? keyword
-          : callName === TOOL_NAMES.webSearch
-            ? (query ?? '')
-            : callName === TOOL_NAMES.requestDirectoryAccess
-              ? (requestedPath ?? '')
-              : relPath === ''
-                ? selectedRoot?.external
-                  ? selectedRoot.path
-                  : '(项目根目录)'
-                : relPath
-      if (doneCalls.has(key)) {
-        sendAgentStep(event, requestId, agentStepText(callName, stepTarget, 'repeat'))
+      if (doneCalls.has(prep.key)) {
+        sendAgentStep(event, requestId, agentStepText(prep.name, prep.stepTarget, 'repeat'))
         toolResults.push({
           role: 'tool',
           tool_call_id: call.id,
@@ -540,79 +274,28 @@ export async function runAgentChat(input: {
         })
         continue
       }
-      doneCalls.add(key)
-      if (callName === TOOL_NAMES.searchContent) searchUsed = true // 质检闸的账:真发起过搜索才算搜过
-      callIdToKey.set(call.id, key)
-      // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
-      const exec: {
-        ok: boolean
-        text: string
-        hint?: string
-        matches?: AgentSearchMatch[]
-        matchesTruncated?: boolean
-        rootId?: string
-        webResults?: Array<{ title: string; url: string }>
-      } =
-        callName === TOOL_NAMES.requestDirectoryAccess
-          ? await agentRequestDirectoryAccess(event, requestedPath)
-          : callName === TOOL_NAMES.listFiles
-            ? await agentListFiles((selectedRoot as { path: string }).path, relPath)
-            : callName === TOOL_NAMES.searchContent
-              ? await agentSearchContent((selectedRoot as { path: string }).path, relPath, keyword)
-              : callName === TOOL_NAMES.webSearch
-                ? await agentWebSearch(query ?? '', input.tavilyKey)
-                : await agentReadFile((selectedRoot as { path: string }).path, relPath, {
-                    offset: readOffset,
-                    limit: readLimit,
-                    maxChars: readChars
-                  })
-      if (exec.ok && selectedRoot?.external)
-        exec.text =
-          selectedRoot.kind === 'file'
-            ? `临时授权文件 ${selectedRoot.rootId}(${selectedRoot.path}) 的读取结果:\n${exec.text}`
-            : `临时目录 ${selectedRoot.rootId}(${selectedRoot.path}) 内的结果:\n${exec.text}`
-      // 联网账:搜过几轮、命中哪些标题/链接(交卷时质检闸要对账);日志只记搜索词和条数,
-      // 不记网页正文 —— 下次出现「搜出来全是别家产品」时,先看它到底拿什么词去搜的
-      if (callName === TOOL_NAMES.webSearch) {
-        webSearchCalls += 1
-        if (exec.ok && exec.webResults) {
-          for (const hit of exec.webResults) {
-            webResultTitles.push(hit.title)
-            webResultUrls.push(hit.url)
-          }
-        }
-        addDevLog(
-          'request',
-          `联网搜索「${query ?? ''}」· ${exec.ok ? `命中 ${exec.webResults?.length ?? 0} 条` : '没查到'}`
-        )
-      }
-      // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
-      // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
-      exec.text = wrapToolResult(exec.text)
-      if (exec.ok && callName !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
-      sendAgentStep(
+      doneCalls.add(prep.key)
+      if (prep.name === TOOL_NAMES.searchContent) searchUsed = true // 质检闸的账:真发起过搜索才算搜过
+      callIdToKey.set(call.id, prep.key)
+      const run = await runAgentTool({
         event,
         requestId,
-        agentStepText(callName, stepTarget, exec.ok ? 'done' : 'error', exec.hint)
-      )
-      // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化批次):结构化命中走旁路,
-      // 用户看到的是程序摆的完整清单,不用模型转手抄写
-      if (
-        callName === TOOL_NAMES.searchContent &&
-        !selectedRoot?.external &&
-        exec.ok &&
-        exec.matches &&
-        exec.matches.length > 0
-      ) {
-        sendAgentMatches(event, requestId, {
-          keyword,
-          items: exec.matches,
-          truncated: exec.matchesTruncated === true
-        })
-        // 质检闸的对状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
-        for (const m of exec.matches) searchHitPaths.add(m.relPath)
+        prep,
+        readChars,
+        tavilyKey: input.tavilyKey
+      })
+      // 联网账:搜过几轮、命中哪些标题/链接(交卷时质检闸要对账)
+      if (prep.name === TOOL_NAMES.webSearch) {
+        webSearchCalls += 1
+        for (const hit of run.webHits) {
+          webResultTitles.push(hit.title)
+          webResultUrls.push(hit.url)
+        }
       }
-      toolResults.push({ role: 'tool', tool_call_id: call.id, content: exec.text })
+      // 质检闸的对状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
+      for (const path of run.matchPaths) searchHitPaths.add(path)
+      if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
+      toolResults.push({ role: 'tool', tool_call_id: call.id, content: run.content })
     }
     messages.push(...toolResults)
     turnTrace.push(...toolResults)
