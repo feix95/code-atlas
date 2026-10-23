@@ -19,13 +19,19 @@ import { buildLaunchPlan } from './launchPlanner.ts'
 import { fetchWithTimeout } from './http.ts'
 import { findMmprojFor } from './mmproj.ts'
 import { probeBuiltinVision } from './visionProbe.ts'
+import {
+  engineLogHasOom,
+  estimateLoadProgress,
+  gpuOffloadWarning,
+  parseGpuOffloadReport,
+  parseLoadProgress,
+  warmupNudgeMessage,
+  type GpuOffloadReport
+} from './loadParsers.ts'
 
 /** 内置 llama-server 的固定端口(与 LM Studio 默认 1234 错开) */
 export const BUILTIN_PORT = 8766
 const POLL_INTERVAL_MS = 1000
-/** 热身多久没好开始温柔提醒(第七十二批,产品裁定):绝不掐进程 —— 大模型从机械盘
- * 搬进显存两三分钟是常事,掐表只会杀死健康的加载;等不等由用户手里的「取消」说了算 */
-const WARMUP_NUDGE_MS = 5 * 60_000
 
 /** 用户按了取消/卸下时,挂起的启动等待收到的一句话(不是故障,是「先不用了」) */
 export const CANCEL_MESSAGE = '加载取消了:想用的时候再问一句,它会重新热身'
@@ -83,71 +89,17 @@ export interface BuiltinLaunchHost {
   noteEngineOom(seen: boolean): void
 }
 
-// ── 热身估价(纯函数;状态表读写经 host 走 builtin.ts 的 userData 目录)──
-
-/**
- * 热身太久的温柔提醒(纯函数,自测覆盖):5 分钟还没好才开口,一句话管理预期,
- * 绝不吓唬也绝不催命 —— 去留是用户手里「取消」的事,不是闹钟的事。
- */
-export function warmupNudgeMessage(elapsedMs: number): string | undefined {
-  return elapsedMs >= WARMUP_NUDGE_MS
-    ? '这次热身有点久:大模型第一次要从硬盘整个搬一遍,慢是正常的;不想等就点「取消」,搬完它自己会说'
-    : undefined
-}
-
-/** 热身估价公式:已用时 ÷ 最近样本均值 → 百分比,1~95 封顶(纯函数,自测覆盖)。
- * 没账可查回 null(界面转圈);宁慢勿快 —— 封顶 95,没真就绪绝不谎报到手。
- */
-export function estimateLoadProgress(elapsedMs: number, lastMs: number | null): number | null {
-  if (lastMs === null || !Number.isFinite(lastMs) || lastMs <= 0) return null
-  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 1
-  return Math.max(1, Math.min(95, Math.floor((elapsedMs / lastMs) * 100)))
-}
-
-/**
- * 从 /health 的 503 响应体里抠加载进度。llama.cpp 新版给
- * {"error":{"message":"Loading model","progress":0.42}},老版啥都不给。
- * 0~1 当比例 ×100,1~100 当百分数,出了范围或不是数 = 拿不到(纯函数,自测覆盖)。
- */
-export function parseLoadProgress(body: unknown): number | null {
-  const raw =
-    typeof body === 'number'
-      ? body
-      : body !== null && typeof body === 'object'
-        ? ((body as { progress?: unknown }).progress ??
-          (body as { error?: { progress?: unknown } }).error?.progress)
-        : undefined
-  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null
-  if (raw <= 1) return raw * 100
-  if (raw <= 100) return raw
-  return null
-}
-
-export interface GpuOffloadReport {
-  offloaded: number
-  total: number
-}
-
-export function parseGpuOffloadReport(line: string): GpuOffloadReport | null {
-  const hit = line.match(/offloaded\s+(\d+)\s*\/\s*(\d+)\s+layers?\s+to\s+GPU/i)
-  if (!hit) return null
-  const offloaded = Number(hit[1])
-  const total = Number(hit[2])
-  if (
-    !Number.isInteger(offloaded) ||
-    !Number.isInteger(total) ||
-    total <= 0 ||
-    offloaded < 0 ||
-    offloaded > total
-  )
-    return null
-  return { offloaded, total }
-}
-
-export function gpuOffloadWarning(report: GpuOffloadReport | null): string | undefined {
-  if (report === null || report.offloaded >= report.total) return undefined
-  return `模型只有 ${report.offloaded}/${report.total} 层放进显卡,其余要在内存里跑,吐字会明显变慢。关掉占显存的程序后点「卸下」再重载,或把「模型上下文」调小。`
-}
+// 启动期的纯算盘(热身估价/进度解析/GPU 层数/显存记号)住在 loadParsers.ts;
+// 这里转手老登记,builtin.ts 与自测照旧从 builtinLaunch 进
+export {
+  warmupNudgeMessage,
+  estimateLoadProgress,
+  parseLoadProgress,
+  parseGpuOffloadReport,
+  gpuOffloadWarning,
+  engineLogHasOom
+} from './loadParsers.ts'
+export type { GpuOffloadReport } from './loadParsers.ts'
 
 /** 就绪后问服务加载了哪个模型(llama-server 以模型文件名作为模型 id) */
 async function fetchModelId(baseUrl: string): Promise<string> {
@@ -159,11 +111,6 @@ async function fetchModelId(baseUrl: string): Promise<string> {
   const model = data.data?.[0]?.id ?? ''
   if (!model) throw new Error('内置模型已就绪,但报告不出模型名,再点一次试试')
   return model
-}
-
-/** 引擎日志里的显存不够记号(纯函数,自测覆盖):保险丝据此换「显存不够」那句人话 */
-export function engineLogHasOom(line: string): boolean {
-  return /ErrorOutOfDeviceMemory|out of memory|cudaMalloc failed|failed to allocate/i.test(line)
 }
 
 /**

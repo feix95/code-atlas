@@ -539,3 +539,4 @@
 - refactor(ui): CodePreview 的按文件记账拆出 usePreviewDoc
 - refactor(ui): 设置页拆出即改即存与上下文账单,左栏地址栏卡独立成件,货架样式拆出展开区与下载控件
 - refactor(ui): Live Preview 拆出清单规划与替身控件,货架拆出数据钩子与单行组件,自由对话拆出流式归账与史料整理
+- refactor(ai): 内置模型拆出启动/收尸/热身账/状态播报/适配估算,agent 拆出工具表/额度压账/质检护栏/消息类型,讲解与联网拆出 SSE/内核/源队列/三道闸

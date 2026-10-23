@@ -1072,11 +1072,11 @@ async function main(): Promise<void> {
     '没人监听就没冲突'
   )
   {
-    const builtinSrc = readFileSync(new URL('../src/ai/builtin.ts', import.meta.url), 'utf8')
-    const reaperStart = builtinSrc.indexOf('function reapOrphanByPidFile')
-    const reaperEnd = builtinSrc.indexOf('export async function ensureBuiltinServer')
-    const reaperSection = builtinSrc.slice(reaperStart, reaperEnd)
-    assert.ok(reaperStart >= 0 && reaperEnd > reaperStart, '收尸段该找得到')
+    // 收尸段已搬到 ai/engineProcess.ts(纯搬家):断言内容不变,只换扫描目标
+    const builtinSrc = readFileSync(new URL('../src/ai/engineProcess.ts', import.meta.url), 'utf8')
+    const reaperStart = builtinSrc.indexOf('function inspectOrphanByPidFile')
+    const reaperSection = builtinSrc.slice(reaperStart)
+    assert.ok(reaperStart >= 0, '收尸段该找得到')
     assert.ok(!reaperSection.includes(`runCommand('taskkill'`), '收尸段不许再发 taskkill')
     assert.ok(!reaperSection.includes('.kill('), '收尸段不许终止任何进程')
   }
