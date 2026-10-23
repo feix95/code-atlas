@@ -28,7 +28,8 @@ import {
   sanitizeCodeRefs,
   buildFreeChatMessages,
   pickWebLookupQuery,
-  resolveWebLookupMeta
+  resolveWebLookupMeta,
+  shouldPreSearchWeb
 } from '../ai/index.ts'
 import { webLookupDetailed } from '../ai/weblookup.ts'
 import { loadAiConfig } from '../ai/config.ts'
@@ -42,7 +43,8 @@ const NOT_REQUESTED: WebLookupMeta = {
   enabled: false,
   attempted: false,
   state: 'not_requested',
-  sources: []
+  sources: [],
+  queries: []
 }
 
 /** 讲解请求认的消息形状(与 buildFreeChatMessages 的产出一致) */
@@ -172,7 +174,14 @@ export async function prepareChat(
   if ('error' in resolved) {
     // 模型服务都没通,查询自然也没发生:如实记成 failed,不让状态表装无事发生
     const meta: WebLookupMeta = requested
-      ? { requested: true, enabled: false, attempted: false, state: 'failed', sources: [] }
+      ? {
+          requested: true,
+          enabled: false,
+          attempted: false,
+          state: 'failed',
+          sources: [],
+          queries: []
+        }
       : NOT_REQUESTED
     return {
       ok: false,
@@ -186,14 +195,15 @@ export async function prepareChat(
     }
   }
 
-  // 联网查询先行:状态边查边播报(searching → completed/failed/empty),不等模型开金口
+  // 联网查询先行:普通对话由程序先查再开答;翻文件开着时不预搜,
+  // 避免把结果贴进用户消息(小模型会当成「你提供的网页」),交给 web_search。
   const enabled = resolved.webLookup
   let outcome:
     | { kind: 'skipped' }
-    | { kind: 'attempted'; material: string; sources: string[] }
+    | { kind: 'attempted'; material: string; sources: string[]; queries?: string[] }
     | { kind: 'error' } = { kind: 'skipped' }
   let webMaterial: { query: string; material: string } | null = null
-  if (requested && enabled) {
+  if (shouldPreSearchWeb(requested, enabled, agentOn)) {
     const query = pickWebLookupQuery(questionText, attachment)
     sendChatLookup(event, requestId, 'searching', [])
     try {
@@ -203,8 +213,14 @@ export async function prepareChat(
         postJson: electronPostJson,
         tavilyKey: resolved.tavilyKey
       })
-      outcome = { kind: 'attempted', material: found.material, sources: found.sources }
-      if (found.material) webMaterial = { query, material: found.material }
+      outcome = {
+        kind: 'attempted',
+        material: found.material,
+        sources: found.sources,
+        queries: found.queries
+      }
+      if (found.material)
+        webMaterial = { query: found.queries[0] ?? query, material: found.material }
     } catch {
       outcome = { kind: 'error' }
     }
@@ -214,7 +230,8 @@ export async function prepareChat(
       event,
       requestId,
       finalState,
-      outcome.kind === 'attempted' ? outcome.sources : []
+      outcome.kind === 'attempted' ? outcome.sources : [],
+      outcome.kind === 'attempted' ? (outcome.queries ?? []) : []
     )
   }
 

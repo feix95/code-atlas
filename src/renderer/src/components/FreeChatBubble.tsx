@@ -16,27 +16,37 @@ import { useFlashFlag } from '../useFlashFlag'
  * 本轮动过联网就在消息下方挂程序记账的状态标签。从 FreeChatPanel 拆出,纯迁移不改行为。
  */
 
+function queryBit(meta: WebLookupMeta): string {
+  const qs = (meta.queries ?? []).map((q) => q.trim()).filter((q) => q !== '')
+  if (qs.length === 0) return ''
+  const listed = qs.map((q) => `「${q}」`).join('')
+  return qs.length === 1 ? listed : `${qs.length} 次${listed}`
+}
+
 /** 联网状态表 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
 function webLabel(
   meta: WebLookupMeta | null
 ): { text: string; tone: 'blue' | 'green' | 'amber' | 'muted' } | null {
   if (!meta || !meta.requested) return null
+  const q = queryBit(meta)
   switch (meta.state) {
     case 'not_requested':
       return null
     case 'disabled':
       return { text: '联网开关未开启,本轮没有查询', tone: 'muted' }
     case 'searching':
-      return { text: '正在联网查询…', tone: 'blue' }
-    case 'completed':
-      return {
-        text: `已联网查询:${meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'}`,
-        tone: 'green'
-      }
+      return { text: `正在联网查询${q}…`, tone: 'blue' }
+    case 'completed': {
+      const src = meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'
+      return { text: q ? `已联网查询${q}:${src}` : `已联网查询:${src}`, tone: 'green' }
+    }
     case 'failed':
       return { text: '联网查询失败,以下内容不是联网结论', tone: 'amber' }
     case 'empty':
-      return { text: '已查询,但没有找到可用资料', tone: 'amber' }
+      return {
+        text: q ? `已查询${q},没有可用资料` : '本轮没有发起联网查询',
+        tone: 'amber'
+      }
   }
 }
 

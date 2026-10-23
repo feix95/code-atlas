@@ -441,6 +441,8 @@ export interface WebLookupMeta {
   state: WebLookupState
   /** 查到资料时,命中的来源(如「维基百科(中文)」「DuckDuckGo」) */
   sources: string[]
+  /** 本轮真正拿去搜过的词,按时间排列;没有搜过就是空数组 */
+  queries?: string[]
 }
 
 /** 自由对话一次请求的载荷(渲染进程 → 主进程) */
@@ -574,6 +576,8 @@ export interface AiChatLookupPayload {
   id: string
   state: Extract<WebLookupState, 'searching' | 'completed' | 'failed' | 'empty'>
   sources: string[]
+  /** 已经搜过的词;搜索中可能还是空的 */
+  queries?: string[]
 }
 
 /**

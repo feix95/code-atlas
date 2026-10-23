@@ -26,6 +26,8 @@ import {
   SALVAGE_SEARCH_NUDGE,
   WEB_SALVAGE_NUDGE,
   WEB_SALVAGE_NUDGE_MAX,
+  WEB_SKIP_NUDGE,
+  WEB_SKIP_NUDGE_MAX,
   agentPromptBudget,
   agentReadChars,
   agentRound,
@@ -41,6 +43,7 @@ import {
   extractToolCalls,
   findAnswerGap,
   findWebAnswerGap,
+  findWebSearchSkipped,
   isFindQuestion,
   looksLikeToolsUnsupported,
   mergeUsage,
@@ -74,6 +77,7 @@ import {
   sanitizeAgentRootId,
   sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
+import { reviewAgentAnswer } from '../src/main/agentSignoff.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 
 async function main(): Promise<void> {
@@ -651,6 +655,9 @@ async function main(): Promise<void> {
   assert.ok(AGENT_WEB_ADDENDUM.includes('标题和链接'), '结果里带链接,模型才知道能引用哪条')
   assert.ok(WEB_SALVAGE_NUDGE.includes('这不算查过'), '补救提醒要直说只搜一轮不算查过')
   assert.equal(WEB_SALVAGE_NUDGE_MAX, 1, '联网纠错只拦一次,掰不过来就尊重结论')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('不是用户提供的'), '上网守则要写清查来的资料不是用户给的')
+  assert.ok(WEB_SKIP_NUDGE.includes(TOOL_NAMES.webSearch), '漏搜提醒要点名 web_search')
+  assert.equal(WEB_SKIP_NUDGE_MAX, 1, '漏搜只拦一次')
   assert.ok(
     !AGENT_FILES_ADDENDUM.includes('web_search'),
     '没开联网时切片不提 web_search:模型连有这工具都不该知道'
@@ -765,6 +772,79 @@ async function main(): Promise<void> {
     false,
     '答案已经引用了结果,不再拦'
   )
+  assert.equal(
+    answerLooksLikeWebGiveUp('搜索结果没有直接找到这个项目。'),
+    true,
+    '「没有直接找到」也是放弃交卷'
+  )
+  assert.equal(
+    findWebSearchSkipped({
+      webEnabled: true,
+      searchIntent: true,
+      isFindQuestion: false,
+      webSearchCalls: 0
+    }),
+    true,
+    '点名要搜却一次都没调 = 要拦'
+  )
+  assert.equal(
+    findWebSearchSkipped({
+      webEnabled: true,
+      searchIntent: true,
+      isFindQuestion: true,
+      webSearchCalls: 0
+    }),
+    false,
+    '找位置题不拦去网上搜'
+  )
+  assert.equal(
+    findWebSearchSkipped({
+      webEnabled: true,
+      searchIntent: true,
+      isFindQuestion: false,
+      webSearchCalls: 1
+    }),
+    false,
+    '已经搜过就不走漏搜闸'
+  )
+  {
+    const skip = reviewAgentAnswer({
+      answer: '网上没这个东西。',
+      question: '去github看看 opencode',
+      useTools: true,
+      toolCallsExecuted: 0,
+      searchUsed: false,
+      hitPaths: [],
+      webSearchCalls: 0,
+      webTitles: [],
+      webUrls: [],
+      salvageNudges: 0,
+      webSalvageNudges: 0,
+      webSkipNudges: 0,
+      rounds: 1,
+      webSearchEnabled: true,
+      searchIntent: true
+    })
+    assert.equal(skip?.nudge, WEB_SKIP_NUDGE, '漏搜闸要拦并给出漏搜提醒')
+    const skipUsed = reviewAgentAnswer({
+      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
+      question: '搜搜 opencode',
+      useTools: true,
+      toolCallsExecuted: 1,
+      searchUsed: false,
+      hitPaths: [],
+      webSearchCalls: 1,
+      webTitles: webTitles,
+      webUrls: webUrls,
+      salvageNudges: 0,
+      webSalvageNudges: 0,
+      webSkipNudges: 1,
+      rounds: 2,
+      webSearchEnabled: true,
+      searchIntent: true
+    })
+    assert.equal(skipUsed?.nudge, WEB_SALVAGE_NUDGE, '漏搜拦过一次后,一轮就放弃仍走换词闸')
+  }
 
   // ── 18c. 喂给模型的材料要带链接和发布时间(模型能判断来源、能引用) ──
   const material = await webSearchDetailed('selftest-web-material-2026', {

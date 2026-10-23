@@ -5,6 +5,7 @@ import { agentStepText, wrapToolResult } from '../ai/agent.ts'
 import { TOOL_NAMES } from '../shared/agentTools.ts'
 import type { AgentSearchMatch } from '../shared/types.ts'
 import { addDevLog } from '../shared/devlog.ts'
+import { sendChatLookup } from './aiEvidence.ts'
 import {
   agentListFiles,
   agentReadFile,
@@ -23,6 +24,8 @@ export interface AgentToolRun {
   content: string
   webHits: Array<{ title: string; url: string }>
   matchPaths: string[]
+  queries: string[]
+  sources: string[]
 }
 
 /** 执行一次合法调用(参数已过安检;这里只干活,不记账) */
@@ -36,6 +39,9 @@ export async function runAgentTool(input: {
   const { event, requestId, prep, readChars, tavilyKey } = input
   const { name, root, relPath, keyword, readOffset, readLimit, query, requestedPath, stepTarget } =
     prep
+  if (name === TOOL_NAMES.webSearch) {
+    sendChatLookup(event, requestId, 'searching', [], query ? [query] : [])
+  }
   // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
   const exec: {
     ok: boolean
@@ -45,6 +51,8 @@ export async function runAgentTool(input: {
     matchesTruncated?: boolean
     rootId?: string
     webResults?: Array<{ title: string; url: string }>
+    queries?: string[]
+    sources?: string[]
   } =
     name === TOOL_NAMES.requestDirectoryAccess
       ? await agentRequestDirectoryAccess(event, requestedPath)
@@ -99,5 +107,12 @@ export async function runAgentTool(input: {
     // 质检闸的状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
     for (const m of exec.matches) matchPaths.push(m.relPath)
   }
-  return { ok: exec.ok, content, webHits, matchPaths }
+  return {
+    ok: exec.ok,
+    content,
+    webHits,
+    matchPaths,
+    queries: exec.queries ?? [],
+    sources: exec.sources ?? []
+  }
 }

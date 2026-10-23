@@ -16,6 +16,10 @@ import {
   codeRefsBudget,
   buildAttachmentText,
   pickWebLookupQuery,
+  extractWebQueryTokens,
+  pickRetryQuery,
+  shouldPreSearchWeb,
+  finalizeAgentWebLookup,
   resolveWebLookupMeta,
   parseLmStudioContext,
   parseLlamaProps,
@@ -163,6 +167,7 @@ async function main(): Promise<void> {
     'agent 路不挂无工具切片(翻文件切片走 agent 自己的追加机制)'
   )
   assert.ok(buildChatSystem({ agent: true }).includes(SLICE_CHAT), 'agent 路照样有聊天切片')
+  assert.ok(SLICE_CHAT.includes('不是用户贴的'), '聊天切片要写清 <web_results> 不是用户贴的')
 
   assert.deepEqual(sanitizeHistory('不是数组'), [], '历史不是数组就当没有')
   const longText = '长'.repeat(600)
@@ -618,9 +623,13 @@ async function main(): Promise<void> {
     webMsgs[webMsgs.length - 1]?.content.includes('对得上的信息讲出来'),
     '要要求模型讲出对得上的信息'
   )
+  assert.ok(
+    webMsgs[webMsgs.length - 1]?.content.includes('不是你贴的网页'),
+    '预搜资料要写清不是用户贴的'
+  )
 
-  // 联网查询词:优先选中对象的名字;没对象就剥掉意图词,封顶 60 字
-  assert.equal(pickWebLookupQuery('联网搜搜它', att), 'components', '有选中对象就查名字')
+  // 联网查询词:能抽出英文专名就用短词;抽不出才用选中对象或削完套话的中文
+  assert.equal(pickWebLookupQuery('联网搜搜它', att), 'components', '抽不出专名才查选中对象名字')
   assert.equal(
     pickWebLookupQuery('联网搜一下这个软件', null),
     '这个软件',
@@ -628,6 +637,52 @@ async function main(): Promise<void> {
   )
   assert.ok(pickWebLookupQuery('帮我查查', null).length <= 60, '查询词封顶 60 字')
   assert.equal(pickWebLookupQuery('帮我查查', null), '', '剥完啥都不剩就给空串,别拿垃圾去查')
+  assert.equal(
+    pickWebLookupQuery(
+      '你能去 opencode他们 连接是怎么做的吗？应该有开源仓库，去github看看',
+      att
+    ),
+    'opencode github',
+    '口语整句抽出专名+github,不拿附件名'
+  )
+  assert.deepEqual(
+    extractWebQueryTokens('搜搜opencode他们 github'),
+    ['opencode', 'github'],
+    '中英粘连要切开,套话剥掉'
+  )
+  assert.equal(
+    pickRetryQuery('你能去 opencode 看看', [{ title: 'DuckDuckGo', snippet: 'search engine' }]),
+    'opencode',
+    '命中对不上专名时换短词'
+  )
+  assert.equal(
+    pickRetryQuery('opencode', [{ title: 'OpenCode CLI', snippet: 'terminal UI' }]),
+    null,
+    '命中对得上就不换词'
+  )
+  assert.equal(shouldPreSearchWeb(true, true, false), true, '普通对话点名且开关开着才预搜')
+  assert.equal(shouldPreSearchWeb(true, true, true), false, '翻文件开着不预搜')
+  assert.equal(shouldPreSearchWeb(true, false, false), false, '开关关着不预搜')
+  const agentEmpty = finalizeAgentWebLookup(
+    {
+      requested: true,
+      enabled: true,
+      attempted: false,
+      state: 'failed',
+      sources: [],
+      queries: []
+    },
+    [],
+    []
+  )
+  assert.equal(agentEmpty.state, 'empty', '翻文件收工没搜过 = empty,不当成查询失败')
+  const agentDone = finalizeAgentWebLookup(agentEmpty, ['opencode github', 'opencode'], [
+    'DuckDuckGo',
+    'DuckDuckGo'
+  ])
+  assert.equal(agentDone.state, 'completed', '翻文件真搜过 = completed')
+  assert.deepEqual(agentDone.queries, ['opencode github', 'opencode'], '搜索词按出现顺序去重')
+  assert.deepEqual(agentDone.sources, ['DuckDuckGo'], '来源去重')
 
   // 联网状态状态表:程序做了什么就是什么,六种状态各有归属
   assert.equal(
@@ -673,6 +728,7 @@ async function main(): Promise<void> {
   assert.ok(hasSearchIntent('联网搜搜最新信息'), '「联网搜搜」要识别为搜索意图')
   assert.ok(hasSearchIntent('帮我查查这是什么软件'), '「查查」要识别为搜索意图')
   assert.ok(!hasSearchIntent('这个能删吗?'), '普通追问不该误触发联网')
+  assert.ok(hasSearchIntent('去github看看'), '点名 github 也算搜索意图')
 
   // ── 3.7 webLookupDetailed:来源记账 + 缓存 + 全灭认输(免费链:DDG → 维基中 → 维基英)──
   {

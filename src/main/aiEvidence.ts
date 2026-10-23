@@ -200,14 +200,16 @@ export function sendChatLookup(
   event: IpcMainInvokeEvent,
   requestId: unknown,
   state: AiChatLookupPayload['state'],
-  sources: string[]
+  sources: string[],
+  queries: string[] = []
 ): void {
   if (typeof requestId !== 'string' || requestId === '') return
   if (!event.sender.isDestroyed()) {
     event.sender.send(CH.aiChatLookup, {
       id: requestId,
       state,
-      sources
+      sources,
+      queries
     } satisfies AiChatLookupPayload)
   }
 }

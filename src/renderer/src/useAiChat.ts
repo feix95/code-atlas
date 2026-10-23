@@ -114,7 +114,8 @@ export function useAiChat(
                     enabled: true,
                     attempted: payload.state !== 'searching',
                     state: payload.state,
-                    sources: payload.sources
+                    sources: payload.sources,
+                    queries: payload.queries ?? []
                   }
                 }
               : m

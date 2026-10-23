@@ -1,5 +1,5 @@
 import { announceActivityBusy, lastActivityProvider } from './modelStatus.ts'
-import { sendResetDelta } from './aiEvidence.ts'
+import { sendChatLookup, sendResetDelta } from './aiEvidence.ts'
 import { sendAgentDelta, sendAgentStep } from './agentTools.ts'
 import { type IpcMainInvokeEvent } from 'electron'
 import {
@@ -27,6 +27,7 @@ import { handleAgentFailure, type AgentGuardFlags } from './agentFallback.ts'
 import { prepareAgentCall } from './agentCallArgs.ts'
 import { runAgentTool } from './agentRunTool.ts'
 import { reviewAgentAnswer } from './agentSignoff.ts'
+import { finalizeAgentWebLookup, hasSearchIntent } from '../ai/webPrompts.ts'
 import type { AiChatResult, AiUsage, ChatTarget, WebLookupMeta } from '../shared/types.ts'
 
 /**
@@ -107,7 +108,11 @@ export async function runAgentChat(input: {
   let webSearchCalls = 0
   const webResultTitles: string[] = []
   const webResultUrls: string[] = []
+  const webQueries: string[] = []
+  const webSources: string[] = []
   let webSalvageNudges = 0
+  let webSkipNudges = 0
+  const searchIntent = hasSearchIntent(currentQuestion)
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
@@ -131,7 +136,8 @@ export async function runAgentChat(input: {
     `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`
   )
   for (;;) {
-    if (signal.aborted) return agentResult(input, 'cancelled', '', usage, resultReasoning())
+    if (signal.aborted)
+      return agentResult(input, 'cancelled', '', usage, resultReasoning(), webQueries, webSources)
     // 上下文将满先腾地方(第一百三十八批):早先翻看的大段原文提炼成占位注记,
     // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
     const compressed = compressAgentMessages(messages, promptBudget)
@@ -188,7 +194,15 @@ export async function runAgentChat(input: {
       }
       if (decision.step) sendAgentStep(event, requestId, decision.step)
       if (decision.status === 'supported') input.onTurnComplete?.(turnTrace, decision.text)
-      return agentResult(input, decision.status, decision.text, usage, resultReasoning())
+      return agentResult(
+        input,
+        decision.status,
+        decision.text,
+        usage,
+        resultReasoning(),
+        webQueries,
+        webSources
+      )
     }
     usage = mergeUsage(usage, round.usage)
     if (round.reasoning)
@@ -213,7 +227,9 @@ export async function runAgentChat(input: {
           'error',
           '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试',
           usage,
-          resultReasoning()
+          resultReasoning(),
+          webQueries,
+          webSources
         )
       }
       // 质检闸(救敷衍)与联网质检闸:判据与话术住 agentSignoff,这里只管拦下重答的账
@@ -229,10 +245,14 @@ export async function runAgentChat(input: {
         webUrls: webResultUrls,
         salvageNudges,
         webSalvageNudges,
-        rounds
+        webSkipNudges,
+        rounds,
+        webSearchEnabled: input.webSearchEnabled,
+        searchIntent
       })
       if (nudge) {
         if (nudge.kind === 'file') salvageNudges += 1
+        else if (webSearchCalls === 0) webSkipNudges += 1
         else webSalvageNudges += 1
         flags.skipNudgeOnce = true
         messages.push(raw)
@@ -243,7 +263,7 @@ export async function runAgentChat(input: {
       }
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       input.onTurnComplete?.(turnTrace, text)
-      return agentResult(input, 'supported', text, usage, resultReasoning())
+      return agentResult(input, 'supported', text, usage, resultReasoning(), webQueries, webSources)
     }
     // 工具调用原样回填进对话(服务端要求 assistant 消息和 tool 结果成对出现)
     messages.push(raw)
@@ -287,10 +307,19 @@ export async function runAgentChat(input: {
       // 联网账:搜过几轮、命中哪些标题/链接(交卷时质检闸要对账)
       if (prep.name === TOOL_NAMES.webSearch) {
         webSearchCalls += 1
+        for (const q of run.queries) if (q !== '' && !webQueries.includes(q)) webQueries.push(q)
+        for (const s of run.sources) if (s !== '' && !webSources.includes(s)) webSources.push(s)
         for (const hit of run.webHits) {
           webResultTitles.push(hit.title)
           webResultUrls.push(hit.url)
         }
+        sendChatLookup(
+          event,
+          requestId,
+          run.webHits.length > 0 ? 'completed' : 'empty',
+          webSources,
+          webQueries
+        )
       }
       // 质检闸的对状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
       for (const path of run.matchPaths) searchHitPaths.add(path)
@@ -317,7 +346,9 @@ function agentResult(
   status: AiChatResult['status'],
   text: string,
   usage: AiUsage | undefined,
-  reasoning: string | undefined
+  reasoning: string | undefined,
+  queries: string[],
+  sources: string[]
 ): AiChatResult {
   return {
     status,
@@ -326,6 +357,6 @@ function agentResult(
     model: input.target.model,
     durationMs: Date.now() - input.startedAt,
     usage,
-    webLookup: input.webLookup
+    webLookup: finalizeAgentWebLookup(input.webLookup, queries, sources)
   }
 }

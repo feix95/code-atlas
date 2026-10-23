@@ -230,7 +230,7 @@ export function buildFreeChatMessages<H extends AgentChatMessage = AiHistoryMess
   // 当前问题只包 <current_question> 标签本体;联网资料、参考资料指路都跟在标签后面,
   // agent 链取问题时按标签一剥就是干净原文
   const webTail = webMaterial
-    ? `\n\n${TAG.programNote.open}已按你的要求联网查询「${webMaterial.query}」,公开资料在下面 ${TAG.webResults.open} 里:把跟问题对得上的信息讲出来(它是什么、是谁家的、有哪些部分);资料没帮助才照常回答,别硬编。${TAG.programNote.close}\n${webMaterial.material}`
+    ? `\n\n${TAG.programNote.open}程序刚按你的要求上网查了「${webMaterial.query}」,结果在下面 ${TAG.webResults.open} 里(不是你贴的网页):把跟问题对得上的信息讲出来(它是什么、是谁家的、有哪些部分);资料没帮助才照常回答,别硬编。${TAG.programNote.close}\n${webMaterial.material}`
     : ''
   // 资料提示贴着问题走(小葵报的案):附件虽垫在最前,中间隔着几轮历史,小模型就忘了它的
   // 存在,问「这个呢?」开始瞎猜文件名。每轮问题后面跟一张「当前参考资料是谁」的程序提醒,

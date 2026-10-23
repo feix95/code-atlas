@@ -75,6 +75,8 @@ export async function agentWebSearch(
   text: string
   hint?: string
   webResults?: Array<{ title: string; url: string }>
+  queries: string[]
+  sources: string[]
 }> {
   const found = await webSearchDetailed(query, {
     fetchText: electronFetchText,
@@ -85,14 +87,18 @@ export async function agentWebSearch(
     return {
       ok: false,
       text: '没查到有用的资料(可能断网、被限流或词太生僻):就用你已经知道的先答,答不准就明说拿不准',
-      hint: '没查到'
+      hint: '没查到',
+      queries: found.queries,
+      sources: found.sources
     }
   }
   return {
     ok: true,
     text: found.material,
     hint: found.sources.join('、'),
-    webResults: found.hits.map((h) => ({ title: h.title, url: h.url }))
+    webResults: found.hits.map((h) => ({ title: h.title, url: h.url })),
+    queries: found.queries,
+    sources: found.sources
   }
 }
 

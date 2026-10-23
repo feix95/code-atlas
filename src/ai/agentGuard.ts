@@ -25,8 +25,14 @@ export const SALVAGE_CITE_NUDGE = `${TAG.programReminder.open}\n程序自动质�
  *  开头自报家门(小模型老把程序插话当用户催促),并明确「只搜一轮不算查过」 */
 export const WEB_SALVAGE_NUDGE = `${TAG.programReminder.open}\n程序自动质检,不是用户说话。你只搜了一轮,结果对不上就说没查到 —— 这不算查过。换 2-3 个更短、更准的词再搜:先只搜主体本身,再按方面补短词;别把对话里其他产品名拼进去。问题本身没变,不用重新理解。\n${TAG.programReminder.close}`
 
+/** 点名要上网查却一次 web_search 都没调:拦下逼它先搜,别拿编的网页交差 */
+export const WEB_SKIP_NUDGE = `${TAG.programReminder.open}\n程序自动质检,不是用户说话。这题点名要上网查,你到现在还没用 ${TOOL_NAMES.webSearch}。先用短词搜主体(专名、github),搜完再答;问题本身没变,不用重新理解。\n${TAG.programReminder.close}`
+
 /** 联网质检闸最多拦一次:换过词还说没查到,就尊重它的结论,不无限跟它耗 */
 export const WEB_SALVAGE_NUDGE_MAX = 1
+
+/** 「该搜却没搜」单独拦一次,不跟换词闸抢名额 */
+export const WEB_SKIP_NUDGE_MAX = 1
 
 /** 找位置题的特征词(宁保守勿激进):命中才认「找东西的题」,质检闸只管这类,别的不多管闲事。
  *  「搜一下/搜搜/搜出」这类泛搜语气词不进表(2026-09-17 产品定):带"搜"字的问句多半是
@@ -102,6 +108,9 @@ const WEB_GIVE_UP_WORDS = [
   '没找到',
   '没有找到',
   '没有直接命中',
+  '没有直接找到',
+  '并没有找到',
+  '没有找到名为',
   '无法直接',
   '信息不足',
   '资料不足',
@@ -158,6 +167,20 @@ export function findWebAnswerGap(input: {
   if (input.webSearchCalls !== 1) return false
   if (!answerLooksLikeWebGiveUp(input.answer)) return false
   return !answerCitesAnyWebResult(input.answer, input.titles, input.urls)
+}
+
+/**
+ * 点名要上网查却一次都没调 web_search(纯函数,自测覆盖)。
+ * 找位置题交给文件质检闸,避免「搜一下这个文件夹」被逼去网上搜。
+ */
+export function findWebSearchSkipped(input: {
+  webEnabled: boolean
+  searchIntent: boolean
+  isFindQuestion: boolean
+  webSearchCalls: number
+}): boolean {
+  if (!input.webEnabled || !input.searchIntent || input.isFindQuestion) return false
+  return input.webSearchCalls === 0
 }
 
 /** 提醒卡的触发门槛(提示词体系重写第二批):本场工具调用满这么多次才开始垫提醒卡 ——

@@ -7,8 +7,11 @@ import {
   SALVAGE_SEARCH_NUDGE,
   WEB_SALVAGE_NUDGE,
   WEB_SALVAGE_NUDGE_MAX,
+  WEB_SKIP_NUDGE,
+  WEB_SKIP_NUDGE_MAX,
   findAnswerGap,
   findWebAnswerGap,
+  findWebSearchSkipped,
   isFindQuestion
 } from '../ai/agent.ts'
 
@@ -30,8 +33,13 @@ export interface AgentAnswerReviewInput {
   /** 已经拦过几次 */
   salvageNudges: number
   webSalvageNudges: number
+  webSkipNudges: number
   /** 已经跑完的轮数(轮数烧完的逼卷轮不拦 —— 那轮它没工具可调,拦了也白拦) */
   rounds: number
+  /** 联网查证开着,才有资格拦「该搜却没搜」 */
+  webSearchEnabled: boolean
+  /** 用户这轮点名要搜/联网 */
+  searchIntent: boolean
 }
 
 /** 质检闸的裁决:要拦就交出提醒原文与给人看的步骤灰字,放行回 null */
@@ -61,6 +69,22 @@ export function reviewAgentAnswer(input: AgentAnswerReviewInput): AgentAnswerNud
             ? '这题是找东西,它一次文件都没搜就想交卷 —— 程序拦下,让它先搜再答'
             : '答案里没落到具体文件 —— 程序拦下,让它把搜到的文件写进答案再交'
       }
+    }
+  }
+  // 点名要上网查却一次工具都没调:先拦它去搜。找位置题不走这条,避免误逼网上搜。
+  if (
+    input.webSkipNudges < WEB_SKIP_NUDGE_MAX &&
+    findWebSearchSkipped({
+      webEnabled: input.webSearchEnabled,
+      searchIntent: input.searchIntent,
+      isFindQuestion: isFindQuestion(input.question),
+      webSearchCalls: input.webSearchCalls
+    })
+  ) {
+    return {
+      kind: 'web',
+      nudge: WEB_SKIP_NUDGE,
+      step: '这题点名要上网查,它一次都没搜 —— 程序拦下,让它先搜'
     }
   }
   // 联网质检闸:只搜了一轮、结果对不上就说没查到 —— 拦一次,让它换短词重搜。
