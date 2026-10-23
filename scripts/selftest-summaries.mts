@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { annotateSummaries } from '../src/summarizer/index.ts'
+import { annotateSummaries, DOC_TITLE_MAX_CHARS } from '../src/summarizer/index.ts'
 import type { LanguageTag, ScanDirNode, ScanFileNode } from '../src/shared/types.ts'
 
 let fileSeq = 0
@@ -257,13 +257,15 @@ async function main(): Promise<void> {
 
   // ── 12. 文档读开头(第一百批):有真标题亮真名,标题过长掐头留省略号 ──
   const titledDoc = file('a.md', undefined, '安装指南')
-  const longDoc = file('b.md', undefined, '这是一个特别特别特别长的文档标题超出了预算')
+  const longTitle = '这是一个特别特别特别长的文档标题超出了预算还要再长一点'
+  const longDoc = file('b.md', undefined, longTitle)
   const titledTxt = file('c.txt', undefined, '随手记')
   const plainMd = file('d.md')
   annotateSummaries(dir('proj', [titledDoc, longDoc, titledTxt, plainMd]))
   assert.equal(textOf(titledDoc), 'doc 文档：安装指南', `md 真标题亮真名,实际:${textOf(titledDoc)}`)
-  assert.ok(
-    textOf(longDoc).includes('…') && textOf(longDoc).length <= 24,
+  assert.equal(
+    textOf(longDoc),
+    `doc 文档：${longTitle.slice(0, DOC_TITLE_MAX_CHARS)}…`,
     `超长标题掐头留省略号,实际:${textOf(longDoc)}`
   )
   assert.equal(textOf(titledTxt), 'doc 文档：随手记', 'txt 有标题也算文档')

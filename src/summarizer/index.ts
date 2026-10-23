@@ -19,6 +19,9 @@ import {
   SCRIPTS_LIKE
 } from './dictionary.ts'
 
+/** 文档真标题进树悬停的字数上限。当年按行内小灰字定 16,灰字退役后改悬停,放到 24。 */
+export const DOC_TITLE_MAX_CHARS = 24
+
 function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   const lower = file.name.toLowerCase()
 
@@ -42,7 +45,10 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
 
   // 文档读开头(第一百批):有真标题就亮真名,别再笼统一句「文档」
   if (file.docTitle) {
-    const t = file.docTitle.length > 16 ? `${file.docTitle.slice(0, 16)}…` : file.docTitle
+    const t =
+      file.docTitle.length > DOC_TITLE_MAX_CHARS
+        ? `${file.docTitle.slice(0, DOC_TITLE_MAX_CHARS)}…`
+        : file.docTitle
     return { icon: 'doc', text: `文档：${t}` }
   }
 
