@@ -133,18 +133,18 @@
 /* 页签右键菜单的二级列表(翻译语种):就地展开,行距与一级一致 */
 .fpm-more {
   margin-left: auto;
-  padding-left: 0.35rem;
+  padding-left: var(--space-1);
   color: var(--chrome-muted);
   font-size: var(--font-ui-smaller);
 }
 
 /* 二级菜单:复用一级菜单皮肤,贴父行右侧出生(落点由 ContextMenu 按视口钳) */
 .fpm-flyout {
-  padding: 0.25rem;
+  padding: var(--space-1);
 }
 
 /* 菜单内容多时(页签菜单 + 展开的语种)允许内部滚动,不怼出窗口 */
 .file-path-menu {
-  max-height: calc(100vh - 2rem);
+  max-height: calc(100vh - var(--space-7));
   overflow-y: auto;
 }

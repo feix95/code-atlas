@@ -4,7 +4,7 @@
     上区 pin+历史(可视 5 条内部滚动),分隔线下固定盘根区 ── */
 .ws-menu {
   position: absolute;
-  top: calc(100% + 0.3rem);
+  top: calc(100% + var(--space-1));
   left: 0;
   right: 0;
   z-index: var(--z-dropdown);

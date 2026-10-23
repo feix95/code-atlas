@@ -8,7 +8,7 @@ export function canOpenAsWorkspace(isDirectory: boolean, relPath: string): boole
   return isDirectory && relPath !== ''
 }
 
-/** 备注系列动作(菜单统一批次,产品裁定:对着文件右键 = 复制路径/资源管理器/写备注三件套):
+/** 备注系列动作(菜单统一批次,产品裁定:对着文件右键 = 打开所在位置/复制路径/写备注三件套):
  *  树菜单、聊天绿字链接,一处规格两家共用。
  *  编辑框就地长在菜单里,所以这里给的是「现有正文 + 落盘口」,不再需要外部弹窗。 */
 export interface FilePathNoteActions {
@@ -30,7 +30,7 @@ export interface FilePathMenuRequest {
   doc: Document
   /** 复制完整路径:成功返回绝对路径;失败返回 null(菜单里说人话,不弹错误框) */
   copy: () => Promise<string | null>
-  /** 在文件资源管理器中显示:成功返回 null(资源管理器弹出本身就是反馈);
+  /** 打开所在位置:成功返回 null(资源管理器弹出本身就是反馈);
    *  失败返回要显示的人话(比如文件已经不在了) */
   reveal: () => Promise<string | null>
   /** 可选:预览动作(文件树给;聊天链接不给就不摆这一项) */

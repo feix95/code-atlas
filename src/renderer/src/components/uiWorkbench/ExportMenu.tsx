@@ -4,6 +4,7 @@
 import { EXPORT_FORMATS } from '@shared/uiWorkbench/export/formats'
 import type { FrameExportTarget } from '@shared/uiWorkbench/export/frameDocument'
 import { openContextMenu } from '../contextMenuStore'
+import { readTokenPx } from '../../overlayLayout'
 import { downloadText } from '../../uiWorkbench/download'
 
 /** 多画板时给文件名插入画板名:design.html + 画板 1 → design-画板 1.html */
@@ -27,9 +28,11 @@ export function ExportMenu({
       onClick={(e) => {
         const target = e.currentTarget
         const rect = target.getBoundingClientRect()
+        const view = target.ownerDocument.defaultView ?? window
+        const gap = readTokenPx(target, view, '--space-1', 4)
         openContextMenu({
           x: rect.left,
-          y: rect.bottom + 4,
+          y: rect.bottom + gap,
           doc: target.ownerDocument,
           compact: true,
           items: EXPORT_FORMATS.map((f) => ({

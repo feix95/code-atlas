@@ -227,7 +227,7 @@ export function registerChatIpc(): void {
     }
   })
 
-  // 右键文件链接「在文件资源管理器中显示」:把资源管理器拉到文件面前、选中高亮,
+  // 右键文件链接「打开所在位置」:把资源管理器拉到文件面前、选中高亮,
   // 照样不开文件不执行任何东西 —— 到家门口为止,开不开门用户自己定
   ipcMain.handle(CH.revealFilePath, (_event, rootPath: unknown, relPath: unknown) => {
     if (typeof rootPath !== 'string' || rootPath === '' || typeof relPath !== 'string') {

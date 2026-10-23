@@ -10,6 +10,13 @@ import {
 import { useMenuDismiss } from '../useMenuDismiss'
 import { TreeIcon } from './Icons'
 import { MENU_ICON_ONLY_SIZE, MENU_ICON_SIZE } from '../inputMetrics'
+import {
+  OVERLAY_EDGE_FALLBACK_PX,
+  OVERLAY_MAX_WIDTH_FALLBACK_PX,
+  clampOverlayBox,
+  clampPreferRightOverlay,
+  readTokenPx
+} from '../overlayLayout'
 
 /**
  * 通用右键菜单(第二台全局单例):不是「对着文件」的右键菜单走这儿 ——
@@ -22,62 +29,23 @@ import { MENU_ICON_ONLY_SIZE, MENU_ICON_SIZE } from '../inputMetrics'
  * 渲染域隔离:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
  */
 
-/** 菜单的估尺寸:宽窄一条,高按行数算(一项一行约 34px);贴窗口边时按它往里收,别弹出窗外 */
-const MENU_W = 200
-/** 二级菜单估宽:语种名最长「中文（简体）」,10rem 够摆 */
-const SUB_W = 190
-/** 父行右缘到二级菜单左缘的缝:让开一级菜单的 4px 内边距,再留 2px 视觉缝 */
-const SUB_GAP = 6
-/** 窄身档的估宽(compact 菜单,比如导出格式那挂) */
-const MENU_W_COMPACT = 96
-/** 纯图标档收起估宽:方钮 2.25rem + 内边距 + 1px 边框×2,100% 缩放下约 46px */
-const MENU_W_ICON_ONLY = 46
-/** 纯图标档展开估宽:给「剪切」等两字标签 + 反馈句留空,贴右边时用来决定往哪边长 */
-const MENU_W_ICON_EXPANDED = 256
+/** 二级菜单估高还按行数估(飞出层量盒子之前要先落点);主菜单宽高已改成量真实盒子 */
 const ROW_H = 34
-/** 窄身档的行高(行高 1.2 + 上下边距各 0.25rem ≈ 24px,和 is-compact 的 CSS 账对得上) */
+/** 窄身档的行高(行高 1.2 + 上下边距各 --space-1,和 is-compact 的 CSS 账对得上) */
 const ROW_H_COMPACT = 24
 /** 纯图标档的方钮边长(2.25rem,100% 缩放下 36px) */
 const ROW_H_ICON_ONLY = 36
-/** 组间细线在估高里的份额:1px 线 + 上下各 ~3px 外距 */
-const SEP_H = 7
-/** 分区小标题行的估高:小字一行 + 上下透气 */
-const HEADING_H = 26
-/** 外框一圈的厚度(边框 + 内边距)在估高里的份额:通用档 10px,窄身档 6px,纯图标档 8px */
+/** 外框一圈的厚度(边框 + 内边距)在估高里的份额 */
 const CHROME = 10
-const CHROME_COMPACT = 6
-const CHROME_ICON_ONLY = 10
-const EDGE = 8
-/** 菜单相对光标的空隙:横向约两个汉字,纵向一个汉字 */
-const CURSOR_GAP_X = 24
-const CURSOR_GAP_Y = 12
 /** 行内反馈停一拍的时长:让人亲眼看到结果,不是菜单凭空消失 */
 const LINGER_MS = 900
 
-function clampedPosition(
-  x: number,
-  y: number,
-  menuH: number,
-  view: Window,
-  menuW: number,
-  preferRight: boolean
-): { left: number; top: number; pinBottom: number | null } {
-  if (preferRight) {
-    // 鼠标右上角出生:钉住菜单底缘在光标上方一个汉字,左缘在光标右边约两个汉字;
-    // 底缘用 CSS bottom 钉,不靠估高,真实高度往上长。右边挤不下翻左,上边挤不下翻下。
-    const fitsRight = x + CURSOR_GAP_X + menuW + EDGE <= view.innerWidth
-    const fitsAbove = y - CURSOR_GAP_Y - menuH >= EDGE
-    return {
-      left: fitsRight ? x + CURSOR_GAP_X : Math.max(EDGE, x - menuW - CURSOR_GAP_X),
-      top: fitsAbove ? 0 : Math.min(y + CURSOR_GAP_Y, view.innerHeight - menuH - EDGE),
-      pinBottom: fitsAbove ? view.innerHeight - y + CURSOR_GAP_Y : null
-    }
-  }
-  return {
-    left: Math.max(EDGE, Math.min(x, view.innerWidth - menuW - EDGE)),
-    top: Math.max(EDGE, Math.min(y, view.innerHeight - menuH - EDGE)),
-    pinBottom: null
-  }
+type MenuPos = {
+  left: number
+  top: number
+  width: number
+  pinBottom: number | null
+  expandLeft: boolean
 }
 
 export function ContextMenu(): React.JSX.Element | null {
@@ -118,36 +86,66 @@ function ContextMenuCard({
   const [expanded, setExpanded] = useState<number | null>(null)
   /** 二级菜单的落点(视口坐标,贴着父行右侧;右边挤不下翻左侧) */
   const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null)
+  const [pos, setPos] = useState<MenuPos | null>(null)
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const iconOnly = request.iconOnly === true
   const rowH = iconOnly ? ROW_H_ICON_ONLY : request.compact ? ROW_H_COMPACT : ROW_H
-  const chrome = iconOnly ? CHROME_ICON_ONLY : request.compact ? CHROME_COMPACT : CHROME
-  const menuW = iconOnly ? MENU_W_ICON_ONLY : request.compact ? MENU_W_COMPACT : MENU_W
-  const entryH = (it: (typeof request.items)[number]): number =>
-    it === MENU_SEP ? SEP_H : isMenuHeading(it) ? HEADING_H : rowH
-  const baseH = request.items.reduce((h, it) => h + entryH(it), 0) + chrome
-  const menuH = baseH
   const view = doc.defaultView ?? window
-  const pos = clampedPosition(
-    request.x,
-    request.y,
-    menuH,
-    view,
-    menuW,
-    request.preferRight === true
-  )
-  /** 右边不够展开就钉住右缘往左长,图标列位置不动 */
-  const expandLeft = iconOnly && pos.left + MENU_W_ICON_EXPANDED + EDGE > view.innerWidth
+
+  // 宽高由 CSS 自适配,量真实盒子再贴窗边;纯图标档右边挤不下就钉右缘往左长
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    if (!el || !view) return
+    const box = el.getBoundingClientRect()
+    const edge = readTokenPx(el, view, '--overlay-edge', OVERLAY_EDGE_FALLBACK_PX)
+    const gapX = readTokenPx(el, view, '--space-6', 24)
+    const gapY = readTokenPx(el, view, '--space-3', 12)
+    const maxW = readTokenPx(el, view, '--overlay-max-width', OVERLAY_MAX_WIDTH_FALLBACK_PX)
+    const next: MenuPos = request.preferRight
+      ? {
+          ...clampPreferRightOverlay({
+            x: request.x,
+            y: request.y,
+            width: box.width,
+            height: box.height,
+            view,
+            edge,
+            gapX,
+            gapY
+          }),
+          width: box.width,
+          expandLeft: false
+        }
+      : {
+          ...clampOverlayBox(request.x, request.y, box.width, box.height, view, edge),
+          width: box.width,
+          pinBottom: null,
+          expandLeft: false
+        }
+    if (iconOnly) next.expandLeft = next.left + maxW + edge > view.innerWidth
+    setPos((prev) =>
+      prev &&
+      prev.left === next.left &&
+      prev.top === next.top &&
+      prev.width === next.width &&
+      prev.pinBottom === next.pinBottom &&
+      prev.expandLeft === next.expandLeft
+        ? prev
+        : next
+    )
+  }, [request, view, iconOnly, lingering, expanded, flipped])
 
   /** 二级菜单贴着父行右侧出生;右边挤不下就翻到左侧,上下同样往里收 */
   function clampSub(row: HTMLElement, rows: number): { left: number; top: number } {
-    const view = doc.defaultView ?? window
     const rect = row.getBoundingClientRect()
     const h = rows * rowH + CHROME
-    const fitsRight = rect.right + SUB_GAP + SUB_W + EDGE <= view.innerWidth
-    const left = fitsRight ? rect.right + SUB_GAP : Math.max(EDGE, rect.left - SUB_W - SUB_GAP)
+    const edge = readTokenPx(row, view, '--overlay-edge', OVERLAY_EDGE_FALLBACK_PX)
+    const subW = readTokenPx(row, view, '--overlay-max-width', OVERLAY_MAX_WIDTH_FALLBACK_PX)
+    const fitsRight = rect.right + edge + subW + edge <= view.innerWidth
+    const left = fitsRight ? rect.right + edge : Math.max(edge, rect.left - subW - edge)
     return {
       left,
-      top: Math.max(EDGE, Math.min(rect.top, view.innerHeight - h - EDGE))
+      top: Math.max(edge, Math.min(rect.top, view.innerHeight - h - edge))
     }
   }
 
@@ -161,12 +159,16 @@ function ContextMenuCard({
   }
   return (
     <div
-      className={`file-path-menu${iconOnly ? ' is-icon-only' : request.compact ? ' is-compact' : ''}${expandLeft ? ' is-expand-left' : ''}`}
+      ref={cardRef}
+      className={`file-path-menu${iconOnly ? ' is-icon-only' : request.compact ? ' is-compact' : ''}${pos?.expandLeft ? ' is-expand-left' : ''}`}
       style={{
-        ...(expandLeft
-          ? { right: view.innerWidth - pos.left - menuW, left: 'auto' }
-          : { left: pos.left }),
-        ...(pos.pinBottom !== null ? { top: 'auto', bottom: pos.pinBottom } : { top: pos.top })
+        ...(pos?.expandLeft
+          ? { right: view.innerWidth - pos.left - pos.width, left: 'auto' }
+          : { left: pos?.left ?? request.x }),
+        ...(pos?.pinBottom != null
+          ? { top: 'auto', bottom: pos.pinBottom }
+          : { top: pos?.top ?? request.y }),
+        visibility: pos ? 'visible' : 'hidden'
       }}
       role="menu"
     >
@@ -176,7 +178,12 @@ function ContextMenuCard({
         }
         if (isMenuHeading(item)) {
           return (
-            <div key={i} className="file-path-menu-heading" role="presentation">
+            <div
+              key={i}
+              className="file-path-menu-heading"
+              role="presentation"
+              title={item.heading}
+            >
               {item.heading}
             </div>
           )
@@ -233,7 +240,9 @@ function ContextMenuCard({
                   />
                 </span>
               )}
-              <span className="fpm-label">{caption}</span>
+              <span className="fpm-label" title={caption}>
+                {caption}
+              </span>
               {isSwitch && (
                 <span
                   className={`cfg-switch fpm-switch${switchOn ? ' is-on' : ''}`}
@@ -266,7 +275,9 @@ function ContextMenuCard({
                       child.run()
                     }}
                   >
-                    <span className="fpm-label">{child.label}</span>
+                    <span className="fpm-label" title={child.label}>
+                      {child.label}
+                    </span>
                   </button>
                 ))}
               </div>

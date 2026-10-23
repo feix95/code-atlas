@@ -249,7 +249,7 @@ const atlasApi = {
     relPath: string
   ): Promise<{ ok: boolean; path?: string; message?: string }> =>
     ipcRenderer.invoke(CH.copyFilePath, rootPath, relPath),
-  /** 右键文件链接「在文件资源管理器中显示」:资源管理器弹出并选中文件,不开文件 */
+  /** 右键文件链接「打开所在位置」:资源管理器弹出并选中文件,不开文件 */
   revealFilePath: (rootPath: string, relPath: string): Promise<{ ok: boolean; message?: string }> =>
     ipcRenderer.invoke(CH.revealFilePath, rootPath, relPath),
   /** 树文件夹「打开为工作区」:joinRoot 出绝对路径并确认是目录,不写剪贴板、不扫描 */

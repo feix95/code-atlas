@@ -22,6 +22,7 @@ export function SlashPalette({
           id={`slash-opt-${c.name.slice(1)}`}
           aria-selected={i === active}
           className={`slash-item${i === active ? ' is-active' : ''}`}
+          title={`${c.name} ${c.desc}`}
           onMouseDown={(e) => e.preventDefault()}
           onMouseEnter={() => onHover(i)}
           onClick={() => onPick(c.name)}

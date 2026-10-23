@@ -112,11 +112,12 @@
 /* 「+」能力菜单:浮在舱口左上、底边微压舱上沿,每行 = 单色图标 + 名字 + iOS 拨钮 */
 .fc-menu {
   position: absolute;
-  left: 0.375rem;
-  bottom: calc(100% - 0.5rem);
+  left: var(--space-1);
+  bottom: calc(100% - var(--space-2));
   z-index: var(--z-popover);
-  min-width: 14.375rem;
-  padding: 0.375rem;
+  width: max-content;
+  max-width: var(--overlay-max-width);
+  padding: var(--space-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -126,11 +127,12 @@
 .fc-mrow {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: var(--space-2);
   width: 100%;
-  padding: 0.5rem 0.625rem;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xxs);
   background: transparent;
   color: var(--text);
   font-family: inherit;

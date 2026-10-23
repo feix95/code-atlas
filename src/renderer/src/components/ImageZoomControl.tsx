@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IMAGE_ZOOM_PRESETS, parseImageZoomPercent } from '@shared/imageZoom'
 import { useMenuDismiss } from '../useMenuDismiss'
+import { pinOverlayInViewport } from '../overlayLayout'
 
 /** 单击与双击拆开:等这一阵,没等到第二次点击才弹出档位菜单 */
 const CLICK_WAIT_MS = 280
-/** 贴窗边的留白,与文件路径菜单同口径 */
-const MENU_EDGE_PX = 8
 
 /** 缩放档位菜单:关着 / 钉在底栏芯片 / 钉在右键光标 */
 export type ImageZoomMenu =
@@ -14,11 +13,7 @@ export type ImageZoomMenu =
 function pinMenuToCursor(el: HTMLElement, x: number, y: number): void {
   const view = el.ownerDocument.defaultView
   if (!view) return
-  const box = el.getBoundingClientRect()
-  const left = Math.max(MENU_EDGE_PX, Math.min(x, view.innerWidth - box.width - MENU_EDGE_PX))
-  const top = Math.max(MENU_EDGE_PX, Math.min(y, view.innerHeight - box.height - MENU_EDGE_PX))
-  el.style.left = `${left}px`
-  el.style.top = `${top}px`
+  pinOverlayInViewport(el, x, y, view)
 }
 
 /**
@@ -181,6 +176,7 @@ export function ImageZoomControl({
               role="option"
               className={'image-zoom-opt' + (step === percent ? ' is-current' : '')}
               aria-selected={step === percent}
+              title={`${step}%`}
               onClick={() => pick(step)}
             >
               {step}%

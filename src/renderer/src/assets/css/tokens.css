@@ -7,7 +7,7 @@
   /* 亮暗由外观系统往 <html> 挂 data-theme 控制(自动模式跟着系统,也能手动钉死) */
   color-scheme: light;
   /* ── 布局 token ── */
-  --space-1: 0.25rem;
+  --space-1: 0.25rem; /* 4px @ 16px 根字号;间距栅格只走这一套,不另起 px 档 */
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
@@ -15,6 +15,11 @@
   --space-6: 1.5rem;
   --space-7: 2rem;
   --space-8: 3rem;
+  /* 浮层自适配(右键菜单 / 下拉 / tooltip):宽随最长一行文字撑开。
+     max 只兜太长;不设 min,短菜单不许垫空。
+     JS 贴窗边读 --overlay-edge,这里写死 0.5rem(= --space-2)不套 var()。 */
+  --overlay-max-width: 17.5rem;
+  --overlay-edge: 0.5rem;
   --radius-xxs: 0.25rem;
   --radius-xs: 0.3125rem;
   --radius-sm: 0.375rem;
@@ -308,14 +313,16 @@ body {
 .tip-bubble {
   position: absolute;
   z-index: var(--z-tip);
-  max-width: 22rem;
-  padding: 0.375rem 0.625rem;
+  width: max-content;
+  max-width: var(--overlay-max-width);
+  padding: var(--space-1) var(--space-2);
   background: var(--tip-bg);
   color: var(--tip-ink);
   border-radius: var(--radius-md);
   font-size: var(--font-sm);
   line-height: var(--lh-150);
   white-space: pre-line;
+  overflow-wrap: anywhere;
   pointer-events: none;
   box-shadow: var(--shadow-tip);
 }

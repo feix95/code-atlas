@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { OVERLAY_EDGE_FALLBACK_PX, readTokenPx } from '../overlayLayout'
 
 /**
  * 全局轻提示(全局规矩「只定义一次」):全场悬停提示的唯一登记。
@@ -44,10 +45,8 @@ function tipDelayOf(el: HTMLElement, view: Window): number {
   if (!Number.isFinite(v) || v < 0) return FALLBACK_DELAY_MS
   return raw.endsWith('ms') ? v : v * 1000
 }
-/** 气泡与目标之间的缝(小尾巴占掉约 6px,视觉缝 ~4px) */
-const GAP = 10
-/** 距窗口边缘的最小留白 */
-const EDGE = 8
+/** 气泡与目标之间的缝:小尾巴约占 --space-2,再留 --space-1 视觉缝,合计 --space-3 */
+const TIP_GAP_FALLBACK_PX = 12
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi)
 
@@ -78,7 +77,14 @@ function anchorRect(el: HTMLElement): DOMRect {
 }
 
 /** 按愿望方位摆,摆不下沿「对面→bottom→top」翻;实在全挤就硬压 bottom 加夹子 */
-function placeTip(r: DOMRect, b: DOMRect, want: TipSide, view: Window): TipPos {
+function placeTip(
+  r: DOMRect,
+  b: DOMRect,
+  want: TipSide,
+  view: Window,
+  edge: number,
+  gap: number
+): TipPos {
   const vw = view.innerWidth
   const vh = view.innerHeight
   const cy = r.top + r.height / 2
@@ -86,15 +92,15 @@ function placeTip(r: DOMRect, b: DOMRect, want: TipSide, view: Window): TipPos {
 
   const tryAt = (side: TipSide): TipPos | null => {
     if (side === 'right' || side === 'left') {
-      const x = side === 'right' ? r.right + GAP : r.left - GAP - b.width
-      if (x < EDGE || x + b.width > vw - EDGE) return null
-      const y = clamp(cy - b.height / 2, EDGE, Math.max(EDGE, vh - EDGE - b.height))
-      return { x, y, side, arrow: clamp(cy - y, 12, b.height - 12) }
+      const x = side === 'right' ? r.right + gap : r.left - gap - b.width
+      if (x < edge || x + b.width > vw - edge) return null
+      const y = clamp(cy - b.height / 2, edge, Math.max(edge, vh - edge - b.height))
+      return { x, y, side, arrow: clamp(cy - y, gap, b.height - gap) }
     }
-    const y = side === 'bottom' ? r.bottom + GAP : r.top - GAP - b.height
-    if (y < EDGE || y + b.height > vh - EDGE) return null
-    const x = clamp(cx - b.width / 2, EDGE, Math.max(EDGE, vw - EDGE - b.width))
-    return { x, y, side, arrow: clamp(cx - x, 12, b.width - 12) }
+    const y = side === 'bottom' ? r.bottom + gap : r.top - gap - b.height
+    if (y < edge || y + b.height > vh - edge) return null
+    const x = clamp(cx - b.width / 2, edge, Math.max(edge, vw - edge - b.width))
+    return { x, y, side, arrow: clamp(cx - x, gap, b.width - gap) }
   }
 
   const order: TipSide[] =
@@ -107,8 +113,8 @@ function placeTip(r: DOMRect, b: DOMRect, want: TipSide, view: Window): TipPos {
   }
   // 四个方向都塞不下(气泡太大/目标卡死):压 bottom 让夹子兜底
   return {
-    x: clamp(cx - b.width / 2, EDGE, Math.max(EDGE, vw - EDGE - b.width)),
-    y: clamp(r.bottom + GAP, EDGE, Math.max(EDGE, vh - EDGE - b.height)),
+    x: clamp(cx - b.width / 2, edge, Math.max(edge, vw - edge - b.width)),
+    y: clamp(r.bottom + gap, edge, Math.max(edge, vh - edge - b.height)),
     side: 'bottom',
     arrow: b.width / 2
   }
@@ -137,7 +143,9 @@ export function TooltipHost({ doc = document }: { doc?: Document }): React.JSX.E
         setPos(null)
         return
       }
-      const p = placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side, view)
+      const edge = readTokenPx(b, view, '--overlay-edge', OVERLAY_EDGE_FALLBACK_PX)
+      const gap = readTokenPx(b, view, '--space-3', TIP_GAP_FALLBACK_PX)
+      const p = placeTip(anchorRect(t.el), b.getBoundingClientRect(), t.side, view, edge, gap)
       // absolute 的定位基准是 .app 内缘(offsetParent 内容盒),视口坐标减它
       const host = b.offsetParent as HTMLElement | null
       if (host) {

@@ -116,7 +116,7 @@
   bottom: calc(100% + var(--space-1));
   z-index: var(--z-dropdown);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-pop);
 }
 
@@ -193,7 +193,8 @@
   right: auto;
   bottom: auto;
   width: max-content;
-  min-width: 3.25rem;
+  min-width: 0;
+  max-width: var(--overlay-max-width);
 }
 
 .image-zoom-menu.is-at-cursor .image-zoom-opt {
@@ -204,8 +205,8 @@
   display: block;
   width: 100%;
   border: 0;
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) 0;
+  border-radius: var(--radius-xxs);
+  padding: var(--space-1) var(--space-2);
   background: transparent;
   color: var(--muted);
   font-family: inherit;

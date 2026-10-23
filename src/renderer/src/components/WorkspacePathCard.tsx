@@ -161,7 +161,7 @@ export function WorkspacePathCard({
           </svg>
         </button>
         {pathHint && !menuOpen && (
-          <div className="path-hint" role="status">
+          <div className="path-hint" role="status" title={pathHint}>
             {pathHint}
           </div>
         )}

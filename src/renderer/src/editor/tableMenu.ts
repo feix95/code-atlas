@@ -1,5 +1,6 @@
 /** 表格右键菜单:插入/删除行/列 */
 import type { EditorView } from '@codemirror/view'
+import { pinOverlayInViewport } from '../overlayLayout.ts'
 import { dispatchModel, readModelFromDom } from './tableDom.ts'
 
 // ── 右键菜单:插入/删除行/列 ──
@@ -15,7 +16,7 @@ export function openCellMenu(view: EditorView, cell: HTMLElement, x: number, y: 
   const colIdx = tr ? [...tr.querySelectorAll('th, td')].indexOf(cell as HTMLTableCellElement) : -1
 
   const menu = doc.createElement('div')
-  menu.className = 'cm-live-table-menu'
+  menu.className = 'file-path-menu cm-live-table-menu'
   menu.style.left = `${x}px`
   menu.style.top = `${y}px`
 
@@ -111,14 +112,18 @@ export function openCellMenu(view: EditorView, cell: HTMLElement, x: number, y: 
   for (const it of items) {
     if (it === 'sep') {
       const sep = doc.createElement('div')
-      sep.className = 'cm-live-table-menu-sep'
+      sep.className = 'file-path-menu-sep'
       menu.appendChild(sep)
       continue
     }
     const b = doc.createElement('button')
     b.type = 'button'
-    b.className = 'cm-live-table-menu-item'
-    b.textContent = it.label
+    b.className = 'file-path-menu-item'
+    const label = doc.createElement('span')
+    label.className = 'fpm-label'
+    label.textContent = it.label
+    label.title = it.label
+    b.appendChild(label)
     b.addEventListener('click', () => {
       it.run()
       dismiss()
@@ -127,15 +132,8 @@ export function openCellMenu(view: EditorView, cell: HTMLElement, x: number, y: 
   }
   doc.body.appendChild(menu)
 
-  // 越界收进视口
-  const rect = menu.getBoundingClientRect()
   const win = doc.defaultView
-  if (win) {
-    if (rect.right > win.innerWidth)
-      menu.style.left = `${Math.max(4, win.innerWidth - rect.width - 4)}px`
-    if (rect.bottom > win.innerHeight)
-      menu.style.top = `${Math.max(4, win.innerHeight - rect.height - 4)}px`
-  }
+  if (win) pinOverlayInViewport(menu, x, y, win)
 
   // 延后一拍挂哨:当前这次 contextmenu 的 mousedown 还没走完,别把自己收掉
   setTimeout(() => {
