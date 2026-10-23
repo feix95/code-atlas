@@ -32,8 +32,17 @@
 .cm-host .cm-content {
   padding: var(--space-3) var(--space-3) var(--space-4);
   color: var(--text);
+  /* 原生插入符跟字色:drawSelection 会用 transparent !important 掐掉它,改画 .cm-cursor;
+     这条只伺候没走 drawSelection 的角落,真正露脸的光标在下面那组 */
   caret-color: var(--text);
   tab-size: 2;
+}
+
+/* CM 默认 border-left: 1.2px solid black,且只在 .cm-dark 时才翻成 #ddd;
+   我们没挂 darkTheme(选区/行号自己画),暗色底就会黑条吃黑底。颜色跟 --text 走 */
+.cm-host .cm-cursor,
+.cm-host .cm-dropCursor {
+  border-left-color: var(--text);
 }
 
 /* 行号槽:复刻旧 .code-gutter 的样子 —— 哑灰右对齐,右缘一道线 */
@@ -66,7 +75,11 @@
   background: var(--drop-mark);
 }
 
-/* 表格格子等聚焦的原生可编辑子元素:CM 的 hideNativeSelection 强给 Highlight(系统深蓝) !important,同样 !important 抢回 */
+/* 表格格子等聚焦的原生可编辑子元素:CM 的 hideNativeSelection 强给 Highlight(系统深蓝) !important,同样 !important 抢回;
+   顺手把 caret-color 从 initial(Chromium 常落成黑条)抢回 --text */
+.cm-host .cm-editor .cm-content :focus {
+  caret-color: var(--text) !important;
+}
 .cm-host .cm-editor .cm-content :focus::selection,
 .cm-host .cm-editor .cm-content :focus ::selection {
   background: var(--drop-mark) !important;

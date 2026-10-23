@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { EditorState } from '@codemirror/state'
 import { highlightField, selectionToRef, setHighlight } from '../src/renderer/src/editor/cmSetup.ts'
 
@@ -80,8 +82,36 @@ function main(): void {
   assert.equal(selectionToRef(doc, 1, 1), null, '光标不该有引用')
   assert.equal(selectionToRef(doc, 1, 2), null, '只选中换行不该有引用')
 
+  // ── 六、暗色插入符:CM 自绘光标默认黑边,没挂 darkTheme 时暗底会看不见。
+  // 原生 caret-color 被 hideNativeSelection 的 transparent !important 掐掉,
+  // 真正露脸的是 .cm-cursor 的左边框,必须跟 --text;格内 contenteditable
+  // 聚焦时 CM 又把 caret-color 打回 initial,也要抢回来。
+  const editorCss = readFileSync(
+    join(process.cwd(), 'src/renderer/src/assets/css/workspace-editor.css'),
+    'utf8'
+  )
+  assert.match(
+    editorCss,
+    /\.cm-cursor,\s*\.cm-host \.cm-dropCursor \{\s*border-left-color:\s*var\(--text\);/,
+    'CM 自绘光标必须跟 --text,暗色底不能再用库默认黑边'
+  )
+  assert.match(
+    editorCss,
+    /\.cm-content :focus \{\s*caret-color:\s*var\(--text\)\s*!important;/,
+    '格内 contenteditable 聚焦时须抢回 caret-color,压过 CM 的 initial'
+  )
+  const tokensCss = readFileSync(
+    join(process.cwd(), 'src/renderer/src/assets/css/tokens.css'),
+    'utf8'
+  )
+  assert.match(
+    tokensCss,
+    /html,\s*body \{[^}]*caret-color:\s*var\(--text\);/,
+    '原生插入符(输入框/标题改名)也要跟 --text,别靠系统默认黑条'
+  )
+
   console.log('✅ CodeMirror 装配自测全部通过')
-  console.log('   分色账翻译 · 装饰挪位 · 烂账剪除 · 清账 · 选区行号口径')
+  console.log('   分色账翻译 · 装饰挪位 · 烂账剪除 · 清账 · 选区行号口径 · 暗色插入符')
 }
 
 main()

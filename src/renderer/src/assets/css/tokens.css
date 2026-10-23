@@ -278,6 +278,7 @@ html,
 body {
   font-family: var(--sans);
   color: var(--text);
+  caret-color: var(--text);
   -webkit-font-smoothing: antialiased;
   height: 100%;
   /* 实底窗(全窗实底化):body 直接铺画布色 —— 窗口标识 backgroundColor 只兜首帧,
