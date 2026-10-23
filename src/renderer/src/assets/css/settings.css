@@ -117,7 +117,7 @@
   display: none;
 }
 
-/* 右区滚动列:Obsidian 白单列,内容列宽封顶 720px 居中 */
+/* 右区滚动列:Obsidian 白单列,内容列宽封顶 896px 居中 */
 .cfg-scroll {
   position: relative;
   height: 100%;
@@ -131,7 +131,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 45rem;
+  max-width: 56rem;
   margin: 0 auto;
   animation: cfg-pane-in var(--dur-2) var(--ease-smooth);
 }
