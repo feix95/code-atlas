@@ -1,4 +1,4 @@
-// agent 的工具表与调用参数清洗:本地只有「看」的三件 + 可选的联网件。
+// agent 的工具表与调用参数清洗:本地只有「看」的四件 + 可选的联网件。
 import { TOOL_NAMES, TOOL_STEP_WORDS, type ToolName } from '../shared/agentTools.ts'
 import type { ToolCallDelta } from './index.ts'
 import type { AgentRawAssistant, AgentToolCall } from './agentTypes.ts'
@@ -21,7 +21,7 @@ export function sanitizeAgentRelPath(raw: unknown): string | null {
   return parts.filter((p) => p !== '.').join('/')
 }
 
-/** OpenAI tools 格式的本地工具表:只有「看」的三件,写文件的工具根本不存在 */
+/** OpenAI tools 格式的本地工具表:只有「看」的四件,写文件的工具根本不存在 */
 export const AGENT_TOOLS_LOCAL = [
   {
     type: 'function',
@@ -106,8 +106,52 @@ export const WEB_SEARCH_TOOL = {
   }
 } as const
 
-/** 全量工具表(联网查证开着):本地三件 + web_search;关着只发本地三件 */
-export const AGENT_TOOLS = [...AGENT_TOOLS_LOCAL, WEB_SEARCH_TOOL]
+/**
+ * 联网件 web_fetch:打开一个已有的公开地址看正文。GitHub blob 由执行手改成 raw,
+ * 内网闸与 web_search 同一把。进不进工具表同样由「联网查证」开关说了算。
+ */
+export const WEB_FETCH_TOOL = {
+  type: 'function',
+  function: {
+    name: TOOL_NAMES.webFetch,
+    description: '打开公开网页看正文节选;只传 http(s) 地址,不传本地路径。',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: '公开 http(s) 地址' }
+      },
+      required: ['url']
+    }
+  }
+} as const
+
+/**
+ * 联网件 save_research_note:模型读完一页后,把 1-3 条关键事实记进研究账本。
+ * 程序也会自动记账,这个工具让模型主动压缩信息,原文被挤掉后仍有据可依。
+ */
+export const SAVE_RESEARCH_NOTE_TOOL = {
+  type: 'function',
+  function: {
+    name: TOOL_NAMES.researchNote,
+    description: '把 1-3 条关键事实记进本轮研究账本;只记对回答问题有用的结论,别抄整段。',
+    parameters: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: '一条关键事实(一句话)' },
+        source: { type: 'string', description: '可选:来源标题或网址' }
+      },
+      required: ['note']
+    }
+  }
+} as const
+
+/** 全量工具表(联网查证开着):本地四件 + web_search + web_fetch + save_research_note */
+export const AGENT_TOOLS = [
+  ...AGENT_TOOLS_LOCAL,
+  WEB_SEARCH_TOOL,
+  WEB_FETCH_TOOL,
+  SAVE_RESEARCH_NOTE_TOOL
+]
 
 /** arguments 字段洗成对象(纯函数,自测覆盖):字符串 JSON / 直接对象都收,坏的重伤不治给 null */
 export function parseToolArgs(raw: unknown): Record<string, unknown> | null {

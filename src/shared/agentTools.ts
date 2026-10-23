@@ -1,5 +1,5 @@
 /**
- * agent 工具名总账(P1-14):五个工具的名字只许在这登记 ——
+ * agent 工具名总账(P1-14):工具的名字只许在这登记 ——
  * 定义(OpenAI tools 表)、分发(主进程 call.name 判派)、文案(agentStepText)、
  * 类型(ToolName)四层全引这里。改名一处生效;写错名编译器当场拦,
  * 不再让工具静默变「不认识」。
@@ -9,7 +9,9 @@ export const TOOL_NAMES = {
   readFile: 'read_file',
   searchContent: 'search_content',
   requestDirectoryAccess: 'request_directory_access',
-  webSearch: 'web_search'
+  webSearch: 'web_search',
+  webFetch: 'web_fetch',
+  researchNote: 'save_research_note'
 } as const
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES]
@@ -61,5 +63,17 @@ export const TOOL_STEP_WORDS: Record<
     what: '',
     repeat: '刚才已经查过了,不用再查',
     error: '查不了'
+  },
+  [TOOL_NAMES.webFetch]: {
+    verb: '打开了',
+    what: '的网页',
+    repeat: '刚才已经看过了,不用再打开',
+    error: '打不开'
+  },
+  [TOOL_NAMES.researchNote]: {
+    verb: '记下了',
+    what: '这条研究要点',
+    repeat: '这条要点已经记过了,不用再记',
+    error: '记不下'
   }
 }

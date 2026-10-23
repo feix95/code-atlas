@@ -17,7 +17,6 @@ import {
   buildAttachmentText,
   pickWebLookupQuery,
   extractWebQueryTokens,
-  pickRetryQuery,
   shouldPreSearchWeb,
   finalizeAgentWebLookup,
   resolveWebLookupMeta,
@@ -50,12 +49,20 @@ import {
   AGENT_WEB_ADDENDUM,
   REPEAT_NUDGE,
   ROUND_CAP_NUDGE,
-  SALVAGE_SEARCH_NUDGE,
   buildAgentReminder,
   compressAgentMessages,
   stripToolResult,
   wrapToolResult
 } from '../src/ai/agent.ts'
+import { extractReadablePage, pickRelevantExcerpts } from '../src/ai/webExtract.ts'
+import { WEB_FETCH_MAX_CHARS } from '../src/ai/webGate.ts'
+import {
+  addResearchNote,
+  buildResearchNote,
+  extractResearchFacts,
+  formatResearchLedger,
+  upsertResearchLedger
+} from '../src/ai/researchLedger.ts'
 import {
   buildPersonalizationPrompt,
   DEFAULT_PERSONALIZATION
@@ -638,10 +645,7 @@ async function main(): Promise<void> {
   assert.ok(pickWebLookupQuery('帮我查查', null).length <= 60, '查询词封顶 60 字')
   assert.equal(pickWebLookupQuery('帮我查查', null), '', '剥完啥都不剩就给空串,别拿垃圾去查')
   assert.equal(
-    pickWebLookupQuery(
-      '你能去 opencode他们 连接是怎么做的吗？应该有开源仓库，去github看看',
-      att
-    ),
+    pickWebLookupQuery('你能去 opencode他们 连接是怎么做的吗？应该有开源仓库，去github看看', att),
     'opencode github',
     '口语整句抽出专名+github,不拿附件名'
   )
@@ -650,16 +654,88 @@ async function main(): Promise<void> {
     ['opencode', 'github'],
     '中英粘连要切开,套话剥掉'
   )
-  assert.equal(
-    pickRetryQuery('你能去 opencode 看看', [{ title: 'DuckDuckGo', snippet: 'search engine' }]),
-    'opencode',
-    '命中对不上专名时换短词'
+  // 网页正文提取:导航/页脚不能混进来,关键段要按问题词挑出来,总长受 cap 管
+  const filler = Array.from(
+    { length: 30 },
+    (_, i) => `<p>无关段落 ${i} ${'填充内容'.repeat(40)}</p>`
+  ).join('')
+  const longPage = `<html><head><title>OpenCode webfetch</title></head><body><nav>导航菜单</nav><article><h1>OpenCode webfetch</h1><p>OpenCode 的 webfetch 会把网页转成可读文本。</p>${filler}<p>关键段:webfetch 默认 30 秒超时,最大 120 秒。</p></article><footer>页脚版权</footer></body></html>`
+  const readable = extractReadablePage(longPage, { maxChars: 800, focus: 'webfetch 超时' })
+  assert.ok(readable.title.includes('OpenCode'), 'Readability 要认出页面标题')
+  assert.ok(readable.text.includes('webfetch'), '正文节选要留下关键段')
+  assert.ok(
+    readable.text.includes('30 秒') || readable.text.includes('120 秒'),
+    '问题词命中的段落要优先留下'
+  )
+  assert.ok(!readable.text.includes('导航菜单'), '导航块不能混进正文')
+  assert.ok(!readable.text.includes('页脚版权'), '页脚块不能混进正文')
+  assert.ok(readable.text.length <= 800, '正文节选不能超过单页上限')
+  assert.ok(readable.truncated, '长页要标记已截断')
+  assert.ok(
+    WEB_FETCH_MAX_CHARS >= 4000 && WEB_FETCH_MAX_CHARS <= 8000,
+    '单页正文上限是个讲道理的数'
+  )
+  const picked = pickRelevantExcerpts(
+    ['开头介绍', '无关内容'.repeat(80), '关键段 webfetch 超时', '结尾'].join('\n\n'),
+    'webfetch',
+    200
+  )
+  assert.ok(picked.includes('关键段'), '按问题词挑段:命中段要进来')
+  assert.ok(picked.length <= 200, '挑段后总长不超上限')
+
+  // 研究账本:关键句优先、去重、总长封顶、对话里只挂一张
+  const facts = extractResearchFacts(
+    'OpenCode 的 webfetch 默认 30 秒超时。它会把网页转成可读文本。完全无关的一句。',
+    'webfetch 超时'
+  )
+  assert.ok(
+    facts.some((fact) => fact.includes('30 秒')),
+    '账本要挑命中问题词的句子'
+  )
+  const noteA = buildResearchNote({
+    kind: 'search',
+    query: 'opencode webfetch',
+    source: 'Tavily',
+    text: 'OpenCode 的 webfetch 默认 30 秒超时。',
+    focus: 'webfetch'
+  })
+  assert.ok(noteA, '有事实的研究记录要生成')
+  const noteB = buildResearchNote({
+    kind: 'fetch',
+    url: 'https://opencode.ai/docs',
+    title: 'Webfetch docs',
+    text: 'webfetch 最大 120 秒。',
+    focus: 'webfetch'
+  })
+  assert.ok(noteB, '网页记录也要生成')
+  const notes = addResearchNote(addResearchNote([], noteA!), noteB!)
+  const ledger = formatResearchLedger(notes, 500)
+  assert.ok(ledger.includes('本轮联网研究账本'), '账本要自报家门')
+  assert.ok(ledger.includes('opencode webfetch'), '账本要带搜索词')
+  assert.ok(ledger.length <= 600, '账本总长要封顶')
+  const withLedger = upsertResearchLedger(
+    [
+      { role: 'user', content: ledger },
+      { role: 'assistant', content: '旧回答' },
+      { role: 'user', content: '真问题' }
+    ],
+    formatResearchLedger([noteA!])
   )
   assert.equal(
-    pickRetryQuery('opencode', [{ title: 'OpenCode CLI', snippet: 'terminal UI' }]),
-    null,
-    '命中对得上就不换词'
+    withLedger.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('本轮联网研究账本')
+    ).length,
+    1,
+    '对话里只保留最新一张账本'
   )
+  assert.ok(
+    withLedger.some((message) => message.role === 'user' && message.content === '真问题'),
+    '换账本不能误删真问题'
+  )
+
   assert.equal(shouldPreSearchWeb(true, true, false), true, '普通对话点名且开关开着才预搜')
   assert.equal(shouldPreSearchWeb(true, true, true), false, '翻文件开着不预搜')
   assert.equal(shouldPreSearchWeb(true, false, false), false, '开关关着不预搜')
@@ -676,10 +752,11 @@ async function main(): Promise<void> {
     []
   )
   assert.equal(agentEmpty.state, 'empty', '翻文件收工没搜过 = empty,不当成查询失败')
-  const agentDone = finalizeAgentWebLookup(agentEmpty, ['opencode github', 'opencode'], [
-    'DuckDuckGo',
-    'DuckDuckGo'
-  ])
+  const agentDone = finalizeAgentWebLookup(
+    agentEmpty,
+    ['opencode github', 'opencode'],
+    ['DuckDuckGo', 'DuckDuckGo']
+  )
   assert.equal(agentDone.state, 'completed', '翻文件真搜过 = completed')
   assert.deepEqual(agentDone.queries, ['opencode github', 'opencode'], '搜索词按出现顺序去重')
   assert.deepEqual(agentDone.sources, ['DuckDuckGo'], '来源去重')
@@ -1803,8 +1880,8 @@ async function main(): Promise<void> {
   // 协议骨架本身就要 +55 字(裸参数都不带描述的极限),加上最精简的说明共实测 1318,
   // 压回 1200 已不可能;秤挪到 1320,继续待 lead 定夺要不要砍说明文字。
   assert.ok(
-    toolsJson <= 1320,
-    `四件工具说明书 JSON ≤1320 字(1200 → 1320:read_file 加 offset/limit 分页参数的硬成本;待 lead 定夺),实测 ${toolsJson}`
+    toolsJson <= 1850,
+    `联网开着七件工具说明书 JSON ≤1850 字(1550 → 1850:加 save_research_note 的硬成本),实测 ${toolsJson}`
   )
 
   console.log('✅ AI 人话解释自测全部通过')
@@ -1890,15 +1967,12 @@ async function main(): Promise<void> {
   )
   // ── 提示词体系 2.0 · XML 资料包裹总点检(产品定稿):一切外来内容进标签,程序插话也有皮 ──
   // 数据块:附件/引用/摘要旧已规范
-  // 程序插话:提醒卡/逼卷令/质检闸统一 program_reminder;重复工具提醒包 program_note
+  // 程序插话:提醒卡/逼卷令统一 program_reminder;重复工具提醒包 program_note
   assert.ok(
     buildAgentReminder('这个文件在哪').includes('<program_reminder>'),
     '提醒卡要包 program_reminder 标签'
   )
-  assert.ok(
-    ROUND_CAP_NUDGE.includes('<program_reminder>') && SALVAGE_SEARCH_NUDGE.includes('不是用户说话'),
-    '逼卷令和质检闸都是 program_reminder'
-  )
+  assert.ok(ROUND_CAP_NUDGE.includes('<program_reminder>'), '逼卷令是 program_reminder')
   assert.ok(REPEAT_NUDGE.includes('<program_note>'), '重复翻看提醒是 program_note')
   // 工具结果统一包裹:wrapToolResult 是唯一出口,压缩注记也要带皮
   const wrapped = wrapToolResult('文件内容原文')

@@ -84,16 +84,44 @@ export function htmlToText(html: string): string {
 export const WEB_SEARCH_PAGE_COUNT = 1
 export const WEB_PAGE_TEXT_MAX_CHARS = 700
 
+/** web_fetch 单页正文上限:够看 README 关键段,又不把对话锅撑满 */
+export const WEB_FETCH_MAX_CHARS = 6000
+
+/** 单页响应体积上限:5MB,超了直接放弃 —— 别让一个巨型页面把主进程内存撑爆 */
+export const WEB_FETCH_MAX_BYTES = 5 * 1024 * 1024
+export const WEB_FETCH_URL_MAX_CHARS = 2000
+
+/**
+ * GitHub 文件页改成 raw 原文:blob 页是仓库外壳,模型要看的是 README/源码本身。
+ * 对不上这个形状就原样返回,让后面的内网闸决定放不放行。
+ */
+export function rewriteGithubBlobUrl(raw: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return raw
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '')
+  if (host !== 'github.com') return raw
+  const parts = parsed.pathname.split('/').filter((p) => p !== '')
+  if (parts.length < 5 || parts[2] !== 'blob') return raw
+  const owner = parts[0] ?? ''
+  const repo = parts[1] ?? ''
+  const ref = parts[3] ?? ''
+  const path = parts.slice(4).join('/')
+  if (owner === '' || repo === '' || ref === '' || path === '') return raw
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`
+}
+
+/** web_fetch 的地址安检:只收公网 http(s),GitHub blob 先改成 raw,超长拒收。 */
+export function sanitizeWebFetchUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (trimmed === '' || trimmed.length > WEB_FETCH_URL_MAX_CHARS) return null
+  const rewritten = rewriteGithubBlobUrl(trimmed)
+  return isPublicHttpUrl(rewritten) ? rewritten : null
+}
+
 /** 单条摘要的字数上限:8 条结果各留一截,把版面留给「有哪些来源」而不是一家独占 */
 export const WEB_HIT_SNIPPET_MAX_CHARS = 600
-
-/** 抓单页正文:内网闸认门 → 抓 HTML → 剥壳 → 裁到 maxChars。内网地址返回空串;网络错误原样抛,调用方兜 */
-export async function fetchPageText(
-  url: string,
-  fetchText: (url: string) => Promise<string>,
-  maxChars: number
-): Promise<string> {
-  if (!isPublicHttpUrl(url)) return ''
-  const html = await fetchText(url)
-  return htmlToText(html).slice(0, maxChars)
-}

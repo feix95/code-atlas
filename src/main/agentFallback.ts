@@ -45,7 +45,8 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
   // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
   // 绝不把一屏望不到头的循环递给用户
   if (round.status === 'repetition') {
-    if (!flags.repetitionRetried) {
+    // 正文已经吐过:不许整段收回,直接截掉打转尾巴交卷 —— 已经说对的部分原样留着
+    if (!round.bodyStarted && !flags.repetitionRetried) {
       flags.repetitionRetried = true
       flags.skipNudgeOnce = true // 重答这轮不算「轮数烧完」,别把逼卷令也捎上
       return {
@@ -66,7 +67,7 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
       kind: 'finish',
       status: 'supported',
       text,
-      step: '重说了一回还在原地打转,把打转的部分掐了,先把说完的交给你'
+      step: '回答尾巴开始原地打转,把打转的部分掐了,已经说完的正文原样交给你'
     }
   }
   // 兜底(第一百四十批):引擎不认工具调用(甩 400/404/422 还点名 tools)——

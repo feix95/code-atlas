@@ -2,7 +2,7 @@
 // 全是纯函数(自测直接喂),不碰文件系统。
 import { TAG } from '../shared/promptTags.ts'
 import { TOOL_NAMES } from '../shared/agentTools.ts'
-import { AGENT_REMINDER_PREFIX } from './agentGuard.ts'
+import { AGENT_REMINDER_PREFIX, AGENT_RESEARCH_PREFIX } from './agentGuard.ts'
 import type { AgentChatMessage, AgentCompression, AgentReadSlice } from './agentTypes.ts'
 
 /** read_file 单次最多读几行(对齐 Claude Code 的 2000 行默认):想读更多就带 offset 翻页 */
@@ -88,7 +88,9 @@ export function emergencySlim(
     const m = messages[i]
     if (
       m.role === 'user' &&
-      (typeof m.content !== 'string' || !m.content.startsWith(AGENT_REMINDER_PREFIX))
+      (typeof m.content !== 'string' ||
+        (!m.content.startsWith(AGENT_REMINDER_PREFIX) &&
+          !m.content.startsWith(AGENT_RESEARCH_PREFIX)))
     ) {
       questionIdx = i
       break
@@ -156,7 +158,11 @@ export function compressAgentMessages(
     freedCallIds.push(message.tool_call_id)
     // 工具结果外层包着 <tool_result>(2.0 资料边界):取头先剥皮,注记再造皮,标签须成对
     const inner = stripToolResult(message.content)
-    const head = inner.slice(0, AGENT_STUB_HEAD_CHARS).replaceAll('\n', ' ')
+    // 联网资料已经进了研究账本:旧原文不必再留开头,直接把模型指回账本
+    const isWeb = inner.includes(TAG.webResults.open)
+    const head = isWeb
+      ? '这条早先的联网资料已提炼进本轮研究账本。'
+      : inner.slice(0, AGENT_STUB_HEAD_CHARS).replaceAll('\n', ' ')
     return {
       role: 'tool' as const,
       tool_call_id: message.tool_call_id,

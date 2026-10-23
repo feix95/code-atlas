@@ -57,6 +57,8 @@ export type AgentRoundResult =
   | {
       status: 'repetition'
       /** 犯病那轮的全文(含打转部分):主进程的重答兜底拿它截断交卷 */ text: string
+      /** 打转前是否已经吐过正文:吐过就不许整段撤回,只截打转尾巴 */
+      bodyStarted?: boolean
     }
 
 /** 流式轮次边收边推给界面的事件(第一百三十四批):增量 + token 账 + 回滚令 + 封板令 */

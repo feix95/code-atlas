@@ -13,38 +13,26 @@ import {
   AGENT_REMINDER_MAX_CHARS,
   AGENT_REMINDER_MIN_TOOL_CALLS,
   AGENT_REMINDER_PREFIX,
+  AGENT_RESEARCH_PREFIX,
   AGENT_SEARCH_MAX_FILES,
   AGENT_SEARCH_MAX_MATCHES,
   AGENT_SEARCH_MAX_PATH_HITS,
   AGENT_TOOLS,
+  AGENT_WEB_MAX_LOOKUPS,
   AGENT_TOOLS_LOCAL,
   AGENT_WEB_ADDENDUM,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
-  SALVAGE_CITE_NUDGE,
-  SALVAGE_NUDGE_MAX,
-  SALVAGE_SEARCH_NUDGE,
-  WEB_SALVAGE_NUDGE,
-  WEB_SALVAGE_NUDGE_MAX,
-  WEB_SKIP_NUDGE,
-  WEB_SKIP_NUDGE_MAX,
   agentPromptBudget,
   agentReadChars,
   agentRound,
   agentStepText,
-  answerCitesAnyHit,
-  answerCitesAnyWebResult,
-  answerLooksLikeWebGiveUp,
   assembleToolCalls,
   buildAgentReminder,
   compressAgentMessages,
   emergencySlim,
   estimateMessagesTokens,
   extractToolCalls,
-  findAnswerGap,
-  findWebAnswerGap,
-  findWebSearchSkipped,
-  isFindQuestion,
   looksLikeToolsUnsupported,
   mergeUsage,
   parseToolArgs,
@@ -64,6 +52,8 @@ import {
   htmlToText,
   isPublicHttpUrl,
   parseTavilyResults,
+  rewriteGithubBlobUrl,
+  sanitizeWebFetchUrl,
   sanitizeWebQuery,
   webSearchDetailed,
   wikiHitsRelevant,
@@ -77,7 +67,6 @@ import {
   sanitizeAgentRootId,
   sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
-import { reviewAgentAnswer } from '../src/main/agentSignoff.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 
 async function main(): Promise<void> {
@@ -214,18 +203,22 @@ async function main(): Promise<void> {
   assert.ok(REPEAT_NUDGE.includes('已经看过'), '重复提醒要说人话')
   assert.ok(ROUND_CAP_NUDGE.includes('别再调用'), '逼卷令要拦住工具')
 
-  // ── 6. 工具表:本地只有「看」的三件,写文件的工具根本不存在;联网开着才多一件 web_search ──
+  // ── 6. 工具表:本地只有「看」的四件,写文件的工具根本不存在;联网开着才多 web_search / web_fetch ──
   assert.equal(AGENT_TOOLS_LOCAL.length, 4, '本地发三件只读工具和一件临时目录授权工具')
   assert.deepEqual(
     AGENT_TOOLS_LOCAL.map((t) => t.function.name),
     ['list_files', 'read_file', 'search_content', 'request_directory_access'],
     '工具名单对齐:列名单 + 读文件 + 搜内容 + 申请外部目录'
   )
-  assert.equal(AGENT_TOOLS.length, 5, '联网查证开着,全量工具表多一件 web_search')
+  assert.equal(
+    AGENT_TOOLS.length,
+    7,
+    '联网查证开着,全量工具表多 web_search、web_fetch 和 save_research_note'
+  )
 
   // 工具名总账(shared/agentTools):名单、词表、认名闸三样互相对得上 —— 多一件少一件当场拦
   const registered = Object.values(TOOL_NAMES)
-  assert.equal(registered.length, 5, '登记表登记五件工具')
+  assert.equal(registered.length, 7, '登记表登记七件工具')
   assert.deepEqual(
     AGENT_TOOLS.map((t) => t.function.name).sort(),
     [...registered].sort(),
@@ -271,6 +264,10 @@ async function main(): Promise<void> {
     !webTool.function.parameters.properties.source,
     'source 参数已退役:源序程序统一排,不让模型挑'
   )
+  const fetchTool = AGENT_TOOLS.find((t) => t.function.name === 'web_fetch')!
+  assert.deepEqual(fetchTool.function.parameters.required, ['url'], 'web_fetch 必须带 url')
+  const noteTool = AGENT_TOOLS.find((t) => t.function.name === 'save_research_note')!
+  assert.deepEqual(noteTool.function.parameters.required, ['note'], '研究笔记必须带 note')
 
   // ── 7. 步骤播报:翻什么、看成没看成,一句大白话 ──
   assert.ok(
@@ -306,6 +303,10 @@ async function main(): Promise<void> {
     agentStepText('web_search', 'skills 装在哪', 'error', '没查到').includes('查不了'),
     '查网失败说「查不了」'
   )
+  assert.ok(
+    agentStepText('web_fetch', 'https://example.com', 'done').includes('打开了'),
+    '打开网页说「打开了」'
+  )
 
   // ── 8. token 总账:读写累加,速度认最后一轮 ──
   assert.deepEqual(
@@ -320,7 +321,8 @@ async function main(): Promise<void> {
   assert.equal(mergeUsage(undefined, undefined), undefined, '两轮都没账就是没账')
 
   // ── 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后 ──
-  assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 12, '轮数封顶得是个讲道理的数')
+  assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 16, '轮数封顶得是个讲道理的数')
+  assert.equal(AGENT_WEB_MAX_LOOKUPS, 8, '联网研究预算固定 8 次')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
   assert.ok(
@@ -561,6 +563,23 @@ async function main(): Promise<void> {
   assert.equal(sanitizeWebQuery('C:\\Users\\me\\secret'), null, '盘符路径拒收:本地信息绝不出门')
   assert.equal(sanitizeWebQuery('/etc/passwd'), null, '绝对路径拒收')
   assert.equal(sanitizeWebQuery('src\\index.ts'), null, '反斜杠路径拒收')
+  assert.equal(
+    rewriteGithubBlobUrl('https://github.com/sst/opencode/blob/dev/README.md'),
+    'https://raw.githubusercontent.com/sst/opencode/dev/README.md',
+    'GitHub 文件页改成 raw 原文'
+  )
+  assert.equal(
+    rewriteGithubBlobUrl('https://example.com/README.md'),
+    'https://example.com/README.md',
+    '非 GitHub 地址原样返回'
+  )
+  assert.equal(
+    sanitizeWebFetchUrl('https://github.com/sst/opencode/blob/dev/README.md'),
+    'https://raw.githubusercontent.com/sst/opencode/dev/README.md',
+    'web_fetch 安检后是 raw 地址'
+  )
+  assert.equal(sanitizeWebFetchUrl('http://127.0.0.1/secret'), null, '内网地址拒收')
+  assert.equal(sanitizeWebFetchUrl('C:\\Users\\me\\file.md'), null, '本地路径拒收')
 
   assert.equal(isPublicHttpUrl('https://html.duckduckgo.com/html/?q=a'), true, '公网 https 放行')
   assert.equal(isPublicHttpUrl('http://example.com/'), true, '公网 http 放行')
@@ -640,24 +659,14 @@ async function main(): Promise<void> {
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
   assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
-  assert.ok(AGENT_WEB_ADDENDUM.includes('换词再查'), '要教模型结果不对路时换词重查')
-  assert.ok(AGENT_WEB_ADDENDUM.includes('不算重复'), '换词重查要明确豁免防打转')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('换词不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
-  assert.ok(
-    AGENT_WEB_ADDENDUM.includes('只写公开的主体'),
-    '搜索词只写主体:防止把对话里别的产品名拼进去'
-  )
-  assert.ok(AGENT_WEB_ADDENDUM.includes('2-3 条短查询'), '复杂问题要拆成多条短查询')
-  assert.ok(
-    AGENT_WEB_ADDENDUM.includes('只搜一轮就说没查到不算查过'),
-    '明确只搜一轮不算查过:小模型最容易在这里偷懒'
-  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('一次只给一个短词'), '搜索词由模型自己提炼成短词')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('信息够了就收尾'), '要教模型自己判断够了就停,不靠程序硬拦')
   assert.ok(AGENT_WEB_ADDENDUM.includes('标题和链接'), '结果里带链接,模型才知道能引用哪条')
-  assert.ok(WEB_SALVAGE_NUDGE.includes('这不算查过'), '补救提醒要直说只搜一轮不算查过')
-  assert.equal(WEB_SALVAGE_NUDGE_MAX, 1, '联网纠错只拦一次,掰不过来就尊重结论')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不是用户提供的'), '上网守则要写清查来的资料不是用户给的')
-  assert.ok(WEB_SKIP_NUDGE.includes(TOOL_NAMES.webSearch), '漏搜提醒要点名 web_search')
-  assert.equal(WEB_SKIP_NUDGE_MAX, 1, '漏搜只拦一次')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('不用等用户点名'), '拿不准要自己搜,不等用户点名')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('web_fetch'), '上网守则要点名打开网页的工具')
   assert.ok(
     !AGENT_FILES_ADDENDUM.includes('web_search'),
     '没开联网时切片不提 web_search:模型连有这工具都不该知道'
@@ -691,160 +700,6 @@ async function main(): Promise<void> {
   assert.equal(tavilyOk[0]?.published, '2026-10-01', '发布时间源给了就带上')
   assert.deepEqual(parseTavilyResults('不是 JSON'), [], '坏 JSON = 空清单,让兜底链接着走')
   assert.deepEqual(parseTavilyResults('{"results": null}'), [], 'results 缺失 = 空清单')
-
-  // ── 18b. 联网质检闸:只搜一轮就说没查到 = 拦下换词再搜 ──
-  const webTitles = ['OpenCode Go 套餐评测', 'OpenCode 社区评价']
-  const webUrls = [
-    'https://www.cnblogs.com/funkygod/p/20612762',
-    'https://www.reddit.com/r/opencodeCLI/comments/1s40z4p/'
-  ]
-  assert.equal(
-    answerLooksLikeWebGiveUp('很抱歉,搜索结果没有直接命中这个项目的信息。'),
-    true,
-    '「没有直接命中」要认出是放弃交卷'
-  )
-  assert.equal(
-    answerLooksLikeWebGiveUp('目前我无法直接给你一个好或差评,但可以这样判断。'),
-    true,
-    '「无法直接」也是放弃交卷的口风'
-  )
-  assert.equal(
-    answerLooksLikeWebGiveUp('OpenCode Go 是每月 10 美元的订阅。'),
-    false,
-    '正常回答不误判'
-  )
-  assert.equal(
-    answerCitesAnyWebResult(
-      '可以看 https://www.cnblogs.com/funkygod/p/20612762 这篇评测。',
-      webTitles,
-      webUrls
-    ),
-    true,
-    '答案里有完整链接 = 引用过结果'
-  )
-  assert.equal(
-    answerCitesAnyWebResult('cnblogs.com 上有篇评测写得很细。', webTitles, webUrls),
-    true,
-    '只写裸域名也算引用'
-  )
-  assert.equal(
-    answerCitesAnyWebResult('OpenCode Go 套餐评测提到每月 10 美元。', webTitles, webUrls),
-    true,
-    '写到结果标题也算引用'
-  )
-  assert.equal(
-    findWebAnswerGap({
-      webSearchCalls: 1,
-      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
-      titles: webTitles,
-      urls: webUrls
-    }),
-    true,
-    '只搜一轮就说没查到 = 要拦'
-  )
-  assert.equal(
-    findWebAnswerGap({
-      webSearchCalls: 2,
-      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
-      titles: webTitles,
-      urls: webUrls
-    }),
-    false,
-    '换过词搜了两次,尊重它的结论'
-  )
-  assert.equal(
-    findWebAnswerGap({
-      webSearchCalls: 1,
-      answer: '很抱歉,没有查到公开资料。',
-      titles: [],
-      urls: []
-    }),
-    true,
-    '第一次颗粒无收也要给它一次换词机会'
-  )
-  assert.equal(
-    findWebAnswerGap({
-      webSearchCalls: 1,
-      answer: 'cnblogs.com 上有篇评测,说每月 10 美元。',
-      titles: webTitles,
-      urls: webUrls
-    }),
-    false,
-    '答案已经引用了结果,不再拦'
-  )
-  assert.equal(
-    answerLooksLikeWebGiveUp('搜索结果没有直接找到这个项目。'),
-    true,
-    '「没有直接找到」也是放弃交卷'
-  )
-  assert.equal(
-    findWebSearchSkipped({
-      webEnabled: true,
-      searchIntent: true,
-      isFindQuestion: false,
-      webSearchCalls: 0
-    }),
-    true,
-    '点名要搜却一次都没调 = 要拦'
-  )
-  assert.equal(
-    findWebSearchSkipped({
-      webEnabled: true,
-      searchIntent: true,
-      isFindQuestion: true,
-      webSearchCalls: 0
-    }),
-    false,
-    '找位置题不拦去网上搜'
-  )
-  assert.equal(
-    findWebSearchSkipped({
-      webEnabled: true,
-      searchIntent: true,
-      isFindQuestion: false,
-      webSearchCalls: 1
-    }),
-    false,
-    '已经搜过就不走漏搜闸'
-  )
-  {
-    const skip = reviewAgentAnswer({
-      answer: '网上没这个东西。',
-      question: '去github看看 opencode',
-      useTools: true,
-      toolCallsExecuted: 0,
-      searchUsed: false,
-      hitPaths: [],
-      webSearchCalls: 0,
-      webTitles: [],
-      webUrls: [],
-      salvageNudges: 0,
-      webSalvageNudges: 0,
-      webSkipNudges: 0,
-      rounds: 1,
-      webSearchEnabled: true,
-      searchIntent: true
-    })
-    assert.equal(skip?.nudge, WEB_SKIP_NUDGE, '漏搜闸要拦并给出漏搜提醒')
-    const skipUsed = reviewAgentAnswer({
-      answer: '很抱歉,搜索结果没有直接命中这个项目的信息。',
-      question: '搜搜 opencode',
-      useTools: true,
-      toolCallsExecuted: 1,
-      searchUsed: false,
-      hitPaths: [],
-      webSearchCalls: 1,
-      webTitles: webTitles,
-      webUrls: webUrls,
-      salvageNudges: 0,
-      webSalvageNudges: 0,
-      webSkipNudges: 1,
-      rounds: 2,
-      webSearchEnabled: true,
-      searchIntent: true
-    })
-    assert.equal(skipUsed?.nudge, WEB_SALVAGE_NUDGE, '漏搜拦过一次后,一轮就放弃仍走换词闸')
-  }
 
   // ── 18c. 喂给模型的材料要带链接和发布时间(模型能判断来源、能引用) ──
   const material = await webSearchDetailed('selftest-web-material-2026', {
@@ -924,122 +779,18 @@ async function main(): Promise<void> {
       slimmedNoSystem.messages[0].role === 'user',
     '没有 system 也照裁:不硬造 system'
   )
-
-  // ── 20. 质检闸(救敷衍):找位置题不搜不交卷、搜到不引用也拦 ──
-  assert.equal(isFindQuestion('找找我的 skills 都安装在哪了'), true, '「找找+在哪」= 找位置题')
-  assert.equal(isFindQuestion('我的 skills 都安装在哪了'), true, '光「在哪」也算找位置题')
-  assert.equal(isFindQuestion('Where are my skills installed'), true, '英文 where 也认(大小写放平)')
-  assert.equal(isFindQuestion('帮我卸载永劫无间'), false, '操作题不是找位置题,闸不多管闲事')
-  assert.equal(isFindQuestion('Rust 是什么'), false, '概念题不拦')
-  assert.equal(isFindQuestion('这个项目用什么语言写的'), false, '泛泛的问话不误伤')
-  // 泛搜语气词出表(2026-09-17 小葵案):「搜一下 xx 是什么」是介绍题不是找位置题,
-  // 老词表拿「搜一下」当信号误开闸,模型用联网搜索答对了也被逼着重搜本地文件
+  // 研究账本是程序插话,不能当成「最新真问题」把真问题裁掉
+  const withLedger: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '旧问题' },
+    { role: 'user', content: `${AGENT_RESEARCH_PREFIX}\n- 搜索「x」:事实` },
+    { role: 'user', content: '最新真问题' }
+  ]
   assert.equal(
-    isFindQuestion('搜一下这个文件夹是什么'),
-    false,
-    '「搜一下」是查概念,不是找位置,闸别开'
+    (emergencySlim(withLedger)?.messages[1] as { content: string }).content,
+    '最新真问题',
+    '研究账本不能冒充真问题'
   )
-  assert.equal(isFindQuestion('帮我搜搜这类工具有哪些'), false, '「搜搜」同理出表')
-
-  assert.equal(
-    answerCitesAnyHit('你装的 skills 在 node_modules/foo-skill/package.json 里', [
-      'node_modules/foo-skill/package.json'
-    ]),
-    true,
-    '答案引用了命中路径 = 有具体文件'
-  )
-  assert.equal(
-    answerCitesAnyHit('大概在 node_modules\\foo-skill 这个文件夹', [
-      'node_modules/foo-skill/package.json'
-    ]),
-    false,
-    '只报文件夹没到文件 = 没引用'
-  )
-  assert.equal(
-    answerCitesAnyHit('答案里写 src/other.ts', ['node_modules/foo-skill/package.json']),
-    false,
-    '引用的是没搜到的路径 = 对不上账,算没引用'
-  )
-  assert.equal(
-    answerCitesAnyHit('在 a/B.ts:12 那行', ['a/b.ts']),
-    true,
-    '带行号的引用也算(大小写/行号后缀不碍事)'
-  )
-  // 文件名级对账(2026-09-17):模型爱写短路径,少写前缀不再算「没引用」——老口径全路径精确匹配
-  // 太苛刻,答案明明提到了具体文件也被拦着重写一轮;可点跳转另有命中清单卡兜底,不怕放水
-  assert.equal(
-    answerCitesAnyHit('在 logs/cc-switch.log 的日志里能看到', ['cc-switch/logs/cc-switch.log']),
-    true,
-    '少写前缀的短路径,文件名对上就算引用'
-  )
-  assert.equal(
-    answerCitesAnyHit('配置写在 settings.json:21 那行', ['cc-switch/settings.json']),
-    true,
-    '光写文件名+行号也算(模型最常这么写)'
-  )
-
-  assert.equal(
-    findAnswerGap({
-      isFindQuestion: true,
-      searchUsed: false,
-      hitPaths: [],
-      answer: 'skills 在 xxx 文件夹'
-    }),
-    'no-search',
-    '判据一:没搜过就交卷,拦'
-  )
-  assert.equal(
-    findAnswerGap({ isFindQuestion: true, searchUsed: false, hitPaths: [], answer: '' }),
-    'no-search',
-    '判据一不看答案内容:没搜就是没搜'
-  )
-  assert.equal(
-    findAnswerGap({
-      isFindQuestion: true,
-      searchUsed: true,
-      hitPaths: [],
-      answer: '搜了没找着,真没有'
-    }),
-    null,
-    '搜了颗粒无收 = 合法的「真没有」,放行'
-  )
-  assert.equal(
-    findAnswerGap({
-      isFindQuestion: true,
-      searchUsed: true,
-      hitPaths: ['a/b.ts'],
-      answer: '在 a/b.ts 第 3 行'
-    }),
-    null,
-    '判据二:答案引用了命中文件,放行'
-  )
-  assert.equal(
-    findAnswerGap({
-      isFindQuestion: true,
-      searchUsed: true,
-      hitPaths: ['a/b.ts'],
-      answer: '在 a 文件夹里'
-    }),
-    'no-files',
-    '判据二:搜到了却只报文件夹,拦'
-  )
-  assert.equal(
-    findAnswerGap({ isFindQuestion: false, searchUsed: false, hitPaths: [], answer: '随便答' }),
-    null,
-    '不是找位置题,闸不拦'
-  )
-  assert.ok(
-    SALVAGE_SEARCH_NUDGE.includes('search_content') && SALVAGE_SEARCH_NUDGE.includes('真没有'),
-    '判据一的提醒要点名工具、许它说真没有'
-  )
-  assert.ok(SALVAGE_CITE_NUDGE.includes('具体文件'), '判据二的提醒要逼到具体文件')
-  // 纠错消息自报家门(2026-09-17 产品定):小模型老把程序插话当用户催促,以为用户不满意让它重来
-  assert.ok(SALVAGE_SEARCH_NUDGE.includes('不是用户说话'), '判据一的提醒要亮明程序身份')
-  assert.ok(
-    SALVAGE_CITE_NUDGE.includes('不用重新理解问题'),
-    '判据二的提醒要说明只是补信息,不用重想'
-  )
-  assert.ok(SALVAGE_NUDGE_MAX === 1, '补救提醒封顶一次:宁可答案差点,不让用户空等循环')
 
   // ── 21. 翻文件切片的指路分工 + 工具说明瘦身后的口径(提示词体系重写第二批,逐字稿 D/L)──
   // 旧 SOP 段落(固定三步走/验货)随新稿退役:切片现在按「想干什么 → 用哪个工具」分工,
@@ -1095,6 +846,10 @@ async function main(): Promise<void> {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
       if (body.includes('mode=talk')) {
         res.write('data: {"choices":[{"delta":{"content":"直接答你"}}]}\n\n')
+      } else if (body.includes('mode=repeat')) {
+        res.write(
+          'data: {"choices":[{"delta":{"content":"已经答对的正文。重复尾巴内容重复尾巴内容重复尾巴内容重复尾巴内容"}}]}\n\n'
+        )
       } else if (body.includes('mode=silent')) {
         res.write(
           'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"list_files","arguments":"{\\"relPath\\":\\"src\\"}"}}]}}]}\n\n'
@@ -1156,12 +911,26 @@ async function main(): Promise<void> {
     assert.equal(silent.status, 'ok', '哑巴轮应正常收工')
     assert.ok(silent.status === 'ok' && silent.raw.content === null, '没说话正文就是 null')
     assert.ok(!silentEvents.some((ev) => ev.seal), '没吐正经字:没啥可封,不发令')
+
+    // 正文吐过之后打转:只截尾巴,绝不许发回滚令把已经说对的部分抹掉
+    const repeatEvents: AgentStreamEvent[] = []
+    const repeat = await agentRound(sealTarget, [{ role: 'user', content: 'mode=repeat' }], {
+      maxTokens: 200,
+      useTools: true,
+      onDelta: (ev) => repeatEvents.push(ev)
+    })
+    assert.equal(repeat.status, 'repetition', '打转轮要如实回报')
+    assert.ok(
+      repeat.status === 'repetition' && repeat.bodyStarted === true,
+      '打转前已经吐过正文,要标记 bodyStarted'
+    )
+    assert.ok(!repeatEvents.some((ev) => ev.reset), '吐过正文后打转也不许整段撤回')
   } finally {
     await new Promise<void>((resolve) => sealServer.close(() => resolve()))
   }
 
   console.log(
-    '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸、上网守则与联网纠错闸 / 分流 / 紧急瘦身 / 质检闸 / 黑名单兜底拼装 / 流式封板令 全部通过'
+    '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 黑名单兜底拼装 / 流式封板与正文不撤回 全部通过'
   )
 }
 

@@ -9,6 +9,7 @@ import { net, type IpcMainInvokeEvent } from 'electron'
 import { budgetsForContext, probeContextSize, resolveContextSize } from '../ai/index.ts'
 import {
   HttpStatusError,
+  WEB_FETCH_MAX_BYTES,
   WEB_LOOKUP_TIMEOUT_MS,
   type LookupTransport,
   type LookupPostTransport,
@@ -68,7 +69,11 @@ export const electronFetchText: LookupTransport = async (url) => {
     signal: AbortSignal.timeout(WEB_LOOKUP_TIMEOUT_MS)
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.text()
+  const declared = Number(res.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > WEB_FETCH_MAX_BYTES)
+    throw new Error(`页面太大(${declared} 字节),超过单页上限`)
+  const body = await res.text()
+  return body.length > WEB_FETCH_MAX_BYTES ? body.slice(0, WEB_FETCH_MAX_BYTES) : body
 }
 
 /** POST 版传输(Tavily 搜索用):同一个 Chromium 网络栈,JSON body + 认证头,超时口径与 GET 一致。

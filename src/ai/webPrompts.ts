@@ -52,38 +52,6 @@ export function extractWebQueryTokens(question: string): string[] {
   return tokens
 }
 
-/** 口语整句收成更短的搜索词;已经是短词或抽不出时回空串,调用方不要拿去重搜。 */
-export function shortenWebQuery(query: string): string {
-  const short = extractWebQueryTokens(query).join(' ').trim().slice(0, 60)
-  if (short === '' || short.toLowerCase() === query.trim().toLowerCase()) return ''
-  return short
-}
-
-/** 命中标题/摘要里有没有查询里的英文专名;没有专名时有结果就算对得上。 */
-export function hitsMatchWebQuery(
-  query: string,
-  hits: ReadonlyArray<{ title: string; snippet: string }>
-): boolean {
-  const keys = extractWebQueryTokens(query)
-    .map((t) => t.toLowerCase())
-    .filter((t) => t.length >= 3)
-  if (keys.length === 0) return hits.length > 0
-  const hay = hits.map((h) => `${h.title} ${h.snippet}`.toLowerCase()).join('\n')
-  return keys.some((key) => hay.includes(key))
-}
-
-/**
- * 第一轮结果对不上专名时,换更短的词再搜;已经对得上或抽不出更短词就回 null。
- */
-export function pickRetryQuery(
-  query: string,
-  hits: ReadonlyArray<{ title: string; snippet: string }>
-): string | null {
-  if (hitsMatchWebQuery(query, hits)) return null
-  const short = shortenWebQuery(query)
-  return short === '' ? null : short
-}
-
 /** 普通对话才由程序预搜;翻文件开着时交给 web_search,避免把结果贴进用户消息。 */
 export function shouldPreSearchWeb(
   requested: boolean,
@@ -172,7 +140,8 @@ export function finalizeAgentWebLookup(
   sources: string[]
 ): WebLookupMeta {
   const uniqQueries = uniqueTokens(queries.map((q) => q.trim()).filter((q) => q !== ''))
-  if (uniqQueries.length === 0) {
+  const uniqSources = uniqueTokens(sources.filter((s) => s !== ''))
+  if (uniqQueries.length === 0 && uniqSources.length === 0) {
     if (base.requested && base.enabled) {
       return withQueries(
         { requested: true, enabled: true, attempted: false, state: 'empty', sources: [] },
@@ -181,7 +150,6 @@ export function finalizeAgentWebLookup(
     }
     return withQueries(base, base.queries ?? emptyQueries())
   }
-  const uniqSources = uniqueTokens(sources.filter((s) => s !== ''))
   return withQueries(
     {
       requested: true,

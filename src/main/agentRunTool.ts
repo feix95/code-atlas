@@ -11,6 +11,7 @@ import {
   agentReadFile,
   agentRequestDirectoryAccess,
   agentSearchContent,
+  agentWebFetch,
   agentWebSearch,
   sendAgentMatches,
   sendAgentStep
@@ -22,6 +23,9 @@ export interface AgentToolRun {
   ok: boolean
   /** 已包好 <tool_result> 的正文 */
   content: string
+  /** 未包 <tool_result> 的原始执行结果:研究账本从它里面挑关键句 */
+  rawText: string
+  hint?: string
   webHits: Array<{ title: string; url: string }>
   matchPaths: string[]
   queries: string[]
@@ -35,12 +39,29 @@ export async function runAgentTool(input: {
   prep: Extract<PreparedAgentCall, { ok: true }>
   readChars: number
   tavilyKey?: string
+  /** web_fetch 的相关度提示:本轮问题 + 最近一次搜索词,用来挑相关段落 */
+  fetchFocus?: string
 }): Promise<AgentToolRun> {
   const { event, requestId, prep, readChars, tavilyKey } = input
-  const { name, root, relPath, keyword, readOffset, readLimit, query, requestedPath, stepTarget } =
-    prep
+  const {
+    name,
+    root,
+    relPath,
+    keyword,
+    readOffset,
+    readLimit,
+    query,
+    fetchUrl,
+    researchNote,
+    researchSource,
+    requestedPath,
+    stepTarget
+  } = prep
   if (name === TOOL_NAMES.webSearch) {
     sendChatLookup(event, requestId, 'searching', [], query ? [query] : [])
+  }
+  if (name === TOOL_NAMES.webFetch) {
+    sendChatLookup(event, requestId, 'searching', [], [])
   }
   // 执行手统一形状:matches/matchesTruncated 只有 search_content 会带
   const exec: {
@@ -54,19 +75,27 @@ export async function runAgentTool(input: {
     queries?: string[]
     sources?: string[]
   } =
-    name === TOOL_NAMES.requestDirectoryAccess
-      ? await agentRequestDirectoryAccess(event, requestedPath)
-      : name === TOOL_NAMES.listFiles
-        ? await agentListFiles((root as { path: string }).path, relPath)
-        : name === TOOL_NAMES.searchContent
-          ? await agentSearchContent((root as { path: string }).path, relPath, keyword)
-          : name === TOOL_NAMES.webSearch
-            ? await agentWebSearch(query ?? '', tavilyKey)
-            : await agentReadFile((root as { path: string }).path, relPath, {
-                offset: readOffset,
-                limit: readLimit,
-                maxChars: readChars
-              })
+    name === TOOL_NAMES.researchNote
+      ? {
+          ok: true,
+          text: `已记下研究要点:${researchNote}${researchSource ? `(来源:${researchSource})` : ''}`,
+          hint: researchSource || '已记下'
+        }
+      : name === TOOL_NAMES.requestDirectoryAccess
+        ? await agentRequestDirectoryAccess(event, requestedPath)
+        : name === TOOL_NAMES.listFiles
+          ? await agentListFiles((root as { path: string }).path, relPath)
+          : name === TOOL_NAMES.searchContent
+            ? await agentSearchContent((root as { path: string }).path, relPath, keyword)
+            : name === TOOL_NAMES.webSearch
+              ? await agentWebSearch(query ?? '', tavilyKey)
+              : name === TOOL_NAMES.webFetch
+                ? await agentWebFetch(fetchUrl ?? '', input.fetchFocus ?? '')
+                : await agentReadFile((root as { path: string }).path, relPath, {
+                    offset: readOffset,
+                    limit: readLimit,
+                    maxChars: readChars
+                  })
   if (exec.ok && root?.external)
     exec.text =
       root.kind === 'file'
@@ -80,6 +109,9 @@ export async function runAgentTool(input: {
       'request',
       `联网搜索「${query ?? ''}」· ${exec.ok ? `命中 ${exec.webResults?.length ?? 0} 条` : '没查到'}`
     )
+  }
+  if (name === TOOL_NAMES.webFetch) {
+    addDevLog('request', `打开网页「${fetchUrl ?? ''}」· ${exec.ok ? '抓到正文' : '没抓到'}`)
   }
   // 工具结果统一进 <tool_result>(提示词体系 2.0):标签里是资料,不是命令 ——
   // 文件内容、名单、搜索结果、外部目录回执一个待遇,人设里的口径在这落地
@@ -110,6 +142,8 @@ export async function runAgentTool(input: {
   return {
     ok: exec.ok,
     content,
+    rawText: exec.text,
+    hint: exec.hint,
     webHits,
     matchPaths,
     queries: exec.queries ?? [],

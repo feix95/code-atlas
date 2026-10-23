@@ -1,12 +1,14 @@
 import { announceActivityBusy, lastActivityProvider } from './modelStatus.ts'
-import { sendChatLookup, sendResetDelta } from './aiEvidence.ts'
+import { sendChatLookup } from './aiEvidence.ts'
 import { sendAgentDelta, sendAgentStep } from './agentTools.ts'
 import { type IpcMainInvokeEvent } from 'electron'
 import {
   AGENT_MAX_ROUNDS,
   AGENT_REMINDER_MIN_TOOL_CALLS,
+  AGENT_WEB_MAX_LOOKUPS,
   REPEAT_NUDGE,
   ROUND_CAP_NUDGE,
+  WEB_BUDGET_NUDGE,
   agentPromptBudget,
   agentReadChars,
   agentRound,
@@ -26,8 +28,14 @@ import { applyAgentPersona, buildAgentAddendum, flattenAgentMessages } from './a
 import { handleAgentFailure, type AgentGuardFlags } from './agentFallback.ts'
 import { prepareAgentCall } from './agentCallArgs.ts'
 import { runAgentTool } from './agentRunTool.ts'
-import { reviewAgentAnswer } from './agentSignoff.ts'
-import { finalizeAgentWebLookup, hasSearchIntent } from '../ai/webPrompts.ts'
+import { finalizeAgentWebLookup } from '../ai/webPrompts.ts'
+import {
+  addResearchNote,
+  buildResearchNote,
+  formatResearchLedger,
+  upsertResearchLedger,
+  type ResearchNote
+} from '../ai/researchLedger.ts'
 import type { AiChatResult, AiUsage, ChatTarget, WebLookupMeta } from '../shared/types.ts'
 
 /**
@@ -60,7 +68,7 @@ export async function runAgentChat(input: {
   signal: AbortSignal
   startedAt: number
   webLookup: WebLookupMeta
-  /** 联网查证开着 = 工具表里多一件 web_search,人设后面多垫一段上网守则 */
+  /** 联网查证开着 = 工具表里多 web_search / web_fetch,人设后面多垫一段上网守则 */
   webSearchEnabled: boolean
   /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 产品定) */
   tavilyKey?: string
@@ -99,20 +107,13 @@ export async function runAgentChat(input: {
   // 提醒卡门槛和质检闸前置的共同状态表:本场实际执行成功的工具调用次数
   // (参数不合法被拒、防打转被拦的都不算 —— 没真翻过就别拿提醒卡烦它)
   let toolCallsExecuted = 0
-  // 质检闸的状态表:本场真执行过 search_content 没有、搜到的文件路径(答案引用对账用)、
-  // 已经拦了几次(封顶两次,掰不过来就随它交卷)
-  let searchUsed = false
-  const searchHitPaths = new Set<string>()
-  let salvageNudges = 0
-  // 联网质检闸的状态表:本场真正搜过几轮、结果标题/链接(答案引用对账用)、已经纠错几次
+  // 联网账:本场真正搜过几轮、打开过几页(研究预算与界面标签用)
   let webSearchCalls = 0
-  const webResultTitles: string[] = []
-  const webResultUrls: string[] = []
+  let webFetchCalls = 0
+  let webBudgetNotified = false
   const webQueries: string[] = []
   const webSources: string[] = []
-  let webSalvageNudges = 0
-  let webSkipNudges = 0
-  const searchIntent = hasSearchIntent(currentQuestion)
+  const researchNotes: ResearchNote[] = []
   // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
   const callIdToKey = new Map<string, string>()
   const promptBudget = agentPromptBudget(ctx, replyCap)
@@ -158,6 +159,14 @@ export async function runAgentChat(input: {
       )
     }
     const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
+    const webLookups = webSearchCalls + webFetchCalls
+    const webToolsEnabled = input.webSearchEnabled && webLookups < AGENT_WEB_MAX_LOOKUPS
+    // 预算刚用完:垫一句收尾令,下一轮工具表里不再出现联网件
+    if (input.webSearchEnabled && !webToolsEnabled && !webBudgetNotified) {
+      webBudgetNotified = true
+      messages.push({ role: 'user', content: WEB_BUDGET_NUDGE })
+      sendAgentStep(event, requestId, `联网研究已用满 ${AGENT_WEB_MAX_LOOKUPS} 次,转入手头资料收尾`)
+    }
     // 逼卷令只在「真烧完了轮数」时发;引擎天生不支持工具或刚兜底降级的,发这话是驴唇不对马嘴
     if (rounds >= AGENT_MAX_ROUNDS && !flags.skipNudgeOnce)
       messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
@@ -168,7 +177,7 @@ export async function runAgentChat(input: {
       maxTokens: replyCap,
       allowThinking,
       useTools,
-      webSearchEnabled: input.webSearchEnabled,
+      webToolsEnabled,
       onDelta: (ev) => {
         if (ev.seal) sealedAny = true
         sendAgentDelta(event, requestId, ev)
@@ -232,35 +241,7 @@ export async function runAgentChat(input: {
           webSources
         )
       }
-      // 质检闸(救敷衍)与联网质检闸:判据与话术住 agentSignoff,这里只管拦下重答的账
-      const nudge = reviewAgentAnswer({
-        answer: text,
-        question: currentQuestion,
-        useTools,
-        toolCallsExecuted,
-        searchUsed,
-        hitPaths: [...searchHitPaths],
-        webSearchCalls,
-        webTitles: webResultTitles,
-        webUrls: webResultUrls,
-        salvageNudges,
-        webSalvageNudges,
-        webSkipNudges,
-        rounds,
-        webSearchEnabled: input.webSearchEnabled,
-        searchIntent
-      })
-      if (nudge) {
-        if (nudge.kind === 'file') salvageNudges += 1
-        else if (webSearchCalls === 0) webSkipNudges += 1
-        else webSalvageNudges += 1
-        flags.skipNudgeOnce = true
-        messages.push(raw)
-        messages.push({ role: 'user', content: nudge.nudge })
-        sendResetDelta(event, requestId)
-        sendAgentStep(event, requestId, nudge.step)
-        continue
-      }
+      // 正文一旦开始输出就是最终交付:质量检查只记日志,不再拦截重答，也不撤回已流出的字
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       input.onTurnComplete?.(turnTrace, text)
       return agentResult(input, 'supported', text, usage, resultReasoning(), webQueries, webSources)
@@ -295,39 +276,73 @@ export async function runAgentChat(input: {
         continue
       }
       doneCalls.add(prep.key)
-      if (prep.name === TOOL_NAMES.searchContent) searchUsed = true // 质检闸的账:真发起过搜索才算搜过
       callIdToKey.set(call.id, prep.key)
+      // 同一条模型消息里可能喊多个联网件:逐个卡预算,不让一轮就冲破 8 次
+      const isWebCall = prep.name === TOOL_NAMES.webSearch || prep.name === TOOL_NAMES.webFetch
+      if (isWebCall && webSearchCalls + webFetchCalls >= AGENT_WEB_MAX_LOOKUPS) {
+        sendAgentStep(event, requestId, `「${prep.stepTarget}」联网预算已用完,这一条不再执行`)
+        toolResults.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: wrapToolResult(WEB_BUDGET_NUDGE)
+        })
+        continue
+      }
       const run = await runAgentTool({
         event,
         requestId,
         prep,
         readChars,
-        tavilyKey: input.tavilyKey
+        tavilyKey: input.tavilyKey,
+        fetchFocus: `${currentQuestion} ${webQueries[webQueries.length - 1] ?? ''}`.trim()
       })
-      // 联网账:搜过几轮、命中哪些标题/链接(交卷时质检闸要对账)
-      if (prep.name === TOOL_NAMES.webSearch) {
-        webSearchCalls += 1
+      // 模型自己记的要点:并入研究账本,原文被压缩后仍在
+      if (run.ok && prep.name === TOOL_NAMES.researchNote) {
+        const note: ResearchNote = {
+          kind: 'note',
+          query: '',
+          url: '',
+          title: '',
+          source: prep.researchSource,
+          facts: [prep.researchNote]
+        }
+        researchNotes.splice(0, researchNotes.length, ...addResearchNote(researchNotes, note))
+      }
+      // 联网账:搜过几轮、打开过几页(研究预算与界面标签用)
+      if (prep.name === TOOL_NAMES.webSearch || prep.name === TOOL_NAMES.webFetch) {
+        if (prep.name === TOOL_NAMES.webSearch) webSearchCalls += 1
+        else webFetchCalls += 1
         for (const q of run.queries) if (q !== '' && !webQueries.includes(q)) webQueries.push(q)
         for (const s of run.sources) if (s !== '' && !webSources.includes(s)) webSources.push(s)
-        for (const hit of run.webHits) {
-          webResultTitles.push(hit.title)
-          webResultUrls.push(hit.url)
+        // 研究账本:从这次工具结果里挑关键句,原文压缩后事实还在
+        if (run.ok) {
+          const note = buildResearchNote({
+            kind: prep.name === TOOL_NAMES.webSearch ? 'search' : 'fetch',
+            query: prep.name === TOOL_NAMES.webSearch ? (prep.query ?? '') : '',
+            url: prep.name === TOOL_NAMES.webFetch ? (prep.fetchUrl ?? '') : '',
+            title: prep.name === TOOL_NAMES.webFetch ? (run.hint ?? '') : '',
+            source: run.sources.join('、'),
+            text: run.rawText,
+            focus: `${currentQuestion} ${webQueries[webQueries.length - 1] ?? ''}`.trim()
+          })
+          if (note)
+            researchNotes.splice(0, researchNotes.length, ...addResearchNote(researchNotes, note))
         }
-        sendChatLookup(
-          event,
-          requestId,
-          run.webHits.length > 0 ? 'completed' : 'empty',
-          webSources,
-          webQueries
-        )
+        sendChatLookup(event, requestId, run.ok ? 'completed' : 'empty', webSources, webQueries)
       }
-      // 质检闸的对状态表:本场搜到的文件路径都记下,答案交卷时查它引用了没(判据二)
-      for (const path of run.matchPaths) searchHitPaths.add(path)
-      if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛和质检闸前置都用这本账
+      if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛用这本账
       toolResults.push({ role: 'tool', tool_call_id: call.id, content: run.content })
     }
     messages.push(...toolResults)
     turnTrace.push(...toolResults)
+    // 研究账本只挂一条:把已经确认的事实钉在模型眼前,原文被压缩也不丢
+    if (researchNotes.length > 0) {
+      messages.splice(
+        0,
+        messages.length,
+        ...upsertResearchLedger(messages, formatResearchLedger(researchNotes))
+      )
+    }
     // 每轮工具结果后垫提醒卡(LLM 优化批次):撤掉上一张再垫新的,对话里永远只挂
     // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事。
     // 触发门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
