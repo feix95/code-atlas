@@ -85,14 +85,14 @@ body.is-menu-resizing {
   /* 行高与文件树行同款(0.6u) */
   min-height: calc(var(--u) * 0.6);
   border-radius: var(--radius-sm);
-  /* 行底色取不透明值:右缘渐隐层要跟底色严丝合缝,半透明混色会露出色块 */
+  /* pin 钮底要盖住底下路径,必须用不透明色 */
   --wsm-row-bg: var(--chrome-float);
 }
 
 .wsm-row:hover,
 .wsm-row.is-active {
   /* 菜单底已是 chrome-hover,行态改用墨色轻压一档(明暗主题都成立);
-     先混成不透明色再上屏,视觉与压在菜单底上一致,渐隐层才对得上 */
+     先混成不透明色再上屏,pin 钮底才能盖住底下那截路径 */
   --wsm-row-bg: color-mix(in srgb, var(--chrome-ink) 9%, var(--chrome-float));
   background: var(--wsm-row-bg);
 }
@@ -113,8 +113,7 @@ body.is-menu-resizing {
   color: var(--chrome-muted);
   cursor: pointer;
   opacity: 0;
-  /* 压过裁切层渐隐(z-index 1)和带 transform 的路径,叠在文字上也能点;
-     隐身时不吃点击,避免截胡打开工作区 */
+  /* 叠在路径文字上也能点;隐身时不吃点击,避免截胡打开工作区 */
   z-index: 2;
   pointer-events: none;
   transition: opacity var(--dur-2) var(--ease-smooth);
@@ -169,10 +168,7 @@ body.is-menu-resizing {
   padding-left: 2.2rem;
 }
 
-/* 路径裁切层:文本整段不换行、不被压缩,超出部分由这层裁掉。
-   平时贴左露出根目录,溢出则平移到末尾。
-   指针离开后再停留 5s 收回,关菜单立刻重置。
-   右缘渐隐提示「右边还有」,悬停看末尾时改由左缘渐隐提示根被裁 */
+/* 路径裁切层:文本由中间省略算法收成可视宽,这里只兜底裁掉量宽误差 */
 .wsm-clip {
   position: relative;
   display: block;
@@ -181,65 +177,10 @@ body.is-menu-resizing {
   overflow: clip;
 }
 
-.wsm-clip::before,
-.wsm-clip::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1.2rem;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity var(--dur-2) var(--ease-smooth);
-}
-
-.wsm-clip::before {
-  left: 0;
-  background: linear-gradient(to right, var(--wsm-row-bg), transparent);
-}
-
-.wsm-clip::after {
-  right: 0;
-  background: linear-gradient(to right, transparent, var(--wsm-row-bg));
-}
-
-.wsm-row[data-overflow]:not([data-marquee]) .wsm-clip::after {
-  opacity: 1;
-}
-
-.wsm-row[data-marquee] .wsm-clip::before {
-  opacity: 1;
-}
-
-/* 跑马灯专用缓动:起步比全局 --ease-smooth 软,避免一上来猛踹 */
 .wsm-path {
-  --wsm-ease: cubic-bezier(0.4, 0, 0.2, 1);
   display: block;
-  width: max-content;
+  overflow: hidden;
   white-space: nowrap;
-  transform: translateX(0);
-  transition: transform var(--wsm-back, 0.4s) var(--wsm-ease);
-}
-
-.wsm-row[data-marquee] .wsm-path {
-  transform: translateX(calc(-1 * var(--wsm-shift, 0px)));
-  transition-duration: var(--wsm-dur, 0.4s);
-}
-
-/* 减少动态:贴左的休息态保留;完整路径看行上的悬停提示 */
-@media (prefers-reduced-motion: reduce) {
-  .wsm-row[data-marquee] .wsm-path {
-    transform: none;
-  }
-
-  .wsm-row[data-overflow][data-marquee] .wsm-clip::after {
-    opacity: 1;
-  }
-
-  .wsm-row[data-marquee] .wsm-clip::before {
-    opacity: 0;
-  }
 }
 
 /* 行尾 × 即删:悬停/聚焦才显形,不预留空槽 */

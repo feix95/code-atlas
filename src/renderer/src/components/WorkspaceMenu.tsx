@@ -3,12 +3,9 @@
 // 行首 pin 图标悬停显形(pin↔pin-off 互换),行尾 × 悬停显形、单击即删无撤销;↑↓ 方向键移动
 // 高亮 + Enter 进入(按键由 workspace 卡的路径输入框转进来 —— 焦点始终在输入框,地址栏手感;
 // 键盘高亮只记工作区条目,「我的电脑」走点击)。
-// 超长路径平时贴左露出根目录;溢出则慢滑到末尾。
-// 滑到末端先停着;指针离开后再等 5s 收回。再悬停立刻取消倒数,离开后重新计时。
-// 停靠账只活在本次菜单打开期间,关掉即卸,下次打开全部贴左。
-// 装得下的短路径不动。未 pin 行的 pin 叠在文字上,不挤裁切视窗。
+// 超长路径中间省略(盘符与末段同时可见),完整路径走行上悬停提示;未 pin 行的 pin 叠在文字上,不挤视窗。
 // 底边可向下拖高(只在本次打开期间有效),拖到头正好看全所有条目,不留空白。
-import { useCallback, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { RecentProject } from '../recents'
 import { useWorkspaceMenuResize } from '../useWorkspaceMenuResize'
 import { TreeIcon } from './Icons'
@@ -45,24 +42,6 @@ export function WorkspaceMenu({
     `${pinned.length}:${history.length}`
   )
   const hasRows = pinned.length > 0 || history.length > 0
-  // 滑到过末端的路径;菜单关掉组件卸载,这张表一起丢
-  const [parkedPaths, setParkedPaths] = useState(() => new Set<string>())
-  const parkPath = useCallback((path: string) => {
-    setParkedPaths((prev) => {
-      if (prev.has(path)) return prev
-      const next = new Set(prev)
-      next.add(path)
-      return next
-    })
-  }, [])
-  const unparkPath = useCallback((path: string) => {
-    setParkedPaths((prev) => {
-      if (!prev.has(path)) return prev
-      const next = new Set(prev)
-      next.delete(path)
-      return next
-    })
-  }, [])
 
   return (
     // 点击冒泡会落回 ws-card 的「点卡开菜单」把手(openMenu 重置键盘高亮),菜单内一切点击拦在这里
@@ -84,9 +63,6 @@ export function WorkspaceMenu({
               key={r.p}
               project={r}
               isActive={i === highlight}
-              isParked={parkedPaths.has(r.p)}
-              onParked={parkPath}
-              onUnparked={unparkPath}
               onOpen={onOpen}
               onTogglePin={onTogglePin}
               onRemove={onRemove}
@@ -100,9 +76,6 @@ export function WorkspaceMenu({
               key={r.p}
               project={r}
               isActive={pinned.length + i === highlight}
-              isParked={parkedPaths.has(r.p)}
-              onParked={parkPath}
-              onUnparked={unparkPath}
               onOpen={onOpen}
               onTogglePin={onTogglePin}
               onRemove={onRemove}

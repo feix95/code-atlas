@@ -566,3 +566,4 @@
 - chore(format): 自测脚本超宽行按 prettier 折行
 - chore: 升级 electron 到 44.9.3 并抬高 zod 到 4.6.7,修复 audit 高危闸
 - chore: 发布 0.3.0
+- fix(ui): 工作区菜单超长路径改中间省略,去掉跑马灯位移;完整路径靠悬停提示
