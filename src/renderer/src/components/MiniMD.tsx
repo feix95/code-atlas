@@ -13,6 +13,7 @@ import { InlineTitle } from './InlineTitle'
  * 文件链接:传了 fileLinks 时,普通文字里对上登记的文件引用画成可点的链接;
  * 行内代码整段恰是一个文件引用也画成链接(整段判定,不扫子串);
  * 围栏代码块里的字一律不动 —— 那是在展示代码,不是在递文件。
+ * 公式:$...$ 与反引号整段的 LaTeX 收成 Unicode,不走 innerHTML。
  */
 
 /** 文件链接按钮:正文对账与行内代码整段共用一张脸,点击/右键一套逻辑 */
@@ -98,6 +99,12 @@ function renderInline(
         return (
           <span key={kc.n++} className="md-link" data-tip={n.href}>
             {n.label}
+          </span>
+        )
+      case 'math':
+        return (
+          <span key={kc.n++} className={n.display ? 'md-math is-block' : 'md-math'}>
+            {n.text}
           </span>
         )
       default:

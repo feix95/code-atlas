@@ -5,9 +5,17 @@
  *
  * 块级:围栏代码、#~#### 标题、hr、无序/有序/嵌套/待办列表、> 引用(多行合并)、
  *      > [!type] callout、| 管道表格(对齐)、段落(相邻行合并,CommonMark 语义)。
- * 行内:`代码`、双星/双划线粗体、单星/单划线斜体、~~删~~、==亮==、[文](链)。
+ * 行内:`代码`、双星/双划线粗体、单星/单划线斜体、~~删~~、==亮==、[文](链)、
+ *      $...$ / $$...$$ / \\(...\\) / \\[...\\] 公式(收成 Unicode)、HTML 实体。
  * 文件链接不走这里 —— 那是渲染层拿着工作区索引对账的活,AST 里只是普通 text。
  */
+import {
+  decodeHtmlEntities,
+  latexToUnicode,
+  matchMathAt,
+  mathFromCodeSpan,
+  nextMathIndex
+} from './mdMath.ts'
 
 // ── 行内 AST ──
 
@@ -19,6 +27,7 @@ export type MdInline =
   | { t: 'del'; text: string }
   | { t: 'mark'; text: string }
   | { t: 'link'; label: string; href: string }
+  | { t: 'math'; text: string; display: boolean }
 
 // ── 块级 AST ──
 
@@ -52,7 +61,8 @@ export type MdBlock =
 // ── 行内解析 ──
 
 /**
- * `代码` 先单独摘走(里面的字一个语法都不认),剩下的走一把合并正则。
+ * `代码` 先单独摘走(里面的字一个语法都不认);整段恰是公式的代码改画成 math。
+ * 剩下的先抽出 $...$ 公式,再走行内标记。
  * 交替顺序即优先级:粗体(双星/双划线)必须先于斜体(单星/单划线)进表,不然 ** 会被 * 抢走吃一半;
  * _斜体_ 两侧不许贴单词字符(CommonMark:_ 不参与词内强调,a_b_c 不该斜)。
  */
@@ -63,21 +73,25 @@ export function parseInline(text: string): MdInline[] {
   let m: RegExpExecArray | null
   while ((m = codeRe.exec(text)) !== null) {
     if (m.index > last) out.push(...parseRich(text.slice(last, m.index)))
-    out.push({ t: 'code', text: m[1] })
+    const math = mathFromCodeSpan(m[1])
+    out.push(
+      math ? { t: 'math', text: math.text, display: math.display } : { t: 'code', text: m[1] }
+    )
     last = m.index + m[0].length
   }
   if (last < text.length) out.push(...parseRich(text.slice(last)))
   return out
 }
 
-function parseRich(t: string): MdInline[] {
+function parseMarks(t: string): MdInline[] {
+  const src = decodeHtmlEntities(t)
   const out: MdInline[] = []
   const re =
     /\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|(?<![\w])_([^_\n]+)_(?![\w])|~~([^~]+)~~|==([^=]+)==|\[([^\]]+)\]\(([^)]+)\)/g
   let last = 0
   let pm: RegExpExecArray | null
-  while ((pm = re.exec(t)) !== null) {
-    if (pm.index > last) out.push({ t: 'text', text: t.slice(last, pm.index) })
+  while ((pm = re.exec(src)) !== null) {
+    if (pm.index > last) out.push({ t: 'text', text: src.slice(last, pm.index) })
     if (pm[1] !== undefined || pm[2] !== undefined) {
       out.push({ t: 'bold', text: pm[1] ?? pm[2] ?? '' })
     } else if (pm[3] !== undefined || pm[4] !== undefined) {
@@ -91,7 +105,28 @@ function parseRich(t: string): MdInline[] {
     }
     last = pm.index + pm[0].length
   }
-  if (last < t.length) out.push({ t: 'text', text: t.slice(last) })
+  if (last < src.length) out.push({ t: 'text', text: src.slice(last) })
+  return out
+}
+
+function parseRich(t: string): MdInline[] {
+  const out: MdInline[] = []
+  let i = 0
+  while (i < t.length) {
+    const math = matchMathAt(t, i)
+    if (math) {
+      out.push({ t: 'math', text: latexToUnicode(math.tex), display: math.display })
+      i = math.end
+      continue
+    }
+    const next = nextMathIndex(t, i)
+    if (next < 0) {
+      out.push(...parseMarks(t.slice(i)))
+      break
+    }
+    if (next > i) out.push(...parseMarks(t.slice(i, next)))
+    i = next
+  }
   return out
 }
 

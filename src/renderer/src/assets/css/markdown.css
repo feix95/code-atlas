@@ -286,6 +286,19 @@
   color: var(--muted);
 }
 
+/* 公式:LaTeX 已收成 Unicode,跟正文同字体;独立成行的 $$ / \\[ \\] 居中 */
+.md-math {
+  font-style: normal;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
+
+.md-math.is-block {
+  display: block;
+  margin: 0.4em 0;
+  text-align: center;
+}
+
 /* 内联标题(Obsidian 的 inline title):阅读模式顶上摆文件名。
    2em = 14px 基字号下的 28px,比文内 h1(24px)大一号拉开层级 */
 .md-title {

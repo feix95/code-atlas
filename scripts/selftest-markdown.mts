@@ -3,6 +3,12 @@
 // 拆错一格树账就当场对不上。纯函数,不碰系统。
 import assert from 'node:assert/strict'
 import { parseInline, parseMarkdown, type MdBlock, type MdList } from '../src/shared/markdown.ts'
+import {
+  decodeHtmlEntities,
+  latexToUnicode,
+  looksLikeLatex,
+  mathFromCodeSpan
+} from '../src/shared/mdMath.ts'
 
 /** 从块树里按类型领证 */
 function blocksOf(text: string): MdBlock[] {
@@ -160,13 +166,60 @@ function main(): void {
     '行内代码里的 ** 不当粗体'
   )
 
+  // ── 9. 公式:模型写的 $...$ 收成符号,货币不当公式 ──
+  assert.equal(latexToUnicode('\\rightarrow'), '→', '\\rightarrow → 右箭头')
+  assert.equal(latexToUnicode('\\neq'), '≠', '\\neq → 不等于')
+  assert.equal(
+    latexToUnicode('\\rightarrow \\text{指令解析层} \\rightarrow'),
+    '→ 指令解析层 →',
+    '\\text 剥壳,箭头留下'
+  )
+  assert.equal(latexToUnicode('x^2'), 'x²', '上标')
+  assert.equal(latexToUnicode('\\frac{a}{b}'), '(a)/(b)', '分数收成斜杠')
+  assert.equal(looksLikeLatex('\\rightarrow'), true, '认得出的命令算公式')
+  assert.equal(looksLikeLatex('C:\\Users'), false, '盘符路径不算公式')
+  assert.equal(looksLikeLatex('50'), false, '纯数字不算公式')
+  assert.equal(decodeHtmlEntities('a &rarr; b &ne; c'), 'a → b ≠ c', 'HTML 实体收成符号')
+
+  const arrows = parseInline('查询优化 $\\rightarrow$ 检索 $\\rightarrow$ 解析')
+  assert.deepEqual(
+    arrows.filter((n) => n.t === 'math').map((n) => (n.t === 'math' ? n.text : '')),
+    ['→', '→'],
+    '正文里的 $\\rightarrow$ 画成箭头'
+  )
+  const money = parseInline('价格 $50 和 $100 都不是公式')
+  assert.equal(
+    money.some((n) => n.t === 'math'),
+    false,
+    '货币 $50 不当公式'
+  )
+  const neq = parseInline('动作 $\\neq$ 指令').find((n) => n.t === 'math')
+  assert.equal(neq && neq.t === 'math' ? neq.text : '', '≠', '正文里的 $\\neq$ 画成不等于')
+
+  const coded = parseInline('目前是线性的: `$\\rightarrow$` 判断')
+  assert.equal(coded.find((n) => n.t === 'math' || n.t === 'code')?.t, 'math', '反引号整段公式改画,不当代码胶囊')
+  assert.equal(mathFromCodeSpan('$\\rightarrow \\text{指令解析层} \\rightarrow$')?.text, '→ 指令解析层 →')
+
+  const fencedMath = blocksOf('```\n$\\rightarrow$\n```')
+  assert.equal(fencedMath[0]?.t, 'code', '围栏里的公式原样留')
+  if (fencedMath[0]?.t === 'code') {
+    assert.equal(fencedMath[0].text, '$\\rightarrow$', '围栏不翻译公式')
+  }
+
+  const display = parseInline('$$E=mc^2$$')
+  assert.equal(display[0]?.t, 'math', '$$ 是独立公式')
+  if (display[0]?.t === 'math') {
+    assert.equal(display[0].display, true, '$$ 记成独立成行')
+    assert.equal(display[0].text, 'E=mc²', 'E=mc^2 上标')
+  }
+
   // ── 8. hr 与边界 ──
   assert.deepEqual(types(blocksOf('上\n\n---\n\n下')), ['para', 'hr', 'para'], '--- 是分割线')
   assert.deepEqual(types(blocksOf('上\n\n___\n\n下')), ['para', 'hr', 'para'], '___ 也算')
 
   console.log('✅ 迷你 Markdown 解析自测全部通过')
   console.log(
-    '   表格(对齐/行内语法) · 标题四级 · 嵌套/有序/待办列表 · 段落合并 · 引用与 callout · 围栏护体 · 行内全家 · hr'
+    '   表格(对齐/行内语法) · 标题四级 · 嵌套/有序/待办列表 · 段落合并 · 引用与 callout · 围栏护体 · 行内全家 · hr · 公式与实体'
   )
 }
 
