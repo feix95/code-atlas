@@ -1,5 +1,5 @@
 // 上下文档位 + 黑板账单:档位走 2 的幂,最大档照模型出厂上限封顶;账单跟着框里的数实时算。
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   CONTEXT_NOTCHES,
   FALLBACK_CONTEXT_CAP,
@@ -89,10 +89,16 @@ export function useContextBill(input: {
     }
   }
 
+  // 身份必须稳定:设置页的首读存档 effect 拿它当依赖,每次渲染换个新函数会把
+  // 「读配置 → 改状态 → 再渲染 → 再读配置」接成死循环,下拉框选完立刻被旧值顶回去
+  const seedContextRaw = useCallback((size: number | undefined): void => {
+    setContextRaw(size === undefined ? '' : String(size))
+  }, [])
+
   return {
     contextRaw,
     setContextRaw,
-    seedContextRaw: (size) => setContextRaw(size === undefined ? '' : String(size)),
+    seedContextRaw,
     contextNotches,
     ctxLine,
     commitContextValue,

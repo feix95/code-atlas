@@ -358,6 +358,20 @@ try {
   await page.locator('.cfg-snav-item').filter({ hasText: 'AI 设置' }).click()
   await page.locator('.cfg-snav-item.is-active').filter({ hasText: 'AI 设置' }).waitFor()
   await page.locator('#cfg-model-path').waitFor()
+  // 回复风格的两个下拉必须真的改得动:设置页首读存档的 effect 一旦把「每次渲染都新建的
+  // 回调」当依赖,就会读配置↔改状态的死循环,选完立刻被旧值顶回去(症状:下拉能点开、切不动)
+  const cfgGetsBefore = await calls('atlas:ai-config-get')
+  const toneSelect = page.getByLabel('语气', { exact: true })
+  const teachingSelect = page.getByLabel('讲解深度', { exact: true })
+  await toneSelect.selectOption('humorous')
+  await teachingSelect.selectOption('deep')
+  await page.waitForTimeout(600)
+  assert.equal(await toneSelect.inputValue(), 'humorous', '语气选择必须留得住')
+  assert.equal(await teachingSelect.inputValue(), 'deep', '讲解深度选择必须留得住')
+  assert.ok(
+    (await calls('atlas:ai-config-get')) - cfgGetsBefore < 10,
+    '设置页渲染不该反复重读 AI 配置'
+  )
   await shot('settings-page')
   await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
   await page.locator('.cfg-page').waitFor({ state: 'hidden' })
