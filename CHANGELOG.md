@@ -4,6 +4,14 @@
 
 每个正式版本的几句话说明在这里。往下是开发流水,一行一条照实记,新记录往最下面加,格式与 commit message 同款:`<类型>(<范围>): <大白话说明>`,顺序就是时间顺序(越往下越新),不额外编号。
 
+### 0.3.0 —— (2026-10-24)
+
+- 到 [Releases](https://github.com/feix95/code-atlas/releases) 下载 `CodeAtlas-Setup-0.3.0.exe`,双击安装
+- 页签改版:打开项目不再自动弹出页签;页签可拖到另一组、拆成独立窗口
+- 图片(JPG/PNG)可缩放平移,MP3/WAV 可在页签里听;Markdown / txt 等文档可翻成其他语言对照看
+- 文件树右键可写备注、把子文件夹打开为工作区;自由对话支持翻文件与联网查证(联网默认关)
+- 基础浏览仍不需要 AI;仅支持 Windows 10/11(x64)
+
 ### 0.2.0 —— 第一个安装包版本(2026-09-16)
 
 - 第一个提供 Windows 安装包的版本:到 [Releases](https://github.com/feix95/code-atlas/releases) 下载 `CodeAtlas-Setup-0.2.0.exe`,双击安装
@@ -557,3 +565,4 @@
 - chore(test): 单文件行数闸只计有效代码并设分档上限,拆掉原始行 1000 与棘轮
 - chore(format): 自测脚本超宽行按 prettier 折行
 - chore: 升级 electron 到 44.9.3 并抬高 zod 到 4.6.7,修复 audit 高危闸
+- chore: 发布 0.3.0
