@@ -1,45 +1,29 @@
 import { announceActivityBusy, lastActivityProvider } from './modelStatus.ts'
-import { sendChatLookup } from './aiEvidence.ts'
 import { sendAgentDelta, sendAgentStep } from './agentTools.ts'
 import { type IpcMainInvokeEvent } from 'electron'
 import {
   AGENT_MAX_ROUNDS,
-  AGENT_REMINDER_MIN_TOOL_CALLS,
   AGENT_WEB_MAX_LOOKUPS,
-  REPEAT_NUDGE,
   ROUND_CAP_NUDGE,
   WEB_BUDGET_NUDGE,
   agentPromptBudget,
   agentReadChars,
   agentRound,
-  agentStepText,
-  buildAgentReminder,
   compressAgentMessages,
   extractToolCalls,
   mergeUsage,
-  stripLastAgentReminder,
-  wrapToolResult,
   type AgentChatMessage
 } from '../ai/agent.ts'
-import { TOOL_NAMES } from '../shared/agentTools.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { applyAgentPersona, buildAgentAddendum, flattenAgentMessages } from './agentPersona.ts'
 import { handleAgentFailure, type AgentGuardFlags } from './agentFallback.ts'
-import { prepareAgentCall } from './agentCallArgs.ts'
-import { runAgentTool } from './agentRunTool.ts'
 import { finalizeAgentWebLookup } from '../ai/webPrompts.ts'
-import {
-  addResearchNote,
-  buildResearchNote,
-  formatResearchLedger,
-  upsertResearchLedger,
-  type ResearchNote
-} from '../ai/researchLedger.ts'
 import type { AiChatResult, AiUsage, ChatTarget, WebLookupMeta } from '../shared/types.ts'
+import { fulfillAgentToolCalls, type AgentToolLedger } from './agentChatTools.ts'
 
 /**
- * 翻文件模式里「不认工具调用」的引擎黑名单(第一百四十批,只记会话内存,零落盘):
+ * 翻文件模式里「不认工具调用」的引擎黑名单(只记会话内存,零落盘):
  * 键 = baseUrl|模型名。有的外接服务(甚至不带工具模板的模型文件)收到 tools 字段
  * 直接甩 400,循环还没起步就断 —— 摔过一跤的记下来,下次直接按普通对话回答,
  * 不再拿石头砸自己的脚。
@@ -53,7 +37,7 @@ const noToolEngines = new Set<string>()
  * 模型不会喊工具也没关系:第一轮就交正文,当普通回答返回 —— 不装 agent 空转。
  *
  * 分工:参数安检住 agentCallArgs,单次执行住 agentRunTool,人设装配住 agentPersona,
- * 「这轮没成」的兜底阶梯住 agentFallback;本文件只留循环与账本。
+ * 「这轮没成」的兜底阶梯住 agentFallback,本轮工具往来住 agentChatTools;本文件只留循环与收尾。
  */
 export async function runAgentChat(input: {
   event: IpcMainInvokeEvent
@@ -70,7 +54,7 @@ export async function runAgentChat(input: {
   webLookup: WebLookupMeta
   /** 联网查证开着 = 工具表里多 web_search / web_fetch,人设后面多垫一段上网守则 */
   webSearchEnabled: boolean
-  /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头(2026-09-17 产品定) */
+  /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头 */
   tavilyKey?: string
   /** 顺利交卷时回报本轮的工具往来(assistant 的 tool_calls + tool 结果,不含提问和提醒/质检插话)和最终答案:会话记忆靠它记档 */
   onTurnComplete?: (trace: AgentChatMessage[], answer: string) => void
@@ -79,45 +63,36 @@ export async function runAgentChat(input: {
     input
   const messages: AgentChatMessage[] = [...baseMessages]
   const turnTrace: AgentChatMessage[] = []
-  // 本轮用户真正的问题 = 组装消息里最后一条 user(附件/摘要/历史都垫在它前面);
-  // 每轮工具结果后垫提醒卡时引用它,把正事重新钉在模型眼皮底下。
-  // 剥掉注意力锚(答旧题修复·刀三):提醒卡引用的是干净的问题原文,标牌不进提醒
+  // 提醒卡引用干净的问题原文:最后一条 user,剥掉注意力锚;带图分段数组本不该走到这
   let currentQuestion = ''
   for (let i = baseMessages.length - 1; i >= 0; i--) {
     const m = baseMessages[i]
     if (m.role === 'user') {
-      // 带图那轮的 content 是分段数组(agent 在带图时被强制关掉,本不该走到这);兜底取文字段
       currentQuestion = stripCurrentQuestionAnchor(typeof m.content === 'string' ? m.content : '')
       break
     }
   }
-  // 这引擎摔过「不认工具调用」的跤就直接按普通对话走,连守则都不垫
   const engineKey = `${target.baseUrl}|${target.model}`
   let engineNoTools = noToolEngines.has(engineKey)
   if (engineNoTools) {
     sendAgentStep(event, requestId, '这个模型不会自己翻文件(不支持工具调用),按普通对话回答')
     flattenAgentMessages(messages)
   }
-  // 人设后面垫翻文件切片(prompts.ts 的逐字稿):教它现在有什么手脚;
-  // 联网查证开着再垫一段上网守则(模型这才知道有 web_search)。拆除兜底认同一把尺子,别拆岔了
   const addendum = buildAgentAddendum(input.webSearchEnabled)
   applyAgentPersona(messages, { addendum, engineNoTools })
   const readChars = agentReadChars(ctx)
-  const doneCalls = new Set<string>()
-  // 提醒卡门槛和质检闸前置的共同状态表:本场实际执行成功的工具调用次数
-  // (参数不合法被拒、防打转被拦的都不算 —— 没真翻过就别拿提醒卡烦它)
-  let toolCallsExecuted = 0
-  // 联网账:本场真正搜过几轮、打开过几页(研究预算与界面标签用)
-  let webSearchCalls = 0
-  let webFetchCalls = 0
-  let webBudgetNotified = false
-  const webQueries: string[] = []
-  const webSources: string[] = []
-  const researchNotes: ResearchNote[] = []
-  // 工具结果 id → 防打转记账键的对照表:旧资料被压缩成注记时,按它解锁重读
-  const callIdToKey = new Map<string, string>()
+  const ledger: AgentToolLedger = {
+    doneCalls: new Set<string>(),
+    callIdToKey: new Map<string, string>(),
+    webSearchCalls: 0,
+    webFetchCalls: 0,
+    webQueries: [],
+    webSources: [],
+    researchNotes: [],
+    toolCallsExecuted: 0
+  }
   const promptBudget = agentPromptBudget(ctx, replyCap)
-  // 各道兜底「用过了」的账本(兜底阶梯在 agentFallback)
+  let webBudgetNotified = false
   const flags: AgentGuardFlags = {
     repetitionRetried: false,
     reminderFailsafe: false,
@@ -126,8 +101,6 @@ export async function runAgentChat(input: {
   }
   let usage: AiUsage | undefined
   let reasoningAll: string | undefined
-  // 封板账(第一百五十一批):中间轮的话一旦封成独立气泡,思考过程也按轮各归各 ——
-  // 早轮的思考已经随流躺在各自封口气泡里,结果里只回最后一轮的;没封过板照旧回全场总账
   let lastRoundReasoning: string | undefined
   let sealedAny = false
   const resultReasoning = (): string | undefined => (sealedAny ? lastRoundReasoning : reasoningAll)
@@ -137,15 +110,14 @@ export async function runAgentChat(input: {
     `翻文件模式开跑 · 最多 ${AGENT_MAX_ROUNDS} 轮 · 单次读文件约 ${readChars} 字 · 压缩警戒线约 ${promptBudget} tokens`
   )
   for (;;) {
-    if (signal.aborted)
-      return agentResult(input, 'cancelled', '', usage, resultReasoning(), webQueries, webSources)
-    // 上下文将满先腾地方(第一百三十八批):早先翻看的大段原文提炼成占位注记,
-    // 最近的留原样;被压掉的按对照表解锁「不许翻第二遍」,模型要重温随时能重读
+    if (signal.aborted) {
+      return agentResult(input, 'cancelled', '', usage, resultReasoning(), ledger)
+    }
     const compressed = compressAgentMessages(messages, promptBudget)
     if (compressed) {
       for (const callId of compressed.freedCallIds) {
-        const key = callIdToKey.get(callId)
-        if (key) doneCalls.delete(key)
+        const key = ledger.callIdToKey.get(callId)
+        if (key) ledger.doneCalls.delete(key)
       }
       messages.splice(0, messages.length, ...compressed.messages)
       sendAgentStep(
@@ -159,17 +131,16 @@ export async function runAgentChat(input: {
       )
     }
     const useTools = !engineNoTools && rounds < AGENT_MAX_ROUNDS
-    const webLookups = webSearchCalls + webFetchCalls
+    const webLookups = ledger.webSearchCalls + ledger.webFetchCalls
     const webToolsEnabled = input.webSearchEnabled && webLookups < AGENT_WEB_MAX_LOOKUPS
-    // 预算刚用完:垫一句收尾令,下一轮工具表里不再出现联网件
     if (input.webSearchEnabled && !webToolsEnabled && !webBudgetNotified) {
       webBudgetNotified = true
       messages.push({ role: 'user', content: WEB_BUDGET_NUDGE })
       sendAgentStep(event, requestId, `联网研究已用满 ${AGENT_WEB_MAX_LOOKUPS} 次,转入手头资料收尾`)
     }
-    // 逼卷令只在「真烧完了轮数」时发;引擎天生不支持工具或刚兜底降级的,发这话是驴唇不对马嘴
-    if (rounds >= AGENT_MAX_ROUNDS && !flags.skipNudgeOnce)
+    if (rounds >= AGENT_MAX_ROUNDS && !flags.skipNudgeOnce) {
       messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
+    }
     flags.skipNudgeOnce = false
     rounds += 1
     const round = await agentRound(target, messages, {
@@ -192,8 +163,8 @@ export async function runAgentChat(input: {
         useTools,
         engineNoTools,
         flags,
-        doneCalls,
-        callIdToKey
+        doneCalls: ledger.doneCalls,
+        callIdToKey: ledger.callIdToKey
       })
       if (decision.kind === 'retry') {
         if (decision.blacklistEngine) noToolEngines.add(engineKey)
@@ -203,21 +174,12 @@ export async function runAgentChat(input: {
       }
       if (decision.step) sendAgentStep(event, requestId, decision.step)
       if (decision.status === 'supported') input.onTurnComplete?.(turnTrace, decision.text)
-      return agentResult(
-        input,
-        decision.status,
-        decision.text,
-        usage,
-        resultReasoning(),
-        webQueries,
-        webSources
-      )
+      return agentResult(input, decision.status, decision.text, usage, resultReasoning(), ledger)
     }
     usage = mergeUsage(usage, round.usage)
-    if (round.reasoning)
+    if (round.reasoning) {
       reasoningAll = reasoningAll ? `${reasoningAll}\n\n${round.reasoning}` : round.reasoning
-    // 状态条的实时计数是流式增量顺手喂的,翻文件按轮非流式没增量可蹭 ——
-    // 每轮收完账自己报一次,左下角不至于整场只挂「在干活……」
+    }
     if (usage) {
       announceActivityBusy(lastActivityProvider, {
         phase: 'writing',
@@ -237,120 +199,28 @@ export async function runAgentChat(input: {
           '模型翻是翻了,但最后一句话没说出来 —— 再问一次试试',
           usage,
           resultReasoning(),
-          webQueries,
-          webSources
+          ledger
         )
       }
-      // 正文一旦开始输出就是最终交付:质量检查只记日志,不再拦截重答，也不撤回已流出的字
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       input.onTurnComplete?.(turnTrace, text)
-      return agentResult(input, 'supported', text, usage, resultReasoning(), webQueries, webSources)
+      return agentResult(input, 'supported', text, usage, resultReasoning(), ledger)
     }
-    // 工具调用原样回填进对话(服务端要求 assistant 消息和 tool 结果成对出现)
     messages.push(raw)
     turnTrace.push(raw)
-    const toolResults: Array<{ role: 'tool'; tool_call_id: string; content: string }> = []
-    for (const call of calls) {
-      if (signal.aborted) break
-      const prep = prepareAgentCall(call, rootPath)
-      if (!prep.ok) {
-        sendAgentStep(
-          event,
-          requestId,
-          agentStepText(prep.name ?? TOOL_NAMES.listFiles, prep.badTarget, 'error', prep.why)
-        )
-        toolResults.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: wrapToolResult(`参数不合法:${prep.why}`)
-        })
-        continue
-      }
-      if (doneCalls.has(prep.key)) {
-        sendAgentStep(event, requestId, agentStepText(prep.name, prep.stepTarget, 'repeat'))
-        toolResults.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: wrapToolResult(REPEAT_NUDGE)
-        })
-        continue
-      }
-      doneCalls.add(prep.key)
-      callIdToKey.set(call.id, prep.key)
-      // 同一条模型消息里可能喊多个联网件:逐个卡预算,不让一轮就冲破 8 次
-      const isWebCall = prep.name === TOOL_NAMES.webSearch || prep.name === TOOL_NAMES.webFetch
-      if (isWebCall && webSearchCalls + webFetchCalls >= AGENT_WEB_MAX_LOOKUPS) {
-        sendAgentStep(event, requestId, `「${prep.stepTarget}」联网预算已用完,这一条不再执行`)
-        toolResults.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: wrapToolResult(WEB_BUDGET_NUDGE)
-        })
-        continue
-      }
-      const run = await runAgentTool({
-        event,
-        requestId,
-        prep,
-        readChars,
-        tavilyKey: input.tavilyKey,
-        fetchFocus: `${currentQuestion} ${webQueries[webQueries.length - 1] ?? ''}`.trim()
-      })
-      // 模型自己记的要点:并入研究账本,原文被压缩后仍在
-      if (run.ok && prep.name === TOOL_NAMES.researchNote) {
-        const note: ResearchNote = {
-          kind: 'note',
-          query: '',
-          url: '',
-          title: '',
-          source: prep.researchSource,
-          facts: [prep.researchNote]
-        }
-        researchNotes.splice(0, researchNotes.length, ...addResearchNote(researchNotes, note))
-      }
-      // 联网账:搜过几轮、打开过几页(研究预算与界面标签用)
-      if (prep.name === TOOL_NAMES.webSearch || prep.name === TOOL_NAMES.webFetch) {
-        if (prep.name === TOOL_NAMES.webSearch) webSearchCalls += 1
-        else webFetchCalls += 1
-        for (const q of run.queries) if (q !== '' && !webQueries.includes(q)) webQueries.push(q)
-        for (const s of run.sources) if (s !== '' && !webSources.includes(s)) webSources.push(s)
-        // 研究账本:从这次工具结果里挑关键句,原文压缩后事实还在
-        if (run.ok) {
-          const note = buildResearchNote({
-            kind: prep.name === TOOL_NAMES.webSearch ? 'search' : 'fetch',
-            query: prep.name === TOOL_NAMES.webSearch ? (prep.query ?? '') : '',
-            url: prep.name === TOOL_NAMES.webFetch ? (prep.fetchUrl ?? '') : '',
-            title: prep.name === TOOL_NAMES.webFetch ? (run.hint ?? '') : '',
-            source: run.sources.join('、'),
-            text: run.rawText,
-            focus: `${currentQuestion} ${webQueries[webQueries.length - 1] ?? ''}`.trim()
-          })
-          if (note)
-            researchNotes.splice(0, researchNotes.length, ...addResearchNote(researchNotes, note))
-        }
-        sendChatLookup(event, requestId, run.ok ? 'completed' : 'empty', webSources, webQueries)
-      }
-      if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) toolCallsExecuted += 1 // 真执行成功才记账:提醒卡门槛用这本账
-      toolResults.push({ role: 'tool', tool_call_id: call.id, content: run.content })
-    }
-    messages.push(...toolResults)
-    turnTrace.push(...toolResults)
-    // 研究账本只挂一条:把已经确认的事实钉在模型眼前,原文被压缩也不丢
-    if (researchNotes.length > 0) {
-      messages.splice(
-        0,
-        messages.length,
-        ...upsertResearchLedger(messages, formatResearchLedger(researchNotes))
-      )
-    }
-    // 每轮工具结果后垫提醒卡(LLM 优化批次):撤掉上一张再垫新的,对话里永远只挂
-    // 最新一张 —— 工具结果一大坨最容易把真问题挤出小模型的注意力,靠它每轮抬头见正事。
-    // 触发门槛(提示词体系重写第二批):本场真翻满 AGENT_REMINDER_MIN_TOOL_CALLS 次才垫 ——
-    // 资料还少的头几轮垫卡只会稀释注意力;撤卡照旧每轮先撤,保证不攒
-    messages.splice(0, messages.length, ...stripLastAgentReminder(messages))
-    if (toolCallsExecuted >= AGENT_REMINDER_MIN_TOOL_CALLS) {
-      messages.push({ role: 'user', content: buildAgentReminder(currentQuestion) })
-    }
+    await fulfillAgentToolCalls({
+      event,
+      requestId,
+      rootPath,
+      readChars,
+      tavilyKey: input.tavilyKey,
+      currentQuestion,
+      signal,
+      calls,
+      messages,
+      turnTrace,
+      ledger
+    })
     addDevLog('request', `翻文件第 ${rounds} 轮:模型要看 ${calls.length} 样东西`)
   }
 }
@@ -362,8 +232,7 @@ function agentResult(
   text: string,
   usage: AiUsage | undefined,
   reasoning: string | undefined,
-  queries: string[],
-  sources: string[]
+  ledger: AgentToolLedger
 ): AiChatResult {
   return {
     status,
@@ -372,6 +241,6 @@ function agentResult(
     model: input.target.model,
     durationMs: Date.now() - input.startedAt,
     usage,
-    webLookup: finalizeAgentWebLookup(input.webLookup, queries, sources)
+    webLookup: finalizeAgentWebLookup(input.webLookup, ledger.webQueries, ledger.webSources)
   }
 }
