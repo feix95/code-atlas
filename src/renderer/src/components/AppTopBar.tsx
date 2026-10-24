@@ -16,14 +16,14 @@ const REFRESH_ICON = 22
 
 /** 禁用提示的框宽降级链:塞得下的最长一档胜出,全塞不下落最末档 */
 const FIT_HINTS = ['先打开一个文件夹', '先打开文件夹', '打开文件夹', '搜索文件'] as const
-/** 文案与 input 边缘的余量:贴边刚好看不见切不算「放得下」 */
-const FIT_MARGIN_PX = 8
-/** is-tight 收紧 padding/gap 腾出的宽度(0.75rem→0.375rem + gap 8px→4px) */
-const TIGHT_SAVED_PX = 16
+/** 文案与 input 边缘的余量:按根字号走,界面缩放档不同余量同比(100% 时 8px) */
+const FIT_MARGIN_REM = 0.5
+/** is-tight 收紧 padding/gap 腾出的宽度:padding 0.75rem→0.375rem + gap 0.5rem→0.25rem,合计 1rem */
+const TIGHT_SAVED_REM = 1
 
 /** 框宽降级 placeholder:ResizeObserver 盯 input 实宽,canvas 按当前字号实测各档
     文案宽,挑塞得下的最长一档;整句塞不下时进 tight 档收 padding/gap 再腾宽。
-    进出 tight 用「正常态可用宽」这一根线判,迟滞天然在(腾宽 16px 即两阈值差),
+    进出 tight 用「正常态可用宽」这一根线判,迟滞天然在(腾宽即两阈值差),
     边界宽度不会来回抖;拖侧栏/改缩放都会重估。 */
 function useFittedPlaceholder(
   inputRef: React.RefObject<HTMLInputElement | null>,
@@ -40,17 +40,21 @@ function useFittedPlaceholder(
     let tight = false
     const pick = () => {
       const w = input.clientWidth
-      if (w < FIT_MARGIN_PX || !ctx) return
+      // 余量与腾宽都跟着根字号走:界面缩放 125%/150% 时布局按 rem 放大,常量会算岔
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      const margin = rem * FIT_MARGIN_REM
+      const saved = rem * TIGHT_SAVED_REM
+      if (w < margin || !ctx) return
       const cs = getComputedStyle(input)
       ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
       // 判 tight 永远按「正常 padding 下的可用宽」算:已 tight 就先扣回腾出的部分
-      const normalAvail = w - (tight ? TIGHT_SAVED_PX : 0)
-      const nextTight = ctx.measureText(FIT_HINTS[0]).width + FIT_MARGIN_PX > normalAvail
-      // 本次转 tight 则 input 会变宽,预支它再挑档;转回正常同理已在 normalAvail 里判过
-      const avail = w + (nextTight && !tight ? TIGHT_SAVED_PX : 0)
+      const normalAvail = w - (tight ? saved : 0)
+      const nextTight = ctx.measureText(FIT_HINTS[0]).width + margin > normalAvail
+      // 挑档要用「这轮 CSS 落定后的实宽」:退 tight 时宽度会缩回正常态,不能拿腾宽后的算
+      const avail = nextTight ? normalAvail + saved : normalAvail
       tight = nextTight
       const text =
-        FIT_HINTS.find((t) => ctx.measureText(t).width + FIT_MARGIN_PX <= avail) ??
+        FIT_HINTS.find((t) => ctx.measureText(t).width + margin <= avail) ??
         FIT_HINTS[FIT_HINTS.length - 1]
       setFit((prev) => (prev.text === text && prev.tight === tight ? prev : { text, tight }))
     }

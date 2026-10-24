@@ -119,6 +119,32 @@ try {
       )
     }, channel)
   const shot = (name: string) => page.screenshot({ path: join(run, 'shots', `${name}.png`) })
+  /** 截一块区域量「墨迹」宽度:按列看明暗差,有字的列对比高、纯底色列没有(明暗主题通用) */
+  const inkWidth = async (clip: { x: number; y: number; width: number; height: number }) => {
+    const png = await page.screenshot({ clip })
+    return electron.evaluate(({ nativeImage }, data) => {
+      const img = nativeImage.createFromBuffer(Buffer.from(data, 'base64'))
+      const { width, height } = img.getSize()
+      const bmp = img.getBitmap()
+      let left = -1
+      let right = -1
+      for (let x = 0; x < width; x++) {
+        let min = 255
+        let max = 0
+        for (let y = 0; y < height; y++) {
+          const i = (y * width + x) * 4
+          const lum = 0.114 * bmp[i] + 0.587 * bmp[i + 1] + 0.299 * bmp[i + 2]
+          if (lum < min) min = lum
+          if (lum > max) max = lum
+        }
+        if (max - min > 20) {
+          if (left < 0) left = x
+          right = x
+        }
+      }
+      return right - left + 1
+    }, png.toString('base64'))
+  }
   const open = async (folder: string) => {
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).fill(folder)
     await page.getByRole('textbox', { name: '文件夹路径', exact: true }).press('Enter')
@@ -134,6 +160,86 @@ try {
     await page.getByRole('searchbox', { name: '搜索文件', exact: true }).isDisabled(),
     'top-bar search must be disabled without a workspace'
   )
+  // 顶栏搜索框的降级 placeholder 不能被切:type=search 的原生清除钮会在框内占一块地,
+  // clientWidth 却把它算进可用宽,量着放得下的文案会被切掉最后一个字(实测窄侧栏切掉约 7px)。
+  // 账按墨迹量:placeholder 的墨迹必须跟同字体同文案的 DOM 文本一样长。
+  {
+    const sidebarBefore = await page.evaluate(() =>
+      document.querySelector('.app')?.style.getPropertyValue('--sidebar-w')
+    )
+    await page.evaluate(() => {
+      document.querySelector('.app')?.style.setProperty('--sidebar-w', '17rem')
+    })
+    // 侧栏宽度会被 App 的后续渲染写回,顶住几轮确认落地
+    for (let i = 0; i < 3; i++) {
+      await page.waitForTimeout(150)
+      const applied = await page.evaluate(() =>
+        document.querySelector('.app')?.style.getPropertyValue('--sidebar-w')
+      )
+      if (applied === '17rem') break
+      await page.evaluate(() => {
+        document.querySelector('.app')?.style.setProperty('--sidebar-w', '17rem')
+      })
+    }
+    // 悬停态交给 CDP 强制:真鼠标悬停时,展开动画会把导航组挪到手底下,偶发把悬停抢走,
+    // 截图那一下框已经收回,量到的是旁边的按钮(表现为「被切了 100 多像素」的假红)
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('DOM.enable')
+    await cdp.send('CSS.enable')
+    const doc = (await cdp.send('DOM.getDocument', { depth: -1 })) as { root: { nodeId: number } }
+    const found = (await cdp.send('DOM.querySelector', {
+      nodeId: doc.root.nodeId,
+      selector: '.tb-search'
+    })) as { nodeId: number }
+    await cdp.send('CSS.forcePseudoState', {
+      nodeId: found.nodeId,
+      forcedPseudoClasses: ['hover']
+    })
+    await page.waitForTimeout(700)
+    const ruler = await page.evaluate(() => {
+      const input = document.querySelector('.tb-search input')
+      if (!(input instanceof HTMLInputElement)) return null
+      const cs = getComputedStyle(input)
+      const span = document.createElement('span')
+      span.id = 'hint-ruler'
+      span.textContent = input.placeholder
+      span.style.cssText = `position:fixed;left:420px;top:300px;white-space:pre;color:#000;background:#fff;font:${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily};z-index:9999`
+      document.body.appendChild(span)
+      const r = input.getBoundingClientRect()
+      const sr = span.getBoundingClientRect()
+      return {
+        placeholder: input.placeholder,
+        clientW: input.clientWidth,
+        input: { x: r.x, y: r.y, width: r.width, height: r.height },
+        span: { x: sr.x, y: sr.y, width: sr.width, height: sr.height }
+      }
+    })
+    assert.ok(ruler, 'search input must exist')
+    const inputInk = await inkWidth({
+      x: Math.ceil(ruler.input.x),
+      y: Math.ceil(ruler.input.y),
+      width: Math.floor(ruler.input.width),
+      height: Math.ceil(ruler.input.height)
+    })
+    const rulerInk = await inkWidth({
+      x: Math.ceil(ruler.span.x),
+      y: Math.ceil(ruler.span.y),
+      width: Math.ceil(ruler.span.width) + 8,
+      height: Math.ceil(ruler.span.height)
+    })
+    await page.evaluate(() => document.getElementById('hint-ruler')?.remove())
+    await cdp.send('CSS.forcePseudoState', { nodeId: found.nodeId, forcedPseudoClasses: [] })
+    await cdp.detach()
+    await page.evaluate((v) => {
+      document.querySelector('.app')?.style.setProperty('--sidebar-w', v ?? '')
+    }, sidebarBefore)
+    await shot('search-hint')
+    assert.ok(ruler.clientW > 100, `搜索框没展开(clientWidth=${ruler.clientW}),量不到 placeholder`)
+    assert.ok(
+      rulerInk - inputInk <= 4,
+      `placeholder「${ruler.placeholder}」被切掉 ${rulerInk - inputInk} 设备像素(框宽 ${ruler.clientW})`
+    )
+  }
   // UI v3(B4):AI 状态收进 rail 底槽浮层,未配置引导要点开状态钮才现身
   await page.getByRole('button', { name: /AI 状态/ }).click()
   await page.locator('.ai-status-pop').getByText('AI 讲解尚未设置', { exact: true }).waitFor()

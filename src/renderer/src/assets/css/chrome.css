@@ -165,6 +165,13 @@
   color: var(--chrome-muted);
 }
 
+/* type=search 的原生清除钮会在输入框内占一块宽度,clientWidth 却把它算成可用空间 ——
+   量着放得下的 placeholder 会被这块地界切掉最后一个字(实测切掉约 7px)。
+   清除已有 Esc(见 AppTopBar 的 onKeyDown),这颗钮不留。 */
+.tb-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
 /* 窄框腾宽档(外方方案第三步):整句提示塞不下时收 padding/gap,
    再给 input 挤出约 16px;进出由 useFittedPlaceholder 双阈值判定 */
 .tb-search:hover.is-tight,
