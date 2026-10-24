@@ -556,3 +556,4 @@
 - refactor(core): 清掉注释里的批次号、刀次和装饰分隔线
 - chore(test): 单文件行数闸只计有效代码并设分档上限,拆掉原始行 1000 与棘轮
 - chore(format): 自测脚本超宽行按 prettier 折行
+- chore: 升级 electron 到 44.9.3 并抬高 zod 到 4.6.7,修复 audit 高危闸
