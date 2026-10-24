@@ -73,7 +73,7 @@ check('parseWindowState:块头小于窗口下限就夹到下限;maximized 缺省
   assert.equal(saved!.maximized, false)
 })
 
-// UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale 
+// UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale
 
 check('parseWindowState:scale 合法才认账;认了 scale,宽高下限按系数折回基准口径', () => {
   const saved = parseWindowState({
@@ -288,7 +288,7 @@ check('MainPanelController:hide() 收窗记账;窗销毁后 show/hide 都不再�
 })
 
 async function main(): Promise<void> {
-  // IO 落盘回环:写得进、读得出;垃圾内容和不存在的档都安静回 null 
+  // IO 落盘回环:写得进、读得出;垃圾内容和不存在的档都安静回 null
   const dir = mkdtempSync(join(tmpdir(), 'atlas-window-state-'))
   try {
     check('readWindowState:没记过回 null', () => {

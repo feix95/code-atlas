@@ -59,7 +59,11 @@ assert.equal(isGatedName('env.d.ts'), false, '*.d.ts 不扫')
 assert.equal(isGatedName('types.ts'), true)
 assert.equal(codeLineCount('const u = "http://x.com"\n'), 1, '字符串里的 // 不算注释')
 assert.equal(codeLineCount('const x = 1 /* tmp */\n'), 1, '一行代码带块注释仍算一行')
-assert.equal(codeLineCount('const a = 1\n/*\nskip\nme\n*/\nconst b = 2\n'), 2, '多行块注释中间几行去掉')
+assert.equal(
+  codeLineCount('const a = 1\n/*\nskip\nme\n*/\nconst b = 2\n'),
+  2,
+  '多行块注释中间几行去掉'
+)
 assert.equal(codeLineCount('}\n'), 1, '单独的 } 算代码')
 assert.equal(codeLineCount('const x = 1\r\n\r\n// hi\r\n}\r\n'), 2, 'CRLF 空行与注释行去掉')
 

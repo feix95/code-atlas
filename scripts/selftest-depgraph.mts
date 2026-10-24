@@ -91,7 +91,7 @@ function sortedEdges(graph: DepGraphResult): string[] {
 }
 
 async function main(): Promise<void> {
-  // 第一轮:JS/TS + Python 平铺的老场景,行为必须和以前一模一样 
+  // 第一轮:JS/TS + Python 平铺的老场景,行为必须和以前一模一样
   const root = await makeFixture()
   try {
     const graph = await buildDependencyGraph(root)
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
     await fs.rm(dirname(root), { recursive: true, force: true })
   }
 
-  // 第二轮:Python 相对导入 + Go + Java + Rust,四种语言各连各的 
+  // 第二轮:Python 相对导入 + Go + Java + Rust,四种语言各连各的
   const polyRoot = await makePolyglotFixture()
   try {
     const graph = await buildDependencyGraph(polyRoot)

@@ -18,7 +18,7 @@ function withPatch(patch: Partial<PersonalizationConfig>): PersonalizationConfig
 }
 
 function main(): void {
-  // 1. 默认档不垫语气(产品定):全默认时风格段是空串,人设一字不加 
+  // 1. 默认档不垫语气(产品定):全默认时风格段是空串,人设一字不加
   assert.equal(
     buildPersonalizationPrompt(DEFAULT_PERSONALIZATION),
     '',
@@ -34,7 +34,7 @@ function main(): void {
   )
   assert.ok(!defaultWithCustom.includes('温暖'), '默认档不该漏出任何语气人设句')
 
-  // 2. 语气:默认档空着,三档人设各说各的话,互不串味 
+  // 2. 语气:默认档空着,三档人设各说各的话,互不串味
   for (const opt of TONE_OPTIONS) {
     const text = buildPersonalizationPrompt(withPatch({ tone: opt.key }))
     if (opt.key === 'default') assert.equal(text, '', '默认档 = 不垫语气')
@@ -55,7 +55,7 @@ function main(): void {
   assert.ok(humorous.includes('大白话'), '幽默档要爱说大白话')
   assert.ok(!humorous.includes('沉稳克制'), '选了幽默就不该同时冒出专业那句')
 
-  // 3. 自订指令:裁空白、空白等于没写、超长裁到上限 
+  // 3. 自订指令:裁空白、空白等于没写、超长裁到上限
   assert.equal(
     buildPersonalizationPrompt(withPatch({ custom: '   ' })),
     buildPersonalizationPrompt(DEFAULT_PERSONALIZATION),
@@ -97,7 +97,7 @@ function main(): void {
     'teaching 非 brief 时风格段也不掺教学文本'
   )
 
-  // 5. 读档清洗:脏数据一律回默认 
+  // 5. 读档清洗:脏数据一律回默认
   assert.deepEqual(sanitizePersonalization(null), DEFAULT_PERSONALIZATION, 'null 回默认')
   assert.deepEqual(sanitizePersonalization('乱传的'), DEFAULT_PERSONALIZATION, '字符串回默认')
   assert.deepEqual(sanitizePersonalization([1, 2]), DEFAULT_PERSONALIZATION, '数组回默认')
@@ -118,7 +118,7 @@ function main(): void {
   assert.equal('warmth' in mixed, false, '下架的特质键不许混进配置')
   assert.ok(!('乱七八糟' in mixed), '多出来的键不许混进配置')
 
-  // 6. 讲解深度(教学三档):默认精简,脏值回默认,三档都认 
+  // 6. 讲解深度(教学三档):默认精简,脏值回默认,三档都认
   assert.equal(
     DEFAULT_PERSONALIZATION.teaching,
     'brief',
@@ -150,7 +150,7 @@ function main(): void {
     '讲解深度不拼进风格段:三档拼出来的风格段要一模一样'
   )
 
-  // 7. 界面按这张表排控件:数量变了说明有人动过,提醒一句 
+  // 7. 界面按这张表排控件:数量变了说明有人动过,提醒一句
   assert.equal(TONE_OPTIONS.length, 4, '语气四档(默认 + 产品定的三档人设)')
   for (const t of TONE_OPTIONS) assert.ok(t.label && t.hint, '每档都要有档名和介绍(参考图的两行式)')
   assert.equal(TEACHING_OPTIONS.length, 3, '讲解深度三档(简洁/精简/详细)')

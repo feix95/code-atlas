@@ -90,7 +90,7 @@ function makeImage(
   return { id: `id-${name}`, name, mime, dataUrl: toDataUrl(mime, bytes), width: w, height: h }
 }
 
-// estimateImageTokens:28px 块口径,64 下限,宁高勿低 
+// estimateImageTokens:28px 块口径,64 下限,宁高勿低
 assert.equal(estimateImageTokens(128, 128), 64, '小图吃下限 64(5×5 块=25 < 64)')
 assert.equal(estimateImageTokens(28, 28), 64, '一块图也是 64')
 assert.equal(estimateImageTokens(1024, 768), 37 * 28, '1024×768 → 37×28=1036')
@@ -98,7 +98,7 @@ assert.equal(estimateImageTokens(1025, 768), 37 * 28, '多 1px 也多占一块(�
 assert.equal(estimateImageTokens(0, 0), 64, '坏尺寸按 1px 算,下限兜底')
 assert.equal(estimateImageTokens(4096, 4096), 147 * 147, '4K 大图 21609 个块')
 
-// imageGate:纯文本拦,视觉放,拿不准放行带提醒 
+// imageGate:纯文本拦,视觉放,拿不准放行带提醒
 assert.deepEqual(imageGate('text-only', 1), {
   allow: false,
   reason: '当前模型是纯文本模型,看不了图片'
@@ -110,7 +110,7 @@ assert.equal(unknownGate.hint, '没法确认这个模型能不能看图')
 assert.deepEqual(imageGate(undefined, 1).allow, true, '没报能力 = unknown 口径')
 assert.deepEqual(imageGate('text-only', 0), { allow: true }, '不带图不用过闸')
 
-// planImageBudget:16K 上下文窗口(16384),人设+问题约 1000,回答预留 512 
+// planImageBudget:16K 上下文窗口(16384),人设+问题约 1000,回答预留 512
 const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
 
 // 一张大图(4096²,原生约 21609):上限 min(8192, 14872)=8192,缩到能坐进 8192
@@ -183,7 +183,7 @@ const CTX16K = { ctxTokens: 16384, replyTokens: 512, otherTokens: 1000 }
 // 空列表直接过
 assert.deepEqual(planImageBudget({ ...CTX16K, images: [] }), { ok: true, items: [] })
 
-// sanitizeChatImages:收编洗白 
+// sanitizeChatImages:收编洗白
 // 合法 PNG / JPEG
 {
   const r = sanitizeChatImages([
@@ -266,7 +266,7 @@ assert.deepEqual(planImageBudget({ ...CTX16K, images: [] }), { ok: true, items: 
 assert.deepEqual(sanitizeChatImages(undefined), { images: [], rejected: [] })
 assert.deepEqual(sanitizeChatImages('str'), { images: [], rejected: [] })
 
-// buildFreeChatMessages:无图 = 字符串(老路径零变化);有图 = 仅尾条多模态 
+// buildFreeChatMessages:无图 = 字符串(老路径零变化);有图 = 仅尾条多模态
 const attachment = {
   targetType: 'file' as const,
   name: 'a.ts',
@@ -368,7 +368,7 @@ assert.equal(
   2 + 4
 )
 
-// collectHistoryRounds:附图轮在历史里留一句话交代,图片本体不进 
+// collectHistoryRounds:附图轮在历史里留一句话交代,图片本体不进
 {
   const hist = collectHistoryRounds([
     { role: 'user', text: '这图什么色', images: [{}, {}], state: 'done' },

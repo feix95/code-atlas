@@ -12,7 +12,7 @@ import { refButtonLabel, selectionGeometry } from '../src/renderer/src/selection
 import { clampDocZoom, DOC_ZOOM_MAX, DOC_ZOOM_MIN } from '../src/shared/docZoom.ts'
 
 function main(): void {
-  // 1. clipPreview:只归一换行 + 数行数,一个字不裁 
+  // 1. clipPreview:只归一换行 + 数行数,一个字不裁
   const plain = clipPreview('a\nb\nc')
   assert.equal(plain.text, 'a\nb\nc', '全文原样给,没有「开头一段」')
   assert.equal(plain.totalLines, 3, '三行')
@@ -21,19 +21,19 @@ function main(): void {
   const trailing = clipPreview('a\nb\n')
   assert.equal(trailing.totalLines, 2, '结尾换行不算新的一行')
 
-  // 2. 换行符归一:CRLF / 裸 CR 都收成 LF,界面上不留半个回车 
+  // 2. 换行符归一:CRLF / 裸 CR 都收成 LF,界面上不留半个回车
   assert.equal(clipPreview('a\r\nb').text, 'a\nb', 'CRLF 归一成 LF')
   assert.equal(clipPreview('a\rb').text, 'a\nb', '老 Mac 的裸 CR 也归一')
   assert.equal(clipPreview('a\r\nb').totalLines, 2, '归一只影响显示,行数照实')
 
-  // 3. 空文件:零行零字,不是一行空 
+  // 3. 空文件:零行零字,不是一行空
   assert.equal(clipPreview('').totalLines, 0, '空文件没有行')
 
-  // 4. 拒绝路径:10 MB 量级 —— 纯文本揣得住,日志怪进不来 
+  // 4. 拒绝路径:10 MB 量级 —— 纯文本揣得住,日志怪进不来
   assert.ok(PREVIEW_MAX_BYTES >= 5 * 1024 * 1024, '拒绝路径放宽到 MB 量级(全文预览配得上)')
   assert.ok(PREVIEW_MAX_BYTES <= 64 * 1024 * 1024, '但也不能大到把内存当仓库')
 
-  // 5. 可视区账(虚拟滚动的心脏):起止行怎么算都不能错 
+  // 5. 可视区账(虚拟滚动的心脏):起止行怎么算都不能错
   const rng = (
     over: Partial<Parameters<typeof visibleLineRange>[0]>
   ): { start: number; end: number } =>
@@ -70,7 +70,7 @@ function main(): void {
   const tall = rng({ scrollTop: 10_000, lineHeight: 40 })
   assert.deepEqual(tall, { start: 231, end: 286 }, '行高 40:首行 = 251 - 20,可视 15 行')
 
-  // 6. 二进制嗅探:有 NUL 字节就不是文本 
+  // 6. 二进制嗅探:有 NUL 字节就不是文本
   assert.equal(looksBinary(new Uint8Array([0x61, 0x62, 0x63])), false, '纯 ASCII 不是二进制')
   assert.equal(
     looksBinary(new TextEncoder().encode('中文也照样是文本')),
@@ -84,7 +84,7 @@ function main(): void {
   )
   assert.equal(looksBinary(new Uint8Array([])), false, '空的一段不冤枉')
 
-  // 7. 选区几何:首尾标记、左缘竖线、浮钮锚点 
+  // 7. 选区几何:首尾标记、左缘竖线、浮钮锚点
   assert.equal(selectionGeometry([]), null, '一行都没有就不画标记')
   const oneLine = selectionGeometry([{ left: 40, top: 100, right: 180, bottom: 118 }])
   assert.ok(oneLine, '单行选区要算得出来')
@@ -115,7 +115,7 @@ function main(): void {
     '零高选区竖线给最小可见高度'
   )
 
-  // 8. 浮钮文案:额度满了说额度,选太长了照实说会截断 
+  // 8. 浮钮文案:额度满了说额度,选太长了照实说会截断
   const base = {
     canAddRef: true,
     refLimit: 6,
@@ -138,9 +138,9 @@ function main(): void {
   )
 
   // 10. 整份引用已退役:拖文件改走 <attached_files> 附件,
-  // planWholeFileRef 连同自测一起摘除;新口径见 selftest-fileattach 
+  // planWholeFileRef 连同自测一起摘除;新口径见 selftest-fileattach
 
-  // 12. 文档缩放夹紧:系数不许飞出档外,脏值回 100% 
+  // 12. 文档缩放夹紧:系数不许飞出档外,脏值回 100%
   assert.equal(clampDocZoom(1.5), 1.5, '档内原样')
   assert.equal(clampDocZoom(0), 1, '零/负/NaN 回 100%')
   assert.equal(clampDocZoom(NaN), 1, 'NaN 也回 100%')

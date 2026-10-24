@@ -49,7 +49,7 @@ check('小葵的绿(#7dba32)明度带内不夹,压深字', () => {
   assert.equal(pickAccentInk(h, s, l), INK_DARK)
 })
 
-// 外观迁移(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘 
+// 外观迁移(2026-09-16,localStorage → 主进程 appearance.json):清洗/迁移/落盘
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -179,7 +179,7 @@ check('落盘:存进 appearance.json 再读回来是同一份,坏文件老实回
   }
 })
 
-// IPC 通道对账(2026-09-17 补网):两边收发必须成对,不然消息静默丢弃 
+// IPC 通道对账(2026-09-17 补网):两边收发必须成对,不然消息静默丢弃
 // 起因:atlas:appearance-save 一边 ipcRenderer.send、一边 ipcMain.handle —— 一边发件、一边只收 invoke,
 // 消息没人接也没人报错,appearance.json 一次都没写成过,外观重启就回出厂。
 // 硬规矩:send/sendSync 配 ipcMain.on,invoke 配 ipcMain.handle;主进程推给渲染层的配 ipcRenderer.on。

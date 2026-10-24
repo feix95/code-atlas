@@ -29,7 +29,7 @@ function dirNode(
 }
 
 function main(): void {
-  // 1. parse:垃圾整条扔 
+  // 1. parse:垃圾整条扔
   assert.deepEqual(parseNotes(null), {}, 'null 回空表')
   assert.deepEqual(parseNotes('junk'), {}, '字符串回空表')
   assert.deepEqual(parseNotes([1, 2]), {}, '数组回空表')
@@ -43,7 +43,7 @@ function main(): void {
   assert.deepEqual(Object.keys(mixed), ['good'], '只留干净条目,空键空文坏时间戳全扔')
   assert.equal(mixed['good']?.text, '参考网页', '正文去首尾空白')
 
-  // 2. parse:超长截断 + 超量淘汰最旧 
+  // 2. parse:超长截断 + 超量淘汰最旧
   const long = parseNotes({ a: { text: '长'.repeat(NOTE_MAX_CHARS + 10), t: 1 } })
   assert.equal(long['a']?.text.length, NOTE_MAX_CHARS, '超长截到上限')
   const flood: NoteMap = {}
@@ -55,7 +55,7 @@ function main(): void {
     '淘汰的是最旧的'
   )
 
-  // 3. upsert:增/改/删 + 时间戳刷新 + 老条目让位 
+  // 3. upsert:增/改/删 + 时间戳刷新 + 老条目让位
   let m: NoteMap = { old: { text: '旧备注', t: 1 } }
   m = upsertNote(m, 'src/a.ts', ' 扫描入口 ', 50)
   assert.equal(m['src/a.ts']?.text, '扫描入口', '新增去空白')
@@ -70,7 +70,7 @@ function main(): void {
   assert.equal(Object.keys(full).length, NOTES_MAX, 'upsert 也守上限')
   assert.ok(full['newest'] !== undefined && full['k0'] === undefined, '挤掉最旧的 k0')
 
-  // 4. prune:孤儿回收,但 lazy/truncated 底下宁可多留不误删 
+  // 4. prune:孤儿回收,但 lazy/truncated 底下宁可多留不误删
   const tree = dirNode('', [
     fileNode('README.md'),
     dirNode('lazy-dir', [fileNode('placeholder')], { lazy: true }),
@@ -88,10 +88,10 @@ function main(): void {
   assert.ok(pruned['lazy-dir/reports/file.ts'] !== undefined, 'lazy 目录底下不误删')
   assert.ok(pruned['cut/hidden.ts'] !== undefined, 'truncated 目录底下不误删')
 
-  // 5. 存储键归一化:同一项目不裂成两份 
+  // 5. 存储键归一化:同一项目不裂成两份
   assert.equal(notesStorageKey('E:\\A\\B'), notesStorageKey('e:/a/b/'), '大小写和斜杠方向归一')
 
-  // 6. 正文净化:换行/制表/控制符折叠成单空格,防伪造悬停提示第二行 
+  // 6. 正文净化:换行/制表/控制符折叠成单空格,防伪造悬停提示第二行
   assert.equal(sanitizeNoteText('第一行\n第二行'), '第一行 第二行', '换行折叠成空格')
   assert.equal(sanitizeNoteText('a\t\tb'), 'a b', '制表符折叠成单空格')
   assert.equal(sanitizeNoteText('a\r\nb'), 'a b', '回车换行一起折成一个空格')

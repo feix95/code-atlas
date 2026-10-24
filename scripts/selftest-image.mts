@@ -67,7 +67,7 @@ function jpegBytes(width: number, height: number, sof = 0xc0): Uint8Array {
 }
 
 async function main(): Promise<void> {
-  // 1. 图片名单(IMAGE_EXTS 是唯一名单):png/jpg/jpeg 三种,别的图片格式暂不认 
+  // 1. 图片名单(IMAGE_EXTS 是唯一名单):png/jpg/jpeg 三种,别的图片格式暂不认
   assert.deepEqual([...IMAGE_EXTS].sort(), ['.jpeg', '.jpg', '.png'], '名单就这三种')
   assert.equal(isImageFile('a.png'), true, 'png 是图片')
   assert.equal(isImageFile('B.JPG'), true, '大写后缀也算')
@@ -83,14 +83,14 @@ async function main(): Promise<void> {
   assert.equal(canPreviewFile('a.pdf'), false, 'pdf 不开预览签')
   assert.equal(canPreviewFile('a.gif'), false, 'gif 不开预览签')
 
-  // 2. 后缀 → MIME:名单外的后缀回 null,不许冒充 
+  // 2. 后缀 → MIME:名单外的后缀回 null,不许冒充
   assert.equal(imageMimeOf('a.png'), 'image/png', 'png → image/png')
   assert.equal(imageMimeOf('a.jpg'), 'image/jpeg', 'jpg → image/jpeg')
   assert.equal(imageMimeOf('a.JPEG'), 'image/jpeg', '大写 jpeg 也认')
   assert.equal(imageMimeOf('a.gif'), null, 'gif 没有 MIME 可报')
   assert.equal(imageMimeOf('a.txt'), null, '文本后缀回 null')
 
-  // 3. sniffImage·PNG:魔数认亲,IHDR 量宽高 
+  // 3. sniffImage·PNG:魔数认亲,IHDR 量宽高
   const png = pngBytes(2, 3)
   assert.deepEqual(
     sniffImage(png),
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
     'PNG 截在 IHDR 中间:宽高 null'
   )
 
-  // 4. sniffImage·JPEG:认 FF D8 FF,扫段量 SOF 
+  // 4. sniffImage·JPEG:认 FF D8 FF,扫段量 SOF
   const jpeg = jpegBytes(64, 32)
   assert.deepEqual(
     sniffImage(jpeg),
@@ -174,14 +174,14 @@ async function main(): Promise<void> {
     'JPEG 没扫到 SOF:宽高 null'
   )
 
-  // 5. 假冒与残缺:魔数对不上就是不是图 
+  // 5. 假冒与残缺:魔数对不上就是不是图
   assert.equal(sniffImage(new Uint8Array([0x89, 0x50])), null, 'PNG 签名不全不算图')
   assert.equal(sniffImage(new Uint8Array([0xff, 0xd8])), null, 'FF D8 两字节不算 JPEG')
   assert.equal(sniffImage(new TextEncoder().encode('这不是图片,是文字')), null, '文本字节不是图')
   assert.equal(sniffImage(new Uint8Array([])), null, '空数据不是图')
   assert.equal(sniffImage(new Uint8Array([0x47, 0x49, 0x46, 0x38])), null, 'GIF 魔数不认')
 
-  // 6. 分支判定(图片支路的纯逻辑):真图回 image、假冒回 binary 
+  // 6. 分支判定(图片支路的纯逻辑):真图回 image、假冒回 binary
   const ok = imageResultFromBytes('a.png', png)
   assert.equal(ok.status, 'image', '真 PNG 回 image')
   assert.equal(ok.image?.mime, 'image/png', 'MIME 跟字节走')
@@ -232,7 +232,7 @@ async function main(): Promise<void> {
   assert.equal(mislabeled.status, 'image', '后缀标错的真图照样看')
   assert.equal(mislabeled.image?.mime, 'image/jpeg', 'MIME 按字节报,不按后缀报')
 
-  // 7. 拒绝路径:超线的图片在进 readImagePreview 时被 too-big 挡回(不碰盘) 
+  // 7. 拒绝路径:超线的图片在进 readImagePreview 时被 too-big 挡回(不碰盘)
   const tooBig = await readImagePreview({
     absPath: 'E:/这条路根本不存在/不会真去读.png',
     relPath: 'huge.png',

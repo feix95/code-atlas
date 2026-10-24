@@ -145,7 +145,7 @@ function lmConfig(model: string, baseUrl = 'http://127.0.0.1:1234/v1'): AiConfig
 }
 
 async function main(): Promise<void> {
-  // 0. 标签登记(shared/promptTags):每个标签开闭成对、派生常量都出自这张表 
+  // 0. 标签登记(shared/promptTags):每个标签开闭成对、派生常量都出自这张表
   for (const [key, tag] of Object.entries(TAG)) {
     assert.ok(tag.open.startsWith('<') && tag.open.endsWith('>'), `${key} 的开标签要是 <...> 形`)
     assert.equal(tag.close, `</${tag.open.slice(1)}`, `${key} 的闭标签要和开标签同名`)
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
   assert.equal(CURRENT_QUESTION_PREFIX, `${TAG.currentQuestion.open}\n`, '当前问题前缀从登记派生')
   assert.equal(COMPACT_SUMMARY_TAG, TAG.compressedSummary.open, '压缩摘要标签从登记派生')
 
-  // 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装 
+  // 3.5 自由对话:闲聊底座组装(内核+聊天切片+无工具切片)+ 历史清洗 + 附件清洗 + 消息组装
   // 提示词体系重写:断言打到组装产物上,不再钉某个常量文本
   const chatSystem = buildChatSystem({ agent: false })
   assert.ok(chatSystem.includes('Atlas 小探针'), '内核要点名本名「Atlas 小探针」(2.0 新稿)')
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
   assert.equal(ragged[ragged.length - 1]?.content, '第5答', '留在窗口里的是最近一轮的答案')
   assert.ok(!ragged.some((m) => m.content === '第6问'), '悬空的旧问题(没被回答过的)要摘掉')
 
-  // (2026-09-18):历史按「轮」成对收集,悬空旧问题整轮扔 
+  // (2026-09-18):历史按「轮」成对收集,悬空旧问题整轮扔
   // 报错轮:提问一发出就永久 done,回答却是 error —— 整轮都不许进历史
   const errRound = collectHistoryRounds(
     [
@@ -497,7 +497,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!bareMsgs.some((m) => m.content.includes('当前参考资料')), '没附件也不垫资料提示')
 
-  // 引用代码清洗:条数/字数都封顶,垃圾条目整条扔 
+  // 引用代码清洗:条数/字数都封顶,垃圾条目整条扔
   assert.deepEqual(sanitizeCodeRefs(null), [], '不是数组就当没引用')
   assert.deepEqual(sanitizeCodeRefs([null, '乱传的', 7]), [], '垃圾条目整条扔')
   assert.deepEqual(
@@ -795,7 +795,7 @@ async function main(): Promise<void> {
   assert.equal(doneMeta.state, 'completed', '查到资料 = completed')
   assert.deepEqual(doneMeta.sources, ['维基百科(英文)'], '来源要记账')
 
-  // 3.6 联网查证(默认关):摘要洗白 
+  // 3.6 联网查证(默认关):摘要洗白
   assert.equal(
     stripHtmlTags('<span class="x">傲梅</span> &amp; 备份  软件'),
     '傲梅 & 备份 软件',
@@ -846,7 +846,7 @@ async function main(): Promise<void> {
     )
   }
 
-  // 3.8 Tavily 打头(2026-09-17 产品定序):填了 Key 走官方 API,免费源一次都不跑 
+  // 3.8 Tavily 打头(2026-09-17 产品定序):填了 Key 走官方 API,免费源一次都不跑
   {
     let getCalls = 0
     const found = await webLookupDetailed('傲梅官网 联网批次', {
@@ -873,7 +873,7 @@ async function main(): Promise<void> {
     assert.equal(getCalls, 1, 'Tavily 命中后免费源不跑;仅抓第一条正文那一脚(GET 失败被吞,不拖垮)')
   }
 
-  // 3.9 Tavily Key:洗污染 / 看形状 / 测一下(2026-09-17)—— 瞎填能存但不吭声的老毛病,现在当场说话 
+  // 3.9 Tavily Key:洗污染 / 看形状 / 测一下(2026-09-17)—— 瞎填能存但不吭声的老毛病,现在当场说话
   {
     // 洗:复制粘贴常见的污染一律剥掉
     assert.equal(sanitizeTavilyKey('  tvly-abc123def  '), 'tvly-abc123def', '首尾空白剥掉')
@@ -983,14 +983,14 @@ async function main(): Promise<void> {
     )
   }
 
-  // 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算) 
+  // 4. 二进制判断:媒体/二进制后缀表(svg 与无后缀不算)
   assert.ok(isBinaryFile('photo.PNG'), '大小写不敏感')
   assert.ok(isBinaryFile('app.exe'), '可执行文件是二进制')
   assert.ok(!isBinaryFile('logo.svg'), 'svg 是文本')
   assert.ok(!isBinaryFile('.gitignore'), '隐藏文件不算二进制')
   assert.ok(!isBinaryFile('Makefile'), '无后缀不算二进制')
 
-  // 5. 配置读写往返(新双 Provider 格式)+ 老格式自动迁移 
+  // 5. 配置读写往返(新双 Provider 格式)+ 老格式自动迁移
   const dir = await mkdtemp(join(tmpdir(), 'codeatlas-ai-'))
   try {
     const fallback = defaultAiConfig()
@@ -1080,7 +1080,7 @@ async function main(): Promise<void> {
     await rm(dir, { recursive: true, force: true })
   }
 
-  // 6. resolveAiTarget:两个 Provider 收敛成同一个 ChatTarget 
+  // 6. resolveAiTarget:两个 Provider 收敛成同一个 ChatTarget
   const lmOk = resolveAiTarget(lmConfig('gpt-本地'))
   assert.ok(lmOk.ok, 'LM Studio 配好模型应解析成功')
   assert.equal(
@@ -1112,7 +1112,7 @@ async function main(): Promise<void> {
   assert.equal(biOk.ok && biOk.target.model, 'qwen-7b', '目标模型名来自子进程报告')
   assert.equal(biOk.ok && biOk.target.engine, 'builtin', '内置目标盖章 builtin(报错话术按它分家)')
 
-  // 6.5 引擎自动定位:填了就用填的;没填找 app 自带的;都没有给人话错误 
+  // 6.5 引擎自动定位:填了就用填的;没填找 app 自带的;都没有给人话错误
   const exeDir = await mkdtemp(join(tmpdir(), 'codeatlas-builtin-'))
   try {
     const exePath = join(exeDir, 'llama-server.exe')
@@ -1140,7 +1140,7 @@ async function main(): Promise<void> {
     await rm(exeDir, { recursive: true, force: true })
   }
 
-  // 6.6 孤儿收尸的纯函数:netstat / tasklist 输出解析(端口认领要精确,击杀要验明正身) 
+  // 6.6 孤儿收尸的纯函数:netstat / tasklist 输出解析(端口认领要精确,击杀要验明正身)
   const netstatSample = [
     '  Proto  Local Address          Foreign Address        State           PID',
     '  TCP    127.0.0.1:8766         0.0.0.0:0              LISTENING       1234',
@@ -1170,7 +1170,7 @@ async function main(): Promise<void> {
     '查无此进程应得空串,绝不凭空杀人'
   )
 
-  // 6.7 引擎 PID 档认读(收尸盲区修复):只认正整数 pid,变形/垃圾回 null 
+  // 6.7 引擎 PID 档认读(收尸盲区修复):只认正整数 pid,变形/垃圾回 null
   assert.equal(parseEnginePidFile({ pid: 1234 }), 1234, '干净档原样认回')
   assert.equal(parseEnginePidFile({ pid: '1234' }), null, '字符串不收')
   assert.equal(parseEnginePidFile({ pid: 0 }), null, '0 不是合法 pid')
@@ -1214,7 +1214,7 @@ async function main(): Promise<void> {
     assert.ok(!reaperSection.includes('.kill('), '收尸段不许终止任何进程')
   }
 
-  // 6.5 单飞闸门:并发的第二个调用等同一份,绝不各起各的 
+  // 6.5 单飞闸门:并发的第二个调用等同一份,绝不各起各的
   {
     let spawns = 0
     let releaseGate: (v: string) => void = () => {}
@@ -1246,7 +1246,7 @@ async function main(): Promise<void> {
     void second
   }
 
-  // 7. 用本地假模型服务验证整条 fetch → 解析链路(非流式 + SSE 流式) 
+  // 7. 用本地假模型服务验证整条 fetch → 解析链路(非流式 + SSE 流式)
   const receivedBodies: string[] = []
   const server = createServer((req, res) => {
     let body = ''
@@ -1350,7 +1350,7 @@ async function main(): Promise<void> {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 
-  // 7½. 思考模式:开关、思考流的拆账、掺标签的正文的账 
+  // 7½. 思考模式:开关、思考流的拆账、掺标签的正文的账
   // 没写收尾的 <think> 全算思考;拆完正文里不留半个标签
   const st1 = splitThinking('<think>先看看题目</think>答案是 4')
   assert.equal(st1.reasoning, '先看看题目', '收尾标签里的算思考')
@@ -1462,7 +1462,7 @@ async function main(): Promise<void> {
     await new Promise<void>((resolve) => thinkServer.close(() => resolve()))
   }
 
-  // 8. 服务连不上:应返回 error 状态而不是抛异常 
+  // 8. 服务连不上:应返回 error 状态而不是抛异常
   const down = await explainWithModel(
     { baseUrl: 'http://127.0.0.1:1/v1', model: 'x' },
     testPrompt,
@@ -1474,7 +1474,7 @@ async function main(): Promise<void> {
     '错误信息要提示检查模型服务'
   )
 
-  // 10. 模型上下文自适应:探测解析 / 预算公式 / 撞墙特征 
+  // 10. 模型上下文自适应:探测解析 / 预算公式 / 撞墙特征
   const lmPayload = JSON.stringify({
     data: [
       { id: 'other-model', max_context_length: 8192 },
@@ -1544,7 +1544,7 @@ async function main(): Promise<void> {
     '适配估算不传上下文时按共享默认算,不许各写各的数'
   )
 
-  // 11. 模型状态栏:进度解析不虚报 + LM Studio 状态映射 
+  // 11. 模型状态栏:进度解析不虚报 + LM Studio 状态映射
   assert.equal(parseLoadProgress({ progress: 0.3525 }), 35.25, 'llama.cpp 新版:0~1 按比例 ×100')
   assert.equal(
     parseLoadProgress({ error: { message: 'Loading model', progress: 0.42 } }),
@@ -1611,7 +1611,7 @@ async function main(): Promise<void> {
   )
   assert.equal(parseLmStudioModelState(null, 'q').state, 'idle', '垃圾回复别炸')
 
-  // 12. 热身估价进度:数是估的,但估得有据、封顶诚实 
+  // 12. 热身估价进度:数是估的,但估得有据、封顶诚实
   assert.equal(estimateLoadProgress(5000, 10_000), 50, '已用时÷上次耗时,一半就是 50%')
   assert.equal(estimateLoadProgress(0, 10_000), 1, '刚开始加载给 1%,避免进度停在 0')
   assert.equal(estimateLoadProgress(99_999, 10_000), 95, '封顶 95:没真就绪绝不谎报 100')
@@ -1670,7 +1670,7 @@ async function main(): Promise<void> {
   assert.equal(averageWarmup([150_000, 30_000, 30_000]), 70_000, '一冷两热,均值落在中间')
   assert.equal(averageWarmup([1000, 1500]), 1250, '均值四舍五入到毫秒')
 
-  // 13. 热身不掐表:5 分钟后温柔提醒,绝不催命 
+  // 13. 热身不掐表:5 分钟后温柔提醒,绝不催命
   assert.equal(warmupNudgeMessage(0), undefined, '刚开始加载不提醒')
   assert.equal(warmupNudgeMessage(4 * 60_000 + 59_000), undefined, '差一秒到五分钟也不提醒')
   assert.ok(warmupNudgeMessage(5 * 60_000)?.includes('取消'), '到点开口:提醒里得告诉人「取消」在哪')
@@ -1770,7 +1770,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
 
-  // 超时话术按现场分流 + 半截必留(纯函数) 
+  // 超时话术按现场分流 + 半截必留(纯函数)
   assert.ok(halfNote('disconnect').includes('连接断了'), '断线注脚说断线')
   assert.ok(halfNote('watchdog').includes('等太久'), '掐断注脚说等太久')
   assert.ok(halfNote('stall').includes('卡住'), '卡住注脚说卡住')
@@ -1784,7 +1784,7 @@ async function main(): Promise<void> {
   )
   assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
   assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
-  // 上下文指路话术按引擎分家 
+  // 上下文指路话术按引擎分家
   assert.ok(
     friendlyHttpError(400, 'exceeds the available context size', 'lmstudio')?.includes('LM Studio'),
     '外接的指路去 LM Studio 调大'
@@ -1804,7 +1804,7 @@ async function main(): Promise<void> {
     '不带引擎名号按内置口径(兼容老调用)'
   )
 
-  // 上下文认主:手填数只在内置当真,LM Studio 只信探测 
+  // 上下文认主:手填数只在内置当真,LM Studio 只信探测
   assert.equal(
     resolveContextSize('builtin', 8192, 32768),
     8192,
@@ -1832,14 +1832,14 @@ async function main(): Promise<void> {
     'LM Studio:旧数加探测失败,一样兜底不认旧数'
   )
 
-  // KV 缓存估算(纯函数) 
+  // KV 缓存估算(纯函数)
   assert.equal(estimateKvBytes(4096, 14.26 * G), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
   assert.equal(estimateKvBytes(4096, 6 * G), 4096 * 128 * 1024, '4~8GB 减半')
   assert.equal(estimateKvBytes(4096, 2 * G), 4096 * 64 * 1024, '<4GB 再减半')
   assert.equal(estimateKvBytes(0, 14.26 * G), 0, '上下文 0 不估')
   assert.equal(estimateKvBytes(Number.NaN, 14.26 * G), 0, 'NaN 不估')
 
-  // 提示词体系重写:教学三档切片互不串味(自由对话仍在消费) 
+  // 提示词体系重写:教学三档切片互不串味(自由对话仍在消费)
   // 名词小课堂由档位接管:off 明确不教学,brief 封顶 3 条,deep 封顶 5 条
   assert.ok(
     teachingSlice('off').includes('不搞教学') && !teachingSlice('off').includes('名词小课堂'),
@@ -1856,7 +1856,7 @@ async function main(): Promise<void> {
   )
   assert.ok(!teachingSlice('deep').includes('不搞教学'), '详细档不串 off 的「不搞教学」')
 
-  // 体积红线(产品指定的防回弹):装配产物不许再胖回去 
+  // 体积红线(产品指定的防回弹):装配产物不许再胖回去
   assert.ok(
     chatSystem.length <= 900,
     `闲聊底座(无工具)≤900 字(2.0 内核+标签口径后放宽,实测 ${chatSystem.length})`
@@ -1886,7 +1886,7 @@ async function main(): Promise<void> {
 
   console.log('✅ AI 人话解释自测全部通过')
 
-  // 流式 token 账(纯函数) 
+  // 流式 token 账(纯函数)
   // extractStreamStats:timings 帧(读材料段)
   void (() => {
     const s = extractStreamStats({ timings: { prompt_n: 2048, predicted_n: 0 } }, 'reading')
@@ -1965,7 +1965,7 @@ async function main(): Promise<void> {
   console.log(
     '   自由对话(小探针人设/附件清洗/引用代码清洗与组装/消息组装/联网状态表) · 二进制判断 · 双 Provider 配置与老格式迁移 · resolveAiTarget 收敛 · 非流式与 SSE 流式链路通 · 教学三档切片 · 模型状态栏(进度不虚报/LM 状态映射/热身估价有据封顶/滚动三条均值/热身不掐表只提醒/适配估算与退出诊断)'
   )
-  // 提示词体系 2.0 · XML 资料包裹总点检(产品定稿):一切外来内容进标签,程序插话也有皮 
+  // 提示词体系 2.0 · XML 资料包裹总点检(产品定稿):一切外来内容进标签,程序插话也有皮
   // 数据块:附件/引用/摘要旧已规范
   // 程序插话:提醒卡/逼卷令统一 program_reminder;重复工具提醒包 program_note
   assert.ok(
@@ -1998,7 +1998,7 @@ async function main(): Promise<void> {
   assert.ok(stubbed?.messages[2]?.content.includes('占位注记'), '占位注记要自述来历')
   assert.ok(stripToolResult(wrapped) === '文件内容原文', '剥工具结果皮要还原原文')
 
-  // /compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列) 
+  // /compact 手动压缩(命令识别/史料清洗/压缩消息拼装/摘要洗消/摘要进消息序列)
   // isCompactCommand:整句就是 /compact 才算,大小写不拘;后面跟了字的不算
   assert.equal(isCompactCommand('/compact'), true, '光杆 /compact 要认')
   assert.equal(isCompactCommand('  /Compact  '), true, '首尾空白和大小写不拘')
@@ -2089,7 +2089,7 @@ async function main(): Promise<void> {
     '没摘要不留空块'
   )
 
-  // 15. 复读机防线:探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端 
+  // 15. 复读机防线:探测器/截断纯函数 + 反重复参数 + 重答保险丝端到端
   // 15a. 探测器:该抓的抓、该放的放(只查尾巴 —— 后面还在往下写的重复不算)
   assert.equal(
     detectRepetitionTail('今天天气不错,我们出门逛逛,顺路买了点菜。'),

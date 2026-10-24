@@ -122,7 +122,7 @@ function dir(
   assert.equal(isTreePartial(tree), false)
 }
 
-// 内联标题改名:renameFileNode 换名重排 
+// 内联标题改名:renameFileNode 换名重排
 {
   const tree = dir('root', '', [
     dir('docs', 'docs', [file('b.md', 'docs/b.md'), file('c.md', 'docs/c.md')]),

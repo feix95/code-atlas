@@ -43,7 +43,7 @@ function eq(name: string, actual: unknown, want: unknown) {
   check(name, canon(actual) === canon(want), `got ${canon(actual)} want ${canon(want)}`)
 }
 
-// normalizeModelPathKey 
+// normalizeModelPathKey
 console.log(' normalizeModelPathKey 键归一化')
 check(
   '正斜杠归一成反斜杠+小写',
@@ -166,7 +166,7 @@ console.log(' 账簿净化(64 本上限/脏键/原型污染)')
   )
 }
 
-// launchFor / launchSignature 
+// launchFor / launchSignature
 console.log(' 按模型取账 / 对账签名')
 {
   const builtin = {
@@ -200,7 +200,7 @@ console.log(' 按模型取账 / 对账签名')
   )
 }
 
-// parseExtraArgs 
+// parseExtraArgs
 console.log(' 专家参数解析(白名单/带值旗/注入)')
 {
   const ok = parseExtraArgs('-t 6 -b 1024 -ub 512 --no-mmap --mlock -np 4')
@@ -253,7 +253,7 @@ console.log(' 专家参数解析(白名单/带值旗/注入)')
   const r = parseExtraArgs('--wat 5')
   check('拒绝理由报旗名', !r.ok && r.reason.includes('--wat'))
 }
-// 签名与重启对账 
+// 签名与重启对账
 console.log(' 签名进对账(改账重启,不改不重启)')
 {
   // 模拟 builtin.ts 的对账:startedSig 记启动时的签名;设置里的账洗完再比
@@ -276,7 +276,7 @@ console.log(' 签名进对账(改账重启,不改不重启)')
   check('清账回自动签名', launchSignature(launchFor(cfg3)) === launchSignature(null))
 }
 
-// config 落盘→读回 round-trip 
+// config 落盘→读回 round-trip
 console.log(' config 持久化 round-trip')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-cfg-'))

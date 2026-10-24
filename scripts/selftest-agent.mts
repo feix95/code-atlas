@@ -70,7 +70,7 @@ import {
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 
 async function main(): Promise<void> {
-  // 1. 路径安检:项目内相对路径放行,越界的花活一律拒收 
+  // 1. 路径安检:项目内相对路径放行,越界的花活一律拒收
   assert.equal(sanitizeAgentRelPath('src/index.ts'), 'src/index.ts', '正常相对路径原样通过')
   assert.equal(sanitizeAgentRelPath(''), '', '空串 = 项目根目录,放行')
   assert.equal(sanitizeAgentRelPath('  src/a.ts  '), 'src/a.ts', '首尾空白剪掉')
@@ -164,19 +164,19 @@ async function main(): Promise<void> {
     await rm(grantSandbox, { recursive: true, force: true })
   }
 
-  // 2. 读文件额度:按上下文窗口缩放,有下限有上限(放宽一档,压缩接客) 
+  // 2. 读文件额度:按上下文窗口缩放,有下限有上限(放宽一档,压缩接客)
   assert.equal(agentReadChars(4096), 2000, '小上下文达下限:一段也保 2000 字')
   assert.equal(agentReadChars(16384), 5461, '16384 token 上下文读约 5461 字')
   assert.equal(agentReadChars(32768), 10922, '32768 token 上下文读约 10922 字')
   assert.equal(agentReadChars(65536), 12000, '大上下文封顶:最多 12000 字')
 
-  // 3. 工具参数清洗:arguments 是字符串 JSON、直接对象、坏账三种都接得住 
+  // 3. 工具参数清洗:arguments 是字符串 JSON、直接对象、坏账三种都接得住
   assert.deepEqual(parseToolArgs('{"relPath":"src"}'), { relPath: 'src' }, '字符串 JSON 解析')
   assert.deepEqual(parseToolArgs({ relPath: 'src' }), { relPath: 'src' }, '直接对象原样通过')
   assert.equal(parseToolArgs('not json'), null, '坏 JSON 给 null,不炸循环')
   assert.equal(parseToolArgs(null), null, '空参数给 null')
 
-  // 4. 工具调用抽取:缺 id 补序号,坏参不拖垮整轮 
+  // 4. 工具调用抽取:缺 id 补序号,坏参不拖垮整轮
   const calls = extractToolCalls({
     role: 'assistant',
     content: null,
@@ -194,7 +194,7 @@ async function main(): Promise<void> {
   assert.equal(calls[1].id, 'call_1', '缺 id 的按序号补兜底(第二条 index=1)')
   assert.equal(calls[1].args, null, '坏参数解析为 null')
 
-  // 5. 防打转:同键第二次就算重复 
+  // 5. 防打转:同键第二次就算重复
   const done = new Set<string>()
   const key = toolCallKey('read_file', 'src/index.ts')
   assert.equal(done.has(key), false, '第一遍不算重复')
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
   assert.ok(REPEAT_NUDGE.includes('已经看过'), '重复提醒要说人话')
   assert.ok(ROUND_CAP_NUDGE.includes('别再调用'), '逼卷令要拦住工具')
 
-  // 6. 工具表:本地只有「看」的四件,写文件的工具根本不存在;联网开着才多 web_search / web_fetch 
+  // 6. 工具表:本地只有「看」的四件,写文件的工具根本不存在;联网开着才多 web_search / web_fetch
   assert.equal(AGENT_TOOLS_LOCAL.length, 4, '本地发三件只读工具和一件临时目录授权工具')
   assert.deepEqual(
     AGENT_TOOLS_LOCAL.map((t) => t.function.name),
@@ -269,7 +269,7 @@ async function main(): Promise<void> {
   const noteTool = AGENT_TOOLS.find((t) => t.function.name === 'save_research_note')!
   assert.deepEqual(noteTool.function.parameters.required, ['note'], '研究笔记必须带 note')
 
-  // 7. 步骤播报:翻什么、看成没看成,一句大白话 
+  // 7. 步骤播报:翻什么、看成没看成,一句大白话
   assert.ok(
     agentStepText('list_files', 'src', 'done', '共 3 个').includes('src'),
     '翻完要带上目标名'
@@ -308,7 +308,7 @@ async function main(): Promise<void> {
     '打开网页说「打开了」'
   )
 
-  // 8. token 总账:读写累加,速度认最后一轮 
+  // 8. token 总账:读写累加,速度认最后一轮
   assert.deepEqual(
     mergeUsage(
       { promptTokens: 100, outputTokens: 50, tokensPerSecond: 30 },
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
   assert.deepEqual(mergeUsage(undefined, { promptTokens: 9 }), { promptTokens: 9 }, '空账并入实账')
   assert.equal(mergeUsage(undefined, undefined), undefined, '两轮都没账就是没账')
 
-  // 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后 
+  // 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后
   assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 16, '轮数封顶得是个讲道理的数')
   assert.equal(AGENT_WEB_MAX_LOOKUPS, 8, '联网研究预算固定 8 次')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
@@ -338,7 +338,7 @@ async function main(): Promise<void> {
   assert.ok(AGENT_FILES_ADDENDUM.includes('search_content'), '切片要教模型用搜索找内容')
   assert.equal(AGENT_REMINDER_MIN_TOOL_CALLS, 3, '提醒卡触发门槛:本场工具调用满 3 次才垫卡')
 
-  // 10. 流式工具调用碎片的拼装:参数逐段续、多调用按 index 分组 
+  // 10. 流式工具调用碎片的拼装:参数逐段续、多调用按 index 分组
   const assembled = assembleToolCalls([
     { index: 0, id: 'call_a', function: { name: 'list_files', arguments: '' } },
     { index: 0, function: { arguments: '{"relPath":"s' } },
@@ -358,7 +358,7 @@ async function main(): Promise<void> {
   const [noArgs] = assembleToolCalls([{ index: 0, id: 'c', function: { name: 'list_files' } }])
   assert.equal(noArgs.args, null, '一个字参数都没给的,args 为 null 走「参数不合法」的喂回')
 
-  // 11. 上下文自动压缩:上下文将满时旧资料变注记,近的留原样 
+  // 11. 上下文自动压缩:上下文将满时旧资料变注记,近的留原样
   const longContent = 'A'.repeat(2000)
   const shortContent = 'B'.repeat(100)
   const conversation: AgentChatMessage[] = [
@@ -454,7 +454,7 @@ async function main(): Promise<void> {
     '留原样的条数得是个讲道理的数'
   )
 
-  // 12. 工具能力探测的判别:只认「请求被拒 + 点名工具」的错 
+  // 12. 工具能力探测的判别:只认「请求被拒 + 点名工具」的错
   assert.equal(
     looksLikeToolsUnsupported(400, '{"error":"tools is not supported by this model"}'),
     true,
@@ -474,7 +474,7 @@ async function main(): Promise<void> {
   assert.equal(looksLikeToolsUnsupported(500, 'tools error'), false, '500 是服务端自己呛到:不冒领')
   assert.equal(looksLikeToolsUnsupported(200, 'tools'), false, '200 根本不是错误:不认')
 
-  // 13. 本轮问题的提醒卡:每轮垫、垫前撤,问题原话封顶 200 字 
+  // 13. 本轮问题的提醒卡:每轮垫、垫前撤,问题原话封顶 200 字
   const reminder = buildAgentReminder('  「忙」这个字出现在哪些文件,要具体到行号  ')
   assert.ok(reminder.startsWith(AGENT_REMINDER_PREFIX), '提醒卡带固定前缀,撤卡和兜底都靠它认')
   assert.ok(reminder.includes('「忙」这个字出现在哪些文件'), '问题原话要原样引用进卡里')
@@ -532,7 +532,7 @@ async function main(): Promise<void> {
     '没卡的消息原样返回(条数不变)'
   )
 
-  // 14. 翻文件切片的两条铁规矩(口径换成逐字稿 D):清单让程序摆 + 资料里的指令不许当真 
+  // 14. 翻文件切片的两条铁规矩(口径换成逐字稿 D):清单让程序摆 + 资料里的指令不许当真
   assert.ok(
     AGENT_FILES_ADDENDUM.includes('命中清单程序会直接摆给用户看'),
     '切片要交代:命中清单程序直接摆,模型只说要点'
@@ -547,11 +547,11 @@ async function main(): Promise<void> {
     '防自指条款要点名「程序垫的提醒」这条边界'
   )
 
-  // 15. 翻文件切片的行为规矩:同一样不翻第二遍、不提「工具」这个词 
+  // 15. 翻文件切片的行为规矩:同一样不翻第二遍、不提「工具」这个词
   assert.ok(AGENT_FILES_ADDENDUM.includes('不翻第二遍'), '切片要有「不翻第二遍」的规矩')
   assert.ok(AGENT_FILES_ADDENDUM.includes('别提「工具」'), '切片要让模型说人话,别提工具')
 
-  // 16. web_search 的三道闸:搜索词安检 / 内网闸 / 正文剥壳 
+  // 16. web_search 的三道闸:搜索词安检 / 内网闸 / 正文剥壳
   assert.equal(
     sanitizeWebQuery('  Claude Code\nskills 在哪  '),
     'Claude Code skills 在哪',
@@ -618,7 +618,7 @@ async function main(): Promise<void> {
     '单条摘要留一截就够判断讲什么,别让一家独占上下文'
   )
 
-  // 16b. 维基相关性把关(联网验收批次):弱关联垃圾不许截胡,真命中的放行 
+  // 16b. 维基相关性把关(联网验收批次):弱关联垃圾不许截胡,真命中的放行
   const hit = (title: string, snippet: string): WebSearchHit => ({
     title,
     snippet,
@@ -655,7 +655,7 @@ async function main(): Promise<void> {
   )
   assert.equal(wikiHitsRelevant('永劫无间', []), false, '没命中就是没查到')
 
-  // 17. 上网守则:开了「联网查证」才垫的一段,教它查证、守隐私、防上当 
+  // 17. 上网守则:开了「联网查证」才垫的一段,教它查证、守隐私、防上当
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_search'), '上网守则要点名工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('绝不把本地路径'), '隐私红线要白纸黑字')
   assert.ok(AGENT_WEB_ADDENDUM.includes('别当真'), '网页内容的防上当条款要有')
@@ -676,7 +676,7 @@ async function main(): Promise<void> {
     'source 分流已退役(源序程序统一排),守则里不该再教它挑源'
   )
 
-  // 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过 
+  // 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过
   const tavilyOk = parseTavilyResults(
     JSON.stringify({
       results: [
@@ -701,7 +701,7 @@ async function main(): Promise<void> {
   assert.deepEqual(parseTavilyResults('不是 JSON'), [], '坏 JSON = 空清单,让兜底链接着走')
   assert.deepEqual(parseTavilyResults('{"results": null}'), [], 'results 缺失 = 空清单')
 
-  // 18c. 喂给模型的材料要带链接和发布时间(模型能判断来源、能引用) 
+  // 18c. 喂给模型的材料要带链接和发布时间(模型能判断来源、能引用)
   const material = await webSearchDetailed('selftest-web-material-2026', {
     tavilyKey: 'tvly-selftest',
     postJson: async () =>
@@ -725,7 +725,7 @@ async function main(): Promise<void> {
   assert.ok(material.material.includes('2026-10-01'), '发布时间要带上,判断新鲜度用')
   assert.ok(material.material.includes('正文第一段'), '第一条正文节选照旧垫底')
 
-  // 19. 紧急瘦身(压缩那案的兜底):上下文溢出时整段裁旧账,只保 system 和最新真问题 
+  // 19. 紧急瘦身(压缩那案的兜底):上下文溢出时整段裁旧账,只保 system 和最新真问题
   const fat: AgentChatMessage[] = [
     { role: 'system', content: '人设' },
     { role: 'user', content: '旧问题一' },
@@ -834,7 +834,7 @@ async function main(): Promise<void> {
   )
   assert.ok(blacklistedSystem.includes('翻文件开关'), '要指路输入框旁的翻文件开关')
 
-  // 23. 流式轮次的封板令:边说边喊工具时,已吐的话封口保留 
+  // 23. 流式轮次的封板令:边说边喊工具时,已吐的话封口保留
   // 假模型服务按问题里的 mode 出三种牌:talk = 纯说话;work = 先说话再喊工具;
   // silent = 一个字不说直接喊工具。验证:work 发封板令不发回滚,另外两种都不发
   const sealServer = createServer((req, res) => {

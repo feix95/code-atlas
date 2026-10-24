@@ -59,7 +59,7 @@ const M = (over: Partial<MachineProfile>): MachineProfile => ({
   ...over
 })
 
-// 目录登记完整性 
+// 目录登记完整性
 console.log(' 引擎目录完整性')
 {
   for (const b of ['cuda', 'vulkan', 'cpu'] as const) {
@@ -83,7 +83,7 @@ console.log(' 引擎目录完整性')
   check('cuda 两包(主包+cudart)', ENGINE_CATALOG.cuda.assets.length === 2)
 }
 
-// 后端推荐矩阵 
+// 后端推荐矩阵
 console.log(' recommendBackend 矩阵')
 eq('RTX 5060 Ti(cc 12.0)→ cuda', recommendBackend(M({})).backend, 'cuda')
 eq('GTX 1060(cc 6.1)→ vulkan', recommendBackend(M({ gpuComputeCap: 6.1 })).backend, 'vulkan')
@@ -116,7 +116,7 @@ eq(
   'cuda'
 )
 
-// 引擎选择矩阵 
+// 引擎选择矩阵
 console.log(' resolveEngineChoice 矩阵')
 {
   const r = (userChoice: 'auto' | 'cuda' | 'vulkan' | 'cpu', installed: string[], vendor = true) =>
@@ -176,7 +176,7 @@ eq('sanitizeBackendChoice 白名单', ['auto', 'cuda', 'junk', undefined].map(sa
   'auto'
 ])
 
-// 安装器纯函数件 
+// 安装器纯函数件
 console.log(' 安装器纯件(进度折算 / zip 安检)')
 eq('下载进度:两包下完一半', downloadPercent([100, 300], [50, 150]), 45)
 eq('下载进度:全下完 = 90(尾巴留给校验解压)', downloadPercent([100, 300], [100, 300]), 90)
@@ -190,7 +190,7 @@ check('zip 安检:UNC 拒', !isZipEntrySafe('\\\\share\\x'))
 check('zip 安检:正常条目收', isZipEntrySafe('./llama-server.exe') && isZipEntrySafe('bin/x.dll'))
 check('zip 安检:反斜杠 .. 拒', !isZipEntrySafe('a\\..\\evil.txt'))
 
-// verifyAndExtract 全谱 
+// verifyAndExtract 全谱
 console.log(' verifyAndExtract(真 tar,错 sha / 截短 / zip-slip)')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-eng-'))
@@ -337,7 +337,7 @@ console.log(' installBackend 失败谱(假 exe 跑不动 → 清理 + 人话)')
   }
 }
 
-// config 的 backend 落盘 
+// config 的 backend 落盘
 console.log(' config backend round-trip')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-cfgb-'))
@@ -357,7 +357,7 @@ console.log(' config backend round-trip')
   }
 }
 
-// 对账键把后端算进签名 
+// 对账键把后端算进签名
 console.log(' settingsKey 签名含后端')
 {
   const base = { serverPath: '', modelPath: 'f:\\m.gguf' }

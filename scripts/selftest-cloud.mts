@@ -52,7 +52,7 @@ function cloudConfig(patch: Partial<AiCloudSettings> = {}): AiConfig {
   }
 }
 
-// 1. 预设表与清洗 
+// 1. 预设表与清洗
 {
   const ids = CLOUD_VENDORS.map((v) => v.id)
   assert.equal(new Set(ids).size, ids.length, '服务商 id 不得重复')
@@ -72,7 +72,7 @@ function cloudConfig(patch: Partial<AiCloudSettings> = {}): AiConfig {
   assert.equal(sanitizeProviderKind(undefined), 'lmstudio', '缺字段沿用历史兜底 lmstudio')
 }
 
-// 2. 存取往返:有加密器 → 落盘为密文,读回为明文 
+// 2. 存取往返:有加密器 → 落盘为密文,读回为明文
 const dir = await mkdtemp(join(tmpdir(), 'codeatlas-cloud-'))
 try {
   setSecretCodec(fakeCodec)
@@ -119,7 +119,7 @@ try {
   await rm(dir, { recursive: true, force: true })
 }
 
-// 3. resolveAiTarget:在线 API 缺项各给指路话,齐全则盖章 cloud 
+// 3. resolveAiTarget:在线 API 缺项各给指路话,齐全则盖章 cloud
 {
   const ok = resolveAiTarget(cloudConfig())
   assert.ok(ok.ok, '配置齐全应解析成功')
@@ -138,7 +138,7 @@ try {
   }
 }
 
-// 4. 上下文:在线 API 不探测,用设置里选的档 
+// 4. 上下文:在线 API 不探测,用设置里选的档
 {
   assert.equal(resolveContextSize('cloud', 65536, null), 65536, '在线 API 用选定档位')
   assert.equal(resolveContextSize('cloud', 1048576, null), 1048576, '在线 API 可到 1M')
@@ -160,7 +160,7 @@ try {
   }
 }
 
-// 5. 报错人话:只对在线 API 翻译状态码,本地两路行为不变 
+// 5. 报错人话:只对在线 API 翻译状态码,本地两路行为不变
 {
   assert.ok(friendlyHttpError(401, '', 'cloud')?.includes('API Key'))
   assert.ok(friendlyHttpError(402, '', 'cloud')?.includes('余额'))
@@ -172,7 +172,7 @@ try {
   assert.equal(friendlyHttpError(500, '', 'builtin'), null, '内置引擎行为不变')
 }
 
-// 6. 读取模型:带 Key、翻译报错、连不上、空 Key 拦截(mock 网络) 
+// 6. 读取模型:带 Key、翻译报错、连不上、空 Key 拦截(mock 网络)
 {
   assert.deepEqual(parseModelIds({ data: [{ id: 'b' }, { id: 'a' }, { x: 1 }] }), ['b', 'a'])
   assert.deepEqual(parseModelIds(null), [], '认不出回空数组')
@@ -222,7 +222,7 @@ try {
   assert.deepEqual(lmIds, ['local'])
 }
 
-// 7. 设置完成度:在线 API 需确认 + Key + 模型 + http(s) 地址 
+// 7. 设置完成度:在线 API 需确认 + Key + 模型 + http(s) 地址
 {
   assert.equal(isAiConfigured(cloudConfig()), true)
   assert.equal(isAiConfigured(cloudConfig({ consented: false })), false)

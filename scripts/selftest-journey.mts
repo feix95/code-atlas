@@ -1030,7 +1030,7 @@ try {
   assert.equal(Number(await hFieldE.inputValue()), hEdge0, 'height untouched')
   await page.keyboard.press('Control+z')
   assert.equal(Number(await wFieldE.inputValue()), wEdge0, 'undo restores width')
-  // 外观样式(Figma 式活链接):存方案 → 应用 → 手动改脱钩 → 同名覆盖回写 → 删除保数值 
+  // 外观样式(Figma 式活链接):存方案 → 应用 → 手动改脱钩 → 同名覆盖回写 → 删除保数值
   const styleSelect = page.getByRole('combobox', { name: '外观样式', exact: true })
   const styleNameOf = (): Promise<string> =>
     styleSelect.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? '')

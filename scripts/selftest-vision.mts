@@ -1,4 +1,4 @@
-// 自测:纯函数全摊平 
+// 自测:纯函数全摊平
 // 跑法: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-vision.mts
 // 覆盖:
 // pickMmproj(ai/mmproj.ts)        —— 无/单个/多只候选、大小写、前缀并列、精度序、字母序
@@ -15,7 +15,7 @@ import { cloudVisionOf } from '../src/shared/visionModels.ts'
 import { sameModelStatus } from '../src/shared/statusCompare.ts'
 import type { ModelStatus } from '../src/shared/types.ts'
 
-// pickMmproj 
+// pickMmproj
 const MODEL = 'X:/models/Qwen2-VL-7B-Q8_0.gguf'
 
 // 零候选:没有 mmproj / 有 mmproj 但不是 .gguf / 只认文件名含 mmproj
@@ -56,7 +56,7 @@ assert.equal(pickMmproj(MODEL, ['mmproj-x-bf16.gguf', 'mmproj-x-f32.gguf']), 'mm
 // 精度再并列 → 字母序
 assert.equal(pickMmproj(MODEL, ['mmproj-x-b.gguf', 'mmproj-x-a.gguf']), 'mmproj-x-a.gguf')
 
-// 歧义防线:多模型平铺目录 
+// 歧义防线:多模型平铺目录
 // 单模型目录:一只 mmproj 名字再陌生也直接用(它就是这模型的眼睛)
 assert.equal(
   pickMmproj('X:/models/minicpm-v-4_6-q8_0.gguf', [
@@ -112,7 +112,7 @@ assert.equal(
   null
 )
 
-// 保险丝判定:该不该摘掉 mmproj 降级重拉 
+// 保险丝判定:该不该摘掉 mmproj 降级重拉
 // 带了投影仪 + 引擎自己退了 → 重拉一次
 assert.equal(shouldRetryWithoutMmproj('D:/models/mmproj-f16.gguf', true), true)
 // 没带投影仪的失败(模型坏/显存不够)→ 不重试,重拉也白搭
@@ -121,7 +121,7 @@ assert.equal(shouldRetryWithoutMmproj(null, true), false)
 assert.equal(shouldRetryWithoutMmproj('D:/models/mmproj-f16.gguf', false), false)
 assert.equal(shouldRetryWithoutMmproj(null, false), false)
 
-// parseLlamaPropsVision 
+// parseLlamaPropsVision
 assert.equal(parseLlamaPropsVision({ modalities: { vision: true } }), 'vision')
 assert.equal(parseLlamaPropsVision({ modalities: { vision: false } }), 'text-only')
 // 字段缺失/类型不对/坏数据一律 unknown
@@ -130,7 +130,7 @@ assert.equal(parseLlamaPropsVision({}), 'unknown')
 assert.equal(parseLlamaPropsVision(null), 'unknown')
 assert.equal(parseLlamaPropsVision({ modalities: { vision: 'yes' } }), 'unknown')
 
-// parseLmStudioModelVision 
+// parseLmStudioModelVision
 const lmList = {
   data: [
     { id: 'minicpm-v', type: 'vlm', state: 'loaded' },
@@ -146,7 +146,7 @@ assert.equal(parseLmStudioModelVision(null, 'minicpm-v'), 'unknown')
 // 老版本回数组直给的形状也认
 assert.equal(parseLmStudioModelVision([{ id: 'x', type: 'vlm' }], 'x'), 'vision')
 
-// cloudVisionOf:在线 API 名字认账 
+// cloudVisionOf:在线 API 名字认账
 // 命中已知视觉系 → vision
 for (const name of [
   'gpt-4o',
@@ -192,7 +192,7 @@ for (const name of [
   assert.equal(cloudVisionOf(name), 'unknown', `${name} 不该冒认`)
 }
 
-// sameModelStatus:vision 纳入去重 
+// sameModelStatus:vision 纳入去重
 const base: ModelStatus = {
   provider: 'builtin',
   state: 'ready',

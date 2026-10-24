@@ -48,7 +48,7 @@ function edge(g: LevelGraph, from: string, to: string): LevelGraph['edges'][numb
   return g.edges.find((e) => e.from === from && e.to === to)
 }
 
-// 根目录视角 
+// 根目录视角
 {
   const g = buildLevelGraph(tree, edges, '')
   assert.ok(g)
@@ -70,7 +70,7 @@ function edge(g: LevelGraph, from: string, to: string): LevelGraph['edges'][numb
   assert.equal(node(g, 'src').degree, 1)
 }
 
-// 子目录视角:层内边、归并计数、外部节点 
+// 子目录视角:层内边、归并计数、外部节点
 {
   const g = buildLevelGraph(tree, edges, 'src')
   assert.ok(g)
@@ -92,7 +92,7 @@ function edge(g: LevelGraph, from: string, to: string): LevelGraph['edges'][numb
   assert.equal(node(g, 'src/App.tsx').degree, 3, '度数按归并后的权重累计')
 }
 
-// 深层视角:外部节点取与当前目录最近公共祖先的下一级 
+// 深层视角:外部节点取与当前目录最近公共祖先的下一级
 {
   const g = buildLevelGraph(tree, edges, 'src/utils')
   assert.ok(g)
@@ -108,10 +108,10 @@ function edge(g: LevelGraph, from: string, to: string): LevelGraph['edges'][numb
   assert.ok(!g.nodes.some((n) => n.id === 'run.ts'), '两端都在层外的边(run.ts → src/main.ts)不出现')
 }
 
-// 目录不存在 → null 
+// 目录不存在 → null
 assert.equal(buildLevelGraph(tree, edges, 'nope'), null)
 
-// 空目录、未扫描目录:无节点 
+// 空目录、未扫描目录:无节点
 {
   const g = buildLevelGraph(tree, edges, 'src/vendorish')
   assert.ok(g)
@@ -119,7 +119,7 @@ assert.equal(buildLevelGraph(tree, edges, 'nope'), null)
   assert.equal(g.lazy, true, '当前目录本身未扫描时带 lazy 标记,界面据此先扫描')
 }
 
-// 引用端点不在扫描树里(边比树新):不凭空造节点 
+// 引用端点不在扫描树里(边比树新):不凭空造节点
 {
   const g = buildLevelGraph(tree, [{ from: 'src/ghost.ts', to: 'src/main.ts' }], 'src')
   assert.ok(g)
@@ -127,7 +127,7 @@ assert.equal(buildLevelGraph(tree, edges, 'nope'), null)
   assert.ok(!g.nodes.some((n) => n.id === 'src/ghost.ts'))
 }
 
-// 单层节点超限:按度数保留前 N 个,其余归并为「其余」节点,边改挂过去 
+// 单层节点超限:按度数保留前 N 个,其余归并为「其余」节点,边改挂过去
 {
   const many: ScanTreeNode[] = []
   for (let i = 0; i < 10; i++) many.push(file(`big/f${i}.ts`))

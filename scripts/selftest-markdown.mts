@@ -20,7 +20,7 @@ function types(blocks: MdBlock[]): string[] {
 }
 
 function main(): void {
-  // 1. 表格:头 + 分隔 + 数据行,对齐登记照分隔行 
+  // 1. 表格:头 + 分隔 + 数据行,对齐登记照分隔行
   const tbl = blocksOf('| 项 | 说 | 数 |\n|----|:--:|---:|\n| a | **粗** | 1 |\n| b | c | 2 |')
   assert.deepEqual(types(tbl), ['table'], '一张表占一个块')
   const t0 = tbl[0]
@@ -39,7 +39,7 @@ function main(): void {
   const onlySep = blocksOf('|----|----|')
   assert.deepEqual(types(onlySep), ['para'], '裸分隔行只是一行文字')
 
-  // 2. 标题四级 
+  // 2. 标题四级
   const heads = blocksOf('# 一\n## 二\n### 三\n#### 四')
   assert.deepEqual(
     heads.map((b) => (b.t === 'heading' ? b.level : 0)),
@@ -47,7 +47,7 @@ function main(): void {
     'h1–h4 各级都认'
   )
 
-  // 3. 列表:嵌套折树、有序无序、待办 
+  // 3. 列表:嵌套折树、有序无序、待办
   const list = blocksOf('- 甲\n  - 子一\n  - 子二\n- 乙')
   assert.equal(list.length, 1, '一张列表块')
   const l0 = list[0] as MdList
@@ -75,7 +75,7 @@ function main(): void {
     '待办标记 [ ] 不进正文'
   )
 
-  // 4. 段落合并:相邻行是一段,空行才分家 
+  // 4. 段落合并:相邻行是一段,空行才分家
   const paras = blocksOf('第一行\n第二行\n\n第三行')
   assert.deepEqual(types(paras), ['para', 'para'], '空行分两段,中间那行是合并的')
   const joined = paras[0]
@@ -91,7 +91,7 @@ function main(): void {
   const mixed = blocksOf('前话\n- 项一\n- 项二')
   assert.deepEqual(types(mixed), ['para', 'list'], '列表把段落截断')
 
-  // 5. 引用:多行合并成一块,里面还能有列表 
+  // 5. 引用:多行合并成一块,里面还能有列表
   const quote = blocksOf('> 第一行\n> 第二行\n\n外话')
   assert.deepEqual(types(quote), ['quote', 'para'], '两行 > 是一块引用')
   const q = quote[0]
@@ -121,7 +121,7 @@ function main(): void {
     assert.equal(callDefault[0].title, 'tip', '没写标题就用类型名')
   }
 
-  // 6. 围栏代码:里面一个字不动 
+  // 6. 围栏代码:里面一个字不动
   const fenced = blocksOf('```\n**不是粗体** | a | b\n```\n\n- 外头')
   assert.deepEqual(types(fenced), ['code', 'list'], '围栏是一块代码,后面列表照常')
   const f0 = fenced[0]
@@ -129,7 +129,7 @@ function main(): void {
     assert.equal(f0.text, '**不是粗体** | a | b', '围栏内原样保留')
   }
 
-  // 7. 行内语法全家 
+  // 7. 行内语法全家
   const inl = parseInline('粗**b** 斜*i* 下_u_ 删~~d~~ 亮==m== 链[L](u) 码`c`')
   assert.deepEqual(
     inl.map((n) => n.t),
@@ -166,7 +166,7 @@ function main(): void {
     '行内代码里的 ** 不当粗体'
   )
 
-  // 9. 公式:模型写的 $...$ 收成符号,货币不当公式 
+  // 9. 公式:模型写的 $...$ 收成符号,货币不当公式
   assert.equal(latexToUnicode('\\rightarrow'), '→', '\\rightarrow → 右箭头')
   assert.equal(latexToUnicode('\\neq'), '≠', '\\neq → 不等于')
   assert.equal(
@@ -197,8 +197,15 @@ function main(): void {
   assert.equal(neq && neq.t === 'math' ? neq.text : '', '≠', '正文里的 $\\neq$ 画成不等于')
 
   const coded = parseInline('目前是线性的: `$\\rightarrow$` 判断')
-  assert.equal(coded.find((n) => n.t === 'math' || n.t === 'code')?.t, 'math', '反引号整段公式改画,不当代码胶囊')
-  assert.equal(mathFromCodeSpan('$\\rightarrow \\text{指令解析层} \\rightarrow$')?.text, '→ 指令解析层 →')
+  assert.equal(
+    coded.find((n) => n.t === 'math' || n.t === 'code')?.t,
+    'math',
+    '反引号整段公式改画,不当代码胶囊'
+  )
+  assert.equal(
+    mathFromCodeSpan('$\\rightarrow \\text{指令解析层} \\rightarrow$')?.text,
+    '→ 指令解析层 →'
+  )
 
   const fencedMath = blocksOf('```\n$\\rightarrow$\n```')
   assert.equal(fencedMath[0]?.t, 'code', '围栏里的公式原样留')
@@ -213,7 +220,7 @@ function main(): void {
     assert.equal(display[0].text, 'E=mc²', 'E=mc^2 上标')
   }
 
-  // 8. hr 与边界 
+  // 8. hr 与边界
   assert.deepEqual(types(blocksOf('上\n\n---\n\n下')), ['para', 'hr', 'para'], '--- 是分割线')
   assert.deepEqual(types(blocksOf('上\n\n___\n\n下')), ['para', 'hr', 'para'], '___ 也算')
 

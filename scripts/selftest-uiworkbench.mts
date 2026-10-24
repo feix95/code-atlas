@@ -593,7 +593,7 @@ check('外观适配:不填/不勾时三端都缺省;描边按「内描边」口�
   })
 })
 
-// 对齐吸附(snap.ts) 
+// 对齐吸附(snap.ts)
 
 check('snapMove:阈值内吸最近锚点(边/中线),阈值外不动,两轴独立', () => {
   const target = { x: 100, y: 0, width: 40, height: 40 }
@@ -659,7 +659,7 @@ check('框选旋转矩形:按真实旋转轮廓判定,不拿声明外接框糊�
   assert.ok(!rectOverlapsBox(node, { x: 75, y: -25, width: 20, height: 15 }))
 })
 
-// 撤销/重做历史(history.ts + documentStore) 
+// 撤销/重做历史(history.ts + documentStore)
 
 // 文档仓库默认预置一个画板;历史/批次用例按「空白文档」写,先换成空白页
 docActions.resetDocument(false)

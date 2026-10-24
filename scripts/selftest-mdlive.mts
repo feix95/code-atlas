@@ -35,7 +35,7 @@ const ofType =
     d.t === t
 
 function main(): void {
-  // 一、标题:# 化妆成大字行,记号藏起来 
+  // 一、标题:# 化妆成大字行,记号藏起来
   // '# 标题' 占 0~4;光标放后面段落 = 标题不在场
   let text = '# 标题\n\n正文段落\n'
   let plan = planLiveDecosForText(text, 9, 9)
@@ -46,7 +46,7 @@ function main(): void {
   has(plan, (d) => d.t === 'line' && d.cls === 'cm-live-h1', '在场标题行皮照留')
   lacks(plan, ofType('hide'), '在场标题不该藏记号')
 
-  // 二、行内件:**粗** *斜* ~~删~~ `代码` [链](址) 
+  // 二、行内件:**粗** *斜* ~~删~~ `代码` [链](址)
   text = '一段 **粗体** 和 *斜体* 和 ~~删除~~ 和 `code` 和 [文档](doc.md)\n\n收尾行\n'
   const tail = text.length // 光标钉尾 = 上面全不在场
   plan = planLiveDecosForText(text, tail, tail)
@@ -63,7 +63,7 @@ function main(): void {
   lacks(plan, (d) => isHide(d) && d.from >= strongAt - 2 && d.to <= strongAt + 4, '在场粗体不藏 **')
   has(plan, (d) => isHide(d) && text.slice(d.from, d.to) === '~~', '别处记号照藏')
 
-  // 三、列表:无序换圆点、有序染号、待办换真框 
+  // 三、列表:无序换圆点、有序染号、待办换真框
   text = '- 苹果\n1. 第一\n- [ ] 没干\n- [x] 干了\n\n完事\n'
   const end = text.length
   plan = planLiveDecosForText(text, end, end)
@@ -79,7 +79,7 @@ function main(): void {
   plan = planLiveDecosForText(text, text.indexOf('没'), text.indexOf('没'))
   lacks(plan, (d) => d.t === 'task' && d.from === text.indexOf('[ ]'), '在场待办不换框')
 
-  // 四、块级件:引用 / 代码块 / 分割线 / 表格 
+  // 四、块级件:引用 / 代码块 / 分割线 / 表格
   text = '前文\n\n> 引用一行\n> 又一行\n\n下文\n'
   plan = planLiveDecosForText(text, end, end)
   assert.equal(
@@ -118,13 +118,13 @@ function main(): void {
   plan = planLiveDecosForText(text, text.indexOf('苹果'), text.indexOf('苹果'))
   lacks(plan, ofType('table'), '在场表格不换装')
 
-  // 五、下划线标题(Setext):本体行上妆,=== 行关闭 
+  // 五、下划线标题(Setext):本体行上妆,=== 行关闭
   text = '标题字\n===\n\n正文\n'
   plan = planLiveDecosForText(text, text.length, text.length)
   has(plan, (d) => d.t === 'line' && d.from === 0 && d.cls === 'cm-live-h1', 'setext 标题行皮')
   has(plan, (d) => d.t === 'line' && d.cls === 'cm-live-setext', '=== 行关闭成零高')
 
-  // 六、裸 URL 与图片:Autolink 本体不藏,图片记号收 
+  // 六、裸 URL 与图片:Autolink 本体不藏,图片记号收
   text = '<https://x.y> 和 ![图](p.png)\n\n尾\n'
   plan = planLiveDecosForText(text, text.length, text.length)
   lacks(
@@ -135,7 +135,7 @@ function main(): void {
   has(plan, (d) => d.t === 'mark' && d.cls === 'cm-live-img', '图片染哑灰')
 
   // 七、格内编辑的模型账:splitRowCells 切格 / tableModelFromSource 建账 /
-  // serializeTable 回写规范 GFM 
+  // serializeTable 回写规范 GFM
   assert.deepEqual(splitRowCells('| 名 | 价 |'), ['名', '价'], '常规两格掐边')
   assert.deepEqual(splitRowCells('| a | b'), ['a', 'b'], '缺尾管尾段也是格')
   assert.deepEqual(splitRowCells('| a\\|b | c |'), ['a\\|b', 'c'], '转义竖线不断格')
@@ -176,7 +176,7 @@ function main(): void {
   const canonical = '| a | b |\n| --- | --- |\n| 1 | 2 |'
   assert.equal(serializeTable(tableModelFromSource(canonical)!), canonical, '规范源码往返幂等')
 
-  // 表格多格选区:矩形归一 + 剪贴板格子账 
+  // 表格多格选区:矩形归一 + 剪贴板格子账
   assert.deepEqual(
     normalizeRange({ row: 3, col: 2 }, { row: 1, col: 4 }),
     { top: 1, left: 2, bottom: 3, right: 4 },
@@ -218,7 +218,7 @@ function main(): void {
   assert.equal(parseCellsPayload('{"x":1}'), null, '非二维字符串数组的载荷拒收')
   assert.equal(gridToMarkdown(grid), '| a | b\\|c |\n| --- | --- |\n| 1 | 2 |', '格子 → 管道表')
 
-  // 抓手热区:热区在表格边缘外侧宽(罩住图标)、内侧窄(格子中间不现身) 
+  // 抓手热区:热区在表格边缘外侧宽(罩住图标)、内侧窄(格子中间不现身)
   const cols = [
     { start: 100, end: 200 },
     { start: 200, end: 400 }

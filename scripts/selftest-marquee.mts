@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
-import { MARQUEE_HOLD_MS, MARQUEE_HOVER_DELAY_MS, marqueePlan } from '../src/renderer/src/marquee.ts'
+import {
+  MARQUEE_HOLD_MS,
+  MARQUEE_HOVER_DELAY_MS,
+  marqueePlan
+} from '../src/renderer/src/marquee.ts'
 
 assert.equal(MARQUEE_HOVER_DELAY_MS, 100)
 assert.equal(MARQUEE_HOLD_MS, 5000)
