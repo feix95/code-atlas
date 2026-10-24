@@ -1,5 +1,5 @@
 // 第 2 层最左的图标列(UI v3 第 6 节):图谱 → 自由对话 → UI 工作台 → 设置,底端 AI 状态。
-// UI 工作台不吃工作区(设计的是用户自己的 app 界面),没开项目也能点。
+// 自由对话与 UI 工作台不吃工作区,没开项目也能点(没开项目时对话只是不带项目文件上下文)。
 // 列宽 1u(= 顶栏高),与顶栏同底同色;图标 ~0.425u,点击区 ~0.75u。
 // 图谱本体还没实现(规格见《项目结构图谱》),点开一张单例占位页签;
 // AI 状态 = 三态图标 + 状态浮层(内容沿用旧文档第七节,细节在 RailAiStatus)。
@@ -39,7 +39,6 @@ export function Rail({
       <button
         type="button"
         className="rail-btn"
-        disabled={!hasWorkspace}
         onClick={onChat}
         data-tip="自由对话"
         data-tip-side="right"

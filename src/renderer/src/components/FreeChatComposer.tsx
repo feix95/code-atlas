@@ -32,7 +32,8 @@ export function FreeChatComposer({
   onRemoveRef,
   chatImages,
   chatFiles,
-  onWillSend
+  onWillSend,
+  hasProject = true
 }: {
   chat: AiChatApi
   /** 已引用的代码段:预览模式下由左栏选中攒出来 */
@@ -44,6 +45,8 @@ export function FreeChatComposer({
   chatFiles: ChatFilesApi
   /** 发送/压缩前先回底:自己的话自己得看见,发出去这一眼不被上翻状态挡住 */
   onWillSend: () => void
+  /** 开着工作区没有:没开就别说「问项目的事」 */
+  hasProject?: boolean
 }): React.JSX.Element {
   const setup = useContext(AiSetupContext)
   const draftRefs = refs
@@ -57,6 +60,12 @@ export function FreeChatComposer({
   const attachInputRef = useRef<HTMLInputElement>(null)
   const { inputRef, lineCount, capped } = useComposerAutosize(draft, expanded, setExpanded)
   const { webOn, toggleWeb } = useWebLookupToggle()
+  // 占位字:引用原子一上桌就该让位;没开工作区时不提「项目的事」
+  const inputPlaceholder = chat.busy
+    ? '正在回答上一个问题……'
+    : hasProject
+      ? '问项目的事,或者随便聊聊……'
+      : '想问点什么,直接说……'
 
   useEffect(() => {
     if (!menuOpen) return
@@ -241,13 +250,7 @@ export function FreeChatComposer({
             ref={inputRef}
             value={draft}
             // 引用原子一上桌,舱里就有东西了 —— 占位字该让位,别跟原子抢排面
-            placeholder={
-              refs.length > 0
-                ? ''
-                : chat.busy
-                  ? '正在回答上一个问题……'
-                  : '问项目的事,或者随便聊聊……'
-            }
+            placeholder={refs.length > 0 ? '' : inputPlaceholder}
             aria-label="输入自由对话"
             aria-expanded={slashOpen}
             aria-controls="slash-palette"

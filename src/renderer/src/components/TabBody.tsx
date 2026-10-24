@@ -121,6 +121,23 @@ export function TabBody({
   }
   // UI 工作台:不吃工作区,和设置一样拦在 result 闸之前
   if (tab.kind === 'uiworkbench') return <UiWorkbench />
+  // 自由对话同样拦在 result 闸之前:没开工作区也能聊,只是不带项目里的文件上下文
+  if (tab.kind === 'chat') {
+    // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(的老规矩)
+    // (小探针飞出时这张页签连卡带页签活 DOM一起隐去,走不到这儿 —— 见渲染处 act 判定)
+    return (
+      <div className="preview-chat soft-in">
+        <FreeChatPanel
+          chat={chat}
+          refs={previewRefs}
+          onRemoveRef={removePreviewRef}
+          onDropRef={handleDropRef}
+          rootPath={result?.rootPath}
+          fileLinks={fileLinks}
+        />
+      </div>
+    )
+  }
   if (!result) return null
   // 翻译镜像签:虚拟内容,读根仍是当前工作区;只读,不落盘
   if (tab.kind === 'translate') {
@@ -134,22 +151,6 @@ export function TabBody({
     )
   }
   const file = tab.relPath !== '' ? findFile(result.tree, tab.relPath) : null
-  if (tab.kind === 'chat') {
-    // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(的老规矩)
-    // (小探针飞出时这张页签连卡带页签活 DOM一起隐去,走不到这儿 —— 见渲染处 act 判定)
-    return (
-      <div className="preview-chat soft-in">
-        <FreeChatPanel
-          chat={chat}
-          refs={previewRefs}
-          onRemoveRef={removePreviewRef}
-          onDropRef={handleDropRef}
-          rootPath={result.rootPath}
-          fileLinks={fileLinks}
-        />
-      </div>
-    )
-  }
   // 预览页签:纯源码窗(产品裁定的拆分) —— 想边看代码边聊,把探针页签拖去另一组拼一屏
   if (file) {
     return (

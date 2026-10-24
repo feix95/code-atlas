@@ -240,6 +240,31 @@ try {
       `placeholder「${ruler.placeholder}」被切掉 ${rulerInk - inputInk} 设备像素(框宽 ${ruler.clientW})`
     )
   }
+  // 自由对话不吃工作区:没开项目也能点开聊,只是不带项目上下文;关系图谱仍要项目
+  const railNav = page.locator('.rail-btn')
+  assert.equal(
+    await railNav.nth(0).isDisabled(),
+    true,
+    'graph must stay disabled without a workspace'
+  )
+  assert.equal(await railNav.nth(1).isDisabled(), false, 'free chat must open without a workspace')
+  await railNav.nth(1).click()
+  await page.locator('.free-chat').waitFor()
+  await page.locator('.fc-chip').first().waitFor()
+  const noProjectChips = (await page.locator('.fc-chip').allTextContents()).join('|')
+  assert.equal(
+    /项目|文件/.test(noProjectChips),
+    false,
+    `no-workspace starter chips must not point at a project: ${noProjectChips}`
+  )
+  assert.equal(
+    await page.locator('.chat-input textarea').getAttribute('placeholder'),
+    '想问点什么,直接说……',
+    'no-workspace composer must not mention the project'
+  )
+  await shot('chat-no-workspace')
+  await page.getByRole('button', { name: '关闭 自由对话' }).click()
+  await home()
   // UI v3(B4):AI 状态收进 rail 底槽浮层,未配置引导要点开状态钮才现身
   await page.getByRole('button', { name: /AI 状态/ }).click()
   await page.locator('.ai-status-pop').getByText('AI 讲解尚未设置', { exact: true }).waitFor()

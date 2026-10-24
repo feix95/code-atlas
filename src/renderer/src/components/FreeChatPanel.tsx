@@ -31,6 +31,13 @@ const CHAT_EXAMPLES = [
   '这个文件和其他部分有什么关系？'
 ]
 
+/** 没开工作区时的开场示例:不带任何项目指向,免得问了没东西可看 */
+const CHAT_EXAMPLES_NO_PROJECT = [
+  '帮我讲讲这段报错是什么意思',
+  '这两种写法哪个更好？',
+  '给我解释一个编程概念'
+]
+
 export function FreeChatPanel({
   chat,
   refs,
@@ -141,7 +148,8 @@ export function FreeChatPanel({
   }
 
   /** 开场示例 chips:只在一条消息都还没有时挂着;聊起来就关闭,不再推荐 */
-  const chipList = chat.messages.length === 0 ? CHAT_EXAMPLES : []
+  const chipList =
+    chat.messages.length === 0 ? (rootPath ? CHAT_EXAMPLES : CHAT_EXAMPLES_NO_PROJECT) : []
 
   const composerEl = (
     <FreeChatComposer
@@ -151,8 +159,14 @@ export function FreeChatPanel({
       chatImages={chatImages}
       chatFiles={chatFiles}
       onWillSend={forceBottom}
+      hasProject={rootPath !== undefined}
     />
   )
+  // 没开工作区时没有「选中的代码」可挂,提示只留拖文件
+  const dropTip =
+    rootPath !== undefined
+      ? ' · 拖文件进来读原文,选中的代码挂引用,图片进待发区'
+      : ' · 拖文件进来读原文,图片进待发区'
 
   return (
     <div
@@ -235,7 +249,7 @@ export function FreeChatPanel({
         {chat.messages.length > 0 && composerEl}
         <p className="fc-tip">
           回车发送 · Shift+回车换行
-          {onDropRef || rootPath ? ' · 拖文件进来读原文,选中的代码挂引用,图片进待发区' : ''}
+          {onDropRef || rootPath !== undefined ? dropTip : ''}
         </p>
       </div>
     </div>
