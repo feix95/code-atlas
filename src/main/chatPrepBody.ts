@@ -1,4 +1,4 @@
-// 自由对话请求的入口安检:图片/文件洗白、空题拦截、看图能力闸、翻文件与带图互斥。
+// 自由对话请求的入口安检:图片/文件洗白、空题拦截、看图能力闸、翻文件与带图/没项目互斥。
 // prepareChat 的编排在 chatContext,预算与联网在 chatPrepPlan。
 import { userDataDir } from './paths.ts'
 import { sendAgentStep } from './agentTools.ts'
@@ -7,6 +7,7 @@ import { sanitizeChatFiles, type ChatFileAttachment } from '../shared/chatFiles.
 import { probeChatVision } from './modelStatus.ts'
 import type { IpcMainInvokeEvent } from 'electron'
 import { hasSearchIntent, sanitizeAttachment, sanitizeCodeRefs } from '../ai/index.ts'
+import { agentOnThisRound } from '../ai/agentGuard.ts'
 import { loadAiConfig } from '../ai/config.ts'
 import type { AiChatResult, ChatContextAttachment, WebLookupMeta } from '../shared/types.ts'
 
@@ -95,8 +96,14 @@ export async function ingestChatBody(
       sendAgentStep(event, requestId, `有图片没带进来:${imgSan.rejected.join(';')}`)
     }
   }
-  const agentOn = body.agent === true && images.length === 0
-  if (body.agent === true && !agentOn) sendAgentStep(event, requestId, '这一轮带图片,没有翻文件')
+  const agentOn = agentOnThisRound({
+    agent: body.agent === true,
+    imageCount: images.length,
+    rootPath: body.rootPath
+  })
+  if (body.agent === true && images.length > 0) {
+    sendAgentStep(event, requestId, '这一轮带图片,没有翻文件')
+  }
   if (files.length > 0 && fileSan.rejected.length > 0) {
     sendAgentStep(event, requestId, `有文件没带进来:${fileSan.rejected.join(';')}`)
   }

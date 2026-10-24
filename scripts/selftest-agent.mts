@@ -28,6 +28,7 @@ import {
   agentRound,
   agentStepText,
   assembleToolCalls,
+  agentOnThisRound,
   buildAgentReminder,
   compressAgentMessages,
   emergencySlim,
@@ -833,6 +834,34 @@ async function main(): Promise<void> {
     '黑名单引擎的人设要明说本轮没有翻文件能力'
   )
   assert.ok(blacklistedSystem.includes('翻文件开关'), '要指路输入框旁的翻文件开关')
+  assert.ok(SLICE_NO_TOOLS.includes('闲聊'), '没翻文件时闲聊直接答,别拦着要开项目')
+
+  // 22b. 没开项目不走翻文件循环:开关只表示给过这能力,没有文件可翻就当普通对话
+  assert.equal(
+    agentOnThisRound({ agent: true, imageCount: 0, rootPath: '/proj' }),
+    true,
+    '开着翻文件且有项目根才走循环'
+  )
+  assert.equal(
+    agentOnThisRound({ agent: true, imageCount: 0, rootPath: '' }),
+    false,
+    '没开项目不当翻文件,也不报错'
+  )
+  assert.equal(
+    agentOnThisRound({ agent: true, imageCount: 0, rootPath: undefined }),
+    false,
+    '没带项目根不当翻文件'
+  )
+  assert.equal(
+    agentOnThisRound({ agent: true, imageCount: 1, rootPath: '/proj' }),
+    false,
+    '带图这一轮没有翻文件'
+  )
+  assert.equal(
+    agentOnThisRound({ agent: false, imageCount: 0, rootPath: '/proj' }),
+    false,
+    '开关关着不走循环'
+  )
 
   // 23. 流式轮次的封板令:边说边喊工具时,已吐的话封口保留
   // 假模型服务按问题里的 mode 出三种牌:talk = 纯说话;work = 先说话再喊工具;

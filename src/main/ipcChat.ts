@@ -45,18 +45,9 @@ export function registerChatIpc(): void {
     const prepared = await prepareChat(event, body, startedAt)
     if (!prepared.ok) return prepared.result
     const { prep } = prepared
-    // 翻文件模式(agent):开关开着就走工具循环 —— 模型自己喊看哪,
-    // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
-    if (prep.agentOn) {
-      if (prep.agentRoot === '') {
-        return {
-          status: 'error',
-          text: '翻文件模式得先打开一个项目才有得翻:关掉「翻文件」开关,或先在左边打开项目再问',
-          model: '',
-          durationMs: Date.now() - startedAt,
-          webLookup: prep.meta
-        }
-      }
+    // 翻文件模式(agent):开关开着且有项目根才走工具循环;
+    // 没开项目这一轮当普通对话,不报错、不要求关掉开关
+    if (prep.agentOn && prep.agentRoot !== '') {
       const aborter = new AbortController()
       if (prep.requestId !== '') explainAborters.set(prep.requestId, aborter)
       try {

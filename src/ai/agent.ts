@@ -53,6 +53,7 @@ export {
   AGENT_RESEARCH_PREFIX,
   AGENT_REMINDER_MAX_CHARS,
   buildAgentReminder,
+  agentOnThisRound,
   stripLastAgentReminder
 } from './agentGuard.ts'
 export {

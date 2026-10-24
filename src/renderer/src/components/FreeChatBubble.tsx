@@ -177,7 +177,7 @@ export const AssistantBubble = memo(function AssistantBubble({
           </div>
         )}
         {msg.reasoning && <ThinkingBlock reasoning={msg.reasoning} busy={msg.state === 'busy'} />}
-        {msg.text && (
+        {msg.text && msg.state !== 'error' && (
           <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />
         )}
         {msg.state === 'done' && !msg.text && msg.reasoning && (

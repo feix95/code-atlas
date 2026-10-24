@@ -41,6 +41,20 @@ export function buildAgentReminder(question: string): string {
 }
 
 /**
+ * 这一轮要不要走翻文件循环:开关开着、没带图、且有项目沙盒。
+ * 没开项目不报错 —— 开关只表示给过这能力,没有文件可翻就当普通对话。
+ */
+export function agentOnThisRound(input: {
+  agent: boolean
+  imageCount: number
+  rootPath: unknown
+}): boolean {
+  if (!input.agent) return false
+  if (input.imageCount > 0) return false
+  return typeof input.rootPath === 'string' && input.rootPath.trim() !== ''
+}
+
+/**
  * 撤掉对话里最近一张提醒卡(纯函数,自测覆盖):垫新卡前调用,对话里永远只挂
  * 最新一张 —— 每轮都垫的话八轮攒八张,账面白白涨还稀释注意力。没卡就原样返回。
  */

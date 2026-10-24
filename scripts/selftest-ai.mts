@@ -163,6 +163,7 @@ async function main(): Promise<void> {
     '内核的诚实边界要在:如实相告能力、承认不确定'
   )
   assert.ok(chatSystem.includes('翻文件开关'), '无工具切片要指路「翻文件开关」')
+  assert.ok(chatSystem.includes('闲聊'), '无工具切片闲聊直接答,别拦着要开项目')
   assert.ok(chatSystem.includes('不许说自己翻过'), '没翻过文件不许装翻过')
   assert.ok(chatSystem.includes('<capabilities>'), '无工具切片要包 capabilities 标签(2.0)')
   assert.ok(
