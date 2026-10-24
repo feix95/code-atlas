@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict'
-import { marqueePlan } from '../src/renderer/src/marquee.ts'
+import {
+  MARQUEE_CROSSFADE_MS,
+  MARQUEE_HOVER_DELAY_MS,
+  MARQUEE_SLIDE_MAX_PX,
+  MARQUEE_TAIL_NUDGE_PX,
+  marqueePlan
+} from '../src/renderer/src/marquee.ts'
+
+assert.equal(MARQUEE_HOVER_DELAY_MS, 100)
+assert.equal(MARQUEE_SLIDE_MAX_PX, 120)
+assert.equal(MARQUEE_TAIL_NUDGE_PX, 3)
+assert.equal(MARQUEE_CROSSFADE_MS, 280)
 
 // 装得下:不滚
 assert.equal(marqueePlan(120, 160), null)
@@ -16,29 +27,47 @@ assert.equal(marqueePlan(161, 160), null)
   assert.equal(plan.shift, 41)
 }
 
-// 超长路径:去程封顶 6s、回程封顶 260ms
+// 去程按 1200px/s 算,夹在 250–450ms;超长路径回程封顶 260ms
 {
-  const plan = marqueePlan(400, 160)
-  assert.ok(plan)
-  assert.equal(plan.shift, 240)
-  assert.equal(plan.durMs, 6000)
-  assert.equal(plan.rewindMs, 260)
+  const short = marqueePlan(220, 160)
+  assert.ok(short)
+  assert.equal(short.shift, 60)
+  assert.equal(short.durMs, 250)
+  assert.equal(short.rewindMs, 160)
+  assert.equal(short.mode, 'slide')
+
+  const mid = marqueePlan(520, 160)
+  assert.ok(mid)
+  assert.equal(mid.shift, 360)
+  assert.equal(mid.durMs, 300)
+  assert.equal(mid.mode, 'crossfade')
+
+  const long = marqueePlan(800, 160)
+  assert.ok(long)
+  assert.equal(long.shift, 640)
+  assert.equal(long.durMs, 450)
+  assert.equal(long.rewindMs, 260)
+  assert.equal(long.mode, 'crossfade')
 }
 
-// 小幅溢出:去程按 28px/s 算(60px ≈ 2143ms),回程兜底 160ms 下限
+// 120px 及以内平移,再长两层硬切
 {
-  const plan = marqueePlan(220, 160)
-  assert.ok(plan)
-  assert.equal(plan.shift, 60)
-  assert.equal(plan.durMs, 2143)
-  assert.equal(plan.rewindMs, 160)
+  const atCap = marqueePlan(280, 160)
+  assert.ok(atCap)
+  assert.equal(atCap.shift, 120)
+  assert.equal(atCap.mode, 'slide')
+
+  const over = marqueePlan(281, 160)
+  assert.ok(over)
+  assert.equal(over.shift, 121)
+  assert.equal(over.mode, 'crossfade')
 }
 
-// 自定义速度与下限:去程 60px / 100px每秒 = 600ms
+// 自定义去程时长
 {
-  const plan = marqueePlan(220, 160, { speedPxPerSec: 100, minDurMs: 100 })
+  const plan = marqueePlan(220, 160, { durMs: 400 })
   assert.ok(plan)
-  assert.equal(plan.durMs, 600)
+  assert.equal(plan.durMs, 400)
 }
 
 // 非法读数(排版未完成、NaN):一律不滚
@@ -51,9 +80,9 @@ assert.equal(marqueePlan(0, 0), null)
 
 // 坏配置回落默认值,不把 NaN 漏进 CSS 变量
 {
-  const plan = marqueePlan(220, 160, { speedPxPerSec: Number.NaN, maxDurMs: -1 })
+  const plan = marqueePlan(220, 160, { durMs: Number.NaN })
   assert.ok(plan)
-  assert.equal(plan.durMs, 2143)
+  assert.equal(plan.durMs, 250)
 }
 
 console.log('marquee: 全部通过')

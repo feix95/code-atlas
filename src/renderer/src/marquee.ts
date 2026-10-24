@@ -41,7 +41,7 @@ export const MARQUEE_HOVER_DELAY_MS = 100
 /** 溢出不超过这一档才平移;再长改两层硬切加微移 */
 export const MARQUEE_SLIDE_MAX_PX = 120
 /** 长路径结尾层休息态往右错开的像素:悬停收回,做出微微滑入 */
-export const MARQUEE_TAIL_NUDGE_PX = 2
+export const MARQUEE_TAIL_NUDGE_PX = 3
 /** 长溢出结尾层微移时长(ms) */
 export const MARQUEE_CROSSFADE_MS = 280
 
