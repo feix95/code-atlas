@@ -1,8 +1,10 @@
 /* 自由对话页骨架(从原 free-chat.css 按职责拆出:纯迁移,不改行为):中轴尺、空场 hero、内容栏、消息气泡、舱底跳转 */
 
-/* 对话页中轴登记:hero/内容栏/chips/输入舱共用一把限宽尺,微调改一处,不散落硬编码  */
+/* 对话页中轴登记:内容栏/聊开后的输入舱共用 --fc-col-w;
+   空场问候下的输入舱与 chips 走更短的 --fc-hero-input-w,聊开了再展开 */
 :root {
   --fc-col-w: 56rem; /* 中轴限宽(896px @16px 根字号;与设置页 .cfg-pane 同宽) */
+  --fc-hero-input-w: 48rem; /* 空场输入舱(768px @16px),真聊起来走 --fc-col-w */
 }
 
 /* AI 对话 Tab  */
@@ -70,6 +72,7 @@
 
 .fc-hero .fc-chips {
   margin-top: 1.125rem;
+  width: min(var(--fc-hero-input-w), 100%);
 }
 
 .fc-chip {

@@ -14,6 +14,11 @@
   transition: border-color var(--dur-2) var(--ease-smooth);
 }
 
+/* 空场问候下的输入舱短一截:聊开了舱沉到底栏,宽度回到 --fc-col-w */
+.fc-hero .chat-input {
+  width: min(var(--fc-hero-input-w), 100%);
+}
+
 .chat-input:focus-within {
   border-color: color-mix(in srgb, var(--text) 30%, var(--line));
 }
