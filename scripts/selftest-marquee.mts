@@ -1,16 +1,8 @@
 import assert from 'node:assert/strict'
-import {
-  MARQUEE_CROSSFADE_MS,
-  MARQUEE_HOVER_DELAY_MS,
-  MARQUEE_SLIDE_MAX_PX,
-  MARQUEE_TAIL_NUDGE_PX,
-  marqueePlan
-} from '../src/renderer/src/marquee.ts'
+import { MARQUEE_HOLD_MS, MARQUEE_HOVER_DELAY_MS, marqueePlan } from '../src/renderer/src/marquee.ts'
 
 assert.equal(MARQUEE_HOVER_DELAY_MS, 100)
-assert.equal(MARQUEE_SLIDE_MAX_PX, 120)
-assert.equal(MARQUEE_TAIL_NUDGE_PX, 3)
-assert.equal(MARQUEE_CROSSFADE_MS, 280)
+assert.equal(MARQUEE_HOLD_MS, 5000)
 
 // 装得下:不滚
 assert.equal(marqueePlan(120, 160), null)
@@ -27,40 +19,25 @@ assert.equal(marqueePlan(161, 160), null)
   assert.equal(plan.shift, 41)
 }
 
-// 去程按 1200px/s 算,夹在 250–450ms;超长路径回程封顶 260ms
+// 去程/回程都按 800px/s 算,夹在 400–700ms
 {
   const short = marqueePlan(220, 160)
   assert.ok(short)
   assert.equal(short.shift, 60)
-  assert.equal(short.durMs, 250)
-  assert.equal(short.rewindMs, 160)
-  assert.equal(short.mode, 'slide')
+  assert.equal(short.durMs, 400)
+  assert.equal(short.rewindMs, 400)
 
   const mid = marqueePlan(520, 160)
   assert.ok(mid)
   assert.equal(mid.shift, 360)
-  assert.equal(mid.durMs, 300)
-  assert.equal(mid.mode, 'crossfade')
+  assert.equal(mid.durMs, 450)
+  assert.equal(mid.rewindMs, 450)
 
   const long = marqueePlan(800, 160)
   assert.ok(long)
   assert.equal(long.shift, 640)
-  assert.equal(long.durMs, 450)
-  assert.equal(long.rewindMs, 260)
-  assert.equal(long.mode, 'crossfade')
-}
-
-// 120px 及以内平移,再长两层硬切
-{
-  const atCap = marqueePlan(280, 160)
-  assert.ok(atCap)
-  assert.equal(atCap.shift, 120)
-  assert.equal(atCap.mode, 'slide')
-
-  const over = marqueePlan(281, 160)
-  assert.ok(over)
-  assert.equal(over.shift, 121)
-  assert.equal(over.mode, 'crossfade')
+  assert.equal(long.durMs, 700)
+  assert.equal(long.rewindMs, 700)
 }
 
 // 自定义去程时长
@@ -82,7 +59,7 @@ assert.equal(marqueePlan(0, 0), null)
 {
   const plan = marqueePlan(220, 160, { durMs: Number.NaN })
   assert.ok(plan)
-  assert.equal(plan.durMs, 250)
+  assert.equal(plan.durMs, 400)
 }
 
 console.log('marquee: 全部通过')

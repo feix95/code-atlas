@@ -1,9 +1,8 @@
 /** 路径跑马灯的节奏计算:纯函数,不碰 DOM(自测见 scripts/selftest-marquee.mts)。
  *
  * 位移口径:溢出量向上取整等于「文本宽 - 可视宽」,正好让长边贴齐可视区一端。
- * 溢出不超过 MARQUEE_SLIDE_MAX_PX 走平移(时长按速度算,夹在 250–450ms);
- * 再长改两层硬切加微移,不让眼睛去追长距离。
- * 悬停延迟见 MARQUEE_HOVER_DELAY_MS:路过不甩,停稳再动。
+ * 去程/回程按时长按速度算,夹在 400–700ms;路过不甩,停稳再动见 MARQUEE_HOVER_DELAY_MS。
+ * 指针离开后停留 MARQUEE_HOLD_MS,再按同一套慢滑收回左边。
  */
 
 export interface MarqueeOptions {
@@ -23,35 +22,27 @@ export interface MarqueeOptions {
   maxRewindMs?: number
 }
 
-export type MarqueeMode = 'slide' | 'crossfade'
-
 export interface MarqueePlan {
-  /** 溢出像素数:平移档用它把末尾送进视窗 */
+  /** 溢出像素数:把末尾送进视窗 */
   shift: number
-  /** 去程时长(ms):只给平移档 */
+  /** 去程时长(ms) */
   durMs: number
-  /** 回程时长(ms):只给平移档 */
+  /** 回程时长(ms):与去程同一套慢滑 */
   rewindMs: number
-  /** 短溢出平移,长溢出两层硬切加微移 */
-  mode: MarqueeMode
 }
 
 /** 指针停稳多久才开去程(ms):路过划过不甩,避免行缘抖动来回抽 */
 export const MARQUEE_HOVER_DELAY_MS = 100
-/** 溢出不超过这一档才平移;再长改两层硬切加微移 */
-export const MARQUEE_SLIDE_MAX_PX = 120
-/** 长路径结尾层休息态往右错开的像素:悬停收回,做出微微滑入 */
-export const MARQUEE_TAIL_NUDGE_PX = 3
-/** 长溢出结尾层微移时长(ms) */
-export const MARQUEE_CROSSFADE_MS = 280
+/** 指针离开后再停留多久才收回(ms) */
+export const MARQUEE_HOLD_MS = 5000
 
 const DEFAULT_OPTIONS = {
-  goPxPerSec: 1200,
-  minDurMs: 250,
-  maxDurMs: 450,
-  rewindPxPerSec: 400,
-  minRewindMs: 160,
-  maxRewindMs: 260
+  goPxPerSec: 800,
+  minDurMs: 400,
+  maxDurMs: 700,
+  rewindPxPerSec: 800,
+  minRewindMs: 400,
+  maxRewindMs: 700
 } as const
 
 function clamp(value: number, min: number, max: number): number {
@@ -96,7 +87,6 @@ export function marqueePlan(
   return {
     shift,
     durMs,
-    rewindMs: Math.round(clamp((shift / rewindSpeed) * 1000, minRewind, maxRewind)),
-    mode: shift <= MARQUEE_SLIDE_MAX_PX ? 'slide' : 'crossfade'
+    rewindMs: Math.round(clamp((shift / rewindSpeed) * 1000, minRewind, maxRewind))
   }
 }

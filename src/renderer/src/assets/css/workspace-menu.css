@@ -170,12 +170,12 @@ body.is-menu-resizing {
 }
 
 /* 路径裁切层:文本整段不换行、不被压缩,超出部分由这层裁掉。
-   平时贴左露出根目录。短溢出平移;长溢出两层硬切加微移。
+   平时贴左露出根目录,溢出则平移到末尾。
+   指针离开后再停留 5s 收回,关菜单立刻重置。
    右缘渐隐提示「右边还有」,悬停看末尾时改由左缘渐隐提示根被裁 */
 .wsm-clip {
   position: relative;
-  display: flex;
-  justify-content: flex-start;
+  display: block;
   flex: 1 1 auto;
   min-width: 0;
   overflow: clip;
@@ -218,58 +218,19 @@ body.is-menu-resizing {
   display: block;
   width: max-content;
   white-space: nowrap;
-}
-
-.wsm-path-head {
-  position: relative;
-  z-index: 0;
-  flex: 0 0 auto;
   transform: translateX(0);
-  opacity: 1;
-  transition: transform var(--wsm-back, 0.18s) var(--wsm-ease);
+  transition: transform var(--wsm-back, 0.4s) var(--wsm-ease);
 }
 
-/* 结尾层贴右、压在头层下面;不占点击。透明度硬切,只过渡微移 */
-.wsm-path-tail {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 0;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(var(--wsm-nudge, 3px));
-  transition: transform var(--wsm-fade, 0.28s) var(--wsm-ease);
-}
-
-/* 短溢出:头层按时长滑到末尾,移开走回程短档 */
-.wsm-row[data-marquee][data-mode='slide'] .wsm-path-head {
+.wsm-row[data-marquee] .wsm-path {
   transform: translateX(calc(-1 * var(--wsm-shift, 0px)));
-  transition-duration: var(--wsm-dur, 0.25s);
+  transition-duration: var(--wsm-dur, 0.4s);
 }
 
-/* 长溢出:头尾硬切,尾层收回 nudge 微移 */
-.wsm-row[data-marquee][data-mode='crossfade'] .wsm-path-head {
-  opacity: 0;
-}
-
-.wsm-row[data-marquee][data-mode='crossfade'] .wsm-path-tail {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* 减少动态:两档都不动,贴左的休息态保留;完整路径看行上的悬停提示 */
+/* 减少动态:贴左的休息态保留;完整路径看行上的悬停提示 */
 @media (prefers-reduced-motion: reduce) {
-  .wsm-row[data-marquee][data-mode='slide'] .wsm-path-head {
+  .wsm-row[data-marquee] .wsm-path {
     transform: none;
-  }
-
-  .wsm-row[data-marquee][data-mode='crossfade'] .wsm-path-head {
-    opacity: 1;
-  }
-
-  .wsm-row[data-marquee][data-mode='crossfade'] .wsm-path-tail {
-    opacity: 0;
-    transform: translateX(var(--wsm-nudge, 3px));
   }
 
   .wsm-row[data-overflow][data-marquee] .wsm-clip::after {
