@@ -121,7 +121,7 @@ export async function runAgentTool(input: {
     requestId,
     agentStepText(name, stepTarget, exec.ok ? 'done' : 'error', exec.hint)
   )
-  // 搜索搜到了就顺手把命中清单推给界面画卡(LLM 优化批次):结构化命中走旁路,
+  // 搜索搜到了就顺手把命中清单推给界面画卡:结构化命中走旁路,
   // 用户看到的是程序摆的完整清单,不用模型转手抄写
   const matchPaths: string[] = []
   if (

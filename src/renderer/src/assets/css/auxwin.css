@@ -1,9 +1,9 @@
 /* 子窗壳(拆自 chrome.css,纯迁移):页签拆出独立窗口的 .aux-shell/.aux-strip/.aux-panes */
-/* ── 独立子窗壳(页签独立窗口)─────────────────────────────
+/* 独立子窗壳(页签独立窗口)
    子窗是无边框正常窗:页签带兼标题栏(浏览器同款,一页不两层皮),窗控三键钉带尾。
    拖窗走手动搬窗引擎(windowDrag.ts)—— 它按 payload 的 frameName 认目标窗,
    主窗子窗同一套;不铺 app-region:drag,系统拖窗通道不吃 Aero Shake。
-   缩放靠 Windows 无边框隐藏缩放边(M0 实测),不画自绘热区;窗控三键 no-drag ── */
+   缩放靠 Windows 无边框隐藏缩放边(M0 实测),不画自绘热区;窗控三键 no-drag  */
 
 .aux-shell {
   height: 100vh;

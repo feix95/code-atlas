@@ -1,5 +1,5 @@
 /** 格内「装饰源码」渲染与光标账:记号藏而不删,textContent 恒等于源码 */
-// ── 装饰源码渲染:记号藏而不删 ──
+// 装饰源码渲染:记号藏而不删
 
 /** 格内行内语法总闸:`代码`、粗体两档、斜体两档、删除线、高亮、链接 —— 与 parseRich 同一张正则桌 */
 const RE_CELL_INLINE =
@@ -51,7 +51,7 @@ export function renderCellSource(src: HTMLElement, raw: string, doc: Document): 
   if (last < raw.length) src.appendChild(doc.createTextNode(raw.slice(last)))
 }
 
-// ── 光标账:以 textContent 字符偏移记账,装饰重画后能落回原位 ──
+// 光标账:以 textContent 字符偏移记账,装饰重画后能落回原位
 
 export function getCaretCharOffset(el: HTMLElement): number | null {
   const sel = el.ownerDocument?.defaultView?.getSelection()

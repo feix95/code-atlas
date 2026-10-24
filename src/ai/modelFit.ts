@@ -1,4 +1,4 @@
-// 提前适配估算(第七十三批):选模型那一刻就拿「模型块头」比「机器尺寸」,带不动当场说,
+// 提前适配估算:选模型那一刻就拿「模型块头」比「机器尺寸」,带不动当场说,
 // 不让用户白等一场。启动就死的退出诊断也靠这里的估账说人话。
 import { DEFAULT_CONTEXT_SIZE } from '../shared/aiDefaults.ts'
 import { estimateKvBytes, formatGB } from '../shared/contextBill.ts'
@@ -31,7 +31,7 @@ export function judgeModelFit(
   contextTokens = DEFAULT_CONTEXT_SIZE
 ): ModelFitVerdictPure {
   if (vramBytes !== null && vramBytes > 0) {
-    // 第八十六批:显存是权重 + 上下文缓存一起抢的,适配估算把缓存估进去再说话
+    // 显存是权重 + 上下文缓存一起抢的,适配估算把缓存估进去再说话
     const kv = estimateKvBytes(contextTokens, modelBytes)
     const need = modelBytes + kv
     if (need <= vramBytes * MODEL_FIT_VRAM_RATIO) {

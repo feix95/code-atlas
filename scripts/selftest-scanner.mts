@@ -70,7 +70,7 @@ async function main(): Promise<void> {
     await fs.rm(root, { recursive: true, force: true })
   }
 
-  // ── 7. 大文件夹防线:视频壳、超大文件、海量小文件,扫描都要秒过且内存有界 ──
+  // 7. 大文件夹防线:视频壳、超大文件、海量小文件,扫描都要秒过且内存有界 
   const bigRoot = join(tmpdir(), `code-atlas-big-selftest-${Date.now()}`)
   await fs.mkdir(join(bigRoot, 'videos'), { recursive: true })
   await fs.mkdir(join(bigRoot, 'pile'), { recursive: true })
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     await fs.rm(bigRoot, { recursive: true, force: true })
   }
 
-  // ── 8. 分级扫描:节点预算用尽就收,没探到的目录挂"点开再扫"占位 ──
+  // 8. 分级扫描:节点预算用尽就收,没探到的目录挂"点开再扫"占位 
   const tierRoot = join(tmpdir(), `code-atlas-tier-selftest-${Date.now()}`)
   await fs.mkdir(join(tierRoot, 'big'), { recursive: true })
   await fs.mkdir(join(tierRoot, 'small'))
@@ -173,7 +173,7 @@ async function main(): Promise<void> {
     await fs.rm(tierRoot, { recursive: true, force: true })
   }
 
-  // ── 9. 分级扫描的路径契约:多层子目录也要带全前缀;整项目扫描不传前缀,行为照旧 ──
+  // 9. 分级扫描的路径契约:多层子目录也要带全前缀;整项目扫描不传前缀,行为照旧 
   const subRoot = join(tmpdir(), `code-atlas-subdir-selftest-${Date.now()}`)
   await fs.mkdir(join(subRoot, 'src', 'lib'), { recursive: true })
   await fs.writeFile(join(subRoot, 'src', 'lib', 'util.ts'), 'export {}')

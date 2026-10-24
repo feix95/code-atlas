@@ -143,7 +143,7 @@ export async function resolveChatTargetOrError(): Promise<
   }
   const resolved = resolveAiTarget(config, runtime)
   if (!resolved.ok) return { error: resolved.message }
-  // 过了这关就是真要使唤模型了:状态栏进「忙」(第八十四批)
+  // 过了这关就是真要使唤模型了:状态栏进「忙」
   setActivityProvider(config.provider)
   announceActivityBusy(config.provider)
   // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的上下文窗口归它自己管,
@@ -170,7 +170,7 @@ export async function resolveChatTargetOrError(): Promise<
 }
 
 /**
- * 流式回滚令(第一百四十三批):复读机重答前发给界面,把这条请求已吐的字收回。
+ * 流式回滚令:复读机重答前发给界面,把这条请求已吐的字收回。
  * 按 requestId 对号入座;没带 id(非流式调用方)本来就无字可收,发不发都一样。
  */
 export function sendResetDelta(event: IpcMainInvokeEvent, requestId: unknown): void {
@@ -195,7 +195,7 @@ export function makeDeltaSender(
       : { id: requestId, text }
     if (stats) payload.stats = stats
     event.sender.send(CH.aiDelta, payload)
-    // 引擎回报用量,状态栏的「忙」就跟着报数(第八十四批)
+    // 引擎回报用量,状态栏的「忙」就跟着报数
     if (stats) announceActivityBusy(lastActivityProvider, stats)
   }
 }

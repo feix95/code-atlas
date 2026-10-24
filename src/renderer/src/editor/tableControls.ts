@@ -4,7 +4,7 @@ import { appendRow } from './tableCellEditing.ts'
 import { attachGripHover, makeGripZones } from './tableGripHover.ts'
 import { dispatchModel, findTableRange, readModelFromDom } from './tableDom.ts'
 
-// ── 抓手与边缘加号(Excel 式体感) ──
+// 抓手与边缘加号(Excel 式体感)
 
 interface DragState {
   axis: 'row' | 'col'
@@ -108,7 +108,7 @@ export function attachTableControls(view: EditorView, box: HTMLElement, wrapEl: 
     () => drag !== null
   )
 
-  // ── 拖拽重排 ──
+  // 拖拽重排
   let drag: DragState | null = null
   const onMove = (e: PointerEvent): void => {
     if (!drag) return
@@ -237,7 +237,7 @@ export function attachTableControls(view: EditorView, box: HTMLElement, wrapEl: 
     if (idx >= 0) startDrag('col', idx)(e)
   })
 
-  // ── 边缘加号 ──
+  // 边缘加号
   const blurActiveSrc = (): void => {
     const ae = doc.activeElement
     if ((ae as HTMLElement | null)?.classList?.contains('cm-live-cell-src'))

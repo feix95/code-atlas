@@ -1,5 +1,5 @@
 /**
- * 自由聊天的历史状态表(答旧题修复批次):渲染层和自测共用同一份口径。
+ * 自由聊天的历史状态表:渲染层和自测共用同一份口径。
  * 病根:以前渲染层按「条」收历史,报错/取消轮的提问一发出就永久是 done、照样入史,
  * 它的回答却被过滤 —— 历史里留下一道「问了从没被答」的悬空旧问题,沉到历史中间;
  * 合并逻辑再把旧问题和下一问粘成一条,小模型看见「连问两件事只有一条回答」,
@@ -19,7 +19,7 @@ export const FREE_CHAT_HISTORY_MAX = 8
 export const CHAT_HISTORY_SEND_MAX = 40
 
 /**
- * 当前问题的注意力锚(答旧题修复·刀三,2.0 换成 XML 包裹):历史洗干净后,旧问题都是
+ * 当前问题的注意力锚(2.0 换成 XML 包裹):历史洗干净后,旧问题都是
  * 干净短句,当前问题后面却粘着联网资料、参考资料指路话 —— 小模型按「长得最像待答问题」
  * 作答就会偏。给当前问题包一对 <current_question> 标签;早前问答都只是历史背景。
  * 主进程 agent 链取问题时用 stripCurrentQuestionAnchor 剥掉这对标签。
@@ -45,12 +45,12 @@ export interface HistorySourceMessage {
   role: 'user' | 'assistant' | 'note'
   state?: string
   text?: string
-  /** 这轮附带的图片(第一百五十二批):历史只记「附过几张图」一句话,图片本体不进历史 */
+  /** 这轮附带的图片:历史只记「附过几张图」一句话,图片本体不进历史 */
   images?: readonly unknown[]
 }
 
 /**
- * 按轮收历史(答旧题修复·刀一):每个提问起一「轮」,到下一个提问之前的内容都归它;
+ * 按轮收历史:每个提问起一「轮」,到下一个提问之前的内容都归它;
  * 轮里取**最后一个回答气泡**当这轮的答案(翻文件模式中途封板的叙述气泡「我先读一下」
  * 不许顶替最终答案进历史),它必须是 done;答案不是 done(报错/取消/还没答)整轮扔,
  * 悬空的旧问题(后面直接又是提问)同理。从新往旧扫,重复提问只留最新一对
@@ -72,7 +72,7 @@ export function collectHistoryRounds(
     const answer = answerAt > i ? messages[answerAt] : undefined
     roundEnd = i
     const qText = question.text?.trim() ?? ''
-    // 附过图的那轮在历史里留一句话交代(第一百五十二批):图片本体是 data URL,
+    // 附过图的那轮在历史里留一句话交代:图片本体是 data URL,
     // 绝不进历史 —— 不然一轮旧图就把小模型的上下文吃干抹净
     const imageCount = question.images?.length ?? 0
     const imageMark =

@@ -23,7 +23,7 @@ async function analyzeViaContract(result: ScanResult, relPath: string): Promise<
 }
 
 async function main(): Promise<void> {
-  // ── 第一幕:拿真实项目根当靶子(npm test 时 cwd 就是项目根) ──
+  // 第一幕:拿真实项目根当靶子(npm test 时 cwd 就是项目根) 
   const result = await scanDirectory(process.cwd())
   const nodes = new Map<string, ScanTreeNode>()
   collectNodes(result.tree, nodes)
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 第二幕:中文 + 空格路径的临时项目 ──
+  // 第二幕:中文 + 空格路径的临时项目 
   const fancyParent = join(tmpdir(), `中文 目录 ${Date.now()}`)
   const fancyRoot = join(fancyParent, 'code atlas')
   await fs.mkdir(join(fancyRoot, '深 处'), { recursive: true })

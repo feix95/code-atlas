@@ -1,4 +1,4 @@
-// 内联标题改名(内联标题改名批次):Obsidian 式点标题改文件名,三处同吃同一数据源 ——
+// 内联标题改名:Obsidian 式点标题改文件名,三处同吃同一数据源 ——
 // 标题显示(fileBaseName)、提交前轻校验(fileBaseError)、改名回执(RenameOutcome)。
 // 权威校验在主进程 renameTextFile;这里供渲染层就地挡一眼 + 主进程复核,两边同一份口径。
 

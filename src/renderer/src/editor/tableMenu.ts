@@ -3,7 +3,7 @@ import type { EditorView } from '@codemirror/view'
 import { pinOverlayInViewport } from '../overlayLayout.ts'
 import { dispatchModel, readModelFromDom } from './tableDom.ts'
 
-// ── 右键菜单:插入/删除行/列 ──
+// 右键菜单:插入/删除行/列
 
 export function openCellMenu(view: EditorView, cell: HTMLElement, x: number, y: number): void {
   const wrap = cell.closest<HTMLElement>('.cm-live-table')

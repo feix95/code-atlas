@@ -131,7 +131,7 @@ export function agentPromptBudget(ctx: number, replyCap: number): number {
 }
 
 /**
- * 上下文自动压缩(纯函数,自测覆盖,第一百三十七批):账面超过预算时,把较早的
+ * 上下文自动压缩(纯函数,自测覆盖):账面超过预算时,把较早的
  * 工具结果(翻文件读进来的大段原文)换成占位注记,最近 2 条留原样。
  * 只动 tool 消息 —— 人设、用户的提问、assistant 的喊话都不碰;协议要求
  * tool 结果和 assistant 的 tool_calls 成对,只缩内容不动条数,对账关系不破。

@@ -41,7 +41,7 @@ export type AgentFailureDecision =
 export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecision {
   const { round, messages, addendum, useTools, flags, doneCalls, callIdToKey } = ctx
   let engineNoTools = ctx.engineNoTools
-  // 复读机兜底(第一百四十三批):流式尾巴连着打转 —— agentRound 已发 reset 令收回
+  // 复读机兜底:流式尾巴连着打转 —— agentRound 已发 reset 令收回
   // 已吐的字。掐了重说一轮(只兜一次);重说还打转就截到打转起点,拿剩下的交卷,
   // 绝不把一屏望不到头的循环递给用户
   if (round.status === 'repetition') {
@@ -70,7 +70,7 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
       step: '回答尾巴开始原地打转,把打转的部分掐了,已经说完的正文原样交给你'
     }
   }
-  // 兜底(第一百四十批):引擎不认工具调用(甩 400/404/422 还点名 tools)——
+  // 兜底:引擎不认工具调用(甩 400/404/422 还点名 tools)——
   // 记进会话黑名单,拆掉人设里垫的守则,这轮按普通对话重答;只兜一次,
   // 普通请求再出错照实报给用户
   if (round.status === 'error' && round.toolsUnsupported === true && useTools && !engineNoTools) {

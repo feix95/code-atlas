@@ -32,7 +32,7 @@ export interface ScanFileNode {
   language?: LanguageTag
   /** 全树速览标签;规则引擎实在认不出时不填(界面不硬凑) */
   summary?: NodeSummary
-  /** 文档类文件(.md/.txt)读开头得到的首行标题(第一百批);读不到不填 */
+  /** 文档类文件(.md/.txt)读开头得到的首行标题;读不到不填 */
   docTitle?: string
 }
 
@@ -100,7 +100,7 @@ export interface DriveInfo {
   free?: number
   total?: number
   /** 盘的来路:固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到不填(界面照旧叫本地磁盘)。
-   *  卷标(ssd/software 这些)第八十二批起不再上卡片 —— 产品裁定:盘就认大写字母,直白 */
+   *  卷标(ssd/software 这些)不再上卡片 —— 产品裁定:盘就认大写字母,直白 */
   kind?: 'fixed' | 'removable' | 'network' | 'optical'
 }
 
@@ -214,7 +214,7 @@ export interface AiConfig {
    */
   contextSize?: number
   /**
-   * 说话方式偏好(第一百一十三批):语气/特质/自订指令。
+   * 说话方式偏好:语气/特质/自订指令。
    * 全默认时拼出来的风格段是空串 —— 提示词逐字不变,老配置升级上来行为与从前完全一致。
    */
   personalization?: PersonalizationConfig
@@ -237,7 +237,7 @@ export interface ChatTarget {
   model: string
   apiKey?: string
   /**
-   * 内置引擎专旗(第八十四批):请求里带 timings_per_token + stream_options,
+   * 内置引擎专旗:请求里带 timings_per_token + stream_options,
    * 引擎才肯在流里报「读了多少 token / 吐了多少 token / 多快」。外接服务不认识这些旗子,不塞
    */
   timings?: boolean
@@ -249,7 +249,7 @@ export interface ChatTarget {
 }
 
 /**
- * 模型状态栏的心跳(第七十批):主进程随状态变化广播 'atlas:model-status',
+ * 模型状态栏的心跳:主进程随状态变化广播 'atlas:model-status',
  * 渲染层常驻底栏展示。progress 只在服务真报了数时给值,拿不到就是 null —— 绝不编进度。
  */
 /** 模型看图的登记表:vision=能看图片 text-only=只能读文字 unknown=还没问到/认不出(缺省) */
@@ -274,7 +274,7 @@ export interface ModelStatus {
 }
 
 /**
- * 模型块头 vs 机器尺寸的适配估算结果(第七十三批):选模型那一刻就给,不等引擎空跑一次。
+ * 模型块头 vs 机器尺寸的适配估算结果:选模型那一刻就给,不等引擎空跑一次。
  * level:ok=装得下 tight=有点挤(能跑但慢) too-big=装不下 missing=文件不存在 empty=还没选
  */
 export interface ModelFitVerdict {
@@ -330,7 +330,7 @@ export interface AgentSearchMatch {
 }
 
 /**
- * 命中清单卡的数据(第十六批·LLM 优化):search_content 搜完,主进程把结构化命中
+ * 命中清单卡的数据(·LLM 优化):search_content 搜完,主进程把结构化命中
  * 走旁路直接推给界面画卡 —— 格式主动权归程序,不再让小模型当抄写员。
  * 这些数据只走内存通道,零落盘。
  */
@@ -345,17 +345,17 @@ export interface AgentSearchCard {
 export interface AiDeltaPayload {
   id: string
   text: string
-  /** 思考过程的增量(第一百一十五批):思考型模型才吐,普通请求没有 */
+  /** 思考过程的增量:思考型模型才吐,普通请求没有 */
   reasoning?: string
-  /** 实时 token 账(第八十四批):引擎报了就捎来,没报没有 —— 界面绝不编数 */
+  /** 实时 token 账:引擎报了就捎来,没报没有 —— 界面绝不编数 */
   stats?: AiStreamStats
-  /** agent 的工具步骤播报(第一百二十八批):翻文件模式下每翻一样播一句大白话 */
+  /** agent 的工具步骤播报:翻文件模式下每翻一样播一句大白话 */
   step?: { text: string }
-  /** agent 流式的回滚(第一百三十四批):已吐的字是垃圾/脏稿(打转、思考标签掺字),收回重讲 */
+  /** agent 流式的回滚:已吐的字是垃圾/脏稿(打转、思考标签掺字),收回重讲 */
   reset?: boolean
-  /** agent 流式的封板(第一百五十一批):本轮吐的正经话保留完工,另起新气泡接下一轮 */
+  /** agent 流式的封板:本轮吐的正经话保留完工,另起新气泡接下一轮 */
   seal?: boolean
-  /** agent 的命中清单卡(LLM 优化批次):search_content 搜到的结构化命中走旁路直递,程序画卡 */
+  /** agent 的命中清单卡:search_content 搜到的结构化命中走旁路直递,程序画卡 */
   matches?: AgentSearchCard
 }
 
@@ -365,19 +365,19 @@ export interface AiExplainResult {
   status: 'supported' | 'unsupported' | 'error' | 'cancelled'
   /** 解释文本;出错时是给用户看的人话说明 */
   text: string
-  /** 模型的思考过程(第一百一十五批):思考型模型才肯给,其他情况没有这个字段 */
+  /** 模型的思考过程:思考型模型才肯给,其他情况没有这个字段 */
   reasoning?: string
   /** 本次用了哪个模型(方便界面回显) */
   model: string
   /** 耗时(ms) */
   durationMs: number
-  /** 本次问答的 token 账(第八十四批):引擎肯报才有,绝不编数 */
+  /** 本次问答的 token 账:引擎肯报才有,绝不编数 */
   usage?: AiUsage
-  /** 复读机警报(第一百四十三批):true = 回答尾巴在原地打转。AI 层内部流转用,截断交卷后清掉 */
+  /** 复读机警报:true = 回答尾巴在原地打转。AI 层内部流转用,截断交卷后清掉 */
   repetitionDetected?: boolean
 }
 
-/** 一次问答的 token 账(第八十四批):读了多少提示词、吐了多少字、多快 */
+/** 一次问答的 token 账:读了多少提示词、吐了多少字、多快 */
 export interface AiUsage {
   promptTokens?: number
   outputTokens?: number
@@ -385,7 +385,7 @@ export interface AiUsage {
   tokensPerSecond?: number
 }
 
-/** 流式过程中的实时账(第八十四批):随增量帧捎给界面,读材料/吐字两阶段 */
+/** 流式过程中的实时账:随增量帧捎给界面,读材料/吐字两阶段 */
 export interface AiStreamStats {
   phase: 'reading' | 'writing'
   promptTokens?: number
@@ -393,7 +393,7 @@ export interface AiStreamStats {
   tokensPerSecond?: number
 }
 
-/** 后台日志的来源(第八十七批,Developer 日志窗口):引擎输出 / 请求用量 / 应用记账 */
+/** 后台日志的来源(Developer 日志窗口):引擎输出 / 请求用量 / 应用记账 */
 export type DevLogSource = 'engine' | 'request' | 'system'
 
 /** 后台日志的一条记录:只记元数据和引擎输出,绝不记用户的问题内容 */
@@ -458,40 +458,40 @@ export interface AiChatRequest {
   conversationId?: string
   /** 当前选中对象的资料;没选中就是 null */
   context: ChatContextAttachment | null
-  /** 用户从代码预览里选中、要一起发给探针的代码(第一百一十一批);没有就是 undefined */
+  /** 用户从代码预览里选中、要一起发给探针的代码;没有就是 undefined */
   codeRefs?: ChatCodeRef[]
   /**
-   * 用户拖/选进来的文件(文件附件批次,对齐 Claude Code 的 @文件):正文随这轮消息
+   * 用户拖/选进来的文件(对齐 Claude Code 的 @文件):正文随这轮消息
    * 进上下文,主进程会洗白 + 按预算按行截断(行账明写在提示词里)。最多 CHAT_FILES_MAX
    * 个;没有就是 undefined。图片走 images 那条链,不进这里。
    */
   files?: ChatFileAttachment[]
   /**
-   * 这轮带的图片(第一百五十二批):JPG/PNG 的 data URL,主进程会洗白+按预算缩图,
+   * 这轮带的图片:JPG/PNG 的 data URL,主进程会洗白+按预算缩图,
    * 纯文本模型直接拒收。最多 CHAT_IMAGES_MAX 张;没有就是 undefined。
    */
   images?: ChatImage[]
   /**
-   * 思考模式开关(第一百一十五批):true = 允许模型先想一遍,思考过程展示给用户;
+   * 思考模式开关:true = 允许模型先想一遍,思考过程展示给用户;
    * 缺省 false = 一句话解释这类快问快答,别让思考白烧字数。只有内置引擎吃这个开关
    * (外接服务由它们自己的设置管)。
    */
   thinking?: boolean
   /**
-   * 翻文件模式(agent,第一百二十八批):true = 允许小探针自己翻项目 —— 列文件名单、
+   * 翻文件模式(agent):true = 允许小探针自己翻项目 —— 列文件名单、
    * 读文件内容。只有「看」的工具,没有「改」的;轮数和重复翻看都有护栏约束。
    */
   agent?: boolean
   /** 翻文件模式的项目根(绝对路径):工具只许在这个目录里看,越界一律拒 */
   rootPath?: string
   /**
-   * 手动压缩生成的早前对话摘要(第一百四十二批):用户发 /compact 后,旧对话被提炼成
+   * 手动压缩生成的早前对话摘要:用户发 /compact 后,旧对话被提炼成
    * 摘要卡,之后的每次请求都带上来当背景记忆;没有压缩过就是 undefined。
    */
   summary?: string
 }
 
-/** /compact 手动压缩一次请求的载荷(渲染进程 → 主进程,第一百四十二批) */
+/** /compact 手动压缩一次请求的载荷(渲染进程 → 主进程) */
 export interface AiCompactRequest {
   requestId: string
   /** 目前为止的对话记录(含旧摘要卡转写的条目):渲染进程全量带上,主进程自己洗 */
@@ -499,7 +499,7 @@ export interface AiCompactRequest {
 }
 
 /**
- * 用户从代码预览里选中、要探针讲解的一段代码(第一百一十一批)。
+ * 用户从代码预览里选中、要探针讲解的一段代码。
  * 行号是给界面和提示词对账用的(「第 10-24 行」),code 是从预览里原样抠下来的原文。
  */
 export interface ChatCodeRef {
@@ -539,7 +539,7 @@ export interface AuxWindowRect {
 export type ChatMsgState = 'busy' | 'done' | 'error' | 'cancelled'
 
 /**
- * 共享自由对话的一条消息(桌宠气泡批次):既是主窗公用场的 UI 状态,也是
+ * 共享自由对话的一条消息:既是主窗公用场的 UI 状态,也是
  * 主窗 → 主进程 → 气泡 的镜像快照契约 —— 三边同一形状,不许各画各的。
  * 消息只有用户和探针两种;note = 程序垫的灰字条,不发模型、不进历史。
  */
@@ -549,25 +549,25 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'note'
   text: string
   state: ChatMsgState
-  /** note 的细分(第一百四十一批):step = 翻文件模式探针干活的步骤,时间线样式;
-   * summary(第一百四十二批)= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型;
-   * matches(LLM 优化批次)= 命中清单卡,search_content 搜到的结构化命中程序直接摆卡 */
+  /** note 的细分:step = 翻文件模式探针干活的步骤,时间线样式;
+   * summary= /compact 压出来的摘要卡,点开看全文,每次请求当背景记忆带给模型;
+   * matches= 命中清单卡,search_content 搜到的结构化命中程序直接摆卡 */
   kind?: 'step' | 'summary' | 'matches'
   /** kind = 'matches' 时的卡数据(主进程旁路直递的完整命中) */
   matches?: AgentSearchCard
-  /** 模型的思考过程(第一百一十五批):思考型模型才有的字,界面折叠展示 */
+  /** 模型的思考过程:思考型模型才有的字,界面折叠展示 */
   reasoning?: string
-  /** 流式过程中的实时账(第八十四批) */
+  /** 流式过程中的实时账 */
   stats?: AiStreamStats
-  /** 本次问答收尾的 token 账(第八十四批):引擎肯报才有 */
+  /** 本次问答收尾的 token 账:引擎肯报才有 */
   usage?: AiUsage
   /** 助手消息才挂的联网状态表;还没收到任何状态表时为 null(界面就不挂标签) */
   web: WebLookupMeta | null
-  /** 发这条消息时带的引用代码(第一百一十一批):重试要原样带上,不然重答的题就换了 */
+  /** 发这条消息时带的引用代码:重试要原样带上,不然重答的题就换了 */
   refs?: ChatCodeRef[]
-  /** 发这条消息时带的文件附件(文件附件批次):重试要原样带上;只在内存,不落盘不进日志 */
+  /** 发这条消息时带的文件附件:重试要原样带上;只在内存,不落盘不进日志 */
   files?: ChatFileAttachment[]
-  /** 发这条消息时带的图片(第一百五十二批):留着画缩略图,重试要原样带上;只在内存,不落盘不进日志 */
+  /** 发这条消息时带的图片:留着画缩略图,重试要原样带上;只在内存,不落盘不进日志 */
   images?: ChatImage[]
 }
 
@@ -590,7 +590,7 @@ export interface AiHistoryMessage {
 }
 
 /**
- * 代码预览的读文件结果(第一百一十批):只给「够看懂」的一段,超了如实标 truncated。
+ * 代码预览的读文件结果:只给「够看懂」的一段,超了如实标 truncated。
  * 二进制/超大各有专门状态,让界面说人话 —— 绝不硬塞一屏乱码。
  * image = 后缀是 JPG/PNG 且内容验过魔数:界面直接看图,不走文本那套。
  * audio = 后缀是 MP3/WAV 且内容验过魔数:界面走协议流播放,不走文本那套。
@@ -604,7 +604,7 @@ export interface FilePreviewResult {
   /** 不是 ok 时的原因(人话) */
   reason: string
   /**
-   * status='ok' 时的分色账(可选,预览分色本批):外层是行,中层是行内的段,
+   * status='ok' 时的分色账(可选):外层是行,中层是行内的段,
    * 每段 [起始列, 结束列, 角色编号](列从 0 起,不含换行符;角色编号对 shared/highlight 的 HL_KINDS)。
    * 缺省 = 这份不上色(超闸 / 语言不认识 / 解析出错),界面照常白字,绝不是出错。
    */
@@ -637,12 +637,12 @@ export interface FilePreviewAudio {
   bytes: number
 }
 
-/** 文件写盘回执(预览编辑批次):mtimeMs 给文件监视器对账 —— 对上这个时间的 watch 事件是我们自己写的,吞掉 */
+/** 文件写盘回执:mtimeMs 给文件监视器对账 —— 对上这个时间的 watch 事件是我们自己写的,吞掉 */
 export interface SaveFileResult {
   mtimeMs: number
 }
 
-/** 文件改名回执(内联标题改名批次):渲染层拿它给页签/扫描树/选中态换新登记 */
+/** 文件改名回执:渲染层拿它给页签/扫描树/选中态换新登记 */
 export interface RenameFileResult {
   /** 改名后的 relPath('/' 分隔,与旧路径同目录) */
   relPath: string

@@ -1,4 +1,4 @@
-/* ── 关系图谱(Graph View):画布铺满页签,面包屑与工具按钮浮在画布上层 ──
+/* 关系图谱(Graph View):画布铺满页签,面包屑与工具按钮浮在画布上层 
    --graph-* token 由 renderer/src/graph/drawGraph.ts 的 readGraphColors 读取;
    背景与高亮色借用 --canvas-tint / --accent-bright,跟随主题色 */
 

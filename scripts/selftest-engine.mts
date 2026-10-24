@@ -1,4 +1,4 @@
-// ── 引擎后端自测(第 4 期)─────────────────────────────────────────
+// 引擎后端自测
 // 跑法:npm run test:engine
 // 钉死的账:engineCatalog 登记完整(每包有真 sha256/大小,URL 对得上钉的版本);
 // recommendBackend / resolveEngineChoice 的推荐与退路矩阵;安装器的纯函数件
@@ -59,8 +59,8 @@ const M = (over: Partial<MachineProfile>): MachineProfile => ({
   ...over
 })
 
-// ── 目录登记完整性 ──────────────────────────────────────────────
-console.log('── 引擎目录完整性')
+// 目录登记完整性 
+console.log(' 引擎目录完整性')
 {
   for (const b of ['cuda', 'vulkan', 'cpu'] as const) {
     const info = ENGINE_CATALOG[b]
@@ -83,8 +83,8 @@ console.log('── 引擎目录完整性')
   check('cuda 两包(主包+cudart)', ENGINE_CATALOG.cuda.assets.length === 2)
 }
 
-// ── 后端推荐矩阵 ────────────────────────────────────────────────
-console.log('── recommendBackend 矩阵')
+// 后端推荐矩阵 
+console.log(' recommendBackend 矩阵')
 eq('RTX 5060 Ti(cc 12.0)→ cuda', recommendBackend(M({})).backend, 'cuda')
 eq('GTX 1060(cc 6.1)→ vulkan', recommendBackend(M({ gpuComputeCap: 6.1 })).backend, 'vulkan')
 eq('cc 7.5 边缘 → cuda', recommendBackend(M({ gpuComputeCap: 7.5 })).backend, 'cuda')
@@ -116,8 +116,8 @@ eq(
   'cuda'
 )
 
-// ── 引擎选择矩阵 ────────────────────────────────────────────────
-console.log('── resolveEngineChoice 矩阵')
+// 引擎选择矩阵 
+console.log(' resolveEngineChoice 矩阵')
 {
   const r = (userChoice: 'auto' | 'cuda' | 'vulkan' | 'cpu', installed: string[], vendor = true) =>
     resolveEngineChoice({
@@ -176,8 +176,8 @@ eq('sanitizeBackendChoice 白名单', ['auto', 'cuda', 'junk', undefined].map(sa
   'auto'
 ])
 
-// ── 安装器纯函数件 ──────────────────────────────────────────────
-console.log('── 安装器纯件(进度折算 / zip 安检)')
+// 安装器纯函数件 
+console.log(' 安装器纯件(进度折算 / zip 安检)')
 eq('下载进度:两包下完一半', downloadPercent([100, 300], [50, 150]), 45)
 eq('下载进度:全下完 = 90(尾巴留给校验解压)', downloadPercent([100, 300], [100, 300]), 90)
 eq('下载进度:越界数字被夹住', downloadPercent([100], [999]), 90)
@@ -190,8 +190,8 @@ check('zip 安检:UNC 拒', !isZipEntrySafe('\\\\share\\x'))
 check('zip 安检:正常条目收', isZipEntrySafe('./llama-server.exe') && isZipEntrySafe('bin/x.dll'))
 check('zip 安检:反斜杠 .. 拒', !isZipEntrySafe('a\\..\\evil.txt'))
 
-// ── verifyAndExtract 全谱 ─────────────────────────────────────
-console.log('── verifyAndExtract(真 tar,错 sha / 截短 / zip-slip)')
+// verifyAndExtract 全谱 
+console.log(' verifyAndExtract(真 tar,错 sha / 截短 / zip-slip)')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-eng-'))
   try {
@@ -312,8 +312,8 @@ function makeZip(entries: { name: string; data: Buffer }[]): Buffer {
   return Buffer.concat([...locals, cd, eocd])
 }
 
-// ── installBackend(本地 fetch 喂假包:下载→校验→解压→试跑全链走一遍)──
-console.log('── installBackend 失败谱(假 exe 跑不动 → 清理 + 人话)')
+// installBackend(本地 fetch 喂假包:下载→校验→解压→试跑全链走一遍)
+console.log(' installBackend 失败谱(假 exe 跑不动 → 清理 + 人话)')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-enginst-'))
   try {
@@ -337,8 +337,8 @@ console.log('── installBackend 失败谱(假 exe 跑不动 → 清理 + 人�
   }
 }
 
-// ── config 的 backend 落盘 ─────────────────────────────────────
-console.log('── config backend round-trip')
+// config 的 backend 落盘 
+console.log(' config backend round-trip')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-cfgb-'))
   try {
@@ -357,8 +357,8 @@ console.log('── config backend round-trip')
   }
 }
 
-// ── 对账键把后端算进签名 ────────────────────────────────────────
-console.log('── settingsKey 签名含后端')
+// 对账键把后端算进签名 
+console.log(' settingsKey 签名含后端')
 {
   const base = { serverPath: '', modelPath: 'f:\\m.gguf' }
   check(

@@ -1,6 +1,6 @@
 /* 源码编辑器、选区与气泡附件痕(从 workspace.css 拆出:纯迁移,不改行为) */
 
-/* ── 源码编辑器(预览编辑批次):CodeMirror 6 在 .code-view.is-editing 里自己管滚动 ──
+/* 源码编辑器:CodeMirror 6 在 .code-view.is-editing 里自己管滚动 
    外层 .code-view 只留个框(不再 overflow:auto)—— cm-scroller 内部虚拟渲染,
    滚动条、行号槽、折行全归编辑器管;字号公式与旧 .code-text 同一份(--doc-zoom 照吃) */
 .code-view.is-editing {
@@ -132,7 +132,7 @@
   font-size: var(--font-xxs);
 }
 
-/* 用户气泡里的文件痕(文件附件批次):他带过什么文件,回看时对得上 */
+/* 用户气泡里的文件痕:他带过什么文件,回看时对得上 */
 .msg-files {
   display: flex;
   flex-wrap: wrap;
@@ -152,7 +152,7 @@
   font-size: var(--font-xxs);
 }
 
-/* 用户气泡里的图片痕(第一百五十二批):他发过什么图,缩略图排一排回看时对得上 */
+/* 用户气泡里的图片痕:他发过什么图,缩略图排一排回看时对得上 */
 .msg-imgs {
   display: flex;
   flex-wrap: wrap;

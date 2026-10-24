@@ -1,7 +1,7 @@
 /* Live Preview 装饰与档级覆写(从 markdown.css 拆出:纯迁移,不改行为)。
    须排在 markdown-live-table.css 之后:末段 .code-view.is-live 要压过通用编辑器账 */
 
-/* ── Live Preview 装饰(md 三档批次)──
+/* Live Preview 装饰
    标题行量级/行高与阅读档同一份(.code-reading .md-hN 的写真照抄),
    字号相对 scroller 基字号走 —— Ctrl+滚轮的 --doc-zoom 天然全场同步 */
 .cm-host .cm-live-h1,
@@ -128,7 +128,7 @@
   margin: 0;
 }
 
-/* ── live 档排版对齐阅读档(Obsidian 同款观感;档级覆写段,放最后压过通用编辑器账)──
+/* live 档排版对齐阅读档(Obsidian 同款观感;档级覆写段,放最后压过通用编辑器账)
    正文吃 --sans 非等宽 + 阅读行高 1.75 + 46rem 可读栏居中 + 上下呼吸同款;
    行号槽 live 档不挂(cmSetup 装配侧摘了),栏边距内呼吸,border-box 下
    max-width 吃 padding —— 46rem 是文字净宽,与 .code-reading 同一把尺 */

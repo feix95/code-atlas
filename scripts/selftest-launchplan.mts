@@ -61,7 +61,7 @@ const baseInput = (over: Partial<Parameters<typeof planLaunch>[0]>) => ({
 })
 
 function main(): void {
-  // ── 1. 基本盘:小模型 16GB 卡,默认档装得下 ──
+  // 1. 基本盘:小模型 16GB 卡,默认档装得下 
   let plan = planLaunch(baseInput({}))
   assert.equal(plan.rung, 0, '4GB 模型 16GB 卡 → 默认档就够')
   assert.equal(plan.estimate.verdict, 'ok')
@@ -74,7 +74,7 @@ function main(): void {
   assert.equal(plan.estimate.verdict, 'ok', '8GB 模型 16GB 卡装得下')
   assert.equal(plan.rung, 0)
 
-  // ── 2. args 硬约束:auto 绝不出 -ngl,显式层数才出 ──
+  // 2. args 硬约束:auto 绝不出 -ngl,显式层数才出 
   assert.ok(!plan.args.includes('-ngl'), 'auto 层数不出 -ngl(--fit 靠缺省生效)')
   const forced = planLaunch(baseInput({ overrides: { gpuLayers: 20 } }))
   assert.deepEqual(
@@ -84,7 +84,7 @@ function main(): void {
   )
   assert.ok(!forced.args.includes('-ngl') || forced.params.gpuLayers === 20)
 
-  // ── 3. 梯子顺序:先摘投影仪,再降黑板,最后砍上下文 ──
+  // 3. 梯子顺序:先摘投影仪,再降黑板,最后砍上下文 
   // 4.5GB 模型 + 0.7GB 投影仪,8GB 卡:rung0 超预算,rung1 摘掉投影仪装下
   const t1 = planLaunch(baseInput({ machine: M8, modelBytes: 4.5 * GB, mmprojBytes: 0.7 * GB }))
   assert.equal(t1.rung, 1, '第一档:投影仪放内存')
@@ -110,7 +110,7 @@ function main(): void {
   )
   assert.ok(t3.reasons.some((r) => r.includes('上下文从 16384 调到 8192')))
 
-  // ── 4. Gemma-4-26B MoE + 投影仪,16GB 卡(真机实测那台)──
+  // 4. Gemma-4-26B MoE + 投影仪,16GB 卡(真机实测那台)
   const gemma = planLaunch(
     baseInput({ modelBytes: GEMMA_BYTES, mmprojBytes: MMPROJ_BYTES, shape: GEMMA4_SHAPE })
   )
@@ -137,7 +137,7 @@ function main(): void {
   assert.equal(gemma24.estimate.verdict, 'ok', '24GB 卡装 Gemma-26B MoE 从容')
   assert.equal(gemma24.rung, 0)
 
-  // ── 5. 装不下的结局:稠密 13.4GB 16GB 卡连降到底还是超 → too-big ──
+  // 5. 装不下的结局:稠密 13.4GB 16GB 卡连降到底还是超 → too-big 
   const dense13 = planLaunch(baseInput({ modelBytes: 13.4 * GB, mmprojBytes: MMPROJ_BYTES }))
   assert.equal(dense13.estimate.verdict, 'too-big', '稠密 13.4GB+投影仪 16GB 卡降到底也装不下')
   assert.equal(dense13.rung, 3, '梯子走到头')
@@ -152,7 +152,7 @@ function main(): void {
   const dense40 = planLaunch(baseInput({ machine: M24, modelBytes: 40 * GB }))
   assert.equal(dense40.estimate.verdict, 'too-big')
 
-  // ── 6. 没认出显卡:默认档 + 内存口径 + 人话 ──
+  // 6. 没认出显卡:默认档 + 内存口径 + 人话 
   const noGpu = planLaunch(baseInput({ machine: NO_GPU, modelBytes: 4 * GB }))
   assert.equal(noGpu.rung, 0, '无卡不玩梯子')
   assert.equal(noGpu.estimate.vramBytes, null)
@@ -161,7 +161,7 @@ function main(): void {
   const noGpuBig = planLaunch(baseInput({ machine: NO_GPU, modelBytes: 30 * GB }))
   assert.equal(noGpuBig.estimate.verdict, 'too-big', '30GB 模型 32GB 内存装不下')
 
-  // ── 7. AMD 卡走同同一数据源(vendor 不当门槛) ──
+  // 7. AMD 卡走同同一数据源(vendor 不当门槛) 
   const amd = planLaunch(
     baseInput({
       machine: { ...M8, gpuName: 'AMD Radeon RX 7800 XT', gpuVendor: 'amd' },
@@ -170,7 +170,7 @@ function main(): void {
   )
   assert.equal(amd.estimate.verdict, 'ok')
 
-  // ── 8. 手动指定照原样,梯子不碰 ──
+  // 8. 手动指定照原样,梯子不碰 
   const ovCtx = planLaunch(baseInput({ overrides: { contextSize: 8192 } }))
   assert.equal(ovCtx.params.contextSize, 8192)
   assert.ok(!ovCtx.reasons.some((r) => r.includes('上下文从')), '用户自己填的档,不归账到梯子头上')
@@ -216,13 +216,13 @@ function main(): void {
   assert.equal(ovKv.params.kvCache, 'f16', '指定的 f16 不许被梯子改掉')
   assert.equal(ovKv.params.contextSize, 8192, '黑板动不了就往上下文降')
 
-  // ── 9. 上下文地板:低于 8192 的不许再砍 ──
+  // 9. 上下文地板:低于 8192 的不许再砍 
   const lowCtx = planLaunch(baseInput({ machine: M8, modelBytes: 6 * GB, requestedContext: 4096 }))
   assert.equal(lowCtx.params.contextSize, 4096, '请求 4096 不再往下砍')
   const atFloor = planLaunch(baseInput({ machine: M8, modelBytes: 6 * GB, requestedContext: 8192 }))
   assert.equal(atFloor.params.contextSize, 8192, '8192 是地板,砍不动')
 
-  // ── 10. 重启对账钥匙:账上记用户档,不记计划降下去的档 ──
+  // 10. 重启对账钥匙:账上记用户档,不记计划降下去的档 
   // dense 6GB 8GB 卡计划降到 8192;若账记 8192,用户档 16384 下一轮永远对不上 → 重启死循环
   assert.equal(bookkeepingContextSize(16384), 16384)
   assert.notEqual(
@@ -232,7 +232,7 @@ function main(): void {
   )
   assert.equal(t3.params.contextSize, 8192, '上面这个计划确实降过档')
 
-  // ── 11. 就绪播报摘句:上下文降了 > 投影仪放内存 > 缓存降格 ──
+  // 11. 就绪播报摘句:上下文降了 > 投影仪放内存 > 缓存降格 
   assert.ok(planCaveat(t3, 16384)!.includes('上下文'), '砍了上下文先说它')
   assert.ok(planCaveat(t1, 16384)!.includes('视觉文件'), '投影仪放内存报这个')
   assert.equal(planCaveat(planLaunch(baseInput({})), 16384), null, '没妥协没话说')
@@ -244,7 +244,7 @@ function main(): void {
     assert.equal(planCaveat(q8Only, 8192), null)
   }
 
-  // ── 12. OOM 记号检测(保险丝话术用) ──
+  // 12. OOM 记号检测(保险丝话术用) 
   assert.ok(engineLogHasOom('ggml_vulkan: vk::Device::allocateMemory: ErrorOutOfDeviceMemory'))
   assert.ok(engineLogHasOom('llama_model_load: error: out of memory'))
   assert.ok(engineLogHasOom('ggml_cuda_host_malloc: failed to allocate 1024.00 MiB'))
@@ -253,7 +253,7 @@ function main(): void {
   assert.ok(!engineLogHasOom('模型加载完成'))
   assert.ok(!engineLogHasOom(''))
 
-  // ── 13. nvidia-smi 行解析与厂商名识别 ──
+  // 13. nvidia-smi 行解析与厂商名识别 
   const nv = parseNvidiaSmiProfile('NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 15174 MiB')
   assert.equal(nv?.gpuName, 'NVIDIA GeForce RTX 5060 Ti')
   assert.equal(nv?.vramBytes, 16311 * 1024 * 1024)
@@ -269,7 +269,7 @@ function main(): void {
   assert.equal(vendorFromGpuName('Intel(R) UHD Graphics 770'), 'intel')
   assert.equal(vendorFromGpuName('ASPEED Graphics Family'), 'unknown')
 
-  // ── 14. 预算口径:有空闲显存按空闲算,没有按总量算 ──
+  // 14. 预算口径:有空闲显存按空闲算,没有按总量算 
   const freeLow = planLaunch(baseInput({ machine: gpu(16, 9), modelBytes: 8 * GB }))
   // 9GB 空闲 → 预算 8.28GB;8GB 模型 + 黑板 2GB + 缓冲 0.6 = 10.6 > 8.28 → 降档
   assert.notEqual(freeLow.rung, 0, '按空闲显存算,占了半张卡就得降档')

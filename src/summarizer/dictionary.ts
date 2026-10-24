@@ -6,7 +6,7 @@ import { LANGUAGES } from '../shared/languages.ts'
 // 风险句构造器:档位3专用,同话重播时不参与降噪(见 shared/summaryDedup)
 export const TIER3 = (icon: string, text: string): NodeSummary => ({ icon, text, sticky: true })
 
-// ── 文件:精确文件名字典(小写比对,最铁的证据) ──
+// 文件:精确文件名字典(小写比对,最铁的证据)
 export const FILE_SUMMARIES: Record<string, NodeSummary> = {
   'package.json': { icon: 'config', text: '项目配置：名称、依赖和命令' },
   'package-lock.json': TIER3('lock', '锁定依赖版本，自动生成，不要手动改'),
@@ -61,7 +61,7 @@ export const FILE_SUMMARIES: Record<string, NodeSummary> = {
   '.nvmrc': { icon: 'config', text: '指定 Node 版本' }
 }
 
-// ── 文件:名字模式规则(字典没精确命中时看名字形状) ──
+// 文件:名字模式规则(字典没精确命中时看名字形状)
 export const FILE_PATTERNS: Array<{ re: RegExp; summary: NodeSummary }> = [
   {
     re: /\.test\.|\.spec\.|selftest|(^|[.-])test[.-]/,
@@ -93,7 +93,7 @@ export const CODE_LANG_IDS = new Set(
   LANGUAGES.filter((l) => l.category === 'code' && !CODE_LANG_EXCLUDES.has(l.id)).map((l) => l.id)
 )
 
-// ── 文件:后缀范畴词(档位1:只给非常用后缀配 2~4 字范畴词,不写句子) ──
+// 文件:后缀范畴词(档位1:只给非常用后缀配 2~4 字范畴词,不写句子)
 export const FILE_EXT_SUMMARIES: Record<string, NodeSummary> = {
   '.md': { icon: 'doc', text: '文档' },
   '.markdown': { icon: 'doc', text: '文档' },
@@ -167,7 +167,7 @@ export const KNOWN_SILENT_EXTS = new Set([
   '.webp'
 ])
 
-// ── 目录:名字习惯字典(档位2直述,≤14 字,无人物拟人) ──
+// 目录:名字习惯字典(档位2直述,≤14 字,无人物拟人)
 export const DIR_SUMMARIES: Record<string, NodeSummary> = {
   src: { icon: 'code', text: '项目全部源代码' },
   source: { icon: 'code', text: '项目全部源代码' },

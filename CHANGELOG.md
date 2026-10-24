@@ -553,3 +553,4 @@
 - refactor(ai): 聊天请求拆出入口安检与预算规划,翻文件循环拆出工具往来
 - refactor(ui): Markdown 公式命令对照表拆出 mdMathTables
 - chore(test): 有效代码行加 300 闸,图标册/词根表/类型契约登白名单
+- refactor(core): 清掉注释里的批次号、刀次和装饰分隔线

@@ -57,7 +57,7 @@ registerAudioMediaScheme()
 // 第四案(软件渲染版照样隐身)补刀:凶手不在显卡,在 Windows 合成器那一层。
 // 两道开关都冲着「无声断供」去:
 // ① Chromium 的原生窗口遮挡计算在 Windows 上有老毛病,会把没被遮住的窗误判成
-//    「被遮住了」从而停画 —— 这是社区公认的窗口凭空消失惯犯,直接关掉这个 feature;
+// 「被遮住了」从而停画 —— 这是社区公认的窗口凭空消失惯犯,直接关掉这个 feature;
 // ② 见 createWindow 里的 5 秒一次强制重画(让 DWM 随时都能接上新帧)。
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 // 退出时把全局快捷键一并还回去,不留幽灵热键占着系统;托盘图标一并摘掉,不留僵尸托盘
@@ -75,7 +75,7 @@ function startApp(): void {
   // 窗口操作由主窗渲染层按 frameName 代发,桥在 installAuxWindowBridge(createWindow 里上弦)
   registerAuxWindowIpc(() => mainWindowRef)
 
-  // 后台日志广播员上岗(第八十七批):每记一笔就推给所有窗口(日志窗口常驻收听)
+  // 后台日志广播员上岗:每记一笔就推给所有窗口(日志窗口常驻收听)
   setDevLogListener((entry) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send(CH.devLog, entry)
@@ -101,7 +101,7 @@ function startApp(): void {
   })
 }
 
-// ── 单实例锁(桌宠托管第一批;当年双实例 GPU 缓存大战的老伤疤,别再揭一次)──
+// 单实例锁(当年双实例 GPU 缓存大战的老伤疤,别再揭一次)
 // 抢不到锁 = 已经有一个 CodeAtlas 在跑:本实例一个窗都不建,悄悄退场。
 // 已在跑的实例通过 second-instance 收到敲门:把主窗带焦点唤回前台。
 app.on('before-quit', () => {
@@ -130,7 +130,7 @@ app.on('will-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // Windows / Linux:所有窗口都没了才退出。收起模式(桌宠托管第一批)下关窗只是
+  // Windows / Linux:所有窗口都没了才退出。收起模式下关窗只是
   // 藏进托盘、窗口不销毁,这个事件不触发 —— 真退出走托盘「退出」,走到这儿时
   // quit 已在进行,再喊一声无害
   if (process.platform !== 'darwin') app.quit()

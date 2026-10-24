@@ -102,7 +102,7 @@ export function registerScanIpc(): void {
     }
   )
 
-  // 代码预览读文件(第一百一十批):右键「预览文件」用的那条通道。
+  // 代码预览读文件:右键「预览文件」用的那条通道。
   // 路径契约同 analyze-file —— 收 (rootPath, relPath),绝对路径只经 joinRoot 解析,
   // relPath 越界(.. 上跳、盘符注入)在这儿被拦。守卫三道:二进制不受理、超大不受理、
   // 能读的也只给前一段(行数/字数双封顶),账目如实回给界面,绝不静默腰斩。
@@ -161,7 +161,7 @@ export function registerScanIpc(): void {
         }
       }
       const clip = clipPreview(buf.toString('utf8'))
-      // 预览分色(本批):顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
+      // 顺手让 tree-sitter 把代码过一遍。超闸、不认识的语言、
       // 解析出错都老实回 null —— 界面白字照常,分色永远不拖累预览本身。
       const colors = await highlightSource(clip.text, name)
       return {

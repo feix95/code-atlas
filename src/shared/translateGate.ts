@@ -1,6 +1,6 @@
 /** 这份预览签能不能翻译:与 canReadingMode(排版显示)并列,禁止合并。
  *
- * md 系继续可翻;本批另收给人读的说明书(.txt / .rst / .adoc / .asciidoc)。
+ * md 系继续可翻;另收给人读的说明书(.txt / .rst / .adoc / .asciidoc)。
  * 程序文件碰巧叫 .txt 的挡掉(包装清单、编译脚本、爬虫规则)。
  */
 import { fileExtOf } from './fileRename.ts'

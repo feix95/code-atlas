@@ -103,7 +103,7 @@ export class HrWidget extends WidgetType {
 /** live 档的内联标题登记(cmSetup 装配时喂文件名,缺省 '' = 不摆) */
 export const liveTitle = Facet.define<string, string>({ combine: (v) => v[0] ?? '' })
 
-/** live 档的标题改名通道(内联标题改名批次):cmSetup 喂回调,缺省 = 标题只展示不可改 */
+/** live 档的标题改名通道:cmSetup 喂回调,缺省 = 标题只展示不可改 */
 export const liveRename = Facet.define<
   ((base: string) => Promise<RenameOutcome>) | undefined,
   ((base: string) => Promise<RenameOutcome>) | undefined

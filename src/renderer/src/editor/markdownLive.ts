@@ -1,5 +1,5 @@
 /**
- * Live Preview 装饰引擎(md 三档批次):
+ * Live Preview 装饰引擎:
  * 同一份源码,光标不在的地方「上妆」成渲染效果,光标所在的语法块「卸妆」露源码 ——
  * 对标 Obsidian 的 Live Preview。
  *

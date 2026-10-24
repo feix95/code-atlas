@@ -38,7 +38,7 @@ export interface AgentRawAssistant {
 }
 
 /** agent 循环里的一条对话消息(比普通聊天多了 tool 两种形态);
- *  user 的 content 可以是多模态分段数组(第一百五十二批,带图轮);数组形态不跟别的消息合并 */
+ *  user 的 content 可以是多模态分段数组(带图轮);数组形态不跟别的消息合并 */
 export type AgentChatMessage =
   | { role: 'system' | 'user' | 'assistant'; content: string | ChatContentPart[] }
   | AgentRawAssistant
@@ -61,14 +61,14 @@ export type AgentRoundResult =
       bodyStarted?: boolean
     }
 
-/** 流式轮次边收边推给界面的事件(第一百三十四批):增量 + token 账 + 回滚令 + 封板令 */
+/** 流式轮次边收边推给界面的事件:增量 + token 账 + 回滚令 + 封板令 */
 export interface AgentStreamEvent {
   text?: string
   reasoning?: string
   stats?: AiStreamStats
   /** 已吐的字是垃圾/脏稿(复读打转、思考标签掺进正文),让界面收回去 */
   reset?: boolean
-  /** 本轮吐的字是正经话且模型喊了工具(第一百五十一批):让界面把当前气泡封口保留,
+  /** 本轮吐的字是正经话且模型喊了工具:让界面把当前气泡封口保留,
    *  另起新气泡接下一轮 —— 说出口的话不抹掉,各轮的输出和思考按轮分开 */
   seal?: boolean
 }

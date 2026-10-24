@@ -1,4 +1,4 @@
-// ── 模型/服务 HTTP 底座(P1-6/P1-8/P2-18) ──
+// 模型/服务 HTTP 底座(P1-6/P1-8/P2-18)
 // 以前同款样板在 ai/index.ts 和 ai/agent.ts 各抄一遍:AbortController 接力、
 // 响应头看门狗、chat/completions POST 组装、headers、HTTP 错误翻译;
 // 探测服务的 fetch+AbortSignal.timeout 更是在 main/ai/builtin/modelShelf 散写近十处。

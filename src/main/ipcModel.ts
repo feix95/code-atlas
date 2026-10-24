@@ -124,7 +124,7 @@ export function registerModelIpc(): void {
       webLookup: c.webLookup === true,
       // Tavily Key(可选,2026-09-17):设置页填了才进档;saveAiConfig 里会洗(trim,空白当没填)
       tavilyKey: typeof c.tavilyKey === 'string' ? c.tavilyKey : undefined,
-      // 个性化(第一百一十三批)也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
+      // 个性化也得跟着进档:上一版在这一步被弄丢,设置完下次打开就打回原形
       personalization: sanitizePersonalization(c.personalization),
       // 手动上下文(留空 = 自动探测):上一版在这一步被弄丢,设置页填了也白填
       contextSize:
@@ -151,7 +151,7 @@ export function registerModelIpc(): void {
     return saved
   })
 
-  // ── 模型状态栏(第七十批):界面随时来问当前状态;按「取消/卸下」就地解散引擎 ──
+  // 模型状态栏:界面随时来问当前状态;按「取消/卸下」就地解散引擎
   ipcMain.handle(CH.modelStatusGet, async (): Promise<ModelStatus> => {
     const config = await loadAiConfig(userDataDir())
     if (config.provider === 'builtin') {
@@ -188,7 +188,7 @@ export function registerModelIpc(): void {
     }
   })
 
-  // 适配估算(第七十三批):选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
+  // 适配估算:选模型那一刻就拿块头比机器尺寸,带不动当场说,不让用户白等
   ipcMain.handle(CH.modelFitCheck, async (_event, modelPath: unknown): Promise<ModelFitVerdict> => {
     if (typeof modelPath !== 'string' || !modelPath.trim()) {
       return { level: 'empty', title: '', detail: '', sizeBytes: null }
@@ -206,7 +206,7 @@ export function registerModelIpc(): void {
       }
     }
     const spec = await queryMachineSpec()
-    // 上下文缓存跟着配置走(第八十六批):手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
+    // 上下文缓存跟着配置走:手动填了按手动的,没填按默认窗口(DEFAULT_CONTEXT_SIZE)
     const config = await loadAiConfig(userDataDir())
     const ctx =
       typeof config.contextSize === 'number' && config.contextSize >= CONTEXT_SIZE_MIN

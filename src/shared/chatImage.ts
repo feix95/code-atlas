@@ -1,4 +1,4 @@
-// 自由对话的图片附件(第一百五十二批):类型、能力闸、token 估算、预算规划、收编洗白。
+// 自由对话的图片附件:类型、能力闸、token 估算、预算规划、收编洗白。
 // 全是纯函数 —— 渲染层与主进程共用同一把尺子,自测一把全摁住。
 import { sniffImage, type ImageMime } from './imageMeta.ts'
 import { IMAGE_PREVIEW_MAX_BYTES } from './preview.ts'
@@ -135,7 +135,7 @@ export function planImageBudget(input: {
   return { ok: true, items }
 }
 
-// ── 主进程收编:渲染层递来的图片再过一遍筛,脏数据不许混进发给模型的消息 ──
+// 主进程收编:渲染层递来的图片再过一遍筛,脏数据不许混进发给模型的消息
 
 export interface SanitizedChatImages {
   images: ChatImage[]

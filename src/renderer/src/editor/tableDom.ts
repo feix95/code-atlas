@@ -6,7 +6,7 @@ import type { SyntaxNode } from '@lezer/common'
 import type { MdAlign } from '../../../shared/markdown.ts'
 import { serializeTable, type TableModel } from './tableModel.ts'
 
-// ── 范围与回写 ──
+// 范围与回写
 
 /** 替身 DOM → 当前 Table 语法区间(每次现查,编辑漂移不炸账) */
 export function findTableRange(

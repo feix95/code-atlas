@@ -10,7 +10,7 @@ import { clipPreview, looksBinary, PREVIEW_MAX_BYTES } from '@shared/preview'
 import { formatSize } from '@shared/fsMessages'
 
 /**
- * 待发文件的小状态表(文件附件批次,对齐 Claude Code 的 @文件):三个入口
+ * 待发文件的小状态表(对齐 Claude Code 的 @文件):三个入口
  * (「+」菜单「添加附件」选文件、从系统拖文件进来、从文件树拖文件进来)都汇到 addFiles ——
  * 同一份校验口径:只收文本文件(后缀名单先挡纯二进制,开头字节有 NUL 再挡一道)、
  * 单份不超 10MB、最多 3 个;收进来的正文按行裁到静态上限,行账(第 1-N 行 / 共 M 行)留给界面和模型看。

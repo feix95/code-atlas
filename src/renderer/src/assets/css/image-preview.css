@@ -1,4 +1,4 @@
-/* ── 图片预览:JPG/PNG 签的正文 ──
+/* 图片预览:JPG/PNG 签的正文 
    舞台 overflow:hidden;图按原像素排,translate + scale 做适应/缩放/平移 */
 .image-pane {
   display: flex;

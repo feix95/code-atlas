@@ -1,4 +1,4 @@
-// ── 音频预览支路:ipcScan 的 readPreview 配套小文件 ──
+// 音频预览支路:ipcScan 的 readPreview 配套小文件
 // 只读文件头验魔数,整文件不进内存;真身字节由 atlas-media 协议按需流给 <audio>。
 
 import { promises as fs } from 'node:fs'

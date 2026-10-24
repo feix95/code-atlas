@@ -25,7 +25,7 @@ export type { TableModel } from './tableModel.ts'
 /** 点表格边缘卸妆露源码的回调(由 markdownLive 装配时注入,避免循环依赖) */
 export type TableReveal = (view: EditorView, from: number) => (e: MouseEvent) => void
 
-// ── 替身本体 ──
+// 替身本体
 
 export class TableWidget extends WidgetType {
   readonly model: TableModel

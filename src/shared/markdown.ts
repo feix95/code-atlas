@@ -1,5 +1,5 @@
 /**
- * 迷你 Markdown 解析器(阅读模式批次起):把手写 md 拆成纯数据 AST,
+ * 迷你 Markdown 解析器:把手写 md 拆成纯数据 AST,
  * 渲染交给 MiniMD.tsx —— 解析与描画分家,这里不碰 React、不碰 DOM,
  * 自测可以直接把 AST 对状态表,不必过浏览器。
  *
@@ -17,7 +17,7 @@ import {
   nextMathIndex
 } from './mdMath.ts'
 
-// ── 行内 AST ──
+// 行内 AST
 
 export type MdInline =
   | { t: 'text'; text: string }
@@ -29,7 +29,7 @@ export type MdInline =
   | { t: 'link'; label: string; href: string }
   | { t: 'math'; text: string; display: boolean }
 
-// ── 块级 AST ──
+// 块级 AST
 
 export type MdAlign = 'left' | 'center' | 'right'
 export type MdCalloutKind = 'note' | 'tip' | 'warn' | 'danger' | 'quote'
@@ -58,7 +58,7 @@ export type MdBlock =
   | { t: 'callout'; kind: MdCalloutKind; title: string; children: MdBlock[] }
   | { t: 'para'; content: MdInline[] }
 
-// ── 行内解析 ──
+// 行内解析
 
 /**
  * `代码` 先单独摘走(里面的字一个语法都不认);整段恰是公式的代码改画成 math。
@@ -130,7 +130,7 @@ function parseRich(t: string): MdInline[] {
   return out
 }
 
-// ── 块级认家 ──
+// 块级认家
 
 const RE_FENCE = /^\s*```/
 const RE_HEADING = /^(#{1,4})\s+(.*)$/

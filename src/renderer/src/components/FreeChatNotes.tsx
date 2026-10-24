@@ -53,7 +53,7 @@ export const FileNoteText = memo(function FileNoteText({
 const MATCH_PREVIEW_COUNT = 8
 
 /**
- * 命中清单卡(LLM 优化批次):search_content 搜到的结构化命中,程序摆卡直说,
+ * 命中清单卡:search_content 搜到的结构化命中,程序摆卡直说,
  * 不劳模型转手抄写 —— 一条不丢、行号一个不错。「文件:行号」整块可点,
  * 点了左边开预览直达那一行(和聊天里 AI 提到文件的可点链接同一去处)。
  * 数据是主进程程序自己产的真货,路径不用再过 findFileLinks 的登记检查。

@@ -172,7 +172,7 @@ try {
     .filter({ has: page.locator('.tabbar-name').getByText(peekName, { exact: true }) })
   await peekTab.waitFor()
   assert.equal(await peekTab.count(), 1, 'browse file must open a peek preview tab')
-  // 文档缩放(文档字号本批):Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
+  // 文档缩放:Ctrl+滚轮落在预览正文上 = 字号比例缩放,根字号不许动;
   // 量 .cm-content 的 computed font-size(编辑批次:正文登记搬进了 CodeMirror,旧 .code-text 退役)
   // —— --doc-zoom 乘进去的就是它,真账不量 CSS 变量
   const codeView = page.locator('.code-view').first()
@@ -413,7 +413,7 @@ try {
     0,
     'tree rows must not render gray annotation text'
   )
-  // 备注(第一批):树上右键 → 写备注就地长输入框 → 回车保存 → 悬停提示只显示备注正文;
+  // 备注:树上右键 → 写备注就地长输入框 → 回车保存 → 悬停提示只显示备注正文;
   // 清除备注后,悬停提示自动恢复引擎摘要
   const noteTarget = page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' })
   const summaryTip = await noteTarget.getAttribute('data-tip')
@@ -485,7 +485,7 @@ try {
   await page.locator('.search-results .tree-row').waitFor()
   await shot('search-results')
   await page.locator('.search-results .tree-row').filter({ hasText: 'guide.md' }).click()
-  // md 系文件签默认 Live Preview(md 三档批次):容器是 .cm-editor,上妆后标题记号藏起只剩大字;
+  // md 系文件签默认 Live Preview:容器是 .cm-editor,上妆后标题记号藏起只剩大字;
   // 块级替身也要现身(表格/hr 走 compute 出账 —— 走插件出账是 CM6 禁令,一报就崩)
   await page.locator('.cm-editor').filter({ hasText: 'Getting started' }).waitFor()
   await page.locator('.cm-live-table .md-table').waitFor()
@@ -1030,7 +1030,7 @@ try {
   assert.equal(Number(await hFieldE.inputValue()), hEdge0, 'height untouched')
   await page.keyboard.press('Control+z')
   assert.equal(Number(await wFieldE.inputValue()), wEdge0, 'undo restores width')
-  // ── 外观样式(Figma 式活链接):存方案 → 应用 → 手动改脱钩 → 同名覆盖回写 → 删除保数值 ──
+  // 外观样式(Figma 式活链接):存方案 → 应用 → 手动改脱钩 → 同名覆盖回写 → 删除保数值 
   const styleSelect = page.getByRole('combobox', { name: '外观样式', exact: true })
   const styleNameOf = (): Promise<string> =>
     styleSelect.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.textContent ?? '')

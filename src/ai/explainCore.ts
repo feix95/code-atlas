@@ -40,18 +40,18 @@ export async function explainWithMessagesCore(
         model: config.model,
         messages,
         temperature: CHAT_TEMPERATURE,
-        // 反重复采样(第一百四十三批):复读机防线的引擎侧闸门,只对内置引擎发 ——
+        // 反重复采样:复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),
         max_tokens: maxTokens,
         stream: Boolean(onDelta),
-        // 思考开关(第一百一十五批):只对内置引擎发 —— 它认 chat_template_kwargs,
+        // 思考开关:只对内置引擎发 —— 它认 chat_template_kwargs,
         // 能让思考型模型(Qwen3.5 这类)跳过 思考 直接答题;外接服务不认识这个
         // 字段,有的还会报错,所以外接的一律不塞,思考与否由它们自己的设置管
         ...(!opts?.allowThinking && config.timings
           ? { chat_template_kwargs: { enable_thinking: false } }
           : {}),
-        // 内置引擎(llama-server)才塞的旗子(第八十四批):流里报 token 账,预处理进度看得见。
+        // 内置引擎(llama-server)才塞的旗子:流里报 token 账,预处理进度看得见。
         // 外接服务不认识这些字段,不塞,行为一分不变
         ...(config.timings
           ? { timings_per_token: true, stream_options: { include_usage: true } }
@@ -109,7 +109,7 @@ export async function explainWithMessagesCore(
           usage
         }
       }
-      // 非流式没有逐帧监工的机会,交卷前整篇查一次尾巴(第一百四十三批):犯没犯都由上层定夺
+      // 非流式没有逐帧监工的机会,交卷前整篇查一次尾巴:犯没犯都由上层定夺
       return {
         status: 'supported',
         text: content,
@@ -124,7 +124,7 @@ export async function explainWithMessagesCore(
     // 流式:逐帧喂给 onDelta(正文 + 思考 + token 账),全文攒到最后一起返回。
     // 「没动静」的看守交棒给 sseEvents 自己(首帧/帧间两档);用户取消也由它插铃保底
     let lastStats: AiStreamStats | undefined
-    // 复读机监工(第一百四十三批):尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
+    // 复读机监工:尾巴连着 4 遍同一短语就当场掐流,标记交上层重答
     let looped = false
     for await (const ev of sseEvents(res, signal ?? controller.signal)) {
       if (ev.text) {
@@ -196,7 +196,7 @@ export async function explainWithMessagesCore(
       repetitionDetected: looped
     }
   } catch (err) {
-    // 第八十五批:到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
+    // 到手的半截永远先保住 —— 掐断、卡住、断线,一律不扔字,注脚按现场给
     const isAbort = err instanceof Error && err.name === 'AbortError'
     const idle = err instanceof StreamIdleError ? err : null
     const userCancelled = signal?.aborted === true

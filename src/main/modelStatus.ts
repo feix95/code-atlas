@@ -18,7 +18,7 @@ import type {
   VisionSupport
 } from '../shared/types.ts'
 
-// ── 第七十批:模型状态栏的后厨 ──
+// 模型状态栏的后厨
 // 内置引擎的状态由 builtin.ts 播报员推过来;外接 LM Studio 没法订阅,只能低频去问。
 // 两路都汇到 broadcastModelStatus,渲染层的常驻底栏只认这一条频道。
 
@@ -28,7 +28,7 @@ let lastBroadcast: ModelStatus | null = null
 
 export function broadcastModelStatus(status: ModelStatus): void {
   lastBroadcast = status
-  // 第八十八批:必须挨个窗都发 —— Developer 日志窗进了队,「[0]」不一定是主窗;
+  // 必须挨个窗都发 —— Developer 日志窗进了队,「[0]」不一定是主窗;
   // 广播喂给没人听的日志窗,主窗底栏就冻死在「还没叫醒」
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(CH.modelStatus, status)
@@ -84,7 +84,7 @@ export function cloudStatus(config: AiConfig): ModelStatus {
 }
 
 /**
- * 带图请求前的能力闸账(第一百五十二批):内置按 mmproj 登记(跑着且报过 vision 的优先),
+ * 带图请求前的能力闸账:内置按 mmproj 登记(跑着且报过 vision 的优先),
  * 在线 API 按模型名认账,LM Studio 当场探一轮条目 type。与状态卡的显示口径同源。
  */
 export async function probeChatVision(config: AiConfig): Promise<VisionSupport> {
@@ -112,7 +112,7 @@ export async function refreshModelStatus(): Promise<void> {
   broadcastModelStatus(status)
 }
 
-// ── 「忙」播报(第八十四批):就绪 ≠ 闲着 —— 模型请求从发出到收工,状态栏全程在场 ──
+// 「忙」播报:就绪 ≠ 闲着 —— 模型请求从发出到收工,状态栏全程在场
 // 起点在 resolveChatTargetOrError(每个模型请求的必经口),终点在 explainWithCancel /
 // 自由对话的 finally(explainAborters 清空才收工,嵌套的讲解不会中途闪「就绪」)。
 let lastExternalStatus: ModelStatus | null = null

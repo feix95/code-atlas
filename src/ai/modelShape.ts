@@ -1,4 +1,4 @@
-// 模型档案读取(智能启动批次拆出):GGUF 头翻结构档案,词表会被头尺寸自动跳过。
+// 模型档案读取:GGUF 头翻结构档案,词表会被头尺寸自动跳过。
 // 无 Electron 依赖,纯 node fs —— ipcModel / launchPlanner / builtin.ts 三处共用这一份。
 import { open } from 'node:fs/promises'
 import { parseGgufHeader } from '../shared/gguf.ts'

@@ -48,7 +48,7 @@ export interface SessionState {
   groups: SessionGroupState[]
 }
 
-// ── 写账 ──
+// 写账
 
 /** 把活状态表压成存档(纯函数):激活签/激活组换成 on 标记 —— 还原时有签掉了也不指错 */
 export function serializeSession(
@@ -76,7 +76,7 @@ export function serializeSession(
   }
 }
 
-// ── 读账 ──
+// 读账
 
 function parseTab(raw: unknown): SessionTab | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -129,7 +129,7 @@ export function saveSession(s: SessionState): void {
   writePref(SESSION_KEY, s)
 }
 
-// ── 水合:存档 → 活状态表 ──
+// 水合:存档 → 活状态表
 
 /**
  * 存档 → 页签组(纯函数):id 换新发号;relPath 指向工作区的签要验货 ——

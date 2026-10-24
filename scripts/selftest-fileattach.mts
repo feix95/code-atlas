@@ -1,4 +1,4 @@
-// 文件附件批次自测(对齐 Claude Code 的 @文件):按行裁剪/动态预算/收编洗白/装配块/翻页读取,
+// 自测(对齐 Claude Code 的 @文件):按行裁剪/动态预算/收编洗白/装配块/翻页读取,
 // 一把全摁住。跑法:node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/selftest-fileattach.mts
 // 样本全在内存里,不碰盘不碰网。
 import assert from 'node:assert/strict'
@@ -38,7 +38,7 @@ function goodFile(over: Partial<ChatFileAttachment> = {}): ChatFileAttachment {
 }
 
 function main(): void {
-  // ── 1. clipTextToLines:按行边界裁,差一个尾换行不算裁,怪单行才裁断 ──
+  // 1. clipTextToLines:按行边界裁,差一个尾换行不算裁,怪单行才裁断 
   const short = clipTextToLines('a\nb\nc', 100)
   assert.equal(short.text, 'a\nb\nc', '装得下就原样')
   assert.equal(short.shownEndLine, 3, '三行')
@@ -63,7 +63,7 @@ function main(): void {
   assert.equal(exact.text, 'aa\nbb', '刚好塞满就停手')
   assert.equal(exact.shownEndLine, 2, '两行')
 
-  // ── 2. planFileAttachments:穷保底、富封顶、小文件省下的配额顺延 ──
+  // 2. planFileAttachments:穷保底、富封顶、小文件省下的配额顺延 
   assert.deepEqual(
     planFileAttachments({ ctxTokens: 20000, replyTokens: 1000, otherTokens: 1000, files: [] }),
     [],
@@ -116,7 +116,7 @@ function main(): void {
   })
   assert.equal(preClipped[0].truncated, true, '正文比总行数短 = 没带全,必须报')
 
-  // ── 3. sanitizeChatFiles:数量封顶、坏条目整条丢、relPath 脏了就丢字段 ──
+  // 3. sanitizeChatFiles:数量封顶、坏条目整条丢、relPath 脏了就丢字段 
   assert.deepEqual(sanitizeChatFiles('nope').files, [], '不是数组就当没有')
   const capped = sanitizeChatFiles([
     goodFile({ id: 'a' }),
@@ -171,7 +171,7 @@ function main(): void {
   assert.equal(absDirty.files[0].absPath, undefined, '带 NUL 的路径丢掉')
   assert.equal(absDirty.files[1].absPath, undefined, '超长的路径丢掉')
 
-  // ── 4. fileAttachRangeLabel:界面上的行账不许撒谎 ──
+  // 4. fileAttachRangeLabel:界面上的行账不许撒谎 
   assert.equal(fileAttachRangeLabel(goodFile()), '共 2 行', '整份就报总数')
   assert.equal(
     fileAttachRangeLabel(goodFile({ text: 'a\nb', totalLines: 5 })),
@@ -179,7 +179,7 @@ function main(): void {
     '截断报区间'
   )
 
-  // ── 5. buildFileAttachmentsText:块头行账 + 截断注记(带不带续读指引) ──
+  // 5. buildFileAttachmentsText:块头行账 + 截断注记(带不带续读指引) 
   const fullBlock = buildFileAttachmentsText(
     [{ ...goodFile(), shownEndLine: 2, truncated: false }],
     { agentOn: false }
@@ -280,7 +280,7 @@ function main(): void {
     '交底与防假道歉两件都在'
   )
 
-  // ── 6. 消息装配:文件块垫在引用后、问题前,相邻合并成一条 ──
+  // 6. 消息装配:文件块垫在引用后、问题前,相邻合并成一条 
   const msgs = buildFreeChatMessages(
     'sys',
     null,
@@ -306,7 +306,7 @@ function main(): void {
     '文件块排在当前问题前面'
   )
 
-  // ── 7. sliceAgentRead:行号 + 分页 + 注记(对齐 Claude Code 的 Read) ──
+  // 7. sliceAgentRead:行号 + 分页 + 注记(对齐 Claude Code 的 Read) 
   const whole = sliceAgentRead('a\nb\nc', { offset: 1, limit: 2000, maxChars: 10000 })
   assert.equal(whole.ok, true, '小文件读得动')
   assert.equal(whole.text, '1\ta\n2\tb\n3\tc', '每行前置行号')

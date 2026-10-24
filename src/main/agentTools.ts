@@ -64,7 +64,7 @@ export async function agentRequestDirectoryAccess(
 }
 
 /**
- * web_search 的执行手(联网批次):搜索 + 第一条正文节选。源队列在 weblookup.ts 纯函数层
+ * web_search 的执行手:搜索 + 第一条正文节选。源队列在 weblookup.ts 纯函数层
  * (Tavily 有 Key 打头 → DDG → 维基中 → 维基英),三道闸(搜索词安检/内网闸/防上当声明)
  * 也都扎在那边,这边只管跑和报。查不到不报错:照实告诉模型没查到,让它用已有的知识答并注明拿不准。
  */
@@ -164,7 +164,7 @@ export function sendAgentStep(event: IpcMainInvokeEvent, requestId: string, text
 }
 
 /**
- * 命中清单卡走旁路(LLM 优化批次):search_content 搜到的结构化命中直接推给界面画卡,
+ * 命中清单卡走旁路:search_content 搜到的结构化命中直接推给界面画卡,
  * 每条「文件:行号:原文」原样到用户眼前、可点跳转 —— 不再让小模型当抄写员,
  * 一条不丢、行号一个不错。只走内存通道,零落盘。
  */
@@ -178,7 +178,7 @@ export function sendAgentMatches(
   event.sender.send(CH.aiDelta, payload)
 }
 
-/** agent 流式轮次的增量转发(第一百三十四批):思考/正文逐帧推给界面,token 账同帧喂状态条 */
+/** agent 流式轮次的增量转发:思考/正文逐帧推给界面,token 账同帧喂状态条 */
 export function sendAgentDelta(
   event: IpcMainInvokeEvent,
   requestId: string,

@@ -1,4 +1,4 @@
-// 引擎包检验室(第 4 期):下载下来的 zip 在这过安检 ——
+// 引擎包检验室:下载下来的 zip 在这过安检 ——
 // 字节数/sha256 对登记,tar 条目先过一遍安检(.. 越级/绝对路径整包拒收,防 zip slip),
 // 干净才解压。跟安装器(engineInstaller)分家:那边管下载编排,这边管「包能不能信」。
 import { createHash } from 'node:crypto'

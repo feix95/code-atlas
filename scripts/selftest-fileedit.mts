@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const registry = new FileWatchRegistry((sig) => signals.push(sig), 60)
 
   try {
-    // ── 一、saveTextFile 准入与保真 ──
+    // 一、saveTextFile 准入与保真 
     await fs.writeFile(join(root, 'a.ts'), 'const a = 1\n')
     const r1 = await saveTextFile(root, 'a.ts', 'const a = 2\nlet b = 3\n')
     assert.ok(r1.mtimeMs > 0, 'saveFile 应回写后 mtime')
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
     await assert.rejects(() => saveTextFile(root, 'a.ts', 'x'.repeat(11 * 1024 * 1024)), /上限/)
     await assert.rejects(() => saveTextFile(root, 1 as unknown as string, 'a.ts', 'x'), /不合法/)
 
-    // ── 二、监视账:外部改动通报、自家人写盘不响 ──
+    // 二、监视账:外部改动通报、自家人写盘不响 
     const absA = join(root, 'a.ts')
     assert.equal(registry.add(root, 'a.ts', absA), true)
     assert.equal(registry.size, 1)
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     // 挂在不存在的文件上:老实回 false,不抛不崩
     assert.equal(registry.add(root, 'ghost.ts', join(root, 'ghost.ts')), false)
 
-    // ── 三、内联标题改名:renameTextFile 准入与换登记 ──
+    // 三、内联标题改名:renameTextFile 准入与换登记 
     // 基础名/扩展名分家(内联标题显示的配方)
     assert.equal(fileBaseName('notes.md'), 'notes')
     assert.equal(fileBaseName('archive.tar.gz'), 'archive.tar')

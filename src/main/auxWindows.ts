@@ -1,10 +1,10 @@
-// ── 独立子窗桥(页签独立窗口)──
+// 独立子窗桥(页签独立窗口)
 // 子窗 = 主窗渲染层 window.open 开出来的同进程子窗(about:blank 白窗),
 // 页签的活的 DOM 由 React Portal 渲染进它的 document —— 登记在渲染层,
 // 主进程只管两件小事:
-//   1) 放行白名单:只有 aux- 前缀 frameName 的 window.open 才许成窗,而且无边框;
-//   2) 窗口操作代发:子窗没有 preload 没有 window.atlas,缩放/关闭由主窗渲染层
-//      经 atlas:aux-window-op 代发,这边按 frameName 从注册表找窗执行。
+// 1) 放行白名单:只有 aux- 前缀 frameName 的 window.open 才许成窗,而且无边框;
+// 2) 窗口操作代发:子窗没有 preload 没有 window.atlas,缩放/关闭由主窗渲染层
+// 经 atlas:aux-window-op 代发,这边按 frameName 从注册表找窗执行。
 import { ipcMain, screen, shell, BrowserWindow } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import type { AuxWindowRect, AuxWindowOp } from '../shared/types.ts'

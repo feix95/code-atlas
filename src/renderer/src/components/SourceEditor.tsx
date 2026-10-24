@@ -1,4 +1,4 @@
-// 源码编辑器(预览编辑批次·第2批):所有文本文件的源码档 = 一台 CodeMirror 6 编辑器。
+// 源码编辑器:所有文本文件的源码档 = 一台 CodeMirror 6 编辑器。
 // 只管一件事:把文件摊开给你改,停手 1 秒自动落盘。
 // 分色用主进程 tree-sitter 的老账(换字先让旧色跟着挪,存盘后重算换新);
 // 选区引用/直拖沿用老规矩,右键菜单同一份;跳行/折行/文档缩放照吃老开关。
@@ -60,7 +60,7 @@ export function SourceEditor({
   onTextChange: (text: string) => void
   /** 编辑内的 Alt+Z 扳动折行:跟页头那颗钮走同一个开关 */
   onToggleWrap: () => void
-  /** 内联标题改名通道(内联标题改名批次):递新主名进回调,拿 RenameOutcome 回执 */
+  /** 内联标题改名通道:递新主名进回调,拿 RenameOutcome 回执 */
   onRenameFile?: (base: string) => Promise<RenameOutcome>
   jump?: { line: number; seq: number } | null
 }): React.JSX.Element {
@@ -91,7 +91,7 @@ export function SourceEditor({
     }
   })
 
-  // ── 编辑器本体:一挂立一台,一卸收一台 ──
+  // 编辑器本体:一挂立一台,一卸收一台
   // (relPath 变 = 换文件,父组件用 key={relPath} 强制重挂,这台编辑器一辈子只伺候一份文件)
   useEffect(() => {
     const host = hostRef.current
@@ -182,7 +182,7 @@ export function SourceEditor({
           readOnly,
           // 内联标题(Obsidian inline title):文件名掐尾去扩展名,与阅读档 MiniMD title 同配方
           liveTitle: live ? fileBaseName(relPath.split(/[\\/]/).pop() ?? '') : undefined,
-          /* 内联标题改名通道(内联标题改名批次):改名前先把账结清 —— 在路上的保存等它落袋,
+          /* 内联标题改名通道:改名前先把账结清 —— 在路上的保存等它落袋,
              脏文稿先落盘;不然改名后旧路径会被迟到的自动保存「复活」成第二个文件。
              存不进去就别让改(改了内存稿会丢)。重挂前的空窗期把 relPath 就地换账,
              万一这缝里又来一笔写盘,直接去新路径 */

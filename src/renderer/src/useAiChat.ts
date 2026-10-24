@@ -26,12 +26,12 @@ export type { ChatMessage, ChatMsgState } from '@shared/types'
 /** 只引了代码没写字时替他说一句(主进程也有同一句兜底) */
 export const REF_ONLY_QUESTION = '讲讲选中的这段代码'
 
-/** 思考开关存档的 localStorage 键(第一百一十五批)。
+/** 思考开关存档的 localStorage 键。
  *  键名是横杠系:全仓别的键走 'atlas.*' 点号系,这俩是早期定的老键,
  *  改名会弄丢已存档的开关状态 —— 命名风格不统一是已知差异,为存档兼容刻意保留(P2-4 补注) */
 const THINKING_KEY = 'atlas-freechat-thinking'
 
-/** 翻文件(agent)开关的 localStorage 键(第一百二十八批)。命名同上,刻意保留 */
+/** 翻文件(agent)开关的 localStorage 键。命名同上,刻意保留 */
 const AGENT_KEY = 'atlas-freechat-agent'
 
 /** 历史按「轮」成对收集的口径住在 chatTranscript(渲染层与自测共用同一份) */
@@ -43,21 +43,21 @@ export function useAiChat(
 ): {
   messages: ChatMessage[]
   busy: boolean
-  /** 思考模式开关(第一百一十五批):开着 = 允许模型先想一遍,思考过程折叠展示 */
+  /** 思考模式开关:开着 = 允许模型先想一遍,思考过程折叠展示 */
   thinking: boolean
   setThinking: (on: boolean) => void
-  /** 翻文件模式开关(第一百二十八批):开着 = 允许小探针自己列名单/读文件(只读) */
+  /** 翻文件模式开关:开着 = 允许小探针自己列名单/读文件(只读) */
   agent: boolean
   setAgent: (on: boolean) => void
-  /** 程序垫一条灰字(第一百二十四批):如「探针正答着话」,不进历史、不发给模型 */
+  /** 程序垫一条灰字:如「探针正答着话」,不进历史、不发给模型 */
   note: (text: string) => void
-  /** 开新对话(第一百二十七批):清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
+  /** 开新对话:清空消息从头聊;探针忙着回答就先掐掉。记录只在内存,清了就是真没了 */
   newChat: () => void
-  /** /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
+  /** /compact 手动压缩:把目前为止的对话提炼成摘要卡,之后的请求都带着它走 */
   compact: () => void
   /**
-   * 发送:refs = 引用的代码段;images = 这轮带的图片(第一百五十二批);files = 这轮带的文件附件
-   * (文件附件批次,对齐 Claude Code 的 @文件);允许只发图/只发文件不发字
+   * 发送:refs = 引用的代码段;images = 这轮带的图片;files = 这轮带的文件附件
+   * (对齐 Claude Code 的 @文件);允许只发图/只发文件不发字
    */
   send: (
     question: string,
@@ -166,7 +166,7 @@ export function useAiChat(
     void (async () => {
       try {
         // 历史取发送前的消息(不含本轮),当前问题单独走 question 字段;
-        // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆(第一百四十二批);
+        // 压缩过的摘要卡不进历史,单独走 summary 字段当背景记忆;
         const summary = findSummary(messagesRef.current)
         const agentOn = agentRef.current
         const req: AiChatRequest = {
@@ -231,7 +231,7 @@ export function useAiChat(
   }
 
   /**
-   * /compact 手动压缩(第一百四十二批):输入框拦下命令后走这条。
+   * /compact 手动压缩:输入框拦下命令后走这条。
    * 生成中显示成一个正在回答的气泡(流式增量照糊上去),成功后气泡当场变身摘要卡 ——
    * 旧对话(含上一代摘要)全数交给模型提炼,只留最近几条原文,之后的请求靠 summary 字段
    * 把摘要带给模型。没聊过东西就不劳烦模型,垫一句灰字了事。

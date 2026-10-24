@@ -21,7 +21,7 @@ import { SettingsNet } from './SettingsNet.tsx'
 // 界面大小范围/上下文合法范围的登记在 shared(uiScale.ts / aiDefaults.ts):
 // 滑块档位、preload 根字号引擎、引擎 -c 归一化,三面同认一份
 
-// 第八十九批:模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
+// 模型上下文的合法范围。夹紧只发生在失焦那一刻 —— 以前每敲一个键就夹,
 // 8 当场变 512、删一个字又弹回 512,门卫跟手抢键盘,数根本输不进去也删不掉
 
 /** 上下文输入框的落账规则在 useContextBill */
@@ -82,7 +82,7 @@ export function SettingsPage({
   const fitNote = fitCheck.path === modelPath ? fitCheck.verdict : null
   const ctxInfo = ctxInfoFetched.path === modelPath ? ctxInfoFetched.info : null
 
-  // ── 上下文档位 + 黑板账单(2026-09-13 产品裁定)──
+  // 上下文档位 + 黑板账单(2026-09-13 产品裁定)
   const {
     contextRaw,
     setContextRaw,
@@ -93,7 +93,7 @@ export function SettingsPage({
     onContextBlur
   } = useContextBill({ config, ctxInfo, commitConfig })
 
-  // ── 即改即存:防抖聚笔的落盘状态表(在 useConfigAutosave)──
+  // 即改即存:防抖聚笔的落盘状态表(在 useConfigAutosave)
   const appearanceRef = useRef(appearance)
   const scaleRef = useRef(scale)
 
@@ -256,7 +256,7 @@ export function SettingsPage({
 
   const scaleShown = dragValue ?? scale
 
-  // 说话方式(第一百一十三批):存档里没有就是全默认 —— 界面照默认摆
+  // 说话方式:存档里没有就是全默认 —— 界面照默认摆
   const personal = config?.personalization ?? DEFAULT_PERSONALIZATION
   function updatePersonal(patch: Partial<PersonalizationConfig>): void {
     if (!config) return

@@ -42,7 +42,7 @@
   color: var(--danger);
 }
 
-/* 待发文件原子(文件附件批次):文件名躺在文字流里,与引用原子同一排面;常驻,每轮都带上 */
+/* 待发文件原子:文件名躺在文字流里,与引用原子同一排面;常驻,每轮都带上 */
 .fc-file {
   display: inline-flex;
   align-items: center;
@@ -79,7 +79,7 @@
   color: var(--danger);
 }
 
-/* 待发图片原子(第一百五十二批):缩略图小块+×,与引用原子同一排面躺在文字流里 */
+/* 待发图片原子:缩略图小块+×,与引用原子同一排面躺在文字流里 */
 .fc-img {
   display: inline-flex;
   align-items: center;

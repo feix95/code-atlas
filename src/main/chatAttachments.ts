@@ -6,7 +6,7 @@ import { buildFileMemoNote, createChatFileMemoStore } from '../ai/chatFileMemo.t
 import { planFileAttachments, type ChatFileAttachment } from '../shared/chatFiles.ts'
 import { buildFileAttachmentsText, READ_HONESTY_NOTE, type PlannedChatFile } from '../ai/index.ts'
 
-/** 附件登记表(附件追问本批):最近带过的文件附件记在内存里,下一轮垫成注记(详见 ai/chatFileMemo.ts) */
+/** 附件登记表:最近带过的文件附件记在内存里,下一轮垫成注记(详见 ai/chatFileMemo.ts) */
 const chatFileMemo = createChatFileMemoStore()
 
 /**
@@ -35,7 +35,7 @@ export async function buildAttachmentBlock(input: {
       otherTokens: input.otherTokens,
       files: input.files.map((f) => ({ text: f.text, totalLines: f.totalLines }))
     })
-    // 拖入即授权(第一百五十三批):系统拖/选进来的文件凭它的绝对路径换本次运行的
+    // 拖入即授权:系统拖/选进来的文件凭它的绝对路径换本次运行的
     // 只读授权令牌,截断的正文就有续读的钥匙;拿不到授权令牌(文件没了/不是文件)就照实说,
     // 绝不开空头支票
     const plannedFiles: PlannedChatFile[] = []

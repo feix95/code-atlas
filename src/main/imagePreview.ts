@@ -1,4 +1,4 @@
-// ── 图片预览支路(图片预览批次):ipcScan 的 readPreview 配套小文件 ──
+// 图片预览支路:ipcScan 的 readPreview 配套小文件
 // 后缀是 JPG/PNG 的文件走这里:先拒绝路径,再读盘验魔数 —— 后缀可以改名冒充,
 // 字节不会撒谎;验过才回 'image',dataUrl 里的 MIME 按字节嗅出来的写。
 

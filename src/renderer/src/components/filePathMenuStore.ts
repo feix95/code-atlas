@@ -8,7 +8,7 @@ export function canOpenAsWorkspace(isDirectory: boolean, relPath: string): boole
   return isDirectory && relPath !== ''
 }
 
-/** 备注系列动作(菜单统一批次,产品裁定:对着文件右键 = 打开所在位置/复制路径/写备注三件套):
+/** 备注系列动作(产品裁定:对着文件右键 = 打开所在位置/复制路径/写备注三件套):
  *  树菜单、聊天绿字链接,一处规格两家共用。
  *  编辑框就地长在菜单里,所以这里给的是「现有正文 + 落盘口」,不再需要外部弹窗。 */
 export interface FilePathNoteActions {

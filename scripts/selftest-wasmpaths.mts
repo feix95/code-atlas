@@ -23,7 +23,7 @@ function ok(cond: boolean, name: string): void {
 
 const CWD = process.cwd()
 
-console.log('── 开发态(resourcesPath 没有或没货)→ 回退 node_modules ──')
+console.log(' 开发态(resourcesPath 没有或没货)→ 回退 node_modules ')
 {
   const engine = engineWasmPath({ resourcesPath: undefined, cwd: CWD })
   const grammars = grammarWasmDir({ resourcesPath: undefined, cwd: CWD })
@@ -47,7 +47,7 @@ console.log('── 开发态(resourcesPath 没有或没货)→ 回退 node_modu
   rmSync(fakeRes, { recursive: true, force: true })
 }
 
-console.log('── 打包态(resources/wasm/ 里引擎真在)→ 切行李箱 ──')
+console.log(' 打包态(resources/wasm/ 里引擎真在)→ 切行李箱 ')
 {
   const fake = mkdtempSync(join(tmpdir(), 'code-atlas-wasmpaths-'))
   const wasmDir = join(fake, 'wasm')
@@ -72,7 +72,7 @@ console.log('── 打包态(resources/wasm/ 里引擎真在)→ 切行李箱 �
   rmSync(fake, { recursive: true, force: true })
 }
 
-console.log('── 行李清单对账:两家用到的语法字典,electron-builder.yml 的 filter 必须全带上 ──')
+console.log(' 行李清单对账:两家用到的语法字典,electron-builder.yml 的 filter 必须全带上 ')
 {
   const yml = readFileSync(join(CWD, 'electron-builder.yml'), 'utf8')
   const allFiles = new Set([...Object.values(HL_FILES), ...Object.values(ANALYZER_FILES)])

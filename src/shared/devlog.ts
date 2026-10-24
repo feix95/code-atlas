@@ -1,4 +1,4 @@
-// 后台日志状态表(第八十七批,Developer 日志窗口的库房)。
+// 后台日志状态表(Developer 日志窗口的库房)。
 // 纯模块:不 import electron —— 主进程、AI 模块、自测脚本都从这里进同同一数据源。
 // 只是个环形缓冲,进程退出就清空,不落盘 —— 后台日志是给现场排障用的,不是档案。
 import type { DevLogEntry, DevLogSource } from './types.ts'

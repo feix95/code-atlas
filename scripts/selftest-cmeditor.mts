@@ -18,7 +18,7 @@ function makeState(doc: string): EditorState {
 }
 
 function main(): void {
-  // ── 一、分色账翻译:行内段落账 → CM 装饰标记 ──
+  // 一、分色账翻译:行内段落账 → CM 装饰标记 
   // doc:'const x = "s";\nfoo bar\n'  行 0:'const x = "s";' 行 1:'foo bar'
   let state = makeState('const x = "s";\nfoo bar\n')
   // HL_KINDS: 0=ctl 1=kw 2=str 3=com 4=num 5=fn 6=type 7=var 8=regex 9=symbol
@@ -70,7 +70,7 @@ function main(): void {
   state = state.update({ effects: setHighlight.of(undefined) }).state
   assert.equal(marks(state).length, 0, 'undefined 账应清成空装饰')
 
-  // ── 五、选区折算:位置 → 引用行号 ──
+  // 五、选区折算:位置 → 引用行号 
   const doc = makeState('a\nb\nc\n').doc
   assert.deepEqual(selectionToRef(doc, 0, 4), { startLine: 1, endLine: 2, code: 'a\nb\n' })
   assert.deepEqual(selectionToRef(doc, 0, 2), { startLine: 1, endLine: 1, code: 'a\n' })
@@ -82,7 +82,7 @@ function main(): void {
   assert.equal(selectionToRef(doc, 1, 1), null, '光标不该有引用')
   assert.equal(selectionToRef(doc, 1, 2), null, '只选中换行不该有引用')
 
-  // ── 六、暗色插入符:CM 自绘光标默认黑边,没挂 darkTheme 时暗底会看不见。
+  // 六、暗色插入符:CM 自绘光标默认黑边,没挂 darkTheme 时暗底会看不见。
   // 原生 caret-color 被 hideNativeSelection 的 transparent !important 掐掉,
   // 真正露脸的是 .cm-cursor 的左边框,必须跟 --text;格内 contenteditable
   // 聚焦时 CM 又把 caret-color 打回 initial,也要抢回来。

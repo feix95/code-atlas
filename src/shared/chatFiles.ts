@@ -129,7 +129,7 @@ export function fileAttachRangeLabel(f: ChatFileAttachment): string {
   return `共 ${f.totalLines} 行`
 }
 
-// ── 主进程收编:渲染层递来的文件再过一遍筛,脏数据不许混进发给模型的消息 ──
+// 主进程收编:渲染层递来的文件再过一遍筛,脏数据不许混进发给模型的消息
 
 export interface SanitizedChatFiles {
   files: ChatFileAttachment[]

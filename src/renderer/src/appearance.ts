@@ -208,9 +208,9 @@ export function applyAppearance(a: Appearance): void {
   const [h, s, l] = hexToHsl(accentHex)
   const [h2, s2, l2] = hexToHsl(secondaryHex)
 
-  // 第七十六批:遮罩摘除 —— --accent-soft / --selected-bg 回归中性面板,主题色不再整面染色,
-  // 只上动作件和细边/细条;第七十七批补刀:画布雾也转中性,主题色只活在动作件上。
-  // 第七十九批(产品裁定):自定义彻底放开 —— 色相、饱和度给满,明度不再按亮暗主题分带,
+  // 遮罩摘除 —— --accent-soft / --selected-bg 回归中性面板,主题色不再整面染色,
+  // 只上动作件和细边/细条;画布雾也转中性,主题色只活在动作件上。
+  // (产品裁定):自定义彻底放开 —— 色相、饱和度给满,明度不再按亮暗主题分带,
   // 亮暗同带 5~95(极深极浅都听用户的)。原来「明度安全带」保的是按钮上固定字色的可读性,
   // 现在改由 --accent-ink 承担:按派生出的主题色算对比度,深墨/白自动翻,色自由、字不糊。
   // 预设档(石墨 + 手动叠了自定义色的组合)仍走配档逻辑,长相一分不变;
@@ -263,7 +263,7 @@ export function applyAppearance(a: Appearance): void {
     return
   }
 
-  // 预设档:沿用第76批前的配档逻辑(明度带按亮暗分),保证三套皮肤和从前长得一样
+  // 预设档:沿用前的配档逻辑(明度带按亮暗分),保证三套皮肤和从前长得一样
   const sat = clamp(s, 30, 85)
   const sat2 = clamp(s2, 25, 80)
   const achro = s < 8

@@ -15,7 +15,7 @@ function kindAt(colors: number[][][], line: number, col: number): string | null 
 }
 
 async function main(): Promise<void> {
-  // ── 1. 后缀认语言:认识的老老实实报,不认识的(比如 md)老实说 null ──
+  // 1. 后缀认语言:认识的老老实实报,不认识的(比如 md)老实说 null 
   assert.equal(hlLanguageFor('a.ts'), 'tsx')
   assert.equal(hlLanguageFor('a.tsx'), 'tsx')
   assert.equal(hlLanguageFor('a.mjs'), 'tsx')
@@ -40,13 +40,13 @@ async function main(): Promise<void> {
   assert.equal(hlLanguageFor('Makefile'), null, '没后缀认不出')
   assert.equal(hlLanguageFor('.gitignore'), null, '点开头的隐藏文件不算后缀')
 
-  // ── 2. 字数闸:超了不上色(纯函数对账,主进程里也用它把门) ──
+  // 2. 字数闸:超了不上色(纯函数对账,主进程里也用它把门) 
   assert.equal(hlEligible('x'.repeat(100), 'tsx'), true)
   assert.equal(hlEligible('x'.repeat(HL_MAX_CHARS + 1), 'tsx'), false, '超过闸的不上色')
   assert.equal(hlEligible('x'.repeat(100), null), false, '不认识的语言不上色')
   assert.ok(HL_MAX_CHARS >= 100_000 && HL_MAX_CHARS <= 10_000_000, '闸是个讲道理的数')
 
-  // ── 3. 行切分(纯函数):同色合并、空行空账、跨行切段、换行符不算列 ──
+  // 3. 行切分(纯函数):同色合并、空行空账、跨行切段、换行符不算列 
   const segs = tokensToLineSegments('aa\n\nbb cc', [
     { start: 0, end: 2, kind: 'kw' },
     { start: 4, end: 6, kind: 'kw' },
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   assert.deepEqual(merged[0], [[0, 3, HL_KINDS.indexOf('str')]], '行内挨着的同角色合并成一段')
   assert.deepEqual(tokensToLineSegments('', [])[0], [], '空文本也有(空)第一行的账')
 
-  // ── 4. 真解析(TS):关键字/字符串/数字/注释/函数名/类型名/控制流/模板插值,逐点对号 ──
+  // 4. 真解析(TS):关键字/字符串/数字/注释/函数名/类型名/控制流/模板插值,逐点对号 
   const tsCode = [
     "const greeting = '你好,世界' // 打个招呼",
     'function hello(name: string): string {',
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
   assert.equal(kindAt(tsColors!, 6, 20), 'num', '数字是数字色')
   assert.equal(tsColors!.length, 6, '账的行数跟文本一致')
 
-  // ── 5. 真解析(其他语言):python / json / css / html / bash 各点一穴 ──
+  // 5. 真解析(其他语言):python / json / css / html / bash 各点一穴 
   const pyColors = await highlightSource(
     ['def greet(name):', '    # 问好', '    return name'].join('\n'),
     'tool.py'
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
   assert.equal(kindAt(shColors!, 1, 3), 'com', 'bash 注释是注释色')
   assert.equal(kindAt(shColors!, 2, 1), 'var', '命令名有变量色(分得不完美也比白字强)')
 
-  // ── 6. 跨行块注释:每行都有段;空行的账是空的 ──
+  // 6. 跨行块注释:每行都有段;空行的账是空的 
   const blockColors = await highlightSource(
     ['/* 第一行', '   第二行 */', 'const ok = 1', '', 'const end = 2'].join('\n'),
     'b.ts'
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
   assert.deepEqual(blockColors![3], [], '空行空账')
   assert.equal(blockColors!.length, 5, '行数一致')
 
-  // ── 7. 化妆不越权:不认识的语言、超闸、空文本都回 null(白字照常,绝不报错) ──
+  // 7. 化妆不越权:不认识的语言、超闸、空文本都回 null(白字照常,绝不报错) 
   assert.equal(await highlightSource('# 标题\n正文', 'readme.md'), null, 'markdown 不上色')
   assert.equal(await highlightSource('x'.repeat(HL_MAX_CHARS + 1), 'big.ts'), null, '超闸不上色')
   assert.equal(await highlightSource('', 'a.ts'), null, '空文本不上色(没必要)')

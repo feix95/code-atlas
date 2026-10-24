@@ -77,7 +77,7 @@ function sortTreeChildren(children: ScanTreeNode[]): void {
 }
 
 /**
- * 文件改名(内联标题改名批次):树上只换名不挪窝 —— 沿 relPath 一路浅拷到父目录,
+ * 文件改名:树上只换名不挪窝 —— 沿 relPath 一路浅拷到父目录,
  * 换文件节点的 name/relPath 并照扫描器口径重排同层;找不到就回 null,状态表原样。
  * 其余字段(语言/标签/首行标题)原封不动 —— 改名保扩展名,这些账不跟着变。
  */

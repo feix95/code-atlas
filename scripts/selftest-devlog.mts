@@ -1,4 +1,4 @@
-// Developer 后台日志自测(第八十七批):环形缓冲滚动、引擎输出按行拆、超长掐中留头尾、
+// Developer 后台日志自测:环形缓冲滚动、引擎输出按行拆、超长掐中留头尾、
 // 时间话术、来源标签、监听广播 —— 状态表模块是纯的,不碰 electron 直接打。
 import assert from 'node:assert/strict'
 import {

@@ -16,7 +16,7 @@ export type { ToolCallDelta, SseEvent } from './sse.ts'
 export { splitThinking, halfNote, timeoutText } from './explainText.ts'
 
 // 看门狗四档的登记都在 shared/aiDefaults.ts(AI_HEADERS/AI_BODY/AI_STREAM_FIRST_FRAME/AI_STREAM_IDLE):
-// 首帧前的耐心对齐响应头 = 两分钟(第八十五批:30 秒静默掐读是小葵冤案的帮凶)
+// 首帧前的耐心对齐响应头 = 两分钟(30 秒静默掐读是小葵冤案的帮凶)
 
 /**
  * 调 OpenAI 兼容接口(ChatTarget),拿到人话解释。
@@ -26,7 +26,7 @@ export { splitThinking, halfNote, timeoutText } from './explainText.ts'
  * 一旦没动静立刻掐断 —— 绝不无限挂死,也不把慢模型的正常输出拦腰砍断。
  * signal = 外部取消(用户换了讲解目标):立刻掐,不让过气的生成占着模型排队。
  * 能力边界:服务不通、超时、返回空,都给 status='error' 的人话,不抛异常。
- * 第八十七批:所有模型请求都过这一道 —— 起止都在后台日志里记账(只记元数据:
+ * 所有模型请求都过这一道 —— 起止都在后台日志里记账(只记元数据:
  * 消息条数、提示词字数、token 账、耗时,问题内容一个字不落账)。
  */
 export async function explainWithMessages(
@@ -37,7 +37,7 @@ export async function explainWithMessages(
   maxTokens = 500,
   opts?: {
     allowThinking?: boolean
-    /** 复读机重答前的收尾令(第一百四十三批):聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void
+    /** 复读机重答前的收尾令:聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void
   }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
@@ -48,7 +48,7 @@ export async function explainWithMessages(
     `提问 → ${config.baseUrl} · 模型 ${config.model} · ${messages.length} 条消息 · 提示词约 ${promptChars} 字 · 上限 ${maxTokens} tokens${onDelta ? ' · 流式' : ''}${opts?.allowThinking ? ' · 思考模式' : ''}`
   )
   let result = await explainWithMessagesCore(config, messages, onDelta, signal, maxTokens, opts)
-  // 复读机保险丝(第一百四十三批):模型嘴皮子抽筋了 —— 发收尾令收回已吐的字,重答一遍;
+  // 复读机保险丝:模型嘴皮子抽筋了 —— 发收尾令收回已吐的字,重答一遍;
   // 重答还犯就截到打转起点,附注脚交卷,绝不把一屏望不到头的循环原样递给用户
   if (result.repetitionDetected) {
     addDevLog('request', '复读机警报:回答在原地打转,掐掉重说一遍')

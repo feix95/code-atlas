@@ -1,4 +1,4 @@
-// ── 提示词体系 2.0:人设装配间(纯函数,无 fs,scripts 可直接 import 自测)──
+// 提示词体系 2.0:人设装配间(纯函数,无 fs,scripts 可直接 import 自测)
 // 包裹规矩(产品定稿):人设分节与资料一律用结构化 XML 标签 —— <capabilities>/
 // <web_access>/<teaching_style>/<rules> 这类;旧写法 «»/【】/「Given:」全退役。
 // 内核文案当前以产品定稿为底(提示词人设2.0原文.md); AI 模块待整体整理,不设禁改红线。

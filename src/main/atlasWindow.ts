@@ -1,4 +1,4 @@
-// ── 开窗工厂(DRY 收口)──
+// 开窗工厂(DRY 收口)
 // 两扇窗(主窗/日志窗)同吃一副壳药:安全 webPreferences、透明无边框底、
 // 露窗多路抢跑 + 3 秒看门狗、?view= 加载。以前每扇窗各抄一遍,安全开关改一处漏三处。
 // 这里只出「共有的底」;各窗自己的戏份(尺寸/落位/事件接线/救生圈)还在原文件。
@@ -39,7 +39,7 @@ export interface RevealWatchdog {
 /**
  * 露窗三保险上弦:ready-to-show 快路 +(可选)渲染层双 rAF 首帧信号 + 无条件看门狗,
  * 多路抢跑,谁都不许当唯一依靠 —— 无边框模式下 ready-to-show 在部分高缩放屏上
- * 永不触发(第三十六批补实测),不能指望它;窗口绝不永久隐身。
+ * 永不触发,不能指望它;窗口绝不永久隐身。
  * via 报给定制口的三档:'ready-to-show' / 'first-frame' / 'watchdog-Ns'。
  */
 export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {}): void {
@@ -66,7 +66,7 @@ export function armRevealWatchdog(win: BrowserWindow, opts: RevealWatchdog = {})
     win.on('closed', () => ipcMain.removeListener(CH.firstFrame, onFirstFrame))
   }
   // 3) 看门狗:唯一无条件的兜底。隐藏的透明窗此刻多半还没内容,
-  //    用户看到「窗口浮现」的实际时刻仍是首帧画好之时
+  // 用户看到「窗口浮现」的实际时刻仍是首帧画好之时
   setTimeout(() => showOnce(`watchdog-${Math.round(timeoutMs / 1000)}s`), timeoutMs)
 }
 

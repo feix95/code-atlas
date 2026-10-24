@@ -1,9 +1,9 @@
 // 选择工具的「拖动对象」手势(从 useCanvasTools 抽出):
 // 命中节点先定选集再整组移动;Shift 轴锁;吸附 = 对齐吸附(snap.ts)优先、没吸上的轴再试间距吸附(spacing.ts)。
 // 修饰键约定(同类功能同一个键):
-//   Shift 轴向锁定;Ctrl/Cmd 单独按住 = 临时关闭全部吸附;
-//   Alt 或 Ctrl+Alt 起手 = 拖出副本(原件留原地,副本跟手并被选中),此时 Ctrl 不再关吸附;
-//   Alt/Ctrl/Shift 任一按住期间,全程显示被拖对象到四向邻居的间距标注。
+// Shift 轴向锁定;Ctrl/Cmd 单独按住 = 临时关闭全部吸附;
+// Alt 或 Ctrl+Alt 起手 = 拖出副本(原件留原地,副本跟手并被选中),此时 Ctrl 不再关吸附;
+// Alt/Ctrl/Shift 任一按住期间,全程显示被拖对象到四向邻居的间距标注。
 // 修饰键中途变化由 trackPointer 原地重放 onMove,标注与吸附随之即时刷新。
 import type { Point } from '@shared/uiWorkbench/geometry'
 import { translatePatch, unionBox, type SceneNode } from '@shared/uiWorkbench/scene'

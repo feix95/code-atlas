@@ -7,9 +7,9 @@
   padding: 0.3em 0;
 }
 
-/* ── 格内编辑(Obsidian 式):格子常驻 contenteditable「装饰源码」——
+/* 格内编辑(Obsidian 式):格子常驻 contenteditable「装饰源码」——
    定界符以 display:none 留在 DOM,textContent 恒等于源码;
-   光标进了哪层记号,哪层 .cm-live-cell-wrap 掀定界符 ── */
+   光标进了哪层记号,哪层 .cm-live-cell-wrap 掀定界符  */
 .cm-live-cell-src {
   display: block;
   min-height: 1em;

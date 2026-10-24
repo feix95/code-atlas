@@ -50,7 +50,7 @@ async function prepare(languageId: string): Promise<Parser> {
   return sharedParser
 }
 
-// ── 控制流关键字(紫):VS Code 把「管流程的词」单独上一档色,照办 ──
+// 控制流关键字(紫):VS Code 把「管流程的词」单独上一档色,照办
 const CONTROL_WORDS = new Set([
   'if',
   'else',

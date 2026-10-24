@@ -78,7 +78,7 @@ export function FreeChatPanel({
     return bindChatZoomWheel(el)
   }, [])
 
-  // 重试回调的稳定三件套(隐身案本批):消息列表、发话器、回底函数每轮渲染都是新身份,
+  // 重试回调的稳定三件套:消息列表、发话器、回底函数每轮渲染都是新身份,
   // 直接进闭包的话,每条气泡拿到的 onRetry 都不一样,刚上的 memo 当场破功 —— 请进 ref,
   // retryFrom 从此一个身份用到底。
   const retryCtxRef = useRef({ messages: chat.messages, send: chat.send, forceBottom })

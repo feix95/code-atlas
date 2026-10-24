@@ -1,4 +1,4 @@
-// ── 高级启动账自测(第 3 期)─────────────────────────────────────────
+// 高级启动账自测
 // 跑法:npm run test:launchsettings
 // 钉死的账:launchSettings.ts 的账簿净化(白名单字段、空账不留、最多 64 本按写入先后
 // 挤旧的、原型链污染防住);parseExtraArgs 专家参数白名单解析;launchSignature 对账签名
@@ -43,8 +43,8 @@ function eq(name: string, actual: unknown, want: unknown) {
   check(name, canon(actual) === canon(want), `got ${canon(actual)} want ${canon(want)}`)
 }
 
-// ── normalizeModelPathKey ────────────────────────────────────────
-console.log('── normalizeModelPathKey 键归一化')
+// normalizeModelPathKey 
+console.log(' normalizeModelPathKey 键归一化')
 check(
   '正斜杠归一成反斜杠+小写',
   normalizeModelPathKey('F:/Models/ABC.GGUF') === normalizeModelPathKey('f:\\models\\abc.gguf')
@@ -52,8 +52,8 @@ check(
 eq('混写归一', normalizeModelPathKey('F:/Models\\A.GGUF '), 'f:\\models\\a.gguf')
 check('空串 = 空键', normalizeModelPathKey('   ') === '')
 
-// ── sanitizeModelLaunchSettings(字段白名单)────────────────────────
-console.log('── 高级账字段净化')
+// sanitizeModelLaunchSettings(字段白名单)
+console.log(' 高级账字段净化')
 eq(
   '合法字段全收',
   sanitizeModelLaunchSettings({
@@ -125,8 +125,8 @@ eq(
   }
 )
 
-// ── sanitizeLaunchRecord(账簿级)──────────────────────────────────
-console.log('── 账簿净化(64 本上限/脏键/原型污染)')
+// sanitizeLaunchRecord(账簿级)
+console.log(' 账簿净化(64 本上限/脏键/原型污染)')
 {
   const dirty = {
     'f:\\models\\a.gguf': { overrides: { kvCache: 'q8_0' } },
@@ -166,8 +166,8 @@ console.log('── 账簿净化(64 本上限/脏键/原型污染)')
   )
 }
 
-// ── launchFor / launchSignature ─────────────────────────────────
-console.log('── 按模型取账 / 对账签名')
+// launchFor / launchSignature 
+console.log(' 按模型取账 / 对账签名')
 {
   const builtin = {
     serverPath: '',
@@ -200,8 +200,8 @@ console.log('── 按模型取账 / 对账签名')
   )
 }
 
-// ── parseExtraArgs ───────────────────────────────────────────────
-console.log('── 专家参数解析(白名单/带值旗/注入)')
+// parseExtraArgs 
+console.log(' 专家参数解析(白名单/带值旗/注入)')
 {
   const ok = parseExtraArgs('-t 6 -b 1024 -ub 512 --no-mmap --mlock -np 4')
   check('常用旗全收', ok.ok && ok.args.join(' ') === '-t 6 -b 1024 -ub 512 --no-mmap --mlock -np 4')
@@ -253,8 +253,8 @@ console.log('── 专家参数解析(白名单/带值旗/注入)')
   const r = parseExtraArgs('--wat 5')
   check('拒绝理由报旗名', !r.ok && r.reason.includes('--wat'))
 }
-// ── 签名与重启对账 ────────────────────────────────────────────────
-console.log('── 签名进对账(改账重启,不改不重启)')
+// 签名与重启对账 
+console.log(' 签名进对账(改账重启,不改不重启)')
 {
   // 模拟 builtin.ts 的对账:startedSig 记启动时的签名;设置里的账洗完再比
   const cfg = {
@@ -276,8 +276,8 @@ console.log('── 签名进对账(改账重启,不改不重启)')
   check('清账回自动签名', launchSignature(launchFor(cfg3)) === launchSignature(null))
 }
 
-// ── config 落盘→读回 round-trip ─────────────────────────────────
-console.log('── config 持久化 round-trip')
+// config 落盘→读回 round-trip 
+console.log(' config 持久化 round-trip')
 {
   const dir = mkdtempSync(join(tmpdir(), 'atlas-cfg-'))
   try {

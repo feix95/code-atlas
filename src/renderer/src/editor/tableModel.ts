@@ -1,7 +1,7 @@
 /** 表格模型:管道表源码 ↔ 中间账(纯函数,无 DOM / 无 CM 依赖,node 自测直接驱动) */
 import type { MdAlign } from '../../../shared/markdown.ts'
 
-// ── 模型:源码 ↔ 中间账 ──
+// 模型:源码 ↔ 中间账
 
 /** 表格模型:表头格 + 对齐登记 + 数据行;格内是源码文本(含 \| 转义) */
 export interface TableModel {

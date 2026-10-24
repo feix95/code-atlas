@@ -35,7 +35,7 @@ export function registerShellIpc(): void {
 
   // 页签尾空白的手动搬窗:那块地是右键菜单+拖放落点的地盘,铺不了 app-region:drag
   // (drag 区不吃 contextmenu/dragover),渲染层改报光标的绝对屏幕坐标,主进程挪窗。
-  // ⚠ 雷区档案②(第九十批实证):150% 缩放下每写一次 bounds 窗体偷长 1px
+  // ⚠ 雷区档案②(实证):150% 缩放下每写一次 bounds 窗体偷长 1px
   // (DIP↔物理像素取整偏差,黑匣子 1432x969→1700x1250 连涨 380 次)——
   // 治法:拖窗起点锁一份基准矩形,尺寸恒写它(偷长收敛于一处不回读),
   // 位置按「基准 + 总位移」绝对回放,不攒增量不喂回声。
@@ -92,16 +92,16 @@ export function registerShellIpc(): void {
   })
 
   // 弹出系统"选择文件夹"对话框,返回所选路径;取消则返回 null
-  // 第八十八批:对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
+  // 对话框认准来叫它的那个窗,不再抓「[0]」——日志窗开着时别把弹窗挂错门
   ipcMain.handle(CH.pickFolder, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = { properties: ['openDirectory'] }
     return pickPathDialog(win, options)
   })
 
-  // 列盘符(第六十批):只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
+  // 列盘符:只问 Windows「有哪些盘」,不翻任何文件内容,秒回。
   // 跳过 A/B(软驱遗物,探测可能卡好几秒);容量用 statfs 一次系统调用,拿不到就只给盘符
-  // 列盘符(第八十一批加固,第八十二批瘦身):①所有盘一起问、单盘 2.5 秒不答就当缺席 ——
+  // 列盘符():①所有盘一起问、单盘 2.5 秒不答就当缺席 ——
   // 掉线的网络映射盘以前能拖住整列;②盘的来路(固定/移动/网络/光驱)一次 PowerShell 问齐,
   // 失败/超时就当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(带 5 秒小缓存,
   // 回首页重列盘符时不用次次都起 PowerShell)。卷标不再问 —— 产品裁定:盘就认大写字母,直白
@@ -183,7 +183,7 @@ export function registerShellIpc(): void {
     if (typeof v === 'number' && Number.isFinite(v) && v > 0) setUiScaleFactor(clampUiScale(v))
   })
 
-  // ── Developer 日志(第八十七批):拉全量 / 清账 / 开窗 ──
+  // Developer 日志:拉全量 / 清账 / 开窗
   ipcMain.handle(CH.devLogPull, () => devLogSnapshot())
   ipcMain.handle(CH.devLogClear, () => {
     clearDevLogs()

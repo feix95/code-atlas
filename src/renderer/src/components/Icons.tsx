@@ -3,8 +3,8 @@ import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 /** size 的语义:100% 缩放下的 px;落 svg 时换算成 rem,图标(含线宽)随界面缩放档一起涨缩 */
 const iconRem = (px: number): string => `${(px / ROOT_FONT_BASE_PX).toFixed(4)}rem`
 
-/* ── 文件/文件夹辨识色(图标册 v5):文件树、盘符浏览、搜索命中同一套 ICON_COLORS;
- *  其余界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。 ── */
+/* 文件/文件夹辨识色(图标册 v5):文件树、盘符浏览、搜索命中同一套 ICON_COLORS;
+ *  其余界面图标默认 mono,吃 currentColor 随主题和所在文字色变化。  */
 const ICON_COLORS: Record<string, string> = {
   file: '#8fa8cc',
   folder: '#eab75c',
@@ -128,7 +128,7 @@ export function NotePen({
   )
 }
 
-/** 顶栏线稿图标家族(第一百零三批);默认去色吃 currentColor,按需可选彩色稿 */
+/** 顶栏线稿图标家族;默认去色吃 currentColor,按需可选彩色稿 */
 export function IconArrowLeft({
   size = 14,
   mono = true,
@@ -241,7 +241,7 @@ export function IconFolder({
   )
 }
 
-/* ── 树图标册:一图一义、24 线稿、一图一色(v5:小葵手改稿 + Lucide 官方稿混编) ── */
+/* 树图标册:一图一义、24 线稿、一图一色(v5:小葵手改稿 + Lucide 官方稿混编)  */
 
 function Line({
   children,
@@ -558,7 +558,7 @@ const BOOK: Record<string, React.ReactNode> = {
   // 选区首尾的一对角括号(Lucide brackets 拆半):一正一反,读作「从这里开始 / 到这里结束」
   markStart: <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />,
   markEnd: <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />,
-  // 思考模式(第一百一十八批):小葵给的参考图是颗脑子,线稿照脑回的双瓣画
+  // 思考模式:小葵给的参考图是颗脑子,线稿照脑回的双瓣画
   brain: (
     <>
       <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
@@ -568,7 +568,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" />
     </>
   ),
-  // 发送(第一百一十八批):产品指定要「向上的箭头」
+  // 发送:产品指定要「向上的箭头」
   arrowUp: (
     <>
       <path d="M12 19V5" />
@@ -592,7 +592,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M3 21l7-7" />
     </>
   ),
-  // 翻文件(第一百二十八批):文件夹上搁一枚放大镜 —— 自己动手翻项目
+  // 翻文件:文件夹上搁一枚放大镜 —— 自己动手翻项目
   folderSearch: (
     <>
       <path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
@@ -600,7 +600,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="m19.8 19.8 2.2 2.2" />
     </>
   ),
-  // ── 工作区卡/菜单供稿(UI v3 §7.3 小葵原样收录,lucide 线稿)──
+  // 工作区卡/菜单供稿(UI v3 §7.3 小葵原样收录,lucide 线稿)
   // 菜单收起态指示:lucide chevrons-up-down
   chevronsUpDown: (
     <>
@@ -638,7 +638,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M21 3v5h-5" />
     </>
   ),
-  // ── 设置页收编(P2-8:第二本 ICON_PATHS 并册,全是 Lucide 线稿,走 mono 单色斑) ──
+  // 设置页收编(P2-8:第二本 ICON_PATHS 并册,全是 Lucide 线稿,走 mono 单色斑)
   settings2: (
     <>
       <path d="M14 17H5" />
@@ -788,7 +788,7 @@ const BOOK: Record<string, React.ReactNode> = {
   ),
   // 裸对勾(不带圈):预设卡角上的「选中了」小标记
   checkBare: <path d="M20 6 9 17l-5-5" />,
-  // ── UI v3 框架件(小葵供稿,lucide 线稿;框架图标一律 mono 吃 currentColor,不给登记色)──
+  // UI v3 框架件(小葵供稿,lucide 线稿;框架图标一律 mono 吃 currentColor,不给登记色)
   // 搜索框放大镜(lucide search,规格 §5.3)
   search: (
     <>
@@ -819,7 +819,7 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M6 4v4" />
     </>
   ),
-  // 实时预览(md 三档批次,lucide pencil-line):一支笔一道线 = 边写边出效果
+  // 实时预览(lucide pencil-line):一支笔一道线 = 边写边出效果
   penLine: (
     <>
       <path d="M12 20h9" />

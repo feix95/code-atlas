@@ -21,13 +21,13 @@ import { installWindowRescue } from './windowRescue.ts'
 import { runAcceptanceProbe } from './windowProbe.ts'
 import { CH } from '../shared/ipcChannels.ts'
 
-// ── Developer 日志窗口(第八十七批):模型后台原话亮出来看 ──
+// Developer 日志窗口:模型后台原话亮出来看
 // 独立小窗(frameless,和主窗一个实底壳),渲染层用 ?view=devlogs 分支画日志页。
 // 引擎的每一行原话、每笔请求用量,广播员推给所有窗口,这窗常驻收听。
 
 let devLogWindow: BrowserWindow | null = null
 
-// ── 托盘常驻与单实例(桌宠托管第一批,2026-09-18)──
+// 托盘常驻与单实例(2026-09-18)
 // 收起模式的地基:主窗引用提升到模块级,托盘和 second-instance 都要够得着它。
 export let mainWindowRef: BrowserWindow | null = null
 export let mainPanelController: MainPanelController | null = null
@@ -118,7 +118,7 @@ export function openDevLogWindow(): void {
 }
 
 export function createWindow(): void {
-  // ── 第七十八批:窗口尺寸记事本 ──
+  // 窗口尺寸记事本
   // 上回把窗拉到多大、搁在哪儿,这回开窗就照旧;最大化单独记一票,还原时先落回上次的
   // 正常大小再最大化(最大化时 getBounds 是铺满屏的假尺寸,不能当正常尺寸记)。
   // 存档先过安检再落窗:垃圾存档走默认,旧存档对着现在的屏幕贴边夹紧(换屏/改分辨率
@@ -163,7 +163,7 @@ export function createWindow(): void {
     webPreferences: WEB_PREFS
   })
   trackWindowBackground(mainWindow)
-  // 主窗引用上提(桌宠托管第一批):托盘、second-instance 都要够得着它
+  // 主窗引用上提:托盘、second-instance 都要够得着它
   mainWindowRef = mainWindow
   mainPanelController = new MainPanelController(mainWindow)
   mainPanelController.onShownChange = refreshTrayMenu
@@ -206,7 +206,7 @@ export function createWindow(): void {
   mainWindow.on('close', (event) => {
     if (stateSaveTimer) clearTimeout(stateSaveTimer)
     persistWindowState()
-    // 收起模式(桌宠托管第一批):点关闭 = 藏进托盘,程序继续跑、聊天继续在线、
+    // 收起模式:点关闭 = 藏进托盘,程序继续跑、聊天继续在线、
     // 任务栏和 Alt+Tab 里都不再有主窗。真退出只走托盘「退出」—— 它先立 quitting
     // 旗再 quit,close 事件看见旗才放行销毁
     if (!quitting) {
@@ -217,7 +217,7 @@ export function createWindow(): void {
   // 上回关窗时是最大化:先把存档的正常大小落好,再进最大化,圆角描边那条链照常接手
   if (savedWindowState?.maximized) mainWindow.maximize()
 
-  // ── 露窗链(工厂上弦):多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身 ──
+  // 露窗链(工厂上弦):多路信号抢跑 + 无条件看门狗,窗口绝不永久隐身
   // 本机实测(模块四验收):ready-to-show 只在 GPU 缓存健康时才来 —— 缓存被另一个
   // 实例锁住(Gpu Cache Creation failed)或被污染时就永远装死;当年「窗隐身」就是
   // 两实例缓存大战 + show 眼巴巴等 ready-to-show 叠出来的。所以每一路都只当快路,

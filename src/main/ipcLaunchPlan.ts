@@ -1,4 +1,4 @@
-// 「本机运行方案」通道(智能启动批次):给设置卡端齐一份只读报单 ——
+// 「本机运行方案」通道:给设置卡端齐一份只读报单 ——
 // 机器规格 + 当前内置模型的启动方案 + 已存高级账 + 自动档对照参数。
 // draft 参数 = 界面上还没存盘的草稿,按草稿出预览方案(不动存档)。纯查询,不启动引擎。
 import { ipcMain } from 'electron'
@@ -28,7 +28,7 @@ async function launchPlanInfo(draft: unknown): Promise<LaunchPlanInfo> {
   const machine = await queryMachineProfile()
   const dir = userDataDir()
   const config = await loadAiConfig(dir)
-  // 当前引擎登记(第 4 期):定位 + --version;查不到就给 null,不挡方案报单
+  // 当前引擎登记:定位 + --version;查不到就给 null,不挡方案报单
   const engine = await locateEngine(config.builtin, dir).catch(() => null)
   const engineVersion = engine?.exePath ? await engineVersionFor(engine.exePath) : null
   const activeEngine = engine

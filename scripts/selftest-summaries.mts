@@ -34,7 +34,7 @@ function textOf(node: ScanFileNode | ScanDirNode): string {
 }
 
 async function main(): Promise<void> {
-  // ── 1. 名人文件字典:档位2直说是什么,档位3带行动 + sticky(豁免降噪) ──
+  // 1. 名人文件字典:档位2直说是什么,档位3带行动 + sticky(豁免降噪) 
   const pkg = file('package.json')
   const readme = file('README.MD')
   const gitignore = file('.gitignore')
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     '.env:风险句带"不要外传" + sticky'
   )
 
-  // ── 2. 名字模式规则:tsconfig 两代 / prettier 家族 / eslint / env / 打包流水线 ──
+  // 2. 名字模式规则:tsconfig 两代 / prettier 家族 / eslint / env / 打包流水线 
   const cases: Array<[ScanFileNode, string]> = [
     [file('tsconfig.node.json'), '编译配置'],
     [file('tsconfig.json'), '编译配置'],
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 3. 档位1:类型标签已说清的不写字;非常用后缀给范畴词;诚实话兜底 ──
+  // 3. 档位1:类型标签已说清的不写字;非常用后缀给范畴词;诚实话兜底 
   const entry = file('index.ts', TS)
   const cssFile = file('index.css', CSS) // css 不是代码语言,不该被当成入口
   const kt = file('mystery.kt', KOTLIN)
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(entry).includes('入口'), '代码语言的 index.ts 是入口(档位2,真信息)')
   assert.ok(textOf(cssFile).includes('样式'), 'index.css → 范畴词「样式」')
   assert.equal(kt.summary, undefined, '任意 .kt:名字查不出词,老实闭嘴')
-  assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」(第九十九批)')
+  assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」')
   assert.equal(textOf(docMd), 'doc 文档', '.md → 范畴词「文档」')
   assert.equal(photo.summary, undefined, '.png 家喻户晓,沉默名单不写字')
   assert.equal(silentTxt.summary, undefined, '.txt 沉默名单不写字')
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(unknownExt).includes('未知类型'), '陌生后缀诚实说未知')
   assert.ok(textOf(noExt).includes('没有后缀'), '无后缀诚实说')
 
-  // ── 4. 目录名字典:直述 ≤14 字,无人物拟人;风险目录带 sticky ──
+  // 4. 目录名字典:直述 ≤14 字,无人物拟人;风险目录带 sticky 
   const src = dir('src', [file('a.ts', TS)])
   const insp = dir('inspiration', [file('idea.md')])
   const vendor = dir('vendor', [file('lib.so')])
@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   )
   assert.ok(textOf(dist).includes('打包产物') && dist.summary?.sticky === true, 'dist 风险句')
 
-  // ── 5. scripts 目录看内容改口:大半是测试就报数量 ──
+  // 5. scripts 目录看内容改口:大半是测试就报数量 
   const selftests = dir('scripts', [
     file('selftest-scanner.mts'),
     file('selftest-parser.mts'),
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [mixedScripts]))
   assert.ok(textOf(mixedScripts).includes('自动化脚本'), '不含自测的 scripts 说自动化脚本')
 
-  // ── 6. 内容兜底:没名字线索时看装了啥 ──
+  // 6. 内容兜底:没名字线索时看装了啥 
   const mysteryCode = dir(
     'mystery',
     Array.from({ length: 5 }, (_, i) => file(`m${i}.ts`, TS))
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
   assert.ok(textOf(empty).includes('空的，还没有内容'), '空目录像日志一样播报')
   assert.ok(textOf(drawers).includes('只含子文件夹，3 个'), '只有子目录要说清结构')
 
-  // ── 7. 根节点聚合:子孙合计全算进来;目录个个有标签,档位1文件可留空 ──
+  // 7. 根节点聚合:子孙合计全算进来;目录个个有标签,档位1文件可留空 
   const root = dir('code-atlas', [
     dir('src', [file('a.ts', TS), file('b.ts', TS), file('index.ts', TS)]),
     dir('docs', [file('guide.md'), file('faq.md')]),
@@ -178,14 +178,14 @@ async function main(): Promise<void> {
     n.children.every((c) => (c.type === 'directory' ? allDirsTagged(c) : true))
   assert.ok(allDirsTagged(root), '整棵树每个目录都有速览标签(文件允许档位1留空)')
 
-  // ── 8. 分级扫描占位:没展开的要老实说,不许装成空文件夹;名字认得出的保留身份 ──
+  // 8. 分级扫描占位:没展开的要老实说,不许装成空文件夹;名字认得出的保留身份 
   const lazyPlain = dir('mystery-plain', [], { lazy: true })
   const lazyVideos = dir('videos', [], { lazy: true })
   annotateSummaries(dir('proj', [lazyPlain, lazyVideos]))
   assert.ok(textOf(lazyPlain).includes('还没展开，点击查看'), '没名字线索的未展开目录要老实说')
   assert.ok(textOf(lazyVideos).startsWith('video'), '名字认得出的未展开目录保留身份标签(媒体文件)')
 
-  // ── 8.5 打开被拒的空目录(系统保护区):像日志一样播报 ──
+  // 8.5 打开被拒的空目录(系统保护区):像日志一样播报 
   const locked = dir('locked-vault', [], { truncated: true })
   annotateSummaries(dir('proj', [locked]))
   assert.ok(
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     `被锁的空目录要说系统保护,实际:${textOf(locked)}`
   )
 
-  // ── 9. 事实压过别名 + 残账说"至少":空目录不用别名,截断合计不报成总数 ──
+  // 9. 事实压过别名 + 残账说"至少":空目录不用别名,截断合计不报成总数 
   const emptyConfig = dir('config')
   annotateSummaries(dir('proj', [emptyConfig]))
   assert.ok(
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
     `截断的文档目录也要说「至少」,实际:${textOf(cutNotes)}`
   )
 
-  // ── 10. 风险句标记:sticky 是数据标记(风险提示句),渲染层一律文字标注,不做 emoji 降噪 ──
+  // 10. 风险句标记:sticky 是数据标记(风险提示句),渲染层一律文字标注,不做 emoji 降噪 
   const stickyLock = file('yarn.lock')
   annotateSummaries(dir('proj', [stickyLock]))
   assert.ok(
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
     '风险句保留 sticky 标记'
   )
 
-  // ── 11. 词根词典(第九十九批):名字拆词查表,业务起的名也有身份 ──
+  // 11. 词根词典:名字拆词查表,业务起的名也有身份 
   const scannerFile = file('scanner.ts', TS)
   const gitFile = file('GitFileStatus.tsx')
   const askHook = file('useAiAsk.ts', TS)
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [genericApp]))
   assert.equal(genericApp.summary, undefined, 'App.tsx 只剩「应用」空话,老实闭嘴')
 
-  // ── 12. 文档读开头(第一百批):有真标题亮真名,标题过长掐头留省略号 ──
+  // 12. 文档读开头:有真标题亮真名,标题过长掐头留省略号 
   const titledDoc = file('a.md', undefined, '安装指南')
   const longTitle = '这是一个特别特别特别长的文档标题超出了预算还要再长一点'
   const longDoc = file('b.md', undefined, longTitle)

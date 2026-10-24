@@ -1,4 +1,4 @@
-// ── 内置引擎「拉起来直到就绪」这一棒 ──
+// 内置引擎「拉起来直到就绪」这一棒
 // 从 builtin.ts 拆出来的启动域:spawn llama-server、接管 stdout/stderr、
 // 轮询 /health 到就绪、问 /v1/models 拿模型名、就绪后探一轮视觉能力(/props)。
 // 还有启动域的纯函数:加载进度解析、GPU 层数报告、热身估价小状态表。
@@ -129,7 +129,7 @@ export async function launchBuiltinServer(
   opts: {
     skipMmproj?: boolean
     mmprojDropNote?: string
-    /** devlog 启动行展示的引擎名(第 4 期:'CUDA 加速 · b11685'/'自带引擎'/'自指引擎') */
+    /** devlog 启动行展示的引擎名('CUDA 加速 · b11685'/'自带引擎'/'自指引擎') */
     engineLabel?: string
     /** 后端退路重拉成功时就绪播报捎的一句 */
     engineNote?: string
@@ -140,10 +140,10 @@ export async function launchBuiltinServer(
   const engineLabel = opts.engineLabel
   const engineNote = opts.engineNote
   const ctxSize = normalizeContextSize(contextSize)
-  // 视觉能力批次:模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
+  // 模型同目录躺着 mmproj 投影仪就带上 --mmproj,视觉模型才真能看图;
   // 没带就按纯文本跑。记进对账状态表 —— 旁边增删 mmproj 后下次提问对账重启
   const mmproj = skipMmproj ? null : findMmprojFor(modelPath)
-  // 智能启动批次:机器规格 + 模型登记过一遍纯算盘,出本轮启动参数;用户在「高级」里
+  // 机器规格 + 模型登记过一遍纯算盘,出本轮启动参数;用户在「高级」里
   // 指定过的字段原样进算盘,梯子不碰。显卡层数默认交给引擎 --fit 自动摆层。
   const { plan } = await buildLaunchPlan(modelPath, ctxSize, mmproj, launch?.overrides)
   // 专家命令行:白名单解析,合法的排在方案参数之后(后写赢);非法整段丢弃只留日志,不拦启动
@@ -160,7 +160,7 @@ export async function launchBuiltinServer(
   const facts = host.idleFacts(modelPath)
   const startedAt = Date.now()
   const lastWarmupMs = host.readWarmupMs(modelPath)
-  // 第八十七批:引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
+  // 引擎要干什么,先在后台日志里亮个底 —— 参数全摆出来,LM Studio 同款透明度
   addDevLog(
     'system',
     `启动内置引擎:${engineLabel ? `${engineLabel}(${serverPath})` : serverPath} · 模型 ${modelPath} · 端口 ${BUILTIN_PORT} · 工具模板(--jinja)${mmproj ? ` · 视觉投影仪(--mmproj ${mmproj})` : ''} · 方案参数:${plan.args.join(' ') || '(引擎默认)'}${extraArgs.length ? ` · 专家参数:${extraArgs.join(' ')}` : ''}`
@@ -176,7 +176,7 @@ export async function launchBuiltinServer(
       String(BUILTIN_PORT),
       '--host',
       '127.0.0.1',
-      // --jinja(第一百二十八批):让引擎用模型自带的对话模板,工具调用(agent 的
+      // --jinja:让引擎用模型自带的对话模板,工具调用(agent 的
       // 翻文件)靠它才开得了;chat_template_kwargs 的思考开关也走这条路。换模型后生效
       '--jinja',
       ...(mmproj ? ['--mmproj', mmproj] : []),
@@ -188,7 +188,7 @@ export async function launchBuiltinServer(
     ],
     {
       windowsHide: true,
-      // 第八十七批:stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
+      // stdout/stderr 接管(原来直接扔)—— 引擎的原话进 Developer 日志窗口
       stdio: ['ignore', 'pipe', 'pipe']
     }
   )
@@ -267,7 +267,7 @@ export async function launchBuiltinServer(
 
   const healthUrl = baseUrl.replace(/\/v1$/, '') + '/health'
   const ready = (async () => {
-    // 不设闹钟(第七十二批):进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
+    // 不设闹钟:进程活着就一直等 —— 机械盘搬 14GB 模型两三分钟是常事,
     // 2 分钟的硬超时只会掐死健康的加载;真死锁交给用户手里的「取消」
     while (host.isEngineRunning()) {
       try {

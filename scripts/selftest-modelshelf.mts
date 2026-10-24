@@ -32,7 +32,7 @@ function ok(cond: boolean, name: string): void {
 
 const GB = 1024 ** 3
 
-console.log('── 模态标签:多模态组合优先,认不出老实说「其他」──')
+console.log(' 模态标签:多模态组合优先,认不出老实说「其他」')
 {
   ok(modalityLabel({ tags: ['gguf', 'text-generation'] }) === '文本', '纯文本模型 → 文本')
   ok(
@@ -48,7 +48,7 @@ console.log('── 模态标签:多模态组合优先,认不出老实说「其�
   ok(modalityLabel({ tags: '垃圾' }) === '其他', 'tags 不是数组 → 不炸,回其他')
 }
 
-console.log('── 参数量级:从仓库名解析最大的 N B,解析不出老实 null ──')
+console.log(' 参数量级:从仓库名解析最大的 N B,解析不出老实 null ')
 {
   ok(
     parseParamScale('mradermacher/Ornith-1.5-9B-uncensored-GGUF') === '9B',
@@ -63,7 +63,7 @@ console.log('── 参数量级:从仓库名解析最大的 N B,解析不出老
   ok(parseParamScale('') === null, '空串 → null')
 }
 
-console.log('── 量化等级:文件名解析 + 技术翻译,认不出 null ──')
+console.log(' 量化等级:文件名解析 + 技术翻译,认不出 null ')
 {
   ok(parseQuantNote('Ornith-1.5-9B-uncensored.Q8_0.gguf') === '几乎无损', 'Q8_0 → 几乎无损')
   ok(parseQuantNote('Qwen3-Q4_K_M.gguf') === '大小和质量平衡的主流选择', 'Q4_K_M → 主流之选')
@@ -81,7 +81,7 @@ console.log('── 量化等级:文件名解析 + 技术翻译,认不出 null �
   ok(parseQuantNote('model-Q9_custom.gguf') === null, '认不出的档位(Q9) → null,不硬猜')
 }
 
-console.log('── 货架准入:不是文本打底的一律过滤(2026-09-18 产品定)──')
+console.log(' 货架准入:不是文本打底的一律过滤(2026-09-18 产品定)')
 {
   ok(isChatCapable({ pipeline_tag: 'text-generation' }), '文本生成 → 上架')
   ok(isChatCapable({ pipeline_tag: 'image-text-to-text' }), '图文 → 上架(视觉是产品能力)')
@@ -100,7 +100,7 @@ console.log('── 货架准入:不是文本打底的一律过滤(2026-09-18 �
   ok(!isChatCapable({}), '什么线索都没有 → 滤,不赌')
 }
 
-console.log('── 清洗:烂条目/不达标条目不进列表 ──')
+console.log(' 清洗:烂条目/不达标条目不进列表 ')
 {
   const good = sanitizeShelfEntry({
     id: 'unsloth/Qwen3-4B-GGUF',
@@ -142,7 +142,7 @@ console.log('── 清洗:烂条目/不达标条目不进列表 ──')
   )
 }
 
-console.log('── 带不动判定:内存预算 = 总内存 × 0.7,贴线提醒 ──')
+console.log(' 带不动判定:内存预算 = 总内存 × 0.7,贴线提醒 ')
 {
   const spec16 = { ramBytes: 16 * GB, vramBytes: null }
   ok(judgeRun(4 * GB, spec16) === 'yes', '16G 内存跑 4G 模型 → 宽裕')
@@ -155,7 +155,7 @@ console.log('── 带不动判定:内存预算 = 总内存 × 0.7,贴线提醒
   ok(runVerdictLabel('yes') === '', 'yes 不带话,不啰嗦')
 }
 
-console.log('── 筛选与排序 ──')
+console.log(' 筛选与排序 ')
 {
   const mk = (id: string, gb: number, downloads: number, daysAgo: number): ShelfEntry => ({
     id,
@@ -199,7 +199,7 @@ console.log('── 筛选与排序 ──')
   )
 }
 
-console.log('── 仓库文件清洗:只留 gguf,大小认 lfs ──')
+console.log(' 仓库文件清洗:只留 gguf,大小认 lfs ')
 {
   const files = sanitizeRepoFiles([
     { path: '.gitattributes' },
@@ -215,7 +215,7 @@ console.log('── 仓库文件清洗:只留 gguf,大小认 lfs ──')
   ok(sanitizeRepoFiles(null).length === 0, '烂响应 → 空')
 }
 
-console.log('── 人话格式化 ──')
+console.log(' 人话格式化 ')
 {
   ok(formatGgufSize(4.24 * GB) === '4.2 GB', '小数 GB 保留一位')
   ok(formatGgufSize(30.4 * GB) === '30 GB', '两位数 GB 取整,不虚张')

@@ -1,4 +1,4 @@
-// 引擎定位(第 4 期):「这次该用哪颗 llama-server」收成一个决定 ——
+// 引擎定位:「这次该用哪颗 llama-server」收成一个决定 ——
 // 用户自指路径 > 已装引擎(按选择/推荐)> 应用自带 vendor。
 // 顺手产出 fallback 链(安装引擎起不来时退到哪颗)与展示标签/版本号。
 import { execFile } from 'node:child_process'

@@ -24,7 +24,7 @@
   color: var(--danger);
 }
 
-/* ── 目录树:箭头管展开,名字管选中 ── */
+/* 目录树:箭头管展开,名字管选中  */
 
 .tree-row {
   display: flex;
@@ -35,7 +35,7 @@
   margin: 1px 0;
   border-radius: var(--radius-sm);
   transition: background var(--dur-2) var(--ease-smooth);
-  /* 轻量虚拟化(第九十六批):视口外的行让浏览器跳过渲染,展开 node_modules 这类
+  /* 轻量虚拟化:视口外的行让浏览器跳过渲染,展开 node_modules 这类
      几千行的目录不再一次性画完;行高固定,占位尺寸给准了滚动条不跳 */
   content-visibility: auto;
   contain-intrinsic-size: auto calc(var(--u) * 0.6);
@@ -45,7 +45,7 @@
   background: var(--hover);
 }
 
-/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(第七十六批摘遮罩,底色不再染色) */
+/* 选中态必须比 hover 抢眼:中性底亮一档 + 名字染亮(摘遮罩,底色不再染色) */
 .tree-row.is-selected {
   background: var(--selected-bg);
 }
@@ -137,7 +137,7 @@
   color: var(--muted-2);
 }
 
-/* ── 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户 ── */
+/* 深搜结果清单(§7.2):行骨架沿用树行,状态句(搜索中/空账/截断提示)自立门户  */
 .search-results .sr-state {
   margin: var(--space-2) var(--space-1);
   color: var(--muted-2);

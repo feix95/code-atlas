@@ -24,7 +24,7 @@ function assertTag(
 }
 
 async function main(): Promise<void> {
-  // ── 一、后缀速查 ──
+  // 一、后缀速查 
   assertTag(identifyByExtension('app.ts'), 'typescript', 'extension', 'app.ts')
   assertTag(identifyByExtension('App.tsx'), 'typescript-react', 'extension', 'App.tsx')
   assertTag(identifyByExtension('util.JS'), 'javascript', 'extension', '大写后缀 util.JS')
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   assert.equal(identifyByExtension('photo.xyz'), null, '陌生后缀应交给内容嗅探')
   assert.equal(identifyByExtension('noext'), null, '无后缀应交给内容嗅探')
 
-  // ── 二、内容嗅探 ──
+  // 二、内容嗅探 
   assertTag(
     identifyFromContent('run', buf('#!/usr/bin/env python3\nimport os\nprint("hi")\n')),
     'python',
@@ -106,7 +106,7 @@ async function main(): Promise<void> {
   assert.equal(identifyFromContent('blob', buf('a\x00b')), null, '二进制应拒绝猜')
   assert.equal(identifyFromContent('empty', buf('')), null, '空文件应拒绝猜')
 
-  // ── 三、完整识别(临时文件走真 I/O)──
+  // 三、完整识别(临时文件走真 I/O)
   const dir = join(tmpdir(), `code-atlas-parser-test-${Date.now()}`)
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(join(dir, 'run'), '#!/usr/bin/env python3\nimport os\n')
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
       '二进制无语言'
     )
 
-    // ── 三·五、大文件防线:只读文件头,绝不整只读进内存 ──
+    // 三·五、大文件防线:只读文件头,绝不整只读进内存 
     // 稀疏文件:先写满一段文本(头 4KB 不能有零字节),再 truncate 撑大,瞬间造出"巨型文件"
     const smallHead = 'interface User {\n  id: number;\n}\nconst name: string = "a";\n'.padEnd(
       4096,
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
       '视频壳走二进制黑名单,零 I/O 直接放过'
     )
 
-    // ── 四、扫描器联动:byLanguage 统计与树节点标签 ──
+    // 四、扫描器联动:byLanguage 统计与树节点标签 
     await fs.writeFile(join(dir, 'lib.rs'), 'fn main() { println!("x"); }\n')
     await fs.writeFile(join(dir, 'data.json'), '{}')
     await fs.writeFile(join(dir, 'notes.md'), '# Notes\n')

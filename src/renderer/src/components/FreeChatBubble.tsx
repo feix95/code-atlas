@@ -106,7 +106,7 @@ function ThinkingBlock({
   )
 }
 
-// 回答气泡上 memo(隐身案本批):流式输出每补一段字,消息区就重画一次;气泡不 memo,
+// 回答气泡上 memo:流式输出每补一段字,消息区就重画一次;气泡不 memo,
 // 旧消息全量陪跑,聊得越久越沉。memo 生效的前提是 props 身份稳定 —— msg 是消息对象
 // 本身(流式只换正在写的那条,旧的不动)、onRetry 由父层用 ref 稳住、fileLinks 同理。
 export const AssistantBubble = memo(function AssistantBubble({
@@ -124,7 +124,7 @@ export const AssistantBubble = memo(function AssistantBubble({
   fileLinks?: FileLinkTarget | null
 }): React.JSX.Element {
   const label = webLabel(msg.web)
-  // 已复制提示(第一百零七批补):按小提示走,1 秒自己退场
+  // 已复制提示(补):按小提示走,1 秒自己退场
   const [copied, flashCopied] = useFlashFlag(800)
   function copyAnswer(): void {
     void navigator.clipboard.writeText(msg.text).then(flashCopied)
@@ -190,7 +190,7 @@ export const AssistantBubble = memo(function AssistantBubble({
           <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
         )}
         {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
-        {/* 实时 token 账(第八十四批):引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
+        {/* 实时 token 账:引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
         {msg.state === 'busy' && (msg.stats || msg.text) && (
           <div className="chat-stats">
             {msg.stats

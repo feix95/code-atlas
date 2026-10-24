@@ -116,7 +116,7 @@ const FULL_SHAPE = {
 }
 
 function main(): void {
-  // ── 1. GGUF 头解析:要紧的抓下来,词表/无关键按格式跳过去 ──
+  // 1. GGUF 头解析:要紧的抓下来,词表/无关键按格式跳过去 
   const buf = new GgufBuilder()
     .u32('llama.context_length', 131072)
     .u32('llama.block_count', 32)
@@ -139,7 +139,7 @@ function main(): void {
   assert.equal(parsed.shape.embeddingLength, 4096, '嵌入维度抓得到')
   assert.equal(parsed.shape.architecture, 'qwen2', '架构名按 general.architecture 报')
 
-  // ── 1.5 架构无关:gemma4 的键全挂 gemma4.* 前缀,kv 头数还是每层一个的数组 ──
+  // 1.5 架构无关:gemma4 的键全挂 gemma4.* 前缀,kv 头数还是每层一个的数组 
   const gemma4 = parseGgufHeader(
     new GgufBuilder()
       .str('general.architecture', 'gemma4')
@@ -180,7 +180,7 @@ function main(): void {
   if (noArch.status !== 'ok') throw new Error('unreachable')
   assert.equal(noArch.shape.contextLength, 2048, '没标架构也能从键前缀推断')
 
-  // ── 2. 坏账/没读完,两种身份分得清 ──
+  // 2. 坏账/没读完,两种身份分得清 
   assert.equal(parseGgufHeader(Buffer.alloc(32, 0x4e)).status, 'bad', '魔数不对 = 坏账')
   assert.equal(parseGgufHeader(Buffer.alloc(10)).status, 'truncated', '头部没读完 = 截断')
   const badVersion = Buffer.alloc(24)
@@ -195,21 +195,21 @@ function main(): void {
     .subarray(0, 60)
   assert.equal(parseGgufHeader(cutInVocab).status, 'truncated', '截断在数组中间认成截断')
 
-  // ── 3. 黑板精算:照真实结构,K+V 两份、f16 两字节 ──
+  // 3. 黑板精算:照真实结构,K+V 两份、f16 两字节 
   // 每 token = 2 × 32层 × 8头 × 128宽 × 2字节 = 128KB
   assert.equal(kvBytesFromShape(8192, FULL_SHAPE), 1073741824, '8192 tokens = 1 GiB 黑板')
   assert.equal(kvBytesFromShape(0, FULL_SHAPE), null, '上下文 0 不算账')
   assert.equal(kvBytesFromShape(8192, { ...FULL_SHAPE, headCount: null }), null, '档案缺条目算不出')
   assert.equal(kvBytesFromShape(Number.NaN, FULL_SHAPE), null, 'NaN 不算账')
 
-  // ── 4. 粗估兜底(和适配估算同一套分档,老断言迁移过来) ──
+  // 4. 粗估兜底(和适配估算同一套分档,老断言迁移过来) 
   assert.equal(estimateKvBytes(4096, 14.26 * GB), 4096 * 256 * 1024, '≥8GB 大模型按 256KB/token 估')
   assert.equal(estimateKvBytes(4096, 6 * GB), 4096 * 128 * 1024, '4~8GB 减半')
   assert.equal(estimateKvBytes(4096, 2 * GB), 4096 * 64 * 1024, '<4GB 再减半')
   assert.equal(estimateKvBytes(0, 14.26 * GB), 0, '上下文 0 不估')
   assert.equal(estimateKvBytes(Number.NaN, 14.26 * GB), 0, 'NaN 不估')
 
-  // ── 5. 账单各档位:数字说话,人话收尾 ──
+  // 5. 账单各档位:数字说话,人话收尾 
   const bill = (over: Partial<Parameters<typeof formatContextBill>[0]>): string =>
     formatContextBill({
       contextTokens: 8192,
@@ -288,7 +288,7 @@ function main(): void {
   })
   assert.ok(auto.text.startsWith('上下文留空'), '留空自动档注明按默认算')
 
-  // ── 6. 档位表:2 的幂,出厂上限封顶,翻不出档案按 64k 兜底 ──
+  // 6. 档位表:2 的幂,出厂上限封顶,翻不出档案按 64k 兜底 
   assert.deepEqual(CONTEXT_NOTCHES, [4096, 8192, 16384, 32768, 65536, 131072], '档位就是 4k~128k')
   assert.deepEqual(
     CONTEXT_NOTCHES.filter((n) => n <= 32768),

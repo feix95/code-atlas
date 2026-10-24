@@ -58,9 +58,9 @@ export function ModelShelfPanel({
     saveShelfPrefs(next)
   }
 
-  // ── GSAP 点睛(数字滚动在 ShelfRow 里,这是另一处)──
+  // GSAP 点睛(数字滚动在 ShelfRow 里,这是另一处)
   // 展开清单错落淡入:高度过渡归 CSS(grid-rows),GSAP 只管内容逐项浮现;
-  //   首版 4px/0.25s 被高度变化整个掩盖(小葵实测看不见),8px/0.3s 才从过渡里透出来
+  // 首版 4px/0.25s 被高度变化整个掩盖(小葵实测看不见),8px/0.3s 才从过渡里透出来
   useGSAP(
     () => {
       if (expanded === null) return

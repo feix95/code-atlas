@@ -28,8 +28,8 @@ export function usePreviewDoc(deps: {
 } {
   const { rootPath, relPath, onRenameFile } = deps
 
-  // ── 换文件就地复位:App 不挂 key={relPath} 强制重挂,复位收编在这里 ——
-  //    所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂 ──
+  // 换文件就地复位:App 不挂 key={relPath} 强制重挂,复位收编在这里 ——
+  // 所有现场按文件名记账,哪份文件的账归哪份用;对不上号,当场回出厂
   /** 读文件这笔账:读到什么/出什么错,记在哪个文件名下 */
   const [loadedAt, setLoadedAt] = useState<{
     file: string

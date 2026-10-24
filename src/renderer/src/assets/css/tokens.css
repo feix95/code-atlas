@@ -6,7 +6,7 @@
 :root {
   /* 亮暗由外观系统往 <html> 挂 data-theme 控制(自动模式跟着系统,也能手动钉死) */
   color-scheme: light;
-  /* ── 布局 token ── */
+  /* 布局 token  */
   --space-1: 0.25rem; /* 4px @ 16px 根字号;间距栅格只走这一套,不另起 px 档 */
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -37,7 +37,7 @@
   --font-display: 1.625rem;
   --font-title: 1.75rem;
   --font-hero: clamp(1.75rem, 3vw, 2.5rem);
-  /* ── UI v3 比例布局(规格:docs/archive/UI重构-v3-比例布局)──
+  /* UI v3 比例布局(规格:docs/archive/UI重构-v3-比例布局)
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
   --u: 2.5rem; /* chrome 比例基准;JS 侧同值在 shared/uiScale.ts CHROME_U_REM */
   /* 树行层级缩进/级(小葵实测:原 1.125rem 减半定稿) */
@@ -59,13 +59,13 @@
   --chrome-ink-strong: #141414; /* 激活页签标题 */
   --chrome-surface: #ffffff; /* 激活页签/内容面 */
   --chrome-muted: #8a8a8a; /* 占位灰字(搜索框/路径框 hint) */
-  /* ── 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有登记才叫正经档 ── */
+  /* 字重五档:650 是自造半粗(介于 semi 与 bold 之间),有登记才叫正经档  */
   --font-w-regular: 400;
   --font-w-medium: 500;
   --font-w-semi: 600;
   --font-w-strong: 650;
   --font-w-bold: 700;
-  /* ── 行高梯度 ── */
+  /* 行高梯度  */
   --lh-100: 1;
   --lh-125: 1.25;
   --lh-130: 1.3;
@@ -78,15 +78,15 @@
   --lh-190: 1.9;
   --content-max: 70rem;
   --control-height: 2.5rem;
-  /* ── 动效(Obsidian 节奏):70/150/300ms 三档 + 快进慢落的 smooth 曲线 ── */
+  /* 动效(Obsidian 节奏):70/150/300ms 三档 + 快进慢落的 smooth 曲线  */
   --dur-1: 0.07s;
   --dur-2: 0.15s;
   --dur-3: 0.3s;
   --dur-spin: 0.6s; /* 刷新钮转一圈;与 useRefreshFeedback 的 MIN_SPIN_MS 同值 */
   --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 回弹感:过冲后归位 */
-  /* ── 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /
-     通用浮层 30 / 下拉菜单 40 / 设置页 50 / 复活提示 90 / 文件菜单 95 ── */
+  /* 层级表(谁压谁只认这本账,从小到大排):局部件 1-6 / 轻提示 10 / 代码浮件 28-29 /
+     通用浮层 30 / 下拉菜单 40 / 设置页 50 / 复活提示 90 / 文件菜单 95  */
   --z-raise: 1;
   --z-jump: 2;
   --z-float: 5;
@@ -99,7 +99,7 @@
   --z-revive: 90;
   --z-menu: 95;
   --z-tip: 100;
-  /* ── 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调 ── */
+  /* 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调  */
   --focus-ring: 0 0 0 0.1875rem;
   /* 阴影阶(产品定:全仓投影唯一出处,升档 = 浮得越高):
      sm = 贴地小件(开关钮/选中段/卡片架);tip = 悬停气泡(小面积高浓度);
@@ -112,7 +112,7 @@
   --shadow-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --shadow-inset-line: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   --edge-accent: inset 2px 0 0 var(--accent-bright);
-  /* ── 遮罩两档:普通弹层 / 要压住底下内容的深罩 ── */
+  /* 遮罩两档:普通弹层 / 要压住底下内容的深罩  */
   --scrim: rgba(0, 0, 0, 0.36);
   --scrim-deep: rgba(0, 0, 0, 0.45);
   /* 拖拽落点记号统一的一抹(页签缝蓝线 + 正文分屏虚线):sash 拖条同款蓝、30% 透明 */
@@ -123,7 +123,7 @@
   /* 悬停多久才亮提示(TooltipHost 读这个):全场统一 1s,稳悬停才亮,数值只在这儿登记;
      个别元素确需不同延迟,在它自己的 CSS 里局部改写本变量(别写死数值) */
   --tip-delay: 1s;
-  /* ── 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色 ── */
+  /* 窗控圆点(mac 三灯):平时统一中性灰,悬停才露本色  */
   --traffic-dot: #d1d3d4;
   --traffic-ink: #5c6165;
   --traffic-chip: #c5c9c8;
@@ -141,7 +141,7 @@
   --mono: 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, Menlo, var(--cjk), monospace;
   /* 正文非等宽字栈(live 档排版对齐阅读档用):与 body 同一份,别两处各写各的 */
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', var(--cjk), sans-serif;
-  /* ── 色板(浅色,Obsidian 无色阶)──
+  /* 色板(浅色,Obsidian 无色阶)
      灰阶真值登记在 shared/appearancePalette.ts(NEUTRAL_PALETTE.light):
      外观系统 achro 回落和石墨种子色都查那本 —— 这边是同款写真的首帧兜底,两边必须一致 */
   --window: #f6f6f6;
@@ -165,7 +165,7 @@
   /* accent 的亮档:当字色/细线用(实心块上另有 accent-ink),浅色下即纯黑 */
   --accent-bright: #000000;
   --accent-hover: #000000;
-  /* 实心主题色件上的字色:第七十九批起由 appearance 按派生主题色的对比度自动翻深浅,
+  /* 实心主题色件上的字色:由 appearance 按派生主题色的对比度自动翻深浅,
      亮色默认白字;样式表默认值只伺候「原装预设不写内联」的路 */
   --accent-ink: #ffffff;
   --accent-soft: rgba(0, 0, 0, 0.06);
@@ -186,7 +186,7 @@
   --hover: rgba(0, 0, 0, 0.05);
   --selected-bg: rgba(0, 0, 0, 0.08);
   --shadow-pop: 0 0.5rem 1.125rem rgba(0, 0, 0, 0.18);
-  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题 ── */
+  /* 预览分色(2026-09-14):色号照抄 VS Code 官方 Light+ 主题  */
   --tok-ctl: #af00db;
   --tok-kw: #0000ff;
   --tok-str: #a31515;
@@ -252,7 +252,7 @@
   --chrome-ink-strong: #f0f0f0;
   --chrome-surface: #1c1c1c;
   --chrome-muted: #9a9a9a;
-  /* ── 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题 ── */
+  /* 预览分色(2026-09-14):色号照抄 VS Code 官方 Dark+ 主题  */
   --tok-ctl: #c586c0;
   --tok-kw: #569cd6;
   --tok-str: #ce9178;
@@ -271,7 +271,7 @@
   box-sizing: border-box;
 }
 
-/* 界面缩放约定(第四十七批起):缩放 = 改根字号(html 的 font-size = 16px × 系数),
+/* 界面缩放约定:缩放 = 改根字号(html 的 font-size = 16px × 系数),
    布局/字号/图标全挂 rem 跟着变,点击坐标和视觉永远 1:1 —— 不再借用浏览器缩放坐标系。
    两类例外保持物理像素:①<3px 的发丝线和微位移,放大只会发糊;②窗壳的圆角和描边是「窗」的装饰 */
 html,
@@ -307,10 +307,10 @@ body {
   background: var(--canvas-tint);
 }
 
-/* ── 全局轻提示(TooltipHost,全场唯一登记):黑底白字圆角小尾巴。
+/* 全局轻提示(TooltipHost,全场唯一登记):黑底白字圆角小尾巴。
    absolute 锚 .app(透明窗合成器裁根层 fixed 件,浮层必须落 .app 里);
    .app 的 overflow:hidden 顺手把气泡收进窗框圆角;pointer-events 永不吃鼠标;
-   data-side 由 JS 写,小尾巴转 45° 方块贴在朝目标那一侧 --arrow 位上 ── */
+   data-side 由 JS 写,小尾巴转 45° 方块贴在朝目标那一侧 --arrow 位上  */
 .tip-bubble {
   position: absolute;
   z-index: var(--z-tip);

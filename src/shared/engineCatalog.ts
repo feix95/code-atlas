@@ -1,4 +1,4 @@
-// 引擎目录(第 4 期):钉死的发行版登记 —— 每个后端有哪几个包、多大、
+// 引擎目录:钉死的发行版登记 —— 每个后端有哪几个包、多大、
 // sha256 指纹是什么。数字与 ggml-org/llama.cpp 的 release API 交叉核对过,
 // 升版只改这一份目录;纯数据 + 纯函数,不碰文件/网络。
 export const ENGINE_TAG = 'b11685'
@@ -104,7 +104,7 @@ export function sanitizeBackendChoice(raw: unknown): EngineBackendChoice {
   return raw === 'cuda' || raw === 'vulkan' || raw === 'cpu' || raw === 'auto' ? raw : 'auto'
 }
 
-// ── IPC 报单形状(引擎状态/安装进度;main 组装、preload/renderer 共用类型)──
+// IPC 报单形状(引擎状态/安装进度;main 组装、preload/renderer 共用类型)
 
 export type EngineInstallStage = 'download' | 'verify' | 'extract' | 'check' | 'done'
 

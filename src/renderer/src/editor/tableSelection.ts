@@ -71,7 +71,7 @@ class TableSelection {
     return this.anchor && this.head ? normalizeRange(this.anchor, this.head) : null
   }
 
-  // ── 画框 ──
+  // 画框
 
   private paint(): void {
     const r = this.range
@@ -117,7 +117,7 @@ class TableSelection {
     this.paint()
   }
 
-  // ── 鼠标 ──
+  // 鼠标
 
   private readonly onBoxDown = (e: MouseEvent): void => {
     const pos = cellPosOfTarget(this.box, e.target)
@@ -164,7 +164,7 @@ class TableSelection {
     if (this.anchor) e.preventDefault()
   }
 
-  // ── 键盘与剪贴板(只收外框自己的事件;格内按键归格子) ──
+  // 键盘与剪贴板(只收外框自己的事件;格内按键归格子)
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     const r = this.range

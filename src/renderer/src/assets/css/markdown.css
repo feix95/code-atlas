@@ -1,4 +1,4 @@
-/* ── 阅读档疏密登记:排版间距变量集中在这,微调改一处,不散落硬编码 ── */
+/* 阅读档疏密登记:排版间距变量集中在这,微调改一处,不散落硬编码  */
 :root {
   --md-reading-lh: 1.75; /* 正文行高(中文长文舒适档 1.7–1.8) */
   --md-li-gap: 0.4em; /* 列表条目之间的缝 */
@@ -9,7 +9,7 @@
   --md-cell-pad-y: 0.5em; /* 表格单元格上下内边距 */
 }
 
-/* ── 迷你 Markdown(第一百零七批):AI 爱用标题/加粗/列表说话,这里给真排版 ── */
+/* 迷你 Markdown:AI 爱用标题/加粗/列表说话,这里给真排版  */
 .md {
   white-space: normal;
   line-height: var(--lh-170);
@@ -148,7 +148,7 @@
   color: var(--muted);
 }
 
-/* ── 阅读模式批次补齐:表格 / 待办 / callout / 高亮 / 内联标题 ── */
+/* 表格 / 待办 / callout / 高亮 / 内联标题  */
 
 /* 管道表格(GFM):栏宽吃满可读列,塞不下时表内横滚,绝不撑爆栏 */
 .md-table-wrap {
@@ -197,7 +197,7 @@
   font-weight: var(--font-w-semi);
 }
 
-/* ── 阅读档疏密排版(数值登记在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动) ── */
+/* 阅读档疏密排版(数值登记在本文件顶部 :root;只锁 .code-reading,聊天里的 .md 不动)  */
 
 .code-reading .md {
   line-height: var(--md-reading-lh);
@@ -309,7 +309,7 @@
   line-height: 1.111;
 }
 
-/* 内联标题可改名(内联标题改名批次):能改的标题悬停给文本光标;
+/* 内联标题可改名:能改的标题悬停给文本光标;
    输入框吃标题同一身皮,Obsidian 同款素脸——无边线无底纹,只多一个光标 */
 .md-title[role='button'] {
   cursor: text;

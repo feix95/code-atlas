@@ -1,11 +1,11 @@
-// ── 第九十九批:开发者命名词根词典 ──
+// 开发者命名词根词典
 // 程序员的命名翻来覆去就两三百个词(scanner/parser/router……),名字本身就是文件最大的信息量。
 // 这里把名字拆成单词逐个查表,拼回一句中文:GitFileStatus → git文件状态,scanner → 扫描器。
 // 纯查表、零成本、离线;认不出的词不硬翻 —— 查不出任何词就如实退回原来的兜底链。
 
 /** 词根表:小写词 → 中文(缩写词映射回原样,留在合成词里当身份) */
 export const WORD_BOOK: Record<string, string> = {
-  // ── 角色/职责 ──
+  // 角色/职责
   scanner: '扫描器',
   scan: '扫描',
   parser: '解析器',
@@ -79,7 +79,7 @@ export const WORD_BOOK: Record<string, string> = {
   inspector: '检查器',
   predictor: '预测器',
   recommender: '推荐器',
-  // ── 结构/位置 ──
+  // 结构/位置
   core: '核心',
   common: '公共',
   shared: '共享',
@@ -123,7 +123,7 @@ export const WORD_BOOK: Record<string, string> = {
   preference: '偏好',
   options: '选项',
   env: '环境',
-  // ── 界面 ──
+  // 界面
   view: '视图',
   page: '页面',
   screen: '屏幕',
@@ -178,7 +178,7 @@ export const WORD_BOOK: Record<string, string> = {
   caret: '光标',
   spinner: '加载圈',
   progress: '进度',
-  // ── 数据/网络 ──
+  // 数据/网络
   file: '文件',
   folder: '文件夹',
   directory: '目录',
@@ -240,7 +240,7 @@ export const WORD_BOOK: Record<string, string> = {
   sample: '样例',
   template: '模板',
   snapshot: '快照',
-  // ── 行为/状态 ──
+  // 行为/状态
   error: '错误',
   exception: '异常',
   debug: '调试',
@@ -289,7 +289,7 @@ export const WORD_BOOK: Record<string, string> = {
   reload: '重载',
   jump: '跳转',
   navigate: '导航',
-  // ── 缩写词:原样保留,在合成词里当身份 ──
+  // 缩写词:原样保留,在合成词里当身份
   ai: 'AI',
   ui: '界面',
   cli: '命令行',

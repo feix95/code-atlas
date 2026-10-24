@@ -126,7 +126,7 @@ export async function loadAiConfig(userDataDir: string): Promise<AiConfig> {
         typeof parsed.contextSize === 'number' && parsed.contextSize >= CONTEXT_SIZE_MIN
           ? parsed.contextSize
           : undefined,
-      // 说话方式(第一百一十三批):老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
+      // 说话方式:老配置没这字段 = 全默认,拼出来是空串,提示词逐字不变
       personalization: sanitizePersonalization(parsed.personalization)
     }
   } catch {
@@ -197,7 +197,7 @@ export function resolveAiTarget(
     }
     return {
       ok: true,
-      // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子(第八十四批)
+      // 内置引擎是自己家的 llama-server,认 timings_per_token / stream_options 旗子
       target: {
         baseUrl: builtinRuntime.baseUrl,
         model: builtinRuntime.model,

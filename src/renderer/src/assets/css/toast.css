@@ -1,4 +1,4 @@
-/* ── 通用轻提示 Toast + 顶栏刷新钮转圈 ──
+/* 通用轻提示 Toast + 顶栏刷新钮转圈 
    Toast 与 .tip-bubble 同款黑底白字,落 .app 内(透明窗合成器裁根层 fixed 件);
    区域本身不吃鼠标。入场只淡入上浮,reduced-motion 下直接出现 */
 

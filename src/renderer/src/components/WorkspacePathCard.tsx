@@ -39,8 +39,8 @@ export function WorkspacePathCard({
   onRemoveRecent: (path: string) => void
   onGoHome: () => void
 }): React.JSX.Element {
-  // ── 地址栏手感:点卡任意处 = 聚焦输入框 + 弹出菜单;⇅ 钮开/收;
-  //    Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
+  // 地址栏手感:点卡任意处 = 聚焦输入框 + 弹出菜单;⇅ 钮开/收;
+  // Esc / 点外 / 选中条目 = 收(useMenuDismiss 管外面,键盘管里面)
   const [menuOpen, setMenuOpen] = useState(false)
   // 键盘高亮行号:-1 = 还没动过方向键,Enter 还按「输入的路径」走;按下箭头才开始挑条目
   const [menuHi, setMenuHi] = useState(-1)

@@ -96,7 +96,7 @@ export const nodeGetTransport: LookupGetTransport = async (url, headers) => {
   return res.text()
 }
 
-// ── Tavily 源(2026-09-17 产品裁定接进队首):官方 API,免费档每月 1000 次,Key 用户自备 ──
+// Tavily 源(2026-09-17 产品裁定接进队首):官方 API,免费档每月 1000 次,Key 用户自备
 
 /** Tavily 搜索的官方入口(写死,不跟别的源混) */
 export const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
@@ -160,7 +160,7 @@ async function searchTavilyHits(
   return parseTavilyResults(raw)
 }
 
-// ── Key 体检(2026-09-17 产品裁定):设置里点「测一下」,真打一次官方接口验货 ──
+// Key 体检(2026-09-17 产品裁定):设置里点「测一下」,真打一次官方接口验货
 // 2026-09-17 二次改造(小葵提议):从实搜一次改打 /usage —— 零搜索额度成本,
 // 200 本身就证明 Key 有效,还白送本月用量;真搜索通不通,平时聊天调 web_search 立见分晓。
 

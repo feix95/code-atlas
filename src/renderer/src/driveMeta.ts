@@ -8,7 +8,7 @@ export function driveCapacity(d: DriveInfo): string {
   return d.free !== undefined ? `剩 ${gb(d.free)} / 共 ${gb(d.total)}` : '就绪'
 }
 
-/** 盘的来路人话(第八十一批):固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到照旧叫本地磁盘 */
+/** 盘的来路人话:固定硬盘 / U 盘或移动硬盘 / 网络盘 / 光驱;问不到照旧叫本地磁盘 */
 export function driveKindName(d: DriveInfo): string {
   if (d.kind === 'removable') return 'U 盘或移动硬盘'
   if (d.kind === 'network') return '网络盘'

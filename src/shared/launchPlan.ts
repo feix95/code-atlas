@@ -1,5 +1,5 @@
 /**
- * 智能启动方案(模型启动规划批次):给定机器规格 + 模型登记,算出 llama-server 的启动参数。
+ * 智能启动方案:给定机器规格 + 模型登记,算出 llama-server 的启动参数。
  * 规矩来自真机实测(RTX 5060 Ti 16GB + Gemma-4-26B MoE):
  *   - 显卡摆层一律交给引擎内置的 --fit 自动安排;硬塞 -ngl 999 会关掉自动摆层,
  *     Vulkan 后端在分配视觉投影仪缓冲时当场 OOM 崩掉(ErrorOutOfDeviceMemory)。

@@ -164,7 +164,7 @@ export function SettingsModel({
                   </button>
                 </div>
               </CfgRow>
-              {/* 智能启动批次:这台机器会怎么跑当前模型,摊成一张卡;
+              {/* 这台机器会怎么跑当前模型,摊成一张卡;
                   「高级设置」里逐项手动指定,按模型文件各自记账(没选模型给提示) */}
               <LaunchPlanCard
                 modelPath={modelPath}
@@ -172,7 +172,7 @@ export function SettingsModel({
                 config={config}
                 onConfigChange={onConfigChange}
               />
-              {/* 引擎后端管理(第 4 期):推荐 + 一键安装 + 手动选择 */}
+              {/* 引擎后端管理:推荐 + 一键安装 + 手动选择 */}
               <EngineBackendPanel config={config} onConfigChange={onConfigChange} />
               <div className="cfg-divider" />
               <CfgRow label="模型货架" hint="热门模型榜单；按机器规模筛选，可直接下载。">
@@ -201,7 +201,7 @@ export function SettingsModel({
                     placeholder="留空自动探测"
                     aria-label="上下文窗口"
                     onChange={(e) => {
-                      // 第八十九批:打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
+                      // 打字时只挡非数字,大小不拦 —— 夹紧挪到失焦/保存那一刻
                       setContextRaw(e.target.value.replace(/[^0-9]/g, ''))
                     }}
                     onBlur={onContextBlur}

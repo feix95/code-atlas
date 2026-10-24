@@ -16,7 +16,7 @@ function resetBusyText(prev: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * agent 流式的封板令(第一百五十一批):本轮说出口的话是正经输出(「我去翻翻 xx」),不能抹掉 ——
+ * agent 流式的封板令:本轮说出口的话是正经输出(「我去翻翻 xx」),不能抹掉 ——
  * 当前气泡封口完工保留,另起一个新气泡接下一轮的话和思考。
  * 新气泡沿用原 key(botKey),最终答案收尾才找得到它;封口气泡换新 key,别撞车。
  */
@@ -57,7 +57,7 @@ export function applyChatDelta(prev: ChatMessage[], payload: AiDeltaPayload): Ch
       kind: 'step'
     })
   }
-  // 命中清单卡(LLM 优化批次):search_content 的结构化命中走旁路直递,程序自己画卡
+  // 命中清单卡:search_content 的结构化命中走旁路直递,程序自己画卡
   // —— 一条不丢、行号一个不错,可点跳预览。和步骤灰字一样只给人看,不进对话历史
   if (payload.matches) {
     return insertBeforeBusy(prev, {

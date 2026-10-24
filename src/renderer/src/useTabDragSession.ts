@@ -256,7 +256,7 @@ export function useTabDragSession(deps: {
         return
       }
 
-      // ── 跨窗:按屏幕坐标找目标窗,再换算成目标窗局部坐标套同一套判定 ──
+      // 跨窗:按屏幕坐标找目标窗,再换算成目标窗局部坐标套同一套判定
       setGap(null)
       setDropMark(null)
       const probe = probeCrossZone({

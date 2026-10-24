@@ -1,4 +1,4 @@
-// 翻文件模式(agent)的纯逻辑库房(第一百二十八批)。
+// 翻文件模式(agent)的纯逻辑库房。
 // 这里只放「算得出来」的东西:工具表、路径安检、读文件额度、防循环护栏、
 // 单轮请求的收发。真正动手翻文件系统的那只手在主进程(main/index.ts 的
 // agentListFiles / agentReadFile),那边有 fs;这边一个 node:fs 都不碰,
@@ -28,7 +28,7 @@ import type {
   AgentStreamEvent
 } from './agentTypes.ts'
 
-// ── 老登记转手(实现在各专属模块,保住 import 路径)──
+// 老登记转手(实现在各专属模块,保住 import 路径)
 export {
   AGENT_READ_LIMIT_MAX,
   AGENT_CHARS_PER_TOKEN,
@@ -100,7 +100,7 @@ export const AGENT_FILE_MAX_BYTES = 5 * 1024 * 1024
 /**
  * 单次读文件的字数额度,按上下文窗口缩放:上下文小则少读点,上下文大则放宽到 12000 字。
  * 16384 token 上下文 → 5461 字;8192 → 2731(下限保护前);4096 → 2000(达下限);32768 往上 → 12000(封顶)。
- * 第一百三十七批放宽了一档(原 8000/除四):上下文将满有自动压缩接着(同一批次),
+ * 放宽了一档(原 8000/除四):上下文将满有自动压缩接着(同一批次),
  * 读可以大胆些 —— 一次读全,好过读半截再花一轮补读。
  */
 export function agentReadChars(contextTokens: number): number {
@@ -108,7 +108,7 @@ export function agentReadChars(contextTokens: number): number {
 }
 
 // 翻文件守则(旧 AGENT_ADDENDUM)已迁移:逐字稿在 prompts.ts 的 AGENT_FILES_ADDENDUM,
-// 主进程往人设上贴/拆都改引那边(提示词体系重写第二批)
+// 主进程往人设上贴/拆都改引那边
 
 /**
  * 上网守则:「联网查证」开着才垫在人设后面(主进程按开关拼),
@@ -142,7 +142,7 @@ export function mergeUsage(a: AiUsage | undefined, b: AiUsage | undefined): AiUs
 }
 
 /**
- * 看报错像不像「这个引擎/模型不认工具调用」(纯函数,自测覆盖,第一百四十批)。
+ * 看报错像不像「这个引擎/模型不认工具调用」(纯函数,自测覆盖)。
  * 只看 400/404/422 这几档「请求本身被拒」的错,再瞄一眼报错正文里有没有
  * tool/function 字样 —— 500 这类服务端自己呛到的、跟工具无关的错不冒领。
  * 误判的最坏结果也只是这轮按普通对话回答,不会卡死谁。
@@ -156,11 +156,11 @@ export function looksLikeToolsUnsupported(status: number, detail: string): boole
 // 和普通聊天同一口径(大提示词预处理可能整段静默;首帧之后由 sseEvents 自己的看门狗接管)
 
 /**
- * agent 的单轮请求(流式,第一百三十四批):带上工具表问模型,边收边拼边推。
+ * agent 的单轮请求(流式):带上工具表问模型,边收边拼边推。
  * 思考和正文逐帧走 onDelta 推给界面(左下角的 token 账同帧捎走),等答案不再是黑洞;
  * 工具调用的参数碎片按 index 现场拼(assembleToolCalls)。
  * useTools = false 时(轮数烧完的逼卷轮)不带工具表,模型只能交答案。
- * 中间轮次吐过的正经话不抹掉(第一百五十一批,产品定的):发 seal 令让界面把当前气泡
+ * 中间轮次吐过的正经话不抹掉(产品定的):发 seal 令让界面把当前气泡
  * 封口、另起新气泡接下一轮;只有打转废话和思考标签掺字这类脏稿才发 reset 收回。
  */
 export async function agentRound(
@@ -186,7 +186,7 @@ export async function agentRound(
         model: config.model,
         messages,
         temperature: CHAT_TEMPERATURE,
-        // 反重复采样(第一百四十三批):复读机防线的引擎侧闸门,只对内置引擎发 ——
+        // 反重复采样:复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),
         max_tokens: opts.maxTokens,
@@ -223,7 +223,7 @@ export async function agentRound(
     let lastStats: AiStreamStats | undefined
     // 正文一旦开始吐,任何兜底都只许封口/截尾巴,不许整段收回(2026-10-24 产品定)
     let bodyStarted = false
-    // 复读机监工(第一百四十三批):尾巴连着 4 遍同一短语就当场掐流。
+    // 复读机监工:尾巴连着 4 遍同一短语就当场掐流。
     // 没吐过正文时收回重答;吐过正文时只截打转尾巴,正文原样留着
     let looped = false
     for await (const ev of sseEvents(res, controller.signal)) {

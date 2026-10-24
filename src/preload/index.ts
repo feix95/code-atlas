@@ -39,7 +39,7 @@ import type {
   DevLogEntry
 } from '../shared/types.ts'
 
-// 界面缩放(第四十七批起换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
+// 界面缩放(换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
 // 会把整个渲染坐标系缩一顿,无边框自绘窗的「鼠标判定」和「视觉框」就对不上:
 // 设置面板 × 视觉上正对着却点不中、拖边热区跑出窗框、设置页比窗还大,三个连环 bug 同这个根。
 // 现在改成改根字号:html 的 font-size = 16px × 系数,布局/字号/图标全挂 rem 跟着变,
@@ -64,7 +64,7 @@ applyRootFont(readUiScale())
 
 // 首帧信号:连跑两个动画帧 = 合成器真的画出了画面,主进程收到才敢露窗。
 // 这是露窗链的主保险 —— 无边框模式下 ready-to-show 在部分高缩放屏上永不触发
-// (第三十六批补实测),不能指望它;主进程另备 3 秒看门狗兜底,窗口绝不永久隐身
+// ,不能指望它;主进程另备 3 秒看门狗兜底,窗口绝不永久隐身
 requestAnimationFrame(() => {
   requestAnimationFrame(() => ipcRenderer.send(CH.firstFrame))
 })
@@ -154,7 +154,7 @@ const atlasApi = {
   },
   depGraph: (rootPath: string): Promise<DepGraphResult> =>
     ipcRenderer.invoke(CH.depGraph, rootPath),
-  // ── 文件编辑与监视(预览编辑批次) ──
+  // 文件编辑与监视
   /** 把文本写进项目内文件;返回写后 mtime,给文件监视器对自激账 */
   saveFile: (rootPath: string, relPath: string, text: string): Promise<{ mtimeMs: number }> =>
     ipcRenderer.invoke(CH.saveFile, rootPath, relPath, text),
@@ -201,10 +201,10 @@ const atlasApi = {
   aiPickFile: (): Promise<string | null> => ipcRenderer.invoke(CH.aiPickFile),
   /** 自由对话:独立通道,资料当附件、联网状态程序记账,与文件解释互不掺和 */
   aiChat: (req: AiChatRequest): Promise<AiChatResult> => ipcRenderer.invoke(CH.aiChat, req),
-  /** /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
+  /** /compact 手动压缩:把目前为止的对话提炼成摘要,流式增量走 atlas:ai-delta */
   aiCompact: (req: AiCompactRequest): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiCompact, req),
-  /** 试一句(第一百一十三批):拿「还没保存的草稿」念一段,当场听说话方式的效果 */
+  /** 试一句:拿「还没保存的草稿」念一段,当场听说话方式的效果 */
   aiStyleSample: (personalization: unknown, requestId?: string): Promise<AiExplainResult> =>
     ipcRenderer.invoke(CH.aiStyleSample, personalization, requestId),
   /** 订阅自由对话的联网状态播报(查询中/查到/没查到);返回退订函数 */
@@ -238,7 +238,7 @@ const atlasApi = {
     ipcRenderer.on(CH.aiDelta, listener)
     return () => ipcRenderer.removeListener(CH.aiDelta, listener)
   },
-  // ── 模型状态栏(第七十批):查一次现状 + 订阅后续变化 + 取消热身/卸下模型 ──
+  // 模型状态栏:查一次现状 + 订阅后续变化 + 取消热身/卸下模型
   modelStatusGet: (): Promise<ModelStatus> => ipcRenderer.invoke(CH.modelStatusGet),
   modelEject: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke(CH.modelEject),
   /** 主动装载内置模型(叫醒引擎热身);外接模型的装载归 LM Studio 管 */
@@ -265,17 +265,17 @@ const atlasApi = {
     ipcRenderer.on(CH.modelStatus, listener)
     return () => ipcRenderer.removeListener(CH.modelStatus, listener)
   },
-  /** 适配估算(第七十三批):模型块头 vs 机器尺寸,选模型那一刻就给结论 */
+  /** 适配估算:模型块头 vs 机器尺寸,选模型那一刻就给结论 */
   modelFitCheck: (modelPath: string): Promise<ModelFitVerdict> =>
     ipcRenderer.invoke(CH.modelFitCheck, modelPath),
   /** 模型档案(上下文档位的状态表):出厂上限 + 层数头数 + 机器规格,一次端齐;翻不到回 null */
   modelContextInfo: (modelPath: string): Promise<ModelContextInfo | null> =>
     ipcRenderer.invoke(CH.modelContextInfo, modelPath),
-  /** 本机运行方案(智能启动批次):机器规格 + 当前内置模型的启动计划,只读不算命;
+  /** 本机运行方案:机器规格 + 当前内置模型的启动计划,只读不算命;
       draft 传了按草稿预览(不动存档) */
   aiLaunchPlan: (draft?: ModelLaunchSettings | null): Promise<LaunchPlanInfo | null> =>
     ipcRenderer.invoke(CH.aiLaunchPlan, draft),
-  // ── 引擎后端管理(第 4 期)──
+  // 引擎后端管理
   engineState: (): Promise<EngineStateInfo | null> => ipcRenderer.invoke(CH.engineState),
   engineInstall: (backend: EngineBackend): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke(CH.engineInstall, backend),
@@ -303,15 +303,15 @@ const atlasApi = {
   frameHeartbeat: (): void => {
     ipcRenderer.send(CH.frameHeartbeat)
   },
-  // ── 独立子窗(页签独立窗口):子窗 document 是 about:blank 白窗没有 preload,
+  // 独立子窗(页签独立窗口):子窗 document 是 about:blank 白窗没有 preload,
   // 窗口操作由主窗渲染层代发 —— 渲染进子窗的 Portal 组件跑的还是主 realm,
-  // 按钮回调里拿到的 window.atlas 就是这桥。主进程按 frameName 认窗 ──
+  // 按钮回调里拿到的 window.atlas 就是这桥。主进程按 frameName 认窗
   auxWindowOp: (frameName: string, op: AuxWindowOp): void => {
     ipcRenderer.send(CH.auxWindowOp, { frameName, op })
   },
   /** 跨窗拖页签:取主窗 + 各子窗的内容区矩形(DIP),拖拽开始时问一次 */
   auxWindowRects: (): Promise<AuxWindowRect[]> => ipcRenderer.invoke(CH.auxWindowRects),
-  // ── Developer 日志(第八十七批):拉旧账 / 清账 / 开窗 / 订阅新账 ──
+  // Developer 日志:拉旧账 / 清账 / 开窗 / 订阅新账
   devLogsPull: (): Promise<DevLogEntry[]> => ipcRenderer.invoke(CH.devLogPull),
   devLogsClear: (): Promise<void> => ipcRenderer.invoke(CH.devLogClear),
   devLogsOpen: (): Promise<void> => ipcRenderer.invoke(CH.devLogOpen),

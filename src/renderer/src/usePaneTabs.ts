@@ -46,7 +46,7 @@ export function usePaneTabs(deps: {
   // 刚被点名的页签(比如挂了引用要指给用户看探针签在哪):轻强调一下,不弹窗不出声
   const [flashTabId, flashTab, dismissTabFlash] = useFlashValue<string | null>(null)
 
-  // 自由对话的公用场(第一百二十四批的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
+  // 自由对话的公用场(的老规矩原样保留):全 app 一份,挂在 App 顶层 ——
   // 换文件、换文件夹、切页签,聊天记录都活着
   // 激活组 = 用户最后点的那组:新签开在这组,另一组不被打扰
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null
@@ -124,7 +124,7 @@ export function usePaneTabs(deps: {
     })
   }
 
-  // ── 页签层(小葵的页签模型·文件签版:文件签 + 单例签 + 左右分组) ──
+  // 页签层(小葵的页签模型·文件签版:文件签 + 单例签 + 左右分组)
 
   // 只改某一组的账,别的组一个手指都不碰
   function patchGroup(groupId: string, patch: (g: PaneGroup) => PaneGroup): void {
@@ -259,7 +259,7 @@ export function usePaneTabs(deps: {
     revealTab(t)
   }
 
-  // 文件改名(内联标题改名批次):开着的文件签就地换登记 —— relPath/名牌换新的,
+  // 文件改名:开着的文件签就地换登记 —— relPath/名牌换新的,
   // 档位/组位一概不动;登记认 (relPath, scopeRoot) 两件,与开签对账同口径
   function renameFileTab(
     scopeRoot: string | undefined,

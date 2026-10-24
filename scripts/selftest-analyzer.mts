@@ -209,7 +209,7 @@ function assertContains(list: string[], expected: string[], label: string): void
 }
 
 async function main(): Promise<void> {
-  // ── 一、TypeScript ──
+  // 一、TypeScript 
   const ts = await analyzeSource(TS_SOURCE, 'typescript')
   assert.ok(ts, 'TypeScript 应可分析')
   assertContains(ts!.imports, ['react', 'node:path', 'fs'], 'TS imports')
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
   assertContains(ts!.exports, ['startTimer', 'TimerStore', 'helper'], 'TS exports')
   assert.ok(ts!.reactComponents.length === 0, '纯 TS 无 React 组件')
 
-  // ── 二、TypeScript React:组件识别 ──
+  // 二、TypeScript React:组件识别 
   const tsx = await analyzeSource(TSX_SOURCE, 'typescript-react')
   assert.ok(tsx, 'TSX 应可分析')
   assertContains(
@@ -230,14 +230,14 @@ async function main(): Promise<void> {
   assert.ok(!tsx!.reactComponents.includes('notAComponent'), '小写箭头函数不算组件')
   assertContains(tsx!.imports, ['react'], 'TSX imports')
 
-  // ── 三、Python ──
+  // 三、Python 
   const py = await analyzeSource(PY_SOURCE, 'python')
   assert.ok(py, 'Python 应可分析')
   assertContains(py!.imports, ['os', 'pathlib'], 'Py imports')
   assertContains(py!.functions, ['start', 'pause_timer', '_internal'], 'Py functions(含方法)')
   assertContains(py!.classes, ['Timer'], 'Py classes')
 
-  // ── 四、Java ──
+  // 四、Java 
   const java = await analyzeSource(JAVA_SOURCE, 'java')
   assert.ok(java, 'Java 应可分析')
   assertContains(java!.imports, ['java.util.List', 'java.io.File'], 'Java imports')
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
   assertContains(java!.classes, ['UserService', 'Color'], 'Java classes(含枚举)')
   assertContains(java!.interfaces, ['Repo'], 'Java interfaces')
 
-  // ── 五、Go ──
+  // 五、Go 
   const go = await analyzeSource(GO_SOURCE, 'go')
   assert.ok(go, 'Go 应可分析')
   assertContains(go!.imports, ['fmt', 'os', 'strings'], 'Go imports(带别名的取真实路径)')
@@ -253,21 +253,21 @@ async function main(): Promise<void> {
   assertContains(go!.classes, ['User'], 'Go struct 归类')
   assertContains(go!.interfaces, ['Repo'], 'Go interface 归接口')
 
-  // ── 六、C ──
+  // 六、C 
   const c = await analyzeSource(C_SOURCE, 'c')
   assert.ok(c, 'C 应可分析')
   assertContains(c!.imports, ['stdio.h', 'utils.h'], 'C #include')
   assertContains(c!.functions, ['add', 'print_point'], 'C functions')
   assertContains(c!.classes, ['Point'], 'C struct 归类')
 
-  // ── 七、C++ ──
+  // 七、C++ 
   const cpp = await analyzeSource(CPP_SOURCE, 'cpp')
   assert.ok(cpp, 'C++ 应可分析')
   assertContains(cpp!.imports, ['vector', 'player.h'], 'C++ #include')
   assertContains(cpp!.functions, ['run', 'main'], 'C++ functions(含类外定义 Player::run)')
   assertContains(cpp!.classes, ['Player', 'Config'], 'C++ class + struct')
 
-  // ── 八、C# ──
+  // 八、C# 
   const cs = await analyzeSource(CS_SOURCE, 'csharp')
   assert.ok(cs, 'C# 应可分析')
   assertContains(cs!.imports, ['System', 'System.Collections.Generic'], 'C# using')
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
   assertContains(cs!.classes, ['UserService'], 'C# classes')
   assertContains(cs!.interfaces, ['IRepo'], 'C# interfaces')
 
-  // ── 九、Rust ──
+  // 九、Rust 
   const rust = await analyzeSource(RUST_SOURCE, 'rust')
   assert.ok(rust, 'Rust 应可分析')
   assertContains(rust!.imports, ['std::collections::HashMap', 'crate::config::Config'], 'Rust use')
@@ -283,12 +283,12 @@ async function main(): Promise<void> {
   assertContains(rust!.classes, ['User'], 'Rust struct 归类')
   assertContains(rust!.interfaces, ['Repo'], 'Rust trait 归接口')
 
-  // ── 十、能力边界:没接入的语言诚实返回 null ──
+  // 十、能力边界:没接入的语言诚实返回 null 
   assert.equal(isAnalysisSupported('vue'), false, 'Vue 暂不支持')
   assert.equal(await analyzeSource('anything', 'vue'), null, '不支持的语言返回 null')
   assert.equal(await analyzeSource('anything', 'unknown'), null, '未知语言返回 null')
 
-  // ── 十一、坏代码不崩:解析器带 ERROR 节点也能提取出能提的 ──
+  // 十一、坏代码不崩:解析器带 ERROR 节点也能提取出能提的 
   const broken = await analyzeSource('function broken( { const x = ', 'typescript')
   assert.ok(broken, '语法残缺也应返回结构')
 

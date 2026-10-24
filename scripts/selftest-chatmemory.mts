@@ -47,7 +47,7 @@ const rounds = (...qa: Array<[string, string]>) =>
     { role: 'assistant', content: answer }
   ])
 
-// ── 症结一:翻文件多轮回答中,封板的叙述气泡不许顶替最终答案进历史 ──
+// 症结一:翻文件多轮回答中,封板的叙述气泡不许顶替最终答案进历史 
 {
   const history = collectHistoryRounds(
     [
@@ -77,7 +77,7 @@ const rounds = (...qa: Array<[string, string]>) =>
   assert.deepEqual(unfinished, [], '最终气泡出错的轮整轮扔')
 }
 
-// ── 症结二:长回答的结尾不许被截掉(用户追问「你刚才最后说的那个」) ──
+// 症结二:长回答的结尾不许被截掉(用户追问「你刚才最后说的那个」) 
 const REMARK = '顺便提一句:文档标题其实写的是「格式漂移」,和正文的 Format Drift 是同一个词。'
 const longAnswer = `${'前面是一大段讲解。'.repeat(120)}${REMARK}`
 {
@@ -110,13 +110,13 @@ const longAnswer = `${'前面是一大段讲解。'.repeat(120)}${REMARK}`
   )
 }
 
-// ── 分档:按来源,漏登记 typecheck 会红 ──
+// 分档:按来源,漏登记 typecheck 会红 
 assert.equal(tierOfProvider('builtin'), 'small')
 assert.equal(tierOfProvider('lmstudio'), 'small')
 assert.equal(tierOfProvider('cloud'), 'large')
 assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstudio'])
 
-// ── 大模型档:行为不变(历史、装配、会话记忆都不碰) ──
+// 大模型档:行为不变(历史、装配、会话记忆都不碰) 
 {
   const history = rounds(
     ['一', '答一'],
@@ -183,7 +183,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   )
 }
 
-// ── 会话加料:问+答对上记录的轮拿回完整工具往来;对不上的退回纯文字 ──
+// 会话加料:问+答对上记录的轮拿回完整工具往来;对不上的退回纯文字 
 {
   const history = rounds(['看看 a.ts', '它在做 A'], ['再看 b.ts', '它在做 B'])
   const planned = planSmallTierHistory({
@@ -216,7 +216,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.deepEqual(toPlainHistory(planned.messages), history, '摘掉工具往来后,问和最终答案一条不少')
 }
 
-// ── 装不下:先遮蔽旧工具原文 → 再丢最旧整轮 → 最近一轮退纯文字 ──
+// 装不下:先遮蔽旧工具原文 → 再丢最旧整轮 → 最近一轮退纯文字 
 {
   const history = rounds(['问 a', '答 a'], ['问 b', '答 b'], ['问 c', '答 c'])
   const records = [
@@ -259,7 +259,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.equal(droppedRoundsNotice(full), null, '没丢就不打扰用户')
 }
 
-// ── 记档与对账:翻文件交卷后记下,下一轮请求拿得回来 ──
+// 记档与对账:翻文件交卷后记下,下一轮请求拿得回来 
 {
   const body = { agent: true, conversationId: 'conv-1' }
   const firstPlan = planChatMemory({
@@ -305,7 +305,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   )
 }
 
-// ── 小件:洗数据、预算、摘工具、存档洗形 ──
+// 小件:洗数据、预算、摘工具、存档洗形 
 {
   assert.deepEqual(pairRounds('乱七八糟'), [])
   assert.deepEqual(
@@ -361,7 +361,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.equal(rec.question, '问')
 }
 
-// ── 会话库:会话数淘汰最久没用的、单会话只记最近几轮 ──
+// 会话库:会话数淘汰最久没用的、单会话只记最近几轮 
 {
   const store = createChatSessionStore({ sessionsMax: 2, turnsPerSessionMax: 2 })
   const turn = (n: number) => ({ question: `问${n}`, answer: `答${n}`, trace: [] })
@@ -386,7 +386,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   assert.equal(sanitizeConversationId('ok'), 'ok')
 }
 
-// ── 装配:带工具往来的历史不被合并,纯文字历史装配与旧行为一致 ──
+// 装配:带工具往来的历史不被合并,纯文字历史装配与旧行为一致 
 {
   const richHistory = [
     { role: 'user' as const, content: '看 a' },
@@ -419,7 +419,7 @@ assert.deepEqual(Object.keys(PROVIDER_TIER).sort(), ['builtin', 'cloud', 'lmstud
   )
 }
 
-// ── 附件登记表(附件追问):注记记账、洗形、拼条 —— 「你读完了吗/接着读完它」的据 ──
+// 附件登记表(附件追问):注记记账、洗形、拼条 —— 「你读完了吗/接着读完它」的据 
 {
   const store = createChatFileMemoStore({ sessionsMax: 2, filesMax: 2 })
   const note = (name: string, totalLines: number, shownEndLine: number, rootId?: string) => ({

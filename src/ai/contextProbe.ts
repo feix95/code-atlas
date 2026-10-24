@@ -1,4 +1,4 @@
-/* ── 模型上下文自适应(第六十九批):LM 那边最清楚自己脑子多大,问它;预算按比例算 ── */
+/* 模型上下文自适应:LM 那边最清楚自己脑子多大,问它;预算按比例算  */
 import type { AiProviderKind, ChatTarget } from '../shared/types.ts'
 import { parseLoadProgress } from './builtin.ts'
 import { CONTEXT_SIZE_MIN, DEFAULT_CONTEXT_SIZE, PROBE_LMSTUDIO_MS } from '../shared/aiDefaults.ts'

@@ -1,4 +1,4 @@
-// 引擎后端管理 IPC(第 4 期):状态报单、一键安装(进度推送)、取消、卸载。
+// 引擎后端管理 IPC:状态报单、一键安装(进度推送)、取消、卸载。
 // 只调度 engineLocator/engineInstaller;不碰启动逻辑(那在 builtin.ts)。
 import { BrowserWindow, ipcMain } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'

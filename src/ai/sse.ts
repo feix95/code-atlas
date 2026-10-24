@@ -6,13 +6,13 @@ interface ChatStreamChunk {
   choices?: Array<{
     delta?: { content?: string; reasoning_content?: string; tool_calls?: ToolCallDelta[] }
   }>
-  /** llama-server timings_per_token(第八十四批):已读提示词/已吐 token/吐字速度 */
+  /** llama-server timings_per_token:已读提示词/已吐 token/吐字速度 */
   timings?: { prompt_n?: number; predicted_n?: number; predicted_per_second?: number }
   /** OpenAI 习惯的收尾账(llama-server / LM Studio 都可能给) */
   usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
-/** 流式一帧里的工具调用碎片(第一百三十四批):参数按 index 分组、arguments 逐段拼 */
+/** 流式一帧里的工具调用碎片:参数按 index 分组、arguments 逐段拼 */
 export interface ToolCallDelta {
   index?: number
   id?: string
@@ -78,7 +78,7 @@ export class StreamIdleError extends Error {
  * 解析 OpenAI 流式(SSE)响应体,逐帧吐出「新增文本 + token 账」。
  * 格式:每行 `data: {json}`,`data: [DONE]` 收尾;残帧(半个 JSON)留到下一轮。
  * timings/usage 帧照常转发(llama-server 吐字帧里捎 timings,收尾捎 usage)。
- * 工具调用碎片照原样转发(agent 的流式循环自己按 index 拼,第一百三十四批)。
+ * 工具调用碎片照原样转发(agent 的流式循环自己按 index 拼)。
  */
 export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGenerator<SseEvent> {
   const reader = res.body?.getReader()
@@ -86,7 +86,7 @@ export async function* sseEvents(res: Response, signal?: AbortSignal): AsyncGene
   const decoder = new TextDecoder()
   let buffer = ''
   let writing = false
-  // 用户取消的铃:abort 掐不掐得进读队列看引擎心情,铃是保底(第八十五批)
+  // 用户取消的铃:abort 掐不掐得进读队列看引擎心情,铃是保底
   const abortBell = new Promise<'abort'>((resolve) => {
     if (!signal) return
     if (signal.aborted) resolve('abort')

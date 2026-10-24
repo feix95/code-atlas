@@ -1,8 +1,8 @@
 // 全树速览:文件夹一扫完,给树里每个节点配一句大白话标签。
-// 词条三档规矩(第九十二批,按外部 AI 会诊定稿的《词条撰写执行规则》执行):
-//   档位1  类型标签+文件名已说清 → 不写字(留空);只有非常用后缀给 2~4 字范畴词(如 .md → 文档)
-//   档位2  身份唯一、无风险     → 只说"是什么",≤14 字,禁人物拟人,比喻只许空间/容器
-//   档位3  动错会出事           → "是什么 + 该怎么处理",≤20 字,"不要手动改"统一措辞(sticky:重复不降噪)
+// 词条三档规矩(按外部 AI 会诊定稿的《词条撰写执行规则》执行):
+// 档位1  类型标签+文件名已说清 → 不写字(留空);只有非常用后缀给 2~4 字范畴词(如 .md → 文档)
+// 档位2  身份唯一、无风险     → 只说"是什么",≤14 字,禁人物拟人,比喻只许空间/容器
+// 档位3  动错会出事           → "是什么 + 该怎么处理",≤20 字,"不要手动改"统一措辞(sticky:重复不降噪)
 // 状态类(空/锁定/未展开/截断)单走第五节规矩:像日志播报,比喻全免。
 // 纯规则引擎,不劳烦 AI:毫秒级、零成本、断网也能用;认不出就给诚实话,绝不硬凑。
 // 词库(文件名字典/名字形状规则/后缀范畴词/目录名字典)住在 dictionary.ts。
@@ -43,7 +43,7 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { icon: 'entry', text: '入口：程序多半从这儿开始跑' }
   }
 
-  // 文档读开头(第一百批):有真标题就亮真名,别再笼统一句「文档」
+  // 文档读开头:有真标题就亮真名,别再笼统一句「文档」
   if (file.docTitle) {
     const t =
       file.docTitle.length > DOC_TITLE_MAX_CHARS
@@ -52,7 +52,7 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { icon: 'doc', text: `文档：${t}` }
   }
 
-  // 词根词典(第九十九批):名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
+  // 词根词典:名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
   // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
   const byWords = translateName(file.name)
   if (byWords) return { icon: 'code', text: byWords }
@@ -108,7 +108,7 @@ function summarizeDir(
     return byName
   }
 
-  // 词根词典(第九十九批):业务起的名(scanner/summarizer)按词根给个身份词
+  // 词根词典:业务起的名(scanner/summarizer)按词根给个身份词
   const dirWords = translateName(node.name)
   if (dirWords) return { icon: 'folder', text: dirWords }
 

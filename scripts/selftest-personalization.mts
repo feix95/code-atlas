@@ -1,4 +1,4 @@
-// 个性化(说话方式)的自测(第一百一十三批,一百一十八批次补改为「语气+自订指令」两件套):
+// 个性化(说话方式)的自测(一百一十八批次补改为「语气+自订指令」两件套):
 // 拼出来的提示词要准,「默认档不垫语气」的口径要钉死。纯函数,不碰配置读写也不碰界面。
 import assert from 'node:assert/strict'
 import {
@@ -18,7 +18,7 @@ function withPatch(patch: Partial<PersonalizationConfig>): PersonalizationConfig
 }
 
 function main(): void {
-  // ── 1. 默认档不垫语气(第一百五十一批产品定):全默认时风格段是空串,人设一字不加 ──
+  // 1. 默认档不垫语气(产品定):全默认时风格段是空串,人设一字不加 
   assert.equal(
     buildPersonalizationPrompt(DEFAULT_PERSONALIZATION),
     '',
@@ -34,7 +34,7 @@ function main(): void {
   )
   assert.ok(!defaultWithCustom.includes('温暖'), '默认档不该漏出任何语气人设句')
 
-  // ── 2. 语气:默认档空着,三档人设各说各的话,互不串味 ──
+  // 2. 语气:默认档空着,三档人设各说各的话,互不串味 
   for (const opt of TONE_OPTIONS) {
     const text = buildPersonalizationPrompt(withPatch({ tone: opt.key }))
     if (opt.key === 'default') assert.equal(text, '', '默认档 = 不垫语气')
@@ -44,7 +44,7 @@ function main(): void {
         `语气「${opt.label}」要成段(2.0 起包 style_preference 标签)`
       )
   }
-  // 语气三档的新稿(提示词体系重写第二批,逐字稿 J):各认各的招牌词,互不串味
+  // 语气三档的新稿(逐字稿 J):各认各的招牌词,互不串味
   const friendly = buildPersonalizationPrompt(withPatch({ tone: 'friendly' }))
   assert.ok(friendly.includes('好朋友'), '友善档要像跟好朋友聊天')
   assert.ok(!friendly.includes('沉稳克制'), '选了友善就不该同时冒出专业那句')
@@ -55,7 +55,7 @@ function main(): void {
   assert.ok(humorous.includes('大白话'), '幽默档要爱说大白话')
   assert.ok(!humorous.includes('沉稳克制'), '选了幽默就不该同时冒出专业那句')
 
-  // ── 3. 自订指令:裁空白、空白等于没写、超长裁到上限 ──
+  // 3. 自订指令:裁空白、空白等于没写、超长裁到上限 
   assert.equal(
     buildPersonalizationPrompt(withPatch({ custom: '   ' })),
     buildPersonalizationPrompt(DEFAULT_PERSONALIZATION),
@@ -70,7 +70,7 @@ function main(): void {
   assert.ok(longCustom.includes('很'.repeat(CUSTOM_MAX)), '该收的字一个不少')
   assert.ok(!longCustom.includes('很'.repeat(CUSTOM_MAX + 1)), '超长的部分要裁掉')
 
-  // ── 4. 顺序就是结构:人设 → 风格段(<style_preference> 里语气在前、自订指令在后、收尾划线)──
+  // 4. 顺序就是结构:人设 → 风格段(<style_preference> 里语气在前、自订指令在后、收尾划线)
   // 2.0 换了内核:旧硬约束尾引用的「不编造/不假装干过活」已不在内核,尾巴整个删掉;
   // 风格段收尾改垫一句「以上只改你说话的方式」,把自订指令的权力圈回说话方式上
   const styled = withPersonalization(
@@ -86,7 +86,7 @@ function main(): void {
   assert.ok(styled.endsWith('</style_preference>'), '风格段闭合标签收尾')
   assert.ok(!styled.includes('«') && !styled.includes('»'), '旧的 «» 包裹不许残留(2.0 全换 XML)')
 
-  // 风格段和讲法是两路(提示词体系重写第二批):讲解深度不住进风格段 ——
+  // 风格段和讲法是两路:讲解深度不住进风格段 ——
   // 教学切片在 prompts.ts,换 teaching 不该往 withPersonalization 的输出里漏教学文本
   const deepStyled = withPersonalization(
     '人设在此',
@@ -97,7 +97,7 @@ function main(): void {
     'teaching 非 brief 时风格段也不掺教学文本'
   )
 
-  // ── 5. 读档清洗:脏数据一律回默认 ──
+  // 5. 读档清洗:脏数据一律回默认 
   assert.deepEqual(sanitizePersonalization(null), DEFAULT_PERSONALIZATION, 'null 回默认')
   assert.deepEqual(sanitizePersonalization('乱传的'), DEFAULT_PERSONALIZATION, '字符串回默认')
   assert.deepEqual(sanitizePersonalization([1, 2]), DEFAULT_PERSONALIZATION, '数组回默认')
@@ -118,7 +118,7 @@ function main(): void {
   assert.equal('warmth' in mixed, false, '下架的特质键不许混进配置')
   assert.ok(!('乱七八糟' in mixed), '多出来的键不许混进配置')
 
-  // ── 6. 讲解深度(教学三档):默认精简,脏值回默认,三档都认 ──
+  // 6. 讲解深度(教学三档):默认精简,脏值回默认,三档都认 
   assert.equal(
     DEFAULT_PERSONALIZATION.teaching,
     'brief',
@@ -143,14 +143,14 @@ function main(): void {
     'deep',
     '详细档存读一个来回不丢'
   )
-  // 教学切片的提示词文本住 ai/prompts.ts(第二批),不进 buildPersonalizationPrompt —— 风格段照旧不掺教学
+  // 教学切片的提示词文本住 ai/prompts.ts,不进 buildPersonalizationPrompt —— 风格段照旧不掺教学
   assert.equal(
     buildPersonalizationPrompt(withPatch({ teaching: 'deep' })),
     buildPersonalizationPrompt(withPatch({ teaching: 'off' })),
     '讲解深度不拼进风格段:三档拼出来的风格段要一模一样'
   )
 
-  // ── 7. 界面按这张表排控件:数量变了说明有人动过,提醒一句 ──
+  // 7. 界面按这张表排控件:数量变了说明有人动过,提醒一句 
   assert.equal(TONE_OPTIONS.length, 4, '语气四档(默认 + 产品定的三档人设)')
   for (const t of TONE_OPTIONS) assert.ok(t.label && t.hint, '每档都要有档名和介绍(参考图的两行式)')
   assert.equal(TEACHING_OPTIONS.length, 3, '讲解深度三档(简洁/精简/详细)')

@@ -1,4 +1,4 @@
-/* ── 设置页(Obsidian 风格稿定版):左侧栏一项 = 右侧一整页;
+/* 设置页(Obsidian 风格稿定版):左侧栏一项 = 右侧一整页;
    版式语言:扁平底、分组灰卡外露小标题、卡内行发丝线、左文右控一条轴。
    说明灰字走 --chrome-muted(= 稿子 --faint 的亮暗真值);控件样式登记在 personalize.css。
    即改即存:控件一拨当场生效并落盘,没有草稿状态表也没有页脚 —— Obsidian/VS Code 同款。
@@ -39,7 +39,7 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-/* ── 设置模式下的侧栏换脸件:「设置」小字标 + 分类导航 ── */
+/* 设置模式下的侧栏换脸件:「设置」小字标 + 分类导航  */
 .cfg-snav-head {
   display: flex;
   align-items: center;
@@ -126,7 +126,7 @@
   background: var(--canvas-tint);
 }
 
-/* ── 一页一导航:左侧栏选中项即页名,右区只渲染当前页,换页微淡入 ── */
+/* 一页一导航:左侧栏选中项即页名,右区只渲染当前页,换页微淡入  */
 .cfg-pane {
   display: flex;
   flex-direction: column;

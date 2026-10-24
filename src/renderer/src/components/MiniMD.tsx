@@ -5,7 +5,7 @@ import type { RenameOutcome } from '@shared/fileRename'
 import { InlineTitle } from './InlineTitle'
 
 /**
- * 迷你 Markdown 渲染(第一百零七批起;阅读模式批次拆成 解析/描画 两层):
+ * 迷你 Markdown 渲染(拆成 解析/描画 两层):
  * 语法拆解在 src/shared/markdown.ts(纯数据 AST,能进自测),这里只把 AST 画成 React 元素。
  * 刻意手写小解析器而不是上重型库:渲染成 React 元素,不碰 dangerouslySetInnerHTML,
  * 模型/文件吐什么都不会变成可执行内容。
@@ -228,7 +228,7 @@ export const MiniMD = memo(function MiniMD({
   fileLinks?: FileLinkTarget
   /** 文档内联标题(阅读模式喂文件名);不传不摆 */
   title?: string
-  /** 内联标题改名通道(内联标题改名批次):喂了标题才可点改名;不传 = 标题只展示 */
+  /** 内联标题改名通道:喂了标题才可点改名;不传 = 标题只展示 */
   onRenameTitle?: (base: string) => Promise<RenameOutcome>
   /** 裸渲染:不出 .md 外壳(对照稿按块渲染时,外壳由外层容器统一给) */
   bare?: boolean

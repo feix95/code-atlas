@@ -1,4 +1,4 @@
-// 窗口尺寸记事本自测(第七十八批):存档的认读、贴屏落位的各种旧世界,全用假屏幕数据
+// 窗口尺寸记事本自测:存档的认读、贴屏落位的各种旧世界,全用假屏幕数据
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -73,7 +73,7 @@ check('parseWindowState:块头小于窗口下限就夹到下限;maximized 缺省
   assert.equal(saved!.maximized, false)
 })
 
-// ── UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale ──
+// UI v3·§2.2:存档记「100% 基准值 + scale」,物理尺寸 = 基准 × scale 
 
 check('parseWindowState:scale 合法才认账;认了 scale,宽高下限按系数折回基准口径', () => {
   const saved = parseWindowState({
@@ -178,7 +178,7 @@ check('placeWindowBox:没有屏幕时只给块头,坐标交给系统居中', () 
   assert.equal(placed.y, undefined)
 })
 
-// ── 右键菜单第一项看主面板状态下菜(小葵验收点的名)──
+// 右键菜单第一项看主面板状态下菜(小葵验收点的名)
 check('mainPanelMenuLabel:主面板在屏上给「藏起」,不在给「叫它出来」', () => {
   assert.equal(mainPanelMenuLabel(true), '隐藏主面板')
   assert.equal(mainPanelMenuLabel(false), '显示主面板')
@@ -288,7 +288,7 @@ check('MainPanelController:hide() 收窗记账;窗销毁后 show/hide 都不再�
 })
 
 async function main(): Promise<void> {
-  // ── IO 落盘回环:写得进、读得出;垃圾内容和不存在的档都安静回 null ──
+  // IO 落盘回环:写得进、读得出;垃圾内容和不存在的档都安静回 null 
   const dir = mkdtempSync(join(tmpdir(), 'atlas-window-state-'))
   try {
     check('readWindowState:没记过回 null', () => {

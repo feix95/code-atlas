@@ -1,4 +1,4 @@
-// 内置模型的状态播报(第七十批):引擎在干嘛由这里记账并喊给状态栏。
+// 内置模型的状态播报:引擎在干嘛由这里记账并喊给状态栏。
 // progress 只在 /health 真报了数时给值,拿不到就 null,绝不编百分比。
 import { statSync } from 'node:fs'
 import { basename } from 'node:path'
@@ -86,7 +86,7 @@ export function announceBuiltinError(modelPath: string, err: unknown): void {
   )
 }
 
-/** 内置模型当前能不能看图(图片附件闸用,第一百五十二批):
+/** 内置模型当前能不能看图():
  *  跑着/就绪的引擎自己报过账最可信(/props 探测的实话);没起或还在加载时,
  *  按模型旁的 mmproj 登记判意图 —— 有投影仪就是奔着视觉去的,文件在但引擎还没带上它
  *  会由 builtinNeedsRestart 重启补齐;没模型文件可判时老实说 unknown */

@@ -73,7 +73,7 @@ export function TopBarTabs({
   ) => void
 }): React.JSX.Element {
   // 第一组条带宽 = paneSplit × 内容列宽。用页签区宽当分母折回:
-  //   条带宽 = 占比 × (页签区宽 + 窗控宽)
+  // 条带宽 = 占比 × (页签区宽 + 窗控宽)
   const firstBasis = `calc(${(paneSplit * 100).toFixed(3)}% + var(--u) * ${(WIN_CTL_U * paneSplit).toFixed(4)})`
 
   const { drag, gap, cross, chipRef, beginTabDrag, dragSrcGroupId, chipHidden } = useTabDragSession(

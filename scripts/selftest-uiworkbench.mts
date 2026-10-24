@@ -593,7 +593,7 @@ check('外观适配:不填/不勾时三端都缺省;描边按「内描边」口�
   })
 })
 
-// ── 对齐吸附(snap.ts) ──
+// 对齐吸附(snap.ts) 
 
 check('snapMove:阈值内吸最近锚点(边/中线),阈值外不动,两轴独立', () => {
   const target = { x: 100, y: 0, width: 40, height: 40 }
@@ -635,7 +635,7 @@ check('snapTargets:排除自身,只剩其余节点的包围盒', () => {
   assert.deepEqual(snapTargets([a, b, c], [a.id, b.id]), [{ x: 90, y: 0, width: 10, height: 10 }])
 })
 
-// ── 框选命中(rectOverlapsBox)──
+// 框选命中(rectOverlapsBox)
 
 check('框选相交判定:扫到任意部分即中,全包/擦边都算,完全在外不算', () => {
   const node = { x: 100, y: 100, width: 40, height: 40, rotation: 0 }
@@ -659,7 +659,7 @@ check('框选旋转矩形:按真实旋转轮廓判定,不拿声明外接框糊�
   assert.ok(!rectOverlapsBox(node, { x: 75, y: -25, width: 20, height: 15 }))
 })
 
-// ── 撤销/重做历史(history.ts + documentStore) ──
+// 撤销/重做历史(history.ts + documentStore) 
 
 // 文档仓库默认预置一个画板;历史/批次用例按「空白文档」写,先换成空白页
 docActions.resetDocument(false)
@@ -853,7 +853,7 @@ check('cloneRect:序号取现有最大 + 1,偏移落位,源对象不动', () => 
   assert.equal(a.x, 10, '源节点不被修改')
 })
 
-// ── 外观样式(styles.ts + styleId 活链接)──
+// 外观样式(styles.ts + styleId 活链接)
 
 check('样式名规范:去空白截断,留空回落「样式 N」', () => {
   assert.equal(normalizeStyleName('  主按钮 ', 1), '主按钮')

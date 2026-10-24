@@ -45,7 +45,7 @@ export function registerChatIpc(): void {
     const prepared = await prepareChat(event, body, startedAt)
     if (!prepared.ok) return prepared.result
     const { prep } = prepared
-    // 翻文件模式(agent,第一百二十八批):开关开着就走工具循环 —— 模型自己喊看哪,
+    // 翻文件模式(agent):开关开着就走工具循环 —— 模型自己喊看哪,
     // 主进程沙盒里翻给它看;rootPath 是沙盒的墙,没带或不对就老实说翻不了
     if (prep.agentOn) {
       if (prep.agentRoot === '') {
@@ -126,7 +126,7 @@ export function registerChatIpc(): void {
     }
   })
 
-  // /compact 手动压缩(第一百四十二批):把目前为止的对话提炼成一份要点摘要,
+  // /compact 手动压缩:把目前为止的对话提炼成一份要点摘要,
   // 渲染进程拦下 /compact 后走这条专属通道。流式增量照走 atlas:ai-delta 按 requestId 对号,
   // 「停一停」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
   ipcMain.handle(CH.aiCompact, async (event, req: unknown): Promise<AiExplainResult> => {
@@ -171,7 +171,7 @@ export function registerChatIpc(): void {
     }
   })
 
-  // 试一句(第一百一十三批):设置页改完说话方式,拿草稿当场念一段听效果。
+  // 试一句:设置页改完说话方式,拿草稿当场念一段听效果。
   // 关键在「草稿」二字 —— 走的是传进来的那份个性化,不是存档里的那份,
   // 所以还没点「应用更改」也能试,试完不满意直接退回,不用先存再改。
   ipcMain.handle(

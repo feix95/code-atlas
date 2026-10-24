@@ -41,7 +41,7 @@ import { queryMachineSpec } from './machineSpec.ts'
 import { createSingleFlight } from './singleFlight.ts'
 import { settingsKey } from './builtinKey.ts'
 
-// ── 老登记转手(实现在各专属模块,这里保住 import 路径)──
+// 老登记转手(实现在各专属模块,这里保住 import 路径)
 export { estimateKvBytes } from '../shared/contextBill.ts'
 export {
   warmupNudgeMessage,
@@ -155,7 +155,7 @@ const startBuiltinSingleFlight = createSingleFlight(
     let engineBackendKind: 'custom' | 'installed' | 'vendor' | 'none'
     let engineBackendId: string | null
     try {
-      // 引擎定位(第 4 期):自指路径 > 已装引擎(按选择/推荐)> 自带 vendor;
+      // 引擎定位:自指路径 > 已装引擎(按选择/推荐)> 自带 vendor;
       // installed 引擎自带「下一颗退路」给启动保险丝
       const engine = await locateEngine(settings, builtinDataDir())
       if (!engine.exePath) {
@@ -197,7 +197,7 @@ const startBuiltinSingleFlight = createSingleFlight(
     try {
       return await readyPromise
     } catch (err) {
-      // 保险丝(视觉能力批次):带了 --mmproj、引擎却「自己退了」型失败 → 投影仪跟模型
+      // 保险丝:带了 --mmproj、引擎却「自己退了」型失败 → 投影仪跟模型
       // 对不上账,摘掉它按纯文本重拉一次;只兜这一次,第二次仍失败照常退出诊断上报,
       // 别把模型损坏/显存不够这类真错吞掉。用户主动叫停的不降级。
       const engineExited = err instanceof EngineExitError
@@ -227,7 +227,7 @@ const startBuiltinSingleFlight = createSingleFlight(
           finalErr = retryErr // 降级重拉也挂了:落回下面的退出诊断/上报,人话照实说
         }
       }
-      // 保险丝(第 4 期):installed 引擎一启动就退(驱动/运行库对不上),顺着优先级链
+      // 保险丝:installed 引擎一启动就退(驱动/运行库对不上),顺着优先级链
       // 退到下一颗引擎重拉一次;用户叫停的不退,vendor/自指引擎没有退路也不退。
       // 这是链条上最后一条保险丝,触发即占满 relaunches<2 的剩余预算,不必再自增
       if (
@@ -263,7 +263,7 @@ const startBuiltinSingleFlight = createSingleFlight(
           builtinStatus('idle', facts.modelName, facts.sizeBytes, null, CANCEL_MESSAGE)
         )
       } else {
-        // 退出诊断(第七十三批):启动就死的,拿适配估算分清「内存耗尽退出/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
+        // 退出诊断:启动就死的,拿适配估算分清「内存耗尽退出/上下文填爆/文件坏」,不再一句「可能太大」糊弄人
         if (finalErr instanceof EngineExitError) {
           const spec = await queryMachineSpec()
           finalErr.message = autopsyExitMessage(
@@ -288,7 +288,7 @@ const startBuiltinSingleFlight = createSingleFlight(
 /**
  * 确保 llama-server 跑起来了,返回它的 ChatTarget(baseUrl + 模型名)。
  * 已在跑就直接复用;没跑就走单飞闸门拉起(同秒并发的第二个请求等同一份,
- * 绝不双生,第一百三十六批):收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
+ * 绝不双生):收尸清端口、拉起、轮询 /health 直到就绪、再问 /v1/models 拿模型名。
  * contextSize 是喂给引擎的上下文窗口(-c):设置里手动填了就用填的,没填按默认(shared/aiDefaults)。
  * 引擎优先用 app 自带的,用户只管选模型文件。
  * 所有失败都抛"给人看的人话",由 IPC 层原样转给界面;状态栏同步收到播报。

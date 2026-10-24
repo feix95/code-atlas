@@ -43,7 +43,7 @@ function viewOf(el: HTMLElement | null): Window | null {
 }
 
 /**
- * 代码预览/编辑(预览编辑批次·第2批):树上右键「预览文件」后,左栏装这扇文本窗。
+ * 代码预览/编辑:树上右键「预览文件」后,左栏装这扇文本窗。
  * 源码档 = CodeMirror 6 编辑器:所有文本文件打开就能改,停手 1 秒自动落盘;
  * 行号/撤销/选区/搜索键位全是编辑器自带的。分色仍吃主进程 tree-sitter 的段落账,
  * 存盘后重算换新;选区引用(右键菜单/直拖)照老规矩,角标美术随新引擎退役。
@@ -71,12 +71,12 @@ export function CodePreview({
   jump?: { line: number; seq: number } | null
   /** 阅读模式里的文件链接通道:工作区签传它,md 里对得上登记的文件名渲染成可点链接 */
   fileLinks?: FileLinkTarget | null
-  /** 内联标题改名通道(内联标题改名批次):递新主名进回调,拿 RenameOutcome 回执;
+  /** 内联标题改名通道:递新主名进回调,拿 RenameOutcome 回执;
       不传 = 标题只展示(live/阅读两档共用) */
   onRenameFile?: (base: string) => Promise<RenameOutcome>
 }): React.JSX.Element {
   const codeViewRef = useRef<HTMLDivElement>(null)
-  // ── 按文件记账(读稿/编辑稿/提示/改名回执)全在 usePreviewDoc ──
+  // 按文件记账(读稿/编辑稿/提示/改名回执)全在 usePreviewDoc
   const {
     result,
     err,
@@ -123,7 +123,7 @@ export function CodePreview({
     if (!showLinked || sourceBlocks.length === 0 || el === null) return
     return registerMdScroll(mdKey, 'source', el)
   }, [showLinked, sourceBlocks.length, mdKey])
-  // 文档字号缩放(Ctrl+滚轮本批):系数落 --doc-zoom,正文各行 font-size 乘它
+  // 文档字号缩放:系数落 --doc-zoom,正文各行 font-size 乘它
   const docZoom = useDocZoom()
 
   // Ctrl+滚轮 = 文档字号缩放:监听器挂预览元素本身,子窗 realm-safe;编辑器滚轮照冒泡上来。
@@ -217,7 +217,7 @@ export function CodePreview({
         result.status !== 'ok' &&
         result.status !== 'image' &&
         result.status !== 'audio' && <p className="code-pane-note">{result.reason}</p>}
-      {/* 图片签(图片预览批次):JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
+      {/* 图片签:JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
           image 账没带回来(不该发生)就老实按 reason 说明 */}
       {!err && result?.status === 'image' && (
         <>
