@@ -1,4 +1,5 @@
-// 主进程与渲染进程共用的数据契约,两边都从这里导入,防止口径不一
+// 主进程与渲染进程共用的数据契约,两边都从这里导入,防止口径不一。
+// 只放跨进程契约类型,业务逻辑和其他域的类型不往里塞。
 
 import type { PersonalizationConfig } from './personalization.ts'
 import type { CloudVendorId } from './cloudVendors.ts'

@@ -554,3 +554,4 @@
 - refactor(ui): Markdown 公式命令对照表拆出 mdMathTables
 - chore(test): 有效代码行加 300 闸,图标册/词根表/类型契约登白名单
 - refactor(core): 清掉注释里的批次号、刀次和装饰分隔线
+- chore(test): 单文件行数闸只计有效代码并设分档上限,拆掉原始行 1000 与棘轮

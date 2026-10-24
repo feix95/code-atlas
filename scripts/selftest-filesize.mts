@@ -1,35 +1,45 @@
-// 单文件行数棘轮闸:src/ 内手写源码超 MAX_LINES(原始行)即红灯;
-// 另卡 CODE_MAX 有效代码行(去空行去注释);纯数据/类型文件登 CODE_EXEMPT。
-// 白名单内现存超限文件按基线只降不升,瘦回线内提醒毕业除名
+// 单文件有效代码行闸:≤CODE_MAX 通过,≥CODE_MAX+1 红灯;
+// 纯数据表/图标册/跨进程契约登 CODE_CAPS,过各自上限即红灯。
+// 只扫 src/ 下 ts/tsx/mts/cts/js/jsx/css;*.d.ts 与 scripts/ 自测不扫。
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SRC_DIR = join(import.meta.dirname, '..', 'src')
-const MAX_LINES = 1000
 const CODE_MAX = 300
+const WARN_NEAR = 10
 const CODE_EXT = /\.(ts|tsx|mts|cts|js|jsx|css)$/
 
-// 现存超限文件登记处:值 = 当前行数基线,只降不许升;瘦到 MAX_LINES 以内就该除名
-const GIANTS: Record<string, number> = {}
+// 允许超过 CODE_MAX 的文件 → 有效代码上限。未登记的一律 CODE_MAX。
+// key 必须是 src/ 下相对路径,分隔符只用 /;Windows 的 \ 要先换成 / 再查表。
+const CODE_CAPS: Record<string, number> = {
+  'renderer/src/components/Icons.tsx': 1000,
+  'summarizer/words.ts': 500,
+  'summarizer/dictionary.ts': 500,
+  'shared/types.ts': 400,
+  'renderer/src/assets/css/tokens.css': 400
+}
 
-// 有效代码行超过 CODE_MAX 的豁免:图标册、词根表、跨进程类型契约(纯数据/类型,不拆)
-const CODE_EXEMPT = new Set([
-  'renderer/src/components/Icons.tsx',
-  'summarizer/words.ts',
-  'shared/types.ts'
-])
+function isGatedName(name: string): boolean {
+  if (name.endsWith('.d.ts')) return false
+  return CODE_EXT.test(name)
+}
+
+/** src/ 相对路径,分隔符统一成 / */
+function srcRel(abs: string): string {
+  return abs.slice(SRC_DIR.length + 1).replaceAll('\\', '/')
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, entry.name)
     if (entry.isDirectory()) walk(p, out)
-    else if (CODE_EXT.test(entry.name)) out.push(p)
+    else if (isGatedName(entry.name)) out.push(p)
   }
   return out
 }
 
-/** 去掉块注释、整行 // 注释和空行后的有效代码行 */
+/** 去掉块注释、整行 // 注释和空行后的有效代码行;判空行先 trim(CRLF 行尾一并去掉) */
 function codeLineCount(src: string): number {
   const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '')
   return noBlock.split('\n').filter((line) => {
@@ -38,47 +48,55 @@ function codeLineCount(src: string): number {
   }).length
 }
 
+assert.equal(srcRel(join(SRC_DIR, 'highlight', 'index.ts')), 'highlight/index.ts')
+assert.equal(srcRel(join(SRC_DIR, 'depgraph', 'index.ts')), 'depgraph/index.ts')
+assert.notEqual(
+  srcRel(join(SRC_DIR, 'highlight', 'index.ts')),
+  srcRel(join(SRC_DIR, 'preload', 'index.ts')),
+  '同名文件按相对路径区分,不能只按文件名登记'
+)
+assert.equal(isGatedName('env.d.ts'), false, '*.d.ts 不扫')
+assert.equal(isGatedName('types.ts'), true)
+assert.equal(codeLineCount('const u = "http://x.com"\n'), 1, '字符串里的 // 不算注释')
+assert.equal(codeLineCount('const x = 1 /* tmp */\n'), 1, '一行代码带块注释仍算一行')
+assert.equal(codeLineCount('const a = 1\n/*\nskip\nme\n*/\nconst b = 2\n'), 2, '多行块注释中间几行去掉')
+assert.equal(codeLineCount('}\n'), 1, '单独的 } 算代码')
+assert.equal(codeLineCount('const x = 1\r\n\r\n// hi\r\n}\r\n'), 2, 'CRLF 空行与注释行去掉')
+
 const violations: string[] = []
-const graduated: string[] = []
-const seen = new Set<string>()
+const near: string[] = []
 
 for (const file of walk(SRC_DIR)) {
-  const rel = file.slice(SRC_DIR.length + 1).replaceAll('\\', '/')
+  const rel = srcRel(file)
   const src = readFileSync(file, 'utf8')
-  const lines = src.split('\n').length
-  const baseline = GIANTS[rel]
-  if (baseline !== undefined) {
-    seen.add(rel)
-    if (lines > baseline) violations.push(`${rel} 超过基线:${baseline} → ${lines}(只降不升)`)
-    else if (lines <= MAX_LINES) graduated.push(`${rel} 已回落 ${lines} 行,可从白名单除名`)
-    continue
-  }
-  if (lines > MAX_LINES) violations.push(`${rel} 新增超限文件:${lines} 行 > ${MAX_LINES}`)
-  if (!CODE_EXEMPT.has(rel)) {
-    const code = codeLineCount(src)
-    if (code > CODE_MAX) {
-      violations.push(
-        `${rel} 有效代码 ${code} 行 > ${CODE_MAX}(去空行去注释);数据表/类型契约登 CODE_EXEMPT,其余请拆文件`
-      )
-    }
+  const cap = CODE_CAPS[rel] ?? CODE_MAX
+  const code = codeLineCount(src)
+  if (code > cap) {
+    const hint =
+      rel in CODE_CAPS
+        ? `CODE_CAPS 上限 ${cap}`
+        : `默认 ${CODE_MAX};数据表/图标册/跨进程契约登 CODE_CAPS 并写明上限,其余按职责拆文件`
+    violations.push(`${rel} 有效代码 ${code} 行 > ${hint}`)
+  } else if (code >= cap - WARN_NEAR) {
+    near.push(`${rel} 有效代码 ${code} / ${cap}`)
   }
 }
 
-for (const rel of Object.keys(GIANTS)) {
-  if (!seen.has(rel)) violations.push(`${rel} 登记在册但文件不在了——若已拆没请除名`)
-}
-
-for (const rel of CODE_EXEMPT) {
+for (const rel of Object.keys(CODE_CAPS)) {
   const abs = join(SRC_DIR, rel)
   try {
     readFileSync(abs)
   } catch {
-    violations.push(`${rel} 登记在 CODE_EXEMPT 但文件不在了——若已拆没请除名`)
+    violations.push(`${rel} 登记在 CODE_CAPS 但文件不在了——若已拆没请除名`)
   }
 }
 
-for (const v of violations) console.error(`✗ ${v}`)
-for (const g of graduated) console.log(`◎ ${g}`)
-assert.equal(violations.length, 0, '单文件行数棘轮闸有红灯')
+if (near.length) {
+  console.log('⚠️ 快贴线(不红灯,先拆再追加):')
+  for (const n of near) console.log(`  ${n}`)
+}
 
-console.log('✅ 单文件行数棘轮闸全绿')
+for (const v of violations) console.error(`✗ ${v}`)
+assert.equal(violations.length, 0, '单文件行数闸有红灯')
+
+console.log('✅ 单文件行数闸全绿')
