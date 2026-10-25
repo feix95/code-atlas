@@ -86,7 +86,13 @@ function TreeRow({
           data-tip-side="right"
         >
           <span className="tree-icon" aria-hidden="true">
-            {<TreeIcon name={node.summary?.icon ?? 'file'} size={TREE_ICON_SIZE} mono={false} />}
+            {
+              <TreeIcon
+                name={node.summary?.icon ?? node.typeIcon ?? 'file'}
+                size={TREE_ICON_SIZE}
+                mono={false}
+              />
+            }
           </span>
           <span className="tree-name">{node.name}</span>
           {note && (

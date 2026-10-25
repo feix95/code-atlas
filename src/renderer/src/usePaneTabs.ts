@@ -106,7 +106,7 @@ export function usePaneTabs(deps: {
       kind: scopeRoot ? 'peek' : 'preview',
       relPath: file.relPath,
       name: file.name,
-      icon: file.summary?.icon ?? 'file',
+      icon: file.summary?.icon ?? file.typeIcon ?? 'file',
       scopeRoot
     }
   }

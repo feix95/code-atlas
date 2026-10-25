@@ -97,7 +97,10 @@ async function main(): Promise<void> {
   assert.ok(textOf(plainTs).includes('工具'), 'util.ts → 词根词典给「工具」')
   assert.equal(textOf(docMd), 'doc 文档', '.md → 范畴词「文档」')
   assert.equal(photo.summary, undefined, '.png 家喻户晓,沉默名单不写字')
+  assert.equal(photo.typeIcon, 'image', '.png 不写字,类型图标仍是图片')
   assert.equal(silentTxt.summary, undefined, '.txt 沉默名单不写字')
+  assert.equal(silentTxt.typeIcon, 'doc', '.txt 不写字,类型图标仍是文档')
+  assert.equal(kt.typeIcon, 'code', '识别出语言的 .kt 有类型图标')
   assert.ok(textOf(zipFile).includes('压缩包'), '.zip → 范畴词「压缩包」')
   assert.ok(textOf(unknownExt).includes('未知类型'), '陌生后缀诚实说未知')
   assert.ok(textOf(noExt).includes('没有后缀'), '无后缀诚实说')
@@ -255,6 +258,35 @@ async function main(): Promise<void> {
   annotateSummaries(dir('proj', [genericApp]))
   assert.equal(genericApp.summary, undefined, 'App.tsx 只剩「应用」空话,老实闭嘴')
 
+  // 11.5 图标与文案分家:词根只改文案,不许把文档/数据图标抢成代码
+  const apiDoc = file('API.md')
+  const sshLoginDoc = file('SSH-login.md')
+  const apiTxt = file('API.txt')
+  const testDoc = file('test.md')
+  const httpJson = file('http.json')
+  const plainTsIcon = file('foo.ts', TS)
+  const namedImage = file('image.png')
+  annotateSummaries(
+    dir('types', [apiDoc, sshLoginDoc, apiTxt, testDoc, httpJson, plainTsIcon, namedImage])
+  )
+  assert.equal(apiDoc.summary?.icon, 'doc', `API.md 图标应是文档,实际:${textOf(apiDoc)}`)
+  assert.equal(apiDoc.summary?.text, '文档：API', `词根只改文案,实际:${textOf(apiDoc)}`)
+  assert.equal(
+    sshLoginDoc.summary?.icon,
+    'doc',
+    `SSH-login.md 不许抢成代码,实际:${textOf(sshLoginDoc)}`
+  )
+  assert.equal(apiTxt.summary?.icon, 'doc', '.txt 也是文档,词根不许抢图标')
+  assert.equal(testDoc.summary?.icon, 'doc', 'test.md 是文档,不该给测试图标')
+  assert.equal(
+    httpJson.summary?.icon,
+    'data',
+    `http.json 按后缀给数据图标,实际:${textOf(httpJson)}`
+  )
+  assert.equal(plainTsIcon.summary, undefined, 'foo.ts 没有词根,摘要留白')
+  assert.equal(plainTsIcon.typeIcon, 'code', '没摘要的 ts 用类型图标兜底')
+  assert.equal(namedImage.summary?.icon, 'image', 'image.png 词根只改文案,图标仍是图片')
+
   // 12. 文档读开头:有真标题亮真名,标题过长掐头留省略号
   const titledDoc = file('a.md', undefined, '安装指南')
   const longTitle = '这是一个特别特别特别长的文档标题超出了预算还要再长一点'
@@ -273,7 +305,7 @@ async function main(): Promise<void> {
 
   console.log('✅ 全树速览自测全部通过')
   console.log(
-    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录直述 · scripts 报数 · 子树汇总 · 未展开占位 · 锁定目录 · 事实压过别名 · 残账至少 · 风险句标记 · 词根词典'
+    '   三档词条(沉默/说明/风险+行动) · 模式规则 · 范畴词与诚实话 · 目录直述 · scripts 报数 · 子树汇总 · 未展开占位 · 锁定目录 · 事实压过别名 · 残账至少 · 风险句标记 · 词根词典 · 类型图标与文案分层'
   )
 }
 

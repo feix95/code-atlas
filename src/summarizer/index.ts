@@ -8,6 +8,7 @@
 // 词库(文件名字典/名字形状规则/后缀范畴词/目录名字典)住在 dictionary.ts。
 import type { NodeSummary, ScanDirNode, ScanFileNode } from '../shared/types.ts'
 import { DOC_EXTS } from '../shared/fileKinds.ts'
+import { LANGUAGES, type LanguageCategory } from '../shared/languages.ts'
 import { translateName } from './words.ts'
 import {
   CODE_LANG_IDS,
@@ -22,12 +23,69 @@ import {
 /** 文档真标题进树悬停的字数上限。当年按行内小灰字定 16,灰字退役后改悬停,放到 24。 */
 export const DOC_TITLE_MAX_CHARS = 24
 
+/** 语言类别 → 类型图标;纯文本也按文档画,图标册里没有单独的文本图标 */
+const LANGUAGE_CATEGORY_ICONS: Record<LanguageCategory, string> = {
+  code: 'code',
+  config: 'config',
+  style: 'style',
+  doc: 'doc',
+  text: 'doc'
+}
+
+const LANGUAGE_TYPE_ICONS = new Map(
+  LANGUAGES.map((lang) => [lang.id, LANGUAGE_CATEGORY_ICONS[lang.category]])
+)
+
+/** 沉默名单里的常见类型不写字,但图标仍要说清是什么 */
+const SILENT_TYPE_ICONS: Record<string, string> = {
+  '.pdf': 'doc',
+  '.png': 'image',
+  '.jpg': 'image',
+  '.jpeg': 'image',
+  '.gif': 'image',
+  '.bmp': 'image',
+  '.webp': 'image'
+}
+
+/**
+ * 文件类型图标:只认后缀和语言,不看名字含义。
+ * 摘要带语义图标(锁/测试/入口)时界面优先用摘要的,这里负责没摘要或词根命中时的类型兜底。
+ */
+function resolveFileTypeIcon(file: ScanFileNode): string {
+  if (DOC_EXTS.has(file.ext)) return 'doc'
+  const byExt = FILE_EXT_SUMMARIES[file.ext]
+  if (byExt) return byExt.icon
+  const bySilentType = SILENT_TYPE_ICONS[file.ext]
+  if (bySilentType) return bySilentType
+  return file.language ? (LANGUAGE_TYPE_ICONS.get(file.language.id) ?? 'file') : 'file'
+}
+
+/** 文档只按文档处理:名字含义只影响文案,不能把图标抢成代码 */
+function summarizeDocFile(file: ScanFileNode): NodeSummary | undefined {
+  if (file.docTitle) {
+    const title =
+      file.docTitle.length > DOC_TITLE_MAX_CHARS
+        ? `${file.docTitle.slice(0, DOC_TITLE_MAX_CHARS)}…`
+        : file.docTitle
+    return { icon: 'doc', text: `文档：${title}` }
+  }
+  const byWords = translateName(file.name)
+  if (byWords) return { icon: 'doc', text: `文档：${byWords}` }
+  const byExt = FILE_EXT_SUMMARIES[file.ext]
+  if (byExt) return byExt
+  if (KNOWN_SILENT_EXTS.has(file.ext)) return undefined
+  return { icon: 'doc', text: '文档' }
+}
+
 function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
   const lower = file.name.toLowerCase()
 
   // 名字精确命中最可信
   const byName = FILE_SUMMARIES[lower]
   if (byName) return byName
+
+  // 文档先定性:后缀已说明是文档,名字里的词根只允许影响文案
+  if (DOC_EXTS.has(file.ext)) return summarizeDocFile(file)
 
   for (const { re, summary } of FILE_PATTERNS) {
     if (re.test(lower)) return summary
@@ -43,19 +101,13 @@ function summarizeFile(file: ScanFileNode): NodeSummary | undefined {
     return { icon: 'entry', text: '入口：程序多半从这儿开始跑' }
   }
 
-  // 文档读开头:有真标题就亮真名,别再笼统一句「文档」
-  if (file.docTitle) {
-    const t =
-      file.docTitle.length > DOC_TITLE_MAX_CHARS
-        ? `${file.docTitle.slice(0, DOC_TITLE_MAX_CHARS)}…`
-        : file.docTitle
-    return { icon: 'doc', text: `文档：${t}` }
-  }
-
   // 词根词典:名字本身就是最大的信息 —— GitFileStatus → git状态,scanner → 扫描器
-  // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了
+  // 注意传原始名:lower 已把驼峰压平,拆词就拆不动了;图标仍归类型层,词根不许抢
   const byWords = translateName(file.name)
-  if (byWords) return { icon: 'code', text: byWords }
+  if (byWords) {
+    const typeIcon = resolveFileTypeIcon(file)
+    return { icon: typeIcon === 'file' ? 'code' : typeIcon, text: byWords }
+  }
 
   const byExt = FILE_EXT_SUMMARIES[file.ext]
   if (byExt) return byExt
@@ -156,6 +208,7 @@ function tallyDir(node: ScanDirNode): DirTally {
   const tally: DirTally = { directDirs: 0, fileCount: 0, byLang: new Map(), extCounts: new Map() }
   for (const child of node.children) {
     if (child.type === 'file') {
+      child.typeIcon = resolveFileTypeIcon(child)
       const summary = summarizeFile(child)
       if (summary) child.summary = summary
       tally.fileCount++

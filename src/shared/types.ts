@@ -33,6 +33,8 @@ export interface ScanFileNode {
   language?: LanguageTag
   /** 全树速览标签;规则引擎实在认不出时不填(界面不硬凑) */
   summary?: NodeSummary
+  /** 文件类型图标:只按后缀/语言定,不掺名字含义;摘要自带语义图标时界面优先用摘要的 */
+  typeIcon?: string
   /** 文档类文件(.md/.txt)读开头得到的首行标题;读不到不填 */
   docTitle?: string
 }
