@@ -55,8 +55,36 @@
   line-height: var(--lh-160);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 12rem;
+  max-height: 16rem;
   overflow-y: auto;
+}
+
+/* 渐隐只挂在还有藏字的那一侧(组件按滚动位置切换):短思考不糊边,滚到顶/底就恢复清楚 */
+.chat-thinking-body.is-fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4));
+}
+
+.chat-thinking-body.is-fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
+}
+
+.chat-thinking-body.is-fade-top.is-fade-bottom {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-4),
+    #000 calc(100% - var(--space-4)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-4),
+    #000 calc(100% - var(--space-4)),
+    transparent
+  );
 }
 
 /* 流光字:灰底上一道亮扫过去,思考中活着的信号 */

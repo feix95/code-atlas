@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { WebLookupMeta } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
@@ -74,6 +74,19 @@ function ThinkingBlock({
       setSecs(Math.max(1, Math.round((performance.now() - startRef.current) / 1000)))
   }, [busy])
   const open = toggled ?? busy
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [fade, setFade] = useState({ top: false, bottom: false })
+  // 只有确实还有藏字的那一侧才渐隐:短思考不糊边,滚到顶/底时对应一侧也恢复清楚
+  const syncFade = useCallback(() => {
+    const el = bodyRef.current
+    if (!el) return
+    const top = el.scrollTop > 1
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
+    setFade((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }))
+  }, [])
+  useLayoutEffect(() => {
+    if (open) syncFade()
+  }, [open, reasoning, syncFade])
   if (reasoning.trim() === '') return null
   return (
     <div className={`chat-thinking${open ? ' is-open' : ''}`}>
@@ -102,7 +115,15 @@ function ThinkingBlock({
           </>
         )}
       </button>
-      {open && <div className="chat-thinking-body">{reasoning}</div>}
+      {open && (
+        <div
+          ref={bodyRef}
+          className={`chat-thinking-body${fade.top ? ' is-fade-top' : ''}${fade.bottom ? ' is-fade-bottom' : ''}`}
+          onScroll={syncFade}
+        >
+          {reasoning}
+        </div>
+      )}
     </div>
   )
 }
