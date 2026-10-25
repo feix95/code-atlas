@@ -21,4 +21,7 @@ inspiration/ui-ref-02.jpg
 # 本地测试输出
 test-results/
 
+# Qoder 本地生成的仓库知识,只在本机留用
+.qoder/
+
 
