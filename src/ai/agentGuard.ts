@@ -25,6 +25,9 @@ export const AGENT_REMINDER_PREFIX = `${TAG.programReminder.open}\n本轮要回�
 /** 联网研究账本的前缀:只挂一张,替换/兜底识别都靠它认 */
 export const AGENT_RESEARCH_PREFIX = `${TAG.programReminder.open}\n本轮联网研究账本:`
 
+/** 研究补查闸门的话术前缀:爆仓瘦身要跳过它,别把程序补查令当成用户真问题 */
+export const AGENT_RESEARCH_GATE_PREFIX = `${TAG.programReminder.open}\n按你自报的研究计划,还差:`
+
 /** 提醒卡引用问题原话的字数封顶:注记太长自己就成了新的大坨,把注意力又冲散了 */
 export const AGENT_REMINDER_MAX_CHARS = 200
 

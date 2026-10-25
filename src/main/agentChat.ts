@@ -14,6 +14,13 @@ import {
   mergeUsage,
   type AgentChatMessage
 } from '../ai/agent.ts'
+import type { ResearchFloor } from '../ai/researchPlan.ts'
+import {
+  completeResearchPlanRound,
+  gateResearchAnswer,
+  isPlanForceUnsupported,
+  type ResearchGateState
+} from './agentResearch.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { applyAgentPersona, buildAgentAddendum, flattenAgentMessages } from './agentPersona.ts'
@@ -86,6 +93,9 @@ export async function runAgentChat(input: {
     callIdToKey: new Map<string, string>(),
     webSearchCalls: 0,
     webFetchCalls: 0,
+    webFetchOk: 0,
+    githubOpens: 0,
+    localFileCalls: 0,
     webQueries: [],
     webSources: [],
     webLinks: [],
@@ -104,6 +114,10 @@ export async function runAgentChat(input: {
   let reasoningAll: string | undefined
   let lastRoundReasoning: string | undefined
   let sealedAny = false
+  // 研究计划表:联网开着才在首轮强制填;填完按它算最低查证量,交卷前对账
+  let researchFloor: ResearchFloor | null = null
+  let planForcePending = input.webSearchEnabled && !engineNoTools
+  const researchGate: ResearchGateState = { nudges: 0, mark: 0 }
   const resultReasoning = (): string | undefined => (sealedAny ? lastRoundReasoning : reasoningAll)
   let rounds = 0
   addDevLog(
@@ -143,6 +157,7 @@ export async function runAgentChat(input: {
       messages.push({ role: 'user', content: ROUND_CAP_NUDGE })
     }
     flags.skipNudgeOnce = false
+    const forcePlan = planForcePending && rounds === 0 && useTools && !engineNoTools
     rounds += 1
     const round = await agentRound(target, messages, {
       signal,
@@ -151,6 +166,7 @@ export async function runAgentChat(input: {
       useTools,
       webToolsEnabled,
       githubToolsEnabled: input.webSearchEnabled,
+      forcePlan,
       onDelta: (ev) => {
         if (ev.seal) sealedAny = true
         sendAgentDelta(event, requestId, ev)
@@ -158,6 +174,20 @@ export async function runAgentChat(input: {
     })
     lastRoundReasoning = round.status === 'ok' ? round.reasoning : undefined
     if (round.status !== 'ok') {
+      const httpNote =
+        round.status === 'error' && round.httpStatus ? ` HTTP ${round.httpStatus}` : ''
+      // 人话翻译会盖住服务端原文,日志留原文的头一段,排查爆仓/工具不认时才看得见真凶
+      const rawError = round.status === 'error' && round.detail ? round.detail : round.text
+      addDevLog('request', `本轮失败 · ${round.status}${httpNote} · ${rawError.slice(0, 200)}`)
+      // 个别引擎认工具却不认 tool_choice=required:别把它当「不支持工具」降级,
+      // 只是跳过计划表,同一轮槽位重来,工具照旧可用
+      if (forcePlan && isPlanForceUnsupported(round)) {
+        planForcePending = false
+        rounds -= 1
+        sendAgentStep(event, requestId, '这个引擎不支持强制先填研究计划,按普通节奏回答')
+        addDevLog('request', '引擎拒绝 tool_choice=required,跳过研究计划表')
+        continue
+      }
       const decision = handleAgentFailure({
         round,
         messages,
@@ -192,6 +222,17 @@ export async function runAgentChat(input: {
     }
     const raw = round.raw
     const calls = useTools ? extractToolCalls(raw) : []
+    if (forcePlan && calls.length > 0) {
+      // 首轮只亮了计划表:回填 tool 结果后换回常驻工具表,不让它占着这一轮
+      planForcePending = false
+      researchFloor = completeResearchPlanRound({ event, requestId, raw, calls, messages })
+      // 计划表是程序元数据,不进会话记忆的翻看往来(turnTrace)
+      continue
+    }
+    if (forcePlan) {
+      planForcePending = false
+      addDevLog('request', '首轮没按计划表填,按普通回答继续')
+    }
     if (calls.length === 0 || !useTools) {
       const text = (raw.content ?? '').trim()
       if (text === '') {
@@ -204,6 +245,31 @@ export async function runAgentChat(input: {
           ledger
         )
       }
+      const counts = {
+        lookups: ledger.webSearchCalls + ledger.webFetchCalls,
+        fetches: ledger.webFetchOk + ledger.githubOpens,
+        local: ledger.localFileCalls
+      }
+      if (
+        gateResearchAnswer({
+          event,
+          requestId,
+          floor: researchFloor,
+          counts,
+          githubOpens: ledger.githubOpens,
+          state: researchGate,
+          toolsAvailable: useTools,
+          webBudgetLeft: counts.lookups < AGENT_WEB_MAX_LOOKUPS,
+          text,
+          raw,
+          messages,
+          sealDraft: () => {
+            sealedAny = true
+            sendAgentDelta(event, requestId, { seal: true })
+          }
+        })
+      )
+        continue
       addDevLog('request', `翻文件收工 · 第 ${rounds} 轮交卷 · 输出约 ${text.length} 字`)
       input.onTurnComplete?.(turnTrace, text)
       return agentResult(input, 'supported', text, usage, resultReasoning(), ledger)

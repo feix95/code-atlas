@@ -65,6 +65,7 @@ function rejectWhy(name: ToolName | null, root: AgentSelectedRoot, queryMissing:
   if (name === TOOL_NAMES.openGithubRepo)
     return '要给公开 github.com 仓库地址(url),不收 gist、站点页或其它网站'
   if (name === TOOL_NAMES.researchNote) return '要给一条关键事实(note),一句话说清'
+  if (name === TOOL_NAMES.planResearch) return '研究计划第一轮已经填过了,这一轮直接查资料或回答'
   if (name === TOOL_NAMES.searchContent) return '要给关键词(keyword),如 500 或 DWELL_MS'
   return '路径不合法,要用所选根目录内的相对路径'
 }

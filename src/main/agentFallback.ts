@@ -88,10 +88,13 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
   // 提醒卡兜底:个别外接引擎不认「tool 结果后面跟 user 消息」的形态,甩 4xx ——
   // 撤掉提醒卡退回无卡形态重答一轮(只兜一次);再错就照实报给用户,不跟它耗。
   // 上下文爆仓也常报 400,那是下一道瘦身兜底的活,别抢走它的一次机会
+  const overflow =
+    round.status === 'error' &&
+    (isContextOverflow(round.text) || isContextOverflow(round.detail ?? ''))
   if (
     round.status === 'error' &&
     !flags.reminderFailsafe &&
-    !isContextOverflow(round.text) &&
+    !overflow &&
     (round.httpStatus === 400 || round.httpStatus === 404 || round.httpStatus === 422) &&
     messages.some(
       (m) =>
@@ -111,7 +114,7 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
   }
   // 紧急瘦身兜底:轮间的注记压缩是保养,服务直接甩「上下文装不下」拒收时只有整段裁旧账能救 ——
   // 只保 system 和最新真问题(400 拒收时模型一个字没吐,重试不重影);只兜一次,再爆就照实报错
-  if (round.status === 'error' && isContextOverflow(round.text) && !flags.slimRetried) {
+  if (round.status === 'error' && overflow && !flags.slimRetried) {
     flags.slimRetried = true
     const slimmed = emergencySlim(messages)
     if (slimmed) {

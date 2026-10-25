@@ -2,7 +2,12 @@
 // 全是纯函数(自测直接喂),不碰文件系统。
 import { TAG } from '../shared/promptTags.ts'
 import { TOOL_NAMES } from '../shared/agentTools.ts'
-import { AGENT_REMINDER_PREFIX, AGENT_RESEARCH_PREFIX } from './agentGuard.ts'
+import { estimateTokens } from '../shared/aiText.ts'
+import {
+  AGENT_REMINDER_PREFIX,
+  AGENT_RESEARCH_GATE_PREFIX,
+  AGENT_RESEARCH_PREFIX
+} from './agentGuard.ts'
 import type { AgentChatMessage, AgentCompression, AgentReadSlice } from './agentTypes.ts'
 
 /** read_file 单次最多读几行(对齐 Claude Code 的 2000 行默认):想读更多就带 offset 翻页 */
@@ -60,9 +65,6 @@ export function sliceAgentRead(
   return { ok: true, text, hint: `读了第 ${offset}-${end} 行 / 共 ${totalLines} 行` }
 }
 
-/** 账面换算:约几个字算一个 token。代码偏 4 字一个,中文偏 2 字一个,取 3 打粗账 */
-export const AGENT_CHARS_PER_TOKEN = 3
-
 /** 压缩时留原样的最近工具结果条数:最新的资料模型正要用,绝不压 */
 export const AGENT_KEEP_RECENT_TOOLS = 2
 
@@ -91,7 +93,8 @@ export function emergencySlim(
       m.role === 'user' &&
       (typeof m.content !== 'string' ||
         (!m.content.startsWith(AGENT_REMINDER_PREFIX) &&
-          !m.content.startsWith(AGENT_RESEARCH_PREFIX)))
+          !m.content.startsWith(AGENT_RESEARCH_PREFIX) &&
+          !m.content.startsWith(AGENT_RESEARCH_GATE_PREFIX)))
     ) {
       questionIdx = i
       break
@@ -106,20 +109,22 @@ export function emergencySlim(
 }
 
 /**
- * 对话账面估算(纯函数,自测覆盖):所有消息按字数折成约多少 token。
+ * 对话账面估算(纯函数,自测覆盖):所有消息折成约多少 token。
+ * 统一用 estimateTokens 的 CJK 口径:按字数除以 3 会把中文严重算少(一字约一 token),
+ * 中文工具资料一多,账面没到警戒线、服务端已经拒收(2026-10-25 M8 爆仓案)。
  * assistant 的工具调用参数也是账面的一部分(arguments 可能是很长的 JSON)。
  */
 export function estimateMessagesTokens(messages: AgentChatMessage[]): number {
-  let chars = 0
+  let tokens = 0
   for (const message of messages) {
-    chars += (typeof message.content === 'string' ? message.content : '').length
+    if (typeof message.content === 'string') tokens += estimateTokens(message.content)
     if ('tool_calls' in message && message.tool_calls) {
       for (const call of message.tool_calls) {
-        chars += call.function.name.length + call.function.arguments.length + 16
+        tokens += estimateTokens(call.function.name) + estimateTokens(call.function.arguments) + 16
       }
     }
   }
-  return Math.ceil(chars / AGENT_CHARS_PER_TOKEN)
+  return tokens
 }
 
 /**

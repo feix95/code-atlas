@@ -50,6 +50,8 @@ export type AgentRoundResult =
   | {
       status: 'error'
       text: string
+      /** 服务端原始错误正文:人话翻译会盖住英文特征词,爆仓判定得看原文 */
+      detail?: string
       toolsUnsupported?: boolean
       /** HTTP 状态码(有响应头才有):主进程的提醒卡兜底靠它认 4xx */ httpStatus?: number
     }

@@ -12,7 +12,8 @@ export const TOOL_NAMES = {
   webSearch: 'web_search',
   webFetch: 'web_fetch',
   researchNote: 'save_research_note',
-  openGithubRepo: 'open_github_repo'
+  openGithubRepo: 'open_github_repo',
+  planResearch: 'plan_research'
 } as const
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES]
@@ -82,5 +83,11 @@ export const TOOL_STEP_WORDS: Record<
     what: '这个 GitHub 仓库',
     repeat: '这个仓库已经打开过了',
     error: '打不开这个仓库'
+  },
+  [TOOL_NAMES.planResearch]: {
+    verb: '定了',
+    what: '研究计划',
+    repeat: '计划已经定过了',
+    error: '没法定研究计划'
   }
 }

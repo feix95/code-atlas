@@ -47,6 +47,17 @@ import {
 } from '../src/ai/agent.ts'
 // 翻文件切片:旧 AGENT_ADDENDUM 的逐字稿新家,守口径断言都打它
 import { AGENT_FILES_ADDENDUM, buildChatSystem, SLICE_NO_TOOLS } from '../src/ai/prompts.ts'
+import { AGENT_RESEARCH_GATE_PREFIX } from '../src/ai/agentGuard.ts'
+import {
+  PLAN_RESEARCH_TOOL,
+  RESEARCH_GATE_MAX_NUDGES,
+  buildResearchGateNudge,
+  floorFromPlan,
+  parseResearchPlan,
+  runResearchPlanCall,
+  shouldGateAnswer,
+  unmetResearchFloor
+} from '../src/ai/researchPlan.ts'
 import {
   TAVILY_MAX_RESULTS,
   WEB_HIT_SNIPPET_MAX_CHARS,
@@ -70,6 +81,7 @@ import {
   sanitizeAgentRootId,
   sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
+import { handleAgentFailure } from '../src/main/agentFallback.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 import {
   githubDisplayPath,
@@ -253,12 +265,13 @@ async function main(): Promise<void> {
   )
 
   // 工具名总账(shared/agentTools):名单、词表、认名闸三样互相对得上 —— 多一件少一件当场拦
+  // 计划表(plan_research)只走首轮强制调用、不在常规工具表里,但照样要登记
   const registered = Object.values(TOOL_NAMES)
-  assert.equal(registered.length, 8, '登记表登记八件工具')
+  assert.equal(registered.length, 9, '登记表登记九件工具')
   assert.deepEqual(
     AGENT_TOOLS.map((t) => t.function.name).sort(),
-    [...registered].sort(),
-    '发给模型的工具表全部出自登记表'
+    registered.filter((name) => name !== TOOL_NAMES.planResearch).sort(),
+    '发给模型的常规工具表 = 登记表去掉计划表'
   )
   assert.deepEqual(
     Object.keys(TOOL_STEP_WORDS).sort(),
@@ -508,6 +521,11 @@ async function main(): Promise<void> {
     AGENT_KEEP_RECENT_TOOLS >= 1 && AGENT_KEEP_RECENT_TOOLS <= 4,
     '留原样的条数得是个讲道理的数'
   )
+  // 中文按一字约一 token 记账:按字数除以 3 会把中文算少,长研究账面没到线、服务端已爆仓
+  const cjkMessages: AgentChatMessage[] = [
+    { role: 'tool', tool_call_id: 'c9', content: '中'.repeat(600) }
+  ]
+  assert.equal(estimateMessagesTokens(cjkMessages), 600, '600 个汉字记 600 token,不再除以 3')
 
   // 12. 工具能力探测的判别:只认「请求被拒 + 点名工具」的错
   assert.equal(
@@ -923,6 +941,30 @@ async function main(): Promise<void> {
     '高风险问题要先搜再答,不能凭记忆下结论'
   )
 
+  // 17.7 研究计划表:首轮先填字段,程序按填表对账
+  assert.ok(AGENT_WEB_ADDENDUM.includes('plan_research'), '守则要教它在开头填研究计划表')
+  for (const field of [
+    'parts',
+    'mayChange',
+    'stakesHigh',
+    'asksSources',
+    'aboutProject',
+    'depth'
+  ]) {
+    assert.ok(AGENT_WEB_ADDENDUM.includes(field), `计划表字段 ${field} 要逐项写清`)
+  }
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('SQLite、DuckDB、ClickHouse') &&
+      AGENT_WEB_ADDENDUM.includes('list 和 tuple'),
+    '对比题与直答题要有一对例子,帮小模型分清 parts'
+  )
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('程序按你填的定最低查证量') &&
+      AGENT_WEB_ADDENDUM.includes('没到数会请你补'),
+    '要告诉模型:程序按它填的表对账,没查够会被请回去补'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('原样打开'), '用户给的地址不改写,直接打开')
+
   // 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过
   const tavilyOk = parseTavilyResults(
     JSON.stringify({
@@ -1038,6 +1080,18 @@ async function main(): Promise<void> {
     '最新真问题',
     '研究账本不能冒充真问题'
   )
+  // 补查闸门也是程序插话:爆仓瘦身时同样不许顶替真问题
+  const withGateNudge: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '旧问题' },
+    { role: 'user', content: buildResearchGateNudge(['联网 0/3 次']) },
+    { role: 'user', content: '最新真问题' }
+  ]
+  assert.equal(
+    (emergencySlim(withGateNudge)?.messages[1] as { content: string }).content,
+    '最新真问题',
+    '研究补查令不能冒充真问题'
+  )
   // 翻文件模式的工具往来都在真问题之后,同样算旧账:只保问题,让模型拿着问题重新翻
   const agentFat: AgentChatMessage[] = [
     { role: 'system', content: '人设' },
@@ -1149,6 +1203,7 @@ async function main(): Promise<void> {
   // 23. 流式轮次的封板令:边说边喊工具时,已吐的话封口保留
   // 假模型服务按问题里的 mode 出三种牌:talk = 纯说话;work = 先说话再喊工具;
   // silent = 一个字不说直接喊工具。验证:work 发封板令不发回滚,另外两种都不发
+  let planRequestBody = ''
   const sealServer = createServer((req, res) => {
     let body = ''
     req.on('data', (c: Buffer) => {
@@ -1158,6 +1213,11 @@ async function main(): Promise<void> {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
       if (body.includes('mode=talk')) {
         res.write('data: {"choices":[{"delta":{"content":"直接答你"}}]}\n\n')
+      } else if (body.includes('mode=plan')) {
+        planRequestBody = body
+        res.write(
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_plan","type":"function","function":{"name":"plan_research","arguments":"{\\"parts\\":[\\"SQLite\\"],\\"mayChange\\":true,\\"stakesHigh\\":false,\\"asksSources\\":false,\\"aboutProject\\":false,\\"depth\\":\\"quick\\"}"}}]}}]}\n\n'
+        )
       } else if (body.includes('mode=repeat')) {
         res.write(
           'data: {"choices":[{"delta":{"content":"已经答对的正文。重复尾巴内容重复尾巴内容重复尾巴内容重复尾巴内容"}}]}\n\n'
@@ -1237,9 +1297,337 @@ async function main(): Promise<void> {
       '打转前已经吐过正文,要标记 bodyStarted'
     )
     assert.ok(!repeatEvents.some((ev) => ev.reset), '吐过正文后打转也不许整段撤回')
+
+    // 首轮强制计划:请求里只许出现 plan_research,且点名必须调用
+    const planRound = await agentRound(sealTarget, [{ role: 'user', content: 'mode=plan' }], {
+      maxTokens: 200,
+      useTools: true,
+      forcePlan: true
+    })
+    assert.equal(planRound.status, 'ok', '强制计划轮应正常收工')
+    assert.ok(planRequestBody.includes('"plan_research"'), '强制计划轮只亮计划表工具')
+    assert.ok(planRequestBody.includes('"tool_choice":"required"'), '强制计划轮要求必须调用')
+    assert.ok(!planRequestBody.includes('"list_files"'), '强制计划轮不夹带常驻工具')
+    assert.ok(
+      planRound.status === 'ok' && planRound.raw.tool_calls?.[0]?.function.name === 'plan_research',
+      '计划调用要能拼回来'
+    )
   } finally {
     await new Promise<void>((resolve) => sealServer.close(() => resolve()))
   }
+
+  // 24. 研究计划表:模型自己填字段,程序只执行它报的数,交卷前按规定对账
+  const planM0 = parseResearchPlan({
+    parts: [],
+    mayChange: false,
+    stakesHigh: false,
+    asksSources: false,
+    aboutProject: true,
+    depth: 'none'
+  })
+  assert.ok(planM0, '计划表要能解析')
+  assert.deepEqual(
+    floorFromPlan(planM0),
+    { depth: 'none', lookups: 0, fetches: 0, local: 1 },
+    '问项目:先翻本地文件,不许拿记忆冒充'
+  )
+
+  const planM1 = parseResearchPlan({
+    parts: [],
+    mayChange: false,
+    stakesHigh: false,
+    asksSources: false,
+    aboutProject: false,
+    depth: 'none'
+  })
+  assert.ok(planM1)
+  assert.deepEqual(
+    floorFromPlan(planM1),
+    { depth: 'none', lookups: 0, fetches: 0, local: 0 },
+    '稳定知识直答:一次也不许逼它搜'
+  )
+
+  const planM2 = parseResearchPlan({
+    parts: [],
+    mayChange: true,
+    stakesHigh: false,
+    asksSources: false,
+    aboutProject: false,
+    depth: 'quick'
+  })
+  assert.ok(planM2)
+  assert.deepEqual(
+    floorFromPlan(planM2),
+    { depth: 'quick', lookups: 2, fetches: 1, local: 0 },
+    '单一当前事实:快查并打开一次正文,合计落进 1-2 次'
+  )
+
+  const planM3 = parseResearchPlan({
+    parts: ['SQLite', 'DuckDB', 'ClickHouse'],
+    mayChange: true,
+    stakesHigh: false,
+    asksSources: false,
+    aboutProject: false,
+    depth: 'quick'
+  })
+  assert.ok(planM3)
+  assert.deepEqual(
+    floorFromPlan(planM3),
+    { depth: 'normal', lookups: 3, fetches: 1, local: 0 },
+    '多对象对比:模型报快查也要升到常规,每个对象至少一次'
+  )
+
+  const planM5 = parseResearchPlan({
+    parts: [],
+    mayChange: false,
+    stakesHigh: true,
+    asksSources: false,
+    aboutProject: false,
+    depth: 'none'
+  })
+  assert.ok(planM5)
+  assert.deepEqual(
+    floorFromPlan(planM5),
+    { depth: 'quick', lookups: 2, fetches: 1, local: 0 },
+    '法律/高风险:报直答也要先搜并打开原文'
+  )
+
+  const planM8 = parseResearchPlan({
+    parts: ['React', 'Vue', 'Angular', 'Svelte'],
+    mayChange: true,
+    stakesHigh: false,
+    asksSources: true,
+    aboutProject: false,
+    depth: 'normal'
+  })
+  assert.ok(planM8)
+  assert.deepEqual(
+    floorFromPlan(planM8),
+    { depth: 'deep', lookups: 8, fetches: 2, local: 0 },
+    '要来源又拆出多块:报常规也按深查准备,修 M8 深度'
+  )
+
+  const dirtyPlan = parseResearchPlan({
+    parts: [' A ', '', 'A', 'B', 3],
+    mayChange: 'yes',
+    stakesHigh: 1,
+    asksSources: true,
+    aboutProject: false,
+    depth: 'bogus'
+  })
+  assert.ok(dirtyPlan)
+  assert.deepEqual(dirtyPlan.parts, ['A', 'B'], 'parts 去空去重,非字符串丢掉')
+  assert.equal(dirtyPlan.mayChange, false, '字符串 yes 不算真布尔')
+  assert.equal(dirtyPlan.stakesHigh, false, '数字 1 不算真布尔')
+  assert.equal(dirtyPlan.depth, 'none', '不认识的档位按直答收')
+  assert.equal(parseResearchPlan(null), null, '参数读不出就明说读不懂')
+
+  const m3Floor = floorFromPlan(planM3)
+  assert.deepEqual(
+    unmetResearchFloor(m3Floor, { lookups: 1, fetches: 0, local: 0 }),
+    ['联网 1/3 次', '打开原文 0/1 次'],
+    '缺口按账本实数报'
+  )
+  assert.deepEqual(
+    unmetResearchFloor(m3Floor, { lookups: 3, fetches: 1, local: 0 }),
+    [],
+    '达标就没有缺口'
+  )
+
+  const m8Floor = floorFromPlan(planM8)
+  assert.equal(
+    shouldGateAnswer({
+      floor: m8Floor,
+      counts: { lookups: 2, fetches: 0, local: 0 },
+      nudges: 0,
+      hasNewProgress: true,
+      toolsAvailable: true,
+      webBudgetLeft: true
+    }),
+    true,
+    '没查够:打回去补查,不急着交卷'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: m8Floor,
+      counts: { lookups: 2, fetches: 0, local: 0 },
+      nudges: RESEARCH_GATE_MAX_NUDGES,
+      hasNewProgress: true,
+      toolsAvailable: true,
+      webBudgetLeft: true
+    }),
+    false,
+    '劝到上限就放行,不能死循环'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: m8Floor,
+      counts: { lookups: 2, fetches: 0, local: 0 },
+      nudges: 1,
+      hasNewProgress: false,
+      toolsAvailable: true,
+      webBudgetLeft: true
+    }),
+    false,
+    '上一劝之后没动手:放行,不空转'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: m8Floor,
+      counts: { lookups: 2, fetches: 0, local: 0 },
+      nudges: 0,
+      hasNewProgress: true,
+      toolsAvailable: true,
+      webBudgetLeft: false
+    }),
+    false,
+    '联网预算烧完:放行,让它用手头资料收尾'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: floorFromPlan(planM0),
+      counts: { lookups: 0, fetches: 0, local: 0 },
+      nudges: 0,
+      hasNewProgress: true,
+      toolsAvailable: true,
+      webBudgetLeft: false
+    }),
+    true,
+    '问项目且没翻本地:跟联网预算无关,照样要求先翻'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: floorFromPlan(planM1),
+      counts: { lookups: 0, fetches: 0, local: 0 },
+      nudges: 0,
+      hasNewProgress: true,
+      toolsAvailable: true,
+      webBudgetLeft: true
+    }),
+    false,
+    '直答档没有缺口:不拦'
+  )
+  assert.equal(
+    shouldGateAnswer({
+      floor: m8Floor,
+      counts: { lookups: 2, fetches: 0, local: 0 },
+      nudges: 0,
+      hasNewProgress: true,
+      toolsAvailable: false,
+      webBudgetLeft: true
+    }),
+    false,
+    '工具已经撤了:放行,不能让它无路可走'
+  )
+
+  const gateNudge = buildResearchGateNudge(['联网 1/3 次', '打开原文 0/1 次'])
+  assert.ok(gateNudge.startsWith(AGENT_RESEARCH_GATE_PREFIX), '补查令带固定前缀,瘦身时认得出')
+  assert.ok(gateNudge.includes('联网 1/3 次'), '差多少要写清楚')
+  assert.ok(gateNudge.includes('先按计划补查再交卷'), '明确要求先查再答')
+
+  const planOutcome = runResearchPlanCall({
+    parts: ['SQLite', 'DuckDB', 'ClickHouse'],
+    mayChange: true,
+    stakesHigh: false,
+    asksSources: false,
+    aboutProject: false,
+    depth: 'quick'
+  })
+  assert.ok(planOutcome.floor, '正常计划要算出下限')
+  assert.ok(planOutcome.content.includes('联网至少 3 次'), '工具结果要把程序下限告诉模型')
+  assert.ok(planOutcome.content.includes('SQLite'), '对象清单回给模型,照着查')
+  assert.ok(planOutcome.step.includes('常规'), '界面灰字要报升上来的档位')
+  const unreadablePlan = runResearchPlanCall(null)
+  assert.equal(unreadablePlan.floor, null, '读不懂计划表就不设下限,不硬造')
+  assert.ok(unreadablePlan.content.includes('没读懂'), '读不懂要明说')
+
+  assert.equal(PLAN_RESEARCH_TOOL.function.name, 'plan_research', '计划表登记名叫 plan_research')
+  assert.deepEqual(
+    [...PLAN_RESEARCH_TOOL.function.parameters.required],
+    ['parts', 'mayChange', 'stakesHigh', 'asksSources', 'aboutProject', 'depth'],
+    '六项字段全部必填'
+  )
+  assert.ok(
+    !AGENT_TOOLS.some((tool) => tool.function.name === 'plan_research'),
+    '计划表只在首轮临时给,不进常驻工具表'
+  )
+
+  // 24.1 爆仓判定认服务端原文:人话翻译把英文特征词盖掉了,不能因此跳过紧急瘦身
+  const overflowMessages: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '最新真问题' },
+    { role: 'user', content: `${AGENT_REMINDER_PREFIX}最新真问题` },
+    { role: 'tool', tool_call_id: 'call_1', content: '早先的资料' }
+  ]
+  const overflowFlags = {
+    repetitionRetried: false,
+    reminderFailsafe: false,
+    slimRetried: false,
+    skipNudgeOnce: false
+  }
+  const overflowDecision = handleAgentFailure({
+    round: {
+      status: 'error',
+      text: '材料塞不下模型的脑容量了:清点一下参考材料,或去设置里调大「模型上下文」',
+      detail: 'the request exceeds the available context size, try increasing it',
+      httpStatus: 400
+    },
+    messages: overflowMessages,
+    addendum: '',
+    useTools: true,
+    engineNoTools: false,
+    flags: overflowFlags,
+    doneCalls: new Set<string>(),
+    callIdToKey: new Map<string, string>()
+  })
+  assert.equal(overflowDecision.kind, 'retry', '爆仓要重试')
+  assert.ok(
+    overflowDecision.kind === 'retry' && overflowDecision.step.includes('脑容量'),
+    '爆仓走紧急瘦身,不能被提示词翻译成中文就漏判'
+  )
+  assert.equal(overflowFlags.reminderFailsafe, false, '爆仓不许消耗提醒卡兜底的那次机会')
+  assert.deepEqual(
+    overflowMessages,
+    [
+      { role: 'system', content: '人设' },
+      { role: 'user', content: '最新真问题' }
+    ],
+    '爆仓瘦身只保 system 和最新真问题'
+  )
+
+  // 普通 4xx 仍走提醒卡兜底:撤卡重答,不误判成爆仓
+  const reminderMessages: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '最新真问题' },
+    { role: 'user', content: `${AGENT_REMINDER_PREFIX}最新真问题` }
+  ]
+  const reminderFlags = {
+    repetitionRetried: false,
+    reminderFailsafe: false,
+    slimRetried: false,
+    skipNudgeOnce: false
+  }
+  const reminderDecision = handleAgentFailure({
+    round: {
+      status: 'error',
+      text: '模型服务返回错误(400):bad request',
+      detail: 'bad request',
+      httpStatus: 400
+    },
+    messages: reminderMessages,
+    addendum: '',
+    useTools: true,
+    engineNoTools: false,
+    flags: reminderFlags,
+    doneCalls: new Set<string>(),
+    callIdToKey: new Map<string, string>()
+  })
+  assert.equal(reminderDecision.kind, 'retry', '普通 4xx 也要重试')
+  assert.ok(
+    reminderDecision.kind === 'retry' && reminderDecision.step.includes('小注记'),
+    '普通 4xx 走撤卡兜底'
+  )
+  assert.equal(reminderFlags.reminderFailsafe, true, '撤卡兜底只兜一次')
 
   console.log(
     '✅ agent 纯逻辑自测:路径安检 / 文件授权令牌(拖入即授权) / 额度 / 参数清洗 / 护栏 / 播报话术 / 流式碎片拼装 / 自动压缩 / 提醒卡垫撤 / 翻文件切片口径 / web_search 三道闸与上网守则 / 分流 / 紧急瘦身 / 黑名单兜底拼装 / 流式封板与正文不撤回 全部通过'

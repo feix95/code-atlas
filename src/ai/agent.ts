@@ -19,6 +19,7 @@ import { detectRepetitionTail } from './repetition.ts'
 import { AI_ANTI_REPEAT_PARAMS, CHAT_TEMPERATURE } from '../shared/aiDefaults.ts'
 import { TAG } from '../shared/promptTags.ts'
 import { TOOL_NAMES } from '../shared/agentTools.ts'
+import { PLAN_RESEARCH_TOOL } from './researchPlan.ts'
 import { assembleToolCalls, pickAgentTools } from './agentToolSpec.ts'
 import { AGENT_WEB_MAX_LOOKUPS } from './agentGuard.ts'
 import type {
@@ -31,7 +32,6 @@ import type {
 // 老登记转手(实现在各专属模块,保住 import 路径)
 export {
   AGENT_READ_LIMIT_MAX,
-  AGENT_CHARS_PER_TOKEN,
   AGENT_KEEP_RECENT_TOOLS,
   AGENT_STUB_MIN_CHARS,
   AGENT_STUB_HEAD_CHARS,
@@ -121,15 +121,25 @@ export function agentReadChars(contextTokens: number): number {
 export const AGENT_WEB_ADDENDUM = `
 
 ${TAG.webAccess.open}
-你可以用 ${TOOL_NAMES.webSearch} 联网查公开资料。该搜就搜,不用等用户点名。先按三个问题定深度;三个问题一起看,任何一条要求搜就搜,别因为觉得知识稳定,就跳过对比、研究或要来源的题:
+你可以用 ${TOOL_NAMES.webSearch} 联网查公开资料。该搜就搜,不用等用户点名。一开始先调用 ${TOOL_NAMES.planResearch} 填研究计划,把题拆开:
+- parts:要分别查的独立对象(每个产品/项目/仓库/法条/人物一项;同一门语言里的概念不拆)
+- mayChange:答案会不会随时间变(版本、价格、政策、职位、谁还在做、最近动态;带“现在/还/最新”算会)
+- stakesHigh:答错代价大(具体剂量、法律条款、买卖决定、安全操作、不可逆动作)
+- asksSources:用户要研究、全面、最新进展,或明说要来源
+- aboutProject:问的是当前项目里的代码或实现
+- depth:none 直答 / quick 一个点 / normal 对比多对象 / deep 研究
 
-1. 会不会变:原理、定义、语法、历史,直接答;版本、价格、政策、职位、谁还在做、最近发生了什么,必须搜,哪怕你觉得知道;拿不准或带“现在/还/最新”,就搜。
-2. 要答几块:一个点,1-2 次够就停;对比、多对象、多部分、开放推荐,分开搜,合计 3-8 次;要研究/全面/最新进展,或结论影响实际决策且信息分散,按 8-20 次准备。从低档起步,不够再升,别一上来铺最大。
-3. 答错代价多大:具体剂量、法律条款、买卖决定、安全操作、不可逆动作,必须先搜,至少两个独立来源或一个权威原始来源,找不到就明说;日常问题一个可靠来源够用。
+三个问题一起看,任何一条要求搜就搜,别因为觉得知识稳定,就跳过对比、研究或要来源的题:
+1. 会不会变:原理、定义、语法、历史,直接答;版本、价格、政策、职位、最近动态,必须搜,哪怕你觉得知道;拿不准或带“现在/还/最新”,就搜。
+2. 要答几块:一个点,1-2 次够就停;对比、多对象,分开搜,合计 3-8 次;要研究/全面/最新进展,按 8-20 次准备。从低档起步,不够再升。
+3. 答错代价多大:具体剂量、法律条款、买卖决定、安全操作、不可逆动作,必须先搜,至少两个独立来源或一个权威原始来源,找不到就明说。
+
+例:“SQLite、DuckDB、ClickHouse 各适合什么” → parts 三项、depth normal;“list 和 tuple 的区别” → parts 空、depth none。“我觉得我知道”不是填 none 的理由。程序按你填的定最低查证量,没到数会请你补,别急着交卷。
 
 查法:
 - 搜索词由你提炼,一次只给一个短词:先主体(产品名、仓库名、报错原文),不够再按方面补。别拿整句长问题硬搜,绝不把本地路径、代码片段、文件内容、对话里其他产品名拼进去 —— 隐私红线,也会把结果带偏。
 - 先看标题、链接和摘要:泛泛介绍,摘要够答就停;涉及具体数字、版本、政策、对比,或摘要说法不一,必须挑最值得的一两条用 ${TOOL_NAMES.webFetch} 打开正文核对,不能只信摘要。
+- 用户给了网址或仓库,原样打开,不要改写地址。
 - 读完一页,把 1-3 条有用事实用 ${TOOL_NAMES.researchNote} 记下(一句一条)。
 - 答非所问、全是别家产品或只有泛泛介绍:换个更短更准的角度再搜。同一个词不搜第二遍;换词不算重复。
 - 每搜完一轮,在思考里记一句“确认了什么、还缺什么”,再决定下一步。
@@ -185,6 +195,8 @@ export async function agentRound(
     webToolsEnabled?: boolean
     /** GitHub 远程根是否进工具表:联网开着即可,不跟网页预算抢 */
     githubToolsEnabled?: boolean
+    /** 首轮强制填研究计划:工具表只给 plan_research,并要求必须调用 */
+    forcePlan?: boolean
     onDelta?: (ev: AgentStreamEvent) => void
   }
 ): Promise<AgentRoundResult> {
@@ -204,16 +216,19 @@ export async function agentRound(
         max_tokens: opts.maxTokens,
         stream: true,
         stream_options: { include_usage: true },
-        // 工具表按「联网查证」开关与预算分层:开着且还有预算才亮联网件,否则只给本地件
-        ...(opts.useTools
-          ? {
-              tools: pickAgentTools(
-                opts.webToolsEnabled === true,
-                opts.githubToolsEnabled === true
-              ),
-              tool_choice: 'auto'
-            }
-          : {}),
+        // 首轮强制填研究计划:只亮这一件并点名调用,模型没法跳过判档;
+        // 其余轮次工具表按「联网查证」开关与预算分层
+        ...(opts.forcePlan
+          ? { tools: [PLAN_RESEARCH_TOOL], tool_choice: 'required' }
+          : opts.useTools
+            ? {
+                tools: pickAgentTools(
+                  opts.webToolsEnabled === true,
+                  opts.githubToolsEnabled === true
+                ),
+                tool_choice: 'auto'
+              }
+            : {}),
         // 和普通聊天同一口径:思考开关只对内置引擎发(外接服务不认这个字段)
         ...(!opts.allowThinking && config.timings
           ? { chat_template_kwargs: { enable_thinking: false } }
@@ -225,6 +240,7 @@ export async function agentRound(
       return {
         status: 'error',
         text: post.text,
+        detail: post.detail,
         toolsUnsupported: looksLikeToolsUnsupported(post.httpStatus, post.detail),
         httpStatus: post.httpStatus
       }

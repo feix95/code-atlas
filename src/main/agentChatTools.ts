@@ -33,6 +33,12 @@ export interface AgentToolLedger {
   callIdToKey: Map<string, string>
   webSearchCalls: number
   webFetchCalls: number
+  /** 真抓到正文的 web_fetch 次数:计划下限只认这个,打不开不算 */
+  webFetchOk: number
+  /** 成功打开的 GitHub 仓库:和打开原文同算一次「看了原始出处」 */
+  githubOpens: number
+  /** 项目内本地文件调用:问项目的问题靠它对账 */
+  localFileCalls: number
   webQueries: string[]
   webSources: string[]
   webLinks: WebLookupLink[]
@@ -106,7 +112,10 @@ async function fulfillOneCall(
   }
   if (prep.name === TOOL_NAMES.webSearch || prep.name === TOOL_NAMES.webFetch) {
     if (prep.name === TOOL_NAMES.webSearch) ledger.webSearchCalls += 1
-    else ledger.webFetchCalls += 1
+    else {
+      ledger.webFetchCalls += 1
+      if (run.ok) ledger.webFetchOk += 1
+    }
     for (const q of run.queries)
       if (q !== '' && !ledger.webQueries.includes(q)) ledger.webQueries.push(q)
     for (const s of run.sources)
@@ -150,6 +159,8 @@ async function fulfillOneCall(
       ledger.webLinks
     )
   }
+  if (run.ok && prep.name === TOOL_NAMES.openGithubRepo) ledger.githubOpens += 1
+  if (run.ok && prep.isFileTool && prep.root?.kind !== 'github') ledger.localFileCalls += 1
   if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) ledger.toolCallsExecuted += 1
   return { role: 'tool', tool_call_id: call.id, content: run.content }
 }
