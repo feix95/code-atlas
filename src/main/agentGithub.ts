@@ -1,5 +1,5 @@
 // 公开 GitHub 仓库当远程只读根:Trees API 拉文件树,raw.githubusercontent.com 读正文。
-// 不占网页搜索 8 次预算;树缓存在内存,关应用即失效。
+// 不占网页搜索预算;树缓存在内存,关应用即失效。
 import { net } from 'electron'
 import { IGNORED_NAMES } from '../scanner/index.ts'
 import {

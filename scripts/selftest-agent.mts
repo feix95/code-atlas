@@ -372,7 +372,7 @@ async function main(): Promise<void> {
   // 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后
   assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 32, '轮数封顶得是个讲道理的数')
   assert.equal(AGENT_MAX_ROUNDS, 24, '翻文件轮次封顶 24,留给远程根翻文件')
-  assert.equal(AGENT_WEB_MAX_LOOKUPS, 8, '联网研究预算固定 8 次')
+  assert.equal(AGENT_WEB_MAX_LOOKUPS, 20, '联网研究预算固定 20 次,只防无界搜索')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
   assert.ok(
@@ -825,13 +825,12 @@ async function main(): Promise<void> {
   assert.ok(AGENT_WEB_ADDENDUM.includes('换词不算重复'), '换词重查要明确豁免防打转')
   assert.ok(AGENT_WEB_ADDENDUM.includes('没查到'), '查不到要教它老实说')
   assert.ok(AGENT_WEB_ADDENDUM.includes('一次只给一个短词'), '搜索词由模型自己提炼成短词')
-  assert.ok(AGENT_WEB_ADDENDUM.includes('信息够了就收尾'), '要教模型自己判断够了就停,不靠程序硬拦')
   assert.ok(AGENT_WEB_ADDENDUM.includes('标题和链接'), '结果里带链接,模型才知道能引用哪条')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不是用户提供的'), '上网守则要写清查来的资料不是用户给的')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不用等用户点名'), '拿不准要自己搜,不等用户点名')
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_fetch'), '上网守则要点名打开网页的工具')
   assert.ok(AGENT_WEB_ADDENDUM.includes('open_github_repo'), '上网守则要点名打开 GitHub 仓库')
-  assert.ok(AGENT_WEB_ADDENDUM.includes('不占上面'), 'GitHub 远程根不占网页 8 次预算')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('不占上面'), 'GitHub 远程根不占网页预算')
   assert.ok(
     !AGENT_FILES_ADDENDUM.includes('web_search'),
     '没开联网时切片不提 web_search:模型连有这工具都不该知道'
@@ -839,6 +838,84 @@ async function main(): Promise<void> {
   assert.ok(
     !AGENT_WEB_ADDENDUM.includes('source'),
     'source 分流已退役(源序程序统一排),守则里不该再教它挑源'
+  )
+
+  // 17.1 研究深度自适应:三问定档,不给「信息够了」这种模糊口令
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('会不会变') &&
+      AGENT_WEB_ADDENDUM.includes('要答几块') &&
+      AGENT_WEB_ADDENDUM.includes('答错代价多大'),
+    '三问要逐条点名:会不会变 / 要答几块 / 答错代价多大'
+  )
+  assert.ok(!AGENT_WEB_ADDENDUM.includes('信息够了就收尾'), '旧的模糊收尾口令已退役,收尾改看覆盖')
+
+  // 17.2 四档与从低档起步:直答 0 次、快查 1-2 次、常规 3-8 次、深查 8-20 次
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('1-2 次') &&
+      AGENT_WEB_ADDENDUM.includes('3-8 次') &&
+      AGENT_WEB_ADDENDUM.includes('8-20 次'),
+    '四档的次数区间要写全:1-2 / 3-8 / 8-20'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('从低档起步'), '够用就停,不够再升,不许一上来铺最大')
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('防止无界搜索的硬上限') &&
+      AGENT_WEB_ADDENDUM.includes(`最多 ${AGENT_WEB_MAX_LOOKUPS} 次`),
+    '20 次要说清是防无界搜索的硬上限,不是任务指标'
+  )
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('三个问题一起看') &&
+      AGENT_WEB_ADDENDUM.includes('任何一条要求搜就搜') &&
+      AGENT_WEB_ADDENDUM.includes('别因为觉得知识稳定'),
+    '三问要一起看:任何一条要求搜就搜,不能因知识稳定跳过对比/研究/来源题'
+  )
+
+  // 17.3 具体事实必须落到正文,不能只信摘要
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('涉及具体数字、版本、政策、对比') &&
+      AGENT_WEB_ADDENDUM.includes('打开正文核对') &&
+      AGENT_WEB_ADDENDUM.includes('不能只信摘要'),
+    '具体数字/版本/政策/对比必须打开正文核对'
+  )
+
+  // 17.4 收尾看覆盖:逐条对结论、排除备选、两轮无新增即收、缺失如实说
+  assert.ok(AGENT_WEB_ADDENDUM.includes('收尾不看次数'), '收尾看覆盖,不看搜了几次')
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('每个关键结论都要有资料撑着'),
+    '写答案前逐条对照,关键结论都要有出处'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('用搜索排除不对的'), '多个可能答案时要用搜索证伪')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('连续两轮没有新东西'), '两轮无新增就收尾,别打转')
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('没搜到') &&
+      AGENT_WEB_ADDENDUM.includes('不等于') &&
+      AGENT_WEB_ADDENDUM.includes('不存在'),
+    '没搜到不等于不存在,不许把推测说成事实'
+  )
+
+  // 17.5 来源质量:原始来源优先,论坛和聚合站只作旁证
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('官方站、原始文档、GitHub、论文/政府/公司公告'),
+    '原始来源要逐类点名'
+  )
+  assert.ok(AGENT_WEB_ADDENDUM.includes('论坛和聚合站只作旁证'), '论坛不能和官方站并列')
+  assert.ok(!AGENT_WEB_ADDENDUM.includes('Reddit、知乎'), '论坛不再作为优先来源推荐')
+
+  // 17.6 高风险问题:两个独立来源或一个权威原始来源
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('两个独立来源或一个权威原始来源'),
+    '高风险问题要抬高来源门槛'
+  )
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('具体剂量') &&
+      AGENT_WEB_ADDENDUM.includes('法律条款') &&
+      AGENT_WEB_ADDENDUM.includes('买卖决定') &&
+      AGENT_WEB_ADDENDUM.includes('安全操作') &&
+      AGENT_WEB_ADDENDUM.includes('不可逆动作'),
+    '高风险场景要逐类点名'
+  )
+  assert.ok(
+    AGENT_WEB_ADDENDUM.includes('不可逆动作,必须先搜'),
+    '高风险问题要先搜再答,不能凭记忆下结论'
   )
 
   // 18. Tavily 响应解析(2026-09-17 接 Tavily 打头):洗成搜索命中,脏数据一律跳过

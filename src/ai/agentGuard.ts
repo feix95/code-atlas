@@ -9,8 +9,8 @@ export const REPEAT_NUDGE = `${TAG.programNote.open}这个你刚才已经看过�
 /** 工具轮数烧完后的逼卷令:当一条普通消息插进对话,模型只能交答案 */
 export const ROUND_CAP_NUDGE = `${TAG.programReminder.open}\n翻看步数已到上限 —— 别再调用任何工具了,就用现在已经看到的资料,直接把答案完整说完。\n${TAG.programReminder.close}`
 
-/** 联网研究预算:搜索与打开网页合计最多几次(产品定 8 次,防止无限搜) */
-export const AGENT_WEB_MAX_LOOKUPS = 8
+/** 联网研究预算:搜索与打开网页合计最多几次(产品定 20 次,防止无界搜索;不是任务指标) */
+export const AGENT_WEB_MAX_LOOKUPS = 20
 
 /** 联网预算用满后的收尾令:工具表里已经撤掉联网件,这轮只能用手头资料 */
 export const WEB_BUDGET_NUDGE = `${TAG.programReminder.open}\n联网研究已用满 ${AGENT_WEB_MAX_LOOKUPS} 次,现在不再提供 web_search / web_fetch;open_github_repo 仍可用。用已经搜到的资料和网页节选把答案收尾;资料不够就如实说明哪部分没查到,不要假装看过。\n${TAG.programReminder.close}`

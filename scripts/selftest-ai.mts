@@ -1927,8 +1927,8 @@ async function main(): Promise<void> {
     AGENT_WEB_ADDENDUM +
     buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' })
   assert.ok(
-    agentFullSystem.length <= 2300,
-    `agent 全量人设 ≤2300 字(2200 → 2300:加 GitHub 远程根说明的硬成本),实测 ${agentFullSystem.length}`
+    agentFullSystem.length <= 2611,
+    `agent 全量人设 ≤2611 字(2300 → 2611:三问四档研究深度的硬成本,含真机迭代的联合判断规则),实测 ${agentFullSystem.length}`
   )
   const toolsJson = JSON.stringify(AGENT_TOOLS).length
   // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
