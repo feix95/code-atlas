@@ -1869,8 +1869,8 @@ async function main(): Promise<void> {
     AGENT_WEB_ADDENDUM +
     buildPersonalizationPrompt({ ...DEFAULT_PERSONALIZATION, tone: 'friendly' })
   assert.ok(
-    agentFullSystem.length <= 2200,
-    `agent 全量人设 ≤2200 字(2.0 内核+XML 标签后放宽,实测 ${agentFullSystem.length})`
+    agentFullSystem.length <= 2300,
+    `agent 全量人设 ≤2300 字(2200 → 2300:加 GitHub 远程根说明的硬成本),实测 ${agentFullSystem.length}`
   )
   const toolsJson = JSON.stringify(AGENT_TOOLS).length
   // ⚠️ 口径冲突,等 lead 定夺:任务书写的红线是 ≤1000 字,但逐字稿 L 的说明文本 +
@@ -1881,8 +1881,8 @@ async function main(): Promise<void> {
   // 协议骨架本身就要 +55 字(裸参数都不带描述的极限),加上最精简的说明共实测 1318,
   // 压回 1200 已不可能;秤挪到 1320,继续待 lead 定夺要不要砍说明文字。
   assert.ok(
-    toolsJson <= 1850,
-    `联网开着七件工具说明书 JSON ≤1850 字(1550 → 1850:加 save_research_note 的硬成本),实测 ${toolsJson}`
+    toolsJson <= 2200,
+    `联网开着八件工具说明书 JSON ≤2200 字(1850 → 2200:加 open_github_repo 的硬成本),实测 ${toolsJson}`
   )
 
   console.log('✅ AI 人话解释自测全部通过')

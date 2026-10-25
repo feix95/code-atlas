@@ -18,9 +18,11 @@ import {
   AGENT_SEARCH_MAX_MATCHES,
   AGENT_SEARCH_MAX_PATH_HITS,
   AGENT_TOOLS,
+  AGENT_TOOLS_GITHUB,
   AGENT_WEB_MAX_LOOKUPS,
   AGENT_TOOLS_LOCAL,
   AGENT_WEB_ADDENDUM,
+  pickAgentTools,
   ROUND_CAP_NUDGE,
   REPEAT_NUDGE,
   agentPromptBudget,
@@ -69,6 +71,16 @@ import {
   sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
+import {
+  githubDisplayPath,
+  githubRawFileUrl,
+  githubRepoKey,
+  listGithubTree,
+  parseGithubRepoMeta,
+  parseGithubTreePayload,
+  parseGitHubRepoUrl,
+  searchGithubTreePaths
+} from '../src/ai/githubRepo.ts'
 
 async function main(): Promise<void> {
   // 1. 路径安检:项目内相对路径放行,越界的花活一律拒收
@@ -161,6 +173,29 @@ async function main(): Promise<void> {
     )
     await assert.rejects(joinAuthorizedRoot(realNote, 'x.txt'), '穿沙盒:带子路径越不过去')
     await assert.rejects(joinAuthorizedRoot(realNote, '../x'), '穿沙盒:上跳越不过去')
+    const githubGrant = access.grantGithub('github.com/foo/bar@main')
+    assert.deepEqual(
+      githubGrant,
+      { rootId: 'github_1', path: 'github.com/foo/bar@main', kind: 'github' },
+      '公开仓库拿到独立的 github_ 编号,不跟本地令牌抢号'
+    )
+    assert.deepEqual(
+      access.grantGithub('github.com/foo/bar@main'),
+      githubGrant,
+      '同一仓库同一分支重复打开复用原授权令牌'
+    )
+    assert.deepEqual(
+      access.resolve('E:\\project', 'github_1'),
+      {
+        rootId: 'github_1',
+        path: 'github.com/foo/bar@main',
+        external: true,
+        kind: 'github'
+      },
+      'GitHub 编号只解到那份远程展示名'
+    )
+    assert.equal(sanitizeAgentRootId('github_1'), 'github_1', 'github_ 编号格式放行')
+    assert.equal(sanitizeAgentRootId('github_0'), null, '伪造的零号 GitHub 根拒收')
   } finally {
     await rm(grantSandbox, { recursive: true, force: true })
   }
@@ -213,13 +248,13 @@ async function main(): Promise<void> {
   )
   assert.equal(
     AGENT_TOOLS.length,
-    7,
-    '联网查证开着,全量工具表多 web_search、web_fetch 和 save_research_note'
+    8,
+    '联网查证开着,全量工具表多 web_search、web_fetch、save_research_note 和 open_github_repo'
   )
 
   // 工具名总账(shared/agentTools):名单、词表、认名闸三样互相对得上 —— 多一件少一件当场拦
   const registered = Object.values(TOOL_NAMES)
-  assert.equal(registered.length, 7, '登记表登记七件工具')
+  assert.equal(registered.length, 8, '登记表登记八件工具')
   assert.deepEqual(
     AGENT_TOOLS.map((t) => t.function.name).sort(),
     [...registered].sort(),
@@ -269,6 +304,15 @@ async function main(): Promise<void> {
   assert.deepEqual(fetchTool.function.parameters.required, ['url'], 'web_fetch 必须带 url')
   const noteTool = AGENT_TOOLS.find((t) => t.function.name === 'save_research_note')!
   assert.deepEqual(noteTool.function.parameters.required, ['note'], '研究笔记必须带 note')
+  const githubTool = AGENT_TOOLS.find((t) => t.function.name === 'open_github_repo')!
+  assert.deepEqual(githubTool.function.parameters.required, ['url'], '打开仓库必须带 url')
+  assert.deepEqual(pickAgentTools(true, true), AGENT_TOOLS, '网页预算还在时发全量工具表(含 GitHub)')
+  assert.deepEqual(
+    pickAgentTools(false, true).map((t) => t.function.name),
+    AGENT_TOOLS_GITHUB.map((t) => t.function.name),
+    '网页预算用完仍留 open_github_repo'
+  )
+  assert.deepEqual(pickAgentTools(false, false), AGENT_TOOLS_LOCAL, '没开联网只发本地四件')
 
   // 7. 步骤播报:翻什么、看成没看成,一句大白话
   assert.ok(
@@ -308,6 +352,10 @@ async function main(): Promise<void> {
     agentStepText('web_fetch', 'https://example.com', 'done').includes('打开了'),
     '打开网页说「打开了」'
   )
+  assert.ok(
+    agentStepText('open_github_repo', 'https://github.com/foo/bar', 'done').includes('GitHub'),
+    '打开仓库说「GitHub 仓库」'
+  )
 
   // 8. token 总账:读写累加,速度认最后一轮
   assert.deepEqual(
@@ -322,7 +370,8 @@ async function main(): Promise<void> {
   assert.equal(mergeUsage(undefined, undefined), undefined, '两轮都没账就是没账')
 
   // 9. 护栏阈值:轮数封顶、名单封顶、搜索封顶、守则垫在人设后
-  assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 16, '轮数封顶得是个讲道理的数')
+  assert.ok(AGENT_MAX_ROUNDS >= 4 && AGENT_MAX_ROUNDS <= 32, '轮数封顶得是个讲道理的数')
+  assert.equal(AGENT_MAX_ROUNDS, 24, '翻文件轮次封顶 24,留给远程根翻文件')
   assert.equal(AGENT_WEB_MAX_LOOKUPS, 8, '联网研究预算固定 8 次')
   assert.ok(AGENT_LIST_MAX_ENTRIES >= 100, '名单封顶不能小气到列不完小项目')
   assert.ok(AGENT_SEARCH_MAX_FILES >= 500, '搜索扫的文件数不能小气到扫不完小项目')
@@ -582,6 +631,119 @@ async function main(): Promise<void> {
   assert.equal(sanitizeWebFetchUrl('http://127.0.0.1/secret'), null, '内网地址拒收')
   assert.equal(sanitizeWebFetchUrl('C:\\Users\\me\\file.md'), null, '本地路径拒收')
 
+  assert.deepEqual(
+    parseGitHubRepoUrl('https://github.com/sst/opencode'),
+    { owner: 'sst', repo: 'opencode', ref: null, blobPath: null },
+    '仓库首页解析出 owner/repo'
+  )
+  assert.deepEqual(
+    parseGitHubRepoUrl('https://github.com/sst/opencode.git'),
+    { owner: 'sst', repo: 'opencode', ref: null, blobPath: null },
+    '.git 后缀剥掉'
+  )
+  assert.deepEqual(
+    parseGitHubRepoUrl('https://www.github.com/sst/opencode/tree/dev/packages'),
+    { owner: 'sst', repo: 'opencode', ref: 'dev', blobPath: null },
+    'tree 页带上分支,子目录不当 blob'
+  )
+  assert.deepEqual(
+    parseGitHubRepoUrl('https://github.com/sst/opencode/blob/dev/README.md'),
+    { owner: 'sst', repo: 'opencode', ref: 'dev', blobPath: 'README.md' },
+    'blob 页记下文件路径,打开后提示用 read_file'
+  )
+  assert.equal(parseGitHubRepoUrl('https://gist.github.com/foo/bar'), null, 'gist 拒收')
+  assert.equal(parseGitHubRepoUrl('https://gitlab.com/foo/bar'), null, '非 github.com 拒收')
+  assert.equal(parseGitHubRepoUrl('not a url'), null, '不是 URL 拒收')
+  assert.equal(
+    githubDisplayPath('sst', 'opencode', 'dev'),
+    'github.com/sst/opencode@dev',
+    '远程根展示名带分支'
+  )
+  assert.equal(
+    githubRawFileUrl('sst', 'opencode', 'dev', 'src/a.ts'),
+    'https://raw.githubusercontent.com/sst/opencode/dev/src/a.ts',
+    '正文走 raw.githubusercontent.com'
+  )
+  assert.equal(
+    githubRawFileUrl('sst', 'opencode', 'feature/foo', 'a.ts'),
+    'https://raw.githubusercontent.com/sst/opencode/feature/foo/a.ts',
+    '带斜杠的分支在 raw 地址里按路径段拼,不整段转义'
+  )
+  assert.equal(
+    githubRepoKey({ owner: 'SST', repo: 'OpenCode', ref: 'dev', blobPath: null }),
+    'sst/opencode@dev'
+  )
+  assert.deepEqual(
+    parseGithubRepoMeta({
+      full_name: 'sst/opencode',
+      default_branch: 'dev',
+      private: false
+    }),
+    { owner: 'sst', repo: 'opencode', defaultBranch: 'dev', private: false },
+    '公开仓库元信息放行'
+  )
+  assert.equal(
+    parseGithubRepoMeta({ full_name: 'sst/opencode', default_branch: 'dev', private: true })
+      ?.private,
+    true,
+    '私有仓库标出来让执行手拒'
+  )
+  assert.equal(parseGithubRepoMeta({ default_branch: 'dev' }), null, '缺 full_name 拒收')
+  const tree = parseGithubTreePayload({
+    truncated: true,
+    tree: [
+      { path: 'README.md', type: 'blob' },
+      { path: 'src', type: 'tree' },
+      { path: 'src/index.ts', type: 'blob' },
+      { path: 'node_modules/pkg/index.js', type: 'blob' },
+      { path: 'vendor/lib', type: 'commit' },
+      { path: '', type: 'blob' }
+    ]
+  })
+  assert.ok(tree, '文件树回包能解析')
+  assert.equal(tree?.truncated, true, 'GitHub 截断标记原样留下')
+  assert.deepEqual(
+    tree?.entries.map((e) => e.path),
+    ['README.md', 'src', 'src/index.ts', 'node_modules/pkg/index.js'],
+    '子模块和空路径丢掉,杂物堆留给 list 过滤器'
+  )
+  const ignored = new Set(['node_modules'])
+  const listed = listGithubTree(tree?.entries ?? [], {
+    relPath: '',
+    ignored,
+    maxEntries: 10,
+    maxDepth: 12
+  })
+  assert.deepEqual(
+    listed.lines,
+    ['README.md', 'src/', 'src/index.ts'],
+    '名单带尾斜杠,node_modules 绕开'
+  )
+  const srcOnly = listGithubTree(tree?.entries ?? [], {
+    relPath: 'src',
+    ignored,
+    maxEntries: 10,
+    maxDepth: 12
+  })
+  assert.deepEqual(srcOnly.lines, ['src/index.ts'], '子目录只列自己下面的')
+  const hits = searchGithubTreePaths(tree?.entries ?? [], {
+    keyword: 'index',
+    relPath: '',
+    ignored,
+    maxHits: 20
+  })
+  assert.deepEqual(hits.paths, ['src/index.ts'], '路径搜索只认 blob,且绕开忽略名单')
+  assert.equal(
+    searchGithubTreePaths(tree?.entries ?? [], {
+      keyword: '  ',
+      relPath: '',
+      ignored,
+      maxHits: 20
+    }).paths.length,
+    0,
+    '空关键词不搜'
+  )
+
   assert.equal(isPublicHttpUrl('https://html.duckduckgo.com/html/?q=a'), true, '公网 https 放行')
   assert.equal(isPublicHttpUrl('http://example.com/'), true, '公网 http 放行')
   assert.equal(isPublicHttpUrl('http://localhost:5173/'), false, 'localhost 拒收')
@@ -668,6 +830,8 @@ async function main(): Promise<void> {
   assert.ok(AGENT_WEB_ADDENDUM.includes('不是用户提供的'), '上网守则要写清查来的资料不是用户给的')
   assert.ok(AGENT_WEB_ADDENDUM.includes('不用等用户点名'), '拿不准要自己搜,不等用户点名')
   assert.ok(AGENT_WEB_ADDENDUM.includes('web_fetch'), '上网守则要点名打开网页的工具')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('open_github_repo'), '上网守则要点名打开 GitHub 仓库')
+  assert.ok(AGENT_WEB_ADDENDUM.includes('不占上面'), 'GitHub 远程根不占网页 8 次预算')
   assert.ok(
     !AGENT_FILES_ADDENDUM.includes('web_search'),
     '没开联网时切片不提 web_search:模型连有这工具都不该知道'

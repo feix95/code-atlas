@@ -145,13 +145,43 @@ export const SAVE_RESEARCH_NOTE_TOOL = {
   }
 } as const
 
-/** 全量工具表(联网查证开着):本地四件 + web_search + web_fetch + save_research_note */
+/** 联网件 open_github_repo:公开仓库当只读根,之后沿用 list/read/search + rootId */
+export const OPEN_GITHUB_REPO_TOOL = {
+  type: 'function',
+  function: {
+    name: TOOL_NAMES.openGithubRepo,
+    description: '打开公开 GitHub 仓库当只读根,返回 rootId。',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'github.com 仓库地址' }
+      },
+      required: ['url']
+    }
+  }
+} as const
+
+/** 搜索预算用完后仍可打开 GitHub 仓库:本地四件 + open_github_repo */
+export const AGENT_TOOLS_GITHUB = [...AGENT_TOOLS_LOCAL, OPEN_GITHUB_REPO_TOOL]
+
+/** 全量工具表(联网查证开着):本地四件 + 搜索/打开网页 + 研究笔记 + GitHub 仓库 */
 export const AGENT_TOOLS = [
   ...AGENT_TOOLS_LOCAL,
   WEB_SEARCH_TOOL,
   WEB_FETCH_TOOL,
-  SAVE_RESEARCH_NOTE_TOOL
+  SAVE_RESEARCH_NOTE_TOOL,
+  OPEN_GITHUB_REPO_TOOL
 ]
+
+/** 本轮发给模型的工具表:网页预算和 GitHub 根分开闸 */
+export function pickAgentTools(
+  web: boolean,
+  github: boolean
+): typeof AGENT_TOOLS | typeof AGENT_TOOLS_GITHUB | typeof AGENT_TOOLS_LOCAL {
+  if (web) return AGENT_TOOLS
+  if (github) return AGENT_TOOLS_GITHUB
+  return AGENT_TOOLS_LOCAL
+}
 
 /** arguments 字段洗成对象(纯函数,自测覆盖):字符串 JSON / 直接对象都收,坏的重伤不治给 null */
 export function parseToolArgs(raw: unknown): Record<string, unknown> | null {

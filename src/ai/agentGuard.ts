@@ -13,7 +13,7 @@ export const ROUND_CAP_NUDGE = `${TAG.programReminder.open}\n翻看步数已到�
 export const AGENT_WEB_MAX_LOOKUPS = 8
 
 /** 联网预算用满后的收尾令:工具表里已经撤掉联网件,这轮只能用手头资料 */
-export const WEB_BUDGET_NUDGE = `${TAG.programReminder.open}\n联网研究已用满 ${AGENT_WEB_MAX_LOOKUPS} 次,现在不再提供 web_search / web_fetch。用已经搜到的资料和网页节选把答案收尾;资料不够就如实说明哪部分没查到,不要假装看过。\n${TAG.programReminder.close}`
+export const WEB_BUDGET_NUDGE = `${TAG.programReminder.open}\n联网研究已用满 ${AGENT_WEB_MAX_LOOKUPS} 次,现在不再提供 web_search / web_fetch;open_github_repo 仍可用。用已经搜到的资料和网页节选把答案收尾;资料不够就如实说明哪部分没查到,不要假装看过。\n${TAG.programReminder.close}`
 
 /** 提醒卡的触发门槛:本场工具调用满这么多次才开始垫提醒卡 ——
  *  前两三轮资料还少,提醒卡只会稀释注意力,不垫 */

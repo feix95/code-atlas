@@ -52,7 +52,7 @@ export async function runAgentChat(input: {
   signal: AbortSignal
   startedAt: number
   webLookup: WebLookupMeta
-  /** 联网查证开着 = 工具表里多 web_search / web_fetch,人设后面多垫一段上网守则 */
+  /** 联网查证开着 = 工具表里多 web_search / web_fetch / open_github_repo,人设后面多垫一段上网守则 */
   webSearchEnabled: boolean
   /** Tavily 的 Key(可选):填了 web_search 的源队列 Tavily 打头 */
   tavilyKey?: string
@@ -149,6 +149,7 @@ export async function runAgentChat(input: {
       allowThinking,
       useTools,
       webToolsEnabled,
+      githubToolsEnabled: input.webSearchEnabled,
       onDelta: (ev) => {
         if (ev.seal) sealedAny = true
         sendAgentDelta(event, requestId, ev)

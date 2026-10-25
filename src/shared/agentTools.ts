@@ -11,7 +11,8 @@ export const TOOL_NAMES = {
   requestDirectoryAccess: 'request_directory_access',
   webSearch: 'web_search',
   webFetch: 'web_fetch',
-  researchNote: 'save_research_note'
+  researchNote: 'save_research_note',
+  openGithubRepo: 'open_github_repo'
 } as const
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES]
@@ -75,5 +76,11 @@ export const TOOL_STEP_WORDS: Record<
     what: '这条研究要点',
     repeat: '这条要点已经记过了,不用再记',
     error: '记不下'
+  },
+  [TOOL_NAMES.openGithubRepo]: {
+    verb: '打开了',
+    what: '这个 GitHub 仓库',
+    repeat: '这个仓库已经打开过了',
+    error: '打不开这个仓库'
   }
 }

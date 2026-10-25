@@ -1,13 +1,14 @@
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, win32 } from 'node:path'
+import { GITHUB_ROOT_PREFIX } from '../ai/githubRepo.ts'
 import { joinRoot } from '../shared/paths.ts'
 
 export const PROJECT_AGENT_ROOT = 'project'
 const EXTERNAL_ROOT_PREFIX = 'external_'
 const MAX_EXTERNAL_PATH_CHARS = 1024
 
-/** 授权根的品种:目录(申请制)或单个文件(拖入即授权的文件授权令牌) */
-export type AgentRootKind = 'dir' | 'file'
+/** 授权根的品种:目录(申请制)、单个文件(拖入即授权)、公开 GitHub 仓库(远程只读) */
+export type AgentRootKind = 'dir' | 'file' | 'github'
 
 /** 一张发出去的授权令牌:编号 + 真实路径 + 品种 */
 export interface AgentGrantedRoot {
@@ -48,7 +49,8 @@ export function sanitizeAgentRootId(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const value = raw.trim()
   if (value === PROJECT_AGENT_ROOT) return value
-  return /^external_[1-9]\d*$/.test(value) ? value : null
+  if (/^external_[1-9]\d*$/.test(value)) return value
+  return /^github_[1-9]\d*$/.test(value) ? value : null
 }
 
 /**
@@ -60,6 +62,7 @@ export class AgentDirectoryAccess {
   private readonly roots = new Map<string, { path: string; kind: AgentRootKind }>()
   private readonly ids = new Map<string, string>()
   private nextId = 1
+  private githubNextId = 1
 
   find(rawPath: unknown): AgentGrantedRoot | null {
     const path = sanitizeExternalAbsPath(rawPath)
@@ -76,6 +79,13 @@ export class AgentDirectoryAccess {
     const path = sanitizeExternalAbsPath(rawPath)
     if (path === null) return null
     return this.upsert(path, 'dir')
+  }
+
+  /** 公开 GitHub 仓库(远程只读根):path 是展示名 github.com/owner/repo@ref,不是本地盘路径 */
+  grantGithub(displayPath: string): AgentGrantedRoot | null {
+    const path = displayPath.trim()
+    if (path === '' || path.length > MAX_EXTERNAL_PATH_CHARS) return null
+    return this.upsert(path, 'github')
   }
 
   /** 文件授权令牌(拖入即授权):只收真实存在的单个文件;目录、不存在、形状不对一律不发令牌 */
@@ -101,16 +111,20 @@ export class AgentDirectoryAccess {
     return root ? { rootId, path: root.path, external: true, kind: root.kind } : null
   }
 
-  /** 同一条真实路径重复授权复用原授权令牌(Windows 下不区分大小写) */
+  /** 同一条真实路径重复授权复用原授权令牌(Windows 下不区分大小写;GitHub 展示名一律小写) */
   private upsert(path: string, kind: AgentRootKind): AgentGrantedRoot {
-    const key = process.platform === 'win32' ? path.toLowerCase() : path
+    const key = kind === 'github' || process.platform === 'win32' ? path.toLowerCase() : path
     const existingId = this.ids.get(key)
     if (existingId) {
       const root = this.roots.get(existingId) as { path: string; kind: AgentRootKind }
       return { rootId: existingId, path: root.path, kind: root.kind }
     }
-    const rootId = `${EXTERNAL_ROOT_PREFIX}${this.nextId}`
-    this.nextId += 1
+    const rootId =
+      kind === 'github'
+        ? `${GITHUB_ROOT_PREFIX}${this.githubNextId}`
+        : `${EXTERNAL_ROOT_PREFIX}${this.nextId}`
+    if (kind === 'github') this.githubNextId += 1
+    else this.nextId += 1
     this.ids.set(key, rootId)
     this.roots.set(rootId, { path, kind })
     return { rootId, path, kind }

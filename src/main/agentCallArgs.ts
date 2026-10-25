@@ -2,6 +2,7 @@
 // 不合法就交出一句人话原因,由调用方垫步骤灰字并把驳回喂回模型。
 import type { AgentToolCall } from '../ai/agent.ts'
 import { AGENT_READ_LIMIT_MAX, sanitizeAgentRelPath } from '../ai/agent.ts'
+import { githubRepoKey, parseGitHubRepoUrl } from '../ai/githubRepo.ts'
 import { sanitizeWebFetchUrl, sanitizeWebQuery } from '../ai/weblookup.ts'
 import { asToolName, TOOL_NAMES, type ToolName } from '../shared/agentTools.ts'
 import { agentDirectoryAccess } from './agentTools.ts'
@@ -29,6 +30,8 @@ export type PreparedAgentCall =
       readLimit: number
       query: string | null
       fetchUrl: string | null
+      /** open_github_repo 的已过安检仓库地址;其它工具为 null */
+      githubUrl: string | null
       /** save_research_note 的正文与来源 */
       researchNote: string
       researchSource: string
@@ -59,6 +62,8 @@ function rejectWhy(name: ToolName | null, root: AgentSelectedRoot, queryMissing:
       ? '要给搜索词(query),写概念词、软件名或短的公开问题'
       : '搜索词不合法:别把本地路径、代码或超长文字当搜索词,换几个公开的关键词再试'
   if (name === TOOL_NAMES.webFetch) return '要给公开网页地址(url),只收 http(s),别传本地路径'
+  if (name === TOOL_NAMES.openGithubRepo)
+    return '要给公开 github.com 仓库地址(url),不收 gist、站点页或其它网站'
   if (name === TOOL_NAMES.researchNote) return '要给一条关键事实(note),一句话说清'
   if (name === TOOL_NAMES.searchContent) return '要给关键词(keyword),如 500 或 DWELL_MS'
   return '路径不合法,要用所选根目录内的相对路径'
@@ -73,7 +78,8 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
     name === TOOL_NAMES.webSearch ||
     name === TOOL_NAMES.webFetch ||
     name === TOOL_NAMES.researchNote ||
-    name === TOOL_NAMES.requestDirectoryAccess
+    name === TOOL_NAMES.requestDirectoryAccess ||
+    name === TOOL_NAMES.openGithubRepo
       ? ''
       : name === TOOL_NAMES.searchContent && call.args?.relPath === undefined
         ? ''
@@ -97,6 +103,8 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
   const query = name === TOOL_NAMES.webSearch ? sanitizeWebQuery(rawQuery) : null
   const rawFetchUrl = call.args?.url
   const fetchUrl = name === TOOL_NAMES.webFetch ? sanitizeWebFetchUrl(rawFetchUrl) : null
+  const githubRef = name === TOOL_NAMES.openGithubRepo ? parseGitHubRepoUrl(rawFetchUrl) : null
+  const githubUrl = githubRef && typeof rawFetchUrl === 'string' ? rawFetchUrl.trim() : null
   const researchNote =
     name === TOOL_NAMES.researchNote && typeof call.args?.note === 'string'
       ? call.args.note.trim().slice(0, 500)
@@ -115,12 +123,13 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
     (name === TOOL_NAMES.requestDirectoryAccess && requestedPath === null) ||
     (name === TOOL_NAMES.webSearch && query === null) ||
     (name === TOOL_NAMES.webFetch && fetchUrl === null) ||
+    (name === TOOL_NAMES.openGithubRepo && githubUrl === null) ||
     (name === TOOL_NAMES.researchNote && researchNote === '')
   ) {
     const badTarget =
       name === TOOL_NAMES.webSearch
         ? String(rawQuery ?? '(没给搜索词)')
-        : name === TOOL_NAMES.webFetch
+        : name === TOOL_NAMES.webFetch || name === TOOL_NAMES.openGithubRepo
           ? String(rawFetchUrl ?? '(没给地址)')
           : name === TOOL_NAMES.researchNote
             ? String(call.args?.note ?? '(没给要点)')
@@ -148,11 +157,13 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
           ? `${name}:${query ?? ''}`
           : name === TOOL_NAMES.webFetch
             ? `${name}:${fetchUrl ?? ''}`
-            : name === TOOL_NAMES.researchNote
-              ? `${name}:${researchNote}`
-              : name === TOOL_NAMES.requestDirectoryAccess
-                ? `${name}:${requestedPath ?? ''}`
-                : `${name}:${rootKey}:${relPath}`
+            : name === TOOL_NAMES.openGithubRepo
+              ? `${name}:${githubRef ? githubRepoKey(githubRef) : ''}`
+              : name === TOOL_NAMES.researchNote
+                ? `${name}:${researchNote}`
+                : name === TOOL_NAMES.requestDirectoryAccess
+                  ? `${name}:${requestedPath ?? ''}`
+                  : `${name}:${rootKey}:${relPath}`
   const stepTarget =
     name === TOOL_NAMES.searchContent
       ? keyword
@@ -160,15 +171,17 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
         ? (query ?? '')
         : name === TOOL_NAMES.webFetch
           ? (fetchUrl ?? '')
-          : name === TOOL_NAMES.researchNote
-            ? researchNote
-            : name === TOOL_NAMES.requestDirectoryAccess
-              ? (requestedPath ?? '')
-              : relPath === ''
-                ? root?.external
-                  ? root.path
-                  : '(项目根目录)'
-                : relPath
+          : name === TOOL_NAMES.openGithubRepo
+            ? (githubUrl ?? '')
+            : name === TOOL_NAMES.researchNote
+              ? researchNote
+              : name === TOOL_NAMES.requestDirectoryAccess
+                ? (requestedPath ?? '')
+                : relPath === ''
+                  ? root?.external
+                    ? root.path
+                    : '(项目根目录)'
+                  : relPath
   return {
     ok: true,
     name,
@@ -180,6 +193,7 @@ export function prepareAgentCall(call: AgentToolCall, projectRoot: string): Prep
     readLimit,
     query,
     fetchUrl,
+    githubUrl,
     researchNote,
     researchSource,
     requestedPath,
