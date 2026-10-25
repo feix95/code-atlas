@@ -205,10 +205,9 @@
   justify-content: space-between;
   gap: var(--space-2);
   height: calc(var(--u) + 1px);
-  /* 右垫让备注钮中线对齐顶卡下拉钮中线:
-     顶 = sidebar-top 0.1875u + ws-card 0.375rem + 半颗 0.6875u 钮;
-     底 = 右垫 + 半颗 0.75u 备注钮 ⇒ 右垫 = 0.15625u + 0.375rem */
-  padding: 0 calc(var(--u) * 0.15625 + 0.375rem) 0 var(--space-2);
+  /* 右垫让备注钮中线对齐顶卡下拉钮(--ws-menu-center-from-end − 半颗 0.75u 备注钮);
+     +1px 是小葵看完后的光学微调 */
+  padding: 0 calc(var(--ws-menu-center-from-end) - var(--u) * 0.75 / 2 + 1px) 0 var(--space-2);
   color: var(--muted);
   border-top: 1px solid var(--line);
   font-size: var(--font-lg);

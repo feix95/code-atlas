@@ -209,13 +209,15 @@
   opacity: 0.55;
 }
 
-/* 导航组 ← → ↻:auto 左外边距把整组顶到左段右缘(分隔线左侧),搜索向右展开时原地不动;
+/* 导航组 ← → ↻:auto 左外边距把整组顶到左段右缘,搜索向右展开只吃中间空档、三钮原地不动。
+   右缘按刷新钮中线对齐工作区卡下拉钮(--ws-menu-center-from-end);顶栏左段有 1px 右边框,
+   从分隔线再让 1px。空档比旧案略窄,placeholder 降级按 input 实宽估,不靠写死宽度。
    钮底块收为与搜索行高同边长的方形,圆角沿用 .tb-btn 控件档(与 rail 图标同一登记) */
 .tb-nav {
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  margin: 0 0.375rem 0 auto;
+  margin: 0 calc(var(--ws-menu-center-from-end) - var(--chrome-search-row-height) / 2 - 1px) 0 auto;
 }
 
 .tb-nav .tb-btn {
