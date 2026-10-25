@@ -170,8 +170,99 @@
   text-decoration: underline;
 }
 
+/* 联网足迹:状态标签旁的小三角,点开列出搜到/打开过的链接;默认收起 */
 .chat-webstatus {
   margin-top: 0.125rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.chat-weblinks-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.125rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chat-weblinks-toggle:hover {
+  color: var(--text);
+}
+
+.chat-weblinks-toggle .cv {
+  display: grid;
+  place-items: center;
+  color: var(--muted-2);
+}
+
+.chat-weblinks-toggle .cv svg {
+  transform: rotate(-90deg);
+  transition: transform var(--dur-2) var(--ease-smooth);
+}
+
+.chat-weblinks-toggle.is-open .cv svg {
+  transform: rotate(0);
+}
+
+.chat-weblinks {
+  flex-basis: 100%;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: 0.125rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.chat-weblinks-head {
+  margin-bottom: 0.25rem;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.chat-weblinks-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.chat-weblink {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--accent-bright);
+  font-size: var(--font-xs);
+  text-decoration: none;
+}
+
+.chat-weblink:hover .chat-weblink-title {
+  text-decoration: underline;
+}
+
+.chat-weblink-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-weblink-host {
+  flex: none;
+  color: var(--muted-2);
+  font-family: var(--mono);
 }
 
 /* 实时 token 账:流式时贴在气泡左下的小灰字;收尾换一行「本次 · 读 x 吐 y」 */

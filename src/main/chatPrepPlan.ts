@@ -14,6 +14,7 @@ import {
   estimateTokens,
   buildAttachmentText,
   buildFreeChatMessages,
+  mergeWebLookupLinks,
   pickWebLookupQuery,
   resolveWebLookupMeta,
   sanitizeCodeRefs,
@@ -21,7 +22,12 @@ import {
 } from '../ai/index.ts'
 import { webLookupDetailed } from '../ai/weblookup.ts'
 import { sanitizeCompactSummary } from '../shared/compact.ts'
-import type { AiProviderKind, ChatContextAttachment, WebLookupMeta } from '../shared/types.ts'
+import type {
+  AiProviderKind,
+  ChatContextAttachment,
+  WebLookupLink,
+  WebLookupMeta
+} from '../shared/types.ts'
 import type { TeachingLevel } from '../shared/personalization.ts'
 
 /** 讲解请求认的消息形状(与 buildFreeChatMessages 的产出一致) */
@@ -41,7 +47,13 @@ export async function lookupChatWeb(input: {
 }): Promise<{ meta: WebLookupMeta; webMaterial: WebMaterial | null }> {
   let outcome:
     | { kind: 'skipped' }
-    | { kind: 'attempted'; material: string; sources: string[]; queries?: string[] }
+    | {
+        kind: 'attempted'
+        material: string
+        sources: string[]
+        queries?: string[]
+        links?: WebLookupLink[]
+      }
     | { kind: 'error' } = { kind: 'skipped' }
   let webMaterial: WebMaterial | null = null
   if (shouldPreSearchWeb(input.requested, input.enabled, input.agentOn)) {
@@ -57,7 +69,11 @@ export async function lookupChatWeb(input: {
         kind: 'attempted',
         material: found.material,
         sources: found.sources,
-        queries: found.queries
+        queries: found.queries,
+        links: mergeWebLookupLinks(
+          [],
+          found.hits.map((h) => ({ title: h.title, url: h.url, opened: false }))
+        )
       }
       if (found.material) {
         webMaterial = { query: found.queries[0] ?? query, material: found.material }
@@ -72,7 +88,8 @@ export async function lookupChatWeb(input: {
       input.requestId,
       finalState,
       outcome.kind === 'attempted' ? outcome.sources : [],
-      outcome.kind === 'attempted' ? (outcome.queries ?? []) : []
+      outcome.kind === 'attempted' ? (outcome.queries ?? []) : [],
+      outcome.kind === 'attempted' ? (outcome.links ?? []) : []
     )
   }
   return {

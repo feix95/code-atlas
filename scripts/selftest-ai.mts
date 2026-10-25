@@ -19,7 +19,9 @@ import {
   extractWebQueryTokens,
   shouldPreSearchWeb,
   finalizeAgentWebLookup,
+  mergeWebLookupLinks,
   resolveWebLookupMeta,
+  WEB_LOOKUP_LINKS_MAX,
   parseLmStudioContext,
   parseLlamaProps,
   parseLmStudioModelState,
@@ -761,6 +763,56 @@ async function main(): Promise<void> {
   assert.equal(agentDone.state, 'completed', '翻文件真搜过 = completed')
   assert.deepEqual(agentDone.queries, ['opencode github', 'opencode'], '搜索词按出现顺序去重')
   assert.deepEqual(agentDone.sources, ['DuckDuckGo'], '来源去重')
+  const agentLinked = finalizeAgentWebLookup(
+    agentDone,
+    ['opencode'],
+    ['Tavily'],
+    [{ title: 'opencode', url: 'https://github.com/sst/opencode', opened: false }]
+  )
+  assert.deepEqual(
+    agentLinked.links,
+    [{ title: 'opencode', url: 'https://github.com/sst/opencode', opened: false }],
+    '翻文件收工的联网足迹跟着状态表一起交出去'
+  )
+
+  // 联网足迹:按 URL 去重、打开过的优先、空标题拿地址兜底、条数封顶
+  const mergedLinks = mergeWebLookupLinks(
+    [{ title: 'A', url: 'https://a.test/1', opened: false }],
+    [
+      { title: 'A 打开', url: 'https://a.test/1', opened: true },
+      { title: 'B', url: 'https://b.test/2', opened: false },
+      { title: 'B 重复', url: 'https://b.test/2', opened: false }
+    ]
+  )
+  assert.deepEqual(
+    mergedLinks,
+    [
+      { title: 'A', url: 'https://a.test/1', opened: true },
+      { title: 'B', url: 'https://b.test/2', opened: false }
+    ],
+    '同一地址只留一条,打开过的标记不会被搜索结果降级'
+  )
+  assert.deepEqual(
+    mergeWebLookupLinks(
+      [],
+      [
+        { title: '  ', url: ' https://c.test/x ', opened: false },
+        { title: '空地址', url: '   ', opened: false }
+      ]
+    ),
+    [{ title: 'https://c.test/x', url: 'https://c.test/x', opened: false }],
+    '空标题拿地址兜底,空地址直接丢'
+  )
+  const manyLinks = Array.from({ length: WEB_LOOKUP_LINKS_MAX + 3 }, (_, i) => ({
+    title: `t${i}`,
+    url: `https://x.test/${i}`,
+    opened: false
+  }))
+  assert.equal(
+    mergeWebLookupLinks([], manyLinks).length,
+    WEB_LOOKUP_LINKS_MAX,
+    `联网足迹最多留 ${WEB_LOOKUP_LINKS_MAX} 条`
+  )
 
   // 联网状态状态表:程序做了什么就是什么,六种状态各有归属
   assert.equal(
@@ -791,10 +843,16 @@ async function main(): Promise<void> {
   const doneMeta = resolveWebLookupMeta(true, true, {
     kind: 'attempted',
     material: '资料',
-    sources: ['维基百科(英文)']
+    sources: ['维基百科(英文)'],
+    links: [{ title: '维基百科', url: 'https://zh.wikipedia.org/wiki/x', opened: false }]
   })
   assert.equal(doneMeta.state, 'completed', '查到资料 = completed')
   assert.deepEqual(doneMeta.sources, ['维基百科(英文)'], '来源要记账')
+  assert.deepEqual(
+    doneMeta.links,
+    [{ title: '维基百科', url: 'https://zh.wikipedia.org/wiki/x', opened: false }],
+    '搜到的链接跟着状态表一起交出去'
+  )
 
   // 3.6 联网查证(默认关):摘要洗白
   assert.equal(

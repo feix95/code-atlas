@@ -25,6 +25,8 @@ import {
   upsertResearchLedger,
   type ResearchNote
 } from '../ai/researchLedger.ts'
+import { mergeWebLookupLinks } from '../ai/webPrompts.ts'
+import type { WebLookupLink } from '../shared/types.ts'
 
 export interface AgentToolLedger {
   doneCalls: Set<string>
@@ -33,6 +35,7 @@ export interface AgentToolLedger {
   webFetchCalls: number
   webQueries: string[]
   webSources: string[]
+  webLinks: WebLookupLink[]
   researchNotes: ResearchNote[]
   toolCallsExecuted: number
 }
@@ -108,6 +111,17 @@ async function fulfillOneCall(
       if (q !== '' && !ledger.webQueries.includes(q)) ledger.webQueries.push(q)
     for (const s of run.sources)
       if (s !== '' && !ledger.webSources.includes(s)) ledger.webSources.push(s)
+    if (prep.name === TOOL_NAMES.webSearch) {
+      ledger.webLinks = mergeWebLookupLinks(
+        ledger.webLinks,
+        run.webHits.map((hit) => ({ title: hit.title, url: hit.url, opened: false }))
+      )
+    }
+    if (prep.name === TOOL_NAMES.webFetch && run.ok && prep.fetchUrl) {
+      ledger.webLinks = mergeWebLookupLinks(ledger.webLinks, [
+        { title: run.hint?.trim() || prep.fetchUrl, url: prep.fetchUrl, opened: true }
+      ])
+    }
     if (run.ok) {
       const note = buildResearchNote({
         kind: prep.name === TOOL_NAMES.webSearch ? 'search' : 'fetch',
@@ -132,7 +146,8 @@ async function fulfillOneCall(
       input.requestId,
       run.ok ? 'completed' : 'empty',
       ledger.webSources,
-      ledger.webQueries
+      ledger.webQueries,
+      ledger.webLinks
     )
   }
   if (run.ok && prep.name !== TOOL_NAMES.requestDirectoryAccess) ledger.toolCallsExecuted += 1

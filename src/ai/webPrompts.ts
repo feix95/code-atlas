@@ -1,6 +1,6 @@
 // 联网查证的问题端:挑搜索词、命中对账、把程序真做过的动作收敛成状态表 ——
 // 全是纯函数,不发请求。
-import type { ChatContextAttachment, WebLookupMeta } from '../shared/types.ts'
+import type { ChatContextAttachment, WebLookupLink, WebLookupMeta } from '../shared/types.ts'
 
 const WEB_INTENT_SRC = '联网|搜索|搜搜|搜一下|查查|查一下|上网|网上|百度|谷歌|帮我|search'
 const WEB_FILLER_SRC = '你能去|他们|应该有|开源仓库|是怎么做的吗|是怎么做的|怎么做的|去看看|看看'
@@ -30,8 +30,39 @@ function emptyQueries(): string[] {
   return []
 }
 
-function withQueries(meta: Omit<WebLookupMeta, 'queries'>, queries: string[] = []): WebLookupMeta {
-  return { ...meta, queries }
+/** 界面上最多列这么多条联网足迹:够回看,又不至于把消息区撑爆 */
+export const WEB_LOOKUP_LINKS_MAX = 40
+
+/** 合并联网足迹(纯函数,自测覆盖):按 URL 去重,打开过的记录优先,超过上限就丢新来的 */
+export function mergeWebLookupLinks(
+  existing: readonly WebLookupLink[],
+  incoming: readonly WebLookupLink[]
+): WebLookupLink[] {
+  const merged: WebLookupLink[] = []
+  const indexByUrl = new Map<string, number>()
+  for (const raw of [...existing, ...incoming]) {
+    const url = raw.url.trim()
+    if (url === '') continue
+    const title = raw.title.trim() === '' ? url : raw.title.trim()
+    const at = indexByUrl.get(url)
+    if (at === undefined) {
+      if (merged.length >= WEB_LOOKUP_LINKS_MAX) continue
+      indexByUrl.set(url, merged.length)
+      merged.push({ title, url, opened: raw.opened })
+      continue
+    }
+    const prev = merged[at]
+    if (prev && raw.opened && !prev.opened) merged[at] = { ...prev, opened: true }
+  }
+  return merged
+}
+
+function withQueries(
+  meta: Omit<WebLookupMeta, 'queries' | 'links'>,
+  queries: string[] = [],
+  links: WebLookupLink[] = []
+): WebLookupMeta {
+  return { ...meta, queries, links }
 }
 
 /**
@@ -92,7 +123,13 @@ export function resolveWebLookupMeta(
   enabled: boolean,
   outcome:
     | { kind: 'skipped' }
-    | { kind: 'attempted'; material: string; sources: string[]; queries?: string[] }
+    | {
+        kind: 'attempted'
+        material: string
+        sources: string[]
+        queries?: string[]
+        links?: WebLookupLink[]
+      }
     | { kind: 'error' }
 ): WebLookupMeta {
   if (!requested)
@@ -116,10 +153,12 @@ export function resolveWebLookupMeta(
       emptyQueries()
     )
   const queries = outcome.queries ?? emptyQueries()
+  const links = mergeWebLookupLinks([], outcome.links ?? [])
   if (outcome.material === '')
     return withQueries(
       { requested: true, enabled: true, attempted: true, state: 'empty', sources: [] },
-      queries
+      queries,
+      links
     )
   return withQueries(
     {
@@ -129,7 +168,8 @@ export function resolveWebLookupMeta(
       state: 'completed',
       sources: outcome.sources
     },
-    queries
+    queries,
+    links
   )
 }
 
@@ -137,18 +177,21 @@ export function resolveWebLookupMeta(
 export function finalizeAgentWebLookup(
   base: WebLookupMeta,
   queries: string[],
-  sources: string[]
+  sources: string[],
+  links: readonly WebLookupLink[] = []
 ): WebLookupMeta {
   const uniqQueries = uniqueTokens(queries.map((q) => q.trim()).filter((q) => q !== ''))
   const uniqSources = uniqueTokens(sources.filter((s) => s !== ''))
+  const uniqLinks = mergeWebLookupLinks([], links)
   if (uniqQueries.length === 0 && uniqSources.length === 0) {
     if (base.requested && base.enabled) {
       return withQueries(
         { requested: true, enabled: true, attempted: false, state: 'empty', sources: [] },
-        emptyQueries()
+        emptyQueries(),
+        uniqLinks
       )
     }
-    return withQueries(base, base.queries ?? emptyQueries())
+    return withQueries(base, base.queries ?? emptyQueries(), uniqLinks)
   }
   return withQueries(
     {
@@ -158,7 +201,8 @@ export function finalizeAgentWebLookup(
       state: uniqSources.length > 0 ? 'completed' : 'empty',
       sources: uniqSources
     },
-    uniqQueries
+    uniqQueries,
+    uniqLinks
   )
 }
 

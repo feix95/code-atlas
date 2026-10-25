@@ -29,7 +29,8 @@ import type {
   AiExplainResult,
   AiProviderKind,
   AiStreamStats,
-  ChatTarget
+  ChatTarget,
+  WebLookupLink
 } from '../shared/types.ts'
 
 /** 还在生成中的请求,按 requestId 登记:渲染进程换了目标,旧的就地掐掉,不让过气的生成占着模型排队 */
@@ -206,7 +207,8 @@ export function sendChatLookup(
   requestId: unknown,
   state: AiChatLookupPayload['state'],
   sources: string[],
-  queries: string[] = []
+  queries: string[] = [],
+  links: WebLookupLink[] = []
 ): void {
   if (typeof requestId !== 'string' || requestId === '') return
   if (!event.sender.isDestroyed()) {
@@ -214,7 +216,8 @@ export function sendChatLookup(
       id: requestId,
       state,
       sources,
-      queries
+      queries,
+      links
     } satisfies AiChatLookupPayload)
   }
 }

@@ -88,6 +88,7 @@ export async function runAgentChat(input: {
     webFetchCalls: 0,
     webQueries: [],
     webSources: [],
+    webLinks: [],
     researchNotes: [],
     toolCallsExecuted: 0
   }
@@ -242,6 +243,11 @@ function agentResult(
     model: input.target.model,
     durationMs: Date.now() - input.startedAt,
     usage,
-    webLookup: finalizeAgentWebLookup(input.webLookup, ledger.webQueries, ledger.webSources)
+    webLookup: finalizeAgentWebLookup(
+      input.webLookup,
+      ledger.webQueries,
+      ledger.webSources,
+      ledger.webLinks
+    )
   }
 }

@@ -115,7 +115,12 @@ export function useAiChat(
                     attempted: payload.state !== 'searching',
                     state: payload.state,
                     sources: payload.sources,
-                    queries: payload.queries ?? []
+                    queries: payload.queries ?? [],
+                    // 搜索中的播报不带历史链接:这一轮已经攒下的足迹别被新一次搜索抹掉
+                    links:
+                      payload.links && payload.links.length > 0
+                        ? payload.links
+                        : (m.web?.links ?? [])
                   }
                 }
               : m

@@ -3,6 +3,7 @@ import type { WebLookupMeta } from '@shared/types'
 import type { FileLinkTarget } from '@shared/fileLinks'
 import { formatStreamStats, formatUsage } from '@shared/aiText'
 import { Badge } from './Badge'
+import { ChatWebLinks } from './ChatWebLinks'
 import { Notice } from './Notice'
 import { IconRefresh, TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
@@ -210,6 +211,7 @@ export const AssistantBubble = memo(function AssistantBubble({
       {label && (
         <div className="chat-webstatus">
           <Badge label={label.text} tone={label.tone} />
+          {msg.web && <ChatWebLinks links={msg.web.links ?? []} />}
         </div>
       )}
     </div>

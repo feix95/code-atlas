@@ -431,6 +431,14 @@ export type WebLookupState =
   | 'failed' // 查询失败/超时
   | 'empty' // 查完了,但没有找到可用资料
 
+/** 一条联网足迹:搜索结果里列出的,或真的打开抓过正文的 */
+export interface WebLookupLink {
+  title: string
+  url: string
+  /** true = 打开抓过正文;false = 只在搜索结果里列过 */
+  opened: boolean
+}
+
 /** 联网查询的状态状态表(主进程如实记账 → 界面照实展示) */
 export interface WebLookupMeta {
   /** 用户这轮有没有点名要联网/搜索 */
@@ -444,6 +452,8 @@ export interface WebLookupMeta {
   sources: string[]
   /** 本轮真正拿去搜过的词,按时间排列;没有搜过就是空数组 */
   queries?: string[]
+  /** 本轮搜到/打开过的链接,按出现顺序去重;没有就是空数组 */
+  links?: WebLookupLink[]
 }
 
 /** 自由对话一次请求的载荷(渲染进程 → 主进程) */
@@ -579,6 +589,8 @@ export interface AiChatLookupPayload {
   sources: string[]
   /** 已经搜过的词;搜索中可能还是空的 */
   queries?: string[]
+  /** 已经搜到/打开过的链接;搜索中可能还是空的 */
+  links?: WebLookupLink[]
 }
 
 /**
