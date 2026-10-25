@@ -97,18 +97,26 @@ function main(): void {
     '得说清楚投影仪为什么放内存'
   )
 
-  // 6GB 模型(不带投影仪)8GB 卡:rung1 跳档 → q8+fa → 还不够 → 砍上下文
+  // 6GB 模型(不带投影仪)8GB 卡:rung1 跳档 → q8+fa → 12k 仍紧 → 8k 落地
   const t3 = planLaunch(baseInput({ machine: M8, modelBytes: 6 * GB }))
-  assert.equal(t3.rung, 3, '4GB 级模型 8GB 卡要连降三档')
+  assert.equal(t3.rung, 4, '6GB 模型 8GB 卡要连降到底')
   assert.equal(t3.params.kvCache, 'q8_0')
   assert.equal(t3.params.flashAttn, 'on')
-  assert.equal(t3.params.contextSize, 8192, '16384 砍半')
+  assert.equal(t3.params.contextSize, 8192, '12k 也装不下,退到 8k 地板')
   assert.deepEqual(
     t3.args,
     ['-c', '8192', '-ctk', 'q8_0', '-ctv', 'q8_0', '-fa', 'on'],
     '参数串带全套省显存旗'
   )
   assert.ok(t3.reasons.some((r) => r.includes('上下文从 16384 调到 8192')))
+
+  // 16GB 卡 11.3GB 模型:16k 装不下,先落 12k(3/4),不用直接砍半
+  const ctx12k = planLaunch(baseInput({ modelBytes: 11.3 * GB }))
+  assert.equal(ctx12k.rung, 3, '12k 档顶上来')
+  assert.equal(ctx12k.params.contextSize, 12288, '16k 的 3/4')
+  assert.equal(ctx12k.params.kvCache, 'q8_0', '降上下文前先把黑板换 q8')
+  assert.equal(ctx12k.estimate.verdict, 'ok', '12k 档刚好落进 16GB 卡的预算')
+  assert.ok(ctx12k.reasons.some((r) => r.includes('上下文从 16384 调到 12288')))
 
   // 4. Gemma-4-26B MoE + 投影仪,16GB 卡(真机实测那台)
   const gemma = planLaunch(
@@ -140,7 +148,7 @@ function main(): void {
   // 5. 装不下的结局:稠密 13.4GB 16GB 卡连降到底还是超 → too-big
   const dense13 = planLaunch(baseInput({ modelBytes: 13.4 * GB, mmprojBytes: MMPROJ_BYTES }))
   assert.equal(dense13.estimate.verdict, 'too-big', '稠密 13.4GB+投影仪 16GB 卡降到底也装不下')
-  assert.equal(dense13.rung, 3, '梯子走到头')
+  assert.equal(dense13.rung, 4, '梯子走到头')
   assert.equal(dense13.params.contextSize, 8192)
   assert.ok(dense13.reasons.some((r) => r.includes('装不下')))
 

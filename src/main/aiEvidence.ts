@@ -129,15 +129,18 @@ export async function resolveChatTargetOrError(): Promise<
 > {
   const config = await loadAiConfig(userDataDir())
   let runtime: BuiltinRuntime | undefined
+  let launchedContext: number | null = null
   if (config.provider === 'builtin') {
     try {
-      // 手动上下文直接喂给引擎(-c):预算和引擎本尊吃一个数,不再各说各话;
-      // 是否手动填的也带过去 —— 引擎启动就死时,退出诊断文案能点名「上下文填太大」
-      runtime = await ensureBuiltinServer(
+      // 手填的数是「要多少」;显存不够时启动梯子会把它调低,就绪回报里带回真正喂给 -c 的档,
+      // 后面的预算必须按那一档算(否则按手填值算预算,会把引擎的上下文挤爆)
+      const ready = await ensureBuiltinServer(
         config.builtin,
         config.contextSize,
         config.contextSize ?? null
       )
+      runtime = ready
+      launchedContext = ready.contextSize
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
@@ -147,12 +150,13 @@ export async function resolveChatTargetOrError(): Promise<
   // 过了这关就是真要使唤模型了:状态栏进「忙」
   setActivityProvider(config.provider)
   announceActivityBusy(config.provider)
-  // 上下文认主:手动填的数只在内置引擎当真参数;LM Studio 的上下文窗口归它自己管,
-  // 一律只信探测(存档里给内置填的旧数隐身不管事),探测不到按默认窗口兜底
+  // 上下文认主:内置引擎按实际 -c 档算;LM Studio 归它自己管,只信探测;
+  // 在线 API 认设置里选的档。探测不到按默认窗口兜底。
   const ctx = resolveContextSize(
     config.provider,
     config.provider === 'cloud' ? config.cloud.contextSize : config.contextSize,
-    await probeContextSize(resolved.target, config.provider)
+    config.provider === 'builtin' ? null : await probeContextSize(resolved.target, config.provider),
+    launchedContext
   )
   // 个性化段在这儿一次拼好,跟着 resolved 走遍所有调用点:全默认时是空串,人设一字不加
   const style = buildPersonalizationPrompt(sanitizePersonalization(config.personalization))

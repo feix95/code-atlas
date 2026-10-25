@@ -75,9 +75,10 @@ export const AGENT_STUB_HEAD_CHARS = 200
 /**
  * 紧急瘦身(上下文爆掉的最后一道兜底,纯函数,自测覆盖):
  * 轮间的注记压缩是常态保养,但历史/附件本身大坨、或第一轮就爆时它救不了 ——
- * 服务直接甩「上下文装不下」拒收。这时整段裁掉「最新真问题之前」的旧账,
+ * 服务直接甩「上下文装不下」拒收。这时整段裁掉最新真问题之外的旧账,
  * 只留 system 和最后一条真问题(提醒卡、旧问答、旧工具往来一并清光)。
- * 整段一起扔,assistant(tool_calls) 和 tool 的成对关系天然不破,协议安全。
+ * 翻文件模式下工具往来都在真问题之后,同样整段扔 —— 模型拿着问题重新翻,
+ * assistant(tool_calls) 和 tool 成对的关系天然不破,协议安全。
  * 没有可保的真问题、或裁不出东西时返回 null(调用方照实报错,不硬撑)。
  */
 export function emergencySlim(
@@ -98,7 +99,8 @@ export function emergencySlim(
   }
   if (questionIdx <= 0) return null // 前面没有可裁的旧账(只有 system 或根本没有问题)
   const head = messages[0]?.role === 'system' ? [messages[0]] : []
-  const kept = [...head, ...messages.slice(questionIdx)]
+  // 真问题之后的工具往来也是旧账:只保问题本身,让模型重新翻
+  const kept = [...head, messages[questionIdx]]
   if (kept.length >= messages.length) return null
   return { messages: kept, dropped: messages.length - kept.length }
 }
@@ -121,12 +123,18 @@ export function estimateMessagesTokens(messages: AgentChatMessage[]): number {
 }
 
 /**
+ * 固定预留(单位 token):工具表、聊天模板和中文字数换 token 的误差都不在消息账面里。
+ * 8k 档实测约 2k —— 不扣掉它,账面没超、服务端仍会拒收(2026-10-25 M0 爆仓案)。
+ */
+export const AGENT_PROMPT_RESERVE_TOKENS = 2048
+
+/**
  * 提示词侧的预算(纯函数,自测覆盖):上下文窗口减去留给答案的空间(replyCap,思考另算的
- * 也含在调用方传进来的数里),再打八折当警戒线 —— 账面超过它就压缩。
+ * 也含在调用方传进来的数里)和固定预留,再打八折当警戒线 —— 账面超过它就压缩。
  * 算出来再小也不低于 2048:上下文再小,压到没东西可读还不如让引擎自行报上下文不足。
  */
 export function agentPromptBudget(ctx: number, replyCap: number): number {
-  const usable = Math.max(2048, ctx - Math.max(1024, replyCap))
+  const usable = Math.max(2048, ctx - Math.max(1024, replyCap) - AGENT_PROMPT_RESERVE_TOKENS)
   return Math.max(2048, Math.floor(usable * 0.8))
 }
 

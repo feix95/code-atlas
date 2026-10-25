@@ -3,7 +3,8 @@
  * 规矩来自真机实测(RTX 5060 Ti 16GB + Gemma-4-26B MoE):
  *   - 显卡摆层一律交给引擎内置的 --fit 自动安排;硬塞 -ngl 999 会关掉自动摆层,
  *     Vulkan 后端在分配视觉投影仪缓冲时当场 OOM 崩掉(ErrorOutOfDeviceMemory)。
- *   - 装不下就按梯子降档:①视觉文件放内存 → ②KV 黑板改 q8_0 + 开 flash-attn → ③上下文砍半。
+ *   - 装不下就按梯子降档:①视觉文件放内存 → ②KV 黑板改 q8_0 + 开 flash-attn →
+ *     ③上下文逐级缩到 3/4、1/2、1/4,再低守住 8192 地板。
  *   - --n-cpu-moe 99 手动全放内存实测慢 3~4 倍,绝不自动选。
  * 纯状态表:不碰文件/进程/Electron,I/O 一律在 src/ai 侧。
  */
@@ -27,6 +28,8 @@ const MOE_HOST_SHARE = 0.5
 const MMPROJ_GPU_OVERHEAD = 1.1
 /** 上下文再省也不能跌破这档,再低就真没法聊长材料了 */
 const MIN_PLANNED_CONTEXT = 8192
+/** 降上下文的档位比例:16k 档先落 12k(真机实测 q8+fa 仍全速),再退一半、四分之一 */
+const CONTEXT_LADDER_RATIOS = [0.75, 0.5, 0.25] as const
 
 export type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'unknown'
 
@@ -217,7 +220,7 @@ export function planLaunch(input: LaunchPlanInput): LaunchPlan {
     }
   }
 
-  // 梯子四级,逐级更省;每一级只碰「没被手动指定的」字段
+  // 梯子逐级更省;每一级只碰「没被手动指定的」字段
   const base: LaunchParams = {
     gpuLayers: 'auto',
     contextSize: input.requestedContext,
@@ -225,16 +228,22 @@ export function planLaunch(input: LaunchPlanInput): LaunchPlan {
     flashAttn: 'auto',
     mmprojOffload: true
   }
-  // 四级固定排布:rung 编号 = 梯子深度;没带投影仪时 rung1 与 rung0 参数相同,
+  // 固定排布:rung 编号 = 梯子深度;没带投影仪时 rung1 与 rung0 参数相同,
   // 评估结果一样自然往下降,不算白走
   const rungs: LaunchParams[] = [base, { ...base, mmprojOffload: false }]
   const afterKv: LaunchParams = { ...rungs[1], kvCache: 'q8_0', flashAttn: 'on' }
   rungs.push(afterKv)
   if (input.requestedContext > MIN_PLANNED_CONTEXT) {
-    rungs.push({
-      ...afterKv,
-      contextSize: Math.max(MIN_PLANNED_CONTEXT, Math.floor(input.requestedContext / 2))
-    })
+    const sizes = [
+      ...CONTEXT_LADDER_RATIOS.map((ratio) =>
+        Math.max(MIN_PLANNED_CONTEXT, Math.floor(input.requestedContext * ratio))
+      ),
+      MIN_PLANNED_CONTEXT
+    ]
+    const descending = [...new Set(sizes)]
+      .filter((size) => size < input.requestedContext)
+      .sort((a, b) => b - a)
+    for (const contextSize of descending) rungs.push({ ...afterKv, contextSize })
   }
 
   // 全字段被手动指定:梯子原地解散,直接评估

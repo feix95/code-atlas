@@ -20,7 +20,8 @@ import {
   CANCEL_MESSAGE,
   EngineExitError,
   launchBuiltinServer,
-  type BuiltinLaunchHost
+  type BuiltinLaunchHost,
+  type BuiltinReady
 } from './builtinLaunch.ts'
 import {
   announceBuiltin,
@@ -80,10 +81,10 @@ export { createSingleFlight } from './singleFlight.ts'
 
 /** 当前子进程与它的就绪结果(模块级单例:整个 app 只养一个内置模型) */
 let child: ChildProcess | null = null
-let readyPromise: Promise<{ baseUrl: string; model: string }> | null = null
+let readyPromise: Promise<BuiltinReady> | null = null
 /** 当前子进程是用哪组设置拉起的(serverPath|modelPath),换模型时判断要不要重启 */
 let startedKey = ''
-/** 当前子进程实际喂给 -c 的上下文档位(归一后的数),改档位时判断要不要重启(2026-09-13) */
+/** 当前子进程是按哪档「用户要的上下文」拉起的(重启对账用;实际 -c 可能被启动梯子调低) */
 let startedCtx = 0
 /** 当前子进程实际喂给 --mmproj 的路径(空串 = 没带眼睛);模型旁增删 mmproj 后要按新参数重启 */
 let startedMmproj = ''
@@ -142,7 +143,7 @@ const startBuiltinSingleFlight = createSingleFlight(
     settings: AiBuiltinSettings,
     contextSize: number,
     manualContext: number | null
-  ): Promise<{ baseUrl: string; model: string }> => {
+  ): Promise<BuiltinReady> => {
     const modelPath = settings.modelPath.trim()
     if (!modelPath) {
       const err = new Error('还没设置 AI。打开设置,选择一个本地模型;不设置也能浏览项目地图。')
@@ -297,7 +298,7 @@ export async function ensureBuiltinServer(
   settings: AiBuiltinSettings,
   contextSize = DEFAULT_CONTEXT_SIZE,
   manualContext: number | null = null
-): Promise<{ baseUrl: string; model: string }> {
+): Promise<BuiltinReady> {
   if (isBuiltinRunning() && readyPromise) {
     // 参数对不上账就解散重拉:上下文档位对不上(2026-09-13 白屏案),或模型旁的
     // mmproj 增删了(引擎还按旧参数跑,新眼睛白放)—— 单飞开头会收尸并等端口放行
@@ -362,7 +363,7 @@ function startAndWaitReady(
     /** 后端退路重拉成功时就绪播报捎的一句('CUDA 引擎没能启动,已改用 X') */
     engineNote?: string
   } = {}
-): Promise<{ baseUrl: string; model: string }> {
+): Promise<BuiltinReady> {
   return launchBuiltinServer(launchHost, serverPath, modelPath, baseUrl, contextSize, launch, opts)
 }
 

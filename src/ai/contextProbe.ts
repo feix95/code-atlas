@@ -96,26 +96,35 @@ export async function probeContextSize(
   return value
 }
 
+/** 回复预算的封顶:8k 档守住 1024 不挤地图,10k 起给满 2048(研究结论/清单不再被腰斩) */
+const REPLY_TOKENS_CAP = 2048
+const REPLY_TOKENS_RAISED_CONTEXT_MIN = 10240
+
 /** 按真实上下文算各路预算(纯函数):地图 ≈ 55%,回复 ≈ 20%;两端各留安全下限 */
 export function budgetsForContext(ctx: number): { mapTokens: number; replyTokens: number } {
   const safe = ctx >= CONTEXT_SIZE_MIN ? ctx : DEFAULT_CONTEXT_SIZE
   return {
     mapTokens: Math.max(600, Math.floor(safe * 0.55)),
-    replyTokens: Math.max(256, Math.min(1024, Math.floor(safe * 0.2)))
+    replyTokens:
+      safe >= REPLY_TOKENS_RAISED_CONTEXT_MIN
+        ? REPLY_TOKENS_CAP
+        : Math.max(256, Math.min(1024, Math.floor(safe * 0.2)))
   }
 }
 
 /**
- * 上下文认主:手动填的「模型上下文」只属于内置引擎 —— 它是真参数,
- * 直接喂给引擎的 -c;LM Studio 的上下文窗口归 LM Studio 管,App 一律只信探测,存档里的手填数不看
- * (不然设置页藏了字段,旧数还隐身管事)。探测失败(接口没开全/版本老)按默认窗口兜底。
- * 在线 API 探测不到,调用方传入的是设置里选的档(cloud.contextSize),同样按手动数当真。
+ * 上下文认主:内置引擎按真正喂给 -c 的档位算 —— 启动梯子可能把手填的 16k 降到 12k/8k,
+ * 预算再按手填值算就会把引擎的上下文挤爆(2026-10-25 M0 截断案)。
+ * launched 为空(引擎还没起来)时才退回手填值,再不行吃探测,最后按默认窗口兜底。
+ * LM Studio / 在线 API 没有 -c 这回事:LM Studio 只信探测,在线 API 认设置里选的档。
  */
 export function resolveContextSize(
   provider: AiProviderKind,
   manual: number | undefined,
-  probed: number | null
+  probed: number | null,
+  launched: number | null = null
 ): number {
+  if (provider === 'builtin' && launched !== null && launched >= CONTEXT_SIZE_MIN) return launched
   if (provider !== 'lmstudio' && manual !== undefined && manual >= CONTEXT_SIZE_MIN) return manual
   return probed !== null && probed >= CONTEXT_SIZE_MIN ? probed : DEFAULT_CONTEXT_SIZE
 }

@@ -46,6 +46,13 @@ export class EngineExitError extends Error {
   }
 }
 
+/** 引擎就绪回报:目标地址、模型名,以及实际喂给 -c 的上下文档位(启动梯子可能降过档) */
+export interface BuiltinReady {
+  baseUrl: string
+  model: string
+  contextSize: number
+}
+
 /**
  * 启动时要借道的 builtin.ts 单例状态与播报口。
  * 引擎子进程/启动参数账/叫停标记都记在 builtin.ts 那边,这里只经口子读写。
@@ -134,7 +141,7 @@ export async function launchBuiltinServer(
     /** 后端退路重拉成功时就绪播报捎的一句 */
     engineNote?: string
   } = {}
-): Promise<{ baseUrl: string; model: string }> {
+): Promise<BuiltinReady> {
   const skipMmproj = opts.skipMmproj ?? false
   const mmprojDropNote = opts.mmprojDropNote
   const engineLabel = opts.engineLabel
@@ -349,7 +356,7 @@ export async function launchBuiltinServer(
         )
       }
     })
-    return { baseUrl, model }
+    return { baseUrl, model, contextSize: plan.params.contextSize }
   })()
 
   // 谁先出结果听谁的:就绪 or 进程夭折

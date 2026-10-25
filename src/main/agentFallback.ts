@@ -86,10 +86,12 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
     }
   }
   // 提醒卡兜底:个别外接引擎不认「tool 结果后面跟 user 消息」的形态,甩 4xx ——
-  // 撤掉提醒卡退回无卡形态重答一轮(只兜一次);再错就照实报给用户,不跟它耗
+  // 撤掉提醒卡退回无卡形态重答一轮(只兜一次);再错就照实报给用户,不跟它耗。
+  // 上下文爆仓也常报 400,那是下一道瘦身兜底的活,别抢走它的一次机会
   if (
     round.status === 'error' &&
     !flags.reminderFailsafe &&
+    !isContextOverflow(round.text) &&
     (round.httpStatus === 400 || round.httpStatus === 404 || round.httpStatus === 422) &&
     messages.some(
       (m) =>

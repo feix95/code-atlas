@@ -466,7 +466,12 @@ async function main(): Promise<void> {
   const budget = agentPromptBudget(16384, 2048)
   assert.ok(
     budget >= 8000 && budget <= 20000,
-    '16384 token 上下文扣完答案额度再打八折,警戒线是个讲道理的数'
+    '16384 token 上下文扣完答案额度和固定预留再打八折,警戒线是个讲道理的数'
+  )
+  assert.equal(
+    agentPromptBudget(8192, 1024),
+    4096,
+    '8k 档给工具表和分词误差留 2k 固定预留,别让账面没超、服务端先拒收'
   )
   assert.equal(
     compressAgentMessages(conversation, Number.MAX_SAFE_INTEGER),
@@ -1032,6 +1037,43 @@ async function main(): Promise<void> {
     (emergencySlim(withLedger)?.messages[1] as { content: string }).content,
     '最新真问题',
     '研究账本不能冒充真问题'
+  )
+  // 翻文件模式的工具往来都在真问题之后,同样算旧账:只保问题,让模型拿着问题重新翻
+  const agentFat: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '最新的真问题' },
+    {
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'c1',
+          type: 'function',
+          function: { name: 'read_file', arguments: '{"relPath":"a.ts"}' }
+        }
+      ]
+    },
+    { role: 'tool', tool_call_id: 'c1', content: '文件内容一大坨' },
+    {
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'c2',
+          type: 'function',
+          function: { name: 'read_file', arguments: '{"relPath":"b.ts"}' }
+        }
+      ]
+    },
+    { role: 'tool', tool_call_id: 'c2', content: '又一大坨' }
+  ]
+  const slimmedAgent = emergencySlim(agentFat)
+  assert.ok(slimmedAgent, '翻文件模式也要裁得动:工具往来都在真问题之后')
+  assert.equal(slimmedAgent!.dropped, 4, '真问题之后的四段工具往来整段走')
+  assert.deepEqual(
+    slimmedAgent!.messages.map((m) => m.role),
+    ['system', 'user'],
+    '只剩 system 和真问题:tool_calls 与 tool 成对一起走,协议不破'
   )
 
   // 21. 翻文件切片的指路分工 + 工具说明瘦身后的口径(逐字稿 D/L)

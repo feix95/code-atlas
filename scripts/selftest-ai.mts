@@ -1588,6 +1588,11 @@ async function main(): Promise<void> {
   const budgetsSmall = budgetsForContext(2048)
   assert.equal(budgetsSmall.replyTokens, 409, '2k 上下文:回复按比例缩')
   assert.ok(budgetsSmall.mapTokens >= 600, '地图有安全下限,再小的上下文也不许把地图掐死')
+  const budgets8k = budgetsForContext(8192)
+  assert.equal(budgets8k.replyTokens, 1024, '8k 档仍守 1024,先保地图')
+  const budgets12k = budgetsForContext(12288)
+  assert.equal(budgets12k.mapTokens, 6758, '12k 上下文:地图 ≈ 55%')
+  assert.equal(budgets12k.replyTokens, 2048, '10k 起回复上限抬到 2048,长答不再被 1024 腰斩')
   const budgetsJunk = budgetsForContext(100)
   assert.equal(
     budgetsJunk.mapTokens,
@@ -1863,17 +1868,37 @@ async function main(): Promise<void> {
     '不带引擎名号按内置口径(兼容老调用)'
   )
 
-  // 上下文认主:手填数只在内置当真,LM Studio 只信探测
+  // 上下文认主:内置按实际 -c 档,LM Studio 只信探测
   assert.equal(
     resolveContextSize('builtin', 8192, 32768),
     8192,
-    '内置:手填的数说了算,探测结果不抢座'
+    '内置:引擎没回报实际档时,手填的数说了算'
+  )
+  assert.equal(
+    resolveContextSize('builtin', 16384, null, 12288),
+    12288,
+    '内置:引擎实际跑 12k,预算按实际档算,手填 16k 不许抢座'
+  )
+  assert.equal(
+    resolveContextSize('builtin', 16384, 32768, 12288),
+    12288,
+    '内置:实际 -c 优先于探测结果'
+  )
+  assert.equal(
+    resolveContextSize('builtin', undefined, null, 8192),
+    8192,
+    '内置:没手填也认引擎的实际档'
   )
   assert.equal(resolveContextSize('builtin', undefined, 32768), 32768, '内置:没手填就吃探测')
   assert.equal(
     resolveContextSize('builtin', undefined, null),
     DEFAULT_CONTEXT_SIZE,
     '内置:两头都没有落默认窗口'
+  )
+  assert.equal(
+    resolveContextSize('lmstudio', 4096, 32768, 12288),
+    32768,
+    'LM Studio:没有 -c,launched 不参与,仍只信探测'
   )
   assert.equal(
     resolveContextSize('lmstudio', 4096, 32768),
