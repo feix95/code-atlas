@@ -78,10 +78,11 @@
   --lh-190: 1.9;
   --content-max: 70rem;
   --control-height: 2.5rem;
-  /* 动效(Obsidian 节奏):70/150/300ms 三档 + 快进慢落的 smooth 曲线  */
+  /* 动效(Obsidian 节奏):70/150/300/500ms 四档 + 快进慢落的 smooth 曲线  */
   --dur-1: 0.07s;
   --dur-2: 0.15s;
   --dur-3: 0.3s;
+  --dur-4: 0.5s; /* 慢速淡入:需要肉眼看清过程的场合(搜索框提示等) */
   --dur-spin: 0.6s; /* 刷新钮转一圈;与 useRefreshFeedback 的 MIN_SPIN_MS 同值 */
   --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 回弹感:过冲后归位 */

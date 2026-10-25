@@ -29,8 +29,11 @@ const OPEN_HINTS = [
 ] as const
 /** 文案与 input 边缘的余量:按根字号走,界面缩放档不同余量同比(100% 时 8px) */
 const FIT_MARGIN_REM = 0.5
-/** is-tight 收紧 padding/gap 腾出的宽度:padding 0.75rem→0.375rem + gap 0.5rem→0.25rem,合计 1rem */
-const TIGHT_SAVED_REM = 1
+/** 文字起点缩进(与 CSS 的 text-indent 同值):占 input 内部宽度,量宽时要扣掉;
+    全程固定,收起/展开文字不位移 —— 位移来自 gap 会随展开长出来的旧方案 */
+const SEARCH_INDENT_REM = 0.5
+/** is-tight 只收右侧留白腾出的宽度:padding-right 0.75rem→0.25rem,合计 0.5rem */
+const TIGHT_SAVED_REM = 0.5
 
 /** 框宽降级 placeholder:ResizeObserver 盯 input 实宽,canvas 按当前字号实测各档
     文案宽,挑塞得下的最长一档;整句塞不下时进 tight 档收 padding/gap 再腾宽。
@@ -58,13 +61,15 @@ function useFittedPlaceholder(
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
       const margin = rem * FIT_MARGIN_REM
       const saved = rem * TIGHT_SAVED_REM
+      const indent = rem * SEARCH_INDENT_REM
       const cs = getComputedStyle(input)
       ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
       // 判 tight 永远按「正常 padding 下的可用宽」算:已 tight 就先扣回腾出的部分
       const normalAvail = w - (tight ? saved : 0)
       const nextTight = ctx.measureText(hints[0]).width + margin > normalAvail
-      // 挑档要用「这轮 CSS 落定后的实宽」:退 tight 时宽度会缩回正常态,不能拿腾宽后的算
-      const avail = nextTight ? normalAvail + saved : normalAvail
+      // 挑档要用「这轮 CSS 落定后的实宽」:退 tight 时宽度会缩回正常态,不能拿腾宽后的算;
+      // text-indent 占的是 input 内部宽度,要从可用宽里扣掉,否则最后一字会被切
+      const avail = (nextTight ? normalAvail + saved : normalAvail) - indent
       tight = nextTight
       const text = hints.find((t) => ctx.measureText(t).width + margin <= avail) ?? ''
       setFit((prev) => (prev.text === text && prev.tight === tight ? prev : { text, tight }))

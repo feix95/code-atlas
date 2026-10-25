@@ -68,7 +68,9 @@
 
 /* 搜索框:空闲时灰底方块边长等于行高,hover/focus 后向右展开;左缘与 workspace 卡对齐。
    首列固定为行高宽的图标位,展开只加长第二列(输入框),放大镜原地不动。
-   导航组单独 auto 贴右,搜索展开只吃中间空档,三个导航钮不会被推着走 */
+   导航组单独 auto 贴右,搜索展开只吃中间空档,三个导航钮不会被推着走。
+   文字起点由 input 的 text-indent 钉死,不用 gap —— gap 收起态必须为 0(26px 方块塞不下),
+   若展开时再长出来,文字会跟着滑 8px,视觉上就是「展开完文字又挪一下」 */
 .tb-search {
   position: relative;
   isolation: isolate;
@@ -117,7 +119,6 @@
 .tb-search:hover,
 .tb-search:focus-within {
   flex-grow: 1;
-  gap: 0.5rem;
   padding: 0 0.75rem 0 0;
   background: var(--chrome-hover);
 }
@@ -138,6 +139,9 @@
   color: var(--chrome-ink);
   font-size: var(--font-ui-medium);
   font-family: inherit;
+  /* 文字起点:只缩进文字本身,不占布局宽度,收起/展开全程 8px 不变.
+     值须与 AppTopBar.tsx 的 SEARCH_INDENT_REM 保持一致 */
+  text-indent: 0.5rem;
   opacity: 0;
 }
 
@@ -151,7 +155,6 @@
   .tb-search {
     transition:
       flex-grow var(--dur-3) var(--ease-smooth),
-      gap var(--dur-3) var(--ease-smooth),
       padding var(--dur-3) var(--ease-smooth),
       background-color var(--dur-2) var(--ease-smooth);
   }
@@ -161,6 +164,20 @@
   }
 
   .tb-search input {
+    transition:
+      max-width var(--dur-3) var(--ease-smooth),
+      opacity var(--dur-2) var(--ease-smooth);
+  }
+
+  /* 展开方向:等框宽动画收尾再整句淡入,慢速让肉眼看清过程 */
+  .tb-search:hover input {
+    transition:
+      max-width var(--dur-3) var(--ease-smooth),
+      opacity var(--dur-4) var(--ease-smooth) var(--dur-3);
+  }
+
+  /* 已经点进输入框:输入文字与光标要立刻可见,不再等展开 */
+  .tb-search:focus-within input {
     transition:
       max-width var(--dur-3) var(--ease-smooth),
       opacity var(--dur-2) var(--ease-smooth);
@@ -178,12 +195,13 @@
   display: none;
 }
 
-/* 窄框腾宽档(外方方案第三步):整句提示塞不下时收 padding/gap,
-   再给 input 挤出约 16px;进出由 useFittedPlaceholder 双阈值判定 */
+/* 窄框腾宽档(外方方案第三步):整句提示塞不下时收右侧留白,
+   给 input 挤出约 8px;进出由 useFittedPlaceholder 双阈值判定.
+   只收 padding-right,不动 text-indent —— 文字起点一旦随宽度变,就是小葵说的
+   「展开完又挪一下」;腾出的宽度须与 AppTopBar.tsx 的 TIGHT_SAVED_REM 一致 */
 .tb-search:hover.is-tight,
 .tb-search:focus-within.is-tight {
-  gap: 0.25rem;
-  padding: 0 0.375rem 0 0;
+  padding: 0 0.25rem 0 0;
 }
 
 /* 没开工作区:搜索框整组置灰(深搜要有工作区根,规格默认项) */
