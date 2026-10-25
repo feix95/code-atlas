@@ -1599,8 +1599,13 @@ try {
   await home()
   await control({ partial: true })
   await open(project)
-  // 分级扫描没探完:页脚不出字,实情挂进计数簇的悬停提示(树里对应目录另有「未扫描」徽章)
-  await page.locator('.sidebar-footer .sidebar-counts[data-tip*="部分已扫描"]').waitFor()
+  // 分级扫描没探完:页脚只留计数,实情在树里「未扫描」徽章
+  await page.locator('.tree-badge.is-warn').filter({ hasText: '未扫描' }).waitFor()
+  assert.match(
+    (await page.locator('.sidebar-footer .sidebar-counts').innerText()).trim(),
+    /^\d+ \/ \d+$/,
+    'footer counts stay numeric when scan is partial'
+  )
   await control({ partial: false, holdGraph: true })
   // 关系分析挂在半路时换工作区:单例签不随工作区关闭,但迟到的旧项目图必须被丢弃,
   // 不许落进还开着的图谱签里

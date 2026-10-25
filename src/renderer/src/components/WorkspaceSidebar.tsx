@@ -7,7 +7,6 @@ import { useState } from 'react'
 import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
 import type { SearchNameHit } from '@shared/searchNames'
-import { isTreePartial } from '@shared/scanCoverage'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import type { RecentProject } from '../recents'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
@@ -21,8 +20,6 @@ import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 import type { SidebarFace } from '../useSettingsNav'
 import { UiWorkbenchSidebar } from './uiWorkbench/UiWorkbenchSidebar'
 
-/** 页脚计数图标本体(100% 缩放下 px):1rem,与数字同档 */
-const FOOTER_COUNT_ICON_SIZE = 16
 /** 页脚备注开关图标本体:1.3rem */
 const FOOTER_NOTE_ICON_SIZE = 1.3 * ROOT_FONT_BASE_PX
 
@@ -141,8 +138,6 @@ export function WorkspaceSidebar({
 }): React.JSX.Element {
   const settingsMode = sidebarFace === 'settings'
   const [notesShown, setNotesShown] = useState(readNotesShown)
-  // 分级扫描没探完:页脚不出字,只把实情挂进计数簇的悬停里(树里对应目录另有「未扫描」徽章)
-  const treePartial = result !== null && isTreePartial(result.tree)
   return (
     <>
       {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
@@ -239,17 +234,10 @@ export function WorkspaceSidebar({
                 className="sidebar-counts"
                 role="img"
                 aria-label={`${result.stats.dirCount} 个文件夹,${result.stats.fileCount} 个文件`}
-                data-tip={treePartial ? '部分已扫描:点开的目录会继续扫描' : undefined}
+                data-tip="文件夹 / 文件"
                 data-tip-side="top"
               >
-                <span className="sidebar-count">
-                  {result.stats.dirCount}
-                  <TreeIcon name="folder" size={FOOTER_COUNT_ICON_SIZE} />
-                </span>
-                <span className="sidebar-count">
-                  {result.stats.fileCount}
-                  <TreeIcon name="doc" size={FOOTER_COUNT_ICON_SIZE} />
-                </span>
+                {result.stats.dirCount} / {result.stats.fileCount}
               </span>
               <button
                 type="button"

@@ -252,7 +252,7 @@ function FilePathMenuCard({
               className="file-path-menu-input"
               value={draft}
               maxLength={NOTE_MAX_CHARS}
-              placeholder="一句话备注:当初为什么建它/它是干嘛的"
+              placeholder="添加备注…"
               aria-label="备注内容"
               spellCheck={false}
               onChange={(e) => setDraft(e.target.value)}
