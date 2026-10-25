@@ -749,6 +749,45 @@ try {
   )
   await page.mouse.move(12, 320)
   await bubble.waitFor({ state: 'detached' })
+  // 页脚笔形开关:关掉只藏显示(行内小笔标 + 悬停里的备注话术),备注数据与右键菜单照旧
+  const notesToggle = page.locator('.sidebar-notes-toggle')
+  assert.equal(
+    await notesToggle.getAttribute('aria-pressed'),
+    'true',
+    'notes must be visible by default'
+  )
+  await notesToggle.click()
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('atlas.treeNotesShown')),
+    'off',
+    'notes toggle must be a global preference, not per project'
+  )
+  await page
+    .locator('.tree-row.is-file')
+    .filter({ hasText: 'README.md' })
+    .locator('.tree-note-mark')
+    .waitFor({ state: 'detached' })
+  assert.equal(
+    await noteTarget.getAttribute('data-tip'),
+    summaryTip,
+    'hiding notes must restore the summary tip'
+  )
+  await notesToggle.click()
+  await page
+    .locator('.tree-row.is-file')
+    .filter({ hasText: 'README.md' })
+    .locator('.tree-note-mark')
+    .waitFor()
+  assert.equal(
+    await noteTarget.getAttribute('data-tip'),
+    '这是我对 README 的备注',
+    'showing notes again must bring the note back'
+  )
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('atlas.treeNotesShown')),
+    'on',
+    'the global notes preference must record the "on" state too'
+  )
   await noteTarget.click({ button: 'right' })
   await page.getByRole('menuitem', { name: '清除备注', exact: true }).click()
   await page.locator('.file-path-menu').waitFor({ state: 'detached' })
@@ -1560,8 +1599,8 @@ try {
   await home()
   await control({ partial: true })
   await open(project)
-  // 分级扫描没探完:侧栏页脚如实说「部分已扫描」(旧「项目导览」的预警条随概览板块退役)
-  await page.locator('.sidebar-footer').getByText('部分已扫描').waitFor()
+  // 分级扫描没探完:页脚不出字,实情挂进计数簇的悬停提示(树里对应目录另有「未扫描」徽章)
+  await page.locator('.sidebar-footer .sidebar-counts[data-tip*="部分已扫描"]').waitFor()
   await control({ partial: false, holdGraph: true })
   // 关系分析挂在半路时换工作区:单例签不随工作区关闭,但迟到的旧项目图必须被丢弃,
   // 不许落进还开着的图谱签里

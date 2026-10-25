@@ -86,7 +86,8 @@ function parseTab(raw: unknown): SessionTab | null {
   const relPath = typeof t['relPath'] === 'string' ? t['relPath'] : ''
   // 文件签存文件名/图标;单例签存品类名牌,坏了也能回名牌兜底
   const name = typeof t['name'] === 'string' && t['name'] !== '' ? t['name'] : KIND_LABELS[kind]
-  const icon = typeof t['icon'] === 'string' && t['icon'] !== '' ? t['icon'] : KIND_ICONS[kind]
+  const stored = typeof t['icon'] === 'string' && t['icon'] !== '' ? t['icon'] : KIND_ICONS[kind]
+  const icon = kind === 'chat' || kind === 'uiworkbench' ? KIND_ICONS[kind] : stored
   return {
     kind,
     relPath,

@@ -1,18 +1,4 @@
-/* 文件树、扫描状态点与深搜结果(从 workspace.css 拆出:纯迁移,不改行为) */
-
-.status-dot {
-  display: inline-block;
-  width: 0.4375rem;
-  height: 0.4375rem;
-  margin-right: 0.3125rem;
-  border-radius: 50%;
-  background: var(--green);
-}
-
-/* 还有没探完的目录:琥珀点,提醒但不是错 */
-.status-dot.is-amber {
-  background: var(--amber);
-}
+/* 文件树与深搜结果(从 workspace.css 拆出:纯迁移,不改行为) */
 
 /* 探测失败等人话提示:贴在树栏底部 */
 .tree-toast {

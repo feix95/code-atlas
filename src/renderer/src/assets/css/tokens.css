@@ -40,6 +40,7 @@
   /* UI v3 比例布局(规格:docs/archive/UI重构-v3-比例布局)
      1u = 顶栏高 = rail 宽;全校准只动这一个锚值 */
   --u: 2.5rem; /* chrome 比例基准;JS 侧同值在 shared/uiScale.ts CHROME_U_REM */
+  --icon-rail: 1.6rem; /* rail 列图标本体(图谱/对话/工作台/设置)。JS 侧 RAIL_ICON_SIZE = 1.6 × ROOT_FONT_BASE_PX */
   /* 树行层级缩进/级(小葵实测:原 1.125rem 减半定稿) */
   --tree-indent: 0.5625rem;
   --chrome-search-row-height: calc(var(--u) * 0.65); /* 顶栏搜索行高;收起态方块与导航钮底块的边长 */

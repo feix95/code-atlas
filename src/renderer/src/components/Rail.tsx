@@ -3,11 +3,9 @@
 // 列宽 1u(= 顶栏高),与顶栏同底同色;图标 ~0.425u,点击区 ~0.75u。
 // 图谱本体还没实现(规格见《项目结构图谱》),点开一张单例占位页签;
 // AI 状态 = 三态图标 + 状态浮层(内容沿用旧文档第七节,细节在 RailAiStatus)。
+import { RAIL_ICON_SIZE } from '../inputMetrics'
 import { TreeIcon } from './Icons'
 import { RailAiStatus } from './RailAiStatus'
-
-/** rail 图标本体 ≈0.425u ≈ 27px@100%(顶栏图标 ×0.85,规格给定) */
-const RAIL_ICON = 25.3125
 
 export function Rail({
   hasWorkspace,
@@ -34,7 +32,7 @@ export function Rail({
         data-tip-side="right"
         aria-label="关系图谱"
       >
-        <TreeIcon name="view" size={RAIL_ICON} mono />
+        <TreeIcon name="view" size={RAIL_ICON_SIZE} mono />
       </button>
       <button
         type="button"
@@ -44,7 +42,7 @@ export function Rail({
         data-tip-side="right"
         aria-label="自由对话"
       >
-        <TreeIcon name="bot" size={RAIL_ICON} mono />
+        <TreeIcon name="chat" size={RAIL_ICON_SIZE} mono />
       </button>
       <button
         type="button"
@@ -54,7 +52,7 @@ export function Rail({
         data-tip-side="right"
         aria-label="UI 工作台"
       >
-        <TreeIcon name="palette" size={RAIL_ICON} mono />
+        <TreeIcon name="pencilRuler" size={RAIL_ICON_SIZE} mono />
       </button>
       <button
         type="button"
@@ -64,7 +62,7 @@ export function Rail({
         data-tip-side="right"
         aria-label="设置"
       >
-        <TreeIcon name="gear" size={RAIL_ICON} mono />
+        <TreeIcon name="gear" size={RAIL_ICON_SIZE} mono />
       </button>
       {/* AI 状态:图标本体随模型状态切换(§6.1 唯一保色图标),点击弹状态浮层 */}
       <RailAiStatus />

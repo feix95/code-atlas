@@ -2,6 +2,8 @@
  * 输入舱弹性长高的公共口径(P2-11):自动长高到 CAP 行封顶,
  * 封顶后浮拨杆,拨上去固定 EXPAND 行。
  */
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
+
 export const INPUT_CAP_LINES = 5
 export const INPUT_EXPAND_LINES = 10
 /** 拨杆(展开/收合)那颗小箭头的尺寸:两窗同款岗,同同一数据源 */
@@ -20,3 +22,5 @@ export const MENU_ICON_ONLY_SIZE = 17
 
 /** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和独立子窗同一颗钮,同同一数据源 */
 export const WIN_ICON_SIZE = 18
+/** rail 列图标本体:1.6rem,与 tokens.css --icon-rail 同值 */
+export const RAIL_ICON_SIZE = 1.6 * ROOT_FONT_BASE_PX

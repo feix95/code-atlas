@@ -64,7 +64,7 @@ check('serializeSession→parseSession 往返:字段原样认回,激活标记落
     {
       id: 'pane:2',
       activeId: 'tab:3',
-      tabs: [{ id: 'tab:3', kind: 'chat', relPath: '', name: '自由对话', icon: 'bot' }]
+      tabs: [{ id: 'tab:3', kind: 'chat', relPath: '', name: '自由对话', icon: 'chat' }]
     }
   ]
   const s = serializeSession('C:\\work\\demo', groups, 'pane:2', 'src/b.ts')
@@ -144,6 +144,7 @@ check('parseSession:旧档里的概览签被丢弃,同组其余签照常还原',
   assert.ok(s, '存档整体照认,不因一张退役签作废')
   assert.equal(s.groups[0].tabs.length, 1, '概览签退役后旧存档里它被丢掉')
   assert.equal(s.groups[0].tabs[0].kind, 'chat', '同组其余签照常还原')
+  assert.equal(s.groups[0].tabs[0].icon, 'chat', '旧对话签的机器人图标换成对话气泡')
 })
 
 check('hydrateSession:死签扔掉、活签换新 id、激活标记不错位', () => {
@@ -248,7 +249,7 @@ check('serializeSession:激活指针没指到任何签时,on 不落、还原兜�
     {
       id: 'pane:1',
       activeId: null,
-      tabs: [{ id: 'tab:1', kind: 'chat', relPath: '', name: '自由对话', icon: 'bot' }]
+      tabs: [{ id: 'tab:1', kind: 'chat', relPath: '', name: '自由对话', icon: 'chat' }]
     }
   ]
   const s = serializeSession(null, groups, null, null)

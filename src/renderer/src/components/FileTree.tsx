@@ -14,6 +14,8 @@ interface TreeRowProps {
   depth: number
   /** 本项目的手动备注表:备注过的行亮小葵自己的话,压过引擎一句话 */
   notes?: NoteMap
+  /** 备注显示开关(页脚那支笔):关掉只藏标记与悬停话术,备注本身照旧可编辑 */
+  notesShown?: boolean
   /** 右键菜单(现统一走全局文件菜单):把节点报给 App 层换动作 */
   onRowContextMenu?: (e: React.MouseEvent, node: ScanTreeNode) => void
   selectedPath: string | null
@@ -33,6 +35,7 @@ function TreeRow({
   node,
   depth,
   notes,
+  notesShown,
   onRowContextMenu,
   selectedPath,
   expandingPath,
@@ -56,7 +59,7 @@ function TreeRow({
   const expanded = open || !!forceExpand
 
   if (node.type === 'file') {
-    const note = notes?.[node.relPath]
+    const note = notesShown === false ? undefined : notes?.[node.relPath]
     // 注释小灰字退役:行内只留「有备注」的笔帽小标,话本身挪进悬停提示(右侧出)。
     // 备注盖住引擎摘要:有备注只看备注,备注删掉后摘要自动回来
     const tip = note ? note.text : (node.summary?.text ?? '')
@@ -106,7 +109,7 @@ function TreeRow({
   }
 
   const dir = node
-  const dirNote = notes?.[dir.relPath]
+  const dirNote = notesShown === false ? undefined : notes?.[dir.relPath]
   // 注释小灰字退役:摘要/备注/子项数都挪进悬停提示;琥珀警示徽章仍常亮(留个心眼不藏进悬停)。
   // 备注盖住整条提示:有备注只看备注,备注删掉后摘要和子项数自动回来
   const dirTip = dirNote
@@ -201,6 +204,7 @@ function TreeRow({
             node={child}
             depth={depth + 1}
             notes={notes}
+            notesShown={notesShown}
             onRowContextMenu={onRowContextMenu}
             selectedPath={selectedPath}
             expandingPath={expandingPath}
@@ -221,6 +225,8 @@ interface FileTreeProps {
   rootPath?: string
   /** 本项目手动备注表;不传就只亮引擎一句话 */
   notes?: NoteMap
+  /** 备注显示开关(页脚那支笔);不传 = 显示 */
+  notesShown?: boolean
   selectedPath: string | null
   expandingPath: string | null
   /** reveal 联动(页签地基):激活的页签/跳转目标在树里的父目录链,这些目录强制展开 */
@@ -242,6 +248,7 @@ export function FileTree({
   root,
   rootPath,
   notes,
+  notesShown,
   selectedPath,
   expandingPath,
   revealPaths,
@@ -302,6 +309,7 @@ export function FileTree({
             node={root}
             depth={0}
             notes={notes}
+            notesShown={notesShown}
             onRowContextMenu={handleRowContextMenu}
             selectedPath={selectedPath}
             expandingPath={expandingPath}

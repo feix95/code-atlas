@@ -48,6 +48,8 @@
 .rail > .rail-btn:not(.rail-ai) > svg {
   position: relative;
   z-index: 1;
+  width: var(--icon-rail);
+  height: var(--icon-rail);
 }
 
 .rail > .rail-btn:not(.rail-ai):hover:not(:disabled) {

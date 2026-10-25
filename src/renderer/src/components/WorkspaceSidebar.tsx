@@ -3,20 +3,28 @@
 // 规格 §7.1「不存在空侧栏」:没开工作区时树区 = 「这台电脑」盘符列表;
 // 现在的盘符行单击即开,B8 换成资源管理器语义(单击原地展开、双击开为工作区)。
 // 「项目导览」钮按规格摘除:导览内容 = 概览页签的零状态,入口挪进 rail。
+import { useState } from 'react'
 import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
 import type { SearchNameHit } from '@shared/searchNames'
 import { isTreePartial } from '@shared/scanCoverage'
+import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
 import type { RecentProject } from '../recents'
 import { MIN_SIDEBAR_WIDTH } from '../useSidebarSash'
+import { readNotesShown, writeNotesShown } from '../treePrefs'
 import { DriveBrowser } from './DriveBrowser'
 import { FileTree } from './FileTree'
 import { SearchResults } from './SearchResults'
 import { WorkspacePathCard } from './WorkspacePathCard'
-import { TreeIcon } from './Icons'
+import { NoteToggleIcon, TreeIcon } from './Icons'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 import type { SidebarFace } from '../useSettingsNav'
 import { UiWorkbenchSidebar } from './uiWorkbench/UiWorkbenchSidebar'
+
+/** 页脚计数图标本体(100% 缩放下 px):1rem,与数字同档 */
+const FOOTER_COUNT_ICON_SIZE = 16
+/** 页脚备注开关图标本体:1.3rem */
+const FOOTER_NOTE_ICON_SIZE = 1.3 * ROOT_FONT_BASE_PX
 
 export function WorkspaceSidebar({
   result,
@@ -132,6 +140,9 @@ export function WorkspaceSidebar({
   onSettingsSection: (key: SectionKey) => void
 }): React.JSX.Element {
   const settingsMode = sidebarFace === 'settings'
+  const [notesShown, setNotesShown] = useState(readNotesShown)
+  // 分级扫描没探完:页脚不出字,只把实情挂进计数簇的悬停里(树里对应目录另有「未扫描」徽章)
+  const treePartial = result !== null && isTreePartial(result.tree)
   return (
     <>
       {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
@@ -198,6 +209,7 @@ export function WorkspaceSidebar({
                 root={result.tree}
                 rootPath={result.rootPath}
                 notes={notes}
+                notesShown={notesShown}
                 selectedPath={selectedFile?.relPath ?? selectedFolder?.relPath ?? null}
                 expandingPath={expanding}
                 revealPaths={revealPaths}
@@ -223,16 +235,37 @@ export function WorkspaceSidebar({
           )}
           {result && (
             <footer className="sidebar-footer">
-              <span>
-                <i
-                  className={`status-dot${isTreePartial(result.tree) ? ' is-amber' : ''}`}
-                  aria-hidden="true"
-                />
-                {isTreePartial(result.tree) ? '部分已扫描' : '扫描完成'}
+              <span
+                className="sidebar-counts"
+                role="img"
+                aria-label={`${result.stats.dirCount} 个文件夹,${result.stats.fileCount} 个文件`}
+                data-tip={treePartial ? '部分已扫描:点开的目录会继续扫描' : undefined}
+                data-tip-side="top"
+              >
+                <span className="sidebar-count">
+                  {result.stats.dirCount}
+                  <TreeIcon name="folder" size={FOOTER_COUNT_ICON_SIZE} />
+                </span>
+                <span className="sidebar-count">
+                  {result.stats.fileCount}
+                  <TreeIcon name="doc" size={FOOTER_COUNT_ICON_SIZE} />
+                </span>
               </span>
-              <span className="mono">
-                {result.stats.fileCount} 个文件 · {result.stats.dirCount} 个文件夹
-              </span>
+              <button
+                type="button"
+                className="sidebar-notes-toggle"
+                aria-pressed={notesShown}
+                aria-label={notesShown ? '隐藏文件备注' : '显示文件备注'}
+                data-tip={notesShown ? '隐藏备注' : '显示备注'}
+                data-tip-side="top"
+                onClick={() => {
+                  const next = !notesShown
+                  setNotesShown(next)
+                  writeNotesShown(next)
+                }}
+              >
+                <NoteToggleIcon off={!notesShown} size={FOOTER_NOTE_ICON_SIZE} />
+              </button>
             </footer>
           )}
         </div>

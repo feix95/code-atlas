@@ -19,12 +19,12 @@ export const KIND_LABELS: Record<PaneKind, string> = {
 }
 
 export const KIND_ICONS: Record<PaneKind, string> = {
-  chat: 'bot',
+  chat: 'chat',
   preview: 'code',
   graph: 'view',
   settings: 'settings2',
   peek: 'code',
-  uiworkbench: 'palette',
+  uiworkbench: 'pencilRuler',
   translate: 'sparkles'
 }
 

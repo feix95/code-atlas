@@ -128,6 +128,34 @@ export function NotePen({
   )
 }
 
+/** 页脚备注开关:开 = 一支笔,关 = 划掉的笔(小葵稿 Lucide 线稿)。
+ *  状态只用图形说话,不另起强调色,免得脚注里冒出一颗抢眼的点 */
+export function NoteToggleIcon({
+  off,
+  size = 12
+}: {
+  off: boolean
+  size?: number
+}): React.JSX.Element {
+  return (
+    <Line size={size}>
+      {off ? (
+        <>
+          <path d="m10 10-6.157 6.162a2 2 0 0 0-.5.833l-1.322 4.36a.5.5 0 0 0 .622.624l4.358-1.323a2 2 0 0 0 .83-.5L14 13.982" />
+          <path d="m12.829 7.172 4.359-4.346a1 1 0 1 1 3.986 3.986l-4.353 4.353" />
+          <path d="m15 5 4 4" />
+          <path d="m2 2 20 20" />
+        </>
+      ) : (
+        <>
+          <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+          <path d="m15 5 4 4" />
+        </>
+      )}
+    </Line>
+  )
+}
+
 /** 顶栏线稿图标家族;默认去色吃 currentColor,按需可选彩色稿 */
 export function IconArrowLeft({
   size = 14,
@@ -215,32 +243,6 @@ export function IconRefresh({
   )
 }
 
-/* 「打开项目」钮上的文件夹不吃彩色:它坐在 accent 底上,得跟按钮文字同色(accent-ink)保住对比度 */
-export function IconFolder({
-  size = 14,
-  strokeWidth = 2
-}: {
-  size?: number
-  strokeWidth?: number
-}): React.JSX.Element {
-  return (
-    <svg
-      className="top-icon"
-      width={iconRem(size)}
-      height={iconRem(size)}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-    </svg>
-  )
-}
-
 /* 树图标册:一图一义、24 线稿、一图一色(v5:小葵手改稿 + Lucide 官方稿混编)  */
 
 function Line({
@@ -283,13 +285,14 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3" />
     </>
   ),
-  // 文件夹(小葵稿):加一道盒盖横线
+  // 文件夹(小葵稿):加一道盒盖横线;文件树、盘符浏览、搜索命中、页脚计数共用
   folder: (
     <>
       <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
       <path d="M2 10.5h20" />
     </>
   ),
+  // 文档页:文件树 README 等、聊天待发文件原子、页脚文件计数共用
   doc: (
     <>
       <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" />
@@ -455,6 +458,13 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M9 5h6" />
       <path d="M9 14v.01" />
       <path d="M15 14v.01" />
+    </>
+  ),
+  // 自由对话(lucide messages-circle):rail 入口与对话页签共用;bot 留给文件树 AI/CI 岗
+  chat: (
+    <>
+      <path d="M19.95 10.05a7 7 0 011.412 7.872 1 1 0 00-.058.787l.675 2.089a1 1 0 01-1.236 1.168l-2.155-.631a1 1 0 00-.745.06 7 7 0 01-7.793-1.445" />
+      <path d="M2.696 12.708a1 1 0 00-.058-.785 7 7 0 113.518 3.473 1 1 0 00-.744-.061l-2.155.63a1 1 0 01-1.236-1.167z" />
     </>
   ),
   bulb: (
@@ -656,6 +666,17 @@ const BOOK: Record<string, React.ReactNode> = {
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.6-1.7h2c3 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z" />
     </>
   ),
+  // UI 工作台(lucide pencil-ruler):rail 入口与页签共用;palette 留给外观设置
+  pencilRuler: (
+    <>
+      <path d="M13 7 8.7 2.7a2.41 2.41 0 0 0-3.4 0L2.7 5.3a2.41 2.41 0 0 0 0 3.4L7 13" />
+      <path d="m8 6 2-2" />
+      <path d="m18 16 2-2" />
+      <path d="m17 11 4.3 4.3c.94.94.94 2.46 0 3.4l-2.6 2.6c-.94.94-2.46.94-3.4 0L11 17" />
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+      <path d="m15 5 4 4" />
+    </>
+  ),
   gauge: (
     <>
       <path d="M12 15l3.5-3.5" />
@@ -843,13 +864,20 @@ const BOOK: Record<string, React.ReactNode> = {
       <line x1="12" x2="12" y1="22" y2="18" />
     </>
   ),
-  // 关系图谱(lucide view,规格 §6 槽位1)
+  // 关系图谱(lucide graph-star):rail 入口、页签与空状态共用
   view: (
     <>
-      <path d="M21 17v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2" />
-      <path d="M21 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2" />
-      <circle cx="12" cy="12" r="1" />
-      <path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0" />
+      <path d="m12.342 9.316 1.764-3.527" />
+      <path d="m12.59 14.545 2.35 3.759" />
+      <path d="m13.982 12.332 4.03.447" />
+      <path d="M5.414 17.586 8.88 14.12" />
+      <path d="M9.025 9.742 5.317 5.505" />
+      <circle cx="11" cy="12" r="3" />
+      <circle cx="15" cy="4" r="2" />
+      <circle cx="16" cy="20" r="2" />
+      <circle cx="20" cy="13" r="2" />
+      <circle cx="4" cy="19" r="2" />
+      <circle cx="4" cy="4" r="2" />
     </>
   ),
   // 概览(lucide navigation,规格 §6 槽位2)
