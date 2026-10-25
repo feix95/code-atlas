@@ -74,6 +74,39 @@ export const AGENT_STUB_MIN_CHARS = 300
 /** 占位注记保留原文开头的字数:留个开头,模型还记得这段大概是什么 */
 export const AGENT_STUB_HEAD_CHARS = 200
 
+/** 最新一条也塞不下时硬裁的开头字数:留一截能用的,剩下的让模型按注记重读 */
+export const AGENT_HARD_TRIM_CHARS = 1600
+
+type AgentToolMessage = Extract<AgentChatMessage, { role: 'tool' }>
+
+/** 工具结果压成占位注记(纯函数,自测覆盖);太短的返回 null,不值得动 */
+function stubToolMessage(message: AgentToolMessage): AgentToolMessage | null {
+  if (message.content.length <= AGENT_STUB_MIN_CHARS) return null
+  // 工具结果外层包着 <tool_result>(2.0 资料边界):取头先剥皮,注记再造皮,标签须成对
+  const inner = stripToolResult(message.content)
+  // 联网资料已经进了研究账本:旧原文不必再留开头,直接把模型指回账本
+  const isWeb = inner.includes(TAG.webResults.open)
+  const head = isWeb
+    ? '这条早先的联网资料已提炼进本轮研究账本。'
+    : inner.slice(0, AGENT_STUB_HEAD_CHARS).replaceAll('\n', ' ')
+  return {
+    role: 'tool',
+    tool_call_id: message.tool_call_id,
+    content: `${TAG.toolResult.open}\n${head}……${TAG.programNote.open}这条是早先翻看的资料,对话上下文将满,已提炼成占位注记;原文约 ${inner.length} 字。要重温就再调一次工具重读,允许重读${TAG.programNote.close}\n${TAG.toolResult.close}`
+  }
+}
+
+/** 最新一条也塞不下时只留开头一截(纯函数,自测覆盖);裁不动返回 null */
+function trimToolMessage(message: AgentToolMessage, keepChars: number): AgentToolMessage | null {
+  const inner = stripToolResult(message.content)
+  if (inner.length <= keepChars + AGENT_STUB_MIN_CHARS) return null
+  return {
+    role: 'tool',
+    tool_call_id: message.tool_call_id,
+    content: `${TAG.toolResult.open}\n${inner.slice(0, keepChars)}……${TAG.programNote.open}这条结果太长,只带了开头一截(原文约 ${inner.length} 字);要后面的细节就再调一次工具,读文件用 offset 接着翻${TAG.programNote.close}\n${TAG.toolResult.close}`
+  }
+}
+
 /**
  * 紧急瘦身(上下文爆掉的最后一道兜底,纯函数,自测覆盖):
  * 轮间的注记压缩是常态保养,但历史/附件本身大坨、或第一轮就爆时它救不了 ——
@@ -144,8 +177,10 @@ export function agentPromptBudget(ctx: number, replyCap: number): number {
 }
 
 /**
- * 上下文自动压缩(纯函数,自测覆盖):账面超过预算时,把较早的
- * 工具结果(翻文件读进来的大段原文)换成占位注记,最近 2 条留原样。
+ * 上下文自动压缩(纯函数,自测覆盖):账面超过预算时按三档递进压短历史。
+ * 先压「最近两条以外」的旧资料;还不够就连倒数第二条也压掉,只留最新一条;
+ * 仍不够就把最新一条裁成开头一截 —— 8k 档人设加两条完整搜索结果就占满窗口,
+ * 只压旧账会让账面永远降不下来(2026-10-25 M4 工具调用被截断案)。
  * 只动 tool 消息 —— 人设、用户的提问、assistant 的喊话都不碰;协议要求
  * tool 结果和 assistant 的 tool_calls 成对,只缩内容不动条数,对账关系不破。
  * 不超预算返回 null(啥也不用做);原数组不动,压不压、压多少都由调用方拍板。
@@ -159,29 +194,36 @@ export function compressAgentMessages(
   for (const [index, message] of messages.entries()) {
     if (message.role === 'tool') toolIdx.push(index)
   }
-  // 倒数第 1、2 条留原样,更早的长条目压成注记
-  const keepFrom = Math.max(0, toolIdx.length - AGENT_KEEP_RECENT_TOOLS)
+  const next = [...messages]
   const freedCallIds: string[] = []
   let compressedCount = 0
-  const next = messages.map((message, index) => {
-    if (message.role !== 'tool' || !toolIdx.includes(index) || toolIdx.indexOf(index) >= keepFrom)
-      return message
-    if (message.content.length <= AGENT_STUB_MIN_CHARS) return message
-    compressedCount += 1
-    freedCallIds.push(message.tool_call_id)
-    // 工具结果外层包着 <tool_result>(2.0 资料边界):取头先剥皮,注记再造皮,标签须成对
-    const inner = stripToolResult(message.content)
-    // 联网资料已经进了研究账本:旧原文不必再留开头,直接把模型指回账本
-    const isWeb = inner.includes(TAG.webResults.open)
-    const head = isWeb
-      ? '这条早先的联网资料已提炼进本轮研究账本。'
-      : inner.slice(0, AGENT_STUB_HEAD_CHARS).replaceAll('\n', ' ')
-    return {
-      role: 'tool' as const,
-      tool_call_id: message.tool_call_id,
-      content: `${TAG.toolResult.open}\n${head}……${TAG.programNote.open}这条是早先翻看的资料,对话上下文将满,已提炼成占位注记;原文约 ${inner.length} 字。要重温就再调一次工具重读,允许重读${TAG.programNote.close}\n${TAG.toolResult.close}`
+  const shrinkRange = (start: number, end: number, hardTrim: boolean): void => {
+    for (let i = start; i < end; i += 1) {
+      const message = next[toolIdx[i]]
+      if (message.role !== 'tool') continue
+      const replaced = hardTrim
+        ? trimToolMessage(message, AGENT_HARD_TRIM_CHARS)
+        : stubToolMessage(message)
+      if (!replaced) continue
+      next[toolIdx[i]] = replaced
+      compressedCount += 1
+      freedCallIds.push(message.tool_call_id)
     }
-  })
+  }
+  // 第一档:最近两条留原样,更早的压成注记
+  shrinkRange(0, Math.max(0, toolIdx.length - AGENT_KEEP_RECENT_TOOLS), false)
+  if (estimateMessagesTokens(next) > budgetTokens) {
+    // 第二档:连倒数第二条也压掉,只留最新一条
+    shrinkRange(
+      Math.max(0, toolIdx.length - AGENT_KEEP_RECENT_TOOLS),
+      Math.max(0, toolIdx.length - 1),
+      false
+    )
+    if (estimateMessagesTokens(next) > budgetTokens) {
+      // 第三档:最新一条也只留开头一截,不再整条占满窗口
+      shrinkRange(Math.max(0, toolIdx.length - 1), toolIdx.length, true)
+    }
+  }
   if (compressedCount === 0) return null
   return { messages: next, freedCallIds, compressedCount }
 }

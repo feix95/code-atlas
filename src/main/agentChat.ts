@@ -22,6 +22,7 @@ import {
   type ResearchGateState
 } from './agentResearch.ts'
 import { stripCurrentQuestionAnchor } from '../shared/chatHistory.ts'
+import { researchLedgerMaxChars } from '../ai/researchLedger.ts'
 import { addDevLog } from '../shared/devlog.ts'
 import { applyAgentPersona, buildAgentAddendum, flattenAgentMessages } from './agentPersona.ts'
 import { handleAgentFailure, type AgentGuardFlags } from './agentFallback.ts'
@@ -108,6 +109,7 @@ export async function runAgentChat(input: {
     repetitionRetried: false,
     reminderFailsafe: false,
     slimRetried: false,
+    cutCallRetried: false,
     skipNudgeOnce: false
   }
   let usage: AiUsage | undefined
@@ -281,6 +283,7 @@ export async function runAgentChat(input: {
       requestId,
       rootPath,
       readChars,
+      ledgerMaxChars: researchLedgerMaxChars(ctx),
       tavilyKey: input.tavilyKey,
       currentQuestion,
       signal,

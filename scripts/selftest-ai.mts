@@ -63,6 +63,7 @@ import {
   buildResearchNote,
   extractResearchFacts,
   formatResearchLedger,
+  researchLedgerMaxChars,
   upsertResearchLedger
 } from '../src/ai/researchLedger.ts'
 import {
@@ -716,6 +717,20 @@ async function main(): Promise<void> {
   assert.ok(ledger.includes('本轮联网研究账本'), '账本要自报家门')
   assert.ok(ledger.includes('opencode webfetch'), '账本要带搜索词')
   assert.ok(ledger.length <= 600, '账本总长要封顶')
+  assert.equal(researchLedgerMaxChars(8192), 1200, '8k 档账本只给 1200 字,不能占掉近四成窗口')
+  assert.equal(researchLedgerMaxChars(16384), 2048, '16k 档放宽到 2048 字')
+  assert.equal(researchLedgerMaxChars(32768), 3000, '大上下文仍封顶 3000 字')
+  const longNote = buildResearchNote({
+    kind: 'search',
+    query: '最新的调查',
+    source: 'Tavily',
+    text: `最新事实甲${'甲'.repeat(80)}。最新事实乙${'乙'.repeat(80)}。`,
+    focus: '最新'
+  })
+  assert.ok(longNote, '长记录要生成')
+  const clippedLedger = formatResearchLedger(addResearchNote(notes, longNote!), ledger.length + 20)
+  assert.ok(clippedLedger.includes('最新事实'), '账本超长时保最新事实,不砍刚查到的')
+  assert.ok(clippedLedger.startsWith('…') || clippedLedger.includes('\n…'), '砍掉旧料要留省略号')
   const withLedger = upsertResearchLedger(
     [
       { role: 'user', content: ledger },

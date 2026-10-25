@@ -81,7 +81,7 @@ import {
   sanitizeAgentRootId,
   sanitizeExternalAbsPath
 } from '../src/main/agentAccess.ts'
-import { handleAgentFailure } from '../src/main/agentFallback.ts'
+import { handleAgentFailure, isCutToolCall } from '../src/main/agentFallback.ts'
 import { asToolName, TOOL_NAMES, TOOL_STEP_WORDS } from '../src/shared/agentTools.ts'
 import {
   githubDisplayPath,
@@ -491,7 +491,7 @@ async function main(): Promise<void> {
     null,
     '账面没超预算:一根手指都不动'
   )
-  const squeezed = compressAgentMessages(conversation, 100)
+  const squeezed = compressAgentMessages(conversation, 1000)
   assert.ok(squeezed, '超了预算:要动手压缩')
   assert.equal(squeezed!.compressedCount, 2, '四条工具结果里,两条长的旧账压成注记')
   assert.deepEqual(squeezed!.freedCallIds, ['c1', 'c2'], '被压的 id 上报名单,主进程好解锁重读')
@@ -499,7 +499,7 @@ async function main(): Promise<void> {
   assert.ok(squeezedTools[0].content.includes('占位注记'), '旧账第一条换成了注记')
   assert.ok(squeezedTools[0].content.includes('2000'), '注记注明原文约多少字')
   assert.ok(squeezedTools[1].content.includes('占位注记'), '旧账第二条同样换成注记')
-  assert.equal(squeezedTools[2].content, longContent, '倒数第二条留原样:最新的资料模型正要用')
+  assert.equal(squeezedTools[2].content, longContent, '第一档就够时,倒数第二条留原样')
   assert.equal(squeezedTools[3].content, shortContent, '最新一条留原样')
   assert.deepEqual(squeezed!.messages[0], conversation[0], '人设不碰')
   assert.deepEqual(squeezed!.messages[1], conversation[1], '用户的提问不碰')
@@ -507,6 +507,37 @@ async function main(): Promise<void> {
     squeezed!.messages.length,
     conversation.length,
     '只缩内容不动条数:tool 和 tool_calls 的对账关系不破'
+  )
+  // 第一档压完还不够:连倒数第二条也压掉,只留最新一条(2026-10-25 M4 挤爆案)
+  const tighter = compressAgentMessages(conversation, 520)
+  assert.ok(tighter, '预算更紧时仍要压')
+  assert.equal(tighter!.compressedCount, 3, '第二档把倒数第二条也压成注记')
+  assert.deepEqual(tighter!.freedCallIds, ['c1', 'c2', 'c3'], '被压的三条都能重读')
+  const tighterTools = tighter!.messages.filter((m) => m.role === 'tool')
+  assert.ok(tighterTools[2].content.includes('占位注记'), '倒数第二条不再整条占着窗口')
+  assert.equal(tighterTools[3].content, shortContent, '最新一条仍留原样')
+  // 最新一条自己就超大:裁成开头一截,并注明原文多长、怎么接着翻
+  const hugeRecent: AgentChatMessage[] = [
+    { role: 'system', content: '你是助手' },
+    { role: 'user', content: '帮我找东西' },
+    { role: 'tool', tool_call_id: 'c1', content: longContent },
+    { role: 'tool', tool_call_id: 'c2', content: longContent },
+    { role: 'tool', tool_call_id: 'c3', content: 'C'.repeat(6000) }
+  ]
+  const trimmed = compressAgentMessages(hugeRecent, 500)
+  assert.ok(trimmed, '最新一条超大时也要压')
+  const trimmedNewest = trimmed!.messages[trimmed!.messages.length - 1]
+  assert.ok(
+    trimmedNewest.role === 'tool' && trimmedNewest.content.includes('只带了开头一截'),
+    '最新一条裁成开头一截,不留整条占满窗口'
+  )
+  assert.ok(
+    trimmedNewest.role === 'tool' && trimmedNewest.content.includes('原文约 6000 字'),
+    '裁断要照实说原文多长'
+  )
+  assert.ok(
+    trimmedNewest.role === 'tool' && trimmedNewest.content.includes('offset'),
+    '读文件的裁断要教模型怎么接着翻'
   )
   assert.ok(
     conversation[3].role === 'tool' && conversation[3].content === longContent,
@@ -1563,6 +1594,7 @@ async function main(): Promise<void> {
     repetitionRetried: false,
     reminderFailsafe: false,
     slimRetried: false,
+    cutCallRetried: false,
     skipNudgeOnce: false
   }
   const overflowDecision = handleAgentFailure({
@@ -1595,6 +1627,61 @@ async function main(): Promise<void> {
     '爆仓瘦身只保 system 和最新真问题'
   )
 
+  // 24.2 工具调用被截断:500 + 参数解析失败 → 压一轮重试,只兜一次
+  assert.equal(
+    isCutToolCall({
+      status: 'error',
+      text: '模型服务返回错误(500):模型服务出错了',
+      detail:
+        '{"error":{"code":500,"message":"Failed to parse tool call arguments as JSON: parse error"}}',
+      httpStatus: 500
+    }),
+    true,
+    '500 + 参数解析失败认作工具调用被截断'
+  )
+  assert.equal(
+    isCutToolCall({
+      status: 'error',
+      text: '服务炸了',
+      detail: 'internal server error',
+      httpStatus: 500
+    }),
+    false,
+    '普通 500 不冒领成工具截断'
+  )
+  const cutFlags = {
+    repetitionRetried: false,
+    reminderFailsafe: false,
+    slimRetried: false,
+    cutCallRetried: false,
+    skipNudgeOnce: false
+  }
+  const cutMessages: AgentChatMessage[] = [
+    { role: 'system', content: '人设' },
+    { role: 'user', content: '最新真问题' }
+  ]
+  const cutDecision = handleAgentFailure({
+    round: {
+      status: 'error',
+      text: '模型服务返回错误(500):模型服务出错了',
+      detail: 'Failed to parse tool call arguments as JSON: unexpected end of input',
+      httpStatus: 500
+    },
+    messages: cutMessages,
+    addendum: '',
+    useTools: true,
+    engineNoTools: false,
+    flags: cutFlags,
+    doneCalls: new Set<string>(),
+    callIdToKey: new Map<string, string>()
+  })
+  assert.equal(cutDecision.kind, 'retry', '工具调用被截断要压短重试')
+  assert.ok(
+    cutDecision.kind === 'retry' && cutDecision.step.includes('截断'),
+    '重试灰字说明是工具调用被截断'
+  )
+  assert.equal(cutFlags.cutCallRetried, true, '截断兜底只兜一次')
+
   // 普通 4xx 仍走提醒卡兜底:撤卡重答,不误判成爆仓
   const reminderMessages: AgentChatMessage[] = [
     { role: 'system', content: '人设' },
@@ -1605,6 +1692,7 @@ async function main(): Promise<void> {
     repetitionRetried: false,
     reminderFailsafe: false,
     slimRetried: false,
+    cutCallRetried: false,
     skipNudgeOnce: false
   }
   const reminderDecision = handleAgentFailure({

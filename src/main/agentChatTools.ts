@@ -171,6 +171,8 @@ export async function fulfillAgentToolCalls(input: {
   requestId: string
   rootPath: string
   readChars: number
+  /** 研究账本字数上限:按上下文缩放,8k 档不能让它占掉近四成窗口 */
+  ledgerMaxChars: number
   tavilyKey?: string
   currentQuestion: string
   signal: AbortSignal
@@ -190,7 +192,10 @@ export async function fulfillAgentToolCalls(input: {
     input.messages.splice(
       0,
       input.messages.length,
-      ...upsertResearchLedger(input.messages, formatResearchLedger(input.ledger.researchNotes))
+      ...upsertResearchLedger(
+        input.messages,
+        formatResearchLedger(input.ledger.researchNotes, input.ledgerMaxChars)
+      )
     )
   }
   input.messages.splice(0, input.messages.length, ...stripLastAgentReminder(input.messages))

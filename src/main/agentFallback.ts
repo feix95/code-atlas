@@ -11,6 +11,7 @@ export interface AgentGuardFlags {
   repetitionRetried: boolean
   reminderFailsafe: boolean
   slimRetried: boolean
+  cutCallRetried: boolean
   skipNudgeOnce: boolean
 }
 
@@ -36,6 +37,12 @@ export type AgentFailureDecision =
       /** 交卷前要垫的一句步骤灰字 */
       step?: string
     }
+
+/** 引擎没写完整工具参数就解析失败(纯函数,自测覆盖):HTTP 500 点名 arguments 解不动 */
+export function isCutToolCall(round: Extract<AgentRoundResult, { status: 'error' }>): boolean {
+  if (round.httpStatus !== 500) return false
+  return /Failed to parse tool call arguments/i.test(round.detail ?? round.text)
+}
 
 /** 这轮没成:按阶梯决定重来还是交卷(会就地改 messages 与 flags) */
 export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecision {
@@ -128,6 +135,17 @@ export function handleAgentFailure(ctx: AgentFailureContext): AgentFailureDecisi
         engineNoTools,
         step: `对话把模型的脑容量撑爆了:把翻看前的旧账整段清掉(约 ${slimmed.dropped} 条),保住你最新的问题,重答一遍`
       }
+    }
+  }
+  // 工具调用被截断兜底:上下文挤到没地方写完参数,引擎把半截 JSON 当错拒收(500)。
+  // 循环顶会把旧资料硬压一轮再重试;真写不完就照实报错,只兜一次
+  if (round.status === 'error' && !flags.cutCallRetried && isCutToolCall(round)) {
+    flags.cutCallRetried = true
+    flags.skipNudgeOnce = true
+    return {
+      kind: 'retry',
+      engineNoTools,
+      step: '这轮工具调用写到一半被截断了,压短上下文重来一次'
     }
   }
   return {

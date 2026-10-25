@@ -21,8 +21,16 @@ export const RESEARCH_NOTE_MAX = 12
 /** 每条事实最长多少字:一行说清一件事,不搬整段 */
 export const RESEARCH_FACT_MAX_CHARS = 240
 
-/** 账本总字数上限:保证它自己不会变成新的大坨 */
+/** 账本总字数上限(大上下文封顶):保证它自己不会变成新的大坨 */
 export const RESEARCH_LEDGER_MAX_CHARS = 3000
+
+/**
+ * 账本上限按上下文缩放(纯函数,自测覆盖):8k 窗口给 1200 字,16k 给 2048,
+ * 24k 以上才放宽到 3000。固定 3000 在 8k 档占了近四成窗口,深查题必爆(2026-10-25 M4 爆仓案)。
+ */
+export function researchLedgerMaxChars(contextTokens: number): number {
+  return Math.min(RESEARCH_LEDGER_MAX_CHARS, Math.max(1200, Math.round(contextTokens / 8)))
+}
 
 /** 程序从工具结果里至少挑几条事实 */
 const RESEARCH_FACTS_PER_NOTE = 3
@@ -136,7 +144,13 @@ export function formatResearchLedger(
   }
   if (lines.length === 0) return ''
   const body = lines.join('\n')
-  const clipped = body.length > maxChars ? `${body.slice(0, maxChars)}…` : body
+  // 超长时保最新:研究越往后的事实越贴近当前问题,砍尾巴会把刚查到的丢掉
+  let clipped = body
+  if (body.length > maxChars) {
+    const tail = body.slice(body.length - maxChars)
+    const lineStart = tail.indexOf('\n')
+    clipped = `…${lineStart >= 0 ? tail.slice(lineStart + 1) : tail}`
+  }
   return `${AGENT_RESEARCH_PREFIX}\n${clipped}\n${TAG.programReminder.close}`
 }
 
