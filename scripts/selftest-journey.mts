@@ -393,6 +393,158 @@ try {
     'double-clicked drive must become the workspace root'
   )
   await open(project)
+  // 高缩放 × 最小侧栏(4K 屏 + 界面缩放):240px 侧栏下限是固定 px,字和间距按 rem 放大,
+  // 有工作区时 placeholder 若写死就会差一两个像素切掉末字(实测 110% 缩放切 2px)。
+  // 降级链 + tight 腾宽必须兜住;按几何账判,不比墨迹抗锯齿。
+  // 同时钉住顶栏布局:搜索框独占左端、向右展开,放大镜不随展开漂移,
+  // 三个导航钮贴右且原地不动。
+  {
+    const uiScaleBefore = await page.evaluate(() => window.atlas.getUiScale())
+    await page.evaluate(() => window.atlas.setUiScale(1.1))
+    await page.waitForTimeout(300)
+    // 侧栏宽度会被 App 的缩放回调写回,顶住几轮确认落到 240px 下限
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+        document.querySelector('.app')?.style.setProperty('--sidebar-w', `${240 / rem}rem`)
+      })
+      await page.waitForTimeout(120)
+      const applied = await page.evaluate(() => {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+        const want = `${240 / rem}rem`
+        return document.querySelector('.app')?.style.getPropertyValue('--sidebar-w') === want
+      })
+      if (applied) break
+    }
+    // 顶栏左段宽度带 0.3s 过渡:钉完再等它落定,否则收起/展开两次测量撞在过渡中间,
+    // 导航组的绝对位置会差出十几像素(量的不是搜索展开造成的位移)
+    await page.waitForTimeout(500)
+    /** 顶栏几何:导航组右缘、三个钮的 x、放大镜中心;收起/动画中段/展开各量一次对账 */
+    const navGeo = () =>
+      page.evaluate(() => {
+        const nav = document.querySelector('.tb-nav')
+        const side = document.querySelector('.topbar-side')
+        const search = document.querySelector('.tb-search')
+        const collapse = document.querySelector('.tb-collapse')
+        if (!nav || !side || !search || !collapse) return null
+        const box = (el: Element): { x: number; right: number } => {
+          const r = el.getBoundingClientRect()
+          return { x: r.x, right: r.right }
+        }
+        const icon = search.querySelector(':scope > svg')
+        const iconBox = icon?.getBoundingClientRect()
+        return {
+          nav: box(nav),
+          search: box(search),
+          collapse: box(collapse),
+          iconCenterX: iconBox ? iconBox.x + iconBox.width / 2 : Number.NaN,
+          sideRight: side.getBoundingClientRect().right,
+          sideBorder: parseFloat(getComputedStyle(side).borderRightWidth),
+          searchMarginLeft: parseFloat(getComputedStyle(search).marginLeft),
+          navMarginRight: parseFloat(getComputedStyle(nav).marginRight),
+          buttons: [...nav.querySelectorAll('.tb-btn')].map(box)
+        }
+      })
+    const collapsedGeo = await navGeo()
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('DOM.enable')
+    await cdp.send('CSS.enable')
+    const doc = (await cdp.send('DOM.getDocument', { depth: -1 })) as { root: { nodeId: number } }
+    const found = (await cdp.send('DOM.querySelector', {
+      nodeId: doc.root.nodeId,
+      selector: '.tb-search'
+    })) as { nodeId: number }
+    await cdp.send('CSS.forcePseudoState', {
+      nodeId: found.nodeId,
+      forcedPseudoClasses: ['hover']
+    })
+    // 展开动画中途也量一次:图标若跟着左内边距走,静止态看不出来,动画期间会一路漂
+    await page.waitForTimeout(120)
+    const midGeo = await navGeo()
+    await page.waitForTimeout(480)
+    const expandedGeo = await navGeo()
+    const fit = await page.evaluate(() => {
+      const input = document.querySelector('.tb-search input')
+      if (!(input instanceof HTMLInputElement)) return null
+      const cs = getComputedStyle(input)
+      const canvas = document.createElement('canvas').getContext('2d')
+      if (!canvas) return null
+      canvas.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+      return {
+        placeholder: input.placeholder,
+        clientW: input.clientWidth,
+        textW: canvas.measureText(input.placeholder).width,
+        rem: parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      }
+    })
+    await cdp.send('CSS.forcePseudoState', { nodeId: found.nodeId, forcedPseudoClasses: [] })
+    await cdp.detach()
+    await page.evaluate((v) => window.atlas.setUiScale(v), uiScaleBefore)
+    await page.waitForTimeout(300)
+    assert.ok(collapsedGeo, '收起态顶栏几何量不到')
+    assert.ok(expandedGeo, '展开态顶栏几何量不到')
+    // 导航组贴左段右缘(只留右内边距 + 1px 分隔线);搜索框独占左端,与导航组隔开
+    assert.ok(
+      Math.abs(
+        collapsedGeo.nav.right -
+          (collapsedGeo.sideRight - collapsedGeo.sideBorder - collapsedGeo.navMarginRight)
+      ) <= 1,
+      `导航组没贴右:nav.right=${collapsedGeo.nav.right}, 左段右缘=${collapsedGeo.sideRight}`
+    )
+    assert.ok(
+      Math.abs(
+        collapsedGeo.search.x - (collapsedGeo.collapse.right + collapsedGeo.searchMarginLeft)
+      ) <= 1,
+      '收起态搜索框没有留在左端'
+    )
+    assert.ok(
+      collapsedGeo.nav.x - collapsedGeo.search.right > 20,
+      '收起态搜索框与导航组之间应留出空档'
+    )
+    // 展开时左缘钉住、右缘向右长;三个导航钮一像素都不许挪
+    assert.ok(
+      Math.abs(expandedGeo.sideRight - collapsedGeo.sideRight) <= 0.5,
+      `量导航组时左段宽度还在变:${collapsedGeo.sideRight} -> ${expandedGeo.sideRight}`
+    )
+    assert.ok(
+      Math.abs(expandedGeo.nav.right - collapsedGeo.nav.right) <= 0.5,
+      `搜索展开把导航组右缘挪了位:${collapsedGeo.nav.right} -> ${expandedGeo.nav.right}`
+    )
+    assert.ok(
+      Math.abs(expandedGeo.search.x - collapsedGeo.search.x) <= 0.5,
+      `搜索框左缘挪了位:${collapsedGeo.search.x} -> ${expandedGeo.search.x}`
+    )
+    assert.ok(
+      expandedGeo.search.right > collapsedGeo.search.right + 20,
+      `搜索框没有向右展开:${collapsedGeo.search.right} -> ${expandedGeo.search.right}`
+    )
+    assert.ok(
+      Math.abs(expandedGeo.search.right - expandedGeo.nav.x) <= 1,
+      `搜索框展开后没有吃满到导航组左缘:search.right=${expandedGeo.search.right}, nav.x=${expandedGeo.nav.x}`
+    )
+    // 放大镜占固定首列:展开只加长输入框,图标在整段动画里都不许动
+    assert.ok(midGeo, '展开动画中段顶栏几何量不到')
+    assert.ok(
+      Math.abs(midGeo.iconCenterX - collapsedGeo.iconCenterX) <= 0.5,
+      `展开动画中放大镜漂了位:${collapsedGeo.iconCenterX} -> ${midGeo.iconCenterX}`
+    )
+    assert.ok(
+      Math.abs(expandedGeo.iconCenterX - collapsedGeo.iconCenterX) <= 0.5,
+      `搜索展开把放大镜挪了位:${collapsedGeo.iconCenterX} -> ${expandedGeo.iconCenterX}`
+    )
+    collapsedGeo.buttons.forEach((box, i) => {
+      assert.ok(
+        expandedGeo.buttons[i] && Math.abs(expandedGeo.buttons[i].x - box.x) <= 0.5,
+        `搜索展开把第 ${i + 1} 个导航钮挪了位:${box.x} -> ${expandedGeo.buttons[i]?.x}`
+      )
+    })
+    assert.ok(fit, 'search input must exist')
+    assert.equal(fit.placeholder, '搜索文件', '110% 缩放下搜索提示应完整显示')
+    assert.ok(
+      fit.textW + fit.rem * 0.5 <= fit.clientW + 0.5,
+      `placeholder 塞不进输入框:文案 ${fit.textW.toFixed(1)}px + 余量,框宽 ${fit.clientW}px`
+    )
+  }
   // 页签改版(产品裁定):树里点文件 = 开绑死它的文件签 —— 一文件一张,
   // 重开同一文件只激活不生第二张;点文件夹只选中不开签;已有页签一概不动
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()

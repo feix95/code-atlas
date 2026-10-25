@@ -14,8 +14,19 @@ const TOP_ICON = 25
 const TOP_ICON_STROKE = 2
 const REFRESH_ICON = 22
 
-/** 禁用提示的框宽降级链:塞得下的最长一档胜出,全塞不下落最末档 */
-const FIT_HINTS = ['先打开一个文件夹', '先打开文件夹', '打开文件夹', '搜索文件'] as const
+/** 有工作区:占位提示的降级链;末档空串,框窄到极限时宁可没提示也不切字。
+    240px 侧栏下限是固定 px,界面缩放会把字和间距放大,窄框 + 高缩放时
+    「搜索文件」会差一两个像素塞不下,必须留降级。 */
+const SEARCH_HINTS = ['搜索文件', '搜索', ''] as const
+/** 没开工作区:禁用态的引导语,同样以空串兜底 */
+const OPEN_HINTS = [
+  '先打开一个文件夹',
+  '先打开文件夹',
+  '打开文件夹',
+  '搜索文件',
+  '搜索',
+  ''
+] as const
 /** 文案与 input 边缘的余量:按根字号走,界面缩放档不同余量同比(100% 时 8px) */
 const FIT_MARGIN_REM = 0.5
 /** is-tight 收紧 padding/gap 腾出的宽度:padding 0.75rem→0.375rem + gap 0.5rem→0.25rem,合计 1rem */
@@ -24,38 +35,38 @@ const TIGHT_SAVED_REM = 1
 /** 框宽降级 placeholder:ResizeObserver 盯 input 实宽,canvas 按当前字号实测各档
     文案宽,挑塞得下的最长一档;整句塞不下时进 tight 档收 padding/gap 再腾宽。
     进出 tight 用「正常态可用宽」这一根线判,迟滞天然在(腾宽即两阈值差),
-    边界宽度不会来回抖;拖侧栏/改缩放都会重估。 */
+    边界宽度不会来回抖;拖侧栏/改缩放都会重估。
+    active = input 是否挂在 DOM 上(侧栏收起时整组卸载),重挂后要重新观察。 */
 function useFittedPlaceholder(
   inputRef: React.RefObject<HTMLInputElement | null>,
-  enabled: boolean
+  hints: readonly string[],
+  active: boolean
 ): { text: string; tight: boolean } {
-  const [fit, setFit] = useState({ text: FIT_HINTS[0] as string, tight: false })
+  const [fit, setFit] = useState({ text: hints[0] as string, tight: false })
   useEffect(() => {
     const input = inputRef.current
-    if (!enabled || !input) {
-      setFit({ text: FIT_HINTS[0], tight: false })
+    if (!active || !input) {
+      setFit({ text: hints[0], tight: false })
       return
     }
     const ctx = document.createElement('canvas').getContext('2d')
     let tight = false
     const pick = () => {
+      if (!ctx) return
       const w = input.clientWidth
       // 余量与腾宽都跟着根字号走:界面缩放 125%/150% 时布局按 rem 放大,常量会算岔
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
       const margin = rem * FIT_MARGIN_REM
       const saved = rem * TIGHT_SAVED_REM
-      if (w < margin || !ctx) return
       const cs = getComputedStyle(input)
       ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
       // 判 tight 永远按「正常 padding 下的可用宽」算:已 tight 就先扣回腾出的部分
       const normalAvail = w - (tight ? saved : 0)
-      const nextTight = ctx.measureText(FIT_HINTS[0]).width + margin > normalAvail
+      const nextTight = ctx.measureText(hints[0]).width + margin > normalAvail
       // 挑档要用「这轮 CSS 落定后的实宽」:退 tight 时宽度会缩回正常态,不能拿腾宽后的算
       const avail = nextTight ? normalAvail + saved : normalAvail
       tight = nextTight
-      const text =
-        FIT_HINTS.find((t) => ctx.measureText(t).width + margin <= avail) ??
-        FIT_HINTS[FIT_HINTS.length - 1]
+      const text = hints.find((t) => ctx.measureText(t).width + margin <= avail) ?? ''
       setFit((prev) => (prev.text === text && prev.tight === tight ? prev : { text, tight }))
     }
     const ro = new ResizeObserver(pick)
@@ -66,7 +77,7 @@ function useFittedPlaceholder(
       ro.disconnect()
       window.removeEventListener(CH.uiScaleChanged, pick)
     }
-  }, [inputRef, enabled])
+  }, [inputRef, hints, active])
   return fit
 }
 
@@ -107,7 +118,11 @@ export function AppTopBar({
 }): React.JSX.Element {
   const maximized = useWindowMaximized()
   const searchRef = useRef<HTMLInputElement>(null)
-  const fitted = useFittedPlaceholder(searchRef, !hasWorkspace)
+  const fitted = useFittedPlaceholder(
+    searchRef,
+    hasWorkspace ? SEARCH_HINTS : OPEN_HINTS,
+    sidebarShown
+  )
   return (
     // 顶栏死空间拖窗/双击最大化走手动引擎:原生 app-region:drag 会吃 Windows
     // Aero Shake(摇窗最小化其它窗,产品指定要哑火);可交互件(按钮/输入框/
@@ -146,7 +161,7 @@ export function AppTopBar({
                 ref={searchRef}
                 type="search"
                 value={filter}
-                placeholder={hasWorkspace ? '搜索文件' : fitted.text}
+                placeholder={fitted.text}
                 aria-label="搜索文件"
                 spellCheck={false}
                 disabled={!hasWorkspace || fileNavOff}
