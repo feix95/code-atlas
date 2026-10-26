@@ -243,6 +243,34 @@
   background: var(--hover);
 }
 
+/* 划痕是常驻的一层:解锁(切到显示)时原地擦掉,擦完再彻底隐身;
+   上锁时先现身再把线划上。显隐与擦除分开定时,隐身别抢在擦除前面 */
+.sidebar-notes-toggle > svg > .note-slash {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+
+.sidebar-notes-toggle[aria-pressed='true'] > svg > .note-slash {
+  stroke-dashoffset: 30;
+  opacity: 0;
+}
+
+/* 备注笔只在点击切换时动:悬停本身不再带动效 */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-notes-toggle > svg > .note-slash {
+    transition:
+      stroke-dashoffset var(--dur-3) var(--ease-smooth),
+      opacity 0s;
+  }
+
+  .sidebar-notes-toggle[aria-pressed='true'] > svg > .note-slash {
+    transition:
+      stroke-dashoffset var(--dur-3) var(--ease-smooth),
+      opacity 0s var(--dur-3);
+  }
+}
+
 /* 计数:文件夹数 / 文件数。左缘对齐树里根下文件图标
    (脚注已垫 space-2,与树滚动区同左垫;图标再右移一层 --tree-indent + .tree-main 左 2px) */
 .sidebar-counts {

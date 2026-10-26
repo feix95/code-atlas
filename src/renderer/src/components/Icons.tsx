@@ -129,6 +129,7 @@ export function NotePen({
 }
 
 /** 页脚备注开关:开 = 一支笔,关 = 划掉的笔(小葵稿 Lucide 线稿)。
+ *  划痕独立成一层、两种状态都挂:解锁时让它原地擦掉,不靠整体换图;
  *  状态只用图形说话,不另起强调色,免得脚注里冒出一颗抢眼的点 */
 export function NoteToggleIcon({
   off,
@@ -144,7 +145,6 @@ export function NoteToggleIcon({
           <path d="m10 10-6.157 6.162a2 2 0 0 0-.5.833l-1.322 4.36a.5.5 0 0 0 .622.624l4.358-1.323a2 2 0 0 0 .83-.5L14 13.982" />
           <path d="m12.829 7.172 4.359-4.346a1 1 0 1 1 3.986 3.986l-4.353 4.353" />
           <path d="m15 5 4 4" />
-          <path d="m2 2 20 20" />
         </>
       ) : (
         <>
@@ -152,6 +152,7 @@ export function NoteToggleIcon({
           <path d="m15 5 4 4" />
         </>
       )}
+      <path className="note-slash" d="m2 2 20 20" />
     </Line>
   )
 }

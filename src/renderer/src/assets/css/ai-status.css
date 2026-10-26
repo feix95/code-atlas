@@ -76,6 +76,37 @@
   }
 }
 
+/* 悬停 = 把插头推回插座:两半向中间靠,插脚缩进去;移开再拔开。
+   站点动效里插脚随插入收短,这里用淡出代替(CSS 不做路径形变) */
+@media (prefers-reduced-motion: no-preference) {
+  .rail-ai.is-idle .ai-unplug-plug,
+  .rail-ai.is-idle .ai-unplug-socket,
+  .rail-ai.is-error .ai-unplug-plug,
+  .rail-ai.is-error .ai-unplug-socket {
+    transition: transform var(--dur-3) var(--ease-smooth);
+  }
+
+  .rail-ai.is-idle .ai-unplug-plug > path:nth-of-type(n + 3),
+  .rail-ai.is-error .ai-unplug-plug > path:nth-of-type(n + 3) {
+    transition: opacity var(--dur-3) var(--ease-smooth);
+  }
+
+  .rail-ai.is-idle:hover .ai-unplug-plug,
+  .rail-ai.is-error:hover .ai-unplug-plug {
+    transform: translate(3px, -3px);
+  }
+
+  .rail-ai.is-idle:hover .ai-unplug-socket,
+  .rail-ai.is-error:hover .ai-unplug-socket {
+    transform: translate(-3px, 3px);
+  }
+
+  .rail-ai.is-idle:hover .ai-unplug-plug > path:nth-of-type(n + 3),
+  .rail-ai.is-error:hover .ai-unplug-plug > path:nth-of-type(n + 3) {
+    opacity: 0;
+  }
+}
+
 @keyframes ai-status-ring-fade {
   0%,
   55% {

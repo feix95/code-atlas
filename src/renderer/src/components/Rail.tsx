@@ -25,7 +25,7 @@ export function Rail({
     <nav className="rail" aria-label="主导航">
       <button
         type="button"
-        className="rail-btn"
+        className="rail-btn rail-btn-graph"
         disabled={!hasWorkspace}
         onClick={onGraph}
         data-tip="关系图谱"
@@ -36,7 +36,7 @@ export function Rail({
       </button>
       <button
         type="button"
-        className="rail-btn"
+        className="rail-btn rail-btn-chat"
         onClick={onChat}
         data-tip="自由对话"
         data-tip-side="right"
@@ -46,7 +46,7 @@ export function Rail({
       </button>
       <button
         type="button"
-        className="rail-btn"
+        className="rail-btn rail-btn-workbench"
         onClick={onUiWorkbench}
         data-tip="UI 工作台"
         data-tip-side="right"
@@ -56,7 +56,7 @@ export function Rail({
       </button>
       <button
         type="button"
-        className="rail-btn"
+        className="rail-btn rail-btn-settings"
         onClick={onSettings}
         data-tip="设置"
         data-tip-side="right"

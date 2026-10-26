@@ -1,0 +1,180 @@
+/* rail 图标的悬停微动效:各入口用这类图标的通行动作,只动图标本体,底块保持原样;
+   从 rail.css 拆出,单独担动效,不跟布局混在一起 */
+@media (prefers-reduced-motion: no-preference) {
+  /* 关系图谱(lucide view):悬停时中心圆先从 0 弹出来,五条分支再从它向外依次长出把点连上,
+     连到的点再弹一下;外圈的点一开始就在 */
+  .rail-btn-graph > svg > circle:first-of-type {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:first-of-type {
+    animation: rail-graph-hub-pop 0.3s var(--ease-smooth) both;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > path {
+    stroke-dasharray: 6;
+    stroke-dashoffset: 6;
+    animation: rail-graph-draw var(--dur-3) var(--ease-smooth) both;
+    animation-delay: 260ms;
+  }
+
+  /* 第四条分支在图标里是从外往里写的,反向画才同样「从中心出发」 */
+  .rail-btn-graph:hover:not(:disabled) > svg > path:nth-of-type(4) {
+    stroke-dashoffset: -6;
+    animation-name: rail-graph-draw-reverse;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > path:nth-of-type(2) {
+    animation-delay: 310ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > path:nth-of-type(3) {
+    animation-delay: 360ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > path:nth-of-type(4) {
+    animation-delay: 410ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > path:nth-of-type(5) {
+    animation-delay: 460ms;
+  }
+
+  .rail-btn-graph > svg > circle:not(:first-of-type) {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:not(:first-of-type) {
+    animation: rail-graph-node-bounce 0.35s var(--ease-smooth);
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:nth-of-type(2) {
+    animation-delay: 520ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:nth-of-type(3) {
+    animation-delay: 570ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:nth-of-type(4) {
+    animation-delay: 620ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:nth-of-type(5) {
+    animation-delay: 670ms;
+  }
+
+  .rail-btn-graph:hover:not(:disabled) > svg > circle:nth-of-type(6) {
+    animation-delay: 720ms;
+  }
+
+  /* 自由对话:左气泡先冒出来并摇一下,右下的再跟上摇一下,整体节奏和图谱同长 */
+  .rail-btn-chat:hover:not(:disabled) > svg > path {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation:
+      rail-chat-bubble var(--dur-3) var(--ease-spring) both,
+      rail-chat-wobble 0.35s var(--ease-smooth);
+    animation-delay: 0ms, 320ms;
+  }
+
+  /* 图标里右下的气泡写在第一条,单独排到左气泡之后 */
+  .rail-btn-chat:hover:not(:disabled) > svg > path:nth-of-type(1) {
+    animation-delay: 240ms, 560ms;
+  }
+
+  /* UI 工作台:铅笔贴着尺子轻轻蹭一下,尺子不动 */
+  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(5),
+  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(6) {
+    animation: rail-pencil-nudge var(--dur-4) var(--ease-smooth);
+  }
+
+  /* 设置:齿轮转 90° 并带一点回弹,移开再转回去 */
+  .rail-btn-settings > svg {
+    transition: transform var(--dur-3) var(--ease-spring);
+  }
+
+  .rail-btn-settings:hover:not(:disabled) > svg {
+    transform: rotate(90deg);
+  }
+}
+
+@keyframes rail-graph-hub-pop {
+  0% {
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rail-graph-draw {
+  from {
+    stroke-dashoffset: 6;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rail-graph-draw-reverse {
+  from {
+    stroke-dashoffset: -6;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rail-graph-node-bounce {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.35);
+  }
+  60% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rail-chat-bubble {
+  from {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rail-chat-wobble {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+  75% {
+    transform: rotate(-1.5deg);
+  }
+}
+
+@keyframes rail-pencil-nudge {
+  50% {
+    transform: translate(-1px, 1px);
+  }
+}

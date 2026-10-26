@@ -66,6 +66,21 @@
   flex-shrink: 0;
 }
 
+/* 收起钮悬停:分隔线朝这次动作的方向让一步 —— 展开态往左(收),收起态往右(展) */
+@media (prefers-reduced-motion: no-preference) {
+  .tb-collapse .tb-btn > svg > path {
+    transition: transform var(--dur-3) var(--ease-spring);
+  }
+
+  .tb-collapse .tb-btn:hover:not(:disabled) > svg > path {
+    transform: translateX(-1.5px);
+  }
+
+  .tb-collapse .tb-btn[aria-pressed='true']:hover:not(:disabled) > svg > path {
+    transform: translateX(1.5px);
+  }
+}
+
 /* 搜索框:空闲时灰底方块边长等于行高,hover/focus 后向右展开;左缘与 workspace 卡对齐。
    首列固定为行高宽的图标位,展开只加长第二列(输入框),放大镜原地不动。
    导航组单独 auto 贴右,搜索展开只吃中间空档,三个导航钮不会被推着走。
@@ -182,6 +197,21 @@
       max-width var(--dur-3) var(--ease-smooth),
       opacity var(--dur-2) var(--ease-smooth);
   }
+
+  /* 放大镜悬停翻转一圈:旋转轴 = 手柄所在的对角线(y=x,过图标中心),
+     手柄在轴上原地不动,镜片绕着它翻出去再翻回来 */
+  .tb-search:hover > svg {
+    animation: search-flip var(--dur-spin) var(--ease-smooth);
+  }
+}
+
+@keyframes search-flip {
+  from {
+    transform: perspective(120px) rotate3d(1, 1, 0, 0deg);
+  }
+  to {
+    transform: perspective(120px) rotate3d(1, 1, 0, 360deg);
+  }
 }
 
 .tb-search input::placeholder {
@@ -223,6 +253,39 @@
 .tb-nav .tb-btn {
   width: var(--chrome-search-row-height);
   height: var(--chrome-search-row-height);
+}
+
+/* 前进/后退悬停:箭头朝自己的方向轻移一格,移开回位。
+   位移不照搬站点的 25%:顶栏钮里图标几乎顶满,25% 会撞到邻钮,2px 已是能读出的上限 */
+@media (prefers-reduced-motion: no-preference) {
+  .tb-nav .tb-btn > svg {
+    transition: transform var(--dur-3) var(--ease-smooth);
+  }
+
+  .tb-nav .tb-btn:first-child:hover:not(:disabled) > svg {
+    transform: translateX(-2px);
+  }
+
+  .tb-nav .tb-btn:nth-child(2):hover:not(:disabled) > svg {
+    transform: translateX(2px);
+  }
+
+  /* 刷新:悬停轻轻胀一下再收回;转圈刷新时让位给旋转动画 */
+  .tb-nav .tb-btn:nth-child(3):not(.is-spinning):hover:not(:disabled) > svg {
+    animation: tb-refresh-pop 0.35s var(--ease-smooth);
+  }
+}
+
+@keyframes tb-refresh-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 窗控三键(规格 §5.2):1u 方格顶天立地并排(宽=高撑满整行),— ▢ 悬停灰底,× 悬停红底白叉 */
