@@ -106,3 +106,9 @@ export function builtinIdleStatus(modelPath: string): ModelStatus {
     modelPath.trim() === '' ? 'unknown' : findMmprojFor(modelPath) !== null ? 'vision' : 'text-only'
   return builtinStatus('idle', facts.modelName, facts.sizeBytes, null, facts.message, false, vision)
 }
+
+/** 主动卸下/切走内置模型:状态账与广播一起翻到「未装载」。
+ *  只广播不记账的话,下一轮状态刷新会拿旧「就绪」账把界面翻回去,像模型自己又装上了 */
+export function announceBuiltinIdle(modelPath: string): void {
+  announceBuiltin(builtinIdleStatus(modelPath))
+}

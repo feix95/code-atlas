@@ -1,10 +1,5 @@
 import { userDataDir } from './paths.ts'
-import {
-  broadcastModelStatus,
-  cloudStatus,
-  probeLmStudioStatus,
-  refreshModelStatus
-} from './modelStatus.ts'
+import { cloudStatus, probeLmStudioStatus, refreshModelStatus } from './modelStatus.ts'
 import { installSafeStorageCodec } from './safeStorageCodec.ts'
 import { listRemoteModels } from '../ai/remoteModels.ts'
 import { electronGetJson } from './aiEvidence.ts'
@@ -16,6 +11,7 @@ import { loadAiConfig, sanitizeProviderKind, saveAiConfig } from '../ai/config.t
 import { fetchModelShelf, fetchRepoFiles } from '../ai/modelShelf.ts'
 import { cancelModelDownload, pointConfigAtModel, startModelDownload } from '../ai/modelDownload.ts'
 import {
+  announceBuiltinIdle,
   builtinContextDiffers,
   builtinNeedsRestart,
   builtinIdleStatus,
@@ -136,7 +132,7 @@ export function registerModelIpc(): void {
     // 下次用到 AI 时按新配置重新拉起 —— 不然讲着旧模型的旧账
     if (previous.provider === 'builtin' && saved.provider !== 'builtin' && isBuiltinRunning()) {
       stopBuiltinServer()
-      broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
+      announceBuiltinIdle(saved.builtin.modelPath)
     }
     if (
       saved.provider === 'builtin' &&
@@ -144,7 +140,7 @@ export function registerModelIpc(): void {
         builtinContextDiffers(saved.contextSize ?? DEFAULT_CONTEXT_SIZE))
     ) {
       stopBuiltinServer()
-      broadcastModelStatus(builtinIdleStatus(saved.builtin.modelPath))
+      announceBuiltinIdle(saved.builtin.modelPath)
     }
     // 换了 provider 或模型,状态栏立刻照新配置报话,不等下一轮轮询
     void refreshModelStatus().catch(() => {})
@@ -167,7 +163,7 @@ export function registerModelIpc(): void {
     }
     const wasRunning = isBuiltinRunning()
     stopBuiltinServer()
-    broadcastModelStatus(builtinIdleStatus(config.builtin.modelPath))
+    announceBuiltinIdle(config.builtin.modelPath)
     return {
       ok: true,
       message: wasRunning ? '模型卸下了,内存腾出来了;下次提问会重新热身' : '模型本来就没在跑'

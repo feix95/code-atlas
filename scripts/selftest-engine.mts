@@ -3,7 +3,8 @@
 // 钉死的账:engineCatalog 登记完整(每包有真 sha256/大小,URL 对得上钉的版本);
 // recommendBackend / resolveEngineChoice 的推荐与退路矩阵;安装器的纯函数件
 // (进度折算、zip 条目安检、verifyAndExtract 的错 sha/截短/zip-slip 拒收);
-// config 的 backend 落盘口径;builtin 对账键把 backend 算进签名。
+// config 的 backend 落盘口径;builtin 对账键把 backend 算进签名;
+// 主动卸下时状态账与广播一起翻 idle(只广播不记账会被旧「就绪」账翻回来)。
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import {
@@ -28,7 +29,13 @@ import {
 import { recommendBackend, resolveEngineChoice } from '../src/shared/enginePick.ts'
 import { downloadPercent, installBackend, listInstalled } from '../src/ai/engineInstaller.ts'
 import { findExtractedExe, isZipEntrySafe, verifyAndExtract } from '../src/ai/enginePackage.ts'
-import { settingsKey } from '../src/ai/builtin.ts'
+import {
+  announceBuiltinIdle,
+  lastBuiltinStatus,
+  setBuiltinStatusAnnouncer,
+  settingsKey
+} from '../src/ai/builtin.ts'
+import { announceBuiltin } from '../src/ai/builtinStatus.ts'
 import { loadAiConfig, saveAiConfig } from '../src/ai/config.ts'
 import type { MachineProfile } from '../src/shared/launchPlan.ts'
 import type { AiConfig } from '../src/shared/types.ts'
@@ -370,6 +377,25 @@ console.log(' settingsKey 签名含后端')
     '同后端签名同',
     settingsKey({ ...base, backend: 'cpu' }) === settingsKey({ ...base, backend: 'cpu' })
   )
+}
+
+// 主动卸下后状态账必须同时翻到 idle:只广播不记账的话,下一轮轮询会拿旧「就绪」账把界面翻回来
+console.log(' 卸下后状态账翻 idle')
+{
+  const sent: string[] = []
+  setBuiltinStatusAnnouncer((s) => sent.push(`${s.provider}/${s.state}`))
+  announceBuiltin({
+    provider: 'builtin',
+    state: 'ready',
+    modelName: 'x.gguf',
+    sizeBytes: 1,
+    progress: 100
+  })
+  eq('卸下前状态账是就绪', lastBuiltinStatus()?.state, 'ready')
+  announceBuiltinIdle('')
+  eq('卸下后状态账是 idle', lastBuiltinStatus()?.state, 'idle')
+  eq('卸下后最后一广播是 idle', sent.at(-1), 'builtin/idle')
+  setBuiltinStatusAnnouncer(null)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

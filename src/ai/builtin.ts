@@ -58,7 +58,8 @@ export {
   lastBuiltinStatus,
   builtinIdleFacts,
   builtinVisionSupport,
-  builtinIdleStatus
+  builtinIdleStatus,
+  announceBuiltinIdle
 } from './builtinStatus.ts'
 export { setBuiltinWarmupDir } from './builtinDataDir.ts'
 export { parseWarmupSamples, averageWarmup, nextWarmupStore } from './warmupStore.ts'
