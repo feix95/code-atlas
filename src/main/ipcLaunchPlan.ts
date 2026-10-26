@@ -25,9 +25,14 @@ function basename(p: string): string {
  * draft 传了按草稿算(预览),没传按已存账算。
  */
 async function launchPlanInfo(draft: unknown): Promise<LaunchPlanInfo> {
-  const machine = await queryMachineProfile()
   const dir = userDataDir()
   const config = await loadAiConfig(dir)
+  const modelPath = config.builtin.modelPath.trim()
+  const mmprojFile = modelPath ? findMmprojFor(modelPath) : null
+  // 机器规格随模型原料一起拿:一次 nvidia-smi 够用,别为同一轮报单上下各探一遍;
+  // 卡片会定期重取,省下的这趟探测按周期累计
+  const facts = modelPath ? await probeLaunchFacts(modelPath, mmprojFile) : null
+  const machine = facts?.machine ?? (await queryMachineProfile())
   // 当前引擎登记:定位 + --version;查不到就给 null,不挡方案报单
   const engine = await locateEngine(config.builtin, dir).catch(() => null)
   const engineVersion = engine?.exePath ? await engineVersionFor(engine.exePath) : null
@@ -51,11 +56,8 @@ async function launchPlanInfo(draft: unknown): Promise<LaunchPlanInfo> {
     extraArgs: null,
     activeEngine
   }
-  const modelPath = config.builtin.modelPath.trim()
-  if (!modelPath) return empty
+  if (!modelPath || !facts) return empty
 
-  const mmprojFile = findMmprojFor(modelPath)
-  const facts = await probeLaunchFacts(modelPath, mmprojFile)
   if (facts.modelBytes == null) {
     // 文件失踪:报上名字(按路径的档案名),方案算不出
     return { ...empty, modelName: builtinIdleFacts(modelPath).modelName, mmprojFile }

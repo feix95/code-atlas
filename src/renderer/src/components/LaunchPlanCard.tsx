@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { LaunchPlanInfo, MachineProfile } from '@shared/launchPlan'
 import {
   launchSignature,
@@ -6,7 +6,7 @@ import {
   type ModelLaunchSettings
 } from '@shared/launchSettings'
 import { formatGB } from '@shared/contextBill'
-import type { AiConfig } from '@shared/types'
+import type { AiConfig, ModelStatus } from '@shared/types'
 import { CfgRow } from './CfgRow'
 import { LaunchAdvancedPanel } from './LaunchAdvancedPanel.tsx'
 
@@ -52,6 +52,14 @@ const VERDICT_LABEL: Record<string, string> = {
   'too-big': '装不下'
 }
 
+/** 方案里的空闲显存只在取数那一刻准:卡片摆在屏上、引擎又闲着时,按这个节奏重问一次 */
+const PLAN_REFRESH_MS = 10_000
+
+/** 引擎自己占着显存的状态:这期间重算只会把方案误判成装不下,刷新得让路 */
+function isEngineRunning(s: ModelStatus): boolean {
+  return s.state === 'loading' || s.state === 'ready' || s.state === 'busy'
+}
+
 type CardState =
   { status: 'loading' | 'no-model' | 'error' } | { status: 'ready'; info: LaunchPlanInfo }
 
@@ -69,6 +77,8 @@ function withLaunch(config: AiConfig, modelPath: string, s: ModelLaunchSettings)
  * 「本机运行方案」:折叠行 —— 行面只留一句说明与结论戳(装得下/有点挤/装不下);
  * 机器规格、模型登记、每条妥协理由收在展开体里。底下「高级设置」是同款折叠行,可逐项手动指定。
  * modelPath/上下文档位/草稿一变就重新问主进程要预览;取数期间照旧显示旧方案不闪 loading。
+ * 空闲显存会随别的程序起落,卡片在屏上且引擎闲着时每 10 秒重取一次;引擎自己占着显存时
+ * 暂停重取,免得把模型当前占用算成「装不下」。
  */
 export function LaunchPlanCard({
   modelPath,
@@ -92,6 +102,63 @@ export function LaunchPlanCard({
     info: LaunchPlanInfo | null
     failed: boolean
   }>({ key: '', info: null, failed: false })
+  // 后台重取的序号:一变就再问一次,但不改 fetchKey —— 取数期间照旧摆旧方案,不闪 loading
+  const [refreshSeq, setRefreshSeq] = useState(0)
+  // 卡片是否真在屏上:设置签保活层用 display:none 藏页,藏住时停掉轮询
+  const [onScreen, setOnScreen] = useState(true)
+  // 内置引擎正占着显存:这时的空闲读数被模型自己吃了,拿来重算只会误判成「装不下」
+  const [engineRunning, setEngineRunning] = useState(false)
+  // 方案折叠体:IntersectionObserver 盯着它判断卡片还在不在屏上
+  const [cardEl, setCardEl] = useState<HTMLDetailsElement | null>(null)
+  // 卡片当前摆着的取数结果:后台刷新失败时靠它判断「已有方案在,不该翻成错误态」
+  const fetchedRef = useRef(fetched)
+  useEffect(() => {
+    fetchedRef.current = fetched
+  }, [fetched])
+
+  // 卡片藏在别的页签后面(display:none)时观察器会报不可见 —— 顺着它停轮询
+  useEffect(() => {
+    if (!cardEl) return
+    const io = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting))
+    io.observe(cardEl)
+    return () => io.disconnect()
+  }, [cardEl])
+
+  // 引擎状态:先问一次当下账,再跟着广播走,用来决定刷新要不要让路
+  useEffect(() => {
+    let alive = true
+    const apply = (s: ModelStatus): void => {
+      if (alive) setEngineRunning(isEngineRunning(s))
+    }
+    void window.atlas
+      .modelStatusGet()
+      .then(apply)
+      .catch(() => {})
+    const off = window.atlas.onModelStatus(apply)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
+
+  const refreshActive = onScreen && !engineRunning && modelPath.trim() !== ''
+  // 从「藏住/引擎忙」回到可刷新:先补一发,别等满一个周期;挂载首轮由下面的取数 effect 负责
+  const prevRefreshActive = useRef(true)
+  useEffect(() => {
+    const resumed = refreshActive && !prevRefreshActive.current
+    prevRefreshActive.current = refreshActive
+    if (!refreshActive) return
+    if (resumed) setRefreshSeq((n) => n + 1)
+    const tick = (): void => {
+      if (document.visibilityState === 'visible') setRefreshSeq((n) => n + 1)
+    }
+    const timer = window.setInterval(tick, PLAN_REFRESH_MS)
+    window.addEventListener('focus', tick)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', tick)
+    }
+  }, [refreshActive])
 
   useEffect(() => {
     if (!modelPath.trim()) return
@@ -111,12 +178,16 @@ export function LaunchPlanCard({
         setFetched({ key, info, failed: false })
       })
       .catch(() => {
-        if (alive) setFetched({ key: fetchKey, info: null, failed: true })
+        if (!alive) return
+        // 同一把 key 已有方案在屏上:静默刷新失败就留着旧方案等下一轮,别翻成错误态
+        const shown = fetchedRef.current
+        if (shown.key === fetchKey && shown.info && !shown.failed) return
+        setFetched({ key: fetchKey, info: null, failed: true })
       })
     return () => {
       alive = false
     }
-  }, [modelPath, contextSize, fetchKey, draftForPath])
+  }, [modelPath, contextSize, fetchKey, draftForPath, refreshSeq])
 
   const card: CardState = !modelPath.trim()
     ? { status: 'no-model' }
@@ -148,7 +219,7 @@ export function LaunchPlanCard({
     <>
       <div className="cfg-divider" />
       {readyInfo?.plan ? (
-        <details className="cfg-fold">
+        <details className="cfg-fold" ref={setCardEl}>
           <summary className="cfg-fold-summary">
             <div className="cfg-copy">
               <label>本机运行方案</label>
