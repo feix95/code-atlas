@@ -70,25 +70,48 @@
     animation-delay: 720ms;
   }
 
-  /* 自由对话:左气泡先冒出来并摇一下,右下的再跟上摇一下,整体节奏和图谱同长 */
-  .rail-btn-chat:hover:not(:disabled) > svg > path {
+  /* 自由对话:两个气泡都常驻,悬停时各往自己那一侧鼓出去、回弹收小再归位;
+     右气泡只比左气泡晚起步一点点,看着像一口气弹过去,而不是分两拍 */
+  .rail-btn-chat > svg > path {
     transform-box: fill-box;
     transform-origin: center;
-    animation:
-      rail-chat-bubble var(--dur-3) var(--ease-spring) both,
-      rail-chat-wobble 0.35s var(--ease-smooth);
-    animation-delay: 0ms, 320ms;
+    --chat-pop-dir: -1;
+    --chat-pop-tilt: -9deg;
   }
 
-  /* 图标里右下的气泡写在第一条,单独排到左气泡之后 */
+  /* 放大时气泡会顶到 24×24 的画框边,放开裁剪免得外沿被切平 */
+  .rail-btn-chat > svg {
+    overflow: visible;
+  }
+
+  /* 图标里右下的气泡写在第一条:它的外侧是右边,倾斜也跟着翻向 */
+  .rail-btn-chat > svg > path:nth-of-type(1) {
+    --chat-pop-dir: 1;
+    --chat-pop-tilt: 9deg;
+  }
+
+  .rail-btn-chat:hover:not(:disabled) > svg > path {
+    animation: rail-chat-bubble-pop 0.24s var(--ease-smooth);
+  }
+
   .rail-btn-chat:hover:not(:disabled) > svg > path:nth-of-type(1) {
-    animation-delay: 240ms, 560ms;
+    animation-delay: 0.09s;
   }
 
-  /* UI 工作台:铅笔贴着尺子轻轻蹭一下,尺子不动 */
-  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(5),
-  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(6) {
-    animation: rail-pencil-nudge var(--dur-4) var(--ease-smooth);
+  /* UI 工作台:尺子往西北斜向退出一点、铅笔往东北退出一点,再一起戳回交叉位置 ——
+     两根各沿自己的斜向走,只在极短的一瞬间分开,像两根工具先后插回卡槽。不旋转 */
+  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(-n + 4) {
+    animation: rail-workbench-insert-ruler 0.3s var(--ease-smooth);
+  }
+
+  /* 铅笔是压在尺子上面的那根:悬停时把它的内部填成悬停底块的颜色,被它压住的尺子就真的看不见了。
+     不填的话,两根分开时尺子本该被挡住的那截断头会从铅笔身上透出来(露馅) */
+  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(5) {
+    fill: var(--chrome-hover);
+  }
+
+  .rail-btn-workbench:hover:not(:disabled) > svg > path:nth-of-type(n + 5) {
+    animation: rail-workbench-insert-pencil 0.3s var(--ease-smooth) 60ms;
   }
 
   /* 设置:齿轮转 90° 并带一点回弹,移开再转回去 */
@@ -146,35 +169,52 @@
   }
 }
 
-@keyframes rail-chat-bubble {
-  from {
-    opacity: 0;
-    transform: scale(0.45);
+@keyframes rail-chat-bubble-pop {
+  0% {
+    transform: scale(1) rotate(0) translateX(0);
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
+  38% {
+    transform: translateX(calc(var(--chat-pop-dir) * 0.8px)) scale(1.24)
+      rotate(var(--chat-pop-tilt));
   }
-}
-
-@keyframes rail-chat-wobble {
-  0%,
+  66% {
+    transform: translateX(calc(var(--chat-pop-dir) * 0.25px)) scale(0.92)
+      rotate(calc(var(--chat-pop-tilt) * -0.45));
+  }
+  86% {
+    transform: translateX(0) scale(1.05) rotate(calc(var(--chat-pop-tilt) * 0.18));
+  }
   100% {
-    transform: rotate(0);
-  }
-  25% {
-    transform: rotate(-4deg);
-  }
-  50% {
-    transform: rotate(3deg);
-  }
-  75% {
-    transform: rotate(-1.5deg);
+    transform: scale(1) rotate(0) translateX(0);
   }
 }
 
-@keyframes rail-pencil-nudge {
-  50% {
-    transform: translate(-1px, 1px);
+@keyframes rail-workbench-insert-ruler {
+  0% {
+    transform: translate(0, 0);
+  }
+  35% {
+    transform: translate(-1.8px, -1.8px);
+  }
+  65% {
+    transform: translate(0.5px, 0.5px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes rail-workbench-insert-pencil {
+  0% {
+    transform: translate(0, 0);
+  }
+  35% {
+    transform: translate(1.5px, -1.5px);
+  }
+  65% {
+    transform: translate(-0.4px, 0.4px);
+  }
+  100% {
+    transform: translate(0, 0);
   }
 }
