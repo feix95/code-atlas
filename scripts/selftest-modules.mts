@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { cutModules, type ModuleCutInput, type StyleLink } from '../src/modules/cutModules.ts'
-import { mergeSmallCommunities } from '../src/modules/moduleAssign.ts'
+import { mergeSmallCommunities, pickAnchor } from '../src/modules/moduleAssign.ts'
+import { hubWeight } from '../src/modules/communities.ts'
 import { createSeededRandom } from '../src/modules/seededRandom.ts'
 import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
@@ -358,6 +359,63 @@ function checkTestFiles(): void {
   }
 }
 
+function checkHubWeight(): void {
+  assert.equal(hubWeight(0), 1, '没人引用的文件(入度 0)按原权重')
+  assert.equal(hubWeight(2), 0.5, '入度 2 时权重减半:1 / log2(2 + 2)')
+  assert.equal(hubWeight(6), 1 / 3, '入度 6 时权重 1 / log2(8)')
+  assert.ok(hubWeight(100) < hubWeight(10), '入度越高权重越轻')
+  // 公共文件被三个目录的所有文件引用:不降权时两个公共文件被拆开吸进各功能模块(模块横跨两个目录),
+  // 降权后公共文件留在自己的目录模块里,每个模块只占一个目录
+  const dirs = ['a', 'b', 'c']
+  const files = dirs.flatMap((d) => [0, 1, 2].map((i) => `${d}/${d}${i}.ts`))
+  const map = cutWithRuleParams({
+    files: [],
+    analyzable: [...files, 'shared/types.ts', 'shared/ipc.ts'],
+    edges: [
+      ...dirs.flatMap((d) => [
+        e(`${d}/${d}0.ts`, `${d}/${d}1.ts`),
+        e(`${d}/${d}1.ts`, `${d}/${d}2.ts`)
+      ]),
+      ...files.flatMap((f) => [e(f, 'shared/types.ts'), e(f, 'shared/ipc.ts')]),
+      e('shared/ipc.ts', 'shared/types.ts')
+    ]
+  })
+  assert.equal(
+    moduleOf(map, 'shared/ipc.ts'),
+    moduleOf(map, 'shared/types.ts'),
+    '两个公共文件同模块'
+  )
+  assert.deepEqual(
+    map.modules.map((m) => m.folders),
+    [['a'], ['b'], ['c'], ['shared']],
+    '公共文件不被吸进功能模块,每个模块只占一个目录'
+  )
+}
+
+function checkMajorityAnchor(): void {
+  const inDegree = new Map([
+    ['shared/ipc.ts', 10],
+    ['ui/b.tsx', 2],
+    ['ui/a.tsx', 1]
+  ])
+  assert.equal(
+    pickAnchor(['shared/ipc.ts', 'ui/a.tsx', 'ui/b.tsx', 'ui/c.tsx'], inDegree),
+    'ui/b.tsx',
+    '锚点先取成员最多的目录,再在该目录里取入度最高者;公共文件不当锚点'
+  )
+  assert.equal(
+    pickAnchor(['y/p.ts', 'x/q.ts', 'y/r.ts', 'x/s.ts'], new Map([['y/p.ts', 3]])),
+    'x/q.ts',
+    '目录成员数平票时取字典序小的目录'
+  )
+  const map = cutWithRuleParams(twoClusterInput())
+  assert.deepEqual(
+    map.modules.map((m) => m.folder).sort(),
+    ['a', 'b'],
+    '模块记下主目录(成员最多的目录),显示名由它而来'
+  )
+}
+
 function checkSmallMerge(): void {
   const inDegree = new Map<string, number>()
   assert.deepEqual(
@@ -479,6 +537,8 @@ async function main(): Promise<void> {
   checkAnchorStability()
   checkStyles()
   checkTestFiles()
+  checkHubWeight()
+  checkMajorityAnchor()
   checkSmallMerge()
   checkEdgeCases()
   await checkDepGraphShape()

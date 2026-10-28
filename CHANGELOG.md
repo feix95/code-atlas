@@ -605,3 +605,4 @@
 - fix(depgraph): tsconfig 别名一条规则的多个目标按顺序逐个试;读根配置 references 里的 tsconfig.web.json / tsconfig.node.json,并跟相对 extends 链(防环),electron-vite 模板项目的别名也能连上
 - feat(depgraph): 样式文件(css/scss/less)导入能连上项目内文件,不再记 unresolved;模块切分把样式附挂到直接导入它的文件所在模块,其次是用到它类名最多的模块,再次跟着 @import 它的样式走,都没有才按目录就近归属;样式不参与社区发现
 - feat(depgraph): 自测文件(`selftest-*`、`*.test.*`、`*.spec.*`、`__tests__/`)不参与模块切分,分完挂到它导入最多的模块,模块新增 tests 字段记相关自测;自测的导入不再把无关模块连在一起
+- feat(depgraph): 模块切分给公共文件降权(一条导入按被引用方入度记 1 / log2(2 + 入度)),类型表、IPC 通道表、图标册不再把各目录的文件吸成一团;锚点先取成员最多的目录再按入度挑,模块新增 folder 字段记主目录作显示名;切分规则版本升到 2

@@ -178,8 +178,10 @@ export interface ModuleParams {
 export interface ModuleInfo {
   /** 'm:' + 锚点 relPath */
   id: string
-  /** 模块内被引用最多的可分析文件 */
+  /** 主目录里被引用最多的可分析成员 */
   anchor: string
+  /** 主目录:成员最多的目录(锚点所在目录),模块显示名由它而来;项目根为 '' */
+  folder: string
   /** 可分析成员 + 附挂文件 + 相关自测,已排序 */
   files: string[]
   /** files 中附挂进来的那部分:样式与无导入关系的文件,不参与社区发现 */
@@ -206,6 +208,7 @@ export interface ModuleMap {
   fileToModule: Record<string, string>
   links: ModuleLink[]
 }
+
 /**
  * AI 服务的三种来源:LM Studio(外部)、内置模型(llama-server 子进程)、在线 API(付费云服务)。
  * 对上层业务它们是同一种服务 —— 都收敛成 ChatTarget(baseURL + 模型名)。

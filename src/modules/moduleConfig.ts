@@ -2,7 +2,7 @@
 import type { ModuleParams } from '../shared/types.ts'
 
 /** 切分规则版本:算法或参数口径变化时加一,落盘的旧切分结果据此作废 */
-export const MODULE_ALGORITHM_VERSION = 1
+export const MODULE_ALGORITHM_VERSION = 2
 
 /** 同目录偏置边的权重(一条导入记 1,双向互引记 2) */
 export const MODULE_FOLDER_AFFINITY = 0.5

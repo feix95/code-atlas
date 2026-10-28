@@ -7,14 +7,31 @@ export interface HomeCandidate {
   members: string[]
 }
 
-/** 锚点:入度最高的成员,平票取 relPath 字典序最小者 */
-export function pickAnchor(members: string[], inDegree: Map<string, number>): string {
-  let best = members[0]
-  for (const file of members) {
-    const diff = (inDegree.get(file) ?? 0) - (inDegree.get(best) ?? 0)
-    if (diff > 0 || (diff === 0 && file < best)) best = file
+/** 成员最多的目录;平票取字典序小者 */
+function majorityFolder(members: string[]): string {
+  const counts = new Map<string, number>()
+  for (const file of members) counts.set(dirOf(file), (counts.get(dirOf(file)) ?? 0) + 1)
+  let best = dirOf(members[0])
+  for (const [dir, count] of counts) {
+    const diff = count - (counts.get(best) ?? 0)
+    if (diff > 0 || (diff === 0 && dir < best)) best = dir
   }
   return best
+}
+
+/**
+ * 锚点:先取成员最多的目录,再取该目录里入度最高的成员,平票取 relPath 字典序最小者。
+ * 先看目录是为了不让被并进来的公共文件(类型表、IPC 通道表)当锚点,模块 id 与显示名跟着主目录走。
+ */
+export function pickAnchor(members: string[], inDegree: Map<string, number>): string {
+  const folder = majorityFolder(members)
+  let best: string | null = null
+  for (const file of members) {
+    if (dirOf(file) !== folder) continue
+    const diff = best === null ? 1 : (inDegree.get(file) ?? 0) - (inDegree.get(best) ?? 0)
+    if (diff > 0 || (diff === 0 && best !== null && file < best)) best = file
+  }
+  return best ?? members[0]
 }
 
 /** 目录 → (候选下标 → 该目录下的直接成员数) */

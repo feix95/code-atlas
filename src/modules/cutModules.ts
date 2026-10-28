@@ -74,6 +74,7 @@ function toModuleInfo(draft: ModuleDraft): ModuleInfo {
   return {
     id: draft.id,
     anchor: draft.anchor,
+    folder: dirOf(draft.anchor),
     files,
     attached: sortedUnique(draft.attached),
     tests: sortedUnique(draft.tests),
@@ -130,7 +131,7 @@ export function cutModules(
   const edges = projectEdges(input.edges, new Set(input.analyzable.filter((f) => !testSet.has(f))))
   const inDegree = countInDegree(edges)
   const connected = new Set(edges.flatMap((e) => [e.from, e.to]))
-  const communities = detectCommunities(sortedUnique(connected), edges, params)
+  const communities = detectCommunities(sortedUnique(connected), edges, inDegree, params)
   const merged = mergeSmallCommunities(communities, inDegree, params.minFiles)
   const drafts = merged.map((members): ModuleDraft => {
     const anchor = pickAnchor(members, inDegree)
