@@ -7,9 +7,11 @@ import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { RESOLVERS, type ImportHints } from './resolvers.ts'
 import { loadTsPathAliases } from './tsPaths.ts'
+import { cutModules, type ModuleCutInput } from '../modules/cutModules.ts'
 import type {
   DepEdge,
   DepGraphResult,
+  ModuleMap,
   LanguageTag,
   ScanFileNode,
   ScanTreeNode,
@@ -47,6 +49,16 @@ async function detectImportHints(rootPath: string, known: Set<string>): Promise<
   const rustRoot = [...known].some((f) => f.endsWith('.rs') && f.startsWith('src/')) ? 'src' : null
   const tsPaths = await loadTsPathAliases(rootPath)
   return { goModule, goDirs, javaRoots, rustRoot, tsPaths }
+}
+
+/** 模块切分出错不拖垮关系分析:记日志后返回 null,界面按无划分的原始图显示 */
+function cutModulesOrNull(input: ModuleCutInput): ModuleMap | null {
+  try {
+    return cutModules(input)
+  } catch (err) {
+    console.error('[depgraph] 模块切分失败,降级为无划分:', err)
+    return null
+  }
 }
 
 /**
@@ -137,6 +149,11 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
     edges,
     hubs,
     stats: { analyzed, externalCount, skipped, unresolved },
+    modules: cutModulesOrNull({
+      files: files.map((f) => f.relPath),
+      analyzable: nodes.map((n) => n.relPath),
+      edges
+    }),
     durationMs: Date.now() - startedAt
   }
 }

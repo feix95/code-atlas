@@ -161,9 +161,49 @@ export interface DepGraphResult {
     skipped: number
     unresolved: UnresolvedImport[]
   }
+  /** 程序切分的模块;切分失败时为 null,界面降级为无划分的原始图 */
+  modules: ModuleMap | null
   durationMs: number
 }
 
+/** 模块切分参数(见 src/modules/moduleConfig.ts) */
+export interface ModuleParams {
+  resolution: number
+  seed: number
+  folderAffinity: number
+  minFiles: number
+}
+
+/** 程序切分的模块;成员只存 relPath */
+export interface ModuleInfo {
+  /** 'm:' + 锚点 relPath */
+  id: string
+  /** 模块内被引用最多的可分析文件 */
+  anchor: string
+  /** 可分析成员 + 就近归入的文件,已排序 */
+  files: string[]
+  /** files 中按目录就近归入的那部分(无导入关系的文件) */
+  attached: string[]
+  /** 成员所在目录,已排序;项目根为 '' */
+  folders: string[]
+}
+
+/** 模块间边:成员间导入按模块聚合,weight 为原始引用条数 */
+export interface ModuleLink {
+  from: string
+  to: string
+  weight: number
+}
+
+export interface ModuleMap {
+  algorithmVersion: number
+  params: ModuleParams
+  /** 按文件数降序、id 升序 */
+  modules: ModuleInfo[]
+  /** relPath → 模块 id;未归类的文件不出现 */
+  fileToModule: Record<string, string>
+  links: ModuleLink[]
+}
 /**
  * AI 服务的三种来源:LM Studio(外部)、内置模型(llama-server 子进程)、在线 API(付费云服务)。
  * 对上层业务它们是同一种服务 —— 都收敛成 ChatTarget(baseURL + 模型名)。

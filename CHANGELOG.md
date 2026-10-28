@@ -599,3 +599,4 @@
 - refactor(depgraph): 各语言导入翻译器从 index.ts 搬到 resolvers.ts,主流程只留扫描、探测布局与连边
 - fix(depgraph): 关系分析读项目根 tsconfig 的 paths 与 baseUrl 别名,@shared/x 这类导入连到项目内文件,不再算外部包;别名命中但连不上记 unresolved
 - chore(depgraph): 新增依赖 graphology 0.26.0、graphology-communities-louvain 2.0.2 与类型包 graphology-types 0.24.8,供模块切分在主进程跑 Louvain 社区发现
+- feat(depgraph): 关系分析结果新增程序切分的模块(src/modules):文件级导入图加同目录偏置跑 Louvain,固定种子与输入排序保证每次切得一样;无导入文件按目录就近归属,根目录文件未归类
