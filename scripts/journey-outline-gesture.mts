@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict'
 import type { Locator, Page } from 'playwright'
 
-const VIEW = '.code-view.is-reading:visible'
+/** 大纲浮窗挂在预览面板上(阅读栏的兄弟),按可见认当前那扇 */
+const PANEL = '.doc-outline.is-open:visible'
 
 async function centerOf(loc: Locator): Promise<{ x: number; y: number }> {
   const box = await loc.boundingBox()
@@ -90,9 +91,7 @@ async function checkBlurEndsDrag(page: Page, panel: Locator): Promise<void> {
   await page.mouse.move(at.x - 30, at.y + 20, { steps: 3 })
   assert.equal(await isDragging(panel), true, 'moving while pressed starts a drag')
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
-  await page.waitForFunction(
-    () => !document.querySelector('.code-view.is-reading .doc-outline.is-dragging')
-  )
+  await page.waitForFunction(() => !document.querySelector('.doc-outline.is-dragging'))
   const parked = await panel.boundingBox()
   await page.mouse.move(at.x - 120, at.y + 90, { steps: 3 })
   assert.deepEqual(await panel.boundingBox(), parked, 'after blur the panel no longer follows')
@@ -101,7 +100,7 @@ async function checkBlurEndsDrag(page: Page, panel: Locator): Promise<void> {
 
 /** 按住抓手拖到一半就换签(脚本点文件树,鼠标仍按着),换回来不该还在拖 */
 async function checkTabSwitchEndsDrag(page: Page): Promise<void> {
-  const panel = page.locator(`${VIEW} .doc-outline.is-open`)
+  const panel = page.locator(PANEL)
   const at = await hoverGrip(page, panel)
   await page.mouse.down()
   await page.mouse.move(at.x - 20, at.y + 10, { steps: 3 })
@@ -189,7 +188,7 @@ export async function checkCircleDrag(page: Page, toggle: Locator): Promise<void
   const saved = await savedPosition(page)
   assert.ok(typeof saved.right === 'number' && typeof saved.top === 'number', 'position saved')
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'report.docx' }).click()
-  const docxToggle = page.locator(`${VIEW} .doc-outline-toggle`)
+  const docxToggle = page.locator('.doc-outline-toggle:visible')
   await docxToggle.waitFor()
   const there = await docxToggle.boundingBox()
   assert.ok(there && near(there.x, moved.x) && near(there.y, moved.y), 'circle position persists')
@@ -200,15 +199,15 @@ export async function checkCircleDrag(page: Page, toggle: Locator): Promise<void
   await page.mouse.move(at.x - 118, at.y + 81)
   await page.mouse.up()
   assert.equal(await toggle.getAttribute('aria-expanded'), 'true', 'a tiny wiggle still opens')
-  const panel = await page.locator(`${VIEW} .doc-outline.is-open`).boundingBox()
+  const panelLoc = page.locator(PANEL)
+  const panel = await panelLoc.boundingBox()
   assert.ok(panel, 'open panel must have a box')
   // 圆钮中心 = 收起钮中心:面板右缘比圆钮右缘内收 shift,上缘比圆钮上缘下沉 lift
-  const offsets = await page.evaluate(() => {
-    const el = document.querySelector('.code-view.is-reading .doc-outline.is-open')
-    const css = el ? getComputedStyle(el) : null
+  const offsets = await panelLoc.evaluate((el) => {
+    const css = getComputedStyle(el)
     return {
-      shift: css ? parseFloat(css.getPropertyValue('--outline-knob-shift')) : Number.NaN,
-      lift: css ? parseFloat(css.getPropertyValue('--outline-knob-lift')) : Number.NaN
+      shift: parseFloat(css.getPropertyValue('--outline-knob-shift')),
+      lift: parseFloat(css.getPropertyValue('--outline-knob-lift'))
     }
   })
   assert.ok(

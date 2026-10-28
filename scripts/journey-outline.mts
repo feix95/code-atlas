@@ -84,7 +84,8 @@ async function checkMdOutline(page: Page, shot: (name: string) => Promise<unknow
   // 阅读档 = 排版显示 + 只读:先锁上,收尾再解开,不把全局偏好留给后面
   if ((await lock.getAttribute('aria-pressed')) !== 'true') await lock.click()
   const view = page.locator('.code-view.is-reading:visible')
-  const outline = view.locator('.doc-outline')
+  // 浮窗挂在预览面板上(阅读栏的兄弟),不在 view 里
+  const outline = page.locator('.doc-outline:visible')
   const items = outline.locator('.doc-outline-item')
   await items.first().waitFor()
   assert.equal(await items.count(), 1 + MD_SECTIONS.length * 2, 'md outline lists h1..h3')
@@ -139,12 +140,12 @@ async function checkMdOutline(page: Page, shot: (name: string) => Promise<unknow
 
 async function checkDocxOutline(page: Page): Promise<void> {
   await openFile(page, 'report.docx')
-  const outline = page.locator('.code-view.is-reading:visible .doc-outline')
+  const outline = page.locator('.doc-outline:visible')
   await outline.locator('.doc-outline-item').filter({ hasText: 'Quarterly plan' }).waitFor()
   await openFile(page, 'plain.docx')
   await page.locator('.docx-body:visible').filter({ hasText: 'No headings here' }).waitFor()
   assert.equal(
-    await page.locator('.code-view.is-reading:visible .doc-outline').count(),
+    await page.locator('.doc-outline:visible').count(),
     0,
     'no headings -> no outline panel'
   )

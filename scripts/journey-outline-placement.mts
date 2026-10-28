@@ -1,5 +1,5 @@
 // journey 的大纲浮窗摆放一段:半透明底、平时紧包列表、悬停才在上缘之上长出拖动条、宽度紧包内容(出滚动条也不截字)、不出悬停提示、
-// 拉手斜纹常显悬停调亮、抓手拖动与夹边、右下角拉伸、
+// 拉手斜纹常显悬停调亮、抓手拖动与夹边(上缘能压到页头之上)、右下角拉伸、
 // 拉大途中跟手、松手宽高吸回内容尺寸,拉小保留,换短标题的文档收到内容尺寸,
 // 位置落盘后换签照样生效、双击拉手回到自适应。调用前 outline.md 已在阅读档里开着大纲。
 import assert from 'node:assert/strict'
@@ -10,6 +10,8 @@ type Rect = { x: number; y: number; width: number; height: number }
 type PaneRect = { left: number; top: number; right: number; bottom: number }
 
 const VIEW = '.code-view.is-reading:visible'
+/** 大纲浮窗挂在预览面板上(阅读栏的兄弟),按可见认当前那扇 */
+const PANEL = '.doc-outline.is-open:visible'
 
 async function rectOf(loc: Locator): Promise<Rect> {
   const box = await loc.boundingBox()
@@ -17,13 +19,20 @@ async function rectOf(loc: Locator): Promise<Rect> {
   return box
 }
 
+/** 当前阅读栏所在的预览面板:浮窗的活动范围以面板为界(上缘能压到页头之上) */
 async function paneOf(page: Page): Promise<PaneRect> {
   return page.locator(VIEW).evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    const left = r.left + el.clientLeft
-    const top = r.top + el.clientTop
-    return { left, top, right: left + el.clientWidth, bottom: top + el.clientHeight }
+    const pane = el.closest('.code-pane') ?? el
+    const r = pane.getBoundingClientRect()
+    const left = r.left + pane.clientLeft
+    const top = r.top + pane.clientTop
+    return { left, top, right: left + pane.clientWidth, bottom: top + pane.clientHeight }
   })
+}
+
+/** 阅读栏的顶(面板顶 + 页头高):浮窗能拖到它上面,就是压住了页头 */
+async function viewTopOf(page: Page): Promise<number> {
+  return page.locator(VIEW).evaluate((el) => el.getBoundingClientRect().top)
 }
 
 /** 按住某个把手的中心拖到 (x, y) 屏幕坐标 */
@@ -195,7 +204,14 @@ async function checkDragAndClamp(page: Page, panel: Locator): Promise<void> {
   const high = await rectOf(panel)
   assert.ok(high.x >= pane.left - 0.5 && high.y >= pane.top - 0.5, 'drag is clamped at top-left')
   const bar = await rectOf(panel.locator('.doc-outline-bar'))
-  assert.ok(bar.y >= pane.top - 0.5, 'top clamp leaves room for the hover bar above the panel')
+  assert.ok(
+    bar.y >= pane.top - 0.5,
+    'top clamp reaches into the header but keeps the hover bar inside'
+  )
+  assert.ok(
+    high.y < (await viewTopOf(page)) - 0.5,
+    'the panel can be dragged up over the pane header'
+  )
 }
 
 /** 按住拉手拖 (dx, dy) 先不松手,量拖动途中的浮窗,再松手 */
@@ -283,7 +299,7 @@ async function checkResizeAndPersist(page: Page, panel: Locator): Promise<void> 
   // 换一扇阅读签(Word 预览,标题比 outline.md 短、少):同一份全局摆放,右缘与上缘照搬,
   // 记下的宽高比这份的内容尺寸还大,上屏收到内容尺寸,不留空白
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'report.docx' }).click()
-  const docxPanel = page.locator(`${VIEW} .doc-outline.is-open`)
+  const docxPanel = page.locator(PANEL)
   await docxPanel.waitFor()
   const docxPane = await paneOf(page)
   const reopened = await rectOf(docxPanel)
@@ -304,7 +320,7 @@ async function checkResizeAndPersist(page: Page, panel: Locator): Promise<void> 
   assert.ok(near(reset.width, auto.width) && near(reset.height, auto.height), 'dblclick resets')
 }
 export async function checkOutlinePlacement(page: Page): Promise<void> {
-  const panel = page.locator(`${VIEW} .doc-outline.is-open`)
+  const panel = page.locator(PANEL)
   await panel.waitFor()
   await checkLook(panel)
   await checkScrollbarFit(panel)

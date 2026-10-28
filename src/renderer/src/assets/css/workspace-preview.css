@@ -3,6 +3,8 @@
 /* 代码预览:左栏的只读文本窗 
    只摆纯文本 + 行号,不描语法色;等宽字、不折行,横向自己滚 */
 .code-pane {
+  /* 大纲浮窗的定位原点:整个预览面板(doc-outline.css 的坞挂在这上面) */
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;

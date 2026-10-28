@@ -115,7 +115,7 @@ function checkDepthsAndSpy(): void {
 }
 
 /**
- * 预览栏 800x600,坞在栏内上方 16px、左右各缩 24px;浮窗 200x300,缝 8,最小 128x80;
+ * 预览面板 800x600,顶端 48px 是页头,坞贴在面板顶;浮窗 200x300,缝 8,最小 128x80;
  * natural/naturalH = 内容宽/高(null = 没量到),autoMax/autoMaxH = 自适应档宽/高上限(24rem = 384、28rem = 448)
  */
 function sampleBounds(
@@ -126,8 +126,8 @@ function sampleBounds(
   autoMaxH = 448
 ) {
   return outlineBounds({
-    view: { left: 0, top: 0, right: 800, bottom: 600 },
-    dock: { left: 24, top: 16, right: 776, bottom: 16 },
+    view: { left: 0, top: 48, right: 800, bottom: 600 },
+    dock: { left: 0, top: 0, right: 800, bottom: 0 },
     panel,
     gap: 8,
     min: { width: 128, height: 80 },
@@ -146,39 +146,44 @@ function checkPlacement(): void {
     '逐字段验身:坏类型、非正尺寸都当没记过'
   )
   const b = sampleBounds()
-  assert.equal(b.minRight, -16, '默认贴栏右缘留缝(抵掉坞的内缩)')
-  assert.equal(b.minTop, -8, '可以挪到坞上方,贴栏顶留缝')
-  assert.equal(b.maxRight, 768 - 200, '往左最多挪到浮窗左缘贴栏左缝')
-  assert.equal(b.maxTop, 576 - 300, '往下最多挪到浮窗底贴栏底缝')
+  assert.equal(b.minRight, 8, '默认贴面板右缘留缝')
+  assert.equal(b.minTop, 8, '上缘能一路挪到面板顶,贴顶留缝')
+  assert.equal(b.defaultTop, 56, '没拖过落在阅读栏右上角,不压页头')
+  assert.equal(b.maxRight, 792 - 200, '往左最多挪到浮窗左缘贴栏左缝')
+  assert.equal(b.maxTop, 592 - 300, '往下最多挪到浮窗底贴栏底缝')
   const home = clampPlacement(DEFAULT_PLACEMENT, b)
-  assert.deepEqual([home.right, home.top, home.width], [-16, -8, null], '默认 = 右上角、宽高自适应')
+  assert.deepEqual(
+    [home.right, home.top, home.width],
+    [8, 56, null],
+    '默认 = 阅读栏右上角、宽高自适应'
+  )
   const moved = movePlacement(home, -100, 50, b)
-  assert.deepEqual([moved.right, moved.top], [84, 42], '往左下拖:right 变大、top 变大')
+  assert.deepEqual([moved.right, moved.top], [108, 106], '往左下拖:right 变大、top 变大')
   const flung = movePlacement(home, -5000, 5000, b)
-  assert.deepEqual([flung.right, flung.top], [b.maxRight, b.maxTop], '拖出栏外夹回栏内')
+  assert.deepEqual([flung.right, flung.top], [b.maxRight, b.maxTop], '拖出面板外夹回范围内')
   const back = movePlacement(home, 5000, -5000, b)
-  assert.deepEqual([back.right, back.top], [b.minRight, b.minTop])
+  assert.deepEqual([back.right, back.top], [b.minRight, b.minTop], '拖到最右上:贴着面板顶')
 
   const from = { width: 200, height: 300 }
   const grown = resizePlacement(moved, from, 60, 40, b)
   assert.deepEqual([grown.width, grown.height], [260, 340], '往右下拉 = 变宽变高')
-  assert.deepEqual([grown.right, grown.top], [24, 42], '拉尺寸时左上角钉住(右缘跟着往右走)')
+  assert.deepEqual([grown.right, grown.top], [48, 106], '拉尺寸时左上角钉住(右缘跟着往右走)')
   const atEdge = resizePlacement(home, from, 60, 0, b)
-  assert.equal(atEdge.width, 200, '贴着栏右缘时往右拉不出栏外')
+  assert.equal(atEdge.width, 200, '贴着面板右缘时往右拉不出面板外')
   assert.equal(atEdge.height, null, '只拉了横向,高度仍自适应')
   const tallOnly = resizePlacement(moved, from, 0, 30, b)
   assert.deepEqual([tallOnly.width, tallOnly.height], [null, 330], '只拉了纵向,宽度仍自适应')
   const tiny = resizePlacement(moved, from, -500, -500, b)
-  assert.deepEqual([tiny.width, tiny.height, tiny.right], [128, 80, 156], '拉不小于最小档,左缘不动')
+  assert.deepEqual([tiny.width, tiny.height, tiny.right], [128, 80, 180], '拉不小于最小档,左缘不动')
   const huge = resizePlacement(moved, from, 5000, 5000, b)
-  assert.deepEqual([huge.width, huge.right], [300, b.minRight], '拉不出栏右缘')
+  assert.deepEqual([huge.width, huge.right], [300, b.minRight], '拉不出面板右缘')
   assert.equal(huge.height, b.reachDown - moved.top, '拉不出栏底')
   const wide = clampPlacement({ right: 500, top: 0, width: 300, height: null }, b)
   assert.equal(wide.right, b.reachLeft - 300, '手动宽度按自己的宽度夹位置,不拿旧实测宽度')
 
   const narrow = outlineBounds({
-    view: { left: 0, top: 0, right: 300, bottom: 200 },
-    dock: { left: 24, top: 16, right: 276, bottom: 16 },
+    view: { left: 0, top: 30, right: 300, bottom: 200 },
+    dock: { left: 0, top: 0, right: 300, bottom: 0 },
     panel: { width: 200, height: 150 },
     gap: 8,
     min: { width: 128, height: 80 },
@@ -187,7 +192,7 @@ function checkPlacement(): void {
     reserveTop: 0
   })
   const stale = clampPlacement({ right: 400, top: 900, width: 600, height: 600 }, narrow)
-  assert.ok(stale.right <= narrow.maxRight && stale.top <= narrow.maxTop, '栏变小后旧位置夹回来')
+  assert.ok(stale.right <= narrow.maxRight && stale.top <= narrow.maxTop, '面板变小后旧位置夹回来')
   assert.equal(stale.width, narrow.maxWidth, '旧尺寸超栏宽夹回来')
 }
 
@@ -209,10 +214,10 @@ function checkCollapsedClamp(): void {
   )
   assert.deepEqual(
     [
-      clampCollapsed({ ...stored, top: 0 }, knob).top,
-      clampCollapsed({ ...stored, right: 0 }, knob).right
+      clampCollapsed({ ...stored, top: 20 }, knob).top,
+      clampCollapsed({ ...stored, right: 20 }, knob).right
     ],
-    [0, 0],
+    [20, 20],
     '没越过边的不动'
   )
   const dragged = moveCollapsed(clampCollapsed(stored, knob), -5000, -5000, knob)
@@ -324,11 +329,11 @@ function checkDragThreshold(): void {
   assert.equal(isDragStarted(-3, -3), true, '斜着挪,按直线距离算')
 }
 
-/** 悬停拖动条长在浮窗上缘之上:上缘最高只到栏顶缝再往下让出条高,可用高度同样扣掉 */
+/** 悬停拖动条长在浮窗上缘之上:上缘最高只到面板顶缝再往下让出条高,可用高度同样扣掉 */
 function checkBarRoom(): void {
   const geo = {
-    view: { left: 0, top: 0, right: 800, bottom: 600 },
-    dock: { left: 24, top: 16, right: 776, bottom: 16 },
+    view: { left: 0, top: 48, right: 800, bottom: 600 },
+    dock: { left: 0, top: 0, right: 800, bottom: 0 },
     panel: { width: 200, height: 300 },
     gap: 8,
     min: { width: 128, height: 80 },
@@ -349,11 +354,35 @@ function checkBarRoom(): void {
   )
 }
 
+/** 浮窗原点抬到整个预览面板:上缘能压到页头之上,没拖过仍落在阅读栏右上角 */
+function checkPaneOrigin(): void {
+  const geo = {
+    view: { left: 0, top: 48, right: 800, bottom: 600 },
+    dock: { left: 0, top: 0, right: 800, bottom: 0 },
+    panel: { width: 200, height: 300 },
+    gap: 8,
+    min: { width: 128, height: 80 },
+    natural: { width: null, height: null },
+    autoMax: { width: 384, height: 448 }
+  }
+  const b = outlineBounds({ ...geo, reserveTop: 28 })
+  assert.equal(b.minTop, 8 + 28, '上缘能挪到面板顶,只留缝和拖动条/圆钮的位置')
+  assert.equal(b.defaultTop, 48 + 8 + 28, '没拖过落在阅读栏右上角,页头之下')
+  assert.equal(b.maxHeight, 600 - 0 - 16 - 28, '可用高度从面板顶量到栏底')
+  const home = clampPlacement(DEFAULT_PLACEMENT, b)
+  assert.equal(home.top, b.defaultTop, '默认不压页头')
+  const up = movePlacement(home, 0, -5000, b)
+  assert.equal(up.top, 36, '能一路往上压到页头')
+  assert.ok(up.top < geo.view.top, '压上去的位置确实在阅读栏顶之上')
+  const down = movePlacement(home, 0, 5000, b)
+  assert.equal(down.top, b.maxTop, '往下仍到栏底为止')
+}
+
 /** 收起态圆钮外移/上移的预留:右缘与上缘的夹边下限同步推高,展开收起共用,来回切换不挪位 */
 function checkKnobReserve(): void {
   const geo = {
-    view: { left: 0, top: 0, right: 800, bottom: 600 },
-    dock: { left: 24, top: 16, right: 776, bottom: 16 },
+    view: { left: 0, top: 48, right: 800, bottom: 600 },
+    dock: { left: 0, top: 0, right: 800, bottom: 0 },
     panel: { width: 42, height: 42 },
     gap: 8,
     min: { width: 128, height: 80 },
@@ -374,8 +403,8 @@ function checkKnobReserve(): void {
   const folded = clampCollapsed(DEFAULT_PLACEMENT, knob)
   assert.deepEqual(
     [folded.right, folded.top],
-    [knob.minRight, knob.minTop],
-    '圆钮默认落在留好余地的右上角'
+    [knob.minRight, knob.defaultTop],
+    '圆钮默认落在阅读栏右上角的留好余地处,不压页头'
   )
 }
 
@@ -389,7 +418,8 @@ checkContentHeight()
 checkDragThreshold()
 checkBarRoom()
 checkKnobReserve()
+checkPaneOrigin()
 console.log('✅ 文档大纲自测全部通过')
 console.log(
-  '   编号(中英文/重名/兜底) · 收标题(级别/挂编号/只认真标题) · 缩进档 · 读线跟随 · 无标题无大纲 · 浮窗摆放(验身/夹边/拖动/收起态按圆钮尺寸夹边/圆钮位移预留/右下角拉伸/宽高吸回内容尺寸)'
+  '   编号(中英文/重名/兜底) · 收标题(级别/挂编号/只认真标题) · 缩进档 · 读线跟随 · 无标题无大纲 · 浮窗摆放(验身/夹边/拖动/收起态按圆钮尺寸夹边/圆钮位移预留/右下角拉伸/宽高吸回内容尺寸/原点在面板顶能压页头)'
 )

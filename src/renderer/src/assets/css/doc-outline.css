@@ -1,7 +1,7 @@
 /* 文档大纲浮窗(md 阅读档与 Word 预览共用):浮在阅读栏上,不占版面宽度。
-   坞是零高度的 sticky 条,随滚动钉在视口顶;面板绝对定位挂在坞上,
+   坞是贴在预览面板(.code-pane)顶端的零高度条,面板绝对定位挂在坞上,
    位置/尺寸由 useOutlinePlacement 以行内 right/top/width/height 给(量好之前先用下面的默认右上角),
-   正文的可读栏宽度与居中一概不受它影响 */
+   正文的可读栏宽度与居中一概不受它影响;坞本身不接鼠标 —— 浮窗能压到页头之上,页头照常能点 */
 /* 自适应档上限注册成长度:读计算样式时拿到的已是 px(vh、rem 都换算好),脚本据此判断吸附 */
 @property --outline-auto-max {
   syntax: '<length>';
@@ -29,17 +29,22 @@
 }
 
 .doc-outline-dock {
-  position: sticky;
+  position: absolute;
   top: 0;
+  right: 0;
+  left: 0;
   z-index: var(--z-float);
   height: 0;
+  /* 坞铺满面板顶一条线,鼠标只该落在浮窗自己身上:页头、正文照常点得到 */
+  pointer-events: none;
 }
 
 .doc-outline {
   position: absolute;
   top: 0;
-  /* 抵掉 .code-view.is-reading 的右内边距,贴着预览栏右缘留一小条缝 */
-  right: calc(var(--space-2) - var(--space-6));
+  /* 贴着预览面板右缘留一小条缝 */
+  right: var(--space-2);
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -69,7 +74,7 @@
 .doc-outline.is-open {
   width: max-content;
   min-width: 8rem;
-  max-width: min(var(--outline-auto-max), calc(100% + 2 * var(--space-6) - 2 * var(--space-2)));
+  max-width: min(var(--outline-auto-max), calc(100% - 2 * var(--space-2)));
   min-height: 5rem;
   max-height: var(--outline-auto-max-h);
   padding: var(--space-1);

@@ -1,6 +1,6 @@
 // 大纲浮窗的拖动/拉伸现场:抓手按住拖位置,右下角拉手拉尺寸(左上角钉住),方向键微调。
-// 手势进行中只改本地 live 账,松手才落盘;上屏前每次按当前预览栏大小夹一遍,
-// 预览栏变窄、滚动、浮窗自己变大都会重量,不让它跑出栏外。
+// 手势进行中只改本地 live 账,松手才落盘;上屏前每次按当前预览面板大小夹一遍,
+// 面板变窄变宽、页头出现消失、浮窗自己变大都会重量,不让它跑出面板外。
 // 宽高不留多余空白:拉的途中随鼠标走,松手若比内容尺寸还大就平滑吸回内容尺寸(回到自适应)。
 import {
   useCallback,
@@ -136,11 +136,7 @@ export function useOutlinePlacement(
     const observer = new ResizeObserver(update)
     observer.observe(view)
     observer.observe(panel)
-    view.addEventListener('scroll', update, { passive: true })
-    return () => {
-      observer.disconnect()
-      view.removeEventListener('scroll', update)
-    }
+    return () => observer.disconnect()
   }, [viewRef, panelRef, measure, invalidate, isOpen, contentKey])
 
   /**

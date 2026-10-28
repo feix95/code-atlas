@@ -1,12 +1,12 @@
-// 大纲浮窗的摆放账(纯函数,自测覆盖):位置按「离预览栏右上角多远」记(right/top,px),
+// 大纲浮窗的摆放账(纯函数,自测覆盖):位置按「离预览面板右上角多远」记(right/top,px),
 // 尺寸 null = 跟着内容自适应;用户拖过、拉过才有数。读回来的旧账先验身,
-// 每次上屏都按当前预览栏的大小夹一遍 —— 窗口变小、换了屏,浮窗都不会跑出栏外。
+// 每次上屏都按当前预览面板的大小夹一遍 —— 窗口变小、换了屏,浮窗都不会跑出面板外。
 // 宽高另有一条上限「内容尺寸」:刚好露出最长标题全文的宽、刚好放下全部条目的高,再大只会多出空白。
 
 export interface OutlinePlacement {
-  /** 浮窗右缘离停靠坞右缘的距离;null = 默认贴右上角 */
+  /** 浮窗右缘离预览面板右缘的距离;null = 默认贴右上角 */
   right: number | null
-  /** 浮窗上缘离停靠坞上缘的距离;null = 默认贴右上角 */
+  /** 浮窗上缘离预览面板上缘的距离;null = 默认落在阅读栏顶(页头之下) */
   top: number | null
   /** 手动拉出来的宽/高;null = 跟着内容自适应 */
   width: number | null
@@ -30,12 +30,15 @@ export function isDragStarted(dx: number, dy: number): boolean {
 /** 松手时离内容宽/高不到这么多 px 也算「拉满了」,吸回自适应 */
 export const SNAP_SLACK_PX = 4
 
-/** 当前预览栏能给浮窗的活动范围(由实测几何算出) */
+/** 当前预览面板能给浮窗的活动范围(由实测几何算出) */
 export interface OutlineBounds {
   minRight: number
   maxRight: number
+  /** 上缘下限:面板顶(含页头那一栏),浮窗能压到页头之上 */
   minTop: number
   maxTop: number
+  /** top 没记过时的落点:阅读栏右上角(栏顶在页头之下,不跟 minTop 跑),也压回活动范围内 */
+  defaultTop: number
   minWidth: number
   maxWidth: number
   minHeight: number
@@ -85,12 +88,13 @@ export function parseOutlinePlacement(raw: unknown): OutlinePlacement {
 }
 
 /**
- * 活动范围:view = 预览栏可视区(不含滚动条),dock = 停靠坞,panel = 浮窗当前大小,
- * gap = 离栏边留的缝,min = 浮窗的最小宽高(CSS 里登记的那一档),
+ * 活动范围:view = 预览栏可视区(不含滚动条),dock = 贴在预览面板顶端的停靠坞,
+ * panel = 浮窗当前大小,gap = 离面板边留的缝,min = 浮窗的最小宽高(CSS 里登记的那一档),
  * natural = 实测内容宽高(null = 没量到,不设上限),autoMax = 自适应档的宽高上限,
  * reserveTop = 浮窗上缘之上要留的高度(展开态悬停时长在上面的拖动条、收起态圆钮的上移量),
- * reserveRight = 右缘之外要留的宽度(收起态圆钮的外移量),不让它们被栏边裁掉;
- * knob = 收起态圆钮的视觉位移(外移 shift、上移 lift),位置上限也外推同样的量,圆钮才贴得到栏左与栏底。
+ * reserveRight = 右缘之外要留的宽度(收起态圆钮的外移量),不让它们被面板边裁掉;
+ * knob = 收起态圆钮的视觉位移(外移 shift、上移 lift),位置上限也外推同样的量,圆钮才贴得到面板左缘与栏底。
+ * 上缘下限取面板顶(页头也在活动范围里);下缘、左缘仍以阅读栏为准。
  */
 export function outlineBounds(g: {
   view: Box
@@ -105,9 +109,11 @@ export function outlineBounds(g: {
   knob?: { shift: number; lift: number }
 }): OutlineBounds {
   const minRight = g.dock.right - g.view.right + g.gap + (g.reserveRight ?? 0)
-  const minTop = g.view.top - g.dock.top + g.gap + g.reserveTop
+  const minTop = g.gap + g.reserveTop
+  // 没拖过仍落在阅读栏右上角;栏顶随页头高低走,不跟着下限一起上抬
+  const defaultTop = g.view.top - g.dock.top + g.gap + g.reserveTop
   const roomW = g.view.right - g.view.left - 2 * g.gap
-  const roomH = g.view.bottom - g.view.top - 2 * g.gap - g.reserveTop
+  const roomH = g.view.bottom - g.dock.top - 2 * g.gap - g.reserveTop
   const reachLeft = g.dock.right - g.view.left - g.gap
   const reachDown = g.view.bottom - g.dock.top - g.gap
   const maxWidth = Math.max(g.min.width, roomW)
@@ -117,6 +123,7 @@ export function outlineBounds(g: {
     maxRight: Math.max(minRight, reachLeft - g.panel.width + (g.knob?.shift ?? 0)),
     minTop,
     maxTop: Math.max(minTop, reachDown - g.panel.height + (g.knob?.lift ?? 0)),
+    defaultTop,
     minWidth: g.min.width,
     maxWidth,
     minHeight: g.min.height,
@@ -140,8 +147,9 @@ function fitWithin(natural: number | null, lo: number, hi: number): number {
 
 /**
  * 按活动范围夹一遍,并把「默认」展开成实数(right/top 一定有值,宽高 null 仍是自适应)。
+ * 没记过的 top 落在阅读栏右上角(defaultTop),不是面板顶 —— 默认位置不压页头。
  * 手动宽高先夹,再按夹好的尺寸算 right/top 的上限 —— 拉伸途中 bounds 还是开拉时量的旧尺寸,
- * 不能拿旧宽度去夹新位置;老版本存下的账(当时右上角钉住)同样按这条规则夹回栏内。
+ * 不能拿旧宽度去夹新位置;老版本存下的账(当时右上角钉住)同样按这条规则夹回范围内。
  * 这里不管内容尺寸:拉伸途中宽高要能跟着鼠标走,内容尺寸只在松手和上屏时生效。
  */
 export function clampPlacement(
@@ -154,7 +162,7 @@ export function clampPlacement(
   const maxTop = height === null ? b.maxTop : Math.max(b.minTop, b.reachDown - height)
   return {
     right: clamp(p.right ?? b.minRight, b.minRight, maxRight),
-    top: clamp(p.top ?? b.minTop, b.minTop, maxTop),
+    top: clamp(p.top ?? b.defaultTop, b.minTop, maxTop),
     width,
     height
   }
