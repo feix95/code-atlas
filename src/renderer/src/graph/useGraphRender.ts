@@ -9,6 +9,7 @@ import {
   type Transform
 } from './drawGraph'
 import type { ForceScene } from './useForceLayout'
+import type { ModuleDrawState } from './drawModules'
 import type { ViewportSize } from './useGraphViewport'
 import { GRAPH_MOTION, GRAPH_VIEW } from './graphConfig'
 
@@ -31,6 +32,9 @@ export interface RenderRefs {
   sizeRef: React.RefObject<ViewportSize>
   alpha: () => number
   fit: () => void
+  /** 划分叠加层(只用于当前层;淡出中的上一层不画) */
+  modules: ModuleDrawState | null
+  selectedId: string | null
 }
 
 export interface GraphRender {
@@ -104,7 +108,14 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
       const elapsed = now - lv.start
       const base = { hover: hoverRef.current, transform: tf, colors, ...typoRef.current }
       if (lv.ghost && elapsed < GRAPH_MOTION.levelOutMs) {
-        drawGraph(ctx, { ...base, scene: lv.ghost, alpha: 1 - elapsed / GRAPH_MOTION.levelOutMs })
+        const ghostAlpha = 1 - elapsed / GRAPH_MOTION.levelOutMs
+        drawGraph(ctx, {
+          ...base,
+          scene: lv.ghost,
+          alpha: ghostAlpha,
+          modules: null,
+          selectedId: null
+        })
         more = true
       } else lv.ghost = null
       const inStart = lv.start + (lv.hadGhost ? GRAPH_MOTION.levelOutMs : 0)
@@ -113,7 +124,15 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
         : 1
       if (inAlpha < 1) more = true
       const scene = r.sceneRef.current
-      if (scene && !lv.ghost) drawGraph(ctx, { ...base, scene, alpha: inAlpha })
+      if (scene && !lv.ghost) {
+        drawGraph(ctx, {
+          ...base,
+          scene,
+          alpha: inAlpha,
+          modules: r.modules,
+          selectedId: r.selectedId
+        })
+      }
       if (scene && !lv.autoFitted && r.alpha() < GRAPH_VIEW.autoFitAlpha) {
         lv.autoFitted = true
         if (isOutside(scene, tf, size)) r.fit()

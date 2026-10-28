@@ -13,6 +13,7 @@ import {
 } from 'd3-force'
 import type { LevelGraph, LevelNode } from '@shared/graphView'
 import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig'
+import { forceCluster, type ClusterForce } from './forceCluster'
 
 export interface SimNode extends SimulationNodeDatum {
   id: string
@@ -82,7 +83,10 @@ function buildScene(level: LevelGraph, prev: ForceScene | null): ForceScene {
   return { dirRel: level.dirRel, nodes, links }
 }
 
-function createSimulation(onTick: () => void): Simulation<SimNode, SimLink> {
+function createSimulation(
+  onTick: () => void,
+  cluster: ClusterForce<SimNode>
+): Simulation<SimNode, SimLink> {
   return forceSimulation<SimNode, SimLink>()
     .velocityDecay(GRAPH_FORCE.velocityDecay)
     .force(
@@ -104,6 +108,7 @@ function createSimulation(onTick: () => void): Simulation<SimNode, SimLink> {
       'collide',
       forceCollide<SimNode>((n) => n.r + GRAPH_FORCE.collidePadding)
     )
+    .force('cluster', cluster)
     .on('tick', onTick)
 }
 
@@ -114,16 +119,27 @@ export interface ForceLayout {
   alpha: () => number
 }
 
-export function useForceLayout(level: LevelGraph | null, onTick: () => void): ForceLayout {
+/** 节点 id → 聚类力所用的模块 id;null = 关闭聚类力(无模块数据或关闭「模块着色」) */
+export type ClusterMap = ReadonlyMap<string, string> | null
+
+export function useForceLayout(
+  level: LevelGraph | null,
+  onTick: () => void,
+  clusters: ClusterMap
+): ForceLayout {
   const sceneRef = useRef<ForceScene | null>(null)
   const simRef = useRef<Simulation<SimNode, SimLink> | null>(null)
+  const clusterRef = useRef<ClusterForce<SimNode> | null>(null)
+  const clustersRef = useRef<ClusterMap>(clusters)
   const onTickRef = useRef(onTick)
   useEffect(() => {
     onTickRef.current = onTick
   })
 
   useEffect(() => {
-    const sim = createSimulation(() => onTickRef.current())
+    const cluster = forceCluster<SimNode>((n) => clustersRef.current?.get(n.id) ?? null, 0)
+    clusterRef.current = cluster
+    const sim = createSimulation(() => onTickRef.current(), cluster)
     simRef.current = sim
     return () => {
       sim.stop()
@@ -147,6 +163,14 @@ export function useForceLayout(level: LevelGraph | null, onTick: () => void): Fo
     sim.force<ReturnType<typeof forceLink<SimNode, SimLink>>>('link')?.links(scene.links)
     sim.alpha(sameLevel ? 0.3 : 1).restart()
   }, [level])
+
+  // 模块数据晚到或开关「模块着色」:换聚类分组并温和重排;层级切换由上面的 effect 负责重启
+  useEffect(() => {
+    clustersRef.current = clusters
+    clusterRef.current?.strength(clusters ? GRAPH_FORCE.clusterStrength : 0)
+    const sim = simRef.current
+    if (sim && sceneRef.current) sim.alpha(Math.max(sim.alpha(), 0.3)).restart()
+  }, [clusters])
 
   const setDragging = useCallback((dragging: boolean) => {
     const sim = simRef.current
