@@ -38,20 +38,6 @@ const NUDGE_BIG_REM = 4
 /** 吸回动画留多久再撤掉 live 账;要比 doc-outline.css 里 .is-snapping 的过渡(--dur-2)略长 */
 const SNAP_SETTLE_MS = 200
 
-// 窗口宽度变了:浮窗在屏上的位置钉住不动。账里的 right 是相对坞右缘记的,坞右缘跟着窗口右缘走,
-// 把这段位移补回去 —— 位置跟页面走,不跟预览区外框走(拖文件树分隔条不改变窗口宽度,不受影响)
-if (typeof window !== 'undefined') {
-  let viewportWidth = window.innerWidth
-  window.addEventListener('resize', () => {
-    const next = window.innerWidth
-    const shift = next - viewportWidth
-    viewportWidth = next
-    const p = getOutlinePlacement()
-    if (Math.abs(shift) < 0.5 || p.right === null) return
-    setOutlinePlacement({ ...p, right: p.right + shift })
-  })
-}
-
 type GestureKind = 'move' | 'resize'
 
 interface Gesture {
