@@ -1,21 +1,29 @@
 // tsconfig 的 compilerOptions.paths / baseUrl 别名:把 '@shared/x' 这类非相对导入翻译成项目内路径。
-// 只认项目根 tsconfig.json;不跟 extends 链,一条规则多个目标只取第一个,取不到的交给调用方记 unresolved。
+// 读根 tsconfig.json 及其 references,各自跟相对 extends 链;一条规则的多个目标按顺序逐个试,
+// 全都连不上的交给调用方记 unresolved。
 import { promises as fs } from 'node:fs'
 import { joinRoot } from '../shared/paths.ts'
-import { normalizeParts } from './relPath.ts'
+import { toProjectRel } from './relPath.ts'
+import {
+  isRecord,
+  loadTsConfigChain,
+  parseTsConfigText,
+  type EffectiveTsOptions,
+  type ReadProjectFile
+} from './tsconfigFile.ts'
 
-/** 一条 paths 规则:pattern 按唯一的 '*' 拆成前后缀;target 已拼好 baseUrl,'/' 分隔 */
+/** 一条 paths 规则:pattern 按唯一的 '*' 拆成前后缀;targets 已拼好 baseUrl,'/' 分隔,保持声明顺序 */
 interface PathRule {
   prefix: string
   suffix: string
   hasWildcard: boolean
-  target: string
+  targets: string[]
 }
 
 export interface TsPathAliases {
   rules: PathRule[]
-  /** baseUrl 相对项目根的路径('' 为项目根);没写或不可用为 null */
-  baseUrl: string | null
+  /** 各配置的 baseUrl(相对项目根,'' 为项目根),去重后按配置出现顺序 */
+  baseUrls: string[]
 }
 
 /** 别名命中后的结果;结构与 resolvers 的 ImportResolution 一致 */
@@ -24,120 +32,69 @@ export interface AliasResolution {
   external: boolean
 }
 
-/** JSONC → JSON:去掉字符串外的 // 与 块注释,再去掉字符串外 } 或 ] 前的尾逗号 */
-function stripJsonc(text: string): string {
-  let out = ''
-  let inString = false
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (inString) {
-      out += ch
-      if (ch === '\\') out += text[++i] ?? ''
-      else if (ch === '"') inString = false
-      continue
-    }
-    if (ch === '/' && text[i + 1] === '/') {
-      while (i < text.length && text[i] !== '\n') i++
-      out += '\n'
-      continue
-    }
-    if (ch === '/' && text[i + 1] === '*') {
-      const end = text.indexOf('*/', i + 2)
-      i = end < 0 ? text.length : end + 1
-      continue
-    }
-    if (ch === '"') inString = true
-    out += ch
-  }
-  return removeTrailingCommas(out)
+function parseTargets(targets: unknown, base: string): string[] {
+  if (!Array.isArray(targets)) return []
+  return targets.flatMap((t) => (typeof t === 'string' ? (toProjectRel(base, t) ?? []) : []))
 }
 
-function removeTrailingCommas(json: string): string {
-  let out = ''
-  let inString = false
-  for (let i = 0; i < json.length; i++) {
-    const ch = json[i]
-    if (inString) {
-      out += ch
-      if (ch === '\\') out += json[++i] ?? ''
-      else if (ch === '"') inString = false
-      continue
-    }
-    if (ch === ',' && /^\s*[}\]]/.test(json.slice(i + 1))) continue
-    if (ch === '"') inString = true
-    out += ch
-  }
-  return out
-}
-
-/** tsconfig 里写的相对路径 → 项目根相对路径;绝对路径、盘符、上跳出根一律不可用(null) */
-function toProjectRel(base: string, path: string): string | null {
-  const unified = path.replaceAll('\\', '/')
-  if (unified.startsWith('/') || /^[A-Za-z]:/.test(unified)) return null
-  const parts = normalizeParts([...base.split('/'), ...unified.split('/')])
-  return parts ? parts.join('/') : null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function parseRule(pattern: string, targets: unknown, base: string): PathRule | null {
-  if (!Array.isArray(targets) || typeof targets[0] !== 'string') return null
+function splitPattern(pattern: string): Omit<PathRule, 'targets'> | null {
   const star = pattern.indexOf('*')
   if (star !== pattern.lastIndexOf('*')) return null
-  const target = toProjectRel(base, targets[0])
-  if (target === null) return null
-  if (star < 0) return { prefix: pattern, suffix: '', hasWildcard: false, target }
-  return {
-    prefix: pattern.slice(0, star),
-    suffix: pattern.slice(star + 1),
-    hasWildcard: true,
-    target
+  if (star < 0) return { prefix: pattern, suffix: '', hasWildcard: false }
+  return { prefix: pattern.slice(0, star), suffix: pattern.slice(star + 1), hasWildcard: true }
+}
+
+/** 多份配置的规则合并:同一 pattern 的目标按配置顺序拼接去重,pattern 保持首次出现的顺序 */
+function buildAliases(configs: EffectiveTsOptions[]): TsPathAliases | null {
+  const byPattern = new Map<string, PathRule>()
+  const baseUrls: string[] = []
+  for (const config of configs) {
+    if (config.baseUrl !== null && !baseUrls.includes(config.baseUrl)) baseUrls.push(config.baseUrl)
+    if (!isRecord(config.paths)) continue
+    const base = config.baseUrl ?? config.pathsDir
+    for (const [pattern, raw] of Object.entries(config.paths)) {
+      const shape = splitPattern(pattern)
+      const targets = parseTargets(raw, base)
+      if (!shape || targets.length === 0) continue
+      const rule = byPattern.get(pattern) ?? { ...shape, targets: [] }
+      for (const t of targets) if (!rule.targets.includes(t)) rule.targets.push(t)
+      byPattern.set(pattern, rule)
+    }
   }
+  const rules = [...byPattern.values()]
+  return rules.length === 0 && baseUrls.length === 0 ? null : { rules, baseUrls }
 }
 
 /**
- * 解析 tsconfig 文本。返回 null 表示「没有可用的别名配置」(不是合法 JSONC、没有 paths 与 baseUrl),
- * 调用方据此保持改前行为 —— 坏掉的 tsconfig 不该让关系分析整体失败。
+ * 解析单份 tsconfig 文本(视作项目根下的配置,不跟 extends)。返回 null 表示「没有可用的别名配置」
+ * (不是合法 JSONC、没有 paths 与 baseUrl),调用方据此保持改前行为。
  */
 export function parseTsPathAliases(text: string): TsPathAliases | null {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(stripJsonc(text.replace(/^\uFEFF/, '')))
-  } catch {
-    return null
-  }
-  const options = isRecord(parsed) ? parsed.compilerOptions : undefined
-  if (!isRecord(options)) return null
+  const config = parseTsConfigText(text)
+  if (!config) return null
+  const options = config.compilerOptions
   const baseUrl = typeof options.baseUrl === 'string' ? toProjectRel('', options.baseUrl) : null
-  const rules: PathRule[] = []
-  if (isRecord(options.paths)) {
-    for (const [pattern, targets] of Object.entries(options.paths)) {
-      const rule = parseRule(pattern, targets, baseUrl ?? '')
-      if (rule) rules.push(rule)
-    }
-  }
-  if (rules.length === 0 && baseUrl === null) return null
-  return { rules, baseUrl }
+  const paths = isRecord(options.paths) ? options.paths : null
+  return buildAliases([{ baseUrl, paths, pathsDir: '' }])
 }
 
-/** 读项目根 tsconfig.json;不存在或读不了时返回 null(与改前行为一致) */
+/** 读根 tsconfig.json、它的 references 与相对 extends 链;都读不到或没有别名时返回 null */
 export async function loadTsPathAliases(rootPath: string): Promise<TsPathAliases | null> {
-  const raw = await fs.readFile(joinRoot(rootPath, 'tsconfig.json'), 'utf8').catch(() => null)
-  return raw === null ? null : parseTsPathAliases(raw)
+  const read: ReadProjectFile = (rel) =>
+    fs.readFile(joinRoot(rootPath, rel), 'utf8').catch(() => null)
+  return buildAliases(await loadTsConfigChain(read))
 }
 
-/** paths 命中结果:target 为 null 表示替换后上跳出根;isCatchAll 表示命中的是纯 '*' 兜底规则 */
+/** paths 命中结果:candidates 为替换后的候选(上跳出根的已剔除);isCatchAll 表示命中的是纯 '*' 兜底规则 */
 interface RuleHit {
-  target: string | null
+  candidates: string[]
   isCatchAll: boolean
 }
 
 /** 按 TypeScript 的规则挑 paths:精确规则优先,其次前缀最长的通配规则;没有规则命中返回 undefined */
 function applyPathRules(spec: string, rules: PathRule[]): RuleHit | undefined {
   const exact = rules.find((r) => !r.hasWildcard && r.prefix === spec)
-  if (exact) return { target: exact.target, isCatchAll: false }
+  if (exact) return { candidates: exact.targets, isCatchAll: false }
   let best: PathRule | null = null
   for (const rule of rules) {
     if (!rule.hasWildcard || spec.length < rule.prefix.length + rule.suffix.length) continue
@@ -147,15 +104,23 @@ function applyPathRules(spec: string, rules: PathRule[]): RuleHit | undefined {
   if (!best) return undefined
   const matched = spec.slice(best.prefix.length, spec.length - best.suffix.length)
   return {
-    target: toProjectRel('', best.target.replace('*', matched)),
+    candidates: best.targets.flatMap((t) => toProjectRel('', t.replace('*', matched)) ?? []),
     isCatchAll: best.prefix === '' && best.suffix === ''
   }
 }
 
+function firstMatch(bases: string[], matchFile: (base: string) => string | null): string | null {
+  for (const base of bases) {
+    const to = matchFile(base)
+    if (to) return to
+  }
+  return null
+}
+
 /**
- * 非相对导入先过别名。paths 命中:连上算项目内边,连不上记 unresolved(不再算外部包);
+ * 非相对导入先过别名。paths 命中:候选按顺序试,连上算项目内边,都连不上记 unresolved(不再算外部包);
  * 纯 '*' 兜底规则(如 "*": ["types/*"])什么都能命中,连不上时交回外部包判定,不把 react 记成断线;
- * 只有 baseUrl:baseUrl 下真有这个文件才连,否则返回 null 交回外部包判定(TS 同样先试 baseUrl 再找依赖包)。
+ * 只有 baseUrl:某个 baseUrl 下真有这个文件才连,否则返回 null 交回外部包判定(TS 同样先试 baseUrl 再找依赖包)。
  */
 export function resolveTsAlias(
   spec: string,
@@ -165,11 +130,10 @@ export function resolveTsAlias(
   if (!aliases || spec.startsWith('/')) return null
   const hit = applyPathRules(spec, aliases.rules)
   if (hit !== undefined) {
-    const to = hit.target ? matchFile(hit.target) : null
+    const to = firstMatch(hit.candidates, matchFile)
     if (to || !hit.isCatchAll) return { to, external: false }
   }
-  if (aliases.baseUrl === null) return null
-  const base = toProjectRel(aliases.baseUrl, spec)
-  const to = base ? matchFile(base) : null
+  const bases = aliases.baseUrls.flatMap((b) => toProjectRel(b, spec) ?? [])
+  const to = firstMatch(bases, matchFile)
   return to ? { to, external: false } : null
 }

@@ -12,3 +12,11 @@ export function normalizeParts(parts: string[]): string[] | null {
   }
   return out
 }
+
+/** 配置里写的相对路径 → 项目根相对路径;绝对路径、盘符、上跳出根一律不可用(null) */
+export function toProjectRel(base: string, path: string): string | null {
+  const unified = path.replaceAll('\\', '/')
+  if (unified.startsWith('/') || /^[A-Za-z]:/.test(unified)) return null
+  const parts = normalizeParts([...base.split('/'), ...unified.split('/')])
+  return parts ? parts.join('/') : null
+}

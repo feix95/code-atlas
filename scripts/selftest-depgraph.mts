@@ -154,6 +154,34 @@ function makeBaseUrlFixture(): Promise<string> {
   })
 }
 
+/**
+ * electron-vite 模板布局:根 tsconfig 只有 references,别名写在 tsconfig.web.json / tsconfig.node.json,
+ * 还有相对 extends 链(含环)、无法安全解析的包名 extends,以及指向子目录的 reference。
+ */
+function makeReferencesFixture(): Promise<string> {
+  return makeProject('refs-project', {
+    'tsconfig.json':
+      '{ "files": [], "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }, { "path": "./packages/lib" }, { "path": "./missing.json" }] }\n',
+    'tsconfig.web.json':
+      '{ "extends": "@electron-toolkit/tsconfig/tsconfig.web.json", "compilerOptions": { "baseUrl": ".", "paths": { "@renderer/*": ["src/renderer/src/*"] } } }\n',
+    'tsconfig.node.json': '{ "extends": "./config/tsconfig.base", "include": ["src/main/**/*"] }\n',
+    'config/tsconfig.base.json':
+      '{ "extends": ["../tsconfig.node.json"], "compilerOptions": { "paths": { "@main/*": ["../src/main/*"] } } }\n',
+    'packages/lib/tsconfig.json': '{ "compilerOptions": { "paths": { "@lib/*": ["./src/*"] } } }\n',
+    'src/renderer/src/App.tsx': [
+      "import { r } from '@renderer/r'",
+      "import { m } from '@main/m'",
+      "import { l } from '@lib/l'",
+      "import React from 'react'",
+      'export const v = [r, m, l, React]',
+      ''
+    ].join('\n'),
+    'src/renderer/src/r.ts': 'export const r = 1\n',
+    'src/main/m.ts': 'export const m = 1\n',
+    'packages/lib/src/l.ts': 'export const l = 1\n'
+  })
+}
+
 /** tsPaths 纯函数的边界用例:不走文件系统,直接喂字符串 */
 function runTsPathUnitCases(): void {
   const files = new Set(['src/shared/x.ts', 'src/x.ts', 'lib/y.ts'])
@@ -192,7 +220,15 @@ function runTsPathUnitCases(): void {
   assert.equal(
     parseTsPathAliases('{"extends":"./tsconfig.base.json"}'),
     null,
-    '只有 extends 时不跟链,行为与改前一致'
+    '单份文本解析不跟 extends(跟链由 loadTsPathAliases 读文件时负责)'
+  )
+  const multi = parseTsPathAliases(
+    '{"compilerOptions":{"paths":{"@s/*":["nowhere/*","../outside/*","src/shared/*"]}}}'
+  )
+  assert.equal(
+    resolveTsAlias('@s/x', multi, match)?.to,
+    'src/shared/x.ts',
+    '多个候选按顺序试,跳过连不上与越界的'
   )
   assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
 }
@@ -307,13 +343,14 @@ async function main(): Promise<void> {
     await fs.rm(dirname(polyRoot), { recursive: true, force: true })
   }
 
-  // 第三轮:tsconfig paths 别名(带注释与尾逗号的 JSONC),多候选只认第一个,越界与缺失记 unresolved
+  // 第三轮:tsconfig paths 别名(带注释与尾逗号的 JSONC),多候选按顺序逐个试,越界与缺失记 unresolved
   const aliasRoot = await makeAliasFixture()
   try {
     const graph = await buildDependencyGraph(aliasRoot)
     assert.deepEqual(
       sortedEdges(graph),
       [
+        'src/app.ts => fallback/only.ts', // '@shared/only' 第一候选没有,第二候选连上
         'src/app.ts => src/config/index.ts', // '@cfg' 精确规则
         'src/app.ts => src/shared/util/index.ts', // '@shared/util' 补 /index
         'src/app.ts => src/shared/x.ts' // '@shared/x' 与 '@shared/x.ts' 去重成一条
@@ -324,8 +361,8 @@ async function main(): Promise<void> {
     assert.equal(graph.stats.externalCount, 3, '别名之外的外部包应记 3 次')
     assert.deepEqual(
       graph.stats.unresolved.map((u) => u.spec).sort(),
-      ['@shared/../../../outside', '@shared/missing', '@shared/only'],
-      '别名命中但连不上(缺文件、只在第二候选、上跳出根)应记 unresolved'
+      ['@shared/../../../outside', '@shared/missing'],
+      '别名命中但所有候选都连不上(缺文件、上跳出根)应记 unresolved'
     )
   } finally {
     await fs.rm(dirname(aliasRoot), { recursive: true, force: true })
@@ -350,7 +387,26 @@ async function main(): Promise<void> {
     await fs.rm(dirname(baseRoot), { recursive: true, force: true })
   }
 
-  // 第五轮:tsconfig 坏掉(不是合法 JSONC)时行为与没有 tsconfig 一致
+  // 第五轮:根 tsconfig 只有 references(electron-vite 模板),别名藏在被引用的配置与 extends 链里
+  const refsRoot = await makeReferencesFixture()
+  try {
+    const graph = await buildDependencyGraph(refsRoot)
+    assert.deepEqual(
+      sortedEdges(graph),
+      [
+        'src/renderer/src/App.tsx => packages/lib/src/l.ts', // 子目录 reference 的 paths 相对它自己的目录
+        'src/renderer/src/App.tsx => src/main/m.ts', // reference → 相对 extends(省 .json)→ paths;extends 成环不卡死
+        'src/renderer/src/App.tsx => src/renderer/src/r.ts' // reference 里的 baseUrl + paths;包名 extends 跳过
+      ],
+      'references 与 extends 链里的别名都应连上'
+    )
+    assert.equal(graph.stats.externalCount, 1, '只有 react 记外部包')
+    assert.deepEqual(graph.stats.unresolved, [], '不应有断线')
+  } finally {
+    await fs.rm(dirname(refsRoot), { recursive: true, force: true })
+  }
+
+  // 第六轮:tsconfig 坏掉(不是合法 JSONC)时行为与没有 tsconfig 一致
   const brokenRoot = await makeProject('broken-tsconfig', {
     'tsconfig.json': '{ "compilerOptions": { "paths": { "@shared/*": ["./src/shared/*"] ',
     'src/a.ts': "import { x } from '@shared/x'\nexport const y = x\n",
