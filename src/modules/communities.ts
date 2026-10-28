@@ -45,7 +45,9 @@ function addFolderAnchors(graph: UndirectedGraph, members: string[], affinity: n
   const byDir = new Map<string, string[]>()
   for (const file of members) {
     const dir = dirOf(file)
-    byDir.set(dir, [...(byDir.get(dir) ?? []), file])
+    const list = byDir.get(dir)
+    if (list) list.push(file)
+    else byDir.set(dir, [file])
   }
   for (const dir of [...byDir.keys()].sort(byCodeUnit)) {
     const files = byDir.get(dir) ?? []
@@ -81,7 +83,9 @@ export function detectCommunities(
   const groups = new Map<number, string[]>()
   for (const file of members) {
     const community = mapping[fileKey(file)]
-    groups.set(community, [...(groups.get(community) ?? []), file])
+    const group = groups.get(community)
+    if (group) group.push(file)
+    else groups.set(community, [file])
   }
   return [...groups.values()].sort((x, y) => byCodeUnit(x[0], y[0]))
 }

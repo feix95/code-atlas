@@ -18,9 +18,11 @@ export function attachTests(
   edges: DepEdge[]
 ): Map<string, number> {
   const home = indexMembers(candidates)
+  const importsByTest = new Map<string, [string, number][]>(tests.map((t) => [t, []]))
+  for (const { from, to } of edges) importsByTest.get(from)?.push([to, 1])
   const homes = new Map<string, number>()
   for (const test of tests) {
-    const ballots = edges.filter((e) => e.from === test).map((e) => [e.to, 1] as const)
+    const ballots = importsByTest.get(test) ?? []
     const found = pickByVotes(tally(ballots, home), candidates)
     if (found >= 0) homes.set(test, found)
   }

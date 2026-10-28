@@ -310,6 +310,28 @@ function checkStyles(): void {
   assert.deepEqual(map.links, plain.links, '样式不产生模块间边')
 }
 
+/** 菱形 @import 长链:每层两份样式都 @import 下一层两份,全链无人认领;不缓存 -1 时重走次数随层数翻倍 */
+function checkStyleImportChainSpeed(): void {
+  const depth = 22
+  const level = (i: number): string[] => {
+    const tag = String(i).padStart(2, '0')
+    return [`styles/d${tag}a.css`, `styles/d${tag}b.css`]
+  }
+  const styleLinks: StyleLink[] = []
+  for (let i = 0; i < depth; i++) {
+    for (const from of level(i + 1)) {
+      for (const to of level(i)) styleLinks.push({ from, to, kind: 'import', weight: 1 })
+    }
+  }
+  const files = Array.from({ length: depth + 1 }, (_, i) => level(i)).flat()
+  const startedAt = performance.now()
+  const map = cutWithRuleParams({ ...twoClusterInput(), files, styleLinks })
+  const elapsed = performance.now() - startedAt
+  console.log(`  菱形 @import 链 ${depth} 层:${elapsed.toFixed(1)} ms`)
+  assert.ok(elapsed < 500, `菱形 @import 链应很快算完,实际 ${elapsed.toFixed(0)} ms`)
+  for (const f of files) assert.equal(moduleOf(map, f), undefined, `${f} 无人认领应未归类`)
+}
+
 function checkTestFiles(): void {
   const base = twoClusterInput()
   const tests = ['scripts/selftest-a.mts', 'src/b/b.test.ts', 'scripts/selftest-none.mts']
@@ -536,6 +558,7 @@ async function main(): Promise<void> {
   checkLooseFiles()
   checkAnchorStability()
   checkStyles()
+  checkStyleImportChainSpeed()
   checkTestFiles()
   checkHubWeight()
   checkMajorityAnchor()
