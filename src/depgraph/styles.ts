@@ -105,6 +105,22 @@ export function resolveStylePath(
   return parts ? exact(parts.join('/')) : null
 }
 
+/**
+ * 样式里 @import 的说明符 → 项目内样式文件。CSS 里 @import 'a.css' 的裸路径按相对路径算,所以先补 './' 试;
+ * 找不到且不是相对写法时再过 tsconfig 别名(Vite 等构建工具在 CSS @import 里同样认别名)。
+ */
+export function resolveCssImport(
+  fromStyle: string,
+  spec: string,
+  styleFiles: Set<string>,
+  aliases: TsPathAliases | null
+): string | null {
+  const isRelative = spec.startsWith('.')
+  const relative = resolveStylePath(fromStyle, isRelative ? spec : `./${spec}`, styleFiles, null)
+  if (relative || isRelative) return relative
+  return resolveStylePath(fromStyle, spec, styleFiles, aliases)
+}
+
 async function readStyle(rootPath: string, relPath: string): Promise<string | null> {
   const absPath = joinRoot(rootPath, relPath)
   const stat = await fs.stat(absPath).catch(() => null)
@@ -116,7 +132,8 @@ async function readStyle(rootPath: string, relPath: string): Promise<string | nu
 export async function collectStyleLinks(
   rootPath: string,
   styleFiles: Set<string>,
-  classTokens: FileClassTokens[]
+  classTokens: FileClassTokens[],
+  aliases: TsPathAliases | null
 ): Promise<StyleLink[]> {
   const links: StyleLink[] = []
   const classesByStyle = new Map<string, string[]>()
@@ -125,12 +142,7 @@ export async function collectStyleLinks(
     if (text === null) continue
     classesByStyle.set(style, extractCssClasses(text))
     for (const spec of extractCssImports(text)) {
-      const to = resolveStylePath(
-        style,
-        spec.startsWith('.') ? spec : `./${spec}`,
-        styleFiles,
-        null
-      )
+      const to = resolveCssImport(style, spec, styleFiles, aliases)
       if (to && to !== style) links.push({ from: style, to, kind: 'import', weight: 1 })
     }
   }

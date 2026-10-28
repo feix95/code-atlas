@@ -7,8 +7,10 @@ export type ReadProjectFile = (relPath: string) => Promise<string | null>
 
 /** 一份配置合并 extends 链后与别名有关的选项;路径都已换成项目根相对路径 */
 export interface EffectiveTsOptions {
-  /** 生效的 baseUrl;没有为 null */
+  /** 生效的 baseUrl;没有或越出项目根为 null */
   baseUrl: string | null
+  /** 生效的 baseUrl 写了但越出项目根(绝对路径、盘符、../ 上跳):这份配置的别名整体停用 */
+  isBaseUrlOutOfRoot: boolean
   /** 生效的 paths 原文;没有为 null */
   paths: Record<string, unknown> | null
   /** 声明 paths 的那份配置所在目录:没有 baseUrl 时 paths 相对它解析 */
@@ -119,16 +121,25 @@ function resolveReferenceTarget(fromDir: string, target: string): string | null 
   return rel === '' ? 'tsconfig.json' : `${rel}/tsconfig.json`
 }
 
+/** 写了 baseUrl 时的生效值:换算不成项目内路径即越界 */
+export function baseUrlOf(
+  rel: string | null
+): Pick<EffectiveTsOptions, 'baseUrl' | 'isBaseUrlOutOfRoot'> {
+  return { baseUrl: rel, isBaseUrlOutOfRoot: rel === null }
+}
+
 /** 子配置的选项覆盖父配置(与 TS 一致:paths 整体替换,不逐条合并) */
 function overlayOptions(
   parent: EffectiveTsOptions,
   options: Record<string, unknown>,
   dir: string
 ): EffectiveTsOptions {
-  const baseUrl =
-    typeof options.baseUrl === 'string' ? toProjectRel(dir, options.baseUrl) : parent.baseUrl
-  if (!isRecord(options.paths)) return { ...parent, baseUrl }
-  return { baseUrl, paths: options.paths, pathsDir: dir }
+  const base =
+    typeof options.baseUrl === 'string'
+      ? baseUrlOf(toProjectRel(dir, options.baseUrl))
+      : { baseUrl: parent.baseUrl, isBaseUrlOutOfRoot: parent.isBaseUrlOutOfRoot }
+  if (!isRecord(options.paths)) return { ...parent, ...base }
+  return { ...base, paths: options.paths, pathsDir: dir }
 }
 
 interface LoadState {
@@ -148,7 +159,12 @@ async function loadEffective(
   if (!config) return null
   const dir = dirOfRel(relPath)
   state.visiting.add(relPath)
-  let merged: EffectiveTsOptions = { baseUrl: null, paths: null, pathsDir: dir }
+  let merged: EffectiveTsOptions = {
+    baseUrl: null,
+    isBaseUrlOutOfRoot: false,
+    paths: null,
+    pathsDir: dir
+  }
   for (const target of config.extends) {
     const parentPath = resolveExtendsTarget(dir, target)
     const parent = parentPath === null ? null : await loadEffective(parentPath, state, depth + 1)
@@ -161,8 +177,10 @@ async function loadEffective(
 
 /** 多个 extends 时后者覆盖前者 */
 function mergeParent(base: EffectiveTsOptions, next: EffectiveTsOptions): EffectiveTsOptions {
+  const hasNextBase = next.baseUrl !== null || next.isBaseUrlOutOfRoot
   return {
-    baseUrl: next.baseUrl ?? base.baseUrl,
+    baseUrl: hasNextBase ? next.baseUrl : base.baseUrl,
+    isBaseUrlOutOfRoot: hasNextBase ? next.isBaseUrlOutOfRoot : base.isBaseUrlOutOfRoot,
     paths: next.paths ?? base.paths,
     pathsDir: next.paths ? next.pathsDir : base.pathsDir
   }

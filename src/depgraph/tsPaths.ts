@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs'
 import { joinRoot } from '../shared/paths.ts'
 import { toProjectRel } from './relPath.ts'
 import {
+  baseUrlOf,
   isRecord,
   loadTsConfigChain,
   parseTsConfigText,
@@ -49,6 +50,8 @@ function buildAliases(configs: EffectiveTsOptions[]): TsPathAliases | null {
   const byPattern = new Map<string, PathRule>()
   const baseUrls: string[] = []
   for (const config of configs) {
+    // baseUrl 越界时 paths 的基准已不可知:与其悄悄改按配置所在目录解析连错文件,不如整份停用、交回外部包判定
+    if (config.isBaseUrlOutOfRoot) continue
     if (config.baseUrl !== null && !baseUrls.includes(config.baseUrl)) baseUrls.push(config.baseUrl)
     if (!isRecord(config.paths)) continue
     const base = config.baseUrl ?? config.pathsDir
@@ -73,9 +76,12 @@ export function parseTsPathAliases(text: string): TsPathAliases | null {
   const config = parseTsConfigText(text)
   if (!config) return null
   const options = config.compilerOptions
-  const baseUrl = typeof options.baseUrl === 'string' ? toProjectRel('', options.baseUrl) : null
+  const base =
+    typeof options.baseUrl === 'string'
+      ? baseUrlOf(toProjectRel('', options.baseUrl))
+      : { baseUrl: null, isBaseUrlOutOfRoot: false }
   const paths = isRecord(options.paths) ? options.paths : null
-  return buildAliases([{ baseUrl, paths, pathsDir: '' }])
+  return buildAliases([{ ...base, paths, pathsDir: '' }])
 }
 
 /** 读根 tsconfig.json、它的 references 与相对 extends 链;都读不到或没有别名时返回 null */

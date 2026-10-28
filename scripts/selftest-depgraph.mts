@@ -4,10 +4,12 @@ import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
 import { parseTsPathAliases, resolveTsAlias } from '../src/depgraph/tsPaths.ts'
+import { loadTsConfigChain } from '../src/depgraph/tsconfigFile.ts'
 import {
   classUsageLinks,
   extractCssClasses,
   extractCssImports,
+  resolveCssImport,
   resolveStylePath
 } from '../src/depgraph/styles.ts'
 import { extractClassTokens } from '../src/depgraph/classUsage.ts'
@@ -217,6 +219,14 @@ function runTsPathUnitCases(): void {
   assert.equal(resolveTsAlias('x', abs, match), null, '绝对路径 baseUrl 不采用')
   const up = parseTsPathAliases('{"compilerOptions":{"baseUrl":"../outside"}}')
   assert.equal(resolveTsAlias('x', up, match), null, '上跳出根的 baseUrl 不采用')
+  const upWithPaths = parseTsPathAliases(
+    '{"compilerOptions":{"baseUrl":"../outside","paths":{"@s/*":["src/shared/*"]}}}'
+  )
+  assert.equal(
+    resolveTsAlias('@s/x', upWithPaths, match),
+    null,
+    'baseUrl 越出项目根时这份配置的别名整体停用,不悄悄改按配置所在目录解析'
+  )
   const root = parseTsPathAliases('{"compilerOptions":{"baseUrl":"."}}')
   assert.equal(resolveTsAlias('lib/y', root, match)?.to, 'lib/y.ts', 'baseUrl 为根时裸路径可连')
   assert.equal(resolveTsAlias('react', root, match), null, 'baseUrl 下找不到交回外部包判定')
@@ -239,6 +249,27 @@ function runTsPathUnitCases(): void {
   )
   assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
 }
+/** extends 链上的越界 baseUrl:子配置没改写时整份停用,子配置给了合法 baseUrl 时恢复 */
+async function runTsConfigChainCases(): Promise<void> {
+  const fake =
+    (files: Record<string, string>) =>
+    async (rel: string): Promise<string | null> =>
+      Object.hasOwn(files, rel) ? files[rel] : null
+  const base = '{"compilerOptions":{"baseUrl":"../out","paths":{"@s/*":["src/shared/*"]}}}'
+  const [inherited] = await loadTsConfigChain(
+    fake({ 'tsconfig.json': '{"extends":"./base.json"}', 'base.json': base })
+  )
+  assert.equal(inherited?.isBaseUrlOutOfRoot, true, '继承来的越界 baseUrl 照样标记停用')
+  const [fixed] = await loadTsConfigChain(
+    fake({
+      'tsconfig.json': '{"extends":"./base.json","compilerOptions":{"baseUrl":"."}}',
+      'base.json': base
+    })
+  )
+  assert.equal(fixed?.isBaseUrlOutOfRoot, false, '子配置给了合法 baseUrl 时恢复')
+  assert.equal(fixed?.baseUrl, '')
+}
+
 /** 规模基准:400 份样式 × 每份 50 个类名 × 4000 个源码文件,类名使用量统计要远低于 1 秒 */
 function checkClassUsageScale(): void {
   const classesByStyle = new Map<string, string[]>()
@@ -353,6 +384,17 @@ function runStyleUnitCases(): void {
     'src/assets/main.css',
     '样式导入也认别名'
   )
+  assert.equal(
+    resolveCssImport('src/assets/main.css', 'css/a.css', styleFiles, aliases),
+    'src/assets/css/a.css',
+    '@import 的裸路径先按相对路径解析'
+  )
+  assert.equal(
+    resolveCssImport('src/x/theme.css', '@a/main.css', styleFiles, aliases),
+    'src/assets/main.css',
+    '@import 相对路径找不到时再认 tsconfig 别名'
+  )
+  assert.equal(resolveCssImport('src/x/theme.css', 'none.css', styleFiles, aliases), null)
   assert.equal(
     resolveStylePath('src/x/y.tsx', 'pkg/dist/style.css', styleFiles, aliases),
     null,
@@ -567,6 +609,7 @@ async function main(): Promise<void> {
   }
 
   runTsPathUnitCases()
+  await runTsConfigChainCases()
   runStyleUnitCases()
 
   console.log('✅ 项目关系分析自测全部通过')

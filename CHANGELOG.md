@@ -611,3 +611,4 @@
 - feat(depgraph): 样式按类名附挂只认真正当类名用的写法(className / class 属性与赋值、clsx / cn / classnames 参数、classList 增删切换),普通字符串里的 open、error 这类通用词不再把样式拉错模块;抽类名前先去掉属性选择器与伪类参数;类名使用量改为一次建「类名 → 文件」倒排表,扫描时只留每个文件的类名词、不再把全部源码留在内存;切分规则版本升到 3
 - feat(depgraph): 模块切分先请出公共文件(入度大于 max(10, 有入度文件数的 5%),门槛记在 moduleConfig),其余文件分好后再按所在目录就近放回、当正式成员,目录里找不到模块时跟引用它最多的模块走;锚点仍按含公共文件的完整入度挑。本仓库 types.ts 回到 src/shared 模块,成员横跨 3 个以上目录的模块由 6 个降到 4 个
 - fix(depgraph): 自测文件识别补上 `tests/`、`test/`、`e2e/` 目录与 Go 的 `*_test.go`、Python 的 `test_*.py` / `*_test.py`、C# / Java / Kotlin 的 `*Test(s)` 命名;只认代码文件,`openapi.spec.json`、测试目录里的数据夹具不再被当成自测
+- fix(depgraph): tsconfig 的 baseUrl 越出项目根(绝对路径、盘符、../ 上跳)时这份配置的别名整体停用,不再悄悄改按配置所在目录解析 paths;样式里的 @import 相对路径找不到时也认 tsconfig 别名

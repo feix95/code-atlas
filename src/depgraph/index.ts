@@ -170,7 +170,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       edges,
       styleLinks: [
         ...styleImports,
-        ...(await collectStyleLinks(scan.rootPath, styleFiles, classTokens))
+        ...(await collectStyleLinks(scan.rootPath, styleFiles, classTokens, hints.tsPaths))
       ]
     }),
     durationMs: Date.now() - startedAt
