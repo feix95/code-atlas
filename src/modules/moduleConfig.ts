@@ -44,9 +44,18 @@ export const DEFAULT_MODULE_PARAMS: ModuleParams = {
 /**
  * 自测文件的路径特征。自测会同时引用很多被测文件,参与社区发现会把无关模块错连在一起;
  * 命中的文件不参与切分,分完再挂到它导入最多的模块下(侧栏可显示为「相关测试」)。
+ * 覆盖本项目的 selftest-*、JS/TS 的 *.test.* / *.spec.* 与 __tests__/、通用的 tests/ test/ e2e/ 目录、
+ * Go 的 *_test.go、Python 的 test_*.py / *_test.py、C# / Java / Kotlin 的 *Test(s).cs|java|kt。
  */
 export const MODULE_TEST_FILE_PATTERNS: readonly RegExp[] = [
   /(^|\/)selftest-[^/]+$/,
   /\.(test|spec)\.[^/]+$/,
-  /(^|\/)__tests__\//
+  /(^|\/)(__tests__|tests?|e2e)\//,
+  /_test\.(go|py)$/,
+  /(^|\/)test_[^/]+\.py$/,
+  /[a-z0-9]Tests?\.(cs|java|kt|kts|scala)$/
 ]
+
+/** 只有代码文件才算自测:tests/ 下的数据夹具、openapi.spec.json 这类文件按普通文件就近归属 */
+export const MODULE_TEST_CODE_EXT =
+  /\.([cm]?[jt]sx?|py|go|rs|java|kt|kts|scala|cs|rb|php|swift|vue|svelte)$/

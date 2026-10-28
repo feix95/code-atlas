@@ -1,11 +1,14 @@
 // 自测附挂:自测文件不参与社区发现,按它导入的被测文件投票,挂到导入最多的模块。
 import type { DepEdge } from '../shared/types.ts'
 import type { HomeCandidate } from './moduleAssign.ts'
-import { MODULE_TEST_FILE_PATTERNS } from './moduleConfig.ts'
+import { MODULE_TEST_CODE_EXT, MODULE_TEST_FILE_PATTERNS } from './moduleConfig.ts'
 import { indexMembers, pickByVotes, tally } from './linkVotes.ts'
 
 export function isTestFile(relPath: string): boolean {
-  return MODULE_TEST_FILE_PATTERNS.some((pattern) => pattern.test(relPath))
+  return (
+    MODULE_TEST_CODE_EXT.test(relPath) &&
+    MODULE_TEST_FILE_PATTERNS.some((pattern) => pattern.test(relPath))
+  )
 }
 
 /**

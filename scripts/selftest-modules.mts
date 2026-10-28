@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { cutModules, type ModuleCutInput, type StyleLink } from '../src/modules/cutModules.ts'
 import { mergeSmallCommunities, pickAnchor } from '../src/modules/moduleAssign.ts'
 import { hubWeight } from '../src/modules/communities.ts'
+import { isTestFile } from '../src/modules/attachTests.ts'
 import { findHubs, hubThreshold } from '../src/modules/hubs.ts'
 import { createSeededRandom } from '../src/modules/seededRandom.ts'
 import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
@@ -382,6 +383,40 @@ function checkTestFiles(): void {
   }
 }
 
+/** 自测文件识别:常见语言的测试命名与测试目录;只认代码文件,openapi.spec.json 这类数据文件不算 */
+function checkTestFilePatterns(): void {
+  const tests = [
+    'scripts/selftest-a.mts',
+    'src/b/b.test.ts',
+    'src/x.spec.tsx',
+    'src/__tests__/a.ts',
+    'tests/helpers.ts',
+    'test/util.js',
+    'e2e/login.ts',
+    'pkg/tests/a.py',
+    'server/handler_test.go',
+    'pkg/test_util.py',
+    'pkg/util_test.py',
+    'src/FooTests.cs',
+    'src/test/java/com/x/FooTest.java',
+    'app/BarTest.kt'
+  ]
+  for (const f of tests) assert.equal(isTestFile(f), true, `${f} 应识别为自测`)
+  const notTests = [
+    'docs/openapi.spec.json',
+    'tests/fixtures/data.json',
+    'e2e/screens/home.png',
+    'src/latest.ts',
+    'src/contest.py',
+    'src/Contest.java',
+    'src/testing.ts',
+    'e2etools/x.ts',
+    'testdata/case.ts',
+    'pkg/attest_x.go'
+  ]
+  for (const f of notTests) assert.equal(isTestFile(f), false, `${f} 不应识别为自测`)
+}
+
 function checkHubWeight(): void {
   assert.equal(hubWeight(0), 1, '没人引用的文件(入度 0)按原权重')
   assert.equal(hubWeight(2), 0.5, '入度 2 时权重减半:1 / log2(2 + 2)')
@@ -630,6 +665,7 @@ async function main(): Promise<void> {
   checkStyles()
   checkStyleImportChainSpeed()
   checkTestFiles()
+  checkTestFilePatterns()
   checkHubWeight()
   checkHubFiles()
   checkMajorityAnchor()
