@@ -39,9 +39,22 @@ function firstKnown(candidates: string[], known: Set<string>): string | null {
   return null
 }
 
-/** 相对路径基名 → 项目内文件:原样、补后缀、补 /index 三轮 */
+/** TS 原生 ESM(NodeNext)里写的运行时后缀 → 源码后缀:'./x.js' 实指 x.ts 或 x.tsx */
+const TS_SOURCE_EXTS: Record<string, string[]> = {
+  '.js': ['.ts', '.tsx'],
+  '.jsx': ['.tsx'],
+  '.mjs': ['.mts'],
+  '.cjs': ['.cts']
+}
+
+/** 相对路径基名 → 项目内文件:原样、运行时后缀换源码后缀、补后缀、补 /index 四轮 */
 function matchJsFile(joined: string, known: Set<string>): string | null {
   if (known.has(joined)) return joined
+  const dot = joined.lastIndexOf('.')
+  const sources = dot > joined.lastIndexOf('/') ? TS_SOURCE_EXTS[joined.slice(dot)] : undefined
+  for (const ext of sources ?? []) {
+    if (known.has(joined.slice(0, dot) + ext)) return joined.slice(0, dot) + ext
+  }
   for (const ext of JS_EXTS) {
     if (known.has(joined + ext)) return joined + ext
   }

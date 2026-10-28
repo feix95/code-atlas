@@ -649,6 +649,40 @@ async function main(): Promise<void> {
     await fs.rm(dirname(brokenRoot), { recursive: true, force: true })
   }
 
+  // TS 原生 ESM(NodeNext)写法:源码里写 './x.js' 实指同目录的 x.ts;.jsx → .tsx、.mjs → .mts、.cjs → .cts。
+  // 真有同名 .js 时仍连 .js;两样都没有记 unresolved
+  const esmRoot = await makeProject('esm-ext', {
+    'src/index.ts':
+      "import { a } from './a.js'\nimport { V } from './view.jsx'\nimport { m } from './m.mjs'\nimport { c } from './c.cjs'\nimport { r } from './real.js'\nimport { g } from './gone.js'\n",
+    'src/a.ts': 'export const a = 1\n',
+    'src/view.tsx': 'export const V = 1\n',
+    'src/m.mts': 'export const m = 1\n',
+    'src/c.cts': 'export const c = 1\n',
+    'src/real.js': 'export const r = 1\n',
+    'src/real.ts': 'export const r = 2\n'
+  })
+  try {
+    const graph = await buildDependencyGraph(esmRoot)
+    assert.deepEqual(
+      sortedEdges(graph),
+      [
+        'src/index.ts => src/a.ts',
+        'src/index.ts => src/c.cts',
+        'src/index.ts => src/m.mts',
+        'src/index.ts => src/real.js',
+        'src/index.ts => src/view.tsx'
+      ],
+      "'./x.js' 这类 ESM 写法应连到同名 .ts 源文件"
+    )
+    assert.deepEqual(
+      graph.stats.unresolved.map((u) => u.spec),
+      ['./gone.js'],
+      '两样都不存在时记 unresolved'
+    )
+  } finally {
+    await fs.rm(dirname(esmRoot), { recursive: true, force: true })
+  }
+
   runTsPathUnitCases()
   await runTsConfigChainCases()
   runStyleUnitCases()
