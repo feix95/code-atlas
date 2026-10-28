@@ -4,14 +4,19 @@ import type { ModuleParams } from '../shared/types.ts'
 /** 切分规则版本:算法或参数口径变化时加一,落盘的旧切分结果据此作废 */
 export const MODULE_ALGORITHM_VERSION = 2
 
-/** 同目录偏置边的权重(一条导入记 1,双向互引记 2) */
-export const MODULE_FOLDER_AFFINITY = 0.5
+/**
+ * 同目录偏置边的权重(一条冷门文件间的导入记 1;公共文件的导入按入度降权,见 communities.ts 的 hubWeight)。
+ * 2 为本仓库扫参定稿值:0.5 时 21 个模块里 17 个的成员横跨 3 个以上目录,文件夹几乎不起作用;
+ * 2 时只剩 6 个,且删掉一个冷门文件重切时模块 id 与成员几乎不动。
+ */
+export const MODULE_FOLDER_AFFINITY = 2
 
 /**
- * Louvain 分辨率:越大切出的模块越多、越小。2.5 为本仓库试跑定稿值(约 500 个可分析文件切出 19 个模块,
- * 最大 57 个可分析成员);1 时只有 9 个模块且最大的一个装下 180 个文件,太粗。
+ * Louvain 分辨率:越大切出的模块越多、越小。3.5 与 MODULE_FOLDER_AFFINITY = 2 搭配为本仓库扫参定稿值
+ * (约 500 个可分析文件切出 20 个模块,最大 64 个成员);同一偏置下 3 只有 16 个模块、最大 74 个,
+ * 4 起删一个文件就有三四个模块 id 跟着变。扫参表记在需求文档记录栏。
  */
-export const MODULE_RESOLUTION = 2.5
+export const MODULE_RESOLUTION = 3.5
 
 /** 伪随机种子:固定后同一份代码每次切出同样的模块 */
 export const MODULE_SEED = 20261029

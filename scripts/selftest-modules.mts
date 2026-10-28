@@ -80,9 +80,9 @@ function checkDeterminism(): void {
   assert.ok(map.modules.length > 1, '随机项目应切出多个模块')
 }
 
-// 规则类用例固定分辨率 1,只验证归属规则本身;调 MODULE_RESOLUTION 不应让这些用例跟着改。
-// 确定性与端到端用例走默认参数,覆盖定稿值。
-const RULE_PARAMS = { ...DEFAULT_MODULE_PARAMS, resolution: 1 }
+// 规则类用例固定分辨率 1、目录偏置 0.5,只验证归属规则本身;调 MODULE_RESOLUTION 或
+// MODULE_FOLDER_AFFINITY 不应让这些用例跟着改。确定性与端到端用例走默认参数,覆盖定稿值。
+const RULE_PARAMS = { ...DEFAULT_MODULE_PARAMS, resolution: 1, folderAffinity: 0.5 }
 const cutWithRuleParams = (input: ModuleCutInput): ModuleMap => cutModules(input, RULE_PARAMS)
 
 function checkFolderBias(): void {
