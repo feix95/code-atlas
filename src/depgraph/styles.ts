@@ -5,15 +5,22 @@ import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import type { StyleLink } from '../modules/cutModules.ts'
 import { normalizeParts } from './relPath.ts'
+import { byCodeUnit } from '../modules/pathOrder.ts'
 import { resolveTsAlias, type TsPathAliases } from './tsPaths.ts'
 
 const STYLE_EXT = /\.(css|scss|sass|less)$/i
 
-/** 源码里的一份文本,供类名使用统计 */
-export interface SourceText {
+/** 一个源码文件当类名用的词(见 classUsage.ts);扫描时就地抽出,不留源码全文 */
+export interface FileClassTokens {
   relPath: string
-  code: string
+  tokens: Set<string>
 }
+
+/** 属性选择器 [href$=".pdf"]:里面的 .pdf 不是类名 */
+const ATTRIBUTE_SELECTOR = /\[(?:[^\]"']|"[^"]*"|'[^']*')*\]/g
+
+/** 伪元素与伪类连同参数去掉;参数本身是选择器的 :is / :where / :not / :has 只去名字、保留参数 */
+const PSEUDO_PART = /::?(?!(?:is|where|not|has)\()[\w-]+(?:\([^()]*\))?/g
 
 function stripCssComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -34,23 +41,30 @@ export function extractCssImports(text: string): string[] {
   return [...stripCssComments(text).matchAll(pattern)].map((m) => m[2])
 }
 
-/** 选择器里出现的类名(只看每个 '{' 之前的选择器段,数值小数与 url() 不算),去重排序 */
+/** 选择器里出现的类名(只看每个 '{' 之前的选择器段;属性选择器、伪类参数、数值小数与 url() 不算),去重排序 */
 export function extractCssClasses(text: string): string[] {
   const classes = new Set<string>()
   for (const prelude of stripCssComments(text).split('{').slice(0, -1)) {
-    const selector = prelude.slice(Math.max(prelude.lastIndexOf('}'), prelude.lastIndexOf(';')) + 1)
+    const selector = prelude
+      .slice(Math.max(prelude.lastIndexOf('}'), prelude.lastIndexOf(';')) + 1)
+      .replace(ATTRIBUTE_SELECTOR, ' ')
+      .replace(PSEUDO_PART, ' ')
     for (const m of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) classes.add(m[1])
   }
   return [...classes].sort()
 }
 
-/** 源码字符串字面量('…'、"…"、`…`)里出现的词;类名只会写在字符串里,标识符与注释不算 */
-function stringTokens(code: string): Set<string> {
-  const tokens = new Set<string>()
-  for (const m of code.matchAll(/(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
-    for (const word of m[2].split(/[^\w-]+/)) if (word) tokens.add(word)
+/** 类名 → 用到它的源码文件(按 relPath 排序);一次建好,每个类名查一次 */
+function indexUsers(files: FileClassTokens[]): Map<string, string[]> {
+  const usersByToken = new Map<string, string[]>()
+  for (const file of [...files].sort((x, y) => byCodeUnit(x.relPath, y.relPath))) {
+    for (const token of file.tokens) {
+      const users = usersByToken.get(token)
+      if (users) users.push(file.relPath)
+      else usersByToken.set(token, [file.relPath])
+    }
   }
-  return tokens
+  return usersByToken
 }
 
 /**
@@ -59,30 +73,22 @@ function stringTokens(code: string): Set<string> {
  */
 export function classUsageLinks(
   classesByStyle: Map<string, string[]>,
-  sources: SourceText[]
+  files: FileClassTokens[]
 ): StyleLink[] {
-  const ordered = [...sources].sort((x, y) => (x.relPath < y.relPath ? -1 : 1))
-  const tokensByFile = ordered.map((s) => ({ relPath: s.relPath, tokens: stringTokens(s.code) }))
+  const usersByToken = indexUsers(files)
   const weights = new Map<string, StyleLink>()
-  for (const style of [...classesByStyle.keys()].sort()) {
+  for (const style of [...classesByStyle.keys()].sort(byCodeUnit)) {
     for (const cls of classesByStyle.get(style) ?? []) {
-      const users = tokensByFile.filter((f) => f.tokens.has(cls))
+      const users = usersByToken.get(cls) ?? []
       for (const user of users) {
-        const key = JSON.stringify([user.relPath, style])
-        const entry = weights.get(key) ?? {
-          from: user.relPath,
-          to: style,
-          kind: 'usage',
-          weight: 0
-        }
+        const key = JSON.stringify([user, style])
+        const entry = weights.get(key) ?? { from: user, to: style, kind: 'usage', weight: 0 }
         entry.weight += 1 / users.length
         weights.set(key, entry)
       }
     }
   }
-  return [...weights.values()].sort((x, y) =>
-    x.from === y.from ? (x.to < y.to ? -1 : 1) : x.from < y.from ? -1 : 1
-  )
+  return [...weights.values()].sort((x, y) => byCodeUnit(x.from, y.from) || byCodeUnit(x.to, y.to))
 }
 
 /** 样式导入说明符 → 项目内样式文件:相对路径按导入方目录拼,非相对的先过 tsconfig 别名;依赖包里的不连 */
@@ -110,7 +116,7 @@ async function readStyle(rootPath: string, relPath: string): Promise<string | nu
 export async function collectStyleLinks(
   rootPath: string,
   styleFiles: Set<string>,
-  sources: SourceText[]
+  classTokens: FileClassTokens[]
 ): Promise<StyleLink[]> {
   const links: StyleLink[] = []
   const classesByStyle = new Map<string, string[]>()
@@ -128,5 +134,5 @@ export async function collectStyleLinks(
       if (to && to !== style) links.push({ from: style, to, kind: 'import', weight: 1 })
     }
   }
-  return [...links, ...classUsageLinks(classesByStyle, sources)]
+  return [...links, ...classUsageLinks(classesByStyle, classTokens)]
 }

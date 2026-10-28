@@ -10,6 +10,7 @@ import {
   extractCssImports,
   resolveStylePath
 } from '../src/depgraph/styles.ts'
+import { extractClassTokens } from '../src/depgraph/classUsage.ts'
 import type { DepGraphResult } from '../src/shared/types.ts'
 
 // 造一个迷你项目:TS 默认导入、省后缀相对导入、跨目录 ../、CommonJS require、
@@ -238,6 +239,27 @@ function runTsPathUnitCases(): void {
   )
   assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
 }
+/** 规模基准:400 份样式 × 每份 50 个类名 × 4000 个源码文件,类名使用量统计要远低于 1 秒 */
+function checkClassUsageScale(): void {
+  const classesByStyle = new Map<string, string[]>()
+  for (let s = 0; s < 400; s++) {
+    classesByStyle.set(
+      `styles/s${s}.css`,
+      Array.from({ length: 50 }, (_, c) => `s${s}-c${c}`)
+    )
+  }
+  const files = Array.from({ length: 4000 }, (_, f) => ({
+    relPath: `src/f${f}.tsx`,
+    tokens: new Set(Array.from({ length: 8 }, (_, k) => `s${(f + k) % 400}-c${(f * 7 + k) % 50}`))
+  }))
+  const startedAt = performance.now()
+  const links = classUsageLinks(classesByStyle, files)
+  const elapsed = performance.now() - startedAt
+  console.log(`  类名使用量 400 样式 × 50 类名 × 4000 文件:${elapsed.toFixed(1)} ms`)
+  assert.ok(links.length > 0, '规模基准应产出链接')
+  assert.ok(elapsed < 1000, `类名使用量统计应远低于 1 秒,实际 ${elapsed.toFixed(0)} ms`)
+}
+
 /** 样式文件的纯函数:@import 抽取、类名抽取、类名使用量、样式导入路径解析 */
 function runStyleUnitCases(): void {
   assert.deepEqual(
@@ -254,18 +276,55 @@ function runStyleUnitCases(): void {
     ['panel-card', 'title', 'wide'],
     '只抽选择器里的类名,去重排序;数值小数、url 后缀、注释不算'
   )
+  assert.deepEqual(
+    extractCssClasses(
+      'a[href$=".pdf"] .doc-link, .btn::after, .row:nth-child(2n+1.5), [data-x=\'.fake\'] { margin: 0 }\n:is(.alpha, .beta):hover { margin: 0 }\n'
+    ),
+    ['alpha', 'beta', 'btn', 'doc-link', 'row'],
+    '属性选择器与伪类参数里的 .xxx 不算类名;:is() 这类选择器参数里的照算'
+  )
+  const tokens = (code: string): string[] => [...extractClassTokens(code)].sort()
+  assert.deepEqual(tokens('export const P = () => <div className="panel-card shared" />'), [
+    'panel-card',
+    'shared'
+  ])
+  assert.deepEqual(
+    tokens("<i className={open ? 'is-open' : \"closed\"} class='plain' />"),
+    ['closed', 'is-open', 'plain'],
+    'className / class 的表达式里的字符串都算'
+  )
+  assert.deepEqual(
+    tokens("<b className={`tab ${active ? 'tab-active' : ''} tab-${kind}`} />"),
+    ['tab', 'tab-active'],
+    '模板字符串的静态部分算,紧贴插值的半截词不算'
+  )
+  assert.deepEqual(
+    tokens(
+      "clsx('a-1', { 'b-2': x }, cond && \"c-3\"); cn('d-4'); classnames('e-5'); classNames(`f-6`)"
+    ),
+    ['a-1', 'b-2', 'c-3', 'd-4', 'e-5', 'f-6'],
+    'clsx / cn / classnames 的参数里的字符串都算'
+  )
+  assert.deepEqual(
+    tokens("el.classList.add('g-7', 'h-8'); el.classList.toggle('i-9', on); el.className = 'k-10'"),
+    ['g-7', 'h-8', 'i-9', 'k-10'],
+    'classList 增删切换与 className 赋值都算'
+  )
+  assert.deepEqual(tokens('host.innerHTML = `<span class="m-11">${x}</span>`'), ['m-11'])
+  assert.deepEqual(
+    tokens("const label = 'open'\nthrow new Error('error')\nconst panelCard = 1 // other-box"),
+    [],
+    '普通字符串、标识符与注释不算类名'
+  )
   const links = classUsageLinks(
     new Map([
       ['s/panel.css', ['panel-card', 'shared']],
       ['s/other.css', ['other-box']]
     ]),
     [
-      {
-        relPath: 'ui/Panel.tsx',
-        code: 'export const P = () => <div className="panel-card shared" />\n'
-      },
-      { relPath: 'ui/List.tsx', code: 'const cls = `shared ${x}`\nconst panelCard = 1\n' },
-      { relPath: 'ui/None.ts', code: 'const otherBox = 1 // other-box\n' }
+      { relPath: 'ui/Panel.tsx', tokens: new Set(['panel-card', 'shared']) },
+      { relPath: 'ui/List.tsx', tokens: new Set(['shared']) },
+      { relPath: 'ui/None.ts', tokens: new Set() }
     ]
   )
   assert.deepEqual(
@@ -274,8 +333,9 @@ function runStyleUnitCases(): void {
       { from: 'ui/List.tsx', to: 's/panel.css', kind: 'usage', weight: 0.5 },
       { from: 'ui/Panel.tsx', to: 's/panel.css', kind: 'usage', weight: 1.5 }
     ],
-    '类名只在字符串里算使用;多个文件共用的类名按使用文件数均分权重;注释与标识符不算'
+    '多个文件共用的类名按使用文件数均分权重'
   )
+  checkClassUsageScale()
   const styleFiles = new Set(['src/assets/main.css', 'src/assets/css/a.css'])
   assert.equal(
     resolveStylePath('src/main.tsx', './assets/main.css', styleFiles, null),

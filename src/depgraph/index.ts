@@ -7,7 +7,8 @@ import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { RESOLVERS, type ImportHints } from './resolvers.ts'
 import { loadTsPathAliases } from './tsPaths.ts'
-import { collectStyleLinks, isStylePath, resolveStylePath, type SourceText } from './styles.ts'
+import { collectStyleLinks, isStylePath, resolveStylePath, type FileClassTokens } from './styles.ts'
+import { extractClassTokens } from './classUsage.ts'
 import { cutModules, type ModuleCutInput, type StyleLink } from '../modules/cutModules.ts'
 import type {
   DepEdge,
@@ -80,7 +81,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
   const hints = await detectImportHints(scan.rootPath, known)
   const styleFiles = new Set(files.map((f) => f.relPath).filter(isStylePath))
   const styleImports: StyleLink[] = []
-  const sources: SourceText[] = []
+  const classTokens: FileClassTokens[] = []
 
   const edgeSet = new Set<string>()
   const edges: DepEdge[] = []
@@ -111,7 +112,8 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       continue
     }
     analyzed++
-    sources.push({ relPath: file.relPath, code })
+    // 只留当类名用的词,不留源码全文:大项目几千个文件的全文常驻内存会把主进程撑大
+    classTokens.push({ relPath: file.relPath, tokens: extractClassTokens(code) })
     // 没配翻译器的语言(C/C++/C# 这类)导入一律按外部包记,和它们过去的行为一致
     const resolve = RESOLVERS[languageId] ?? null
 
@@ -168,7 +170,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       edges,
       styleLinks: [
         ...styleImports,
-        ...(await collectStyleLinks(scan.rootPath, styleFiles, sources))
+        ...(await collectStyleLinks(scan.rootPath, styleFiles, classTokens))
       ]
     }),
     durationMs: Date.now() - startedAt

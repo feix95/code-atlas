@@ -2,7 +2,7 @@
 import type { ModuleParams } from '../shared/types.ts'
 
 /** 切分规则版本:算法或参数口径变化时加一,落盘的旧切分结果据此作废 */
-export const MODULE_ALGORITHM_VERSION = 2
+export const MODULE_ALGORITHM_VERSION = 3
 
 /**
  * 同目录偏置边的权重(一条冷门文件间的导入记 1;公共文件的导入按入度降权,见 communities.ts 的 hubWeight)。
