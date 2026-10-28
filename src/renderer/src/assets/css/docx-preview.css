@@ -1,0 +1,47 @@
+/* Word 预览:正文直接吃阅读档那套排版(.code-reading .md、.md-h、.md-table),
+   这里只补 Word 才会冒出来的件;不另立颜色/字号,一律走 tokens */
+
+.docx-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 图片懒加载:width/height 属性先按原图比例占好位,字节没到时给一块淡底,滚动条不跳 */
+.docx-body img[src] {
+  background: var(--hover);
+}
+
+/* 转换中的进度行:脉冲点 + 文案 */
+.docx-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 预览不了的图片(EMF/WMF 等)只剩替代文字:给一块淡底让人知道这里原本有图 */
+.docx-body img:not([src]) {
+  display: inline-block;
+  padding: 0.2em 0.5em;
+  border-radius: var(--radius-xxs);
+  background: var(--hover);
+  color: var(--muted);
+}
+
+/* Word 的单元格里每格都包着段落:阅读档的段距会把表格撑得很高,格内收紧 */
+.code-reading .docx-body .md-table p {
+  margin-block: 0;
+}
+
+.code-reading .docx-body .md-table p + p {
+  margin-top: var(--md-li-gap);
+}
+
+.docx-body .md-link {
+  cursor: pointer;
+}
+
+/* 没被放行的链接(拆掉了地址)只剩文字,不装作能点 */
+.docx-body a:not([href]) {
+  color: inherit;
+  text-decoration: none;
+}

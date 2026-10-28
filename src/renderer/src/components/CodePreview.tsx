@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { ChatCodeRef, ScanFileNode } from '@shared/types'
 import { Notice } from './Notice'
-import { ImagePreview } from './ImagePreview'
-import { AudioPreview } from './AudioPreview'
+import { PreviewNonText } from './PreviewNonText'
 import { ProgressDots } from './ProgressDots'
 import { TreeIcon } from './Icons'
 import { MiniMD } from './MiniMD'
 import { InlineTitle } from './InlineTitle'
 import { LinkedMdView } from './LinkedMdView'
 import { LinkedPlainView } from './LinkedPlainView'
+import { ReadingShell } from './ReadingShell'
 import { splitTranslateBlocks } from '@shared/translateBlocks'
 import { usesPlainTranslateView } from '@shared/translateGate'
 import {
@@ -199,6 +199,9 @@ export function CodePreview({
     </button>
   )
 
+  const baseTitle = fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')
+  const rename = onRenameFile ? requestRename : undefined
+
   return (
     <div className="code-pane soft-in" onKeyDown={onPaneKeyDown}>
       {/* 页头栏:文件读成了才立,右对齐一颗只读锁钮;文件名不摆 ——
@@ -212,109 +215,70 @@ export function CodePreview({
           正在读文件……
         </div>
       )}
-      {!err &&
-        result &&
-        result.status !== 'ok' &&
-        result.status !== 'image' &&
-        result.status !== 'audio' && <p className="code-pane-note">{result.reason}</p>}
-      {/* 图片签:JPG/PNG 验过魔数直接看图,代码那套锁/引用/折行一概不出场;
-          image 账没带回来(不该发生)就老实按 reason 说明 */}
-      {!err && result?.status === 'image' && (
-        <>
-          {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
-          {result.image ? (
-            <ImagePreview
-              key={file.relPath}
-              fileName={file.relPath.split(/[\\/]/).pop() ?? file.relPath}
-              image={result.image}
-              onRename={onRenameFile ? requestRename : undefined}
-            />
-          ) : (
-            <p className="code-pane-note">{result.reason || '这张图片的信息没带回来,预览不了'}</p>
-          )}
-        </>
-      )}
-      {!err && result?.status === 'audio' && (
-        <>
-          {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
-          {result.audio ? (
-            <AudioPreview
-              key={file.relPath}
-              rootPath={rootPath}
-              relPath={file.relPath}
-              fileName={file.relPath.split(/[\\/]/).pop() ?? file.relPath}
-              audio={result.audio}
-              onRename={onRenameFile ? requestRename : undefined}
-            />
-          ) : (
-            <p className="code-pane-note">{result.reason || '这支音频的信息没带回来,预览不了'}</p>
-          )}
-        </>
+      {/* 不是文本稿的签(图片/音频/Word/二进制/超大):专属看法或一句 reason,
+          代码那套锁/引用/折行一概不出场 */}
+      {!err && result && result.status !== 'ok' && (
+        <PreviewNonText
+          rootPath={rootPath}
+          relPath={file.relPath}
+          result={result}
+          renameErr={renameErr}
+          viewRef={codeViewRef}
+          docZoom={docZoom}
+          onReadContextMenu={onReadContextMenu}
+          onRename={rename}
+        />
       )}
       {!err && result?.status === 'ok' && (
         <>
           {copiedAll && <p className="code-pane-note">全文已复制到剪贴板</p>}
           {renameErr && <p className="code-pane-note is-warn">{renameErr}</p>}
           {reading ? (
-            /* 阅读档:md 系签的渲染态 —— MiniMD 排版进可读栏,吃编辑器留下的最新文稿 */
-            <div
-              className="code-view is-reading"
-              ref={codeViewRef}
-              tabIndex={0}
-              style={{ '--doc-zoom': docZoom } as React.CSSProperties}
-              aria-label={`${file.relPath} 的阅读模式,全文可滚;按 Ctrl+A 复制全文`}
+            /* 阅读档:md 系签的渲染态 —— MiniMD 排版进可读栏,吃编辑器留下的最新文稿;
+               标题收进右上角的大纲浮窗。内联标题(Obsidian 同款)摆正文顶上,接了改名通道就能改 */
+            <ReadingShell
+              viewRef={codeViewRef}
+              docZoom={docZoom}
+              label={`${file.relPath} 的阅读模式,全文可滚;按 Ctrl+A 复制全文`}
+              outlineKey={sourceBlocks.length > 0 ? undefined : text}
               onContextMenu={onReadContextMenu}
             >
-              <article className="code-reading">
-                {/* 内联标题(Obsidian 同款):文件名掐尾去扩展名,摆正文顶上;
-                    接了改名通道就能点进去改(live/阅读同一条) */}
-                {sourceBlocks.length > 0 ? (
-                  <>
-                    <InlineTitle
-                      title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
-                      onRename={onRenameFile ? requestRename : undefined}
-                    />
-                    <LinkedMdView
-                      blocks={sourceBlocks}
-                      texts={sourceBlocks.map((b) => b.text)}
-                      hovered={linkedHovered}
-                      onHover={(block) => setHoveredBlock(mdKey, block)}
-                      fileLinks={fileLinks ?? undefined}
-                    />
-                  </>
-                ) : (
-                  <MiniMD
-                    text={text}
+              {sourceBlocks.length > 0 ? (
+                <>
+                  <InlineTitle title={baseTitle} onRename={rename} />
+                  <LinkedMdView
+                    blocks={sourceBlocks}
+                    texts={sourceBlocks.map((b) => b.text)}
+                    hovered={linkedHovered}
+                    onHover={(block) => setHoveredBlock(mdKey, block)}
                     fileLinks={fileLinks ?? undefined}
-                    title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
-                    onRenameTitle={onRenameFile ? requestRename : undefined}
                   />
-                )}
-              </article>
-            </div>
+                </>
+              ) : (
+                <MiniMD
+                  text={text}
+                  fileLinks={fileLinks ?? undefined}
+                  title={baseTitle}
+                  onRenameTitle={rename}
+                />
+              )}
+            </ReadingShell>
           ) : linkedPlain && sourceBlocks.length > 0 ? (
             /* 文档族对照:没有阅读档,有镜像时原文切到与译文同号的纯文本块视图 */
-            <div
-              className="code-view is-reading"
-              ref={codeViewRef}
-              tabIndex={0}
-              style={{ '--doc-zoom': docZoom } as React.CSSProperties}
-              aria-label={`${file.relPath} 的对照阅读,全文可滚;按 Ctrl+A 复制全文`}
+            <ReadingShell
+              viewRef={codeViewRef}
+              docZoom={docZoom}
+              label={`${file.relPath} 的对照阅读,全文可滚;按 Ctrl+A 复制全文`}
               onContextMenu={onReadContextMenu}
             >
-              <article className="code-reading">
-                <InlineTitle
-                  title={fileBaseName(file.relPath.split(/[\\/]/).pop() ?? '')}
-                  onRename={onRenameFile ? requestRename : undefined}
-                />
-                <LinkedPlainView
-                  blocks={sourceBlocks}
-                  texts={sourceBlocks.map((b) => b.text)}
-                  hovered={linkedHovered}
-                  onHover={(block) => setHoveredBlock(mdKey, block)}
-                />
-              </article>
-            </div>
+              <InlineTitle title={baseTitle} onRename={rename} />
+              <LinkedPlainView
+                blocks={sourceBlocks}
+                texts={sourceBlocks.map((b) => b.text)}
+                hovered={linkedHovered}
+                onHover={(block) => setHoveredBlock(mdKey, block)}
+              />
+            </ReadingShell>
           ) : (
             /* 实时预览/源码档:同一台 CodeMirror 编辑器,live 档位多挂 markdown 语法树+上妆管线;
                key 带档位 —— 切档重立编辑器,老编辑器的收尾写盘先把最新稿保下来 */
@@ -338,7 +302,7 @@ export function CodePreview({
                 onAddRef={onAddRef}
                 onTextChange={onTextChange}
                 onToggleWrap={toggleWrap}
-                onRenameFile={onRenameFile ? requestRename : undefined}
+                onRenameFile={rename}
                 jump={jump}
               />
             </div>

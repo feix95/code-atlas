@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron } from 'playwright'
+import { buildSampleDocx } from './docx-fixture.mts'
+import { checkDocOutline, writeOutlineFixtures } from './journey-outline.mts'
+import { checkLargeDocx, writeLargeDocx } from './journey-docx-large.mts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // 测试产物不写仓库: 默认系统临时目录, AI 验收时用 CODE_ATLAS_TMP 指到共享 tmp。
@@ -1633,7 +1636,55 @@ try {
     ),
     'reload must restore the last workspace (session replay)'
   )
+  // Word 样本最后才落盘:前面各段的文件数/树形断言不受它牵连
+  await writeFile(join(project, 'report.docx'), buildSampleDocx())
+  await writeOutlineFixtures(project)
+  await writeLargeDocx(project)
   await open(project)
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
+  await page
+    .locator('.cm-editor')
+    .filter({ hasText: 'This application helps organize tasks.' })
+    .waitFor()
+  // Word 预览:真 Chromium 里验消毒 —— javascript: 链接、脚本、事件属性、内联样式都不许上屏,
+  // 点链接应用不许跳走(正常外链不点:那会真去拉起系统浏览器)
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'report.docx' }).click()
+  const docxBody = page.locator('.docx-body')
+  await docxBody.locator('.md-h1').filter({ hasText: 'Quarterly plan' }).waitFor()
+  assert.equal(
+    await docxBody.locator('.md-table-wrap .md-table').count(),
+    1,
+    'docx table must render as a reading-mode table'
+  )
+  assert.equal(
+    await docxBody.locator('img[src^="atlas-media://docx-image/"][loading="lazy"]').count(),
+    1,
+    'docx image must load lazily from a registered token URL'
+  )
+  assert.equal(
+    await docxBody.locator('script, iframe, style, form, [onclick], [onerror], [style]').count(),
+    0,
+    'docx html must be sanitized'
+  )
+  assert.equal(
+    await docxBody.locator('a[href^="javascript" i]').count(),
+    0,
+    'javascript: links must be stripped'
+  )
+  assert.equal(
+    await docxBody.locator('a.md-link[href="https://example.com/"]').count(),
+    1,
+    'http(s) links stay as styled links'
+  )
+  const urlBeforeDocxClick = page.url()
+  await docxBody.getByText('evil link').click()
+  assert.equal(page.url(), urlBeforeDocxClick, 'clicking a docx link must not navigate the app')
+  await shot('docx-preview')
+  await checkDocOutline(page, shot)
+  const large = await checkLargeDocx(page, electron, { tempDir: join(run, 'tmp'), errors, shot })
+  console.log(
+    `Large docx: converted in ${large.convertMs} ms; main ping max ${large.maxMainPingMs} ms over ${large.pings} pings; folder click ${large.clickMs} ms`
+  )
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   await page
     .locator('.cm-editor')

@@ -37,6 +37,11 @@ export const CH = {
   searchNames: 'atlas:search-names',
   analyzeFile: 'atlas:analyze-file',
   readPreview: 'atlas:read-preview',
+  /** Word 预览转换(invoke):后台线程转完才回;渲染层自起任务号,换签就 docxRelease 作废 */
+  docxConvert: 'atlas:docx-convert',
+  docxRelease: 'atlas:docx-release',
+  /** Word 转换进度推送(主 → 渲染):已处理的图片张数 */
+  docxProgress: 'atlas:docx-progress',
   depGraph: 'atlas:dep-graph',
   // 模型货架与下载
   modelShelf: 'atlas:model-shelf',

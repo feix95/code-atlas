@@ -125,11 +125,22 @@ export const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg'])
  */
 export const AUDIO_EXTS = new Set(['.mp3', '.wav'])
 
-/** 按文件名判断是不是预览可直接看的图片(无后缀/.foo 这类隐藏文件一律不算) */
-export function isImageFile(name: string): boolean {
+/**
+ * 预览能直接读的 Word 文档后缀(小写含点):唯一名单。
+ * 仍在 BINARY_EXTS 里;老格式 .doc 是另一种二进制容器,转换器不认,不收。
+ */
+export const DOCX_EXTS = new Set(['.docx'])
+
+/** 文件名的后缀落不落在某张名单里(无后缀/.foo 这类隐藏文件一律不算) */
+function hasExtIn(name: string, exts: ReadonlySet<string>): boolean {
   const dot = name.lastIndexOf('.')
   if (dot <= 0) return false
-  return IMAGE_EXTS.has(name.slice(dot).toLowerCase())
+  return exts.has(name.slice(dot).toLowerCase())
+}
+
+/** 按文件名判断是不是预览可直接看的图片(无后缀/.foo 这类隐藏文件一律不算) */
+export function isImageFile(name: string): boolean {
+  return hasExtIn(name, IMAGE_EXTS)
 }
 
 /** 图片后缀 → MIME;名单外的后缀回 null,不许冒充 */
@@ -144,9 +155,12 @@ export function imageMimeOf(name: string): 'image/png' | 'image/jpeg' | null {
 
 /** 按文件名判断是不是预览可直接播的音频(无后缀/.foo 这类隐藏文件一律不算) */
 export function isAudioFile(name: string): boolean {
-  const dot = name.lastIndexOf('.')
-  if (dot <= 0) return false
-  return AUDIO_EXTS.has(name.slice(dot).toLowerCase())
+  return hasExtIn(name, AUDIO_EXTS)
+}
+
+/** 按文件名判断是不是预览可直接读的 Word 文档(.doc 老格式不算) */
+export function isDocxFile(name: string): boolean {
+  return hasExtIn(name, DOCX_EXTS)
 }
 
 /** 音频后缀 → MIME;名单外的后缀回 null,不许冒充 */
@@ -161,15 +175,14 @@ export function audioMimeOf(name: string): 'audio/mpeg' | 'audio/wav' | null {
 
 /** 按文件名判断是不是二进制/媒体文件(svg 是文本,不算;无后缀/.gitignore 这类隐藏文件也不算) */
 export function isBinaryFile(name: string): boolean {
-  const dot = name.lastIndexOf('.')
-  if (dot <= 0) return false // 无后缀或隐藏文件(如 .gitignore)不当二进制
-  return BINARY_EXTS.has(name.slice(dot).toLowerCase())
+  return hasExtIn(name, BINARY_EXTS)
 }
 
 /**
- * 预览页签肯收的文件:能直接看的图、能直接播的音频,或不当二进制的文本/代码。
- * 其余点开只给一句提示、不开签(名单仍以 BINARY_EXTS / IMAGE_EXTS / AUDIO_EXTS 为准)。
+ * 预览页签肯收的文件:能直接看的图、能直接播的音频、能直接读的 Word 文档,
+ * 或不当二进制的文本/代码。其余点开只给一句提示、不开签
+ * (名单仍以 BINARY_EXTS / IMAGE_EXTS / AUDIO_EXTS / DOCX_EXTS 为准)。
  */
 export function canPreviewFile(name: string): boolean {
-  return isImageFile(name) || isAudioFile(name) || !isBinaryFile(name)
+  return isImageFile(name) || isAudioFile(name) || isDocxFile(name) || !isBinaryFile(name)
 }

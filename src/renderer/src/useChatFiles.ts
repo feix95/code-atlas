@@ -136,7 +136,9 @@ export function useChatFiles(
               ? `「${name}」是图片,拖进来会进图片那条路`
               : res.status === 'audio'
                 ? `「${name}」是音频,不能当文本附件带进来`
-                : res.reason || readFailed
+                : res.status === 'docx'
+                  ? `「${name}」是 Word 文档,暂不支持作为文本附件添加`
+                  : res.reason || readFailed
       )
       return
     }

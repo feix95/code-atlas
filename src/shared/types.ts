@@ -611,7 +611,7 @@ export interface AiHistoryMessage {
  * audio = 后缀是 MP3/WAV 且内容验过魔数:界面走协议流播放,不走文本那套。
  */
 export interface FilePreviewResult {
-  status: 'ok' | 'binary' | 'too-big' | 'image' | 'audio'
+  status: 'ok' | 'binary' | 'too-big' | 'image' | 'audio' | 'docx'
   /** status='ok' 时的正文(全文,只做过换行归一) */
   text: string
   /** 文件真实总行数(ok 时才有) */
@@ -628,6 +628,8 @@ export interface FilePreviewResult {
   image?: FilePreviewImage
   /** status='audio' 时的音频账:字节流走 atlas-media,这里只带 MIME 和体积 */
   audio?: FilePreviewAudio
+  /** status='docx' 时的 Word 账:只带体积,正文由界面另发 docxConvert 转换 */
+  docx?: FilePreviewDocx
 }
 
 /** 图片预览带上界面的那笔账:宽高读不出(截断/畸形)老实回 null,不拿 0 冒充 */
@@ -649,6 +651,12 @@ export interface FilePreviewImage {
 /** 音频预览带上界面的那笔账:时长交给 <audio> metadata,这里只报种类和体积 */
 export interface FilePreviewAudio {
   mime: 'audio/mpeg' | 'audio/wav'
+  bytes: number
+}
+
+/** Word 预览带上界面的那笔账:readPreview 只验身不转换,正文由界面另发 docxConvert 在后台线程转 */
+export interface FilePreviewDocx {
+  /** 文件真实字节数 */
   bytes: number
 }
 
