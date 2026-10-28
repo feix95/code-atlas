@@ -60,6 +60,7 @@
   --chrome-float: #e3e3e3; /* workspace 卡/下拉菜单浮层底 */
   --scrollbar-thumb: #c1c1c1; /* 树区与菜单滚动条柄 */
   --chrome-ink: #424242; /* 框架图标与正文深灰 */
+  --chrome-ink-soft: #767676; /* 顶栏导航可用态:比 ink 更灰,比禁用叠色更醒目 */
   --chrome-ink-strong: #141414; /* 激活页签标题 */
   --chrome-surface: #ffffff; /* 激活页签/内容面 */
   --chrome-muted: #8a8a8a; /* 占位灰字(搜索框/路径框 hint) */
@@ -254,6 +255,7 @@
   --chrome-float: #3d3d3d;
   --scrollbar-thumb: #5a5a5a; /* VS Code 滑块惯例:40% 灰压深底的有效色 */
   --chrome-ink: #dadada;
+  --chrome-ink-soft: #a6a6a6; /* 同浅色:比 ink 更灰,比禁用叠色更醒目 */
   --chrome-ink-strong: #f0f0f0;
   --chrome-surface: #1c1c1c;
   --chrome-muted: #9a9a9a;

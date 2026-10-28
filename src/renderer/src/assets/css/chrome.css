@@ -253,38 +253,17 @@
 .tb-nav .tb-btn {
   width: var(--chrome-search-row-height);
   height: var(--chrome-search-row-height);
+  color: var(--chrome-ink-soft);
 }
 
-/* 前进/后退悬停:箭头朝自己的方向轻移一格,移开回位。
-   位移不照搬站点的 25%:顶栏钮里图标几乎顶满,25% 会撞到邻钮,2px 已是能读出的上限 */
+.tb-nav .tb-btn:hover:not(:disabled) {
+  background: transparent;
+  color: var(--chrome-ink);
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .tb-nav .tb-btn > svg {
-    transition: transform var(--dur-3) var(--ease-smooth);
-  }
-
-  .tb-nav .tb-btn:first-child:hover:not(:disabled) > svg {
-    transform: translateX(-2px);
-  }
-
-  .tb-nav .tb-btn:nth-child(2):hover:not(:disabled) > svg {
-    transform: translateX(2px);
-  }
-
-  /* 刷新:悬停轻轻胀一下再收回;转圈刷新时让位给旋转动画 */
-  .tb-nav .tb-btn:nth-child(3):not(.is-spinning):hover:not(:disabled) > svg {
-    animation: tb-refresh-pop 0.35s var(--ease-smooth);
-  }
-}
-
-@keyframes tb-refresh-pop {
-  0% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.12);
-  }
-  100% {
-    transform: scale(1);
+  .tb-nav .tb-btn {
+    transition: color var(--dur-3) var(--ease-smooth);
   }
 }
 
