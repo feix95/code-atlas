@@ -1,89 +1,28 @@
-// 源码里「当类名用」的词:只认 className / class 属性与赋值、clsx / cn / classnames / classNames 的参数、
-// classList.add / remove / toggle / replace 的参数。普通字符串('open'、'error' 这类通用词)不算,
-// 否则一份样式会被随便哪个出现同名字符串的文件拉走。
+// 源码里「当类名用」的词:只认 className / class 属性与赋值、对象属性 className:、
+// clsx / cn / cx / classnames / classNames / twMerge 的参数、classList.add / remove / toggle / replace 的参数。
+// 普通字符串('open'、'error' 这类通用词)不算,否则一份样式会被随便哪个出现同名字符串的文件拉走。
+// 表达式里再排除两类明显不是类名的字符串: === / !== 比较的一侧,以及嵌套函数调用(如 t('label'))的参数。
 // 只做词法扫描、不建语法树:扫描关系图时每个文件都要过一遍,得快;认错的代价只是样式附挂偏一点。
+import {
+  isOpener,
+  scanExpression,
+  scanTemplate,
+  skipBalanced,
+  skipString,
+  skipToken
+} from './jsLexer.ts'
 
-const CLASS_CONTEXT =
-  /\b(?:className|class)\s*\+?=\s*|\b(?:clsx|cn|classnames|classNames)\s*\(|\bclassList\s*\.\s*(?:add|remove|toggle|replace)\s*\(/g
+const CLASS_CALLS = 'clsx|cn|cx|classnames|classNames|twMerge'
+
+const CLASS_CONTEXT = new RegExp(
+  String.raw`(?<![-\w$])(?:(?:className|class)\s*\+?=\s*|className\s*:\s*|(?:${CLASS_CALLS})\s*\(|classList\s*\.\s*(?:add|remove|toggle|replace)\s*\()`,
+  'g'
+)
 
 const CLASS_NAME = /^-?[_a-zA-Z][\w-]*$/
-
-const CLOSER: Record<string, string> = { '(': ')', '{': '}', '[': ']' }
-
-/** 模板字符串里的一段静态文本;touchesStart / touchesEnd 表示它两端紧贴 ${} 插值 */
-interface TemplateVisitor {
-  part: (text: string, touchesStart: boolean, touchesEnd: boolean) => void
-  expr: (from: number, to: number) => void
-}
-
-const IGNORE_TEMPLATE: TemplateVisitor = { part: () => undefined, expr: () => undefined }
-
-/** 跳过 i 处开始的注释;不是注释原样返回 i */
-function skipComment(code: string, i: number): number {
-  if (code[i] !== '/') return i
-  if (code[i + 1] === '/') {
-    const end = code.indexOf('\n', i)
-    return end < 0 ? code.length : end
-  }
-  if (code[i + 1] === '*') {
-    const end = code.indexOf('*/', i + 2)
-    return end < 0 ? code.length : end + 2
-  }
-  return i
-}
-
-/** i 处是 ` 时扫完整个模板字符串,返回结束后的下标;静态文本与插值区间交给 visitor */
-function scanTemplate(code: string, i: number, visitor: TemplateVisitor): number {
-  let partStart = i + 1
-  let touchesStart = false
-  let j = i + 1
-  while (j < code.length && code[j] !== '`') {
-    if (code[j] === '\\') {
-      j += 2
-      continue
-    }
-    if (code[j] !== '$' || code[j + 1] !== '{') {
-      j++
-      continue
-    }
-    visitor.part(code.slice(partStart, j), touchesStart, true)
-    const end = skipBalanced(code, j + 1)
-    visitor.expr(j + 2, end - 1)
-    partStart = end
-    touchesStart = true
-    j = end
-  }
-  visitor.part(code.slice(partStart, j), touchesStart, false)
-  return j + 1
-}
-
-/** i 处是引号时返回字符串结束后的下标;否则原样返回 i */
-function skipString(code: string, i: number): number {
-  const quote = code[i]
-  if (quote === '`') return scanTemplate(code, i, IGNORE_TEMPLATE)
-  if (quote !== '"' && quote !== "'") return i
-  let j = i + 1
-  while (j < code.length && code[j] !== quote && code[j] !== '\n') j += code[j] === '\\' ? 2 : 1
-  return j + 1
-}
-
-/** open 处的括号到配平的闭括号之后的下标;字符串与注释里的括号不算。不配平时到文件尾 */
-function skipBalanced(code: string, open: number): number {
-  const stack = [CLOSER[code[open]]]
-  let i = open + 1
-  while (i < code.length && stack.length > 0) {
-    const next = Math.max(skipString(code, i), skipComment(code, i))
-    if (next !== i) {
-      i = next
-      continue
-    }
-    const ch = code[i]
-    if (CLOSER[ch] !== undefined) stack.push(CLOSER[ch])
-    else if (ch === stack[stack.length - 1]) stack.pop()
-    i++
-  }
-  return i
-}
+const IDENT = /[\w$.]/
+const COMPARE_BEFORE = /[!=]=\s*$/
+const COMPARE_AFTER = /^\s*[!=]=/
 
 /** 一段字符串文本按空白切词;紧贴插值的首尾半截词(如 `tab-${kind}` 的 tab-)丢掉 */
 function addWords(text: string, cutFirst: boolean, cutLast: boolean, into: Set<string>): void {
@@ -93,8 +32,35 @@ function addWords(text: string, cutFirst: boolean, cutLast: boolean, into: Set<s
   for (const word of words.slice(from, to)) if (CLASS_NAME.test(word)) into.add(word)
 }
 
-/** [from, to) 区间里所有字符串字面量的词(模板字符串的插值里递归找) */
-function collectStrings(code: string, from: number, to: number, into: Set<string>): void {
+/** 字符串 [start, end) 是否站在 === / !== 比较的一侧(那是在比值,不是类名) */
+function isCompared(code: string, start: number, end: number): boolean {
+  return (
+    COMPARE_BEFORE.test(code.slice(Math.max(0, start - 8), start)) ||
+    COMPARE_AFTER.test(code.slice(end, end + 8))
+  )
+}
+
+/** i 处是标识符开头且紧跟 ( 时(函数调用),返回整个调用结束后的下标;否则返回 -1 */
+function skipCall(code: string, i: number): number {
+  if (i > 0 && IDENT.test(code[i - 1])) return -1
+  let j = i
+  while (j < code.length && IDENT.test(code[j])) j++
+  if (j === i) return -1
+  while (j < code.length && /\s/.test(code[j])) j++
+  return code[j] === '(' ? skipBalanced(code, j) : -1
+}
+
+/**
+ * [from, to) 区间里当类名用的字符串的词:模板字符串的插值里递归找;
+ * 比较里的字符串与嵌套函数调用的参数跳过;objectKeys 为真时(clsx 一族的参数)对象字面量只取键。
+ */
+function collectStrings(
+  code: string,
+  from: number,
+  to: number,
+  into: Set<string>,
+  objectKeys = false
+): void {
   let i = from
   while (i < to) {
     const ch = code[i]
@@ -103,14 +69,49 @@ function collectStrings(code: string, from: number, to: number, into: Set<string
         part: (text, touchesStart, touchesEnd) => addWords(text, touchesStart, touchesEnd, into),
         expr: (a, b) => collectStrings(code, a, b, into)
       })
-    } else if (ch === '"' || ch === "'") {
-      const end = skipString(code, i)
-      addWords(code.slice(i + 1, end - 1), false, false, into)
-      i = end
-    } else {
-      i = Math.max(i + 1, skipComment(code, i))
+      continue
     }
+    if (ch === '"' || ch === "'") {
+      const end = skipString(code, i)
+      if (!isCompared(code, i, end)) addWords(code.slice(i + 1, end - 1), false, false, into)
+      i = end
+      continue
+    }
+    if (objectKeys && ch === '{') {
+      i = collectObjectKeys(code, i, into)
+      continue
+    }
+    const afterCall = skipCall(code, i)
+    if (afterCall >= 0) {
+      i = afterCall
+      continue
+    }
+    i = Math.max(i + 1, skipToken(code, i))
   }
+}
+
+/** open 处的对象字面量:键(带引号或不带)当类名,值不看;返回对象结束后的下标 */
+function collectObjectKeys(code: string, open: number, into: Set<string>): number {
+  const close = skipBalanced(code, open) - 1
+  let i = open + 1
+  while (i < close) {
+    while (i < close && /[\s,]/.test(code[i])) i++
+    const keyStart = i
+    if (code[i] === '"' || code[i] === "'") {
+      i = skipString(code, i)
+      addWords(code.slice(keyStart + 1, i - 1), false, false, into)
+    } else if (isOpener(code[i])) {
+      i = skipBalanced(code, i)
+    } else {
+      while (i < close && /[\w$-]/.test(code[i])) i++
+      if (i > keyStart && CLASS_NAME.test(code.slice(keyStart, i))) {
+        into.add(code.slice(keyStart, i))
+      }
+    }
+    const next = scanExpression(code, i)
+    i = Math.max(next, i + 1)
+  }
+  return close + 1
 }
 
 /** 源码里当类名用的词(去重) */
@@ -118,12 +119,16 @@ export function extractClassTokens(code: string): Set<string> {
   const tokens = new Set<string>()
   for (const match of code.matchAll(CLASS_CONTEXT)) {
     const at = match.index + match[0].length
-    const isCall = match[0].endsWith('(')
-    const start = isCall ? at - 1 : at
-    const opener = code[start]
-    if (opener === '(' || opener === '{')
-      collectStrings(code, start + 1, skipBalanced(code, start) - 1, tokens)
-    else collectStrings(code, start, skipString(code, start), tokens)
+    if (match[0].endsWith('(')) {
+      const isClassCall = !match[0].startsWith('classList')
+      collectStrings(code, at, skipBalanced(code, at - 1) - 1, tokens, isClassCall)
+      continue
+    }
+    const opener = code[at]
+    if (opener === '{') collectStrings(code, at + 1, skipBalanced(code, at) - 1, tokens)
+    else if (opener === '"' || opener === "'" || opener === '`') {
+      collectStrings(code, at, skipString(code, at), tokens)
+    } else collectStrings(code, at, scanExpression(code, at), tokens)
   }
   return tokens
 }

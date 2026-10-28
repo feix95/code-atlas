@@ -347,6 +347,47 @@ function runStyleUnitCases(): void {
     [],
     '普通字符串、标识符与注释不算类名'
   )
+  assert.deepEqual(
+    tokens("el.className = on ? 'is-on' : 'is-off'\nconst other = 'plain-word'"),
+    ['is-off', 'is-on'],
+    'className 赋值右侧的三元表达式都算,到行尾为止'
+  )
+  assert.deepEqual(
+    tokens("el.className = on\n  ? 'wrap-on'\n  : 'wrap-off'\nconst later = 'later-word'"),
+    ['wrap-off', 'wrap-on'],
+    '换行续写的三元表达式照算,下一条语句不算'
+  )
+  assert.deepEqual(
+    tokens("const props = { className: 'prop-card big', title: 'not-me' }"),
+    ['big', 'prop-card'],
+    '对象属性 className: 的值算,同对象的其他属性不算'
+  )
+  assert.deepEqual(
+    tokens("clsx({ active: isOn, 'is-x': y, tone: dark ? 'val-a' : 'val-b' }, ['arr-1'])"),
+    ['active', 'arr-1', 'is-x', 'tone'],
+    'clsx 对象的键算(不带引号的也算),值里的字符串不算'
+  )
+  assert.deepEqual(tokens("cx('cx-1'); twMerge('tw-1', 'tw-2')"), ['cx-1', 'tw-1', 'tw-2'])
+  assert.deepEqual(
+    tokens("<i className={kind === 'file' ? 'is-file' : mode !== \"dir\" ? 'is-dir' : ''} />"),
+    ['is-dir', 'is-file'],
+    '=== / !== 比较里的字符串不算'
+  )
+  assert.deepEqual(
+    tokens("<i className={`tip ${t('label')}`} title={t('x')} />; clsx(t('nested'), 'z-1')"),
+    ['tip', 'z-1'],
+    '嵌套函数调用(如 t())参数里的字符串不算'
+  )
+  assert.deepEqual(
+    tokens('<div data-class="nope" my-class="nope2" />'),
+    [],
+    'data-class 不算 class'
+  )
+  assert.deepEqual(
+    tokens("<b className={name.replace(/['\"`(]/g, '') ? 'after-re' : 'other-re'} />"),
+    ['after-re', 'other-re'],
+    '正则字面量里的引号、括号不吞掉后面的类名'
+  )
   const links = classUsageLinks(
     new Map([
       ['s/panel.css', ['panel-card', 'shared']],

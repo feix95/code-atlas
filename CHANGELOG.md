@@ -613,3 +613,4 @@
 - fix(depgraph): 自测文件识别补上 `tests/`、`test/`、`e2e/` 目录与 Go 的 `*_test.go`、Python 的 `test_*.py` / `*_test.py`、C# / Java / Kotlin 的 `*Test(s)` 命名;只认代码文件,`openapi.spec.json`、测试目录里的数据夹具不再被当成自测
 - fix(depgraph): tsconfig 的 baseUrl 越出项目根(绝对路径、盘符、../ 上跳)时这份配置的别名整体停用,不再悄悄改按配置所在目录解析 paths;样式里的 @import 相对路径找不到时也认 tsconfig 别名
 - fix(depgraph): 样式附挂先把 @import 图的强连通分量缩成点(Tarjan)再按拓扑序一次算完,环里的样式共同跟票;带回边成环的菱形 @import 长链不再随层数翻倍(22 层由超过 60 秒降到约 1 毫秒)
+- fix(depgraph): 类名识别补上 className 赋值右侧的三元表达式、对象属性 className:、cx / twMerge,clsx 一族的对象只取键(不带引号的也算)、值不算;=== / !== 比较里的字符串与嵌套函数调用(如 t('label'))的参数不算;data-class 不再当 class;正则字面量里的引号与括号不再吞掉后面的类名。词法跳读拆到 jsLexer.ts
