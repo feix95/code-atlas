@@ -1,7 +1,7 @@
 // 公共文件(hub):被到处引用的文件(类型表、IPC 通道表、图标册)。它跟谁都近,参与社区发现会把各目录的文件
 // 吸成一团、自己却被随手塞进某个小模块;所以先请出去,其余文件分好后再按它所在目录放回,当正式成员。
 import type { DepEdge, ModuleParams } from '../shared/types.ts'
-import { createHomeFinder, pickAnchor } from './moduleAssign.ts'
+import { createHomeFinder, pickAnchor, type HomeCandidate } from './moduleAssign.ts'
 import { indexMembers, pickByVotes, tally } from './linkVotes.ts'
 import { byCodeUnit, dirOf } from './pathOrder.ts'
 
@@ -22,14 +22,49 @@ export function findHubs(inDegree: Map<string, number>, params: HubParams): Set<
 }
 
 /**
+ * 只被别的公共文件引用的公共文件:跟着引用它的公共文件的落点投票,一轮一轮往外传。
+ * 每轮只用上一轮结束时的落点,结果与处理顺序无关。
+ */
+function followImportingHubs(
+  pending: string[],
+  placed: Map<string, number>,
+  importers: Map<string, [string, number][]>,
+  candidates: HomeCandidate[]
+): void {
+  let rest = pending
+  while (rest.length > 0) {
+    const round = new Map<string, number>()
+    for (const hub of rest) {
+      const target = pickByVotes(tally(importers.get(hub) ?? [], placed), candidates)
+      if (target >= 0) round.set(hub, target)
+    }
+    if (round.size === 0) return
+    for (const [hub, target] of round) placed.set(hub, target)
+    rest = rest.filter((hub) => !round.has(hub))
+  }
+}
+
+/** 仍找不到归属的公共文件:同目录(不含项目根)凑够 minFiles 个时合成一个模块,否则未归类 */
+function groupLeftovers(leftovers: string[], minFiles: number): string[][] {
+  const byDir = new Map<string, string[]>()
+  for (const hub of leftovers) {
+    if (dirOf(hub) === '') continue
+    byDir.set(dirOf(hub), [...(byDir.get(dirOf(hub)) ?? []), hub])
+  }
+  return [...byDir.values()].filter((group) => group.length >= minFiles)
+}
+
+/**
  * 把公共文件放回社区(原地追加,组内重新排序):先按所在目录就近归属;目录里找不到模块时,
- * 跟引用它最多的模块走;都没有就单独成组。候选在放回前冻结,结果与放回顺序无关。
+ * 跟引用它最多的模块走,只被别的公共文件引用时跟着那些公共文件走;都没有时同目录凑够数自成模块,
+ * 凑不够就不放回(未归类),不产生 1 个文件的模块。候选在放回前冻结,结果与放回顺序无关。
  */
 export function insertHubs(
   groups: string[][],
   hubs: string[],
   edges: DepEdge[],
-  inDegree: Map<string, number>
+  inDegree: Map<string, number>,
+  minFiles: number
 ): string[][] {
   const candidates = groups.map((members) => ({
     key: pickAnchor(members, inDegree),
@@ -39,12 +74,33 @@ export function insertHubs(
   const home = indexMembers(candidates)
   const importers = new Map<string, [string, number][]>(hubs.map((h) => [h, []]))
   for (const { from, to } of edges) importers.get(to)?.push([from, 1])
-  const alone: string[][] = []
+  const placed = new Map(home)
+  const pending: string[] = []
   for (const hub of hubs) {
     let target = findHome(dirOf(hub))
     if (target < 0) target = pickByVotes(tally(importers.get(hub) ?? [], home), candidates)
-    if (target < 0) alone.push([hub])
-    else groups[target].push(hub)
+    if (target < 0) pending.push(hub)
+    else placed.set(hub, target)
   }
-  return [...groups.map((g) => g.sort(byCodeUnit)), ...alone]
+  followImportingHubs(pending, placed, importers, candidates)
+  const formed = groupLeftovers(
+    pending.filter((hub) => !placed.has(hub)),
+    minFiles
+  )
+  for (const group of formed) {
+    candidates.push({ key: pickAnchor(group, inDegree), members: group })
+    for (const hub of group) placed.set(hub, candidates.length - 1)
+  }
+  followImportingHubs(
+    pending.filter((hub) => !placed.has(hub)),
+    placed,
+    importers,
+    candidates
+  )
+  const out = [...groups, ...formed.map((): string[] => [])]
+  for (const hub of hubs) {
+    const target = placed.get(hub)
+    if (target !== undefined) out[target].push(hub)
+  }
+  return out.map((g) => g.sort(byCodeUnit))
 }

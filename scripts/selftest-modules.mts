@@ -562,6 +562,60 @@ function checkHubFiles(): void {
   )
 }
 
+/** 只被别的公共文件引用、所在目录也没有模块的公共文件:跟着引用它的公共文件走,不单独成 1 个文件的模块 */
+function checkHubWithoutHome(): void {
+  const users = Array.from({ length: 12 }, (_, i) => `a/a${i}.ts`)
+  const coreHubs = Array.from({ length: 11 }, (_, i) => `core/h${i}.ts`)
+  const map = cutWithRuleParams({
+    files: [],
+    analyzable: [...users, ...coreHubs, 'deep/z.ts', 'lone/p.ts', 'lone/q.ts', 'solo.ts'],
+    edges: [
+      ...users.map((f, i) => e(f, users[(i + 1) % users.length])),
+      ...users.flatMap((f) => coreHubs.map((h) => e(f, h))),
+      ...coreHubs.map((h) => e(h, 'deep/z.ts')),
+      ...coreHubs.map((h) => e(h, 'lone/p.ts')),
+      ...coreHubs.map((h) => e(h, 'lone/q.ts')),
+      e('lone/p.ts', 'lone/q.ts'),
+      ...coreHubs.map((h) => e(h, 'solo.ts'))
+    ]
+  })
+  const a = moduleOf(map, 'a/a0.ts')
+  assert.equal(moduleOf(map, 'core/h0.ts'), a, '公共文件跟引用它最多的模块走')
+  assert.equal(moduleOf(map, 'deep/z.ts'), a, '只被公共文件引用时,跟着那些公共文件的模块走')
+  assert.ok(
+    map.modules.every((m) => m.files.length >= 2),
+    '公共文件不单独成 1 个文件的模块'
+  )
+
+  const clique = Array.from({ length: 12 }, (_, i) => `iso/k${i}.ts`)
+  const rootClique = Array.from({ length: 12 }, (_, i) => `r${i}.ts`)
+  const orphan = cutWithRuleParams({
+    files: [],
+    analyzable: [...users, ...clique, 'top.ts', ...rootClique],
+    edges: [
+      ...rootClique.flatMap((h) => rootClique.filter((x) => x !== h).map((x) => e(h, x))),
+      ...users.map((f, i) => e(f, users[(i + 1) % users.length])),
+      ...clique.flatMap((h) => clique.filter((x) => x !== h).map((x) => e(h, x))),
+      ...clique.map((h) => e(h, 'top.ts'))
+    ]
+  })
+  const iso = moduleOf(orphan, 'iso/k0.ts')
+  assert.ok(iso !== undefined && iso !== moduleOf(orphan, 'a/a0.ts'), 'iso 公共文件自成模块')
+  assert.ok(
+    clique.every((f) => moduleOf(orphan, f) === iso),
+    '找不到归属的公共文件,同目录凑够最少成员数时合成一个模块'
+  )
+  assert.equal(moduleOf(orphan, 'top.ts'), iso, '只被公共文件引用的根目录公共文件跟着它们走')
+  assert.ok(
+    rootClique.every((f) => moduleOf(orphan, f) === undefined),
+    '项目根下找不到归属的公共文件未归类,不因同在根下凑成模块'
+  )
+  assert.ok(
+    orphan.modules.every((m) => m.files.length >= 2),
+    '不出现 1 个文件的模块'
+  )
+}
+
 function checkMajorityAnchor(): void {
   const inDegree = new Map([
     ['shared/ipc.ts', 10],
@@ -712,6 +766,7 @@ async function main(): Promise<void> {
   checkTestFilePatterns()
   checkHubWeight()
   checkHubFiles()
+  checkHubWithoutHome()
   checkMajorityAnchor()
   checkSmallMerge()
   checkEdgeCases()

@@ -144,7 +144,8 @@ export function cutModules(
     mergeSmallCommunities(communities, inDegree, params.minFiles),
     [...hubs],
     edges,
-    inDegree
+    inDegree,
+    params.minFiles
   )
   const drafts = merged.map((members): ModuleDraft => {
     const anchor = pickAnchor(members, inDegree)
