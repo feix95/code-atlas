@@ -128,13 +128,16 @@ export async function loadTsPathAliases(rootPath: string): Promise<TsPathAliases
   return raw === null ? null : parseTsPathAliases(raw)
 }
 
-/**
- * 按 TypeScript 的规则挑 paths:精确规则优先,其次前缀最长的通配规则。
- * undefined = 没有规则命中;null = 命中但替换结果上跳出根。
- */
-function applyPathRules(spec: string, rules: PathRule[]): string | null | undefined {
+/** paths 命中结果:target 为 null 表示替换后上跳出根;isCatchAll 表示命中的是纯 '*' 兜底规则 */
+interface RuleHit {
+  target: string | null
+  isCatchAll: boolean
+}
+
+/** 按 TypeScript 的规则挑 paths:精确规则优先,其次前缀最长的通配规则;没有规则命中返回 undefined */
+function applyPathRules(spec: string, rules: PathRule[]): RuleHit | undefined {
   const exact = rules.find((r) => !r.hasWildcard && r.prefix === spec)
-  if (exact) return exact.target
+  if (exact) return { target: exact.target, isCatchAll: false }
   let best: PathRule | null = null
   for (const rule of rules) {
     if (!rule.hasWildcard || spec.length < rule.prefix.length + rule.suffix.length) continue
@@ -143,11 +146,15 @@ function applyPathRules(spec: string, rules: PathRule[]): string | null | undefi
   }
   if (!best) return undefined
   const matched = spec.slice(best.prefix.length, spec.length - best.suffix.length)
-  return toProjectRel('', best.target.replace('*', matched))
+  return {
+    target: toProjectRel('', best.target.replace('*', matched)),
+    isCatchAll: best.prefix === '' && best.suffix === ''
+  }
 }
 
 /**
  * 非相对导入先过别名。paths 命中:连上算项目内边,连不上记 unresolved(不再算外部包);
+ * 纯 '*' 兜底规则(如 "*": ["types/*"])什么都能命中,连不上时交回外部包判定,不把 react 记成断线;
  * 只有 baseUrl:baseUrl 下真有这个文件才连,否则返回 null 交回外部包判定(TS 同样先试 baseUrl 再找依赖包)。
  */
 export function resolveTsAlias(
@@ -156,9 +163,10 @@ export function resolveTsAlias(
   matchFile: (base: string) => string | null
 ): AliasResolution | null {
   if (!aliases || spec.startsWith('/')) return null
-  const mapped = applyPathRules(spec, aliases.rules)
-  if (mapped !== undefined) {
-    return { to: mapped ? matchFile(mapped) : null, external: false }
+  const hit = applyPathRules(spec, aliases.rules)
+  if (hit !== undefined) {
+    const to = hit.target ? matchFile(hit.target) : null
+    if (to || !hit.isCatchAll) return { to, external: false }
   }
   if (aliases.baseUrl === null) return null
   const base = toProjectRel(aliases.baseUrl, spec)

@@ -601,3 +601,4 @@
 - chore(depgraph): 新增依赖 graphology 0.26.0、graphology-communities-louvain 2.0.2 与类型包 graphology-types 0.24.8,供模块切分在主进程跑 Louvain 社区发现
 - feat(depgraph): 关系分析结果新增程序切分的模块(src/modules):文件级导入图加同目录偏置跑 Louvain,固定种子与输入排序保证每次切得一样;无导入文件按目录就近归属,根目录文件未归类
 - chore(depgraph): 模块切分分辨率 MODULE_RESOLUTION 由 1 调到 2.5,本仓库从 9 个模块(最大 180 个文件)细分为 19 个;规则类自测固定分辨率 1,调参不再牵动
+- fix(depgraph): tsconfig 里纯 '*' 兜底别名连不上时交回外部包判定,不再把 react 这类依赖包记成断线

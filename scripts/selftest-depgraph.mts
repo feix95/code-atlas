@@ -186,6 +186,14 @@ function runTsPathUnitCases(): void {
   assert.equal(resolveTsAlias('lib/y', root, match)?.to, 'lib/y.ts', 'baseUrl 为根时裸路径可连')
   assert.equal(resolveTsAlias('react', root, match), null, 'baseUrl 下找不到交回外部包判定')
   assert.equal(resolveTsAlias('/lib/y', root, match), null, '绝对说明符不走别名')
+  const catchAll = parseTsPathAliases('{"compilerOptions":{"paths":{"*":["lib/*"]}}}')
+  assert.equal(resolveTsAlias('y', catchAll, match)?.to, 'lib/y.ts', "纯 '*' 规则能连上时照连")
+  assert.equal(resolveTsAlias('react', catchAll, match), null, "纯 '*' 规则连不上时交回外部包判定")
+  assert.equal(
+    parseTsPathAliases('{"extends":"./tsconfig.base.json"}'),
+    null,
+    '只有 extends 时不跟链,行为与改前一致'
+  )
   assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
 }
 async function main(): Promise<void> {
