@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
+import { parseTsPathAliases, resolveTsAlias } from '../src/depgraph/tsPaths.ts'
 import type { DepGraphResult } from '../src/shared/types.ts'
 
 // 造一个迷你项目:TS 默认导入、省后缀相对导入、跨目录 ../、CommonJS require、
@@ -90,6 +91,103 @@ function sortedEdges(graph: DepGraphResult): string[] {
   return [...edgeKeys(graph)].sort((a, b) => a.localeCompare(b))
 }
 
+/** 按 { relPath: 内容 } 造一个临时项目,返回项目根 */
+async function makeProject(name: string, files: Record<string, string>): Promise<string> {
+  const root = join(tmpdir(), `codeatlas-depgraph-${name}-${Date.now()}`, name)
+  for (const [rel, content] of Object.entries(files)) {
+    await fs.mkdir(dirname(join(root, rel)), { recursive: true })
+    await fs.writeFile(join(root, rel), content, 'utf8')
+  }
+  return root
+}
+
+function makeAliasFixture(): Promise<string> {
+  return makeProject('alias-project', {
+    'tsconfig.json': [
+      '{',
+      '  // 行注释: "@fake/*": ["./nowhere/*"]',
+      '  "compilerOptions": {',
+      '    /* 块注释, 里面的 } 不算 */',
+      '    "paths": {',
+      '      "@shared/*": ["./src/shared/*", "./fallback/*"],',
+      '      "@cfg": ["src\\\\config\\\\index.ts"],',
+      '    },',
+      '  },',
+      '}',
+      ''
+    ].join('\n'),
+    'src/app.ts': [
+      "import { x } from '@shared/x'",
+      "import { x as x2 } from '@shared/x.ts'",
+      "import { u } from '@shared/util'",
+      "import { m } from '@shared/missing'",
+      "import { o } from '@shared/only'",
+      "import { e } from '@shared/../../../outside'",
+      "import all from '@shared'",
+      "import { z } from '@sharedx/y'",
+      "import { cfg } from '@cfg'",
+      "import React from 'react'",
+      'export const v = [x, x2, u, m, o, e, all, z, cfg, React]',
+      ''
+    ].join('\n'),
+    'src/shared/x.ts': 'export const x = 1\n',
+    'src/shared/util/index.ts': 'export const u = 1\n',
+    'src/config/index.ts': 'export const cfg = 1\n',
+    'fallback/only.ts': 'export const o = 1\n'
+  })
+}
+
+function makeBaseUrlFixture(): Promise<string> {
+  return makeProject('baseurl-project', {
+    'tsconfig.json':
+      '{ "compilerOptions": { "baseUrl": "./src", "paths": { "~lib/*": ["lib/*"] } } }\n',
+    'src/main.ts': [
+      "import { a } from '~lib/a'",
+      "import { n } from '~lib/none'",
+      "import { b } from 'feature/b'",
+      "import _ from 'lodash'",
+      'export const v = [a, n, b, _]',
+      ''
+    ].join('\n'),
+    'src/lib/a.ts': 'export const a = 1\n',
+    'src/feature/b.ts': 'export const b = 1\n'
+  })
+}
+
+/** tsPaths 纯函数的边界用例:不走文件系统,直接喂字符串 */
+function runTsPathUnitCases(): void {
+  const files = new Set(['src/shared/x.ts', 'src/x.ts', 'lib/y.ts'])
+  const match = (base: string): string | null =>
+    files.has(base) ? base : files.has(`${base}.ts`) ? `${base}.ts` : null
+
+  assert.equal(parseTsPathAliases('not json'), null, '非 JSON 返回 null')
+  assert.equal(parseTsPathAliases('[]'), null, '顶层不是对象返回 null')
+  assert.equal(parseTsPathAliases('{}'), null, '没有 paths 与 baseUrl 返回 null')
+  const bom = parseTsPathAliases('\uFEFF{"compilerOptions":{"paths":{"@s/*":["src/shared/*"]}}}')
+  assert.equal(resolveTsAlias('@s/x', bom, match)?.to, 'src/shared/x.ts', 'BOM 开头也能解析')
+  const strings = parseTsPathAliases(
+    '{"compilerOptions":{"paths":{"@a/*":["src/*"],"//x":["/*not-a-comment*/"]},}}'
+  )
+  assert.equal(
+    resolveTsAlias('@a/x', strings, match)?.to,
+    'src/x.ts',
+    '字符串里的 // 与 /* 不当注释'
+  )
+  const longest = parseTsPathAliases(
+    '{"compilerOptions":{"paths":{"@/*":["lib/*"],"@/shared/*":["src/shared/*"]}}}'
+  )
+  assert.equal(resolveTsAlias('@/shared/x', longest, match)?.to, 'src/shared/x.ts', '最长前缀优先')
+  assert.equal(resolveTsAlias('@/y', longest, match)?.to, 'lib/y.ts', '短前缀兜底')
+  const abs = parseTsPathAliases('{"compilerOptions":{"baseUrl":"C:/elsewhere"}}')
+  assert.equal(resolveTsAlias('x', abs, match), null, '绝对路径 baseUrl 不采用')
+  const up = parseTsPathAliases('{"compilerOptions":{"baseUrl":"../outside"}}')
+  assert.equal(resolveTsAlias('x', up, match), null, '上跳出根的 baseUrl 不采用')
+  const root = parseTsPathAliases('{"compilerOptions":{"baseUrl":"."}}')
+  assert.equal(resolveTsAlias('lib/y', root, match)?.to, 'lib/y.ts', 'baseUrl 为根时裸路径可连')
+  assert.equal(resolveTsAlias('react', root, match), null, 'baseUrl 下找不到交回外部包判定')
+  assert.equal(resolveTsAlias('/lib/y', root, match), null, '绝对说明符不走别名')
+  assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
+}
 async function main(): Promise<void> {
   // 第一轮:JS/TS + Python 平铺的老场景,行为必须和以前一模一样
   const root = await makeFixture()
@@ -200,6 +298,65 @@ async function main(): Promise<void> {
   } finally {
     await fs.rm(dirname(polyRoot), { recursive: true, force: true })
   }
+
+  // 第三轮:tsconfig paths 别名(带注释与尾逗号的 JSONC),多候选只认第一个,越界与缺失记 unresolved
+  const aliasRoot = await makeAliasFixture()
+  try {
+    const graph = await buildDependencyGraph(aliasRoot)
+    assert.deepEqual(
+      sortedEdges(graph),
+      [
+        'src/app.ts => src/config/index.ts', // '@cfg' 精确规则
+        'src/app.ts => src/shared/util/index.ts', // '@shared/util' 补 /index
+        'src/app.ts => src/shared/x.ts' // '@shared/x' 与 '@shared/x.ts' 去重成一条
+      ],
+      '别名导入应连到 src/shared 与 src/config'
+    )
+    // '@shared'(不带斜杠,不匹配 '@shared/*')、'@sharedx/y'、react 仍是外部包
+    assert.equal(graph.stats.externalCount, 3, '别名之外的外部包应记 3 次')
+    assert.deepEqual(
+      graph.stats.unresolved.map((u) => u.spec).sort(),
+      ['@shared/../../../outside', '@shared/missing', '@shared/only'],
+      '别名命中但连不上(缺文件、只在第二候选、上跳出根)应记 unresolved'
+    )
+  } finally {
+    await fs.rm(dirname(aliasRoot), { recursive: true, force: true })
+  }
+
+  // 第四轮:baseUrl 变体 —— paths 相对 baseUrl 解析;只有 baseUrl 时裸说明符先试 baseUrl 下的文件
+  const baseRoot = await makeBaseUrlFixture()
+  try {
+    const graph = await buildDependencyGraph(baseRoot)
+    assert.deepEqual(
+      sortedEdges(graph),
+      ['src/main.ts => src/feature/b.ts', 'src/main.ts => src/lib/a.ts'],
+      'baseUrl 下的 paths 与裸路径都应连上'
+    )
+    assert.equal(graph.stats.externalCount, 1, 'baseUrl 下找不到的 lodash 仍是外部包')
+    assert.deepEqual(
+      graph.stats.unresolved.map((u) => u.spec),
+      ['~lib/none'],
+      'paths 命中但缺文件应记 unresolved'
+    )
+  } finally {
+    await fs.rm(dirname(baseRoot), { recursive: true, force: true })
+  }
+
+  // 第五轮:tsconfig 坏掉(不是合法 JSONC)时行为与没有 tsconfig 一致
+  const brokenRoot = await makeProject('broken-tsconfig', {
+    'tsconfig.json': '{ "compilerOptions": { "paths": { "@shared/*": ["./src/shared/*"] ',
+    'src/a.ts': "import { x } from '@shared/x'\nexport const y = x\n",
+    'src/shared/x.ts': 'export const x = 1\n'
+  })
+  try {
+    const graph = await buildDependencyGraph(brokenRoot)
+    assert.equal(graph.edges.length, 0, '坏 tsconfig 不应连出别名边')
+    assert.equal(graph.stats.externalCount, 1, '坏 tsconfig 时 @shared/x 按改前口径记外部包')
+  } finally {
+    await fs.rm(dirname(brokenRoot), { recursive: true, force: true })
+  }
+
+  runTsPathUnitCases()
 
   console.log('✅ 项目关系分析自测全部通过')
   console.log(

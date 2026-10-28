@@ -1,21 +1,8 @@
 // 各语言的导入翻译器:把 analyzer 抓出的导入说明符翻译成项目内文件的 relPath。
 // 只做字符串与已知文件表的比对,不读文件;项目布局线索由 index.ts 开场探测后传入。
 import { LANGUAGES } from '../shared/languages.ts'
-
-/** 把路径段归一化(处理 ./ 和 ../),全用 '/' 分隔;上跳出项目根返回 null */
-function normalizeParts(parts: string[]): string[] | null {
-  const out: string[] = []
-  for (const part of parts) {
-    if (part === '' || part === '.') continue
-    if (part === '..') {
-      if (out.length === 0) return null
-      out.pop()
-      continue
-    }
-    out.push(part)
-  }
-  return out
-}
+import { normalizeParts } from './relPath.ts'
+import { resolveTsAlias, type TsPathAliases } from './tsPaths.ts'
 
 /** 一条导入的翻译结果:to 连到了哪个项目内文件;连不上时 external 说明这线是不是指向外面的包 */
 export interface ImportResolution {
@@ -33,6 +20,8 @@ export interface ImportHints {
   javaRoots: string[]
   /** cargo 布局的 crate 根:有 .rs 文件住在 src/ 下就是 'src',否则 null */
   rustRoot: string | null
+  /** 项目根 tsconfig 的 paths / baseUrl 别名;没有或解析不了为 null,非相对导入按改前口径分流 */
+  tsPaths: TsPathAliases | null
 }
 
 /** 每种语言的导入翻译器:把 analyzer 抓出来的导入说明符翻译成项目内的文件 */
@@ -50,33 +39,43 @@ function firstKnown(candidates: string[], known: Set<string>): string | null {
   return null
 }
 
+/** 相对路径基名 → 项目内文件:原样、补后缀、补 /index 三轮 */
+function matchJsFile(joined: string, known: Set<string>): string | null {
+  if (known.has(joined)) return joined
+  for (const ext of JS_EXTS) {
+    if (known.has(joined + ext)) return joined + ext
+  }
+  for (const ext of JS_EXTS) {
+    if (known.has(`${joined}/index${ext}`)) return `${joined}/index${ext}`
+  }
+  return null
+}
+
 /**
- * JS/TS 的相对导入('./x'、'../y/z')解析成项目内文件的 relPath。
- * 尝试原样、补后缀、补 /index 三轮;连不上记 unresolved(别名、css、动态路径这类)。
- * 非相对开头的(react、node:path、@scope/pkg)由 isExternalSpec 分流:外部包还是别名。
+ * JS/TS 导入解析成项目内文件的 relPath。
+ * 相对导入('./x'、'../y/z')按当前文件目录拼;非相对的先过 tsconfig 别名(@shared/x 这类),
+ * 别名不管的(react、node:path、@scope/pkg)再由 isExternalSpec 分流:外部包还是未知别名。
+ * 连不上记 unresolved(css、动态路径这类)。
  */
 function resolveJsImport({
   fromRel,
   spec,
-  known
+  known,
+  hints
 }: {
   fromRel: string
   spec: string
   known: Set<string>
+  hints: ImportHints
 }): ImportResolution {
-  if (!spec.startsWith('.')) return { to: null, external: isExternalSpec(spec) }
+  if (!spec.startsWith('.')) {
+    const aliased = resolveTsAlias(spec, hints.tsPaths, (base) => matchJsFile(base, known))
+    return aliased ?? { to: null, external: isExternalSpec(spec) }
+  }
   const base = fromRel.split('/').slice(0, -1)
   const normalized = normalizeParts([...base, ...spec.split('/')])
   if (!normalized) return { to: null, external: false }
-  const joined = normalized.join('/')
-  if (known.has(joined)) return { to: joined, external: false }
-  for (const ext of JS_EXTS) {
-    if (known.has(joined + ext)) return { to: joined + ext, external: false }
-  }
-  for (const ext of JS_EXTS) {
-    if (known.has(`${joined}/index${ext}`)) return { to: `${joined}/index${ext}`, external: false }
-  }
-  return { to: null, external: false }
+  return { to: matchJsFile(normalized.join('/'), known), external: false }
 }
 
 /**

@@ -597,3 +597,4 @@
 - feat(ui): 顶栏后退前进刷新悬停改走颜色,去掉位移放大与浅灰底
 - feat(ui): 窗控最小关闭放到 1.375rem,最大化收到 1rem
 - refactor(depgraph): 各语言导入翻译器从 index.ts 搬到 resolvers.ts,主流程只留扫描、探测布局与连边
+- fix(depgraph): 关系分析读项目根 tsconfig 的 paths 与 baseUrl 别名,@shared/x 这类导入连到项目内文件,不再算外部包;别名命中但连不上记 unresolved

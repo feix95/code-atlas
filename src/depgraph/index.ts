@@ -6,6 +6,7 @@ import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { RESOLVERS, type ImportHints } from './resolvers.ts'
+import { loadTsPathAliases } from './tsPaths.ts'
 import type {
   DepEdge,
   DepGraphResult,
@@ -44,7 +45,8 @@ async function detectImportHints(rootPath: string, known: Set<string>): Promise<
   )
   const javaRoots = hasMavenLayout ? ['src/main/java', ''] : ['']
   const rustRoot = [...known].some((f) => f.endsWith('.rs') && f.startsWith('src/')) ? 'src' : null
-  return { goModule, goDirs, javaRoots, rustRoot }
+  const tsPaths = await loadTsPathAliases(rootPath)
+  return { goModule, goDirs, javaRoots, rustRoot, tsPaths }
 }
 
 /**
