@@ -612,3 +612,4 @@
 - feat(depgraph): 模块切分先请出公共文件(入度大于 max(10, 有入度文件数的 5%),门槛记在 moduleConfig),其余文件分好后再按所在目录就近放回、当正式成员,目录里找不到模块时跟引用它最多的模块走;锚点仍按含公共文件的完整入度挑。本仓库 types.ts 回到 src/shared 模块,成员横跨 3 个以上目录的模块由 6 个降到 4 个
 - fix(depgraph): 自测文件识别补上 `tests/`、`test/`、`e2e/` 目录与 Go 的 `*_test.go`、Python 的 `test_*.py` / `*_test.py`、C# / Java / Kotlin 的 `*Test(s)` 命名;只认代码文件,`openapi.spec.json`、测试目录里的数据夹具不再被当成自测
 - fix(depgraph): tsconfig 的 baseUrl 越出项目根(绝对路径、盘符、../ 上跳)时这份配置的别名整体停用,不再悄悄改按配置所在目录解析 paths;样式里的 @import 相对路径找不到时也认 tsconfig 别名
+- fix(depgraph): 样式附挂先把 @import 图的强连通分量缩成点(Tarjan)再按拓扑序一次算完,环里的样式共同跟票;带回边成环的菱形 @import 长链不再随层数翻倍(22 层由超过 60 秒降到约 1 毫秒)

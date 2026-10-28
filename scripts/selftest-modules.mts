@@ -334,6 +334,49 @@ function checkStyleImportChainSpeed(): void {
   for (const f of files) assert.equal(moduleOf(map, f), undefined, `${f} 无人认领应未归类`)
 }
 
+/** 菱形 @import 长链再加一条从底层回到顶层的回边:整条链成一个环,撞环不缓存时重走次数随层数翻倍 */
+function checkStyleImportCycleSpeed(): void {
+  const depth = 22
+  const level = (i: number): string[] => {
+    const tag = String(i).padStart(2, '0')
+    return [`styles/c${tag}a.css`, `styles/c${tag}b.css`]
+  }
+  const styleLinks: StyleLink[] = []
+  for (let i = 0; i < depth; i++) {
+    for (const from of level(i + 1)) {
+      for (const to of level(i)) styleLinks.push({ from, to, kind: 'import', weight: 1 })
+    }
+  }
+  styleLinks.push({ from: level(0)[0], to: level(depth)[0], kind: 'import', weight: 1 })
+  const files = Array.from({ length: depth + 1 }, (_, i) => level(i)).flat()
+  const startedAt = performance.now()
+  const map = cutWithRuleParams({ ...twoClusterInput(), files, styleLinks })
+  const elapsed = performance.now() - startedAt
+  console.log(`  带回边的菱形 @import 环 ${depth} 层:${elapsed.toFixed(1)} ms`)
+  assert.ok(elapsed < 100, `带环的菱形 @import 链应很快算完,实际 ${elapsed.toFixed(0)} ms`)
+  for (const f of files) assert.equal(moduleOf(map, f), undefined, `${f} 无人认领应未归类`)
+  const link = (from: string, to: string, kind: StyleLink['kind']): StyleLink => ({
+    from,
+    to,
+    kind,
+    weight: 1
+  })
+  const ring = cutWithRuleParams({
+    ...twoClusterInput(),
+    files: ['styles/r1.css', 'styles/r2.css', 'styles/r3.css'],
+    styleLinks: [
+      link('styles/r1.css', 'styles/r2.css', 'import'),
+      link('styles/r2.css', 'styles/r3.css', 'import'),
+      link('styles/r3.css', 'styles/r1.css', 'import'),
+      link('b/b2.ts', 'styles/r2.css', 'usage')
+    ]
+  })
+  const b = moduleOf(ring, 'b/b1.tsx')
+  for (const f of ['styles/r1.css', 'styles/r2.css', 'styles/r3.css']) {
+    assert.equal(moduleOf(ring, f), b, `${f}: 环里有一份样式找到归属时,整个环跟它走`)
+  }
+}
+
 function checkTestFiles(): void {
   const base = twoClusterInput()
   const tests = ['scripts/selftest-a.mts', 'src/b/b.test.ts', 'scripts/selftest-none.mts']
@@ -664,6 +707,7 @@ async function main(): Promise<void> {
   checkAnchorStability()
   checkStyles()
   checkStyleImportChainSpeed()
+  checkStyleImportCycleSpeed()
   checkTestFiles()
   checkTestFilePatterns()
   checkHubWeight()
