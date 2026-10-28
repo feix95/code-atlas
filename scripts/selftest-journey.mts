@@ -1599,8 +1599,8 @@ try {
   await home()
   await control({ partial: true })
   await open(project)
-  // 分级扫描没探完:页脚只留计数,实情在树里「未扫描」徽章
-  await page.locator('.tree-badge.is-warn').filter({ hasText: '未扫描' }).waitFor()
+  // 分级扫描没探完:页脚只留计数;替身给根节点打 truncated,树上应亮「不完整」
+  await page.locator('.tree-badge.is-warn').filter({ hasText: '不完整' }).waitFor()
   assert.match(
     (await page.locator('.sidebar-footer .sidebar-counts').innerText()).trim(),
     /^\d+ \/ \d+$/,
