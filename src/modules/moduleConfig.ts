@@ -7,8 +7,11 @@ export const MODULE_ALGORITHM_VERSION = 1
 /** 同目录偏置边的权重(一条导入记 1,双向互引记 2) */
 export const MODULE_FOLDER_AFFINITY = 0.5
 
-/** Louvain 分辨率:越大切出的模块越多、越小 */
-export const MODULE_RESOLUTION = 1
+/**
+ * Louvain 分辨率:越大切出的模块越多、越小。2.5 为本仓库试跑定稿值(约 500 个可分析文件切出 19 个模块,
+ * 最大 57 个可分析成员);1 时只有 9 个模块且最大的一个装下 180 个文件,太粗。
+ */
+export const MODULE_RESOLUTION = 2.5
 
 /** 伪随机种子:固定后同一份代码每次切出同样的模块 */
 export const MODULE_SEED = 20261029

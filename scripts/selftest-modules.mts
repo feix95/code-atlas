@@ -71,8 +71,13 @@ function checkDeterminism(): void {
   assert.ok(map.modules.length > 1, '随机项目应切出多个模块')
 }
 
+// 规则类用例固定分辨率 1,只验证归属规则本身;调 MODULE_RESOLUTION 不应让这些用例跟着改。
+// 确定性与端到端用例走默认参数,覆盖定稿值。
+const RULE_PARAMS = { ...DEFAULT_MODULE_PARAMS, resolution: 1 }
+const cutWithRuleParams = (input: ModuleCutInput): ModuleMap => cutModules(input, RULE_PARAMS)
+
 function checkFolderBias(): void {
-  const weak = cutModules({
+  const weak = cutWithRuleParams({
     files: [],
     analyzable: ['a/a1.ts', 'a/a2.ts', 'a/a3.ts', 'b/b1.ts', 'b/b2.ts', 'b/b3.ts'],
     edges: [
@@ -98,7 +103,7 @@ function checkFolderBias(): void {
   )
 
   const pairs = ['x', 'y', 'z']
-  const strong = cutModules({
+  const strong = cutWithRuleParams({
     files: [],
     analyzable: pairs.flatMap((p) => [`ui/${p}.tsx`, `core/${p}.ts`]),
     edges: pairs.flatMap((p) => [
@@ -120,7 +125,7 @@ function checkFolderBias(): void {
 }
 
 function checkLooseFiles(): void {
-  const map = cutModules({
+  const map = cutWithRuleParams({
     files: [
       'README.md',
       'docs/guide.md',
@@ -151,7 +156,7 @@ function checkLooseFiles(): void {
   ])
   assert.deepEqual(module?.folders, ['a', 'a/assets'], 'folders 含就近归入文件的目录')
 
-  const tie = cutModules({
+  const tie = cutWithRuleParams({
     files: ['tie/readme.md'],
     analyzable: ['m1/p.ts', 'm1/q.ts', 'tie/a1.ts', 'm2/r.ts', 'm2/s.ts', 'tie/b1.ts'],
     edges: [
@@ -200,13 +205,13 @@ function checkAnchorStability(): void {
       e('s/a.ts', 't/x.ts')
     ]
   }
-  const before = cutModules(base)
+  const before = cutWithRuleParams(base)
   assert.deepEqual(
     before.modules.map((m) => m.id).sort(),
     ['m:s/hub.ts', 'm:t/hub.ts'],
     '锚点应为入度最高的 hub.ts'
   )
-  const after = cutModules({
+  const after = cutWithRuleParams({
     ...base,
     analyzable: [...base.analyzable, 's/new.ts'],
     edges: [...base.edges, e('s/new.ts', 's/hub.ts')]
@@ -217,7 +222,7 @@ function checkAnchorStability(): void {
     ['m:s/hub.ts', 'm:t/hub.ts'],
     '新增低入度文件后模块 id 不变'
   )
-  const tied = cutModules({
+  const tied = cutWithRuleParams({
     files: [],
     analyzable: ['t/b.ts', 't/a.ts'],
     edges: [e('t/a.ts', 't/b.ts'), e('t/b.ts', 't/a.ts')]
@@ -251,20 +256,28 @@ function checkSmallMerge(): void {
 }
 
 function checkEdgeCases(): void {
-  const empty = cutModules({ files: ['README.md'], analyzable: [], edges: [] })
+  const empty = cutWithRuleParams({ files: ['README.md'], analyzable: [], edges: [] })
   assert.deepEqual(empty.modules, [], '没有可分析文件时没有模块')
   assert.deepEqual(empty.fileToModule, {}, '没有模块时全部未归类')
-  const noEdges = cutModules({ files: ['a/x.css'], analyzable: ['a/x.ts', 'a/y.ts'], edges: [] })
+  const noEdges = cutWithRuleParams({
+    files: ['a/x.css'],
+    analyzable: ['a/x.ts', 'a/y.ts'],
+    edges: []
+  })
   assert.deepEqual(noEdges.modules, [], '全是孤立文件时没有模块')
-  const selfLoop = cutModules({ files: [], analyzable: ['a/x.ts'], edges: [e('a/x.ts', 'a/x.ts')] })
+  const selfLoop = cutWithRuleParams({
+    files: [],
+    analyzable: ['a/x.ts'],
+    edges: [e('a/x.ts', 'a/x.ts')]
+  })
   assert.deepEqual(selfLoop.modules, [], '自引用不算导入边')
-  const dangling = cutModules({
+  const dangling = cutWithRuleParams({
     files: [],
     analyzable: ['a/x.ts'],
     edges: [e('a/x.ts', 'a/ghost.ts')]
   })
   assert.deepEqual(dangling.modules, [], '端点不在可分析文件里的边被忽略')
-  const proto = cutModules({
+  const proto = cutWithRuleParams({
     files: [],
     analyzable: ['__proto__', 'constructor'],
     edges: [e('__proto__', 'constructor')]
