@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
-import { cutModules, type ModuleCutInput } from '../src/modules/cutModules.ts'
+import { cutModules, type ModuleCutInput, type StyleLink } from '../src/modules/cutModules.ts'
 import { mergeSmallCommunities } from '../src/modules/moduleAssign.ts'
 import { createSeededRandom } from '../src/modules/seededRandom.ts'
 import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
@@ -44,8 +44,15 @@ function randomProject(seed: number, dirs: number, perDir: number): ModuleCutInp
       if (analyzable.includes(to)) edges.push(e(from, to))
     }
   }
-  const files = [...analyzable, 'README.md', 'docs/guide.md', 'pkg0/dir0/style.css']
-  return { files, analyzable, edges }
+  const files = [...analyzable, 'README.md', 'docs/guide.md', 'pkg0/dir0/style.css', 'css/a.css']
+  const styleLinks: StyleLink[] = [
+    { from: 'pkg0/dir0/file0.ts', to: 'pkg0/dir0/style.css', kind: 'import', weight: 1 },
+    { from: 'pkg0/dir0/style.css', to: 'css/a.css', kind: 'import', weight: 1 },
+    ...analyzable
+      .filter(() => rand() < 0.1)
+      .map((from): StyleLink => ({ from, to: 'css/a.css', kind: 'usage', weight: 1 / 3 }))
+  ]
+  return { files, analyzable, edges, styleLinks }
 }
 
 function checkDeterminism(): void {
@@ -57,7 +64,8 @@ function checkDeterminism(): void {
     const shuffledInput: ModuleCutInput = {
       files: shuffled(input.files, rand),
       analyzable: shuffled(input.analyzable, rand),
-      edges: shuffled(input.edges, rand)
+      edges: shuffled(input.edges, rand),
+      styleLinks: shuffled(input.styleLinks ?? [], rand)
     }
     assert.equal(
       JSON.stringify(cutModules(shuffledInput)),
@@ -230,6 +238,77 @@ function checkAnchorStability(): void {
   assert.equal(tied.modules[0]?.anchor, 't/a.ts', '入度平票取字典序最小者')
 }
 
+/** 两个各成一团的目录 a、b(三角互引),中间只有一条弱引用;规则类用例共用 */
+function twoClusterInput(): ModuleCutInput {
+  return {
+    files: [],
+    analyzable: ['a/a1.ts', 'a/a2.ts', 'a/a3.ts', 'b/b1.tsx', 'b/b2.ts', 'b/b3.ts'],
+    edges: [
+      e('a/a1.ts', 'a/a2.ts'),
+      e('a/a2.ts', 'a/a3.ts'),
+      e('a/a3.ts', 'a/a1.ts'),
+      e('b/b1.tsx', 'b/b2.ts'),
+      e('b/b2.ts', 'b/b3.ts'),
+      e('b/b3.ts', 'b/b1.tsx'),
+      e('a/a1.ts', 'b/b1.tsx')
+    ]
+  }
+}
+
+function checkStyles(): void {
+  const base = twoClusterInput()
+  const styleFiles = [
+    'styles/main.css',
+    'styles/b.css',
+    'styles/tokens.css',
+    'styles/orphan.css',
+    'styles/loop1.css',
+    'styles/loop2.css',
+    'a/own.css'
+  ]
+  const link = (from: string, to: string, kind: StyleLink['kind'], weight = 1): StyleLink => ({
+    from,
+    to,
+    kind,
+    weight
+  })
+  const styleLinks = [
+    link('a/a1.ts', 'styles/main.css', 'import'),
+    link('styles/main.css', 'styles/b.css', 'import'),
+    link('styles/main.css', 'styles/tokens.css', 'import'),
+    link('b/b1.tsx', 'styles/b.css', 'usage', 2),
+    link('a/a2.ts', 'styles/b.css', 'usage', 0.5),
+    link('styles/loop1.css', 'styles/loop2.css', 'import'),
+    link('styles/loop2.css', 'styles/loop1.css', 'import')
+  ]
+  const plain = cutWithRuleParams({ ...base, files: styleFiles })
+  const map = cutWithRuleParams({ ...base, files: styleFiles, styleLinks })
+  const a = moduleOf(map, 'a/a1.ts')
+  const b = moduleOf(map, 'b/b1.tsx')
+  assert.ok(a && b && a !== b, '夹具应切出 a、b 两个模块')
+  assert.equal(moduleOf(map, 'styles/main.css'), a, '被代码文件直接导入的样式跟导入它的文件走')
+  assert.equal(moduleOf(map, 'styles/b.css'), b, '没被代码直接导入时,跟类名用得最多的模块走')
+  assert.equal(moduleOf(map, 'styles/tokens.css'), a, '只被样式 @import 的,跟导入它的样式走')
+  assert.equal(
+    moduleOf(map, 'styles/orphan.css'),
+    undefined,
+    '无人导入也无人使用,目录就近也找不到时未归类'
+  )
+  assert.equal(
+    moduleOf(map, 'styles/loop1.css'),
+    undefined,
+    '样式互相 @import 成环时不卡死,按就近归属处理'
+  )
+  assert.equal(moduleOf(map, 'a/own.css'), a, '没有任何关系的样式按目录就近归属')
+  for (const f of ['styles/main.css', 'styles/tokens.css']) {
+    assert.ok(map.modules.find((m) => m.id === a)?.attached.includes(f), `${f} 记为附挂文件`)
+  }
+  const membersOnly = (m: ModuleMap): string[][] =>
+    m.modules.map((mod) => mod.files.filter((f) => !mod.attached.includes(f)))
+  assert.deepEqual(membersOnly(map), membersOnly(plain), '样式只附挂,不参与社区发现')
+  assert.deepEqual(map.links, plain.links, '样式不产生模块间边')
+}
+
 function checkSmallMerge(): void {
   const inDegree = new Map<string, number>()
   assert.deepEqual(
@@ -305,6 +384,11 @@ async function checkDepGraphShape(): Promise<void> {
   )
   await put('src/ui/Button.tsx', "import { t } from '@shared/types'\nexport const b = t\n")
   await put('src/ui/app.css', 'body { margin: 0 }\n')
+  await put(
+    'src/ui/Card.tsx',
+    'import { b } from \'./Button\'\nexport const C = () => <div className="card-frame">{b}</div>\n'
+  )
+  await put('src/theme/card.css', '.card-frame { margin: 0 }\n')
   await put('src/shared/types.ts', 'export const t = 1\n')
   await put('README.md', '# demo\n')
   try {
@@ -319,7 +403,16 @@ async function checkDepGraphShape(): Promise<void> {
     assert.equal(
       moduleOf(modules, 'src/ui/app.css'),
       moduleOf(modules, 'src/ui/App.tsx'),
-      'css 就近归入'
+      'css 跟导入它的文件走'
+    )
+    assert.ok(
+      !graph.stats.unresolved.some((u) => u.spec.endsWith('.css')),
+      '存在的 css 导入不再记 unresolved'
+    )
+    assert.equal(
+      moduleOf(modules, 'src/theme/card.css'),
+      moduleOf(modules, 'src/ui/Card.tsx'),
+      '别的目录里的样式跟用到它类名的文件走'
     )
     assert.equal(moduleOf(modules, 'README.md'), undefined, '根目录 README 未归类')
     const text = JSON.stringify(modules)
@@ -335,6 +428,7 @@ async function main(): Promise<void> {
   checkFolderBias()
   checkLooseFiles()
   checkAnchorStability()
+  checkStyles()
   checkSmallMerge()
   checkEdgeCases()
   await checkDepGraphShape()

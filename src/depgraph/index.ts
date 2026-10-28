@@ -7,7 +7,8 @@ import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
 import { RESOLVERS, type ImportHints } from './resolvers.ts'
 import { loadTsPathAliases } from './tsPaths.ts'
-import { cutModules, type ModuleCutInput } from '../modules/cutModules.ts'
+import { collectStyleLinks, isStylePath, resolveStylePath, type SourceText } from './styles.ts'
+import { cutModules, type ModuleCutInput, type StyleLink } from '../modules/cutModules.ts'
 import type {
   DepEdge,
   DepGraphResult,
@@ -77,6 +78,9 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
   )
   const known = new Set(analyzable.map((f) => f.relPath))
   const hints = await detectImportHints(scan.rootPath, known)
+  const styleFiles = new Set(files.map((f) => f.relPath).filter(isStylePath))
+  const styleImports: StyleLink[] = []
+  const sources: SourceText[] = []
 
   const edgeSet = new Set<string>()
   const edges: DepEdge[] = []
@@ -107,10 +111,19 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       continue
     }
     analyzed++
+    sources.push({ relPath: file.relPath, code })
     // 没配翻译器的语言(C/C++/C# 这类)导入一律按外部包记,和它们过去的行为一致
     const resolve = RESOLVERS[languageId] ?? null
 
     for (const spec of structure.imports) {
+      const style = isStylePath(spec)
+        ? resolveStylePath(file.relPath, spec, styleFiles, hints.tsPaths)
+        : null
+      if (style) {
+        // 样式不是可分析文件,不进导入边;记成附挂线索交给模块切分
+        styleImports.push({ from: file.relPath, to: style, kind: 'import', weight: 1 })
+        continue
+      }
       const resolution = resolve
         ? resolve({ fromRel: file.relPath, spec, known, hints })
         : { to: null, external: true }
@@ -126,7 +139,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       } else if (resolution.external) {
         externalCount++
       } else {
-        // 项目内的引用却连不上(别名、css、动态路径、还没建的文件……)——老实记账
+        // 项目内的引用却连不上(别名、不存在的样式、动态路径、还没建的文件……)——老实记账
         unresolved.push({ from: file.relPath, spec })
       }
     }
@@ -152,7 +165,11 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
     modules: cutModulesOrNull({
       files: files.map((f) => f.relPath),
       analyzable: nodes.map((n) => n.relPath),
-      edges
+      edges,
+      styleLinks: [
+        ...styleImports,
+        ...(await collectStyleLinks(scan.rootPath, styleFiles, sources))
+      ]
     }),
     durationMs: Date.now() - startedAt
   }

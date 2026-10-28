@@ -603,3 +603,4 @@
 - chore(depgraph): 模块切分分辨率 MODULE_RESOLUTION 由 1 调到 2.5,本仓库从 9 个模块(最大 180 个文件)细分为 19 个;规则类自测固定分辨率 1,调参不再牵动
 - fix(depgraph): tsconfig 里纯 '*' 兜底别名连不上时交回外部包判定,不再把 react 这类依赖包记成断线
 - fix(depgraph): tsconfig 别名一条规则的多个目标按顺序逐个试;读根配置 references 里的 tsconfig.web.json / tsconfig.node.json,并跟相对 extends 链(防环),electron-vite 模板项目的别名也能连上
+- feat(depgraph): 样式文件(css/scss/less)导入能连上项目内文件,不再记 unresolved;模块切分把样式附挂到直接导入它的文件所在模块,其次是用到它类名最多的模块,再次跟着 @import 它的样式走,都没有才按目录就近归属;样式不参与社区发现

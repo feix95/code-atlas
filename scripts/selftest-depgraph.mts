@@ -4,6 +4,12 @@ import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
 import { parseTsPathAliases, resolveTsAlias } from '../src/depgraph/tsPaths.ts'
+import {
+  classUsageLinks,
+  extractCssClasses,
+  extractCssImports,
+  resolveStylePath
+} from '../src/depgraph/styles.ts'
 import type { DepGraphResult } from '../src/shared/types.ts'
 
 // 造一个迷你项目:TS 默认导入、省后缀相对导入、跨目录 ../、CommonJS require、
@@ -232,6 +238,68 @@ function runTsPathUnitCases(): void {
   )
   assert.equal(resolveTsAlias('@s/x', null, match), null, '没有 tsconfig 时不介入')
 }
+/** 样式文件的纯函数:@import 抽取、类名抽取、类名使用量、样式导入路径解析 */
+function runStyleUnitCases(): void {
+  assert.deepEqual(
+    extractCssImports(
+      "/* @import './commented.css'; */\n@import './a.css';\n@import url(\"../b.css\") screen;\n@import url(c.css);\n.x { background: url('./img.png') }\n"
+    ),
+    ['./a.css', '../b.css', 'c.css'],
+    '@import 三种写法都抽出,注释里的与 url() 背景图不算'
+  )
+  assert.deepEqual(
+    extractCssClasses(
+      "/* .ghost {} */\n.panel-card, .panel-card:hover > .title { margin: 0.5rem; background: url('a.png') }\n@media (min-width: 40rem) { .wide { padding: 1.5em } }\n:root { --gap: 0.25rem }\n"
+    ),
+    ['panel-card', 'title', 'wide'],
+    '只抽选择器里的类名,去重排序;数值小数、url 后缀、注释不算'
+  )
+  const links = classUsageLinks(
+    new Map([
+      ['s/panel.css', ['panel-card', 'shared']],
+      ['s/other.css', ['other-box']]
+    ]),
+    [
+      {
+        relPath: 'ui/Panel.tsx',
+        code: 'export const P = () => <div className="panel-card shared" />\n'
+      },
+      { relPath: 'ui/List.tsx', code: 'const cls = `shared ${x}`\nconst panelCard = 1\n' },
+      { relPath: 'ui/None.ts', code: 'const otherBox = 1 // other-box\n' }
+    ]
+  )
+  assert.deepEqual(
+    links,
+    [
+      { from: 'ui/List.tsx', to: 's/panel.css', kind: 'usage', weight: 0.5 },
+      { from: 'ui/Panel.tsx', to: 's/panel.css', kind: 'usage', weight: 1.5 }
+    ],
+    '类名只在字符串里算使用;多个文件共用的类名按使用文件数均分权重;注释与标识符不算'
+  )
+  const styleFiles = new Set(['src/assets/main.css', 'src/assets/css/a.css'])
+  assert.equal(
+    resolveStylePath('src/main.tsx', './assets/main.css', styleFiles, null),
+    'src/assets/main.css'
+  )
+  assert.equal(
+    resolveStylePath('src/assets/main.css', './css/a.css?inline', styleFiles, null),
+    'src/assets/css/a.css'
+  )
+  assert.equal(resolveStylePath('src/main.tsx', './assets/none.css', styleFiles, null), null)
+  assert.equal(resolveStylePath('src/main.tsx', '../../outside.css', styleFiles, null), null)
+  const aliases = parseTsPathAliases('{"compilerOptions":{"paths":{"@a/*":["src/assets/*"]}}}')
+  assert.equal(
+    resolveStylePath('src/x/y.tsx', '@a/main.css', styleFiles, aliases),
+    'src/assets/main.css',
+    '样式导入也认别名'
+  )
+  assert.equal(
+    resolveStylePath('src/x/y.tsx', 'pkg/dist/style.css', styleFiles, aliases),
+    null,
+    '依赖包的样式不连'
+  )
+}
+
 async function main(): Promise<void> {
   // 第一轮:JS/TS + Python 平铺的老场景,行为必须和以前一模一样
   const root = await makeFixture()
@@ -406,7 +474,25 @@ async function main(): Promise<void> {
     await fs.rm(dirname(refsRoot), { recursive: true, force: true })
   }
 
-  // 第六轮:tsconfig 坏掉(不是合法 JSONC)时行为与没有 tsconfig 一致
+  // 第六轮:存在的样式文件被导入时连得上,不再记 unresolved;不存在的仍记
+  const styleRoot = await makeProject('style-project', {
+    'src/main.tsx': "import './assets/main.css'\nimport './assets/ghost.css'\nexport const v = 1\n",
+    'src/assets/main.css': "@import './css/a.css';\n.app-shell { margin: 0 }\n",
+    'src/assets/css/a.css': '.panel { margin: 0 }\n'
+  })
+  try {
+    const graph = await buildDependencyGraph(styleRoot)
+    assert.deepEqual(
+      graph.stats.unresolved.map((u) => u.spec),
+      ['./assets/ghost.css'],
+      '存在的 css 连上,只有不存在的记 unresolved'
+    )
+    assert.deepEqual(graph.edges, [], '样式导入不进文件导入边(边两端必须都是可分析文件)')
+  } finally {
+    await fs.rm(dirname(styleRoot), { recursive: true, force: true })
+  }
+
+  // 第七轮:tsconfig 坏掉(不是合法 JSONC)时行为与没有 tsconfig 一致
   const brokenRoot = await makeProject('broken-tsconfig', {
     'tsconfig.json': '{ "compilerOptions": { "paths": { "@shared/*": ["./src/shared/*"] ',
     'src/a.ts': "import { x } from '@shared/x'\nexport const y = x\n",
@@ -421,6 +507,7 @@ async function main(): Promise<void> {
   }
 
   runTsPathUnitCases()
+  runStyleUnitCases()
 
   console.log('✅ 项目关系分析自测全部通过')
   console.log(
