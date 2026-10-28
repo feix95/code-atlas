@@ -1,4 +1,5 @@
-// 模块切分(模块层):导入图 → 社区发现 → 小社区合并 → 选锚点定 id → 样式附挂 → 无导入文件就近归属 → 模块间边。
+// 模块切分(模块层):导入图(去掉自测)→ 社区发现 → 小社区合并 → 选锚点定 id
+// → 样式附挂 → 自测附挂 → 无导入文件就近归属 → 模块间边。
 // 纯函数:不读文件、不调用 AI;同一输入无论顺序如何,永远得到同一结果。
 import type { DepEdge, ModuleInfo, ModuleLink, ModuleMap, ModuleParams } from '../shared/types.ts'
 import { detectCommunities } from './communities.ts'
@@ -10,6 +11,7 @@ import {
   type HomeCandidate
 } from './moduleAssign.ts'
 import { attachStyles } from './attachStyles.ts'
+import { attachTests, isTestFile } from './attachTests.ts'
 import { byCodeUnit, dirOf, sortedUnique } from './pathOrder.ts'
 
 export const MODULE_ID_PREFIX = 'm:'
@@ -37,6 +39,7 @@ interface ModuleDraft {
   anchor: string
   members: string[]
   attached: string[]
+  tests: string[]
 }
 
 /** 只留两端都是可分析文件的非自引用边,去重并排序 */
@@ -67,12 +70,13 @@ function countInDegree(edges: DepEdge[]): Map<string, number> {
 }
 
 function toModuleInfo(draft: ModuleDraft): ModuleInfo {
-  const files = sortedUnique([...draft.members, ...draft.attached])
+  const files = sortedUnique([...draft.members, ...draft.attached, ...draft.tests])
   return {
     id: draft.id,
     anchor: draft.anchor,
     files,
     attached: sortedUnique(draft.attached),
+    tests: sortedUnique(draft.tests),
     folders: sortedUnique(files.map(dirOf))
   }
 }
@@ -100,27 +104,41 @@ function attachLooseFiles(drafts: ModuleDraft[], loose: string[]): void {
   const findHome = createHomeFinder(toCandidates(drafts))
   for (const file of loose) {
     const home = findHome(dirOf(file))
-    if (home >= 0) drafts[home].attached.push(file)
+    if (home < 0) continue
+    if (isTestFile(file)) drafts[home].tests.push(file)
+    else drafts[home].attached.push(file)
   }
+}
+
+/** 样式与自测按链接投票附挂;返回已附挂的文件,它们不再走目录就近归属 */
+function attachByLinks(drafts: ModuleDraft[], input: ModuleCutInput, tests: string[]): Set<string> {
+  const candidates = toCandidates(drafts)
+  const styleHomes = attachStyles(candidates, sortStyleLinks(input.styleLinks ?? []))
+  for (const [style, home] of styleHomes) drafts[home].attached.push(style)
+  const allEdges = projectEdges(input.edges, new Set(input.analyzable))
+  const testHomes = attachTests(tests, candidates, allEdges)
+  for (const [test, home] of testHomes) drafts[home].tests.push(test)
+  return new Set([...styleHomes.keys(), ...testHomes.keys()])
 }
 
 export function cutModules(
   input: ModuleCutInput,
   params: ModuleParams = DEFAULT_MODULE_PARAMS
 ): ModuleMap {
-  const edges = projectEdges(input.edges, new Set(input.analyzable))
+  const tests = sortedUnique(input.analyzable.filter(isTestFile))
+  const testSet = new Set(tests)
+  const edges = projectEdges(input.edges, new Set(input.analyzable.filter((f) => !testSet.has(f))))
   const inDegree = countInDegree(edges)
   const connected = new Set(edges.flatMap((e) => [e.from, e.to]))
   const communities = detectCommunities(sortedUnique(connected), edges, params)
   const merged = mergeSmallCommunities(communities, inDegree, params.minFiles)
   const drafts = merged.map((members): ModuleDraft => {
     const anchor = pickAnchor(members, inDegree)
-    return { id: MODULE_ID_PREFIX + anchor, anchor, members, attached: [] }
+    return { id: MODULE_ID_PREFIX + anchor, anchor, members, attached: [], tests: [] }
   })
-  const styleHomes = attachStyles(toCandidates(drafts), sortStyleLinks(input.styleLinks ?? []))
-  for (const [style, home] of styleHomes) drafts[home].attached.push(style)
+  const linked = attachByLinks(drafts, input, tests)
   const loose = sortedUnique([...input.files, ...input.analyzable]).filter(
-    (f) => !connected.has(f) && !styleHomes.has(f)
+    (f) => !connected.has(f) && !linked.has(f)
   )
   attachLooseFiles(drafts, loose)
   const modules = drafts

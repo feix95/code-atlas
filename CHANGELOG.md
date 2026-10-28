@@ -604,3 +604,4 @@
 - fix(depgraph): tsconfig 里纯 '*' 兜底别名连不上时交回外部包判定,不再把 react 这类依赖包记成断线
 - fix(depgraph): tsconfig 别名一条规则的多个目标按顺序逐个试;读根配置 references 里的 tsconfig.web.json / tsconfig.node.json,并跟相对 extends 链(防环),electron-vite 模板项目的别名也能连上
 - feat(depgraph): 样式文件(css/scss/less)导入能连上项目内文件,不再记 unresolved;模块切分把样式附挂到直接导入它的文件所在模块,其次是用到它类名最多的模块,再次跟着 @import 它的样式走,都没有才按目录就近归属;样式不参与社区发现
+- feat(depgraph): 自测文件(`selftest-*`、`*.test.*`、`*.spec.*`、`__tests__/`)不参与模块切分,分完挂到它导入最多的模块,模块新增 tests 字段记相关自测;自测的导入不再把无关模块连在一起

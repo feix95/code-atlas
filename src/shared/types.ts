@@ -180,10 +180,12 @@ export interface ModuleInfo {
   id: string
   /** 模块内被引用最多的可分析文件 */
   anchor: string
-  /** 可分析成员 + 就近归入的文件,已排序 */
+  /** 可分析成员 + 附挂文件 + 相关自测,已排序 */
   files: string[]
-  /** files 中按目录就近归入的那部分(无导入关系的文件) */
+  /** files 中附挂进来的那部分:样式与无导入关系的文件,不参与社区发现 */
   attached: string[]
+  /** files 中挂靠进来的自测文件(不参与社区发现),侧栏显示为相关测试 */
+  tests: string[]
   /** 成员所在目录,已排序;项目根为 '' */
   folders: string[]
 }

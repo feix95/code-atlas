@@ -25,3 +25,13 @@ export const DEFAULT_MODULE_PARAMS: ModuleParams = {
   folderAffinity: MODULE_FOLDER_AFFINITY,
   minFiles: MODULE_MIN_FILES
 }
+
+/**
+ * 自测文件的路径特征。自测会同时引用很多被测文件,参与社区发现会把无关模块错连在一起;
+ * 命中的文件不参与切分,分完再挂到它导入最多的模块下(侧栏可显示为「相关测试」)。
+ */
+export const MODULE_TEST_FILE_PATTERNS: readonly RegExp[] = [
+  /(^|\/)selftest-[^/]+$/,
+  /\.(test|spec)\.[^/]+$/,
+  /(^|\/)__tests__\//
+]

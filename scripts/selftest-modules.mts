@@ -309,6 +309,55 @@ function checkStyles(): void {
   assert.deepEqual(map.links, plain.links, '样式不产生模块间边')
 }
 
+function checkTestFiles(): void {
+  const base = twoClusterInput()
+  const tests = ['scripts/selftest-a.mts', 'src/b/b.test.ts', 'scripts/selftest-none.mts']
+  const withTests: ModuleCutInput = {
+    files: [],
+    analyzable: [...base.analyzable, ...tests],
+    edges: [
+      ...base.edges,
+      e('scripts/selftest-a.mts', 'a/a1.ts'),
+      e('scripts/selftest-a.mts', 'a/a2.ts'),
+      e('scripts/selftest-a.mts', 'b/b2.ts'),
+      e('src/b/b.test.ts', 'b/b1.tsx'),
+      e('src/b/b.test.ts', 'b/b3.ts'),
+      e('src/b/b.test.ts', 'a/a3.ts'),
+      e('src/b/b.test.ts', 'scripts/selftest-a.mts')
+    ]
+  }
+  const plain = cutWithRuleParams(base)
+  const map = cutWithRuleParams(withTests)
+  const a = moduleOf(map, 'a/a1.ts')
+  const b = moduleOf(map, 'b/b1.tsx')
+  assert.ok(a && b && a !== b, '夹具应切出 a、b 两个模块')
+  const shape = (m: ModuleMap): unknown =>
+    m.modules.map((mod) => ({
+      id: mod.id,
+      anchor: mod.anchor,
+      members: mod.files.filter((f) => !mod.tests.includes(f))
+    }))
+  assert.deepEqual(shape(map), shape(plain), '自测文件不参与社区发现,也不影响锚点与 id')
+  assert.deepEqual(map.links, plain.links, '自测文件的导入不算模块间边')
+  assert.equal(moduleOf(map, 'scripts/selftest-a.mts'), a, '自测挂到它导入最多的模块')
+  assert.equal(moduleOf(map, 'src/b/b.test.ts'), b, '*.test.* 同样按自测处理,导入自测文件不算票')
+  assert.equal(
+    moduleOf(map, 'scripts/selftest-none.mts'),
+    undefined,
+    '什么都没导入的自测在根下目录里找不到模块时未归类'
+  )
+  assert.deepEqual(
+    map.modules.find((m) => m.id === a)?.tests,
+    ['scripts/selftest-a.mts'],
+    '模块记下相关自测'
+  )
+  assert.deepEqual(map.modules.find((m) => m.id === b)?.tests, ['src/b/b.test.ts'])
+  for (const m of map.modules) {
+    for (const t of m.tests)
+      assert.ok(!m.attached.includes(t), '自测单独记在 tests,不混进 attached')
+  }
+}
+
 function checkSmallMerge(): void {
   const inDegree = new Map<string, number>()
   assert.deepEqual(
@@ -429,6 +478,7 @@ async function main(): Promise<void> {
   checkLooseFiles()
   checkAnchorStability()
   checkStyles()
+  checkTestFiles()
   checkSmallMerge()
   checkEdgeCases()
   await checkDepGraphShape()
