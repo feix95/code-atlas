@@ -20,7 +20,9 @@ export const MENU_ICON_SIZE = 14
 /** 纯图标菜单的图标尺寸(对照视觉参考 icon-only;线宽走 TreeIcon 默认 2) */
 export const MENU_ICON_ONLY_SIZE = 17
 
-/** 窗控三键(最小化/最大化/关窗)的图标尺寸:主窗和独立子窗同一颗钮,同同一数据源 */
-export const WIN_ICON_SIZE = 18
+/** 窗控最小/关闭:1.375rem。主窗和独立子窗同一数据源 */
+export const WIN_ICON_MIN_CLOSE = 22
+/** 窗控最大化/还原:1rem。主窗和独立子窗同一数据源 */
+export const WIN_ICON_MAXIMIZE = 16
 /** rail 列图标本体:1.6rem,与 tokens.css --icon-rail 同值 */
 export const RAIL_ICON_SIZE = 1.6 * ROOT_FONT_BASE_PX

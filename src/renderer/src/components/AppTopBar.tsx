@@ -6,7 +6,7 @@ import type { NavLocation } from '../navHistory'
 import { IconArrowLeft, IconArrowRight, IconRefresh, TreeIcon } from './Icons'
 import { useWindowMaximized } from '../useWindowMaximized'
 import { isDeadSpace, startWindowDrag } from '../windowDrag'
-import { WIN_ICON_SIZE } from '../inputMetrics'
+import { WIN_ICON_MAXIMIZE, WIN_ICON_MIN_CLOSE } from '../inputMetrics'
 import { CH } from '@shared/ipcChannels'
 
 /** 顶栏图标本体 0.5u ≈ 32px@100%;24 栅格放到 32px,描边降一档才不闷(有效粗 ≈2px) */
@@ -223,7 +223,7 @@ export function AppTopBar({
           data-tip="最小化"
           aria-label="最小化"
         >
-          <TreeIcon name="minus" size={WIN_ICON_SIZE} mono />
+          <TreeIcon name="minus" size={WIN_ICON_MIN_CLOSE} mono />
         </button>
         <button
           type="button"
@@ -232,7 +232,7 @@ export function AppTopBar({
           data-tip={maximized ? '还原' : '最大化'}
           aria-label={maximized ? '还原' : '最大化'}
         >
-          <TreeIcon name={maximized ? 'restore' : 'maximize'} size={WIN_ICON_SIZE} mono />
+          <TreeIcon name={maximized ? 'restore' : 'maximize'} size={WIN_ICON_MAXIMIZE} mono />
         </button>
         <button
           type="button"
@@ -241,7 +241,7 @@ export function AppTopBar({
           data-tip="关闭"
           aria-label="关闭"
         >
-          <TreeIcon name="x" size={WIN_ICON_SIZE} mono />
+          <TreeIcon name="x" size={WIN_ICON_MIN_CLOSE} mono />
         </button>
       </div>
     </header>
