@@ -1,4 +1,5 @@
-// 模块切分(模块层):导入图(去掉自测)→ 社区发现 → 小社区合并 → 选锚点定 id
+// 模块切分(模块层):导入图(去掉自测)→ 请出公共文件 → 社区发现 → 小社区合并 → 公共文件按目录放回
+// → 选锚点定 id
 // → 样式附挂 → 自测附挂 → 无导入文件就近归属 → 模块间边。
 // 纯函数:不读文件、不调用 AI;同一输入无论顺序如何,永远得到同一结果。
 import type { DepEdge, ModuleInfo, ModuleLink, ModuleMap, ModuleParams } from '../shared/types.ts'
@@ -12,6 +13,7 @@ import {
 } from './moduleAssign.ts'
 import { attachStyles } from './attachStyles.ts'
 import { attachTests, isTestFile } from './attachTests.ts'
+import { findHubs, insertHubs } from './hubs.ts'
 import { byCodeUnit, dirOf, sortedUnique } from './pathOrder.ts'
 
 export const MODULE_ID_PREFIX = 'm:'
@@ -131,8 +133,19 @@ export function cutModules(
   const edges = projectEdges(input.edges, new Set(input.analyzable.filter((f) => !testSet.has(f))))
   const inDegree = countInDegree(edges)
   const connected = new Set(edges.flatMap((e) => [e.from, e.to]))
-  const communities = detectCommunities(sortedUnique(connected), edges, inDegree, params)
-  const merged = mergeSmallCommunities(communities, inDegree, params.minFiles)
+  const hubs = findHubs(inDegree, params)
+  const communities = detectCommunities(
+    sortedUnique(connected).filter((f) => !hubs.has(f)),
+    edges.filter((e) => !hubs.has(e.from) && !hubs.has(e.to)),
+    inDegree,
+    params
+  )
+  const merged = insertHubs(
+    mergeSmallCommunities(communities, inDegree, params.minFiles),
+    [...hubs],
+    edges,
+    inDegree
+  )
   const drafts = merged.map((members): ModuleDraft => {
     const anchor = pickAnchor(members, inDegree)
     return { id: MODULE_ID_PREFIX + anchor, anchor, members, attached: [], tests: [] }

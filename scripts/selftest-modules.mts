@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { cutModules, type ModuleCutInput, type StyleLink } from '../src/modules/cutModules.ts'
 import { mergeSmallCommunities, pickAnchor } from '../src/modules/moduleAssign.ts'
 import { hubWeight } from '../src/modules/communities.ts'
+import { findHubs, hubThreshold } from '../src/modules/hubs.ts'
 import { createSeededRandom } from '../src/modules/seededRandom.ts'
 import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
@@ -414,6 +415,75 @@ function checkHubWeight(): void {
   )
 }
 
+/** 公共文件(入度 > max(10, 有入度文件数的 5%))不参与社区发现,分完按目录就近放回、当正式成员 */
+function checkHubFiles(): void {
+  assert.equal(hubThreshold(50, DEFAULT_MODULE_PARAMS), 10, '小项目门槛保底 10')
+  assert.equal(hubThreshold(400, DEFAULT_MODULE_PARAMS), 20, '400 个有入度文件时门槛为 5% 即 20')
+  const degrees = new Map<string, number>([
+    ...Array.from({ length: 30 }, (_, i) => [`x/f${i}.ts`, 1] as [string, number]),
+    ['x/h1.ts', 11],
+    ['x/h2.ts', 10]
+  ])
+  assert.deepEqual([...findHubs(degrees, DEFAULT_MODULE_PARAMS)], ['x/h1.ts'], '入度要严格大于门槛')
+
+  const users = Array.from({ length: 11 }, (_, i) => `a/a${i}.ts`)
+  const pulled = cutWithRuleParams({
+    files: [],
+    analyzable: [...users, 'shared/types.ts', 'shared/x.ts', 'shared/y.ts'],
+    edges: [
+      ...users.map((f, i) => e(f, users[(i + 1) % users.length])),
+      ...users.map((f) => e(f, 'shared/types.ts')),
+      e('shared/x.ts', 'shared/y.ts'),
+      e('shared/y.ts', 'shared/x.ts')
+    ]
+  })
+  assert.equal(
+    moduleOf(pulled, 'shared/types.ts'),
+    moduleOf(pulled, 'shared/x.ts'),
+    '公共文件按所在目录放回,不被引用它的 a 目录吸走'
+  )
+  const dirs = ['a', 'b', 'c', 'd']
+  const files = dirs.flatMap((d) => [0, 1, 2, 3].map((i) => `${d}/${d}${i}.ts`))
+  const map = cutWithRuleParams({
+    files: [],
+    analyzable: [...files, 'shared/types.ts', 'shared/x.ts', 'shared/y.ts', 'lib/hub.ts'],
+    edges: [
+      ...dirs.flatMap((d) => [
+        e(`${d}/${d}0.ts`, `${d}/${d}1.ts`),
+        e(`${d}/${d}1.ts`, `${d}/${d}2.ts`),
+        e(`${d}/${d}2.ts`, `${d}/${d}3.ts`)
+      ]),
+      ...files.map((f) => e(f, 'shared/types.ts')),
+      e('shared/x.ts', 'shared/y.ts'),
+      e('shared/y.ts', 'shared/x.ts'),
+      e('shared/x.ts', 'shared/types.ts'),
+      ...files
+        .filter((f) => !f.endsWith('3.ts') || f.startsWith('b/'))
+        .map((f) => e(f, 'lib/hub.ts')),
+      e('c/c0.ts', 'b/b0.ts')
+    ]
+  })
+  const shared = map.modules.find((m) => m.files.includes('shared/x.ts'))
+  assert.ok(shared, '应有 shared 目录的模块')
+  assert.ok(shared.files.includes('shared/types.ts'), '公共文件按目录放回 shared 模块')
+  assert.ok(!shared.attached.includes('shared/types.ts'), '放回的公共文件是正式成员,不是附挂')
+  assert.equal(shared.anchor, 'shared/types.ts', '锚点按含公共文件在内的完整入度挑')
+  for (const d of dirs) {
+    const mod = map.modules.find((m) => m.files.includes(`${d}/${d}0.ts`))
+    assert.deepEqual(mod?.folders, d === 'b' ? ['b', 'lib'] : [d], `${d} 目录的模块只占自己的目录`)
+  }
+  const hubHome = moduleOf(map, 'lib/hub.ts')
+  assert.equal(hubHome, moduleOf(map, 'b/b0.ts'), '目录里找不到模块的公共文件,跟引用它最多的模块走')
+  assert.ok(
+    !map.modules.find((m) => m.id === hubHome)?.attached.includes('lib/hub.ts'),
+    '跟引用方走的公共文件同样是正式成员'
+  )
+  assert.ok(
+    map.links.some((l) => l.to === shared.id),
+    '公共文件的导入照样算模块间边'
+  )
+}
+
 function checkMajorityAnchor(): void {
   const inDegree = new Map([
     ['shared/ipc.ts', 10],
@@ -561,6 +631,7 @@ async function main(): Promise<void> {
   checkStyleImportChainSpeed()
   checkTestFiles()
   checkHubWeight()
+  checkHubFiles()
   checkMajorityAnchor()
   checkSmallMerge()
   checkEdgeCases()

@@ -24,11 +24,21 @@ export const MODULE_SEED = 20261029
 /** 成员数低于它的社区并入就近模块 */
 export const MODULE_MIN_FILES = 2
 
+/**
+ * 公共文件门槛:入度大于 max(MODULE_HUB_MIN_IN_DEGREE, MODULE_HUB_SHARE × 有入度的文件数) 的文件不参与社区发现,
+ * 分完按目录放回。按比例定门槛,大项目小项目都适用;保底 10 防止小项目里被引用几次的文件也被请出去。
+ * 2026-10-29 定稿;本仓库约 430 个有入度文件,门槛约 22,请出 6 个公共文件。
+ */
+export const MODULE_HUB_MIN_IN_DEGREE = 10
+export const MODULE_HUB_SHARE = 0.05
+
 export const DEFAULT_MODULE_PARAMS: ModuleParams = {
   resolution: MODULE_RESOLUTION,
   seed: MODULE_SEED,
   folderAffinity: MODULE_FOLDER_AFFINITY,
-  minFiles: MODULE_MIN_FILES
+  minFiles: MODULE_MIN_FILES,
+  hubMinInDegree: MODULE_HUB_MIN_IN_DEGREE,
+  hubShare: MODULE_HUB_SHARE
 }
 
 /**

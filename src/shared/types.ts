@@ -172,6 +172,9 @@ export interface ModuleParams {
   seed: number
   folderAffinity: number
   minFiles: number
+  /** 公共文件门槛:入度 > max(hubMinInDegree, hubShare × 有入度文件数) */
+  hubMinInDegree: number
+  hubShare: number
 }
 
 /** 程序切分的模块;成员只存 relPath */
