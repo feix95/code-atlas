@@ -286,6 +286,8 @@
   margin: 0;
   padding: 0;
   overflow-y: auto;
+  /* 滚动条槽常驻:内容宽不随出不出滚动条变,浮窗宽度(按内容宽算)也不会跟着跳 */
+  scrollbar-gutter: stable;
   list-style: none;
 }
 

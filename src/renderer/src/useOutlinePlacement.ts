@@ -308,11 +308,14 @@ export function useOutlinePlacement(
   const wanted = live ? live.placement : bounds ? capToContent(stored, bounds) : stored
   const shown = bounds ? clampByForm(wanted, bounds) : null
   const sized = isOpen && shown !== null
+  // 自适应宽显式落到向上取整的内容宽(不超过自适应上限),不再靠 CSS max-content:
+  // 吸回内容尺寸时右缘按 fitWidth 补偿,不取整的话实宽比它小零点几像素,浮窗会一次次往右挪
+  const autoWidth = bounds ? Math.min(bounds.fitWidth, bounds.autoMaxWidth) : undefined
   const style: React.CSSProperties | undefined = shown
     ? {
         right: shown.right,
         top: shown.top,
-        width: sized ? (shown.width ?? undefined) : undefined,
+        width: sized ? (shown.width ?? autoWidth) : undefined,
         maxWidth: sized && shown.width !== null ? 'none' : undefined,
         height: sized ? (shown.height ?? undefined) : undefined,
         maxHeight: sized && shown.height !== null ? 'none' : undefined
