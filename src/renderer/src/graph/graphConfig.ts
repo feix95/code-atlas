@@ -61,8 +61,11 @@ export const GRAPH_VIEW = {
   clickSlopPx: 4,
   /** 「适应画布」四周留白(屏幕像素) */
   fitPaddingPx: 48,
-  /** 首次布局稳定(alpha 低于此值)时若节点超出视口,自动适应一次 */
-  autoFitAlpha: 0.05
+  /** 「适应画布」最多放大到的比例:三两个节点的小层级不会被放得巨大 */
+  fitMaxScale: 1.5,
+  /** 首次布局稳定(alpha 低于此值)时自动适应一次:节点超出视口,或适应后能放大到当前比例的这么多倍 */
+  autoFitAlpha: 0.05,
+  autoFitGrowRatio: 1.25
 } as const
 
 export const GRAPH_LABEL = {

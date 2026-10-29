@@ -6,6 +6,7 @@ import type { Transform } from './drawGraph'
 import { GRAPH_VIEW } from './graphConfig'
 import { useGraphClicks } from './useGraphClicks'
 import { hitTest, localPoint } from './graphHit'
+import { clampScale, fitTransform } from './fitView'
 
 type Interaction =
   | { mode: 'idle' }
@@ -42,29 +43,6 @@ export interface GraphViewport {
   clearHover: () => void
   /** 平移视口让该节点落在画布中央;节点不在当前层返回 false */
   centerOn: (id: string) => boolean
-}
-
-function clampScale(k: number): number {
-  return Math.max(GRAPH_VIEW.minScale, Math.min(GRAPH_VIEW.maxScale, k))
-}
-
-export function fitTransform(scene: ForceScene | null, size: ViewportSize): Transform | null {
-  if (!scene || scene.nodes.length === 0 || size.w === 0) return null
-  let x0 = Infinity
-  let y0 = Infinity
-  let x1 = -Infinity
-  let y1 = -Infinity
-  for (const n of scene.nodes) {
-    x0 = Math.min(x0, n.x - n.r)
-    y0 = Math.min(y0, n.y - n.r)
-    x1 = Math.max(x1, n.x + n.r)
-    y1 = Math.max(y1, n.y + n.r)
-  }
-  const pad = GRAPH_VIEW.fitPaddingPx
-  const k = clampScale(
-    Math.min((size.w - pad * 2) / (x1 - x0 || 1), (size.h - pad * 2) / (y1 - y0 || 1), 1.5)
-  )
-  return { k, x: size.w / 2 - ((x0 + x1) / 2) * k, y: size.h / 2 - ((y0 + y1) / 2) * k }
 }
 
 function useCanvasSize(

@@ -12,6 +12,8 @@ import {
   moduleDetails,
   unassignedReason
 } from '../src/renderer/src/graph/moduleDetails.ts'
+import { fitTransform, shouldAutoFit } from '../src/renderer/src/graph/fitView.ts'
+import type { ForceScene } from '../src/renderer/src/graph/useForceLayout.ts'
 import type { LevelNode } from '../src/shared/graphView.ts'
 import type { ModuleInfo, ModuleMap } from '../src/shared/types.ts'
 
@@ -287,10 +289,48 @@ function checkDetails(): void {
   assert.match(unassignedReason('docs/a.md'), /没有可划分/)
 }
 
+/** 首次稳定后的自动适应:节点出界要缩小,整体挤在画布中间一小块也要放大;已经铺满就不动 */
+function checkAutoFit(): void {
+  const sceneOf = (points: Array<[number, number]>): ForceScene =>
+    ({
+      dirRel: '',
+      links: [],
+      nodes: points.map(([x, y], i) => ({ id: `n${i}`, x, y, r: 10 }))
+    }) as unknown as ForceScene
+  const size = { w: 1000, h: 800, dpr: 1 }
+  const origin = { k: 1, x: size.w / 2, y: size.h / 2 }
+  const small = sceneOf([
+    [-120, -90],
+    [120, 90],
+    [0, 0]
+  ])
+  assert.equal(shouldAutoFit(small, origin, size), true, '只占画布一小块时自动放大')
+  const fitted = fitTransform(small, size)
+  assert.ok(fitted && fitted.k > 1, '放大后比例大于 1')
+  assert.ok(fitted && fitted.k <= 1.5, '放大有上限,三两个节点不会被放得巨大')
+  assert.equal(
+    shouldAutoFit(small, { k: 1.5, ...{ x: 500, y: 400 } }, size),
+    false,
+    '已到放大上限不再动'
+  )
+  const wide = sceneOf([
+    [-800, 0],
+    [800, 0]
+  ])
+  assert.equal(shouldAutoFit(wide, origin, size), true, '节点出界时自动缩小')
+  const snug = sceneOf([
+    [-400, -300],
+    [400, 300]
+  ])
+  assert.equal(shouldAutoFit(snug, origin, size), false, '已基本铺满画布时不动')
+  assert.equal(fitTransform(sceneOf([]), size), null, '空场景不适应')
+}
+
 checkConvexHull()
 checkCircleHull()
 checkDetails()
 checkOverlay()
 checkClusterForce()
 checkDisplayName()
+checkAutoFit()
 console.log('selftest-graphmodules: 全部通过')

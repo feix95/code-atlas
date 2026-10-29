@@ -11,6 +11,7 @@ import {
 import type { ForceScene } from './useForceLayout'
 import type { ModuleDrawState } from './drawModules'
 import type { ViewportSize } from './useGraphViewport'
+import { shouldAutoFit } from './fitView'
 import { GRAPH_MOTION, GRAPH_VIEW } from './graphConfig'
 
 interface Typography {
@@ -42,14 +43,6 @@ export interface GraphRender {
   setHover: (id: string | null) => void
   /** 切换层级前调用:把当前层存为淡出快照,并重置自动适应 */
   beginLevelTransition: () => void
-}
-
-function isOutside(scene: ForceScene, tf: Transform, size: ViewportSize): boolean {
-  return scene.nodes.some((n) => {
-    const sx = n.x * tf.k + tf.x
-    const sy = n.y * tf.k + tf.y
-    return sx < 0 || sy < 0 || sx > size.w || sy > size.h
-  })
 }
 
 type HoverMotion = HoverState & { target: number; last: number }
@@ -135,7 +128,7 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
       }
       if (scene && !lv.autoFitted && r.alpha() < GRAPH_VIEW.autoFitAlpha) {
         lv.autoFitted = true
-        if (isOutside(scene, tf, size)) r.fit()
+        if (shouldAutoFit(scene, tf, size)) r.fit()
       }
       return more
     },
