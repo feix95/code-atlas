@@ -1,13 +1,16 @@
 // 大纲的现场账:正文换了就重收标题、滚动时算当前节、点条目在预览栏里平滑滚过去。
 // 只滚预览栏自己(scrollTo),不用 scrollIntoView —— 那会连带把外层布局一起滚动。
+// 标题元素按「正文顺序」现取(number 对 number),不依赖挂在节点上的临时编号:
+// 编号在正文重挂时会丢(Word 大文档遇到过),标题顺序不会变。
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
-import { activeOutlineId, collectOutline, OUTLINE_ATTR, type OutlineItem } from './docOutline'
+import { activeOutlineId, collectOutline, outlineHeadingEls, type OutlineItem } from './docOutline'
 
 /** 读线落在视口上方这个比例处:标题滚过它就算进入这一节 */
 const READING_LINE_RATIO = 0.25
 
-function headingEl(view: HTMLElement, id: string): HTMLElement | null {
-  return view.querySelector<HTMLElement>(`[${OUTLINE_ATTR}="${CSS.escape(id)}"]`)
+function headingEl(view: HTMLElement, items: OutlineItem[], id: string): HTMLElement | null {
+  const index = items.findIndex((item) => item.id === id)
+  return index < 0 ? null : (outlineHeadingEls(view)[index] ?? null)
 }
 
 function offsetIn(view: HTMLElement, el: HTMLElement): number {
@@ -40,8 +43,14 @@ export function useDocOutline(
     const measure = (): void => {
       frame = 0
       const line = view.clientHeight * READING_LINE_RATIO
-      const heads = items.flatMap((item) => {
-        const el = headingEl(view, item.id)
+      const els = outlineHeadingEls(view)
+      // 正文节点被整棵换过(Word 预览重挂):按新 DOM 重收,免得旧条目指错
+      if (els.length !== items.length) {
+        setItems(collectOutline(view))
+        return
+      }
+      const heads = items.flatMap((item, i) => {
+        const el = els[i]
         return el ? [{ id: item.id, top: offsetIn(view, el) }] : []
       })
       setActiveId(activeOutlineId(heads, line))
@@ -60,7 +69,7 @@ export function useDocOutline(
   const jumpTo = useCallback(
     (id: string): void => {
       const view = viewRef.current
-      const el = view ? headingEl(view, id) : null
+      const el = view ? headingEl(view, items, id) : null
       if (!view || !el) return
       const padTop = parseFloat(getComputedStyle(view).paddingTop) || 0
       view.scrollTo({
@@ -68,7 +77,7 @@ export function useDocOutline(
         behavior: prefersReducedMotion(view) ? 'auto' : 'smooth'
       })
     },
-    [viewRef]
+    [viewRef, items]
   )
 
   return { items, activeId, jumpTo }

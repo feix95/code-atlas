@@ -5,7 +5,13 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Locator, Page } from 'playwright'
 import { buildDocx, docxXml } from './docx-fixture.mts'
-import { checkCircleDrag, revealBar } from './journey-outline-gesture.mts'
+import {
+  checkCircleDrag,
+  headingOffset,
+  revealBar,
+  waitHeadingNearTop
+} from './journey-outline-gesture.mts'
+import { checkOutlineDock } from './journey-outline-dock.mts'
 import { checkOutlinePlacement } from './journey-outline-placement.mts'
 
 const FILLER = 'Lorem ipsum dolor sit amet, reading line filler text. '.repeat(12)
@@ -52,29 +58,6 @@ async function checkItemType(outline: Locator): Promise<void> {
 
 async function openFile(page: Page, name: string): Promise<void> {
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: name }).click()
-}
-
-/** 当前可见那扇阅读栏里,某个标题离栏顶多远(px);找不到回 null(保活的隐藏签不算) */
-async function headingOffset(page: Page, text: string): Promise<number | null> {
-  return page.evaluate((wanted) => {
-    const view = [...document.querySelectorAll('.code-view.is-reading')].find(
-      (el) => el.getClientRects().length > 0
-    )
-    const head = [...(view?.querySelectorAll('.md-h') ?? [])].find(
-      (el) => el.textContent?.trim() === wanted
-    )
-    if (!view || !head) return null
-    return head.getBoundingClientRect().top - view.getBoundingClientRect().top
-  }, text)
-}
-
-async function waitHeadingNearTop(page: Page, text: string): Promise<void> {
-  for (let tries = 0; tries < 60; tries++) {
-    const gap = await headingOffset(page, text)
-    if (gap !== null && gap >= 0 && gap < 80) return
-    await page.waitForTimeout(50)
-  }
-  assert.fail(`clicking the outline must scroll "${text}" to the top of the preview`)
 }
 
 async function checkMdOutline(page: Page, shot: (name: string) => Promise<unknown>): Promise<void> {
@@ -135,6 +118,7 @@ async function checkMdOutline(page: Page, shot: (name: string) => Promise<unknow
     'Enter jumps to the focused item'
   )
   await checkOutlinePlacement(page)
+  await checkOutlineDock(page, shot, MD_SECTIONS)
   await lock.click()
 }
 

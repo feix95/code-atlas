@@ -58,7 +58,9 @@ export function CodePreview({
   onAddRef,
   jump,
   fileLinks,
-  onRenameFile
+  onRenameFile,
+  outlineOwner,
+  outlineDockOwner
 }: {
   rootPath: string
   file: ScanFileNode
@@ -74,6 +76,10 @@ export function CodePreview({
   /** 内联标题改名通道:递新主名进回调,拿 RenameOutcome 回执;
       不传 = 标题只展示(live/阅读两档共用) */
   onRenameFile?: (base: string) => Promise<RenameOutcome>
+  /** 页签 id:大纲快照按它登记,停靠到左栏时那边接着画 */
+  outlineOwner?: string
+  /** 当前停靠位认的那张签:对上了大纲浮窗才让位给左栏 */
+  outlineDockOwner?: string | null
 }): React.JSX.Element {
   const codeViewRef = useRef<HTMLDivElement>(null)
   // 按文件记账(读稿/编辑稿/提示/改名回执)全在 usePreviewDoc
@@ -227,6 +233,8 @@ export function CodePreview({
           docZoom={docZoom}
           onReadContextMenu={onReadContextMenu}
           onRename={rename}
+          outlineOwner={outlineOwner}
+          outlineDockOwner={outlineDockOwner}
         />
       )}
       {!err && result?.status === 'ok' && (
@@ -241,6 +249,8 @@ export function CodePreview({
               docZoom={docZoom}
               label={`${file.relPath} 的阅读模式,全文可滚;按 Ctrl+A 复制全文`}
               outlineKey={sourceBlocks.length > 0 ? undefined : text}
+              outlineOwner={outlineOwner}
+              outlineDockOwner={outlineDockOwner}
               onContextMenu={onReadContextMenu}
             >
               {sourceBlocks.length > 0 ? (
@@ -269,6 +279,8 @@ export function CodePreview({
               viewRef={codeViewRef}
               docZoom={docZoom}
               label={`${file.relPath} 的对照阅读,全文可滚;按 Ctrl+A 复制全文`}
+              outlineOwner={outlineOwner}
+              outlineDockOwner={outlineDockOwner}
               onContextMenu={onReadContextMenu}
             >
               <InlineTitle title={baseTitle} onRename={rename} />

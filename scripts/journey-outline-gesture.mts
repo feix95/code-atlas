@@ -12,6 +12,30 @@ async function centerOf(loc: Locator): Promise<{ x: number; y: number }> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
+/** 当前可见那扇阅读栏里,某个标题离栏顶多远(px);找不到回 null(保活的隐藏签不算) */
+export async function headingOffset(page: Page, text: string): Promise<number | null> {
+  return page.evaluate((wanted) => {
+    const view = [...document.querySelectorAll('.code-view.is-reading')].find(
+      (el) => el.getClientRects().length > 0
+    )
+    const head = [...(view?.querySelectorAll('.md-h') ?? [])].find(
+      (el) => el.textContent?.trim() === wanted
+    )
+    if (!view || !head) return null
+    return head.getBoundingClientRect().top - view.getBoundingClientRect().top
+  }, text)
+}
+
+/** 等某个标题滚到阅读栏顶附近(大纲跳转落位) */
+export async function waitHeadingNearTop(page: Page, text: string): Promise<void> {
+  for (let tries = 0; tries < 60; tries++) {
+    const gap = await headingOffset(page, text)
+    if (gap !== null && gap >= 0 && gap < 80) return
+    await page.waitForTimeout(50)
+  }
+  assert.fail(`clicking the outline must scroll "${text}" to the top of the preview`)
+}
+
 /** 等悬停拖动条露面(可见且停留延迟走完)或隐去(visibility:hidden);inside 是浮窗或其中任一元素 */
 export async function waitBar(inside: Locator, shown: boolean): Promise<void> {
   await inside.evaluate(

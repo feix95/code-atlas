@@ -27,6 +27,9 @@ interface NonTextProps {
   docZoom: number
   onReadContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void
   onRename?: (base: string) => Promise<RenameOutcome>
+  /** 页签 id 与当前停靠位:Word 签的大纲浮窗靠它们决定让不让位给左栏 */
+  outlineOwner?: string
+  outlineDockOwner?: string | null
 }
 
 function mediaBody(props: NonTextProps, fileName: string): React.JSX.Element | null {
@@ -60,6 +63,8 @@ function mediaBody(props: NonTextProps, fileName: string): React.JSX.Element | n
         docZoom={props.docZoom}
         onContextMenu={props.onReadContextMenu}
         onRename={onRename}
+        outlineOwner={props.outlineOwner}
+        outlineDockOwner={props.outlineDockOwner}
       />
     )
   }

@@ -248,6 +248,38 @@
   border-radius: var(--radius-xs);
   background: currentColor;
 }
+
+/* 拖动条上的「停靠到左栏」钮:与收起横线同一档暗度、同一个身位(1.75rem x 整条高) */
+.doc-outline.is-open .doc-outline-dockbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--outline-toggle-w);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.doc-outline.is-open .doc-outline-dockbtn:hover {
+  color: var(--muted);
+}
+
+/* 拖到左栏上方:浮窗淡下去,让左栏那圈落位框说话(退回时同样淡回来) */
+.doc-outline.is-dock-ready {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .doc-outline.is-open {
+    transition: opacity var(--dur-2) var(--ease-smooth);
+  }
+}
+
 .doc-outline-list {
   flex: 1 1 auto;
   min-height: 0;

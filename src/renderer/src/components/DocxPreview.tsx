@@ -38,7 +38,9 @@ export function DocxPreview({
   viewRef,
   docZoom,
   onContextMenu,
-  onRename
+  onRename,
+  outlineOwner,
+  outlineDockOwner
 }: {
   rootPath: string
   relPath: string
@@ -49,6 +51,9 @@ export function DocxPreview({
   docZoom: number
   onContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void
   onRename?: (base: string) => Promise<RenameOutcome>
+  /** 页签 id 与当前停靠位:大纲浮窗靠它们决定让不让位给左栏 */
+  outlineOwner?: string
+  outlineDockOwner?: string | null
 }): React.JSX.Element {
   const bodyRef = useRef<HTMLDivElement>(null)
   const view = useDocxConversion(rootPath, relPath, docx)
@@ -86,6 +91,8 @@ export function DocxPreview({
       docZoom={docZoom}
       label={`${fileName} 的 Word 预览,可滚动阅读全文`}
       outlineKey={html ?? undefined}
+      outlineOwner={outlineOwner}
+      outlineDockOwner={outlineDockOwner}
       onContextMenu={onContextMenu}
       onKeyDown={onBodyKeyDown}
     >

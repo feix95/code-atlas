@@ -4,18 +4,23 @@
 // 只认真标题:Word 的「标题 1/2…」样式、md 的 #;加粗的普通段落不算。
 
 export interface OutlineItem {
-  /** 本篇内唯一、同一份正文每次算都一样的编号(挂在标题元素的 data-outline-id 上) */
+  /** 本篇内唯一、同一份正文每次算都一样的编号(按标题文字算,重名加序号) */
   id: string
   /** 1~6 */
   level: number
+  /** 空白收拢后的标题文字 */
   text: string
 }
-
-export const OUTLINE_ATTR = 'data-outline-id'
 
 const LEVEL_CLASS = /(?:^|\s)md-h([1-6])(?:\s|$)/
 const NON_WORD = /[^\p{L}\p{N}]+/gu
 const FALLBACK_SLUG = 'section'
+
+interface FoundHeading {
+  el: HTMLElement
+  level: number
+  text: string
+}
 
 /** 标题元素是第几级;不是阅读档标题回 null */
 export function headingLevelOf(el: Element): number | null {
@@ -45,19 +50,27 @@ export function outlineIds(texts: string[]): string[] {
   })
 }
 
-/** 从已上屏的正文里收大纲,顺手给每个标题挂上编号;没有标题回空数组 */
-export function collectOutline(root: Element): OutlineItem[] {
-  const found: Array<{ el: Element; level: number; text: string }> = []
-  for (const el of root.querySelectorAll('.md-h')) {
+/** 正文里的真标题,按文档顺序;不往 DOM 上挂临时属性 —— 正文重挂时属性会丢 */
+function findHeadings(root: Element): FoundHeading[] {
+  const found: FoundHeading[] = []
+  for (const el of root.querySelectorAll<HTMLElement>('.md-h')) {
     const level = headingLevelOf(el)
     const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
     if (level !== null && text !== '') found.push({ el, level, text })
   }
+  return found
+}
+
+/** 真标题元素,顺序与 collectOutline 的条目一一对应(跳转与读线按这个顺序取) */
+export function outlineHeadingEls(root: Element): HTMLElement[] {
+  return findHeadings(root).map((head) => head.el)
+}
+
+/** 从已上屏的正文里收大纲;没有标题回空数组 */
+export function collectOutline(root: Element): OutlineItem[] {
+  const found = findHeadings(root)
   const ids = outlineIds(found.map((h) => h.text))
-  return found.map((h, i) => {
-    h.el.setAttribute(OUTLINE_ATTR, ids[i])
-    return { id: ids[i], level: h.level, text: h.text }
-  })
+  return found.map((h, i) => ({ id: ids[i], level: h.level, text: h.text }))
 }
 
 /** 缩进档:按本篇出现过的最浅一级算起,只有 h2/h3 的文档不会整体空出一格 */

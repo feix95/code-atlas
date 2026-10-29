@@ -31,6 +31,7 @@ import {
   sameBounds,
   type OutlineRefs
 } from './outlineMeasure'
+import type { OutlineDropTarget } from './outlineDock'
 
 /** 方向键一步挪多远(rem);按住 Shift 走大步 */
 const NUDGE_REM = 1
@@ -88,11 +89,15 @@ export function useOutlinePlacement(
   refs: OutlineRefs,
   isOpen: boolean,
   /** 条目列表的指纹(换了文档就变):变了要重量内容宽 */
-  contentKey: unknown
+  contentKey: unknown,
+  /** 拖动落点(左栏能收留时才给):命中就在松手时改停靠,不再存位置账 */
+  dropTarget?: OutlineDropTarget
 ): {
   style: React.CSSProperties | undefined
   isDragging: boolean
   isSnapping: boolean
+  /** 浮窗此刻拖在落点上(左栏已亮起落位框) */
+  isOverDock: boolean
   /** 刚结束的是一次真拖动吗(读一次就清零):圆钮据此决定松手后的 click 要不要展开 */
   consumeDrag: () => boolean
   grip: React.HTMLAttributes<HTMLElement>
@@ -104,6 +109,19 @@ export function useOutlinePlacement(
   const gestureRef = useRef<Gesture | null>(null)
   const snapTimerRef = useRef(0)
   const draggedRef = useRef(false)
+  const dropRef = useRef(dropTarget)
+  useLayoutEffect(() => {
+    dropRef.current = dropTarget
+  }, [dropTarget])
+  const [overDock, setOverDock] = useState(false)
+  const overDockRef = useRef(false)
+  // 落点开合的每一跳都通知外面:左栏据此亮/灭落位框
+  const setOver = useCallback((next: boolean): void => {
+    if (overDockRef.current === next) return
+    overDockRef.current = next
+    setOverDock(next)
+    dropRef.current?.onHot?.(next)
+  }, [])
   const { viewRef, panelRef } = refs
   const { measure, invalidate } = useMeasure(refs)
   // 位置夹边按屏上形态量:展开时手动宽高就是屏上的宽高;收起时只剩圆钮,存下的展开宽高不能拿来算
@@ -143,41 +161,53 @@ export function useOutlinePlacement(
    * 收尾一次手势:挪过才落盘(必要时吸回内容尺寸),只是按了一下就当没发生。
    * 松手、指针取消、丢了指针捕获(页签被藏起来、元素被拆)、窗口失焦、页面转入后台、
    * 换文档、卸载,都走这里 —— 任何一条路都不会让拖动态残留。
+   * commit 只有「用户真的松手」才为 true:拖在左栏上方时改成停靠(位置账原样留着),
+   * 失焦/卸载这类半路收尾不许替人做停靠决定。
    */
-  const endGesture = useCallback((): void => {
-    const g = gestureRef.current
-    if (!g) return
-    gestureRef.current = null
-    if (!g.hasMoved) return
-    // 只拦紧跟在这次松手后面的那一下 click(同一轮输入事件里派发,早于任何定时器),
-    // 过后清零,免得拖完面板再去点圆钮时被误拦
-    draggedRef.current = true
-    window.setTimeout(() => {
-      draggedRef.current = false
-    }, 0)
-    const b = measure() ?? g.bounds
-    const settled = g.kind === 'resize' ? settleResize(g.last, b) : g.last
-    setOutlinePlacement(settled)
-    if (settled.width === g.last.width && settled.height === g.last.height) {
-      setLive(null)
-      return
-    }
-    // 先以显式像素尺寸过渡到内容尺寸,过渡完再交给自适应档
-    setLive({ phase: 'snap', placement: snapFrame(settled, g.last, b) })
-    snapTimerRef.current = window.setTimeout(() => setLive(null), SNAP_SETTLE_MS)
-  }, [measure])
+  const endGesture = useCallback(
+    (commit: boolean): void => {
+      const g = gestureRef.current
+      if (!g) return
+      gestureRef.current = null
+      const dropped = commit && g.kind === 'move' && overDockRef.current
+      setOver(false)
+      if (!g.hasMoved) return
+      // 只拦紧跟在这次松手后面的那一下 click(同一轮输入事件里派发,早于任何定时器),
+      // 过后清零,免得拖完面板再去点圆钮时被误拦
+      draggedRef.current = true
+      window.setTimeout(() => {
+        draggedRef.current = false
+      }, 0)
+      if (dropped) {
+        dropRef.current?.onDrop()
+        return
+      }
+      const b = measure() ?? g.bounds
+      const settled = g.kind === 'resize' ? settleResize(g.last, b) : g.last
+      setOutlinePlacement(settled)
+      if (settled.width === g.last.width && settled.height === g.last.height) {
+        setLive(null)
+        return
+      }
+      // 先以显式像素尺寸过渡到内容尺寸,过渡完再交给自适应档
+      setLive({ phase: 'snap', placement: snapFrame(settled, g.last, b) })
+      snapTimerRef.current = window.setTimeout(() => setLive(null), SNAP_SETTLE_MS)
+    },
+    [measure, setOver]
+  )
 
-  // 手势进行中窗口失焦、页面转入后台:松手事件可能永远到不了,主动收尾
+  // 手势进行中窗口失焦、页面转入后台:松手事件可能永远到不了,主动收尾(不算停靠)
   useEffect(() => {
+    const abort = (): void => endGesture(false)
     const onHidden = (): void => {
-      if (document.visibilityState === 'hidden') endGesture()
+      if (document.visibilityState === 'hidden') abort()
     }
-    window.addEventListener('blur', endGesture)
+    window.addEventListener('blur', abort)
     document.addEventListener('visibilitychange', onHidden)
     return () => {
-      window.removeEventListener('blur', endGesture)
+      window.removeEventListener('blur', abort)
       document.removeEventListener('visibilitychange', onHidden)
-      endGesture()
+      abort()
     }
   }, [endGesture, contentKey])
 
@@ -196,6 +226,7 @@ export function useOutlinePlacement(
         window.clearTimeout(snapTimerRef.current)
         setLive(null)
         draggedRef.current = false
+        setOver(false)
         const start = clampByForm(capToContent(getOutlinePlacement(), b), b)
         const from = { width: panel.offsetWidth, height: panel.offsetHeight }
         gestureRef.current = {
@@ -210,7 +241,7 @@ export function useOutlinePlacement(
           hasMoved: false
         }
       },
-    [measure, panelRef, clampByForm]
+    [measure, panelRef, clampByForm, setOver]
   )
 
   const onPointerMove = useCallback(
@@ -226,13 +257,22 @@ export function useOutlinePlacement(
           ? moveByForm(g.start, dx, dy, g.bounds)
           : resizePlacement(g.start, g.from, dx, dy, g.bounds)
       setLive({ phase: 'drag', placement: g.last })
+      // 只有挪位置才认落点;拉尺寸怎么拉都不该把面板送走
+      setOver(g.kind === 'move' && (dropRef.current?.hit(e.clientX, e.clientY) ?? false))
     },
-    [moveByForm]
+    [moveByForm, setOver]
   )
 
-  const finish = useCallback(
+  const finishOk = useCallback(
     (e: React.PointerEvent<HTMLElement>): void => {
-      if (gestureRef.current?.pointerId === e.pointerId) endGesture()
+      if (gestureRef.current?.pointerId === e.pointerId) endGesture(true)
+    },
+    [endGesture]
+  )
+
+  const finishAbort = useCallback(
+    (e: React.PointerEvent<HTMLElement>): void => {
+      if (gestureRef.current?.pointerId === e.pointerId) endGesture(false)
     },
     [endGesture]
   )
@@ -280,9 +320,9 @@ export function useOutlinePlacement(
     : undefined
   const pointer = {
     onPointerMove,
-    onPointerUp: finish,
-    onPointerCancel: finish,
-    onLostPointerCapture: finish,
+    onPointerUp: finishOk,
+    onPointerCancel: finishAbort,
+    onLostPointerCapture: finishAbort,
     // 鼠标按下不抢焦点:否则松手后按钮留着焦点,切走再切回来焦点复原,顶边条就一直亮着
     onMouseDown: (e: React.MouseEvent<HTMLElement>) => e.preventDefault()
   }
@@ -290,6 +330,7 @@ export function useOutlinePlacement(
     style,
     isDragging: live?.phase === 'drag',
     isSnapping: live?.phase === 'snap',
+    isOverDock: overDock,
     consumeDrag,
     grip: { ...pointer, onPointerDown: begin('move'), onKeyDown: (e) => nudge('move', e) },
     resizer: {

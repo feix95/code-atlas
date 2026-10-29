@@ -1,15 +1,21 @@
-// 文档大纲自测:编号(中英文/重名/空标题)、从上屏正文收标题(级别/挂编号/跳过内联标题)、
+// 文档大纲自测:编号(中英文/重名/空标题)、从上屏正文收标题(级别/顺序/跳过内联标题)、
 // 缩进档、滚动跟随的读线判定、没有标题就没有大纲。DOM 用 linkedom 在内存里搭。
 import assert from 'node:assert/strict'
 import { parseHTML } from 'linkedom'
 import {
-  OUTLINE_ATTR,
   activeOutlineId,
   collectOutline,
   headingLevelOf,
   outlineDepths,
+  outlineHeadingEls,
   outlineIds
 } from '../src/renderer/src/docOutline.ts'
+import {
+  DOCK_MIN_HEIGHT,
+  DOCK_MIN_TREE,
+  clampDockRatio,
+  hidesFloatingOutline
+} from '../src/renderer/src/outlineDock.ts'
 import {
   DEFAULT_PLACEMENT,
   DRAG_START_PX,
@@ -76,14 +82,13 @@ function checkCollect(): void {
     items.map((i) => i.id),
     ['outline-title', 'outline-part-one', 'outline-part-one-2', 'outline-title-2']
   )
-  const tagged = [...root.querySelectorAll(`[${OUTLINE_ATTR}]`)].map((el) =>
-    el.getAttribute(OUTLINE_ATTR)
-  )
+  const els = outlineHeadingEls(root)
   assert.deepEqual(
-    tagged,
-    items.map((i) => i.id),
-    '编号挂回标题元素上,点条目才找得到'
+    els.map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim()),
+    items.map((i) => i.text),
+    '标题元素按正文顺序排,与条目一一对应(跳转和读线按这个顺序取)'
   )
+  assert.equal(els.length, items.length, '被跳过的空标题 / 假标题不会混进来占位')
   assert.deepEqual(collectOutline(root), items, '重收一遍结果不变')
 
   assert.deepEqual(collectOutline(rootOf('<p>no headings</p><div class="md-title">x</div>')), [])
@@ -408,9 +413,41 @@ function checkKnobReserve(): void {
   )
 }
 
+/** 浮窗让位判定:停靠开着、左栏能用、同一个窗口、停靠位就是我这签 —— 四条全占才藏 */
+function checkDockDecision(): void {
+  const all = { docked: true, hostUsable: true, sameDoc: true, isOwner: true }
+  assert.equal(hidesFloatingOutline(all), true, '四条全占:浮窗让位给左栏')
+  for (const key of ['docked', 'hostUsable', 'sameDoc', 'isOwner'] as const) {
+    assert.equal(hidesFloatingOutline({ ...all, [key]: false }), false, `缺 ${key} 就不让位`)
+  }
+  assert.equal(
+    hidesFloatingOutline({ docked: false, hostUsable: true, sameDoc: true, isOwner: true }),
+    false,
+    '没停过:浮窗照常站岗'
+  )
+}
+
+/** 左栏分割线的比例夹边:大纲不低于最小高,文件树也不被挤没;量不出高度时给对半 */
+function checkDockRatio(): void {
+  const room = 600
+  assert.equal(clampDockRatio(0.4, room), 0.4, '中间的比例原样保留')
+  assert.equal(clampDockRatio(0.01, room), DOCK_MIN_HEIGHT / room, '拖到顶:夹在大纲最小高')
+  assert.equal(clampDockRatio(0.99, room), 1 - DOCK_MIN_TREE / room, '拖到底:给文件树留最小高')
+  assert.equal(clampDockRatio(0.99, 5000), 0.9, '左栏再高也不让大纲吃掉九成以上')
+  assert.equal(clampDockRatio(0.5, 0), 0.5, '量不出左栏高:对半')
+  assert.equal(
+    clampDockRatio(0.5, 120),
+    DOCK_MIN_HEIGHT / 120,
+    '左栏矮到两边都放不下:以大纲最小高为准'
+  )
+  assert.equal(clampDockRatio(Number.NaN, room), DOCK_MIN_HEIGHT / room, '脏数值按最小高兜底')
+}
+
 checkIds()
 checkCollect()
 checkDepthsAndSpy()
+checkDockDecision()
+checkDockRatio()
 checkPlacement()
 checkCollapsedClamp()
 checkContentWidth()
@@ -421,5 +458,5 @@ checkKnobReserve()
 checkPaneOrigin()
 console.log('✅ 文档大纲自测全部通过')
 console.log(
-  '   编号(中英文/重名/兜底) · 收标题(级别/挂编号/只认真标题) · 缩进档 · 读线跟随 · 无标题无大纲 · 浮窗摆放(验身/夹边/拖动/收起态按圆钮尺寸夹边/圆钮位移预留/右下角拉伸/宽高吸回内容尺寸/原点在面板顶能压页头)'
+  '   编号(中英文/重名/兜底) · 收标题(级别/顺序/只认真标题) · 缩进档 · 读线跟随 · 无标题无大纲 · 停靠让位判定(四条缺一不让) · 停靠分割线比例夹边(大纲最小高/树留底/量不出回对半) · 浮窗摆放(验身/夹边/拖动/收起态按圆钮尺寸夹边/圆钮位移预留/右下角拉伸/宽高吸回内容尺寸/原点在面板顶能压页头)'
 )

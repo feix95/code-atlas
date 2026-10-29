@@ -198,6 +198,7 @@ function App(): React.JSX.Element {
   // 页签区通用接线:主窗和每扇子窗吃的是同一副药
   const tabs: TabControlProps = {
     groups: pane.groups,
+    activeGroupId: pane.activeGroupId,
     visibleOfGroup: pane.visibleOfGroup,
     flashTabId: pane.flashTabId,
     activateTab: pane.activateTab,

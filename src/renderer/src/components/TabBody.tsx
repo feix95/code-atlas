@@ -41,7 +41,8 @@ export function TabBody({
   settingsSectionReq,
   onAiConfigSaved,
   onSettingsSection,
-  onRenameFile
+  onRenameFile,
+  outlineDockOwner
 }: {
   tab: PaneTab
   result: ScanResult | null
@@ -68,6 +69,8 @@ export function TabBody({
   onSettingsSection: (key: SectionKey) => void
   /** 内联标题改名通道:预览/瞄签都能用,状态表认签认 scopeRoot */
   onRenameFile?: (tab: PaneTab, base: string) => Promise<RenameOutcome>
+  /** 当前停靠位认的那张签(App 按主窗激活组算):预览签据此把大纲让给左栏 */
+  outlineDockOwner: string | null
 }): React.JSX.Element | null {
   // 菜单外单例签不吃工作区(没开项目 rail 上照样能点出来),先拦在 result 闸之前
   // 盘符下钻的「瞄一眼」预览(UI v3 §7.1):读根记在页签上(scopeRoot = 浏览树的盘根),
@@ -91,6 +94,8 @@ export function TabBody({
         refLimit={0}
         onAddRef={() => {}}
         onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
+        outlineOwner={tab.id}
+        outlineDockOwner={outlineDockOwner}
       />
     )
   }
@@ -164,6 +169,8 @@ export function TabBody({
         jump={previewJump}
         fileLinks={fileLinks}
         onRenameFile={onRenameFile ? (base) => onRenameFile(tab, base) : undefined}
+        outlineOwner={tab.id}
+        outlineDockOwner={outlineDockOwner}
       />
     )
   }
