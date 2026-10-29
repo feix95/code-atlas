@@ -1,5 +1,5 @@
 /* 关系图谱的划分叠加层:模块调色板、轮廓透明度、「模块着色」开关与右侧详情抽屉。
-   模块调色板按「文件数降序」循环取色(drawModules / moduleOverlay);轮廓透明度也走 token */
+   模块调色板按「文件数降序」给前 8 个模块,之后的按色相步进生成(moduleColors);轮廓透明度也走 token */
 :root {
   --graph-module-1: #2f9e8f;
   --graph-module-2: #5b6fd6;
@@ -10,6 +10,10 @@
   --graph-module-7: #2f8fc4;
   --graph-module-8: #b8663a;
   --graph-module-neutral: #b5b5b5;
+  /* 第 9 个模块起的生成色:饱和度与明暗两档 */
+  --graph-module-gen-sat: 52%;
+  --graph-module-gen-light-a: 42%;
+  --graph-module-gen-light-b: 55%;
   --graph-hull-fill-alpha: 0.1;
   --graph-hull-stroke-alpha: 0.45;
   --graph-panel-width: 19rem;
@@ -25,6 +29,9 @@
   --graph-module-7: #5cb3e3;
   --graph-module-8: #d98a5f;
   --graph-module-neutral: #6e6e6e;
+  --graph-module-gen-sat: 58%;
+  --graph-module-gen-light-a: 64%;
+  --graph-module-gen-light-b: 75%;
   --graph-hull-fill-alpha: 0.14;
   --graph-hull-stroke-alpha: 0.5;
 }
@@ -222,4 +229,13 @@
   flex-shrink: 0;
   color: var(--muted-2);
   font-size: var(--font-xs);
+}
+
+/* 侧栏里只展示、不可点的行(模块构成、模块间连线) */
+.graph-file-static {
+  cursor: default;
+}
+
+.graph-file-static:hover {
+  background: transparent;
 }

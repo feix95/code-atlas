@@ -10,6 +10,7 @@ import {
 } from './drawGraph'
 import type { ForceScene } from './useForceLayout'
 import type { ModuleDrawState } from './drawModules'
+import type { HoverMode } from './hoverModes'
 import type { ViewportSize } from './useGraphViewport'
 import { shouldAutoFit } from './fitView'
 import { GRAPH_MOTION, GRAPH_VIEW } from './graphConfig'
@@ -35,6 +36,8 @@ export interface RenderRefs {
   fit: () => void
   /** 划分叠加层(只用于当前层;淡出中的上一层不画) */
   modules: ModuleDrawState | null
+  /** 当前悬停看法(滚轮切换) */
+  hoverMode: HoverMode
   selectedId: string | null
 }
 
@@ -122,6 +125,7 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           scene: lv.ghost,
           alpha: ghostAlpha,
           modules: null,
+          hoverMode: 'links',
           selectedId: null
         })
         return true
@@ -137,6 +141,7 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           scene,
           alpha: inAlpha,
           modules: r.modules,
+          hoverMode: r.hoverMode,
           selectedId: r.selectedId
         })
       }

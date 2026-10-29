@@ -125,3 +125,21 @@ export const GRAPH_RING = {
 
 /** 模块调色板的色数:与 graph.css 的 --graph-module-1 至 --graph-module-N 对应 */
 export const GRAPH_MODULE_COLORS = 8
+
+/** 第 GRAPH_MODULE_COLORS+1 个模块起的生成色:色相从 hueStart 起按黄金角步进,明暗两档交替(见 moduleColors.ts) */
+export const GRAPH_MODULE_GEN = {
+  hueStart: 18,
+  hueStep: 137.508
+} as const
+
+/** 滚轮手势(见 wheelIntent.ts) */
+export const GRAPH_WHEEL = {
+  /** 鼠标在节点上停够这么久(ms),滚轮才切看法;刚划过节点就滚轮仍是缩放 */
+  restMs: 300,
+  /** 两个滚轮事件间隔小于此值(ms)算同一个手势,整个手势保持开头的动作 */
+  gestureGapMs: 200,
+  /** 切看法:每累计这么多像素走一步(鼠标滚轮一格约 100px) */
+  modeStepPx: 100,
+  /** 进出层级:累计这么多像素走一步,一个手势最多一步 */
+  levelStepPx: 40
+} as const

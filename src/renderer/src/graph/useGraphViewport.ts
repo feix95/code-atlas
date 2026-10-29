@@ -1,16 +1,17 @@
-// 关系图谱的视口:缩放 / 平移变换、指针命中检测、悬停与拖拽,以及画布尺寸与设备像素比适配。
+// 关系图谱的视口:缩放 / 平移变换、指针命中检测、悬停与拖拽,以及画布尺寸与设备像素比适配;滚轮见 useGraphWheel。
 // 交互状态收敛为单一变量 Interaction;变换与状态都放 ref,指针事件不触发 React 重渲染。
 import { useCallback, useEffect, useRef } from 'react'
-import type { ForceScene, SimNode } from './useForceLayout'
+import type { SimNode } from './useForceLayout'
 import type { Transform } from './drawGraph'
 import { GRAPH_VIEW } from './graphConfig'
+import { useGraphWheel, type HoverReader, type WheelDeps } from './useGraphWheel'
 import { useGraphClicks } from './useGraphClicks'
 import { hitTest, localPoint } from './graphHit'
-import { clampScale, fitTransform } from './fitView'
+import { fitTransform } from './fitView'
 
 type Interaction =
   | { mode: 'idle' }
-  | { mode: 'hovering'; node: SimNode }
+  | { mode: 'hovering'; node: SimNode; since: number }
   | { mode: 'dragging-node'; node: SimNode; sx: number; sy: number; moved: boolean }
   | { mode: 'panning'; sx: number; sy: number; ox: number; oy: number }
 
@@ -20,10 +21,7 @@ export interface ViewportSize {
   dpr: number
 }
 
-export interface ViewportDeps {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
-  sceneRef: React.RefObject<ForceScene | null>
-  requestDraw: () => void
+export interface ViewportDeps extends WheelDeps {
   setDragging: (dragging: boolean) => void
   /** 单击节点(按下后没拖动):选中 */
   onNodeClick: (node: SimNode) => void
@@ -79,28 +77,10 @@ function useCanvasSize(
   return sizeRef
 }
 
-function useWheel(deps: ViewportDeps, transformRef: React.RefObject<Transform>): void {
-  const { canvasRef, requestDraw } = deps
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const onWheel = (e: WheelEvent): void => {
-      // Ctrl+滚轮不再归界面缩放(改键盘 +/-/0):落在画布上的捏合/Ctrl+滚轮就是缩画布
-      e.preventDefault()
-      const [sx, sy] = localPoint(canvas, e)
-      const tf = transformRef.current
-      const k = clampScale(tf.k * Math.exp(-e.deltaY * GRAPH_VIEW.wheelSpeed))
-      tf.x = sx - ((sx - tf.x) / tf.k) * k
-      tf.y = sy - ((sy - tf.y) / tf.k) * k
-      tf.k = k
-      requestDraw()
-    }
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
-  }, [canvasRef, requestDraw, transformRef])
-}
-
-function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>): () => void {
+function usePointer(
+  deps: ViewportDeps,
+  transformRef: React.RefObject<Transform>
+): { clearHover: () => void; readHover: HoverReader } {
   const stateRef = useRef<Interaction>({ mode: 'idle' })
   const depsRef = useRef(deps)
   useEffect(() => {
@@ -163,7 +143,8 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
       }
       const node = hitTest(d.sceneRef.current, transformRef.current, sx, sy)
       if (node) {
-        if (s.mode !== 'hovering' || s.node !== node) setState({ mode: 'hovering', node })
+        if (s.mode !== 'hovering' || s.node !== node)
+          setState({ mode: 'hovering', node, since: performance.now() })
       } else if (s.mode !== 'idle') setState({ mode: 'idle' })
     }
     const onUp = (e: PointerEvent): void => {
@@ -174,7 +155,7 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
         s.node.fy = null
         if (s.moved) depsRef.current.setDragging(false)
         else depsRef.current.onNodeClick(s.node)
-        setState({ mode: 'hovering', node: s.node })
+        setState({ mode: 'hovering', node: s.node, since: performance.now() })
         return
       }
       if (s.mode !== 'panning') return
@@ -199,16 +180,21 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
     }
   }, [deps.canvasRef, setState, transformRef])
 
-  return useCallback(() => {
+  const clearHover = useCallback(() => {
     if (stateRef.current.mode === 'hovering') setState({ mode: 'idle' })
   }, [setState])
+  const readHover = useCallback<HoverReader>(() => {
+    const s = stateRef.current
+    return s.mode === 'hovering' ? { node: s.node, since: s.since } : null
+  }, [])
+  return { clearHover, readHover }
 }
 
 export function useGraphViewport(deps: ViewportDeps): GraphViewport {
   const transformRef = useRef<Transform>({ k: 1, x: 0, y: 0 })
   const sizeRef = useCanvasSize(deps, transformRef)
-  useWheel(deps, transformRef)
-  const clearHover = usePointer(deps, transformRef)
+  const { clearHover, readHover } = usePointer(deps, transformRef)
+  useGraphWheel(deps, transformRef, readHover)
   useGraphClicks(deps, transformRef)
   const { sceneRef, requestDraw } = deps
 

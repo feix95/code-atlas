@@ -3,20 +3,19 @@ import type { ModuleDetails, ModuleLinkView } from '../graph/moduleDetails'
 
 export function ModuleChip({
   name,
-  colorIndex
+  color
 }: {
   name: string
-  colorIndex: number | undefined
+  /** 模块颜色(CSS 颜色值,见 moduleSwatchCss) */
+  color: string
 }): React.JSX.Element {
-  const swatch = colorIndex === undefined ? undefined : `var(--graph-module-${colorIndex + 1})`
   return (
     <span className="graph-chip">
-      <span className="graph-swatch" style={{ background: swatch }} aria-hidden="true" />
+      <span className="graph-swatch" style={{ background: color }} aria-hidden="true" />
       {name}
     </span>
   )
 }
-
 function FileButton({
   path,
   label,
@@ -41,13 +40,11 @@ function FileButton({
 function LinkList({
   title,
   links,
-  colorOf,
-  onPickModule
+  colorOf
 }: {
   title: string
   links: ModuleLinkView[]
-  colorOf: (moduleId: string) => number | undefined
-  onPickModule: (moduleId: string) => void
+  colorOf: (moduleId: string) => string
 }): React.JSX.Element | null {
   if (links.length === 0) return null
   return (
@@ -56,34 +53,26 @@ function LinkList({
       <ul className="graph-file-list">
         {links.map((l) => (
           <li key={l.moduleId}>
-            <button
-              type="button"
-              className="graph-file"
-              data-tip="高亮这个模块"
-              onClick={() => onPickModule(l.moduleId)}
-            >
-              <ModuleChip name={l.name} colorIndex={colorOf(l.moduleId)} />
+            <div className="graph-file graph-file-static">
+              <ModuleChip name={l.name} color={colorOf(l.moduleId)} />
               <span className="graph-file-note">{l.weight} 条引用</span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>
     </section>
   )
 }
-
 const ROLE_NOTE = { member: undefined, attached: '附挂', test: '自测' } as const
 
 export function GraphModuleSection({
   details,
   colorOf,
-  onFocusFile,
-  onPickModule
+  onFocusFile
 }: {
   details: ModuleDetails
-  colorOf: (moduleId: string) => number | undefined
+  colorOf: (moduleId: string) => string
   onFocusFile: (relPath: string) => void
-  onPickModule: (moduleId: string) => void
 }): React.JSX.Element {
   const count = details.module.files.length
   return (
@@ -127,18 +116,8 @@ export function GraphModuleSection({
           </ul>
         </section>
       )}
-      <LinkList
-        title="依赖的模块"
-        links={details.dependsOn}
-        colorOf={colorOf}
-        onPickModule={onPickModule}
-      />
-      <LinkList
-        title="被这些模块使用"
-        links={details.usedBy}
-        colorOf={colorOf}
-        onPickModule={onPickModule}
-      />
+      <LinkList title="依赖的模块" links={details.dependsOn} colorOf={colorOf} />
+      <LinkList title="被这些模块使用" links={details.usedBy} colorOf={colorOf} />
     </>
   )
 }

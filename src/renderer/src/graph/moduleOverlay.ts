@@ -3,7 +3,7 @@
 // 某模块占比够高时文件夹也计入该模块轮廓。外部节点与 overflow 节点不参与。纯函数,不依赖 DOM。
 import type { LevelNode } from '@shared/graphView'
 import type { ModuleInfo, ModuleMap } from '@shared/types'
-import { GRAPH_HULL, GRAPH_MODULE_COLORS, GRAPH_RING } from './graphConfig.ts'
+import { GRAPH_HULL, GRAPH_RING } from './graphConfig.ts'
 
 /** 色环里合并剩余模块的中性段在自测与读屏描述里的记号 */
 export const NEUTRAL_SEGMENT = 'other'
@@ -27,16 +27,19 @@ export interface ModuleOverlay {
   nodes: Map<string, NodeModuleInfo>
   /** 模块 id → 当前屏幕上的轮廓成员节点 id(只收 2 个及以上成员的模块) */
   hulls: Map<string, string[]>
-  /** 模块 id → 调色板下标(按文件数降序、id 升序后循环取色) */
+  /** 模块 id → 调色板下标(按文件数降序、id 升序;前 8 个用调色板,之后按色相步进生成) */
   colorOf: Map<string, number>
   byId: Map<string, ModuleInfo>
+  /** 模块 id → 不在当前层级画面里的成员文件数(悬停「同模块」时提示) */
+  elsewhere: Map<string, number>
 }
 
 const EMPTY_OVERLAY: ModuleOverlay = {
   nodes: new Map(),
   hulls: new Map(),
   colorOf: new Map(),
-  byId: new Map()
+  byId: new Map(),
+  elsewhere: new Map()
 }
 
 /** 模块显示名(P1–P2,无 AI):锚点所在目录名 · 锚点文件名 */
@@ -87,6 +90,25 @@ function folderInfo(perModule: Map<string, number> | undefined): NodeModuleInfo 
   return { hullModule: isDominant ? top.moduleId : null, ring }
 }
 
+/** 每个模块有多少成员文件不在当前屏幕上:总数减去可见文件节点与可见文件夹里的 */
+function elsewhereCounts(
+  nodes: LevelNode[],
+  folders: Map<string, Map<string, number>>,
+  map: ModuleMap
+): Map<string, number> {
+  const left = new Map<string, number>()
+  for (const moduleId of Object.values(map.fileToModule))
+    left.set(moduleId, (left.get(moduleId) ?? 0) + 1)
+  const take = (moduleId: string, n: number): void => {
+    left.set(moduleId, (left.get(moduleId) ?? 0) - n)
+  }
+  for (const n of nodes) {
+    if (n.kind === 'file' && Object.hasOwn(map.fileToModule, n.id)) take(map.fileToModule[n.id], 1)
+    if (n.kind === 'folder') for (const [m, k] of folders.get(n.id) ?? []) take(m, k)
+  }
+  return left
+}
+
 export function buildModuleOverlay(
   nodes: LevelNode[],
   dirRel: string,
@@ -113,7 +135,8 @@ export function buildModuleOverlay(
     nodes: infos,
     // 最顶层只画彩色环:顶层文件夹往往横跨多个模块,轮廓既挤又容易误读
     hulls: dirRel === '' ? new Map() : new Map([...members].filter(([, ids]) => ids.length >= 2)),
-    colorOf: new Map(map.modules.map((m, i) => [m.id, i % GRAPH_MODULE_COLORS])),
-    byId: new Map(map.modules.map((m) => [m.id, m]))
+    colorOf: new Map(map.modules.map((m, i) => [m.id, i])),
+    byId: new Map(map.modules.map((m) => [m.id, m])),
+    elsewhere: elsewhereCounts(nodes, folders, map)
   }
 }

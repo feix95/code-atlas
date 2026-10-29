@@ -1,7 +1,8 @@
 // 关系图谱页签正文:资源管理器的图形视图(drill-down),一次呈现一个目录层级,
 // 在真实文件夹结构上叠加程序切出的模块(划分:轮廓、色环、聚类力)。
 // 组合 useGraphNav(层级)· useForceLayout(布局)· useGraphViewport(交互)· useGraphRender(绘制)
-// · useGraphSelection(选中与高亮);数据全部来自共享的 ScanResult 与 DepGraphResult,不另起扫描或关系计算。
+// · useGraphSelection(选中)· useGraphHoverMode(滚轮切换悬停看法)· useModuleColorPicker(模块改色);
+// 数据全部来自共享的 ScanResult 与 DepGraphResult,不另起扫描或关系计算。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, DepGraphNode, DepGraphResult, ScanDirNode, ScanResult } from '@shared/types'
 import { buildLevelGraph, type LevelNode } from '@shared/graphView'
@@ -11,9 +12,16 @@ import { useGraphViewport } from '../graph/useGraphViewport'
 import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
 import { buildModuleOverlay, moduleDisplayName } from '../graph/moduleOverlay'
 import { nodeMenuItems, useGraphSelection } from '../graph/useGraphSelection'
+import { useGraphHoverMode } from '../graph/useGraphHoverMode'
+import { moduleSwatchCss } from '../graph/moduleColors'
+import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
 import { Crumbs, NodeList } from './GraphNodeList'
+import { GraphHoverTag } from './GraphHoverTag'
+import { ModuleToggle } from './GraphModuleToggle'
+import { footText } from '../graph/graphFootText'
 import { GraphSidePanel } from './GraphSidePanel'
+import { useModuleColorPicker } from '../graph/useModuleColorPicker'
 import { Notice } from './Notice'
 import { TreeIcon } from './Icons'
 
@@ -59,39 +67,8 @@ function useNodeActivate(
   )
 }
 
-const FOOT_EDGES =
-  '连线表示代码里的引用(支持 JS/TS、Python、Go、Java、Rust);没有连线的文件暂未发现引用关系'
-
-/** 底栏说明:模块数据缺席或为空时说清楚;模块着色开着时补一句轮廓的含义 */
-function footText(graph: DepGraphResult | null, modulesOn: boolean): string {
-  if (graph && graph.modules === null) return '模块划分没算出来,先按原始结构显示'
-  if (graph?.modules && graph.modules.modules.length === 0) return '未发现可划分的代码模块'
-  return modulesOn ? `${FOOT_EDGES};彩色轮廓圈出程序划分的模块` : FOOT_EDGES
-}
-
 const isFolderTarget = (d: LevelNode): boolean =>
   d.kind === 'folder' || (d.kind === 'external' && d.target === 'folder')
-
-function ModuleToggle({
-  isOn,
-  onToggle
-}: {
-  isOn: boolean
-  onToggle: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      className="graph-toggle"
-      aria-pressed={isOn}
-      onClick={onToggle}
-      data-tip={isOn ? '关闭后只看原始文件夹结构' : '在图上圈出程序划分的模块'}
-    >
-      <span className="graph-toggle-dot" aria-hidden="true" />
-      模块着色
-    </button>
-  )
-}
 
 function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.Element {
   const { result, graph, graphLoading, graphNote, onLoadGraph, expandLazy, onOpenFile } = props
@@ -116,6 +93,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     () => buildModuleOverlay(level?.nodes ?? [], nav.dirRel, moduleMap),
     [level, nav.dirRel, moduleMap]
   )
+  const overrides = useModuleColorOverrides(result.rootPath)
   const clusters = useMemo(() => {
     if (!showModules || overlay.nodes.size === 0) return null
     const map = new Map<string, string>()
@@ -133,10 +111,18 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   const centerRef = useRef<(id: string) => boolean>(() => false)
   const centerOn = useCallback((id: string) => centerRef.current(id), [])
   const selection = useGraphSelection({ level, navigate: nav.navigate, centerOn })
+  const modulesOn = showModules && overlay.nodes.size > 0
   const moduleOfNode = useCallback(
     (id: string) => overlay.nodes.get(id)?.hullModule ?? null,
     [overlay]
   )
+  // 模块着色关着时没有「同模块」看法可看
+  const hoverModuleOf = useCallback(
+    (id: string) => (modulesOn ? moduleOfNode(id) : null),
+    [modulesOn, moduleOfNode]
+  )
+  const hoverMode = useGraphHoverMode(hoverModuleOf, render.setHover)
+  const picker = useModuleColorPicker({ root: result.rootPath, canvasRef, overlay, overrides })
   const onNodeContextMenu = useCallback(
     (n: SimNode, x: number, y: number) => {
       const moduleId = moduleOfNode(n.id)
@@ -147,15 +133,21 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         noTips: true,
         items: nodeMenuItems(n.data, {
           moduleId,
-          isHighlighted: moduleId !== null && selection.highlight === moduleId,
           onDetails: () => selection.select(n.data),
-          onToggleHighlight: () => moduleId && selection.toggleHighlight(moduleId),
+          onChangeColor: () => moduleId && picker.open(moduleId, x, y),
           onActivate: () => activate(n.data)
         })
       })
     },
-    [activate, moduleOfNode, selection]
+    [activate, moduleOfNode, picker, selection]
   )
+  const enterOrLeave = (node: SimNode | null, steps: number): void => {
+    if (steps > 0) nav.goUp()
+    else if (node && isFolderTarget(node.data)) {
+      selection.select(null)
+      activate(node.data)
+    }
+  }
   const viewport = useGraphViewport({
     canvasRef,
     sceneRef: layout.sceneRef,
@@ -169,12 +161,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       activate(n.data)
     },
     onNodeContextMenu,
-    onHoverChange: render.setHover
+    onHoverChange: hoverMode.onHoverChange,
+    onModeWheel: hoverMode.onModeWheel,
+    onLevelWheel: enterOrLeave
   })
   useEffect(() => {
     centerRef.current = viewport.centerOn
   }, [viewport.centerOn])
-  const modulesOn = showModules && overlay.nodes.size > 0
 
   useEffect(() => {
     linkRef.current = {
@@ -184,7 +177,8 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       sizeRef: viewport.sizeRef,
       alpha: layout.alpha,
       fit: viewport.fit,
-      modules: modulesOn ? { overlay, highlight: selection.highlight } : null,
+      modules: modulesOn ? { overlay, overrides } : null,
+      hoverMode: hoverMode.mode,
       selectedId: selection.selected?.id ?? null
     }
     render.requestDraw()
@@ -210,6 +204,8 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     const info = moduleId ? overlay.byId.get(moduleId) : undefined
     return info ? moduleDisplayName(info) : null
   }
+  const tag = hoverMode.tag
+  const tagModule = tag ? hoverModuleOf(tag.nodeId) : null
   const scanning = nav.status.kind === 'scanning'
   const empty = !scanning && level !== null && level.nodes.length === 0
   const overlayText = scanning
@@ -226,6 +222,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         className="graph-canvas"
         data-graph-dir={nav.dirRel}
         data-graph-hulls={modulesOn ? overlay.hulls.size : 0}
+        data-graph-hover-mode={hoverMode.mode}
       />
       <NodeList
         nodes={level?.nodes ?? []}
@@ -265,20 +262,25 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         )}
       </div>
       {overlayText && <p className="graph-overlay">{overlayText}</p>}
+      {tag && (
+        <GraphHoverTag
+          tag={tag}
+          elsewhere={tagModule ? (overlay.elsewhere.get(tagModule) ?? 0) : 0}
+        />
+      )}
       {selection.selected && (
         <GraphSidePanel
           node={selection.selected}
           modules={moduleMap}
           depNodes={depNodes}
           dirRel={nav.dirRel}
-          highlight={selection.highlight}
-          colorOf={(id) => overlay.colorOf.get(id)}
+          colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
           onClose={selection.clear}
           onOpenFile={onOpenFile}
           onFocusFile={selection.focusFile}
-          onToggleHighlight={selection.toggleHighlight}
         />
       )}
+      {picker.element}
       <p className="graph-foot">{footText(current, modulesOn)}</p>
     </div>
   )

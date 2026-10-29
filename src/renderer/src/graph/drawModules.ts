@@ -4,11 +4,14 @@ import type { ForceScene, SimNode } from './useForceLayout'
 import type { ModuleOverlay, RingSegment } from './moduleOverlay'
 import { moduleDisplayName } from './moduleOverlay'
 import { moduleOutline, type Point } from './outline'
-import { GRAPH_HULL, GRAPH_MOTION, GRAPH_RING } from './graphConfig'
+import { GRAPH_HULL, GRAPH_RING } from './graphConfig'
+import { moduleColor, type ColorOverrides, type GenTone } from './moduleColors'
 
 export interface ModuleColors {
   /** 调色板(--graph-module-1 至 --graph-module-N) */
   palette: string[]
+  /** 第 N+1 个模块起的生成色(--graph-module-gen-*) */
+  tone: GenTone
   neutral: string
   hullFillAlpha: number
   hullStrokeAlpha: number
@@ -16,19 +19,20 @@ export interface ModuleColors {
 
 export interface ModuleDrawState {
   overlay: ModuleOverlay
-  /** 「高亮同模块」的模块 id:非成员变淡;null = 不高亮 */
-  highlight: string | null
+  /** 用户在右键菜单改过的模块颜色 */
+  overrides: ColorOverrides
 }
 
-function colorOf(state: ModuleDrawState, colors: ModuleColors, moduleId: string | null): string {
-  const index = moduleId === null ? undefined : state.overlay.colorOf.get(moduleId)
-  return index === undefined ? colors.neutral : colors.palette[index] || colors.neutral
-}
-
-/** 高亮同模块时,节点(或轮廓)不属于该模块就按 dimAlpha 变淡 */
-export function moduleDim(state: ModuleDrawState | null, moduleId: string | null): number {
-  if (!state?.highlight) return 1
-  return moduleId === state.highlight ? 1 : GRAPH_MOTION.dimAlpha
+/** 模块的实际颜色:改过的颜色 → 调色板 → 生成色;null = 中性色 */
+export function moduleColorOf(
+  state: ModuleDrawState,
+  colors: ModuleColors,
+  moduleId: string | null
+): string {
+  if (moduleId === null) return colors.neutral
+  const index = state.overlay.colorOf.get(moduleId)
+  const override = state.overrides.get(moduleId)
+  return moduleColor(index, override, colors.palette, colors.tone, colors.neutral)
 }
 
 /** 闭合环按相邻顶点中点做二次曲线平滑,去掉网格留下的折角 */
@@ -89,13 +93,14 @@ export function drawHulls(
   scene: ForceScene,
   state: ModuleDrawState,
   colors: ModuleColors,
-  alpha: number,
-  labelAlpha: number
+  labelAlpha: number,
+  /** 每个模块轮廓的不透明度(悬停时不相关的轮廓变淡) */
+  alphaOf: (moduleId: string) => number
 ): void {
   for (const [moduleId, loops] of outlinesOf(scene, state)) {
     if (loops.length === 0) continue
-    const color = colorOf(state, colors, moduleId)
-    const dim = alpha * moduleDim(state, moduleId)
+    const color = moduleColorOf(state, colors, moduleId)
+    const dim = alphaOf(moduleId)
     ctx.beginPath()
     for (const loop of loops) traceSmooth(ctx, loop)
     ctx.fillStyle = color
@@ -130,7 +135,7 @@ export function drawRing(
   let angle = -Math.PI / 2
   for (const seg of segments) {
     const sweep = seg.share * Math.PI * 2
-    ctx.strokeStyle = colorOf(state, colors, seg.moduleId)
+    ctx.strokeStyle = moduleColorOf(state, colors, seg.moduleId)
     ctx.beginPath()
     ctx.arc(n.x, n.y, radius, angle + gap / 2, angle + Math.max(sweep - gap / 2, gap / 2))
     ctx.stroke()

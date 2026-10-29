@@ -11,12 +11,11 @@ export interface GraphSidePanelProps {
   modules: ModuleMap | null
   depNodes: ReadonlyMap<string, DepGraphNode>
   dirRel: string
-  highlight: string | null
-  colorOf: (moduleId: string) => number | undefined
+  /** 模块颜色(CSS 颜色值) */
+  colorOf: (moduleId: string) => string
   onClose: () => void
   onOpenFile: (relPath: string) => void
   onFocusFile: (relPath: string) => void
-  onToggleHighlight: (moduleId: string) => void
 }
 
 const KIND_LABEL: Record<LevelNode['kind'], string> = {
@@ -30,7 +29,7 @@ const isFileNode = (n: LevelNode): boolean =>
   n.kind === 'file' || (n.kind === 'external' && n.target === 'file')
 
 function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element | null {
-  const { node, modules, colorOf, onToggleHighlight } = props
+  const { node, modules, colorOf } = props
   if (!modules) return null
   const shares = folderComposition(modules, node.id)
   if (shares.length === 0) {
@@ -42,15 +41,10 @@ function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Elemen
       <ul className="graph-file-list">
         {shares.map((s) => (
           <li key={s.moduleId}>
-            <button
-              type="button"
-              className="graph-file"
-              data-tip="高亮这个模块"
-              onClick={() => onToggleHighlight(s.moduleId)}
-            >
-              <ModuleChip name={s.name} colorIndex={colorOf(s.moduleId)} />
+            <div className="graph-file graph-file-static">
+              <ModuleChip name={s.name} color={colorOf(s.moduleId)} />
               <span className="graph-file-note">{s.files} 个文件</span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>
@@ -59,7 +53,7 @@ function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Elemen
 }
 
 function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element {
-  const { node, modules, depNodes, dirRel, highlight, colorOf } = props
+  const { node, modules, depNodes, dirRel, colorOf } = props
   const dep = depNodes.get(node.id)
   const moduleId =
     modules && Object.hasOwn(modules.fileToModule, node.id) ? modules.fileToModule[node.id] : null
@@ -75,16 +69,6 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
         <button type="button" className="graph-panel-btn" onClick={() => props.onOpenFile(node.id)}>
           打开文件
         </button>
-        {details && (
-          <button
-            type="button"
-            className="graph-panel-btn"
-            aria-pressed={highlight === details.module.id}
-            onClick={() => props.onToggleHighlight(details.module.id)}
-          >
-            {highlight === details.module.id ? '取消高亮' : '高亮同模块'}
-          </button>
-        )}
       </div>
       {!modules && <p className="graph-panel-note">模块划分暂不可用,先按原始结构显示</p>}
       {modules && !details && (
@@ -94,14 +78,9 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
         <>
           <section className="graph-panel-section">
             <h3 className="graph-panel-h">所属模块</h3>
-            <ModuleChip name={details.name} colorIndex={colorOf(details.module.id)} />
+            <ModuleChip name={details.name} color={colorOf(details.module.id)} />
           </section>
-          <GraphModuleSection
-            details={details}
-            colorOf={colorOf}
-            onFocusFile={props.onFocusFile}
-            onPickModule={props.onToggleHighlight}
-          />
+          <GraphModuleSection details={details} colorOf={colorOf} onFocusFile={props.onFocusFile} />
         </>
       )}
     </>

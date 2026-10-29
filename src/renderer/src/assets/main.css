@@ -44,6 +44,7 @@
 @import './css/modelshelf-files.css';
 @import './css/graph.css';
 @import './css/graph-modules.css';
+@import './css/graph-hover.css';
 @import './css/ui-workbench.css';
 @import './css/ui-workbench-overlay.css';
 @import './css/ui-workbench-inspector.css';

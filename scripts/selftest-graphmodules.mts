@@ -181,10 +181,13 @@ function checkOverlay(): void {
   assert.equal(many.modules.length, 9)
   assert.equal(
     buildModuleOverlay([node('p', 'folder')], '', many).colorOf.get('m:p/d8/f.ts'),
-    0,
-    '调色板 8 色循环'
+    8,
+    '颜色序号不循环:第 9 个模块是 8,不和第 1 个撞色'
   )
-
+  const inner = buildModuleOverlay([node('p/d0', 'folder'), node('p/d1/f.ts', 'file')], 'p', many)
+  assert.equal(inner.elsewhere.get('m:p/d0/f.ts'), 0, '成员都在可见文件夹里:不在屏幕上的为 0')
+  assert.equal(inner.elsewhere.get('m:p/d1/f.ts'), 1, 'p/d1 只露出 f.ts,g.ts 不在屏幕上')
+  assert.equal(inner.elsewhere.get('m:p/d2/f.ts'), 2)
   const atRoot = buildModuleOverlay(
     [node('src', 'folder'), node('lib', 'folder')],
     '',
