@@ -111,7 +111,8 @@ export function buildModuleOverlay(
   }
   return {
     nodes: infos,
-    hulls: new Map([...members].filter(([, ids]) => ids.length >= 2)),
+    // 最顶层只画彩色环:顶层文件夹往往横跨多个模块,轮廓既挤又容易误读
+    hulls: dirRel === '' ? new Map() : new Map([...members].filter(([, ids]) => ids.length >= 2)),
     colorOf: new Map(map.modules.map((m, i) => [m.id, i % GRAPH_MODULE_COLORS])),
     byId: new Map(map.modules.map((m) => [m.id, m]))
   }

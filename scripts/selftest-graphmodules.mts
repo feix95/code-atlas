@@ -1,6 +1,6 @@
-// 关系图谱划分(P1)的纯函数自测:凸包轮廓、模块叠加层(轮廓成员、分段色环、配色)、聚类力、模块显示名。
+// 关系图谱划分(P1)的纯函数自测:贴成员的模块轮廓、首帧预跑、模块叠加层(轮廓成员、分段色环、配色)、聚类力、模块显示名。
 import assert from 'node:assert/strict'
-import { circleHull, convexHull, type Point } from '../src/renderer/src/graph/hull.ts'
+import { moduleOutline, type Circle, type Point } from '../src/renderer/src/graph/outline.ts'
 import {
   buildModuleOverlay,
   moduleDisplayName,
@@ -19,65 +19,60 @@ import type { ForceScene } from '../src/renderer/src/graph/useForceLayout.ts'
 import type { LevelNode } from '../src/shared/graphView.ts'
 import type { ModuleInfo, ModuleMap } from '../src/shared/types.ts'
 
-function checkConvexHull(): void {
-  const square: Point[] = [
-    [0, 0],
-    [2, 0],
-    [2, 2],
-    [0, 2],
-    [1, 1],
-    [1, 0]
-  ]
-  assert.deepEqual(
-    convexHull(square),
-    [
-      [0, 0],
-      [2, 0],
-      [2, 2],
-      [0, 2]
-    ],
-    '内部点与边上共线点不进凸包,按逆时针从最左下点开始'
-  )
-  assert.deepEqual(convexHull([[1, 1]]), [[1, 1]])
-  assert.deepEqual(convexHull([]), [])
-  assert.deepEqual(
-    convexHull([
-      [0, 0],
-      [1, 1],
-      [2, 2]
-    ]),
-    [
-      [0, 0],
-      [2, 2]
-    ],
-    '全共线时只留两端'
-  )
+/** 点在一组闭合环内(奇偶规则,环内的洞不算内) */
+function insideLoops(loops: Point[][], [x, y]: Point): boolean {
+  let inside = false
+  for (const loop of loops) {
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+      const [xi, yi] = loop[i]
+      const [xj, yj] = loop[j]
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+    }
+  }
+  return inside
 }
 
-/** 点在凸多边形内(含边上):逆时针多边形每条边的叉积都不为负 */
-function insideConvex(poly: Point[], [x, y]: Point): boolean {
-  return poly.every(([ax, ay], i) => {
-    const [bx, by] = poly[(i + 1) % poly.length]
-    return (bx - ax) * (y - ay) - (by - ay) * (x - ax) >= -1e-6
+function ringPoints(c: Circle, radius: number): Point[] {
+  return Array.from({ length: 12 }, (_, a) => {
+    const t = (a / 12) * Math.PI * 2
+    return [c.x + Math.cos(t) * radius, c.y + Math.sin(t) * radius] as Point
   })
 }
 
-function checkCircleHull(): void {
-  const circles = [
-    { x: 0, y: 0, r: 5 },
-    { x: 60, y: 10, r: 8 },
-    { x: 20, y: 50, r: 6 }
+/** 模块轮廓只贴着自己的成员走:成员整个圈进去,非成员(哪怕夹在成员中间)不被圈进去 */
+function checkOutline(): void {
+  const opts = { padding: 14, bridgeWidth: 9, obstacleGap: 6, cell: 5 }
+  const members: Circle[] = [
+    { x: 0, y: 0, r: 8 },
+    { x: 160, y: 0, r: 8 },
+    { x: 80, y: 120, r: 10 }
   ]
-  const poly = circleHull(circles, 10, 16)
-  assert.ok(poly.length >= 3, '三个圆应得到多边形')
-  for (const c of circles) {
-    for (let a = 0; a < 8; a++) {
-      const t = (a / 8) * Math.PI * 2
-      const p: Point = [c.x + Math.cos(t) * (c.r + 9), c.y + Math.sin(t) * (c.r + 9)]
-      assert.ok(insideConvex(poly, p), '成员圆外扩 padding 后整个落在轮廓内')
-    }
+  const middle: Circle = { x: 80, y: 40, r: 10 }
+  const onBridge: Circle = { x: 80, y: 0, r: 8 }
+  const far: Circle = { x: 600, y: 600, r: 8 }
+  const loops = moduleOutline(members, [middle, onBridge, far], opts)
+  assert.ok(loops.length >= 1 && loops.every((l) => l.length >= 3), '得到闭合轮廓')
+  for (const m of members) {
+    for (const p of [[m.x, m.y] as Point, ...ringPoints(m, m.r + 2)])
+      assert.ok(insideLoops(loops, p), '成员节点整个落在轮廓内')
   }
-  assert.ok(circleHull([{ x: 0, y: 0, r: 5 }], 10, 16).length > 3, '单个圆也能画成圆形轮廓')
+  for (const o of [middle, onBridge]) {
+    for (const p of [[o.x, o.y] as Point, ...ringPoints(o, o.r + 2)])
+      assert.ok(!insideLoops(loops, p), '夹在成员之间的非成员节点不被圈进去')
+  }
+  assert.ok(!insideLoops(loops, [far.x, far.y]))
+  const free = moduleOutline(members.slice(0, 2), [], opts)
+  assert.equal(free.length, 1, '中间没有别的节点时,两个成员由一条连桥连成一个轮廓')
+  assert.ok(insideLoops(free, [80, 0]), '连桥经过两成员之间')
+  assert.ok(!insideLoops(free, [80, 40]), '轮廓不像凸包那样把整片空白圈进去')
+  const cut = moduleOutline(members.slice(0, 2), [onBridge], opts)
+  assert.ok(!insideLoops(cut, [onBridge.x, onBridge.y]), '连桥遇到非成员节点就断开绕不过去也不圈它')
+  assert.ok(insideLoops(cut, [0, 0]) && insideLoops(cut, [160, 0]), '断开后两个成员各自仍被圈住')
+  const single = moduleOutline([{ x: 0, y: 0, r: 5 }], [], opts)
+  assert.equal(single.length, 1, '单个成员是一个近似圆')
+  assert.ok(insideLoops(single, [17, 0]) && !insideLoops(single, [22, 0]), '半径约为 r + padding')
+  assert.deepEqual(moduleOutline([], [far], opts), [], '没有成员没有轮廓')
+  assert.deepEqual(moduleOutline(members, [middle], opts), moduleOutline(members, [middle], opts))
 }
 
 function mod(id: string, files: string[], extra: Partial<ModuleInfo> = {}): ModuleInfo {
@@ -188,6 +183,18 @@ function checkOverlay(): void {
     buildModuleOverlay([node('p', 'folder')], '', many).colorOf.get('m:p/d8/f.ts'),
     0,
     '调色板 8 色循环'
+  )
+
+  const atRoot = buildModuleOverlay(
+    [node('src', 'folder'), node('lib', 'folder')],
+    '',
+    makeMap([mod('m:src/a.ts', ['src/a.ts', 'src/b.ts', 'lib/c.ts', 'lib/d.ts'])])
+  )
+  assert.equal(atRoot.hulls.size, 0, '最顶层只画彩色环,不画轮廓')
+  assert.equal(
+    atRoot.nodes.get('src')?.hullModule,
+    'm:src/a.ts',
+    '顶层节点仍记归属(聚类力、侧栏用)'
   )
 
   const none = buildModuleOverlay(nodes, 'src', null)
@@ -365,8 +372,7 @@ function checkSettle(): void {
   assert.equal(settleLayout(hot, 0.02, 5), 5, '热度降不下来时按上限停,不卡死')
 }
 
-checkConvexHull()
-checkCircleHull()
+checkOutline()
 checkSettle()
 checkDetails()
 checkOverlay()
