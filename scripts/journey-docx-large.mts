@@ -18,6 +18,9 @@ const MAX_MAIN_PING_MS = 500
 const MAX_CLICK_MS = 1000
 const POLL_MS = 50
 const TOKEN_SRC = /^atlas-media:\/\/docx-image\/[0-9a-f]{32}$/
+/** 点大纲后的落点允许误差:平滑滚动收尾时可能有半个像素的取整 */
+const LAND_TOLERANCE_PX = 4
+const SETTLE_MAX_POLLS = 100
 
 export async function writeLargeDocx(project: string): Promise<void> {
   await writeFile(join(project, LARGE_DOCX), buildImageHeavyDocx(HEAVY))
@@ -107,6 +110,28 @@ async function expectFailedLoad(page: Page, src: string, errors: string[]): Prom
   return loaded
 }
 
+/** 平滑滚动停稳后再量:点中的标题应当停在正文视口顶,空出的正好是正文的上内边距 */
+async function outlineLanding(page: Page, label: string): Promise<{ gap: number; padTop: number }> {
+  const view = page.locator('.code-view.is-reading')
+  let last = Number.NaN
+  let stable = 0
+  for (let i = 0; i < SETTLE_MAX_POLLS && stable < 2; i++) {
+    await page.waitForTimeout(POLL_MS)
+    const top = await view.evaluate((el) => el.scrollTop)
+    stable = top === last ? stable + 1 : 0
+    last = top
+  }
+  return view.evaluate((el, text) => {
+    const head = [...el.querySelectorAll<HTMLElement>('.md-h')].find(
+      (h) => h.textContent?.trim() === text
+    )
+    return {
+      gap: head ? head.getBoundingClientRect().top - el.getBoundingClientRect().top : Number.NaN,
+      padTop: parseFloat(getComputedStyle(el).paddingTop) || 0
+    }
+  }, label)
+}
+
 export async function checkLargeDocx(
   page: Page,
   electron: ElectronApplication,
@@ -122,10 +147,19 @@ export async function checkLargeDocx(
   const facts = await imgs.evaluateAll((els) =>
     els.map((el) => {
       const img = el as HTMLImageElement
-      return { src: img.getAttribute('src') ?? '', lazy: img.loading, loaded: img.naturalWidth > 0 }
+      return {
+        src: img.getAttribute('src') ?? '',
+        lazy: img.loading,
+        loaded: img.naturalWidth > 0,
+        size: [img.getAttribute('width'), img.getAttribute('height')]
+      }
     })
   )
   assert.equal(facts.length, HEAVY.images, 'every screenshot must be in the body')
+  assert.ok(
+    facts.every((f) => f.size.every((v) => v !== null && /^\d{1,5}$/.test(v))),
+    'images must carry pixel width/height so lazy loading reserves their box'
+  )
   assert.ok(
     facts.every((f) => TOKEN_SRC.test(f.src)),
     'images must use registered token URLs'
@@ -147,7 +181,14 @@ export async function checkLargeDocx(
     const all = document.querySelectorAll<HTMLImageElement>('.docx-body img')
     return (all[all.length - 1]?.naturalWidth ?? 0) > 0
   })
-  await page.locator('.doc-outline-item').filter({ hasText: 'Chapter 8' }).first().waitFor()
+  const chapter = page.locator('.doc-outline-item').filter({ hasText: 'Chapter 8' }).first()
+  await chapter.waitFor()
+  await chapter.click()
+  const landing = await outlineLanding(page, 'Chapter 8')
+  assert.ok(
+    Math.abs(landing.gap - landing.padTop) <= LAND_TOLERANCE_PX,
+    `clicking an outline item must land its heading at the top (gap ${landing.gap}px, pad ${landing.padTop}px)`
+  )
   await shot('docx-large')
   const token = facts[0].src
   assert.equal(await imageLoads(page, token), true, 'a registered token must load')

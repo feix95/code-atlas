@@ -118,6 +118,9 @@ export function sanitizeDocxHtml(html: string, doc: Document = document): string
   const fragment = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
+    // 白名单只放行属性名,值还要过一道地址复核:纯数字的宽高/跨列会被当成可疑地址剔掉,
+    // 得标成「值不是地址」才留得住。宽高丢了,懒加载图片就不占位,大文档点大纲跳不到
+    ADD_URI_SAFE_ATTR: ['width', 'height', 'colspan', 'rowspan'],
     ALLOWED_URI_REGEXP: ALLOWED_URI,
     ALLOW_DATA_ATTR: false,
     RETURN_DOM_FRAGMENT: true
