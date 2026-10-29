@@ -127,7 +127,8 @@
   color: var(--muted-2);
 }
 
-.file-path-menu-item:hover .fpm-ic {
+/* 悬停时图标跟着文字提亮,但禁用行整体压暗:图标不许被点亮,免得看着像能点 */
+.file-path-menu-item:hover:not([aria-disabled='true']) .fpm-ic {
   color: inherit;
 }
 

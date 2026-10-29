@@ -144,6 +144,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         x,
         y,
         doc: canvasRef.current?.ownerDocument ?? document,
+        noTips: true,
         items: nodeMenuItems(n.data, {
           moduleId,
           isHighlighted: moduleId !== null && selection.highlight === moduleId,

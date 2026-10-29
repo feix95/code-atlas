@@ -67,13 +67,14 @@ export interface NodeMenuActions {
 export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): ContextMenuEntry[] {
   const isFile = node.kind === 'file' || (node.kind === 'external' && node.target === 'file')
   const noModule = actions.moduleId === null
+  // 禁用的行没有悬停提示可用了(图谱菜单整张不挂提示),把原因写进 label
+  const highlightLabel = actions.isHighlighted ? '取消高亮' : '高亮同模块'
   const items: ContextMenuEntry[] = [
     { label: '查看模块详情', icon: 'component', run: actions.onDetails },
     {
-      label: actions.isHighlighted ? '取消高亮' : '高亮同模块',
+      label: noModule ? `${highlightLabel}(无归属模块)` : highlightLabel,
       icon: 'bulb',
       disabled: noModule,
-      tip: noModule ? '这个节点不属于任何模块' : undefined,
       run: actions.onToggleHighlight
     }
   ]

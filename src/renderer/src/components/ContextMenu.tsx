@@ -89,6 +89,7 @@ function ContextMenuCard({
   const [pos, setPos] = useState<MenuPos | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const iconOnly = request.iconOnly === true
+  const noTips = request.noTips === true
   const rowH = iconOnly ? ROW_H_ICON_ONLY : request.compact ? ROW_H_COMPACT : ROW_H
   const view = doc.defaultView ?? window
 
@@ -182,7 +183,7 @@ function ContextMenuCard({
               key={i}
               className="file-path-menu-heading"
               role="presentation"
-              title={item.heading}
+              title={noTips ? undefined : item.heading}
             >
               {item.heading}
             </div>
@@ -201,10 +202,9 @@ function ContextMenuCard({
               aria-expanded={hasSub ? expanded === i : undefined}
               className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
               /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
-               data-tip 会白挂;aria-disabled 是 ARIA 菜单模式的推荐写法,行仍可悬停读提示,
+               aria-disabled 是 ARIA 菜单模式的推荐写法,行仍能收到指针事件(悬停样式照常),
                点击由下方 item.disabled 闸手动拦(键盘 Enter 也走同一闸) */
               aria-disabled={item.disabled || undefined}
-              data-tip={item.tip}
               aria-haspopup={hasSub ? 'menu' : undefined}
               onPointerEnter={(e) => {
                 if (hasSub) openSub(i, e.currentTarget)
@@ -240,7 +240,7 @@ function ContextMenuCard({
                   />
                 </span>
               )}
-              <span className="fpm-label" title={caption}>
+              <span className="fpm-label" title={noTips ? undefined : caption}>
                 {caption}
               </span>
               {isSwitch && (
@@ -275,7 +275,7 @@ function ContextMenuCard({
                       child.run()
                     }}
                   >
-                    <span className="fpm-label" title={child.label}>
+                    <span className="fpm-label" title={noTips ? undefined : child.label}>
                       {child.label}
                     </span>
                   </button>
