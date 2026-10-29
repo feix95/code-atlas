@@ -64,7 +64,7 @@ async function checkLook(panel: Locator): Promise<void> {
   await checkHugs(panel)
 }
 
-/** 宽度紧包最长条目:列表宽减去最长条目所需不到 4px(或已在最小宽) */
+/** 宽度紧包最长条目(列表宽减去最长条目所需不到 4px,或已在最小宽),且条目离左右边框一样远 */
 async function checkHugs(panel: Locator): Promise<void> {
   const fit = await panel.evaluate((el) => {
     let need = 0
@@ -76,11 +76,25 @@ async function checkHugs(panel: Locator): Promise<void> {
       need = Math.max(need, range.getBoundingClientRect().width + pad)
     }
     const list = el.querySelector('.doc-outline-list')
-    return { width: list?.clientWidth ?? 0, need, min: parseFloat(getComputedStyle(el).minWidth) }
+    const item = el.querySelector<HTMLElement>('.doc-outline-item')
+    const p = el.getBoundingClientRect()
+    const r = item?.getBoundingClientRect()
+    const border = parseFloat(getComputedStyle(el).borderLeftWidth)
+    return {
+      width: list?.clientWidth ?? 0,
+      need,
+      min: parseFloat(getComputedStyle(el).minWidth),
+      leftGap: r ? r.left - (p.left + border) : Number.NaN,
+      rightGap: r ? p.right - border - r.right : Number.NaN
+    }
   })
   assert.ok(
     fit.width - fit.need < 4 || fit.width <= fit.min,
     `outline width must hug the longest item (list ${fit.width}px, needs ${fit.need}px)`
+  )
+  assert.ok(
+    Math.abs(fit.leftGap - fit.rightGap) <= 1.5,
+    `outline sides must be symmetric (left ${fit.leftGap}px, right ${fit.rightGap}px)`
   )
 }
 

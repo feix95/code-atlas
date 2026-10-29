@@ -62,7 +62,7 @@ export function measureWidestItem(panel: HTMLElement): number | null {
   return widest
 }
 
-/** 内容宽 = 最长条目 + 列表竖向滚动条 + 浮窗内边距与边框;向上取整免得差半像素出省略号 */
+/** 内容宽 = 最长条目 + 列表两侧常驻的滚动条槽 + 浮窗内边距与边框;向上取整免得差半像素出省略号 */
 function naturalWidth(panel: HTMLElement, css: CSSStyleDeclaration, widest: number): number {
   const list = panel.querySelector<HTMLElement>('.doc-outline-list')
   const scrollbar = list ? list.offsetWidth - list.clientWidth : 0

@@ -77,7 +77,8 @@
   max-width: min(var(--outline-auto-max), calc(100% - 2 * var(--space-2)));
   min-height: 5rem;
   max-height: var(--outline-auto-max-h);
-  padding: var(--space-1);
+  /* 左右不留内边距:列表两侧各有一条常驻滚动条槽(见 .doc-outline-list),条目高亮离两边的距离才一样 */
+  padding: var(--space-1) 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 68%, transparent);
@@ -154,6 +155,10 @@
 
 /* 拉大松手吸回内容尺寸:宽、高与右缘同步过渡,左上角保持不动;拖动途中不加过渡,跟手 */
 @media (prefers-reduced-motion: no-preference) {
+  .doc-outline.is-open {
+    transition: opacity var(--dur-2) var(--ease-smooth);
+  }
+
   .doc-outline.is-open.is-snapping {
     transition:
       width var(--dur-2) var(--ease-smooth),
@@ -177,11 +182,6 @@
   color: var(--muted-2);
   cursor: grab;
   touch-action: none;
-}
-
-/* 薄底上的图标压得更暗一点,--muted-2 是比正文低一档的提示色;悬停才提亮到 --muted */
-.doc-outline-grip:hover {
-  color: var(--muted);
 }
 
 .doc-outline-grip::before {
@@ -237,10 +237,6 @@
   backdrop-filter: none;
 }
 
-.doc-outline.is-open .doc-outline-toggle:hover {
-  color: var(--muted);
-}
-
 .doc-outline.is-open .doc-outline-toggle::before {
   content: '';
   width: 0.625rem;
@@ -265,6 +261,9 @@
   cursor: pointer;
 }
 
+/* 抓手、展开态的收起钮、停靠钮:悬停都提到同一档 --muted */
+.doc-outline-grip:hover,
+.doc-outline.is-open .doc-outline-toggle:hover,
 .doc-outline.is-open .doc-outline-dockbtn:hover {
   color: var(--muted);
 }
@@ -274,21 +273,30 @@
   opacity: 0.45;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .doc-outline.is-open {
-    transition: opacity var(--dur-2) var(--ease-smooth);
-  }
-}
-
 .doc-outline-list {
   flex: 1 1 auto;
   min-height: 0;
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  /* 滚动条槽常驻:内容宽不随出不出滚动条变,浮窗宽度(按内容宽算)也不会跟着跳 */
-  scrollbar-gutter: stable;
   list-style: none;
+}
+
+/* 浮窗里的列表:滚动条槽常驻且两侧都留 —— 要滚时槽在右边,不滚时两侧各留一条,
+   条目高亮离左右边框一样远,浮窗宽度也不随出不出滚动条跳。左栏停靠的大纲贴栏边,不套这条 */
+.doc-outline .doc-outline-list {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* 常驻槽压窄到 4px:浮窗是小浮层,细条够用,条目高亮才能贴近边框又不贴死(与上下内边距同档) */
+.doc-outline .doc-outline-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* 槽只有 4px,柄不再留透明边,不然抠掉 4px 的边就看不见了 */
+.doc-outline .doc-outline-list::-webkit-scrollbar-thumb {
+  border: 0;
+  border-radius: var(--radius-pill);
 }
 
 /* 条目走设置页左栏的同一套:透明底、悬停 --hover、选中灰底药丸 --selected-bg;
