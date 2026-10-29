@@ -1,5 +1,5 @@
 // 力导向布局(d3-force)的生命周期:同层数据更新(如引用关系晚到)时按 id 保留节点位置,
-// 只做温和重排;切换层级时新节点从原点附近出生、由斥力散开。模拟只算坐标,不碰 DOM。
+// 只做温和重排;切换层级时新节点从原点附近出生,首帧之前同步预跑到接近稳定。模拟只算坐标,不碰 DOM。
 import { useCallback, useEffect, useRef } from 'react'
 import {
   forceCollide,
@@ -13,6 +13,8 @@ import {
 } from 'd3-force'
 import type { LevelGraph, LevelNode } from '@shared/graphView'
 import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig'
+import { forceCluster, type ClusterForce } from './forceCluster'
+import { settleLayout } from './settleLayout'
 
 export interface SimNode extends SimulationNodeDatum {
   id: string
@@ -82,7 +84,10 @@ function buildScene(level: LevelGraph, prev: ForceScene | null): ForceScene {
   return { dirRel: level.dirRel, nodes, links }
 }
 
-function createSimulation(onTick: () => void): Simulation<SimNode, SimLink> {
+function createSimulation(
+  onTick: () => void,
+  cluster: ClusterForce<SimNode>
+): Simulation<SimNode, SimLink> {
   return forceSimulation<SimNode, SimLink>()
     .velocityDecay(GRAPH_FORCE.velocityDecay)
     .force(
@@ -104,6 +109,7 @@ function createSimulation(onTick: () => void): Simulation<SimNode, SimLink> {
       'collide',
       forceCollide<SimNode>((n) => n.r + GRAPH_FORCE.collidePadding)
     )
+    .force('cluster', cluster)
     .on('tick', onTick)
 }
 
@@ -114,22 +120,42 @@ export interface ForceLayout {
   alpha: () => number
 }
 
-export function useForceLayout(level: LevelGraph | null, onTick: () => void): ForceLayout {
+/** 节点 id → 聚类力所用的模块 id;null = 关闭聚类力(无模块数据或关闭「模块着色」) */
+export type ClusterMap = ReadonlyMap<string, string> | null
+
+export function useForceLayout(
+  level: LevelGraph | null,
+  onTick: () => void,
+  clusters: ClusterMap
+): ForceLayout {
   const sceneRef = useRef<ForceScene | null>(null)
   const simRef = useRef<Simulation<SimNode, SimLink> | null>(null)
+  const clusterRef = useRef<ClusterForce<SimNode> | null>(null)
+  const clustersRef = useRef<ClusterMap>(clusters)
   const onTickRef = useRef(onTick)
   useEffect(() => {
     onTickRef.current = onTick
   })
 
   useEffect(() => {
-    const sim = createSimulation(() => onTickRef.current())
+    const cluster = forceCluster<SimNode>((n) => clustersRef.current?.get(n.id) ?? null, 0)
+    clusterRef.current = cluster
+    const sim = createSimulation(() => onTickRef.current(), cluster)
     simRef.current = sim
     return () => {
       sim.stop()
       simRef.current = null
     }
   }, [])
+
+  // 开关「模块着色」等同层分组变化:换聚类分组并温和重排。写在层级 effect 之前:
+  // 切换层级时两者同轮触发,先换好分组,再由层级 effect 带着新分组同步预跑
+  useEffect(() => {
+    clustersRef.current = clusters
+    clusterRef.current?.strength(clusters ? GRAPH_FORCE.clusterStrength : 0)
+    const sim = simRef.current
+    if (sim && sceneRef.current) sim.alpha(Math.max(sim.alpha(), 0.3)).restart()
+  }, [clusters])
 
   useEffect(() => {
     const sim = simRef.current
@@ -145,7 +171,14 @@ export function useForceLayout(level: LevelGraph | null, onTick: () => void): Fo
     sceneRef.current = scene
     sim.nodes(scene.nodes)
     sim.force<ReturnType<typeof forceLink<SimNode, SimLink>>>('link')?.links(scene.links)
-    sim.alpha(sameLevel ? 0.3 : 1).restart()
+    if (sameLevel) {
+      sim.alpha(0.3).restart()
+      return
+    }
+    // 新层级:首帧之前同步预跑到接近稳定,打开即是最终布局,不再边散开边自动缩放
+    sim.stop().alpha(1)
+    settleLayout(sim, GRAPH_FORCE.settleAlpha, GRAPH_FORCE.settleMaxTicks)
+    sim.restart()
   }, [level])
 
   const setDragging = useCallback((dragging: boolean) => {

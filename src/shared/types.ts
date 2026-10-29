@@ -161,7 +161,55 @@ export interface DepGraphResult {
     skipped: number
     unresolved: UnresolvedImport[]
   }
+  /** 程序切分的模块;切分失败时为 null,界面降级为无划分的原始图 */
+  modules: ModuleMap | null
   durationMs: number
+}
+
+/** 模块切分参数(见 src/modules/moduleConfig.ts) */
+export interface ModuleParams {
+  resolution: number
+  seed: number
+  folderAffinity: number
+  minFiles: number
+  /** 公共文件门槛:入度 > max(hubMinInDegree, hubShare × 有入度文件数) */
+  hubMinInDegree: number
+  hubShare: number
+}
+
+/** 程序切分的模块;成员只存 relPath */
+export interface ModuleInfo {
+  /** 'm:' + 锚点 relPath */
+  id: string
+  /** 主目录里被引用最多的可分析成员 */
+  anchor: string
+  /** 主目录:成员最多的目录(锚点所在目录),模块显示名由它而来;项目根为 '' */
+  folder: string
+  /** 可分析成员 + 附挂文件 + 相关自测,已排序 */
+  files: string[]
+  /** files 中附挂进来的那部分:样式与无导入关系的文件,不参与社区发现 */
+  attached: string[]
+  /** files 中挂靠进来的自测文件(不参与社区发现),侧栏显示为相关测试 */
+  tests: string[]
+  /** 成员所在目录,已排序;项目根为 '' */
+  folders: string[]
+}
+
+/** 模块间边:成员间导入按模块聚合,weight 为原始引用条数 */
+export interface ModuleLink {
+  from: string
+  to: string
+  weight: number
+}
+
+export interface ModuleMap {
+  algorithmVersion: number
+  params: ModuleParams
+  /** 按文件数降序、id 升序 */
+  modules: ModuleInfo[]
+  /** relPath → 模块 id;未归类的文件不出现 */
+  fileToModule: Record<string, string>
+  links: ModuleLink[]
 }
 
 /**

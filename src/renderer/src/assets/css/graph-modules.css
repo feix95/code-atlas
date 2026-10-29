@@ -1,0 +1,225 @@
+/* 关系图谱的划分叠加层:模块调色板、轮廓透明度、「模块着色」开关与右侧详情抽屉。
+   模块调色板按「文件数降序」循环取色(drawModules / moduleOverlay);轮廓透明度也走 token */
+:root {
+  --graph-module-1: #2f9e8f;
+  --graph-module-2: #5b6fd6;
+  --graph-module-3: #c98a1e;
+  --graph-module-4: #c85a78;
+  --graph-module-5: #6f9a35;
+  --graph-module-6: #9567c4;
+  --graph-module-7: #2f8fc4;
+  --graph-module-8: #b8663a;
+  --graph-module-neutral: #b5b5b5;
+  --graph-hull-fill-alpha: 0.1;
+  --graph-hull-stroke-alpha: 0.45;
+  --graph-panel-width: 19rem;
+}
+
+:root[data-theme='dark'] {
+  --graph-module-1: #4cc2b1;
+  --graph-module-2: #8494f0;
+  --graph-module-3: #e0a943;
+  --graph-module-4: #e47d99;
+  --graph-module-5: #93bf59;
+  --graph-module-6: #b88ee3;
+  --graph-module-7: #5cb3e3;
+  --graph-module-8: #d98a5f;
+  --graph-module-neutral: #6e6e6e;
+  --graph-hull-fill-alpha: 0.14;
+  --graph-hull-stroke-alpha: 0.5;
+}
+
+.graph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--chrome-search-row-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.graph-toggle:hover {
+  color: var(--text);
+}
+
+.graph-toggle-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--graph-module-neutral);
+}
+
+.graph-toggle[aria-pressed='true'] {
+  color: var(--text);
+}
+
+/* 开着时圆点是调色板前三色的小色轮:一眼看出「图上的颜色就是模块」 */
+.graph-toggle[aria-pressed='true'] .graph-toggle-dot {
+  background: conic-gradient(
+    var(--graph-module-1) 0 33%,
+    var(--graph-module-2) 0 66%,
+    var(--graph-module-3) 0
+  );
+}
+
+.graph-toggle:focus-visible,
+.graph-file:focus-visible,
+.graph-panel-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
+}
+
+.graph-panel {
+  position: absolute;
+  top: calc(var(--space-2) + var(--chrome-search-row-height) + var(--space-2));
+  right: var(--space-3);
+  bottom: calc(var(--space-2) + var(--space-6));
+  z-index: var(--z-float);
+  width: min(var(--graph-panel-width), calc(100% - var(--space-6)));
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+  outline: none;
+}
+
+.graph-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.graph-panel-kind {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+
+.graph-panel-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-ml);
+  font-weight: var(--font-w-semi);
+  line-height: var(--lh-130);
+  word-break: break-all;
+}
+
+.graph-panel-path {
+  margin: var(--space-1) 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  word-break: break-all;
+}
+
+.graph-panel-note {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  line-height: var(--lh-150);
+}
+
+.graph-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.graph-panel-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.graph-panel-btn:hover,
+.graph-panel-btn[aria-pressed='true'] {
+  background: var(--hover);
+}
+
+.graph-panel-section {
+  margin-top: var(--space-4);
+}
+
+.graph-panel-h {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-medium);
+  color: var(--muted-2);
+}
+
+.graph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.graph-swatch {
+  flex-shrink: 0;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--graph-module-neutral);
+}
+
+.graph-folder-group + .graph-folder-group {
+  margin-top: var(--space-2);
+}
+
+.graph-folder-name {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  word-break: break-all;
+}
+
+.graph-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.graph-file {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-file:hover {
+  background: var(--hover);
+}
+
+.graph-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-file-note {
+  flex-shrink: 0;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
