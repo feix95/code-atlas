@@ -1,5 +1,5 @@
 // 力导向布局(d3-force)的生命周期:同层数据更新(如引用关系晚到)时按 id 保留节点位置,
-// 只做温和重排;切换层级时新节点从原点附近出生、由斥力散开。模拟只算坐标,不碰 DOM。
+// 只做温和重排;切换层级时新节点从原点附近出生,首帧之前同步预跑到接近稳定。模拟只算坐标,不碰 DOM。
 import { useCallback, useEffect, useRef } from 'react'
 import {
   forceCollide,
@@ -14,6 +14,7 @@ import {
 import type { LevelGraph, LevelNode } from '@shared/graphView'
 import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig'
 import { forceCluster, type ClusterForce } from './forceCluster'
+import { settleLayout } from './settleLayout'
 
 export interface SimNode extends SimulationNodeDatum {
   id: string
@@ -147,6 +148,15 @@ export function useForceLayout(
     }
   }, [])
 
+  // 开关「模块着色」等同层分组变化:换聚类分组并温和重排。写在层级 effect 之前:
+  // 切换层级时两者同轮触发,先换好分组,再由层级 effect 带着新分组同步预跑
+  useEffect(() => {
+    clustersRef.current = clusters
+    clusterRef.current?.strength(clusters ? GRAPH_FORCE.clusterStrength : 0)
+    const sim = simRef.current
+    if (sim && sceneRef.current) sim.alpha(Math.max(sim.alpha(), 0.3)).restart()
+  }, [clusters])
+
   useEffect(() => {
     const sim = simRef.current
     if (!sim) return
@@ -161,16 +171,15 @@ export function useForceLayout(
     sceneRef.current = scene
     sim.nodes(scene.nodes)
     sim.force<ReturnType<typeof forceLink<SimNode, SimLink>>>('link')?.links(scene.links)
-    sim.alpha(sameLevel ? 0.3 : 1).restart()
+    if (sameLevel) {
+      sim.alpha(0.3).restart()
+      return
+    }
+    // 新层级:首帧之前同步预跑到接近稳定,打开即是最终布局,不再边散开边自动缩放
+    sim.stop().alpha(1)
+    settleLayout(sim, GRAPH_FORCE.settleAlpha, GRAPH_FORCE.settleMaxTicks)
+    sim.restart()
   }, [level])
-
-  // 模块数据晚到或开关「模块着色」:换聚类分组并温和重排;层级切换由上面的 effect 负责重启
-  useEffect(() => {
-    clustersRef.current = clusters
-    clusterRef.current?.strength(clusters ? GRAPH_FORCE.clusterStrength : 0)
-    const sim = simRef.current
-    if (sim && sceneRef.current) sim.alpha(Math.max(sim.alpha(), 0.3)).restart()
-  }, [clusters])
 
   const setDragging = useCallback((dragging: boolean) => {
     const sim = simRef.current

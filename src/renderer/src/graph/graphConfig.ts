@@ -21,7 +21,11 @@ export const GRAPH_FORCE = {
   /** 新节点出生时离原点的最大随机偏移 */
   spawnJitter: 40,
   /** 聚类力:同模块可见节点被拉向该模块可见成员质心的强度(关闭「模块着色」时为 0) */
-  clusterStrength: 0.08
+  clusterStrength: 0.08,
+  /** 打开或切换层级时首帧之前同步预跑到热度低于此值(须低于 GRAPH_VIEW.autoFitAlpha,首帧即可适应画布) */
+  settleAlpha: 0.02,
+  /** 同步预跑的步数上限(单层最多 150 个节点,约几十毫秒) */
+  settleMaxTicks: 400
 } as const
 
 export const GRAPH_NODE = {
@@ -63,7 +67,7 @@ export const GRAPH_VIEW = {
   fitPaddingPx: 48,
   /** 「适应画布」最多放大到的比例:三两个节点的小层级不会被放得巨大 */
   fitMaxScale: 1.5,
-  /** 首次布局稳定(alpha 低于此值)时自动适应一次:节点超出视口,或适应后能放大到当前比例的这么多倍 */
+  /** 新层级布局稳定(alpha 低于此值,预跑后首帧即满足)时、绘制之前自动适应一次:节点超出视口,或适应后能放大到当前比例的这么多倍 */
   autoFitAlpha: 0.05,
   autoFitGrowRatio: 1.25
 } as const

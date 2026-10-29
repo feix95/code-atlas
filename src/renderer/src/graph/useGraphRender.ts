@@ -1,5 +1,5 @@
 // 关系图谱的渲染循环:按需 requestAnimationFrame(模拟 tick / 交互 / 过渡动画时才画),
-// 负责悬停过渡、切换层级的淡出淡入、主题变化时重读颜色、首次稳定后的自动适应画布。
+// 负责悬停过渡、切换层级的淡出淡入、主题变化时重读颜色、新层级首帧绘制前的自动适应画布。
 import { useCallback, useEffect, useRef } from 'react'
 import {
   drawGraph,
@@ -66,6 +66,16 @@ interface LevelMotion {
   /** 本次切换是否带淡出段(决定淡入起点) */
   hadGhost: boolean
   autoFitted: boolean
+  /** 切换前所在层级:新层的场景到位之前不适应(此时场景还是旧层) */
+  fromDir: string | null
+}
+
+/** 新层级布局稳定后(预跑后首帧即满足)、首次绘制之前适应一次画布 */
+function autoFitOnce(lv: LevelMotion, scene: ForceScene | null, r: RenderRefs): void {
+  if (!scene || lv.autoFitted || scene.dirRel === lv.fromDir) return
+  if (r.alpha() >= GRAPH_VIEW.autoFitAlpha) return
+  lv.autoFitted = true
+  if (shouldAutoFit(scene, r.transformRef.current, r.sizeRef.current)) r.fit()
 }
 
 /** refs 由调用方在布局与视口就绪后填入(三者互相引用,经 ref 中转打破循环) */
@@ -76,7 +86,8 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
     start: 0,
     ghost: null,
     hadGhost: false,
-    autoFitted: false
+    autoFitted: false,
+    fromDir: null
   })
   const colorsRef = useRef<GraphColors | null>(null)
   const typoRef = useRef<Typography | null>(null)
@@ -87,20 +98,24 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
       const canvas = r?.canvasRef.current
       const ctx = canvas?.getContext('2d')
       if (!r || !canvas || !ctx) return false
+      const lv = levelRef.current
       const size = r.sizeRef.current
       const tf = r.transformRef.current
       colorsRef.current ??= readGraphColors(canvas)
       typoRef.current ??= readTypography()
       const colors = colorsRef.current
+      const elapsed = now - lv.start
+      if (lv.ghost && elapsed >= GRAPH_MOTION.levelOutMs) lv.ghost = null
+      const scene = r.sceneRef.current
+      // 旧层淡完之后、新层第一次绘制之前适应:淡出中的旧层不被缩放,新层首帧就是最终比例
+      if (!lv.ghost) autoFitOnce(lv, scene, r)
       ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0)
       ctx.fillStyle = colors.bg
       ctx.fillRect(0, 0, size.w, size.h)
       ctx.setTransform(size.dpr * tf.k, 0, 0, size.dpr * tf.k, size.dpr * tf.x, size.dpr * tf.y)
       let more = stepHover(hoverRef.current, now)
-      const lv = levelRef.current
-      const elapsed = now - lv.start
       const base = { hover: hoverRef.current, transform: tf, colors, ...typoRef.current }
-      if (lv.ghost && elapsed < GRAPH_MOTION.levelOutMs) {
+      if (lv.ghost) {
         const ghostAlpha = 1 - elapsed / GRAPH_MOTION.levelOutMs
         drawGraph(ctx, {
           ...base,
@@ -109,15 +124,14 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           modules: null,
           selectedId: null
         })
-        more = true
-      } else lv.ghost = null
+        return true
+      }
       const inStart = lv.start + (lv.hadGhost ? GRAPH_MOTION.levelOutMs : 0)
       const inAlpha = lv.start
         ? Math.max(0, Math.min(1, (now - inStart) / GRAPH_MOTION.levelInMs))
         : 1
       if (inAlpha < 1) more = true
-      const scene = r.sceneRef.current
-      if (scene && !lv.ghost) {
+      if (scene) {
         drawGraph(ctx, {
           ...base,
           scene,
@@ -125,10 +139,6 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           modules: r.modules,
           selectedId: r.selectedId
         })
-      }
-      if (scene && !lv.autoFitted && r.alpha() < GRAPH_VIEW.autoFitAlpha) {
-        lv.autoFitted = true
-        if (shouldAutoFit(scene, tf, size)) r.fit()
       }
       return more
     },
@@ -177,6 +187,7 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
   const beginLevelTransition = useCallback(() => {
     const lv = levelRef.current
     lv.ghost = refs.current?.sceneRef.current ?? null
+    lv.fromDir = lv.ghost?.dirRel ?? null
     lv.hadGhost = lv.ghost !== null && lv.ghost.nodes.length > 0
     lv.start = performance.now()
     lv.autoFitted = false

@@ -126,7 +126,9 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     () => new Map<string, DepGraphNode>((current?.nodes ?? []).map((n) => [n.relPath, n])),
     [current]
   )
-  const layout = useForceLayout(level, render.requestDraw, clusters)
+  // 引用关系(连线与模块)还没到时先不布局:等数据齐了一次排好,首帧即最终布局,不会到货后再重排一遍
+  const isAwaitingGraph = current === null && graphNote === null
+  const layout = useForceLayout(isAwaitingGraph ? null : level, render.requestDraw, clusters)
   const activate = useNodeActivate(nav, onOpenFile)
   const centerRef = useRef<(id: string) => boolean>(() => false)
   const centerOn = useCallback((id: string) => centerRef.current(id), [])
@@ -209,6 +211,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   }
   const scanning = nav.status.kind === 'scanning'
   const empty = !scanning && level !== null && level.nodes.length === 0
+  const overlayText = scanning
+    ? '正在读取文件夹…'
+    : empty
+      ? '这个文件夹是空的'
+      : isAwaitingGraph
+        ? '正在分析引用关系…'
+        : null
   return (
     <div className="graph-view" tabIndex={0} onKeyDown={onKeyDown} aria-label="关系图谱">
       <canvas
@@ -254,9 +263,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           <Notice kind="error">这个文件夹暂时打不开,请稍后再试</Notice>
         )}
       </div>
-      {(scanning || empty) && (
-        <p className="graph-overlay">{scanning ? '正在读取文件夹…' : '这个文件夹是空的'}</p>
-      )}
+      {overlayText && <p className="graph-overlay">{overlayText}</p>}
       {selection.selected && (
         <GraphSidePanel
           node={selection.selected}

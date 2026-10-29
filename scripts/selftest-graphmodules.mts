@@ -13,6 +13,8 @@ import {
   unassignedReason
 } from '../src/renderer/src/graph/moduleDetails.ts'
 import { fitTransform, shouldAutoFit } from '../src/renderer/src/graph/fitView.ts'
+import { settleLayout } from '../src/renderer/src/graph/settleLayout.ts'
+import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import type { ForceScene } from '../src/renderer/src/graph/useForceLayout.ts'
 import type { LevelNode } from '../src/shared/graphView.ts'
 import type { ModuleInfo, ModuleMap } from '../src/shared/types.ts'
@@ -326,8 +328,46 @@ function checkAutoFit(): void {
   assert.equal(fitTransform(sceneOf([]), size), null, '空场景不适应')
 }
 
+/** 打开或切换层级时先同步预跑模拟:首帧适应出的比例要接近完全冷却后的比例,打开后不再出现一下明显缩放 */
+function checkSettle(): void {
+  type N = { id: string; x: number; y: number; r: number }
+  const nodes: N[] = Array.from({ length: 60 }, (_, i) => ({
+    id: `n${i}`,
+    x: Math.cos(i) * 20,
+    y: Math.sin(i) * 20,
+    r: 8
+  }))
+  const links = nodes.slice(1).map((n, i) => ({ source: nodes[Math.floor(i / 3)], target: n }))
+  const sim = forceSimulation(nodes)
+    .velocityDecay(0.35)
+    .force('charge', forceManyBody<N>().strength(-280).distanceMax(900))
+    .force('link', forceLink<N, (typeof links)[number]>(links).distance(80).strength(0.4))
+    .force('x', forceX<N>(0).strength(0.035))
+    .force('y', forceY<N>(0).strength(0.035))
+    .force(
+      'collide',
+      forceCollide<N>((n) => n.r + 6)
+    )
+    .stop()
+  const size = { w: 1000, h: 800, dpr: 1 }
+  const scene = { dirRel: '', links: [], nodes } as unknown as ForceScene
+  const unsettled = fitTransform(scene, size)
+  const ticks = settleLayout(sim, 0.02, 400)
+  assert.ok(sim.alpha() < 0.02, '预跑到热度阈值以下')
+  assert.ok(ticks > 0 && ticks <= 400, '预跑步数有上限')
+  const first = fitTransform(scene, size)
+  while (sim.alpha() > sim.alphaMin()) sim.tick()
+  const last = fitTransform(scene, size)
+  assert.ok(unsettled && first && last)
+  assert.ok(unsettled.k / last.k > 1.3, '没预跑时首帧比例与最终比例差很多(这就是打开后那一下缩放)')
+  assert.ok(Math.abs(first.k / last.k - 1) < 0.08, '预跑后首帧比例与最终比例几乎相同')
+  const hot = { alpha: (): number => 1, tick: (): void => undefined }
+  assert.equal(settleLayout(hot, 0.02, 5), 5, '热度降不下来时按上限停,不卡死')
+}
+
 checkConvexHull()
 checkCircleHull()
+checkSettle()
 checkDetails()
 checkOverlay()
 checkClusterForce()
