@@ -11,15 +11,20 @@ import {
   type Simulation,
   type SimulationNodeDatum
 } from 'd3-force'
-import type { LevelGraph, LevelNode } from '@shared/graphView'
-import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig'
-import { forceCluster, type ClusterForce } from './forceCluster'
-import { settleLayout } from './settleLayout'
+import type { LevelNode, VisibleGraph, VisibleNode } from '@shared/graphView'
+import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig.ts'
+import { forceCluster, type ClusterForce } from './forceCluster.ts'
+import { clampToContainers, containerRadius, forceContain } from './forceContain.ts'
+import { settleLayout } from './settleLayout.ts'
 
 export interface SimNode extends SimulationNodeDatum {
   id: string
-  data: LevelNode
+  data: VisibleNode
+  /** 离焦点的层数:容器约束按它从外到内排序 */
+  depth: number
   r: number
+  /** 直接上级容器;焦点直接子项为 null */
+  parent: SimNode | null
   x: number
   y: number
 }
@@ -59,22 +64,42 @@ function spawn(): number {
   return (Math.random() - 0.5) * 2 * GRAPH_FORCE.spawnJitter
 }
 
-function buildScene(level: LevelGraph, prev: ForceScene | null): ForceScene {
+export function buildScene(level: VisibleGraph, prev: ForceScene | null): ForceScene {
   const keep =
     prev && prev.dirRel === level.dirRel ? new Map(prev.nodes.map((n) => [n.id, n])) : null
+  const fresh: SimNode[] = []
   const nodes: SimNode[] = level.nodes.map((data) => {
     const old = keep?.get(data.id)
-    return {
+    const node: SimNode = {
       id: data.id,
       data,
+      depth: data.depth,
       r: nodeRadius(data),
+      parent: null,
       x: old?.x ?? spawn(),
       y: old?.y ?? spawn(),
       vx: old?.vx,
       vy: old?.vy
     }
+    if (!old) fresh.push(node)
+    return node
   })
   const byId = new Map(nodes.map((n) => [n.id, n]))
+  for (const node of nodes) {
+    const parentId = node.data.parentId
+    node.parent = parentId ? (byId.get(parentId) ?? null) : null
+  }
+  // 新子项在容器中心附近出生;父节点可能也是新节点,按层数从外到内落位
+  for (const node of fresh.sort((a, b) => a.depth - b.depth)) {
+    if (!node.parent) continue
+    node.x = node.parent.x + spawn()
+    node.y = node.parent.y + spawn()
+  }
+  // 容器半径自下而上累加:子容器先算好,父容器才装得下它
+  for (const node of [...nodes].sort((a, b) => b.depth - a.depth)) {
+    if (!node.data.isContainer) continue
+    node.r = containerRadius(nodes.filter((n) => n.parent === node))
+  }
   const links: SimLink[] = []
   for (const e of level.edges) {
     const source = byId.get(e.from)
@@ -110,6 +135,7 @@ function createSimulation(
       forceCollide<SimNode>((n) => n.r + GRAPH_FORCE.collidePadding)
     )
     .force('cluster', cluster)
+    .force('contain', forceContain<SimNode>())
     .on('tick', onTick)
 }
 
@@ -123,7 +149,7 @@ export interface ForceLayout {
 export type ClusterMap = ReadonlyMap<string, string> | null
 
 export function useForceLayout(
-  level: LevelGraph | null,
+  level: VisibleGraph | null,
   onTick: () => void,
   clusters: ClusterMap
 ): ForceLayout {
@@ -139,7 +165,11 @@ export function useForceLayout(
   useEffect(() => {
     const cluster = forceCluster<SimNode>((n) => clustersRef.current?.get(n.id) ?? null, 0)
     clusterRef.current = cluster
-    const sim = createSimulation(() => onTickRef.current(), cluster)
+    const sim = createSimulation(() => {
+      // 积分在力之后:向外的速度可能把子项带出容器边缘,画之前补夹一次
+      if (sceneRef.current) clampToContainers(sceneRef.current.nodes)
+      onTickRef.current()
+    }, cluster)
     simRef.current = sim
     return () => {
       sim.stop()
@@ -177,6 +207,7 @@ export function useForceLayout(
     // 新层级:首帧之前同步预跑到接近稳定,打开即是最终布局,不再边散开边自动缩放
     sim.stop().alpha(1)
     settleLayout(sim, GRAPH_FORCE.settleAlpha, GRAPH_FORCE.settleMaxTicks)
+    clampToContainers(scene.nodes)
     sim.restart()
   }, [level])
 

@@ -6,7 +6,7 @@ import {
   GRAPH_LEVEL_MAX_NODES,
   buildVisibleGraph,
   isVisibleGraphRejection,
-  type LevelGraph
+  type VisibleGraph
 } from './visibleGraph.ts'
 
 export {
@@ -32,7 +32,7 @@ export function buildLevelGraph(
   depEdges: DepEdge[],
   dirRel: string,
   maxNodes: number = GRAPH_LEVEL_MAX_NODES
-): LevelGraph | null {
+): VisibleGraph | null {
   const graph = buildVisibleGraph(folderTree(tree), depEdges, dirRel, NO_EXPANSION, maxNodes)
   // 没有展开的容器:焦点层超限会收进 overflow 节点,不会走到拒绝分支
   return graph && !isVisibleGraphRejection(graph) ? graph : null

@@ -82,7 +82,9 @@ export const GRAPH_ZOOM = {
   /** 容器半径 = sqrt(Σ(子半径 + containerPadding)²) × packFactor */
   packFactor: 1.15,
   /** 容器内边距:子节点半径之外再留的世界坐标距离 */
-  containerPadding: 8
+  containerPadding: 8,
+  /** 约束子项时在容器边缘之外再留的安全边距;切向速度积分后的微小外溢靠它兜住 */
+  containMargin: 1
 } as const
 
 export const GRAPH_LABEL = {
