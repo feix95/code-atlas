@@ -16,7 +16,7 @@ import { fitTransform } from '../src/renderer/src/graph/fitView.ts'
 import { settleLayout } from '../src/renderer/src/graph/settleLayout.ts'
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import type { ForceScene } from '../src/renderer/src/graph/useForceLayout.ts'
-import type { LevelNode } from '../src/shared/graphView.ts'
+import type { LevelNode, VisibleNode } from '../src/shared/graphView.ts'
 import type { ModuleInfo, ModuleMap } from '../src/shared/types.ts'
 
 /** 点在一组闭合环内(奇偶规则,环内的洞不算内) */
@@ -100,12 +100,13 @@ function makeMap(modules: ModuleInfo[]): ModuleMap {
   }
 }
 
-const node = (id: string, kind: LevelNode['kind']): LevelNode => ({
+const node = (id: string, kind: LevelNode['kind'], depth = 1): VisibleNode => ({
   id,
   kind,
   label: id.split('/').pop() ?? id,
   degree: 0,
-  descendantFiles: 0
+  descendantFiles: 0,
+  depth
 })
 
 function checkOverlay(): void {
@@ -203,6 +204,58 @@ function checkOverlay(): void {
   const none = buildModuleOverlay(nodes, 'src', null)
   assert.equal(none.nodes.size, 0, '没有模块数据时叠加层为空(画面与改造前一致)')
   assert.equal(none.hulls.size, 0)
+}
+
+/** P2 层级:展开的容器不进轮廓,它的子项进;嵌套可见文件夹按自己的后代算色环 */
+function checkHierarchyOverlay(): void {
+  const ui = 'm:src/ui/App.tsx'
+  const core = 'm:src/core/x.ts'
+  const map = makeMap([
+    mod(ui, ['src/ui/App.tsx', 'src/ui/a.ts', 'src/ui/deep/x.ts', 'src/main.ts']),
+    mod(core, ['src/core/x.ts', 'src/core/y.ts', 'src/ui/deep/y.ts'])
+  ])
+  const nodes: VisibleNode[] = [
+    { ...node('src/ui', 'folder'), isContainer: true },
+    { ...node('src/ui/App.tsx', 'file', 2), parentId: 'src/ui' },
+    { ...node('src/ui/a.ts', 'file', 2), parentId: 'src/ui' },
+    { ...node('src/ui/deep', 'folder', 2), parentId: 'src/ui' },
+    node('src/core', 'folder'),
+    node('src/main.ts', 'file')
+  ]
+  const overlay = buildModuleOverlay(nodes, 'src', map)
+  assert.equal(overlay.nodes.get('src/ui')?.hullModule, ui, '容器仍记主导模块(聚类力与侧栏用)')
+  assert.deepEqual(
+    overlay.nodes.get('src/ui')?.ring.map((s) => s.moduleId),
+    [ui, core],
+    '容器的色环按全部后代文件算'
+  )
+  assert.deepEqual(
+    overlay.hulls.get(ui),
+    ['src/ui/App.tsx', 'src/ui/a.ts', 'src/main.ts'],
+    '展开的容器不算轮廓成员,它的子项才算'
+  )
+  assert.equal(overlay.hulls.has(core), false, '只有一个可见成员的模块不画轮廓')
+  assert.deepEqual(
+    overlay.nodes.get('src/ui/deep')?.ring.map((s) => s.moduleId),
+    [core, ui],
+    '嵌套的可见文件夹按自己的后代算色环(平票按 id 排)'
+  )
+  assert.equal(overlay.nodes.get('src/ui/deep')?.hullModule, null, '各占一半的嵌套文件夹不计入轮廓')
+  assert.equal(overlay.elsewhere.get(ui), 0, '展开容器里的文件不重复算作「在其他文件夹」')
+  assert.equal(overlay.elsewhere.get(core), 0)
+
+  const rootNodes: VisibleNode[] = [
+    node('src', 'folder'),
+    { ...node('src/ui', 'folder'), isContainer: true },
+    { ...node('src/ui/App.tsx', 'file', 2), parentId: 'src/ui' },
+    { ...node('src/ui/a.ts', 'file', 2), parentId: 'src/ui' }
+  ]
+  const atRoot = buildModuleOverlay(rootNodes, '', map)
+  assert.deepEqual(
+    atRoot.hulls.get(ui),
+    ['src/ui/App.tsx', 'src/ui/a.ts'],
+    '项目根:直接子项不画轮廓,展开容器里的子项照常画'
+  )
 }
 
 function checkClusterForce(): void {
@@ -369,6 +422,7 @@ checkOutline()
 checkSettle()
 checkDetails()
 checkOverlay()
+checkHierarchyOverlay()
 checkClusterForce()
 checkDisplayName()
 checkFitView()
