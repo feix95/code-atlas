@@ -17,6 +17,8 @@ interface NavDeps {
 
 export interface GraphNav {
   dirRel: string
+  /** 层级访问序号:每次真正换焦点加一,旧层级的展开集合据此作废 */
+  visit: number
   status: NavStatus
   navigate: (relPath: string) => Promise<void>
   goUp: () => void
@@ -29,6 +31,7 @@ export function parentOf(relPath: string): string {
 
 export function useGraphNav({ tree, expandLazy, onBeforeChange }: NavDeps): GraphNav {
   const [dirRel, setDirRel] = useState('')
+  const [visit, setVisit] = useState(0)
   const [status, setStatus] = useState<NavStatus>({ kind: 'idle' })
 
   const navigate = useCallback(
@@ -47,6 +50,7 @@ export function useGraphNav({ tree, expandLazy, onBeforeChange }: NavDeps): Grap
       setStatus({ kind: 'idle' })
       onBeforeChange()
       setDirRel(relPath)
+      setVisit((v) => v + 1)
     },
     [tree, dirRel, expandLazy, onBeforeChange]
   )
@@ -57,5 +61,5 @@ export function useGraphNav({ tree, expandLazy, onBeforeChange }: NavDeps): Grap
 
   // 当前目录从扫描树里消失(重新扫描后被删 / 改名):按根目录呈现
   const missing = tree !== null && dirRel !== '' && findDir(tree, dirRel) === null
-  return { dirRel: missing ? '' : dirRel, status, navigate, goUp }
+  return { dirRel: missing ? '' : dirRel, visit, status, navigate, goUp }
 }

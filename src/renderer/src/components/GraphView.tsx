@@ -5,8 +5,11 @@
 // 数据全部来自共享的 ScanResult 与 DepGraphResult,不另起扫描或关系计算。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, DepGraphNode, DepGraphResult, ScanDirNode, ScanResult } from '@shared/types'
-import { buildLevelGraph, type LevelNode } from '@shared/graphView'
+import { folderTree } from '@shared/hierarchy'
+import type { LevelNode } from '@shared/graphView'
 import { useGraphNav, type GraphNav } from '../graph/useGraphNav'
+import { useGraphExpansion } from '../graph/useGraphExpansion'
+import { zoomNodesOf } from '../graph/semanticZoom'
 import { useForceLayout, type SimNode } from '../graph/useForceLayout'
 import { useGraphViewport } from '../graph/useGraphViewport'
 import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
@@ -16,11 +19,11 @@ import { useGraphHoverMode } from '../graph/useGraphHoverMode'
 import { moduleSwatchCss } from '../graph/moduleColors'
 import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
-import { Crumbs, NodeList } from './GraphNodeList'
+import { NodeList } from './GraphNodeList'
+import { GraphToolbar } from './GraphToolbar'
 import { GraphHoverTag } from './GraphHoverTag'
 import { GraphNodeTip } from './GraphNodeTip'
 import { nodeTipText, type NodeTipText } from '../graph/nodeTip'
-import { ModuleToggle } from './GraphModuleToggle'
 import { footText } from '../graph/graphFootText'
 import { GraphSidePanel } from './GraphSidePanel'
 import { useModuleColorPicker } from '../graph/useModuleColorPicker'
@@ -92,10 +95,15 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   const edges = current ? current.edges : NO_EDGES
   const moduleMap = current?.modules ?? null
   const [showModules, setShowModules] = useState(true)
-  const level = useMemo(
-    () => buildLevelGraph(result.tree, edges, nav.dirRel),
-    [result.tree, edges, nav.dirRel]
-  )
+  const tree = useMemo(() => folderTree(result.tree), [result.tree])
+  const expansion = useGraphExpansion({
+    visit: nav.visit,
+    dirRel: nav.dirRel,
+    tree,
+    edges,
+    expandLazy
+  })
+  const level = expansion.level
   const overlay = useMemo(
     () => buildModuleOverlay(level?.nodes ?? [], nav.dirRel, moduleMap),
     [level, nav.dirRel, moduleMap]
@@ -170,7 +178,9 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     onNodeContextMenu,
     onHoverChange: hoverMode.onHoverChange,
     onModeWheel: hoverMode.onModeWheel,
-    onLevelWheel: enterOrLeave
+    onLevelWheel: enterOrLeave,
+    // 普通缩放停下后按屏幕直径决定原地展开 / 收起;切换看法与进出层级不参与
+    onZoomEnd: (scale) => expansion.applyZoom(zoomNodesOf(layout.sceneRef.current), scale)
   })
   useEffect(() => {
     centerRef.current = viewport.centerOn
@@ -242,6 +252,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         data-graph-dir={nav.dirRel}
         data-graph-hulls={modulesOn ? overlay.hulls.size : 0}
         data-graph-hover-mode={hoverMode.mode}
+        data-graph-expanded={expansion.expanded.size}
       />
       <NodeList
         nodes={level?.nodes ?? []}
@@ -249,24 +260,15 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         onActivate={activate}
         onFocusNode={render.setHover}
       />
-      <div className="graph-bar">
-        <Crumbs rootName={result.rootName} nav={nav} />
-        <div className="graph-tools">
-          {graphLoading && <span className="graph-status">正在分析引用关系…</span>}
-          {moduleMap && moduleMap.modules.length > 0 && (
-            <ModuleToggle isOn={showModules} onToggle={() => setShowModules((v) => !v)} />
-          )}
-          <button
-            type="button"
-            className="graph-tool"
-            onClick={viewport.fit}
-            data-tip="适应画布"
-            aria-label="适应画布"
-          >
-            <TreeIcon name="expand" size={16} mono />
-          </button>
-        </div>
-      </div>
+      <GraphToolbar
+        rootName={result.rootName}
+        nav={nav}
+        graphLoading={graphLoading}
+        showModules={showModules}
+        hasModules={moduleMap !== null && moduleMap.modules.length > 0}
+        onToggleModules={() => setShowModules((v) => !v)}
+        onFit={viewport.fit}
+      />
       <div className="graph-notices">
         {graphNote && (
           <Notice kind="error">
@@ -278,6 +280,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         )}
         {nav.status.kind === 'failed' && (
           <Notice kind="error">这个文件夹暂时打不开,请稍后再试</Notice>
+        )}
+        {expansion.notice && (
+          <Notice kind={expansion.notice.kind === 'scanFailed' ? 'error' : 'info'}>
+            {expansion.notice.kind === 'scanFailed'
+              ? '这个文件夹暂时打不开,请稍后再试'
+              : '内容较多,无法原地展开,右键文件夹选「进入此文件夹」查看'}
+          </Notice>
         )}
       </div>
       {overlayText && <p className="graph-overlay">{overlayText}</p>}

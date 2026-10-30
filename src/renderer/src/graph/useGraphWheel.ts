@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import type { ForceScene, SimNode } from './useForceLayout'
 import type { Transform } from './drawGraph'
-import { GRAPH_VIEW } from './graphConfig'
+import { GRAPH_VIEW, GRAPH_ZOOM } from './graphConfig'
 import { hitTest, localPoint } from './graphHit'
 import { clampScale } from './fitView'
 import { nextGesture, takeSteps, wheelDeltaPx, type WheelGesture } from './wheelIntent'
@@ -16,6 +16,8 @@ export interface WheelDeps {
   onModeWheel: (node: SimNode, steps: number, x: number, y: number) => void
   /** Ctrl+滚轮(含触控板捏合):steps 为 -1 = 往上滚,进入鼠标下的文件夹;1 = 往下滚,返回上一层 */
   onLevelWheel: (node: SimNode | null, steps: number) => void
+  /** 普通缩放停止 settleMs 后触发一次,scale 为停止时的比例;给语义缩放判定用 */
+  onZoomEnd: (scale: number) => void
 }
 
 /** 当前悬停的节点与开始悬停的时间(ms,performance.now) */
@@ -43,6 +45,19 @@ export function useGraphWheel(
     if (!canvas) return
     let gesture: WheelGesture | null = null
     let target: SimNode | null = null
+    let settleTimer: ReturnType<typeof setTimeout> | null = null
+    const cancelZoomEnd = (): void => {
+      if (settleTimer === null) return
+      clearTimeout(settleTimer)
+      settleTimer = null
+    }
+    const scheduleZoomEnd = (): void => {
+      cancelZoomEnd()
+      settleTimer = setTimeout(() => {
+        settleTimer = null
+        depsRef.current.onZoomEnd(transformRef.current.k)
+      }, GRAPH_ZOOM.settleMs)
+    }
     const onWheel = (e: WheelEvent): void => {
       // Ctrl+滚轮不归界面缩放(界面缩放走键盘 +/-/0):落在画布上的都由图谱处理
       e.preventDefault()
@@ -59,8 +74,11 @@ export function useGraphWheel(
       if (gesture.action === 'zoom') {
         zoomAt(tf, sx, sy, deltaPx)
         d.requestDraw()
+        scheduleZoomEnd()
         return
       }
+      // 换了手势就不再算「缩放刚结束」,避免拿旧比例去判定展开
+      cancelZoomEnd()
       const r = takeSteps(gesture, deltaPx)
       gesture = r.gesture
       if (r.steps === 0) return
@@ -68,6 +86,9 @@ export function useGraphWheel(
       else if (target) d.onModeWheel(target, r.steps, sx, sy)
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
+    return () => {
+      cancelZoomEnd()
+      canvas.removeEventListener('wheel', onWheel)
+    }
   }, [canvasRef, transformRef, readHover])
 }

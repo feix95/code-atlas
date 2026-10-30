@@ -1,6 +1,7 @@
 // 语义缩放的纯判定:节点屏幕直径跨过阈值时决定原地展开或收起容器。
 // 只做几何与深度判定;lazy 扫描与节点上限由展开状态 hook 处理。
 import { GRAPH_ZOOM } from './graphConfig.ts'
+import type { ForceScene } from './useForceLayout.ts'
 
 export interface ZoomNode {
   id: string
@@ -21,6 +22,16 @@ export interface ZoomRules {
 export interface ZoomDecision {
   expand: string[]
   collapse: string[]
+}
+
+/** 当前场景里可参与判定的节点快照:已展开容器的 r 就是容器半径 */
+export function zoomNodesOf(scene: ForceScene | null): ZoomNode[] {
+  return (scene?.nodes ?? []).map((node) => ({
+    id: node.id,
+    r: node.r,
+    depth: node.depth,
+    isFolder: node.data.kind === 'folder'
+  }))
 }
 
 export function zoomDecisions(
