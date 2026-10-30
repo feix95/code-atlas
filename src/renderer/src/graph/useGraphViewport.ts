@@ -1,13 +1,17 @@
-// 关系图谱的视口:缩放 / 平移变换、指针命中检测、悬停与拖拽,以及画布尺寸与设备像素比适配。
+// 关系图谱的视口:缩放 / 平移变换、指针命中检测、悬停与拖拽,以及画布尺寸与设备像素比适配;滚轮见 useGraphWheel。
 // 交互状态收敛为单一变量 Interaction;变换与状态都放 ref,指针事件不触发 React 重渲染。
 import { useCallback, useEffect, useRef } from 'react'
-import type { ForceScene, SimNode } from './useForceLayout'
+import type { SimNode } from './useForceLayout'
 import type { Transform } from './drawGraph'
-import { GRAPH_NODE, GRAPH_VIEW } from './graphConfig'
+import { GRAPH_VIEW } from './graphConfig'
+import { useGraphWheel, type HoverReader, type WheelDeps } from './useGraphWheel'
+import { useGraphClicks } from './useGraphClicks'
+import { hitTest, localPoint } from './graphHit'
+import { fitTransform } from './fitView'
 
 type Interaction =
   | { mode: 'idle' }
-  | { mode: 'hovering'; node: SimNode }
+  | { mode: 'hovering'; node: SimNode; since: number }
   | { mode: 'dragging-node'; node: SimNode; sx: number; sy: number; moved: boolean }
   | { mode: 'panning'; sx: number; sy: number; ox: number; oy: number }
 
@@ -17,12 +21,14 @@ export interface ViewportSize {
   dpr: number
 }
 
-interface ViewportDeps {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
-  sceneRef: React.RefObject<ForceScene | null>
-  requestDraw: () => void
+export interface ViewportDeps extends WheelDeps {
   setDragging: (dragging: boolean) => void
+  /** 单击节点(按下后没拖动):选中 */
   onNodeClick: (node: SimNode) => void
+  /** 单击空白处(按下后没平移):取消选中 */
+  onBlankClick: () => void
+  onNodeDoubleClick: (node: SimNode) => void
+  onNodeContextMenu: (node: SimNode, clientX: number, clientY: number) => void
   onHoverChange: (id: string | null) => void
 }
 
@@ -33,49 +39,8 @@ export interface GraphViewport {
   fit: () => void
   /** 取消悬停(Esc) */
   clearHover: () => void
-}
-
-function clampScale(k: number): number {
-  return Math.max(GRAPH_VIEW.minScale, Math.min(GRAPH_VIEW.maxScale, k))
-}
-
-function localPoint(
-  canvas: HTMLCanvasElement,
-  e: { clientX: number; clientY: number }
-): [number, number] {
-  const rect = canvas.getBoundingClientRect()
-  return [e.clientX - rect.left, e.clientY - rect.top]
-}
-
-function hitTest(scene: ForceScene | null, tf: Transform, sx: number, sy: number): SimNode | null {
-  if (!scene) return null
-  const wx = (sx - tf.x) / tf.k
-  const wy = (sy - tf.y) / tf.k
-  const slop = GRAPH_NODE.hitSlopPx / tf.k
-  for (let i = scene.nodes.length - 1; i >= 0; i--) {
-    const n = scene.nodes[i]
-    if (Math.hypot(n.x - wx, n.y - wy) <= n.r + slop) return n
-  }
-  return null
-}
-
-export function fitTransform(scene: ForceScene | null, size: ViewportSize): Transform | null {
-  if (!scene || scene.nodes.length === 0 || size.w === 0) return null
-  let x0 = Infinity
-  let y0 = Infinity
-  let x1 = -Infinity
-  let y1 = -Infinity
-  for (const n of scene.nodes) {
-    x0 = Math.min(x0, n.x - n.r)
-    y0 = Math.min(y0, n.y - n.r)
-    x1 = Math.max(x1, n.x + n.r)
-    y1 = Math.max(y1, n.y + n.r)
-  }
-  const pad = GRAPH_VIEW.fitPaddingPx
-  const k = clampScale(
-    Math.min((size.w - pad * 2) / (x1 - x0 || 1), (size.h - pad * 2) / (y1 - y0 || 1), 1.5)
-  )
-  return { k, x: size.w / 2 - ((x0 + x1) / 2) * k, y: size.h / 2 - ((y0 + y1) / 2) * k }
+  /** 平移视口让该节点落在画布中央;节点不在当前层返回 false */
+  centerOn: (id: string) => boolean
 }
 
 function useCanvasSize(
@@ -112,28 +77,10 @@ function useCanvasSize(
   return sizeRef
 }
 
-function useWheel(deps: ViewportDeps, transformRef: React.RefObject<Transform>): void {
-  const { canvasRef, requestDraw } = deps
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const onWheel = (e: WheelEvent): void => {
-      // Ctrl+滚轮不再归界面缩放(改键盘 +/-/0):落在画布上的捏合/Ctrl+滚轮就是缩画布
-      e.preventDefault()
-      const [sx, sy] = localPoint(canvas, e)
-      const tf = transformRef.current
-      const k = clampScale(tf.k * Math.exp(-e.deltaY * GRAPH_VIEW.wheelSpeed))
-      tf.x = sx - ((sx - tf.x) / tf.k) * k
-      tf.y = sy - ((sy - tf.y) / tf.k) * k
-      tf.k = k
-      requestDraw()
-    }
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
-  }, [canvasRef, requestDraw, transformRef])
-}
-
-function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>): () => void {
+function usePointer(
+  deps: ViewportDeps,
+  transformRef: React.RefObject<Transform>
+): { clearHover: () => void; readHover: HoverReader } {
   const stateRef = useRef<Interaction>({ mode: 'idle' })
   const depsRef = useRef(deps)
   useEffect(() => {
@@ -196,7 +143,8 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
       }
       const node = hitTest(d.sceneRef.current, transformRef.current, sx, sy)
       if (node) {
-        if (s.mode !== 'hovering' || s.node !== node) setState({ mode: 'hovering', node })
+        if (s.mode !== 'hovering' || s.node !== node)
+          setState({ mode: 'hovering', node, since: performance.now() })
       } else if (s.mode !== 'idle') setState({ mode: 'idle' })
     }
     const onUp = (e: PointerEvent): void => {
@@ -207,10 +155,13 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
         s.node.fy = null
         if (s.moved) depsRef.current.setDragging(false)
         else depsRef.current.onNodeClick(s.node)
-        setState({ mode: 'hovering', node: s.node })
+        setState({ mode: 'hovering', node: s.node, since: performance.now() })
         return
       }
-      if (s.mode === 'panning') setState({ mode: 'idle' })
+      if (s.mode !== 'panning') return
+      setState({ mode: 'idle' })
+      const [sx, sy] = localPoint(canvas, e)
+      if (Math.hypot(sx - s.sx, sy - s.sy) <= GRAPH_VIEW.clickSlopPx) depsRef.current.onBlankClick()
     }
     const onLeave = (): void => {
       if (stateRef.current.mode === 'hovering') setState({ mode: 'idle' })
@@ -229,16 +180,22 @@ function usePointer(deps: ViewportDeps, transformRef: React.RefObject<Transform>
     }
   }, [deps.canvasRef, setState, transformRef])
 
-  return useCallback(() => {
+  const clearHover = useCallback(() => {
     if (stateRef.current.mode === 'hovering') setState({ mode: 'idle' })
   }, [setState])
+  const readHover = useCallback<HoverReader>(() => {
+    const s = stateRef.current
+    return s.mode === 'hovering' ? { node: s.node, since: s.since } : null
+  }, [])
+  return { clearHover, readHover }
 }
 
 export function useGraphViewport(deps: ViewportDeps): GraphViewport {
   const transformRef = useRef<Transform>({ k: 1, x: 0, y: 0 })
   const sizeRef = useCanvasSize(deps, transformRef)
-  useWheel(deps, transformRef)
-  const clearHover = usePointer(deps, transformRef)
+  const { clearHover, readHover } = usePointer(deps, transformRef)
+  useGraphWheel(deps, transformRef, readHover)
+  useGraphClicks(deps, transformRef)
   const { sceneRef, requestDraw } = deps
 
   const fit = useCallback(() => {
@@ -248,5 +205,18 @@ export function useGraphViewport(deps: ViewportDeps): GraphViewport {
     requestDraw()
   }, [sceneRef, sizeRef, requestDraw])
 
-  return { transformRef, sizeRef, fit, clearHover }
+  const centerOn = useCallback(
+    (id: string): boolean => {
+      const n = sceneRef.current?.nodes.find((node) => node.id === id)
+      if (!n) return false
+      const tf = transformRef.current
+      tf.x = sizeRef.current.w / 2 - n.x * tf.k
+      tf.y = sizeRef.current.h / 2 - n.y * tf.k
+      requestDraw()
+      return true
+    },
+    [sceneRef, sizeRef, requestDraw]
+  )
+
+  return { transformRef, sizeRef, fit, clearHover, centerOn }
 }

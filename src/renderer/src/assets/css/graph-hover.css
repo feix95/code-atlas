@@ -1,0 +1,98 @@
+/* 关系图谱的悬停看法标签(滚轮切换)与模块改色浮层 */
+.graph-mode-tag {
+  position: absolute;
+  z-index: var(--z-float);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(var(--space-4), var(--space-4));
+}
+
+.graph-mode-count,
+.graph-mode-note {
+  color: var(--muted-2);
+}
+
+.graph-color-picker {
+  position: absolute;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.graph-color-title {
+  margin: 0;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.graph-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, var(--space-5));
+  gap: var(--space-2);
+}
+
+.graph-color-swatch {
+  width: var(--space-5);
+  height: var(--space-5);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.graph-color-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.graph-color-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.graph-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.graph-color-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.graph-color-custom input {
+  width: var(--space-5);
+  height: var(--space-5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}

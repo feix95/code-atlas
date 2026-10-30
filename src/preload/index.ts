@@ -13,6 +13,7 @@ import type {
   EngineStateInfo
 } from '../shared/engineCatalog.ts'
 import type { SearchNamesResult } from '../shared/searchNames.ts'
+import type { DocxConvertResult, DocxProgress } from '../shared/docxMedia.ts'
 import type { TranslateEvent, TranslateStartRequest } from '../shared/translateTypes.ts'
 import type {
   AiChatLookupPayload,
@@ -36,7 +37,8 @@ import type {
   ModelStatus,
   RenameFileResult,
   ScanResult,
-  DevLogEntry
+  DevLogEntry,
+  RendererRevivedKind
 } from '../shared/types.ts'
 
 // 界面缩放(换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
@@ -144,6 +146,18 @@ const atlasApi = {
   /** 代码预览:读一个文件的前一段当文本看(二进制/超大/读不了都有专门的话,不硬塞乱码) */
   readPreview: (rootPath: string, relPath: string): Promise<FilePreviewResult> =>
     ipcRenderer.invoke(CH.readPreview, rootPath, relPath),
+  /** Word 预览转换:后台线程转完才回;jobId 由界面自起,换签/关签时用 releaseDocx 作废 */
+  convertDocx: (rootPath: string, relPath: string, jobId: string): Promise<DocxConvertResult> =>
+    ipcRenderer.invoke(CH.docxConvert, rootPath, relPath, jobId),
+  /** 作废一次转换并释放它的图片(幂等) */
+  releaseDocx: (jobId: string): Promise<void> => ipcRenderer.invoke(CH.docxRelease, jobId),
+  /** 订阅 Word 转换进度;返回退订函数 */
+  onDocxProgress: (callback: (progress: DocxProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: DocxProgress): void =>
+      callback(progress)
+    ipcRenderer.on(CH.docxProgress, listener)
+    return () => ipcRenderer.removeListener(CH.docxProgress, listener)
+  },
   /** 系统拖/选进来的文件对象 → 它的本机绝对路径(拖入即授权的凭据);拿不到就回空串 */
   getPathForFile: (file: File): string => {
     try {
@@ -289,11 +303,18 @@ const atlasApi = {
     ipcRenderer.on(CH.engineInstallProgress, listener)
     return () => ipcRenderer.removeListener(CH.engineInstallProgress, listener)
   },
-  /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声,页面弹人话横幅;返回退订函数 */
-  onRendererRevived: (callback: () => void): (() => void) => {
-    const listener = (): void => callback()
+  /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声(kind 区分页面状态是否还在);返回退订函数 */
+  onRendererRevived: (callback: (kind: RendererRevivedKind) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, kind: RendererRevivedKind): void =>
+      callback(kind)
     ipcRenderer.on(CH.rendererRevived, listener)
     return () => ipcRenderer.removeListener(CH.rendererRevived, listener)
+  },
+  /** 主进程的窗口提示(渲染层无响应这类):渲染层只负责显示短句 */
+  onWindowNotice: (callback: (text: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, text: string): void => callback(text)
+    ipcRenderer.on(CH.windowNotice, listener)
+    return () => ipcRenderer.removeListener(CH.windowNotice, listener)
   },
   /** 报错小注记:渲染层抓到的 JS 错误送进后台状态表(主进程的状态表不随渲染层销毁) */
   reportRendererError: (text: string): void => {

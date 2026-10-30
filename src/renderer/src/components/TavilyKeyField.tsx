@@ -14,25 +14,25 @@ function probeText(result: TavilyProbeResult): { cls: string; text: string } {
         cls: 'is-ok',
         text: result.usage
           ? result.usage.limit === null
-            ? `Key 有效 · 本月已用 ${result.usage.used} 次。`
-            : `Key 有效 · 本月已用 ${result.usage.used}/${result.usage.limit} 次。`
-          : 'Key 有效。'
+            ? `Key 有效，本月已用 ${result.usage.used} 次`
+            : `Key 有效，本月已用 ${result.usage.used}/${result.usage.limit} 次`
+          : 'Key 有效'
       }
     case 'bad-key':
-      return { cls: 'is-bad', text: '这个 Key 不对：抄漏了，或被删了。' }
+      return { cls: 'is-bad', text: 'Key 无效，请重新填写' }
     case 'quota':
-      return { cls: 'is-warn', text: '本月额度已用完，下月自动回血。' }
+      return { cls: 'is-warn', text: '本月额度已用完，下月自动恢复' }
     case 'busy':
-      return { cls: 'is-warn', text: '请求太频繁，过一会儿再测。' }
+      return { cls: 'is-warn', text: '请求过于频繁，稍后重试' }
     case 'server':
       return {
         cls: 'is-warn',
-        text: `Tavily 出状况了(状态码 ${result.status ?? '?'})，等会儿再试。`
+        text: `Tavily 暂时异常，状态码 ${result.status ?? '?'}，稍后重试`
       }
     case 'unreachable':
-      return { cls: 'is-bad', text: '连不上 Tavily：检查网络或代理。' }
+      return { cls: 'is-bad', text: '无法连接 Tavily，检查网络或代理' }
     default:
-      return { cls: 'is-warn', text: `没测出结论(状态码 ${result.status ?? '?'})。` }
+      return { cls: 'is-warn', text: `测试未完成，状态码 ${result.status ?? '?'}，稍后重试` }
   }
 }
 
@@ -97,13 +97,13 @@ export function TavilyKeyField({
       }
       hint={
         probe.busy ? (
-          <span className="cfg-hint is-warn">测试中……</span>
+          <span className="cfg-hint is-warn">测试中</span>
         ) : line || errLine ? (
           <span className={`cfg-hint ${line ? line.cls : 'is-bad'}`}>
             {line ? line.text : errLine}
           </span>
         ) : shapeOdd ? (
-          <span className="cfg-hint is-warn">Key 通常以 tvly- 开头。</span>
+          <span className="cfg-hint is-warn">Key 以 tvly- 开头</span>
         ) : (
           <>
             仅保存在本机；
@@ -121,7 +121,7 @@ export function TavilyKeyField({
             autoComplete="off"
             spellCheck={false}
             value={value}
-            placeholder={needKey ? '请先输入 Key。' : TAVILY_PH}
+            placeholder={needKey ? '请先输入 Key' : TAVILY_PH}
             aria-label="Tavily Key"
             onChange={(e) => {
               onChange(e.target.value)

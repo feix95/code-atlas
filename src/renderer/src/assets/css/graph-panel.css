@@ -1,0 +1,335 @@
+/* 节点详情浮窗:半透明磨砂底,默认浮在画布右上角、顶栏之下;位置与尺寸由
+   useGraphPanelPlacement 以行内 right/top/width/height 给(量好之前先用下面的默认位)。
+   宽高紧包内容:默认宽按内容排,超出自适应上限才收住;标题整块是拖动把手,右下角拉手改尺寸 */
+/* 自适应档宽度上限注册成长度:读计算样式时拿到的已是 px(rem 也换算好),脚本据此判断吸附 */
+@property --graph-panel-auto-max {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.graph-panel {
+  position: absolute;
+  top: calc(var(--space-2) + var(--chrome-search-row-height) + var(--space-2));
+  right: var(--space-2);
+  z-index: var(--z-float);
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 12rem;
+  min-height: 6rem;
+  max-width: min(var(--graph-panel-auto-max), calc(100% - 2 * var(--space-2)));
+  max-height: calc(100% - var(--chrome-search-row-height) - 3 * var(--space-2));
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(0.5rem) saturate(1.2);
+  color: var(--text);
+  font-size: var(--font-sm);
+  outline: none;
+  /* 自适应档的宽度上限;useGraphPanelPlacement 也读它,判断吸回内容尺寸时能不能回自适应 */
+  --graph-panel-auto-max: 24rem;
+  /* 右下角拉手的热区边长 */
+  --graph-panel-grip: 0.875rem;
+}
+
+.graph-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+}
+
+/* 标题整块按住能拖;光标给抓握暗示。热区就是标题本身,不与关闭钮抢地盘 */
+.graph-panel-drag {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--radius-xs);
+  cursor: grab;
+  touch-action: none;
+}
+
+.graph-panel-drag:active {
+  cursor: grabbing;
+}
+
+.graph-panel-drag:focus-visible,
+.graph-panel-close:focus-visible,
+.graph-panel-dockbtn:focus-visible,
+.graph-panel-resize:focus-visible,
+.graph-panel-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
+}
+
+.graph-panel-close,
+.graph-panel-dockbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--chrome-search-row-height);
+  height: var(--chrome-search-row-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.graph-panel-close:hover,
+.graph-panel-dockbtn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.graph-panel-kind {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted-2);
+}
+
+/* 名字在左、文件数在右,与下面模块构成的行同一套左右对应 */
+.graph-panel-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.graph-panel-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-ml);
+  font-weight: var(--font-w-semi);
+  line-height: var(--lh-130);
+  word-break: break-all;
+}
+
+.graph-panel-meta {
+  flex: 0 0 auto;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+}
+
+.graph-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-4) var(--space-4);
+  scrollbar-gutter: stable;
+}
+
+/* 停靠在左栏的详情正文:标题条之下自己滚,左右留白与文件树行同档 */
+.graph-panel-dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+}
+
+/* 拉大松手吸回内容尺寸:宽、高与右缘同步过渡,左上角保持不动;拖动途中不加过渡,跟手 */
+@media (prefers-reduced-motion: no-preference) {
+  .graph-panel.is-snapping {
+    transition:
+      width var(--dur-2) var(--ease-smooth),
+      height var(--dur-2) var(--ease-smooth),
+      right var(--dur-2) var(--ease-smooth);
+  }
+}
+
+/* 拖到左栏上方:浮窗淡下去,让左栏那圈落位框说话(退回时同样淡回来) */
+.graph-panel.is-dock-ready {
+  opacity: 0.45;
+}
+
+.graph-panel-path {
+  margin: var(--space-1) 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  word-break: break-all;
+}
+
+.graph-panel-note {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  line-height: var(--lh-150);
+}
+
+.graph-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.graph-panel-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.graph-panel-btn:hover,
+.graph-panel-btn[aria-pressed='true'] {
+  background: var(--hover);
+}
+
+.graph-panel-section {
+  margin-top: var(--space-4);
+}
+
+.graph-panel-h {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-medium);
+  color: var(--muted-2);
+}
+
+/* 拖动/拉伸中:不选字;拉手保持自己的缩放光标 */
+.graph-panel.is-dragging,
+.graph-panel.is-dragging * {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.graph-panel.is-dragging .graph-panel-resize {
+  cursor: nwse-resize;
+}
+
+/* 右下角拉手:左上角钉住,往右下拉 = 变宽变高;两道斜纹,平时淡、悬停/聚焦/拖动时提亮 */
+.graph-panel-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--graph-panel-grip);
+  height: var(--graph-panel-grip);
+  padding: 0;
+  border: 0;
+  border-bottom-right-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.graph-panel-resize::before {
+  content: '';
+  position: absolute;
+  right: 0.1875rem;
+  bottom: 0.1875rem;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  background: linear-gradient(
+    135deg,
+    transparent 0 46%,
+    currentColor 46% 54%,
+    transparent 54% 74%,
+    currentColor 74% 82%,
+    transparent 82%
+  );
+  opacity: 0.5;
+  transition:
+    opacity var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth);
+}
+
+.graph-panel-resize:hover,
+.graph-panel-resize:focus-visible,
+.graph-panel.is-dragging .graph-panel-resize {
+  color: var(--text);
+}
+
+.graph-panel-resize:hover::before,
+.graph-panel-resize:focus-visible::before,
+.graph-panel.is-dragging .graph-panel-resize::before {
+  opacity: 1;
+}
+
+.graph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.graph-swatch {
+  flex-shrink: 0;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--graph-module-neutral);
+}
+
+.graph-folder-group + .graph-folder-group {
+  margin-top: var(--space-2);
+}
+
+.graph-folder-name {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  word-break: break-all;
+}
+
+.graph-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.graph-file {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-file:hover {
+  background: var(--hover);
+}
+
+.graph-file:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
+}
+
+.graph-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-file-note {
+  flex-shrink: 0;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+/* 侧栏里只展示、不可点的行(模块构成、模块间连线) */
+.graph-file-static {
+  cursor: default;
+}
+
+.graph-file-static:hover {
+  background: transparent;
+}

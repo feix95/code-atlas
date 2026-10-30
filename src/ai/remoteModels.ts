@@ -26,8 +26,8 @@ export function parseModelIds(raw: unknown): string[] {
 
 function unreachableText(req: ListModelsRequest): string {
   return req.provider === 'cloud'
-    ? `连不上服务商(${req.baseUrl}):检查网络、代理和服务地址`
-    : `连不上模型服务,检查 LM Studio 是否已启动(${req.baseUrl})`
+    ? '无法连接服务商，检查网络和代理'
+    : '无法连接模型服务，检查 LM Studio 是否已启动'
 }
 
 export async function listRemoteModels(
@@ -35,7 +35,7 @@ export async function listRemoteModels(
   fetchImpl: FetchLike = fetch
 ): Promise<string[]> {
   const isCloud = req.provider === 'cloud'
-  if (isCloud && req.apiKey.trim() === '') throw new Error('先填写 API Key 再读取模型')
+  if (isCloud && req.apiKey.trim() === '') throw new Error('先填写 API Key')
   const url = `${req.baseUrl.trim().replace(/\/+$/, '')}/models`
   const key = req.apiKey.trim()
   const res = await fetchImpl(url, {
@@ -47,7 +47,7 @@ export async function listRemoteModels(
     const detail = await res.text().catch(() => '')
     throw new Error(
       friendlyHttpError(res.status, detail, req.provider) ??
-        (isCloud ? `服务商返回错误(${res.status})` : unreachableText(req))
+        (isCloud ? `服务商返回错误，状态码 ${res.status}` : unreachableText(req))
     )
   }
   return parseModelIds(await res.json().catch(() => null))

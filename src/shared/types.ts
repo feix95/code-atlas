@@ -161,7 +161,55 @@ export interface DepGraphResult {
     skipped: number
     unresolved: UnresolvedImport[]
   }
+  /** 程序切分的模块;切分失败时为 null,界面降级为无划分的原始图 */
+  modules: ModuleMap | null
   durationMs: number
+}
+
+/** 模块切分参数(见 src/modules/moduleConfig.ts) */
+export interface ModuleParams {
+  resolution: number
+  seed: number
+  folderAffinity: number
+  minFiles: number
+  /** 公共文件门槛:入度 > max(hubMinInDegree, hubShare × 有入度文件数) */
+  hubMinInDegree: number
+  hubShare: number
+}
+
+/** 程序切分的模块;成员只存 relPath */
+export interface ModuleInfo {
+  /** 'm:' + 锚点 relPath */
+  id: string
+  /** 主目录里被引用最多的可分析成员 */
+  anchor: string
+  /** 主目录:成员最多的目录(锚点所在目录),模块显示名由它而来;项目根为 '' */
+  folder: string
+  /** 可分析成员 + 附挂文件 + 相关自测,已排序 */
+  files: string[]
+  /** files 中附挂进来的那部分:样式与无导入关系的文件,不参与社区发现 */
+  attached: string[]
+  /** files 中挂靠进来的自测文件(不参与社区发现),侧栏显示为相关测试 */
+  tests: string[]
+  /** 成员所在目录,已排序;项目根为 '' */
+  folders: string[]
+}
+
+/** 模块间边:成员间导入按模块聚合,weight 为原始引用条数 */
+export interface ModuleLink {
+  from: string
+  to: string
+  weight: number
+}
+
+export interface ModuleMap {
+  algorithmVersion: number
+  params: ModuleParams
+  /** 按文件数降序、id 升序 */
+  modules: ModuleInfo[]
+  /** relPath → 模块 id;未归类的文件不出现 */
+  fileToModule: Record<string, string>
+  links: ModuleLink[]
 }
 
 /**
@@ -278,11 +326,11 @@ export interface ModelStatus {
 
 /**
  * 模型块头 vs 机器尺寸的适配估算结果:选模型那一刻就给,不等引擎空跑一次。
- * level:ok=装得下 tight=有点挤(能跑但慢) too-big=装不下 missing=文件不存在 empty=还没选
+ * level:ok=可以运行 tight=接近内存上限 too-big=超出本机内存 missing=文件不存在 empty=还没选
  */
 export interface ModelFitVerdict {
   level: 'ok' | 'tight' | 'too-big' | 'missing' | 'empty'
-  /** 一句话结论(给人看的,如「装得下」「这台机器装不下」) */
+  /** 一句话结论(给人看的,如「可以运行」「超出本机内存」) */
   title: string
   /** 数字说话的细节(模型多大、显存内存多大、建议换多大的) */
   detail: string
@@ -533,6 +581,9 @@ export interface AiChatResult extends AiExplainResult {
  * 子窗 document 是 about:blank 白窗,没有 preload 也没有 window.atlas。 */
 export type AuxWindowOp = 'minimize' | 'toggleMaximize' | 'close' | 'focus'
 
+/** 救生圈的复活方式:page = GPU 重开画布(页面状态还在);reload = 整页重挂(内存里的对话没了) */
+export type RendererRevivedKind = 'page' | 'reload'
+
 /**
  * 一扇窗内容区的屏幕矩形(DIP):跨窗拖页签命中用。
  * frameName 与页签组 host 同一登记(主窗 'main' / 子窗 'aux-N');
@@ -611,7 +662,7 @@ export interface AiHistoryMessage {
  * audio = 后缀是 MP3/WAV 且内容验过魔数:界面走协议流播放,不走文本那套。
  */
 export interface FilePreviewResult {
-  status: 'ok' | 'binary' | 'too-big' | 'image' | 'audio'
+  status: 'ok' | 'binary' | 'too-big' | 'image' | 'audio' | 'docx'
   /** status='ok' 时的正文(全文,只做过换行归一) */
   text: string
   /** 文件真实总行数(ok 时才有) */
@@ -628,6 +679,8 @@ export interface FilePreviewResult {
   image?: FilePreviewImage
   /** status='audio' 时的音频账:字节流走 atlas-media,这里只带 MIME 和体积 */
   audio?: FilePreviewAudio
+  /** status='docx' 时的 Word 账:只带体积,正文由界面另发 docxConvert 转换 */
+  docx?: FilePreviewDocx
 }
 
 /** 图片预览带上界面的那笔账:宽高读不出(截断/畸形)老实回 null,不拿 0 冒充 */
@@ -649,6 +702,12 @@ export interface FilePreviewImage {
 /** 音频预览带上界面的那笔账:时长交给 <audio> metadata,这里只报种类和体积 */
 export interface FilePreviewAudio {
   mime: 'audio/mpeg' | 'audio/wav'
+  bytes: number
+}
+
+/** Word 预览带上界面的那笔账:readPreview 只验身不转换,正文由界面另发 docxConvert 在后台线程转 */
+export interface FilePreviewDocx {
+  /** 文件真实字节数 */
   bytes: number
 }
 

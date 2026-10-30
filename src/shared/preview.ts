@@ -10,6 +10,24 @@ export const PREVIEW_MAX_BYTES = 10 * 1024 * 1024
 /** 图片预览的拒绝路径:整张图转 base64 dataUrl 揣内存,再大的照片墙也先挡在门外 */
 export const IMAGE_PREVIEW_MAX_BYTES = 10 * 1024 * 1024
 
+/**
+ * Word 预览的拒绝路径:转换在后台线程里跑、图片落临时文件按需加载,不再整份塞进界面,
+ * 所以上限可以放到截图很多的学习笔记(实测八九十 MB)也能打开;再大的先挡在门外。
+ */
+export const DOCX_PREVIEW_MAX_BYTES = 200 * 1024 * 1024
+
+/** Word 解压后总量上限:按压缩包目录登记的原始大小合计,挡「解压炸弹」(与文件上限同比例,十倍) */
+export const DOCX_UNZIPPED_MAX_BYTES = 2 * 1024 * 1024 * 1024
+
+/** Word 转出来的网页上限(字符数):图片已不在网页里,只剩文字和标签,这个量足够几千页 */
+export const DOCX_HTML_MAX_CHARS = 16 * 1024 * 1024
+
+/** 单张内嵌图片上限:超过的不落盘,界面按「图片格式不支持预览」占位 */
+export const DOCX_IMAGE_MAX_BYTES = 64 * 1024 * 1024
+
+/** 一次转换最长等多久(毫秒):超时就停掉后台线程,界面给出提示 */
+export const DOCX_CONVERT_TIMEOUT_MS = 3 * 60 * 1000
+
 /** 预览正文 + 账目(全文预览后没有「截断」这回事,总行数永远是全文行数) */
 export interface PreviewClip {
   /** 给界面看的正文(全文,只做过换行归一) */

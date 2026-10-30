@@ -7,13 +7,14 @@ export interface ShelfState {
   ramBytes: number
 }
 
-/** 下载中的那单(进度条用);donePath = 刚下完的(显示「已就位」) */
+/** 下载中的那单(进度条用);donePath = 刚下完的;error = 失败或中断的人话 */
 export interface DownloadState {
   repoId: string
   filePath: string
   receivedBytes: number
   totalBytes: number | null
   donePath: string | null
+  error: string | null
 }
 
 export function useModelShelf(onModelReady?: (finalPath: string) => void): {
@@ -37,7 +38,7 @@ export function useModelShelf(onModelReady?: (finalPath: string) => void): {
   const [files, setFiles] = useState<Record<string, RepoFile[]>>({})
   const [filesLoading, setFilesLoading] = useState(false)
   const [download, setDownload] = useState<DownloadState | null>(null)
-  // 拉货序号:点「再试一次」作废在飞的旧请求,慢回来的旧响应不许覆盖新状态
+  // 拉货序号:点「重试」作废在飞的旧请求,慢回来的旧响应不许覆盖新状态
   const shelfSeqRef = useRef(0)
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -58,7 +59,7 @@ export function useModelShelf(onModelReady?: (finalPath: string) => void): {
       })
       .catch(() => {
         if (mountedRef.current && seq === shelfSeqRef.current) {
-          setError('榜单没拉下来，可能是网络不通。检查网络后再试一次。')
+          setError('无法加载榜单，检查网络后重试')
         }
       })
       .finally(() => {
@@ -70,7 +71,7 @@ export function useModelShelf(onModelReady?: (finalPath: string) => void): {
     fetchShelf()
   }, [fetchShelf])
 
-  /** 「再试一次」:先把状态拨回「进行中」再发请求(挂载那轮不用,初始就是 loading) */
+  /** 「重试」:先把状态拨回「进行中」再发请求(挂载那轮不用,初始就是 loading) */
   const retryShelf = useCallback(() => {
     setLoading(true)
     setError(null)
@@ -80,23 +81,46 @@ export function useModelShelf(onModelReady?: (finalPath: string) => void): {
   // 下载进度:主进程边下边喊,这儿只管画;finalPath 到了 = 完成,报给设置页自动填路径
   useEffect(() => {
     const off = window.atlas.onModelDownloadProgress((p: ModelDownloadProgress) => {
+      const isCurrent = (prev: DownloadState | null): prev is DownloadState =>
+        prev !== null && prev.repoId === p.repoId && prev.filePath === p.filePath
       if (p.finalPath) {
-        setDownload((prev) => (prev ? { ...prev, donePath: p.finalPath } : prev))
+        setDownload((prev) => (isCurrent(prev) ? { ...prev, donePath: p.finalPath } : prev))
         onModelReady?.(p.finalPath)
-      } else if (!p.error && !p.cancelled) {
-        setDownload((prev) =>
-          prev ? { ...prev, receivedBytes: p.receivedBytes, totalBytes: p.totalBytes } : prev
-        )
+        return
       }
+      if (p.cancelled) {
+        setDownload((prev) => (isCurrent(prev) ? { ...prev, error: '下载中断，请重试' } : prev))
+        return
+      }
+      if (p.error) {
+        setDownload((prev) => (isCurrent(prev) ? { ...prev, error: p.error } : prev))
+        return
+      }
+      setDownload((prev) =>
+        isCurrent(prev)
+          ? { ...prev, receivedBytes: p.receivedBytes, totalBytes: p.totalBytes }
+          : prev
+      )
     })
     return off
   }, [onModelReady])
 
   const startDownload = useCallback((repoId: string, filePath: string) => {
-    setDownload({ repoId, filePath, receivedBytes: 0, totalBytes: null, donePath: null })
+    setDownload({
+      repoId,
+      filePath,
+      receivedBytes: 0,
+      totalBytes: null,
+      donePath: null,
+      error: null
+    })
     window.atlas.modelDownloadStart(repoId, filePath).catch(() => {
-      // 失败/取消:进度事件里已带人话,这里把行上状态松开
-      setDownload(null)
+      // 进度事件没来得及报终态就拒绝(例如同名下载占用):兜底给失败提示,行上留重试
+      setDownload((prev) =>
+        prev !== null && prev.donePath === null && prev.error === null
+          ? { ...prev, error: '下载失败，检查网络后重试' }
+          : prev
+      )
     })
   }, [])
 

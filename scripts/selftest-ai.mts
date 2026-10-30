@@ -1171,7 +1171,7 @@ async function main(): Promise<void> {
 
   const biMissing = resolveAiTarget({ ...lmConfig(''), provider: 'builtin' })
   assert.ok(!biMissing.ok, '内置 Provider 没选模型应解析失败')
-  assert.ok(!biMissing.ok && biMissing.message.includes('还没选模型'), '失败要指向选模型这个动作')
+  assert.ok(!biMissing.ok && biMissing.message.includes('尚未选择模型'), '失败要指向选模型这个动作')
 
   const biOk = resolveAiTarget(
     { ...lmConfig(''), provider: 'builtin' },
@@ -1543,10 +1543,7 @@ async function main(): Promise<void> {
     testSystem
   )
   assert.equal(down.status, 'error', '连不上服务时状态应为 error')
-  assert.ok(
-    down.text.includes('连接断了') || down.text.includes('连不上'),
-    '错误信息要提示检查模型服务'
-  )
+  assert.ok(down.text.includes('无法连接模型服务'), '错误信息要提示检查模型服务')
 
   // 10. 模型上下文自适应:探测解析 / 预算公式 / 撞墙特征
   const lmPayload = JSON.stringify({
@@ -1829,39 +1826,38 @@ async function main(): Promise<void> {
   // 退出诊断:内存耗尽退出拿适配估算数字说话;上下文填大了点它名;都不是才说文件坏
   const fitBig = judgeModelFit(20 * G, 16 * G, 8 * G)
   assert.ok(
-    autopsyExitMessage(3, fitBig, null).includes('装不下'),
-    '内存耗尽退出:退出诊断文案点明装不下'
+    autopsyExitMessage(3, fitBig, null).includes('超出本机内存'),
+    '内存耗尽退出:退出诊断文案点明超出本机内存'
   )
   assert.ok(autopsyExitMessage(3, fitBig, null).includes('退出码 3'), '退出诊断文案保留退出码')
   assert.ok(
-    autopsyExitMessage(3221225786, fitBig, 131072).includes('装不下'),
+    autopsyExitMessage(3221225786, fitBig, 131072).includes('超出本机内存'),
     '内存耗尽退出优先于上下文嫌疑'
   )
   const ctxMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, 131072)
-  assert.ok(
-    ctxMsg.includes('模型上下文') && ctxMsg.includes('131072') && ctxMsg.includes('清空'),
-    '装得下却死了+手动上下文填大:点名上下文'
-  )
+  assert.ok(ctxMsg.includes('清空模型上下文'), '装得下却死了+手动上下文填大:点名上下文')
   const brokenMsg = autopsyExitMessage(1, { level: 'ok', title: '装得下', detail: '' }, null)
-  assert.ok(
-    brokenMsg.includes('损坏') || brokenMsg.includes('占用'),
-    '都不是:才归到文件损坏/被占用'
-  )
-  assert.ok(!brokenMsg.includes('装不下'), '机器装得下就不许再冤枉模型大')
+  assert.ok(brokenMsg.includes('重新选择模型文件'), '都不是:才归到文件坏了要重选')
+  assert.ok(!brokenMsg.includes('超出本机内存'), '机器装得下就不许再冤枉模型大')
 
   // 超时话术按现场分流 + 半截必留(纯函数)
-  assert.ok(halfNote('disconnect').includes('连接断了'), '断线注脚说断线')
-  assert.ok(halfNote('watchdog').includes('等太久'), '掐断注脚说等太久')
-  assert.ok(halfNote('stall').includes('卡住'), '卡住注脚说卡住')
-  assert.ok(timeoutText().includes('第一个字'), '空手超时话术点名没等到字')
+  assert.ok(halfNote('disconnect').includes('连接中断'), '断线注脚说断线')
+  assert.ok(halfNote('watchdog').includes('等待超时'), '掐断注脚说等待超时')
+  assert.ok(halfNote('stall').includes('回答中断'), '卡住注脚说回答中断')
+  assert.ok(timeoutText().includes('等待超时'), '空手超时话术说等待超时')
   assert.ok(!timeoutText().includes('还在加载'), '不再冤枉「还在加载」')
   assert.ok(
     friendlyHttpError(400, 'request (4297 tokens) exceeds the available context size')?.includes(
-      '脑容量'
+      '上下文超出模型上限'
     ),
     '小葵的 400 翻译成人话'
   )
-  assert.equal(friendlyHttpError(500, 'boom'), null, '翻不动回 null 透传原文')
+  assert.equal(friendlyHttpError(500, 'boom'), null, '不带引擎名号不猜服务商')
+  assert.equal(
+    friendlyHttpError(500, 'boom', 'cloud'),
+    '服务商暂时异常，状态码 500，稍后重试',
+    '在线 API 5xx 翻成服务商暂时异常'
+  )
   assert.equal(friendlyHttpError(404, ''), null, '404 不是上下文,透传')
   // 上下文指路话术按引擎分家
   assert.ok(

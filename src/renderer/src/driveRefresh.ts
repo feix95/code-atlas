@@ -10,7 +10,7 @@ export function describeDriveChange(prev: DriveInfo[] | null, next: DriveInfo[])
   const added = next.filter((d) => !before.has(d.letter)).map(toLabel)
   const removed = (prev ?? []).filter((d) => !after.has(d.letter)).map(toLabel)
   const parts: string[] = []
-  if (added.length) parts.push(`发现新磁盘 ${added.join('、')}`)
-  if (removed.length) parts.push(`磁盘 ${removed.join('、')} 已断开`)
-  return parts.length ? `已刷新:${parts.join(',')}` : '已刷新,没有发现新磁盘,也没有磁盘断开'
+  if (added.length) parts.push(`发现新磁盘 ${added.join('，')}`)
+  if (removed.length) parts.push(`磁盘 ${removed.join('，')} 已断开`)
+  return parts.length ? parts.join('，') : '已刷新，无变化'
 }

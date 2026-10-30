@@ -1,6 +1,7 @@
 // atlas-media 协议:给音频预览流文件。必须先 registerSchemesAsPrivileged(app ready 前),
 // 再在 ready 后 handle。自己回 Content-Type / Content-Length / Range:
 // 转手 net.fetch(file://) 常常不带长度,Chromium 量不出时长,进度条就钉死在 0。
+// 主机名 docx-image 的请求分给 Word 预览的图片通道(ipcDocx,只认登记过的令牌)。
 
 import { protocol } from 'electron'
 import { createReadStream, promises as fs } from 'node:fs'
@@ -8,6 +9,8 @@ import { Readable } from 'node:stream'
 import { joinRoot } from '../shared/paths.ts'
 import { audioMimeOf, isAudioFile } from '../shared/fileKinds.ts'
 import { AUDIO_MEDIA_SCHEME, audioMediaReply, parseAudioMediaUrl } from '../shared/audioMedia.ts'
+import { DOCX_IMAGE_HOST } from '../shared/docxMedia.ts'
+import { serveDocxImage } from './ipcDocx.ts'
 
 export function registerAudioMediaScheme(): void {
   protocol.registerSchemesAsPrivileged([
@@ -25,7 +28,17 @@ export function registerAudioMediaScheme(): void {
 }
 
 export function installAudioMediaProtocol(): void {
-  protocol.handle(AUDIO_MEDIA_SCHEME, (request) => serveAudioPreview(request))
+  protocol.handle(AUDIO_MEDIA_SCHEME, (request) =>
+    hostOf(request.url) === DOCX_IMAGE_HOST ? serveDocxImage(request) : serveAudioPreview(request)
+  )
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
 }
 
 function fileStream(abs: string, start: number, end: number): ReadableStream<Uint8Array> {

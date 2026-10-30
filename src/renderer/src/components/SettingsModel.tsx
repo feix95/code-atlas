@@ -143,7 +143,7 @@ export function SettingsModel({
                 hint={
                   modelPath.trim() && fitNote && fitNote.level === 'missing' ? (
                     <span className="cfg-hint is-missing">
-                      ✕ {fitNote.title}：{fitNote.detail}
+                      {fitNote.title}，{fitNote.detail}
                     </span>
                   ) : (
                     '本地推理使用的 GGUF 模型文件。'

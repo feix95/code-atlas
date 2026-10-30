@@ -20,12 +20,12 @@ export function splitThinking(text: string): { reasoning: string; answer: string
 
 /** 到手的半截话配的注脚(纯函数,自测覆盖):断线/掐断/卡住各有各的说法 */
 export function halfNote(kind: 'stall' | 'disconnect' | 'watchdog'): string {
-  if (kind === 'disconnect') return '(连接断了,上面是已经生成的部分;再点一次可以重讲)'
-  if (kind === 'watchdog') return '(等太久被掐断了,上面是已经生成的部分)'
-  return '(回答到这儿断了:模型可能卡住了,再点一次可以重讲)'
+  if (kind === 'disconnect') return '连接中断，以上为已生成内容'
+  if (kind === 'watchdog') return '等待超时，以上为已生成内容'
+  return '回答中断，重试可重新生成'
 }
 
 /** 等不到任何输出的超时话术(纯函数,自测覆盖) */
 export function timeoutText(): string {
-  return '等了很久没等到第一个字:材料大预处理就慢,引擎也可能卡住了 —— 不想等就「取消」,清点一下参考材料再问'
+  return '等待超时，减少参考材料后重试'
 }

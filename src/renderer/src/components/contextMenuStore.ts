@@ -9,8 +9,6 @@ export interface ContextMenuItem {
   label: string
   /** 不可用的行摆着但点不动(比如引用额度满了,把原因写进 label) */
   disabled?: boolean
-  /** 悬停轻提示(data-tip) */
-  tip?: string
   /** 行内图标(TreeIcon 登记名):带图标档与纯图标档才摆,窄身文字档不带 */
   icon?: string
   /** 开关行:有值 = 行尾画一颗开关(true=开),点一下拨动且菜单不关闭,让人亲眼看到状态翻面;
@@ -48,6 +46,8 @@ export interface ContextMenuRequest {
   iconOnly?: boolean
   /** 生在光标右上角(左缘约两个汉字、底缘一个汉字):输入框编辑菜单的顺手位 */
   preferRight?: boolean
+  /** 整张菜单不挂任何悬停提示:行项、分区、二级行的浏览器原生 title 都不挂(图谱节点菜单用) */
+  noTips?: boolean
 }
 
 let menuRequest: ContextMenuRequest | null = null

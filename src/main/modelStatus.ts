@@ -40,8 +40,7 @@ export async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus
   const model = config.lmstudio.model.trim()
   const root = stripApiSuffix(config.lmstudio.baseUrl.trim() || DEFAULT_LMSTUDIO_BASE_URL)
   const base = { provider: 'lmstudio' as const, modelName: model, sizeBytes: null, progress: null }
-  if (!model)
-    return { ...base, state: 'idle', message: '未填写模型名,请在「AI 设置」中配置 LM Studio' }
+  if (!model) return { ...base, state: 'idle', message: '未填写模型名，在 AI 设置中配置 LM Studio' }
   try {
     const res = await fetchWithTimeout(`${root}/api/v0/models`, PROBE_LMSTUDIO_MS)
     if (res.ok) {
@@ -62,7 +61,7 @@ export async function probeLmStudioStatus(config: AiConfig): Promise<ModelStatus
     return {
       ...base,
       state: 'unreachable',
-      message: 'LM Studio 未连接,请先开启其「开发者」本地服务'
+      message: '无法连接 LM Studio，开启开发者服务'
     }
   }
 }
@@ -125,7 +124,7 @@ export function announceActivityBusy(provider: AiProviderKind, stats?: AiStreamS
   if (!base) return
   // 引擎还在热身时,加载播报员 owns 这个频道,「忙」不许抢话
   if (base.state === 'loading' || base.state === 'idle') return
-  const message = stats ? formatStreamStats(stats) : '处理中……'
+  const message = stats ? formatStreamStats(stats) : '处理中'
   broadcastModelStatus({ ...base, state: 'busy', progress: null, estimated: undefined, message })
 }
 

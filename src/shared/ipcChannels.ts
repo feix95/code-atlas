@@ -1,5 +1,5 @@
 /**
- * IPC 通道名总账(P1-3):全仓 69 个 'atlas:*' 名只许在这一处登记,
+ * IPC 通道名总账(P1-3):全仓 70 个 'atlas:*' 名只许在这一处登记,
  * main 的 on/handle/send 和 preload/renderer 的 invoke/send/on 全引这里 ——
  * 两边对账靠自测走这张表,改名/加名一处生效,不再靠肉眼核对字面量。
  * 注意:uiScaleChanged 是窗口内的 DOM CustomEvent 名(不走 IPC),
@@ -19,6 +19,8 @@ export const CH = {
   frameHeartbeat: 'atlas:frame-heartbeat',
   rendererError: 'atlas:renderer-error',
   rendererRevived: 'atlas:renderer-revived',
+  /** 主进程 → 渲染层:窗口层面的临时提示(渲染层无响应这类),渲染层翻成 toast */
+  windowNotice: 'atlas:window-notice',
   // 外观与缩放
   appearanceGetSync: 'atlas:appearance-get-sync',
   appearanceSave: 'atlas:appearance-save',
@@ -37,6 +39,11 @@ export const CH = {
   searchNames: 'atlas:search-names',
   analyzeFile: 'atlas:analyze-file',
   readPreview: 'atlas:read-preview',
+  /** Word 预览转换(invoke):后台线程转完才回;渲染层自起任务号,换签就 docxRelease 作废 */
+  docxConvert: 'atlas:docx-convert',
+  docxRelease: 'atlas:docx-release',
+  /** Word 转换进度推送(主 → 渲染):已处理的图片张数 */
+  docxProgress: 'atlas:docx-progress',
   depGraph: 'atlas:dep-graph',
   // 模型货架与下载
   modelShelf: 'atlas:model-shelf',

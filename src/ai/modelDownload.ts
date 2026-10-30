@@ -148,16 +148,18 @@ export async function startModelDownload(opts: {
     }
 
     const cancelled = controller.signal.aborted
+    const failText = '下载失败，检查网络后重试'
+    if (!cancelled && lastError) console.warn(`[model-download] ${lastError.message}`)
     announce(opts.win, {
       repoId: opts.repoId,
       filePath: opts.filePath,
       receivedBytes: existsSync(targetPath) ? statSync(targetPath).size : 0,
       totalBytes: null,
       finalPath: null,
-      error: cancelled ? null : (lastError?.message ?? '两个源都没通'),
+      error: cancelled ? null : failText,
       cancelled
     })
-    throw new Error(cancelled ? '已取消' : `下载失败:${lastError?.message ?? '两个源都没通'}`)
+    throw new Error(cancelled ? '下载中断，请重试' : failText)
   } finally {
     current = null
   }

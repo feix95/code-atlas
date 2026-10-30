@@ -104,11 +104,7 @@ export function FreeChatMessages({
         }
         return (
           // 消息级兜底网:一条回答画崩了只挂这一条,提示+就地重试;以前会掀桌炸掉整棵树
-          <ErrorBoundary
-            key={m.key}
-            note="这条回答画不出来(程序出了个小岔子),其余消息不受影响。"
-            retryLabel="再试一次"
-          >
+          <ErrorBoundary key={m.key} note="这条回答渲染失败，其余消息不受影响" retryLabel="重试">
             <AssistantBubble
               msg={m}
               canRetry={m.key === lastAssistantKey && !busy}

@@ -138,6 +138,18 @@
   opacity: 1;
 }
 
+/* 出错的气泡必须留出路:重试常驻,不靠悬停才看得见 */
+.chat-turn .msg-actions.is-error {
+  opacity: 1;
+}
+
+/* 触屏没有悬停,小动作排直接常驻 */
+@media (hover: none) {
+  .chat-turn .msg-actions {
+    opacity: 1;
+  }
+}
+
 .message {
   color: var(--text);
   font-size: var(--font-md);

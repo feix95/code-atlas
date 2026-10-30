@@ -1,0 +1,388 @@
+/* 文档大纲浮窗(md 阅读档与 Word 预览共用):浮在阅读栏上,不占版面宽度。
+   坞是贴在预览面板(.code-pane)顶端的零高度条,面板绝对定位挂在坞上,
+   位置/尺寸由 useOutlinePlacement 以行内 right/top/width/height 给(量好之前先用下面的默认右上角),
+   正文的可读栏宽度与居中一概不受它影响;坞本身不接鼠标 —— 浮窗能压到页头之上,页头照常能点 */
+/* 自适应档上限注册成长度:读计算样式时拿到的已是 px(vh、rem 都换算好),脚本据此判断吸附 */
+@property --outline-auto-max {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --outline-auto-max-h {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* 收起态圆钮相对浮窗右上角的位移;outlineMeasure 读它们给夹边留出同样的余地 */
+@property --outline-knob-lift {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --outline-knob-shift {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.doc-outline-dock {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: var(--z-float);
+  height: 0;
+  /* 坞铺满面板顶一条线,鼠标只该落在浮窗自己身上:页头、正文照常点得到 */
+  pointer-events: none;
+}
+
+.doc-outline {
+  position: absolute;
+  top: 0;
+  /* 贴着预览面板右缘留一小条缝 */
+  right: var(--space-2);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* 条目字号与文件树文件名(0.95rem)同档 */
+  font-size: var(--font-ml);
+  /* 自适应档的宽高上限;outlineMeasure 也读它们,判断吸回内容尺寸时能不能回自适应 */
+  --outline-auto-max: 24rem;
+  --outline-auto-max-h: min(60vh, 28rem);
+  /* 悬停拖动条的高度;上缘热区与它同块地盘,outlineMeasure 也读它,把浮窗上缘的活动范围往下让出这么多 */
+  --outline-strip: var(--space-4);
+  /* 收起态圆钮直径 / 展开态收起钮宽度;圆钮要正压在收起钮中心上,位移都由这两个数推出 */
+  --outline-knob: 2.5rem;
+  --outline-toggle-w: 1.75rem;
+  /* 收起态圆钮相对浮窗右上角外移 / 上移多少:横向差半个钮宽,纵向 = 圆钮半径 + 条高一半 */
+  --outline-knob-shift: calc((var(--outline-knob) - var(--outline-toggle-w)) / 2);
+  --outline-knob-lift: calc(var(--outline-knob) / 2 + var(--outline-strip) / 2);
+  /* 右下角拉手的热区边长;列表底部也按它让位 */
+  --outline-grip: 0.875rem;
+}
+
+/* 收起态:圆钮挪到展开态收起钮的中心上 —— 点完最小化,圆钮就落在鼠标底下,原地再点就展开 */
+.doc-outline:not(.is-open) {
+  transform: translate(var(--outline-knob-shift), calc(-1 * var(--outline-knob-lift)));
+}
+
+/* 展开态:半透明磨砂底,宽高紧包条目(手动拉小过就以行内尺寸为准,拉大松手会吸回内容尺寸) */
+.doc-outline.is-open {
+  width: max-content;
+  min-width: 8rem;
+  max-width: min(var(--outline-auto-max), calc(100% - 2 * var(--space-2)));
+  min-height: 5rem;
+  max-height: var(--outline-auto-max-h);
+  /* 左右不留内边距:列表两侧各有一条常驻滚动条槽(见 .doc-outline-list),条目高亮离两边的距离才一样 */
+  padding: var(--space-1) 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(0.5rem) saturate(1.2);
+}
+
+/* 拖动/拉伸中:全程不选字,光标保持抓握态 */
+.doc-outline.is-dragging,
+.doc-outline.is-dragging * {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* 悬停拖动条(仅展开态):平时不占任何位置(浮窗紧包列表)。指针要在浮窗上缘那一窄条上
+   停够 --dur-3 才算想用,路过不会闪出来;露面后露出点阵抓手和收起横线,移开就收。
+   条站在边框线之上,不盖住那条边线,也不推列表;四角都是小圆角,只是一层薄灰,不描边、不磨砂。
+   不露面时不接鼠标,正文照常点得到。
+   收起态整条退回成普通的开关钮外壳(同一个按钮元素,收起/展开时焦点不丢) */
+.doc-outline-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.doc-outline.is-open .doc-outline-bar {
+  position: absolute;
+  right: -1px;
+  /* 站在浮窗上边框之上:多让 1px,别把浮窗自己的上边线盖掉 */
+  bottom: calc(100% + 1px);
+  left: -1px;
+  z-index: 1;
+  height: var(--outline-strip);
+  border-radius: var(--radius-sm);
+  /* 10% 的提示灰,压到几乎只是一层薄雾,不抢列表的戏 */
+  background: color-mix(in srgb, var(--muted-2) 10%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 上缘热区(仅展开态,透明、不占位):地盘与拖动条完全重合,就浮窗上边框以上的那一条。
+   指针扫到它就开始计停留时间。叠放在拖动条之下,拖动条露面后同一块地盘归它接鼠标;
+   两边的悬停都算数,来回挪动不会闪烁 */
+.doc-outline-hotzone {
+  position: absolute;
+  top: calc(-1px - var(--outline-strip));
+  right: -1px;
+  left: -1px;
+  z-index: 0;
+  height: var(--outline-strip);
+}
+
+/* 停留计时用过渡延迟:延迟期间保持隐身(visibility 还是 hidden,不接鼠标),
+   停够 --dur-3 才一下现形;鼠标早走了过渡就不会开始,路过不闪。
+   键盘聚焦其中的钮或正在拖时不等停留,立刻露面 */
+.doc-outline.is-open:has(.doc-outline-hotzone:hover) .doc-outline-bar,
+.doc-outline.is-open:has(.doc-outline-bar:hover) .doc-outline-bar {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 0s linear var(--dur-3),
+    visibility 0s linear var(--dur-3);
+}
+
+.doc-outline.is-open .doc-outline-bar:has(:focus-visible),
+.doc-outline.is-open.is-dragging .doc-outline-bar {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 拉大松手吸回内容尺寸:宽、高与右缘同步过渡,左上角保持不动;拖动途中不加过渡,跟手 */
+@media (prefers-reduced-motion: no-preference) {
+  .doc-outline.is-open {
+    transition: opacity var(--dur-2) var(--ease-smooth);
+  }
+
+  .doc-outline.is-open.is-snapping {
+    transition:
+      width var(--dur-2) var(--ease-smooth),
+      height var(--dur-2) var(--ease-smooth),
+      right var(--dur-2) var(--ease-smooth);
+  }
+}
+
+/* 抓手:拖动条上除收起钮外整条都是按住拖动的热区;点阵(2 行 x 3 列)按整条拖动条居中,
+   不受右端收起钮占位的影响(定位参照是拖动条本身) */
+.doc-outline-grip {
+  flex: 1 1 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: grab;
+  touch-action: none;
+}
+
+.doc-outline-grip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.75rem;
+  height: 0.5rem;
+  background: radial-gradient(circle, currentColor 0.0625rem, transparent 0.08rem) 0 0 / 0.25rem
+    0.25rem;
+}
+
+.doc-outline-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--outline-knob);
+  height: var(--outline-knob);
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  /* 收起态是个正圆钮,也是拖动把手:按住挪够 4px 就拖,不到算点开 */
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  color: var(--muted);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(0.5rem);
+  cursor: grab;
+  touch-action: none;
+}
+
+.doc-outline-toggle:active {
+  cursor: grabbing;
+}
+
+.doc-outline-toggle:hover {
+  color: var(--text);
+}
+
+/* 展开时开关钮缩成拖动条右端的收起钮:一道短横线(最小化),不自带底和影;热区 1.75rem x 整条高。
+   和抓手同一档暗度,悬停才提到 --muted */
+.doc-outline.is-open .doc-outline-toggle {
+  width: var(--outline-toggle-w);
+  height: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  color: var(--muted-2);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.doc-outline.is-open .doc-outline-toggle::before {
+  content: '';
+  width: 0.625rem;
+  height: 0.125rem;
+  border-radius: var(--radius-xs);
+  background: currentColor;
+}
+
+/* 拖动条上的「停靠到左栏」钮:与收起横线同一档暗度、同一个身位(1.75rem x 整条高) */
+.doc-outline.is-open .doc-outline-dockbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--outline-toggle-w);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+/* 抓手、展开态的收起钮、停靠钮:悬停都提到同一档 --muted */
+.doc-outline-grip:hover,
+.doc-outline.is-open .doc-outline-toggle:hover,
+.doc-outline.is-open .doc-outline-dockbtn:hover {
+  color: var(--muted);
+}
+
+/* 拖到左栏上方:浮窗淡下去,让左栏那圈落位框说话(退回时同样淡回来) */
+.doc-outline.is-dock-ready {
+  opacity: 0.45;
+}
+
+.doc-outline-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+/* 浮窗里的列表:滚动条槽常驻且两侧都留 —— 要滚时槽在右边,不滚时两侧各留一条,
+   条目高亮离左右边框一样远,浮窗宽度也不随出不出滚动条跳。左栏停靠的大纲贴栏边,不套这条 */
+.doc-outline .doc-outline-list {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* 常驻槽压窄到 4px:浮窗是小浮层,细条够用,条目高亮才能贴近边框又不贴死(与上下内边距同档) */
+.doc-outline .doc-outline-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* 槽只有 4px,柄不再留透明边,不然抠掉 4px 的边就看不见了 */
+.doc-outline .doc-outline-list::-webkit-scrollbar-thumb {
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* 条目走设置页左栏的同一套:透明底、悬停 --hover、选中灰底药丸 --selected-bg;
+   一行到底不折,超出最大宽度的长标题省略号收尾(悬停看全称) */
+.doc-outline-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  /* 每级缩进与文件树同一个 token(--tree-indent) */
+  padding-left: calc(var(--space-2) + var(--tree-indent) * var(--outline-depth, 0));
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.doc-outline-item:hover {
+  background: var(--hover);
+}
+
+.doc-outline-item.is-active {
+  background: var(--selected-bg);
+}
+
+/* 右下角拉手:左上角钉住,往右下拉 = 变宽变高。画成常见的「两道斜纹」拉手(像多行输入框右下角),
+   平时淡淡露着,悬停、键盘聚焦或正在拉时调亮;热区 0.875rem 见方。
+   拉手直接盖在右下角,列表底部不额外留白;竖向滚动条的轨道底端收短一个拉手高,两者不叠 */
+.doc-outline-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--outline-grip);
+  height: var(--outline-grip);
+  padding: 0;
+  border: 0;
+  border-bottom-right-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+/* 两道平行斜纹(左下 → 右上):135° 渐变里两条 1px 左右的色带,近角那条短、外面那条长 */
+.doc-outline-resize::before {
+  content: '';
+  position: absolute;
+  right: 0.1875rem;
+  bottom: 0.1875rem;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  background: linear-gradient(
+    135deg,
+    transparent 0 46%,
+    currentColor 46% 54%,
+    transparent 54% 74%,
+    currentColor 74% 82%,
+    transparent 82%
+  );
+  opacity: 0.5;
+  transition:
+    opacity var(--dur-2) var(--ease-smooth),
+    color var(--dur-2) var(--ease-smooth);
+}
+
+.doc-outline-resize:hover,
+.doc-outline-resize:focus-visible,
+.doc-outline.is-dragging .doc-outline-resize {
+  color: var(--text);
+}
+
+.doc-outline-resize:hover::before,
+.doc-outline-resize:focus-visible::before,
+.doc-outline.is-dragging .doc-outline-resize::before {
+  opacity: 1;
+}
+
+.doc-outline-list::-webkit-scrollbar-track {
+  margin-bottom: calc(var(--outline-grip) - var(--space-1));
+}
+
+.doc-outline.is-dragging .doc-outline-resize {
+  cursor: nwse-resize;
+}

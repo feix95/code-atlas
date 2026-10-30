@@ -11,7 +11,7 @@ import { TooltipHost } from './Tooltip'
 import { FilePathMenu } from './FilePathMenu'
 import { ContextMenu } from './ContextMenu'
 import { TreeIcon } from './Icons'
-import { WIN_ICON_SIZE } from '../inputMetrics'
+import { WIN_ICON_MAXIMIZE, WIN_ICON_MIN_CLOSE } from '../inputMetrics'
 import { installZoomKeys } from '../useZoomKeys'
 import type { DragWindowRef } from '../tabDragWindows'
 
@@ -126,7 +126,7 @@ export function AuxWindowShell({
             data-tip="最小化"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'minimize')}
           >
-            <TreeIcon name="minus" size={WIN_ICON_SIZE} mono />
+            <TreeIcon name="minus" size={WIN_ICON_MIN_CLOSE} mono />
           </button>
           <button
             type="button"
@@ -135,7 +135,7 @@ export function AuxWindowShell({
             data-tip="最大化/还原"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'toggleMaximize')}
           >
-            <TreeIcon name="maximize" size={WIN_ICON_SIZE} mono />
+            <TreeIcon name="maximize" size={WIN_ICON_MAXIMIZE} mono />
           </button>
           <button
             type="button"
@@ -144,7 +144,7 @@ export function AuxWindowShell({
             data-tip="关闭窗口(连签一起关)"
             onClick={() => window.atlas.auxWindowOp(aux.id, 'close')}
           >
-            <TreeIcon name="x" size={WIN_ICON_SIZE} mono />
+            <TreeIcon name="x" size={WIN_ICON_MIN_CLOSE} mono />
           </button>
         </div>
       </div>

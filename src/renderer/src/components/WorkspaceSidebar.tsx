@@ -3,7 +3,7 @@
 // 规格 §7.1「不存在空侧栏」:没开工作区时树区 = 「这台电脑」盘符列表;
 // 现在的盘符行单击即开,B8 换成资源管理器语义(单击原地展开、双击开为工作区)。
 // 「项目导览」钮按规格摘除:导览内容 = 概览页签的零状态,入口挪进 rail。
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DriveInfo, ScanDirNode, ScanFileNode, ScanResult } from '@shared/types'
 import type { NoteMap } from '@shared/notes'
 import type { SearchNameHit } from '@shared/searchNames'
@@ -18,6 +18,14 @@ import { WorkspacePathCard } from './WorkspacePathCard'
 import { NoteToggleIcon, TreeIcon } from './Icons'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 import type { SidebarFace } from '../useSettingsNav'
+import {
+  getSidebarDockState,
+  setSidebarDockHost,
+  setSidebarDockHostUsable,
+  setSidebarDockSlot,
+  subscribeSidebarDock
+} from '../sidebarDock'
+import { SidebarOutline } from './SidebarOutline'
 import { UiWorkbenchSidebar } from './uiWorkbench/UiWorkbenchSidebar'
 
 /** 页脚备注开关图标本体:1.3rem */
@@ -66,7 +74,9 @@ export function WorkspaceSidebar({
   onOpenBrowseFile,
   sidebarFace,
   settingsSection,
-  onSettingsSection
+  onSettingsSection,
+  sidebarCollapsed,
+  outlineOwnerId
 }: {
   /** null = 没开工作区:树区换成「这台电脑」盘符列表(§7.1 空态) */
   result: ScanResult | null
@@ -135,14 +145,43 @@ export function WorkspaceSidebar({
   settingsSection: SectionKey
   /** 点导航 = 发一次跳转请求(走 sectionReq 同一条道,seq 记账) */
   onSettingsSection: (key: SectionKey) => void
+  /** 侧栏收起(宽收到 0):停靠的大纲得退回浮窗,不然跟着一条看不见的栏一起没了 */
+  sidebarCollapsed: boolean
+  /** 当前停靠位认的那张签:左栏大纲画它的标题 */
+  outlineOwnerId: string | null
 }): React.JSX.Element {
   const settingsMode = sidebarFace === 'settings'
   const [notesShown, setNotesShown] = useState(readNotesShown)
+  const asideRef = useRef<HTMLElement>(null)
+  const dockSlotRef = useRef<HTMLDivElement>(null)
+  // 左栏坞位:浮窗拖过来按整条 aside 的框认落点;收起或换脸时让浮窗回来
+  useLayoutEffect(() => {
+    setSidebarDockHost(asideRef.current)
+    setSidebarDockHostUsable(sidebarFace === 'files' && !sidebarCollapsed)
+    return () => {
+      setSidebarDockHost(null)
+      setSidebarDockHostUsable(false)
+    }
+  }, [sidebarFace, sidebarCollapsed])
+  // 停靠槽位:停靠后的面板(大纲/图谱详情)portal 进这块,display:contents 不占版面
+  useLayoutEffect(() => {
+    setSidebarDockSlot(dockSlotRef.current)
+    return () => setSidebarDockSlot(null)
+  }, [])
+  // 落位框直接拨类名:拖动时整棵文件树不该跟着重渲
+  useEffect(() => {
+    const el = asideRef.current
+    const apply = (): void => {
+      el?.classList.toggle('is-dock-target', getSidebarDockState().hot)
+    }
+    apply()
+    return subscribeSidebarDock(apply)
+  }, [])
   return (
     <>
       {/* 宽度在 workspace.css 吃 --sidebar-w(顶栏左段同认它):收起动画要靠类名改宽,
           内联样式会压住类规则,所以宽度不挂行内 */}
-      <aside className="sidebar">
+      <aside className="sidebar" ref={asideRef}>
         {/* 设置模式:顶卡换「设置」标题行,中段换分类导航;
             文件树/搜索结果整棵藏进 .sidebar-mid(display:none 保活不卸载),
             展开态和滚动位都长在节点自己身上,换回来原样还在 */}
@@ -228,35 +267,38 @@ export function WorkspaceSidebar({
               onOpenFile={onOpenBrowseFile}
             />
           )}
-          {result && (
-            <footer className="sidebar-footer">
-              <span
-                className="sidebar-counts"
-                role="img"
-                aria-label={`${result.stats.dirCount} 个文件夹,${result.stats.fileCount} 个文件`}
-                data-tip="文件夹 / 文件"
-                data-tip-side="top"
-              >
-                {result.stats.dirCount} / {result.stats.fileCount}
-              </span>
-              <button
-                type="button"
-                className="sidebar-notes-toggle"
-                aria-pressed={notesShown}
-                aria-label={notesShown ? '隐藏文件备注' : '显示文件备注'}
-                data-tip={notesShown ? '隐藏备注' : '显示备注'}
-                data-tip-side="top"
-                onClick={() => {
-                  const next = !notesShown
-                  setNotesShown(next)
-                  writeNotesShown(next)
-                }}
-              >
-                <NoteToggleIcon off={!notesShown} size={FOOTER_NOTE_ICON_SIZE} />
-              </button>
-            </footer>
-          )}
+          <div className="sidebar-dock-slot" ref={dockSlotRef} />
+          <SidebarOutline ownerId={outlineOwnerId} />
         </div>
+        {/* 页脚站在分割区外面:文件树与大纲按比例分的是它上面的整块高度 */}
+        {result && sidebarFace === 'files' && (
+          <footer className="sidebar-footer">
+            <span
+              className="sidebar-counts"
+              role="img"
+              aria-label={`${result.stats.dirCount} 个文件夹,${result.stats.fileCount} 个文件`}
+              data-tip="文件夹 / 文件"
+              data-tip-side="top"
+            >
+              {result.stats.dirCount} / {result.stats.fileCount}
+            </span>
+            <button
+              type="button"
+              className="sidebar-notes-toggle"
+              aria-pressed={notesShown}
+              aria-label={notesShown ? '隐藏文件备注' : '显示文件备注'}
+              data-tip={notesShown ? '隐藏备注' : '显示备注'}
+              data-tip-side="top"
+              onClick={() => {
+                const next = !notesShown
+                setNotesShown(next)
+                writeNotesShown(next)
+              }}
+            >
+              <NoteToggleIcon off={!notesShown} size={FOOTER_NOTE_ICON_SIZE} />
+            </button>
+          </footer>
+        )}
         {treeNote && (
           <div className="tree-toast" role="alert">
             {treeNote}

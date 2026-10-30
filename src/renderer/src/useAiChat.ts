@@ -225,7 +225,7 @@ export function useAiChat(
     })()
   }
 
-  // 点「停一停」当场标记取消(留着已生成的半截话),主进程的响应回来发现 id 已清,不再覆盖
+  // 点「取消」当场标记取消(留着已生成的半截话),主进程的响应回来发现 id 已清,不再覆盖
   function cancel(): void {
     if (!busyRef.current) return
     if (idRef.current) void window.atlas.aiCancel(idRef.current)

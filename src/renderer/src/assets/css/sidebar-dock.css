@@ -1,0 +1,146 @@
+/* 左栏停靠块(大纲、图谱节点详情共用):与文件树同处一块面板,中间只隔一条分割线,不再自带卡片边框与底色。
+   两块各自滚动、各自的高度由拖分割线分配(比例记在本机),画法沿用左右分栏的分割条 token */
+
+/* 停靠槽位:portal 把停靠块画进这里;display:contents 让分割线与面板直接成为 .sidebar-mid 的 flex 子项,
+   槽位本身不占任何版面 */
+.sidebar-dock-slot {
+  display: contents;
+}
+
+.sidebar-dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  /* 高度:拖过线就是行内百分比(上下限由拖动时的夹边管);没拖过按内容撑开,最多占六成 */
+  min-height: 6rem;
+  overflow: hidden;
+}
+
+.sidebar-dock:not(.is-sized) {
+  max-height: 60%;
+}
+
+/* 文件树|停靠块的分割线:热区 5px,细线画在中线上 */
+.sidebar-dock-sash {
+  flex: 0 0 5px;
+  position: relative;
+  cursor: row-resize;
+  background: transparent;
+  touch-action: none;
+  outline: none;
+}
+
+.sidebar-dock-sash::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+  background: var(--line);
+  transition:
+    background var(--dur-2) var(--ease-smooth),
+    height var(--dur-2) var(--ease-smooth);
+}
+
+/* 悬停、键盘聚焦、拖动中:细线长成 4px 粗蓝条(与 .sash/.pane-sash 同一档) */
+.sidebar-dock-sash:hover::after,
+.sidebar-dock-sash:focus-visible::after,
+.sidebar-dock-sash.is-dragging::after {
+  height: 4px;
+  background: var(--drop-mark);
+}
+
+/* 拖线期间光标一路跟着走;与左右分栏的 is-sash-dragging 同一做法,方向换上下 */
+body.is-dock-sash-dragging {
+  cursor: row-resize;
+  user-select: none;
+}
+
+/* 标题条也是拖出左栏的把手:按住往右拖过分界线,松手就放回浮窗 */
+.sidebar-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.sidebar-dock-head.is-dragging {
+  cursor: grabbing;
+}
+
+.sidebar-dock-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-dock-undock,
+.sidebar-dock-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.sidebar-dock-undock:hover,
+.sidebar-dock-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* 列表沿用浮窗那套,只把右下角拉手让出的轨道收回来(这里没有拉手) */
+.sidebar-outline-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-1) var(--space-2) var(--space-1);
+  overflow-y: auto;
+}
+
+.sidebar-outline-list::-webkit-scrollbar-track {
+  margin-bottom: 0;
+}
+
+/* 拖出左栏时跟着鼠标的小牌:松手就放回浮窗 */
+.sidebar-dock-ghost {
+  position: fixed;
+  z-index: var(--z-tip);
+  transform: translate(-50%, -50%);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-sm);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+
+/* 浮窗拖到左栏上方:整条左栏亮一圈落位框(--sash-hi 与分界线高亮同色) */
+.sidebar.is-dock-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--sash-hi);
+  pointer-events: none;
+}

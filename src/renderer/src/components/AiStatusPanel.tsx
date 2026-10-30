@@ -40,10 +40,10 @@ export function AiStatusPanel({
   }, [])
 
   async function probeCloud(): Promise<void> {
-    setProbe({ kind: 'busy', text: '正在问服务商…' })
+    setProbe({ kind: 'busy', text: '正在测试连接' })
     const config = cfg ?? (await window.atlas.aiConfigGet().catch(() => null))
     if (config?.provider !== 'cloud') {
-      setProbe({ kind: 'fail', text: '读不到在线 API 的配置' })
+      setProbe({ kind: 'fail', text: '无法读取在线 API 配置' })
       return
     }
     try {
@@ -55,7 +55,7 @@ export function AiStatusPanel({
       })
       setProbe({
         kind: 'ok',
-        text: ids.length > 0 ? `服务商列出 ${ids.length} 个模型` : '服务商没列出模型'
+        text: ids.length > 0 ? `服务商返回 ${ids.length} 个模型` : '服务商未列出模型'
       })
     } catch (err) {
       setProbe({ kind: 'fail', text: friendlyErr(err) })
@@ -81,7 +81,7 @@ export function AiStatusPanel({
       <div className="ai-status-pop" role="dialog" aria-label="AI 状态">
         <div className="ai-pop-empty">
           <p className="ai-pop-title">
-            {configured === null ? '正在读取 AI 设置…' : 'AI 讲解尚未设置'}
+            {configured === null ? '正在读取 AI 设置' : 'AI 讲解尚未设置'}
           </p>
           {configured === false && <p className="ai-pop-note">项目地图和文件阅读可以直接使用</p>}
         </div>
@@ -121,7 +121,7 @@ export function AiStatusPanel({
     status?.vision === 'vision'
       ? { label: '视觉', tip: '这个模型能看图片' }
       : status?.vision === 'text-only'
-        ? { label: '纯文本', tip: '这个模型只能读文字,图片附件会被禁用' }
+        ? { label: '纯文本', tip: '这个模型只能读文字，图片附件会被禁用' }
         : null
   // 反馈槽:测试结果优先(它更新),没测过才落引擎消息;异常消息配 ✕,其余纯文字
   const broken = status?.state === 'error' || status?.state === 'unreachable'
@@ -169,7 +169,7 @@ export function AiStatusPanel({
         </>
       ) : (
         <div className="ai-pop-empty">
-          <p className="ai-pop-note">模型状态还没回话,引擎那边可能在热身</p>
+          <p className="ai-pop-note">模型状态尚未返回，请稍候</p>
         </div>
       )}
       {feedback && (
@@ -220,7 +220,7 @@ export function AiStatusPanel({
                 type="button"
                 className="ai-pop-act"
                 disabled={probe?.kind === 'busy'}
-                data-tip="检查连接和 Key 是否有效,不产生费用"
+                data-tip="检查连接和 Key，不产生费用"
                 onClick={() => void probeCloud()}
               >
                 测试连接
@@ -240,7 +240,7 @@ export function AiStatusPanel({
               <button
                 type="button"
                 className="ai-pop-act"
-                data-tip="更换模型文件,并自动重新装载"
+                data-tip="更换模型文件，并自动重新装载"
                 onClick={() => void switchModelFile()}
               >
                 换模型

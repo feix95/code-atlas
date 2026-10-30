@@ -1,6 +1,7 @@
 // 应用外壳:顶栏 + rail + 侧栏 + 正文 + 全局浮层 + 独立子窗。只摆画,不碰业务。
 import type { ComponentProps, ReactNode } from 'react'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
+import type { RendererRevivedKind } from '@shared/types'
 import { AiSetupContext } from './aiSetupContext'
 import { AppTopBar } from './components/AppTopBar'
 import { AuxWindows } from './components/AuxWindows'
@@ -21,6 +22,8 @@ import type { ToastState } from './useToast'
 /** 页签区的通用接线:主窗顶栏、每组正文、独立子窗吃的是同一副药 */
 export interface TabControlProps {
   groups: PaneGroup[]
+  /** 全局激活组:大纲停靠位认它,也决定侧栏换哪张脸 */
+  activeGroupId: string | null
   visibleOfGroup: TabAreaProps['visibleOfGroup']
   flashTabId: TabAreaProps['flashTabId']
   activateTab: TabAreaProps['activateTab']
@@ -42,7 +45,7 @@ export interface TabControlProps {
 }
 
 export function AppLayout(props: {
-  revived: boolean
+  revived: RendererRevivedKind | null
   sidebarCollapsed: boolean
   sidebarWidth: number
   uiScale: number
@@ -52,10 +55,10 @@ export function AppLayout(props: {
   toast: ToastState | null
   topBar: Omit<ComponentProps<typeof AppTopBar>, 'tabs'>
   rail: ComponentProps<typeof Rail>
-  sidebar: ComponentProps<typeof WorkspaceSidebar>
+  sidebar: Omit<ComponentProps<typeof WorkspaceSidebar>, 'sidebarCollapsed' | 'outlineOwnerId'>
   tabs: TabControlProps
-  /** 正文各页签的共同料;每组各自补 tab */
-  tabBody: Omit<ComponentProps<typeof TabBody>, 'tab'>
+  /** 正文各页签的共同料;每组各自补 tab 与大纲停靠位 */
+  tabBody: Omit<ComponentProps<typeof TabBody>, 'tab' | 'outlineDockOwner'>
   workspace: {
     hasWorkspace: boolean
     scanning: boolean
@@ -88,13 +91,17 @@ export function AppLayout(props: {
 
   // 主窗名下的组:顶栏页签带和正文只画这些,子窗的签在子窗自己带里
   const mainGroups = groupsForHost(tabs.groups, MAIN_HOST)
+  // 大纲停靠位 = 主窗激活组的激活签;激活组在子窗(那边没左栏)就没有停靠位
+  const outlineDockOwner = mainGroups.find((g) => g.id === tabs.activeGroupId)?.activeId ?? null
   // 跨窗拖页签的窗口清单:主窗在前,子窗按打开顺序;矩形由主进程按窗口现取。
   // 主窗零组时也要在清单里 —— 拖回主窗靠正文兜底落点现立一组
   const dragWindows = [
     { host: MAIN_HOST, win: window },
     ...auxWins.map((a) => ({ host: a.id, win: a.win }))
   ]
-  const renderTabBody: TabAreaProps['renderTabBody'] = (t) => <TabBody {...tabBody} tab={t} />
+  const renderTabBody: TabAreaProps['renderTabBody'] = (t) => (
+    <TabBody {...tabBody} tab={t} outlineDockOwner={outlineDockOwner} />
+  )
   const tabArea: TabAreaProps = {
     visibleOfGroup: tabs.visibleOfGroup,
     flashTabId: tabs.flashTabId,
@@ -145,8 +152,8 @@ export function AppLayout(props: {
         }
       >
         {revived && (
-          <div className="revive-note" role="alert">
-            画面刚才断了一次,已经自动接上 —— 正在跑的扫描和后台引擎都没受影响,页面回到了刚打开的样子
+          <div className="revive-note" role="status">
+            {revived === 'page' ? '画面已恢复，页面内容仍在' : '画面已恢复，聊天记录未保留'}
           </div>
         )}
         <AppTopBar
@@ -182,7 +189,11 @@ export function AppLayout(props: {
           <Rail {...rail} />
           {/* 侧栏常驻挂载:收起改成宽动画收到 0(visibility 延迟隐),
                 不是卸载 —— 展开态的滚动/勾选都留得住 */}
-          <WorkspaceSidebar {...sidebar} />
+          <WorkspaceSidebar
+            {...sidebar}
+            sidebarCollapsed={sidebarCollapsed}
+            outlineOwnerId={outlineDockOwner}
+          />
           {workspace.hasWorkspace && !workspace.scanning ? (
             <main className="workspace">
               <section className="detail">{paneGroupsEl}</section>

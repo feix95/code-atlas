@@ -118,7 +118,7 @@ async function loadGithubTree(
   try {
     treeRes = await githubGet(treeUrl)
   } catch {
-    return { error: '连不上 GitHub(可能断网或超时),这次打不开这个仓库' }
+    return { error: '无法连接 GitHub，本次未打开仓库' }
   }
   if (treeRes.status !== 200) return { error: githubStatusText(treeRes.status) }
   const tree = parseGithubTreePayload(treeRes.body)
@@ -136,7 +136,7 @@ export async function agentOpenGithubRepo(url: string): Promise<ToolReply> {
     const repoApi = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
     metaRes = await githubGet(repoApi)
   } catch {
-    return { ok: false, text: '连不上 GitHub(可能断网或超时),这次打不开这个仓库' }
+    return { ok: false, text: '无法连接 GitHub，本次未打开仓库' }
   }
   if (metaRes.status !== 200) return { ok: false, text: githubStatusText(metaRes.status) }
   const meta = parseGithubRepoMeta(metaRes.body)

@@ -55,7 +55,7 @@ export function headView(
     return {
       dot: 'off',
       text: '已配置',
-      tip: '配置已填写,尚未测试连接'
+      tip: '配置已填写，尚未测试连接'
     }
   }
   switch (status.state) {
@@ -64,7 +64,7 @@ export function headView(
         dot: 'go',
         text:
           status.progress === null
-            ? '热身中……'
+            ? '热身中'
             : `热身中 ${status.estimated ? '约 ' : ''}${Math.round(status.progress)}%`,
         tip: status.estimated ? '进度为估算值' : undefined
       }
@@ -77,7 +77,7 @@ export function headView(
     case 'unreachable':
       return { dot: 'bad', text: '未连接' }
     default:
-      return { dot: 'bad', text: '出错' }
+      return { dot: 'bad', text: '异常' }
   }
 }
 
@@ -90,7 +90,7 @@ export function builtinAct(
   if (status.state === 'loading')
     return { label: '取消', tip: '取消本次装载', run: () => void window.atlas.modelEject() }
   if (status.state === 'ready')
-    return { label: '卸下', tip: '卸载模型,释放显存', run: () => void window.atlas.modelEject() }
+    return { label: '卸下', tip: '卸载模型，释放显存', run: () => void window.atlas.modelEject() }
   return { label: '装载', tip: '装载模型到内存', run: () => void window.atlas.modelLoad() }
 }
 

@@ -23,6 +23,8 @@
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
+  /* 停靠落位框(.sidebar.is-dock-target::after)按整条左栏定位 */
+  position: relative;
   min-height: 0;
   background: var(--chrome-panel); /* v3 面板底 #f6f6f6 */
   overflow: hidden; /* 右缘分界线由 sash 中线画,侧栏自己不再描边 */

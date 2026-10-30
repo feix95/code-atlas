@@ -204,7 +204,7 @@ try {
   }
   await assert.rejects(
     listRemoteModels({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'cloud' }, down),
-    /连不上服务商/,
+    /无法连接服务商/,
     '断网说清楚是网络问题'
   )
   await assert.rejects(

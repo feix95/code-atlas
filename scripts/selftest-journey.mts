@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron } from 'playwright'
+import { buildSampleDocx } from './docx-fixture.mts'
+import { checkDocOutline, writeOutlineFixtures } from './journey-outline.mts'
+import { checkLargeDocx, writeLargeDocx } from './journey-docx-large.mts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // 测试产物不写仓库: 默认系统临时目录, AI 验收时用 CODE_ATLAS_TMP 指到共享 tmp。
@@ -40,6 +43,32 @@ await writeFile(join(project, 'package.json'), '{"name":"sample-project","privat
 // 超宽单行文件:预览装上后 min-content 极宽,回归分屏/内容区被顶出视口的 bug
 await writeFile(join(project, 'wide.ts'), `export const wide = '${'x'.repeat(2400)}'\n`)
 await writeFile(join(run, 'second/README.md'), '# Second project\n')
+// 划分(P1)样本:app/ 下四个文件串成一条引用链,a.ts 导入同目录样式 -> app 切成一个模块,进入 app 层画出轮廓
+await mkdir(join(run, 'graphdemo/app'), { recursive: true })
+await writeFile(
+  join(run, 'graphdemo/app/a.ts'),
+  "import './style.css'\nimport { b } from './b'\nexport const a = b\n"
+)
+await writeFile(join(run, 'graphdemo/app/b.ts'), "import { c } from './c'\nexport const b = c\n")
+await writeFile(
+  join(run, 'graphdemo/app/c.ts'),
+  "// graph demo c\nimport { d } from './d'\nexport const c = d\n"
+)
+await writeFile(join(run, 'graphdemo/app/d.ts'), 'export const d = 1\n')
+await writeFile(join(run, 'graphdemo/app/style.css'), '.demo-card { margin: 0 }\n')
+await writeFile(join(run, 'graphdemo/README.md'), '# Graph demo\n')
+// 旁边再放三个各自串链的目录、各引用 app 一次:项目太小(少于约 16 个文件)时当前分辨率会把每个文件切成单独模块
+for (const lib of ['lib1', 'lib2', 'lib3']) {
+  await mkdir(join(run, 'graphdemo', lib), { recursive: true })
+  for (let i = 0; i < 4; i++) {
+    const next = i < 3 ? `import { v${i + 1} } from './f${i + 1}'\n` : ''
+    const toApp = i === 0 ? "import { a } from '../app/a'\n" : ''
+    await writeFile(
+      join(run, 'graphdemo', lib, `f${i}.ts`),
+      `${toApp}${next}export const v${i} = 1\n`
+    )
+  }
+}
 const main = join(root, 'out/main/index.js')
 assert.ok(existsSync(main), 'Run npm run build before test:journey')
 const bootstrap = join(run, 'bootstrap.cjs')
@@ -1597,6 +1626,91 @@ try {
   await open(join(run, 'empty'))
   // 空目录 = 一个签都没开:空签板顶上(开工作区不再自动开签)
   await home()
+  // 关系图谱划分(P1):进入 app 层 -> 画出模块轮廓 -> 单击节点开侧栏(所属模块、模块文件)
+  // -> Esc 收起 -> 双击打开预览 -> 「模块着色」关闭后轮廓消失、再开恢复
+  await open(join(run, 'graphdemo'))
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
+  await page.waitForFunction(() => !document.querySelector('.graph-status'))
+  await page.getByRole('button', { name: /^文件夹 app/ }).focus()
+  await page.keyboard.press('Enter')
+  await page.locator('.graph-canvas[data-graph-dir="app"]').waitFor()
+  await page.waitForFunction(
+    () => Number(document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls')) > 0
+  )
+  assert.match(
+    (await page.getByRole('button', { name: /^文件 c\.ts/ }).innerText()) ?? '',
+    /属于模块 app · /,
+    'node list must name the module of each node'
+  )
+  await page.waitForTimeout(4000)
+  // 读屏清单聚焦 c.ts -> 画布把它画成强调色;找强调色最密的一点即节点圆心(连线只有一两像素宽)
+  await page.getByRole('button', { name: /^文件 c\.ts/ }).focus()
+  await page.waitForTimeout(400)
+  const hit = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>('.graph-canvas')
+    const ctx = c?.getContext('2d')
+    if (!c || !ctx) return null
+    const probe = document.createElement('canvas').getContext('2d')
+    if (!probe) return null
+    probe.fillStyle = getComputedStyle(c).getPropertyValue('--graph-focus').trim()
+    probe.fillRect(0, 0, 1, 1)
+    const [fr, fg, fb] = probe.getImageData(0, 0, 1, 1).data
+    const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height)
+    const isFocus = (x: number, y: number): boolean => {
+      const i = (y * width + x) * 4
+      return Math.abs(data[i] - fr) + Math.abs(data[i + 1] - fg) + Math.abs(data[i + 2] - fb) < 24
+    }
+    let best = { x: -1, y: -1, n: 0 }
+    for (let y = 4; y < height - 4; y += 2) {
+      for (let x = 4; x < width - 4; x += 2) {
+        if (!isFocus(x, y)) continue
+        let n = 0
+        for (let dy = -4; dy <= 4; dy += 2)
+          for (let dx = -4; dx <= 4; dx += 2) n += isFocus(x + dx, y + dy) ? 1 : 0
+        if (n > best.n) best = { x, y, n }
+      }
+    }
+    const rect = c.getBoundingClientRect()
+    const scale = c.width / rect.width
+    return best.n >= 20 ? { x: rect.left + best.x / scale, y: rect.top + best.y / scale } : null
+  })
+  assert.ok(hit, 'focused node must be painted in the focus color on the canvas')
+  await page.locator('.graph-view').focus()
+  await page.waitForTimeout(300)
+  await page.mouse.click(hit.x, hit.y)
+  const panel = page.getByRole('complementary', { name: '节点详情' })
+  await panel.waitFor()
+  assert.equal(
+    await panel.locator('.graph-panel-title').innerText(),
+    'c.ts',
+    'single click selects'
+  )
+  assert.ok((await panel.innerText()).includes('所属模块'), 'side panel must show the module')
+  assert.ok((await panel.innerText()).includes('style.css'), 'side panel must list attached styles')
+  await shot('graph-modules')
+  await page.keyboard.press('Escape')
+  await panel.waitFor({ state: 'detached' })
+  await page.mouse.dblclick(hit.x, hit.y)
+  await page.locator('.cm-editor').filter({ hasText: 'graph demo c' }).waitFor()
+  await page.locator('.tabbar-tab').filter({ hasText: '关系图谱' }).locator('.tabbar-name').click()
+  // 切回图谱签会重新挂载、回到根层(既有行为),再进一次 app 层
+  await page.getByRole('button', { name: /^文件夹 app/ }).focus()
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(
+    () => Number(document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls')) > 0
+  )
+  const toggle = page.getByRole('button', { name: '模块着色', exact: true })
+  await toggle.click()
+  await page.waitForFunction(
+    () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls') === '0'
+  )
+  await toggle.click()
+  await page.waitForFunction(
+    () => Number(document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls')) > 0
+  )
+  await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor({ state: 'detached' })
   await control({ partial: true })
   await open(project)
   // 分级扫描没探完:页脚只留计数;替身给根节点打 truncated,树上应亮「不完整」
@@ -1633,7 +1747,55 @@ try {
     ),
     'reload must restore the last workspace (session replay)'
   )
+  // Word 样本最后才落盘:前面各段的文件数/树形断言不受它牵连
+  await writeFile(join(project, 'report.docx'), buildSampleDocx())
+  await writeOutlineFixtures(project)
+  await writeLargeDocx(project)
   await open(project)
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
+  await page
+    .locator('.cm-editor')
+    .filter({ hasText: 'This application helps organize tasks.' })
+    .waitFor()
+  // Word 预览:真 Chromium 里验消毒 —— javascript: 链接、脚本、事件属性、内联样式都不许上屏,
+  // 点链接应用不许跳走(正常外链不点:那会真去拉起系统浏览器)
+  await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'report.docx' }).click()
+  const docxBody = page.locator('.docx-body')
+  await docxBody.locator('.md-h1').filter({ hasText: 'Quarterly plan' }).waitFor()
+  assert.equal(
+    await docxBody.locator('.md-table-wrap .md-table').count(),
+    1,
+    'docx table must render as a reading-mode table'
+  )
+  assert.equal(
+    await docxBody.locator('img[src^="atlas-media://docx-image/"][loading="lazy"]').count(),
+    1,
+    'docx image must load lazily from a registered token URL'
+  )
+  assert.equal(
+    await docxBody.locator('script, iframe, style, form, [onclick], [onerror], [style]').count(),
+    0,
+    'docx html must be sanitized'
+  )
+  assert.equal(
+    await docxBody.locator('a[href^="javascript" i]').count(),
+    0,
+    'javascript: links must be stripped'
+  )
+  assert.equal(
+    await docxBody.locator('a.md-link[href="https://example.com/"]').count(),
+    1,
+    'http(s) links stay as styled links'
+  )
+  const urlBeforeDocxClick = page.url()
+  await docxBody.getByText('evil link').click()
+  assert.equal(page.url(), urlBeforeDocxClick, 'clicking a docx link must not navigate the app')
+  await shot('docx-preview')
+  await checkDocOutline(page, shot)
+  const large = await checkLargeDocx(page, electron, { tempDir: join(run, 'tmp'), errors, shot })
+  console.log(
+    `Large docx: converted in ${large.convertMs} ms; main ping max ${large.maxMainPingMs} ms over ${large.pings} pings; folder click ${large.clickMs} ms`
+  )
   await page.locator('.tree-row.is-file .tree-main').filter({ hasText: 'README.md' }).click()
   await page
     .locator('.cm-editor')
