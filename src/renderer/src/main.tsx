@@ -37,8 +37,8 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     ) : (
       <ErrorBoundary
         variant="top"
-        note="界面出了个岔子崩了,别慌,程序还在。点下面按钮整个重新打开就能接着用;刚聊的内容没能保住,抱歉。"
-        reloadLabel="重新打开界面"
+        note="界面已崩溃，重新打开恢复，聊天记录不保留"
+        reloadLabel="重新打开"
       >
         <App />
       </ErrorBoundary>

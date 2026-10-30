@@ -129,6 +129,21 @@
   display: block;
 }
 
+/* 带字的小动作(错误气泡里的重试):图标加文字,宽度随字走 */
+.msg-action.is-text {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.375rem;
+  font-family: inherit;
+  font-size: var(--font-xs);
+}
+
+.msg-actions.is-error {
+  margin-left: 0;
+}
+
 /* 复制成功的小提示(补):浮在按钮排上方,1 秒内自己走,不挤按钮 */
 .msg-copied {
   position: absolute;

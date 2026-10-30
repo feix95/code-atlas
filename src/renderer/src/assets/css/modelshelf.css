@@ -95,7 +95,7 @@
   font-weight: var(--font-w-regular);
   color: var(--muted-2);
 }
-/* 榜单失败后的「再试一次」:错误不能是死路,给条出路(ux-writing 硬约束) */
+/* 榜单失败后的「重试」:错误不能是死路,给条出路(ux-writing 硬约束) */
 .shelf-retry-btn {
   flex: none;
   border: 1px solid var(--danger-line);

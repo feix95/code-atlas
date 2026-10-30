@@ -11,7 +11,7 @@ import { INPUT_CAP_LINES, INPUT_EXPAND_LINES } from './inputMetrics'
  * (单行舱文字让着按钮排,多行舱铺满),量行数时给多行舱补上按钮排的地盘,
  * 两种布局按同一个尺度量,免得「多行里量着放得下、缩回单行立刻又放不下」来回打架。
  */
-const BAR_RESERVE = '13rem' // 单行舱右侧按钮排的地盘(俩图标胶囊+发送钮,忙时还有「停一停」,往宽了备)
+const BAR_RESERVE = '13rem' // 单行舱右侧按钮排的地盘(俩图标胶囊+发送钮,忙时还有「取消」,往宽了备)
 const COLLAPSE_SLACK = '4rem' // 缩回一行的富余:比按钮排还宽出这么多才缩
 
 export function useComposerAutosize(

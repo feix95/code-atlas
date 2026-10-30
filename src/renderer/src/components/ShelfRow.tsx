@@ -92,7 +92,17 @@ function DownloadCell({
       ? Math.min(100, Math.round((active.receivedBytes / active.totalBytes) * 100))
       : null
   if (donePath !== null) {
-    return <span className="shelf-dl-done">✓ 已下载，配置已自动指向它</span>
+    return <span className="shelf-dl-done">已下载，配置已自动指向它</span>
+  }
+  if (active?.error) {
+    return (
+      <>
+        <span className="shelf-dl-error">{active.error}</span>
+        <button type="button" className="shelf-dl-btn" onClick={onDownload}>
+          重试
+        </button>
+      </>
+    )
   }
   if (active === null) {
     return (
@@ -201,9 +211,9 @@ export function ShelfRow({
         <div className="shelf-files-inner">
           <div className="shelf-files-pad">
             <ShelfProfile entry={entry} />
-            {filesLoading && <p className="shelf-note is-soft">正在看这个仓库里有什么文件……</p>}
+            {filesLoading && <p className="shelf-note is-soft">正在读取仓库文件</p>}
             {!filesLoading && files.length === 0 && (
-              <p className="shelf-note is-soft">这个仓库里没认出可以直接下载的模型文件。</p>
+              <p className="shelf-note is-soft">未找到可下载的模型文件</p>
             )}
             {files.map((f) => {
               const active =

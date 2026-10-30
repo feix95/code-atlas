@@ -9,11 +9,11 @@ import { AI_HEADERS_TIMEOUT_MS } from '../shared/aiDefaults.ts'
 
 /** 在线 API 的常见状态码 → 人话(配置表);本地两路不走这张表,原文透传行为不变 */
 const CLOUD_STATUS_TEXT: Record<number, string> = {
-  401: 'API Key 不对或已失效:去「AI 设置」检查 Key',
-  402: '服务商账户余额不足:去服务商官网充值后再试',
-  403: '服务商拒绝了这次请求:检查 Key 的权限,或这个模型是否已开通',
-  404: '服务商找不到这个地址或模型:检查服务地址和模型名',
-  429: '请求太频繁或额度用完了:稍等一会儿再试,或去服务商官网查看用量'
+  401: 'API Key 无效，在 AI 设置中重新填写',
+  402: '服务商余额不足，充值后重试',
+  403: '服务商拒绝请求，检查 Key 权限或模型是否已开通',
+  404: '服务商未找到地址或模型，检查服务地址和模型名',
+  429: '请求过于频繁或额度不足，稍后重试'
 }
 
 /** 识别「上下文装不下」类的服务报错(各后端措辞不一,取特征词并集) */
@@ -49,13 +49,13 @@ export function friendlyHttpError(
 ): string | null {
   if (isContextOverflow(`${status} ${detail}`)) {
     return engine === 'lmstudio'
-      ? '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去 LM Studio 把上下文调大,再重新加载模型'
+      ? '上下文超出模型上限，减少参考材料或在 LM Studio 中调大'
       : engine === 'cloud'
-        ? '材料超出了上下文窗口:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「上下文窗口」'
-        : '材料塞不下模型的脑容量了:清点一下参考材料(少带几个文件/文件夹),或去设置里调大「模型上下文」'
+        ? '上下文超出窗口上限，减少参考材料或调大上下文窗口'
+        : '上下文超出模型上限，减少参考材料或调大模型上下文'
   }
   if (engine !== 'cloud') return null
-  if (status >= 500) return `服务商那边出了问题(${status}):稍后再试`
+  if (status >= 500) return `服务商暂时异常，状态码 ${status}，稍后重试`
   return CLOUD_STATUS_TEXT[status] ?? null
 }
 
@@ -107,8 +107,7 @@ export async function postChatCompletions(
         ok: false,
         httpStatus: res.status,
         detail,
-        text:
-          friendly ?? `模型服务返回错误(${res.status})${detail ? `:${detail.slice(0, 120)}` : ''}`
+        text: friendly ?? `服务商返回错误，状态码 ${res.status}`
       }
     }
     return { ok: true, res, controller, disarm }

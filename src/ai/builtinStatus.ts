@@ -60,7 +60,7 @@ export function builtinIdleFacts(modelPath: string): {
     return {
       modelName: '',
       sizeBytes: null,
-      message: '还没选模型:去「AI 设置」挑一个 GGUF 模型文件'
+      message: '尚未选择模型，在 AI 设置中选择 GGUF 文件'
     }
   try {
     return { modelName: basename(p), sizeBytes: statSync(p).size }
@@ -68,7 +68,7 @@ export function builtinIdleFacts(modelPath: string): {
     return {
       modelName: basename(p),
       sizeBytes: null,
-      message: '模型文件找不到了(可能被挪走或删了):去「AI 设置」重新选一下'
+      message: '模型文件未找到，在 AI 设置中重新选择'
     }
   }
 }

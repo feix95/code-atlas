@@ -26,7 +26,6 @@ export async function explainWithMessagesCore(
   opts?: { allowThinking?: boolean }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
-  const baseUrl = config.baseUrl.replace(/\/+$/, '')
   let watchdog: ReturnType<typeof setTimeout> | undefined
   let full = ''
   let reasoningFull = ''
@@ -103,7 +102,7 @@ export async function explainWithMessagesCore(
         }
         return {
           status: 'error',
-          text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
+          text: '模型未返回内容，减少参考材料后重试',
           model: config.model,
           durationMs: Date.now() - startedAt,
           usage
@@ -180,7 +179,7 @@ export async function explainWithMessagesCore(
       }
       return {
         status: 'error',
-        text: '模型连上了,但一个字都没回 —— 上下文可能塞得太满:清点一下参考材料再问',
+        text: '模型未返回内容，减少参考材料后重试',
         model: config.model,
         durationMs: Date.now() - startedAt,
         usage
@@ -202,7 +201,7 @@ export async function explainWithMessagesCore(
     const userCancelled = signal?.aborted === true
     const half = full.trim()
     if (half) {
-      // 用户自己停的:界面有「已停下」的专门话术,不重复注脚
+      // 用户自己停的:界面有「已取消」的专门话术,不重复注脚
       const note = userCancelled
         ? ''
         : idle && !idle.writing
@@ -222,10 +221,10 @@ export async function explainWithMessagesCore(
       }
     }
     const msg = userCancelled
-      ? '取消了 —— 这次没等到任何输出'
+      ? '已取消，未生成内容'
       : isAbort || idle
         ? timeoutText()
-        : `连接断了,模型服务可能停了(${baseUrl})`
+        : '无法连接模型服务，检查网络后重试'
     return {
       status: 'error',
       text: msg,

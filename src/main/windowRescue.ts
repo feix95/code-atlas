@@ -5,6 +5,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import { addDevLog } from '../shared/devlog.ts'
 import { CH } from '../shared/ipcChannels.ts'
+import type { RendererRevivedKind } from '../shared/types.ts'
 import { refreshModelStatus } from './modelStatus.ts'
 
 /** 手动拉起的保命窗口:10 秒内连按第二下 = 整页重挂(3 秒来不及,小葵连按三下全超时过) */
@@ -15,15 +16,17 @@ const FRAME_BEAT_PATIENCE_MS = 10_000
 
 /** 给主窗上弦:崩溃重接 / GPU 重开画布 / 心跳看门狗 / 手动拉起。窗关掉时自己收摊 */
 export function installWindowRescue(mainWindow: BrowserWindow): void {
-  // 「接回横幅」:救生圈动过手(reload 完/GPU 重启完)就捎个信,让页面弹一句人话
-  let revivePending = false
+  // 「接回横幅」:救生圈动过手就捎个信,让页面按复活方式说不同的话
+  // (page = 页面状态没丢,reload = 内存里的对话没了)
+  let revivePending: RendererRevivedKind | null = null
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.invalidate()
     // 顺手把模型状态问一轮:状态栏一开屏就有真话可说,不必空等轮询
     void refreshModelStatus().catch(() => {})
     if (revivePending) {
-      revivePending = false
-      mainWindow.webContents.send(CH.rendererRevived)
+      const kind = revivePending
+      revivePending = null
+      mainWindow.webContents.send(CH.rendererRevived, kind)
     }
   })
   // 救生圈(2026-09-13 小葵两次报案:「界面凭空消失,后台还开着」)。这窗是透明无边框的,
@@ -33,7 +36,7 @@ export function installWindowRescue(mainWindow: BrowserWindow): void {
     if (details.reason === 'clean-exit') return
     console.log(`[window] 渲染层断了(${details.reason}),自动重接`)
     addDevLog('system', `画面断了一次(渲染层 ${details.reason}),已自动重接 —— 页面回到刚打开的样子`)
-    revivePending = true
+    revivePending = 'reload'
     if (!mainWindow.isDestroyed()) mainWindow.webContents.reload()
   })
   // GPU 进程打嗝:页面本身是活的(实测 CPU/内存/连接全正常),只是透明窗再也等不来新画面。
@@ -52,13 +55,21 @@ export function installWindowRescue(mainWindow: BrowserWindow): void {
       mainWindow.hide()
       mainWindow.show()
     }
-    mainWindow.webContents.send(CH.rendererRevived)
+    mainWindow.webContents.send(CH.rendererRevived, 'page')
   }
   app.on('child-process-gone', onGpuGone)
-  // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔,让后台状态表有话可查(不动手,等它自己醒)
+  // 卡死不拉黑:渲染层主线程僵住超过 10 秒记一笔并提示逃生键,让后台状态表有话可查;
+  // 同一次卡顿只提示一次,缓过来(responsive)才重新上膛
+  let unresponsiveNotified = false
   mainWindow.webContents.on('unresponsive', () => {
     console.log('[window] 渲染层没响应了一阵')
     addDevLog('system', '画面卡住了一阵(渲染层没响应) —— 记一笔备查')
+    if (unresponsiveNotified) return
+    unresponsiveNotified = true
+    mainWindow.webContents.send(CH.windowNotice, '页面无响应，按 Ctrl+Alt+0 恢复')
+  })
+  mainWindow.webContents.on('responsive', () => {
+    unresponsiveNotified = false
   })
   // 救生圈 2.0(第五案实测定性后立):隐身的真身是「渲染进程活着,画面管线却永久
   // 停摆」——实测这种状态下重画/藏亮/改尺寸全都叫不醒,唯一有效的解药是整页重挂
@@ -77,11 +88,8 @@ export function installWindowRescue(mainWindow: BrowserWindow): void {
     const gap = Date.now() - lastFrameBeat
     if (gap <= FRAME_BEAT_PATIENCE_MS) return
     console.log(`[window] 画面心跳停了 ${gap}ms,自动整页重挂(救生圈2.0)`)
-    addDevLog(
-      'system',
-      `画面管线停了约 ${Math.round(gap / 1000)} 秒,已自动重挂救回 —— 刚才没聊完的内容没能保住,抱歉`
-    )
-    revivePending = true
+    addDevLog('system', `画面管线停了约 ${Math.round(gap / 1000)} 秒,已自动重挂恢复`)
+    revivePending = 'reload'
     lastFrameBeat = Date.now() // 重挂期间先续上账,免得看门狗连开两枪
     mainWindow.webContents.reload()
   }, 3_000)
@@ -98,7 +106,7 @@ export function installWindowRescue(mainWindow: BrowserWindow): void {
       hotkeyArmed = false
       console.log('[window] 手动拉起第二按:整页重挂保命(Ctrl+Alt+0 ×2)')
       addDevLog('system', '手动拉起第二按:整页重挂保命(Ctrl+Alt+0 ×2)')
-      revivePending = true
+      revivePending = 'reload'
       mainWindow.webContents.reload()
       return
     }

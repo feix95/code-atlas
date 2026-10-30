@@ -112,11 +112,11 @@ export type { GpuOffloadReport } from './loadParsers.ts'
 async function fetchModelId(baseUrl: string): Promise<string> {
   const modelsRes = await fetchWithTimeout(`${baseUrl}/models`, PROBE_MODELS_MS)
   if (!modelsRes.ok) {
-    throw new Error(`内置模型已就绪,但拿不到模型信息(${modelsRes.status}),再点一次试试`)
+    throw new Error('内置模型已就绪，但无法读取模型信息，请重试')
   }
   const data = (await modelsRes.json()) as { data?: Array<{ id?: string }> }
   const model = data.data?.[0]?.id ?? ''
-  if (!model) throw new Error('内置模型已就绪,但报告不出模型名,再点一次试试')
+  if (!model) throw new Error('内置模型已就绪，但无法读取模型名，请重试')
   return model
 }
 
@@ -258,7 +258,7 @@ export async function launchBuiltinServer(
           code ?? null,
           host.isStopping()
             ? CANCEL_MESSAGE
-            : `内置模型程序启动失败就退出了(退出码 ${code ?? '未知'}):常见原因是程序路径没指对、模型文件损坏,或端口被占用`
+            : `内置模型启动失败，退出码 ${code ?? '未知'}，检查程序路径和模型文件`
         )
       )
     })
@@ -266,8 +266,8 @@ export async function launchBuiltinServer(
       addDevLog('system', `引擎没法启动:${err.message}`)
       const msg =
         (err as NodeJS.ErrnoException).code === 'ENOENT'
-          ? '找不到 llama-server 程序:去「AI 设置」重新选一下程序路径'
-          : `内置模型程序没法启动:${err.message}`
+          ? '未找到 llama-server，在 AI 设置中重新选择程序路径'
+          : `内置模型无法启动，${err.message}`
       reject(new Error(msg))
     })
   })
@@ -298,7 +298,7 @@ export async function launchBuiltinServer(
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     }
     if (!host.isEngineRunning())
-      throw new EngineExitError(null, '内置模型进程提前退出了,检查路径和模型文件')
+      throw new EngineExitError(null, '内置模型提前退出，检查路径和模型文件')
 
     // 热身真耗时入账:下次同一模型的估价就有据可依
     host.recordWarmupMs(modelPath, Date.now() - startedAt)
@@ -314,7 +314,7 @@ export async function launchBuiltinServer(
     } catch (err) {
       throw err instanceof Error && err.message.includes('内置模型')
         ? err
-        : new Error('内置模型刚就绪就没了响应,再点一次试试')
+        : new Error('内置模型无响应，请重试')
     }
     const offloadWarning = gpuOffloadWarning(latestGpuOffload)
     if (offloadWarning) addDevLog('system', offloadWarning)
@@ -324,7 +324,7 @@ export async function launchBuiltinServer(
     // 方案里的妥协(上下文调小/投影仪放内存/黑板降格)也挑最要紧的一句一并说明
     const readyNote = [
       offloadWarning,
-      skipMmproj ? (mmprojDropNote ?? '视觉文件没能加载,已按纯文本启动') : null,
+      skipMmproj ? (mmprojDropNote ?? '视觉文件未加载，已按纯文本启动') : null,
       engineNote ?? null,
       planCaveat(plan, ctxSize)
     ]
@@ -351,7 +351,7 @@ export async function launchBuiltinServer(
             model,
             facts.sizeBytes,
             null,
-            `内置模型中途退出了(退出码 ${code ?? '未知'}),下次提问会自动重新启动`
+            `内置模型中途退出，退出码 ${code ?? '未知'}，下次提问会自动重启`
           )
         )
       }

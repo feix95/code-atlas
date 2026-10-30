@@ -191,8 +191,8 @@ export function resolveAiTarget(
       return {
         ok: false,
         message: config.builtin.modelPath.trim()
-          ? '内置模型正在启动,稍等几秒再试'
-          : '还没选模型:去「AI 设置」展开模型货架,挑一个点「下载并使用」,或自己选一个 GGUF 文件'
+          ? '内置模型正在启动，请稍候'
+          : '尚未选择模型，在 AI 设置中下载或选择 GGUF 文件'
       }
     }
     return {
@@ -208,7 +208,7 @@ export function resolveAiTarget(
   }
   if (config.provider === 'cloud') return resolveCloudTarget(config.cloud)
   if (!config.lmstudio.model.trim()) {
-    return { ok: false, message: '还没选模型:去「AI 设置」连一下 LM Studio' }
+    return { ok: false, message: '尚未选择模型，在 AI 设置中连接 LM Studio' }
   }
   return {
     ok: true,
@@ -226,12 +226,12 @@ function resolveCloudTarget(
   cloud: AiCloudSettings
 ): { ok: true; target: ChatTarget } | { ok: false; message: string } {
   if (!cloud.consented) {
-    return { ok: false, message: '在线 API 还没确认:去「AI 设置」重新选择「在线 API」并确认' }
+    return { ok: false, message: '在线 API 尚未确认，在 AI 设置中重新选择' }
   }
-  if (!cloud.baseUrl.trim()) return { ok: false, message: '还没填服务地址:去「AI 设置」填写' }
-  if (!cloud.apiKey.trim()) return { ok: false, message: '还没填 API Key:去「AI 设置」填写' }
+  if (!cloud.baseUrl.trim()) return { ok: false, message: '服务地址未填写，在 AI 设置中填写' }
+  if (!cloud.apiKey.trim()) return { ok: false, message: 'API Key 未填写，在 AI 设置中填写' }
   if (!cloud.model.trim()) {
-    return { ok: false, message: '还没选模型:去「AI 设置」点「读取模型」或手动填写模型名' }
+    return { ok: false, message: '尚未选择模型，在 AI 设置中读取或手动填写' }
   }
   return {
     ok: true,

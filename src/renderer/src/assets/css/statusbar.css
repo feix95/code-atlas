@@ -1,21 +1,25 @@
 /* 底部模型状态栏(UI v3 B4 退役):AI 状态已收编进 rail 底槽三态图标+浮层(RailAiStatus)。
    本文件只剩还在岗的小件:设置页的模型适配估算灯、上下文滑块、复活横幅 */
 
-/* 救生圈的复活横幅(2026-09-13):画面断了被主进程重接回来时弹一句人话  */
+/* 救生圈的复活横幅:画面断了被主进程重接回来时弹一句人话。
+   位置在页面中下方,样式跟大纲/图谱浮窗同一套半透明材质,低调不抢视线 */
 
 .revive-note {
   position: fixed;
-  top: 3.5rem;
+  top: 62%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   z-index: var(--z-revive);
-  max-width: min(34rem, calc(100vw - 3rem));
-  padding: 0.625rem 1rem;
-  border: 1px solid var(--amber);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  max-width: min(26rem, calc(100vw - 3rem));
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(0.5rem) saturate(1.2);
   color: var(--text);
   font-size: var(--font-sm);
   line-height: var(--lh-150);
-  box-shadow: var(--shadow-pop);
+  text-align: center;
+  pointer-events: none;
 }

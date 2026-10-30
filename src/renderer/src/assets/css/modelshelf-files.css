@@ -147,3 +147,9 @@
   font-size: var(--font-xs);
   color: var(--green);
 }
+.shelf-dl-error {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--amber);
+  white-space: nowrap;
+}

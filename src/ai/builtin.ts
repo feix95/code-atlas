@@ -161,9 +161,7 @@ const startBuiltinSingleFlight = createSingleFlight(
       // installed 引擎自带「下一颗退路」给启动保险丝
       const engine = await locateEngine(settings, builtinDataDir())
       if (!engine.exePath) {
-        throw new Error(
-          '没找到内置 AI 引擎,内置模型暂时用不了。请打开「AI 设置」安装一个引擎,或改用 LM Studio。'
-        )
+        throw new Error('未找到内置 AI 引擎，在 AI 设置中安装引擎或改用 LM Studio')
       }
       serverPath = engine.exePath
       engineLabel = engine.label
@@ -180,9 +178,7 @@ const startBuiltinSingleFlight = createSingleFlight(
     // 先收尸:上次异常退出留下的孤儿还堵着端口的话,先请走再拉新的
     const reap = await reapOrphanServer()
     if (reap.blockedBy) {
-      const err = new Error(
-        '另一个程序正在使用本地模型服务。CodeAtlas 没有关闭它;请先在那个程序里停止模型,或到设置连接已有的本地服务。'
-      )
+      const err = new Error('本地模型端口被其他程序占用，请先停止该程序')
       announceBuiltinError(modelPath, err)
       throw err
     }
@@ -212,8 +208,8 @@ const startBuiltinSingleFlight = createSingleFlight(
         relaunches++
         // 上一轮引擎日志里见过显存不够的记号,话术就直说显存;不然按普通「没装上」说
         const dropNote = engineOomSeen
-          ? '显存不够,视觉文件没装上,已按纯文本启动'
-          : '视觉文件没能加载,已按纯文本启动'
+          ? '显存不足，视觉文件未加载，已按纯文本启动'
+          : '视觉文件未加载，已按纯文本启动'
         addDevLog(
           'system',
           `视觉投影仪加载失败(${startedMmproj}),摘掉 --mmproj 按纯文本重拉一次${engineOomSeen ? '(引擎报过显存不够)' : ''}`

@@ -326,11 +326,11 @@ export interface ModelStatus {
 
 /**
  * 模型块头 vs 机器尺寸的适配估算结果:选模型那一刻就给,不等引擎空跑一次。
- * level:ok=装得下 tight=有点挤(能跑但慢) too-big=装不下 missing=文件不存在 empty=还没选
+ * level:ok=可以运行 tight=接近内存上限 too-big=超出本机内存 missing=文件不存在 empty=还没选
  */
 export interface ModelFitVerdict {
   level: 'ok' | 'tight' | 'too-big' | 'missing' | 'empty'
-  /** 一句话结论(给人看的,如「装得下」「这台机器装不下」) */
+  /** 一句话结论(给人看的,如「可以运行」「超出本机内存」) */
   title: string
   /** 数字说话的细节(模型多大、显存内存多大、建议换多大的) */
   detail: string
@@ -580,6 +580,9 @@ export interface AiChatResult extends AiExplainResult {
 /** 独立子窗的窗口操作(页签独立窗口):主窗渲染层替子窗按 frameName 代发 ——
  * 子窗 document 是 about:blank 白窗,没有 preload 也没有 window.atlas。 */
 export type AuxWindowOp = 'minimize' | 'toggleMaximize' | 'close' | 'focus'
+
+/** 救生圈的复活方式:page = GPU 重开画布(页面状态还在);reload = 整页重挂(内存里的对话没了) */
+export type RendererRevivedKind = 'page' | 'reload'
 
 /**
  * 一扇窗内容区的屏幕矩形(DIP):跨窗拖页签命中用。

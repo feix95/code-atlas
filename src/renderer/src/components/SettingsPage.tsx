@@ -222,13 +222,11 @@ export function SettingsPage({
       setModels({ provider, ids })
       if (ids.length === 0) {
         setModelsNote(
-          isCloud
-            ? '连接成功，但服务商没有返回模型列表，请手动填写模型名。'
-            : '服务通了，但没列出模型 —— 先在 LM Studio 里加载一个。'
+          isCloud ? '服务商未返回模型列表，手动填写模型名' : '服务已连接，在 LM Studio 中加载模型'
         )
       }
     } catch (err) {
-      setModelsNote(isCloud ? friendlyErr(err) : '连不上这个地址，检查 LM Studio 是否已启动。')
+      setModelsNote(isCloud ? friendlyErr(err) : '无法连接该地址，检查 LM Studio 是否已启动')
     } finally {
       setModelsBusy(false)
     }

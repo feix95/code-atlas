@@ -119,7 +119,7 @@ export function registerChatIpc(): void {
 
   // /compact 手动压缩:把目前为止的对话提炼成一份要点摘要,
   // 渲染进程拦下 /compact 后走这条专属通道。流式增量照走 atlas:ai-delta 按 requestId 对号,
-  // 「停一停」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
+  // 「取消」也照常能掐(登记进 explainAborters);压缩是程序差事,不接思考开关。
   ipcMain.handle(CH.aiCompact, async (event, req: unknown): Promise<AiExplainResult> => {
     const startedAt = Date.now()
     const body = (typeof req === 'object' && req !== null ? req : {}) as Record<string, unknown>

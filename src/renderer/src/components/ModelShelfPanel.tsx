@@ -146,20 +146,20 @@ export function ModelShelfPanel({
 
         {loading && (
           <p className="shelf-note">
-            <ProgressDots /> 正在拉实时榜单，几秒钟的事……
+            <ProgressDots /> 正在加载实时榜单
           </p>
         )}
         {error && (
           <p className="shelf-note is-error">
             {error}
             <button type="button" className="shelf-retry-btn" onClick={retryShelf}>
-              再试一次
+              重试
             </button>
           </p>
         )}
 
         {shelf && visibleAll.length === 0 && !loading && (
-          <p className="shelf-note is-soft">这个大小上限下没有模型，放宽一点试试。</p>
+          <p className="shelf-note is-soft">该大小上限下无模型，放宽上限后重试</p>
         )}
 
         {/* 列表连同「加载更多」一起放进滚动窗口:货架再长也不超一屏,筛选栏永远在场 */}
@@ -183,8 +183,12 @@ export function ModelShelfPanel({
 
           {hiddenCount > 0 && (
             <div className="shelf-more">
-              <button type="button" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
-                还有 {hiddenCount} 个模型没显示，加载更多
+              <button
+                type="button"
+                aria-label={`加载更多，还有 ${hiddenCount} 个模型未显示`}
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              >
+                加载更多
               </button>
             </div>
           )}

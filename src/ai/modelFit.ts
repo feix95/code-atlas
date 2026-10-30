@@ -14,6 +14,8 @@ export interface ModelFitVerdictPure {
   level: 'ok' | 'tight' | 'too-big'
   title: string
   detail: string
+  /** too-big 时给的建议上限(GB);只在这种档位出现 */
+  suggestGB?: number
 }
 
 // GGUF 档案读取搬进了 modelShape.ts(ipcModel / launchPlanner / 本文件三处共用),re-export 保住老登记
@@ -37,22 +39,23 @@ export function judgeModelFit(
     if (need <= vramBytes * MODEL_FIT_VRAM_RATIO) {
       return {
         level: 'ok',
-        title: '装得下',
-        detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)≈ ${formatGB(need)},显存 ${formatGB(vramBytes)} —— 整个进显卡,跑得动`
+        title: '可以运行',
+        detail: `模型 ${formatGB(modelBytes)}，上下文缓存按 ${Math.round(contextTokens)} tokens 估算约 ${formatGB(kv)}，共需 ${formatGB(need)}，显存 ${formatGB(vramBytes)}，可以整体进显卡`
       }
     }
     if (need <= vramBytes + ramBytes * MODEL_FIT_RAM_OK_RATIO) {
       return {
         level: 'tight',
-        title: '有点挤',
-        detail: `模型 ${formatGB(modelBytes)} + 上下文缓存估 ${formatGB(kv)}(按 ${Math.round(contextTokens)} tokens)超出了显存 ${formatGB(vramBytes)},多出来的要落内存 —— 能跑,但读大材料时会明显变慢;把「模型上下文」调小能快回来`
+        title: '接近内存上限',
+        detail: `模型 ${formatGB(modelBytes)}，上下文缓存按 ${Math.round(contextTokens)} tokens 估算约 ${formatGB(kv)}，超出显存 ${formatGB(vramBytes)}，多余部分使用内存，运行会偏慢`
       }
     }
     const suggest = Math.floor(Math.max(1, vramBytes * MODEL_FIT_VRAM_RATIO - kv) / GB)
     return {
       level: 'too-big',
-      title: '这台机器装不下',
-      detail: `模型 ${formatGB(modelBytes)},加上上下文缓存连显存 ${formatGB(vramBytes)} 带内存一起匀也紧张 —— 建议换 ${suggest} GB 以下的模型,或加内存条`
+      title: '超出本机内存',
+      suggestGB: suggest,
+      detail: `模型 ${formatGB(modelBytes)}，显存 ${formatGB(vramBytes)} 和内存合计不足，建议换 ${suggest} GB 以下的模型`
     }
   }
   // 纯内存跑(问不到显存,A/老卡):适配估算只答装不装得下,缓存不另估 —— 内存机型本身就慢,
@@ -60,22 +63,23 @@ export function judgeModelFit(
   if (modelBytes <= ramBytes * MODEL_FIT_RAM_OK_RATIO) {
     return {
       level: 'ok',
-      title: '装得下',
-      detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 装得下`
+      title: '可以运行',
+      detail: `模型 ${formatGB(modelBytes)}，内存 ${formatGB(ramBytes)}，可以运行`
     }
   }
   if (modelBytes <= ramBytes * MODEL_FIT_RAM_MAX_RATIO) {
     return {
       level: 'tight',
-      title: '有点挤',
-      detail: `模型 ${formatGB(modelBytes)},内存 ${formatGB(ramBytes)} —— 塞得下但系统会挤,跑起来偏慢`
+      title: '接近内存上限',
+      detail: `模型 ${formatGB(modelBytes)}，内存 ${formatGB(ramBytes)}，可以运行但系统会偏慢`
     }
   }
   const suggest = Math.floor((ramBytes * MODEL_FIT_RAM_OK_RATIO) / GB)
   return {
     level: 'too-big',
-    title: '这台机器装不下',
-    detail: `模型 ${formatGB(modelBytes)},内存只有 ${formatGB(ramBytes)} —— 建议换 ${suggest} GB 以下的模型`
+    title: '超出本机内存',
+    suggestGB: suggest,
+    detail: `模型 ${formatGB(modelBytes)}，内存 ${formatGB(ramBytes)}，建议换 ${suggest} GB 以下的模型`
   }
 }
 
@@ -89,10 +93,12 @@ export function autopsyExitMessage(
   manualContext: number | null
 ): string {
   if (fit.level === 'too-big') {
-    return `模型在这台机器上装不下,引擎一启动就内存耗尽退出了(退出码 ${exitCode ?? '未知'})。${fit.detail}`
+    const hint =
+      fit.suggestGB !== undefined ? `建议换 ${fit.suggestGB} GB 以下的模型` : '请换更小的模型'
+    return `模型超出本机内存，退出码 ${exitCode ?? '未知'}，${hint}`
   }
   if (manualContext !== null && manualContext >= 32768) {
-    return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'})。最常见的两个原因:①设置里「模型上下文」填得太大(当前 ${manualContext})—— 清空它,回到自动探测;②模型文件损坏 —— 重新下一个`
+    return `内置模型启动失败，退出码 ${exitCode ?? '未知'}，清空模型上下文或重新下载模型`
   }
-  return `内置模型启动就退出了(退出码 ${exitCode ?? '未知'}):常见原因是模型文件损坏或被别的程序占用,重新选一个模型文件试试`
+  return `内置模型启动失败，退出码 ${exitCode ?? '未知'}，请重新选择模型文件`
 }

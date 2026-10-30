@@ -61,7 +61,7 @@ async function downloadOne(
   onBytes: (done: number) => void
 ): Promise<void> {
   const res = await fetchImpl(url, signal)
-  if (!res.ok || !res.body) throw new Error(`下载失败(HTTP ${res.status}),请检查网络后重试`)
+  if (!res.ok || !res.body) throw new Error(`下载失败，HTTP ${res.status}，检查网络后重试`)
   const out = createWriteStream(dest)
   try {
     const reader = res.body.getReader()

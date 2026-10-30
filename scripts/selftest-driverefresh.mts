@@ -13,31 +13,25 @@ const drive = (letter: string): DriveInfo => ({ letter, root: `${letter}:\\` }) 
 check('磁盘没变:明说没有变化', () => {
   assert.equal(
     describeDriveChange([drive('C'), drive('D')], [drive('C'), drive('D')]),
-    '已刷新,没有发现新磁盘,也没有磁盘断开'
+    '已刷新，无变化'
   )
 })
 
 check('插入新盘:报新磁盘', () => {
-  assert.equal(
-    describeDriveChange([drive('C')], [drive('C'), drive('E')]),
-    '已刷新:发现新磁盘 E:\\'
-  )
+  assert.equal(describeDriveChange([drive('C')], [drive('C'), drive('E')]), '发现新磁盘 E:\\')
 })
 
 check('拔掉盘:报断开的磁盘', () => {
-  assert.equal(
-    describeDriveChange([drive('C'), drive('E')], [drive('C')]),
-    '已刷新:磁盘 E:\\ 已断开'
-  )
+  assert.equal(describeDriveChange([drive('C'), drive('E')], [drive('C')]), '磁盘 E:\\ 已断开')
 })
 
 check('同时插拔:两段都报', () => {
   assert.equal(
     describeDriveChange([drive('C'), drive('E')], [drive('C'), drive('F')]),
-    '已刷新:发现新磁盘 F:\\,磁盘 E:\\ 已断开'
+    '发现新磁盘 F:\\，磁盘 E:\\ 已断开'
   )
 })
 
 check('旧列表还没读到:全部算新增', () => {
-  assert.equal(describeDriveChange(null, [drive('C')]), '已刷新:发现新磁盘 C:\\')
+  assert.equal(describeDriveChange(null, [drive('C')]), '发现新磁盘 C:\\')
 })

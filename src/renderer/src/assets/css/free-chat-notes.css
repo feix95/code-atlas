@@ -197,6 +197,22 @@
   color: var(--text);
 }
 
+/* 联网失败或无资料时的原地重问:低调文字按钮,和状态标签同排 */
+.chat-weblookup-retry {
+  padding: 0.125rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.chat-weblookup-retry:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .chat-weblinks-toggle .cv {
   display: grid;
   place-items: center;

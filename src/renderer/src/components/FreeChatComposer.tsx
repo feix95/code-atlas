@@ -14,7 +14,7 @@ import { useComposerAutosize } from '../useComposerAutosize'
 import { useWebLookupToggle } from '../useWebLookupToggle'
 
 /**
- * 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/停一停;
+ * 一体化输入舱(对话页改版定稿):一行胶囊 = 「+」能力菜单 | 内嵌引用原子+文字 | 发送/取消;
  * 写到两行起往上长,控件自然落到第二行;满五行封顶出拨杆,拨上去多撑五行。
  * 空场时整颗舱挂在 hero 居中,聊开了沉到底栏 —— 同一颗舱两处坐席。
  * 拆分登记:待发原子 → ComposerAtoms;两块浮层 → ComposerOverlays;
@@ -284,8 +284,8 @@ export function FreeChatComposer({
             type="button"
             className="fc-send is-stop"
             onClick={chat.cancel}
-            aria-label="停一停"
-            data-tip="停一停"
+            aria-label="取消"
+            data-tip="取消"
           >
             <span className="fc-sq" aria-hidden="true" />
           </button>

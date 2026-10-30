@@ -37,7 +37,8 @@ import type {
   ModelStatus,
   RenameFileResult,
   ScanResult,
-  DevLogEntry
+  DevLogEntry,
+  RendererRevivedKind
 } from '../shared/types.ts'
 
 // 界面缩放(换引擎):不再用 webFrame.setZoomFactor —— 那是 Chromium 整页缩放,
@@ -302,11 +303,18 @@ const atlasApi = {
     ipcRenderer.on(CH.engineInstallProgress, listener)
     return () => ipcRenderer.removeListener(CH.engineInstallProgress, listener)
   },
-  /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声,页面弹人话横幅;返回退订函数 */
-  onRendererRevived: (callback: () => void): (() => void) => {
-    const listener = (): void => callback()
+  /** 救生圈的复活信号:画面断了被主进程重接回来时喊一声(kind 区分页面状态是否还在);返回退订函数 */
+  onRendererRevived: (callback: (kind: RendererRevivedKind) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, kind: RendererRevivedKind): void =>
+      callback(kind)
     ipcRenderer.on(CH.rendererRevived, listener)
     return () => ipcRenderer.removeListener(CH.rendererRevived, listener)
+  },
+  /** 主进程的窗口提示(渲染层无响应这类):渲染层只负责显示短句 */
+  onWindowNotice: (callback: (text: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, text: string): void => callback(text)
+    ipcRenderer.on(CH.windowNotice, listener)
+    return () => ipcRenderer.removeListener(CH.windowNotice, listener)
   },
   /** 报错小注记:渲染层抓到的 JS 错误送进后台状态表(主进程的状态表不随渲染层销毁) */
   reportRendererError: (text: string): void => {

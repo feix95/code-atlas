@@ -19,9 +19,7 @@ import { useFlashFlag } from '../useFlashFlag'
 
 function queryBit(meta: WebLookupMeta): string {
   const qs = (meta.queries ?? []).map((q) => q.trim()).filter((q) => q !== '')
-  if (qs.length === 0) return ''
-  const listed = qs.map((q) => `「${q}」`).join('')
-  return qs.length === 1 ? listed : `${qs.length} 次${listed}`
+  return qs.join('，')
 }
 
 /** 联网状态表 → 界面标签:程序没动手脚的(not_requested)不挂标签,不刷存在感 */
@@ -34,18 +32,18 @@ function webLabel(
     case 'not_requested':
       return null
     case 'disabled':
-      return { text: '联网开关未开启,本轮没有查询', tone: 'muted' }
+      return { text: '联网未开启，本轮未查询', tone: 'muted' }
     case 'searching':
-      return { text: `正在联网查询${q}…`, tone: 'blue' }
+      return { text: `正在联网查询${q}`, tone: 'blue' }
     case 'completed': {
-      const src = meta.sources.length > 0 ? meta.sources.join('、') : '公开资料'
-      return { text: q ? `已联网查询${q}:${src}` : `已联网查询:${src}`, tone: 'green' }
+      const src = meta.sources.length > 0 ? meta.sources.join('，') : '公开资料'
+      return { text: q ? `已联网查询${q}，来源${src}` : `已联网查询，来源${src}`, tone: 'green' }
     }
     case 'failed':
-      return { text: '联网查询失败,以下内容不是联网结论', tone: 'amber' }
+      return { text: '联网查询失败，以下不是联网结论', tone: 'amber' }
     case 'empty':
       return {
-        text: q ? `已查询${q},没有可用资料` : '本轮没有发起联网查询',
+        text: q ? `已查询${q}，无可用资料` : '本轮未发起联网查询',
         tone: 'amber'
       }
   }
@@ -153,6 +151,11 @@ export const AssistantBubble = memo(function AssistantBubble({
   }
   // 复制/重试这一小排:有 token 账时贴在账目右边同行,没账时自己在正文下面一行
   const showActions = (msg.state === 'done' || msg.state === 'cancelled') && msg.text !== ''
+  const retry = canRetry && onRetry ? (): void => onRetry(retryIndex) : null
+  // 错误气泡必须留出路:原地重试,不靠悬停才看得见
+  const showErrorRetry = msg.state === 'error' && retry !== null
+  // 联网失败/无资料:重问一次会重新发起查询
+  const webRetry = retry !== null && (msg.web?.state === 'failed' || msg.web?.state === 'empty')
   const actions = showActions && (
     <div className="msg-actions">
       {copied && (
@@ -169,11 +172,11 @@ export const AssistantBubble = memo(function AssistantBubble({
       >
         <TreeIcon name="copy" size={MSG_ACTION_ICON_SIZE} />
       </button>
-      {canRetry && onRetry && (
+      {retry && (
         <button
           type="button"
           className="msg-action"
-          onClick={() => onRetry(retryIndex)}
+          onClick={retry}
           aria-label="重试生成"
           data-tip="重试"
         >
@@ -203,15 +206,26 @@ export const AssistantBubble = memo(function AssistantBubble({
           <MiniMD text={msg.text} caret={msg.state === 'busy'} fileLinks={fileLinks ?? undefined} />
         )}
         {msg.state === 'done' && !msg.text && msg.reasoning && (
-          <span className="chat-typing chat-muted">
-            想完了但没写出答案 —— 字数可能用尽了,再问一次或关掉思考模式试试。
-          </span>
+          <span className="chat-typing chat-muted">模型未返回答案，关闭思考模式后重试</span>
         )}
-        {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已停下。</span>}
+        {msg.state === 'cancelled' && !msg.text && <span className="chat-typing">已取消</span>}
         {msg.state === 'cancelled' && msg.text && (
-          <div className="chat-typing chat-muted">已停下,上面是已经生成的部分。</div>
+          <div className="chat-typing chat-muted">已取消，以上为已生成内容</div>
         )}
         {msg.state === 'error' && <Notice kind="error">{msg.text}</Notice>}
+        {showErrorRetry && (
+          <div className="msg-actions is-error">
+            <button
+              type="button"
+              className="msg-action is-text"
+              onClick={retry}
+              aria-label="重试生成"
+            >
+              <IconRefresh size={MSG_ACTION_ICON_SIZE} />
+              重试
+            </button>
+          </div>
+        )}
         {/* 实时 token 账:引擎报几笔显示几笔,不报就 ourselves 数字数,绝不编 */}
         {msg.state === 'busy' && (msg.stats || msg.text) && (
           <div className="chat-stats">
@@ -232,6 +246,11 @@ export const AssistantBubble = memo(function AssistantBubble({
       {label && (
         <div className="chat-webstatus">
           <Badge label={label.text} tone={label.tone} />
+          {webRetry && (
+            <button type="button" className="chat-weblookup-retry" onClick={retry}>
+              重新查询
+            </button>
+          )}
           {msg.web && <ChatWebLinks links={msg.web.links ?? []} />}
         </div>
       )}
