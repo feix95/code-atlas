@@ -27,7 +27,7 @@ import { nodeTipText, type NodeTipText } from '../graph/nodeTip'
 import { footText } from '../graph/graphFootText'
 import { GraphSidePanel } from './GraphSidePanel'
 import { useModuleColorPicker } from '../graph/useModuleColorPicker'
-import { Notice } from './Notice'
+import { GraphNotices } from './GraphNotices'
 import { TreeIcon } from './Icons'
 
 const NO_EDGES: DepEdge[] = []
@@ -171,7 +171,11 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     onNodeClick: (n) => selection.select(n.data),
     onBlankClick: selection.clear,
     onNodeDoubleClick: (n) => {
-      // 进入文件夹后旧选中已不在画面里,侧栏一并收起;打开文件则保留选中
+      if (n.data.kind === 'folder') {
+        expansion.toggle(n.id)
+        return
+      }
+      // 进入外部文件夹后旧选中已不在画面里,侧栏一并收起;打开文件则保留选中
       if (isFolderTarget(n.data)) selection.select(null)
       activate(n.data)
     },
@@ -266,29 +270,19 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         graphLoading={graphLoading}
         showModules={showModules}
         hasModules={moduleMap !== null && moduleMap.modules.length > 0}
+        canExpandAll={expansion.canExpandAll}
+        canCollapseAll={expansion.canCollapseAll}
         onToggleModules={() => setShowModules((v) => !v)}
+        onExpandAll={expansion.expandAll}
+        onCollapseAll={expansion.collapseAll}
         onFit={viewport.fit}
       />
-      <div className="graph-notices">
-        {graphNote && (
-          <Notice kind="error">
-            引用关系分析失败:{graphNote}
-            <button type="button" className="graph-retry" onClick={onLoadGraph}>
-              重试
-            </button>
-          </Notice>
-        )}
-        {nav.status.kind === 'failed' && (
-          <Notice kind="error">这个文件夹暂时打不开,请稍后再试</Notice>
-        )}
-        {expansion.notice && (
-          <Notice kind={expansion.notice.kind === 'scanFailed' ? 'error' : 'info'}>
-            {expansion.notice.kind === 'scanFailed'
-              ? '这个文件夹暂时打不开,请稍后再试'
-              : '内容较多,无法原地展开,右键文件夹选「进入此文件夹」查看'}
-          </Notice>
-        )}
-      </div>
+      <GraphNotices
+        graphNote={graphNote}
+        scanFailed={nav.status.kind === 'failed'}
+        expansionNotice={expansion.notice}
+        onRetry={onLoadGraph}
+      />
       {overlayText && <p className="graph-overlay">{overlayText}</p>}
       {tag && (
         <GraphHoverTag

@@ -21,9 +21,15 @@ export function hitTest(
   const wx = (sx - tf.x) / tf.k
   const wy = (sy - tf.y) / tf.k
   const slop = GRAPH_NODE.hitSlopPx / tf.k
+  const hits = (n: SimNode): boolean => Math.hypot(n.x - wx, n.y - wy) <= n.r + slop
+  // 容器是一个大圆,先子项后容器:点在容器内空白处才算命中容器本身
   for (let i = scene.nodes.length - 1; i >= 0; i--) {
     const n = scene.nodes[i]
-    if (Math.hypot(n.x - wx, n.y - wy) <= n.r + slop) return n
+    if (!n.data.isContainer && hits(n)) return n
+  }
+  for (let i = scene.nodes.length - 1; i >= 0; i--) {
+    const n = scene.nodes[i]
+    if (n.data.isContainer && hits(n)) return n
   }
   return null
 }

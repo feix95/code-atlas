@@ -52,7 +52,7 @@ export interface NodeMenuActions {
   onActivate: () => void
 }
 
-/** 节点右键菜单:查看模块详情、更改模块颜色(有归属模块才出)、打开文件 / 进入文件夹 */
+/** 节点右键菜单:查看模块详情、更改模块颜色(有归属模块才出)、打开文件 / 进入此文件夹 */
 export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): ContextMenuEntry[] {
   const isFile = node.kind === 'file' || (node.kind === 'external' && node.target === 'file')
   const items: ContextMenuEntry[] = [
@@ -64,7 +64,7 @@ export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): Contex
   }
   if (node.kind === 'overflow') return items
   items.push({
-    label: isFile ? '打开文件' : '进入文件夹',
+    label: isFile ? '打开文件' : '进入此文件夹',
     icon: isFile ? 'file' : 'folder',
     run: actions.onActivate
   })

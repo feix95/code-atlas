@@ -3,7 +3,8 @@ import type { DepGraphResult } from '@shared/types'
 
 const FOOT_EDGES =
   '连线表示代码里的引用(支持 JS/TS、Python、Go、Java、Rust);没有连线的文件暂未发现引用关系'
-const FOOT_WHEEL = '滚轮缩放;鼠标停在节点上滚动滚轮切换看法;Ctrl+滚轮进出文件夹'
+const FOOT_WHEEL =
+  '滚轮缩放;放大或双击文件夹可展开;鼠标停在节点上滚动滚轮切换看法;Ctrl+滚轮进出文件夹'
 
 /** 底栏说明:模块数据缺席或为空时说清楚;模块着色开着时补一句轮廓的含义;末尾附滚轮操作 */
 export function footText(graph: DepGraphResult | null, modulesOn: boolean): string {

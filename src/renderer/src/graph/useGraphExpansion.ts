@@ -32,6 +32,10 @@ export interface GraphExpansion {
   /** 正在按需扫描的文件夹 id */
   scanningId: string | null
   notice: ExpansionNotice | null
+  /** 「展开两级」当前有可展开的文件夹 */
+  canExpandAll: boolean
+  /** 有已展开的文件夹可以收起 */
+  canCollapseAll: boolean
   toggle: (id: string) => void
   /** 「展开两级」:把当前可见、浅于自动展开深度的文件夹一次展开 */
   expandAll: () => void
@@ -90,6 +94,12 @@ export function useGraphExpansion({
   const effective = resolved.ids
   const notice =
     local ?? (resolved.rejection ? { kind: 'rejected' as const, reason: resolved.rejection } : null)
+  const canExpandAll = useMemo(
+    () =>
+      resolved.level !== null &&
+      expandCandidates(resolved.level.nodes, effective, GRAPH_ZOOM.autoExpandDepth).length > 0,
+    [resolved.level, effective]
+  )
 
   const commit = useCallback((ids: ReadonlySet<string>, forVisit: number): void => {
     setState((prev) => (prev.visit === forVisit ? { visit: forVisit, ids } : prev))
@@ -170,6 +180,8 @@ export function useGraphExpansion({
     expanded: effective,
     scanningId,
     notice,
+    canExpandAll,
+    canCollapseAll: effective.size > 0,
     toggle,
     expandAll,
     collapseAll,

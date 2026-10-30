@@ -126,6 +126,14 @@ export const GRAPH_HULL = {
   labelGap: 4
 } as const
 
+/** 原地展开的容器:半透明圆底 + 顶边内侧的名称 */
+export const GRAPH_CONTAINER = {
+  /** 容器描边宽度(世界坐标) */
+  strokeWidth: 1.2,
+  /** 名称离容器顶边内侧的距离(世界坐标) */
+  labelGap: 8
+} as const
+
 /** 文件夹节点外圈的分段色环 */
 export const GRAPH_RING = {
   /** 最多段数;超出的模块合并成中性色一段 */

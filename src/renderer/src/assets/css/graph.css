@@ -10,6 +10,9 @@
   --graph-label: #4a4a4a;
   --graph-focus: var(--accent-bright);
   --graph-muted: #b5b5b5;
+  /* 原地展开容器:半透明圆底与描边的透明度 */
+  --graph-container-fill-alpha: 0.07;
+  --graph-container-stroke-alpha: 0.5;
   /* 节点标签字号(rem,drawGraph 按根字号换算成像素) */
   --graph-label-size: 0.6875;
 }
@@ -20,6 +23,8 @@
   --graph-edge: #4d4d4d;
   --graph-label: #cfcfcf;
   --graph-muted: #6e6e6e;
+  --graph-container-fill-alpha: 0.1;
+  --graph-container-stroke-alpha: 0.55;
 }
 
 .graph-view {
@@ -109,6 +114,7 @@
 
 .graph-crumb button:focus-visible,
 .graph-tool:focus-visible,
+.graph-tool-text:focus-visible,
 .graph-retry:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
@@ -143,6 +149,30 @@
 .graph-tool:hover {
   background: var(--hover);
   color: var(--text);
+}
+
+/* 工具条上的文字按钮:与模块着色开关同为胶囊样式 */
+.graph-tool-text {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chrome-search-row-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.graph-tool-text:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.graph-tool-text:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .graph-notices {

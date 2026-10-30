@@ -1,6 +1,7 @@
 // 关系图谱的 Canvas 2D 绘制:模块轮廓 → 边 → 箭头 → 色环 → 节点 → 标签。纯绘制,不持有状态;
 // 颜色从 --graph-* CSS 自定义属性读取(跟随亮暗主题与主题色)。
 import type { ForceScene, SimLink, SimNode } from './useForceLayout'
+import { drawContainers, drawContainerLabel } from './drawContainers'
 import { drawHulls, drawRing, type ModuleColors, type ModuleDrawState } from './drawModules'
 import {
   GRAPH_EDGE,
@@ -20,6 +21,11 @@ export interface GraphColors {
   focus: string
   muted: string
   modules: ModuleColors
+  /** 原地展开容器的圆底与描边透明度 */
+  container: {
+    fillAlpha: number
+    strokeAlpha: number
+  }
 }
 
 export function readGraphColors(el: Element): GraphColors {
@@ -33,6 +39,10 @@ export function readGraphColors(el: Element): GraphColors {
     label: v('--graph-label'),
     focus: v('--graph-focus'),
     muted: v('--graph-muted'),
+    container: {
+      fillAlpha: parseFloat(v('--graph-container-fill-alpha')) || 0,
+      strokeAlpha: parseFloat(v('--graph-container-stroke-alpha')) || 0
+    },
     modules: {
       palette: Array.from({ length: GRAPH_MODULE_COLORS }, (_, i) => v(`--graph-module-${i + 1}`)),
       tone: {
@@ -201,8 +211,11 @@ function drawNodes(ctx: CanvasRenderingContext2D, input: DrawInput, related: Set
     const on = related.has(n.id)
     const a = alpha * (on || !hover.id ? 1 : dim)
     const ring = modules?.overlay.nodes.get(n.id)?.ring
-    if (modules && ring) drawRing(ctx, n, ring, modules, c.modules, a)
-    drawNode(ctx, n, c, n.id === hover.id && hover.t > 0.5, a)
+    // 容器的圆底与名称单独绘制,这里跳过它的实心圆与色环
+    if (!n.data.isContainer) {
+      if (modules && ring) drawRing(ctx, n, ring, modules, c.modules, a)
+      drawNode(ctx, n, c, n.id === hover.id && hover.t > 0.5, a)
+    }
     if (n.id === input.selectedId) drawSelection(ctx, n, c.focus, alpha)
   }
 }
@@ -220,8 +233,11 @@ export function drawGraph(ctx: CanvasRenderingContext2D, input: DrawInput): void
   const hullAlpha = (moduleId: string): number =>
     alpha * (!hover.id || (mode === 'module' && moduleId === hoverModule) ? 1 : dim)
 
+  const containerAlpha = (n: SimNode): number => alpha * (related.has(n.id) || !hover.id ? 1 : dim)
+
   ctx.font = `${input.fontPx}px ${input.fontFamily}`
   ctx.textAlign = 'center'
+  drawContainers(ctx, scene.nodes, c, containerAlpha, hover.id, hover.t)
   if (modules) drawHulls(ctx, scene, modules, c.modules, labelBase, hullAlpha)
   for (const l of scene.links) {
     const on = isRelatedLink(l)
@@ -232,7 +248,8 @@ export function drawGraph(ctx: CanvasRenderingContext2D, input: DrawInput): void
   for (const n of scene.nodes) {
     const on = related.has(n.id)
     const a = on ? Math.max(labelBase, hover.t) : labelBase * (hover.id ? dim : 1)
-    drawLabel(ctx, n, c.label, alpha * a)
+    if (n.data.isContainer) drawContainerLabel(ctx, n, c, alpha * a)
+    else drawLabel(ctx, n, c.label, alpha * a)
   }
   ctx.globalAlpha = 1
 }
