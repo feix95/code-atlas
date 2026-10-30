@@ -148,6 +148,36 @@ try {
       )
     }, channel)
   const shot = (name: string) => page.screenshot({ path: join(run, 'shots', `${name}.png`) })
+  /** 读屏清单聚焦某节点后,画布上强调色最密的一点即节点圆心(连线只有一两像素宽) */
+  const canvasFocusPoint = () =>
+    page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>('.graph-canvas')
+      const ctx = c?.getContext('2d')
+      if (!c || !ctx) return null
+      const probe = document.createElement('canvas').getContext('2d')
+      if (!probe) return null
+      probe.fillStyle = getComputedStyle(c).getPropertyValue('--graph-focus').trim()
+      probe.fillRect(0, 0, 1, 1)
+      const [fr, fg, fb] = probe.getImageData(0, 0, 1, 1).data
+      const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height)
+      const isFocus = (x: number, y: number): boolean => {
+        const i = (y * width + x) * 4
+        return Math.abs(data[i] - fr) + Math.abs(data[i + 1] - fg) + Math.abs(data[i + 2] - fb) < 24
+      }
+      let best = { x: -1, y: -1, n: 0 }
+      for (let y = 4; y < height - 4; y += 2) {
+        for (let x = 4; x < width - 4; x += 2) {
+          if (!isFocus(x, y)) continue
+          let n = 0
+          for (let dy = -4; dy <= 4; dy += 2)
+            for (let dx = -4; dx <= 4; dx += 2) n += isFocus(x + dx, y + dy) ? 1 : 0
+          if (n > best.n) best = { x, y, n }
+        }
+      }
+      const rect = c.getBoundingClientRect()
+      const scale = c.width / rect.width
+      return best.n >= 20 ? { x: rect.left + best.x / scale, y: rect.top + best.y / scale } : null
+    })
   /** 截一块区域量「墨迹」宽度:按列看明暗差,有字的列对比高、纯底色列没有(明暗主题通用) */
   const inkWidth = async (clip: { x: number; y: number; width: number; height: number }) => {
     const png = await page.screenshot({ clip })
@@ -1647,34 +1677,7 @@ try {
   // 读屏清单聚焦 c.ts -> 画布把它画成强调色;找强调色最密的一点即节点圆心(连线只有一两像素宽)
   await page.getByRole('button', { name: /^文件 c\.ts/ }).focus()
   await page.waitForTimeout(400)
-  const hit = await page.evaluate(() => {
-    const c = document.querySelector<HTMLCanvasElement>('.graph-canvas')
-    const ctx = c?.getContext('2d')
-    if (!c || !ctx) return null
-    const probe = document.createElement('canvas').getContext('2d')
-    if (!probe) return null
-    probe.fillStyle = getComputedStyle(c).getPropertyValue('--graph-focus').trim()
-    probe.fillRect(0, 0, 1, 1)
-    const [fr, fg, fb] = probe.getImageData(0, 0, 1, 1).data
-    const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height)
-    const isFocus = (x: number, y: number): boolean => {
-      const i = (y * width + x) * 4
-      return Math.abs(data[i] - fr) + Math.abs(data[i + 1] - fg) + Math.abs(data[i + 2] - fb) < 24
-    }
-    let best = { x: -1, y: -1, n: 0 }
-    for (let y = 4; y < height - 4; y += 2) {
-      for (let x = 4; x < width - 4; x += 2) {
-        if (!isFocus(x, y)) continue
-        let n = 0
-        for (let dy = -4; dy <= 4; dy += 2)
-          for (let dx = -4; dx <= 4; dx += 2) n += isFocus(x + dx, y + dy) ? 1 : 0
-        if (n > best.n) best = { x, y, n }
-      }
-    }
-    const rect = c.getBoundingClientRect()
-    const scale = c.width / rect.width
-    return best.n >= 20 ? { x: rect.left + best.x / scale, y: rect.top + best.y / scale } : null
-  })
+  const hit = await canvasFocusPoint()
   assert.ok(hit, 'focused node must be painted in the focus color on the canvas')
   await page.locator('.graph-view').focus()
   await page.waitForTimeout(300)
@@ -1708,6 +1711,125 @@ try {
   await toggle.click()
   await page.waitForFunction(
     () => Number(document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls')) > 0
+  )
+  // 关系图谱层级(P2):回到根层 -> 双击 app 原地展开(不进入)-> 子文件在清单里标出所在容器
+  // -> 双击容器空白处收起 -> 「展开两级」按深度与上限展开 -> 「全部收起」
+  await page.locator('.graph-view').focus()
+  await page.keyboard.press('Backspace')
+  await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
+  // 等层级淡入结束再取色:淡入中的强调色混着底色,探针认不出
+  await page.waitForTimeout(1_200)
+  await page.getByRole('button', { name: /^文件夹 app/ }).focus()
+  await page.waitForTimeout(600)
+  const appPoint = await canvasFocusPoint()
+  assert.ok(appPoint, 'root app folder must be painted in the focus color')
+  await page.mouse.dblclick(appPoint.x, appPoint.y)
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.graph-canvas')?.getAttribute('data-graph-dir') === '' &&
+      document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '1',
+    undefined,
+    { timeout: 5_000 }
+  )
+  assert.match(
+    (await page.getByRole('button', { name: /^文件 a\.ts\(.+?\),在文件夹 app 内/ }).innerText()) ??
+      '',
+    /属于模块 app · /,
+    'expanded folder keeps its level and annotates children with their container'
+  )
+  await shot('graph-levels')
+  // 收起:等布局稳定,测出每个子项圆心,在容器里挑一个离所有子项最远的点双击(点在子项上会打开文件)
+  await page.waitForTimeout(2_500)
+  const childPoints: Array<{ x: number; y: number }> = []
+  for (const name of ['a', 'b', 'c', 'd', 'style']) {
+    await page
+      .getByRole('button', {
+        name: new RegExp(`^文件 ${name}\\.(?:ts|css)\\(.+?\\),在文件夹 app 内`)
+      })
+      .focus()
+    await page.waitForTimeout(300)
+    const point = await canvasFocusPoint()
+    if (point) childPoints.push(point)
+  }
+  assert.equal(childPoints.length, 5, 'all five expanded children must be probeable')
+  const panelBox = await panel.boundingBox()
+  await page.keyboard.press('Escape')
+  await panel.waitFor({ state: 'detached' })
+  const inPanel = (p: { x: number; y: number }): boolean =>
+    panelBox !== null &&
+    p.x >= panelBox.x - 8 &&
+    p.x <= panelBox.x + panelBox.width + 8 &&
+    p.y >= panelBox.y - 8 &&
+    p.y <= panelBox.y + panelBox.height + 8
+  const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+    Math.hypot(a.x - b.x, a.y - b.y)
+  // 展开后容器会随布局小幅移动:用子项质心当容器中心,单击侧栏标题确认命中的是容器
+  const centroid = {
+    x: childPoints.reduce((sum, p) => sum + p.x, 0) / childPoints.length,
+    y: childPoints.reduce((sum, p) => sum + p.y, 0) / childPoints.length
+  }
+  const clearanceOf = (p: { x: number; y: number }): number =>
+    Math.min(...childPoints.map((child) => distance(child, p)))
+  const candidates: Array<{ x: number; y: number }> = []
+  for (let step = 0; step < 16; step++) {
+    const angle = (step / 16) * Math.PI * 2
+    for (let f = 0; f <= 12; f += 3) {
+      const candidate = {
+        x: centroid.x + Math.cos(angle) * f,
+        y: centroid.y + Math.sin(angle) * f
+      }
+      if (!inPanel(candidate)) candidates.push(candidate)
+    }
+  }
+  candidates.sort((a, b) => clearanceOf(b) - clearanceOf(a))
+  let collapsePoint: { x: number; y: number } | null = null
+  for (const candidate of candidates) {
+    await page.mouse.click(candidate.x, candidate.y)
+    const opened = await panel
+      .waitFor({ state: 'visible', timeout: 800 })
+      .then(() => true)
+      .catch(() => false)
+    if (!opened) continue
+    const title = await panel.locator('.graph-panel-title').innerText()
+    await page.keyboard.press('Escape')
+    await panel.waitFor({ state: 'detached' })
+    if (title === 'app') {
+      collapsePoint = candidate
+      break
+    }
+  }
+  assert.ok(collapsePoint, 'a blank spot inside the container must be clickable')
+  assert.ok(
+    clearanceOf(collapsePoint) > 12,
+    `container blank spot too close to a child (${clearanceOf(collapsePoint).toFixed(1)}px)`
+  )
+  // 单击试探留下的点击计数要先散掉,否则双击会被浏览器合并成三击
+  await page.mouse.move(1240, 70)
+  await page.waitForTimeout(600)
+  await page.mouse.dblclick(collapsePoint.x, collapsePoint.y)
+  await page.waitForFunction(
+    () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '0',
+    undefined,
+    { timeout: 5_000 }
+  )
+  assert.equal(
+    await page.getByRole('button', { name: /^文件 a\.ts/ }).count(),
+    0,
+    'collapsing removes the children from the node list'
+  )
+  await page.keyboard.press('Escape')
+  const expandTwo = page.getByRole('button', { name: '展开两级', exact: true })
+  await expandTwo.click()
+  await page.waitForFunction(
+    () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '4'
+  )
+  assert.ok(
+    (await page.locator('.graph-a11y button').count()) <= 150,
+    'two-level expansion stays under the node cap'
+  )
+  await page.getByRole('button', { name: '全部收起', exact: true }).click()
+  await page.waitForFunction(
+    () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '0'
   )
   await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
   await page.locator('.graph-view').waitFor({ state: 'detached' })

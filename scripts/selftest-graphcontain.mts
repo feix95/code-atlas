@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { forceSimulation } from 'd3-force'
+import { forceLink, forceSimulation } from 'd3-force'
 import { GRAPH_NODE, GRAPH_ZOOM } from '../src/renderer/src/graph/graphConfig.ts'
 import {
   clampToContainers,
@@ -7,7 +7,17 @@ import {
   forceContain,
   type ContainNode
 } from '../src/renderer/src/graph/forceContain.ts'
-import { buildScene } from '../src/renderer/src/graph/useForceLayout.ts'
+import {
+  forceChargeOutsideContainers,
+  forcePairCollide
+} from '../src/renderer/src/graph/forceGroups.ts'
+import { forceCluster } from '../src/renderer/src/graph/forceCluster.ts'
+import {
+  buildScene,
+  createSimulation,
+  type SimLink,
+  type SimNode
+} from '../src/renderer/src/graph/useForceLayout.ts'
 import type { VisibleGraph } from '../src/shared/visibleGraph.ts'
 
 // 容器布局自测:半径随子项单调不减;约束力把越界子项拉回父容器;
@@ -142,6 +152,99 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   assert.equal(leaf.parent, inner)
   assert.ok(inner.r > GRAPH_NODE.folderRadiusMax, '容器半径来自子项,不是文件夹基础半径')
   assert.ok(outer.r > inner.r, '父容器半径包含子容器')
+}
+
+// 成对碰撞:祖先与后代紧挨着也不互相推;无亲缘关系的两圆按半径加间隙分开
+{
+  const parent = node('p', 0, 0, 50, 1)
+  const child = node('c', 4, 0, 10, 2)
+  child.parent = parent
+  const nested = forcePairCollide<TestNode>(6)
+  nested.initialize([parent, child], () => 0.5)
+  nested(1)
+  assert.equal(parent.x, 0, '父容器不被子项推动')
+  assert.equal(child.x, 4, '子项不被父容器推出')
+
+  const a = node('a', 0, 0, 10)
+  const b = node('b', 5, 0, 10)
+  const apart = forcePairCollide<TestNode>(6)
+  apart.initialize([a, b], () => 0.5)
+  apart(1)
+  const gap = Math.hypot(b.x - a.x, b.y - a.y)
+  assert.ok(gap >= 10 + 10 + 12 - 1e-6, `无关节点要分开(实测 ${gap.toFixed(1)})`)
+}
+
+// 点电荷斥力:容器不参与,文件之间照常互斥
+{
+  const box = node('box', 0, 0, 50)
+  const a = node('a', 1, 0, 6)
+  const b = node('b', -1, 0, 6)
+  const charge = forceChargeOutsideContainers<TestNode>(-280, 900, (n) => n.id === 'box')
+  const sim = forceSimulation([box, a, b]).force('charge', charge).stop()
+  sim.tick()
+  assert.equal(box.vx, 0, '容器不受点电荷斥力')
+  assert.equal(box.vy, 0)
+  assert.notEqual(a.vx, 0, '文件之间仍有斥力')
+}
+
+// 回归:展开容器后布局静止.子项被夹在容器里,若照常互斥会推着容器无限漂移
+{
+  const files = ['a', 'b', 'c', 'd', 'style'].map((name) => ({
+    id: `app/${name}.ts`,
+    kind: 'file' as const,
+    label: `${name}.ts`,
+    degree: 1,
+    descendantFiles: 0,
+    depth: 2,
+    parentId: 'app'
+  }))
+  const level: VisibleGraph = {
+    dirRel: '',
+    lazy: false,
+    edges: [
+      { from: 'app/a.ts', to: 'lib1.ts', weight: 1 },
+      { from: 'app/b.ts', to: 'lib1.ts', weight: 1 },
+      { from: 'app/c.ts', to: 'lib2.ts', weight: 1 },
+      { from: 'app/d.ts', to: 'lib2.ts', weight: 1 }
+    ],
+    nodes: [
+      {
+        id: 'app',
+        kind: 'folder',
+        label: 'app',
+        degree: 0,
+        descendantFiles: 5,
+        depth: 1,
+        isContainer: true
+      },
+      ...files,
+      { id: 'lib1.ts', kind: 'file', label: 'lib1.ts', degree: 2, descendantFiles: 0, depth: 1 },
+      { id: 'lib2.ts', kind: 'file', label: 'lib2.ts', degree: 2, descendantFiles: 0, depth: 1 }
+    ]
+  }
+  const scene = buildScene(level, null)
+  const sim = createSimulation(
+    () => {},
+    forceCluster<SimNode>(() => null, 0)
+  )
+  sim.nodes(scene.nodes)
+  const link = sim.force('link') as ReturnType<typeof forceLink<SimNode, SimLink>>
+  link.links(scene.links)
+  sim.stop().alpha(1)
+  for (let i = 0; i < 300; i++) {
+    sim.tick()
+    clampToContainers(scene.nodes)
+  }
+  const app = scene.nodes.find((n) => n.data.isContainer)
+  assert.ok(app, '场景里有展开容器')
+  const before = { x: app.x, y: app.y }
+  sim.alpha(0.3)
+  for (let i = 0; i < 300; i++) {
+    sim.tick()
+    clampToContainers(scene.nodes)
+  }
+  const drift = Math.hypot(app.x - before.x, app.y - before.y)
+  assert.ok(drift < 20, `重组后容器应留在原地(实测漂移 ${drift.toFixed(1)})`)
 }
 
 console.log('selftest-graphcontain: 全部通过')

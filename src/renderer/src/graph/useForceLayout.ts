@@ -2,9 +2,7 @@
 // 只做温和重排;切换层级时新节点从原点附近出生,首帧之前同步预跑到接近稳定。模拟只算坐标,不碰 DOM。
 import { useCallback, useEffect, useRef } from 'react'
 import {
-  forceCollide,
   forceLink,
-  forceManyBody,
   forceSimulation,
   forceX,
   forceY,
@@ -15,6 +13,7 @@ import type { LevelNode, VisibleGraph, VisibleNode } from '@shared/graphView'
 import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig.ts'
 import { forceCluster, type ClusterForce } from './forceCluster.ts'
 import { clampToContainers, containerRadius, forceContain } from './forceContain.ts'
+import { forceChargeOutsideContainers, forcePairCollide } from './forceGroups.ts'
 import { settleLayout } from './settleLayout.ts'
 
 export interface SimNode extends SimulationNodeDatum {
@@ -109,7 +108,7 @@ export function buildScene(level: VisibleGraph, prev: ForceScene | null): ForceS
   return { dirRel: level.dirRel, nodes, links }
 }
 
-function createSimulation(
+export function createSimulation(
   onTick: () => void,
   cluster: ClusterForce<SimNode>
 ): Simulation<SimNode, SimLink> {
@@ -117,9 +116,11 @@ function createSimulation(
     .velocityDecay(GRAPH_FORCE.velocityDecay)
     .force(
       'charge',
-      forceManyBody<SimNode>()
-        .strength(GRAPH_FORCE.charge)
-        .distanceMax(GRAPH_FORCE.chargeMaxDistance)
+      forceChargeOutsideContainers<SimNode>(
+        GRAPH_FORCE.charge,
+        GRAPH_FORCE.chargeMaxDistance,
+        (node) => node.data.isContainer === true
+      )
     )
     .force(
       'link',
@@ -130,10 +131,7 @@ function createSimulation(
     )
     .force('x', forceX<SimNode>(0).strength(GRAPH_FORCE.gravity))
     .force('y', forceY<SimNode>(0).strength(GRAPH_FORCE.gravity))
-    .force(
-      'collide',
-      forceCollide<SimNode>((n) => n.r + GRAPH_FORCE.collidePadding)
-    )
+    .force('collide', forcePairCollide<SimNode>(GRAPH_FORCE.collidePadding))
     .force('cluster', cluster)
     .force('contain', forceContain<SimNode>())
     .on('tick', onTick)

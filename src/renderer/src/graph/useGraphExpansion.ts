@@ -1,7 +1,8 @@
 // 图谱的展开状态:持有展开集合,组合 shared/expansion 的纯逻辑。
-// 焦点切换由层级访问序号(visit)判定,旧层级的集合直接作废,不靠 effect 回写状态;
+// 焦点切换由层级访问序号(visit)判定,旧层级的集合直接作废;换层后的第一次展开必须写入状态,
+// 所以用 visitRef 判定迟到结果,而不是拿可能与序号脱节的状态做比较。
 // lazy 文件夹先按需扫描;可见图超限时自动收回最近的展开并给出状态。
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, ScanDirNode } from '@shared/types'
 import type { GroupTree } from '@shared/hierarchy'
 import {
@@ -101,8 +102,14 @@ export function useGraphExpansion({
     [resolved.level, effective]
   )
 
+  const visitRef = useRef(visit)
+  useEffect(() => {
+    visitRef.current = visit
+  }, [visit])
+
   const commit = useCallback((ids: ReadonlySet<string>, forVisit: number): void => {
-    setState((prev) => (prev.visit === forVisit ? { visit: forVisit, ids } : prev))
+    if (visitRef.current !== forVisit) return
+    setState({ visit: forVisit, ids })
   }, [])
   const reject = useCallback((reason: ExpansionRejection, forVisit: number): void => {
     setLocalNotice({ visit: forVisit, notice: { kind: 'rejected', reason } })
