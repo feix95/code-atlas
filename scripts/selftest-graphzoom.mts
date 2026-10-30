@@ -9,7 +9,7 @@ function node(id: string, r: number, depth = 1, isFolder = true): ZoomNode {
   return { id, r, depth, isFolder }
 }
 
-const rules = { expandPx: 72, collapsePx: 48, autoExpandDepth: 2 }
+const rules = { expandPx: 72, collapsePx: 48, autoExpandDepth: 2, minScale: 0.2 }
 
 // 直径 = 2 × r × k:37 → 74 跨过 72,展开
 assert.deepEqual(zoomDecisions([node('a', 37)], 1, new Set(), rules), {
@@ -65,6 +65,18 @@ assert.deepEqual(zoomDecisions([node('deep', 80, 2)], 1, new Set(['deep']), rule
 assert.deepEqual(zoomDecisions([node('deep', 20, 3)], 1, new Set(['deep']), rules), {
   expand: [],
   collapse: ['deep']
+})
+
+// 缩到最小比例后继续往小滚 = 回到总览:大容器在这个比例下直径仍超过 collapsePx
+// (容器半径 200 × 0.2 × 2 = 80 > 48),不加这条会永远收不回去
+assert.deepEqual(zoomDecisions([node('big', 200)], 0.2, new Set(['big']), rules), {
+  expand: [],
+  collapse: ['big']
+})
+// 还没到下限就按常规阈值判定
+assert.deepEqual(zoomDecisions([node('big', 200)], 0.21, new Set(['big']), rules), {
+  expand: [],
+  collapse: []
 })
 
 // 默认配置来自 GRAPH_ZOOM
