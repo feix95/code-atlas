@@ -17,7 +17,13 @@ import {
   stepHoverMode
 } from '../src/renderer/src/graph/hoverModes.ts'
 import { nextGesture, takeSteps, wheelDeltaPx } from '../src/renderer/src/graph/wheelIntent.ts'
-import { GRAPH_MODULE_COLORS, GRAPH_WHEEL } from '../src/renderer/src/graph/graphConfig.ts'
+import {
+  GRAPH_MODULE_COLORS,
+  GRAPH_TIP,
+  GRAPH_WHEEL
+} from '../src/renderer/src/graph/graphConfig.ts'
+import { nodeTipText, tipPlacement } from '../src/renderer/src/graph/nodeTip.ts'
+import type { LevelNode } from '../src/shared/graphView.ts'
 
 const PALETTE = Array.from({ length: GRAPH_MODULE_COLORS }, (_, i) => `#00000${i}`)
 const TONE = { sat: 50, lightA: 40, lightB: 55 }
@@ -136,7 +142,100 @@ function checkWheel(): void {
   assert.equal(takeSteps(zoom, 500).steps, 0, '缩放手势不走步')
 }
 
+function checkNodeTip(): void {
+  const node = (kind: LevelNode['kind'], extra: Partial<LevelNode> = {}): LevelNode => ({
+    id: 'src/graph.ts',
+    kind,
+    label:
+      kind === 'file'
+        ? 'graph.ts'
+        : kind === 'folder'
+          ? 'src'
+          : kind === 'overflow'
+            ? '其余 7 项'
+            : 'shared',
+    degree: 3,
+    descendantFiles: kind === 'folder' ? 12 : 0,
+    ...extra
+  })
+  const signals = { hasModules: true, moduleName: '图谱 · graphView.ts', ringSegments: 3 }
+
+  assert.deepEqual(
+    nodeTipText(node('file'), signals),
+    { title: 'graph.ts', sub: '图谱 · graphView.ts' },
+    '文件:名称 + 所属模块'
+  )
+  assert.deepEqual(
+    nodeTipText(node('file', { id: 'README.md', label: 'README.md' }), {
+      ...signals,
+      moduleName: null
+    }),
+    { title: 'README.md', sub: '未归类' },
+    '没有归属模块的文件说未归类'
+  )
+  assert.deepEqual(
+    nodeTipText(node('file'), { ...signals, hasModules: false, moduleName: null }),
+    { title: 'graph.ts', sub: '' },
+    '模块数据不可用时不能硬说未归类'
+  )
+
+  assert.deepEqual(
+    nodeTipText(node('folder'), signals),
+    { title: 'src', sub: '主要 图谱 · graphView.ts' },
+    '文件夹:占比过半的模块说「主要」'
+  )
+  assert.deepEqual(
+    nodeTipText(node('folder'), { ...signals, moduleName: null }),
+    { title: 'src', sub: '跨 3 个模块' },
+    '文件夹:没有过半模块时说跨几个模块'
+  )
+  assert.deepEqual(
+    nodeTipText(node('folder'), { ...signals, moduleName: null, ringSegments: 0 }),
+    { title: 'src', sub: '12 个文件' },
+    '文件夹:没有模块构成时只报文件数'
+  )
+  assert.deepEqual(
+    nodeTipText(node('folder'), { hasModules: false, moduleName: null, ringSegments: 0 }),
+    { title: 'src', sub: '12 个文件' },
+    '模块数据不可用时文件夹仍有文件数'
+  )
+
+  assert.deepEqual(
+    nodeTipText(node('external', { target: 'folder' }), signals),
+    { title: 'shared', sub: '当前文件夹之外' },
+    '外部节点:说明它不在当前文件夹里'
+  )
+  assert.deepEqual(
+    nodeTipText(node('overflow', { hiddenCount: 7 }), signals),
+    { title: '其余 7 项', sub: '7 项未显示' },
+    'overflow 节点:报被收起的项数'
+  )
+
+  const view = { w: 800, h: 600 }
+  const size = { w: 160, h: 40 }
+  const { gapPx, edgePx } = GRAPH_TIP
+  assert.deepEqual(
+    tipPlacement({ x: 400, y: 300, r: 10 }, size, view),
+    { left: 320, top: 300 - 10 - gapPx - 40, side: 'top' },
+    '上方有位置:贴在节点上沿、水平居中'
+  )
+  const nearTop = tipPlacement({ x: 400, y: 20, r: 10 }, size, view)
+  assert.equal(nearTop.side, 'bottom', '贴着画布上边:翻到节点下方')
+  assert.equal(nearTop.top, 20 + 10 + gapPx)
+  const nearBottom = tipPlacement({ x: 400, y: 595, r: 10 }, size, { w: 800, h: 600 })
+  assert.ok(nearBottom.top <= 600 - edgePx - size.h, '贴着下边:气泡不越出画布')
+  assert.equal(tipPlacement({ x: 5, y: 300, r: 10 }, size, view).left, edgePx, '左边越界:夹回画布')
+  assert.equal(
+    tipPlacement({ x: 795, y: 300, r: 10 }, size, view).left,
+    800 - edgePx - 160,
+    '右边越界:夹回画布'
+  )
+  const tiny = tipPlacement({ x: 20, y: 20, r: 5 }, size, { w: 100, h: 60 })
+  assert.ok(tiny.left >= edgePx && tiny.top >= edgePx, '画布比气泡还窄:落在左上角,不出负数')
+}
+
 checkColors()
 checkHoverModes()
 checkWheel()
+checkNodeTip()
 console.log('selftest-graphhover: 全部通过')

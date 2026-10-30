@@ -18,6 +18,8 @@ import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
 import { Crumbs, NodeList } from './GraphNodeList'
 import { GraphHoverTag } from './GraphHoverTag'
+import { GraphNodeTip } from './GraphNodeTip'
+import { nodeTipText } from '../graph/nodeTip'
 import { ModuleToggle } from './GraphModuleToggle'
 import { footText } from '../graph/graphFootText'
 import { GraphSidePanel } from './GraphSidePanel'
@@ -208,7 +210,14 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     const info = moduleId ? overlay.byId.get(moduleId) : undefined
     return info ? moduleDisplayName(info) : null
   }
+  const nodeTipOf = (node: LevelNode): { title: string; sub: string } =>
+    nodeTipText(node, {
+      hasModules: moduleMap !== null && moduleMap.modules.length > 0,
+      moduleName: moduleNameOf(node.id),
+      ringSegments: overlay.nodes.get(node.id)?.ring.length ?? 0
+    })
   const tag = hoverMode.tag
+  const hover = hoverMode.hover
   const tagModule = tag ? hoverModuleOf(tag.nodeId) : null
   const scanning = nav.status.kind === 'scanning'
   const empty = !scanning && level !== null && level.nodes.length === 0
@@ -277,6 +286,10 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           tag={tag}
           elsewhere={tagModule ? (overlay.elsewhere.get(tagModule) ?? 0) : 0}
         />
+      )}
+      {/* 看法标签亮着时提示框让位;拖拽中先收起,松手后再亮 */}
+      {hover && !hover.dragging && !tag && (
+        <GraphNodeTip key={hover.node.id} anchor={hover} text={nodeTipOf(hover.node.data)} />
       )}
       {selection.selected && (
         <GraphSidePanel

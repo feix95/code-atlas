@@ -129,6 +129,16 @@ export const GRAPH_MODULE_GEN = {
   hueStep: 137.508
 } as const
 
+/** 悬停提示框 */
+export const GRAPH_TIP = {
+  /** 悬停多久才亮(ms):鼠标扫过节点时不闪 */
+  delayMs: 300,
+  /** 气泡与节点边缘的间距(屏幕像素) */
+  gapPx: 10,
+  /** 气泡离画布边缘的最小距离(屏幕像素) */
+  edgePx: 8
+} as const
+
 /** 滚轮手势(见 wheelIntent.ts) */
 export const GRAPH_WHEEL = {
   /** 鼠标在节点上停够这么久(ms),滚轮才切看法;刚划过节点就滚轮仍是缩放 */

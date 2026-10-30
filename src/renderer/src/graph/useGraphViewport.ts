@@ -21,6 +21,17 @@ export interface ViewportSize {
   dpr: number
 }
 
+/** 悬停(或拖拽中)的节点及其屏幕落位:提示框贴在它上方 */
+export interface HoverTarget {
+  node: SimNode
+  /** 节点圆心的画布内像素坐标与缩放后的半径 */
+  x: number
+  y: number
+  r: number
+  /** 拖拽中:高亮照旧,但提示框先收起,松手后再亮 */
+  dragging: boolean
+}
+
 export interface ViewportDeps extends WheelDeps {
   setDragging: (dragging: boolean) => void
   /** 单击节点(按下后没拖动):选中 */
@@ -29,7 +40,7 @@ export interface ViewportDeps extends WheelDeps {
   onBlankClick: () => void
   onNodeDoubleClick: (node: SimNode) => void
   onNodeContextMenu: (node: SimNode, clientX: number, clientY: number) => void
-  onHoverChange: (id: string | null) => void
+  onHoverChange: (hover: HoverTarget | null) => void
 }
 
 export interface GraphViewport {
@@ -87,19 +98,40 @@ function usePointer(
     depsRef.current = deps
   })
 
-  const setState = useCallback((next: Interaction): void => {
-    const prev = stateRef.current
-    stateRef.current = next
-    const d = depsRef.current
-    const canvas = d.canvasRef.current
-    if (canvas) {
-      canvas.style.cursor =
-        next.mode === 'panning' ? 'grabbing' : next.mode === 'idle' ? 'default' : 'pointer'
-    }
-    const prevId = prev.mode === 'hovering' || prev.mode === 'dragging-node' ? prev.node.id : null
-    const nextId = next.mode === 'hovering' || next.mode === 'dragging-node' ? next.node.id : null
-    if (prevId !== nextId) d.onHoverChange(nextId)
-  }, [])
+  const screenOf = useCallback(
+    (node: SimNode, dragging: boolean): HoverTarget => {
+      const tf = transformRef.current
+      return {
+        node,
+        x: tf.x + node.x * tf.k,
+        y: tf.y + node.y * tf.k,
+        r: node.r * tf.k,
+        dragging
+      }
+    },
+    [transformRef]
+  )
+
+  const setState = useCallback(
+    (next: Interaction): void => {
+      const prev = stateRef.current
+      stateRef.current = next
+      const d = depsRef.current
+      const canvas = d.canvasRef.current
+      if (canvas) {
+        canvas.style.cursor =
+          next.mode === 'panning' ? 'grabbing' : next.mode === 'idle' ? 'default' : 'pointer'
+      }
+      const prevId = prev.mode === 'hovering' || prev.mode === 'dragging-node' ? prev.node.id : null
+      const nextId = next.mode === 'hovering' || next.mode === 'dragging-node' ? next.node.id : null
+      if (prevId === nextId && prev.mode === next.mode) return
+      // 拖拽中照旧点亮邻居,只是提示框先收起(dragging)
+      if (next.mode === 'hovering' || next.mode === 'dragging-node')
+        d.onHoverChange(screenOf(next.node, next.mode === 'dragging-node'))
+      else d.onHoverChange(null)
+    },
+    [screenOf]
+  )
 
   useEffect(() => {
     const canvas = deps.canvasRef.current

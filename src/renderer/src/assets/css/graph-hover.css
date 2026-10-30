@@ -23,6 +23,42 @@
   color: var(--muted-2);
 }
 
+/* 悬停提示框:节点名称 + 所属模块;贴在节点上方,不吃鼠标 */
+.graph-node-tip {
+  position: absolute;
+  z-index: var(--z-float);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 20rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity var(--dur-2) ease;
+  pointer-events: none;
+}
+
+.graph-node-tip.is-shown {
+  opacity: 1;
+}
+
+.graph-node-tip-name,
+.graph-node-tip-sub {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.graph-node-tip-sub {
+  color: var(--muted);
+}
+
 .graph-color-picker {
   position: absolute;
   z-index: var(--z-popover);
