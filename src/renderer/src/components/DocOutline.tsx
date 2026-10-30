@@ -1,7 +1,7 @@
 import { useRef, useSyncExternalStore } from 'react'
 import { outlineDepths, type OutlineItem } from '../docOutline'
 import { getDocOutlineOpen, subscribeDocOutlineOpen, toggleDocOutlineOpen } from '../codePrefs'
-import type { OutlineDropTarget } from '../outlineDock'
+import type { SidebarDropTarget } from '../sidebarDock'
 import { useOutlinePlacement } from '../useOutlinePlacement'
 import { TreeIcon } from './Icons'
 
@@ -38,7 +38,7 @@ export function DocOutline({
   canDock?: boolean
   onDock?: () => void
   /** 拖动落点(左栏):拖到它上面松手 = 停靠 */
-  dropTarget?: OutlineDropTarget
+  dropTarget?: SidebarDropTarget
 }): React.JSX.Element {
   const isOpen = useSyncExternalStore(subscribeDocOutlineOpen, getDocOutlineOpen)
   const dockRef = useRef<HTMLDivElement>(null)

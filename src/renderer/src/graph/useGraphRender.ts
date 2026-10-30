@@ -1,5 +1,5 @@
 // 关系图谱的渲染循环:按需 requestAnimationFrame(模拟 tick / 交互 / 过渡动画时才画),
-// 负责悬停过渡、切换层级的淡出淡入、主题变化时重读颜色、新层级首帧绘制前的自动适应画布。
+// 负责悬停过渡、切换层级的淡出淡入、主题变化时重读颜色、新层级首帧绘制前落一次视口。
 import { useCallback, useEffect, useRef } from 'react'
 import {
   drawGraph,
@@ -12,8 +12,7 @@ import type { ForceScene } from './useForceLayout'
 import type { ModuleDrawState } from './drawModules'
 import type { HoverMode } from './hoverModes'
 import type { ViewportSize } from './useGraphViewport'
-import { shouldAutoFit } from './fitView'
-import { GRAPH_MOTION, GRAPH_VIEW } from './graphConfig'
+import { GRAPH_MOTION } from './graphConfig'
 
 interface Typography {
   fontPx: number
@@ -32,7 +31,6 @@ export interface RenderRefs {
   sceneRef: React.RefObject<ForceScene | null>
   transformRef: React.RefObject<Transform>
   sizeRef: React.RefObject<ViewportSize>
-  alpha: () => number
   fit: () => void
   /** 划分叠加层(只用于当前层;淡出中的上一层不画) */
   modules: ModuleDrawState | null
@@ -73,12 +71,13 @@ interface LevelMotion {
   fromDir: string | null
 }
 
-/** 新层级布局稳定后(预跑后首帧即满足)、首次绘制之前适应一次画布 */
+/** 新层级首次绘制之前按内容落一次视口:打开即舒适比例,此后只随用户手动缩放平移 */
 function autoFitOnce(lv: LevelMotion, scene: ForceScene | null, r: RenderRefs): void {
   if (!scene || lv.autoFitted || scene.dirRel === lv.fromDir) return
-  if (r.alpha() >= GRAPH_VIEW.autoFitAlpha) return
+  // 画布尺寸还没量出来(刚挂上等):等下一帧,别把这一次落视口的机会用掉
+  if (r.sizeRef.current.w === 0) return
   lv.autoFitted = true
-  if (shouldAutoFit(scene, r.transformRef.current, r.sizeRef.current)) r.fit()
+  r.fit()
 }
 
 /** refs 由调用方在布局与视口就绪后填入(三者互相引用,经 ref 中转打破循环) */

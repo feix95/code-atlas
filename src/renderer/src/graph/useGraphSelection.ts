@@ -52,20 +52,16 @@ export interface NodeMenuActions {
   onActivate: () => void
 }
 
-/** 节点右键菜单:查看模块详情、更改模块颜色、打开文件 / 进入文件夹 */
+/** 节点右键菜单:查看模块详情、更改模块颜色(有归属模块才出)、打开文件 / 进入文件夹 */
 export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): ContextMenuEntry[] {
   const isFile = node.kind === 'file' || (node.kind === 'external' && node.target === 'file')
-  const noModule = actions.moduleId === null
   const items: ContextMenuEntry[] = [
-    { label: '查看模块详情', icon: 'component', run: actions.onDetails },
-    {
-      // 禁用的行没有悬停提示可用了(图谱菜单整张不挂提示),把原因写进 label
-      label: noModule ? '更改模块颜色(无归属模块)' : '更改模块颜色',
-      icon: 'palette',
-      disabled: noModule,
-      run: actions.onChangeColor
-    }
+    { label: '查看模块详情', icon: 'component', run: actions.onDetails }
   ]
+  // 没有归属模块的节点无从改色:整行不出,菜单宽度随最长一行收窄
+  if (actions.moduleId !== null) {
+    items.push({ label: '更改模块颜色', icon: 'palette', run: actions.onChangeColor })
+  }
   if (node.kind === 'overflow') return items
   items.push({
     label: isFile ? '打开文件' : '进入文件夹',

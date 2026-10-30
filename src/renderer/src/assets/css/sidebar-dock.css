@@ -1,7 +1,13 @@
-/* 文档大纲停靠在左栏:与文件树同处一块面板,中间只隔一条分割线,不再自带卡片边框与底色。
+/* 左栏停靠块(大纲、图谱节点详情共用):与文件树同处一块面板,中间只隔一条分割线,不再自带卡片边框与底色。
    两块各自滚动、各自的高度由拖分割线分配(比例记在本机),画法沿用左右分栏的分割条 token */
 
-.sidebar-outline {
+/* 停靠槽位:portal 把停靠块画进这里;display:contents 让分割线与面板直接成为 .sidebar-mid 的 flex 子项,
+   槽位本身不占任何版面 */
+.sidebar-dock-slot {
+  display: contents;
+}
+
+.sidebar-dock {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -10,12 +16,12 @@
   overflow: hidden;
 }
 
-.sidebar-outline:not(.is-sized) {
+.sidebar-dock:not(.is-sized) {
   max-height: 60%;
 }
 
-/* 文件树|大纲的分割线:热区 5px,细线画在中线上 */
-.sidebar-outline-sash {
+/* 文件树|停靠块的分割线:热区 5px,细线画在中线上 */
+.sidebar-dock-sash {
   flex: 0 0 5px;
   position: relative;
   cursor: row-resize;
@@ -24,7 +30,7 @@
   outline: none;
 }
 
-.sidebar-outline-sash::after {
+.sidebar-dock-sash::after {
   content: '';
   position: absolute;
   left: 0;
@@ -39,21 +45,21 @@
 }
 
 /* 悬停、键盘聚焦、拖动中:细线长成 4px 粗蓝条(与 .sash/.pane-sash 同一档) */
-.sidebar-outline-sash:hover::after,
-.sidebar-outline-sash:focus-visible::after,
-.sidebar-outline-sash.is-dragging::after {
+.sidebar-dock-sash:hover::after,
+.sidebar-dock-sash:focus-visible::after,
+.sidebar-dock-sash.is-dragging::after {
   height: 4px;
   background: var(--drop-mark);
 }
 
 /* 拖线期间光标一路跟着走;与左右分栏的 is-sash-dragging 同一做法,方向换上下 */
-body.is-outline-sash-dragging {
+body.is-dock-sash-dragging {
   cursor: row-resize;
   user-select: none;
 }
 
 /* 标题条也是拖出左栏的把手:按住往右拖过分界线,松手就放回浮窗 */
-.sidebar-outline-head {
+.sidebar-dock-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -65,19 +71,26 @@ body.is-outline-sash-dragging {
   user-select: none;
 }
 
-.sidebar-outline-head.is-dragging {
+.sidebar-dock-head.is-dragging {
   cursor: grabbing;
 }
 
-.sidebar-outline-title {
+.sidebar-dock-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--font-sm);
   color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sidebar-outline-undock {
+.sidebar-dock-undock,
+.sidebar-dock-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 1.5rem;
   height: 1.5rem;
   padding: 0;
@@ -88,7 +101,8 @@ body.is-outline-sash-dragging {
   cursor: pointer;
 }
 
-.sidebar-outline-undock:hover {
+.sidebar-dock-undock:hover,
+.sidebar-dock-close:hover {
   background: var(--hover);
   color: var(--text);
 }
@@ -106,7 +120,7 @@ body.is-outline-sash-dragging {
 }
 
 /* 拖出左栏时跟着鼠标的小牌:松手就放回浮窗 */
-.outline-ghost {
+.sidebar-dock-ghost {
   position: fixed;
   z-index: var(--z-tip);
   transform: translate(-50%, -50%);

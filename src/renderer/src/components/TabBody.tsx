@@ -110,6 +110,8 @@ export function TabBody({
         onLoadGraph={() => void handleLoadGraph()}
         expandLazy={expandLazy}
         onOpenFile={openPreview}
+        tabId={tab.id}
+        activeTabId={outlineDockOwner}
       />
     )
   }

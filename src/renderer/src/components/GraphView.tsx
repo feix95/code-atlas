@@ -35,6 +35,10 @@ interface GraphViewProps {
   onLoadGraph: () => void
   expandLazy: (relPath: string) => Promise<ScanDirNode | null>
   onOpenFile: (relPath: string) => void
+  /** 这扇图谱的页签 id:节点详情停靠时认它 */
+  tabId: string
+  /** 当前停靠位认的那张签(App 按主窗激活组算) */
+  activeTabId: string | null
 }
 
 export function GraphView(props: GraphViewProps): React.JSX.Element {
@@ -73,6 +77,7 @@ const isFolderTarget = (d: LevelNode): boolean =>
 function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.Element {
   const { result, graph, graphLoading, graphNote, onLoadGraph, expandLazy, onOpenFile } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const viewRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<RenderRefs | null>(null)
   const render = useGraphRender(linkRef)
   const nav = useGraphNav({
@@ -175,7 +180,6 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       sceneRef: layout.sceneRef,
       transformRef: viewport.transformRef,
       sizeRef: viewport.sizeRef,
-      alpha: layout.alpha,
       fit: viewport.fit,
       modules: modulesOn ? { overlay, overrides } : null,
       hoverMode: hoverMode.mode,
@@ -216,7 +220,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         ? '正在分析引用关系…'
         : null
   return (
-    <div className="graph-view" tabIndex={0} onKeyDown={onKeyDown} aria-label="关系图谱">
+    <div
+      className="graph-view"
+      ref={viewRef}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      aria-label="关系图谱"
+    >
       <canvas
         ref={canvasRef}
         className="graph-canvas"
@@ -275,6 +285,9 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           depNodes={depNodes}
           dirRel={nav.dirRel}
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
+          viewRef={viewRef}
+          tabId={props.tabId}
+          activeTabId={props.activeTabId}
           onClose={selection.clear}
           onOpenFile={onOpenFile}
           onFocusFile={selection.focusFile}

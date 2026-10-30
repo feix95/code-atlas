@@ -117,7 +117,6 @@ export interface ForceLayout {
   sceneRef: React.RefObject<ForceScene | null>
   /** 拖拽开始 / 结束:保持热度或让模拟自然冷却 */
   setDragging: (dragging: boolean) => void
-  alpha: () => number
 }
 
 /** 节点 id → 聚类力所用的模块 id;null = 关闭聚类力(无模块数据或关闭「模块着色」) */
@@ -188,7 +187,5 @@ export function useForceLayout(
     if (dragging) sim.restart()
   }, [])
 
-  const alpha = useCallback(() => simRef.current?.alpha() ?? 0, [])
-
-  return { sceneRef, setDragging, alpha }
+  return { sceneRef, setDragging }
 }

@@ -11,7 +11,7 @@
 // 靠 storage 事件回流对齐(删键 = 回默认)。
 
 import { readFlagPref, readPref, writeFlagPref, writePref } from '../../shared/localPrefs.ts'
-import { parseOutlinePlacement, type OutlinePlacement } from './outlinePlacement.ts'
+import { parseFloatPlacement, type FloatPlacement } from './floatPlacement.ts'
 
 export const CODE_WRAP_KEY = 'atlas.codeWrap'
 export const PREVIEW_READONLY_KEY = 'atlas.previewReadOnly'
@@ -20,6 +20,8 @@ export const PREVIEW_RENDER_KEY = 'atlas.previewRender'
 export const DOC_OUTLINE_KEY = 'atlas.docOutline'
 /** 文档大纲浮窗的位置与手动尺寸(JSON,全局一档;上屏前按当前预览栏夹一遍) */
 export const DOC_OUTLINE_PLACEMENT_KEY = 'atlas.docOutlinePlacement'
+/** 图谱节点详情浮窗的位置与手动尺寸(JSON,全局一档;上屏前按当前画布夹一遍) */
+export const GRAPH_PANEL_PLACEMENT_KEY = 'atlas.graphPanelPlacement'
 
 /** 一颗开关旗的小状态表:内存读数 + localStorage 落盘 + 订阅广播 + 跨 realm 回流 */
 function flagPref(
@@ -111,31 +113,62 @@ export function toggleDocOutlineOpen(): void {
   outlineOpen.set(!outlineOpen.get())
 }
 
-/** 大纲摆放账:对象档,读回验身;子窗经 storage 事件回流对齐 */
-let outlinePlacement = parseOutlinePlacement(readPref<unknown>(DOC_OUTLINE_PLACEMENT_KEY, null))
-const placementListeners = new Set<() => void>()
-const applyPlacement = (next: OutlinePlacement): void => {
-  outlinePlacement = next
-  placementListeners.forEach((fn) => fn())
-}
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key !== DOC_OUTLINE_PLACEMENT_KEY) return
-    applyPlacement(parseOutlinePlacement(readPref<unknown>(DOC_OUTLINE_PLACEMENT_KEY, null)))
-  })
+/** 一套摆放账:对象档,读回验身;子窗经 storage 事件回流对齐 */
+function placementPref(key: string): {
+  get: () => FloatPlacement
+  subscribe: (fn: () => void) => () => void
+  set: (next: FloatPlacement) => void
+} {
+  let value = parseFloatPlacement(readPref<unknown>(key, null))
+  const listeners = new Set<() => void>()
+  const apply = (next: FloatPlacement): void => {
+    value = next
+    listeners.forEach((fn) => fn())
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+      if (e.key !== key) return
+      apply(parseFloatPlacement(readPref<unknown>(key, null)))
+    })
+  }
+  return {
+    get: () => value,
+    subscribe: (fn) => {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
+    set: (next) => {
+      apply(next)
+      writePref(key, next)
+    }
+  }
 }
 
-export function getOutlinePlacement(): OutlinePlacement {
-  return outlinePlacement
+const outlinePlacement = placementPref(DOC_OUTLINE_PLACEMENT_KEY)
+const graphPanelPlacement = placementPref(GRAPH_PANEL_PLACEMENT_KEY)
+
+export function getOutlinePlacement(): FloatPlacement {
+  return outlinePlacement.get()
 }
 
 export function subscribeOutlinePlacement(fn: () => void): () => void {
-  placementListeners.add(fn)
-  return () => placementListeners.delete(fn)
+  return outlinePlacement.subscribe(fn)
 }
 
 /** 唯一写口:翻账 → 落盘 → 喊醒本 realm 订阅者 */
-export function setOutlinePlacement(next: OutlinePlacement): void {
-  applyPlacement(next)
-  writePref(DOC_OUTLINE_PLACEMENT_KEY, next)
+export function setOutlinePlacement(next: FloatPlacement): void {
+  outlinePlacement.set(next)
+}
+
+export function getGraphPanelPlacement(): FloatPlacement {
+  return graphPanelPlacement.get()
+}
+
+export function subscribeGraphPanelPlacement(fn: () => void): () => void {
+  return graphPanelPlacement.subscribe(fn)
+}
+
+/** 唯一写口:翻账 → 落盘 → 喊醒本 realm 订阅者 */
+export function setGraphPanelPlacement(next: FloatPlacement): void {
+  graphPanelPlacement.set(next)
 }

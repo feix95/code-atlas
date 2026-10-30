@@ -36,7 +36,7 @@
 @import './css/markdown.css';
 @import './css/docx-preview.css';
 @import './css/doc-outline.css';
-@import './css/sidebar-outline.css';
+@import './css/sidebar-dock.css';
 @import './css/file-path-menu.css';
 @import './css/markdown-live-table.css';
 @import './css/markdown-live.css';
@@ -44,6 +44,7 @@
 @import './css/modelshelf-files.css';
 @import './css/graph.css';
 @import './css/graph-modules.css';
+@import './css/graph-panel.css';
 @import './css/graph-hover.css';
 @import './css/ui-workbench.css';
 @import './css/ui-workbench-overlay.css';

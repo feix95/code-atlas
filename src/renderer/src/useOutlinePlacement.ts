@@ -13,25 +13,19 @@ import {
 import { getOutlinePlacement, setOutlinePlacement, subscribeOutlinePlacement } from './codePrefs'
 import {
   capToContent,
-  clampCollapsed,
   clampPlacement,
   isDragStarted,
-  moveCollapsed,
   movePlacement,
   resizePlacement,
+  sameFloatBounds,
   settleResize,
   snapFrame,
-  type OutlineBounds,
-  type OutlinePlacement
-} from './outlinePlacement'
-import {
-  measureBounds,
-  measureWidestItem,
-  remPx,
-  sameBounds,
-  type OutlineRefs
-} from './outlineMeasure'
-import type { OutlineDropTarget } from './outlineDock'
+  type FitBounds,
+  type FloatPlacement
+} from './floatPlacement'
+import { clampCollapsed, moveCollapsed } from './outlinePlacement'
+import { measureBounds, measureWidestItem, remPx, type OutlineRefs } from './outlineMeasure'
+import type { SidebarDropTarget } from './sidebarDock'
 
 /** 方向键一步挪多远(rem);按住 Shift 走大步 */
 const NUDGE_REM = 1
@@ -46,16 +40,16 @@ interface Gesture {
   pointerId: number
   x: number
   y: number
-  start: OutlinePlacement & { right: number; top: number }
+  start: FloatPlacement & { right: number; top: number }
   from: { width: number; height: number }
-  bounds: OutlineBounds
-  last: OutlinePlacement
+  bounds: FitBounds
+  last: FloatPlacement
   /** 挪够 DRAG_START_PX 才为 true;没挪够的松手什么都不改 */
   hasMoved: boolean
 }
 
 /** 本地 live 账(只在内存,从不落盘):drag = 手势进行中(不受内容尺寸限制),snap = 松手后正在吸回内容尺寸 */
-type LivePlacement = { phase: 'drag' | 'snap'; placement: OutlinePlacement }
+type LivePlacement = { phase: 'drag' | 'snap'; placement: FloatPlacement }
 
 function arrowDelta(e: React.KeyboardEvent<HTMLElement>, step: number): [number, number] | null {
   const moves: Record<string, [number, number]> = {
@@ -69,12 +63,12 @@ function arrowDelta(e: React.KeyboardEvent<HTMLElement>, step: number): [number,
 
 /** 实测几何;最长条目宽按「条目或开合变了才重量」缓存(undefined = 待重量) */
 function useMeasure(refs: OutlineRefs): {
-  measure: () => OutlineBounds | null
+  measure: () => FitBounds | null
   invalidate: () => void
 } {
   const widestRef = useRef<number | null | undefined>(undefined)
   const { viewRef, dockRef, panelRef } = refs
-  const measure = useCallback((): OutlineBounds | null => {
+  const measure = useCallback((): FitBounds | null => {
     const panel = panelRef.current
     if (widestRef.current === undefined && panel) widestRef.current = measureWidestItem(panel)
     return measureBounds({ viewRef, dockRef, panelRef }, widestRef.current ?? null)
@@ -91,7 +85,7 @@ export function useOutlinePlacement(
   /** 条目列表的指纹(换了文档就变):变了要重量内容宽 */
   contentKey: unknown,
   /** 拖动落点(左栏能收留时才给):命中就在松手时改停靠,不再存位置账 */
-  dropTarget?: OutlineDropTarget
+  dropTarget?: SidebarDropTarget
 ): {
   style: React.CSSProperties | undefined
   isDragging: boolean
@@ -105,7 +99,7 @@ export function useOutlinePlacement(
 } {
   const stored = useSyncExternalStore(subscribeOutlinePlacement, getOutlinePlacement)
   const [live, setLive] = useState<LivePlacement | null>(null)
-  const [bounds, setBounds] = useState<OutlineBounds | null>(null)
+  const [bounds, setBounds] = useState<FitBounds | null>(null)
   const gestureRef = useRef<Gesture | null>(null)
   const snapTimerRef = useRef(0)
   const draggedRef = useRef(false)
@@ -126,17 +120,16 @@ export function useOutlinePlacement(
   const { measure, invalidate } = useMeasure(refs)
   // 位置夹边按屏上形态量:展开时手动宽高就是屏上的宽高;收起时只剩圆钮,存下的展开宽高不能拿来算
   const clampByForm = useCallback(
-    (p: OutlinePlacement, b: OutlineBounds) =>
-      isOpen ? clampPlacement(p, b) : clampCollapsed(p, b),
+    (p: FloatPlacement, b: FitBounds) => (isOpen ? clampPlacement(p, b) : clampCollapsed(p, b)),
     [isOpen]
   )
   // 挪位置同理:收起态的位移按圆钮尺寸夹,不然存的展开宽度会把圆钮拦在半路
   const moveByForm = useCallback(
     (
-      start: OutlinePlacement & { right: number; top: number },
+      start: FloatPlacement & { right: number; top: number },
       dx: number,
       dy: number,
-      b: OutlineBounds
+      b: FitBounds
     ) => (isOpen ? movePlacement(start, dx, dy, b) : moveCollapsed(start, dx, dy, b)),
     [isOpen]
   )
@@ -148,7 +141,7 @@ export function useOutlinePlacement(
     invalidate()
     const update = (): void => {
       const next = measure()
-      setBounds((prev) => (sameBounds(prev, next) ? prev : next))
+      setBounds((prev) => (sameFloatBounds(prev, next) ? prev : next))
     }
     update()
     const observer = new ResizeObserver(update)

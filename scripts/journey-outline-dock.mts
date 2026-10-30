@@ -6,7 +6,7 @@ import type { Locator, Page } from 'playwright'
 import { revealBar, waitHeadingNearTop } from './journey-outline-gesture.mts'
 
 const FLOAT = '.doc-outline.is-open:visible'
-const DOCK = '.sidebar-outline'
+const DOCK = '.sidebar-dock'
 const SIDEBAR_TOGGLE = '.tb-collapse .tb-btn'
 
 async function box(loc: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
@@ -20,18 +20,18 @@ async function dragOutOfSidebar(
   page: Page,
   sidebar: { x: number; y: number; width: number; height: number }
 ): Promise<void> {
-  const at = await box(page.locator(`${DOCK} .sidebar-outline-head`))
+  const at = await box(page.locator(`${DOCK} .sidebar-dock-head`))
   const from = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
   await page.mouse.move(from.x + 30, from.y, { steps: 3 })
   assert.equal(
-    await page.locator('.outline-ghost').count(),
+    await page.locator('.sidebar-dock-ghost').count(),
     0,
     'still inside the sidebar: no floating pill'
   )
   await page.mouse.move(sidebar.x + sidebar.width + 240, from.y + 30, { steps: 8 })
-  await page.locator('.outline-ghost').waitFor()
+  await page.locator('.sidebar-dock-ghost').waitFor()
   await page.mouse.up()
   await page.locator(FLOAT).waitFor()
   assert.equal(await page.locator(DOCK).count(), 0, 'drag out of the sidebar brings the float back')
@@ -88,7 +88,7 @@ async function waitLine(sash: Locator, want: number): Promise<void> {
 
 /** 按住分割线中线拖 dy:正向 = 往下(大纲变矮) */
 async function dragSash(page: Page, dy: number): Promise<void> {
-  const at = await box(page.locator('.sidebar-outline-sash'))
+  const at = await box(page.locator('.sidebar-dock-sash'))
   const x = at.x + at.width / 2
   const y = at.y + at.height / 2
   await page.mouse.move(x, y)
@@ -103,7 +103,7 @@ async function dragSash(page: Page, dy: number): Promise<void> {
  * 结束时高度已回到自适应。
  */
 async function checkDockSplitter(page: Page): Promise<void> {
-  const sash = page.locator('.sidebar-outline-sash')
+  const sash = page.locator('.sidebar-dock-sash')
   const panel = page.locator(DOCK)
   assert.equal(await sash.count(), 1, 'docked: exactly one divider between tree and outline')
   await page.mouse.move(1, 1)
@@ -188,7 +188,7 @@ export async function checkOutlineDock(
 
   // 6) 直接把抓手拖到左栏上方松手 = 停靠;最后用放回钮回到浮窗,不把停靠态留给后面的检查
   await dragIntoDock(page, sidebarBox)
-  await docked.locator('.sidebar-outline-undock').click()
+  await docked.locator('.sidebar-dock-undock').click()
   await page.locator(FLOAT).waitFor()
   assert.equal(await page.locator(DOCK).count(), 0, 'undock button returns the float')
   assert.equal(

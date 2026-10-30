@@ -1,5 +1,6 @@
 // 大纲浮窗的实测几何:预览栏/停靠坞/浮窗的框、最小宽高、内容宽,交给 outlinePlacement 的纯函数去算。
-import { outlineBounds, type OutlineBounds } from './outlinePlacement'
+import type { FitBounds } from './floatPlacement'
+import { outlineBounds } from './outlinePlacement'
 
 /** 离预览栏四边留的缝(rem) */
 const EDGE_GAP_REM = 0.5
@@ -23,7 +24,7 @@ export function remPx(el: HTMLElement): number {
 }
 
 /** CSS 长度(只认 rem/px)换成 px;认不出 = 不设上限 */
-function lengthPx(value: string, rem: number): number {
+export function lengthPx(value: string, rem: number): number {
   const n = parseFloat(value)
   if (!Number.isFinite(n)) return Infinity
   return value.trim().endsWith('rem') ? n * rem : n
@@ -96,7 +97,7 @@ function naturalHeight(panel: HTMLElement, css: CSSStyleDeclaration): number | n
 export function measureBounds(
   { viewRef, dockRef, panelRef }: OutlineRefs,
   widest: number | null
-): OutlineBounds | null {
+): FitBounds | null {
   const view = viewRef.current
   const dock = dockRef.current
   const panel = panelRef.current
@@ -131,12 +132,4 @@ export function measureBounds(
     // 收起态再按圆钮看上去的边外推上限,圆钮才贴得到栏左与栏底
     ...(open ? {} : { knob })
   })
-}
-
-export function sameBounds(a: OutlineBounds | null, b: OutlineBounds | null): boolean {
-  if (a === null || b === null) return a === b
-  // Infinity(没登记上限)减自己是 NaN,先比全等
-  return (Object.keys(a) as Array<keyof OutlineBounds>).every(
-    (k) => a[k] === b[k] || Math.abs(a[k] - b[k]) < 0.5
-  )
 }

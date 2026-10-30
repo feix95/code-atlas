@@ -12,7 +12,7 @@ import {
   moduleDetails,
   unassignedReason
 } from '../src/renderer/src/graph/moduleDetails.ts'
-import { fitTransform, shouldAutoFit } from '../src/renderer/src/graph/fitView.ts'
+import { fitTransform } from '../src/renderer/src/graph/fitView.ts'
 import { settleLayout } from '../src/renderer/src/graph/settleLayout.ts'
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import type { ForceScene } from '../src/renderer/src/graph/useForceLayout.ts'
@@ -301,8 +301,8 @@ function checkDetails(): void {
   assert.match(unassignedReason('docs/a.md'), /没有可划分/)
 }
 
-/** 首次稳定后的自动适应:节点出界要缩小,整体挤在画布中间一小块也要放大;已经铺满就不动 */
-function checkAutoFit(): void {
+/** 初始落视口:按内容算出舒适比例并居中;小层级封顶 1.5 倍,大层级缩到全部可见 */
+function checkFitView(): void {
   const sceneOf = (points: Array<[number, number]>): ForceScene =>
     ({
       dirRel: '',
@@ -310,31 +310,21 @@ function checkAutoFit(): void {
       nodes: points.map(([x, y], i) => ({ id: `n${i}`, x, y, r: 10 }))
     }) as unknown as ForceScene
   const size = { w: 1000, h: 800, dpr: 1 }
-  const origin = { k: 1, x: size.w / 2, y: size.h / 2 }
   const small = sceneOf([
     [-120, -90],
     [120, 90],
     [0, 0]
   ])
-  assert.equal(shouldAutoFit(small, origin, size), true, '只占画布一小块时自动放大')
   const fitted = fitTransform(small, size)
-  assert.ok(fitted && fitted.k > 1, '放大后比例大于 1')
+  assert.ok(fitted && fitted.k > 1, '小层级放大到舒适比例')
   assert.ok(fitted && fitted.k <= 1.5, '放大有上限,三两个节点不会被放得巨大')
-  assert.equal(
-    shouldAutoFit(small, { k: 1.5, ...{ x: 500, y: 400 } }, size),
-    false,
-    '已到放大上限不再动'
-  )
+  assert.ok(fitted && fitted.x === size.w / 2 && fitted.y === size.h / 2, '内容居中')
   const wide = sceneOf([
     [-800, 0],
     [800, 0]
   ])
-  assert.equal(shouldAutoFit(wide, origin, size), true, '节点出界时自动缩小')
-  const snug = sceneOf([
-    [-400, -300],
-    [400, 300]
-  ])
-  assert.equal(shouldAutoFit(snug, origin, size), false, '已基本铺满画布时不动')
+  const shrunk = fitTransform(wide, size)
+  assert.ok(shrunk && shrunk.k < 1, '大层级缩小到全部可见')
   assert.equal(fitTransform(sceneOf([]), size), null, '空场景不适应')
 }
 
@@ -381,5 +371,5 @@ checkDetails()
 checkOverlay()
 checkClusterForce()
 checkDisplayName()
-checkAutoFit()
+checkFitView()
 console.log('selftest-graphmodules: 全部通过')

@@ -14,23 +14,25 @@ import {
   DOCK_MIN_HEIGHT,
   DOCK_MIN_TREE,
   clampDockRatio,
-  hidesFloatingOutline
-} from '../src/renderer/src/outlineDock.ts'
+  hidesFloatingDock
+} from '../src/renderer/src/sidebarDock.ts'
 import {
   DEFAULT_PLACEMENT,
   DRAG_START_PX,
   SNAP_SLACK_PX,
   capToContent,
-  clampCollapsed,
   clampPlacement,
   isDragStarted,
-  moveCollapsed,
   movePlacement,
-  outlineBounds,
-  parseOutlinePlacement,
+  parseFloatPlacement,
   resizePlacement,
   settleResize,
   snapFrame
+} from '../src/renderer/src/floatPlacement.ts'
+import {
+  clampCollapsed,
+  moveCollapsed,
+  outlineBounds
 } from '../src/renderer/src/outlinePlacement.ts'
 
 function rootOf(html: string): Element {
@@ -143,10 +145,10 @@ function sampleBounds(
 }
 
 function checkPlacement(): void {
-  assert.deepEqual(parseOutlinePlacement(null), DEFAULT_PLACEMENT, '没记过回默认')
-  assert.deepEqual(parseOutlinePlacement('junk'), DEFAULT_PLACEMENT, '坏账回默认')
+  assert.deepEqual(parseFloatPlacement(null), DEFAULT_PLACEMENT, '没记过回默认')
+  assert.deepEqual(parseFloatPlacement('junk'), DEFAULT_PLACEMENT, '坏账回默认')
   assert.deepEqual(
-    parseOutlinePlacement({ right: 10, top: 'x', width: -5, height: 240 }),
+    parseFloatPlacement({ right: 10, top: 'x', width: -5, height: 240 }),
     { right: 10, top: null, width: null, height: 240 },
     '逐字段验身:坏类型、非正尺寸都当没记过'
   )
@@ -416,12 +418,12 @@ function checkKnobReserve(): void {
 /** 浮窗让位判定:停靠开着、左栏能用、同一个窗口、停靠位就是我这签 —— 四条全占才藏 */
 function checkDockDecision(): void {
   const all = { docked: true, hostUsable: true, sameDoc: true, isOwner: true }
-  assert.equal(hidesFloatingOutline(all), true, '四条全占:浮窗让位给左栏')
+  assert.equal(hidesFloatingDock(all), true, '四条全占:浮窗让位给左栏')
   for (const key of ['docked', 'hostUsable', 'sameDoc', 'isOwner'] as const) {
-    assert.equal(hidesFloatingOutline({ ...all, [key]: false }), false, `缺 ${key} 就不让位`)
+    assert.equal(hidesFloatingDock({ ...all, [key]: false }), false, `缺 ${key} 就不让位`)
   }
   assert.equal(
-    hidesFloatingOutline({ docked: false, hostUsable: true, sameDoc: true, isOwner: true }),
+    hidesFloatingDock({ docked: false, hostUsable: true, sameDoc: true, isOwner: true }),
     false,
     '没停过:浮窗照常站岗'
   )

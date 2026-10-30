@@ -1,4 +1,5 @@
-// 「适应画布」的几何:算出让全部节点可见的变换,并判断首次布局稳定后要不要自动适应一次。
+// 「适应画布」的几何:算出让全部节点可见并居中的变换。
+// 打开图谱或进入文件夹时,新层级首帧之前按它落一次视口;之后只随用户手动缩放平移。
 // 纯函数,不依赖 DOM。
 import type { Transform } from './drawGraph'
 import type { ForceScene } from './useForceLayout'
@@ -30,19 +31,4 @@ export function fitTransform(scene: ForceScene | null, size: ViewportSize): Tran
     )
   )
   return { k, x: size.w / 2 - ((x0 + x1) / 2) * k, y: size.h / 2 - ((y0 + y1) / 2) * k }
-}
-
-function isOutside(scene: ForceScene, tf: Transform, size: ViewportSize): boolean {
-  return scene.nodes.some((n) => {
-    const sx = n.x * tf.k + tf.x
-    const sy = n.y * tf.k + tf.y
-    return sx < 0 || sy < 0 || sx > size.w || sy > size.h
-  })
-}
-
-/** 节点出界要缩小;整体只占画布一小块(适应后能放大 autoFitGrowRatio 倍以上)也要放大 */
-export function shouldAutoFit(scene: ForceScene, tf: Transform, size: ViewportSize): boolean {
-  if (isOutside(scene, tf, size)) return true
-  const next = fitTransform(scene, size)
-  return next !== null && next.k >= tf.k * GRAPH_VIEW.autoFitGrowRatio
 }

@@ -19,11 +19,12 @@ import { NoteToggleIcon, TreeIcon } from './Icons'
 import { NAV_ICON_SIZE, NAV_ITEMS, type SectionKey } from '../settingsNav'
 import type { SidebarFace } from '../useSettingsNav'
 import {
-  getOutlineDockState,
-  setOutlineDockHost,
-  setOutlineDockHostUsable,
-  subscribeOutlineDock
-} from '../outlineDock'
+  getSidebarDockState,
+  setSidebarDockHost,
+  setSidebarDockHostUsable,
+  setSidebarDockSlot,
+  subscribeSidebarDock
+} from '../sidebarDock'
 import { SidebarOutline } from './SidebarOutline'
 import { UiWorkbenchSidebar } from './uiWorkbench/UiWorkbenchSidebar'
 
@@ -152,23 +153,29 @@ export function WorkspaceSidebar({
   const settingsMode = sidebarFace === 'settings'
   const [notesShown, setNotesShown] = useState(readNotesShown)
   const asideRef = useRef<HTMLElement>(null)
+  const dockSlotRef = useRef<HTMLDivElement>(null)
   // 左栏坞位:浮窗拖过来按整条 aside 的框认落点;收起或换脸时让浮窗回来
   useLayoutEffect(() => {
-    setOutlineDockHost(asideRef.current)
-    setOutlineDockHostUsable(sidebarFace === 'files' && !sidebarCollapsed)
+    setSidebarDockHost(asideRef.current)
+    setSidebarDockHostUsable(sidebarFace === 'files' && !sidebarCollapsed)
     return () => {
-      setOutlineDockHost(null)
-      setOutlineDockHostUsable(false)
+      setSidebarDockHost(null)
+      setSidebarDockHostUsable(false)
     }
   }, [sidebarFace, sidebarCollapsed])
+  // 停靠槽位:停靠后的面板(大纲/图谱详情)portal 进这块,display:contents 不占版面
+  useLayoutEffect(() => {
+    setSidebarDockSlot(dockSlotRef.current)
+    return () => setSidebarDockSlot(null)
+  }, [])
   // 落位框直接拨类名:拖动时整棵文件树不该跟着重渲
   useEffect(() => {
     const el = asideRef.current
     const apply = (): void => {
-      el?.classList.toggle('is-dock-target', getOutlineDockState().hot)
+      el?.classList.toggle('is-dock-target', getSidebarDockState().hot)
     }
     apply()
-    return subscribeOutlineDock(apply)
+    return subscribeSidebarDock(apply)
   }, [])
   return (
     <>
@@ -260,6 +267,7 @@ export function WorkspaceSidebar({
               onOpenFile={onOpenBrowseFile}
             />
           )}
+          <div className="sidebar-dock-slot" ref={dockSlotRef} />
           <SidebarOutline ownerId={outlineOwnerId} />
         </div>
         {/* 页脚站在分割区外面:文件树与大纲按比例分的是它上面的整块高度 */}
