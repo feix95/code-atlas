@@ -1,4 +1,5 @@
-// 悬停提示框:节点的名称与所属模块。贴在节点上方,上方放不下翻到下方;不吃鼠标。
+// 悬停提示框:补全画布上看不全的名字,并说明文件属于哪个模块。
+// 贴在节点上方,上方放不下翻到下方;不吃鼠标。
 // 读屏不走这里 —— Canvas 节点没有 DOM,读屏信息在 GraphNodeList 里。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GRAPH_TIP } from '../graph/graphConfig'
@@ -47,7 +48,7 @@ export function GraphNodeTip({
       style={{ left: box?.left ?? 0, top: box?.top ?? 0, visibility: box ? 'visible' : 'hidden' }}
       aria-hidden="true"
     >
-      <p className="graph-node-tip-name">{text.title}</p>
+      {text.title !== '' && <p className="graph-node-tip-name">{text.title}</p>}
       {text.sub !== '' && <p className="graph-node-tip-sub">{text.sub}</p>}
     </div>
   )

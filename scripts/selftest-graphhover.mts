@@ -18,6 +18,7 @@ import {
 } from '../src/renderer/src/graph/hoverModes.ts'
 import { nextGesture, takeSteps, wheelDeltaPx } from '../src/renderer/src/graph/wheelIntent.ts'
 import {
+  GRAPH_LABEL,
   GRAPH_MODULE_COLORS,
   GRAPH_TIP,
   GRAPH_WHEEL
@@ -158,57 +159,66 @@ function checkNodeTip(): void {
     descendantFiles: kind === 'folder' ? 12 : 0,
     ...extra
   })
-  const signals = { hasModules: true, moduleName: '图谱 · graphView.ts', ringSegments: 3 }
+  const signals = {
+    hasModules: true,
+    moduleName: '图谱 · graphView.ts'
+  }
+  const longName = 'a'.repeat(GRAPH_LABEL.maxChars + 1)
 
   assert.deepEqual(
     nodeTipText(node('file'), signals),
-    { title: 'graph.ts', sub: '图谱 · graphView.ts' },
-    '文件:名称 + 所属模块'
+    { title: '', sub: '属于 图谱 · graphView.ts' },
+    '短文件名画布上已看全,只补一句所属模块'
   )
   assert.deepEqual(
     nodeTipText(node('file', { id: 'README.md', label: 'README.md' }), {
       ...signals,
       moduleName: null
     }),
-    { title: 'README.md', sub: '未归类' },
+    { title: '', sub: '未归类' },
     '没有归属模块的文件说未归类'
   )
-  assert.deepEqual(
+  assert.equal(
     nodeTipText(node('file'), { ...signals, hasModules: false, moduleName: null }),
-    { title: 'graph.ts', sub: '' },
-    '模块数据不可用时不能硬说未归类'
+    null,
+    '模块数据不可用且名字没截断:没有可补的信息,不弹提示'
+  )
+  assert.deepEqual(
+    nodeTipText(node('file', { label: longName }), {
+      ...signals,
+      hasModules: false,
+      moduleName: null
+    }),
+    { title: longName, sub: '' },
+    '只有名字被截断时也弹提示补全'
+  )
+  assert.deepEqual(
+    nodeTipText(node('file', { label: longName }), signals),
+    { title: longName, sub: '属于 图谱 · graphView.ts' },
+    '名字超过画布上限:标题给全名,模块照常说明'
   )
 
-  assert.deepEqual(
-    nodeTipText(node('folder'), signals),
-    { title: 'src', sub: '主要 图谱 · graphView.ts' },
-    '文件夹:占比过半的模块说「主要」'
-  )
-  assert.deepEqual(
-    nodeTipText(node('folder'), { ...signals, moduleName: null }),
-    { title: 'src', sub: '跨 3 个模块' },
-    '文件夹:没有过半模块时说跨几个模块'
-  )
-  assert.deepEqual(
-    nodeTipText(node('folder'), { ...signals, moduleName: null, ringSegments: 0 }),
-    { title: 'src', sub: '12 个文件' },
-    '文件夹:没有模块构成时只报文件数'
-  )
-  assert.deepEqual(
-    nodeTipText(node('folder'), { hasModules: false, moduleName: null, ringSegments: 0 }),
-    { title: 'src', sub: '12 个文件' },
-    '模块数据不可用时文件夹仍有文件数'
+  assert.equal(nodeTipText(node('folder'), signals), null, '文件夹不弹提示')
+  assert.equal(
+    nodeTipText(node('folder'), { hasModules: false, moduleName: null }),
+    null,
+    '没有模块数据时文件夹同样不弹提示'
   )
 
   assert.deepEqual(
     nodeTipText(node('external', { target: 'folder' }), signals),
-    { title: 'shared', sub: '当前文件夹之外' },
-    '外部节点:说明它不在当前文件夹里'
+    { title: '', sub: '当前文件夹之外' },
+    '外部节点:短名只说明它不在当前文件夹里'
   )
   assert.deepEqual(
+    nodeTipText(node('external', { label: longName, target: 'folder' }), signals),
+    { title: longName, sub: '当前文件夹之外' },
+    '外部节点名字被截断时补全'
+  )
+  assert.equal(
     nodeTipText(node('overflow', { hiddenCount: 7 }), signals),
-    { title: '其余 7 项', sub: '7 项未显示' },
-    'overflow 节点:报被收起的项数'
+    null,
+    'overflow 节点不弹提示'
   )
 
   const view = { w: 800, h: 600 }

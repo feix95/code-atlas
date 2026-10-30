@@ -23,7 +23,7 @@
   color: var(--muted-2);
 }
 
-/* 悬停提示框:节点名称 + 所属模块;贴在节点上方,不吃鼠标 */
+/* 悬停提示框:补全被截断的名字 + 文件所属模块;磨砂半透明,与侧栏浮窗同一套观感 */
 .graph-node-tip {
   position: absolute;
   z-index: var(--z-float);
@@ -33,12 +33,13 @@
   max-width: 20rem;
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(0.5rem) saturate(1.2);
   color: var(--text);
-  font-size: var(--font-xs);
+  font-size: var(--font-sm);
   line-height: 1.4;
   opacity: 0;
   transition: opacity var(--dur-2) ease;

@@ -1,39 +1,46 @@
 // 悬停提示框的内容与落位:只读节点与模块叠加层,不碰 DOM,便于自测。
+// 只给「补全画布上看不全的信息」:文件说属于哪个模块,画布截断的名字在这里补全;
+// 文件夹、overflow 节点不弹提示(文件数与模块数对理解项目没有直接帮助,统计看侧栏)。
 // 提示贴在节点上方;上方放不下时翻到下方,左右越界夹回画布内。
 import type { LevelNode } from '@shared/graphView'
-import { GRAPH_TIP } from './graphConfig.ts'
+import { GRAPH_LABEL, GRAPH_TIP } from './graphConfig.ts'
 
 export interface NodeTipSignals {
   /** 模块数据可用:不可用时不能把没归属的文件说成「未归类」 */
   hasModules: boolean
-  /** 文件:所属模块名;文件夹:占比过半的模块名(没有过半则为 null) */
+  /** 文件所属模块名;没有归属为 null */
   moduleName: string | null
-  /** 文件夹:分段色环的段数(0 = 没有模块构成可显示) */
-  ringSegments: number
 }
 
 export interface NodeTipText {
+  /** 画布上名字被截断时的完整名字;空串表示不显示 */
   title: string
   /** 第二行;空串表示不显示 */
   sub: string
 }
 
-export function nodeTipText(node: LevelNode, signals: NodeTipSignals): NodeTipText {
+/** 画布标签能完整显示时不再重复搬运同一个名字 */
+function fullLabel(node: LevelNode): string {
+  return node.label.length > GRAPH_LABEL.maxChars ? node.label : ''
+}
+
+export function nodeTipText(node: LevelNode, signals: NodeTipSignals): NodeTipText | null {
   switch (node.kind) {
-    case 'file':
-      return {
-        title: node.label,
-        sub: signals.hasModules ? (signals.moduleName ?? '未归类') : ''
-      }
+    case 'file': {
+      const sub = signals.hasModules
+        ? signals.moduleName
+          ? `属于 ${signals.moduleName}`
+          : '未归类'
+        : ''
+      const title = fullLabel(node)
+      return title || sub ? { title, sub } : null
+    }
     case 'folder':
-      if (signals.moduleName) return { title: node.label, sub: `主要 ${signals.moduleName}` }
-      if (signals.ringSegments > 1)
-        return { title: node.label, sub: `跨 ${signals.ringSegments} 个模块` }
-      return { title: node.label, sub: `${node.descendantFiles} 个文件` }
+      return null
     case 'external':
-      return { title: node.label, sub: '当前文件夹之外' }
+      return { title: fullLabel(node), sub: '当前文件夹之外' }
     case 'overflow':
-      return { title: node.label, sub: `${node.hiddenCount ?? 0} 项未显示` }
+      return null
   }
 }
 
