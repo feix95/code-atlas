@@ -69,6 +69,22 @@ export const GRAPH_VIEW = {
   fitMaxScale: 1.5
 } as const
 
+/** 语义缩放:节点屏幕直径跨过阈值时原地展开 / 收起容器 */
+export const GRAPH_ZOOM = {
+  /** 未展开的文件夹,屏幕直径超过此值(px)时原地展开 */
+  expandPx: 72,
+  /** 已展开的容器,屏幕直径低于此值(px)时收起;与 expandPx 之间的区间保持不变,防抖动 */
+  collapsePx: 48,
+  /** 滚轮停止多久后判定一次(ms) */
+  settleMs: 120,
+  /** 缩放触发的自动展开最多到焦点下几级;更深层靠双击展开或进入文件夹 */
+  autoExpandDepth: 2,
+  /** 容器半径 = sqrt(Σ(子半径 + containerPadding)²) × packFactor */
+  packFactor: 1.15,
+  /** 容器内边距:子节点半径之外再留的世界坐标距离 */
+  containerPadding: 8
+} as const
+
 export const GRAPH_LABEL = {
   /** 缩放比例低于 fadeOut 时标签完全隐藏,高于 fadeIn 时完全显示,之间线性过渡 */
   fadeOutScale: 0.55,
