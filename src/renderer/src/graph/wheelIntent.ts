@@ -1,5 +1,5 @@
 // 滚轮手势的意图判定:空白处普通滚轮 = 缩放;在节点上停稳后普通滚轮 = 切换悬停看法;
-// 按住 Ctrl 滚轮 = 层级(空白处展开 / 收起二级,文件夹上进入,其余往下返回上一层;触控板双指捏合也以 Ctrl+滚轮的形式到达)。
+// 按住 Ctrl 滚轮 = 层级(上滚展开二级 / 进入文件夹,下滚返回上一层或收起二级;触控板双指捏合也以 Ctrl+滚轮的形式到达)。
 // 一串连续的滚轮事件算一个手势,整个手势保持开头判定的动作,滚着滚着划过节点也不会从缩放变成切看法。纯函数,不依赖 DOM。
 import { GRAPH_WHEEL } from './graphConfig.ts'
 
@@ -60,14 +60,25 @@ export function takeSteps(
   return { gesture: { ...g, acc: acc - steps * GRAPH_WHEEL.modeStepPx }, steps }
 }
 
-/** Ctrl+滚轮落点:空白处做层级翻页,文件夹上可进入,文件上只往下返回 */
+/** Ctrl+滚轮落点:空白处做层级翻页,文件夹上可进入 */
 export type LevelWheelTarget = 'blank' | 'folder' | 'file'
 
 export type LevelWheelAction = 'expand' | 'collapse' | 'enter' | 'leave' | 'none'
 
-/** Ctrl+滚轮的动作:空白处往上滚 = 展开二级,往下滚 = 收起;文件夹上往上滚 = 进入;其余往下滚 = 返回上一层 */
-export function levelWheelAction(target: LevelWheelTarget, steps: number): LevelWheelAction {
-  if (target === 'blank') return steps < 0 ? 'expand' : 'collapse'
-  if (steps > 0) return 'leave'
+/**
+ * Ctrl+滚轮的动作。往下滚 = 退出:进入要挑文件夹(多路径),退出只有父级这一条路,
+ * 所以焦点不在根层时指针落在哪儿都直接返回上一层;已在根层时空白处往下滚 = 收起二级。
+ * 往上滚 = 空白处展开二级,文件夹上进入。
+ */
+export function levelWheelAction(
+  target: LevelWheelTarget,
+  steps: number,
+  hasParent: boolean
+): LevelWheelAction {
+  if (steps > 0) {
+    if (hasParent) return 'leave'
+    return target === 'blank' ? 'collapse' : 'none'
+  }
+  if (target === 'blank') return 'expand'
   return target === 'folder' ? 'enter' : 'none'
 }

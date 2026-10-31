@@ -150,12 +150,23 @@ function checkWheel(): void {
   assert.equal(takeSteps(nextGesture(null, 0, true, null), 500).steps, 1, '往下滚 = 返回上一层')
   assert.equal(takeSteps(zoom, 500).steps, 0, '缩放手势不走步')
 
-  assert.equal(levelWheelAction('blank', -1), 'expand', 'Ctrl+滚轮空白处往上滚 = 展开二级')
-  assert.equal(levelWheelAction('blank', 1), 'collapse', 'Ctrl+滚轮空白处往下滚 = 收起二级')
-  assert.equal(levelWheelAction('folder', -1), 'enter', 'Ctrl+滚轮文件夹上往上滚 = 进入')
-  assert.equal(levelWheelAction('folder', 1), 'leave', 'Ctrl+滚轮文件夹上往下滚 = 返回上一层')
-  assert.equal(levelWheelAction('file', -1), 'none', 'Ctrl+滚轮文件上往上滚 = 不动作')
-  assert.equal(levelWheelAction('file', 1), 'leave', 'Ctrl+滚轮文件上往下滚 = 返回上一层')
+  assert.equal(levelWheelAction('blank', -1, false), 'expand', 'Ctrl+滚轮空白处往上滚 = 展开二级')
+  assert.equal(levelWheelAction('blank', 1, false), 'collapse', '根层空白处往下滚 = 收起二级')
+  assert.equal(levelWheelAction('blank', 1, true), 'leave', '文件夹里空白处往下滚 = 返回上一层')
+  assert.equal(levelWheelAction('folder', -1, false), 'enter', 'Ctrl+滚轮文件夹上往上滚 = 进入')
+  assert.equal(
+    levelWheelAction('folder', 1, true),
+    'leave',
+    '文件夹里对着文件夹往下滚 = 返回上一层'
+  )
+  assert.equal(levelWheelAction('folder', 1, false), 'none', '根层没有上一层,文件夹上往下滚不动作')
+  assert.equal(levelWheelAction('file', -1, true), 'none', 'Ctrl+滚轮文件上往上滚 = 不动作')
+  assert.equal(
+    levelWheelAction('file', 1, true),
+    'leave',
+    '文件夹里对着文件往下滚也能退,不用瞄准入口'
+  )
+  assert.equal(levelWheelAction('file', 1, false), 'none', '根层文件上往下滚不动作')
 }
 
 function checkNodeTip(): void {

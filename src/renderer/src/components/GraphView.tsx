@@ -161,7 +161,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   )
   const enterOrLeave = (node: SimNode | null, steps: number): void => {
     const target: LevelWheelTarget = !node ? 'blank' : isFolderTarget(node.data) ? 'folder' : 'file'
-    const action = levelWheelAction(target, steps)
+    const action = levelWheelAction(target, steps, nav.dirRel !== '')
     if (action === 'expand') expansion.expandAll()
     else if (action === 'collapse') expansion.collapseAll()
     else if (action === 'leave') nav.goUp()
