@@ -14,6 +14,7 @@ import { GRAPH_FORCE, GRAPH_NODE } from './graphConfig.ts'
 import { forceCluster, type ClusterForce } from './forceCluster.ts'
 import { clampToContainers, containerRadius, forceContain } from './forceContain.ts'
 import { forceChargeOutsideContainers, forcePairCollide } from './forceGroups.ts'
+import { forceOrphanGravity, isOrphanNode } from './forceOrphan.ts'
 import { settleLayout } from './settleLayout.ts'
 
 export interface SimNode extends SimulationNodeDatum {
@@ -131,6 +132,7 @@ export function createSimulation(
     )
     .force('x', forceX<SimNode>(0).strength(GRAPH_FORCE.gravity))
     .force('y', forceY<SimNode>(0).strength(GRAPH_FORCE.gravity))
+    .force('orphan', forceOrphanGravity<SimNode>(GRAPH_FORCE.orphanGravity, isOrphanNode))
     .force('collide', forcePairCollide<SimNode>(GRAPH_FORCE.collidePadding))
     .force('cluster', cluster)
     .force('contain', forceContain<SimNode>())

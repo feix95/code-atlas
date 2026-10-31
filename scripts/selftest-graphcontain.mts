@@ -12,6 +12,7 @@ import {
   forcePairCollide
 } from '../src/renderer/src/graph/forceGroups.ts'
 import { forceCluster } from '../src/renderer/src/graph/forceCluster.ts'
+import { forceOrphanGravity, isOrphanNode } from '../src/renderer/src/graph/forceOrphan.ts'
 import {
   buildScene,
   createSimulation,
@@ -185,6 +186,96 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   assert.equal(box.vx, 0, '容器不受点电荷斥力')
   assert.equal(box.vy, 0)
   assert.notEqual(a.vx, 0, '文件之间仍有斥力')
+}
+
+// 外围散户引力:只拉焦点层无引用的非容器节点;有引用、容器与容器内子项速度不变
+{
+  interface OrphanTestNode {
+    id: string
+    parent: unknown
+    data: { degree: number; isContainer?: boolean }
+    x: number
+    y: number
+  }
+  const make = (
+    id: string,
+    parent: unknown,
+    degree: number,
+    isContainer = false
+  ): OrphanTestNode => ({ id, parent, data: { degree, isContainer }, x: 100, y: 0 })
+  const container = make('box', null, 0, true)
+  const orphan = make('README.md', null, 0)
+  const linked = make('main.ts', null, 2)
+  const child = make('box/README.md', container, 0)
+  const pull = forceOrphanGravity<OrphanTestNode>(0.3, isOrphanNode)
+  pull.initialize([container, orphan, linked, child])
+  pull(1)
+  assert.ok(orphan.vx !== undefined && orphan.vx < 0, '焦点层无引用节点被拉向原点')
+  assert.equal(linked.vx, undefined, '有引用的节点不受额外拉力')
+  assert.equal(container.vx, undefined, '容器不受额外拉力')
+  assert.equal(child.vx, undefined, '容器内子项不受额外拉力')
+
+  const flatOrphan = make('flat/README.md', null, 0)
+  const flatLinked = make('flat/main.ts', null, 2)
+  const flat = forceOrphanGravity<OrphanTestNode>(0.3, isOrphanNode)
+  flat.initialize([flatOrphan, flatLinked])
+  flat(1)
+  assert.equal(flatOrphan.vx, undefined, '没有展开容器的平铺总览不拉散户')
+}
+
+// 接线回归:createSimulation 挂上散户引力,展开容器后远处的无引用文件被收回主体附近
+{
+  const level: VisibleGraph = {
+    dirRel: '',
+    lazy: false,
+    edges: [{ from: 'app/a.ts', to: 'app/b.ts', weight: 1 }],
+    nodes: [
+      {
+        id: 'app',
+        kind: 'folder',
+        label: 'app',
+        degree: 0,
+        descendantFiles: 2,
+        depth: 1,
+        isContainer: true
+      },
+      {
+        id: 'app/a.ts',
+        kind: 'file',
+        label: 'a.ts',
+        degree: 1,
+        descendantFiles: 0,
+        depth: 2,
+        parentId: 'app'
+      },
+      {
+        id: 'app/b.ts',
+        kind: 'file',
+        label: 'b.ts',
+        degree: 1,
+        descendantFiles: 0,
+        depth: 2,
+        parentId: 'app'
+      },
+      { id: 'README.md', kind: 'file', label: 'README.md', degree: 0, descendantFiles: 0, depth: 1 }
+    ]
+  }
+  const scene = buildScene(level, null)
+  const orphan = scene.nodes.find((n) => n.id === 'README.md')
+  assert.ok(orphan, '场景里有外围文件')
+  orphan.x = 500
+  orphan.y = 0
+  const sim = createSimulation(
+    () => {},
+    forceCluster<SimNode>(() => null, 0)
+  )
+  sim.nodes(scene.nodes)
+  const link = sim.force('link') as ReturnType<typeof forceLink<SimNode, SimLink>>
+  link.links(scene.links)
+  sim.stop().alpha(1)
+  for (let i = 0; i < 300; i++) sim.tick()
+  const distance = Math.hypot(orphan.x, orphan.y)
+  assert.ok(distance < 200, `远处散户应被收回主体附近(实测 ${distance.toFixed(0)})`)
 }
 
 // 回归:展开容器后布局静止.子项被夹在容器里,若照常互斥会推着容器无限漂移

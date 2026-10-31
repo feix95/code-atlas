@@ -12,6 +12,8 @@ export const GRAPH_FORCE = {
   linkStrength: 0.4,
   /** 向画布原点的牵引力:孤立节点靠它不飘走 */
   gravity: 0.035,
+  /** 焦点层无引用节点额外的向心引力:只靠全局重力时会被中心斥力推到电荷上限附近,散在外圈 */
+  orphanGravity: 0.3,
   /** 碰撞半径在节点半径之外追加的间隙 */
   collidePadding: 6,
   /** 每帧速度衰减(越大越"黏") */
