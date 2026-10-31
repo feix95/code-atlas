@@ -1,9 +1,9 @@
-// 关系图谱的滚轮:按 wheelIntent 的判定分发成缩放视口、切换悬停看法或进出层级。
+// 关系图谱的滚轮:按 wheelIntent 的判定分发成缩放视口、切换悬停看法或层级动作。
 // 新手势开始时记下鼠标下的节点,整个手势都对它生效;鼠标下的节点与悬停记录不一致(缩放后节点移走了)时不算停稳。
 import { useEffect, useRef } from 'react'
 import type { ForceScene, SimNode } from './useForceLayout'
 import type { Transform } from './drawGraph'
-import { GRAPH_VIEW, GRAPH_ZOOM } from './graphConfig'
+import { GRAPH_VIEW } from './graphConfig'
 import { hitTest, localPoint } from './graphHit'
 import { clampScale } from './fitView'
 import { nextGesture, takeSteps, wheelDeltaPx, type WheelGesture } from './wheelIntent'
@@ -14,10 +14,8 @@ export interface WheelDeps {
   requestDraw: () => void
   /** 在节点上停稳后滚轮:往下滚 steps 为正(下一种看法),坐标为画布内像素 */
   onModeWheel: (node: SimNode, steps: number, x: number, y: number) => void
-  /** Ctrl+滚轮(含触控板捏合):steps 为 -1 = 往上滚,进入鼠标下的文件夹;1 = 往下滚,返回上一层 */
+  /** Ctrl+滚轮(含触控板捏合):steps 为 -1 = 往上滚,1 = 往下滚;落点与动作见 levelWheelAction */
   onLevelWheel: (node: SimNode | null, steps: number) => void
-  /** 普通缩放停止 settleMs 后触发一次,scale 为停止时的比例;给语义缩放判定用 */
-  onZoomEnd: (scale: number) => void
 }
 
 /** 当前悬停的节点与开始悬停的时间(ms,performance.now) */
@@ -45,19 +43,6 @@ export function useGraphWheel(
     if (!canvas) return
     let gesture: WheelGesture | null = null
     let target: SimNode | null = null
-    let settleTimer: ReturnType<typeof setTimeout> | null = null
-    const cancelZoomEnd = (): void => {
-      if (settleTimer === null) return
-      clearTimeout(settleTimer)
-      settleTimer = null
-    }
-    const scheduleZoomEnd = (): void => {
-      cancelZoomEnd()
-      settleTimer = setTimeout(() => {
-        settleTimer = null
-        depsRef.current.onZoomEnd(transformRef.current.k)
-      }, GRAPH_ZOOM.settleMs)
-    }
     const onWheel = (e: WheelEvent): void => {
       // Ctrl+滚轮不归界面缩放(界面缩放走键盘 +/-/0):落在画布上的都由图谱处理
       e.preventDefault()
@@ -74,11 +59,8 @@ export function useGraphWheel(
       if (gesture.action === 'zoom') {
         zoomAt(tf, sx, sy, deltaPx)
         d.requestDraw()
-        scheduleZoomEnd()
         return
       }
-      // 换了手势就不再算「缩放刚结束」,避免拿旧比例去判定展开
-      cancelZoomEnd()
       const r = takeSteps(gesture, deltaPx)
       gesture = r.gesture
       if (r.steps === 0) return
@@ -87,7 +69,6 @@ export function useGraphWheel(
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
     return () => {
-      cancelZoomEnd()
       canvas.removeEventListener('wheel', onWheel)
     }
   }, [canvasRef, transformRef, readHover])

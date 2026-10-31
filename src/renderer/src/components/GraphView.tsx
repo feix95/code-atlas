@@ -10,7 +10,7 @@ import { folderTree } from '@shared/hierarchy'
 import type { LevelNode } from '@shared/graphView'
 import { useGraphNav, type GraphNav } from '../graph/useGraphNav'
 import { useGraphExpansion } from '../graph/useGraphExpansion'
-import { zoomNodesOf } from '../graph/semanticZoom'
+import { levelWheelAction, type LevelWheelTarget } from '../graph/wheelIntent'
 import { useForceLayout, type SimNode } from '../graph/useForceLayout'
 import { useGraphViewport } from '../graph/useGraphViewport'
 import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
@@ -160,8 +160,12 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     [activate, moduleOfNode, picker, selection]
   )
   const enterOrLeave = (node: SimNode | null, steps: number): void => {
-    if (steps > 0) nav.goUp()
-    else if (node && isFolderTarget(node.data)) {
+    const target: LevelWheelTarget = !node ? 'blank' : isFolderTarget(node.data) ? 'folder' : 'file'
+    const action = levelWheelAction(target, steps)
+    if (action === 'expand') expansion.expandAll()
+    else if (action === 'collapse') expansion.collapseAll()
+    else if (action === 'leave') nav.goUp()
+    else if (action === 'enter' && node) {
       selection.select(null)
       activate(node.data)
     }
@@ -184,9 +188,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     onNodeContextMenu,
     onHoverChange: hoverMode.onHoverChange,
     onModeWheel: hoverMode.onModeWheel,
-    onLevelWheel: enterOrLeave,
-    // 普通缩放停下后按屏幕直径决定原地展开 / 收起;切换看法与进出层级不参与
-    onZoomEnd: (scale) => expansion.applyZoom(zoomNodesOf(layout.sceneRef.current), scale)
+    onLevelWheel: enterOrLeave
   })
   useEffect(() => {
     centerRef.current = viewport.centerOn

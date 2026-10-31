@@ -1,5 +1,5 @@
 // 关系图谱模块颜色 token 与滚轮悬停看法的纯函数自测:全局颜色序号与生成色、改色存档清洗、
-// 悬停看法的切换与点亮范围、滚轮手势的意图判定(缩放 / 切看法 / 进出层级)与防误触、
+// 悬停看法的切换与点亮范围、滚轮手势的意图判定(缩放 / 切看法 / 层级翻页与进出)与防误触、
 // 悬停出详情的候选判定。
 import assert from 'node:assert/strict'
 import {
@@ -17,7 +17,12 @@ import {
   isHoverLink,
   stepHoverMode
 } from '../src/renderer/src/graph/hoverModes.ts'
-import { nextGesture, takeSteps, wheelDeltaPx } from '../src/renderer/src/graph/wheelIntent.ts'
+import {
+  levelWheelAction,
+  nextGesture,
+  takeSteps,
+  wheelDeltaPx
+} from '../src/renderer/src/graph/wheelIntent.ts'
 import {
   GRAPH_LABEL,
   GRAPH_MODULE_COLORS,
@@ -144,6 +149,13 @@ function checkWheel(): void {
   assert.equal(takeSteps(r.gesture, -1000).steps, 0, '同一手势最多一层,不会一口气钻到底')
   assert.equal(takeSteps(nextGesture(null, 0, true, null), 500).steps, 1, '往下滚 = 返回上一层')
   assert.equal(takeSteps(zoom, 500).steps, 0, '缩放手势不走步')
+
+  assert.equal(levelWheelAction('blank', -1), 'expand', 'Ctrl+滚轮空白处往上滚 = 展开二级')
+  assert.equal(levelWheelAction('blank', 1), 'collapse', 'Ctrl+滚轮空白处往下滚 = 收起二级')
+  assert.equal(levelWheelAction('folder', -1), 'enter', 'Ctrl+滚轮文件夹上往上滚 = 进入')
+  assert.equal(levelWheelAction('folder', 1), 'leave', 'Ctrl+滚轮文件夹上往下滚 = 返回上一层')
+  assert.equal(levelWheelAction('file', -1), 'none', 'Ctrl+滚轮文件上往上滚 = 不动作')
+  assert.equal(levelWheelAction('file', 1), 'leave', 'Ctrl+滚轮文件上往下滚 = 返回上一层')
 }
 
 function checkNodeTip(): void {

@@ -71,15 +71,9 @@ export const GRAPH_VIEW = {
   fitMaxScale: 1.5
 } as const
 
-/** 语义缩放:节点屏幕直径跨过阈值时原地展开 / 收起容器 */
+/** 层级:原地展开的容器几何与「展开两级」的深度 */
 export const GRAPH_ZOOM = {
-  /** 未展开的文件夹,屏幕直径超过此值(px)时原地展开 */
-  expandPx: 72,
-  /** 已展开的容器,屏幕直径低于此值(px)时收起;与 expandPx 之间的区间保持不变,防抖动 */
-  collapsePx: 48,
-  /** 滚轮停止多久后判定一次(ms) */
-  settleMs: 120,
-  /** 缩放触发的自动展开最多到焦点下几级;更深层靠双击展开或进入文件夹 */
+  /** 「展开两级」最多到焦点下几级;更深层靠双击展开或进入文件夹 */
   autoExpandDepth: 2,
   /** 容器半径 = sqrt(Σ(子半径 + containerPadding)²) × packFactor */
   packFactor: 1.15,
@@ -175,6 +169,6 @@ export const GRAPH_WHEEL = {
   gestureGapMs: 200,
   /** 切看法:每累计这么多像素走一步(鼠标滚轮一格约 100px) */
   modeStepPx: 100,
-  /** 进出层级:累计这么多像素走一步,一个手势最多一步 */
+  /** 层级:累计这么多像素走一步,一个手势最多一步 */
   levelStepPx: 40
 } as const

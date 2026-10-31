@@ -20,7 +20,6 @@ import {
   type ExpansionRejection
 } from '@shared/expansion'
 import { GRAPH_ZOOM } from './graphConfig.ts'
-import { zoomDecisions, type ZoomNode } from './semanticZoom.ts'
 
 export type ExpansionNotice =
   { kind: 'rejected'; reason: ExpansionRejection } | { kind: 'scanFailed' }
@@ -41,7 +40,6 @@ export interface GraphExpansion {
   /** 「展开两级」:把当前可见、浅于自动展开深度的文件夹一次展开 */
   expandAll: () => void
   collapseAll: () => void
-  applyZoom: (nodes: readonly ZoomNode[], scale: number) => void
 }
 
 interface ExpansionState {
@@ -160,28 +158,6 @@ export function useGraphExpansion({
     setLocalNotice(null)
   }, [effective, visit, commit])
 
-  const applyZoom = useCallback(
-    (nodes: readonly ZoomNode[], scale: number): void => {
-      if (!tree) return
-      const decisions = zoomDecisions(nodes, scale, effective)
-      if (decisions.expand.length === 0 && decisions.collapse.length === 0) return
-      let base = effective
-      for (const id of decisions.collapse) base = collapseSubtree(tree, base, id)
-      // 收起可能让原本要展开的节点被遮住:只展开收起后仍可见的
-      const after = buildVisibleGraph(tree, edges, dirRel, base, GRAPH_LEVEL_MAX_NODES)
-      const visible =
-        after !== null && !isVisibleGraphRejection(after)
-          ? new Set(after.nodes.map((node) => node.id))
-          : null
-      const ids = visible ? decisions.expand.filter((id) => visible.has(id)) : []
-      const result = expandIds(tree, edges, dirRel, base, ids, GRAPH_LEVEL_MAX_NODES)
-      commit(result.ids, visit)
-      if (result.rejected) reject(result.rejected, visit)
-      else if (decisions.expand.length > 0) setLocalNotice(null)
-    },
-    [tree, edges, dirRel, visit, effective, commit, reject]
-  )
-
   return {
     level: resolved.level,
     expanded: effective,
@@ -191,7 +167,6 @@ export function useGraphExpansion({
     canCollapseAll: effective.size > 0,
     toggle,
     expandAll,
-    collapseAll,
-    applyZoom
+    collapseAll
   }
 }
