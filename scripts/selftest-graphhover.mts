@@ -1,5 +1,6 @@
 // 关系图谱模块颜色 token 与滚轮悬停看法的纯函数自测:全局颜色序号与生成色、改色存档清洗、
-// 悬停看法的切换与点亮范围、滚轮手势的意图判定(缩放 / 切看法 / 进出层级)与防误触。
+// 悬停看法的切换与点亮范围、滚轮手势的意图判定(缩放 / 切看法 / 进出层级)与防误触、
+// 悬停出详情的候选判定。
 import assert from 'node:assert/strict'
 import {
   generatedHue,
@@ -24,6 +25,8 @@ import {
   GRAPH_WHEEL
 } from '../src/renderer/src/graph/graphConfig.ts'
 import { nodeTipText, tipPlacement } from '../src/renderer/src/graph/nodeTip.ts'
+import { detailNodeOf } from '../src/renderer/src/graph/useGraphHoverDetail.ts'
+import type { HoverTarget } from '../src/renderer/src/graph/useGraphViewport.ts'
 import type { LevelNode } from '../src/shared/graphView.ts'
 
 const PALETTE = Array.from({ length: GRAPH_MODULE_COLORS }, (_, i) => `#00000${i}`)
@@ -244,8 +247,36 @@ function checkNodeTip(): void {
   assert.ok(tiny.left >= edgePx && tiny.top >= edgePx, '画布比气泡还窄:落在左上角,不出负数')
 }
 
+function checkHoverDetail(): void {
+  const hoverOf = (kind: LevelNode['kind'], dragging = false): HoverTarget => {
+    const data = {
+      id: `src/${kind}`,
+      kind,
+      label: kind,
+      degree: 1,
+      descendantFiles: 0,
+      depth: 1
+    }
+    return {
+      node: { id: data.id, data, depth: 0, r: 5, parent: null, x: 0, y: 0 },
+      x: 100,
+      y: 100,
+      r: 5,
+      dragging
+    }
+  }
+  const file = hoverOf('file')
+  assert.equal(detailNodeOf(file), file.node.data, '悬停文件:可开详情')
+  const folder = hoverOf('folder')
+  assert.equal(detailNodeOf(folder), folder.node.data, '悬停文件夹:可开详情')
+  assert.equal(detailNodeOf(hoverOf('overflow')), null, '收起的项只是计数占位,不弹详情')
+  assert.equal(detailNodeOf(hoverOf('file', true)), null, '拖拽中的节点不弹详情')
+  assert.equal(detailNodeOf(null), null, '没有悬停目标时不弹详情')
+}
+
 checkColors()
 checkHoverModes()
 checkWheel()
 checkNodeTip()
+checkHoverDetail()
 console.log('selftest-graphhover: 全部通过')

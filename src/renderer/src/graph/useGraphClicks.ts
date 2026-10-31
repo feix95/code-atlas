@@ -1,5 +1,5 @@
 // 画布的双击与右键:双击节点 = 主动作(文件打开预览、文件夹进入),右键节点 = 节点菜单。
-// 单击(选中)与拖拽在 useGraphViewport 的指针状态机里处理;这里只接浏览器的 dblclick / contextmenu。
+// 拖拽与空白单击(取消选中)在 useGraphViewport 的指针状态机里处理;这里只接浏览器的 dblclick / contextmenu。
 import { useEffect, useRef } from 'react'
 import type { Transform } from './drawGraph'
 import type { ViewportDeps } from './useGraphViewport'

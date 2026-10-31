@@ -83,7 +83,7 @@ export interface DrawInput {
   modules: ModuleDrawState | null
   /** 悬停节点时的看法(滚轮切换):决定哪些节点与连线保持高亮 */
   hoverMode: HoverMode
-  /** 单击选中的节点(侧栏所指) */
+  /** 详情浮窗选中的节点(侧栏所指) */
   selectedId: string | null
 }
 

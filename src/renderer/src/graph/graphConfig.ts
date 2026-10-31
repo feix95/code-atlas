@@ -45,7 +45,7 @@ export const GRAPH_NODE = {
   hitSlopPx: 4,
   /** 空心节点(外部 / 未扫描 / 其余)的描边宽度 */
   ringWidth: 1.5,
-  /** 单击选中节点的外圈:描边宽度与离节点边缘的间隙(世界坐标) */
+  /** 选中节点(详情浮窗所指)的外圈:描边宽度与离节点边缘的间隙(世界坐标) */
   selectedWidth: 2,
   selectedGap: 7
 } as const
@@ -155,6 +155,12 @@ export const GRAPH_MODULE_COLORS = 8
 export const GRAPH_MODULE_GEN = {
   hueStart: 18,
   hueStep: 137.508
+} as const
+
+/** 节点详情浮窗的悬停触发 */
+export const GRAPH_DETAIL = {
+  /** 指针在同一节点上停够这么久(ms)才打开;扫过节点时不闪 */
+  dwellMs: 300
 } as const
 
 /** 悬停提示框 */

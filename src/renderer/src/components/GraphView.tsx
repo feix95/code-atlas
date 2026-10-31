@@ -1,7 +1,8 @@
 // 关系图谱页签正文:资源管理器的图形视图(drill-down),一次呈现一个目录层级,
 // 在真实文件夹结构上叠加程序切出的模块(划分:轮廓、色环、聚类力)。
 // 组合 useGraphNav(层级)· useForceLayout(布局)· useGraphViewport(交互)· useGraphRender(绘制)
-// · useGraphSelection(选中)· useGraphHoverMode(滚轮切换悬停看法)· useModuleColorPicker(模块改色);
+// · useGraphSelection(选中)· useGraphHoverDetail(悬停出详情)· useGraphHoverMode(滚轮切换悬停看法)
+// · useModuleColorPicker(模块改色);
 // 数据全部来自共享的 ScanResult 与 DepGraphResult,不另起扫描或关系计算。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, DepGraphNode, DepGraphResult, ScanDirNode, ScanResult } from '@shared/types'
@@ -16,6 +17,7 @@ import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
 import { buildModuleOverlay, moduleDisplayName } from '../graph/moduleOverlay'
 import { nodeMenuItems, useGraphSelection } from '../graph/useGraphSelection'
 import { useGraphHoverMode } from '../graph/useGraphHoverMode'
+import { useGraphHoverDetail } from '../graph/useGraphHoverDetail'
 import { moduleSwatchCss } from '../graph/moduleColors'
 import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
@@ -137,6 +139,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     [modulesOn, moduleOfNode]
   )
   const hoverMode = useGraphHoverMode(hoverModuleOf, render.setHover)
+  useGraphHoverDetail(hoverMode.hover, selection.select)
   const picker = useModuleColorPicker({ root: result.rootPath, canvasRef, overlay, overrides })
   const onNodeContextMenu = useCallback(
     (n: SimNode, x: number, y: number) => {
@@ -168,7 +171,6 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     sceneRef: layout.sceneRef,
     requestDraw: render.requestDraw,
     setDragging: layout.setDragging,
-    onNodeClick: (n) => selection.select(n.data),
     onBlankClick: selection.clear,
     onNodeDoubleClick: (n) => {
       if (n.data.kind === 'folder') {
@@ -231,7 +233,10 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     })
   const tag = hoverMode.tag
   const hover = hoverMode.hover
-  const hoverTip = hover && !hover.dragging && !tag ? nodeTipOf(hover.node.data) : null
+  // 详情浮窗正展示这个节点时,提示框不再重复同一份信息
+  const detailShown = hover !== null && selection.selected?.id === hover.node.id
+  const hoverTip =
+    hover && !hover.dragging && !tag && !detailShown ? nodeTipOf(hover.node.data) : null
   const tagModule = tag ? hoverModuleOf(tag.nodeId) : null
   const scanning = nav.status.kind === 'scanning'
   const empty = !scanning && level !== null && level.nodes.length === 0
@@ -290,7 +295,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           elsewhere={tagModule ? (overlay.elsewhere.get(tagModule) ?? 0) : 0}
         />
       )}
-      {/* 看法标签亮着时提示框让位;拖拽中先收起,松手后再亮;文件夹与 overflow 没有可补的信息 */}
+      {/* 看法标签亮着或详情浮窗已展示该节点时提示框让位;拖拽中先收起,松手后再亮;文件夹与 overflow 没有可补的信息 */}
       {hover && hoverTip && <GraphNodeTip key={hover.node.id} anchor={hover} text={hoverTip} />}
       {selection.selected && (
         <GraphSidePanel

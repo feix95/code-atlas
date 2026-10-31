@@ -34,8 +34,6 @@ export interface HoverTarget {
 
 export interface ViewportDeps extends WheelDeps {
   setDragging: (dragging: boolean) => void
-  /** 单击节点(按下后没拖动):选中 */
-  onNodeClick: (node: SimNode) => void
   /** 单击空白处(按下后没平移):取消选中 */
   onBlankClick: () => void
   onNodeDoubleClick: (node: SimNode) => void
@@ -186,7 +184,6 @@ function usePointer(
         s.node.fx = null
         s.node.fy = null
         if (s.moved) depsRef.current.setDragging(false)
-        else depsRef.current.onNodeClick(s.node)
         setState({ mode: 'hovering', node: s.node, since: performance.now() })
         return
       }

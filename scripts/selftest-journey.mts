@@ -1656,8 +1656,8 @@ try {
   await open(join(run, 'empty'))
   // 空目录 = 一个签都没开:空签板顶上(开工作区不再自动开签)
   await home()
-  // 关系图谱划分(P1):进入 app 层 -> 画出模块轮廓 -> 单击节点开侧栏(所属模块、模块文件)
-  // -> Esc 收起 -> 双击打开预览 -> 「模块着色」关闭后轮廓消失、再开恢复
+  // 关系图谱划分(P1):进入 app 层 -> 画出模块轮廓 -> 悬停节点开侧栏(所属模块、模块文件)
+  // -> 离开画布浮窗不消失 -> Esc 收起 -> 双击打开预览 -> 「模块着色」关闭后轮廓消失、再开恢复
   await open(join(run, 'graphdemo'))
   await page.getByRole('button', { name: '关系图谱', exact: true }).click()
   await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
@@ -1681,17 +1681,22 @@ try {
   assert.ok(hit, 'focused node must be painted in the focus color on the canvas')
   await page.locator('.graph-view').focus()
   await page.waitForTimeout(300)
-  await page.mouse.click(hit.x, hit.y)
+  // 悬停 0.3 秒才弹详情浮窗,点一下不再开
+  await page.mouse.move(hit.x, hit.y)
   const panel = page.getByRole('complementary', { name: '节点详情' })
   await panel.waitFor()
   assert.equal(
     await panel.locator('.graph-panel-title').innerText(),
     'c.ts',
-    'single click selects'
+    'hovering a node opens its detail panel'
   )
   assert.ok((await panel.innerText()).includes('所属模块'), 'side panel must show the module')
   assert.ok((await panel.innerText()).includes('style.css'), 'side panel must list attached styles')
   await shot('graph-modules')
+  // 指针离开画布浮窗不跟着收:留到点空白或 Esc
+  await page.mouse.move(5, 5)
+  await page.waitForTimeout(700)
+  assert.ok(await panel.isVisible(), 'detail panel must stay after the pointer leaves the canvas')
   await page.keyboard.press('Escape')
   await panel.waitFor({ state: 'detached' })
   await page.mouse.dblclick(hit.x, hit.y)
@@ -1752,6 +1757,13 @@ try {
     if (point) childPoints.push(point)
   }
   assert.equal(childPoints.length, 5, 'all five expanded children must be probeable')
+  // 悬停第一个子项,等浮窗换成它,量出浮窗外框(候选点要避开浮窗);量完 Esc 收起
+  await page.mouse.move(childPoints[0].x, childPoints[0].y)
+  await page.waitForFunction(
+    () => document.querySelector('.graph-panel-title')?.textContent === 'a.ts',
+    undefined,
+    { timeout: 5_000 }
+  )
   const panelBox = await panel.boundingBox()
   await page.keyboard.press('Escape')
   await panel.waitFor({ state: 'detached' })
@@ -1763,7 +1775,7 @@ try {
     p.y <= panelBox.y + panelBox.height + 8
   const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.hypot(a.x - b.x, a.y - b.y)
-  // 展开后容器会随布局小幅移动:用子项质心当容器中心,单击侧栏标题确认命中的是容器
+  // 展开后容器会随布局小幅移动:用子项质心当容器中心,悬停后看侧栏标题确认命中的是容器
   const centroid = {
     x: childPoints.reduce((sum, p) => sum + p.x, 0) / childPoints.length,
     y: childPoints.reduce((sum, p) => sum + p.y, 0) / childPoints.length
@@ -1784,9 +1796,10 @@ try {
   candidates.sort((a, b) => clearanceOf(b) - clearanceOf(a))
   let collapsePoint: { x: number; y: number } | null = null
   for (const candidate of candidates) {
-    await page.mouse.click(candidate.x, candidate.y)
+    // 浮窗是黏的:上一个候选的浮窗会挡住坐标判断,每次从关着的浮窗起探
+    await page.mouse.move(candidate.x, candidate.y)
     const opened = await panel
-      .waitFor({ state: 'visible', timeout: 800 })
+      .waitFor({ state: 'visible', timeout: 900 })
       .then(() => true)
       .catch(() => false)
     if (!opened) continue
@@ -1798,14 +1811,14 @@ try {
       break
     }
   }
-  assert.ok(collapsePoint, 'a blank spot inside the container must be clickable')
+  assert.ok(collapsePoint, 'a blank spot inside the container must reveal the container on hover')
   assert.ok(
     clearanceOf(collapsePoint) > 12,
     `container blank spot too close to a child (${clearanceOf(collapsePoint).toFixed(1)}px)`
   )
-  // 单击试探留下的点击计数要先散掉,否则双击会被浏览器合并成三击
+  // 悬停本身不累加点击计数;先把指针移开让悬停状态复位,再在同一处双击收起
   await page.mouse.move(1240, 70)
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(400)
   await page.mouse.dblclick(collapsePoint.x, collapsePoint.y)
   await page.waitForFunction(
     () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '0',
