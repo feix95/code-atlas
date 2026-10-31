@@ -2,11 +2,8 @@
 // 子项由节点层绘制;容器自身不画实心圆与色环。纯绘制,不持有状态。
 import type { SimNode } from './useForceLayout'
 import type { GraphColors } from './drawGraph'
-import { GRAPH_CONTAINER, GRAPH_LABEL } from './graphConfig'
-
-function truncate(text: string): string {
-  return text.length > GRAPH_LABEL.maxChars ? text.slice(0, GRAPH_LABEL.maxChars - 1) + '…' : text
-}
+import { GRAPH_CONTAINER } from './graphConfig'
+import { truncateLabel } from './graphText'
 
 export function drawContainers(
   ctx: CanvasRenderingContext2D,
@@ -41,5 +38,5 @@ export function drawContainerLabel(
   if (!node.data.isContainer || alpha <= 0.01) return
   ctx.globalAlpha = alpha
   ctx.fillStyle = colors.label
-  ctx.fillText(truncate(node.data.label), node.x, node.y - node.r + GRAPH_CONTAINER.labelGap)
+  ctx.fillText(truncateLabel(node.data.label), node.x, node.y - node.r + GRAPH_CONTAINER.labelGap)
 }

@@ -10,6 +10,7 @@ import {
   GRAPH_MOTION,
   GRAPH_NODE
 } from './graphConfig'
+import { truncateLabel } from './graphText'
 import { hoverRelated, isHoverLink, type BelongsFn, type HoverMode } from './hoverModes'
 
 export interface GraphColors {
@@ -96,10 +97,6 @@ function labelAlphaAt(k: number): number {
   return Math.max(0, Math.min(1, t))
 }
 
-function truncate(text: string): string {
-  return text.length > GRAPH_LABEL.maxChars ? text.slice(0, GRAPH_LABEL.maxChars - 1) + '…' : text
-}
-
 function drawLink(ctx: CanvasRenderingContext2D, l: SimLink, color: string, alpha: number): void {
   const { source: s, target: t } = l
   const dx = t.x - s.x
@@ -172,7 +169,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, n: SimNode, color: string, alp
   if (alpha <= 0.01) return
   ctx.globalAlpha = alpha
   ctx.fillStyle = color
-  ctx.fillText(truncate(n.data.label), n.x, n.y + n.r + GRAPH_LABEL.gap)
+  ctx.fillText(truncateLabel(n.data.label), n.x, n.y + n.r + GRAPH_LABEL.gap)
 }
 
 /** 选中节点:节点外再描一圈强调色 */

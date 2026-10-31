@@ -13,18 +13,7 @@ import type { ModuleDrawState } from './drawModules'
 import type { HoverMode } from './hoverModes'
 import type { ViewportSize } from './useGraphViewport'
 import { GRAPH_MOTION } from './graphConfig'
-
-interface Typography {
-  fontPx: number
-  fontFamily: string
-}
-
-function readTypography(): Typography {
-  const root = getComputedStyle(document.documentElement)
-  const rootPx = parseFloat(root.fontSize) || 16
-  const labelRem = parseFloat(root.getPropertyValue('--graph-label-size')) || 0.6875
-  return { fontPx: rootPx * labelRem, fontFamily: getComputedStyle(document.body).fontFamily }
-}
+import { readTypography, type Typography } from './graphText'
 
 export interface RenderRefs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>

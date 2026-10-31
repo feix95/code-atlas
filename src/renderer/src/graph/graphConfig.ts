@@ -16,6 +16,8 @@ export const GRAPH_FORCE = {
   orphanGravity: 0.3,
   /** 碰撞半径在节点半径之外追加的间隙 */
   collidePadding: 6,
+  /** 圈外节点「圆 + 下方标签」外框之间至少留出的间隙(世界坐标) */
+  labelPadding: 4,
   /** 每帧速度衰减(越大越"黏") */
   velocityDecay: 0.35,
   /** 拖拽节点时模拟保持的热度 */
@@ -75,12 +77,14 @@ export const GRAPH_VIEW = {
 export const GRAPH_ZOOM = {
   /** 「展开两级」最多到焦点下几级;更深层靠双击展开或进入文件夹 */
   autoExpandDepth: 2,
-  /** 容器半径 = sqrt(Σ(子半径 + containerPadding)²) × packFactor */
-  packFactor: 1.15,
-  /** 容器内边距:子节点半径之外再留的世界坐标距离 */
+  /** 容器内相邻子项的标签盒之间至少留出的间距(世界坐标) */
+  childGap: 10,
+  /** 子项标签盒离容器边缘、容器名称的留白(世界坐标) */
   containerPadding: 8,
   /** 约束子项时在容器边缘之外再留的安全边距;切向速度积分后的微小外溢靠它兜住 */
-  containMargin: 1
+  containMargin: 1,
+  /** 按子项盒子总面积预算容器起始半径时的填充率:矩形盒在圆里放不满,留出余量 */
+  containerFill: 0.55
 } as const
 
 export const GRAPH_LABEL = {
@@ -89,6 +93,8 @@ export const GRAPH_LABEL = {
   fadeInScale: 0.95,
   /** 标签与节点底边的间距(世界坐标) */
   gap: 4,
+  /** 布局按字体大小的这个倍数给单行标签留高度 */
+  lineHeight: 1.25,
   /** 标签最长字符数,超出截断加省略号 */
   maxChars: 28
 } as const
@@ -101,7 +107,9 @@ export const GRAPH_MOTION = {
   /** 切换层级:旧层淡出时长(ms) */
   levelOutMs: 150,
   /** 切换层级:新层淡入时长(ms) */
-  levelInMs: 300
+  levelInMs: 300,
+  /** 原地展开:容器从小圆长到装箱半径、子项散到槽位的时长(ms) */
+  containerGrowMs: 420
 } as const
 
 /** 模块轮廓(划分):只贴着本模块成员走,成员间细连桥相连,非成员节点处挖开 */
