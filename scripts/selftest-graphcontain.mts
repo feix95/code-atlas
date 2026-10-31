@@ -10,13 +10,15 @@ import {
   applyContainerSlots,
   forceContainerSlots,
   growContainer,
+  isGrowingChild,
   stepContainerGrowth,
   type SlotNode
 } from '../src/renderer/src/graph/containerLayout.ts'
 import {
   childBox,
   packContainerChildren,
-  type LayoutChild
+  type LayoutChild,
+  type Slot
 } from '../src/renderer/src/graph/containerPack.ts'
 import {
   clampToContainers,
@@ -369,12 +371,102 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   assert.ok(outer.r > inner.r, '父容器半径包含子容器')
 }
 
+// A1:跨容器边只画线不受力。同容器内的引用、圈外之间的引用参与受力;
+// 碰展开容器的边、两端分属不同容器的边只保留绘制。进入文件夹的整层没有容器,全部参与受力
+{
+  const level: VisibleGraph = {
+    dirRel: '',
+    lazy: false,
+    edges: [
+      { from: 'app/a.ts', to: 'app/b.ts', weight: 2 },
+      { from: 'lib.ts', to: 'lib2.ts', weight: 1 },
+      { from: 'app/a.ts', to: 'lib.ts', weight: 1 },
+      { from: 'app', to: 'lib.ts', weight: 1 },
+      { from: 'app', to: 'docs', weight: 1 },
+      { from: 'docs/x.md', to: 'app/b.ts', weight: 1 }
+    ],
+    nodes: [
+      {
+        id: 'app',
+        kind: 'folder',
+        label: 'app',
+        degree: 0,
+        descendantFiles: 2,
+        depth: 1,
+        isContainer: true
+      },
+      {
+        id: 'app/a.ts',
+        kind: 'file',
+        label: 'a.ts',
+        degree: 2,
+        descendantFiles: 0,
+        depth: 2,
+        parentId: 'app'
+      },
+      {
+        id: 'app/b.ts',
+        kind: 'file',
+        label: 'b.ts',
+        degree: 2,
+        descendantFiles: 0,
+        depth: 2,
+        parentId: 'app'
+      },
+      {
+        id: 'docs',
+        kind: 'folder',
+        label: 'docs',
+        degree: 1,
+        descendantFiles: 1,
+        depth: 1,
+        isContainer: true
+      },
+      {
+        id: 'docs/x.md',
+        kind: 'file',
+        label: 'x.md',
+        degree: 1,
+        descendantFiles: 0,
+        depth: 2,
+        parentId: 'docs'
+      },
+      { id: 'lib.ts', kind: 'file', label: 'lib.ts', degree: 2, descendantFiles: 0, depth: 1 },
+      { id: 'lib2.ts', kind: 'file', label: 'lib2.ts', degree: 1, descendantFiles: 0, depth: 1 }
+    ]
+  }
+  const scene = buildScene(level, null, METRICS)
+  assert.equal(scene.links.length, level.edges.length, '所有可见引用都要画出来')
+  const forced = scene.forceLinks.map((link) => `${link.source.id}->${link.target.id}`).sort()
+  assert.deepEqual(
+    forced,
+    ['app/a.ts->app/b.ts', 'lib.ts->lib2.ts'],
+    '只有同容器内与圈外之间的边受力'
+  )
+
+  const plain: VisibleGraph = {
+    dirRel: 'src',
+    lazy: false,
+    edges: [{ from: 'a.ts', to: 'b.ts', weight: 1 }],
+    nodes: [
+      { id: 'a.ts', kind: 'file', label: 'a.ts', degree: 1, descendantFiles: 0, depth: 1 },
+      { id: 'b.ts', kind: 'file', label: 'b.ts', degree: 1, descendantFiles: 0, depth: 1 }
+    ]
+  }
+  const plainScene = buildScene(plain, null, METRICS)
+  assert.equal(plainScene.forceLinks.length, 1, '没有展开容器的整层,引用都参与受力')
+}
+
 // 成对碰撞:祖先与后代紧挨着也不互相推;无亲缘关系的两圆按半径加间隙分开;容器只推普通节点
 {
   const parent = node('p', 0, 0, 50, 1)
   const child = node('c', 4, 0, 10, 2)
   child.parent = parent
-  const nested = forcePairCollide<TestNode>(6, () => false)
+  const nested = forcePairCollide<TestNode>(
+    6,
+    () => false,
+    () => false
+  )
   nested.initialize([parent, child], () => 0.5)
   nested(1)
   assert.equal(parent.x, 0, '父容器不被子项推动')
@@ -382,7 +474,11 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
 
   const a = node('a', 0, 0, 10)
   const b = node('b', 5, 0, 10)
-  const apart = forcePairCollide<TestNode>(6, () => false)
+  const apart = forcePairCollide<TestNode>(
+    6,
+    () => false,
+    () => false
+  )
   apart.initialize([a, b], () => 0.5)
   apart(1)
   const gap = Math.hypot(b.x - a.x, b.y - a.y)
@@ -391,7 +487,11 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   // 容器与普通节点:只挪普通节点,容器留在原地,否则展开的文件夹会被四周一路挤走
   const box = node('box', 0, 0, 50)
   const file = node('file', 40, 0, 10)
-  const pushed = forcePairCollide<TestNode>(6, (n) => n.id === 'box')
+  const pushed = forcePairCollide<TestNode>(
+    6,
+    (n) => n.id === 'box',
+    () => false
+  )
   pushed.initialize([box, file], () => 0.5)
   pushed(1)
   assert.equal(box.x, 0, '容器不被普通节点推动')
@@ -422,7 +522,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
 
   const a = labeled('a.ts', 0, 0, 8, 120)
   const b = labeled('b.ts', 30, 0, 8, 120)
-  const spread = forceLabelCollide<LabelTestNode>(15, 4, isContainer)
+  const spread = forceLabelCollide<LabelTestNode>(15, 4, isContainer, () => false)
   spread.initialize([a, b])
   spread(1)
   assert.ok(boxesApart(a, b), '标签叠在一起的两个节点应被推开')
@@ -432,7 +532,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
 
   const container = labeled('app', 0, 0, 50, 0)
   const file = labeled('file.ts', 0, 40, 8, 120)
-  const against = forceLabelCollide<LabelTestNode>(15, 4, isContainer)
+  const against = forceLabelCollide<LabelTestNode>(15, 4, isContainer, () => false)
   against.initialize([container, file])
   against(1)
   assert.ok(container.x === 0 && container.y === 0, '容器不被标签防挤推动')
@@ -442,7 +542,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   const parent = labeled('app', 0, 0, 50, 0)
   const child = labeled('app/file.ts', 0, 20, 8, 120)
   child.parent = parent
-  const inside = forceLabelCollide<LabelTestNode>(15, 4, isContainer)
+  const inside = forceLabelCollide<LabelTestNode>(15, 4, isContainer, () => false)
   inside.initialize([parent, child])
   inside(1)
   assert.equal(child.x, 0, '父容器不能通过标签防挤推动子项')
@@ -451,7 +551,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   // 回归:容器按圆参与防挤,方盒四角不算实体,圈外节点不会被空角顶开
   const circle = labeled('app2', 0, 0, 50, 0)
   const corner = labeled('corner.ts', 48, 48, 5, 10)
-  const circleForce = forceLabelCollide<LabelTestNode>(15, 4, isContainer)
+  const circleForce = forceLabelCollide<LabelTestNode>(15, 4, isContainer, () => false)
   circleForce.initialize([circle, corner])
   circleForce(1)
   assert.equal(corner.x, 48, '圆圈外、方盒角内的节点不应被推')
@@ -462,7 +562,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   dragged.fx = 0
   dragged.fy = 0
   const outsider = labeled('b.ts', 30, 0, 8, 120)
-  const dragForce = forceLabelCollide<LabelTestNode>(15, 4, isContainer)
+  const dragForce = forceLabelCollide<LabelTestNode>(15, 4, isContainer, () => false)
   dragForce.initialize([dragged, outsider])
   dragForce(1)
   assert.ok(dragged.x === 0 && dragged.y === 0, '拖拽中的节点不被标签防挤推动')
@@ -510,12 +610,87 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   const box = node('box', 0, 0, 50)
   const a = node('a', 1, 0, 6)
   const b = node('b', -1, 0, 6)
-  const charge = forceChargeOutsideContainers<TestNode>(-280, 900, (n) => n.id === 'box')
+  const charge = forceChargeOutsideContainers<TestNode>(
+    -280,
+    900,
+    (n) => n.id === 'box',
+    () => false
+  )
   const sim = forceSimulation([box, a, b]).force('charge', charge).stop()
   sim.tick()
   assert.equal(box.vx, 0, '容器不受点电荷斥力')
   assert.equal(box.vy, 0)
   assert.notEqual(a.vx, 0, '文件之间仍有斥力')
+}
+
+// 生长动画期间被槽位钉住的子项是惰性的:不作斥力源、不参与成对碰撞与标签防挤;
+// 动画结束当帧重建斥力集合,恢复与圈外节点互斥
+{
+  interface InertTestNode extends ContainNode {
+    id: string
+    labelWidth: number
+    parent: InertTestNode | null
+    slot: Slot | null
+  }
+  const parent: InertTestNode = {
+    id: 'app',
+    x: 0,
+    y: 0,
+    r: 200,
+    depth: 1,
+    parent: null,
+    slot: null,
+    labelWidth: 0
+  }
+  const pinned: InertTestNode = {
+    id: 'app/a.ts',
+    x: 0,
+    y: 0,
+    r: 10,
+    depth: 2,
+    parent,
+    slot: { dx: 0, dy: 0 },
+    labelWidth: 70
+  }
+  const free: InertTestNode = {
+    id: 'lib.ts',
+    x: 14,
+    y: 0,
+    r: 10,
+    depth: 1,
+    parent: null,
+    slot: null,
+    labelWidth: 70
+  }
+  growContainer(parent, 18, 0)
+  assert.equal(isGrowingChild(pinned), true, '父容器生长时子项被钉住')
+  assert.equal(isGrowingChild(free), false, '圈外节点不受生长影响')
+
+  const collide = forcePairCollide<InertTestNode>(0, () => false, isGrowingChild)
+  collide.initialize([pinned, free], () => 0.5)
+  collide(1)
+  assert.equal(pinned.x, 0, '生长中的子项不被碰撞推动')
+  assert.equal(free.x, 14, '生长中的子项不作为碰撞源,不推圈外节点')
+
+  const labels = forceLabelCollide<InertTestNode>(15, 4, () => false, isGrowingChild)
+  labels.initialize([pinned, free])
+  labels(1)
+  assert.equal(free.x, 14, '生长中的子项不作为标签防挤的碰撞源')
+
+  const charge = forceChargeOutsideContainers<InertTestNode>(-280, 900, () => false, isGrowingChild)
+  charge.initialize([pinned, free], Math.random)
+  charge(1)
+  assert.equal(pinned.vx ?? 0, 0, '生长中的子项不作斥力源')
+  assert.equal(free.vx ?? 0, 0, '斥力集合里没有别的节点,圈外节点不受斥力')
+
+  stepContainerGrowth([parent], GRAPH_MOTION.containerGrowMs)
+  assert.equal(isGrowingChild(pinned), false, '动画结束后子项不再是惰性节点')
+  charge(1)
+  assert.equal(pinned.vx ?? 0, 0, '未重建前斥力集合仍是生长期间的')
+  charge.refresh()
+  charge(1)
+  assert.ok((pinned.vx ?? 0) !== 0, '重建后子项回到斥力集合')
+  assert.ok((free.vx ?? 0) !== 0, '圈外节点与子项重新互斥')
 }
 
 // 外围散户引力:只拉焦点层无引用的非容器节点;有引用、容器与容器内子项速度不变
@@ -602,7 +777,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   )
   sim.nodes(scene.nodes)
   const link = sim.force('link') as ReturnType<typeof forceLink<SimNode, SimLink>>
-  link.links(scene.links)
+  link.links(scene.forceLinks)
   sim.stop().alpha(1)
   for (let i = 0; i < 300; i++) sim.tick()
   const distance = Math.hypot(orphan.x, orphan.y)
@@ -654,7 +829,7 @@ function node(id: string, x: number, y: number, r: number, depth = 0): TestNode 
   )
   sim.nodes(scene.nodes)
   const link = sim.force('link') as ReturnType<typeof forceLink<SimNode, SimLink>>
-  link.links(scene.links)
+  link.links(scene.forceLinks)
   sim.stop().alpha(1)
   for (let i = 0; i < 300; i++) {
     sim.tick()

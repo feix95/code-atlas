@@ -3,6 +3,7 @@
 // 所以成对碰撞跳过祖先与后代;容器本身不参与点电荷斥力。
 // 容器与普通节点相撞时只推普通节点:容器代表一整块展开区域,推它等于让整个文件夹带着子项逃跑。
 // 自由游走的节点还要按「圆 + 下方标签」的外框防挤:只按圆互斥挡不住又宽又扁的标签。
+// 生长动画里被钉在槽位上的子项是惰性的:位置由槽位决定,参与受力只会隔着圆壁弹飞圈外节点。
 import { forceManyBody } from 'd3-force'
 import { labelBox } from './nodeBox.ts'
 import type { ContainNode } from './forceContain.ts'
@@ -22,7 +23,8 @@ function isAncestor(ancestor: ContainNode, node: ContainNode): boolean {
 /** d3 forceCollide 的成对版本:两圆相交时按比例推开,祖先与后代之间跳过,容器不被普通节点推动 */
 export function forcePairCollide<N extends ContainNode>(
   padding: number,
-  isContainer: (node: N) => boolean
+  isContainer: (node: N) => boolean,
+  isInert: (node: N) => boolean
 ): ContainPairForce<N> {
   let nodes: readonly N[] = []
   const force = ((_alpha: number): void => {
@@ -30,6 +32,7 @@ export function forcePairCollide<N extends ContainNode>(
       const a = nodes[i]
       for (let j = i + 1; j < nodes.length; j++) {
         const b = nodes[j]
+        if (isInert(a) || isInert(b)) continue
         if (isAncestor(a, b) || isAncestor(b, a)) continue
         const dx = b.x - a.x
         const dy = b.y - a.y
@@ -54,20 +57,35 @@ export function forcePairCollide<N extends ContainNode>(
   return force
 }
 
+export interface ChargeForce<N extends ContainNode> extends ContainPairForce<N> {
+  /** 参与斥力的集合变了(生长动画开始 / 结束):按新集合重建内部力 */
+  refresh: () => void
+}
+
 /** 点电荷斥力,但容器节点不参与:被容器罩住的子项离它太近,互斥只会把容器推成无休止漂移 */
 export function forceChargeOutsideContainers<N extends ContainNode>(
   strength: number,
   distanceMax: number,
-  isContainer: (node: N) => boolean
-): ContainPairForce<N> {
+  isContainer: (node: N) => boolean,
+  isInert: (node: N) => boolean
+): ChargeForce<N> {
   const inner = forceManyBody<N>().strength(strength).distanceMax(distanceMax)
-  const force = ((alpha: number): void => inner(alpha)) as ContainPairForce<N>
-  force.initialize = (nodes, random) => {
+  let nodes: readonly N[] = []
+  let random: (() => number) | null = null
+  const rebuild = (): void => {
+    if (!random) return
     inner.initialize(
-      nodes.filter((node) => !isContainer(node)),
+      nodes.filter((node) => !isContainer(node) && !isInert(node)),
       random
     )
   }
+  const force = ((alpha: number): void => inner(alpha)) as ChargeForce<N>
+  force.initialize = (next, nextRandom) => {
+    nodes = next
+    random = nextRandom
+    rebuild()
+  }
+  force.refresh = rebuild
   return force
 }
 
@@ -132,7 +150,8 @@ function pushBoxOutOfCircle(
 export function forceLabelCollide<N extends LabelBoxNode>(
   labelHeight: number,
   padding: number,
-  isContainer: (node: N) => boolean
+  isContainer: (node: N) => boolean,
+  isInert: (node: N) => boolean
 ): LabelCollideForce<N> {
   let nodes: readonly N[] = []
   let extents: LabelExtent[] = []
@@ -141,6 +160,7 @@ export function forceLabelCollide<N extends LabelBoxNode>(
       const a = nodes[i]
       for (let j = i + 1; j < nodes.length; j++) {
         const b = nodes[j]
+        if (isInert(a) || isInert(b)) continue
         if (isAncestor(a, b) || isAncestor(b, a)) continue
         const aContainer = isContainer(a)
         const bContainer = isContainer(b)

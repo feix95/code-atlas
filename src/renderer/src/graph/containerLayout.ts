@@ -66,6 +66,11 @@ export interface SlotForce<N extends SlotNode> {
   initialize: (nodes: readonly N[]) => void
 }
 
+/** 子项是否被父容器的生长动画占住:位置由槽位决定,斥力与碰撞都不该再算它 */
+export function isGrowingChild(node: SlotNode): boolean {
+  return node.parent?.grow != null
+}
+
 function pinSlots<N extends SlotNode>(ordered: readonly N[]): void {
   for (const node of ordered) {
     const { parent, slot } = node

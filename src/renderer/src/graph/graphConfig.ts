@@ -22,6 +22,8 @@ export const GRAPH_FORCE = {
   velocityDecay: 0.35,
   /** 拖拽节点时模拟保持的热度 */
   dragAlphaTarget: 0.3,
+  /** 原地展开的释放热度:生长中的子项被钉在槽位上,热度太高只会让圈外节点跟着弹 */
+  growReleaseAlpha: 0.1,
   /** 新节点出生时离原点的最大随机偏移 */
   spawnJitter: 40,
   /** 聚类力:同模块可见节点被拉向该模块可见成员质心的强度(关闭「模块着色」时为 0) */

@@ -17,11 +17,17 @@ import {
   applyContainerSlots,
   forceContainerSlots,
   growContainer,
+  isGrowingChild,
   stepContainerGrowth
 } from './containerLayout.ts'
 import { packContainerChildren, type Slot } from './containerPack.ts'
 import { clampToContainers, forceContain } from './forceContain.ts'
-import { forceChargeOutsideContainers, forceLabelCollide, forcePairCollide } from './forceGroups.ts'
+import {
+  forceChargeOutsideContainers,
+  forceLabelCollide,
+  forcePairCollide,
+  type ChargeForce
+} from './forceGroups.ts'
 import { forceOrphanGravity, isOrphanNode } from './forceOrphan.ts'
 import { createLabelMetrics, truncateLabel, type LabelMetrics } from './graphText.ts'
 
@@ -52,7 +58,10 @@ export interface SimLink {
 export interface ForceScene {
   dirRel: string
   nodes: SimNode[]
+  /** 全部可见引用:绘制与悬停高亮用 */
   links: SimLink[]
+  /** 参与受力的引用:去掉跨容器边(见 buildScene) */
+  forceLinks: SimLink[]
 }
 
 export function nodeRadius(n: LevelNode): number {
@@ -139,7 +148,15 @@ export function buildScene(
     const target = byId.get(e.to)
     if (source && target) links.push({ source, target, weight: e.weight })
   }
-  return { dirRel: level.dirRel, nodes, links }
+  // 跨容器边只画线不受力:端点碰到展开容器,或两端分属不同容器(圈外算同一个空容器)。
+  // 展开容器里的子项往往一起引用圈外的同一个节点,受力会把它们全部拽向同一面墙。
+  const forceLinks = links.filter(
+    (link) =>
+      link.source.data.isContainer !== true &&
+      link.target.data.isContainer !== true &&
+      link.source.parent === link.target.parent
+  )
+  return { dirRel: level.dirRel, nodes, links, forceLinks }
 }
 
 export function createSimulation(
@@ -150,6 +167,8 @@ export function createSimulation(
   // 容器代表一整块展开区域:它只随用户拖拽移动,不受引力、斥力、碰撞推移,
   // 否则整块区域会被四周的节点一路挤走
   const isContainer = (node: SimNode): boolean => node.data.isContainer === true
+  // 生长动画期间子项被钉在槽位上:位置不在积分结果里,参与受斥只会隔着圆壁弹飞圈外节点
+  const isInert = (node: SimNode): boolean => isGrowingChild(node)
   // 圈外节点拉向全图原点;容器内的子项拉向自己的容器中心,免得被圈外节点一路推到墙边
   const anchorX = (node: SimNode): number => node.parent?.x ?? 0
   const anchorY = (node: SimNode): number => node.parent?.y ?? 0
@@ -162,7 +181,8 @@ export function createSimulation(
         forceChargeOutsideContainers<SimNode>(
           GRAPH_FORCE.charge,
           GRAPH_FORCE.chargeMaxDistance,
-          isContainer
+          isContainer,
+          isInert
         )
       )
       .force(
@@ -175,14 +195,14 @@ export function createSimulation(
       .force('x', forceX<SimNode>(anchorX).strength(gravity))
       .force('y', forceY<SimNode>(anchorY).strength(gravity))
       .force('orphan', forceOrphanGravity<SimNode>(GRAPH_FORCE.orphanGravity, isOrphanNode))
-      .force('collide', forcePairCollide<SimNode>(GRAPH_FORCE.collidePadding, isContainer))
+      .force('collide', forcePairCollide<SimNode>(GRAPH_FORCE.collidePadding, isContainer, isInert))
       .force('cluster', cluster)
       .force('contain', forceContain<SimNode>(labelHeight))
       .force('slots', forceContainerSlots<SimNode>())
       // 最后再按标签盒收一次:前面的力可能把字又挤回一起
       .force(
         'labels',
-        forceLabelCollide<SimNode>(labelHeight, GRAPH_FORCE.labelPadding, isContainer)
+        forceLabelCollide<SimNode>(labelHeight, GRAPH_FORCE.labelPadding, isContainer, isInert)
       )
       .on('tick', onTick)
   )
@@ -242,10 +262,14 @@ export function useForceLayout(
       () => {
         // 积分在力之后:向外的速度可能把子项带出容器边缘,画之前补夹一次;
         // 生长动画中的父容器这帧也在长,槽位要按它的新进度重新钉
-        if (sceneRef.current) {
-          stepContainerGrowth(sceneRef.current.nodes, performance.now())
-          clampToContainers(sceneRef.current.nodes, labelHeight)
-          applyContainerSlots(sceneRef.current.nodes)
+        const scene = sceneRef.current
+        if (scene) {
+          const growing = scene.nodes.some(isGrowingChild)
+          stepContainerGrowth(scene.nodes, performance.now())
+          // 生长中的子项被钉住、不进斥力;动画结束的这一帧要把它们放回斥力集合
+          if (growing) simRef.current?.force<ChargeForce<SimNode>>('charge')?.refresh()
+          clampToContainers(scene.nodes, labelHeight)
+          applyContainerSlots(scene.nodes)
         }
         onTickRef.current()
       },
@@ -282,14 +306,14 @@ export function useForceLayout(
     const metrics = createLabelMetrics()
     const scene = buildScene(level, prevScene, metrics)
     // 新展开的容器先摆好生长起点,首帧就是从中心散开的起点而不是已经铺满
-    if (sameLevel && markContainerGrowth(scene, prevScene, performance.now())) {
-      applyContainerSlots(scene.nodes)
-    }
+    const grew = sameLevel && markContainerGrowth(scene, prevScene, performance.now())
+    if (grew) applyContainerSlots(scene.nodes)
     sceneRef.current = scene
     sim.nodes(scene.nodes)
-    sim.force<ReturnType<typeof forceLink<SimNode, SimLink>>>('link')?.links(scene.links)
+    sim.force<ReturnType<typeof forceLink<SimNode, SimLink>>>('link')?.links(scene.forceLinks)
     if (sameLevel) {
-      sim.alpha(0.3).restart()
+      // 展开动画期间子项被钉住,高热度只会让圈外节点跟着弹;低热度收尾
+      sim.alpha(grew ? GRAPH_FORCE.growReleaseAlpha : 0.3).restart()
       return
     }
     // 新层级:首帧之前同步预跑到接近稳定,打开即是最终布局,不再边散开边自动缩放
