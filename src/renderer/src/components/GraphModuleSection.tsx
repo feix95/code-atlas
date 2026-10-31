@@ -16,23 +16,21 @@ export function ModuleChip({
     </span>
   )
 }
-function FileButton({
+function FileRow({
   path,
   label,
-  note,
-  onFocusFile
+  note
 }: {
   path: string
   label: string
   note?: string
-  onFocusFile: (relPath: string) => void
 }): React.JSX.Element {
   return (
     <li>
-      <button type="button" className="graph-file" title={path} onClick={() => onFocusFile(path)}>
+      <div className="graph-file" title={path}>
         <span className="graph-file-name">{label}</span>
         {note && <span className="graph-file-note">{note}</span>}
-      </button>
+      </div>
     </li>
   )
 }
@@ -53,7 +51,7 @@ function LinkList({
       <ul className="graph-file-list">
         {links.map((l) => (
           <li key={l.moduleId}>
-            <div className="graph-file graph-file-static">
+            <div className="graph-file">
               <ModuleChip name={l.name} color={colorOf(l.moduleId)} />
               <span className="graph-file-note">{l.weight} 条引用</span>
             </div>
@@ -67,12 +65,10 @@ const ROLE_NOTE = { member: undefined, attached: '附挂', test: '自测' } as c
 
 export function GraphModuleSection({
   details,
-  colorOf,
-  onFocusFile
+  colorOf
 }: {
   details: ModuleDetails
   colorOf: (moduleId: string) => string
-  onFocusFile: (relPath: string) => void
 }): React.JSX.Element {
   const count = details.module.files.length
   return (
@@ -84,12 +80,11 @@ export function GraphModuleSection({
             <p className="graph-folder-name">{g.folder === '' ? '根目录' : g.folder}</p>
             <ul className="graph-file-list">
               {g.files.map((f) => (
-                <FileButton
+                <FileRow
                   key={f.path}
                   path={f.path}
                   label={f.name}
                   note={f.isElsewhere ? '在其他文件夹' : ROLE_NOTE[f.role]}
-                  onFocusFile={onFocusFile}
                 />
               ))}
             </ul>
@@ -101,7 +96,7 @@ export function GraphModuleSection({
           <h3 className="graph-panel-h">相关自测({details.tests.length})</h3>
           <ul className="graph-file-list">
             {details.tests.map((t) => (
-              <FileButton key={t} path={t} label={t} onFocusFile={onFocusFile} />
+              <FileRow key={t} path={t} label={t} />
             ))}
           </ul>
         </section>
@@ -111,7 +106,7 @@ export function GraphModuleSection({
           <h3 className="graph-panel-h">附挂样式({details.styles.length})</h3>
           <ul className="graph-file-list">
             {details.styles.map((s) => (
-              <FileButton key={s} path={s} label={s} onFocusFile={onFocusFile} />
+              <FileRow key={s} path={s} label={s} />
             ))}
           </ul>
         </section>

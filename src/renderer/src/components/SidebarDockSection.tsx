@@ -26,6 +26,7 @@ export function SidebarDockSection({
   undockLabel,
   onUndock,
   onClose,
+  head,
   children
 }: {
   /** 标题条上的名字,也是拖出左栏时小牌上的字 */
@@ -37,6 +38,8 @@ export function SidebarDockSection({
   onUndock: () => void
   /** 传了就在放回钮右边多一颗关闭钮 */
   onClose?: () => void
+  /** 自定义标题条内容:传了就不再画默认的标题与放回/关闭钮,放回钮由它自己画;拖动仍归外壳 */
+  head?: React.ReactNode
   /** 正文:自己滚,撑满标题条以下的高度 */
   children: React.ReactNode
 }): React.JSX.Element {
@@ -165,6 +168,15 @@ export function SidebarDockSection({
     if (back) onUndock()
   }
 
+  const headClass = `sidebar-dock-head${head === undefined ? '' : ' is-custom'}${dragging ? ' is-dragging' : ''}`
+  const headHandlers = {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: (e: React.PointerEvent<HTMLElement>) => finish(e, true),
+    onPointerCancel: (e: React.PointerEvent<HTMLElement>) => finish(e, false),
+    onLostPointerCapture: (e: React.PointerEvent<HTMLElement>) => finish(e, false)
+  }
+
   return (
     <>
       <div
@@ -186,38 +198,37 @@ export function SidebarDockSection({
         style={ratio === null ? undefined : { height: `${ratio * 100}%` }}
         aria-label={label}
       >
-        <header
-          className={`sidebar-dock-head${dragging ? ' is-dragging' : ''}`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={(e) => finish(e, true)}
-          onPointerCancel={(e) => finish(e, false)}
-          onLostPointerCapture={(e) => finish(e, false)}
-        >
-          <span className="sidebar-dock-title">{title}</span>
-          <button
-            type="button"
-            className="sidebar-dock-undock"
-            aria-label={undockLabel}
-            data-tip="放回浮窗"
-            data-tip-side="top"
-            onClick={onUndock}
-          >
-            <TreeIcon name="appWindow" size={HEAD_ICON_SIZE} mono />
-          </button>
-          {onClose && (
+        {head === undefined ? (
+          <header className={headClass} {...headHandlers}>
+            <span className="sidebar-dock-title">{title}</span>
             <button
               type="button"
-              className="sidebar-dock-close"
-              aria-label="关闭详情"
-              data-tip="关闭详情"
+              className="sidebar-dock-undock"
+              aria-label={undockLabel}
+              data-tip="放回浮窗"
               data-tip-side="top"
-              onClick={onClose}
+              onClick={onUndock}
             >
-              <TreeIcon name="x" size={HEAD_ICON_SIZE} mono />
+              <TreeIcon name="appWindow" size={HEAD_ICON_SIZE} mono />
             </button>
-          )}
-        </header>
+            {onClose && (
+              <button
+                type="button"
+                className="sidebar-dock-close"
+                aria-label="关闭详情"
+                data-tip="关闭详情"
+                data-tip-side="top"
+                onClick={onClose}
+              >
+                <TreeIcon name="x" size={HEAD_ICON_SIZE} mono />
+              </button>
+            )}
+          </header>
+        ) : (
+          <div className={headClass} {...headHandlers}>
+            {head}
+          </div>
+        )}
         {children}
       </section>
       {ghost &&

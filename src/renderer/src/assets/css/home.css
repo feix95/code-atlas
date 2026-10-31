@@ -276,8 +276,8 @@
 /* 滚动条:细一圈,不抢内容  */
 
 ::-webkit-scrollbar {
-  width: 0.5625rem;
-  height: 0.5625rem;
+  width: var(--scrollbar-w);
+  height: var(--scrollbar-w);
 }
 
 /* 自定义滚动条会唤醒 Chromium 的 legacy 端点按钮(上下三角),显式关掉 */

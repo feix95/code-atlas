@@ -11,6 +11,7 @@ import { useGraphPanelDock } from '../graph/useGraphPanelDock'
 import { setGraphPanelDocked } from '../graphPanelDock'
 import type { SidebarDropTarget } from '../sidebarDock'
 import { GraphModuleSection, ModuleChip } from './GraphModuleSection'
+import { GraphPanelHeader } from './GraphPanelHeader'
 import { SidebarDockSection } from './SidebarDockSection'
 import { TreeIcon } from './Icons'
 
@@ -28,26 +29,12 @@ export interface GraphSidePanelProps {
   /** 当前停靠位认的那张签(App 按主窗激活组算) */
   activeTabId: string | null
   onClose: () => void
-  onOpenFile: (relPath: string) => void
-  onFocusFile: (relPath: string) => void
-}
-
-const KIND_LABEL: Record<LevelNode['kind'], string> = {
-  file: '文件',
-  folder: '文件夹',
-  external: '当前文件夹以外',
-  overflow: '收起的项'
 }
 
 const isFileNode = (n: LevelNode): boolean =>
   n.kind === 'file' || (n.kind === 'external' && n.target === 'file')
 
-/** 名字右边那一列:文件夹给文件数,收起的项给剩余数量;文件不重复正文里的引用数 */
-function headingMeta(node: LevelNode): string | null {
-  if (node.kind === 'folder') return node.lazy ? '尚未读取' : `共 ${node.descendantFiles} 个文件`
-  if (node.kind === 'overflow') return `其余 ${node.hiddenCount ?? 0} 项`
-  return null
-}
+const UNDOCK_LABEL = '把节点详情放回浮窗,也可以按住标题条拖出左栏'
 
 function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element | null {
   const { node, modules, colorOf } = props
@@ -62,7 +49,7 @@ function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Elemen
       <ul className="graph-file-list">
         {shares.map((s) => (
           <li key={s.moduleId}>
-            <div className="graph-file graph-file-static">
+            <div className="graph-file">
               <ModuleChip name={s.name} color={colorOf(s.moduleId)} />
               <span className="graph-file-note">{s.files} 个文件</span>
             </div>
@@ -86,11 +73,6 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
           引用了 {dep.outCount} 个文件,被 {dep.inCount} 个文件引用
         </p>
       )}
-      <div className="graph-panel-actions">
-        <button type="button" className="graph-panel-btn" onClick={() => props.onOpenFile(node.id)}>
-          打开文件
-        </button>
-      </div>
       {!modules && <p className="graph-panel-note">模块划分暂不可用,先按原始结构显示</p>}
       {modules && !details && (
         <p className="graph-panel-note">未归类:{unassignedReason(node.id)}</p>
@@ -101,52 +83,63 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
             <h3 className="graph-panel-h">所属模块</h3>
             <ModuleChip name={details.name} color={colorOf(details.module.id)} />
           </section>
-          <GraphModuleSection details={details} colorOf={colorOf} onFocusFile={props.onFocusFile} />
+          <GraphModuleSection details={details} colorOf={colorOf} />
         </>
       )}
     </>
   )
 }
 
-function Heading({ node }: { node: LevelNode }): React.JSX.Element {
-  const meta = headingMeta(node)
-  return (
-    <>
-      <p className="graph-panel-kind">{KIND_LABEL[node.kind]}</p>
-      <div className="graph-panel-title-row">
-        <h2 className="graph-panel-title">{node.label}</h2>
-        {meta && <span className="graph-panel-meta">{meta}</span>}
-      </div>
-    </>
-  )
-}
-
 function PanelBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element {
-  const { node } = props
-  const isFile = isFileNode(node)
+  const isFile = isFileNode(props.node)
   return (
     <>
-      {node.kind !== 'overflow' && node.id !== node.label && (
-        <p className="graph-panel-path">{node.id}</p>
-      )}
       {isFile && <FileBody props={props} />}
-      {!isFile && node.kind !== 'overflow' && <FolderBody props={props} />}
+      {!isFile && props.node.kind !== 'overflow' && <FolderBody props={props} />}
     </>
   )
 }
 
-/** 停靠进左栏:外壳(分割线、标题条、拖出小牌)与大纲共用,正文自己滚 */
+/** 停靠进左栏:外壳(分割线、标题条、拖出小牌)与大纲共用,标头换成详情自己的两行排版,正文自己滚 */
 function DockedGraphPanel({ props }: { props: GraphSidePanelProps }): React.JSX.Element {
   return (
     <SidebarDockSection
       title="节点详情"
       label="节点详情"
-      undockLabel="把节点详情放回浮窗,也可以按住标题条拖出左栏"
+      undockLabel={UNDOCK_LABEL}
       onUndock={() => setGraphPanelDocked(false)}
       onClose={props.onClose}
+      head={
+        <GraphPanelHeader
+          node={props.node}
+          controls={
+            <>
+              <button
+                type="button"
+                className="graph-panel-ctrl sidebar-dock-undock"
+                aria-label={UNDOCK_LABEL}
+                data-tip="放回浮窗"
+                data-tip-side="top"
+                onClick={() => setGraphPanelDocked(false)}
+              >
+                <TreeIcon name="appWindow" size={14} mono />
+              </button>
+              <button
+                type="button"
+                className="graph-panel-ctrl sidebar-dock-close"
+                aria-label="关闭详情"
+                data-tip="关闭详情"
+                data-tip-side="top"
+                onClick={props.onClose}
+              >
+                <TreeIcon name="x" size={14} mono />
+              </button>
+            </>
+          }
+        />
+      }
     >
       <div className="graph-panel-dock-body">
-        <Heading node={props.node} />
         <PanelBody props={props} />
       </div>
     </SidebarDockSection>
@@ -189,35 +182,37 @@ function FloatingGraphPanel({
   const panelClass = `graph-panel${isDragging ? ' is-dragging' : ''}${isSnapping ? ' is-snapping' : ''}${isOverDock ? ' is-dock-ready' : ''}`
   return (
     <aside ref={panelRef} className={panelClass} style={style} aria-label="节点详情" tabIndex={-1}>
-      <header className="graph-panel-head">
-        <div
-          className="graph-panel-drag"
-          role="button"
-          tabIndex={0}
-          aria-label="移动节点详情,可用方向键微调;拖到左侧文件树上方松手可停靠"
-          {...grip}
-        >
-          <Heading node={node} />
-        </div>
-        {canDock && (
-          <button
-            type="button"
-            className="graph-panel-dockbtn"
-            aria-label="把节点详情停靠到左侧文件树下方"
-            onClick={onDock}
-          >
-            <TreeIcon name="panelLeft" size={14} mono />
-          </button>
-        )}
-        <button
-          type="button"
-          className="graph-panel-close"
-          aria-label="关闭详情"
-          onClick={props.onClose}
-        >
-          <TreeIcon name="x" size={14} mono />
-        </button>
-      </header>
+      <GraphPanelHeader
+        node={node}
+        grip={grip}
+        gripLabel="移动节点详情,可用方向键微调;拖到左侧文件树上方松手可停靠"
+        controls={
+          <>
+            {canDock && (
+              <button
+                type="button"
+                className="graph-panel-ctrl"
+                aria-label="把节点详情停靠到左侧文件树下方"
+                data-tip="停靠到左栏"
+                data-tip-side="left"
+                onClick={onDock}
+              >
+                <TreeIcon name="panelLeft" size={14} mono />
+              </button>
+            )}
+            <button
+              type="button"
+              className="graph-panel-ctrl"
+              aria-label="关闭详情"
+              data-tip="关闭详情"
+              data-tip-side="left"
+              onClick={props.onClose}
+            >
+              <TreeIcon name="x" size={14} mono />
+            </button>
+          </>
+        }
+      />
       <div className="graph-panel-body">
         <PanelBody props={props} />
       </div>

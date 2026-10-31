@@ -71,8 +71,15 @@ body.is-dock-sash-dragging {
   user-select: none;
 }
 
-.sidebar-dock-head.is-dragging {
+.sidebar-dock-head.is-dragging,
+.sidebar-dock-head.is-dragging .graph-panel-drag {
   cursor: grabbing;
+}
+
+/* 自定义标题条(图谱节点详情):排版交给内容自己,外壳只保留拖动与光标 */
+.sidebar-dock-head.is-custom {
+  display: block;
+  padding: 0;
 }
 
 .sidebar-dock-title {

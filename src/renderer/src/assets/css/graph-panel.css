@@ -35,16 +35,26 @@
   --graph-panel-grip: 0.875rem;
 }
 
+/* 两行标头:类型小字占满 24px 一行、控件压在同一行右侧;标题行独占整宽,
+   停靠钮有无都只向左边长,不挤动名字与计数。
+   右垫多补一条滚动条宽:正文开了 stable 槽位,右对齐的计数与控件都按同一条右缘排 */
 .graph-panel-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+  position: relative;
+  padding: var(--space-3) calc(var(--space-4) + var(--scrollbar-w)) var(--space-4) var(--space-4);
 }
 
-/* 标题整块按住能拖;光标给抓握暗示。热区就是标题本身,不与关闭钮抢地盘 */
+/* 停靠态:左栏里留白收到 8px,与正文、大纲标题条同档;控件跟同一行 */
+.sidebar-dock-head.is-custom .graph-panel-head {
+  padding: var(--space-2) calc(var(--space-2) + var(--scrollbar-w)) var(--space-3) var(--space-2);
+}
+
+.sidebar-dock-head.is-custom .graph-panel-controls {
+  top: var(--space-2);
+  right: calc(var(--space-2) + var(--scrollbar-w));
+}
+
+/* 标题整块按住能拖;光标给抓握暗示 */
 .graph-panel-drag {
-  flex: 1 1 auto;
   min-width: 0;
   border-radius: var(--radius-xs);
   cursor: grab;
@@ -56,38 +66,49 @@
 }
 
 .graph-panel-drag:focus-visible,
-.graph-panel-close:focus-visible,
-.graph-panel-dockbtn:focus-visible,
+.graph-panel-ctrl:focus-visible,
 .graph-panel-resize:focus-visible,
 .graph-panel-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
 
-.graph-panel-close,
-.graph-panel-dockbtn {
+/* 右上角控件:浮窗与停靠同一套尺寸与色档,压在类型小字那一行 */
+.graph-panel-controls {
+  position: absolute;
+  top: var(--space-3);
+  right: calc(var(--space-4) + var(--scrollbar-w));
+  display: flex;
+  gap: var(--space-1);
+}
+
+.graph-panel-ctrl {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: var(--chrome-search-row-height);
-  height: var(--chrome-search-row-height);
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--muted);
+  color: var(--muted-2);
   cursor: pointer;
 }
 
-.graph-panel-close:hover,
-.graph-panel-dockbtn:hover {
+.graph-panel-ctrl:hover {
   background: var(--hover);
   color: var(--text);
 }
 
+/* 占满控件那一行的高度,右侧给控件留座;标题行从控件下沿才开始 */
 .graph-panel-kind {
+  display: flex;
+  align-items: center;
+  min-height: 1.5rem;
   margin: 0;
+  padding-right: calc(3rem + var(--space-2));
   font-size: var(--font-xs);
   color: var(--muted-2);
 }
@@ -98,7 +119,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-top: var(--space-1);
+  margin-top: var(--space-3);
 }
 
 .graph-panel-title {
@@ -126,12 +147,19 @@
   scrollbar-gutter: stable;
 }
 
-/* 停靠在左栏的详情正文:标题条之下自己滚,左右留白与文件树行同档 */
+/* 停靠在左栏的详情正文:标头固定、正文自己滚;左右留白与标头、列表计数同档 */
 .graph-panel-dock-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-1) var(--space-2) var(--space-2);
+  padding: 0 var(--space-2) var(--space-3);
+  scrollbar-gutter: stable;
+}
+
+/* 正文第一条不留上外边距:标头与正文的间距只由标头下垫决定,不随首块类型变化 */
+.graph-panel-body > :first-child,
+.graph-panel-dock-body > :first-child {
+  margin-top: 0;
 }
 
 /* 拉大松手吸回内容尺寸:宽、高与右缘同步过渡,左上角保持不动;拖动途中不加过渡,跟手 */
@@ -149,24 +177,10 @@
   opacity: 0.45;
 }
 
-.graph-panel-path {
-  margin: var(--space-1) 0 var(--space-3);
-  color: var(--muted);
-  font-size: var(--font-xs);
-  word-break: break-all;
-}
-
 .graph-panel-note {
   margin: 0 0 var(--space-3);
   color: var(--muted);
   line-height: var(--lh-150);
-}
-
-.graph-panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
 }
 
 .graph-panel-btn {
@@ -287,29 +301,14 @@
   list-style: none;
 }
 
+/* 只读行:色块、文件名与上面的标题、小节的左缘对齐;数字贴正文右缘 */
 .graph-file {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-1) var(--space-2);
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
+  padding: var(--space-1) 0;
   color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.graph-file:hover {
-  background: var(--hover);
-}
-
-.graph-file:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
 
 .graph-file-name {
@@ -323,13 +322,4 @@
   flex-shrink: 0;
   color: var(--muted-2);
   font-size: var(--font-xs);
-}
-
-/* 侧栏里只展示、不可点的行(模块构成、模块间连线) */
-.graph-file-static {
-  cursor: default;
-}
-
-.graph-file-static:hover {
-  background: transparent;
 }

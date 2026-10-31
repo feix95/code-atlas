@@ -18,6 +18,7 @@ import { buildModuleOverlay, moduleDisplayName } from '../graph/moduleOverlay'
 import { nodeMenuItems, useGraphSelection } from '../graph/useGraphSelection'
 import { useGraphHoverMode } from '../graph/useGraphHoverMode'
 import { useGraphHoverDetail } from '../graph/useGraphHoverDetail'
+import { useGraphEscape } from '../graph/useGraphEscape'
 import { moduleSwatchCss } from '../graph/moduleColors'
 import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
@@ -125,9 +126,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   const isAwaitingGraph = current === null && graphNote === null
   const layout = useForceLayout(isAwaitingGraph ? null : level, render.requestDraw, clusters)
   const activate = useNodeActivate(nav, onOpenFile)
-  const centerRef = useRef<(id: string) => boolean>(() => false)
-  const centerOn = useCallback((id: string) => centerRef.current(id), [])
-  const selection = useGraphSelection({ level, navigate: nav.navigate, centerOn })
+  const selection = useGraphSelection()
   const modulesOn = showModules && overlay.nodes.size > 0
   const moduleOfNode = useCallback(
     (id: string) => overlay.nodes.get(id)?.hullModule ?? null,
@@ -190,10 +189,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     onModeWheel: hoverMode.onModeWheel,
     onLevelWheel: enterOrLeave
   })
-  useEffect(() => {
-    centerRef.current = viewport.centerOn
-  }, [viewport.centerOn])
-
+  const { clearHover } = viewport
+  const clearSelection = selection.clear
+  const dismissHoverAndSelection = useCallback(() => {
+    clearHover()
+    clearSelection()
+  }, [clearHover, clearSelection])
+  useGraphEscape(dismissHoverAndSelection)
   useEffect(() => {
     linkRef.current = {
       canvasRef,
@@ -217,9 +219,6 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowLeft')) {
       e.preventDefault()
       nav.goUp()
-    } else if (e.key === 'Escape') {
-      viewport.clearHover()
-      selection.clear()
     }
   }
 
@@ -310,8 +309,6 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           tabId={props.tabId}
           activeTabId={props.activeTabId}
           onClose={selection.clear}
-          onOpenFile={onOpenFile}
-          onFocusFile={selection.focusFile}
         />
       )}
       {picker.element}

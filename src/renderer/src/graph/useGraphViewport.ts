@@ -9,11 +9,36 @@ import { useGraphClicks } from './useGraphClicks'
 import { hitTest, localPoint } from './graphHit'
 import { fitTransform } from './fitView'
 
+interface CarryItem {
+  node: SimNode
+  x: number
+  y: number
+}
+
 type Interaction =
   | { mode: 'idle' }
   | { mode: 'hovering'; node: SimNode; since: number }
-  | { mode: 'dragging-node'; node: SimNode; sx: number; sy: number; moved: boolean }
+  | {
+      mode: 'dragging-node'
+      node: SimNode
+      sx: number
+      sy: number
+      moved: boolean
+      /** 跟着一起搬的容器内子项,按按下时的位置记锚点 */
+      carry: readonly CarryItem[]
+    }
   | { mode: 'panning'; sx: number; sy: number; ox: number; oy: number }
+
+/** 拖容器时连同里面的子项一起搬:收集全部后代 */
+function collectDescendants(scene: { nodes: readonly SimNode[] } | null, node: SimNode): SimNode[] {
+  if (!scene) return []
+  return scene.nodes.filter((other) => {
+    for (let current = other.parent; current; current = current.parent) {
+      if (current === node) return true
+    }
+    return false
+  })
+}
 
 export interface ViewportSize {
   w: number
@@ -48,8 +73,6 @@ export interface GraphViewport {
   fit: () => void
   /** 取消悬停(Esc) */
   clearHover: () => void
-  /** 平移视口让该节点落在画布中央;节点不在当前层返回 false */
-  centerOn: (id: string) => boolean
 }
 
 function useCanvasSize(
@@ -146,7 +169,12 @@ function usePointer(
       if (node) {
         node.fx = node.x
         node.fy = node.y
-        setState({ mode: 'dragging-node', node, sx, sy, moved: false })
+        const carry = collectDescendants(depsRef.current.sceneRef.current, node).map((child) => ({
+          node: child,
+          x: child.x,
+          y: child.y
+        }))
+        setState({ mode: 'dragging-node', node, sx, sy, moved: false, carry })
       } else {
         const tf = transformRef.current
         setState({ mode: 'panning', sx, sy, ox: tf.x, oy: tf.y })
@@ -160,8 +188,22 @@ function usePointer(
         if (!s.moved && Math.hypot(sx - s.sx, sy - s.sy) > GRAPH_VIEW.clickSlopPx) {
           s.moved = true
           d.setDragging(true)
+          // 子项从这一刻起固定,整体跟着容器平移,松手后再交回力
+          for (const item of s.carry) {
+            item.node.fx = item.x
+            item.node.fy = item.y
+          }
         }
-        if (s.moved) [s.node.fx, s.node.fy] = toWorld(sx, sy)
+        if (s.moved) {
+          const [wx, wy] = toWorld(sx, sy)
+          const [ox, oy] = toWorld(s.sx, s.sy)
+          s.node.fx = wx
+          s.node.fy = wy
+          for (const item of s.carry) {
+            item.node.fx = item.x + wx - ox
+            item.node.fy = item.y + wy - oy
+          }
+        }
         return
       }
       if (s.mode === 'panning') {
@@ -181,6 +223,10 @@ function usePointer(
       const s = stateRef.current
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
       if (s.mode === 'dragging-node') {
+        for (const item of s.carry) {
+          item.node.fx = null
+          item.node.fy = null
+        }
         s.node.fx = null
         s.node.fy = null
         if (s.moved) depsRef.current.setDragging(false)
@@ -234,18 +280,5 @@ export function useGraphViewport(deps: ViewportDeps): GraphViewport {
     requestDraw()
   }, [sceneRef, sizeRef, requestDraw])
 
-  const centerOn = useCallback(
-    (id: string): boolean => {
-      const n = sceneRef.current?.nodes.find((node) => node.id === id)
-      if (!n) return false
-      const tf = transformRef.current
-      tf.x = sizeRef.current.w / 2 - n.x * tf.k
-      tf.y = sizeRef.current.h / 2 - n.y * tf.k
-      requestDraw()
-      return true
-    },
-    [sceneRef, sizeRef, requestDraw]
-  )
-
-  return { transformRef, sizeRef, fit, clearHover, centerOn }
+  return { transformRef, sizeRef, fit, clearHover }
 }
