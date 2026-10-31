@@ -1835,6 +1835,27 @@ try {
     clearanceOf(collapsePoint) > 12,
     `container blank spot too close to a child (${clearanceOf(collapsePoint).toFixed(1)}px)`
   )
+  // 换节点不跟着内容变宽:先在容器空白处量 app 的宽,再换子文件 a.ts,宽度应保持一致
+  await page.mouse.move(collapsePoint.x, collapsePoint.y)
+  await page.waitForFunction(
+    () => document.querySelector('.graph-panel-title')?.textContent === 'app',
+    undefined,
+    { timeout: 5_000 }
+  )
+  const folderWidth = (await panel.boundingBox())?.width ?? 0
+  await page.mouse.move(childPoints[0].x, childPoints[0].y)
+  await page.waitForFunction(
+    () => document.querySelector('.graph-panel-title')?.textContent === 'a.ts',
+    undefined,
+    { timeout: 5_000 }
+  )
+  const fileWidth = (await panel.boundingBox())?.width ?? 0
+  assert.ok(
+    folderWidth > 0 && Math.abs(folderWidth - fileWidth) <= 1,
+    'switching nodes must not resize the detail panel'
+  )
+  await page.keyboard.press('Escape')
+  await panel.waitFor({ state: 'detached' })
   // 悬停本身不累加点击计数;先把指针移开让悬停状态复位,再在同一处双击收起
   await page.mouse.move(1240, 70)
   await page.waitForTimeout(400)

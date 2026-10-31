@@ -1,6 +1,7 @@
 // 图谱节点详情浮窗的拖动/拉伸现场:按住标题拖位置,右下角拉手拉尺寸(左上角钉住),方向键微调。
 // 手势进行中只改内存 live 账,松手才落盘;上屏前按当前画布大小夹一遍,换层级、缩窗口都不会跑出画布。
-// 宽高紧包内容:拉的途中跟手,松手比内容尺寸还大就平滑吸回;拖到左栏上方松手 = 停靠。
+// 宽度在本次打开时按首个节点量一次,换节点不再跟着内容改宽,避免悬停切换时面板抽动;高度仍按内容收。
+// 拉的途中跟手,松手比内容尺寸还大就平滑吸回;拖到左栏上方松手 = 停靠。
 import {
   useCallback,
   useEffect,
@@ -87,8 +88,9 @@ export function useGraphPanelPlacement(
   const [bounds, setBounds] = useState<FitBounds | null>(null)
   const gestureRef = useRef<Gesture | null>(null)
   const snapTimerRef = useRef(0)
-  // 内容宽按内容变才重量;内容高还随宽度变(换行),宽度一换就得跟着量
-  const naturalRef = useRef<{ width: number; height: number; atWidth: number } | null>(null)
+  // 自适应宽:本次打开量一次就锁住;内容高随内容与宽度变(换行),每次都要重量
+  const autoWidthRef = useRef<number | null>(null)
+  const naturalHeightRef = useRef<{ height: number; atWidth: number } | null>(null)
   const dropRef = useRef(dropTarget)
   const [overDock, setOverDock] = useState(false)
   const overDockRef = useRef(false)
@@ -109,21 +111,25 @@ export function useGraphPanelPlacement(
     const view = viewRef.current
     const panel = panelRef.current
     if (!view || !panel || view.clientWidth === 0 || view.clientHeight === 0) return null
-    let natural = naturalRef.current
-    if (!natural) natural = { width: measureNaturalWidth(panel), height: 0, atWidth: 0 }
+    if (autoWidthRef.current === null) autoWidthRef.current = measureNaturalWidth(panel)
     const panelWidth = panel.offsetWidth
-    if (natural.atWidth !== panelWidth) {
-      natural = { ...natural, height: measureNaturalHeight(panel), atWidth: panelWidth }
+    let naturalHeight = naturalHeightRef.current
+    if (!naturalHeight || naturalHeight.atWidth !== panelWidth) {
+      naturalHeight = { height: measureNaturalHeight(panel), atWidth: panelWidth }
+      naturalHeightRef.current = naturalHeight
     }
-    naturalRef.current = natural
-    return measureGraphPanelBounds(view, panel, natural)
+    return measureGraphPanelBounds(view, panel, {
+      width: autoWidthRef.current,
+      height: naturalHeight.height
+    })
   }, [viewRef, panelRef])
 
   useLayoutEffect(() => {
     const view = viewRef.current
     const panel = panelRef.current
     if (!view || !panel) return
-    naturalRef.current = null
+    autoWidthRef.current = null
+    naturalHeightRef.current = null
     const update = (): void => {
       const next = measure()
       setBounds((prev) => (sameFloatBounds(prev, next) ? prev : next))
@@ -132,9 +138,9 @@ export function useGraphPanelPlacement(
     const observer = new ResizeObserver(update)
     observer.observe(view)
     observer.observe(panel)
-    // 换节点、模块数据到货都会换掉面板里的内容:内容宽要重量
+    // 换节点、模块数据到货都会换掉面板里的内容:高度重量,宽度沿用本次打开时的值
     const mutations = new MutationObserver(() => {
-      naturalRef.current = null
+      naturalHeightRef.current = null
       update()
     })
     mutations.observe(panel, { childList: true, subtree: true, characterData: true })
