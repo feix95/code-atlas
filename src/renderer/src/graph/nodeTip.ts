@@ -1,6 +1,7 @@
 // 悬停提示框的内容与落位:只读节点与模块叠加层,不碰 DOM,便于自测。
 // 只给「补全画布上看不全的信息」:文件说属于哪个模块,画布截断的名字在这里补全;
-// 文件夹、overflow 节点不弹提示(文件数与模块数对理解项目没有直接帮助,统计看侧栏)。
+// 文件夹不弹提示(文件数与模块数对理解项目没有直接帮助,统计看侧栏);
+// 收起的项说明进入动作,画布上只有计数,不说明它是一扇门。
 // 提示贴在节点上方;上方放不下时翻到下方,左右越界夹回画布内。
 import type { LevelNode } from '@shared/graphView'
 import { GRAPH_LABEL, GRAPH_TIP } from './graphConfig.ts'
@@ -40,7 +41,7 @@ export function nodeTipText(node: LevelNode, signals: NodeTipSignals): NodeTipTe
     case 'external':
       return { title: fullLabel(node), sub: '当前文件夹之外' }
     case 'overflow':
-      return null
+      return { title: '', sub: '双击进入查看全部' }
   }
 }
 

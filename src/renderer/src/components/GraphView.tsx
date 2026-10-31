@@ -8,9 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, DepGraphNode, DepGraphResult, ScanDirNode, ScanResult } from '@shared/types'
 import { folderTree } from '@shared/hierarchy'
 import type { LevelNode } from '@shared/graphView'
-import { useGraphNav, type GraphNav } from '../graph/useGraphNav'
+import { useGraphNav } from '../graph/useGraphNav'
 import { useGraphExpansion } from '../graph/useGraphExpansion'
 import { levelWheelAction, type LevelWheelTarget } from '../graph/wheelIntent'
+import { isFolderTarget, useNodeActivate } from '../graph/useNodeActivate'
 import { useForceLayout, type SimNode } from '../graph/useForceLayout'
 import { useGraphViewport } from '../graph/useGraphViewport'
 import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
@@ -65,22 +66,6 @@ export function GraphView(props: GraphViewProps): React.JSX.Element {
   // 切换项目 = 整个画布重建:层级、布局、视口、选中一并归零
   return <GraphCanvas key={result.rootPath} {...props} result={result} />
 }
-
-function useNodeActivate(
-  nav: GraphNav,
-  onOpenFile: (relPath: string) => void
-): (d: LevelNode) => void {
-  return useCallback(
-    (d: LevelNode) => {
-      if (d.kind === 'file' || (d.kind === 'external' && d.target === 'file')) onOpenFile(d.id)
-      else if (d.kind === 'folder' || d.kind === 'external') void nav.navigate(d.id)
-    },
-    [nav, onOpenFile]
-  )
-}
-
-const isFolderTarget = (d: LevelNode): boolean =>
-  d.kind === 'folder' || (d.kind === 'external' && d.target === 'folder')
 
 function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.Element {
   const { result, graph, graphLoading, graphNote, onLoadGraph, expandLazy, onOpenFile } = props
@@ -285,8 +270,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       />
       <GraphNotices
         graphNote={graphNote}
-        scanFailed={nav.status.kind === 'failed'}
-        expansionNotice={expansion.notice}
+        scanFailed={nav.status.kind === 'failed' || expansion.scanFailed}
         onRetry={onLoadGraph}
       />
       {overlayText && <p className="graph-overlay">{overlayText}</p>}
@@ -296,7 +280,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           elsewhere={tagModule ? (overlay.elsewhere.get(tagModule) ?? 0) : 0}
         />
       )}
-      {/* 看法标签亮着或详情浮窗已展示该节点时提示框让位;拖拽中先收起,松手后再亮;文件夹与 overflow 没有可补的信息 */}
+      {/* 看法标签亮着或详情浮窗已展示该节点时提示框让位;拖拽中先收起,松手后再亮;文件夹没有可补的信息 */}
       {hover && hoverTip && <GraphNodeTip key={hover.node.id} anchor={hover} text={hoverTip} />}
       {selection.selected && (
         <GraphSidePanel

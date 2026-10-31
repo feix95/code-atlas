@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import type { LevelNode } from '@shared/graphView'
 import type { HoverTarget } from './useGraphViewport'
 
-/** 可以弹出详情的悬停目标:拖拽中先不弹,收起的项只是计数占位,没有可看的详情 */
+/** 可以弹出详情的悬停目标:拖拽中先不弹;收起的项是一扇门,悬停只给进入提示 */
 export function detailNodeOf(hover: HoverTarget | null): LevelNode | null {
   if (!hover || hover.dragging) return null
   return hover.node.data.kind === 'overflow' ? null : hover.node.data

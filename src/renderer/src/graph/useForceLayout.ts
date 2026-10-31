@@ -133,7 +133,8 @@ export function buildScene(
       metrics.measure(truncateLabel(container.data.label))
     )
     for (const child of children) child.slot = layout.slots.get(child.id) ?? null
-    container.r = layout.radius
+    // 结构摘要只留少量子项时装箱半径可能小于收起时的节点半径;点开不该看起来更小
+    container.r = Math.max(layout.radius, nodeRadius(container.data))
   }
   // 新子项落在自己的槽位上;父节点可能也是新节点,按层数从外到内落位。
   // 槽位只决定出生站位与展开动画,之后子项交给力自由游走

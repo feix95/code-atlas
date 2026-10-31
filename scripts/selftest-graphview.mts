@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict'
 import { buildLevelGraph, type LevelGraph } from '../src/shared/graphView.ts'
 import { folderTree } from '../src/shared/hierarchy.ts'
-import {
-  buildVisibleGraph,
-  isVisibleGraphRejection,
-  type VisibleGraph
-} from '../src/shared/visibleGraph.ts'
+import { buildVisibleGraph, type VisibleGraph } from '../src/shared/visibleGraph.ts'
 import type { DepEdge, ScanDirNode, ScanFileNode, ScanTreeNode } from '../src/shared/types.ts'
 
 // 关系图谱单层视图(drill-down)的纯函数自测:节点只取当前目录的直接子项,
@@ -133,7 +129,7 @@ assert.equal(buildLevelGraph(tree, edges, 'nope'), null)
   assert.ok(!g.nodes.some((n) => n.id === 'src/ghost.ts'))
 }
 
-// 单层节点超限:按度数保留前 N 个,其余归并为「其余」节点,边改挂过去
+// 焦点页完整:进入大文件夹后直接子项全量呈现,预览额度不参与
 {
   const many: ScanTreeNode[] = []
   for (let i = 0; i < 10; i++) many.push(file(`big/f${i}.ts`))
@@ -143,20 +139,10 @@ assert.equal(buildLevelGraph(tree, edges, 'nope'), null)
     { from: 'big/f2.ts', to: 'big/f1.ts' },
     { from: 'big/f9.ts', to: 'big/f8.ts' }
   ]
-  const g = buildLevelGraph(bigTree, bigEdges, 'big', 4)
+  const g = buildLevelGraph(bigTree, bigEdges, 'big')
   assert.ok(g)
-  const kept = g.nodes.filter((n) => n.kind === 'file').map((n) => n.id)
-  assert.equal(kept.length, 3, '上限 4 = 保留 3 个 + 1 个「其余」节点')
-  assert.ok(kept.includes('big/f1.ts'), '度数最高的优先保留')
-  const rest = g.nodes.find((n) => n.kind === 'overflow')
-  assert.ok(rest)
-  assert.equal(rest.hiddenCount, 7)
-  assert.equal(g.nodes.length, 4)
-  // 被收进「其余」的节点之间的边变成自引用,丢弃;与保留节点之间的边挂到「其余」节点
-  for (const e of g.edges) {
-    assert.ok(g.nodes.some((n) => n.id === e.from) && g.nodes.some((n) => n.id === e.to))
-    assert.notEqual(e.from, e.to)
-  }
+  assert.equal(g.nodes.filter((n) => n.kind === 'file').length, 10, '直接子项一个不少')
+  assert.ok(!g.nodes.some((n) => n.kind === 'overflow'), '焦点页不出现「其余 N 项」')
 }
 
 // ---------- P2:分组树 ----------
@@ -193,7 +179,6 @@ function visible(
 ): VisibleGraph {
   const g = buildVisibleGraph(folderTree(source), depEdges, focus, new Set(expanded), maxNodes)
   assert.ok(g, `焦点 ${focus} 应存在`)
-  assert.ok(!isVisibleGraphRejection(g), `焦点 ${focus} 不应超限`)
   return g
 }
 
@@ -294,42 +279,89 @@ function vnode(g: VisibleGraph, id: string): VisibleGraph['nodes'][number] {
   assert.equal(g.nodes.filter((n) => n.parentId === 'src/vendorish').length, 0)
 }
 
-// ---------- P2:节点上限 ----------
+// ---------- P2 补充:预览额度只约束原地展开 ----------
 {
-  // 多个展开叠加超限:焦点 4 个子项 + src 的 5 个子项 = 9 > 5
-  const g = buildVisibleGraph(folderTree(tree), edges, '', new Set(['src']), 5)
-  assert.ok(g)
-  assert.ok(isVisibleGraphRejection(g))
-  assert.equal(g.reason, 'total')
-  assert.equal(g.count, 9)
-  assert.equal(g.limit, 5)
-}
-
-{
+  // 焦点页直接子项不计入预览额度:额度给 4 也显示全部 10 个
   const many: ScanTreeNode[] = []
   for (let i = 0; i < 10; i++) many.push(file(`big/f${i}.ts`))
   const bigTree = dir('', [dir('big', many)])
-
-  // 单个文件夹自身子项超限:再展开也放不下,原因可区分
-  const rejected = buildVisibleGraph(folderTree(bigTree), [], '', new Set(['big']), 4)
-  assert.ok(rejected)
-  assert.ok(isVisibleGraphRejection(rejected))
-  assert.equal(rejected.reason, 'folder')
-  assert.equal(rejected.count, 5, 'big 自己 + 上限内的子项块')
-  assert.equal(rejected.limit, 4)
-
-  // 焦点层本身超限沿用 overflow 节点,不拒绝
   const g = buildVisibleGraph(folderTree(bigTree), [], 'big', new Set(), 4)
   assert.ok(g)
-  assert.ok(!isVisibleGraphRejection(g))
-  assert.equal(g.nodes.length, 4)
-  const rest = g.nodes.find((n) => n.kind === 'overflow')
-  assert.ok(rest)
-  assert.equal(rest.hiddenCount, 7)
-  assert.equal(rest.depth, 1)
+  assert.equal(g.nodes.length, 10)
+  assert.ok(!g.nodes.some((n) => n.kind === 'overflow'))
 }
 
-// ---------- P2:未超限上限时展开 big ----------
+{
+  // 展开放不下:预览额度全部给子项,其余收进本组的入口节点,不拒绝
+  const many: ScanTreeNode[] = []
+  for (let i = 0; i < 10; i++) many.push(file(`big/f${i}.ts`))
+  const bigTree = dir('', [dir('big', many)])
+  const g = buildVisibleGraph(folderTree(bigTree), [], '', new Set(['big']), 4)
+  assert.ok(g)
+  assert.equal(vnode(g, 'big').isContainer, true)
+  const children = g.nodes.filter((n) => n.parentId === 'big')
+  assert.equal(children.filter((n) => n.kind === 'file').length, 4)
+  const rest = children.find((n) => n.kind === 'overflow')
+  assert.ok(rest)
+  assert.equal(rest.hiddenCount, 6)
+  assert.equal(rest.groupId, 'big')
+  assert.equal(rest.depth, 2)
+}
+
+// ---------- P2 补充:结构摘要先保子文件夹,文件按跨组引用数排序 ----------
+{
+  const t = dir('', [
+    dir('pkg', [
+      dir('pkg/sub', [file('pkg/sub/x.ts')]),
+      file('pkg/f0.ts'),
+      file('pkg/f1.ts'),
+      file('pkg/f2.ts')
+    ]),
+    file('outside.ts')
+  ])
+  const depEdges: DepEdge[] = [
+    // f2 组内互引最多,但对摘要没有贡献
+    { from: 'pkg/f0.ts', to: 'pkg/f2.ts' },
+    { from: 'pkg/f1.ts', to: 'pkg/f2.ts' },
+    { from: 'pkg/f2.ts', to: 'pkg/f0.ts' },
+    // f1 与组外文件有引用
+    { from: 'pkg/f1.ts', to: 'outside.ts' }
+  ]
+  const g = visible('', ['pkg'], 2, t, depEdges)
+  const kept = g.nodes.filter((n) => n.parentId === 'pkg' && n.kind !== 'overflow').map((n) => n.id)
+  assert.deepEqual(kept, ['pkg/sub', 'pkg/f1.ts'], '子文件夹在前,文件按跨组引用数优先')
+  const rest = g.nodes.find((n) => n.kind === 'overflow' && n.parentId === 'pkg')
+  assert.ok(rest)
+  assert.equal(rest.hiddenCount, 2, 'f0 与 f2 收进「其余 N 项」')
+}
+
+// ---------- P2 补充:先展开的组不被后来的组重算,收起后额度释放 ----------
+{
+  const t = dir('', [
+    dir('a', [file('a/1.ts'), file('a/2.ts'), file('a/3.ts')]),
+    dir('b', [file('b/1.ts'), file('b/2.ts'), file('b/3.ts')])
+  ])
+  const first = visible('', ['a'], 3, t, [])
+  const aChildren = first.nodes.filter((n) => n.parentId === 'a').map((n) => n.id)
+  assert.deepEqual(aChildren, ['a/1.ts', 'a/2.ts', 'a/3.ts'])
+  const both = visible('', ['a', 'b'], 3, t, [])
+  assert.deepEqual(
+    both.nodes.filter((n) => n.parentId === 'a').map((n) => n.id),
+    aChildren,
+    '新展开的组不能减少已有组的内容'
+  )
+  const bOnly = both.nodes.filter((n) => n.parentId === 'b')
+  assert.equal(bOnly.length, 1)
+  assert.equal(bOnly[0].kind, 'overflow', '额度已用完:后展开的组只留入口')
+  const freed = visible('', ['b'], 3, t, [])
+  assert.deepEqual(
+    freed.nodes.filter((n) => n.parentId === 'b').map((n) => n.id),
+    ['b/1.ts', 'b/2.ts', 'b/3.ts'],
+    '收起 a 后 b 拿到全部额度'
+  )
+}
+
+// ---------- P2:额度够时展开 big,子项全部出现 ----------
 {
   const many: ScanTreeNode[] = []
   for (let i = 0; i < 10; i++) many.push(file(`big/f${i}.ts`))

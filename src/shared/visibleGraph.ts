@@ -1,12 +1,12 @@
 // 关系图谱的可见图:焦点直接子项 + 已展开容器的子项。
 // 展开的文件夹仍是节点(容器),子项紧随其后;边归并见 visibleEdges.ts。
-// 可见非外部节点超过上限时返回可区分的原因。纯函数,不碰 DOM。
+// 焦点页直接子项全量呈现;原地展开只用预览额度,放不下时给结构摘要与「其余 N 项」入口。纯函数,不碰 DOM。
 import type { DepEdge } from './types.ts'
 import type { GroupTree } from './hierarchy.ts'
 import { aggregate, computeDegrees, resolvePairs } from './visibleEdges.ts'
 
-/** 屏幕上同时可见的非外部节点上限 */
-export const GRAPH_LEVEL_MAX_NODES = 150
+/** 原地展开追加的预览节点额度;焦点页直接子项不计入 */
+export const GRAPH_PREVIEW_NODES = 150
 
 /** overflow 节点 id 的后缀:含冒号,Windows 文件名不可能出现,不会与 relPath 撞车 */
 export const OVERFLOW_ID_SUFFIX = '::overflow'
@@ -29,6 +29,8 @@ export interface LevelNode {
   target?: 'file' | 'folder'
   /** overflow 节点收纳的子项数 */
   hiddenCount?: number
+  /** overflow 节点所属的文件夹:进入焦点页时用它 */
+  groupId?: string
 }
 
 export interface LevelEdge {
@@ -57,20 +59,6 @@ export interface VisibleNode extends LevelNode {
 
 export interface VisibleGraph extends LevelGraph {
   nodes: VisibleNode[]
-}
-
-export interface VisibleGraphRejection {
-  /** total = 多个展开叠加后超限;folder = 某个文件夹自身子项超限,再展开也放不下 */
-  reason: 'total' | 'folder'
-  /** 按展开集合计算出的可见非外部节点数(各组 overflow 收口后) */
-  count: number
-  limit: number
-}
-
-export function isVisibleGraphRejection(
-  value: VisibleGraph | VisibleGraphRejection
-): value is VisibleGraphRejection {
-  return 'reason' in value
 }
 
 export interface VisibleEntry {
@@ -128,61 +116,88 @@ function groupChildren(
 
 interface GroupOverflow {
   overflowId: string
+  groupId: string
   hidden: Set<string>
 }
 
-/** 超限时按度数(并列保持原顺序)保留前 max-1 个,其余收进本组的 overflow 节点 */
-function planGroup(
-  groupId: string,
+/**
+ * 结构摘要的保留顺序:子文件夹保持原序在前;文件按与组外节点的引用条数排,
+ * 组内文件互引对结构没有贡献,只在最后按总引用数做次级排序。
+ */
+function rankGroupChildren(
   childIds: readonly string[],
   nodesById: ReadonlyMap<string, VisibleNode>,
-  max: number
-): GroupOverflow | null {
-  if (childIds.length <= max) return null
-  const ranked = childIds
-    .map((id, index) => ({ id, index, degree: nodesById.get(id)?.degree ?? 0 }))
-    .sort((a, b) => b.degree - a.degree || a.index - b.index)
-  const keep = new Set(ranked.slice(0, max - 1).map((r) => r.id))
-  return {
-    overflowId: groupId + OVERFLOW_ID_SUFFIX,
-    hidden: new Set(childIds.filter((id) => !keep.has(id)))
+  pairs: ReadonlyArray<[string, string]>
+): string[] {
+  const files = new Set(childIds.filter((id) => nodesById.get(id)?.kind === 'file'))
+  const contribution = new Map<string, number>()
+  for (const [from, to] of pairs) {
+    if (files.has(from) && files.has(to)) continue
+    if (files.has(from)) contribution.set(from, (contribution.get(from) ?? 0) + 1)
+    if (files.has(to)) contribution.set(to, (contribution.get(to) ?? 0) + 1)
   }
+  const totalDegree = (id: string): number => nodesById.get(id)?.degree ?? 0
+  const rankedFiles = childIds
+    .map((id, index) => ({ id, index }))
+    .filter(({ id }) => files.has(id))
+    .sort(
+      (a, b) =>
+        (contribution.get(b.id) ?? 0) - (contribution.get(a.id) ?? 0) ||
+        totalDegree(b.id) - totalDegree(a.id) ||
+        a.index - b.index
+    )
+    .map(({ id }) => id)
+  return [...childIds.filter((id) => nodesById.get(id)?.kind === 'folder'), ...rankedFiles]
 }
 
-interface OverflowPlans {
-  byGroup: Map<string, GroupOverflow>
-  directHidden: Map<string, string>
-}
-
+/**
+ * 预览额度按展开顺序分配:先展开的组先取,新组只能用剩余额度,已有组不重算。
+ * 放得下就全展开;放不下时按结构摘要保留,其余收进本组的「其余 N 项」入口。
+ * 焦点组不参与分配:进入文件夹后直接子项必须全量呈现。
+ */
 function planOverflows(
-  focus: string,
+  expanded: ReadonlySet<string>,
   visible: ReadonlyMap<string, VisibleEntry>,
   groups: ReadonlyMap<string, string[]>,
   nodesById: ReadonlyMap<string, VisibleNode>,
-  max: number
-): OverflowPlans {
-  const byGroup = new Map<string, GroupOverflow>()
-  const directHidden = new Map<string, string>()
+  pairs: ReadonlyArray<[string, string]>,
+  previewBudget: number
+): Map<string, GroupOverflow> {
+  const plans = new Map<string, GroupOverflow>()
+  const hidden = new Set<string>()
   const isHidden = (id: string): boolean => {
     let current: string | null = id
     while (current) {
-      if (directHidden.has(current)) return true
+      if (hidden.has(current)) return true
       current = visible.get(current)?.parentId ?? null
     }
     return false
   }
-  const apply = (groupId: string): void => {
-    const plan = planGroup(groupId, groups.get(groupId) ?? [], nodesById, max)
-    if (!plan) return
-    byGroup.set(groupId, plan)
-    for (const id of plan.hidden) directHidden.set(id, plan.overflowId)
+  let remaining = previewBudget
+  for (const groupId of expanded) {
+    if (!visible.get(groupId)?.isContainer || isHidden(groupId)) continue
+    const childIds = groups.get(groupId) ?? []
+    if (childIds.length === 0) continue
+    const keepCount = Math.min(childIds.length, remaining)
+    remaining -= keepCount
+    if (keepCount === childIds.length) continue
+    const keep = new Set(rankGroupChildren(childIds, nodesById, pairs).slice(0, keepCount))
+    for (const id of childIds) if (!keep.has(id)) hidden.add(id)
+    plans.set(groupId, {
+      overflowId: groupId + OVERFLOW_ID_SUFFIX,
+      groupId,
+      hidden: new Set(childIds.filter((id) => !keep.has(id)))
+    })
   }
-  apply(focus)
-  for (const [id, entry] of visible) {
-    if (!entry.isContainer || isHidden(id)) continue
-    apply(id)
+  return plans
+}
+
+function directHiddenIds(plans: ReadonlyMap<string, GroupOverflow>): Map<string, string> {
+  const direct = new Map<string, string>()
+  for (const plan of plans.values()) {
+    for (const id of plan.hidden) direct.set(id, plan.overflowId)
   }
-  return { byGroup, directHidden }
+  return direct
 }
 
 /** 被收进 overflow 节点的 id 查到所在 overflow;其余返回 null */
@@ -212,6 +227,7 @@ function overflowNode(plan: GroupOverflow, depth: number, parentId: string | nul
     degree: 0,
     descendantFiles: 0,
     hiddenCount: plan.hidden.size,
+    groupId: plan.groupId,
     depth,
     ...(parentId !== null ? { parentId } : {})
   }
@@ -250,8 +266,8 @@ export function buildVisibleGraph(
   depEdges: readonly DepEdge[],
   focus: string,
   expanded: ReadonlySet<string>,
-  maxNodes: number = GRAPH_LEVEL_MAX_NODES
-): VisibleGraph | VisibleGraphRejection | null {
+  previewBudget: number = GRAPH_PREVIEW_NODES
+): VisibleGraph | null {
   if (!tree.has(focus) || tree.kindOf(focus) !== 'folder') return null
   const visible = collectVisible(tree, focus, expanded)
   const nodesById = new Map<string, VisibleNode>()
@@ -260,17 +276,10 @@ export function buildVisibleGraph(
   computeDegrees([...nodesById.values()], aggregate(pairs))
 
   const groups = groupChildren(visible, focus)
-  const plans = planOverflows(focus, visible, groups, nodesById, maxNodes)
-  const overflowFor = overflowResolver(visible, focus, plans.directHidden)
-  const visibleNodes = emitNodes(
-    focus,
-    0,
-    null,
-    groups,
-    nodesById,
-    plans.byGroup,
-    plans.directHidden
-  )
+  const plans = planOverflows(expanded, visible, groups, nodesById, pairs, previewBudget)
+  const directHidden = directHiddenIds(plans)
+  const overflowFor = overflowResolver(visible, focus, directHidden)
+  const visibleNodes = emitNodes(focus, 0, null, groups, nodesById, plans, directHidden)
   const remapped = pairs.map(([from, to]): [string, string] => [
     overflowFor(from) ?? from,
     overflowFor(to) ?? to
@@ -278,10 +287,5 @@ export function buildVisibleGraph(
   const nodes = [...visibleNodes, ...externals]
   const edges = aggregate(remapped)
   computeDegrees(nodes, edges)
-
-  if (visibleNodes.length > maxNodes) {
-    const folderFull = [...plans.byGroup.keys()].some((groupId) => groupId !== focus)
-    return { reason: folderFull ? 'folder' : 'total', count: visibleNodes.length, limit: maxNodes }
-  }
   return { dirRel: focus, lazy: tree.isLazy(focus), nodes, edges }
 }

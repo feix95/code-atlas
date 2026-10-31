@@ -43,7 +43,7 @@ function describeBase(d: VisibleNode): string {
     case 'external':
       return `当前文件夹以外 ${d.id}`
     case 'overflow':
-      return d.label
+      return `${d.label},按 Enter 进入文件夹查看全部`
   }
 }
 
@@ -77,7 +77,6 @@ export function NodeList({
         <li key={d.id}>
           <button
             type="button"
-            disabled={d.kind === 'overflow'}
             onClick={() => onActivate(d)}
             onFocus={() => onFocusNode(d.id)}
             onBlur={() => onFocusNode(null)}

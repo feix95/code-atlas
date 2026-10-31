@@ -241,10 +241,10 @@ function checkNodeTip(): void {
     { title: longName, sub: '当前文件夹之外' },
     '外部节点名字被截断时补全'
   )
-  assert.equal(
-    nodeTipText(node('overflow', { hiddenCount: 7 }), signals),
-    null,
-    'overflow 节点不弹提示'
+  assert.deepEqual(
+    nodeTipText(node('overflow', { hiddenCount: 7, groupId: 'src' }), signals),
+    { title: '', sub: '双击进入查看全部' },
+    '收起的项说明进入动作'
   )
 
   const view = { w: 800, h: 600 }
@@ -292,7 +292,7 @@ function checkHoverDetail(): void {
   assert.equal(detailNodeOf(file), file.node.data, '悬停文件:可开详情')
   const folder = hoverOf('folder')
   assert.equal(detailNodeOf(folder), folder.node.data, '悬停文件夹:可开详情')
-  assert.equal(detailNodeOf(hoverOf('overflow')), null, '收起的项只是计数占位,不弹详情')
+  assert.equal(detailNodeOf(hoverOf('overflow')), null, '收起的项是一扇门,不弹详情')
   assert.equal(detailNodeOf(hoverOf('file', true)), null, '拖拽中的节点不弹详情')
   assert.equal(detailNodeOf(null), null, '没有悬停目标时不弹详情')
 }

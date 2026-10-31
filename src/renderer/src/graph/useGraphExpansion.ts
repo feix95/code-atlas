@@ -1,37 +1,23 @@
 // 图谱的展开状态:持有展开集合,组合 shared/expansion 的纯逻辑。
 // 焦点切换由层级访问序号(visit)判定,旧层级的集合直接作废;换层后的第一次展开必须写入状态,
 // 所以用 visitRef 判定迟到结果,而不是拿可能与序号脱节的状态做比较。
-// lazy 文件夹先按需扫描;可见图超限时自动收回最近的展开并给出状态。
+// lazy 文件夹先按需扫描;原地展开放不下时由可见图给出结构摘要,不再拒绝。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DepEdge, ScanDirNode } from '@shared/types'
 import type { GroupTree } from '@shared/hierarchy'
-import {
-  GRAPH_LEVEL_MAX_NODES,
-  buildVisibleGraph,
-  isVisibleGraphRejection,
-  type VisibleGraph
-} from '@shared/visibleGraph'
-import {
-  collapseSubtree,
-  expandCandidates,
-  expandFolder,
-  expandIds,
-  trimExpansion,
-  type ExpansionRejection
-} from '@shared/expansion'
+import { buildVisibleGraph, type VisibleGraph } from '@shared/visibleGraph'
+import { collapseSubtree, expandCandidates, expandFolder, expandIds } from '@shared/expansion'
 import { GRAPH_ZOOM } from './graphConfig.ts'
-
-export type ExpansionNotice =
-  { kind: 'rejected'; reason: ExpansionRejection } | { kind: 'scanFailed' }
 
 export interface GraphExpansion {
   /** 当前展开集合下的可见图;焦点不存在时为 null */
   level: VisibleGraph | null
-  /** 实际生效的展开集合(已去掉超限时收回的部分) */
+  /** 实际生效的展开集合 */
   expanded: ReadonlySet<string>
   /** 正在按需扫描的文件夹 id */
   scanningId: string | null
-  notice: ExpansionNotice | null
+  /** 展开未扫描目录时扫描失败 */
+  scanFailed: boolean
   /** 「展开两级」当前有可展开的文件夹 */
   canExpandAll: boolean
   /** 有已展开的文件夹可以收起 */
@@ -67,37 +53,21 @@ export function useGraphExpansion({
 }: ExpansionDeps): GraphExpansion {
   const [state, setState] = useState<ExpansionState>({ visit, ids: NONE })
   const [scanning, setScanning] = useState<{ visit: number; id: string } | null>(null)
-  const [localNotice, setLocalNotice] = useState<{
-    visit: number
-    notice: ExpansionNotice
-  } | null>(null)
+  const [failedVisit, setFailedVisit] = useState<number | null>(null)
 
   const active = state.visit === visit ? state.ids : NONE
   const scanningId = scanning?.visit === visit ? scanning.id : null
-  const local = localNotice?.visit === visit ? localNotice.notice : null
+  const scanFailed = failedVisit === visit
 
-  // 树或数据更新后可能超限:渲染就用收回后的集合,状态只在下一次操作时跟上
-  const resolved = useMemo(() => {
-    if (!tree) return { level: null, ids: active, rejection: null as ExpansionRejection | null }
-    const graph = buildVisibleGraph(tree, edges, dirRel, active, GRAPH_LEVEL_MAX_NODES)
-    if (graph === null) return { level: null, ids: active, rejection: null }
-    if (!isVisibleGraphRejection(graph)) return { level: graph, ids: active, rejection: null }
-    const trimmed = trimExpansion(tree, edges, dirRel, active, GRAPH_LEVEL_MAX_NODES)
-    const next = buildVisibleGraph(tree, edges, dirRel, trimmed.ids, GRAPH_LEVEL_MAX_NODES)
-    return {
-      level: next !== null && !isVisibleGraphRejection(next) ? next : null,
-      ids: trimmed.ids,
-      rejection: graph.reason
-    }
-  }, [tree, edges, dirRel, active])
-  const effective = resolved.ids
-  const notice =
-    local ?? (resolved.rejection ? { kind: 'rejected' as const, reason: resolved.rejection } : null)
+  const level = useMemo(
+    () => (tree ? buildVisibleGraph(tree, edges, dirRel, active) : null),
+    [tree, edges, dirRel, active]
+  )
   const canExpandAll = useMemo(
     () =>
-      resolved.level !== null &&
-      expandCandidates(resolved.level.nodes, effective, GRAPH_ZOOM.autoExpandDepth).length > 0,
-    [resolved.level, effective]
+      level !== null &&
+      expandCandidates(level.nodes, active, GRAPH_ZOOM.autoExpandDepth).length > 0,
+    [level, active]
   )
 
   const visitRef = useRef(visit)
@@ -109,62 +79,53 @@ export function useGraphExpansion({
     if (visitRef.current !== forVisit) return
     setState({ visit: forVisit, ids })
   }, [])
-  const reject = useCallback((reason: ExpansionRejection, forVisit: number): void => {
-    setLocalNotice({ visit: forVisit, notice: { kind: 'rejected', reason } })
-  }, [])
 
   const toggle = useCallback(
     (id: string): void => {
       if (!tree || scanningId === id) return
-      if (effective.has(id)) {
-        commit(collapseSubtree(tree, effective, id), visit)
-        setLocalNotice(null)
+      if (active.has(id)) {
+        commit(collapseSubtree(tree, active, id), visit)
+        setFailedVisit(null)
         return
       }
       if (tree.has(id) && tree.kindOf(id) === 'folder' && tree.isLazy(id)) {
         setScanning({ visit, id })
       }
-      void expandFolder(tree, edges, dirRel, effective, id, expandLazy).then((outcome) => {
+      void expandFolder(tree, active, id, expandLazy).then((outcome) => {
         setScanning((prev) => (prev?.visit === visit && prev.id === id ? null : prev))
         if (outcome.kind === 'scanFailed') {
-          setLocalNotice({ visit, notice: { kind: 'scanFailed' } })
-          return
-        }
-        if (outcome.kind === 'rejected') {
-          reject(outcome.reason, visit)
+          setFailedVisit(visit)
           return
         }
         if (outcome.kind === 'expanded') {
           commit(outcome.ids, visit)
-          setLocalNotice(null)
+          setFailedVisit(null)
         }
       })
     },
-    [tree, edges, dirRel, visit, effective, scanningId, expandLazy, commit, reject]
+    [tree, visit, active, scanningId, expandLazy, commit]
   )
 
   const expandAll = useCallback((): void => {
-    if (!tree || !resolved.level) return
-    const ids = expandCandidates(resolved.level.nodes, effective, GRAPH_ZOOM.autoExpandDepth)
+    if (!tree || !level) return
+    const ids = expandCandidates(level.nodes, active, GRAPH_ZOOM.autoExpandDepth)
     if (ids.length === 0) return
-    const result = expandIds(tree, edges, dirRel, effective, ids, GRAPH_LEVEL_MAX_NODES)
-    commit(result.ids, visit)
-    if (result.rejected) reject(result.rejected, visit)
-    else setLocalNotice(null)
-  }, [tree, edges, dirRel, visit, effective, resolved.level, commit, reject])
+    commit(expandIds(tree, active, ids), visit)
+    setFailedVisit(null)
+  }, [tree, level, active, visit, commit])
 
   const collapseAll = useCallback((): void => {
-    if (effective.size > 0) commit(NONE, visit)
-    setLocalNotice(null)
-  }, [effective, visit, commit])
+    if (active.size > 0) commit(NONE, visit)
+    setFailedVisit(null)
+  }, [active, visit, commit])
 
   return {
-    level: resolved.level,
-    expanded: effective,
+    level,
+    expanded: active,
     scanningId,
-    notice,
+    scanFailed,
     canExpandAll,
-    canCollapseAll: effective.size > 0,
+    canCollapseAll: active.size > 0,
     toggle,
     expandAll,
     collapseAll

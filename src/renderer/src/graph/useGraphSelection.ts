@@ -29,6 +29,10 @@ export interface NodeMenuActions {
 
 /** 节点右键菜单:查看模块详情、更改模块颜色(有归属模块才出)、打开文件 / 进入此文件夹 */
 export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): ContextMenuEntry[] {
+  // 收起的项是一扇门:直接进文件夹看全部,没有自己的详情
+  if (node.kind === 'overflow') {
+    return [{ label: '进入此文件夹', icon: 'folder', run: actions.onActivate }]
+  }
   const isFile = node.kind === 'file' || (node.kind === 'external' && node.target === 'file')
   const items: ContextMenuEntry[] = [
     { label: '查看模块详情', icon: 'component', run: actions.onDetails }
@@ -37,7 +41,6 @@ export function nodeMenuItems(node: LevelNode, actions: NodeMenuActions): Contex
   if (actions.moduleId !== null) {
     items.push({ label: '更改模块颜色', icon: 'palette', run: actions.onChangeColor })
   }
-  if (node.kind === 'overflow') return items
   items.push({
     label: isFile ? '打开文件' : '进入此文件夹',
     icon: isFile ? 'file' : 'folder',
