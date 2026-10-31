@@ -157,12 +157,6 @@ export const GRAPH_MODULE_GEN = {
   hueStep: 137.508
 } as const
 
-/** 节点详情浮窗的悬停触发 */
-export const GRAPH_DETAIL = {
-  /** 指针在同一节点上停够这么久(ms)才打开;扫过节点时不闪 */
-  dwellMs: 300
-} as const
-
 /** 悬停提示框 */
 export const GRAPH_TIP = {
   /** 悬停多久才亮(ms):鼠标扫过节点时不闪 */

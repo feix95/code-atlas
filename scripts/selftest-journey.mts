@@ -1681,7 +1681,7 @@ try {
   assert.ok(hit, 'focused node must be painted in the focus color on the canvas')
   await page.locator('.graph-view').focus()
   await page.waitForTimeout(300)
-  // 悬停 0.3 秒才弹详情浮窗,点一下不再开
+  // 悬停即弹详情浮窗,点一下不再开
   await page.mouse.move(hit.x, hit.y)
   const panel = page.getByRole('complementary', { name: '节点详情' })
   await panel.waitFor()

@@ -1,9 +1,8 @@
-// 节点详情的悬停触发:指针在同一节点上停够 dwellMs 才展示,扫过不闪。
-// 展示后不随鼠标离开收回(留到点空白或 Esc),换节点重新计时;拖拽中的节点不触发。
+// 节点详情的悬停触发:指针一落到节点上就展示,扫过也开。
+// 展示后不随鼠标离开收回(留到点空白或 Esc),换节点直接切换;拖拽中的节点不触发。
 import { useEffect } from 'react'
 import type { LevelNode } from '@shared/graphView'
 import type { HoverTarget } from './useGraphViewport'
-import { GRAPH_DETAIL } from './graphConfig.ts'
 
 /** 可以弹出详情的悬停目标:拖拽中先不弹,收起的项只是计数占位,没有可看的详情 */
 export function detailNodeOf(hover: HoverTarget | null): LevelNode | null {
@@ -17,8 +16,6 @@ export function useGraphHoverDetail(
 ): void {
   const node = detailNodeOf(hover)
   useEffect(() => {
-    if (!node) return
-    const timer = window.setTimeout(() => show(node), GRAPH_DETAIL.dwellMs)
-    return () => window.clearTimeout(timer)
+    if (node) show(node)
   }, [node, show])
 }

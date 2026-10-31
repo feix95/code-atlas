@@ -1,5 +1,5 @@
 // 图谱的选中状态,以及节点右键菜单的行项。
-// 选中 = 指针在节点上停够 0.3 秒(侧栏所指),点空白或 Esc 取消;只是视图状态,不触发任何请求。
+// 选中 = 指针落到节点上(侧栏所指),点空白或 Esc 取消;只是视图状态,不触发任何请求。
 import { useCallback, useState } from 'react'
 import type { LevelGraph, LevelNode } from '@shared/graphView'
 import type { ContextMenuEntry } from '../components/contextMenuStore'
