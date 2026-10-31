@@ -60,25 +60,35 @@ export function takeSteps(
   return { gesture: { ...g, acc: acc - steps * GRAPH_WHEEL.modeStepPx }, steps }
 }
 
-/** Ctrl+滚轮落点:空白处做层级翻页,文件夹上可进入 */
-export type LevelWheelTarget = 'blank' | 'folder' | 'file'
+/** Ctrl+滚轮落点:container = 已展开的文件夹(圆圈本身),door = 只能进入的节点(外部文件夹、「其余 N 项」) */
+export type LevelWheelTarget = 'blank' | 'folder' | 'container' | 'door' | 'file'
 
-export type LevelWheelAction = 'expand' | 'collapse' | 'enter' | 'leave' | 'none'
+export type LevelWheelAction =
+  | { kind: 'expandAll' }
+  | { kind: 'collapseAll' }
+  | { kind: 'collapseContainer'; id: string }
+  | { kind: 'expandFolder' }
+  | { kind: 'enter' }
+  | { kind: 'leave' }
+  | { kind: 'none' }
 
 /**
- * Ctrl+滚轮的动作。往下滚 = 退出:进入要挑文件夹(多路径),退出只有父级这一条路,
- * 所以焦点不在根层时指针落在哪儿都直接返回上一层;已在根层时空白处往下滚 = 收起二级。
- * 往上滚 = 空白处展开二级,文件夹上进入。
+ * Ctrl+滚轮的动作。往下滚 = 退一层:先退出指针所在的圈(含圈里的文件),
+ * 不在任何圈里才返回上一层;已在根层且不在圈里则全部收起。
+ * 往上滚 = 原地展开:空白处展开二级,没展开的文件夹展开自己;已经展开的圈不再动作。
  */
 export function levelWheelAction(
   target: LevelWheelTarget,
   steps: number,
-  hasParent: boolean
+  hasParent: boolean,
+  containerId: string | null
 ): LevelWheelAction {
   if (steps > 0) {
-    if (hasParent) return 'leave'
-    return target === 'blank' ? 'collapse' : 'none'
+    if (containerId !== null) return { kind: 'collapseContainer', id: containerId }
+    if (hasParent) return { kind: 'leave' }
+    return { kind: 'collapseAll' }
   }
-  if (target === 'blank') return 'expand'
-  return target === 'folder' ? 'enter' : 'none'
+  if (target === 'blank') return { kind: 'expandAll' }
+  if (target === 'door') return { kind: 'enter' }
+  return target === 'folder' ? { kind: 'expandFolder' } : { kind: 'none' }
 }

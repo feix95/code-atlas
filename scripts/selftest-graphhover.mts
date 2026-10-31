@@ -150,23 +150,76 @@ function checkWheel(): void {
   assert.equal(takeSteps(nextGesture(null, 0, true, null), 500).steps, 1, '往下滚 = 返回上一层')
   assert.equal(takeSteps(zoom, 500).steps, 0, '缩放手势不走步')
 
-  assert.equal(levelWheelAction('blank', -1, false), 'expand', 'Ctrl+滚轮空白处往上滚 = 展开二级')
-  assert.equal(levelWheelAction('blank', 1, false), 'collapse', '根层空白处往下滚 = 收起二级')
-  assert.equal(levelWheelAction('blank', 1, true), 'leave', '文件夹里空白处往下滚 = 返回上一层')
-  assert.equal(levelWheelAction('folder', -1, false), 'enter', 'Ctrl+滚轮文件夹上往上滚 = 进入')
-  assert.equal(
-    levelWheelAction('folder', 1, true),
-    'leave',
-    '文件夹里对着文件夹往下滚 = 返回上一层'
+  assert.deepEqual(
+    levelWheelAction('blank', -1, false, null),
+    { kind: 'expandAll' },
+    'Ctrl+滚轮空白处往上滚 = 展开二级'
   )
-  assert.equal(levelWheelAction('folder', 1, false), 'none', '根层没有上一层,文件夹上往下滚不动作')
-  assert.equal(levelWheelAction('file', -1, true), 'none', 'Ctrl+滚轮文件上往上滚 = 不动作')
-  assert.equal(
-    levelWheelAction('file', 1, true),
-    'leave',
-    '文件夹里对着文件往下滚也能退,不用瞄准入口'
+  assert.deepEqual(
+    levelWheelAction('blank', 1, false, null),
+    { kind: 'collapseAll' },
+    '根层空白处往下滚 = 收起二级'
   )
-  assert.equal(levelWheelAction('file', 1, false), 'none', '根层文件上往下滚不动作')
+  assert.deepEqual(
+    levelWheelAction('blank', 1, true, null),
+    { kind: 'leave' },
+    '文件夹里空白处往下滚 = 返回上一层'
+  )
+  assert.deepEqual(
+    levelWheelAction('folder', -1, false, null),
+    { kind: 'expandFolder' },
+    '没展开的文件夹上往上滚 = 原地展开,不进文件夹'
+  )
+  assert.deepEqual(
+    levelWheelAction('container', -1, false, null),
+    { kind: 'none' },
+    '已经展开的圈上往上滚不再进入,也没有可展开的'
+  )
+  assert.deepEqual(
+    levelWheelAction('door', -1, false, null),
+    { kind: 'enter' },
+    '外部文件夹与「其余 N 项」只能进入,上滚保持进入'
+  )
+  assert.deepEqual(
+    levelWheelAction('folder', 1, true, null),
+    { kind: 'leave' },
+    '文件夹里不在圈中往下滚 = 返回上一层'
+  )
+  assert.deepEqual(
+    levelWheelAction('folder', 1, false, null),
+    { kind: 'collapseAll' },
+    '根层不在圈中往下滚 = 全部收起'
+  )
+  assert.deepEqual(
+    levelWheelAction('container', 1, false, 'pkg'),
+    { kind: 'collapseContainer', id: 'pkg' },
+    '根层对着圈往下滚 = 收起这个圈'
+  )
+  assert.deepEqual(
+    levelWheelAction('container', 1, true, 'pkg'),
+    { kind: 'collapseContainer', id: 'pkg' },
+    '文件夹里对着圈往下滚 = 先收圈,不退焦点层'
+  )
+  assert.deepEqual(
+    levelWheelAction('file', -1, true, 'pkg'),
+    { kind: 'none' },
+    'Ctrl+滚轮文件上往上滚 = 不动作'
+  )
+  assert.deepEqual(
+    levelWheelAction('file', 1, true, 'pkg'),
+    { kind: 'collapseContainer', id: 'pkg' },
+    '圈里的文件上往下滚也收所在的圈,不用瞄准圈中空地'
+  )
+  assert.deepEqual(
+    levelWheelAction('file', 1, true, null),
+    { kind: 'leave' },
+    '圈外文件上往下滚 = 返回上一层'
+  )
+  assert.deepEqual(
+    levelWheelAction('file', 1, false, null),
+    { kind: 'collapseAll' },
+    '根层圈外任何落点都能退,不留死区'
+  )
 }
 
 function checkNodeTip(): void {

@@ -36,6 +36,15 @@ import { TreeIcon } from './Icons'
 
 const NO_EDGES: DepEdge[] = []
 
+/** Ctrl+滚轮落点:本地文件夹可原地展开,外部文件夹与「其余 N 项」只能进入 */
+function wheelTargetOf(node: SimNode | null): LevelWheelTarget {
+  if (!node) return 'blank'
+  const d = node.data
+  if (d.kind === 'folder') return d.isContainer ? 'container' : 'folder'
+  if (d.kind === 'overflow' || (d.kind === 'external' && d.target === 'folder')) return 'door'
+  return 'file'
+}
+
 interface GraphViewProps {
   result: ScanResult | null
   graph: DepGraphResult | null
@@ -143,13 +152,15 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     },
     [activate, moduleOfNode, picker, selection]
   )
-  const enterOrLeave = (node: SimNode | null, steps: number): void => {
-    const target: LevelWheelTarget = !node ? 'blank' : isFolderTarget(node.data) ? 'folder' : 'file'
-    const action = levelWheelAction(target, steps, nav.dirRel !== '')
-    if (action === 'expand') expansion.expandAll()
-    else if (action === 'collapse') expansion.collapseAll()
-    else if (action === 'leave') nav.goUp()
-    else if (action === 'enter' && node) {
+  const enterOrLeave = (node: SimNode | null, steps: number, containerId: string | null): void => {
+    const target = wheelTargetOf(node)
+    const action = levelWheelAction(target, steps, nav.dirRel !== '', containerId)
+    if (action.kind === 'expandAll') expansion.expandAll()
+    else if (action.kind === 'collapseAll') expansion.collapseAll()
+    else if (action.kind === 'collapseContainer') expansion.toggle(action.id)
+    else if (action.kind === 'expandFolder' && node) expansion.toggle(node.id)
+    else if (action.kind === 'leave') nav.goUp()
+    else if (action.kind === 'enter' && node) {
       selection.select(null)
       activate(node.data)
     }
@@ -161,11 +172,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     setDragging: layout.setDragging,
     onBlankClick: selection.clear,
     onNodeDoubleClick: (n) => {
-      if (n.data.kind === 'folder') {
-        expansion.toggle(n.id)
-        return
-      }
-      // 进入外部文件夹后旧选中已不在画面里,侧栏一并收起;打开文件则保留选中
+      // 进入文件夹后旧选中已不在画面里,侧栏一并收起;打开文件则保留选中
       if (isFolderTarget(n.data)) selection.select(null)
       activate(n.data)
     },

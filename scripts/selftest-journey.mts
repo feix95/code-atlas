@@ -1737,7 +1737,7 @@ try {
     () => Number(document.querySelector('.graph-canvas')?.getAttribute('data-graph-hulls')) > 0
   )
   // 关系图谱层级(P2):回到根层 -> 双击 app 原地展开(不进入)-> 子文件在清单里标出所在容器
-  // -> 双击容器空白处收起 -> 「展开两级」按深度与上限展开 -> 「全部收起」
+  // -> Ctrl+滚轮在圈里收起 -> 「展开两级」按深度与上限展开 -> 「全部收起」
   await page.locator('.graph-view').focus()
   await page.keyboard.press('Backspace')
   await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
@@ -1747,7 +1747,11 @@ try {
   await page.waitForTimeout(600)
   const appPoint = await canvasFocusPoint()
   assert.ok(appPoint, 'root app folder must be painted in the focus color')
-  await page.mouse.dblclick(appPoint.x, appPoint.y)
+  // 双击现在是进入文件夹;原地展开走 Ctrl+上滚
+  await page.mouse.move(appPoint.x, appPoint.y)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -120)
+  await page.keyboard.up('Control')
   await page.waitForFunction(
     () =>
       document.querySelector('.graph-canvas')?.getAttribute('data-graph-dir') === '' &&
@@ -1762,7 +1766,7 @@ try {
     'expanded folder keeps its level and annotates children with their container'
   )
   await shot('graph-levels')
-  // 收起:等布局稳定,测出每个子项圆心,在容器里挑一个离所有子项最远的点双击(点在子项上会打开文件)
+  // 收起:等布局稳定,测出每个子项圆心,在容器里挑一个离所有子项最远的点(便于悬停确认命中的是容器)
   await page.waitForTimeout(2_500)
   const childPoints: Array<{ x: number; y: number }> = []
   for (const name of ['a', 'b', 'c', 'd', 'style']) {
@@ -1856,10 +1860,13 @@ try {
   )
   await page.keyboard.press('Escape')
   await panel.waitFor({ state: 'detached' })
-  // 悬停本身不累加点击计数;先把指针移开让悬停状态复位,再在同一处双击收起
+  // 双击已改为进入文件夹,收起走 Ctrl+下滚:圈里任何落点都收起所在的圈
   await page.mouse.move(1240, 70)
   await page.waitForTimeout(400)
-  await page.mouse.dblclick(collapsePoint.x, collapsePoint.y)
+  await page.mouse.move(collapsePoint.x, collapsePoint.y)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, 120)
+  await page.keyboard.up('Control')
   await page.waitForFunction(
     () => document.querySelector('.graph-canvas')?.getAttribute('data-graph-expanded') === '0',
     undefined,

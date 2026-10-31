@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { ForceScene, SimNode } from './useForceLayout'
 import type { Transform } from './drawGraph'
 import { GRAPH_VIEW } from './graphConfig'
-import { hitTest, localPoint } from './graphHit'
+import { containerAt, hitTest, localPoint } from './graphHit'
 import { clampScale } from './fitView'
 import { nextGesture, takeSteps, wheelDeltaPx, type WheelGesture } from './wheelIntent'
 
@@ -14,8 +14,11 @@ export interface WheelDeps {
   requestDraw: () => void
   /** 在节点上停稳后滚轮:往下滚 steps 为正(下一种看法),坐标为画布内像素 */
   onModeWheel: (node: SimNode, steps: number, x: number, y: number) => void
-  /** Ctrl+滚轮(含触控板捏合):steps 为 -1 = 往上滚,1 = 往下滚;落点与动作见 levelWheelAction */
-  onLevelWheel: (node: SimNode | null, steps: number) => void
+  /**
+   * Ctrl+滚轮(含触控板捏合):steps 为 -1 = 往上滚,1 = 往下滚;
+   * containerId 是指针所在的最内层展开容器,没在圈里为 null;动作见 levelWheelAction
+   */
+  onLevelWheel: (node: SimNode | null, steps: number, containerId: string | null) => void
 }
 
 /** 当前悬停的节点与开始悬停的时间(ms,performance.now) */
@@ -43,6 +46,7 @@ export function useGraphWheel(
     if (!canvas) return
     let gesture: WheelGesture | null = null
     let target: SimNode | null = null
+    let container: SimNode | null = null
     const onWheel = (e: WheelEvent): void => {
       // Ctrl+滚轮不归界面缩放(界面缩放走键盘 +/-/0):落在画布上的都由图谱处理
       e.preventDefault()
@@ -54,7 +58,10 @@ export function useGraphWheel(
       const hover = readHover()
       const since = hover && hover.node === under ? hover.since : null
       gesture = nextGesture(gesture, now, e.ctrlKey, since)
-      if (gesture.startedAt === now) target = under
+      if (gesture.startedAt === now) {
+        target = under
+        container = containerAt(d.sceneRef.current, tf, sx, sy)
+      }
       const deltaPx = wheelDeltaPx(e.deltaY, e.deltaMode)
       if (gesture.action === 'zoom') {
         zoomAt(tf, sx, sy, deltaPx)
@@ -64,7 +71,7 @@ export function useGraphWheel(
       const r = takeSteps(gesture, deltaPx)
       gesture = r.gesture
       if (r.steps === 0) return
-      if (gesture.action === 'level') d.onLevelWheel(target, r.steps)
+      if (gesture.action === 'level') d.onLevelWheel(target, r.steps, container?.id ?? null)
       else if (target) d.onModeWheel(target, r.steps, sx, sy)
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })

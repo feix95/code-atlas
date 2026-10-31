@@ -11,6 +11,26 @@ export function localPoint(
   return [e.clientX - rect.left, e.clientY - rect.top]
 }
 
+/** 指针所在的展开容器里最靠内的那个;不在任何容器里返回 null。嵌套容器必然在小半径里,取半径最小的 */
+export function containerAt(
+  scene: ForceScene | null,
+  tf: Transform,
+  sx: number,
+  sy: number
+): SimNode | null {
+  if (!scene) return null
+  const wx = (sx - tf.x) / tf.k
+  const wy = (sy - tf.y) / tf.k
+  const slop = GRAPH_NODE.hitSlopPx / tf.k
+  let inner: SimNode | null = null
+  for (const n of scene.nodes) {
+    if (!n.data.isContainer) continue
+    if (Math.hypot(n.x - wx, n.y - wy) > n.r + slop) continue
+    if (!inner || n.r < inner.r) inner = n
+  }
+  return inner
+}
+
 export function hitTest(
   scene: ForceScene | null,
   tf: Transform,
