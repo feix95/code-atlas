@@ -1693,6 +1693,25 @@ try {
   assert.ok((await panel.innerText()).includes('所属模块'), 'side panel must show the module')
   assert.ok((await panel.innerText()).includes('style.css'), 'side panel must list attached styles')
   await shot('graph-modules')
+  // 停靠左栏:文件树与详情之间的分割线要能把详情拖高(停靠槽 display:contents,别把可分配高度量成 0)
+  await panel.getByRole('button', { name: '把节点详情停靠到左侧文件树下方' }).click()
+  const dockedDetail = page.locator('.sidebar-dock[aria-label="节点详情"]')
+  await dockedDetail.waitFor()
+  const dockedAuto = (await dockedDetail.boundingBox())?.height ?? 0
+  const dockSashBox = await page.locator('.sidebar-dock-sash').boundingBox()
+  assert.ok(dockedAuto > 0, 'docked detail must have a measurable height')
+  assert.ok(dockSashBox, 'docked detail must have a divider')
+  const sashX = dockSashBox.x + dockSashBox.width / 2
+  const sashY = dockSashBox.y + dockSashBox.height / 2
+  await page.mouse.move(sashX, sashY)
+  await page.mouse.down()
+  await page.mouse.move(sashX, sashY - 60, { steps: 8 })
+  await page.mouse.up()
+  const dockedTaller = (await dockedDetail.boundingBox())?.height ?? 0
+  assert.ok(dockedTaller > dockedAuto + 40, 'dragging the divider grows the docked detail')
+  await page.locator('.sidebar-dock-sash').dblclick()
+  await page.locator('.sidebar-dock-undock').click()
+  await panel.waitFor()
   // 指针离开画布浮窗不跟着收:留到点空白或 Esc
   await page.mouse.move(5, 5)
   await page.waitForTimeout(700)

@@ -13,6 +13,13 @@ const HEAD_ICON_SIZE = 14
 /** 分割条上方向键一步挪多少(px):与左栏宽度的分割条同档 */
 const SASH_STEP = 24
 
+/** 停靠块参与分高度的那层容器:图谱详情经 display:contents 的槽位画进来,槽位量不出高度,往上找第一个有盒子的父级 */
+function dockRoomOf(section: HTMLElement): number {
+  let el: HTMLElement | null = section.parentElement
+  while (el && el.clientHeight <= 0) el = el.parentElement
+  return el?.clientHeight ?? 0
+}
+
 export function SidebarDockSection({
   title,
   label,
@@ -59,8 +66,9 @@ export function SidebarDockSection({
   function onSashDown(e: React.PointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     const section = sectionRef.current
-    const room = section?.parentElement?.clientHeight ?? 0
-    if (!section || room <= 0) return
+    if (!section) return
+    const room = dockRoomOf(section)
+    if (room <= 0) return
     e.preventDefault()
     const start = section.getBoundingClientRect().height
     sashRef.current = {
@@ -110,8 +118,9 @@ export function SidebarDockSection({
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
     e.preventDefault()
     const section = sectionRef.current
-    const room = section?.parentElement?.clientHeight ?? 0
-    if (!section || room <= 0) return
+    if (!section) return
+    const room = dockRoomOf(section)
+    if (room <= 0) return
     const moved = section.offsetHeight + (e.key === 'ArrowUp' ? SASH_STEP : -SASH_STEP)
     const next = clampDockRatio(moved / room, room)
     setRatio(next)
