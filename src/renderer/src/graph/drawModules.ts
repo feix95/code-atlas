@@ -6,7 +6,8 @@ import { moduleDisplayName } from './moduleOverlay'
 import type { ModuleNames } from './moduleNames'
 import { moduleOutline, type Point } from './outline'
 import { GRAPH_HULL, GRAPH_RING } from './graphConfig'
-import { moduleColor, type ColorOverrides, type GenTone } from './moduleColors'
+import type { ColorOverrides } from './colorPrefs'
+import { moduleColor, type GenTone } from './moduleColors'
 
 export interface ModuleColors {
   /** 调色板(--graph-module-1 至 --graph-module-N) */

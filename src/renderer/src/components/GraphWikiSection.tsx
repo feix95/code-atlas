@@ -1,6 +1,13 @@
 // 侧栏的 Wiki 说明区块:一句话简介、标签、摘要、关键文件、生成信息与文档入口。
 // 散件文件多一行所属散件组;过期、缺失与失败只给提示,重新生成在进度页做。
+// 标签右键可改色,颜色只上标签芯片,不参与画布模块着色。
+import { useState, type MouseEvent } from 'react'
 import type { WikiPanelPage, WikiPanelStatus } from '@shared/wikiTypes'
+import { isHexColor } from '../graph/colorPrefs'
+import { tagColorKey } from '../graph/tagColors'
+import { setTagColor, useTagColorOverrides } from '../graph/tagColorStore'
+import { openContextMenu } from './contextMenuStore'
+import { ModuleColorPicker } from './ModuleColorPicker'
 
 export interface GraphWikiSectionProps {
   page: WikiPanelPage | null
@@ -10,8 +17,26 @@ export interface GraphWikiSectionProps {
   damaged: boolean
   /** 在系统文件管理器中定位这篇 Markdown */
   revealDoc: (file: string) => void
+  /** 项目根:标签颜色按项目分开存 */
+  rootPath: string
   /** 点标签 = 以该标签搜索 */
   onSearchTag?: (tag: string) => void
+}
+
+interface TagPickTarget {
+  tag: string
+  /** 视口坐标:取色浮层固定在打开处 */
+  x: number
+  y: number
+  /** 没改过色时取色器回显的中性色 */
+  base: string
+}
+
+function neutralHex(): string {
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue('--graph-module-neutral')
+    .trim()
+  return isHexColor(value) ? value : '#888888'
 }
 
 const STATUS_NOTE: Partial<Record<WikiPanelStatus, string>> = {
@@ -31,12 +56,52 @@ export function GraphWikiSection({
   groupName,
   damaged,
   revealDoc,
+  rootPath,
   onSearchTag
 }: GraphWikiSectionProps): React.JSX.Element {
+  const tagColors = useTagColorOverrides(rootPath)
+  const [tagTarget, setTagTarget] = useState<TagPickTarget | null>(null)
   const aiName = page?.name ? page.name : groupName
   const status = page?.status ?? 'none'
   const note = STATUS_NOTE[status]
   const hasMeta = page !== null && status !== 'none' && page.generatedAt !== ''
+  const openTagMenu = (e: MouseEvent<HTMLButtonElement>, tag: string): void => {
+    e.preventDefault()
+    const doc = e.currentTarget.ownerDocument
+    const x = e.clientX
+    const y = e.clientY
+    openContextMenu({
+      x,
+      y,
+      doc,
+      noTips: true,
+      compact: true,
+      items: [
+        {
+          label: '更改标签颜色',
+          run: () => setTagTarget({ tag, x, y, base: neutralHex() })
+        }
+      ]
+    })
+  }
+  const picker = tagTarget ? (
+    <ModuleColorPicker
+      fixed
+      target={{
+        id: tagTarget.tag,
+        name: tagTarget.tag,
+        x: tagTarget.x,
+        y: tagTarget.y,
+        current: tagColors.get(tagColorKey(tagTarget.tag)) ?? tagTarget.base,
+        isCustom: tagColors.has(tagColorKey(tagTarget.tag))
+      }}
+      onPick={(color, keepOpen) => {
+        setTagColor(rootPath, tagTarget.tag, color)
+        if (!keepOpen || color === null) setTagTarget(null)
+      }}
+      onClose={() => setTagTarget(null)}
+    />
+  ) : null
   return (
     <section className="graph-panel-section">
       <h3 className="graph-panel-h">Wiki 说明</h3>
@@ -56,17 +121,28 @@ export function GraphWikiSection({
           {page.summary !== '' && <p className="graph-wiki-summary">{page.summary}</p>}
           {page.tags.length > 0 && (
             <ul className="graph-wiki-tags">
-              {page.tags.map((tag) => (
-                <li key={tag}>
-                  <button
-                    type="button"
-                    className="graph-wiki-tag"
-                    onClick={() => onSearchTag?.(tag)}
-                  >
-                    {tag}
-                  </button>
-                </li>
-              ))}
+              {page.tags.map((tag) => {
+                const color = tagColors.get(tagColorKey(tag))
+                return (
+                  <li key={tag}>
+                    <button
+                      type="button"
+                      className="graph-wiki-tag"
+                      onClick={() => onSearchTag?.(tag)}
+                      onContextMenu={(e) => openTagMenu(e, tag)}
+                    >
+                      {color !== undefined && (
+                        <span
+                          className="graph-swatch"
+                          style={{ background: color }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {tag}
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           )}
           {page.excerpt !== '' && <p className="graph-wiki-excerpt">{page.excerpt}</p>}
@@ -100,6 +176,7 @@ export function GraphWikiSection({
           )}
         </>
       )}
+      {picker}
     </section>
   )
 }

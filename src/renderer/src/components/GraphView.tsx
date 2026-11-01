@@ -307,6 +307,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
           moduleNames={moduleNames}
           wiki={wiki}
+          rootPath={result.rootPath}
           onSearchTag={search.searchTag}
           viewRef={viewRef}
           tabId={props.tabId}

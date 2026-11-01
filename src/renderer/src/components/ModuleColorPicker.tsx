@@ -18,9 +18,9 @@ const PRESETS = [
 ]
 
 export interface PickerTarget {
-  moduleId: string
+  id: string
   name: string
-  /** 画布内像素坐标 */
+  /** 浮层坐标:默认相对画布;fixed 时是视口坐标 */
   x: number
   y: number
   /** 当前颜色(#rrggbb,供取色器回显) */
@@ -30,25 +30,30 @@ export interface PickerTarget {
 
 export function ModuleColorPicker({
   target,
+  fixed,
   onPick,
   onClose
 }: {
   target: PickerTarget
+  /** 视口坐标定位:从侧栏等画布外的位置打开时用 */
+  fixed?: boolean
   /** keepOpen:系统取色器拖动中,浮层留着边拖边看效果 */
   onPick: (color: string | null, keepOpen: boolean) => void
   onClose: () => void
 }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ left: target.x, top: target.y })
-  // 贴着鼠标打开;超出图谱区域时往回收
+  // 贴着鼠标打开;超出画布或视口时往回收
   useLayoutEffect(() => {
     const el = ref.current
-    const box = el?.offsetParent
-    if (!el || !box) return
-    const left = Math.max(0, Math.min(target.x, box.clientWidth - el.offsetWidth))
-    const top = Math.max(0, Math.min(target.y, box.clientHeight - el.offsetHeight))
+    const box = fixed ? null : el?.offsetParent
+    if (!el) return
+    const width = box?.clientWidth ?? el.ownerDocument.defaultView?.innerWidth ?? 0
+    const height = box?.clientHeight ?? el.ownerDocument.defaultView?.innerHeight ?? 0
+    const left = Math.max(0, Math.min(target.x, width - el.offsetWidth))
+    const top = Math.max(0, Math.min(target.y, height - el.offsetHeight))
     setPos({ left, top })
-  }, [target.x, target.y])
+  }, [fixed, target.x, target.y])
   useEffect(() => {
     const doc = ref.current?.ownerDocument ?? document
     const onDown = (e: PointerEvent): void => {
@@ -67,7 +72,7 @@ export function ModuleColorPicker({
   return (
     <div
       ref={ref}
-      className="graph-color-picker"
+      className={`graph-color-picker${fixed ? ' graph-color-picker-fixed' : ''}`}
       role="dialog"
       aria-label={`更改「${target.name}」的颜色`}
       style={pos}

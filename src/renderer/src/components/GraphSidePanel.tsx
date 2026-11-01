@@ -42,6 +42,8 @@ export interface GraphSidePanelProps {
   moduleNames: ModuleNames
   /** 当前语种的 Wiki 快照;还没读到为 null */
   wiki: WikiPanelData | null
+  /** 项目根:标签颜色按项目分开存 */
+  rootPath: string
   /** 点 Wiki 标签 = 以该标签搜索 */
   onSearchTag: (tag: string) => void
   /** 画布容器:浮窗的位置、尺寸按它夹边 */

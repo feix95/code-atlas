@@ -75,6 +75,10 @@
   font-size: var(--font-sm);
 }
 
+.graph-color-picker-fixed {
+  position: fixed;
+}
+
 .graph-color-title {
   margin: 0;
   max-width: 12rem;

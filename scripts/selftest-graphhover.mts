@@ -3,13 +3,15 @@
 // 悬停命中(展开容器只作背景)与悬停出详情的候选判定、拖拽保持抓取点不瞬移、空格与右键平移手势判定。
 import assert from 'node:assert/strict'
 import {
-  generatedHue,
   isHexColor,
   MAX_OVERRIDES_PER_ROOT,
+  sanitizeColorPrefs,
+  setColorIn
+} from '../src/renderer/src/graph/colorPrefs.ts'
+import {
+  generatedHue,
   moduleColor,
-  moduleSwatchCss,
-  sanitizeModuleColorPrefs,
-  setModuleColorIn
+  moduleSwatchCss
 } from '../src/renderer/src/graph/moduleColors.ts'
 import {
   hoverModesFor,
@@ -63,22 +65,21 @@ function checkColors(): void {
 
   assert.ok(isHexColor('#a1B2c3') && !isHexColor('red') && !isHexColor('#fff') && !isHexColor(3))
   assert.deepEqual(
-    sanitizeModuleColorPrefs({ r: { a: '#AABBCC', b: 'red', c: 1 }, bad: [1], empty: {} }),
+    sanitizeColorPrefs({ r: { a: '#AABBCC', b: 'red', c: 1 }, bad: [1], empty: {} }),
     { r: { a: '#aabbcc' } },
     '存档清洗:只留合法 #rrggbb,统一小写,空项目丢掉'
   )
-  assert.deepEqual(sanitizeModuleColorPrefs('x'), {})
-  assert.deepEqual(sanitizeModuleColorPrefs(null), {})
-  let prefs = setModuleColorIn({}, 'r', 'm:a', '#FF0000')
+  assert.deepEqual(sanitizeColorPrefs('x'), {})
+  assert.deepEqual(sanitizeColorPrefs(null), {})
+  let prefs = setColorIn({}, 'r', 'm:a', '#FF0000')
   assert.deepEqual(prefs, { r: { 'm:a': '#ff0000' } })
-  prefs = setModuleColorIn(prefs, 'r2', 'm:a', '#00ff00')
+  prefs = setColorIn(prefs, 'r2', 'm:a', '#00ff00')
   assert.equal(prefs.r['m:a'], '#ff0000', '每个项目分开存')
-  prefs = setModuleColorIn(prefs, 'r', 'm:a', null)
+  prefs = setColorIn(prefs, 'r', 'm:a', null)
   assert.equal(prefs.r, undefined, '恢复默认后项目没有改色就整项删掉')
-  assert.deepEqual(setModuleColorIn({}, 'r', 'm:a', 'nope'), {}, '非法颜色当恢复默认')
+  assert.deepEqual(setColorIn({}, 'r', 'm:a', 'nope'), {}, '非法颜色当恢复默认')
   let big = {}
-  for (let i = 0; i <= MAX_OVERRIDES_PER_ROOT; i++)
-    big = setModuleColorIn(big, 'r', `m:${i}`, '#000000')
+  for (let i = 0; i <= MAX_OVERRIDES_PER_ROOT; i++) big = setColorIn(big, 'r', `m:${i}`, '#000000')
   const kept = Object.keys((big as Record<string, Record<string, string>>).r)
   assert.equal(kept.length, MAX_OVERRIDES_PER_ROOT, '条数有上限')
   assert.ok(!kept.includes('m:0'), '超出上限丢最早的')

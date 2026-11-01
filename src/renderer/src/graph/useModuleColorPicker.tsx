@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import { ModuleColorPicker, type PickerTarget } from '../components/ModuleColorPicker'
 import { readGraphColors } from './drawGraph'
 import { moduleColorOf } from './drawModules'
-import { isHexColor, type ColorOverrides } from './moduleColors'
+import { isHexColor, type ColorOverrides } from './colorPrefs'
 import { setModuleColor } from './moduleColorStore'
 import { moduleDisplayName, type ModuleOverlay } from './moduleOverlay'
 import type { ModuleNames } from './moduleNames'
@@ -41,7 +41,7 @@ export function useModuleColorPicker({ root, canvasRef, overlay, overrides, name
       const colors = readGraphColors(canvas).modules
       const color = moduleColorOf({ overlay, overrides }, colors, moduleId)
       setTarget({
-        moduleId,
+        id: moduleId,
         name: names.get(moduleId) ?? moduleDisplayName(info),
         x: clientX - rect.left,
         y: clientY - rect.top,
@@ -55,7 +55,7 @@ export function useModuleColorPicker({ root, canvasRef, overlay, overrides, name
   const pick = useCallback(
     (color: string | null, keepOpen: boolean) => {
       if (!target) return
-      setModuleColor(root, target.moduleId, color)
+      setModuleColor(root, target.id, color)
       // 点预设或恢复默认就收起;拖系统取色器时浮层留着,边拖边看图上的效果
       if (!keepOpen || color === null) setTarget(null)
       else setTarget({ ...target, current: color, isCustom: true })

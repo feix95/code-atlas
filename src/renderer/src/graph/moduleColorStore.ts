@@ -2,20 +2,20 @@
 // 存档里有、当前模块表里已经没有的模块 id(重扫后模块变了)不会被用到,静默忽略。
 import { useSyncExternalStore } from 'react'
 import {
-  sanitizeModuleColorPrefs,
-  setModuleColorIn,
+  sanitizeColorPrefs,
+  setColorIn,
   type ColorOverrides,
-  type ModuleColorPrefs
-} from './moduleColors.ts'
+  type ColorPrefs
+} from './colorPrefs.ts'
 
 const KEY = 'atlas.graph.module-colors'
 const EMPTY: ColorOverrides = new Map()
 
-function readStored(): ModuleColorPrefs {
+function readStored(): ColorPrefs {
   if (typeof localStorage === 'undefined') return {}
   try {
     const raw = localStorage.getItem(KEY)
-    return raw === null ? {} : sanitizeModuleColorPrefs(JSON.parse(raw))
+    return raw === null ? {} : sanitizeColorPrefs(JSON.parse(raw))
   } catch (err) {
     console.warn('[graph] 模块颜色存档读取失败,回落默认', { key: KEY, err })
     return {}
@@ -48,7 +48,7 @@ export function useModuleColorOverrides(root: string | null): ColorOverrides {
 
 /** 改一个模块的颜色;color 为 null = 恢复默认 */
 export function setModuleColor(root: string, moduleId: string, color: string | null): void {
-  prefs = setModuleColorIn(prefs, root, moduleId, color)
+  prefs = setColorIn(prefs, root, moduleId, color)
   cache = new Map()
   try {
     localStorage.setItem(KEY, JSON.stringify(prefs))

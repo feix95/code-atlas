@@ -10,15 +10,6 @@ export interface GenTone {
   lightB: number
 }
 
-/** 用户改过的模块颜色:模块 id → #rrggbb */
-export type ColorOverrides = ReadonlyMap<string, string>
-
-const HEX_COLOR = /^#[0-9a-f]{6}$/i
-
-export function isHexColor(value: unknown): value is string {
-  return typeof value === 'string' && HEX_COLOR.test(value)
-}
-
 /** 第 index 个模块的生成色相(度);index 小于调色板色数时不会用到 */
 export function generatedHue(index: number): number {
   const n = index - GRAPH_MODULE_COLORS
@@ -53,42 +44,4 @@ export function moduleSwatchCss(index: number | undefined, override: string | un
     ? 'var(--graph-module-gen-light-a)'
     : 'var(--graph-module-gen-light-b)'
   return `hsl(${generatedHue(index)}, var(--graph-module-gen-sat), ${light})`
-}
-
-/** 每个项目一份:项目根路径 → (模块 id → #rrggbb) */
-export type ModuleColorPrefs = Record<string, Record<string, string>>
-
-/** 一个项目最多记住的改色条数;超出时丢掉最早写入的 */
-export const MAX_OVERRIDES_PER_ROOT = 200
-
-/** 读存档时清洗:只留字符串键 + 合法 #rrggbb 值,其余静默丢弃 */
-export function sanitizeModuleColorPrefs(raw: unknown): ModuleColorPrefs {
-  const out: ModuleColorPrefs = {}
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
-  for (const [root, entries] of Object.entries(raw)) {
-    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) continue
-    const kept = Object.entries(entries).filter((e): e is [string, string] => isHexColor(e[1]))
-    if (kept.length > 0)
-      out[root] = Object.fromEntries(
-        kept.slice(-MAX_OVERRIDES_PER_ROOT).map(([id, c]) => [id, c.toLowerCase()])
-      )
-  }
-  return out
-}
-
-/** 改一个模块的颜色;color 为 null = 恢复默认 */
-export function setModuleColorIn(
-  prefs: ModuleColorPrefs,
-  root: string,
-  moduleId: string,
-  color: string | null
-): ModuleColorPrefs {
-  const current = { ...(prefs[root] ?? {}) }
-  delete current[moduleId]
-  if (color !== null && isHexColor(color)) current[moduleId] = color.toLowerCase()
-  const entries = Object.entries(current).slice(-MAX_OVERRIDES_PER_ROOT)
-  const next = { ...prefs }
-  if (entries.length === 0) delete next[root]
-  else next[root] = Object.fromEntries(entries)
-  return next
 }
