@@ -23,9 +23,11 @@ import {
 } from '../src/renderer/src/graph/graphPanelSections.ts'
 import { folderContents } from '../src/renderer/src/graph/folderContents.ts'
 import { availableGraphPanelSections } from '../src/renderer/src/graph/graphPanelAvailability.ts'
+import { moduleNamesOf } from '../src/renderer/src/graph/moduleNames.ts'
 import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
 import { folderTree } from '../src/shared/hierarchy.ts'
-import type { DepGraphNode, ModuleMap, ScanDirNode } from '../src/shared/types.ts'
+import type { DepGraphNode, ModuleInfo, ModuleMap, ScanDirNode } from '../src/shared/types.ts'
+import type { WikiPanelPage } from '../src/shared/wikiTypes.ts'
 import {
   GRAPH_PREVIEW_NODES,
   type LevelNode,
@@ -204,10 +206,11 @@ function node(kind: LevelNodeKind, extra: Partial<LevelNode> = {}): LevelNode {
 
 /** 「显示项」的区块清单与本地账验身 */
 function checkSections(): void {
+  const fileSections = ['wiki', 'refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles']
   assert.deepEqual(
     graphPanelSections('file').map((s) => s.id),
-    ['refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
-    '文件区块:关系三项 + 模块四项'
+    fileSections,
+    '文件区块:Wiki 说明 + 关系三项 + 模块四项'
   )
   assert.deepEqual(
     graphPanelSections('folder').map((s) => s.id),
@@ -240,7 +243,7 @@ function checkSectionOrder(): void {
   const defaults = parseSectionOrders(null)
   assert.deepEqual(
     defaults.file,
-    ['refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
+    ['wiki', 'refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
     '没记过 = 默认顺序'
   )
   assert.deepEqual(defaults.folder, ['contents', 'composition'], '文件夹默认顺序')
@@ -251,7 +254,7 @@ function checkSectionOrder(): void {
   })
   assert.deepEqual(
     dirty.file,
-    ['files', 'refs', 'dependsOn', 'usedBy', 'module', 'tests', 'styles'],
+    ['files', 'refs', 'wiki', 'dependsOn', 'usedBy', 'module', 'tests', 'styles'],
     '认得的去重保留,异类与未知 id 丢掉,缺的按默认补在末尾'
   )
   assert.deepEqual(dirty.folder, ['contents', 'composition'], '坏档回默认')
@@ -391,14 +394,20 @@ function checkAvailability(): void {
   const available = (
     id: string,
     kind: LevelNodeKind = 'file',
-    modules: ModuleMap | null = MODULE_MAP
+    modules: ModuleMap | null = MODULE_MAP,
+    wiki: {
+      wikiPage?: WikiPanelPage | null
+      wikiGroup?: string | null
+      wikiDamaged?: boolean
+    } = {}
   ) =>
     [
       ...availableGraphPanelSections({
         node: node(kind, { id }),
         modules,
         depNodes: DEP_NODES,
-        tree
+        tree,
+        ...wiki
       })
     ].sort()
 
@@ -414,6 +423,43 @@ function checkAvailability(): void {
   )
   assert.deepEqual(available('CHANGELOG.md'), [], '未归类的根目录文件没有任何区块可显示')
   assert.deepEqual(available('src/a.ts', 'file', null), ['refs'], '模块划分不可用时只剩引用关系')
+
+  const donePage: WikiPanelPage = {
+    pageId: 'm:src/a.ts',
+    kind: 'module',
+    status: 'done',
+    name: '文件来源',
+    summary: '一句话',
+    tags: ['文件'],
+    keyFiles: ['src/a.ts'],
+    excerpt: '摘要',
+    file: '模块/文件来源.md',
+    generatedAt: '2026-11-01T10:00:00.000Z',
+    model: 'qwen'
+  }
+  assert.ok(
+    available('src/a.ts', 'file', MODULE_MAP, { wikiPage: donePage }).includes('wiki'),
+    '有 Wiki 说明就摆这一块'
+  )
+  assert.ok(
+    !available('src/a.ts', 'file', MODULE_MAP, {
+      wikiPage: { ...donePage, status: 'none' }
+    }).includes('wiki'),
+    '记账里没有这页 = 不摆空区块'
+  )
+  assert.ok(
+    available('CHANGELOG.md', 'file', MODULE_MAP, { wikiGroup: '根目录散件' }).includes('wiki'),
+    '散件还没生成也能看到所属组'
+  )
+  assert.ok(
+    !available('lib/c.ts', 'file', MODULE_MAP, { wikiGroup: null }).includes('wiki'),
+    '模块文件没有散件组归属'
+  )
+  assert.ok(
+    available('lib/c.ts', 'file', MODULE_MAP, { wikiDamaged: true }).includes('wiki'),
+    '记账损坏也要留一行提示'
+  )
+
   assert.deepEqual(
     available('src', 'folder'),
     ['composition', 'contents'],
@@ -424,6 +470,47 @@ function checkAvailability(): void {
   assert.deepEqual(available('overflow', 'overflow'), [], '收起的项没有正文')
 }
 
+/** 模块名:有 AI 名称用 AI 的,没有回退程序名,重名各自缀上程序名 */
+function checkModuleNames(): void {
+  const modules: ModuleInfo[] = [
+    {
+      id: 'm:a',
+      anchor: 'src/a.ts',
+      folder: 'src',
+      files: [],
+      attached: [],
+      tests: [],
+      folders: []
+    },
+    {
+      id: 'm:b',
+      anchor: 'src/b.ts',
+      folder: 'src',
+      files: [],
+      attached: [],
+      tests: [],
+      folders: []
+    },
+    {
+      id: 'm:c',
+      anchor: 'src/c.ts',
+      folder: 'src',
+      files: [],
+      attached: [],
+      tests: [],
+      folders: []
+    }
+  ]
+  const names = moduleNamesOf(modules, (id) => (id === 'm:a' || id === 'm:b' ? '同名模块' : null))
+  assert.equal(names.get('m:a'), '同名模块 · src · a.ts', '两条 AI 名称撞车时缀上程序名')
+  assert.equal(names.get('m:b'), '同名模块 · src · b.ts')
+  assert.equal(names.get('m:c'), 'src · c.ts', '没有 AI 名称回退程序名')
+
+  const single = moduleNamesOf([modules[0]], () => '独立名称')
+  assert.equal(single.get('m:a'), '独立名称', '名字唯一时直接显示 AI 名称')
+  assert.equal(moduleNamesOf([], () => 'x').size, 0, '没有模块就没有名字')
+}
+
 checkBounds()
 checkResize()
 checkContentFit()
@@ -432,7 +519,8 @@ checkSections()
 checkSectionOrder()
 checkFolderContents()
 checkAvailability()
+checkModuleNames()
 console.log('✅ 图谱详情浮窗自测全部通过')
 console.log(
-  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回 · 显示项区块清单与本地账验身 · 显示项拖动排序(顺序账验身/可见序并回整单) · 文件夹内容清单(直接子项/截断) · 显示项可用性过滤'
+  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回 · 显示项区块清单与本地账验身 · 显示项拖动排序(顺序账验身/可见序并回整单) · 文件夹内容清单(直接子项/截断) · 显示项可用性过滤 · 模块 AI 名称与重名回退'
 )

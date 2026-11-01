@@ -2,6 +2,7 @@
 // 按住 Ctrl 滚轮 = 层级(上滚展开二级 / 进入文件夹,下滚返回上一层或收起二级;触控板双指捏合也以 Ctrl+滚轮的形式到达)。
 // 一串连续的滚轮事件算一个手势,整个手势保持开头判定的动作,滚着滚着划过节点也不会从缩放变成切看法。纯函数,不依赖 DOM。
 import { GRAPH_WHEEL } from './graphConfig.ts'
+import type { SimNode } from './useForceLayout.ts'
 
 export type WheelAction = 'zoom' | 'mode' | 'level'
 
@@ -62,6 +63,17 @@ export function takeSteps(
 
 /** Ctrl+滚轮落点:container = 已展开的文件夹(圆圈本身),door = 只能进入的节点(外部文件夹、「其余 N 项」) */
 export type LevelWheelTarget = 'blank' | 'folder' | 'container' | 'door' | 'file'
+
+/** 悬停节点换算成落点:本地文件夹可原地展开,外部文件夹与「其余 N 项」只能进入 */
+export function wheelTargetOf(node: SimNode | null): LevelWheelTarget {
+  if (!node) return 'blank'
+  const data = node.data
+  if (data.kind === 'folder') return data.isContainer ? 'container' : 'folder'
+  if (data.kind === 'overflow' || (data.kind === 'external' && data.target === 'folder')) {
+    return 'door'
+  }
+  return 'file'
+}
 
 export type LevelWheelAction =
   | { kind: 'expandAll' }

@@ -11,6 +11,7 @@ import type {
 import { DEFAULT_WIKI_LANGUAGE } from '@shared/wikiTypes'
 import { friendlyErr } from './errText'
 import { recentProjectPaths } from './recents'
+import { notifyWikiLanguageChanged } from './wikiLanguageBus'
 import { mergeWikiRows, planWikiRows, type WikiRunPlan } from './wikiProgressModel'
 
 export interface WikiGenerateApi {
@@ -138,6 +139,7 @@ export function useWikiGenerate(
     try {
       const result = await window.atlas.wiki.saveLanguage(code)
       if (!result.ok) setError(result.message)
+      else notifyWikiLanguageChanged()
     } catch (err) {
       setError(friendlyErr(err))
     }

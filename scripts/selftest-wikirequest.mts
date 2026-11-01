@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
-import { parseProjectRoot, parseWikiStart } from '../src/main/wikiRequest.ts'
+import { parseProjectRoot, parseWikiPanelRequest, parseWikiStart } from '../src/main/wikiRequest.ts'
 import { resolveWikiDocPath } from '../src/main/wikiDocPath.ts'
 import { createWikiState, resolveProjectDir, writeWikiState } from '../src/wiki/wikiStore.ts'
 
@@ -84,6 +84,38 @@ function checkParse(base: string): void {
   assert.equal(parseProjectRoot(7), null)
 }
 
+/** 侧栏快照请求:页清单可以为空,但越界路径要丢、重复页只留第一个 */
+function checkPanelRequest(base: string): void {
+  const root = join(base, 'panel-project')
+  const parsed = parseWikiPanelRequest({
+    projectRoot: root,
+    language: 'ja',
+    pages: [basePage(), { ...basePage(), name: '重复页' }]
+  })
+  assert.equal(parsed.ok, true, '正常快照请求能过')
+  if (parsed.ok) {
+    assert.equal(parsed.request.language, 'ja', '语种原样带过')
+    assert.equal(parsed.request.pages.length, 1, '重复页 id 只留第一个')
+    assert.equal(parsed.request.pages[0].files[0].path, 'src/a.ts', '反斜杠统一')
+  }
+
+  const absolutePage = basePage()
+  absolutePage.files = [{ path: 'C:\\Windows\\win.ini' }]
+  const dropped = parseWikiPanelRequest({
+    projectRoot: root,
+    language: 'zh-CN',
+    pages: [absolutePage]
+  })
+  assert.equal(dropped.ok, true, '越界页丢掉但请求本身不失败')
+  if (dropped.ok) assert.equal(dropped.request.pages.length, 0, '绝对路径页不进快照')
+
+  const empty = parseWikiPanelRequest({ projectRoot: root, language: 'zh-CN', pages: [] })
+  assert.equal(empty.ok, true, '页清单可以为空')
+  assert.equal(parseWikiPanelRequest({ projectRoot: root, language: '', pages: [] }).ok, false)
+  assert.equal(parseWikiPanelRequest({ projectRoot: 'relative', language: 'zh-CN' }).ok, false)
+  assert.equal(parseWikiPanelRequest(null).ok, false)
+}
+
 async function checkDocPath(base: string): Promise<void> {
   const wiki = join(base, 'doc', 'wiki')
   const project = join(base, 'doc', 'demo')
@@ -125,9 +157,11 @@ async function main(): Promise<void> {
   await fs.mkdir(base, { recursive: true })
   try {
     checkParse(base)
+    checkPanelRequest(base)
     await checkDocPath(base)
     console.log('✅ Wiki 请求边界自测全部通过')
     console.log('   页面路径只收项目内相对路径 · 绝对路径与 .. 丢弃 · 重复页去重')
+    console.log('   侧栏快照页清单可为空 · 越界页单独丢弃 · 语种与项目根缺一即拒')
     console.log('   打开文档越界/缺失/未登记语种一律拒绝 · 相对项目根拒绝')
   } finally {
     await fs.rm(base, { recursive: true, force: true })

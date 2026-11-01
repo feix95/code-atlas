@@ -171,6 +171,36 @@ export interface WikiPageSummary {
   exists: boolean
 }
 
+/** 侧栏说明区块:没有记账的页返回 none,其余状态已按当前文件内容重算过 */
+export type WikiPanelStatus = WikiPageSummary['status'] | 'none'
+
+export interface WikiPanelPage {
+  pageId: string
+  kind: 'module' | 'group'
+  status: WikiPanelStatus
+  /** 记账里的 AI 名称;没有记录时为空串,由调用方回退程序名 */
+  name: string
+  summary: string
+  tags: string[]
+  keyFiles: string[]
+  /** 正文第一段,压成一行给侧栏看 */
+  excerpt: string
+  file: string
+  generatedAt: string
+  model: string
+}
+
+export type WikiPanelStateResult =
+  | { ok: true; language: string; damaged: boolean; pages: WikiPanelPage[] }
+  | { ok: false; error: string }
+
+/** 侧栏快照请求:项目、语种与当前图谱切出的页清单 */
+export interface WikiPanelRequest {
+  projectRoot: string
+  language: string
+  pages: WikiPageSource[]
+}
+
 export interface WikiLanguageSummary {
   code: string
   label: string

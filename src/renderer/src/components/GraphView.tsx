@@ -10,12 +10,14 @@ import { folderTree } from '@shared/hierarchy'
 import type { LevelNode } from '@shared/graphView'
 import { useGraphNav } from '../graph/useGraphNav'
 import { useGraphExpansion } from '../graph/useGraphExpansion'
-import { levelWheelAction, type LevelWheelTarget } from '../graph/wheelIntent'
+import { levelWheelAction, wheelTargetOf } from '../graph/wheelIntent'
 import { isFolderTarget, useNodeActivate } from '../graph/useNodeActivate'
 import { useForceLayout, type SimNode } from '../graph/useForceLayout'
 import { useGraphViewport } from '../graph/useGraphViewport'
 import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
 import { buildModuleOverlay, moduleDisplayName } from '../graph/moduleOverlay'
+import { moduleNamesOf } from '../graph/moduleNames'
+import { useWikiPanel } from '../useWikiPanel'
 import { nodeMenuItems, useGraphSelection } from '../graph/useGraphSelection'
 import { useGraphHoverMode } from '../graph/useGraphHoverMode'
 import { useGraphHoverDetail } from '../graph/useGraphHoverDetail'
@@ -36,15 +38,6 @@ import { GraphWikiEntry } from './GraphWikiEntry'
 import { TreeIcon } from './Icons'
 
 const NO_EDGES: DepEdge[] = []
-
-/** Ctrl+滚轮落点:本地文件夹可原地展开,外部文件夹与「其余 N 项」只能进入 */
-function wheelTargetOf(node: SimNode | null): LevelWheelTarget {
-  if (!node) return 'blank'
-  const d = node.data
-  if (d.kind === 'folder') return d.isContainer ? 'container' : 'folder'
-  if (d.kind === 'overflow' || (d.kind === 'external' && d.target === 'folder')) return 'door'
-  return 'file'
-}
 
 interface GraphViewProps {
   result: ScanResult | null
@@ -119,6 +112,12 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     () => new Map<string, DepGraphNode>((current?.nodes ?? []).map((n) => [n.relPath, n])),
     [current]
   )
+  // 当前语种的 Wiki 快照:图谱 AI 名称与详情区块共用,只在打开时按内容哈希重算过期,不调模型
+  const wiki = useWikiPanel(result, current)
+  const moduleNames = useMemo(
+    () => moduleNamesOf(moduleMap?.modules ?? [], (id) => wiki?.pages.get(id)?.name ?? null),
+    [moduleMap, wiki]
+  )
   // 引用关系(连线与模块)还没到时先不布局:等数据齐了一次排好,首帧即最终布局,不会到货后再重排一遍
   const isAwaitingGraph = current === null && graphNote === null
   const layout = useForceLayout(isAwaitingGraph ? null : level, render.requestDraw, clusters)
@@ -136,7 +135,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   )
   const hoverMode = useGraphHoverMode(hoverModuleOf, render.setHover)
   useGraphHoverDetail(hoverMode.hover, selection.select)
-  const picker = useModuleColorPicker({ root: result.rootPath, canvasRef, overlay, overrides })
+  const picker = useModuleColorPicker({
+    root: result.rootPath,
+    canvasRef,
+    overlay,
+    overrides,
+    names: moduleNames
+  })
   const onNodeContextMenu = useCallback(
     (n: SimNode, x: number, y: number) => {
       const moduleId = moduleOfNode(n.id)
@@ -198,7 +203,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       transformRef: viewport.transformRef,
       sizeRef: viewport.sizeRef,
       fit: viewport.fit,
-      modules: modulesOn ? { overlay, overrides } : null,
+      modules: modulesOn ? { overlay, overrides, names: moduleNames } : null,
       hoverMode: hoverMode.mode,
       selectedId: selection.selected?.id ?? null
     }
@@ -220,7 +225,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
   const moduleNameOf = (id: string): string | null => {
     const moduleId = moduleOfNode(id)
     const info = moduleId ? overlay.byId.get(moduleId) : undefined
-    return info ? moduleDisplayName(info) : null
+    return info ? (moduleNames.get(info.id) ?? moduleDisplayName(info)) : null
   }
   const nodeTipOf = (node: LevelNode): NodeTipText | null =>
     nodeTipText(node, {
@@ -301,6 +306,8 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           tree={tree}
           dirRel={nav.dirRel}
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
+          moduleNames={moduleNames}
+          wiki={wiki}
           viewRef={viewRef}
           tabId={props.tabId}
           activeTabId={props.activeTabId}

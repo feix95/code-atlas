@@ -1,13 +1,12 @@
 // 关系图谱的节点详情:默认是画布上的半透明浮窗(按住标题能拖、右下角能拉尺寸,位置与尺寸全局记住,
 // 宽高紧包内容,拉大松手吸回);也可以停靠进左侧文件树下方,与大纲共用同一块坞位与分割线。
 // 只读展示,数据全部来自已有的 DepGraphResult(引用数、模块划分),不发任何请求。
-import { Fragment, useRef } from 'react'
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { LevelNode } from '@shared/graphView'
 import type { GroupTree } from '@shared/hierarchy'
 import type { DepGraphNode, ModuleMap } from '@shared/types'
 import { availableGraphPanelSections } from '../graph/graphPanelAvailability'
-import { moduleDetails, type ModuleDetails } from '../graph/moduleDetails'
 import {
   graphPanelKindOf,
   orderGraphPanelSections,
@@ -17,18 +16,15 @@ import {
   type GraphPanelSectionId,
   type GraphPanelSectionOrders
 } from '../graph/graphPanelSections'
+import { wikiOwnerOf } from '../graph/wikiOwner'
 import { FolderBody } from './GraphFolderBody'
+import { GraphFileBody } from './GraphFileBody'
+import type { ModuleNames } from '../graph/moduleNames'
+import type { WikiPanelData } from '../useWikiPanel'
 import { useGraphPanelPlacement } from '../graph/useGraphPanelPlacement'
 import { useGraphPanelDock } from '../graph/useGraphPanelDock'
 import { setGraphPanelDocked } from '../graphPanelDock'
 import type { SidebarDropTarget } from '../sidebarDock'
-import {
-  ModuleChip,
-  ModuleFilesSection,
-  ModuleLinksSection,
-  ModuleStylesSection,
-  ModuleTestsSection
-} from './GraphModuleSection'
 import { GraphPanelHeader } from './GraphPanelHeader'
 import { SidebarDockSection } from './SidebarDockSection'
 import { TreeIcon } from './Icons'
@@ -42,6 +38,10 @@ export interface GraphSidePanelProps {
   dirRel: string
   /** 模块颜色(CSS 颜色值) */
   colorOf: (moduleId: string) => string
+  /** 当前语种的模块显示名(AI 名称,没有就回退程序名) */
+  moduleNames: ModuleNames
+  /** 当前语种的 Wiki 快照;还没读到为 null */
+  wiki: WikiPanelData | null
   /** 画布容器:浮窗的位置、尺寸按它夹边 */
   viewRef: React.RefObject<HTMLDivElement | null>
   /** 这扇图谱的页签 id:停靠位认它 */
@@ -52,11 +52,6 @@ export interface GraphSidePanelProps {
 }
 
 const UNDOCK_LABEL = '把节点详情放回浮窗,也可以按住标题条拖出左栏'
-
-interface BodyProps {
-  props: GraphSidePanelProps
-  hidden: ReadonlySet<GraphPanelSectionId>
-}
 
 const HIDDEN_ALL_NOTE = '全部内容已隐藏'
 
@@ -70,75 +65,19 @@ interface PanelView {
 function panelViewOf(props: GraphSidePanelProps, orders: GraphPanelSectionOrders): PanelView {
   const kind = graphPanelKindOf(props.node)
   if (kind === null) return { sections: [], available: new Set(), orders }
+  const owner =
+    kind === 'file' ? wikiOwnerOf(props.wiki, props.node.id) : { page: null, groupName: null }
   // 菜单始终列全这一类的区块,没内容的置灰;正文只认能拿到的那几块
   return {
     sections: orderGraphPanelSections(kind, orders),
-    available: availableGraphPanelSections(props),
+    available: availableGraphPanelSections({
+      ...props,
+      wikiPage: owner.page,
+      wikiGroup: owner.groupName,
+      wikiDamaged: props.wiki?.damaged ?? false
+    }),
     orders
   }
-}
-
-/** 一个区块的正文块;数据不够就交 null(可用性已在菜单那层算过,这里只认数据) */
-function fileSection(
-  id: GraphPanelSectionId,
-  dep: DepGraphNode | undefined,
-  details: ModuleDetails | null,
-  colorOf: (moduleId: string) => string
-): React.ReactNode {
-  switch (id) {
-    case 'refs':
-      return dep ? (
-        <p className="graph-panel-note">
-          引用了 {dep.outCount} 个文件,被 {dep.inCount} 个文件引用
-        </p>
-      ) : null
-    case 'module':
-      return details ? (
-        <section className="graph-panel-section">
-          <h3 className="graph-panel-h">所属模块</h3>
-          <ModuleChip name={details.name} color={colorOf(details.module.id)} />
-        </section>
-      ) : null
-    case 'files':
-      return details ? <ModuleFilesSection details={details} /> : null
-    case 'tests':
-      return details ? <ModuleTestsSection details={details} /> : null
-    case 'styles':
-      return details ? <ModuleStylesSection details={details} /> : null
-    case 'dependsOn':
-      return details ? (
-        <ModuleLinksSection title="依赖的模块" links={details.dependsOn} colorOf={colorOf} />
-      ) : null
-    case 'usedBy':
-      return details ? (
-        <ModuleLinksSection title="被这些模块使用" links={details.usedBy} colorOf={colorOf} />
-      ) : null
-    default:
-      return null
-  }
-}
-
-function FileBody({
-  props,
-  hidden,
-  order
-}: BodyProps & { order: readonly GraphPanelSectionId[] }): React.JSX.Element {
-  const { node, modules, depNodes, dirRel, colorOf } = props
-  const dep = depNodes.get(node.id)
-  const moduleId =
-    modules && Object.hasOwn(modules.fileToModule, node.id) ? modules.fileToModule[node.id] : null
-  const details = modules && moduleId ? moduleDetails(modules, moduleId, dirRel) : null
-  return (
-    <>
-      {order.map((id) => {
-        if (hidden.has(id)) return null
-        const block = fileSection(id, dep, details, colorOf)
-        return block === null ? null : <Fragment key={id}>{block}</Fragment>
-      })}
-      {!modules && <p className="graph-panel-note">模块划分暂不可用,先按原始结构显示</p>}
-      {modules && !details && <p className="graph-panel-note">未归入任何模块</p>}
-    </>
-  )
 }
 
 function PanelBody({
@@ -157,7 +96,7 @@ function PanelBody({
     return <p className="graph-panel-note">{HIDDEN_ALL_NOTE}</p>
   }
   return kind === 'file' ? (
-    <FileBody props={props} hidden={hidden} order={orders.file} />
+    <GraphFileBody {...props} hidden={hidden} order={orders.file} />
   ) : (
     <FolderBody {...props} hidden={hidden} order={orders.folder} />
   )

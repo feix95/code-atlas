@@ -6,6 +6,7 @@ import type {
   WikiDependencyFact,
   WikiPageFileSource,
   WikiPageSource,
+  WikiPanelRequest,
   WikiStartRequest
 } from '../shared/wikiTypes.ts'
 
@@ -178,4 +179,25 @@ export function parseWikiStart(raw: unknown): WikiStartParse {
 export function parseProjectRoot(raw: unknown): string | null {
   const value = text(raw, 2048)
   return value !== null && isAbsolute(value) ? value : null
+}
+
+export type WikiPanelParse = { ok: true; request: WikiPanelRequest } | { ok: false; error: string }
+
+/** 侧栏快照请求:项目、语种与当前图谱切出的页清单;页清单可以为空 */
+export function parseWikiPanelRequest(raw: unknown): WikiPanelParse {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, error: '请求不完整' }
+  const record = raw as Record<string, unknown>
+  const projectRoot = parseProjectRoot(record.projectRoot)
+  const language = text(record.language, 20)
+  if (projectRoot === null || language === null) return { ok: false, error: '请求不完整' }
+  const seen = new Set<string>()
+  const pages: WikiPageSource[] = []
+  const rawPages = Array.isArray(record.pages) ? record.pages.slice(0, MAX_PAGES) : []
+  for (const item of rawPages) {
+    const page = pageSource(projectRoot, item)
+    if (page === null || seen.has(page.pageId)) continue
+    seen.add(page.pageId)
+    pages.push(page)
+  }
+  return { ok: true, request: { projectRoot, language, pages } }
 }

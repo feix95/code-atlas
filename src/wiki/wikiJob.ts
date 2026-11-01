@@ -4,6 +4,7 @@ import { buildWikiMessages } from '../ai/wikiPrompt.ts'
 import {
   renderWikiMarkdown,
   requestWikiContent,
+  wikiDocExcerpt,
   type WikiContentAttempt,
   type WikiModelRequest
 } from '../ai/wikiOutput.ts'
@@ -111,6 +112,12 @@ async function recordFailure(args: {
     status: 'failed',
     name: existing?.name ?? source.name
   }
+  // 旧文档还在:摘要、标签与关键文件留着,失败不该把已有的说明一起抹掉
+  if (existing?.summary !== undefined) record.summary = existing.summary
+  if (existing?.tags !== undefined) record.tags = existing.tags
+  if (existing?.keyFiles !== undefined) record.keyFiles = existing.keyFiles
+  if (existing?.excerpt !== undefined) record.excerpt = existing.excerpt
+  if (existing?.truncated === true) record.truncated = true
   languageState.pages[source.pageId] = record
   await writeWikiState(options.projectDir, state)
   return record
@@ -259,7 +266,11 @@ export async function runWikiJob(
         model: options.model,
         generatedAt,
         status: 'done',
-        name: content.name
+        name: content.name,
+        summary: content.summary,
+        tags: [...content.tags],
+        keyFiles: [...content.keyFiles],
+        excerpt: wikiDocExcerpt(content.doc)
       }
       if (wasTrimmed) record.truncated = true
       const markdown = renderWikiMarkdown(content, {

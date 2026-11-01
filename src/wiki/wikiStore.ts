@@ -27,6 +27,12 @@ export interface WikiPageRecord {
   /** 生成时的 AI 名称,改名时用来对比 */
   name: string
   truncated?: boolean
+  /** 侧栏展示用的 AI 摘要、标签与关键文件;旧记录可能没有,按缺省处理 */
+  summary?: string
+  tags?: string[]
+  keyFiles?: string[]
+  /** 正文第一段,压成一行给侧栏 */
+  excerpt?: string
 }
 
 export interface WikiLanguageState {
@@ -231,6 +237,22 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function cleanString(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  return text === '' || text.length > max ? null : text
+}
+
+function cleanStringList(value: unknown, maxItems: number, maxLength: number): string[] | null {
+  if (!Array.isArray(value)) return null
+  const items: string[] = []
+  for (const item of value.slice(0, maxItems)) {
+    const text = cleanString(item, maxLength)
+    if (text !== null && !items.includes(text)) items.push(text)
+  }
+  return items.length === 0 ? null : items
+}
+
 function sanitizePage(raw: unknown, pageId: string): WikiPageRecord | null {
   if (!isObject(raw) || raw.pageId !== pageId) return null
   if (raw.kind !== 'module' && raw.kind !== 'group') return null
@@ -252,6 +274,14 @@ function sanitizePage(raw: unknown, pageId: string): WikiPageRecord | null {
     name: raw.name
   }
   if (raw.truncated === true) record.truncated = true
+  const summary = cleanString(raw.summary, 120)
+  const tags = cleanStringList(raw.tags, 5, 24)
+  const keyFiles = cleanStringList(raw.keyFiles, 5, 1024)
+  const excerpt = cleanString(raw.excerpt, 400)
+  if (summary !== null) record.summary = summary
+  if (tags !== null) record.tags = tags
+  if (keyFiles !== null) record.keyFiles = keyFiles
+  if (excerpt !== null) record.excerpt = excerpt
   return record
 }
 

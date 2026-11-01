@@ -3,6 +3,7 @@
 import type { ModuleInfo, ModuleMap } from '@shared/types'
 import { STYLE_EXT } from './fileKinds.ts'
 import { moduleDisplayName } from './moduleOverlay.ts'
+import type { ModuleNames } from './moduleNames.ts'
 
 export type MemberRole = 'member' | 'attached' | 'test'
 
@@ -56,7 +57,12 @@ function groupFiles(m: ModuleInfo, dirRel: string): FolderGroup[] {
   return [...groups].map(([folder, files]) => ({ folder, files }))
 }
 
-function linkViews(map: ModuleMap, moduleId: string, side: 'from' | 'to'): ModuleLinkView[] {
+function linkViews(
+  map: ModuleMap,
+  moduleId: string,
+  side: 'from' | 'to',
+  nameOf: (module: ModuleInfo) => string
+): ModuleLinkView[] {
   const other = side === 'from' ? 'to' : 'from'
   const byId = new Map(map.modules.map((m) => [m.id, m]))
   return map.links
@@ -65,28 +71,34 @@ function linkViews(map: ModuleMap, moduleId: string, side: 'from' | 'to'): Modul
       const target = byId.get(l[other])
       return {
         moduleId: l[other],
-        name: target ? moduleDisplayName(target) : l[other],
+        name: target ? nameOf(target) : l[other],
         weight: l.weight
       }
     })
     .sort((a, b) => b.weight - a.weight || (a.moduleId < b.moduleId ? -1 : 1))
 }
 
+function nameResolver(names?: ModuleNames): (module: ModuleInfo) => string {
+  return (module) => names?.get(module.id) ?? moduleDisplayName(module)
+}
+
 export function moduleDetails(
   map: ModuleMap,
   moduleId: string,
-  dirRel: string
+  dirRel: string,
+  names?: ModuleNames
 ): ModuleDetails | null {
   const module = map.modules.find((m) => m.id === moduleId)
   if (!module) return null
+  const nameOf = nameResolver(names)
   return {
     module,
-    name: moduleDisplayName(module),
+    name: nameOf(module),
     groups: groupFiles(module, dirRel),
     styles: module.attached.filter((f) => STYLE_EXT.test(f)),
     tests: module.tests,
-    dependsOn: linkViews(map, moduleId, 'from'),
-    usedBy: linkViews(map, moduleId, 'to')
+    dependsOn: linkViews(map, moduleId, 'from', nameOf),
+    usedBy: linkViews(map, moduleId, 'to', nameOf)
   }
 }
 
@@ -97,16 +109,21 @@ export interface FolderShare {
 }
 
 /** 文件夹(含子目录)里各模块的文件数,按文件数降序、id 升序;未归类的文件不计 */
-export function folderComposition(map: ModuleMap, folder: string): FolderShare[] {
+export function folderComposition(
+  map: ModuleMap,
+  folder: string,
+  names?: ModuleNames
+): FolderShare[] {
   const counts = new Map<string, number>()
   for (const [file, moduleId] of Object.entries(map.fileToModule)) {
     if (isUnder(file, folder)) counts.set(moduleId, (counts.get(moduleId) ?? 0) + 1)
   }
   const byId = new Map(map.modules.map((m) => [m.id, m]))
+  const nameOf = nameResolver(names)
   return [...counts]
     .map(([moduleId, files]) => {
       const m = byId.get(moduleId)
-      return { moduleId, files, name: m ? moduleDisplayName(m) : moduleId }
+      return { moduleId, files, name: m ? nameOf(m) : moduleId }
     })
     .sort((a, b) => b.files - a.files || (a.moduleId < b.moduleId ? -1 : 1))
 }

@@ -8,18 +8,22 @@ import type {
   WikiCleanupOutcome,
   WikiFileOpResult,
   WikiLocationChoice,
+  WikiPanelStateResult,
   WikiProjectStateResult,
   WikiRootScan
 } from '../shared/wikiTypes.ts'
+import { getFactFileCount, getFileFact } from '../depgraph/factCache.ts'
 import { pickPathDialog } from './atlasWindow.ts'
 import { userDataDir } from './paths.ts'
-import { parseProjectRoot } from './wikiRequest.ts'
+import { parseProjectRoot, parseWikiPanelRequest } from './wikiRequest.ts'
 import { resolveWikiDocPath } from './wikiDocPath.ts'
 import { isWikiJobActive } from './wikiRun.ts'
 import { ensureWikiRootMarker, resolveWikiLocation } from '../wiki/wikiLocation.ts'
 import { loadWikiSettings, saveWikiSettings } from '../wiki/wikiSettings.ts'
 import { cleanupWiki, scanWikiRoot } from '../wiki/wikiCleanup.ts'
 import { pageFileExists, readWikiState, resolveProjectDir } from '../wiki/wikiStore.ts'
+import { wikiPageInputHash } from '../wiki/wikiPageFacts.ts'
+import { panelPageOf } from '../wiki/wikiPanel.ts'
 
 function wikiRoot(): string | null {
   return loadWikiSettings(userDataDir()).location
@@ -70,6 +74,36 @@ async function projectState(raw: unknown): Promise<WikiProjectStateResult> {
     }))
   )
   return { ok: true, projectDir, damaged: false, languages }
+}
+
+/**
+ * 侧栏快照:当前语种下每页的 AI 名称、简介、标签与状态。
+ * 过期按当前内容哈希重算;分析还没跑完(事实缓存为空)时不判过期,免得整份误报。
+ */
+async function panelState(raw: unknown): Promise<WikiPanelStateResult> {
+  const parsed = parseWikiPanelRequest(raw)
+  if (!parsed.ok) return parsed
+  const { projectRoot, language, pages } = parsed.request
+  if (translateLang(language) === null) return { ok: false, error: '这个语种还没登记' }
+  const location = wikiRoot()
+  if (location === null) return { ok: true, language, damaged: false, pages: [] }
+  const projectDir = await resolveProjectDir(location, projectRoot)
+  const read = await readWikiState(projectDir)
+  if (read.status === 'damaged') return { ok: true, language, damaged: true, pages: [] }
+  const languageState = read.status === 'ok' ? read.state.languages[language] : undefined
+  const factReady = getFactFileCount(projectRoot) > 0
+  const result = await Promise.all(
+    pages.map(async (source) => {
+      const record = languageState?.pages[source.pageId]
+      if (!record) return panelPageOf({ source, record, exists: false, currentHash: null })
+      const exists = await pageFileExists(projectDir, language, record)
+      const currentHash = factReady
+        ? wikiPageInputHash(source, language, (relPath) => getFileFact(projectRoot, relPath))
+        : null
+      return panelPageOf({ source, record, exists, currentHash })
+    })
+  )
+  return { ok: true, language, damaged: false, pages: result }
 }
 
 /** 打开文档只认语种目录下记账形状的相对路径;realpath 必须仍在 Wiki 根内 */
@@ -168,4 +202,5 @@ export function registerWikiIpc(): void {
   registerCleanup()
   registerFiles()
   ipcMain.handle(CH.wikiProjectState, (_event, raw: unknown) => projectState(raw))
+  ipcMain.handle(CH.wikiPanelState, (_event, raw: unknown) => panelState(raw))
 }

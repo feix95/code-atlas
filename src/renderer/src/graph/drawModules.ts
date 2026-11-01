@@ -3,6 +3,7 @@
 import type { ForceScene, SimNode } from './useForceLayout'
 import type { ModuleOverlay, RingSegment } from './moduleOverlay'
 import { moduleDisplayName } from './moduleOverlay'
+import type { ModuleNames } from './moduleNames'
 import { moduleOutline, type Point } from './outline'
 import { GRAPH_HULL, GRAPH_RING } from './graphConfig'
 import { moduleColor, type ColorOverrides, type GenTone } from './moduleColors'
@@ -21,11 +22,13 @@ export interface ModuleDrawState {
   overlay: ModuleOverlay
   /** 用户在右键菜单改过的模块颜色 */
   overrides: ColorOverrides
+  /** 当前语种的模块显示名(AI 名称优先);缺项回退程序名 */
+  names: ModuleNames
 }
 
 /** 模块的实际颜色:改过的颜色 → 调色板 → 生成色;null = 中性色 */
 export function moduleColorOf(
-  state: ModuleDrawState,
+  state: Pick<ModuleDrawState, 'overlay' | 'overrides'>,
   colors: ModuleColors,
   moduleId: string | null
 ): string {
@@ -115,7 +118,11 @@ export function drawHulls(
     const top = topmost(loops)
     ctx.globalAlpha = dim * labelAlpha
     ctx.textBaseline = 'bottom'
-    ctx.fillText(moduleDisplayName(info), top[0], top[1] - GRAPH_HULL.labelGap)
+    ctx.fillText(
+      state.names.get(moduleId) ?? moduleDisplayName(info),
+      top[0],
+      top[1] - GRAPH_HULL.labelGap
+    )
   }
 }
 

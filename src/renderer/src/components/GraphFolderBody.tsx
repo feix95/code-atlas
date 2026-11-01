@@ -6,6 +6,7 @@ import type { ModuleMap } from '@shared/types'
 import { folderContents } from '../graph/folderContents'
 import type { GraphPanelSectionId } from '../graph/graphPanelSections'
 import { folderComposition } from '../graph/moduleDetails'
+import type { ModuleNames } from '../graph/moduleNames'
 import { ModuleChip } from './GraphModuleSection'
 
 export interface FolderBodyProps {
@@ -13,6 +14,8 @@ export interface FolderBodyProps {
   modules: ModuleMap | null
   tree: GroupTree
   colorOf: (moduleId: string) => string
+  /** 当前语种的模块显示名 */
+  moduleNames?: ModuleNames
   hidden: ReadonlySet<GraphPanelSectionId>
   /** 「显示项」拖出来的区块顺序 */
   order: readonly GraphPanelSectionId[]
@@ -50,10 +53,11 @@ function FolderContentsSection({ node, tree }: FolderBodyProps): React.JSX.Eleme
 function FolderCompositionSection({
   node,
   modules,
-  colorOf
+  colorOf,
+  moduleNames
 }: FolderBodyProps): React.JSX.Element | null {
   if (!modules) return null
-  const shares = folderComposition(modules, node.id)
+  const shares = folderComposition(modules, node.id, moduleNames)
   if (shares.length === 0) return null
   return (
     <section className="graph-panel-section">

@@ -7,6 +7,7 @@ import { moduleColorOf } from './drawModules'
 import { isHexColor, type ColorOverrides } from './moduleColors'
 import { setModuleColor } from './moduleColorStore'
 import { moduleDisplayName, type ModuleOverlay } from './moduleOverlay'
+import type { ModuleNames } from './moduleNames'
 /** 任意 CSS 颜色(含 hsl)换成 #rrggbb:交给 Canvas 解析,解析不了回落中灰 */
 function toHex(color: string, doc: Document): string {
   const ctx = doc.createElement('canvas').getContext('2d')
@@ -21,10 +22,12 @@ interface PickerDeps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>
   overlay: ModuleOverlay
   overrides: ColorOverrides
+  /** 当前语种的模块显示名 */
+  names: ModuleNames
 }
 
 /** 浮层的打开状态;open 的坐标是右键菜单给的屏幕坐标 */
-export function useModuleColorPicker({ root, canvasRef, overlay, overrides }: PickerDeps): {
+export function useModuleColorPicker({ root, canvasRef, overlay, overrides, names }: PickerDeps): {
   open: (moduleId: string, clientX: number, clientY: number) => void
   element: React.JSX.Element | null
 } {
@@ -39,14 +42,14 @@ export function useModuleColorPicker({ root, canvasRef, overlay, overrides }: Pi
       const color = moduleColorOf({ overlay, overrides }, colors, moduleId)
       setTarget({
         moduleId,
-        name: moduleDisplayName(info),
+        name: names.get(moduleId) ?? moduleDisplayName(info),
         x: clientX - rect.left,
         y: clientY - rect.top,
         current: toHex(color, canvas.ownerDocument),
         isCustom: overrides.has(moduleId)
       })
     },
-    [canvasRef, overlay, overrides]
+    [canvasRef, overlay, overrides, names]
   )
   const close = useCallback(() => setTarget(null), [])
   const pick = useCallback(

@@ -33,7 +33,8 @@ import {
   WIKI_DOC_MAX_CHARS,
   WIKI_MARKER_FILE,
   WIKI_SUBDIRECTORY,
-  type WikiPageFacts
+  type WikiPageFacts,
+  type WikiPageSource
 } from '../src/shared/wikiTypes.ts'
 import {
   buildWikiMessages,
@@ -43,7 +44,13 @@ import {
   sanitizeWikiFacts,
   withWikiRetryNote
 } from '../src/ai/wikiPrompt.ts'
-import { parseWikiOutput, renderWikiMarkdown, requestWikiContent } from '../src/ai/wikiOutput.ts'
+import {
+  parseWikiOutput,
+  renderWikiMarkdown,
+  requestWikiContent,
+  wikiDocExcerpt
+} from '../src/ai/wikiOutput.ts'
+import { panelPageOf } from '../src/wiki/wikiPanel.ts'
 import { WIKI_COPY, wikiCopy } from '../src/ai/wikiCopy.ts'
 import { TRANSLATE_LANGS } from '../src/shared/translateLangs.ts'
 import { estimateTokens } from '../src/shared/aiText.ts'
@@ -246,6 +253,25 @@ async function checkStore(base: string): Promise<void> {
   if (read.status === 'ok') {
     assert.equal(read.state.languages[code].pages['m:src/a.ts'].file, '模块/B.md')
   }
+
+  state.languages[code].pages['m:src/a.ts'] = pageRecord({
+    file: '模块/B.md',
+    summary: '  一句话简介  ',
+    tags: ['UI', 'UI', '   ', 'a'.repeat(25), '图谱'],
+    keyFiles: ['src/a.ts', 'src/a.ts', 7] as unknown as string[],
+    excerpt: 'x'.repeat(401)
+  })
+  await writeWikiState(projectDir, state)
+  const metaRead = await readWikiState(projectDir)
+  assert.equal(metaRead.status, 'ok')
+  if (metaRead.status === 'ok') {
+    const page = metaRead.state.languages[code].pages['m:src/a.ts']
+    assert.equal(page.summary, '一句话简介', '摘要去空白后保留')
+    assert.deepEqual(page.tags, ['UI', '图谱'], '标签去重,空白与超长的丢掉')
+    assert.deepEqual(page.keyFiles, ['src/a.ts'], '关键文件只留非空字符串')
+    assert.equal(page.excerpt, undefined, '超长摘录整条丢掉')
+  }
+
   const badDir = join(base, 'bad-state')
   await fs.mkdir(join(badDir, '.codeatlas'), { recursive: true })
   await fs.writeFile(join(badDir, '.codeatlas', 'state.json'), 'not json', 'utf8')
@@ -254,6 +280,66 @@ async function checkStore(base: string): Promise<void> {
   await fs.mkdir(join(wrongDir, '.codeatlas'), { recursive: true })
   await fs.writeFile(join(wrongDir, '.codeatlas', 'state.json'), '{"schema":2}', 'utf8')
   assert.equal((await readWikiState(wrongDir)).status, 'damaged', '不认识的版本记为损坏')
+}
+
+/** 侧栏面板状态:缺失优先于过期,拿不到当前哈希不判过期,失败状态原样保留 */
+function checkPanel(): void {
+  const source: WikiPageSource = {
+    pageId: 'm:src/a.ts',
+    kind: 'module',
+    name: 'A',
+    files: [],
+    attachedFiles: [],
+    folders: [],
+    dependsOn: [],
+    usedBy: []
+  }
+  const record = pageRecord({
+    summary: '简介',
+    tags: ['文件'],
+    keyFiles: ['src/a.ts'],
+    excerpt: '摘要'
+  })
+  const done = panelPageOf({ source, record, exists: true, currentHash: 'h' })
+  assert.equal(done.status, 'done')
+  assert.equal(done.summary, '简介', '摘要带进面板')
+  assert.deepEqual(done.tags, ['文件'], '标签带进面板')
+  assert.deepEqual(done.keyFiles, ['src/a.ts'], '关键文件带进面板')
+  assert.equal(done.excerpt, '摘要')
+  assert.equal(
+    panelPageOf({ source, record, exists: false, currentHash: 'h' }).status,
+    'missing',
+    '文件不在优先报缺失'
+  )
+  assert.equal(
+    panelPageOf({ source, record, exists: true, currentHash: 'other' }).status,
+    'stale',
+    '内容变了报过期'
+  )
+  assert.equal(
+    panelPageOf({ source, record, exists: true, currentHash: null }).status,
+    'done',
+    '拿不到当前哈希(分析未完成)不判过期'
+  )
+  assert.equal(
+    panelPageOf({
+      source,
+      record: { ...record, promptVersion: WIKI_PROMPT_VERSION + 1 },
+      exists: true,
+      currentHash: 'h'
+    }).status,
+    'stale',
+    '提示词版本变了也过期'
+  )
+  assert.equal(
+    panelPageOf({ source, record: { ...record, status: 'failed' }, exists: true, currentHash: 'h' })
+      .status,
+    'failed',
+    '失败状态原样保留'
+  )
+  const none = panelPageOf({ source, record: undefined, exists: false, currentHash: null })
+  assert.equal(none.status, 'none', '没有记账 = 未生成')
+  assert.deepEqual([none.name, none.summary, none.file], ['', '', ''], '未生成页给空字段')
 }
 
 function checkHash(): void {
@@ -748,6 +834,16 @@ function checkMarkdown(): void {
     }
   )
   assert.ok(empty.includes('- 关键文件: —'), '没有关键文件时留占位')
+
+  assert.equal(
+    wikiDocExcerpt('## 标题\n\n第一段  摘要。\n第二行'),
+    '第一段 摘要。',
+    '侧栏摘要跳过标题与空行,压成一行'
+  )
+  assert.equal(wikiDocExcerpt(''), '', '空正文给空摘要')
+  const longExcerpt = wikiDocExcerpt('字'.repeat(200))
+  assert.equal([...longExcerpt].length, 141, '超过上限按字截断并留省略号')
+  assert.ok(longExcerpt.endsWith('…'))
 }
 
 function checkCopy(): void {
@@ -771,6 +867,7 @@ async function main(): Promise<void> {
     checkSettings(base)
     await checkLocation(base)
     await checkStore(base)
+    checkPanel()
     checkHash()
     checkGroups()
     checkPrompt()

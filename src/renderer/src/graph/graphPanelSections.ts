@@ -9,6 +9,7 @@ export const GRAPH_PANEL_SECTIONS_KEY = 'atlas.graphPanelSections'
 export const GRAPH_PANEL_ORDER_KEY = 'atlas.graphPanelSectionOrder'
 
 export type GraphPanelSectionId =
+  | 'wiki'
   | 'refs'
   | 'module'
   | 'files'
@@ -27,6 +28,7 @@ export interface GraphPanelSectionDef {
 }
 
 const FILE_SECTIONS: readonly GraphPanelSectionDef[] = [
+  { id: 'wiki', label: 'Wiki 说明', group: '说明' },
   { id: 'refs', label: '引用关系', group: '关系' },
   { id: 'dependsOn', label: '依赖的模块', group: '关系' },
   { id: 'usedBy', label: '被这些模块使用', group: '关系' },

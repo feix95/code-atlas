@@ -6,6 +6,8 @@ import type {
   WikiEvent,
   WikiFileOpResult,
   WikiLocationChoice,
+  WikiPanelRequest,
+  WikiPanelStateResult,
   WikiProjectStateResult,
   WikiRootScan,
   WikiRunStatus,
@@ -23,6 +25,8 @@ export const wikiBridge = {
   scanRoot: (): Promise<WikiRootScan> => ipcRenderer.invoke(CH.wikiScanRoot),
   projectState: (projectRoot: string): Promise<WikiProjectStateResult> =>
     ipcRenderer.invoke(CH.wikiProjectState, projectRoot),
+  panelState: (request: WikiPanelRequest): Promise<WikiPanelStateResult> =>
+    ipcRenderer.invoke(CH.wikiPanelState, request),
   start: (request: WikiStartRequest): Promise<WikiStartResult> =>
     ipcRenderer.invoke(CH.wikiStart, request),
   runStatus: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatus),

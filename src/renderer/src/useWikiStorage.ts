@@ -5,6 +5,7 @@ import { formatSize } from '@shared/fsMessages'
 import type { WikiRootScan, WikiSettings } from '@shared/wikiTypes'
 import { friendlyErr } from './errText'
 import { recentProjectPaths } from './recents'
+import { notifyWikiLanguageChanged } from './wikiLanguageBus'
 
 export interface WikiStorageApi {
   loading: boolean
@@ -96,6 +97,7 @@ export function useWikiStorage(): WikiStorageApi {
         return
       }
       setSettings((prev) => (prev === null ? prev : { ...prev, language: code }))
+      notifyWikiLanguageChanged()
     } catch (err) {
       setError(friendlyErr(err))
     }

@@ -1,0 +1,49 @@
+/* 节点详情里的 Wiki 说明区块:简介、标签、摘要、关键文件与文档入口。
+   左缘与其它区块共用面板正文的留白,右侧数字/按钮贴正文右缘 */
+.graph-wiki-owner {
+  margin-bottom: var(--space-2);
+}
+
+.graph-wiki-summary {
+  margin: 0 0 var(--space-2);
+  font-weight: var(--font-w-medium);
+  line-height: var(--lh-150);
+  word-break: break-word;
+}
+
+.graph-wiki-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.graph-wiki-tag {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--hover);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: var(--lh-150);
+}
+
+.graph-wiki-excerpt {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  line-height: var(--lh-150);
+  word-break: break-word;
+}
+
+.graph-wiki-block {
+  margin: 0 0 var(--space-3);
+}
+
+.graph-wiki-meta {
+  margin-bottom: var(--space-2);
+}
+
+.graph-wiki-open {
+  margin-top: var(--space-1);
+}

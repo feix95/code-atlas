@@ -159,6 +159,27 @@ export async function requestWikiContent(
   return { ok: false, errors: second.errors, attempts: 2 }
 }
 
+const EXCERPT_MAX_CHARS = 140
+
+/** 标题、代码围栏与分隔线不是正文,摘录时跳过 */
+function isExcerptNoise(line: string): boolean {
+  return (
+    line === '' || line.startsWith('#') || /^(`{3,}|~{3,})/.test(line) || /^[-*_]{3,}$/.test(line)
+  )
+}
+
+/** 侧栏摘要:跳过标题、代码围栏与空行,取正文第一段,压成一行;超出上限按字截断 */
+export function wikiDocExcerpt(doc: string): string {
+  const paragraph = doc
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => !isExcerptNoise(line))
+  if (paragraph === undefined) return ''
+  const text = paragraph.replace(/^[\s>#*+-]+/, '').replace(/\s+/g, ' ')
+  const chars = [...text]
+  return chars.length > EXCERPT_MAX_CHARS ? `${chars.slice(0, EXCERPT_MAX_CHARS).join('')}…` : text
+}
+
 function formatWikiTime(iso: string): string {
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso)
   return match ? `${match[1]} ${match[2]}` : iso

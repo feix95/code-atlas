@@ -3,6 +3,7 @@
 import type { LevelNode } from '../../../shared/graphView.ts'
 import type { GroupTree } from '../../../shared/hierarchy.ts'
 import type { DepGraphNode, ModuleInfo, ModuleMap } from '@shared/types'
+import type { WikiPanelPage } from '@shared/wikiTypes'
 import { STYLE_EXT } from './fileKinds.ts'
 import { graphPanelKindOf, type GraphPanelSectionId } from './graphPanelSections.ts'
 
@@ -11,6 +12,12 @@ export interface GraphPanelSources {
   modules: ModuleMap | null
   depNodes: ReadonlyMap<string, DepGraphNode>
   tree: GroupTree
+  /** 当前语种下这个文件的 Wiki 页;还没生成或没读到为 null */
+  wikiPage?: WikiPanelPage | null
+  /** 散件文件所属组名:即使还没生成 Wiki,也有一行归属可看 */
+  wikiGroup?: string | null
+  /** 记账损坏:给一行提示,不摆空内容 */
+  wikiDamaged?: boolean
 }
 
 function moduleOf(map: ModuleMap | null, file: string): ModuleInfo | null {
@@ -33,10 +40,12 @@ function hasDescendantFiles(map: ModuleMap, folder: string): boolean {
 export function availableGraphPanelSections(
   sources: GraphPanelSources
 ): ReadonlySet<GraphPanelSectionId> {
-  const { node, modules, depNodes, tree } = sources
+  const { node, modules, depNodes, tree, wikiPage, wikiGroup, wikiDamaged } = sources
   const ids = new Set<GraphPanelSectionId>()
   const kind = graphPanelKindOf(node)
   if (kind === 'file') {
+    // 有生成的说明、散件至少能说出所属组,或记账损坏需要提示,才摆这一块
+    if (wikiDamaged || (wikiPage && wikiPage.status !== 'none') || wikiGroup) ids.add('wiki')
     if (depNodes.has(node.id)) ids.add('refs')
     const m = moduleOf(modules, node.id)
     if (m) {

@@ -91,6 +91,8 @@ export const CH = {
   wikiChooseLocation: 'atlas:wiki-choose-location',
   wikiScanRoot: 'atlas:wiki-scan-root',
   wikiProjectState: 'atlas:wiki-project-state',
+  /** 侧栏说明区块与图谱 AI 名称:按当前语种读整份页快照并重算过期 */
+  wikiPanelState: 'atlas:wiki-panel-state',
   wikiStart: 'atlas:wiki-start',
   wikiRunStatus: 'atlas:wiki-run-status',
   wikiCancel: 'atlas:wiki-cancel',
