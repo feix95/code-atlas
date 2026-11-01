@@ -1,6 +1,6 @@
 // 画布手势的指针追踪:window 级监听 + 批次收尾 + 焦点释放。选择/画矩形/画直线/端点拖拽等手势共用。
 import { docActions } from './documentStore'
-import { isEditableTarget } from './isEditableTarget'
+import { isEditableTarget } from '../isEditableTarget'
 
 /** 画布手势的 pointerdown 都 preventDefault(防选中文字),浏览器因此不会转移焦点:
  *  之前停在面板输入框/下拉上的焦点会原地留着,isEditableTarget 随即把 Delete、V/R、方向键

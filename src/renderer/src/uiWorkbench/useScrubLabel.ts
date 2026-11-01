@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react'
 import { scrubStep } from '@shared/uiWorkbench/scrub'
 import { docActions } from './documentStore'
-import { isEditableTarget } from './isEditableTarget'
+import { isEditableTarget } from '../isEditableTarget'
 
 const SCRUB_CURSOR = 'ew-resize'
 

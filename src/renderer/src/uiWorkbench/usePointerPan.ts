@@ -2,7 +2,7 @@
 // 同时记录鼠标是否停在画布上(isHoveredRef),供空格键与缩放快捷键判断是否归画布处理。
 import { useEffect, useRef, useState } from 'react'
 import type { Viewport } from './viewport.ts'
-import { isEditableTarget } from './isEditableTarget.ts'
+import { isEditableTarget } from '../isEditableTarget.ts'
 
 /** idle = 普通;ready = 空格已按下待拖(抓手光标);panning = 正在拖 */
 export type PanMode = 'idle' | 'ready' | 'panning'

@@ -12,7 +12,7 @@ import {
   type ViewSize
 } from './viewport.ts'
 import { usePointerPan, type PanMode } from './usePointerPan.ts'
-import { isEditableTarget } from './isEditableTarget.ts'
+import { isEditableTarget } from '../isEditableTarget.ts'
 
 /** 滚轮 deltaMode 换算成 CSS px:行模式按 16px/行,页模式按视口高 */
 function wheelPixels(e: WheelEvent, pageHeight: number): { dx: number; dy: number } {

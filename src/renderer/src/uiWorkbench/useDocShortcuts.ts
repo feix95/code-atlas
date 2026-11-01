@@ -25,7 +25,7 @@ import {
 } from '@shared/uiWorkbench/tree'
 import { appearanceOf, type StyleAppearance } from '@shared/uiWorkbench/styles'
 import { docActions, getDocState } from './documentStore'
-import { isEditableTarget, isTextEditingTarget } from './isEditableTarget'
+import { isEditableTarget, isTextEditingTarget } from '../isEditableTarget'
 import type { CanvasViewportApi } from './useCanvasViewport'
 
 // 工作台内存剪贴板:只活在本模块,不碰系统剪贴板;pastes 计数让连续粘贴逐级错开
