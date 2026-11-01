@@ -11,7 +11,7 @@ import {
 import type { ForceScene } from './useForceLayout'
 import type { ModuleDrawState } from './drawModules'
 import type { HoverMode } from './hoverModes'
-import type { ViewportSize } from './useGraphViewport'
+import type { ViewportSize } from './useGraphCanvasSize'
 import { GRAPH_MOTION } from './graphConfig'
 import { readTypography, type Typography } from './graphText'
 

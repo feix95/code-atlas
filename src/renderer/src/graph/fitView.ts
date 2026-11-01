@@ -3,7 +3,7 @@
 // 纯函数,不依赖 DOM。
 import type { Transform } from './drawGraph'
 import type { ForceScene } from './useForceLayout'
-import type { ViewportSize } from './useGraphViewport'
+import type { ViewportSize } from './useGraphCanvasSize'
 import { GRAPH_VIEW } from './graphConfig.ts'
 
 export function clampScale(k: number): number {

@@ -1,6 +1,6 @@
 // 关系图谱模块颜色 token 与滚轮悬停看法的纯函数自测:全局颜色序号与生成色、改色存档清洗、
 // 悬停看法的切换与点亮范围、滚轮手势的意图判定(缩放 / 切看法 / 层级翻页与进出)与防误触、
-// 悬停出详情的候选判定。
+// 悬停命中(展开容器只作背景)与悬停出详情的候选判定、拖拽保持抓取点不瞬移、空格与右键平移手势判定。
 import assert from 'node:assert/strict'
 import {
   generatedHue,
@@ -30,6 +30,12 @@ import {
   GRAPH_WHEEL
 } from '../src/renderer/src/graph/graphConfig.ts'
 import { nodeTipText, tipPlacement } from '../src/renderer/src/graph/nodeTip.ts'
+import {
+  dragCenterAt,
+  grabOffsetAt,
+  hoverNodeOf,
+  panGestureAt
+} from '../src/renderer/src/graph/graphHit.ts'
 import { detailNodeOf } from '../src/renderer/src/graph/useGraphHoverDetail.ts'
 import type { HoverTarget } from '../src/renderer/src/graph/useGraphViewport.ts'
 import type { LevelNode } from '../src/shared/graphView.ts'
@@ -323,6 +329,36 @@ function checkNodeTip(): void {
   assert.ok(tiny.left >= edgePx && tiny.top >= edgePx, '画布比气泡还窄:落在左上角,不出负数')
 }
 
+function checkHoverTarget(): void {
+  const nodeOf = (isContainer?: boolean): { data: { isContainer?: boolean } } => ({
+    data: isContainer === undefined ? {} : { isContainer }
+  })
+  const file = nodeOf()
+  const folder = nodeOf(false)
+  assert.equal(hoverNodeOf(file), file, '普通节点照常悬停')
+  assert.equal(hoverNodeOf(folder), folder, '显式非容器的文件夹照常悬停')
+  assert.equal(hoverNodeOf(nodeOf(true)), null, '圆圈是背景:悬停圈内空白处不算悬停节点')
+  assert.equal(hoverNodeOf(null), null, '指针不在任何节点上')
+}
+
+function checkDragGrab(): void {
+  const node = { x: 100, y: 50 }
+  // 按在容器圆的右下边缘:拖起来后圆心只跟着位移走,不瞬移到指针下
+  const grab = grabOffsetAt(node, 130, 70)
+  assert.deepEqual(dragCenterAt(grab, 130, 70), node, '还没移动时圆心原地不动')
+  assert.deepEqual(dragCenterAt(grab, 200, 120), { x: 170, y: 100 }, '拖拽位移与指针一致')
+  const centerGrab = grabOffsetAt(node, 100, 50)
+  assert.deepEqual(dragCenterAt(centerGrab, 145, 80), { x: 145, y: 80 }, '按在圆心时照旧跟随指针')
+}
+
+function checkPanGesture(): void {
+  assert.equal(panGestureAt(2, false), 'right', '右键按下直接平移,不必先找空白')
+  assert.equal(panGestureAt(2, true), 'right', '按住空格时右键仍是右键手势')
+  assert.equal(panGestureAt(0, true), 'space', '按住空格 + 左键平移,圆上也能起拖')
+  assert.equal(panGestureAt(0, false), null, '不按空格时左键照常命中节点或空白')
+  assert.equal(panGestureAt(1, true), null, '中键不参与平移')
+}
+
 function checkHoverDetail(): void {
   const hoverOf = (kind: LevelNode['kind'], dragging = false): HoverTarget => {
     const data = {
@@ -354,5 +390,8 @@ checkColors()
 checkHoverModes()
 checkWheel()
 checkNodeTip()
+checkHoverTarget()
+checkDragGrab()
+checkPanGesture()
 checkHoverDetail()
 console.log('selftest-graphhover: 全部通过')

@@ -1766,7 +1766,7 @@ try {
     'expanded folder keeps its level and annotates children with their container'
   )
   await shot('graph-levels')
-  // 收起:等布局稳定,测出每个子项圆心,在容器里挑一个离所有子项最远的点(便于悬停确认命中的是容器)
+  // 等布局稳定:测出每个子项圆心,从子项质心附近挑一个离子项最远的空白点,稍后用它收圈
   await page.waitForTimeout(2_500)
   const childPoints: Array<{ x: number; y: number }> = []
   for (const name of ['a', 'b', 'c', 'd', 'style']) {
@@ -1780,25 +1780,9 @@ try {
     if (point) childPoints.push(point)
   }
   assert.equal(childPoints.length, 5, 'all five expanded children must be probeable')
-  // 悬停第一个子项,等浮窗换成它,量出浮窗外框(候选点要避开浮窗);量完 Esc 收起
-  await page.mouse.move(childPoints[0].x, childPoints[0].y)
-  await page.waitForFunction(
-    () => document.querySelector('.graph-panel-title')?.textContent === 'a.ts',
-    undefined,
-    { timeout: 5_000 }
-  )
-  const panelBox = await panel.boundingBox()
-  await page.keyboard.press('Escape')
-  await panel.waitFor({ state: 'detached' })
-  const inPanel = (p: { x: number; y: number }): boolean =>
-    panelBox !== null &&
-    p.x >= panelBox.x - 8 &&
-    p.x <= panelBox.x + panelBox.width + 8 &&
-    p.y >= panelBox.y - 8 &&
-    p.y <= panelBox.y + panelBox.height + 8
   const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.hypot(a.x - b.x, a.y - b.y)
-  // 展开后容器会随布局小幅移动:用子项质心当容器中心,悬停后看侧栏标题确认命中的是容器
+  // 展开容器只是背景:子项质心近似容器中心,在附近挑离所有子项最远的点
   const centroid = {
     x: childPoints.reduce((sum, p) => sum + p.x, 0) / childPoints.length,
     y: childPoints.reduce((sum, p) => sum + p.y, 0) / childPoints.length
@@ -1809,53 +1793,43 @@ try {
   for (let step = 0; step < 16; step++) {
     const angle = (step / 16) * Math.PI * 2
     for (let f = 0; f <= 12; f += 3) {
-      const candidate = {
+      candidates.push({
         x: centroid.x + Math.cos(angle) * f,
         y: centroid.y + Math.sin(angle) * f
-      }
-      if (!inPanel(candidate)) candidates.push(candidate)
+      })
     }
   }
   candidates.sort((a, b) => clearanceOf(b) - clearanceOf(a))
-  let collapsePoint: { x: number; y: number } | null = null
-  for (const candidate of candidates) {
-    // 浮窗是黏的:上一个候选的浮窗会挡住坐标判断,每次从关着的浮窗起探
-    await page.mouse.move(candidate.x, candidate.y)
-    const opened = await panel
-      .waitFor({ state: 'visible', timeout: 900 })
-      .then(() => true)
-      .catch(() => false)
-    if (!opened) continue
-    const title = await panel.locator('.graph-panel-title').innerText()
-    await page.keyboard.press('Escape')
-    await panel.waitFor({ state: 'detached' })
-    if (title === 'app') {
-      collapsePoint = candidate
-      break
-    }
-  }
-  assert.ok(collapsePoint, 'a blank spot inside the container must reveal the container on hover')
+  const collapsePoint = candidates[0]
   assert.ok(
     clearanceOf(collapsePoint) > 12,
     `container blank spot too close to a child (${clearanceOf(collapsePoint).toFixed(1)}px)`
   )
-  // 换节点不跟着内容变宽:先在容器空白处量 app 的宽,再换子文件 a.ts,宽度应保持一致
+  // 圆圈空白处悬停按空白处理:不高亮圆本身,也不弹详情
   await page.mouse.move(collapsePoint.x, collapsePoint.y)
-  await page.waitForFunction(
-    () => document.querySelector('.graph-panel-title')?.textContent === 'app',
-    undefined,
-    { timeout: 5_000 }
+  await page.waitForTimeout(600)
+  assert.equal(
+    await panel.count(),
+    0,
+    'hovering a container blank spot must not open a detail panel'
   )
-  const folderWidth = (await panel.boundingBox())?.width ?? 0
+  // 换节点不跟着内容变宽:两个子文件之间切,浮窗宽度应保持一致
   await page.mouse.move(childPoints[0].x, childPoints[0].y)
   await page.waitForFunction(
     () => document.querySelector('.graph-panel-title')?.textContent === 'a.ts',
     undefined,
     { timeout: 5_000 }
   )
-  const fileWidth = (await panel.boundingBox())?.width ?? 0
+  const firstWidth = (await panel.boundingBox())?.width ?? 0
+  await page.mouse.move(childPoints[1].x, childPoints[1].y)
+  await page.waitForFunction(
+    () => document.querySelector('.graph-panel-title')?.textContent === 'b.ts',
+    undefined,
+    { timeout: 5_000 }
+  )
+  const secondWidth = (await panel.boundingBox())?.width ?? 0
   assert.ok(
-    folderWidth > 0 && Math.abs(folderWidth - fileWidth) <= 1,
+    firstWidth > 0 && Math.abs(firstWidth - secondWidth) <= 1,
     'switching nodes must not resize the detail panel'
   )
   await page.keyboard.press('Escape')

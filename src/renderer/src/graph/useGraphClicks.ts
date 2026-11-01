@@ -5,7 +5,12 @@ import type { Transform } from './drawGraph'
 import type { ViewportDeps } from './useGraphViewport'
 import { hitTest, localPoint } from './graphHit'
 
-export function useGraphClicks(deps: ViewportDeps, transformRef: React.RefObject<Transform>): void {
+export function useGraphClicks(
+  deps: ViewportDeps,
+  transformRef: React.RefObject<Transform>,
+  /** 右键拖动已经平移过画面:这一次松手不弹节点菜单 */
+  rightPanMovedRef: React.RefObject<boolean>
+): void {
   const depsRef = useRef(deps)
   useEffect(() => {
     depsRef.current = deps
@@ -23,6 +28,12 @@ export function useGraphClicks(deps: ViewportDeps, transformRef: React.RefObject
       if (node) depsRef.current.onNodeDoubleClick(node)
     }
     const onContextMenu = (e: MouseEvent): void => {
+      // 右键拖动画面的松手:只关掉浏览器菜单,不当成对节点的右键
+      if (rightPanMovedRef.current) {
+        rightPanMovedRef.current = false
+        e.preventDefault()
+        return
+      }
       const node = nodeAt(e)
       if (!node) return
       e.preventDefault()
@@ -34,5 +45,5 @@ export function useGraphClicks(deps: ViewportDeps, transformRef: React.RefObject
       canvas.removeEventListener('dblclick', onDoubleClick)
       canvas.removeEventListener('contextmenu', onContextMenu)
     }
-  }, [canvasRef, transformRef])
+  }, [canvasRef, rightPanMovedRef, transformRef])
 }
