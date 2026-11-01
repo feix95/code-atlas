@@ -1,7 +1,11 @@
 // 节点详情两态(画布浮窗、左栏停靠)共用的标头:类型小字 + 名字/计数 + 右上角控件。
 // 控件压在类型小字那一行,标题行独占整宽;停靠钮有没有都只向左边长,不挤动名字与计数。
 import type { LevelNode } from '@shared/graphView'
-import { graphPanelKindOf } from '../graph/graphPanelSections'
+import {
+  graphPanelKindOf,
+  type GraphPanelSectionDef,
+  type GraphPanelSectionId
+} from '../graph/graphPanelSections'
 import { GraphPanelViewMenu } from './GraphPanelViewMenu'
 
 const KIND_LABEL: Record<LevelNode['kind'], string> = {
@@ -20,17 +24,20 @@ function headingMeta(node: LevelNode): string | null {
 
 export function GraphPanelHeader({
   node,
+  sections,
+  available,
   grip,
   gripLabel,
-  tipSide,
   controls
 }: {
   node: LevelNode
+  /** 这一类节点全部可选的区块(按记下的顺序);菜单始终列全,没内容的置灰 */
+  sections: readonly GraphPanelSectionDef[]
+  /** 当前节点真有内容、能勾选的区块 */
+  available: ReadonlySet<GraphPanelSectionId>
   /** 浮窗态传入整套拖动把手;停靠态由外壳的标题条接管拖出,这里不传 */
   grip?: React.HTMLAttributes<HTMLElement>
   gripLabel?: string
-  /** 控件悬停提示压在哪一侧:浮窗朝左、停靠朝上 */
-  tipSide: 'left' | 'top'
   /** 右上角控件(停靠、放回、关闭);「显示项」由标头自己摆在最前 */
   controls: React.ReactNode
 }): React.JSX.Element {
@@ -61,7 +68,9 @@ export function GraphPanelHeader({
         <div className="graph-panel-drag">{heading}</div>
       )}
       <div className="graph-panel-controls">
-        {kind !== null && <GraphPanelViewMenu kind={kind} tipSide={tipSide} />}
+        {kind !== null && sections.length > 0 && (
+          <GraphPanelViewMenu kind={kind} sections={sections} available={available} />
+        )}
         {controls}
       </div>
     </header>

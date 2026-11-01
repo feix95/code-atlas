@@ -294,6 +294,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           node={selection.selected}
           modules={moduleMap}
           depNodes={depNodes}
+          tree={tree}
           dirRel={nav.dirRel}
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
           viewRef={viewRef}

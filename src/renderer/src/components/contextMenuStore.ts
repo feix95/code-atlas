@@ -19,6 +19,8 @@ export interface ContextMenuItem {
   run?: (nextOn?: boolean) => void | string | Promise<string | null | void>
   /** 二级列表:点了这行就地展开(菜单不关闭),子行点完才关闭 */
   children?: Array<{ label: string; run: () => void }>
+  /** 拖动排序的身份:菜单带 onReorder 时,带本字段的行可按住上下拖(不带的行不动) */
+  dragId?: string
 }
 
 /** 分区小标题:不可点的一行小灰字,告诉人下面几行是同一类东西 */
@@ -48,6 +50,8 @@ export interface ContextMenuRequest {
   preferRight?: boolean
   /** 整张菜单不挂任何悬停提示:行项、分区、二级行的浏览器原生 title 都不挂(图谱节点菜单用) */
   noTips?: boolean
+  /** 行拖动排序:按住带 dragId 的行上下拖,松手回调新的行序(只含 dragId,按菜单里的先后) */
+  onReorder?: (ids: string[]) => void
 }
 
 let menuRequest: ContextMenuRequest | null = null

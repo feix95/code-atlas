@@ -41,10 +41,11 @@
 /* 两行标头:类型小字占满 24px 一行、控件压在同一行右侧;标题行独占整宽,
    停靠钮有无都只向左边长,不挤动名字与计数。
    左右同垫「8px + 一条滚动条宽」:正文开了 stable 槽位,扣掉槽位后左右留白相等,
-   标题、类型小字、模块行与右侧计数、控件都各落在同一条竖线上 */
+   标题、类型小字、模块行与右侧计数、控件都各落在同一条竖线上;
+   顶垫收到 8px 档,与控件到右缘的距离一致,标头不悬空 */
 .graph-panel-head {
   position: relative;
-  padding: var(--space-3) calc(var(--space-2) + var(--scrollbar-w)) var(--space-4)
+  padding: var(--space-2) calc(var(--space-2) + var(--scrollbar-w)) var(--space-4)
     calc(var(--space-2) + var(--scrollbar-w));
 }
 
@@ -84,7 +85,7 @@
    让关闭钮的笔画右缘与右侧文字落在同一条竖线上 */
 .graph-panel-controls {
   position: absolute;
-  top: var(--space-3);
+  top: var(--space-2);
   right: calc(var(--space-2) + var(--scrollbar-w) - 0.5rem);
   display: flex;
   gap: var(--space-1);
@@ -151,8 +152,9 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  /* 左垫把滚动条槽位算进去,右垫只留 8px:两边到内容的距离都是 8px + 槽位,数值相等 */
-  padding: 0 var(--space-2) var(--space-4) calc(var(--space-2) + var(--scrollbar-w));
+  /* 左垫把滚动条槽位算进去,右垫只留 8px:两边到内容的距离都是 8px + 槽位,数值相等;
+     下垫与顶垫同为 8px,面板底部不额外悬空 */
+  padding: 0 var(--space-2) var(--space-2) calc(var(--space-2) + var(--scrollbar-w));
   scrollbar-gutter: stable;
 }
 
@@ -161,7 +163,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 var(--space-2) var(--space-3) calc(var(--space-2) + var(--scrollbar-w));
+  padding: 0 var(--space-2) var(--space-2) calc(var(--space-2) + var(--scrollbar-w));
   scrollbar-gutter: stable;
 }
 
@@ -169,6 +171,14 @@
 .graph-panel-body > :first-child,
 .graph-panel-dock-body > :first-child {
   margin-top: 0;
+}
+
+/* 最后一截(含小节里的最后一行)不留外底距:底部留白只由容器下垫给,与顶部同为 8px */
+.graph-panel-body > :last-child,
+.graph-panel-body > :last-child > :last-child,
+.graph-panel-dock-body > :last-child,
+.graph-panel-dock-body > :last-child > :last-child {
+  margin-bottom: 0;
 }
 
 /* 拉大松手吸回内容尺寸:宽、高与右缘同步过渡,左上角保持不动;拖动途中不加过渡,跟手 */

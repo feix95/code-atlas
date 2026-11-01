@@ -7,11 +7,7 @@ import {
   NEUTRAL_SEGMENT
 } from '../src/renderer/src/graph/moduleOverlay.ts'
 import { forceCluster } from '../src/renderer/src/graph/forceCluster.ts'
-import {
-  folderComposition,
-  moduleDetails,
-  unassignedReason
-} from '../src/renderer/src/graph/moduleDetails.ts'
+import { folderComposition, moduleDetails } from '../src/renderer/src/graph/moduleDetails.ts'
 import { fitTransform } from '../src/renderer/src/graph/fitView.ts'
 import { settleLayout } from '../src/renderer/src/graph/settleLayout.ts'
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
@@ -350,8 +346,6 @@ function checkDetails(): void {
     ],
     '文件夹的模块构成按文件数降序'
   )
-  assert.match(unassignedReason('README.md'), /根目录/)
-  assert.match(unassignedReason('docs/a.md'), /没有可划分/)
 }
 
 /** 初始落视口:按内容算出舒适比例并居中;小层级封顶 1.5 倍,大层级缩到全部可见 */

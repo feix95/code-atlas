@@ -10,6 +10,7 @@ import {
 import { useMenuDismiss } from '../useMenuDismiss'
 import { TreeIcon } from './Icons'
 import { MENU_ICON_ONLY_SIZE, MENU_ICON_SIZE } from '../inputMetrics'
+import { useMenuRowReorder } from './useMenuRowReorder'
 import {
   OVERLAY_EDGE_FALLBACK_PX,
   OVERLAY_MAX_WIDTH_FALLBACK_PX,
@@ -26,6 +27,7 @@ import {
  * iconOnly = 纯图标方钮竖排,悬停向右展开露出文字(输入框编辑菜单);
  * compact = 窄身文字档(导出格式那挂);
  * { heading } = 分区小标题;item.switchOn = 开关行(复用设置页 .cfg-switch,点了不关闭)。
+ * item.dragId + request.onReorder = 该行可按住上下拖,落点画一条蓝线(--drop-mark),松手交回新行序。
  * 渲染域隔离:主窗和每个子窗各挂一台本组件,各认各 document 里的请求。
  */
 
@@ -92,6 +94,13 @@ function ContextMenuCard({
   const noTips = request.noTips === true
   const rowH = iconOnly ? ROW_H_ICON_ONLY : request.compact ? ROW_H_COMPACT : ROW_H
   const view = doc.defaultView ?? window
+  const reorder = useMenuRowReorder({
+    request,
+    cardRef,
+    onActivate: () => setExpanded(null),
+    // 菜单重建后行号会变,开关的本地翻面账作废,以 store 为准重新起算
+    onCommit: () => setFlipped({})
+  })
 
   // 宽高由 CSS 自适配,量真实盒子再贴窗边;纯图标档右边挤不下就钉右缘往左长
   useLayoutEffect(() => {
@@ -171,6 +180,11 @@ function ContextMenuCard({
           : { top: pos?.top ?? request.y }),
         visibility: pos ? 'visible' : 'hidden'
       }}
+      onClickCapture={(e) => {
+        if (!reorder.consumeSuppressedClick()) return
+        e.stopPropagation()
+        e.preventDefault()
+      }}
       role="menu"
     >
       {request.items.map((item, i) => {
@@ -193,19 +207,28 @@ function ContextMenuCard({
         const switchOn = flipped[i] ?? item.switchOn === true
         const hasSub = item.children !== undefined && item.children.length > 0
         const caption = lingering?.index === i ? lingering.text : item.label
+        const draggable = reorder.canReorder && item.dragId !== undefined && !item.disabled
+        const isRowDragging = reorder.dropLine !== null && item.dragId === reorder.dropLine.dragId
         return (
           <Fragment key={i}>
             <button
+              ref={(el) => reorder.setRowEl(i, el)}
               type="button"
               role={isSwitch ? 'menuitemcheckbox' : 'menuitem'}
               aria-checked={isSwitch ? switchOn : undefined}
               aria-expanded={hasSub ? expanded === i : undefined}
-              className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}`}
+              className={`file-path-menu-item${lingering?.index === i ? ' is-ok' : ''}${draggable ? ' is-draggable' : ''}${isRowDragging ? ' is-dragging' : ''}`}
               /* aria-disabled 而非 disabled:Chrome 不给原生禁用按钮派发鼠标事件,
-               aria-disabled 是 ARIA 菜单模式的推荐写法,行仍能收到指针事件(悬停样式照常),
-               点击由下方 item.disabled 闸手动拦(键盘 Enter 也走同一闸) */
+               aria-disabled 是 ARIA 菜单模式的推荐写法,行仍能收到指针事件(悬停样式照常,
+               拖动另由可拖名单把置灰行排除),点击由下方 item.disabled 闸手动拦(键盘 Enter 也走同一闸) */
               aria-disabled={item.disabled || undefined}
               aria-haspopup={hasSub ? 'menu' : undefined}
+              onPointerDown={(e) => {
+                if (item.dragId !== undefined) reorder.startDrag(e, item.dragId)
+              }}
+              onPointerMove={reorder.moveDrag}
+              onPointerUp={reorder.endDrag}
+              onPointerCancel={reorder.cancelDrag}
               onPointerEnter={(e) => {
                 if (hasSub) openSub(i, e.currentTarget)
                 else if (expanded !== null) setExpanded(null)
@@ -285,6 +308,9 @@ function ContextMenuCard({
           </Fragment>
         )
       })}
+      {reorder.dropLine !== null && (
+        <div className="fpm-drop-line" style={{ top: reorder.dropLine.top }} aria-hidden="true" />
+      )}
     </div>
   )
 }

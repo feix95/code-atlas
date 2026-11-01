@@ -1,9 +1,8 @@
-// 侧栏要展示的模块信息:成员按文件夹分组、相关自测、附挂样式、与其他模块的连线、文件夹的模块构成、
-// 未归类原因。纯函数,只读 ModuleMap,不依赖 DOM。
+// 侧栏要展示的模块信息:成员按文件夹分组、相关自测、附挂样式、与其他模块的连线、文件夹的模块构成。
+// 纯函数,只读 ModuleMap,不依赖 DOM。
 import type { ModuleInfo, ModuleMap } from '@shared/types'
+import { STYLE_EXT } from './fileKinds.ts'
 import { moduleDisplayName } from './moduleOverlay.ts'
-
-const STYLE_EXT = /\.(css|scss|sass|less)$/i
 
 export type MemberRole = 'member' | 'attached' | 'test'
 
@@ -110,11 +109,4 @@ export function folderComposition(map: ModuleMap, folder: string): FolderShare[]
       return { moduleId, files, name: m ? moduleDisplayName(m) : moduleId }
     })
     .sort((a, b) => b.files - a.files || (a.moduleId < b.moduleId ? -1 : 1))
-}
-
-/** 未归类文件的原因(侧栏原话) */
-export function unassignedReason(relPath: string): string {
-  return dirOf(relPath) === ''
-    ? '项目根目录下的文件不参与模块划分'
-    : '所在目录里没有可划分的代码模块'
 }

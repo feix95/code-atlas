@@ -16,9 +16,21 @@ import { graphPanelBounds } from '../src/renderer/src/graph/graphPanelBounds.ts'
 import {
   graphPanelKindOf,
   graphPanelSections,
-  parseHiddenSections
+  mergeVisibleOrder,
+  orderGraphPanelSections,
+  parseHiddenSections,
+  parseSectionOrders
 } from '../src/renderer/src/graph/graphPanelSections.ts'
-import type { LevelNode, LevelNodeKind } from '../src/shared/visibleGraph.ts'
+import { folderContents } from '../src/renderer/src/graph/folderContents.ts'
+import { availableGraphPanelSections } from '../src/renderer/src/graph/graphPanelAvailability.ts'
+import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
+import { folderTree } from '../src/shared/hierarchy.ts'
+import type { DepGraphNode, ModuleMap, ScanDirNode } from '../src/shared/types.ts'
+import {
+  GRAPH_PREVIEW_NODES,
+  type LevelNode,
+  type LevelNodeKind
+} from '../src/shared/visibleGraph.ts'
 
 /** 画布 1000x800,顶栏让出 48,缝 8,浮窗 304x400,最小 192x96,自适应档宽 512(32rem) */
 function sample(
@@ -199,8 +211,8 @@ function checkSections(): void {
   )
   assert.deepEqual(
     graphPanelSections('folder').map((s) => s.id),
-    ['composition'],
-    '文件夹只有模块构成一项'
+    ['contents', 'composition'],
+    '文件夹:内容清单 + 模块构成'
   )
 
   assert.equal(parseHiddenSections(null).size, 0, '没记过 = 全显示')
@@ -223,12 +235,204 @@ function checkSections(): void {
   assert.equal(graphPanelKindOf(node('overflow', { hiddenCount: 3 })), null, '收起的项没有正文')
 }
 
+/** 区块顺序账:按种类验身、拖完的可见顺序并回整单、菜单按账重排 */
+function checkSectionOrder(): void {
+  const defaults = parseSectionOrders(null)
+  assert.deepEqual(
+    defaults.file,
+    ['refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
+    '没记过 = 默认顺序'
+  )
+  assert.deepEqual(defaults.folder, ['contents', 'composition'], '文件夹默认顺序')
+
+  const dirty = parseSectionOrders({
+    file: ['files', 'refs', 'files', 'nope', 'contents'],
+    folder: 'bad'
+  })
+  assert.deepEqual(
+    dirty.file,
+    ['files', 'refs', 'dependsOn', 'usedBy', 'module', 'tests', 'styles'],
+    '认得的去重保留,异类与未知 id 丢掉,缺的按默认补在末尾'
+  )
+  assert.deepEqual(dirty.folder, ['contents', 'composition'], '坏档回默认')
+
+  assert.deepEqual(
+    mergeVisibleOrder(
+      ['refs', 'dependsOn', 'usedBy', 'module', 'files'],
+      ['refs', 'module', 'files'],
+      ['files', 'refs', 'module']
+    ),
+    ['files', 'dependsOn', 'usedBy', 'refs', 'module'],
+    '菜单没列出的区块保持原槽位,可见子序列整体换序'
+  )
+
+  const ordered = orderGraphPanelSections('folder', {
+    file: defaults.file,
+    folder: ['composition', 'contents']
+  })
+  assert.deepEqual(
+    ordered.map((s) => s.id),
+    ['composition', 'contents'],
+    '按记下的顺序出菜单'
+  )
+  assert.equal(ordered[0]?.label, '模块构成', '顺序换了,标签跟着走')
+
+  const fileOrder = ['tests', ...defaults.file.filter((id) => id !== 'tests')]
+  assert.equal(
+    orderGraphPanelSections('file', { file: fileOrder, folder: defaults.folder })[0]?.id,
+    'tests',
+    '文件单也认自己的顺序'
+  )
+}
+
+const SAMPLE_TREE: ScanDirNode = {
+  type: 'directory',
+  name: 'root',
+  relPath: '',
+  children: [
+    {
+      type: 'directory',
+      name: 'src',
+      relPath: 'src',
+      children: [
+        {
+          type: 'directory',
+          name: 'deep',
+          relPath: 'src/deep',
+          children: [{ type: 'file', name: 'b.ts', relPath: 'src/deep/b.ts', ext: '.ts' }]
+        },
+        { type: 'file', name: 'a.ts', relPath: 'src/a.ts', ext: '.ts' }
+      ]
+    },
+    { type: 'file', name: 'README.md', relPath: 'README.md', ext: '.md' }
+  ]
+}
+
+/** 文件夹内容清单:只列直接子项、文件夹在前、超长按预览额度截断 */
+function checkFolderContents(): void {
+  const tree = folderTree(SAMPLE_TREE)
+  assert.deepEqual(
+    folderContents(tree, 'src'),
+    {
+      entries: [
+        { id: 'src/deep', name: 'deep', kind: 'folder', descendantFiles: 1 },
+        { id: 'src/a.ts', name: 'a.ts', kind: 'file', descendantFiles: 0 }
+      ],
+      hidden: 0
+    },
+    '只列直接子项,文件夹在前,不递归'
+  )
+  assert.deepEqual(folderContents(tree, 'missing'), { entries: [], hidden: 0 }, '不在树里 = 空')
+  assert.deepEqual(
+    folderContents(tree, '').entries.map((entry) => entry.name),
+    ['src', 'README.md'],
+    '根目录也只列直接子项'
+  )
+  assert.equal(folderContents(tree, '').entries[0]?.descendantFiles, 2, '文件夹带后代文件数')
+  const wide: ScanDirNode = {
+    type: 'directory',
+    name: 'wide',
+    relPath: '',
+    children: Array.from({ length: GRAPH_PREVIEW_NODES + 3 }, (_, i) => ({
+      type: 'file',
+      name: `f${i}.ts`,
+      relPath: `f${i}.ts`,
+      ext: '.ts'
+    }))
+  }
+  const capped = folderContents(folderTree(wide), '')
+  assert.equal(capped.entries.length, GRAPH_PREVIEW_NODES, '按预览额度截断')
+  assert.equal(capped.hidden, 3, '其余项数单独给出')
+}
+
+const MODULE_MAP: ModuleMap = {
+  algorithmVersion: 1,
+  params: DEFAULT_MODULE_PARAMS,
+  modules: [
+    {
+      id: 'm:src/a.ts',
+      anchor: 'src/a.ts',
+      folder: 'src',
+      files: ['src/a.ts', 'src/a.css', 'src/a.test.ts', 'src/b.ts'],
+      attached: ['src/a.css'],
+      tests: ['src/a.test.ts'],
+      folders: ['src']
+    },
+    {
+      id: 'm:lib/c.ts',
+      anchor: 'lib/c.ts',
+      folder: 'lib',
+      files: ['lib/c.ts'],
+      attached: [],
+      tests: [],
+      folders: ['lib']
+    }
+  ],
+  fileToModule: {
+    'src/a.ts': 'm:src/a.ts',
+    'src/a.css': 'm:src/a.ts',
+    'src/a.test.ts': 'm:src/a.ts',
+    'src/b.ts': 'm:src/a.ts',
+    'lib/c.ts': 'm:lib/c.ts'
+  },
+  links: [
+    { from: 'm:src/a.ts', to: 'm:lib/c.ts', weight: 2 },
+    { from: 'm:lib/c.ts', to: 'm:src/a.ts', weight: 1 }
+  ]
+}
+
+const DEP_NODES = new Map<string, DepGraphNode>([
+  ['src/a.ts', { relPath: 'src/a.ts', languageId: 'typescript', inCount: 1, outCount: 2 }]
+])
+
+/** 「显示项」只列当前节点真有内容的区块:未归类文件不摆一堆空开关 */
+function checkAvailability(): void {
+  const tree = folderTree(SAMPLE_TREE)
+  const available = (
+    id: string,
+    kind: LevelNodeKind = 'file',
+    modules: ModuleMap | null = MODULE_MAP
+  ) =>
+    [
+      ...availableGraphPanelSections({
+        node: node(kind, { id }),
+        modules,
+        depNodes: DEP_NODES,
+        tree
+      })
+    ].sort()
+
+  assert.deepEqual(
+    available('src/a.ts'),
+    ['dependsOn', 'files', 'module', 'refs', 'styles', 'tests', 'usedBy'],
+    '归类的文件:引用、模块、文件、自测、样式与两条模块连线都真有内容'
+  )
+  assert.deepEqual(
+    available('lib/c.ts'),
+    ['dependsOn', 'files', 'module', 'usedBy'],
+    '没有引用记录的文件不摆引用关系,没有自测/样式也不摆'
+  )
+  assert.deepEqual(available('CHANGELOG.md'), [], '未归类的根目录文件没有任何区块可显示')
+  assert.deepEqual(available('src/a.ts', 'file', null), ['refs'], '模块划分不可用时只剩引用关系')
+  assert.deepEqual(
+    available('src', 'folder'),
+    ['composition', 'contents'],
+    '有后代模块的文件夹两块都列'
+  )
+  assert.deepEqual(available('lib', 'folder'), ['composition'], '不在扫描树里的文件夹只列模块构成')
+  assert.deepEqual(available('docs', 'folder'), [], '树里没有、模块也没有的文件夹不给空菜单')
+  assert.deepEqual(available('overflow', 'overflow'), [], '收起的项没有正文')
+}
+
 checkBounds()
 checkResize()
 checkContentFit()
 checkStaleRecord()
 checkSections()
+checkSectionOrder()
+checkFolderContents()
+checkAvailability()
 console.log('✅ 图谱详情浮窗自测全部通过')
 console.log(
-  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回 · 显示项区块清单与本地账验身'
+  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回 · 显示项区块清单与本地账验身 · 显示项拖动排序(顺序账验身/可见序并回整单) · 文件夹内容清单(直接子项/截断) · 显示项可用性过滤'
 )

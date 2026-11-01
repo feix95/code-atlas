@@ -139,6 +139,18 @@
   pointer-events: none;
 }
 
+/* 没内容的区块:开关整颗置灰并停在关位,和「能拨但已关」一眼区分开 */
+.file-path-menu-item[aria-disabled='true'] .fpm-switch,
+.file-path-menu-item[aria-disabled='true'] .fpm-switch.is-on {
+  background: var(--line);
+}
+
+.file-path-menu-item[aria-disabled='true'] .fpm-switch span,
+.file-path-menu-item[aria-disabled='true'] .fpm-switch.is-on span {
+  transform: none;
+  background: var(--muted-2);
+}
+
 /* 备注编辑行:点「写/编辑备注」后菜单里原地长出的输入框,不再跳概览页 */
 .file-path-menu-editor {
   padding: var(--space-1);
@@ -204,4 +216,27 @@
 
 .file-path-menu-item.is-fail {
   color: var(--danger);
+}
+
+/* 拖动排序:按住行上下拖换位;touch-action 关掉滚动,拖动中换成抓取光标 */
+.file-path-menu-item.is-draggable {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.file-path-menu-item.is-dragging {
+  cursor: grabbing;
+}
+
+/* 落点蓝线:与页签缝、分割条同一抹 --drop-mark,横着画两道行缝之间 */
+.fpm-drop-line {
+  position: absolute;
+  left: var(--space-1);
+  right: var(--space-1);
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--drop-mark);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
