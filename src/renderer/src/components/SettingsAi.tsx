@@ -3,6 +3,7 @@ import type { PersonalizationConfig } from '@shared/personalization'
 import type { AiConfig, ModelFitVerdict } from '@shared/types'
 import { SettingsModel } from './SettingsModel.tsx'
 import { SettingsVoice } from './SettingsVoice.tsx'
+import { SettingsWikiStorage } from './SettingsWikiStorage.tsx'
 
 /**
  * 「AI 设置」页(一导航一页):页内两个模块两张灰卡 ——
@@ -82,6 +83,10 @@ export function SettingsAi({
       <h3 className="cfg-subhead">回复风格</h3>
       <div className="cfg-panel">
         <SettingsVoice config={config} personal={personal} updatePersonal={updatePersonal} />
+      </div>
+      <h3 className="cfg-subhead">仓库 Wiki</h3>
+      <div className="cfg-panel">
+        <SettingsWikiStorage />
       </div>
     </div>
   )

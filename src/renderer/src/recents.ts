@@ -113,6 +113,11 @@ export function readRecentProjects(): RecentProject[] {
   return parseRecentProjects(readPref<unknown>(RECENTS_KEY, null))
 }
 
+/** 最近项目的根路径:Wiki 选位置时要排除当前与这些仓库 */
+export function recentProjectPaths(): string[] {
+  return readRecentProjects().map((r) => r.p)
+}
+
 export function writeRecentProjects(list: RecentProject[]): void {
   writePref(RECENTS_KEY, list)
 }

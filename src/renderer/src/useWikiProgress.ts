@@ -10,6 +10,7 @@ import type {
   WikiSettings
 } from '@shared/wikiTypes'
 import { friendlyErr } from './errText'
+import { recentProjectPaths } from './recents'
 import { wikiEventKey } from './wikiProgressModel'
 
 export interface WikiSnapshot {
@@ -32,6 +33,8 @@ interface WikiReadResult {
   settings: WikiSettings | null
   snapshot: WikiSnapshot | null
   error: string | null
+  /** 挂载时已经有任务在跑:补读快照,不用等下一页事件 */
+  run: WikiRunState | null
 }
 
 export interface WikiProgressApi {
@@ -71,14 +74,25 @@ export function useWikiProgress(projectRoot: string | null): WikiProgressApi {
   const [actionError, setActionError] = useState<string | null>(null)
 
   const read = useCallback(async (): Promise<WikiReadResult> => {
-    if (projectRoot === null) return { settings: null, snapshot: null, error: null }
+    if (projectRoot === null) return { settings: null, snapshot: null, error: null, run: null }
     try {
       const nextSettings = await window.atlas.wiki.settingsGet()
+      const status = await window.atlas.wiki.runStatus()
+      const run =
+        status.active && status.projectRoot === projectRoot
+          ? {
+              language: status.language,
+              total: status.total,
+              processed: status.processed,
+              provider: status.provider,
+              model: status.model
+            }
+          : null
       if (nextSettings.location === null) {
-        return { settings: nextSettings, snapshot: null, error: null }
+        return { settings: nextSettings, snapshot: null, error: null, run }
       }
       const state = await window.atlas.wiki.projectState(projectRoot)
-      if (!state.ok) return { settings: nextSettings, snapshot: null, error: state.error }
+      if (!state.ok) return { settings: nextSettings, snapshot: null, error: state.error, run }
       return {
         settings: nextSettings,
         snapshot: {
@@ -86,15 +100,17 @@ export function useWikiProgress(projectRoot: string | null): WikiProgressApi {
           damaged: state.damaged,
           languages: state.languages
         },
-        error: null
+        error: null,
+        run
       }
     } catch (err) {
-      return { settings: null, snapshot: null, error: friendlyErr(err) }
+      return { settings: null, snapshot: null, error: friendlyErr(err), run: null }
     }
   }, [projectRoot])
 
   const applyRead = useCallback((result: WikiReadResult): void => {
     if (result.settings !== null) setSettings(result.settings)
+    if (result.run !== null) setRun(result.run)
     setSnapshot(result.snapshot)
     setLoadError(result.error)
     setLoading(false)
@@ -214,9 +230,9 @@ export function useWikiProgress(projectRoot: string | null): WikiProgressApi {
 
   const chooseLocation = useCallback(async (): Promise<void> => {
     try {
-      const choice: WikiLocationChoice = await window.atlas.wiki.chooseLocation(
-        projectRoot === null ? [] : [projectRoot]
-      )
+      const roots =
+        projectRoot === null ? recentProjectPaths() : [projectRoot, ...recentProjectPaths()]
+      const choice: WikiLocationChoice = await window.atlas.wiki.chooseLocation([...new Set(roots)])
       if (choice.ok) {
         await reloadRef.current()
         return

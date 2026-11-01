@@ -127,6 +127,19 @@ export type WikiEvent =
       error?: string
     }
 
+/** 进度页晚于生成开跑时补读的运行快照;任务结束或没有任务时 active=false */
+export type WikiRunStatus =
+  | { active: false }
+  | {
+      active: true
+      projectRoot: string
+      language: string
+      total: number
+      processed: number
+      provider: string
+      model: string
+    }
+
 /** 开始生成:页面清单由渲染层按当前图谱装配,主进程只信路径与类型 */
 export interface WikiStartRequest {
   requestId: string

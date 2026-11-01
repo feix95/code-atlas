@@ -12,6 +12,7 @@ import {
   eventsForLanguage,
   mergeWikiRows,
   pickWikiPage,
+  planWikiRows,
   regeneratePageIds,
   retryPageIds,
   wikiEventKey,
@@ -211,6 +212,11 @@ function checkMerge(pages: WikiPageSource[]): void {
   )
   assert.deepEqual(retryPageIds(rows), ['g:old'], '失败页进重试清单')
   assert.deepEqual(regeneratePageIds(rows), [], '正在重跑的不再重复进过期清单')
+  assert.deepEqual(
+    planWikiRows(rows),
+    { total: 5, cached: 1, toGenerate: 4 },
+    '确认弹窗里已完成的算缓存,其余都要请求'
+  )
 
   const noEvents = mergeWikiRows(pages, language, {})
   const stale = noEvents.find((row) => row.pageId === 'm:src/b.ts') as WikiProgressRow

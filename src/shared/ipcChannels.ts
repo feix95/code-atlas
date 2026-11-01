@@ -92,6 +92,7 @@ export const CH = {
   wikiScanRoot: 'atlas:wiki-scan-root',
   wikiProjectState: 'atlas:wiki-project-state',
   wikiStart: 'atlas:wiki-start',
+  wikiRunStatus: 'atlas:wiki-run-status',
   wikiCancel: 'atlas:wiki-cancel',
   wikiCleanupAll: 'atlas:wiki-cleanup-all',
   wikiCleanupProject: 'atlas:wiki-cleanup-project',

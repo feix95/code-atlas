@@ -6,7 +6,7 @@ import { ipcMain } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { translateLang } from '../shared/translateLangs.ts'
-import type { WikiEvent, WikiStartResult } from '../shared/wikiTypes.ts'
+import type { WikiEvent, WikiRunStatus, WikiStartResult } from '../shared/wikiTypes.ts'
 import { explainWithMessages } from '../ai/explain.ts'
 import { getFileFact } from '../depgraph/factCache.ts'
 import { resolveChatTargetOrError, explainAborters } from './aiEvidence.ts'
@@ -26,12 +26,24 @@ interface ActiveJob {
   requestId: string
   projectRoot: string
   controller: AbortController
+  language: string
+  total: number
+  processed: number
+  provider: string
+  model: string
 }
 
 let activeJob: ActiveJob | null = null
 
 export function isWikiJobActive(): boolean {
   return activeJob !== null
+}
+
+/** 进度页可能晚于任务开跑才挂载:补读一次运行快照,不用干等到下一页事件 */
+export function wikiRunStatus(): WikiRunStatus {
+  if (activeJob === null) return { active: false }
+  const { projectRoot, language, total, processed, provider, model } = activeJob
+  return { active: true, projectRoot, language, total, processed, provider, model }
 }
 
 async function isDirectory(path: string): Promise<boolean> {
@@ -94,11 +106,19 @@ export function registerWikiRunIpc(): void {
       senderId: event.sender.id,
       requestId: req.requestId,
       projectRoot: req.projectRoot,
-      controller
+      controller,
+      language: req.language,
+      total: pages.length,
+      processed: 0,
+      provider: chat.provider,
+      model: chat.target.model
     }
     activeJob = job
     event.sender.once('destroyed', () => controller.abort())
     const send = (payload: WikiEvent): void => {
+      if (payload.type === 'progress') {
+        job.processed = Math.max(job.processed, payload.processed)
+      }
       if (!event.sender.isDestroyed()) event.sender.send(CH.wikiEvent, payload)
     }
     const replyCap = wikiOutputTokens(chat.ctx)
@@ -177,6 +197,8 @@ export function registerWikiRunIpc(): void {
       projectDir
     }
   })
+
+  ipcMain.handle(CH.wikiRunStatus, () => wikiRunStatus())
 
   ipcMain.handle(CH.wikiCancel, (event) => {
     if (activeJob !== null && activeJob.senderId === event.sender.id) {

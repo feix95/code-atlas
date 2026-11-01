@@ -16,6 +16,8 @@ interface GraphToolbarProps {
   onExpandAll: () => void
   onCollapseAll: () => void
   onFit: () => void
+  /** Wiki 入口:按钮与弹窗由 GraphWikiEntry 自带状态 */
+  wiki?: React.ReactNode
 }
 
 export function GraphToolbar(props: GraphToolbarProps): React.JSX.Element {
@@ -43,6 +45,7 @@ export function GraphToolbar(props: GraphToolbarProps): React.JSX.Element {
         {props.hasModules && (
           <ModuleToggle isOn={props.showModules} onToggle={props.onToggleModules} />
         )}
+        {props.wiki}
         <button
           type="button"
           className="graph-tool"

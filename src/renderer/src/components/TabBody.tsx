@@ -38,11 +38,11 @@ export function TabBody({
   addPreviewRef,
   removePreviewRef,
   handleDropRef,
-  settingsWorkspaceName,
   settingsSectionReq,
   onAiConfigSaved,
   onSettingsSection,
   onRenameFile,
+  onOpenWikiTab,
   outlineDockOwner
 }: {
   tab: PaneTab
@@ -63,13 +63,14 @@ export function TabBody({
   /** 预览里选中的一段拖进来挂引用:ref 正文自包含,不用读盘 */
   handleDropRef: (ref: ChatCodeRef) => void
   // 设置页签的口粮(app 级,不吃工作区):rail 齿轮/AI 状态浮层都能开,没开项目也能用
-  settingsWorkspaceName: string | null
   settingsSectionReq: { section: SectionKey; seq: number } | undefined
   onAiConfigSaved: (config: AiConfig) => void
   /** 设置页滚动间谍回报(App 转发给侧栏导航高亮) */
   onSettingsSection: (key: SectionKey) => void
   /** 内联标题改名通道:预览/瞄签都能用,状态表认签认 scopeRoot */
   onRenameFile?: (tab: PaneTab, base: string) => Promise<RenameOutcome>
+  /** 图谱顶栏「Wiki 进度」与生成开跑后转场:打开单例进度页 */
+  onOpenWikiTab: () => void
   /** 当前停靠位认的那张签(App 按主窗激活组算):预览签据此把大纲让给左栏 */
   outlineDockOwner: string | null
 }): React.JSX.Element | null {
@@ -111,6 +112,7 @@ export function TabBody({
         onLoadGraph={() => void handleLoadGraph()}
         expandLazy={expandLazy}
         onOpenFile={openPreview}
+        onOpenWiki={onOpenWikiTab}
         tabId={tab.id}
         activeTabId={outlineDockOwner}
       />
@@ -120,7 +122,7 @@ export function TabBody({
   if (tab.kind === 'settings') {
     return (
       <SettingsPage
-        workspaceName={settingsWorkspaceName}
+        workspaceName={result?.rootName ?? null}
         sectionReq={settingsSectionReq}
         onAiConfigSaved={onAiConfigSaved}
         onSettingsSection={onSettingsSection}

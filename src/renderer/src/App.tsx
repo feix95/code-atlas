@@ -314,7 +314,7 @@ function App(): React.JSX.Element {
         removePreviewRef,
         handleDropRef,
         onRenameFile: handleRenameFile,
-        settingsWorkspaceName: folder ? (folder.split(/[\\/]/).pop() ?? null) : null,
+        onOpenWikiTab: () => pane.openSingletonTab('wiki'),
         settingsSectionReq: settings.settingsReq,
         onSettingsSection: settings.setSettingsSection,
         onAiConfigSaved: applyAiConfig

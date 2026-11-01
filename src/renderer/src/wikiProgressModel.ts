@@ -284,6 +284,20 @@ export function regeneratePageIds(rows: readonly WikiProgressRow[]): string[] {
     .map((row) => row.pageId)
 }
 
+export interface WikiRunPlan {
+  total: number
+  /** 已生成且文件还在的篇目:开跑后会按内容哈希跳过 */
+  cached: number
+  /** 需要真正请求模型的篇目 */
+  toGenerate: number
+}
+
+/** 生成确认弹窗的口径:记账里完成的算缓存,其余(未生成/过期/缺失/失败/取消)都要重跑 */
+export function planWikiRows(rows: readonly WikiProgressRow[]): WikiRunPlan {
+  const cached = rows.filter((row) => row.status === 'done').length
+  return { total: rows.length, cached, toGenerate: rows.length - cached }
+}
+
 export function pickWikiPage(
   pages: readonly WikiPageSource[],
   ids: readonly string[]

@@ -8,6 +8,7 @@ import type {
   WikiLocationChoice,
   WikiProjectStateResult,
   WikiRootScan,
+  WikiRunStatus,
   WikiSettings,
   WikiStartRequest,
   WikiStartResult
@@ -24,6 +25,7 @@ export const wikiBridge = {
     ipcRenderer.invoke(CH.wikiProjectState, projectRoot),
   start: (request: WikiStartRequest): Promise<WikiStartResult> =>
     ipcRenderer.invoke(CH.wikiStart, request),
+  runStatus: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatus),
   cancel: (): Promise<void> => ipcRenderer.invoke(CH.wikiCancel),
   cleanupAll: (): Promise<WikiCleanupOutcome> => ipcRenderer.invoke(CH.wikiCleanupAll),
   cleanupProject: (projectRoot: string): Promise<WikiCleanupOutcome> =>

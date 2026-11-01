@@ -32,6 +32,7 @@ import { footText } from '../graph/graphFootText'
 import { GraphSidePanel } from './GraphSidePanel'
 import { useModuleColorPicker } from '../graph/useModuleColorPicker'
 import { GraphNotices } from './GraphNotices'
+import { GraphWikiEntry } from './GraphWikiEntry'
 import { TreeIcon } from './Icons'
 
 const NO_EDGES: DepEdge[] = []
@@ -53,6 +54,8 @@ interface GraphViewProps {
   onLoadGraph: () => void
   expandLazy: (relPath: string) => Promise<ScanDirNode | null>
   onOpenFile: (relPath: string) => void
+  /** 打开 Wiki 进度页签(生成开跑后自动转过去) */
+  onOpenWiki: () => void
   /** 这扇图谱的页签 id:节点详情停靠时认它 */
   tabId: string
   /** 当前停靠位认的那张签(App 按主窗激活组算) */
@@ -274,6 +277,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         onExpandAll={expansion.expandAll}
         onCollapseAll={expansion.collapseAll}
         onFit={viewport.fit}
+        wiki={<GraphWikiEntry result={result} graph={current} onOpenWiki={props.onOpenWiki} />}
       />
       <GraphNotices
         graphNote={graphNote}
