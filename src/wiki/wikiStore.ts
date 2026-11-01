@@ -111,7 +111,7 @@ export function languageDir(projectDir: string, languageCode: string): string {
   return join(projectDir, languageDirLabel(languageCode))
 }
 
-function isSafePageFile(file: string): boolean {
+export function isSafePageFile(file: string): boolean {
   const parts = file.split('/')
   return (
     parts.length === 2 &&

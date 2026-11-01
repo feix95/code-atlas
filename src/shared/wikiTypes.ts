@@ -112,6 +112,86 @@ export interface WikiJobEvent {
   page: WikiPageProgress
 }
 
+/** 主进程推给界面的整轮事件:逐页进度 + 收场汇总 */
+export type WikiEvent =
+  | ({ type: 'progress' } & WikiJobEvent)
+  | {
+      type: 'finished'
+      projectRoot: string
+      language: string
+      status: 'done' | 'cancelled' | 'failed'
+      done: number
+      skipped: number
+      failed: number
+      cancelled: number
+      error?: string
+    }
+
+/** 开始生成:页面清单由渲染层按当前图谱装配,主进程只信路径与类型 */
+export interface WikiStartRequest {
+  requestId: string
+  projectRoot: string
+  language: string
+  pages: WikiPageSource[]
+  /** 只跑这些页(重试失败项 / 重新生成);不传按缓存键全量检查 */
+  only?: string[]
+  /** 忽略缓存强制重写 */
+  force?: boolean
+  /** 已有标签名,给模型对齐写法 */
+  knownTags?: string[]
+}
+
+export type WikiStartResult =
+  | { ok: true; total: number; provider: string; model: string; projectDir: string }
+  | { ok: false; error: string }
+
+/** 进度页读到的单篇现状:记账状态 + 文件是否还在 */
+export interface WikiPageSummary {
+  pageId: string
+  kind: 'module' | 'group'
+  name: string
+  status: 'done' | 'stale' | 'missing' | 'failed' | 'cancelled'
+  file: string
+  generatedAt: string
+  model: string
+  truncated: boolean
+  exists: boolean
+}
+
+export interface WikiLanguageSummary {
+  code: string
+  label: string
+  pages: WikiPageSummary[]
+}
+
+export type WikiProjectStateResult =
+  | { ok: true; projectDir: string; damaged: boolean; languages: WikiLanguageSummary[] }
+  | { ok: false; error: string }
+
+/** 根目录扫描(设置卡片与清理确认窗用) */
+export interface WikiRootScan {
+  location: string | null
+  projects: number
+  /** 记账里的篇数,含尚未生成成功的失败页 */
+  pages: number
+  /** 实际还在磁盘上的生成文档数 */
+  files: number
+  bytes: number
+  /** 记账损坏的项目目录,清理会整体拒绝 */
+  damaged: string[]
+}
+
+export type WikiCleanupOutcome =
+  | { ok: true; projects: number; files: number; bytes: number; removedRoot: boolean }
+  | { ok: false; reason: string; damaged: string[] }
+
+export type WikiFileOpResult = { ok: true } | { ok: false; message: string }
+
+export type WikiLocationChoice =
+  | { ok: true; location: string; usedSubdirectory: boolean }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false; error: string }
+
 interface WikiPageFactsBase {
   language: { code: string; name: string }
   project: { name: string; moduleCount: number; groupCount: number; knownTags: string[] }

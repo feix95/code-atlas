@@ -85,6 +85,21 @@ export const CH = {
   translateCancel: 'atlas:translate-cancel',
   /** 主进程 → 渲染层推送:翻译计划 / 逐块译文 / 完成 / 失败 */
   translateEvent: 'atlas:translate-event',
+  // AI Wiki(仓库百科)
+  wikiSettingsGet: 'atlas:wiki-settings-get',
+  wikiSaveLanguage: 'atlas:wiki-save-language',
+  wikiChooseLocation: 'atlas:wiki-choose-location',
+  wikiScanRoot: 'atlas:wiki-scan-root',
+  wikiProjectState: 'atlas:wiki-project-state',
+  wikiStart: 'atlas:wiki-start',
+  wikiCancel: 'atlas:wiki-cancel',
+  wikiCleanupAll: 'atlas:wiki-cleanup-all',
+  wikiCleanupProject: 'atlas:wiki-cleanup-project',
+  /** 主进程 → 渲染层推送:逐页进度与收场汇总 */
+  wikiEvent: 'atlas:wiki-event',
+  wikiOpenDoc: 'atlas:wiki-open-doc',
+  wikiRevealDoc: 'atlas:wiki-reveal-doc',
+  wikiOpenLocation: 'atlas:wiki-open-location',
   // 文件路径工具
   copyFilePath: 'atlas:copy-file-path',
   revealFilePath: 'atlas:reveal-file-path',

@@ -3,7 +3,11 @@
 // 记账损坏时整次拒绝,不做「猜着删」。
 import { promises as fs } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { WIKI_MARKER_FILE } from '../shared/wikiTypes.ts'
+import {
+  WIKI_MARKER_FILE,
+  type WikiCleanupOutcome,
+  type WikiRootScan
+} from '../shared/wikiTypes.ts'
 import { isInsideRoot } from './wikiLocation.ts'
 import {
   languageDir,
@@ -16,17 +20,6 @@ import {
   type WikiState
 } from './wikiStore.ts'
 
-export interface WikiRootScan {
-  projects: number
-  /** 记账里的篇数,含尚未生成成功的失败页 */
-  pages: number
-  /** 实际还在磁盘上的生成文档数 */
-  files: number
-  bytes: number
-  /** 记账损坏的项目目录,清理会整体拒绝 */
-  damaged: string[]
-}
-
 export interface WikiCleanupOptions {
   /** 已校验过的 Wiki 根 */
   root: string
@@ -35,13 +28,9 @@ export interface WikiCleanupOptions {
   isGenerating: boolean
 }
 
-export type WikiCleanupResult =
-  | { ok: true; projects: number; files: number; bytes: number; removedRoot: boolean }
-  | { ok: false; reason: string; damaged: string[] }
-
 type CleanupPlan = { dir: string; state: WikiState }
 
-const fail = (reason: string, damaged: string[] = []): WikiCleanupResult => ({
+const fail = (reason: string, damaged: string[] = []): WikiCleanupOutcome => ({
   ok: false,
   reason,
   damaged
@@ -61,7 +50,14 @@ async function listProjectDirs(root: string): Promise<string[]> {
 
 /** 只统计，不动文件;确认弹窗与设置卡片用它算篇数、占用与损坏项目 */
 export async function scanWikiRoot(root: string): Promise<WikiRootScan> {
-  const scan: WikiRootScan = { projects: 0, pages: 0, files: 0, bytes: 0, damaged: [] }
+  const scan: WikiRootScan = {
+    location: root,
+    projects: 0,
+    pages: 0,
+    files: 0,
+    bytes: 0,
+    damaged: []
+  }
   for (const dir of await listProjectDirs(root)) {
     const read = await readWikiState(dir)
     if (read.status === 'damaged') {
@@ -140,7 +136,7 @@ async function removeRootIfOwned(root: string): Promise<boolean> {
 
 async function planCleanup(
   options: WikiCleanupOptions
-): Promise<CleanupPlan[] | WikiCleanupResult> {
+): Promise<CleanupPlan[] | WikiCleanupOutcome> {
   if (options.projectDir) {
     const target = resolve(options.projectDir)
     if (target === resolve(options.root) || !isInsideRoot(target, options.root)) {
@@ -161,7 +157,7 @@ async function planCleanup(
 }
 
 /** 清全部项目或单个项目;先生成计划,任何项目记账损坏都不动手 */
-export async function cleanupWiki(options: WikiCleanupOptions): Promise<WikiCleanupResult> {
+export async function cleanupWiki(options: WikiCleanupOptions): Promise<WikiCleanupOutcome> {
   if (options.isGenerating) return fail('生成任务进行中,先取消再清理')
   const rootStat = await statSafe(options.root)
   if (!rootStat?.isDirectory()) return fail('Wiki 目录不见了,可能已被移动或删除')

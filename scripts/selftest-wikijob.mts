@@ -162,6 +162,11 @@ async function checkRunAndCache(base: string): Promise<void> {
     events.some((event) => event.page.status === 'skipped'),
     '跳过也要推进度'
   )
+
+  const forced = await runWikiJob(options(root, projectDir, pages, { force: true }), h.deps)
+  assert.equal(forced.done, 2, '强制重写不看缓存')
+  assert.equal(forced.skipped, 0)
+  assert.equal(h.requests.length, 4, '强制重写重新请求每一页')
 }
 
 async function checkChangedPage(base: string): Promise<void> {

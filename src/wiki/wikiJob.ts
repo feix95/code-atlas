@@ -49,6 +49,8 @@ export interface WikiJobOptions {
   replyCap: number
   knownTags: string[]
   pages: WikiPageSource[]
+  /** 忽略缓存强制重写 */
+  force?: boolean
   signal?: AbortSignal
 }
 
@@ -169,6 +171,7 @@ export async function runWikiJob(
       const inputHash = wikiPageInputHash(source, options.language, deps.factOf)
       const existing = languageState.pages[source.pageId]
       if (
+        options.force !== true &&
         existing &&
         existing.inputHash === inputHash &&
         existing.promptVersion === WIKI_PROMPT_VERSION &&

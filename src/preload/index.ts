@@ -15,6 +15,7 @@ import type {
 import type { SearchNamesResult } from '../shared/searchNames.ts'
 import type { DocxConvertResult, DocxProgress } from '../shared/docxMedia.ts'
 import type { TranslateEvent, TranslateStartRequest } from '../shared/translateTypes.ts'
+import { wikiBridge } from './wikiBridge.ts'
 import type {
   AiChatLookupPayload,
   AiChatRequest,
@@ -245,6 +246,8 @@ const atlasApi = {
     ipcRenderer.on(CH.translateEvent, listener)
     return () => ipcRenderer.removeListener(CH.translateEvent, listener)
   },
+  /** AI Wiki:设置、位置、项目快照、生成、清理与打开文档 */
+  wiki: wikiBridge,
   /** 订阅 AI 流式增量;返回退订函数,组件卸载时调用,防止泄漏监听 */
   onAiDelta: (callback: (payload: AiDeltaPayload) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: AiDeltaPayload): void =>

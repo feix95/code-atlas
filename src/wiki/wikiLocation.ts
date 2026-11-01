@@ -69,3 +69,14 @@ export async function resolveWikiLocation(input: WikiLocationInput): Promise<Wik
   }
   return { ok: true, location: join(checked, WIKI_SUBDIRECTORY), usedSubdirectory: true }
 }
+
+/** 选定位置就落标记:下次校验能认出这是应用自己的目录,根目录空了清理也能连根收 */
+export async function ensureWikiRootMarker(root: string): Promise<void> {
+  await fs.mkdir(root, { recursive: true })
+  const body = JSON.stringify({ schema: 1, createdAt: new Date().toISOString() }, null, 2)
+  try {
+    await fs.writeFile(join(root, WIKI_MARKER_FILE), body, { flag: 'wx' })
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+  }
+}

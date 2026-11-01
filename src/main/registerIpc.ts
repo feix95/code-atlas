@@ -7,6 +7,8 @@ import { registerLaunchPlanIpc } from './ipcLaunchPlan.ts'
 import { registerEngineIpc } from './ipcEngine.ts'
 import { registerTranslateIpc } from './ipcTranslate.ts'
 import { registerDocxIpc } from './ipcDocx.ts'
+import { registerWikiIpc } from './ipcWiki.ts'
+import { registerWikiRunIpc } from './wikiRun.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -18,4 +20,6 @@ export function registerIpc(): void {
   registerEngineIpc()
   registerTranslateIpc()
   registerDocxIpc()
+  registerWikiIpc()
+  registerWikiRunIpc()
 }
