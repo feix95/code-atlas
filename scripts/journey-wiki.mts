@@ -1,0 +1,224 @@
+// Journey 用的本地模型替身:只监听回环地址,按 Wiki 提示词里的 page_facts 回一份合规 JSON。
+// 记录每次 chat 请求对应的页,自测据此核对「每页一次请求」与「只重生成改动的一页」。
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+
+export interface WikiChatRecord {
+  pageId: string
+  name: string
+  language: string
+}
+
+export interface WikiMockServer {
+  baseUrl: string
+  chats: WikiChatRecord[]
+  close: () => Promise<void>
+}
+
+interface PageRef extends WikiChatRecord {
+  file: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function textOf(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function firstFilePath(value: unknown): string {
+  if (!Array.isArray(value)) return ''
+  for (const item of value) {
+    if (isRecord(item)) {
+      const path = textOf(item.path)
+      if (path !== '') return path
+    }
+  }
+  return ''
+}
+
+function lastFolderName(value: unknown): string {
+  if (!Array.isArray(value)) return ''
+  for (const item of value) {
+    const text = textOf(item)
+    if (text === '') continue
+    const segments = text.split(/[\\/]+/).filter(Boolean)
+    return segments[segments.length - 1] ?? ''
+  }
+  return ''
+}
+
+/** 标题必须落在 2-16 字,超长按字截断,过短回退 */
+function clampTitle(raw: string, fallback: string): string {
+  const chars = [...(raw.trim() || fallback)]
+  const kept = chars.slice(0, 16).join('').trim()
+  return [...kept].length >= 2 ? kept : fallback
+}
+
+function pageRefOf(facts: Record<string, unknown>): PageRef {
+  const language = isRecord(facts.language) ? textOf(facts.language.code) : ''
+  if (facts.kind === 'group') {
+    const group = isRecord(facts.group) ? facts.group : {}
+    return {
+      pageId: textOf(group.id) || 'group',
+      name: clampTitle(textOf(group.name), '散件组'),
+      language: language || 'en',
+      file: firstFilePath(group.files)
+    }
+  }
+  const module = isRecord(facts.module) ? facts.module : {}
+  const folder = lastFolderName(module.folders)
+  return {
+    pageId: textOf(module.id) || 'module',
+    name: clampTitle(folder === '' ? '' : `${folder} 模块`, '模块页面'),
+    language: language || 'en',
+    file: firstFilePath(module.files)
+  }
+}
+
+function extractFacts(userText: string): Record<string, unknown> | null {
+  const open = '<page_facts>'
+  const close = '</page_facts>'
+  const start = userText.indexOf(open)
+  const end = userText.indexOf(close)
+  if (start < 0 || end <= start) return null
+  try {
+    const parsed: unknown = JSON.parse(userText.slice(start + open.length, end).trim())
+    return isRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function wikiReply(facts: Record<string, unknown>): { reply: unknown; page: PageRef } {
+  const page = pageRefOf(facts)
+  const keyFiles = page.file === '' ? [] : [page.file]
+  const keyLine = page.file === '' ? '' : `\n## 关键文件\n\n- \`${page.file}\`\n`
+  return {
+    page,
+    reply: {
+      name: page.name,
+      summary: '自测替身生成的页面说明。',
+      tags: ['自测'],
+      keyFiles,
+      doc: `## 页面说明\n\n这是仓库 Wiki 自测替身生成的正文。\n${keyLine}`
+    }
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify(body))
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+}
+
+async function handleChat(
+  req: IncomingMessage,
+  res: ServerResponse,
+  chats: WikiChatRecord[]
+): Promise<void> {
+  const raw = await readBody(req).catch(() => '')
+  let body: unknown
+  try {
+    body = JSON.parse(raw)
+  } catch {
+    sendJson(res, 500, { error: 'journey mock: request body is not JSON' })
+    return
+  }
+  const messages = isRecord(body) && Array.isArray(body.messages) ? body.messages : []
+  let userText = ''
+  for (const message of messages) {
+    if (isRecord(message) && message.role === 'user' && typeof message.content === 'string') {
+      userText = message.content
+    }
+  }
+  const facts = extractFacts(userText)
+  if (facts === null) {
+    sendJson(res, 500, { error: 'journey mock: page_facts missing from the request' })
+    return
+  }
+  const { reply, page } = wikiReply(facts)
+  chats.push({ pageId: page.pageId, name: page.name, language: page.language })
+  sendJson(res, 200, {
+    id: `chatcmpl-journey-${chats.length}`,
+    object: 'chat.completion',
+    model: 'test-only',
+    choices: [
+      {
+        index: 0,
+        message: { role: 'assistant', content: JSON.stringify(reply) },
+        finish_reason: 'stop'
+      }
+    ],
+    usage: { prompt_tokens: 120, completion_tokens: 60, total_tokens: 180 }
+  })
+}
+
+async function handle(
+  req: IncomingMessage,
+  res: ServerResponse,
+  chats: WikiChatRecord[]
+): Promise<void> {
+  const path = new URL(req.url ?? '/', 'http://127.0.0.1').pathname
+  if (req.method === 'GET' && path === '/api/v0/models') {
+    sendJson(res, 200, {
+      data: [
+        {
+          id: 'test-only',
+          object: 'model',
+          type: 'llm',
+          state: 'loaded',
+          loaded_context_length: 8192,
+          max_context_length: 8192
+        }
+      ]
+    })
+    return
+  }
+  if (req.method === 'GET' && path === '/v1/models') {
+    sendJson(res, 200, { object: 'list', data: [{ id: 'test-only', object: 'model' }] })
+    return
+  }
+  if (req.method === 'POST' && path === '/v1/chat/completions') {
+    await handleChat(req, res, chats)
+    return
+  }
+  sendJson(res, 404, { error: 'journey mock: unsupported route' })
+}
+
+export async function startWikiMockServer(): Promise<WikiMockServer> {
+  const chats: WikiChatRecord[] = []
+  const server = createServer((req, res) => {
+    void handle(req, res, chats).catch((err: unknown) => {
+      sendJson(res, 500, { error: err instanceof Error ? err.message : 'journey mock failed' })
+    })
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') {
+    server.close()
+    throw new Error('journey mock: failed to bind a loopback port')
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/v1`,
+    chats,
+    close: async () => {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }
+}

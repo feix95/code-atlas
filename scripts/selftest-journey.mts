@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -8,6 +8,8 @@ import { _electron } from 'playwright'
 import { buildSampleDocx } from './docx-fixture.mts'
 import { checkDocOutline, writeOutlineFixtures } from './journey-outline.mts'
 import { checkLargeDocx, writeLargeDocx } from './journey-docx-large.mts'
+import { startWikiMockServer } from './journey-wiki.mts'
+import { languageDir, readWikiState } from '../src/wiki/wikiStore.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // 测试产物不写仓库: 默认系统临时目录, AI 验收时用 CODE_ATLAS_TMP 指到共享 tmp。
@@ -15,6 +17,38 @@ const tempRoot = process.env.CODE_ATLAS_TMP ?? tmpdir()
 const base = join(tempRoot, 'code-atlas-journey')
 await mkdir(base, { recursive: true })
 const run = await mkdtemp(join(base, 'run-'))
+
+const pathExists = (path: string): Promise<boolean> =>
+  access(path).then(
+    () => true,
+    () => false
+  )
+
+async function listMarkdown(dir: string): Promise<string[]> {
+  return readdir(dir, { recursive: true }).then(
+    (entries) => entries.filter((entry) => entry.endsWith('.md')).sort(),
+    () => [] as string[]
+  )
+}
+
+async function waitUntil(
+  check: () => boolean | Promise<boolean>,
+  timeoutMs = 15_000
+): Promise<void> {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    if (await check()) return
+    await new Promise((done) => setTimeout(done, 50))
+  }
+  throw new Error('journey wait timed out')
+}
+
+async function readLedger(projectDir: string) {
+  const read = await readWikiState(projectDir)
+  if (read.status !== 'ok') throw new Error(`Wiki ledger is ${read.status}`)
+  return read.state
+}
+
 for (const name of [
   'profile',
   'session',
@@ -71,6 +105,8 @@ for (const lib of ['lib1', 'lib2', 'lib3']) {
 }
 const main = join(root, 'out/main/index.js')
 assert.ok(existsSync(main), 'Run npm run build before test:journey')
+// Wiki 生成要真使唤模型:本机回环替身应答,外网仍一律拦下并计数
+const wikiServer = await startWikiMockServer()
 const bootstrap = join(run, 'bootstrap.cjs')
 await writeFile(
   bootstrap,
@@ -86,9 +122,25 @@ cp.execFile = function(file, ...args) {
   if (/taskkill(?:\\.exe)?$/i.test(file)) throw new Error('Journey forbids process termination')
   return originalExec.call(this, file, ...args)
 }
-globalThis.fetch = async () => { throw new Error('Journey forbids network requests') }
+const state = globalThis.__journey = { configured:false, calls:{}, partial:false, holdGraph:false, releases:[], externalFetches:0 }
+const realFetch = globalThis.fetch.bind(globalThis)
+const isLoopback = (input) => {
+  try {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input && typeof input.url === 'string' ? input.url : ''
+    const host = new URL(url).hostname
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]'
+  } catch {
+    return false
+  }
+}
+globalThis.fetch = async (input, init) => {
+  if (!isLoopback(input)) {
+    state.externalFetches += 1
+    throw new Error('Journey forbids external network requests')
+  }
+  return realFetch(input, init)
+}
 net.fetch = globalThis.fetch
-const state = globalThis.__journey = { configured:false, calls:{}, partial:false, holdGraph:false, releases:[] }
 const originalHandle = ipcMain.handle.bind(ipcMain)
 ipcMain.handle = (channel, handler) => originalHandle(channel, async (event, ...args) => {
   state.calls[channel] = (state.calls[channel] || 0) + 1
@@ -1783,6 +1835,9 @@ try {
     /属于模块 app · /,
     'expanded folder keeps its level and annotates children with their container'
   )
+  // 展开前指针停在文件夹上,详情浮窗按规则已弹;先收起,下面才测「圈内空白不弹详情」
+  await page.keyboard.press('Escape')
+  await panel.waitFor({ state: 'detached' })
   await shot('graph-levels')
   // 等布局稳定:测出每个子项圆心,从子项质心附近挑一个离子项最远的空白点,稍后用它收圈
   await page.waitForTimeout(2_500)
@@ -1885,6 +1940,214 @@ try {
   )
   await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
   await page.locator('.graph-view').waitFor({ state: 'detached' })
+  // 仓库 Wiki(P3):临时根目录 -> 选语种 -> 逐页生成 -> 进度页 -> 重开读盘
+  // -> 改一个文件只重生成一页 -> 清理回到未生成。模型走本机回环替身,外网请求必须为 0。
+  const wikiRoot = join(run, 'wiki')
+  const wikiProject = join(run, 'graphdemo')
+  await mkdir(wikiRoot, { recursive: true })
+  await writeFile(
+    join(run, 'profile/ai-config.json'),
+    JSON.stringify(
+      {
+        provider: 'lmstudio',
+        lmstudio: { baseUrl: wikiServer.baseUrl, model: 'test-only', apiKey: '' },
+        webLookup: false
+      },
+      null,
+      2
+    )
+  )
+  await writeFile(
+    join(run, 'profile/wiki-settings.json'),
+    JSON.stringify({ location: wikiRoot, language: 'zh-CN', hasChosenLocation: true }, null, 2)
+  )
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
+  await page.waitForFunction(() => !document.querySelector('.graph-status'))
+
+  await page.getByRole('button', { name: '生成 Wiki', exact: true }).click()
+  const generateDialog = page.getByRole('dialog', { name: '生成仓库 Wiki' })
+  await generateDialog.waitFor()
+  await generateDialog.getByRole('combobox', { name: 'Wiki 语种' }).selectOption('en')
+  const startButton = generateDialog.getByRole('button', { name: '开始生成', exact: true })
+  await waitUntil(() => startButton.isEnabled(), 20_000)
+  await startButton.click()
+
+  await page.locator('.wiki-page').waitFor()
+  const pageCount = await page.locator('.wiki-row').count()
+  assert.ok(pageCount > 0, 'wiki must plan at least one page')
+  await page
+    .locator('.wiki-notices')
+    .getByText(/本轮结束:完成 \d+ 篇/)
+    .waitFor({ timeout: 60_000 })
+  assert.equal(
+    await page.locator('.wiki-row.is-failed, .wiki-row.is-missing, .wiki-row.is-stale').count(),
+    0,
+    'the first wiki run must finish every page'
+  )
+  assert.equal(wikiServer.chats.length, pageCount, 'each wiki page gets exactly one model request')
+
+  const stateAfterRun = (await page.evaluate(
+    (root) => window.atlas.wiki.projectState(root),
+    wikiProject
+  )) as {
+    ok: boolean
+    projectDir?: string
+    languages?: Array<{ code: string; pages: Array<{ status: string; exists: boolean }> }>
+  }
+  assert.equal(stateAfterRun.ok, true, 'wiki project state must load')
+  const englishState = stateAfterRun.languages?.find((item) => item.code === 'en')
+  assert.ok(englishState, 'the english wiki must be recorded')
+  assert.equal(englishState.pages.length, pageCount)
+  assert.ok(
+    englishState.pages.every((item) => item.status === 'done' && item.exists),
+    'every wiki record must be done and present on disk'
+  )
+  const projectDir = stateAfterRun.projectDir ?? ''
+  assert.ok(projectDir !== '', 'wiki project dir must be known')
+  const firstLedger = await readLedger(projectDir)
+  assert.equal(Object.keys(firstLedger.languages.en.pages).length, pageCount)
+  const firstMarkdown = await listMarkdown(languageDir(projectDir, 'en'))
+  assert.equal(firstMarkdown.length, pageCount + 1, 'one markdown per page plus the README index')
+  const indexText = await readFile(join(languageDir(projectDir, 'en'), 'README.md'), 'utf8')
+  assert.ok(
+    indexText.includes('# Repository Wiki'),
+    'README index is generated in the chosen language'
+  )
+  assert.equal(
+    indexText.split('\n').filter((line) => line.startsWith('- [')).length,
+    pageCount,
+    'README index links every page'
+  )
+
+  // 重开应用:进度页只读盘,不再请求模型
+  await page.reload()
+  await page.locator('.sidebar-footer').waitFor()
+  if ((await page.locator('.graph-view').count()) === 0) {
+    await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  }
+  await page.locator('.graph-view').waitFor()
+  await page.getByRole('button', { name: 'Wiki 进度', exact: true }).click()
+  await page.locator('.wiki-page').waitFor()
+  await page.waitForFunction(
+    (expected) => {
+      const text = document.querySelector('.wiki-counts')?.textContent ?? ''
+      return text.includes(`已完成 ${expected} / ${expected}`) && !text.includes('进行中')
+    },
+    pageCount,
+    { timeout: 30_000 }
+  )
+  assert.equal(wikiServer.chats.length, pageCount, 'reopening the app must not re-request any page')
+  assert.match(
+    (await page.locator('.wiki-head small').innerText()) ?? '',
+    new RegExp(`${pageCount} 篇记账`),
+    'the progress page reads the ledger back from disk'
+  )
+
+  // 改一个文件:刷新事实缓存后再生成,只有它所在的那一页重写
+  const beforeChats = wikiServer.chats.length
+  const beforeTimes = new Map(
+    Object.entries(firstLedger.languages.en.pages).map(([id, record]) => [id, record.generatedAt])
+  )
+  await writeFile(
+    join(wikiProject, 'app/c.ts'),
+    "// changed for wiki cache test\nimport { d } from './d'\nexport const c = d + 1\n"
+  )
+  await page.evaluate((root) => window.atlas.depGraph(root), wikiProject)
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor()
+  await page.getByRole('button', { name: '生成 Wiki', exact: true }).click()
+  const secondDialog = page.getByRole('dialog', { name: '生成仓库 Wiki' })
+  await secondDialog.waitFor()
+  assert.equal(
+    await secondDialog.getByRole('combobox', { name: 'Wiki 语种' }).inputValue(),
+    'en',
+    'the chosen language is remembered'
+  )
+  const secondStart = secondDialog.getByRole('button', { name: '开始生成', exact: true })
+  await waitUntil(() => secondStart.isEnabled(), 20_000)
+  await secondStart.click()
+  // 进度页可能在本轮瞬时完成后才重新挂载,「本轮结束」提示会错过;以记账与请求数为准
+  await waitUntil(async () => {
+    const current = await readLedger(projectDir)
+    const changed = Object.entries(current.languages.en.pages).filter(
+      ([id, record]) => beforeTimes.get(id) !== record.generatedAt
+    )
+    return changed.length === 1 && wikiServer.chats.length === beforeChats + 1
+  }, 60_000)
+  assert.equal(wikiServer.chats.length, beforeChats + 1, 'only the changed page is requested again')
+  const secondLedger = await readLedger(projectDir)
+  const changedPages = Object.entries(secondLedger.languages.en.pages).filter(
+    ([id, record]) => beforeTimes.get(id) !== record.generatedAt
+  )
+  assert.equal(changedPages.length, 1, 'exactly one page gets a new generation time')
+  assert.ok(
+    Object.values(secondLedger.languages.en.pages).every((record) => record.status === 'done'),
+    'regenerated wiki records stay done'
+  )
+  assert.deepEqual(
+    await listMarkdown(languageDir(projectDir, 'en')),
+    firstMarkdown,
+    'regeneration must not add or remove documents'
+  )
+
+  // 清理:只走记账,回到未生成
+  await page.getByRole('button', { name: /AI 状态/ }).click()
+  await page
+    .locator('.ai-status-pop')
+    .getByRole('button', { name: /^(设置 AI|AI 设置)$/ })
+    .click()
+  await page.locator('.cfg-page').waitFor()
+  const cleanupButton = page.getByRole('button', { name: '一键清理', exact: true })
+  await cleanupButton.waitFor()
+  await waitUntil(() => cleanupButton.isEnabled(), 20_000)
+  await cleanupButton.click()
+  const cleanupDialog = page.getByRole('dialog', { name: '清理全部 Wiki' })
+  await cleanupDialog.waitFor()
+  await cleanupDialog.getByRole('button', { name: '清理', exact: true }).click()
+  await page
+    .locator('.settings-wiki-notices')
+    .getByText(/已清理 \d+ 个项目/)
+    .waitFor({ timeout: 30_000 })
+  assert.equal(
+    await pathExists(wikiRoot),
+    false,
+    'cleanup removes the wiki root once only the marker is left'
+  )
+  assert.equal(
+    await pathExists(languageDir(projectDir, 'en')),
+    false,
+    'cleanup removes generated docs'
+  )
+  assert.equal(
+    await pathExists(join(projectDir, '.codeatlas/state.json')),
+    false,
+    'cleanup removes the ledger'
+  )
+  await page.getByRole('button', { name: '关闭 设置', exact: true }).click()
+
+  await page.getByRole('button', { name: '关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor()
+  await page.getByRole('button', { name: 'Wiki 进度', exact: true }).click()
+  await page.locator('.wiki-page').waitFor()
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  await page.waitForFunction(
+    (expected) => {
+      const counts = document.querySelector('.wiki-counts')?.textContent ?? ''
+      const statuses = [...document.querySelectorAll('.wiki-row-status')]
+      return (
+        counts.includes(`已完成 0 / ${expected}`) &&
+        statuses.length === expected &&
+        statuses.every((node) => node.textContent?.trim() === '未生成')
+      )
+    },
+    pageCount,
+    { timeout: 30_000 }
+  )
+  await shot('wiki-cleaned')
+  await page.getByRole('button', { name: '关闭 仓库 Wiki', exact: true }).click()
+  await page.getByRole('button', { name: '关闭 关系图谱', exact: true }).click()
+  await page.locator('.graph-view').waitFor({ state: 'detached' })
   await control({ partial: true })
   await open(project)
   // 分级扫描没探完:页脚只留计数;替身给根节点打 truncated,树上应亮「不完整」
@@ -1979,6 +2242,15 @@ try {
     document.documentElement.dataset.theme = 'dark'
   })
   await shot('file-dark')
+  assert.equal(
+    await electron.evaluate(
+      () =>
+        (globalThis as typeof globalThis & { __journey: { externalFetches: number } }).__journey
+          .externalFetches
+    ),
+    0,
+    'the whole journey must not reach the external network'
+  )
   assert.deepEqual(errors, [], 'Renderer must not report errors')
   console.log(
     'Journey passed: real scanning/reading/navigation/setup/recovery, mocked delayed and stale graph.'
@@ -1986,4 +2258,5 @@ try {
   console.log(`Local screenshots: ${join(run, 'shots')}`)
 } finally {
   await electron.close()
+  await wikiServer.close()
 }
