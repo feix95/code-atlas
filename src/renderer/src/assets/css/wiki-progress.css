@@ -1,0 +1,320 @@
+/* 仓库 Wiki 进度页:页签内一整页 —— 头条动作、语种与总账、进度条、逐页表,底部存放位置。
+   颜色与间距全走 token;状态色只借语义档(绿=完成、红=失败、琥珀=过期/缺失)。 */
+
+.wiki-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--canvas-tint);
+}
+
+.wiki-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.wiki-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-semi);
+}
+
+.wiki-title small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+}
+
+.wiki-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.wiki-actions .btn {
+  height: 1.75rem;
+  padding: 0 var(--space-2);
+  font-size: var(--font-xs);
+}
+
+.wiki-sub {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-4) var(--space-1);
+}
+
+.wiki-langs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.wiki-counts {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.wiki-bar {
+  flex: none;
+  height: 0.25rem;
+  margin: 0 var(--space-4) var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+}
+
+.wiki-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent-bright);
+  transition: width var(--dur-2) var(--ease-smooth);
+}
+
+.wiki-notices {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.wiki-notices:empty {
+  display: none;
+}
+
+.wiki-notices .notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wiki-notice-close {
+  margin-left: auto;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-md);
+  line-height: var(--lh-100);
+  cursor: pointer;
+}
+
+.wiki-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.wiki-row {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) 5.5rem 8.5rem 1.75rem;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--font-sm);
+}
+
+.wiki-row:hover {
+  background: var(--hover);
+}
+
+.wiki-kind {
+  justify-self: start;
+  padding: 0.0625rem var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-xxs);
+  white-space: nowrap;
+}
+
+.wiki-kind.is-module {
+  color: var(--secondary-deep);
+  background: var(--accent-soft);
+}
+
+.wiki-kind.is-group {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.wiki-row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.wiki-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: var(--font-w-medium);
+}
+
+.wiki-row-flag {
+  margin-left: var(--space-2);
+  color: var(--amber);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-regular);
+}
+
+.wiki-row-file {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wiki-row-file:hover:not(:disabled) {
+  color: var(--accent-bright);
+  text-decoration: underline;
+}
+
+.wiki-row-file:disabled,
+.wiki-row-file.is-muted {
+  color: var(--muted-2);
+  cursor: default;
+}
+
+.wiki-row-error {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--danger);
+  font-size: var(--font-xs);
+}
+
+.wiki-row-status {
+  justify-self: start;
+  padding: 0.0625rem var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--muted);
+  font-size: var(--font-xxs);
+  white-space: nowrap;
+}
+
+.wiki-row.is-done .wiki-row-status {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.wiki-row.is-failed .wiki-row-status {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.wiki-row.is-stale .wiki-row-status,
+.wiki-row.is-missing .wiki-row-status {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.wiki-row.is-running .wiki-row-status,
+.wiki-row.is-queued .wiki-row-status {
+  color: var(--accent-bright);
+}
+
+.wiki-row.is-pending .wiki-row-status,
+.wiki-row.is-cancelled .wiki-row-status {
+  color: var(--muted-2);
+}
+
+.wiki-row-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.wiki-row-actions {
+  display: grid;
+  place-items: center;
+}
+
+.wiki-reveal {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.wiki-reveal:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.wiki-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--muted-2);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+.wiki-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.wiki-foot span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -5,7 +5,7 @@
  * 单例签由 rail/菜单入口开合,再点入口只聚焦不生第二张。
  */
 export type PaneKind =
-  'chat' | 'preview' | 'graph' | 'settings' | 'peek' | 'uiworkbench' | 'translate'
+  'chat' | 'preview' | 'graph' | 'settings' | 'peek' | 'uiworkbench' | 'translate' | 'wiki'
 
 /** 单例签的名牌登记(文件签的名/图标来自文件自己,不从这里领) */
 export const KIND_LABELS: Record<PaneKind, string> = {
@@ -15,7 +15,8 @@ export const KIND_LABELS: Record<PaneKind, string> = {
   settings: '设置',
   peek: '预览',
   uiworkbench: 'UI 工作台',
-  translate: '翻译'
+  translate: '翻译',
+  wiki: '仓库 Wiki'
 }
 
 export const KIND_ICONS: Record<PaneKind, string> = {
@@ -25,7 +26,8 @@ export const KIND_ICONS: Record<PaneKind, string> = {
   settings: 'settings2',
   peek: 'code',
   uiworkbench: 'pencilRuler',
-  translate: 'sparkles'
+  translate: 'sparkles',
+  wiki: 'bookOpen'
 }
 
 /** 文件签品类:绑死一个文件(relPath + scopeRoot 定位),同一文件全应用只此一张 */

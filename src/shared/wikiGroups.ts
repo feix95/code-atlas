@@ -1,6 +1,6 @@
 // 散件分组(纯函数):没被任何模块收进去的文件按路径与后缀分成四组,每组一篇 Wiki。
 // 只影响面板与 Wiki 的归属,不改图谱结构;分组顺序固定,同一输入永远同一结果。
-import { basename, extname } from 'node:path'
+// 不依赖 node:path:渲染层装配页面清单与主进程共用这一份判定,两边不许各写一套。
 
 export type ScatterGroupKind = 'root-config' | 'git-hooks' | 'docs-assets' | 'other'
 
@@ -76,12 +76,21 @@ const DOC_BASENAMES = new Set([
   'contributing'
 ])
 
+/** 扩展名(含点,小写);点开头的文件不算扩展名,与 node:path.extname 同口径 */
+function extOf(file: string): string {
+  const base = file.slice(file.lastIndexOf('/') + 1)
+  const dot = base.lastIndexOf('.')
+  return dot <= 0 ? '' : base.slice(dot).toLowerCase()
+}
+
 function classifyScattered(file: string): ScatterGroupKind {
   const lower = file.toLowerCase()
   if (GIT_HOOK_DIRS.some((dir) => lower.startsWith(dir))) return 'git-hooks'
   if (DOC_ASSET_DIRS.some((dir) => lower.startsWith(dir))) return 'docs-assets'
-  if (DOC_ASSET_EXT.has(extname(lower))) return 'docs-assets'
-  if (DOC_BASENAMES.has(basename(lower, extname(lower)))) return 'docs-assets'
+  const ext = extOf(lower)
+  if (DOC_ASSET_EXT.has(ext)) return 'docs-assets'
+  const base = lower.slice(lower.lastIndexOf('/') + 1)
+  if (DOC_BASENAMES.has(ext === '' ? base : base.slice(0, -ext.length))) return 'docs-assets'
   if (!file.includes('/')) return 'root-config'
   return 'other'
 }

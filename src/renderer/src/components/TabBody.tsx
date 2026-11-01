@@ -20,6 +20,7 @@ import { SettingsPage, type SectionKey } from './SettingsPage'
 import { GraphView } from './GraphView'
 import { UiWorkbench } from './uiWorkbench/UiWorkbench'
 import { TranslationView } from './TranslationView'
+import { WikiProgressPage } from './WikiProgressPage'
 
 export function TabBody({
   tab,
@@ -128,6 +129,19 @@ export function TabBody({
   }
   // UI 工作台:不吃工作区,和设置一样拦在 result 闸之前
   if (tab.kind === 'uiworkbench') return <UiWorkbench />
+  // 仓库 Wiki 进度页:读记账 + 订阅生成事件;图谱没算过时页内自己补一轮
+  if (tab.kind === 'wiki') {
+    return (
+      <WikiProgressPage
+        key={result?.rootPath ?? ''}
+        result={result}
+        graph={graph}
+        graphLoading={graphLoading}
+        graphNote={graphNote}
+        onLoadGraph={handleLoadGraph}
+      />
+    )
+  }
   // 自由对话同样拦在 result 闸之前:没开工作区也能聊,只是不带项目里的文件上下文
   if (tab.kind === 'chat') {
     // 公用对话场:所有文件聊天都在这一场里,除非主动开新对话(的老规矩)

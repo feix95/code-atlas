@@ -27,7 +27,7 @@ import {
   type WikiPageRecord
 } from '../src/wiki/wikiStore.ts'
 import { WIKI_PROMPT_VERSION, wikiInputHash } from '../src/wiki/wikiHash.ts'
-import { groupScatteredFiles } from '../src/wiki/wikiGroups.ts'
+import { groupScatteredFiles } from '../src/shared/wikiGroups.ts'
 import {
   DEFAULT_WIKI_LANGUAGE,
   WIKI_DOC_MAX_CHARS,
