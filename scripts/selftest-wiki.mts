@@ -26,6 +26,7 @@ import {
   type WikiPageRecord
 } from '../src/wiki/wikiStore.ts'
 import { WIKI_PROMPT_VERSION, wikiInputHash } from '../src/wiki/wikiHash.ts'
+import { groupScatteredFiles } from '../src/wiki/wikiGroups.ts'
 import { DEFAULT_WIKI_LANGUAGE, WIKI_MARKER_FILE, WIKI_SUBDIRECTORY } from '../src/shared/wikiTypes.ts'
 
 function checkSettings(base: string): void {
@@ -269,6 +270,52 @@ function checkHash(): void {
   )
 }
 
+function checkGroups(): void {
+  const files = [
+    'src/logo.png',
+    'README.md',
+    'package.json',
+    '.git/hooks/pre-commit',
+    '.husky/pre-push',
+    'docs/guide.md',
+    'assets/app.css',
+    'config/app.json',
+    'scripts/tool.py',
+    'README.md'
+  ]
+  const groups = groupScatteredFiles(files)
+  assert.deepEqual(
+    groups.map((group) => group.kind),
+    ['root-config', 'git-hooks', 'docs-assets', 'other'],
+    '四组按固定顺序排列'
+  )
+  const byKind = Object.fromEntries(groups.map((group) => [group.kind, group]))
+  assert.deepEqual(byKind['root-config'].files, ['package.json'], '根目录配置归项目根配置')
+  assert.deepEqual(
+    byKind['git-hooks'].files,
+    ['.git/hooks/pre-commit', '.husky/pre-push'],
+    'Git 钩子单列一组'
+  )
+  assert.deepEqual(
+    byKind['docs-assets'].files,
+    ['README.md', 'assets/app.css', 'docs/guide.md', 'src/logo.png'],
+    '文档与静态资源归一组,重复路径只算一次'
+  )
+  assert.deepEqual(
+    byKind['other'].files,
+    ['config/app.json', 'scripts/tool.py'],
+    '其余散件归其他目录散件'
+  )
+  assert.equal(byKind['git-hooks'].name, 'Git 钩子', '组名固定')
+  assert.equal(byKind['root-config'].id, 'g:root-config', '组 id 带 g: 前缀')
+  assert.equal(
+    JSON.stringify(groupScatteredFiles([...files].reverse())),
+    JSON.stringify(groups),
+    '输入顺序不影响分组结果'
+  )
+  assert.deepEqual(groupScatteredFiles([]), [], '没有散件就没有组')
+}
+
 async function main(): Promise<void> {
   const base = join(tmpdir(), `codeatlas-wiki-${Date.now()}`)
   await fs.mkdir(base, { recursive: true })
@@ -277,6 +324,7 @@ async function main(): Promise<void> {
     await checkLocation(base)
     await checkStore(base)
     checkHash()
+    checkGroups()
     console.log('✅ Wiki 存储自测全部通过')
     console.log(
       '   设置默认值与回退 · 配置读写往返 · 仓库内拒绝 · 非空无标记改用子目录 · 大小写不敏感'
