@@ -10,6 +10,8 @@ export interface GraphWikiSectionProps {
   damaged: boolean
   /** 在系统文件管理器中定位这篇 Markdown */
   revealDoc: (file: string) => void
+  /** 点标签 = 以该标签搜索 */
+  onSearchTag?: (tag: string) => void
 }
 
 const STATUS_NOTE: Partial<Record<WikiPanelStatus, string>> = {
@@ -28,7 +30,8 @@ export function GraphWikiSection({
   page,
   groupName,
   damaged,
-  revealDoc
+  revealDoc,
+  onSearchTag
 }: GraphWikiSectionProps): React.JSX.Element {
   const aiName = page?.name ? page.name : groupName
   const status = page?.status ?? 'none'
@@ -54,8 +57,14 @@ export function GraphWikiSection({
           {page.tags.length > 0 && (
             <ul className="graph-wiki-tags">
               {page.tags.map((tag) => (
-                <li key={tag} className="graph-wiki-tag">
-                  {tag}
+                <li key={tag}>
+                  <button
+                    type="button"
+                    className="graph-wiki-tag"
+                    onClick={() => onSearchTag?.(tag)}
+                  >
+                    {tag}
+                  </button>
                 </li>
               ))}
             </ul>

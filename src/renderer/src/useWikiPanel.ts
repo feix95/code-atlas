@@ -11,6 +11,8 @@ export interface WikiPanelData {
   language: string
   /** 记账损坏:区块不装数据,由侧栏提示重建 */
   damaged: boolean
+  /** 当前图谱切出的全部页:搜索的名称、路径与成员来源 */
+  sources: readonly WikiPageSource[]
   pages: ReadonlyMap<string, WikiPanelPage>
   /** 文件 → 所属页 id;模块成员、附挂与散件组成员都收 */
   filePage: ReadonlyMap<string, string>
@@ -37,10 +39,15 @@ function pageIndex(pages: readonly WikiPageSource[]): PageIndex {
   return { filePage, programName }
 }
 
-function emptyData(index: PageIndex, error: string | null): WikiPanelData {
+function emptyData(
+  index: PageIndex,
+  sources: readonly WikiPageSource[],
+  error: string | null
+): WikiPanelData {
   return {
     language: '',
     damaged: false,
+    sources,
     pages: new Map(),
     ...index,
     error,
@@ -76,6 +83,7 @@ export function useWikiPanel(
       const base: WikiPanelData = {
         language: settings.language,
         damaged: false,
+        sources: pages,
         pages: new Map(),
         ...index,
         error: null,
@@ -96,7 +104,7 @@ export function useWikiPanel(
         pages: new Map(state.pages.map((page) => [page.pageId, page]))
       }
     } catch (err) {
-      return emptyData(index, friendlyErr(err))
+      return emptyData(index, pages, friendlyErr(err))
     }
   }, [root, pages, revealDoc])
 

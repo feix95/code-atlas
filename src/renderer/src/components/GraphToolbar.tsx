@@ -18,6 +18,8 @@ interface GraphToolbarProps {
   onFit: () => void
   /** Wiki 入口:按钮与弹窗由 GraphWikiEntry 自带状态 */
   wiki?: React.ReactNode
+  /** 顶栏搜索框 */
+  search?: React.ReactNode
 }
 
 export function GraphToolbar(props: GraphToolbarProps): React.JSX.Element {
@@ -25,6 +27,7 @@ export function GraphToolbar(props: GraphToolbarProps): React.JSX.Element {
     <div className="graph-bar">
       <Crumbs rootName={props.rootName} nav={props.nav} />
       <div className="graph-tools">
+        {props.search}
         {props.graphLoading && <span className="graph-status">正在分析引用关系…</span>}
         <button
           type="button"

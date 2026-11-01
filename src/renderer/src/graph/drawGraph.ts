@@ -12,6 +12,7 @@ import {
 } from './graphConfig'
 import { truncateLabel } from './graphText'
 import { hoverRelated, isHoverLink, type BelongsFn, type HoverMode } from './hoverModes'
+import { countSearchFilesUnder, type SearchFocus } from './wikiSearch'
 
 export interface GraphColors {
   bg: string
@@ -86,6 +87,8 @@ export interface DrawInput {
   hoverMode: HoverMode
   /** 详情浮窗选中的节点(侧栏所指) */
   selectedId: string | null
+  /** 搜索命中的成员与模块;非空时其余节点、连线与轮廓一起变淡 */
+  search: SearchFocus | null
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -201,12 +204,39 @@ function belongsFn(input: DrawInput): BelongsFn {
   }
 }
 
-function drawNodes(ctx: CanvasRenderingContext2D, input: DrawInput, related: Set<string>): void {
+/** 节点是否属于搜索命中:文件看路径,文件夹看模块归属或有命中文件在后代里 */
+function nodeInSearch(input: DrawInput, n: SimNode): boolean {
+  const search = input.search
+  if (search === null) return false
+  const info = input.modules?.overlay.nodes.get(n.id)
+  if (info) {
+    if (info.hullModule !== null && search.modules.has(info.hullModule)) return true
+    if (
+      info.ring.some((segment) => segment.moduleId !== null && search.modules.has(segment.moduleId))
+    )
+      return true
+  }
+  if (n.data.kind === 'folder' || n.data.isContainer) {
+    return countSearchFilesUnder(search.files, n.id) > 0
+  }
+  return search.files.has(n.id)
+}
+
+function drawNodes(
+  ctx: CanvasRenderingContext2D,
+  input: DrawInput,
+  related: Set<string>,
+  searchNodes: ReadonlySet<string>
+): void {
   const { scene, hover, colors: c, alpha, modules } = input
-  const dim = lerp(1, GRAPH_MOTION.dimAlpha, hover.t)
+  const dim = Math.min(
+    lerp(1, GRAPH_MOTION.dimAlpha, hover.t),
+    input.search === null ? 1 : GRAPH_MOTION.dimAlpha
+  )
+  const noHighlight = hover.id === null && input.search === null
   for (const n of scene.nodes) {
-    const on = related.has(n.id)
-    const a = alpha * (on || !hover.id ? 1 : dim)
+    const on = related.has(n.id) || searchNodes.has(n.id)
+    const a = alpha * (on || noHighlight ? 1 : dim)
     const ring = modules?.overlay.nodes.get(n.id)?.ring
     // 容器的圆底与名称单独绘制,这里跳过它的实心圆与色环
     if (!n.data.isContainer) {
@@ -217,36 +247,75 @@ function drawNodes(ctx: CanvasRenderingContext2D, input: DrawInput, related: Set
   }
 }
 
+/** 搜索命中的文件夹角标:收起时也能看出里面有几处命中 */
+function drawSearchBadges(ctx: CanvasRenderingContext2D, input: DrawInput, alpha: number): void {
+  const search = input.search
+  if (search === null) return
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.font = `${GRAPH_NODE.searchBadgeFontPx}px ${input.fontFamily}`
+  for (const n of input.scene.nodes) {
+    if (n.data.kind !== 'folder' || n.data.isContainer) continue
+    const count = countSearchFilesUnder(search.files, n.id)
+    if (count === 0) continue
+    const x = n.x + n.r * GRAPH_NODE.searchBadgeOffset
+    const y = n.y - n.r * GRAPH_NODE.searchBadgeOffset
+    ctx.globalAlpha = alpha
+    ctx.fillStyle = input.colors.focus
+    ctx.beginPath()
+    ctx.arc(x, y, GRAPH_NODE.searchBadgeRadius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = input.colors.bg
+    ctx.fillText(count > 99 ? '99+' : String(count), x, y)
+  }
+}
+
 export function drawGraph(ctx: CanvasRenderingContext2D, input: DrawInput): void {
   const { scene, hover, hoverMode: mode, transform: tf, colors: c, alpha, modules } = input
+  const search = input.search
   const belongs = belongsFn(input)
   const hoverModule = nodeModule(input, hover.id)
   const related = hoverRelated(scene.nodes, scene.links, hover.id, mode, belongs, hoverModule)
-  const dim = lerp(1, GRAPH_MOTION.dimAlpha, hover.t)
+  const searchNodes = new Set<string>()
+  if (search !== null) {
+    for (const n of scene.nodes) if (nodeInSearch(input, n)) searchNodes.add(n.id)
+  }
+  const noHighlight = hover.id === null && search === null
+  const dim = Math.min(
+    lerp(1, GRAPH_MOTION.dimAlpha, hover.t),
+    search === null ? 1 : GRAPH_MOTION.dimAlpha
+  )
   const labelBase = labelAlphaAt(tf.k)
   const isRelatedLink = (l: SimLink): boolean =>
     hover.id !== null && isHoverLink(l, hover.id, mode, belongs, hoverModule)
-  // 「同模块」看法下它自己的模块轮廓保持亮,其余轮廓与节点一起变淡
+  // 「同模块」看法下它自己的模块轮廓保持亮,搜索命中的模块轮廓也保持亮
+  const hullOn = (moduleId: string): boolean =>
+    (hover.id !== null && mode === 'module' && moduleId === hoverModule) ||
+    (search !== null && search.modules.has(moduleId))
   const hullAlpha = (moduleId: string): number =>
-    alpha * (!hover.id || (mode === 'module' && moduleId === hoverModule) ? 1 : dim)
+    alpha * (hullOn(moduleId) || noHighlight ? 1 : dim)
 
-  const containerAlpha = (n: SimNode): number => alpha * (related.has(n.id) || !hover.id ? 1 : dim)
+  const containerAlpha = (n: SimNode): number =>
+    alpha * (related.has(n.id) || searchNodes.has(n.id) || noHighlight ? 1 : dim)
 
   ctx.font = `${input.fontPx}px ${input.fontFamily}`
   ctx.textAlign = 'center'
   drawContainers(ctx, scene.nodes, c, containerAlpha, hover.id, hover.t)
   if (modules) drawHulls(ctx, scene, modules, c.modules, labelBase, hullAlpha)
   for (const l of scene.links) {
-    const on = isRelatedLink(l)
-    drawLink(ctx, l, on && hover.t > 0.5 ? c.focus : c.edge, alpha * (on ? 1 : dim))
+    const on =
+      isRelatedLink(l) ||
+      (search !== null && searchNodes.has(l.source.id) && searchNodes.has(l.target.id))
+    drawLink(ctx, l, on && hover.t > 0.5 ? c.focus : c.edge, alpha * (on || noHighlight ? 1 : dim))
   }
-  drawNodes(ctx, input, related)
+  drawNodes(ctx, input, related, searchNodes)
   ctx.textBaseline = 'top'
   for (const n of scene.nodes) {
-    const on = related.has(n.id)
-    const a = on ? Math.max(labelBase, hover.t) : labelBase * (hover.id ? dim : 1)
+    const on = related.has(n.id) || searchNodes.has(n.id)
+    const a = on ? Math.max(labelBase, hover.t) : labelBase * (noHighlight ? 1 : dim)
     if (n.data.isContainer) drawContainerLabel(ctx, n, c, alpha * a)
     else drawLabel(ctx, n, c.label, alpha * a)
   }
+  drawSearchBadges(ctx, input, alpha)
   ctx.globalAlpha = 1
 }

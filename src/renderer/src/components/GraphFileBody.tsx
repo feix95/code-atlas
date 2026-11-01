@@ -25,6 +25,8 @@ export interface GraphFileBodyProps {
   colorOf: (moduleId: string) => string
   moduleNames: ModuleNames
   wiki: WikiPanelData | null
+  /** 点标签 = 以该标签搜索 */
+  onSearchTag?: (tag: string) => void
   hidden: ReadonlySet<GraphPanelSectionId>
   /** 「显示项」拖出来的区块顺序 */
   order: readonly GraphPanelSectionId[]
@@ -84,6 +86,7 @@ function wikiSection(props: GraphFileBodyProps): React.ReactNode {
       groupName={owner.groupName}
       damaged={damaged}
       revealDoc={props.wiki?.revealDoc ?? noopReveal}
+      onSearchTag={props.onSearchTag}
     />
   )
 }

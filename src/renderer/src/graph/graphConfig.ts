@@ -51,7 +51,11 @@ export const GRAPH_NODE = {
   ringWidth: 1.5,
   /** 选中节点(详情浮窗所指)的外圈:描边宽度与离节点边缘的间隙(世界坐标) */
   selectedWidth: 2,
-  selectedGap: 7
+  selectedGap: 7,
+  /** 搜索命中的文件夹角标:半径、字号与离节点中心的比例 */
+  searchBadgeRadius: 8,
+  searchBadgeFontPx: 10,
+  searchBadgeOffset: 0.72
 } as const
 
 export const GRAPH_EDGE = {

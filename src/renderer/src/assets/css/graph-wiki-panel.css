@@ -22,11 +22,18 @@
 
 .graph-wiki-tag {
   padding: 0 var(--space-2);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--hover);
   color: var(--muted);
+  font: inherit;
   font-size: var(--font-xs);
   line-height: var(--lh-150);
+  cursor: pointer;
+}
+
+.graph-wiki-tag:hover {
+  color: var(--text);
 }
 
 .graph-wiki-excerpt {

@@ -11,6 +11,7 @@ import {
 import type { ForceScene } from './useForceLayout'
 import type { ModuleDrawState } from './drawModules'
 import type { HoverMode } from './hoverModes'
+import type { SearchFocus } from './wikiSearch'
 import type { ViewportSize } from './useGraphCanvasSize'
 import { GRAPH_MOTION } from './graphConfig'
 import { readTypography, type Typography } from './graphText'
@@ -26,6 +27,8 @@ export interface RenderRefs {
   /** 当前悬停看法(滚轮切换) */
   hoverMode: HoverMode
   selectedId: string | null
+  /** 搜索命中的成员与模块;非空时其余节点与连线变淡 */
+  search: SearchFocus | null
 }
 
 export interface GraphRender {
@@ -114,7 +117,8 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           alpha: ghostAlpha,
           modules: null,
           hoverMode: 'links',
-          selectedId: null
+          selectedId: null,
+          search: null
         })
         return true
       }
@@ -130,7 +134,8 @@ export function useGraphRender(refs: React.RefObject<RenderRefs | null>): GraphR
           alpha: inAlpha,
           modules: r.modules,
           hoverMode: r.hoverMode,
-          selectedId: r.selectedId
+          selectedId: r.selectedId,
+          search: r.search
         })
       }
       return more

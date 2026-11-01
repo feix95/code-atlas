@@ -1,0 +1,130 @@
+/* 关系图谱顶栏搜索:输入框与结果下拉;颜色与间距全走主题 token */
+.graph-search {
+  position: relative;
+}
+
+.graph-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: clamp(10rem, 16vw, 15rem);
+  height: var(--chrome-search-row-height);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted-2);
+}
+
+.graph-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--accent-bright) 45%, var(--line));
+  color: var(--muted);
+}
+
+.graph-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-sm);
+  outline: none;
+}
+
+.graph-search-input::placeholder {
+  color: var(--muted-2);
+}
+
+.graph-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.graph-search-clear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.graph-search-results {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--z-dropdown);
+  display: grid;
+  gap: var(--space-1);
+  width: min(20rem, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.graph-search-hit {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-search-hit:hover,
+.graph-search-hit.is-active {
+  background: var(--hover);
+}
+
+.graph-search-hit-main,
+.graph-search-hit-note,
+.graph-search-hit-why {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-search-hit-main {
+  font-size: var(--font-sm);
+}
+
+.graph-search-hit-note,
+.graph-search-hit-why {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.graph-search-empty,
+.graph-search-hint {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: var(--lh-150);
+}
+
+.graph-search-hint {
+  border-top: 1px solid var(--line);
+}
+
+.graph-search-clear:focus-visible,
+.graph-search-hit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
+}

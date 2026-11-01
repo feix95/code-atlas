@@ -10,7 +10,7 @@ import { folderTree } from '@shared/hierarchy'
 import type { LevelNode } from '@shared/graphView'
 import { useGraphNav } from '../graph/useGraphNav'
 import { useGraphExpansion } from '../graph/useGraphExpansion'
-import { levelWheelAction, wheelTargetOf } from '../graph/wheelIntent'
+import { useGraphEnterLeave } from '../graph/useGraphEnterLeave'
 import { isFolderTarget, useNodeActivate } from '../graph/useNodeActivate'
 import { useForceLayout, type SimNode } from '../graph/useForceLayout'
 import { useGraphViewport } from '../graph/useGraphViewport'
@@ -18,6 +18,9 @@ import { useGraphRender, type RenderRefs } from '../graph/useGraphRender'
 import { buildModuleOverlay, moduleDisplayName } from '../graph/moduleOverlay'
 import { moduleNamesOf } from '../graph/moduleNames'
 import { useWikiPanel } from '../useWikiPanel'
+import { useGraphSearch } from '../graph/useGraphSearch'
+import { useGraphLocate } from '../graph/useGraphLocate'
+import { graphKeyHandler } from '../graph/graphKeys'
 import { nodeMenuItems, useGraphSelection } from '../graph/useGraphSelection'
 import { useGraphHoverMode } from '../graph/useGraphHoverMode'
 import { useGraphHoverDetail } from '../graph/useGraphHoverDetail'
@@ -27,6 +30,7 @@ import { useModuleColorOverrides } from '../graph/moduleColorStore'
 import { openContextMenu } from './contextMenuStore'
 import { NodeList } from './GraphNodeList'
 import { GraphToolbar } from './GraphToolbar'
+import { GraphSearch } from './GraphSearch'
 import { GraphHoverTag } from './GraphHoverTag'
 import { GraphNodeTip } from './GraphNodeTip'
 import { nodeTipText, type NodeTipText } from '../graph/nodeTip'
@@ -75,6 +79,7 @@ export function GraphView(props: GraphViewProps): React.JSX.Element {
 function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.Element {
   const { result, graph, graphLoading, graphNote, onLoadGraph, expandLazy, onOpenFile } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const viewRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<RenderRefs | null>(null)
   const render = useGraphRender(linkRef)
@@ -118,11 +123,13 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     () => moduleNamesOf(moduleMap?.modules ?? [], (id) => wiki?.pages.get(id)?.name ?? null),
     [moduleMap, wiki]
   )
+  const search = useGraphSearch(wiki, searchInputRef)
   // 引用关系(连线与模块)还没到时先不布局:等数据齐了一次排好,首帧即最终布局,不会到货后再重排一遍
   const isAwaitingGraph = current === null && graphNote === null
   const layout = useForceLayout(isAwaitingGraph ? null : level, render.requestDraw, clusters)
   const activate = useNodeActivate(nav, onOpenFile)
   const selection = useGraphSelection()
+  const locateHit = useGraphLocate({ level, nav, select: selection.select })
   const modulesOn = showModules && overlay.nodes.size > 0
   const moduleOfNode = useCallback(
     (id: string) => overlay.nodes.get(id)?.hullModule ?? null,
@@ -160,19 +167,14 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     },
     [activate, moduleOfNode, picker, selection]
   )
-  const enterOrLeave = (node: SimNode | null, steps: number, containerId: string | null): void => {
-    const target = wheelTargetOf(node)
-    const action = levelWheelAction(target, steps, nav.dirRel !== '', containerId)
-    if (action.kind === 'expandAll') expansion.expandAll()
-    else if (action.kind === 'collapseAll') expansion.collapseAll()
-    else if (action.kind === 'collapseContainer') expansion.toggle(action.id)
-    else if (action.kind === 'expandFolder' && node) expansion.toggle(node.id)
-    else if (action.kind === 'leave') nav.goUp()
-    else if (action.kind === 'enter' && node) {
+  const enterOrLeave = useGraphEnterLeave({
+    nav,
+    expansion,
+    onEnter: (node) => {
       selection.select(null)
-      activate(node.data)
+      activate(node)
     }
-  }
+  })
   const viewport = useGraphViewport({
     canvasRef,
     sceneRef: layout.sceneRef,
@@ -205,7 +207,8 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
       fit: viewport.fit,
       modules: modulesOn ? { overlay, overrides, names: moduleNames } : null,
       hoverMode: hoverMode.mode,
-      selectedId: selection.selected?.id ?? null
+      selectedId: selection.selected?.id ?? null,
+      search: search.focus
     }
     render.requestDraw()
   })
@@ -215,12 +218,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
     if (!graph && !graphLoading && !graphNote) onLoadGraph()
   }, [graph, graphLoading, graphNote, onLoadGraph])
 
-  const onKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowLeft')) {
-      e.preventDefault()
-      nav.goUp()
-    }
-  }
+  const onKeyDown = graphKeyHandler(nav, search.focusInput)
 
   const moduleNameOf = (id: string): string | null => {
     const moduleId = moduleOfNode(id)
@@ -283,6 +281,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
         onCollapseAll={expansion.collapseAll}
         onFit={viewport.fit}
         wiki={<GraphWikiEntry result={result} graph={current} onOpenWiki={props.onOpenWiki} />}
+        search={<GraphSearch search={search} inputRef={searchInputRef} onLocate={locateHit} />}
       />
       <GraphNotices
         graphNote={graphNote}
@@ -308,6 +307,7 @@ function GraphCanvas(props: GraphViewProps & { result: ScanResult }): React.JSX.
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
           moduleNames={moduleNames}
           wiki={wiki}
+          onSearchTag={search.searchTag}
           viewRef={viewRef}
           tabId={props.tabId}
           activeTabId={props.activeTabId}
