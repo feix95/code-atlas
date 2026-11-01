@@ -26,6 +26,10 @@ export const TAG = {
   attachedFiles: { open: '<attached_files>', close: '</attached_files>' },
   /** 联网查到的公开资料 */
   webResults: { open: '<web_results>', close: '</web_results>' },
+  /** 仓库 Wiki 一次一篇的事实(模块或散件组) */
+  pageFacts: { open: '<page_facts>', close: '</page_facts>' },
+  /** 目标语种名(Wiki 与翻译共用同一写法) */
+  targetLanguage: { open: '<target_language>', close: '</target_language>' },
   /** 人设分节:能力边界 */
   capabilities: { open: '<capabilities>', close: '</capabilities>' },
   /** 人设分节:联网守则 */

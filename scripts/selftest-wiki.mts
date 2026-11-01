@@ -1,5 +1,6 @@
-// Wiki 存储自测:设置默认值/坏值回退/读写往返;位置校验(空、不存在、文件、仓库内、空目录直接用、
-// 非空无标记改用子目录、已带标记直接用);Windows 路径大小写不敏感。
+// Wiki 自测:设置默认值/坏值回退/读写往返;位置校验(空、不存在、文件、仓库内、空目录直接用、
+// 非空无标记改用子目录、已带标记直接用);Windows 路径大小写不敏感;提示词只带当前页、
+// 隐私清洗、语种注入;输出逐字段校验与重试注记;8 语种文案齐全;预算裁剪顺序。
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,7 +28,25 @@ import {
 } from '../src/wiki/wikiStore.ts'
 import { WIKI_PROMPT_VERSION, wikiInputHash } from '../src/wiki/wikiHash.ts'
 import { groupScatteredFiles } from '../src/wiki/wikiGroups.ts'
-import { DEFAULT_WIKI_LANGUAGE, WIKI_MARKER_FILE, WIKI_SUBDIRECTORY } from '../src/shared/wikiTypes.ts'
+import {
+  DEFAULT_WIKI_LANGUAGE,
+  WIKI_DOC_MAX_CHARS,
+  WIKI_MARKER_FILE,
+  WIKI_SUBDIRECTORY,
+  type WikiPageFacts
+} from '../src/shared/wikiTypes.ts'
+import {
+  buildWikiMessages,
+  fitWikiFactsToBudget,
+  isAbsoluteWikiPath,
+  isSensitiveWikiPath,
+  sanitizeWikiFacts,
+  withWikiRetryNote
+} from '../src/ai/wikiPrompt.ts'
+import { parseWikiOutput, renderWikiMarkdown, requestWikiContent } from '../src/ai/wikiOutput.ts'
+import { WIKI_COPY, wikiCopy } from '../src/ai/wikiCopy.ts'
+import { TRANSLATE_LANGS } from '../src/shared/translateLangs.ts'
+import { estimateTokens } from '../src/shared/aiText.ts'
 
 function checkSettings(base: string): void {
   const defaults = {
@@ -51,7 +70,11 @@ function checkSettings(base: string): void {
 
   const userData = join(base, 'user-data')
   assert.deepEqual(loadWikiSettings(userData), defaults, '没写过配置文件时回默认')
-  saveWikiSettings(userData, { location: join(base, 'wiki'), language: 'fr', hasChosenLocation: true })
+  saveWikiSettings(userData, {
+    location: join(base, 'wiki'),
+    language: 'fr',
+    hasChosenLocation: true
+  })
   assert.deepEqual(
     loadWikiSettings(userData),
     { location: join(base, 'wiki'), language: 'fr', hasChosenLocation: true },
@@ -116,7 +139,11 @@ async function checkLocation(base: string): Promise<void> {
   if (process.platform === 'win32') {
     await reject(project.toUpperCase(), 'Windows 下大小写不同的仓库内路径也应拒绝')
     assert.equal(isInsideRoot('C:\\Work\\Proj\\src', 'c:\\work\\proj'), true, '包含判断不分大小写')
-    assert.equal(isInsideRoot('C:\\Work\\ProjTwo', 'C:\\Work\\Proj'), false, '同前缀的兄弟目录不算包含')
+    assert.equal(
+      isInsideRoot('C:\\Work\\ProjTwo', 'C:\\Work\\Proj'),
+      false,
+      '同前缀的兄弟目录不算包含'
+    )
   }
   assert.equal(isInsideRoot('/a/b/c', '/a/b'), true, '子路径算包含')
   assert.equal(isInsideRoot('/a/bc', '/a/b'), false, '只是前缀相同不算包含')
@@ -154,11 +181,7 @@ async function checkStore(base: string): Promise<void> {
   await writeWikiState(dirA, createWikiState(projectA, dirA))
   assert.equal(await resolveProjectDir(wikiRoot, projectA), dirA, '同一项目重解析稳定')
   const dirB = await resolveProjectDir(wikiRoot, projectB)
-  assert.equal(
-    dirB,
-    join(wikiRoot, `demo-${shortProjectCode(projectB)}`),
-    '重名项目加短编号'
-  )
+  assert.equal(dirB, join(wikiRoot, `demo-${shortProjectCode(projectB)}`), '重名项目加短编号')
   assert.equal(await resolveProjectDir(wikiRoot, projectB), dirB, '重名项目重解析也稳定')
 
   assert.equal(allocatePageFile([], 'module', 'A', 'm:src/a.ts'), '模块/A.md', '模块页进模块目录')
@@ -316,6 +339,431 @@ function checkGroups(): void {
   assert.deepEqual(groupScatteredFiles([]), [], '没有散件就没有组')
 }
 
+function moduleFacts(): WikiPageFacts {
+  return {
+    language: { code: 'en', name: 'English' },
+    kind: 'module',
+    project: { name: 'demo', moduleCount: 2, groupCount: 4, knownTags: ['UI'] },
+    module: {
+      id: 'm:src/a.ts',
+      folders: ['src'],
+      files: [
+        {
+          path: 'src/a.ts',
+          language: 'typescript',
+          inCount: 5,
+          outCount: 2,
+          exports: ['run'],
+          functions: ['run'],
+          classes: [],
+          interfaces: [],
+          reactComponents: []
+        },
+        {
+          path: 'src/b.ts',
+          language: 'typescript',
+          inCount: 1,
+          outCount: 1,
+          exports: ['helper'],
+          functions: ['helper'],
+          classes: [],
+          interfaces: [],
+          reactComponents: []
+        }
+      ],
+      attachedFiles: ['src/a.css'],
+      dependsOn: [{ moduleId: 'm:src/c.ts', name: null, weight: 2 }],
+      usedBy: []
+    },
+    excerpts: [{ path: 'src/a.ts', head: 'export function run() {}' }],
+    truncated: { files: 0, symbols: 0, excerpts: 0 }
+  }
+}
+
+function checkPrompt(): void {
+  const facts = moduleFacts()
+  const messages = buildWikiMessages(facts)
+  const { user } = messages
+  assert.ok(
+    user.startsWith('<target_language>English</target_language>'),
+    '语种标签沿用翻译功能的写法'
+  )
+  assert.ok(user.includes('<page_facts>') && user.endsWith('</page_facts>'), '事实只放 page_facts')
+  const parsed = JSON.parse(user.slice(user.indexOf('{'), user.lastIndexOf('}') + 1)) as {
+    kind: string
+    module: { id: string; files: Array<{ path: string }> }
+  }
+  assert.equal(parsed.kind, 'module', '模块篇标 module')
+  assert.equal(parsed.module.id, 'm:src/a.ts', '只放当前这一篇')
+  assert.deepEqual(
+    parsed.module.files.map((file) => file.path),
+    ['src/a.ts', 'src/b.ts'],
+    '文件清单原样带上'
+  )
+  assert.ok(!user.includes('m:src/d.ts'), '别的模块不进当前页')
+  assert.ok(!user.includes('src/other'), '别的页文件不进当前页')
+  for (const lang of TRANSLATE_LANGS) {
+    const tagged = buildWikiMessages({
+      ...facts,
+      language: { code: lang.code, name: lang.enName }
+    })
+    assert.ok(
+      tagged.user.includes(`<target_language>${lang.enName}</target_language>`),
+      `${lang.code} 的语种要注入`
+    )
+  }
+
+  const leaky = structuredClone(facts)
+  leaky.excerpts = [
+    { path: 'src/a.ts', head: 'see C:\\Users\\Alice\\proj\\src\\a.ts and /home/bob/work/x.ts' }
+  ]
+  const cleaned = buildWikiMessages(leaky).user
+  assert.ok(!cleaned.includes('Alice'), '用户名不得进提示词')
+  assert.ok(!cleaned.includes('C:\\'), '盘符路径不得进提示词')
+  assert.ok(!cleaned.includes('/home/bob'), 'Unix 家目录不得进提示词')
+  assert.ok(cleaned.includes('[local-path]'), '本机路径换成占位')
+  assert.ok(!JSON.stringify(sanitizeWikiFacts(leaky)).includes('Alice'), '清洗函数可单独使用')
+
+  const urls = structuredClone(facts)
+  urls.excerpts = [
+    {
+      path: 'src/a.ts',
+      head: 'docs https://example.com/Users/guide and C:\\Users\\Alice\\a.ts'
+    }
+  ]
+  const urlUser = buildWikiMessages(urls).user
+  assert.ok(urlUser.includes('https://example.com/Users/guide'), '公开网址保持原样')
+  assert.ok(!urlUser.includes('Alice'), '同一段里的本机路径照常清洗')
+
+  const secret = structuredClone(facts)
+  secret.module.files[0] = { ...secret.module.files[0], path: '.env.local' }
+  secret.excerpts = [
+    { path: '.env.local', head: 'SECRET_TOKEN=abc' },
+    { path: 'src/a.ts', head: 'export const ok = 1' }
+  ]
+  const secretUser = buildWikiMessages(secret).user
+  assert.ok(!secretUser.includes('SECRET_TOKEN'), '敏感文件不给摘录')
+  assert.ok(secretUser.includes('.env.local'), '敏感文件仍然只列名字')
+  assert.ok(secretUser.includes('export const ok = 1'), '正常摘录照常带')
+
+  assert.equal(isSensitiveWikiPath('.env.production'), true, '.env 变体算敏感')
+  assert.equal(isSensitiveWikiPath('certs/server.pem'), true, '证书私钥算敏感')
+  assert.equal(isSensitiveWikiPath('keys/id_rsa'), true, 'SSH 私钥算敏感')
+  assert.equal(isSensitiveWikiPath('src/app.ts'), false, '普通源码不敏感')
+  assert.equal(isAbsoluteWikiPath('C:\\proj\\a.ts'), true, '盘符路径算绝对')
+  assert.equal(isAbsoluteWikiPath('\\\\server\\share\\a.ts'), true, 'UNC 路径算绝对')
+  assert.equal(isAbsoluteWikiPath('/home/a.ts'), true, 'Unix 绝对路径算绝对')
+  assert.equal(isAbsoluteWikiPath('src/a.ts'), false, '项目内相对路径放行')
+
+  const absolute = structuredClone(facts)
+  absolute.module.files[0].path = 'C:\\proj\\src\\a.ts'
+  assert.throws(() => buildWikiMessages(absolute), '绝对路径要当场拦住,不发给模型')
+
+  const retry = withWikiRetryNote(messages, ['name is required'])
+  assert.ok(retry.user.includes('<program_note>'), '重试要求放程序注记里')
+  assert.ok(retry.user.includes('name is required'), '注记要列出错误')
+  assert.ok(retry.user.startsWith(user), '重试不重写原始事实')
+  assert.equal(retry.system, messages.system, '系统提示保持原样')
+}
+
+function budgetFacts(): WikiPageFacts {
+  const files = Array.from({ length: 6 }, (_, index) => ({
+    path: `src/f${index}.ts`,
+    language: 'typescript',
+    inCount: 6 - index,
+    outCount: 1,
+    exports: [`export${index}`],
+    functions: [`fn${index}`],
+    classes: [],
+    interfaces: [],
+    reactComponents: []
+  }))
+  return {
+    language: { code: 'zh-CN', name: 'Simplified Chinese' },
+    kind: 'module',
+    project: { name: 'demo', moduleCount: 1, groupCount: 4, knownTags: [] },
+    module: {
+      id: 'm:src/f0.ts',
+      folders: ['src'],
+      files,
+      attachedFiles: [],
+      dependsOn: [],
+      usedBy: []
+    },
+    excerpts: Array.from({ length: 3 }, (_, index) => ({
+      path: `src/f${index}.ts`,
+      head: '中'.repeat(400)
+    })),
+    truncated: { files: 0, symbols: 0, excerpts: 0 }
+  }
+}
+
+function checkBudget(): void {
+  const facts = budgetFacts()
+  const fullTokens = estimateTokens(JSON.stringify(facts))
+  assert.equal(
+    JSON.stringify(fitWikiFactsToBudget(facts, fullTokens)),
+    JSON.stringify(facts),
+    '预算够时原样返回'
+  )
+
+  const oneLess = structuredClone(facts)
+  oneLess.excerpts.pop()
+  oneLess.truncated.excerpts = 1
+  const excerptFit = fitWikiFactsToBudget(facts, estimateTokens(JSON.stringify(oneLess)))
+  if (excerptFit.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  assert.equal(excerptFit.excerpts.length, 2, '先裁摘录')
+  assert.equal(excerptFit.truncated.excerpts, 1, '摘录裁剪要记数')
+  assert.equal(excerptFit.truncated.symbols, 0, '摘录够省时不碰符号')
+  assert.equal(excerptFit.module.files.length, 6, '摘录够省时不碰文件')
+
+  const noExcerpt = structuredClone(facts)
+  noExcerpt.excerpts = []
+  if (noExcerpt.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  const stripped = structuredClone(noExcerpt)
+  const last = stripped.module.files[stripped.module.files.length - 1]
+  stripped.module.files[stripped.module.files.length - 1] = {
+    path: last.path,
+    language: last.language,
+    inCount: last.inCount,
+    outCount: last.outCount
+  }
+  stripped.truncated.symbols = 1
+  const symbolFit = fitWikiFactsToBudget(noExcerpt, estimateTokens(JSON.stringify(stripped)))
+  if (symbolFit.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  assert.equal(symbolFit.truncated.excerpts, 0, '没有摘录时直接进入符号裁剪')
+  assert.equal(symbolFit.truncated.symbols, 1, '符号清单按次要文件逐个裁')
+  assert.equal(symbolFit.module.files.length, 6, '符号够省时不碰文件')
+  assert.ok(symbolFit.module.files[0].functions?.length, '最主要的文件先保留符号')
+  assert.equal(symbolFit.module.files[5].functions, undefined, '最次要的文件先丢符号')
+
+  const lean = structuredClone(noExcerpt)
+  if (lean.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  lean.module.files = lean.module.files.map((file) => ({
+    path: file.path,
+    language: file.language,
+    inCount: file.inCount,
+    outCount: file.outCount
+  }))
+  const dropped = structuredClone(lean)
+  if (dropped.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  dropped.module.files.pop()
+  dropped.truncated.files = 1
+  const fileFit = fitWikiFactsToBudget(lean, estimateTokens(JSON.stringify(dropped)))
+  if (fileFit.kind !== 'module') return assert.fail('模块事实不该变成散件组')
+  assert.equal(fileFit.module.files.length, 5, '摘录和符号都省完才裁文件尾部')
+  assert.equal(fileFit.truncated.files, 1, '文件裁剪要记数')
+  assert.equal(fileFit.module.files[0].path, 'src/f0.ts', '入度最高的文件留在前列')
+}
+
+function checkOutput(): void {
+  const input = {
+    files: ['src/a.ts', 'src/b.ts'],
+    attachedFiles: ['src/a.css'],
+    knownTags: ['UI', '图谱']
+  }
+  const raw = [
+    '```json',
+    JSON.stringify({
+      name: ' 关系图谱 ',
+      summary: '把文件引用关系画成图',
+      tags: [' UI ', 'ui', '图谱', 'x'.repeat(13), '第三'],
+      keyFiles: ['src/a.ts', 'nope.ts', 'src/a.css', 'src/b.ts', 'src/a.ts'],
+      doc: '## 职责\n画图。',
+      module: 'evil'
+    }),
+    '```'
+  ].join('\n')
+  const result = parseWikiOutput(raw, input)
+  assert.ok(result.ok, '包在代码围栏里的 JSON 要能解析')
+  if (result.ok) {
+    assert.equal(result.content.name, '关系图谱', '名称去首尾空格')
+    assert.deepEqual(
+      result.content.tags,
+      ['UI', '图谱', '第三'],
+      '标签去重、复用 knownTags 写法、超长丢弃'
+    )
+    assert.deepEqual(
+      result.content.keyFiles,
+      ['src/a.ts', 'src/a.css', 'src/b.ts'],
+      '只留输入里的路径、去重、最多 5 个'
+    )
+    assert.ok(!('module' in result.content), '其他字段一律丢弃')
+  }
+
+  const parse = (value: unknown) => parseWikiOutput(JSON.stringify(value), input)
+  const base = { summary: 's', tags: ['t'], keyFiles: [], doc: 'd' }
+  assert.equal(parse({ ...base, name: 'A' }).ok, false, '1 个字符的名称不合规')
+  assert.equal(parse({ ...base, name: 'x'.repeat(17) }).ok, false, '超过 16 个字符的名称不合规')
+  assert.equal(parse({ ...base, name: 'AB' }).ok, true, '2 个字符的名称合规')
+  assert.equal(parse({ ...base, name: 'x'.repeat(16) }).ok, true, '16 个字符的名称合规')
+  const spaced = parse({ ...base, name: 'Graph\nView', summary: 'one\ntwo' })
+  assert.ok(spaced.ok, '名称里的换行要压成空格')
+  if (spaced.ok) {
+    assert.equal(spaced.content.name, 'Graph View', '名称只留单空格')
+    assert.equal(spaced.content.summary, 'one two', '摘要只留单空格')
+  }
+  assert.equal(
+    parse({ name: 'AB', summary: 'x'.repeat(61), tags: ['t'], keyFiles: [], doc: 'd' }).ok,
+    false,
+    '摘要超过 60 字不合规'
+  )
+  assert.equal(
+    parse({ name: 'AB', summary: 'x'.repeat(60), tags: ['t'], keyFiles: [], doc: 'd' }).ok,
+    true,
+    '摘要 60 字合规'
+  )
+  assert.equal(
+    parse({ name: 'AB', summary: ' ', tags: ['t'], keyFiles: [], doc: 'd' }).ok,
+    false,
+    '摘要必填'
+  )
+  assert.equal(
+    parse({ name: 'AB', summary: 's', tags: [], keyFiles: [], doc: 'd' }).ok,
+    false,
+    '标签至少一个'
+  )
+  const five = parse({
+    name: 'AB',
+    summary: 's',
+    tags: ['1', '2', '3', '4', '5', '6'],
+    keyFiles: [],
+    doc: 'd'
+  })
+  assert.ok(five.ok, '标签多了留前五个')
+  if (five.ok) assert.deepEqual(five.content.tags, ['1', '2', '3', '4', '5'])
+  assert.equal(
+    parse({ name: 'AB', summary: 's', tags: ['x'.repeat(13)], keyFiles: [], doc: 'd' }).ok,
+    false,
+    '全是超长标签视为没有标签'
+  )
+  assert.equal(
+    parse({ name: 'AB', summary: 's', tags: ['t'], keyFiles: [], doc: '' }).ok,
+    false,
+    '正文必填'
+  )
+  assert.equal(parseWikiOutput('not json', input).ok, false, '非 JSON 要报错')
+  assert.equal(parseWikiOutput('[]', input).ok, false, '数组不是对象')
+  const longDoc = parse({
+    name: 'AB',
+    summary: 's',
+    tags: ['t'],
+    keyFiles: [],
+    doc: '中'.repeat(WIKI_DOC_MAX_CHARS + 20)
+  })
+  assert.ok(longDoc.ok, '超长正文截断后仍可用')
+  if (longDoc.ok) {
+    assert.equal([...longDoc.content.doc].length, WIKI_DOC_MAX_CHARS, '正文截到上限')
+    assert.equal(longDoc.content.docTruncated, true, '截断要标注')
+  }
+}
+
+async function checkRetry(): Promise<void> {
+  const input = { files: ['src/a.ts'], knownTags: [] }
+  const valid = JSON.stringify({
+    name: 'AB',
+    summary: 's',
+    tags: ['t'],
+    keyFiles: ['src/a.ts'],
+    doc: 'd'
+  })
+  const messages = { system: 'sys', user: 'facts' }
+  let calls = 0
+  const firstTry = await requestWikiContent(messages, input, async () => {
+    calls += 1
+    return valid
+  })
+  assert.equal(firstTry.ok, true, '第一次通过就直接用')
+  assert.equal(calls, 1, '第一次通过不再请求')
+
+  calls = 0
+  const seen: Array<{ system: string; user: string }> = []
+  const recovered = await requestWikiContent(messages, input, async (sent) => {
+    calls += 1
+    seen.push(sent)
+    return calls === 1 ? 'not json' : valid
+  })
+  assert.equal(recovered.ok, true, '重试一次后可恢复')
+  assert.equal(recovered.attempts, 2, '恢复那次算第二次机会')
+  assert.equal(calls, 2, '失败后只重试一次')
+  assert.ok(seen[1].user.includes('<program_note>'), '重试请求带程序注记')
+  assert.ok(seen[1].user.includes('the output is not a JSON object'), '注记列出错误')
+
+  calls = 0
+  const failed = await requestWikiContent(messages, input, async () => {
+    calls += 1
+    return 'not json'
+  })
+  assert.equal(failed.ok, false, '两次都不行就交失败')
+  assert.equal(failed.attempts, 2, '失败也停在第二次')
+  assert.equal(calls, 2, '两次失败后不再纠缠模型')
+  assert.ok(failed.errors.length > 0, '失败要带错误清单')
+}
+
+function checkMarkdown(): void {
+  const content = {
+    name: '关系图谱',
+    summary: '把文件引用关系画成图',
+    tags: ['UI', '图谱'],
+    keyFiles: ['src/a.ts'],
+    doc: '## 职责\n画图。',
+    docTruncated: false
+  }
+  const md = renderWikiMarkdown(content, {
+    language: 'zh-CN',
+    model: 'qwen',
+    generatedAt: '2026-11-02T12:34:56.000Z',
+    truncated: { files: 0, symbols: 0, excerpts: 0 }
+  })
+  assert.ok(md.startsWith('# 关系图谱\n'), '一级标题用名称')
+  assert.ok(md.includes('> 把文件引用关系画成图'), '摘要用引用块')
+  assert.ok(md.includes('- 标签: UI · 图谱'), '标签行用当前语种文案')
+  assert.ok(md.includes('- 关键文件: `src/a.ts`'), '关键文件带代码样式')
+  assert.ok(md.includes('生成时间: 2026-11-02 12:34'), '时间只留到分钟')
+  assert.ok(md.includes('模型: qwen') && md.includes('语种: 中文（简体）'), '模型与语种')
+  assert.ok(!md.includes('已裁剪'), '没有裁剪不写这一行')
+  assert.ok(md.includes('## 职责'), '正文原样接在后面')
+  assert.ok(md.endsWith('\n'), '文件末尾留换行')
+  assert.ok(!md.includes('C:\\'), 'Markdown 不写盘符')
+
+  const trimmed = renderWikiMarkdown(
+    { ...content, docTruncated: true },
+    {
+      language: 'en',
+      model: 'm',
+      generatedAt: '2026-11-02T00:00:00.000Z',
+      truncated: { files: 2, symbols: 3, excerpts: 1 }
+    }
+  )
+  assert.ok(trimmed.includes('- Truncated: files 2 · symbols 3 · excerpts 1'), '裁剪计数按语种写')
+  assert.ok(trimmed.includes(wikiCopy('en').truncatedDoc), '正文截断要标注')
+
+  const empty = renderWikiMarkdown(
+    { ...content, keyFiles: [] },
+    {
+      language: 'zh-CN',
+      model: 'm',
+      generatedAt: '2026-11-02T00:00:00.000Z',
+      truncated: { files: 0, symbols: 0, excerpts: 0 }
+    }
+  )
+  assert.ok(empty.includes('- 关键文件: —'), '没有关键文件时留占位')
+}
+
+function checkCopy(): void {
+  assert.equal(Object.keys(WIKI_COPY).length, TRANSLATE_LANGS.length, '8 个语种一份不少')
+  for (const lang of TRANSLATE_LANGS) {
+    const copy = WIKI_COPY[lang.code]
+    assert.ok(copy, `${lang.code} 要有文案`)
+    if (!copy) continue
+    for (const [key, value] of Object.entries(copy)) {
+      assert.equal(typeof value, 'string', `${lang.code}.${key} 是字符串`)
+      assert.ok(value.trim().length > 0, `${lang.code}.${key} 不能空`)
+    }
+  }
+  assert.equal(wikiCopy('xx'), WIKI_COPY[DEFAULT_WIKI_LANGUAGE], '不认识的语种回默认')
+}
+
 async function main(): Promise<void> {
   const base = join(tmpdir(), `codeatlas-wiki-${Date.now()}`)
   await fs.mkdir(base, { recursive: true })
@@ -325,12 +773,21 @@ async function main(): Promise<void> {
     await checkStore(base)
     checkHash()
     checkGroups()
-    console.log('✅ Wiki 存储自测全部通过')
+    checkPrompt()
+    checkBudget()
+    checkOutput()
+    await checkRetry()
+    checkMarkdown()
+    checkCopy()
+    console.log('✅ Wiki 自测全部通过')
     console.log(
       '   设置默认值与回退 · 配置读写往返 · 仓库内拒绝 · 非空无标记改用子目录 · 大小写不敏感'
     )
     console.log(
       '   文件名清洗与重名 · 项目目录防冲突 · MD 原子写 · 记账读写与损坏识别 · 改名删旧 · 缓存键含语种'
+    )
+    console.log(
+      '   提示词只带当前页 · 语种注入 · 本机路径与敏感摘录清洗 · 输出逐字段校验 · 只重试一次 · 8 语种文案 · 预算裁剪顺序'
     )
   } finally {
     await fs.rm(base, { recursive: true, force: true })
