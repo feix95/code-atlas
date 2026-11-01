@@ -130,7 +130,10 @@ export function parseWikiOutput(raw: string, input: WikiOutputInput): WikiOutput
   return { ok: true, content: { name, summary, tags, keyFiles, doc, docTruncated } }
 }
 
-export type WikiModelRequest = (messages: WikiPromptMessages) => Promise<string>
+export type WikiModelRequest = (
+  messages: WikiPromptMessages,
+  signal?: AbortSignal
+) => Promise<string>
 
 export type WikiContentAttempt =
   | { ok: true; content: WikiPageContent; attempts: 1 | 2 }
@@ -143,11 +146,15 @@ export type WikiContentAttempt =
 export async function requestWikiContent(
   messages: WikiPromptMessages,
   input: WikiOutputInput,
-  request: WikiModelRequest
+  request: WikiModelRequest,
+  signal?: AbortSignal
 ): Promise<WikiContentAttempt> {
-  const first = parseWikiOutput(await request(messages), input)
+  const first = parseWikiOutput(await request(messages, signal), input)
   if (first.ok) return { ok: true, content: first.content, attempts: 1 }
-  const second = parseWikiOutput(await request(withWikiRetryNote(messages, first.errors)), input)
+  const second = parseWikiOutput(
+    await request(withWikiRetryNote(messages, first.errors), signal),
+    input
+  )
   if (second.ok) return { ok: true, content: second.content, attempts: 2 }
   return { ok: false, errors: second.errors, attempts: 2 }
 }

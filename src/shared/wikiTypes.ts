@@ -68,6 +68,50 @@ export interface WikiExcerpt {
   head: string
 }
 
+/** 任务层的页面成员:路径与图上计数;结构符号由事实缓存补齐 */
+export interface WikiPageFileSource {
+  path: string
+  language?: string
+  inCount?: number
+  outCount?: number
+}
+
+/** 一篇 Wiki 的输入:由 IPC 层从模块/散件组拼好,任务只负责逐页生成 */
+export interface WikiPageSource {
+  pageId: string
+  kind: 'module' | 'group'
+  /** 程序名,AI 名称不可用时的回退 */
+  name: string
+  files: WikiPageFileSource[]
+  attachedFiles: string[]
+  folders: string[]
+  dependsOn: WikiDependencyFact[]
+  usedBy: WikiDependencyFact[]
+}
+
+/** 进度事件里的单页状态:queued 只在首轮快照出现,之后按实际推进更新 */
+export type WikiPageRunStatus = 'queued' | 'running' | 'done' | 'skipped' | 'failed' | 'cancelled'
+
+export interface WikiPageProgress {
+  pageId: string
+  kind: 'module' | 'group'
+  name: string
+  status: WikiPageRunStatus
+  /** 相对语种目录的 MD 路径;done/skipped 时有 */
+  file?: string
+  /** failed 时的人话原因 */
+  error?: string
+}
+
+export interface WikiJobEvent {
+  projectRoot: string
+  language: string
+  total: number
+  /** 已处理页数(done + skipped + failed + cancelled),进度条按它推进 */
+  processed: number
+  page: WikiPageProgress
+}
+
 interface WikiPageFactsBase {
   language: { code: string; name: string }
   project: { name: string; moduleCount: number; groupCount: number; knownTags: string[] }
