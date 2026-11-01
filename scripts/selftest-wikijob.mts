@@ -10,7 +10,7 @@ import {
   type WikiJobDeps,
   type WikiJobOptions
 } from '../src/wiki/wikiJob.ts'
-import { readWikiState } from '../src/wiki/wikiStore.ts'
+import { readWikiState, WIKI_README } from '../src/wiki/wikiStore.ts'
 import type { FileFact } from '../src/depgraph/factCache.ts'
 import type { WikiJobEvent, WikiPageSource } from '../src/shared/wikiTypes.ts'
 import type { WikiPromptMessages } from '../src/ai/wikiPrompt.ts'
@@ -152,6 +152,12 @@ async function checkRunAndCache(base: string): Promise<void> {
     ),
     'Markdown 用 AI 名称'
   )
+  const index = await fs.readFile(join(projectDir, LANGUAGE_DIR, WIKI_README), 'utf8')
+  assert.ok(index.includes('# 仓库 Wiki'), '目录页按语种生成')
+  assert.ok(
+    index.includes('(./模块/P1.md)') && index.includes('(./未归类/P2.md)'),
+    '目录页链接到每篇已完成文档'
+  )
 
   const second = await runWikiJob(options(root, projectDir, pages), h.deps)
   assert.equal(second.status, 'done')
@@ -213,6 +219,10 @@ async function checkCancel(base: string): Promise<void> {
   assert.equal(h.requests.length, 1, '取消后不再请求下一页')
   const files = await records(projectDir)
   assert.equal(Object.keys(files).length, 1, '只完成一页')
+  await assert.rejects(
+    fs.access(join(projectDir, LANGUAGE_DIR, WIKI_README)),
+    '取消的半轮不写目录页'
+  )
 }
 
 async function checkProjectSwitch(base: string): Promise<void> {

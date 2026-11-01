@@ -5,6 +5,8 @@ import { DEFAULT_WIKI_LANGUAGE } from '../shared/wikiTypes.ts'
 export interface WikiCopy {
   /** README 的目录页标题 */
   wikiTitle: string
+  /** README 里的项目名标签 */
+  project: string
   module: string
   group: string
   tags: string
@@ -22,6 +24,7 @@ export interface WikiCopy {
 export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   'zh-CN': {
     wikiTitle: '仓库 Wiki',
+    project: '项目',
     module: '模块',
     group: '散件组',
     tags: '标签',
@@ -37,6 +40,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   'zh-TW': {
     wikiTitle: '倉庫 Wiki',
+    project: '專案',
     module: '模組',
     group: '散件組',
     tags: '標籤',
@@ -52,6 +56,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   en: {
     wikiTitle: 'Repository Wiki',
+    project: 'Project',
     module: 'Module',
     group: 'Scattered files',
     tags: 'Tags',
@@ -67,6 +72,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   ja: {
     wikiTitle: 'リポジトリ Wiki',
+    project: 'プロジェクト',
     module: 'モジュール',
     group: '散在ファイル',
     tags: 'タグ',
@@ -82,6 +88,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   ko: {
     wikiTitle: '저장소 Wiki',
+    project: '프로젝트',
     module: '모듈',
     group: '흩어진 파일',
     tags: '태그',
@@ -97,6 +104,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   fr: {
     wikiTitle: 'Wiki du dépôt',
+    project: 'Projet',
     module: 'Module',
     group: 'Fichiers dispersés',
     tags: 'Étiquettes',
@@ -112,6 +120,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   de: {
     wikiTitle: 'Repository-Wiki',
+    project: 'Projekt',
     module: 'Modul',
     group: 'Verstreute Dateien',
     tags: 'Schlagwörter',
@@ -127,6 +136,7 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
   },
   es: {
     wikiTitle: 'Wiki del repositorio',
+    project: 'Proyecto',
     module: 'Módulo',
     group: 'Archivos dispersos',
     tags: 'Etiquetas',

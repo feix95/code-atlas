@@ -23,6 +23,7 @@ import {
   sanitizeFileName,
   savePage,
   shortProjectCode,
+  WIKI_README,
   writeWikiState,
   type WikiPageRecord
 } from '../src/wiki/wikiStore.ts'
@@ -51,6 +52,7 @@ import {
   wikiDocExcerpt
 } from '../src/ai/wikiOutput.ts'
 import { panelPageOf } from '../src/wiki/wikiPanel.ts'
+import { renderWikiIndex, wikiIndexLink, writeWikiIndex } from '../src/wiki/wikiIndex.ts'
 import { WIKI_COPY, wikiCopy } from '../src/ai/wikiCopy.ts'
 import { TRANSLATE_LANGS } from '../src/shared/translateLangs.ts'
 import { estimateTokens } from '../src/shared/aiText.ts'
@@ -846,6 +848,40 @@ function checkMarkdown(): void {
   assert.ok(longExcerpt.endsWith('…'))
 }
 
+async function checkIndex(base: string): Promise<void> {
+  const projectDir = join(base, 'index', 'wiki')
+  const input = {
+    projectName: 'demo project',
+    language: 'en',
+    model: 'test-model',
+    generatedAt: '2026-11-02T12:34:56.000Z',
+    pages: [
+      { kind: 'module' as const, name: 'Core module', file: '模块/Core module.md' },
+      { kind: 'group' as const, name: 'Docs', file: '未归类/Docs.md' }
+    ]
+  }
+  const markdown = renderWikiIndex(input)
+  assert.ok(markdown.startsWith('# Repository Wiki'), '标题按语种取文案')
+  assert.ok(markdown.includes('- Project: demo project'), '目录页写项目名')
+  assert.ok(markdown.includes('- Language: English'), '目录页写语种')
+  assert.ok(markdown.includes('- Model: test-model'), '目录页写模型')
+  assert.ok(markdown.includes('- Generated: 2026-11-02 12:34'), '目录页写生成时间')
+  assert.ok(
+    markdown.includes('## Module\n\n- [Core module](./模块/Core%20module.md)'),
+    '模块链接相对语种目录并转义空格'
+  )
+  assert.ok(markdown.includes('## Scattered files\n\n- [Docs](./未归类/Docs.md)'), '散件组单列一节')
+  assert.ok(!markdown.includes(base), '目录页不写本机绝对路径')
+
+  const empty = renderWikiIndex({ ...input, pages: [] })
+  assert.ok(!empty.includes('## '), '没有页时不落空小节')
+
+  await writeWikiIndex(projectDir, input)
+  const written = await fs.readFile(join(languageDir(projectDir, 'en'), WIKI_README), 'utf8')
+  assert.equal(written, markdown, '目录页按语种目录落盘')
+  assert.equal(wikiIndexLink('模块/a#b.md'), './模块/a%23b.md', '链接里的 # 要转义')
+}
+
 function checkCopy(): void {
   assert.equal(Object.keys(WIKI_COPY).length, TRANSLATE_LANGS.length, '8 个语种一份不少')
   for (const lang of TRANSLATE_LANGS) {
@@ -875,6 +911,7 @@ async function main(): Promise<void> {
     checkOutput()
     await checkRetry()
     checkMarkdown()
+    await checkIndex(base)
     checkCopy()
     console.log('✅ Wiki 自测全部通过')
     console.log(
@@ -886,6 +923,7 @@ async function main(): Promise<void> {
     console.log(
       '   提示词只带当前页 · 语种注入 · 本机路径与敏感摘录清洗 · 输出逐字段校验 · 只重试一次 · 8 语种文案 · 预算裁剪顺序'
     )
+    console.log('   README 目录页按语种落盘 · 相对链接与转义 · 空目录不落空壳')
   } finally {
     await fs.rm(base, { recursive: true, force: true })
   }
