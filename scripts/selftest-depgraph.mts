@@ -1,8 +1,16 @@
+import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
+import {
+  beginFactScan,
+  clearFactCache,
+  getFactFileCount,
+  getFileFact,
+  putFileFact
+} from '../src/depgraph/factCache.ts'
 import { parseTsPathAliases, resolveTsAlias } from '../src/depgraph/tsPaths.ts'
 import { loadTsConfigChain } from '../src/depgraph/tsconfigFile.ts'
 import {
@@ -443,6 +451,39 @@ function runStyleUnitCases(): void {
   )
 }
 
+/** 事实缓存:哈希与内容一致、结构清单留在主进程、换根目录不串、过期代次写不进、作废清空 */
+async function checkFactCache(root: string, analyzed: number): Promise<void> {
+  const main = getFileFact(root, 'src/main.tsx')
+  assert.ok(main, '事实缓存应存下 src/main.tsx')
+  assert.match(main.sha256, /^[0-9a-f]{64}$/, 'sha256 应为 64 位小写十六进制')
+  const raw = await fs.readFile(join(root, 'src/main.tsx'), 'utf8')
+  assert.equal(
+    main.sha256,
+    createHash('sha256').update(raw, 'utf8').digest('hex'),
+    '哈希应与文件内容逐字节一致'
+  )
+  assert.deepEqual(main.structure.imports, ['./App'], '结构清单应保留调用的全部导入')
+  assert.equal(getFactFileCount(root), analyzed, '缓存条目数应等于 analyzed')
+  assert.equal(getFileFact(root, 'src/missing.ts'), null, '没分析过的文件回 null')
+  assert.equal(getFileFact(`${root}-other`, 'src/main.tsx'), null, '换根目录后不认旧缓存')
+
+  const stale = beginFactScan(root)
+  const fresh = beginFactScan(root)
+  assert.equal(
+    putFileFact(root, stale, 'ghost.ts', 'f'.repeat(64), main.structure),
+    false,
+    '被新一次扫描顶掉的代次不得写入'
+  )
+  assert.equal(getFileFact(root, 'ghost.ts'), null, '过期代次的文件不进缓存')
+  assert.equal(
+    putFileFact(root, fresh, 'ghost.ts', 'e'.repeat(64), main.structure),
+    true,
+    '当前代次可以写入'
+  )
+  clearFactCache()
+  assert.equal(getFileFact(root, 'ghost.ts'), null, '作废后缓存清空')
+}
+
 async function main(): Promise<void> {
   // 第一轮:JS/TS + Python 平铺的老场景,行为必须和以前一模一样
   const root = await makeFixture()
@@ -497,6 +538,8 @@ async function main(): Promise<void> {
       assert.ok(!relPath.includes('\\'), `relPath 分隔符必须是 '/':${relPath}`)
       assert.ok(!relPath.startsWith(`${graph.rootPath}/`), `relPath 混入了绝对路径:${relPath}`)
     }
+
+    await checkFactCache(root, graph.stats.analyzed)
   } finally {
     await fs.rm(dirname(root), { recursive: true, force: true })
   }

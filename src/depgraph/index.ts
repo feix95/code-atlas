@@ -5,6 +5,7 @@ import { scanDirectory } from '../scanner/index.ts'
 import { analyzeSource, isAnalysisSupported } from '../analyzer/index.ts'
 import { joinRoot } from '../shared/paths.ts'
 import { SOURCE_PARSE_MAX_BYTES } from '../shared/analysisLimits.ts'
+import { beginFactScan, putFileFact, sha256Hex } from './factCache.ts'
 import { RESOLVERS, type ImportHints } from './resolvers.ts'
 import { loadTsPathAliases } from './tsPaths.ts'
 import { collectStyleLinks, isStylePath, resolveStylePath, type FileClassTokens } from './styles.ts'
@@ -70,6 +71,7 @@ function cutModulesOrNull(input: ModuleCutInput): ModuleMap | null {
 export async function buildDependencyGraph(rootPath: string): Promise<DepGraphResult> {
   const startedAt = Date.now()
   const scan = await scanDirectory(rootPath)
+  const factGeneration = beginFactScan(scan.rootPath)
 
   const files: ScanFileNode[] = []
   collectFiles(scan.tree, files)
@@ -112,6 +114,7 @@ export async function buildDependencyGraph(rootPath: string): Promise<DepGraphRe
       continue
     }
     analyzed++
+    putFileFact(scan.rootPath, factGeneration, file.relPath, sha256Hex(code), structure)
     // 只留当类名用的词,不留源码全文:大项目几千个文件的全文常驻内存会把主进程撑大
     classTokens.push({ relPath: file.relPath, tokens: extractClassTokens(code) })
     // 没配翻译器的语言(C/C++/C# 这类)导入一律按外部包记,和它们过去的行为一致

@@ -9,6 +9,7 @@ import { CH } from '../shared/ipcChannels.ts'
 import { auxWindowByName } from './auxWindows.ts'
 import { clampUiScale } from '../shared/uiScale.ts'
 import { queryDriveKinds } from './drive-meta.ts'
+import { clearFactCache } from '../depgraph/factCache.ts'
 import { IGNORED_NAMES } from '../scanner/index.ts'
 import type { BrowseEntry, DriveInfo } from '../shared/types.ts'
 
@@ -106,6 +107,8 @@ export function registerShellIpc(): void {
   // 失败/超时就当没有,盘卡片照常按老样子叫「本地磁盘」,基本面不受影响(带 5 秒小缓存,
   // 回首页重列盘符时不用次次都起 PowerShell)。卷标不再问 —— 产品裁定:盘就认大写字母,直白
   ipcMain.handle(CH.listDrives, async (): Promise<DriveInfo[]> => {
+    // 开屏与回首页都会重列盘符:这时上一个项目的事实缓存已没人用,就地作废
+    clearFactCache()
     /** 单个询问加超时:到点回 null,慢半拍的输家就地安静,不许变未处理的拒绝 */
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> => {
       let timer: ReturnType<typeof setTimeout> | null = null
