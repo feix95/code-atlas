@@ -6,6 +6,12 @@ import { createPortal } from 'react-dom'
 import type { LevelNode } from '@shared/graphView'
 import type { DepGraphNode, ModuleMap } from '@shared/types'
 import { folderComposition, moduleDetails, unassignedReason } from '../graph/moduleDetails'
+import {
+  graphPanelKindOf,
+  graphPanelSections,
+  useHiddenGraphPanelSections,
+  type GraphPanelSectionId
+} from '../graph/graphPanelSections'
 import { useGraphPanelPlacement } from '../graph/useGraphPanelPlacement'
 import { useGraphPanelDock } from '../graph/useGraphPanelDock'
 import { setGraphPanelDocked } from '../graphPanelDock'
@@ -31,14 +37,19 @@ export interface GraphSidePanelProps {
   onClose: () => void
 }
 
-const isFileNode = (n: LevelNode): boolean =>
-  n.kind === 'file' || (n.kind === 'external' && n.target === 'file')
-
 const UNDOCK_LABEL = '把节点详情放回浮窗,也可以按住标题条拖出左栏'
 
-function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element | null {
+interface BodyProps {
+  props: GraphSidePanelProps
+  hidden: ReadonlySet<GraphPanelSectionId>
+}
+
+const HIDDEN_ALL_NOTE = '全部内容已隐藏,可在「显示项」里恢复'
+
+function FolderBody({ props, hidden }: BodyProps): React.JSX.Element | null {
   const { node, modules, colorOf } = props
-  if (!modules) return null
+  if (hidden.has('composition')) return null
+  if (!modules) return <p className="graph-panel-note">模块划分暂不可用,先按原始结构显示</p>
   const shares = folderComposition(modules, node.id)
   if (shares.length === 0) {
     return <p className="graph-panel-note">这个文件夹里没有可划分的代码模块</p>
@@ -60,7 +71,7 @@ function FolderBody({ props }: { props: GraphSidePanelProps }): React.JSX.Elemen
   )
 }
 
-function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element {
+function FileBody({ props, hidden }: BodyProps): React.JSX.Element {
   const { node, modules, depNodes, dirRel, colorOf } = props
   const dep = depNodes.get(node.id)
   const moduleId =
@@ -68,7 +79,7 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
   const details = modules && moduleId ? moduleDetails(modules, moduleId, dirRel) : null
   return (
     <>
-      {dep && (
+      {dep && !hidden.has('refs') && (
         <p className="graph-panel-note">
           引用了 {dep.outCount} 个文件,被 {dep.inCount} 个文件引用
         </p>
@@ -79,24 +90,30 @@ function FileBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element 
       )}
       {details && (
         <>
-          <section className="graph-panel-section">
-            <h3 className="graph-panel-h">所属模块</h3>
-            <ModuleChip name={details.name} color={colorOf(details.module.id)} />
-          </section>
-          <GraphModuleSection details={details} colorOf={colorOf} />
+          {!hidden.has('module') && (
+            <section className="graph-panel-section">
+              <h3 className="graph-panel-h">所属模块</h3>
+              <ModuleChip name={details.name} color={colorOf(details.module.id)} />
+            </section>
+          )}
+          <GraphModuleSection details={details} colorOf={colorOf} hidden={hidden} />
         </>
       )}
     </>
   )
 }
 
-function PanelBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element {
-  const isFile = isFileNode(props.node)
-  return (
-    <>
-      {isFile && <FileBody props={props} />}
-      {!isFile && props.node.kind !== 'overflow' && <FolderBody props={props} />}
-    </>
+function PanelBody({ props }: { props: GraphSidePanelProps }): React.JSX.Element | null {
+  const hidden = useHiddenGraphPanelSections()
+  const kind = graphPanelKindOf(props.node)
+  if (kind === null) return null
+  if (graphPanelSections(kind).every((s) => hidden.has(s.id))) {
+    return <p className="graph-panel-note">{HIDDEN_ALL_NOTE}</p>
+  }
+  return kind === 'file' ? (
+    <FileBody props={props} hidden={hidden} />
+  ) : (
+    <FolderBody props={props} hidden={hidden} />
   )
 }
 
@@ -112,6 +129,7 @@ function DockedGraphPanel({ props }: { props: GraphSidePanelProps }): React.JSX.
       head={
         <GraphPanelHeader
           node={props.node}
+          tipSide="top"
           controls={
             <>
               <button
@@ -186,6 +204,7 @@ function FloatingGraphPanel({
         node={node}
         grip={grip}
         gripLabel="移动节点详情,可用方向键微调;拖到左侧文件树上方松手可停靠"
+        tipSide="left"
         controls={
           <>
             {canDock && (

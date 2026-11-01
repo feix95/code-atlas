@@ -1,5 +1,6 @@
 // 侧栏的模块区块:模块名(色块)、成员文件(按文件夹分组)、相关自测、附挂样式、与其他模块的连线。
 import type { ModuleDetails, ModuleLinkView } from '../graph/moduleDetails'
+import type { GraphPanelSectionId } from '../graph/graphPanelSections'
 
 export function ModuleChip({
   name,
@@ -12,7 +13,9 @@ export function ModuleChip({
   return (
     <span className="graph-chip">
       <span className="graph-swatch" style={{ background: color }} aria-hidden="true" />
-      {name}
+      <span className="graph-chip-name" title={name}>
+        {name}
+      </span>
     </span>
   )
 }
@@ -65,33 +68,38 @@ const ROLE_NOTE = { member: undefined, attached: '附挂', test: '自测' } as c
 
 export function GraphModuleSection({
   details,
-  colorOf
+  colorOf,
+  hidden
 }: {
   details: ModuleDetails
   colorOf: (moduleId: string) => string
+  /** 「显示项」里被勾掉的区块 */
+  hidden: ReadonlySet<GraphPanelSectionId>
 }): React.JSX.Element {
   const count = details.module.files.length
   return (
     <>
-      <section className="graph-panel-section">
-        <h3 className="graph-panel-h">模块文件({count})</h3>
-        {details.groups.map((g) => (
-          <div key={g.folder} className="graph-folder-group">
-            <p className="graph-folder-name">{g.folder === '' ? '根目录' : g.folder}</p>
-            <ul className="graph-file-list">
-              {g.files.map((f) => (
-                <FileRow
-                  key={f.path}
-                  path={f.path}
-                  label={f.name}
-                  note={f.isElsewhere ? '在其他文件夹' : ROLE_NOTE[f.role]}
-                />
-              ))}
-            </ul>
-          </div>
-        ))}
-      </section>
-      {details.tests.length > 0 && (
+      {!hidden.has('files') && (
+        <section className="graph-panel-section">
+          <h3 className="graph-panel-h">模块文件({count})</h3>
+          {details.groups.map((g) => (
+            <div key={g.folder} className="graph-folder-group">
+              <p className="graph-folder-name">{g.folder === '' ? '根目录' : g.folder}</p>
+              <ul className="graph-file-list">
+                {g.files.map((f) => (
+                  <FileRow
+                    key={f.path}
+                    path={f.path}
+                    label={f.name}
+                    note={f.isElsewhere ? '在其他文件夹' : ROLE_NOTE[f.role]}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      )}
+      {details.tests.length > 0 && !hidden.has('tests') && (
         <section className="graph-panel-section">
           <h3 className="graph-panel-h">相关自测({details.tests.length})</h3>
           <ul className="graph-file-list">
@@ -101,7 +109,7 @@ export function GraphModuleSection({
           </ul>
         </section>
       )}
-      {details.styles.length > 0 && (
+      {details.styles.length > 0 && !hidden.has('styles') && (
         <section className="graph-panel-section">
           <h3 className="graph-panel-h">附挂样式({details.styles.length})</h3>
           <ul className="graph-file-list">
@@ -111,8 +119,12 @@ export function GraphModuleSection({
           </ul>
         </section>
       )}
-      <LinkList title="依赖的模块" links={details.dependsOn} colorOf={colorOf} />
-      <LinkList title="被这些模块使用" links={details.usedBy} colorOf={colorOf} />
+      {!hidden.has('dependsOn') && (
+        <LinkList title="依赖的模块" links={details.dependsOn} colorOf={colorOf} />
+      )}
+      {!hidden.has('usedBy') && (
+        <LinkList title="被这些模块使用" links={details.usedBy} colorOf={colorOf} />
+      )}
     </>
   )
 }

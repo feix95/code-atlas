@@ -13,8 +13,14 @@ import {
   snapFrame
 } from '../src/renderer/src/floatPlacement.ts'
 import { graphPanelBounds } from '../src/renderer/src/graph/graphPanelBounds.ts'
+import {
+  graphPanelKindOf,
+  graphPanelSections,
+  parseHiddenSections
+} from '../src/renderer/src/graph/graphPanelSections.ts'
+import type { LevelNode, LevelNodeKind } from '../src/shared/visibleGraph.ts'
 
-/** 画布 1000x800,顶栏让出 48,缝 8,浮窗 304x400,最小 192x96,自适应档宽 384(24rem) */
+/** 画布 1000x800,顶栏让出 48,缝 8,浮窗 304x400,最小 192x96,自适应档宽 512(32rem) */
 function sample(
   view = { width: 1000, height: 800 },
   panel = { width: 304, height: 400 },
@@ -27,7 +33,7 @@ function sample(
     topInset: 48,
     min: { width: 192, height: 96 },
     natural,
-    autoMaxWidth: 384
+    autoMaxWidth: 512
   })
 }
 
@@ -43,7 +49,7 @@ function checkBounds(): void {
   assert.equal(b.reachLeft, 992)
   assert.equal(b.reachDown, 792)
   assert.equal(b.fitWidth, 984, '没量到内容宽 = 不设上限')
-  assert.equal(b.autoMaxWidth, 384, '宽度自适应档取 CSS 登记的 24rem')
+  assert.equal(b.autoMaxWidth, 512, '宽度自适应档取 CSS 登记的 32rem')
   assert.equal(b.fitHeight, 744, '没量到内容高 = 不设上限')
   assert.equal(b.autoMaxHeight, 744, '高度自适应档就是画布能给的最大高')
 
@@ -97,7 +103,7 @@ function moved(at: ReturnType<typeof clampPlacement>) {
 }
 
 /**
- * 内容尺寸吸附:量到内容宽 300、高 500,自适应档宽 384。
+ * 内容尺寸吸附:量到内容宽 300、高 500,自适应档宽 512。
  * 拉大松手吸回内容尺寸(左上角钉住);拉小保留;旧账比内容大就收到内容尺寸。
  */
 function checkContentFit(): void {
@@ -146,16 +152,16 @@ function checkContentFit(): void {
   const overCap = sample(
     { width: 1000, height: 800 },
     { width: 304, height: 400 },
-    { width: 500, height: 5000 }
+    { width: 800, height: 5000 }
   )
-  assert.equal(overCap.fitWidth, 500, '内容宽 500 超过自适应档 384')
+  assert.equal(overCap.fitWidth, 800, '内容宽 800 超过自适应档 512')
   assert.equal(overCap.fitHeight, overCap.maxHeight, '内容高夹进画布能给的高度')
   assert.equal(
-    capToContent({ right: 8, top: 48, width: 700, height: 700 }, overCap).width,
-    500,
+    capToContent({ right: 8, top: 48, width: 900, height: 700 }, overCap).width,
+    800,
     '自适应档装不下内容宽:吸附落成手动的内容宽'
   )
-  assert.equal(settleResize({ right: 8, top: 48, width: 500, height: null }, overCap).width, 500)
+  assert.equal(settleResize({ right: 8, top: 48, width: 900, height: null }, overCap).width, 800)
 
   const frame = snapFrame(settled, grown, b)
   assert.deepEqual(
@@ -180,11 +186,49 @@ function checkStaleRecord(): void {
   assert.equal(clamped.top + clamped.height, b.reachDown, '底边不越界')
 }
 
+function node(kind: LevelNodeKind, extra: Partial<LevelNode> = {}): LevelNode {
+  return { id: 'node', kind, label: 'node', degree: 0, descendantFiles: 0, ...extra }
+}
+
+/** 「显示项」的区块清单与本地账验身 */
+function checkSections(): void {
+  assert.deepEqual(
+    graphPanelSections('file').map((s) => s.id),
+    ['refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
+    '文件区块:关系三项 + 模块四项'
+  )
+  assert.deepEqual(
+    graphPanelSections('folder').map((s) => s.id),
+    ['composition'],
+    '文件夹只有模块构成一项'
+  )
+
+  assert.equal(parseHiddenSections(null).size, 0, '没记过 = 全显示')
+  assert.equal(parseHiddenSections('refs').size, 0, '不是数组当没记过')
+  assert.equal(parseHiddenSections(['nope', 42]).size, 0, '废 id 全丢掉')
+  assert.deepEqual(
+    [...parseHiddenSections(['refs', 'tests', 'refs'])].sort(),
+    ['refs', 'tests'],
+    '保留认识的 id,重复只算一次(旧版本留下的废 id 不会锁死新区块)'
+  )
+
+  assert.equal(graphPanelKindOf(node('file')), 'file', '文件')
+  assert.equal(graphPanelKindOf(node('external', { target: 'file' })), 'file', '外部文件按文件列')
+  assert.equal(
+    graphPanelKindOf(node('external', { target: 'folder' })),
+    'folder',
+    '外部文件夹按文件夹列'
+  )
+  assert.equal(graphPanelKindOf(node('folder')), 'folder', '文件夹')
+  assert.equal(graphPanelKindOf(node('overflow', { hiddenCount: 3 })), null, '收起的项没有正文')
+}
+
 checkBounds()
 checkResize()
 checkContentFit()
 checkStaleRecord()
+checkSections()
 console.log('✅ 图谱详情浮窗自测全部通过')
 console.log(
-  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回'
+  '   活动范围(顶栏让位/四边缝/默认右上角) · 拖动夹边 · 右下角拉伸(左上角钉住/最小宽高/拉不出画布) · 内容尺寸吸附(拉大吸回/拉小保留/旧账收窄) · 画布缩小后旧账夹回 · 显示项区块清单与本地账验身'
 )

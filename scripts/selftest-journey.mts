@@ -1692,6 +1692,14 @@ try {
   )
   assert.ok((await panel.innerText()).includes('所属模块'), 'side panel must show the module')
   assert.ok((await panel.innerText()).includes('style.css'), 'side panel must list attached styles')
+  assert.equal(
+    await panel
+      .locator('.graph-chip-name')
+      .first()
+      .evaluate((el) => getComputedStyle(el).whiteSpace),
+    'nowrap',
+    'module names must stay on one line instead of wrapping'
+  )
   await shot('graph-modules')
   // 停靠左栏:文件树与详情之间的分割线要能把详情拖高(停靠槽 display:contents,别把可分配高度量成 0)
   await panel.getByRole('button', { name: '把节点详情停靠到左侧文件树下方' }).click()
@@ -1813,7 +1821,7 @@ try {
     0,
     'hovering a container blank spot must not open a detail panel'
   )
-  // 换节点不跟着内容变宽:两个子文件之间切,浮窗宽度应保持一致
+  // 换节点只在内容更宽时放宽:两个内容等宽的子文件之间切,浮窗宽度应保持一致
   await page.mouse.move(childPoints[0].x, childPoints[0].y)
   await page.waitForFunction(
     () => document.querySelector('.graph-panel-title')?.textContent === 'a.ts',
