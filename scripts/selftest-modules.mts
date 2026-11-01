@@ -10,9 +10,14 @@ import { hubWeight } from '../src/modules/communities.ts'
 import { isTestFile } from '../src/modules/attachTests.ts'
 import { findHubs, hubThreshold } from '../src/modules/hubs.ts'
 import { createSeededRandom } from '../src/modules/seededRandom.ts'
-import { DEFAULT_MODULE_PARAMS } from '../src/modules/moduleConfig.ts'
+import {
+  DEFAULT_MODULE_PARAMS,
+  MODULE_ALGORITHM_VERSION,
+  MODULE_MATCH_JACCARD
+} from '../src/modules/moduleConfig.ts'
+import { matchModuleIds } from '../src/modules/matchPrevious.ts'
 import { buildDependencyGraph } from '../src/depgraph/index.ts'
-import type { DepEdge, ModuleMap } from '../src/shared/types.ts'
+import type { DepEdge, ModuleLink, ModuleMap } from '../src/shared/types.ts'
 
 const e = (from: string, to: string): DepEdge => ({ from, to })
 
@@ -754,6 +759,77 @@ async function checkDepGraphShape(): Promise<void> {
   }
 }
 
+/** 手搭一份模块表,专测跨次匹配,不依赖真实切分 */
+function manualMap(
+  modules: { id: string; files: string[] }[],
+  links: ModuleLink[] = []
+): ModuleMap {
+  return {
+    algorithmVersion: MODULE_ALGORITHM_VERSION,
+    params: { ...DEFAULT_MODULE_PARAMS },
+    modules: modules.map((m) => ({
+      id: m.id,
+      anchor: m.files[0] ?? '',
+      folder: dirname(m.files[0] ?? ''),
+      files: m.files,
+      attached: [],
+      tests: [],
+      folders: [...new Set(m.files.map(dirname))]
+    })),
+    fileToModule: Object.fromEntries(modules.flatMap((m) => m.files.map((f) => [f, m.id]))),
+    links
+  }
+}
+
+/** 跨次匹配:达到阈值沿用旧 id;低于阈值保留新 id;旧 id 一对一;映射与模块间边同步重命名;顺序无关 */
+function checkMatchPrevious(): void {
+  const previous = [{ id: 'm:old/anchor.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts'] }]
+  const next = manualMap(
+    [{ id: 'm:new/anchor.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts'] }],
+    [{ from: 'm:new/anchor.ts', to: 'm:other', weight: 2 }]
+  )
+  const matched = matchModuleIds(next, previous, MODULE_MATCH_JACCARD)
+  assert.equal(matched.modules[0].id, 'm:old/anchor.ts', 'Jaccard 3/4 应沿用旧 id')
+  assert.equal(matched.modules[0].anchor, 'src/a.ts', '锚点仍用本次切分的结果')
+  for (const file of ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts']) {
+    assert.equal(matched.fileToModule[file], 'm:old/anchor.ts', `${file} 的模块映射应同步改名`)
+  }
+  assert.equal(matched.links[0].from, 'm:old/anchor.ts', '模块间边应同步改名')
+  assert.equal(matched.links[0].to, 'm:other', '不在本次模块表里的边端点保持原样')
+
+  const low = manualMap([{ id: 'm:x.ts', files: ['src/a.ts'] }])
+  assert.equal(
+    matchModuleIds(low, previous).modules[0].id,
+    'm:x.ts',
+    'Jaccard 1/3 低于阈值时应保留新 id'
+  )
+
+  const two = manualMap([
+    { id: 'm:first.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts'] },
+    { id: 'm:second.ts', files: ['src/a.ts', 'src/b.ts', 'src/d.ts'] }
+  ])
+  const twoMatched = matchModuleIds(two, [
+    { id: 'm:old.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts'] }
+  ])
+  const ids = twoMatched.modules.map((m) => m.id)
+  assert.equal(ids.filter((id) => id === 'm:old.ts').length, 1, '一个旧 id 只能被认领一次')
+  assert.ok(ids.includes('m:second.ts'), '平票时按新模块顺序取第一个,另一个保留新 id')
+
+  const many = manualMap([
+    { id: 'm:n1.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts'] },
+    { id: 'm:n2.ts', files: ['src/x.ts', 'src/y.ts'] }
+  ])
+  const prevMany = [
+    { id: 'm:p1.ts', files: ['src/a.ts', 'src/b.ts', 'src/c.ts'] },
+    { id: 'm:p2.ts', files: ['src/x.ts', 'src/y.ts'] }
+  ]
+  assert.equal(
+    JSON.stringify(matchModuleIds(many, [...prevMany].reverse())),
+    JSON.stringify(matchModuleIds(many, prevMany)),
+    '旧模块表的顺序不应影响匹配结果'
+  )
+}
+
 async function main(): Promise<void> {
   checkDeterminism()
   checkFolderBias()
@@ -770,6 +846,7 @@ async function main(): Promise<void> {
   checkMajorityAnchor()
   checkSmallMerge()
   checkEdgeCases()
+  checkMatchPrevious()
   await checkDepGraphShape()
   console.log('selftest-modules: 全部通过')
 }

@@ -32,6 +32,12 @@ export const MODULE_MIN_FILES = 2
 export const MODULE_HUB_MIN_IN_DEGREE = 10
 export const MODULE_HUB_SHARE = 0.05
 
+/**
+ * 跨次匹配阈值:重新切分后,新模块与上次落盘模块的成员 Jaccard 达到它才沿用旧 id。
+ * 0.5 表示成员过半重合即视为同一个模块;低于它保留新 id,AI 说明按新模块重新生成。
+ */
+export const MODULE_MATCH_JACCARD = 0.5
+
 export const DEFAULT_MODULE_PARAMS: ModuleParams = {
   resolution: MODULE_RESOLUTION,
   seed: MODULE_SEED,
