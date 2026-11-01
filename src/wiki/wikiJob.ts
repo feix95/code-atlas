@@ -27,7 +27,7 @@ import {
   type WikiFactDeps,
   type WikiFactsInput
 } from './wikiPageFacts.ts'
-import { writeWikiIndex, type WikiIndexPage } from './wikiIndex.ts'
+import { refreshWikiIndex } from './wikiIndex.ts'
 import type { WikiJobEvent, WikiPageProgress, WikiPageSource } from '../shared/wikiTypes.ts'
 
 export { wikiOutputTokens } from './wikiPageFacts.ts'
@@ -122,32 +122,6 @@ async function recordFailure(args: {
   languageState.pages[source.pageId] = record
   await writeWikiState(options.projectDir, state)
   return record
-}
-
-/**
- * 目录页在整轮末尾重写:按生成顺序收已完成且文件还在的页,失败或缺失的不进索引。
- * 空目录(一页都没成)不落 README,免得留下只有表头的空壳。
- */
-async function refreshIndex(
-  options: WikiJobOptions,
-  languageState: WikiLanguageState,
-  deps: WikiJobDeps
-): Promise<void> {
-  const pages: WikiIndexPage[] = []
-  for (const source of options.pages) {
-    const record = languageState.pages[source.pageId]
-    if (record?.status !== 'done') continue
-    if (!(await pageFileExists(options.projectDir, options.language, record))) continue
-    pages.push({ kind: record.kind, name: record.name, file: record.file })
-  }
-  if (pages.length === 0) return
-  await writeWikiIndex(options.projectDir, {
-    projectName: options.projectName,
-    language: options.language,
-    model: options.model,
-    generatedAt: deps.now?.() ?? new Date().toISOString(),
-    pages
-  })
 }
 
 /** 跑一整轮 Wiki 生成(并发 1):每页成功即落盘,失败记状态继续下一题 */
@@ -319,7 +293,16 @@ export async function runWikiJob(
       emit({ ...progress, status: 'done', file })
     }
     // 目录页最后生成,不调用模型;中途取消不写,避免把半轮结果当成全量
-    if (active()) await refreshIndex(options, languageState, deps)
+    if (active())
+      await refreshWikiIndex({
+        projectDir: options.projectDir,
+        projectName: options.projectName,
+        language: options.language,
+        model: options.model,
+        generatedAt: deps.now?.() ?? new Date().toISOString(),
+        sources: options.pages,
+        records: languageState.pages
+      })
   } catch (err) {
     return summary('failed', errorText(err))
   }

@@ -2,7 +2,15 @@
 // 与 MD 页头共用 wikiCopy 的固定文案;链接相对 README 所在的语种目录计算。
 import { join } from 'node:path'
 import { wikiCopy, wikiLanguageLabel } from '../ai/wikiCopy.ts'
-import { languageDir, WIKI_README, writeFileAtomic, type WikiPageKind } from './wikiStore.ts'
+import {
+  languageDir,
+  pageFileExists,
+  WIKI_README,
+  writeFileAtomic,
+  type WikiPageKind,
+  type WikiPageRecord
+} from './wikiStore.ts'
+import type { WikiPageSource } from '../shared/wikiTypes.ts'
 
 export interface WikiIndexPage {
   kind: WikiPageKind
@@ -74,4 +82,36 @@ export function renderWikiIndex(input: WikiIndexInput): string {
 export async function writeWikiIndex(projectDir: string, input: WikiIndexInput): Promise<void> {
   const file = join(languageDir(projectDir, input.language), WIKI_README)
   await writeFileAtomic(file, renderWikiIndex(input))
+}
+
+export interface WikiIndexRefreshInput {
+  projectDir: string
+  projectName: string
+  language: string
+  model: string
+  generatedAt: string
+  sources: readonly WikiPageSource[]
+  records: Record<string, WikiPageRecord>
+}
+
+/**
+ * 目录页在整轮末尾重写:按生成顺序收已完成且文件还在的页,失败或缺失的不进索引。
+ * 空目录(一页都没成)不落 README,免得留下只有表头的空壳。
+ */
+export async function refreshWikiIndex(input: WikiIndexRefreshInput): Promise<void> {
+  const pages: WikiIndexPage[] = []
+  for (const source of input.sources) {
+    const record = input.records[source.pageId]
+    if (record?.status !== 'done') continue
+    if (!(await pageFileExists(input.projectDir, input.language, record))) continue
+    pages.push({ kind: record.kind, name: record.name, file: record.file })
+  }
+  if (pages.length === 0) return
+  await writeWikiIndex(input.projectDir, {
+    projectName: input.projectName,
+    language: input.language,
+    model: input.model,
+    generatedAt: input.generatedAt,
+    pages
+  })
 }
