@@ -1714,6 +1714,19 @@ try {
   await page.getByRole('button', { name: '关系图谱', exact: true }).click()
   await page.locator('.graph-canvas[data-graph-dir=""]').waitFor()
   await page.waitForFunction(() => !document.querySelector('.graph-status'))
+  // 回归:搜索框里按 Backspace 只删字符,不能触发图谱的「返回上一层」
+  await page.locator('.graph-view').focus()
+  await page.keyboard.press('Control+f')
+  const graphSearchInput = page.getByRole('combobox', { name: '搜索图谱' })
+  await graphSearchInput.fill('a.ts')
+  await graphSearchInput.press('Backspace')
+  assert.equal(
+    await graphSearchInput.inputValue(),
+    'a.t',
+    'Backspace inside the graph search must edit text instead of navigating up'
+  )
+  await page.getByRole('button', { name: '清除搜索', exact: true }).click()
+  assert.equal(await graphSearchInput.inputValue(), '', 'clear button must empty the query')
   await page.getByRole('button', { name: /^文件夹 app/ }).focus()
   await page.keyboard.press('Enter')
   await page.locator('.graph-canvas[data-graph-dir="app"]').waitFor()
