@@ -24,6 +24,25 @@ export const PLAN_CROSS_DIR_MIN_COHESION = 0.5
 /** 跨目录合并的规模上限:再大就不像一个功能页,留在各自目录里 */
 export const PLAN_CROSS_DIR_MAX_FILES = 12
 
+/** 叶子页主角文件数上限:超过就对该页再切一轮社区(硬线,区别于参考分布的文件数) */
+export const PLAN_LEAF_MAX_PRIMARY = 16
+
+/** 叶子页证据量再切目标:超过它先尝试拆页,拆不动才留给 oversized 标记 */
+export const PLAN_SPLIT_TOKEN_TARGET = 45_000
+
+/** 功能名成页的候选规模上限:同名标记词横跨多目录的文件超过它就不再像一个功能 */
+export const PLAN_FEATURE_MAX_FILES = 40
+
+/** 功能名候选的最少文件数:只有两个文件同名多半是巧合,不成页 */
+export const PLAN_FEATURE_MIN_FILES = 3
+
+/** 功能名成页的内聚下限:比纯社区合并放宽,因为公共文件会稀释这类页的引用占比 */
+export const PLAN_FEATURE_MIN_COHESION = 0.2
+
+/** 薄页合并线:主角不多于 2 个且证据量低于它的叶子页,并进上级,不单独成页 */
+export const PLAN_TINY_PAGE_MAX_PRIMARY = 2
+export const PLAN_TINY_PAGE_TOKEN_MAX = 400
+
 /** 主题树最深层级(与需求 A2 的「最多约 4 层」一致) */
 export const PLAN_TREE_MAX_DEPTH = 4
 
@@ -114,6 +133,8 @@ export interface WikiPlanPage {
   kind: WikiPlanPageKind
   /** 程序名;模型润名是后续步骤,落盘后锁定 */
   title: string
+  /** 主题目录覆盖:功能页按功能标记词归主题(如 feature:wiki),不按锚点目录;其余页为 null */
+  topicDir: string | null
   /** 主题锚点目录;根主题页为 '' */
   anchorDir: string
   /** 主题锚点符号:页内核心入口文件的首要导出/类/函数名;取不到为 null */

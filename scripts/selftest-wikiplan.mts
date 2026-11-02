@@ -38,6 +38,10 @@ function leafPages(plan: ReturnType<typeof buildWikiPlan>): WikiPlanPage[] {
   return plan.pages.filter((p) => p.kind === 'leaf')
 }
 
+function primariesOf(page: WikiPlanPage): string[] {
+  return page.members.filter((m) => m.role === 'primary').map((m) => m.path)
+}
+
 function primaryOwner(plan: ReturnType<typeof buildWikiPlan>): Map<string, string> {
   const owner = new Map<string, string>()
   for (const page of plan.pages) {
@@ -187,6 +191,134 @@ function main(): void {
   walk(plan6.topics, 0)
   assert.ok(maxDepth <= 4, `主题目录最深 4 层,实际 ${maxDepth}`)
   assert.equal(primaryOwner(plan6).size, 2, '深层文件仍有归属')
+
+  // 七、功能名成页:名字带同一功能标记、又互相有引用的文件横跨多目录合成一页
+  const plan7 = buildWikiPlan(
+    input(
+      [
+        file('src/wiki/wikiStore.ts'),
+        file('src/wiki/wikiJob.ts'),
+        file('src/main/wikiRequest.ts'),
+        file('src/shared/wikiTypes.ts'),
+        file('src/other/alpha.ts'),
+        file('src/other/beta.ts'),
+        file('src/other/gamma.ts'),
+        file('src/other/delta.ts')
+      ],
+      [
+        ['src/wiki/wikiJob.ts', 'src/wiki/wikiStore.ts'],
+        ['src/wiki/wikiJob.ts', 'src/shared/wikiTypes.ts'],
+        ['src/main/wikiRequest.ts', 'src/shared/wikiTypes.ts'],
+        ['src/other/alpha.ts', 'src/shared/wikiTypes.ts'],
+        ['src/other/beta.ts', 'src/shared/wikiTypes.ts'],
+        ['src/other/gamma.ts', 'src/wiki/wikiStore.ts'],
+        ['src/other/delta.ts', 'src/main/wikiRequest.ts']
+      ]
+    )
+  )
+  const featurePage = leafPages(plan7).find((p) => p.basis.some((b) => b.includes('功能名')))
+  assert.ok(featurePage, '功能名成页生效')
+  assert.deepEqual(
+    primariesOf(featurePage!).sort(),
+    [
+      'src/main/wikiRequest.ts',
+      'src/shared/wikiTypes.ts',
+      'src/wiki/wikiJob.ts',
+      'src/wiki/wikiStore.ts'
+    ],
+    'Wiki 四个文件同属一页'
+  )
+
+  // 八、薄页合并:只有一个小文件的目录不单独成页
+  const plan8 = buildWikiPlan(
+    input(
+      [
+        file('src/big/a.ts', { sizeBytes: 9000 }),
+        file('src/big/b.ts', { sizeBytes: 9000 }),
+        file('src/big/c.ts', { sizeBytes: 9000 }),
+        file('web/index.html', { languageId: '', sizeBytes: 300 })
+      ],
+      []
+    )
+  )
+  assert.ok(!leafPages(plan8).some((p) => p.anchorDir === 'web'), 'web 薄页被合并,不单独成页')
+  assert.ok(
+    leafPages(plan8).some((p) =>
+      p.members.some((m) => m.path === 'web/index.html' && m.role === 'supporting')
+    ),
+    'index.html 降为配角并进大页'
+  )
+
+  // 九、自测按名归属:名字对上被测文件时,压过引用计数
+  const plan9 = buildWikiPlan(
+    input(
+      [
+        file('src/shared/types.ts'),
+        file('src/shared/defaults.ts'),
+        file('src/shared/cloud.ts'),
+        file('src/shared/launch.ts'),
+        file('src/wiki/wikiCleanup.ts'),
+        file('src/wiki/wikiStore.ts'),
+        file('scripts/selftest-wikicleanup.mts')
+      ],
+      [
+        ['scripts/selftest-wikicleanup.mts', 'src/shared/types.ts'],
+        ['scripts/selftest-wikicleanup.mts', 'src/shared/defaults.ts'],
+        ['scripts/selftest-wikicleanup.mts', 'src/shared/cloud.ts'],
+        ['scripts/selftest-wikicleanup.mts', 'src/shared/launch.ts'],
+        ['scripts/selftest-wikicleanup.mts', 'src/wiki/wikiCleanup.ts'],
+        ['src/wiki/wikiCleanup.ts', 'src/wiki/wikiStore.ts']
+      ]
+    )
+  )
+  const host9 = leafPages(plan9).find((p) =>
+    p.members.some((m) => m.path === 'scripts/selftest-wikicleanup.mts')
+  )
+  assert.ok(host9, '自测有归属页')
+  assert.ok(
+    primariesOf(host9!).includes('src/wiki/wikiCleanup.ts'),
+    '自测挂在被测文件所在页,不被公共文件页抢走'
+  )
+
+  // 十、CI 工作流进构建与部署;tsconfig 解析文件不混进构建页
+  const plan10 = buildWikiPlan(
+    input(
+      [
+        file('src/a.ts'),
+        file('.github/workflows/ci.yml', { languageId: '' }),
+        file('src/depgraph/tsconfigFile.ts')
+      ],
+      [],
+      { manifestPath: 'package.json', manifestScripts: ['build'] }
+    )
+  )
+  assert.ok(
+    !plan10.unassigned.some((u) => u.path === '.github/workflows/ci.yml'),
+    'CI 工作流不再被当成工具内部配置'
+  )
+  const buildPage = plan10.pages.find((p) => p.title === '构建与部署')
+  assert.ok(buildPage, '构建与部署已提名')
+  assert.ok(
+    buildPage!.members.some((m) => m.path === '.github/workflows/ci.yml'),
+    '构建与部署含 CI 工作流'
+  )
+  assert.ok(
+    !buildPage!.members.some((m) => m.path.includes('tsconfig')),
+    '构建与部署不含 tsconfig 文件'
+  )
+
+  // 十一、主题链折叠:中间空层不占一层
+  const plan11 = buildWikiPlan(input([file('a/b/c/deep.ts'), file('a/x.ts'), file('a/y.ts')], []))
+  const topicDirs: string[] = []
+  const walkTopics = (topics: typeof plan11.topics): void => {
+    for (const topic of topics) {
+      topicDirs.push(topic.dir)
+      walkTopics(topic.children)
+    }
+  }
+  walkTopics(plan11.topics)
+  assert.ok(!topicDirs.includes('a/b'), '空中间层 a/b 被折叠')
+  assert.ok(topicDirs.includes('a/b/c'), '叶子主题保留')
 
   console.log('✅ Wiki 主题树切分自测全部通过')
   console.log(

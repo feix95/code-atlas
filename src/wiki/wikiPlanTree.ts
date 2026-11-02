@@ -16,7 +16,10 @@ export function shortHash(text: string): string {
 }
 
 const BUILD_CONFIG_PATTERN =
-  /(^|\/)(electron-builder[^/]*|vite\.config\.[^/]+|webpack[^/]*|rollup\.config\.[^/]+|Dockerfile|Makefile|tsconfig[^/]*)$/
+  /(^|\/)(electron-builder[^/]*|vite\.config\.[^/]+|webpack[^/]*|rollup\.config\.[^/]+|Dockerfile|Makefile)$/
+
+/** 进程间通道定义文件:只认通道定义本身(如 ipcChannels.ts),不认各通道的处理器文件 */
+const IPC_DEFINITION_PATTERN = /(^|\/)[^/]*channels?\.ts$/i
 
 /** 根主题页提名:项目概述常设,其余有信号才提名,不硬凑 */
 export function buildRootPages(
@@ -27,6 +30,7 @@ export function buildRootPages(
   const draft = (title: string, memberPaths: string[], basis: string[]): WikiPlanPage => ({
     id: `w:${shortHash(`|root|${title}`)}`,
     kind: 'root',
+    topicDir: null,
     title,
     anchorDir: '',
     anchorSymbol: null,
@@ -53,11 +57,43 @@ export function buildRootPages(
   const buildConfigs = files
     .filter((f) => BUILD_CONFIG_PATTERN.test(f.relPath))
     .map((f) => f.relPath)
+  const workflows = files
+    .filter((f) => f.relPath.startsWith('.github/workflows/'))
+    .map((f) => f.relPath)
   if (
     buildConfigs.length > 0 ||
+    workflows.length > 0 ||
     input.manifestScripts.some((s) => ['build', 'pack', 'dist'].includes(s))
   ) {
-    rootPages.push(draft('构建与部署', buildConfigs.slice(0, 6), ['存在构建配置或构建脚本']))
+    rootPages.push(
+      draft('构建与部署', [...workflows, ...buildConfigs].slice(0, 6), [
+        '存在构建配置、CI 工作流或构建脚本'
+      ])
+    )
+  }
+  const ipcFiles = files.filter((f) => IPC_DEFINITION_PATTERN.test(f.relPath)).map((f) => f.relPath)
+  if (ipcFiles.length > 0) {
+    rootPages.push(draft('数据流设计', ipcFiles.slice(0, 4), ['存在进程间通道定义文件']))
+  }
+  // 架构设计:一级子系统不少于 3 个时提名,成员取各子系统被引最多的文件。
+  // 子系统只认目录:有 src 时只看 src 下一级目录,根级散文件与脚本目录不算子系统。
+  const hasSrc = files.some((f) => f.relPath.startsWith('src/'))
+  const topDirs = new Map<string, WikiPlanFileInput[]>()
+  for (const file of files) {
+    if (file.languageId === '' || testPaths.has(file.relPath)) continue
+    const parts = file.relPath.split('/')
+    if (parts.length < 2) continue
+    if (hasSrc && parts[0] !== 'src') continue
+    const top = parts.length >= 3 && parts[0] === 'src' ? `src/${parts[1]}` : parts[0]!
+    const list = topDirs.get(top)
+    if (list) list.push(file)
+    else topDirs.set(top, [file])
+  }
+  if (topDirs.size >= 3) {
+    const anchors = [...topDirs.values()]
+      .map((list) => [...list].sort((a, b) => b.inCount - a.inCount)[0]!.relPath)
+      .slice(0, 8)
+    rootPages.push(draft('架构设计', anchors, ['一级子系统不少于 3 个']))
   }
   const testFiles = files.filter((f) => testPaths.has(f.relPath))
   if (testFiles.length > 0) {
@@ -98,7 +134,7 @@ export function assembleTopics(
     return parts.slice(0, PLAN_TREE_MAX_DEPTH).join('/')
   }
   for (const page of leafPages) {
-    const dir = cappedDir(page.anchorDir)
+    const dir = page.topicDir ?? cappedDir(page.anchorDir)
     const topic = topicOf(dir)
     topic.pageIds.push(page.id)
     page.topicId = topic.id
@@ -117,6 +153,15 @@ export function assembleTopics(
     }
     topicByDir.get(dirOf(topic.dir))!.children.push(topic)
   }
+  // 链式折叠:自己没有页、只有一个子主题的中间层不占一层(如 src/renderer 只有 src 一个子目录)
+  const collapseTopic = (topic: WikiPlanTopic): WikiPlanTopic => {
+    topic.children = topic.children.map(collapseTopic)
+    if (topic.dir !== '' && topic.pageIds.length === 0 && topic.children.length === 1) {
+      return topic.children[0]!
+    }
+    return topic
+  }
+  const collapsedRoots = rootTopics.map(collapseTopic)
   const pageById = new Map(leafPages.map((p) => [p.id, p]))
   const overviewPages: WikiPlanPage[] = []
   for (const topic of [...topicByDir.values()].sort((a, b) => byCodeUnit(a.dir, b.dir))) {
@@ -131,6 +176,7 @@ export function assembleTopics(
     const overview: WikiPlanPage = {
       id: `w:${shortHash(`${topic.dir}|overview`)}`,
       kind: 'overview',
+      topicDir: null,
       title: topic.title,
       anchorDir: topic.dir,
       anchorSymbol: null,
@@ -143,5 +189,5 @@ export function assembleTopics(
     topic.overviewPageId = overview.id
     overviewPages.push(overview)
   }
-  return { topics: rootTopics.sort((a, b) => byCodeUnit(a.dir, b.dir)), overviewPages }
+  return { topics: collapsedRoots.sort((a, b) => byCodeUnit(a.dir, b.dir)), overviewPages }
 }
