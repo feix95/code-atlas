@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import Parser from 'web-tree-sitter'
-import type { FileStructure } from '../shared/types.ts'
+import type { FileStructure, SymbolRange } from '../shared/types.ts'
 import { GRAMMAR_WASM, LANG_TO_GRAMMAR } from '../shared/grammarWasm.ts'
 import { currentWasmOpts, engineWasmPath, grammarWasmDir } from '../native/wasmPaths.ts'
 
@@ -165,6 +165,81 @@ export function isAnalysisSupported(languageId: string): boolean {
   return GRAMMAR_FILES[languageId] !== undefined
 }
 
+/**
+ * 各语言中「一个符号的完整声明」对应的语法节点类型(全部提取规则共用一张表:
+ * 同名类型在不同语法里都是声明节点,不会误认)。名字节点向上找到的第一层声明节点即该符号的范围。
+ */
+const DECLARATION_TYPES = new Set([
+  'function_declaration',
+  'function_definition',
+  'function_item',
+  'function_signature_item',
+  'method_definition',
+  'method_declaration',
+  'constructor_declaration',
+  'variable_declarator',
+  'class_declaration',
+  'class_definition',
+  'class_specifier',
+  'struct_specifier',
+  'struct_item',
+  'enum_declaration',
+  'enum_item',
+  'interface_declaration',
+  'type_alias_declaration',
+  'type_spec',
+  'trait_item'
+])
+
+/** 声明外面的包裹层:范围要把它们算进去,切段时才不会把导出与装饰器切丢 */
+const WRAPPER_TYPES = new Set([
+  'export_statement',
+  'lexical_declaration',
+  'variable_declaration',
+  'decorated_definition'
+])
+
+type TSNode = NonNullable<ReturnType<Parser['parse']>>['rootNode']
+
+/** 从符号的名字节点向上找声明整体,返回 1 起的起止行;找不到声明节点时退回名字节点自身的行 */
+function declarationRangeOf(nameNode: TSNode): { startLine: number; endLine: number } | null {
+  let declaration: TSNode | null = null
+  let cursor: TSNode | null = nameNode.parent
+  while (cursor) {
+    if (DECLARATION_TYPES.has(cursor.type)) {
+      declaration = cursor
+      break
+    }
+    cursor = cursor.parent
+  }
+  // C/C++ 的 struct/class 说明符在「struct Point p」这类引用处也会被抓到:没有类体就不是声明,不给行号
+  if (
+    declaration &&
+    (declaration.type === 'struct_specifier' || declaration.type === 'class_specifier') &&
+    !declaration.namedChildren.some(
+      (child) => child.type === 'field_declaration_list' || child.type === 'declaration_list'
+    )
+  ) {
+    return null
+  }
+  let outer: TSNode = declaration ?? nameNode
+  while (outer.parent && WRAPPER_TYPES.has(outer.parent.type)) {
+    outer = outer.parent
+  }
+  return { startLine: outer.startPosition.row + 1, endLine: outer.endPosition.row + 1 }
+}
+
+/** 把一个符号的名字与行号范围记进结果;范围取不到(引用而非声明)时只记名字,不记范围 */
+function pushSymbolRange(
+  result: FileStructure,
+  nameNode: TSNode,
+  name: string,
+  kind: SymbolRange['kind']
+): void {
+  const range = declarationRangeOf(nameNode)
+  if (range) result.symbolRanges.push({ name, kind, ...range })
+}
+
 /** 剥掉字符串/系统头的包装:C 的 #include <x> 和各种引号,只留里面的名字 */
 function stripQuotes(text: string): string {
   const trimmed = text.trim()
@@ -199,7 +274,8 @@ export async function analyzeSource(
       functions: [],
       classes: [],
       interfaces: [],
-      reactComponents: []
+      reactComponents: [],
+      symbolRanges: []
     }
 
     for (const match of query.matches(tree.rootNode)) {
@@ -208,12 +284,15 @@ export async function analyzeSource(
         switch (capture.name) {
           case 'fn':
             result.functions.push(text)
+            pushSymbolRange(result, capture.node, text, 'function')
             break
           case 'cls':
             result.classes.push(text)
+            pushSymbolRange(result, capture.node, text, 'class')
             break
           case 'iface':
             result.interfaces.push(text)
+            pushSymbolRange(result, capture.node, text, 'interface')
             break
           case 'imp':
             result.imports.push(stripQuotes(text))
@@ -254,6 +333,18 @@ export async function analyzeSource(
     result.classes = dedupeSorted(result.classes)
     result.interfaces = dedupeSorted(result.interfaces)
     result.reactComponents = dedupeSorted(result.reactComponents)
+    // 行号范围不按名去重(同名方法各占一条),只去掉同一声明被多条规则重复抓出的完全相同条目;按起始行排序
+    const seenRanges = new Set<string>()
+    result.symbolRanges = result.symbolRanges
+      .filter((range) => {
+        const key = `${range.kind}:${range.name}:${range.startLine}:${range.endLine}`
+        if (seenRanges.has(key)) return false
+        seenRanges.add(key)
+        return true
+      })
+      .sort(
+        (a, b) => a.startLine - b.startLine || a.endLine - b.endLine || a.name.localeCompare(b.name)
+      )
     return result
   } finally {
     tree.delete()

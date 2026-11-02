@@ -47,6 +47,17 @@ export interface LanguageTag {
   source: 'extension' | 'content'
 }
 
+/** 一个符号在源码中的位置:声明整体的起止行,供按符号切分阅读与出处标注使用 */
+export interface SymbolRange {
+  name: string
+  /** 与 FileStructure 的分类口径一致:函数(含方法与构造器)、类(含 struct 与 enum)、接口(含 type 别名与 trait) */
+  kind: 'function' | 'class' | 'interface'
+  /** 起始行,1 起,含声明首行(导出语句、装饰器等包裹层计入) */
+  startLine: number
+  /** 结束行,1 起,含声明末行 */
+  endLine: number
+}
+
 /** AST 分析提取出的文件结构(只结构化,不解释) */
 export interface FileStructure {
   languageId: string
@@ -60,6 +71,12 @@ export interface FileStructure {
   interfaces: string[]
   /** React 组件(文件含 JSX 且函数/类名大写开头) */
   reactComponents: string[]
+  /**
+   * 每个符号的声明行号范围,按起始行排序;同名符号(重载、不同类中的同名方法)各占一条,不去重。
+   * React 组件就是 functions 与 classes 中与 reactComponents 同名的条目,按名单对应即可。
+   * 例外:C/C++ 中只被引用、本文件没有声明本体的 struct 名只进 classes 名单,不进本表
+   */
+  symbolRanges: SymbolRange[]
 }
 
 export interface ScanDirNode {

@@ -208,6 +208,29 @@ function assertContains(list: string[], expected: string[], label: string): void
   }
 }
 
+type StructureLike = Awaited<ReturnType<typeof analyzeSource>>
+
+/** 断言某个符号的行号范围存在且起止行正确(源码常量首行是空行,行号从 1 起含空行) */
+function assertRange(
+  structure: NonNullable<StructureLike>,
+  name: string,
+  kind: 'function' | 'class' | 'interface',
+  startLine: number,
+  endLine: number
+): void {
+  const hit = structure.symbolRanges.some(
+    (range) =>
+      range.name === name &&
+      range.kind === kind &&
+      range.startLine === startLine &&
+      range.endLine === endLine
+  )
+  assert.ok(
+    hit,
+    `${structure.languageId} 符号 ${name} 应有行号范围 ${startLine}-${endLine},实际 ${JSON.stringify(structure.symbolRanges)}`
+  )
+}
+
 async function main(): Promise<void> {
   // 一、TypeScript
   const ts = await analyzeSource(TS_SOURCE, 'typescript')
@@ -291,6 +314,53 @@ async function main(): Promise<void> {
   // 十一、坏代码不崩:解析器带 ERROR 节点也能提取出能提的
   const broken = await analyzeSource('function broken( { const x = ', 'typescript')
   assert.ok(broken, '语法残缺也应返回结构')
+
+  // 十二、符号行号范围:声明整体的起止行,导出与包裹层计入,按起始行排序
+  assertRange(ts!, 'Timer', 'interface', 6, 8)
+  assertRange(ts!, 'Mode', 'interface', 10, 10)
+  assertRange(ts!, 'startTimer', 'function', 12, 14)
+  assertRange(ts!, 'pauseTimer', 'function', 16, 18)
+  assertRange(ts!, 'TimerStore', 'class', 20, 23)
+  assertRange(ts!, 'tick', 'function', 21, 21)
+  assertRange(ts!, 'reset', 'function', 22, 22)
+  assertRange(ts!, 'helper', 'function', 25, 25)
+  const sortedByStart = [...ts!.symbolRanges].sort((a, b) => a.startLine - b.startLine)
+  assert.deepEqual(ts!.symbolRanges, sortedByStart, '行号范围按起始行排序')
+  assertRange(tsx!, 'TimerPanel', 'function', 4, 7)
+  assertRange(tsx!, 'SmallButton', 'function', 9, 11)
+  assertRange(tsx!, 'notAComponent', 'function', 13, 13)
+  assertRange(py!, 'Timer', 'class', 5, 7)
+  assertRange(py!, 'start', 'function', 6, 7)
+  assertRange(py!, 'pause_timer', 'function', 9, 10)
+  assertRange(java!, 'UserService', 'class', 7, 15)
+  assertRange(java!, 'UserService', 'function', 9, 11)
+  assertRange(java!, 'getName', 'function', 12, 14)
+  assertRange(java!, 'Repo', 'interface', 17, 19)
+  assertRange(java!, 'Color', 'class', 21, 23)
+  assertRange(go!, 'User', 'class', 11, 13)
+  assertRange(go!, 'Repo', 'interface', 15, 17)
+  assertRange(go!, 'NewUser', 'function', 19, 21)
+  assertRange(go!, 'Rename', 'function', 23, 25)
+  assertRange(c!, 'Point', 'class', 5, 8)
+  assertRange(c!, 'add', 'function', 10, 12)
+  assertRange(c!, 'print_point', 'function', 14, 16)
+  assert.equal(
+    c!.symbolRanges.filter((range) => range.name === 'Point').length,
+    1,
+    'C 里参数处的 struct 引用不是声明,不重复给行号'
+  )
+  assertRange(cpp!, 'Player', 'class', 5, 10)
+  assertRange(cpp!, 'Config', 'class', 12, 14)
+  assertRange(cpp!, 'run', 'function', 16, 18)
+  assertRange(cpp!, 'main', 'function', 20, 22)
+  assertRange(cs!, 'UserService', 'class', 7, 17)
+  assertRange(cs!, 'GetName', 'function', 13, 16)
+  assertRange(cs!, 'IRepo', 'interface', 19, 22)
+  assertRange(rust!, 'User', 'class', 5, 7)
+  assertRange(rust!, 'Repo', 'interface', 9, 11)
+  assertRange(rust!, 'find', 'function', 10, 10)
+  assertRange(rust!, 'find', 'function', 14, 16)
+  assertRange(rust!, 'build', 'function', 19, 21)
 
   console.log('✅ AST 分析器自测全部通过')
   console.log(
