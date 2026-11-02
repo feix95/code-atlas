@@ -7,6 +7,7 @@ import { translateLang } from '../shared/translateLangs.ts'
 import { wikiInputHash } from './wikiHash.ts'
 import type { FileFact } from '../depgraph/factCache.ts'
 import type {
+  WikiDependencyFact,
   WikiExcerpt,
   WikiFileFact,
   WikiPageFacts,
@@ -15,13 +16,20 @@ import type {
 } from '../shared/wikiTypes.ts'
 
 /** 摘录最多带几个文件,每个文件只取开头若干行;超出由输入预算继续裁 */
-export const WIKI_EXCERPT_MAX_FILES = 3
-export const WIKI_EXCERPT_MAX_LINES = 40
-export const WIKI_EXCERPT_MAX_CHARS = 2000
+export const WIKI_EXCERPT_MAX_FILES = 5
+export const WIKI_EXCERPT_MAX_LINES = 60
+export const WIKI_EXCERPT_MAX_CHARS = 2400
 
-/** 输出上限与 AI 模块口径一致:8k 档 1024,10k 及以上 2048 */
+/** 每个文件最多带几条导入;内部路径在前,外部包只补位 */
+export const WIKI_IMPORTS_PER_FILE = 12
+
+/** 输出上限随上下文档位抬升:8k 起给 2048,长文档位继续加,配合流式不会被正文看门狗截断 */
 export function wikiOutputTokens(contextSize: number): number {
-  return contextSize >= 10240 ? 2048 : 1024
+  if (contextSize >= 32768) return 6144
+  if (contextSize >= 16384) return 4096
+  if (contextSize >= 12288) return 3072
+  if (contextSize >= 8192) return 2048
+  return 1024
 }
 
 export interface WikiFactDeps {
@@ -73,6 +81,18 @@ function fileLanguage(file: WikiPageSource['files'][number], fact: FileFact | nu
   return fact?.structure.languageId ?? file.language ?? 'unknown'
 }
 
+function isInternalImport(target: string): boolean {
+  return target.startsWith('.') || target.startsWith('@') || target.startsWith('/')
+}
+
+/** 内部导入最能让模型讲清文件间协作,排前面;外部包补位,总量封顶 */
+function pickImports(imports: readonly string[]): string[] {
+  const unique = [...new Set(imports)]
+  const internal = unique.filter(isInternalImport)
+  const external = unique.filter((target) => !isInternalImport(target))
+  return [...internal, ...external].slice(0, WIKI_IMPORTS_PER_FILE)
+}
+
 function buildWikiFileFact(
   file: WikiPageSource['files'][number],
   fact: FileFact | null
@@ -81,6 +101,8 @@ function buildWikiFileFact(
   if (file.inCount !== undefined) out.inCount = file.inCount
   if (file.outCount !== undefined) out.outCount = file.outCount
   if (fact) {
+    const imports = pickImports(fact.structure.imports)
+    if (imports.length > 0) out.imports = imports
     out.exports = [...fact.structure.exports]
     out.functions = [...fact.structure.functions]
     out.classes = [...fact.structure.classes]
@@ -88,6 +110,11 @@ function buildWikiFileFact(
     out.reactComponents = [...fact.structure.reactComponents]
   }
   return out
+}
+
+/** 图上展示名带「·」不是路径;有真路径时不给模型看,免得它照抄进文档 */
+function modelDependency(dependency: WikiDependencyFact): WikiDependencyFact {
+  return dependency.path === undefined ? dependency : { ...dependency, name: null }
 }
 
 function buildPageFacts(
@@ -119,8 +146,8 @@ function buildPageFacts(
         folders: source.folders,
         files: source.files.map((file) => buildWikiFileFact(file, factOf(file.path))),
         attachedFiles: source.attachedFiles,
-        dependsOn: source.dependsOn,
-        usedBy: source.usedBy
+        dependsOn: source.dependsOn.map(modelDependency),
+        usedBy: source.usedBy.map(modelDependency)
       }
     }
   }
@@ -130,10 +157,7 @@ function buildPageFacts(
     group: {
       id: source.pageId,
       name: source.name,
-      files: source.files.map((file) => ({
-        path: file.path,
-        language: fileLanguage(file, factOf(file.path))
-      }))
+      files: source.files.map((file) => buildWikiFileFact(file, factOf(file.path)))
     }
   }
 }

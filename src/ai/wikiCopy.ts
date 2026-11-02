@@ -19,6 +19,8 @@ export interface WikiCopy {
   truncatedSymbols: string
   truncatedExcerpts: string
   truncatedDoc: string
+  /** 正文固定八段的标题,顺序即结构;模型只填内容,标题由程序拼 */
+  sectionTitles: readonly string[]
 }
 
 export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
@@ -36,7 +38,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: '文件',
     truncatedSymbols: '符号',
     truncatedExcerpts: '摘录',
-    truncatedDoc: '正文超出长度上限,已截断。'
+    truncatedDoc: '正文超出长度上限,已截断。',
+    sectionTitles: [
+      '引言',
+      '结构定位',
+      '构成与职责',
+      '依赖与协作',
+      '实现要点',
+      '使用与扩展',
+      '注意事项',
+      '结论'
+    ]
   },
   'zh-TW': {
     wikiTitle: '倉庫 Wiki',
@@ -52,7 +64,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: '檔案',
     truncatedSymbols: '符號',
     truncatedExcerpts: '摘錄',
-    truncatedDoc: '正文超出長度上限,已截斷。'
+    truncatedDoc: '正文超出長度上限,已截斷。',
+    sectionTitles: [
+      '引言',
+      '結構定位',
+      '構成與職責',
+      '依賴與協作',
+      '實作要點',
+      '使用與擴充',
+      '注意事項',
+      '結論'
+    ]
   },
   en: {
     wikiTitle: 'Repository Wiki',
@@ -68,7 +90,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: 'files',
     truncatedSymbols: 'symbols',
     truncatedExcerpts: 'excerpts',
-    truncatedDoc: 'The document body was cut at the length limit.'
+    truncatedDoc: 'The document body was cut at the length limit.',
+    sectionTitles: [
+      'Introduction',
+      'Location',
+      'Composition and responsibilities',
+      'Dependencies and collaboration',
+      'Implementation notes',
+      'Usage and extension',
+      'Caveats',
+      'Conclusion'
+    ]
   },
   ja: {
     wikiTitle: 'リポジトリ Wiki',
@@ -84,7 +116,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: 'ファイル',
     truncatedSymbols: 'シンボル',
     truncatedExcerpts: '抜粋',
-    truncatedDoc: '本文が長さ上限を超えたため、切り詰めました。'
+    truncatedDoc: '本文が長さ上限を超えたため、切り詰めました。',
+    sectionTitles: [
+      'はじめに',
+      '構成の位置づけ',
+      '構成と責務',
+      '依存関係と連携',
+      '実装の要点',
+      '使い方と拡張',
+      '注意事項',
+      'まとめ'
+    ]
   },
   ko: {
     wikiTitle: '저장소 Wiki',
@@ -100,7 +142,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: '파일',
     truncatedSymbols: '심볼',
     truncatedExcerpts: '발췌',
-    truncatedDoc: '본문이 길이 한도를 넘어 잘렸습니다.'
+    truncatedDoc: '본문이 길이 한도를 넘어 잘렸습니다.',
+    sectionTitles: [
+      '소개',
+      '구조 위치',
+      '구성과 책임',
+      '의존성과 협업',
+      '구현 요점',
+      '사용과 확장',
+      '주의 사항',
+      '결론'
+    ]
   },
   fr: {
     wikiTitle: 'Wiki du dépôt',
@@ -116,7 +168,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: 'fichiers',
     truncatedSymbols: 'symboles',
     truncatedExcerpts: 'extraits',
-    truncatedDoc: 'Le corps du document a été tronqué à la limite de longueur.'
+    truncatedDoc: 'Le corps du document a été tronqué à la limite de longueur.',
+    sectionTitles: [
+      'Introduction',
+      'Localisation',
+      'Composition et responsabilités',
+      'Dépendances et collaboration',
+      "Points d'implémentation",
+      'Utilisation et extension',
+      "Points d'attention",
+      'Conclusion'
+    ]
   },
   de: {
     wikiTitle: 'Repository-Wiki',
@@ -132,7 +194,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: 'Dateien',
     truncatedSymbols: 'Symbole',
     truncatedExcerpts: 'Auszüge',
-    truncatedDoc: 'Der Dokumenttext wurde am Längenlimit abgeschnitten.'
+    truncatedDoc: 'Der Dokumenttext wurde am Längenlimit abgeschnitten.',
+    sectionTitles: [
+      'Einführung',
+      'Einordnung',
+      'Aufbau und Zuständigkeiten',
+      'Abhängigkeiten und Zusammenarbeit',
+      'Implementierungshinweise',
+      'Nutzung und Erweiterung',
+      'Hinweise',
+      'Fazit'
+    ]
   },
   es: {
     wikiTitle: 'Wiki del repositorio',
@@ -148,7 +220,17 @@ export const WIKI_COPY: Readonly<Record<string, WikiCopy>> = {
     truncatedFiles: 'archivos',
     truncatedSymbols: 'símbolos',
     truncatedExcerpts: 'extractos',
-    truncatedDoc: 'El cuerpo del documento se recortó en el límite de longitud.'
+    truncatedDoc: 'El cuerpo del documento se recortó en el límite de longitud.',
+    sectionTitles: [
+      'Introducción',
+      'Ubicación',
+      'Composición y responsabilidades',
+      'Dependencias y colaboración',
+      'Puntos de implementación',
+      'Uso y extensión',
+      'Advertencias',
+      'Conclusión'
+    ]
   }
 }
 
@@ -160,4 +242,9 @@ export function wikiCopy(code: string): WikiCopy {
 /** 页头里的语种名用菜单同一份 label;代号认不出就原样显示 */
 export function wikiLanguageLabel(code: string): string {
   return translateLang(code)?.label ?? code
+}
+
+/** 固定八段的标题;代号认不出回默认语种,绝不空着 */
+export function wikiSectionTitles(code: string): readonly string[] {
+  return wikiCopy(code).sectionTitles
 }

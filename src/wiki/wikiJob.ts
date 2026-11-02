@@ -2,12 +2,14 @@
 // 模型调用与文件读取都从 deps 注入,自测用替身把流程跑全,不碰真实网络。
 import { buildWikiMessages } from '../ai/wikiPrompt.ts'
 import {
+  displayModelName,
   renderWikiMarkdown,
   requestWikiContent,
   wikiDocExcerpt,
   type WikiContentAttempt,
   type WikiModelRequest
 } from '../ai/wikiOutput.ts'
+import { wikiSectionTitles } from '../ai/wikiCopy.ts'
 import { translateLang } from '../shared/translateLangs.ts'
 import { WIKI_PROMPT_VERSION } from './wikiHash.ts'
 import {
@@ -200,7 +202,10 @@ export async function runWikiJob(
           {
             files: source.files.map((file) => file.path),
             attachedFiles: source.attachedFiles,
-            knownTags: options.knownTags
+            knownTags: options.knownTags,
+            language: options.language,
+            sectionTitles: wikiSectionTitles(options.language),
+            sourceName: source.name
           },
           deps.request,
           options.signal
@@ -264,7 +269,7 @@ export async function runWikiJob(
         file,
         inputHash,
         promptVersion: WIKI_PROMPT_VERSION,
-        model: options.model,
+        model: displayModelName(options.model),
         generatedAt,
         status: 'done',
         name: content.name,

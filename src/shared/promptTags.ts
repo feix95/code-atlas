@@ -28,6 +28,8 @@ export const TAG = {
   webResults: { open: '<web_results>', close: '</web_results>' },
   /** 仓库 Wiki 一次一篇的事实(模块或散件组) */
   pageFacts: { open: '<page_facts>', close: '</page_facts>' },
+  /** 仓库 Wiki 正文的固定章节标题(按目标语种给) */
+  sectionPlan: { open: '<section_plan>', close: '</section_plan>' },
   /** 目标语种名(Wiki 与翻译共用同一写法) */
   targetLanguage: { open: '<target_language>', close: '</target_language>' },
   /** 人设分节:能力边界 */

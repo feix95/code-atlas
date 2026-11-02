@@ -56,6 +56,16 @@ function fileSource(root: string, raw: unknown): WikiPageFileSource | null {
   return out
 }
 
+/** 模块 id 形如 m:src/shared/types.ts;只认仓库内相对路径,绝对路径与越界一律不给 */
+function modulePath(moduleId: string): string | null {
+  if (!moduleId.startsWith('m:')) return null
+  const path = moduleId.slice(2).replaceAll('\\', '/')
+  if (path === '' || path.length > 1024) return null
+  if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) return null
+  if (path.split('/').some((part) => part === '..' || part === '')) return null
+  return path
+}
+
 function dependency(raw: unknown): WikiDependencyFact | null {
   if (typeof raw !== 'object' || raw === null) return null
   const record = raw as Record<string, unknown>
@@ -66,7 +76,10 @@ function dependency(raw: unknown): WikiDependencyFact | null {
     typeof record.weight === 'number' && Number.isFinite(record.weight) && record.weight >= 0
       ? record.weight
       : 0
-  return { moduleId, name, weight }
+  const path = modulePath(moduleId)
+  return path === null
+    ? { kind: 'module', moduleId, name, weight }
+    : { kind: 'module', moduleId, name, path, weight }
 }
 
 function dependencies(raw: unknown): WikiDependencyFact[] {

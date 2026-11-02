@@ -33,10 +33,20 @@ function modulePage(
     folders: module.folders,
     dependsOn: links
       .filter((link) => link.from === module.id)
-      .map((link) => ({ moduleId: link.to, name: displayNameOf(link.to), weight: link.weight })),
+      .map((link) => ({
+        kind: 'module' as const,
+        moduleId: link.to,
+        name: displayNameOf(link.to),
+        weight: link.weight
+      })),
     usedBy: links
       .filter((link) => link.to === module.id)
-      .map((link) => ({ moduleId: link.from, name: displayNameOf(link.from), weight: link.weight }))
+      .map((link) => ({
+        kind: 'module' as const,
+        moduleId: link.from,
+        name: displayNameOf(link.from),
+        weight: link.weight
+      }))
   }
 }
 

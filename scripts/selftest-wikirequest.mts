@@ -16,7 +16,10 @@ function basePage(): Record<string, unknown> {
     files: [{ path: 'src\\a.ts', inCount: 2, outCount: 1 }],
     attachedFiles: ['src\\b.css'],
     folders: ['src'],
-    dependsOn: [{ moduleId: 'm:x', name: 'X', weight: 2 }],
+    dependsOn: [
+      { moduleId: 'm:src/shared/types.ts', name: 'shared · types.ts', weight: 12 },
+      { moduleId: 'm:C:/leak.ts', name: 'leak', weight: 1 }
+    ],
     usedBy: []
   }
 }
@@ -41,7 +44,9 @@ function checkParse(base: string): void {
   assert.equal(page.files[0].inCount, 2)
   assert.deepEqual(page.attachedFiles, ['src/b.css'])
   assert.deepEqual(page.folders, ['src'])
-  assert.equal(page.dependsOn[0].moduleId, 'm:x')
+  assert.equal(page.dependsOn[0].moduleId, 'm:src/shared/types.ts')
+  assert.equal(page.dependsOn[0].path, 'src/shared/types.ts', '模块路径取自 moduleId')
+  assert.equal(page.dependsOn[1].path, undefined, '盘符路径不当作模块路径')
 
   const absolutePage = basePage()
   absolutePage.files = [{ path: 'C:\\Windows\\win.ini' }]

@@ -65,7 +65,10 @@ function outputFrom(messages: WikiPromptMessages, name: string): string {
     summary: 'summary',
     tags: ['t'],
     keyFiles: first ? [first] : [],
-    doc: '## Body'
+    sections: Array.from(
+      { length: 8 },
+      (_, index) => `第${index + 1}段正文：这一页由自测替身生成，用来验证任务流程能正常落盘。`
+    )
   })
 }
 
@@ -349,9 +352,10 @@ async function checkSensitive(base: string): Promise<void> {
 
 function checkOutputTokens(): void {
   assert.equal(wikiOutputTokens(4096), 1024)
-  assert.equal(wikiOutputTokens(8192), 1024)
-  assert.equal(wikiOutputTokens(10240), 2048)
-  assert.equal(wikiOutputTokens(16384), 2048)
+  assert.equal(wikiOutputTokens(8192), 2048)
+  assert.equal(wikiOutputTokens(12288), 3072)
+  assert.equal(wikiOutputTokens(16384), 4096)
+  assert.equal(wikiOutputTokens(32768), 6144)
 }
 
 async function main(): Promise<void> {

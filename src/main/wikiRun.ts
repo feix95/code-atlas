@@ -8,6 +8,7 @@ import { joinRoot } from '../shared/paths.ts'
 import { translateLang } from '../shared/translateLangs.ts'
 import type { WikiEvent, WikiRunStatus, WikiStartResult } from '../shared/wikiTypes.ts'
 import { explainWithMessages } from '../ai/explain.ts'
+import { displayModelName } from '../ai/wikiOutput.ts'
 import { getFileFact } from '../depgraph/factCache.ts'
 import { resolveChatTargetOrError, explainAborters } from './aiEvidence.ts'
 import { announceActivityIdle } from './modelStatus.ts'
@@ -92,6 +93,7 @@ export function registerWikiRunIpc(): void {
 
     const chat = await resolveChatTargetOrError()
     if ('error' in chat) return { ok: false, error: chat.error }
+    const model = displayModelName(chat.target.model)
 
     const root = resolved.location
     await ensureWikiRootMarker(root)
@@ -111,7 +113,7 @@ export function registerWikiRunIpc(): void {
       total: pages.length,
       processed: 0,
       provider: chat.provider,
-      model: chat.target.model
+      model
     }
     activeJob = job
     event.sender.once('destroyed', () => controller.abort())
@@ -128,7 +130,7 @@ export function registerWikiRunIpc(): void {
         projectName: basename(req.projectRoot),
         projectDir,
         language: req.language,
-        model: chat.target.model,
+        model,
         contextSize: chat.ctx,
         replyCap,
         knownTags: req.knownTags ?? [],
@@ -146,7 +148,9 @@ export function registerWikiRunIpc(): void {
               { role: 'system', content: messages.system },
               { role: 'user', content: messages.user }
             ],
-            undefined,
+            // 流式只为续命:一页可能写到几千 token,非流式的 120 秒整段看门狗会拦腰截断;
+            // 增量不往界面推,收完仍是一次性解析
+            () => {},
             signal,
             replyCap
           )
@@ -193,7 +197,7 @@ export function registerWikiRunIpc(): void {
       ok: true,
       total: pages.length,
       provider: chat.provider,
-      model: chat.target.model,
+      model,
       projectDir
     }
   })

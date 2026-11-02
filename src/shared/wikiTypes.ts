@@ -29,6 +29,8 @@ export interface WikiFileFact {
   language: string
   inCount?: number
   outCount?: number
+  /** 文件开头里的导入目标;内部相对路径与别名优先,用来还原模块内协作 */
+  imports?: string[]
   exports?: string[]
   functions?: string[]
   classes?: string[]
@@ -37,8 +39,12 @@ export interface WikiFileFact {
 }
 
 export interface WikiDependencyFact {
+  /** 固定为 module:提示词据此说明依赖的是模块而不是文件 */
+  kind: 'module'
   moduleId: string
   name: string | null
+  /** 模块在仓库里的相对路径;图上展示名用「目录 · 文件」,写文档时按这个路径引用 */
+  path?: string
   weight: number
 }
 
@@ -51,10 +57,8 @@ export interface WikiModuleFact {
   usedBy: WikiDependencyFact[]
 }
 
-export interface WikiGroupFileFact {
-  path: string
-  language: string
-}
+/** 散件组沿用文件事实:散件里的源码同样有符号与导入可讲 */
+export type WikiGroupFileFact = WikiFileFact
 
 export interface WikiGroupFact {
   id: string

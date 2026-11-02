@@ -123,7 +123,9 @@ function checkAssembly(): WikiPageSource[] {
     inCount: 4,
     outCount: 1
   })
-  assert.deepEqual(first.usedBy, [{ moduleId: 'm:src/b.ts', name: 'src · b.ts', weight: 3 }])
+  assert.deepEqual(first.usedBy, [
+    { kind: 'module', moduleId: 'm:src/b.ts', name: 'src · b.ts', weight: 3 }
+  ])
   assert.deepEqual(first.dependsOn, [])
   const docs = findPage(pages, 'g:docs-assets')
   assert.deepEqual(

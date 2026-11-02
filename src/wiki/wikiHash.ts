@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto'
 
 /** 提示词口径变化时加一,旧文档据此整体过期 */
-export const WIKI_PROMPT_VERSION = 1
+export const WIKI_PROMPT_VERSION = 4
 
 export interface WikiHashInput {
   /** 语种代号,取 translateLangs */

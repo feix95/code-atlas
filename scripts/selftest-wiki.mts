@@ -46,6 +46,8 @@ import {
   withWikiRetryNote
 } from '../src/ai/wikiPrompt.ts'
 import {
+  displayModelName,
+  languageMatches,
   parseWikiOutput,
   renderWikiMarkdown,
   requestWikiContent,
@@ -53,9 +55,10 @@ import {
 } from '../src/ai/wikiOutput.ts'
 import { panelPageOf } from '../src/wiki/wikiPanel.ts'
 import { renderWikiIndex, wikiIndexLink, writeWikiIndex } from '../src/wiki/wikiIndex.ts'
-import { WIKI_COPY, wikiCopy } from '../src/ai/wikiCopy.ts'
+import { WIKI_COPY, wikiCopy, wikiSectionTitles } from '../src/ai/wikiCopy.ts'
 import { TRANSLATE_LANGS } from '../src/shared/translateLangs.ts'
 import { estimateTokens } from '../src/shared/aiText.ts'
+import { prepareWikiPageFacts } from '../src/wiki/wikiPageFacts.ts'
 
 function checkSettings(base: string): void {
   const defaults = {
@@ -460,7 +463,7 @@ function moduleFacts(): WikiPageFacts {
         }
       ],
       attachedFiles: ['src/a.css'],
-      dependsOn: [{ moduleId: 'm:src/c.ts', name: null, weight: 2 }],
+      dependsOn: [{ kind: 'module', moduleId: 'm:src/c.ts', name: null, weight: 2 }],
       usedBy: []
     },
     excerpts: [{ path: 'src/a.ts', head: 'export function run() {}' }],
@@ -473,8 +476,15 @@ function checkPrompt(): void {
   const messages = buildWikiMessages(facts)
   const { user } = messages
   assert.ok(
-    user.startsWith('<target_language>English</target_language>'),
-    '语种标签沿用翻译功能的写法'
+    user.startsWith(
+      '<target_language>English - write name, summary, tags and every section in this language.</target_language>'
+    ),
+    '语种标签沿用翻译功能的写法,并要求全部字段用目标语种'
+  )
+  assert.ok(
+    user.includes('<section_plan>\n1. Introduction\n2. Location') &&
+      user.includes('8. Conclusion\n</section_plan>'),
+    '八段标题按语种注入 section_plan'
   )
   assert.ok(user.includes('<page_facts>') && user.endsWith('</page_facts>'), '事实只放 page_facts')
   const parsed = JSON.parse(user.slice(user.indexOf('{'), user.lastIndexOf('}') + 1)) as {
@@ -496,9 +506,14 @@ function checkPrompt(): void {
       language: { code: lang.code, name: lang.enName }
     })
     assert.ok(
-      tagged.user.includes(`<target_language>${lang.enName}</target_language>`),
+      tagged.user.includes(
+        `<target_language>${lang.enName} - write name, summary, tags and every section in this language.</target_language>`
+      ),
       `${lang.code} 的语种要注入`
     )
+    for (const title of wikiSectionTitles(lang.code)) {
+      assert.ok(tagged.user.includes(title), `${lang.code} 的段落标题 ${title} 要进 section_plan`)
+    }
   }
 
   const leaky = structuredClone(facts)
@@ -644,12 +659,36 @@ function checkBudget(): void {
   assert.equal(fileFit.module.files[0].path, 'src/f0.ts', '入度最高的文件留在前列')
 }
 
+const ZH_TITLES = wikiSectionTitles('zh-CN')
+const EN_TITLES = wikiSectionTitles('en')
+const JA_TITLES = wikiSectionTitles('ja')
+
+function zhSections(): string[] {
+  return Array.from(
+    { length: 8 },
+    (_, index) =>
+      `第${index + 1}段说明：这一页描述模块的职责、文件构成、依赖方向与阅读顺序，所有内容都来自给定事实。`
+  )
+}
+
+function enSections(): string[] {
+  return Array.from(
+    { length: 8 },
+    (_, index) =>
+      `Section ${index + 1} explains the module responsibilities, file composition, dependency direction, and reading order using only the provided facts.`
+  )
+}
+
 function checkOutput(): void {
   const input = {
     files: ['src/a.ts', 'src/b.ts'],
     attachedFiles: ['src/a.css'],
-    knownTags: ['UI', '图谱']
+    knownTags: ['UI', '图谱'],
+    language: 'zh-CN',
+    sectionTitles: ZH_TITLES
   }
+  const sections = zhSections()
+  sections[0] = `# 模型自带的标题\n${sections[0]}`
   const raw = [
     '```json',
     JSON.stringify({
@@ -657,7 +696,7 @@ function checkOutput(): void {
       summary: '把文件引用关系画成图',
       tags: [' UI ', 'ui', '图谱', 'x'.repeat(13), '第三'],
       keyFiles: ['src/a.ts', 'nope.ts', 'src/a.css', 'src/b.ts', 'src/a.ts'],
-      doc: '## 职责\n画图。',
+      sections,
       module: 'evil'
     }),
     '```'
@@ -676,11 +715,34 @@ function checkOutput(): void {
       ['src/a.ts', 'src/a.css', 'src/b.ts'],
       '只留输入里的路径、去重、最多 5 个'
     )
+    assert.ok(result.content.doc.startsWith('## 1. 引言\n\n第1段说明'), '八段标题由程序拼')
+    assert.ok(!result.content.doc.includes('# 模型自带的标题'), '模型自带的一级标题要剥掉')
+    assert.ok(result.content.doc.includes('## 8. 结论'), '最后一段标题也在')
     assert.ok(!('module' in result.content), '其他字段一律丢弃')
   }
 
   const parse = (value: unknown) => parseWikiOutput(JSON.stringify(value), input)
-  const base = { summary: 's', tags: ['t'], keyFiles: [], doc: 'd' }
+  const base = { summary: 's', tags: ['t'], keyFiles: [], sections: zhSections() }
+
+  const codeSection = parseWikiOutput(
+    JSON.stringify({
+      ...base,
+      name: 'AB',
+      sections: [
+        ...zhSections().slice(0, 7),
+        '下面这段代码说明为什么要包含这个头文件，以及它在文件开头的作用。\n```c\n#include <stdio.h>\n```'
+      ]
+    }),
+    input
+  )
+  assert.ok(codeSection.ok, '段内代码块不影响校验')
+  if (codeSection.ok) {
+    assert.ok(
+      codeSection.content.doc.includes('#include <stdio.h>'),
+      '只剥段首一级标题,不误删代码里的 #'
+    )
+  }
+
   assert.equal(parse({ ...base, name: 'A' }).ok, false, '1 个字符的名称不合规')
   assert.equal(parse({ ...base, name: 'x'.repeat(17) }).ok, false, '超过 16 个字符的名称不合规')
   assert.equal(parse({ ...base, name: 'AB' }).ok, true, '2 个字符的名称合规')
@@ -692,52 +754,93 @@ function checkOutput(): void {
     assert.equal(spaced.content.summary, 'one two', '摘要只留单空格')
   }
   assert.equal(
-    parse({ name: 'AB', summary: 'x'.repeat(61), tags: ['t'], keyFiles: [], doc: 'd' }).ok,
+    parse({ ...base, name: 'AB', summary: '中'.repeat(81) }).ok,
     false,
-    '摘要超过 60 字不合规'
+    '摘要超过 80 字不合规'
   )
-  assert.equal(
-    parse({ name: 'AB', summary: 'x'.repeat(60), tags: ['t'], keyFiles: [], doc: 'd' }).ok,
-    true,
-    '摘要 60 字合规'
-  )
-  assert.equal(
-    parse({ name: 'AB', summary: ' ', tags: ['t'], keyFiles: [], doc: 'd' }).ok,
-    false,
-    '摘要必填'
-  )
-  assert.equal(
-    parse({ name: 'AB', summary: 's', tags: [], keyFiles: [], doc: 'd' }).ok,
-    false,
-    '标签至少一个'
-  )
-  const five = parse({
-    name: 'AB',
-    summary: 's',
-    tags: ['1', '2', '3', '4', '5', '6'],
-    keyFiles: [],
-    doc: 'd'
-  })
+  assert.equal(parse({ ...base, name: 'AB', summary: '中'.repeat(80) }).ok, true, '摘要 80 字合规')
+  assert.equal(parse({ ...base, name: 'AB', summary: ' ' }).ok, false, '摘要必填')
+  assert.equal(parse({ ...base, name: 'AB', tags: [] }).ok, false, '标签至少一个')
+  const five = parse({ ...base, name: 'AB', tags: ['1', '2', '3', '4', '5', '6'] })
   assert.ok(five.ok, '标签多了留前五个')
   if (five.ok) assert.deepEqual(five.content.tags, ['1', '2', '3', '4', '5'])
   assert.equal(
-    parse({ name: 'AB', summary: 's', tags: ['x'.repeat(13)], keyFiles: [], doc: 'd' }).ok,
+    parse({ ...base, name: 'AB', tags: ['x'.repeat(13)] }).ok,
     false,
     '全是超长标签视为没有标签'
   )
+  assert.equal(parse({ ...base, name: 'AB', sections: [] }).ok, false, '段落数量不够不合规')
   assert.equal(
-    parse({ name: 'AB', summary: 's', tags: ['t'], keyFiles: [], doc: '' }).ok,
+    parse({ ...base, name: 'AB', sections: zhSections().slice(1) }).ok,
     false,
-    '正文必填'
+    '段落少了不合规'
   )
-  assert.equal(parseWikiOutput('not json', input).ok, false, '非 JSON 要报错')
-  assert.equal(parseWikiOutput('[]', input).ok, false, '数组不是对象')
-  const longDoc = parse({
+  const shortSection = zhSections()
+  shortSection[2] = '短'
+  assert.equal(parse({ ...base, name: 'AB', sections: shortSection }).ok, false, '单段太短不合规')
+  const emptySection = zhSections()
+  emptySection[5] = '   '
+  assert.equal(parse({ ...base, name: 'AB', sections: emptySection }).ok, false, '单段空白不合规')
+
+  const english = { ...input, language: 'en', sectionTitles: EN_TITLES }
+  assert.equal(
+    parseWikiOutput(
+      JSON.stringify({
+        name: 'AB',
+        summary: 's',
+        tags: ['t'],
+        keyFiles: [],
+        sections: zhSections()
+      }),
+      english
+    ).ok,
+    false,
+    '英文目标写了中文正文要拦下'
+  )
+  const japanese = { ...english, language: 'ja', sectionTitles: JA_TITLES }
+  const enBody = JSON.stringify({
     name: 'AB',
     summary: 's',
     tags: ['t'],
     keyFiles: [],
-    doc: '中'.repeat(WIKI_DOC_MAX_CHARS + 20)
+    sections: enSections()
+  })
+  assert.equal(parseWikiOutput(enBody, japanese).ok, false, '日文目标写了英文正文要拦下')
+  const copiedName = parseWikiOutput(
+    JSON.stringify({
+      name: 'Core Module',
+      summary: 'Core runtime module owns all application responsibilities.',
+      tags: ['t'],
+      keyFiles: [],
+      sections: enSections()
+    }),
+    { ...english, sourceName: 'Core Module' }
+  )
+  assert.equal(copiedName.ok, false, '非中文目标照抄程序页名要拦下')
+  if (!copiedName.ok) {
+    assert.ok(
+      copiedName.errors.some((error) => error.includes('name must be translated')),
+      '错误清单点明名称没翻译'
+    )
+  }
+  const localized = parseWikiOutput(
+    JSON.stringify({
+      name: 'Core Module',
+      summary: 'Core runtime module owns all application responsibilities.',
+      tags: ['t'],
+      keyFiles: [],
+      sections: enSections()
+    }),
+    english
+  )
+  assert.ok(localized.ok, '英文目标写英文正文可过')
+
+  assert.equal(parseWikiOutput('not json', input).ok, false, '非 JSON 要报错')
+  assert.equal(parseWikiOutput('[]', input).ok, false, '数组不是对象')
+  const longDoc = parse({
+    ...base,
+    name: 'AB',
+    sections: zhSections().map(() => '中'.repeat(600))
   })
   assert.ok(longDoc.ok, '超长正文截断后仍可用')
   if (longDoc.ok) {
@@ -746,14 +849,58 @@ function checkOutput(): void {
   }
 }
 
+async function checkDependencyFacts(): Promise<void> {
+  const source: WikiPageSource = {
+    pageId: 'm:src/a.ts',
+    kind: 'module',
+    name: 'A',
+    files: [{ path: 'src/a.ts', language: 'typescript', inCount: 0, outCount: 2 }],
+    attachedFiles: [],
+    folders: ['src'],
+    dependsOn: [
+      {
+        kind: 'module',
+        moduleId: 'm:src/shared/types.ts',
+        name: 'shared · types.ts',
+        path: 'src/shared/types.ts',
+        weight: 3
+      }
+    ],
+    usedBy: [{ kind: 'module', moduleId: 'm:src/b.ts', name: 'b.ts', weight: 1 }]
+  }
+  const facts = await prepareWikiPageFacts(
+    source,
+    {
+      language: 'zh-CN',
+      projectName: 'demo',
+      moduleCount: 1,
+      groupCount: 0,
+      knownTags: [],
+      contextSize: 8192,
+      replyCap: 2048
+    },
+    { factOf: () => null, readHead: async () => 'export const a = 1' }
+  )
+  assert.equal(facts.kind, 'module')
+  if (facts.kind !== 'module') return
+  assert.equal(facts.module.dependsOn[0].name, null, '有真路径时展示名不进提示词')
+  assert.equal(facts.module.dependsOn[0].path, 'src/shared/types.ts', '依赖带上真路径')
+  assert.equal(facts.module.usedBy[0].name, 'b.ts', '没有路径时保留展示名')
+}
+
 async function checkRetry(): Promise<void> {
-  const input = { files: ['src/a.ts'], knownTags: [] }
+  const input = {
+    files: ['src/a.ts'],
+    knownTags: [],
+    language: 'zh-CN',
+    sectionTitles: ZH_TITLES
+  }
   const valid = JSON.stringify({
     name: 'AB',
     summary: 's',
     tags: ['t'],
     keyFiles: ['src/a.ts'],
-    doc: 'd'
+    sections: zhSections()
   })
   const messages = { system: 'sys', user: 'facts' }
   let calls = 0
@@ -813,6 +960,53 @@ function checkMarkdown(): void {
   assert.ok(md.includes('## 职责'), '正文原样接在后面')
   assert.ok(md.endsWith('\n'), '文件末尾留换行')
   assert.ok(!md.includes('C:\\'), 'Markdown 不写盘符')
+
+  const fullPath = renderWikiMarkdown(content, {
+    language: 'zh-CN',
+    model: 'F:\\models\\qwen3-27b.gguf',
+    generatedAt: '2026-11-02T12:34:56.000Z',
+    truncated: { files: 0, symbols: 0, excerpts: 0 }
+  })
+  assert.ok(fullPath.includes('模型: qwen3-27b.gguf'), '模型只留文件名')
+  assert.ok(!fullPath.includes('models\\'), '模型所在目录不进文档')
+  assert.equal(displayModelName('  '), '—', '空模型名给占位')
+  assert.equal(displayModelName('/opt/models/x.gguf'), 'x.gguf', 'Unix 路径同样只留文件名')
+
+  assert.equal(languageMatches(zhSections()[0], 'zh-CN'), true, '中文正文通过中文闸')
+  assert.equal(
+    languageMatches(
+      'これは日本語の説明文です。ひらがなとカタカナが十分に含まれています。モジュールの責任を説明します。',
+      'ja'
+    ),
+    true,
+    '日文正文通过日文闸'
+  )
+  assert.equal(languageMatches(zhSections().join('\n'), 'ja'), false, '中文正文过不了日文闸')
+  assert.equal(languageMatches(enSections().join('\n'), 'en'), true, '英文正文通过英文闸')
+  assert.equal(languageMatches(enSections().join('\n'), 'zh-CN'), false, '英文正文过不了中文闸')
+  assert.equal(languageMatches('short', 'ja'), true, '太短的文字不做判断')
+  const mixedSummary = 'Electron 预加载层，向渲染进程暴露主进程 IPC 能力。'
+  assert.equal(languageMatches(mixedSummary, 'zh-CN', 'summary'), true, '中文摘要允许夹技术词')
+  assert.equal(languageMatches(mixedSummary, 'zh-CN'), false, '同样文字按正文口径不够长')
+  const technicalSummary = 'Electron preload 模块，负责 IPC 通信与 UI 缩放。'
+  assert.equal(
+    languageMatches(technicalSummary, 'zh-CN', 'summary'),
+    true,
+    '中文摘要里技术词占大半也算中文'
+  )
+  assert.equal(
+    languageMatches('Electron preload bridge exposing IPC.', 'zh-CN', 'summary'),
+    false,
+    '整句英文过不了中文摘要闸'
+  )
+  const shortEnglish = 'Electron preload bridge exposing IPC APIs to the renderer.'
+  assert.equal(languageMatches(shortEnglish, 'en', 'summary'), true, '英文短摘要可过')
+  assert.equal(languageMatches(shortEnglish, 'en'), false, '英文短句按正文口径不够长')
+  assert.equal(
+    languageMatches('Electron のプリロード層です。', 'ja', 'summary'),
+    true,
+    '日文短摘要按假名判断'
+  )
 
   const trimmed = renderWikiMarkdown(
     { ...content, docTruncated: true },
@@ -889,8 +1083,15 @@ function checkCopy(): void {
     assert.ok(copy, `${lang.code} 要有文案`)
     if (!copy) continue
     for (const [key, value] of Object.entries(copy)) {
+      if (key === 'sectionTitles') continue
       assert.equal(typeof value, 'string', `${lang.code}.${key} 是字符串`)
       assert.ok(value.trim().length > 0, `${lang.code}.${key} 不能空`)
+    }
+    const titles = wikiSectionTitles(lang.code)
+    assert.equal(titles.length, 8, `${lang.code} 固定八段`)
+    assert.equal(new Set(titles).size, 8, `${lang.code} 段标题不重复`)
+    for (const title of titles) {
+      assert.ok(title.trim().length > 0, `${lang.code} 段标题不能空`)
     }
   }
   assert.equal(wikiCopy('xx'), WIKI_COPY[DEFAULT_WIKI_LANGUAGE], '不认识的语种回默认')
@@ -909,6 +1110,7 @@ async function main(): Promise<void> {
     checkPrompt()
     checkBudget()
     checkOutput()
+    await checkDependencyFacts()
     await checkRetry()
     checkMarkdown()
     await checkIndex(base)
@@ -921,7 +1123,7 @@ async function main(): Promise<void> {
       '   文件名清洗与重名 · 项目目录防冲突 · MD 原子写 · 记账读写与损坏识别 · 改名删旧 · 缓存键含语种'
     )
     console.log(
-      '   提示词只带当前页 · 语种注入 · 本机路径与敏感摘录清洗 · 输出逐字段校验 · 只重试一次 · 8 语种文案 · 预算裁剪顺序'
+      '   提示词只带当前页 · 语种注入 · 依赖按真路径引用 · 本机路径与敏感摘录清洗 · 输出逐字段校验 · 只重试一次 · 8 语种文案 · 预算裁剪顺序'
     )
     console.log('   README 目录页按语种落盘 · 相对链接与转义 · 空目录不落空壳')
   } finally {
