@@ -38,7 +38,16 @@ export function checkWhitelist(
   return [...new Set(violations)]
 }
 
-/** 行内代码配平:模型偶尔漏写右反引号,整行奇数个时在行尾补一个,不动代码围栏行 */
+/** 代码片段合法内容:纯 ASCII 且无空白(标识符、路径、简单签名);含中文或空格即属正文粘连 */
+function isCodeSpan(content: string): boolean {
+  return content !== '' && !/\s/.test(content) && !/[^\x20-\x7E]/.test(content)
+}
+
+/**
+ * 行内代码修复:模型偶尔漏写右反引号,使路径与后面的中文粘成一整段假代码。
+ * 逐行处理:内容粘连的片段拆掉它的反引号(文字保留);行尾未闭合的片段,
+ * 内容像代码就补上右反引号,像正文就拆掉左反引号。不动代码围栏行。
+ */
 export function balanceInlineCode(text: string): string {
   let inFence = false
   return text
@@ -48,9 +57,26 @@ export function balanceInlineCode(text: string): string {
         inFence = !inFence
         return line
       }
-      if (inFence) return line
-      const count = (line.match(/`/g) ?? []).length
-      return count % 2 === 1 ? `${line}\`` : line
+      if (inFence || !line.includes('`')) return line
+      const ticks: number[] = []
+      for (let i = 0; i < line.length; i++) if (line[i] === '`') ticks.push(i)
+      const drop = new Set<number>()
+      let appendClose = false
+      for (let k = 0; k + 1 < ticks.length; k += 2) {
+        const content = line.slice(ticks[k]! + 1, ticks[k + 1]!)
+        if (!isCodeSpan(content)) {
+          drop.add(ticks[k]!)
+          drop.add(ticks[k + 1]!)
+        }
+      }
+      if (ticks.length % 2 === 1) {
+        const last = ticks[ticks.length - 1]!
+        if (isCodeSpan(line.slice(last + 1))) appendClose = true
+        else drop.add(last)
+      }
+      if (drop.size === 0 && !appendClose) return line
+      const kept = [...line].filter((_, i) => !drop.has(i)).join('')
+      return appendClose ? `${kept}\`` : kept
     })
     .join('\n')
 }

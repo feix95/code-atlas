@@ -7,6 +7,7 @@ import type { WikiPlanFileInput, WikiPlanInput } from '../src/wiki/wikiPlanTypes
 import type { FileFact } from '../src/depgraph/factCache.ts'
 import { buildPageEvidence } from '../src/wiki/wikiEvidence.ts'
 import { WikiNoteLedger } from '../src/wiki/wikiNotes.ts'
+import { balanceInlineCode } from '../src/wiki/wikiPageCheck.ts'
 import { runWikiPage } from '../src/wiki/wikiPageRun.ts'
 import type { WikiCompleter } from '../src/wiki/wikiReadTypes.ts'
 
@@ -756,8 +757,10 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     '段文本必须等于原文整段切片,空行间隙不许丢'
   )
   let thetaBCode = ''
+  let thetaFirstUser = ''
   const thetaCompleter: WikiCompleter = async (system, user, maxTokens) => {
     if (system.includes('代码阅读员')) {
+      if (thetaFirstUser === '') thetaFirstUser = user
       const only = /\(主体符号 (\w+)\)/.exec(user)
       if (!only) return 'garbage,不是 JSON'
       if (only[1] === 'thetaB') thetaBCode = user.split('代码:\n')[1] ?? ''
@@ -787,6 +790,23 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     'thetaB 子段首行必须是它自己的声明行(带正确行号)'
   )
   assert.ok(!thetaBCode.includes('return 1'), 'thetaB 子段不应混进 thetaA 的代码')
+  assert.ok(
+    thetaFirstUser.includes('本段要写记录的符号只有') && thetaFirstUser.includes('thetaB'),
+    '笔记提示词必须明确列出本段目标符号'
+  )
+
+  // 十五、行内代码修复:粘连片段拆引号保留文字,未闭合的代码片段补右引号,正常片段不动
+  const glued = balanceInlineCode(
+    '`src/ai/engineInstaller.ts不仅依赖共享模块，还直接调用 `enginePackage` 的功能'
+  )
+  assert.ok(!glued.includes('`'), '粘连片段应拆掉全部反引号,只留文字')
+  assert.ok(glued.includes('engineInstaller.ts不仅依赖'), '粘连修复不应吞掉正文')
+  assert.equal(balanceInlineCode('调用 `alphaRun'), '调用 `alphaRun`', '未闭合代码片段应补右引号')
+  assert.equal(
+    balanceInlineCode('调用 `alphaRun` 完成'),
+    '调用 `alphaRun` 完成',
+    '正常片段不应被改动'
+  )
 
   // 十四、子段笔记写错符号:能解析也不算成功,不入缓存,复跑必须重试
   const iotaLines: string[] = ["import { x } from './x.ts'", '']
@@ -867,6 +887,62 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     iotaDeps
   )
   assert.ok(iotaRun2.stats.noteCalls >= 1, '写错符号的子段不应入缓存,复跑必须重试')
+
+  // 十六、节正文漏写右反引号把真实路径与中文粘连时,修复后不应整节判校验失败
+  const kappaLines = [
+    "import { x } from './x.ts'",
+    '',
+    'export function kappaRun(): number {',
+    '  return 1',
+    '}'
+  ]
+  const kappaRanges = [{ name: 'kappaRun', kind: 'function' as const, startLine: 3, endLine: 5 }]
+  const kappaPlan = buildWikiPlan({
+    ...planInput,
+    files: [planFile('src/kappa/kappa.ts', { exports: ['kappaRun'], functions: ['kappaRun'] })],
+    edges: []
+  })
+  const kappaPage = kappaPlan.pages.find((p) => p.kind === 'leaf')!
+  const kappaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      return JSON.stringify({
+        symbols: [
+          { name: 'kappaRun', role: '启动入口', deps: [], sideEffects: '无', crossRefs: [] }
+        ],
+        summary: '本段讲 kappaRun'
+      })
+    }
+    if (system.includes('产品说明')) return '本页讲 `kappaRun` 的职责。'
+    if (system.includes('技术文档作者')) {
+      return '`src/kappa/kappa.ts不仅导出核心函数，还直接调用 `kappaRun` 完成启动。'
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const kappaResult = await runWikiPage(
+    { page: kappaPage, topicTitle: null, plan: kappaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: () => ({
+        sha256: 'k',
+        structure: {
+          languageId: 'typescript',
+          imports: ['./x.ts'],
+          exports: ['kappaRun'],
+          functions: ['kappaRun'],
+          classes: [],
+          interfaces: [],
+          reactComponents: [],
+          symbolRanges: kappaRanges
+        }
+      }),
+      readFile: async () => kappaLines.join('\n'),
+      complete: kappaCompleter,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.deepEqual(kappaResult.stats.checkFailedSections, [], '反引号粘连经修复后不应判节校验失败')
+  assert.ok(kappaResult.markdown.includes('kappa.ts不仅导出核心函数'), '修复后正文文字应保留')
 
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }

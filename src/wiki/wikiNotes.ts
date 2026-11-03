@@ -13,6 +13,7 @@ export { WikiNoteLedger } from './wikiLedger.ts'
 
 const NOTE_SYSTEM = [
   '你是代码阅读员。只依据给定的代码段做阅读笔记,不推测代码里没有的内容,不使用代码里不存在的标识符。',
+  '符号指代码段里定义的名字;import 进来的名字不是段内符号,不要为它们单独写条目,需要时只能写进 deps。',
   '段内每个符号都要有一条记录,一条都不能漏。role 不超过 30 字,deps 最多 3 个,crossRefs 最多 2 条,写紧凑些。',
   '只输出一个 JSON 对象,不要输出任何其他文字。格式:',
   '{"symbols":[{"name":"符号名","role":"一句话作用","deps":["依赖的符号或模块名"],"sideEffects":"副作用,没有写 无","crossRefs":["需要跨段注意的点,没有留空数组"]}],"summary":"本段一句话摘要"}'
@@ -104,9 +105,19 @@ export async function generateSegmentNotes(
       .split('\n')
       .map((line, i) => `${segment.startLine + i}: ${line}`)
       .join('\n')
+    // 明确列出本段目标符号:不说清哪些名字算符号,模型会把 import 名也逐个写成条目,
+    // 输出被截断成废 JSON,整段首试白跑(真机实测教训)
+    const insideNames = symbolsInside(file, segment).map((r) => r.name)
+    const targets =
+      insideNames.length > 0 ? insideNames : segment.symbolName !== null ? [segment.symbolName] : []
+    const targetLine =
+      targets.length > 0
+        ? `本段要写记录的符号只有:${targets.join('、')}。`
+        : '本段没有段内符号,symbols 输出空数组,只写 summary。'
     const user = [
       structurePrefix(evidence, segment),
       `本段:${segment.path} 第 ${segment.startLine}-${segment.endLine} 行${segment.symbolName ? `(主体符号 ${segment.symbolName})` : ''}`,
+      targetLine,
       relatedNotes(segment, notes),
       '代码:',
       numbered,
@@ -128,9 +139,13 @@ export async function generateSegmentNotes(
       : { note: null, failure: '输出无法解析为结构化笔记', raw }
   }
 
+  /** 原始输出摘录:超长时保留头尾,截断类失败要能看到它最终停在哪里 */
+  const excerptRaw = (raw: string): string =>
+    raw.length <= 4000 ? raw : `${raw.slice(0, 2500)}\n...(中段省略)...\n${raw.slice(-1200)}`
+
   const recordFailure = (segmentId: string, failure: string | null, raw: string): void => {
     failures.push(`${segmentId}:${failure ?? '笔记失败'}`)
-    rawFailures.push({ segmentId, reason: failure ?? '笔记失败', raw: raw.slice(0, 4000) })
+    rawFailures.push({ segmentId, reason: failure ?? '笔记失败', raw: excerptRaw(raw) })
   }
 
   /** 单符号子段:先查子段缓存,失败带提示加额再试一次;成功按子段键入缓存,失败返回占位 */
@@ -204,7 +219,7 @@ export async function generateSegmentNotes(
     rawFailures.push({
       segmentId: segment.id,
       reason: `${first.failure ?? '笔记失败'}(整段首试)`,
-      raw: first.raw.slice(0, 4000)
+      raw: excerptRaw(first.raw)
     })
     // 升级重试:多符号段拆成单符号子段逐个记(整段反复失败时,小步通常能过),
     // 子段各自缓存、各自成败,合并结果不整段入缓存,免得占位条目混进去冒充读过;

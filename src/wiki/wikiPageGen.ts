@@ -83,13 +83,17 @@ async function runSection(
   } catch {
     // 调用失败保持空稿,下面按未通过处理
   }
+  // 先修行内代码再校验:漏写右反引号会把真实路径与中文粘成假名称,误判整节不合格
+  text = balanceInlineCode(text)
   let violations =
     text === '' ? ['模型未返回内容'] : checkWhitelist(text, ctx.evidence, ctx.planPaths)
   if (violations.length > 0) {
     stats.retries++
     try {
-      const retry = await ask(
-        `上一稿不合格:出现了证据里不存在的名称(${violations.join('、')})。重写本节,只使用证据中真实存在的名称。`
+      const retry = balanceInlineCode(
+        await ask(
+          `上一稿不合格:出现了证据里不存在的名称(${violations.join('、')})。重写本节,只使用证据中真实存在的名称。`
+        )
       )
       const retryViolations = checkWhitelist(retry, ctx.evidence, ctx.planPaths)
       if (retry.trim() !== '' && retryViolations.length < violations.length) {
