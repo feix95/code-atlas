@@ -215,13 +215,19 @@ export function parseWikiStartV2(raw: unknown): WikiStartV2Parse {
   if (requestId === null || language === null || projectRoot === null) {
     return { ok: false, error: '生成请求不完整' }
   }
+  const pageIds = Array.isArray(record.pageIds)
+    ? record.pageIds
+        .filter((id): id is string => typeof id === 'string' && id !== '')
+        .slice(0, 1000)
+    : []
   return {
     ok: true,
     request: {
       requestId,
       projectRoot,
       language,
-      ...(record.force === true ? { force: true } : {})
+      ...(record.force === true ? { force: true } : {}),
+      ...(pageIds.length > 0 ? { pageIds } : {})
     }
   }
 }

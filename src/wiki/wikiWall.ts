@@ -8,7 +8,10 @@ import type { WikiLanguageStateV2 } from './wikiStoreV2.ts'
 function topicPaths(plan: WikiPlan): Map<string, string[]> {
   const paths = new Map<string, string[]>()
   const walk = (topic: WikiPlanTopic, chain: string[]): void => {
-    const here = [...chain, topic.title]
+    const full = [...chain, topic.title]
+    // 根主题的标题就是项目名,它是整棵树的伞不是一个板块:
+    // 主题链去掉这一段,分区与详情才落在真正的第一层主题上
+    const here = full.length > 1 && full[0] === plan.projectName ? full.slice(1) : full
     // 总览页就是本主题的门面,主题链含本主题;叶子页同理
     if (topic.overviewPageId !== null) paths.set(topic.overviewPageId, here)
     for (const pageId of topic.pageIds) paths.set(pageId, here)
@@ -88,6 +91,7 @@ export function buildWikiWall(
       keyFiles:
         record?.keyFiles ?? page.members.filter((m) => m.role === 'primary').map((m) => m.path),
       memberCount: page.members.length,
+      members: page.members.map((m) => m.path),
       topicPath: paths.get(page.id) ?? []
     }
   })

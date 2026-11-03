@@ -19,7 +19,6 @@ import {
   pageFileExists,
   readWikiState,
   removePageFile,
-  resolveProjectDir,
   sanitizeFileName,
   savePage,
   shortProjectCode,
@@ -27,6 +26,7 @@ import {
   writeWikiState,
   type WikiPageRecord
 } from '../src/wiki/wikiStore.ts'
+import { resolveProjectDir } from '../src/wiki/wikiProjectDir.ts'
 import { WIKI_PROMPT_VERSION, wikiInputHash } from '../src/wiki/wikiHash.ts'
 import { groupScatteredFiles } from '../src/shared/wikiGroups.ts'
 import {

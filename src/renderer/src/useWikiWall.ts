@@ -58,15 +58,42 @@ export function useWikiWall(rootPath: string): WikiWallData {
     refreshRef.current()
   }, [rootPath])
 
+  const lastRefreshRef = useRef(0)
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    // 生成中每页落定就刷新一次卡片状态,节流 4 秒:本地模型一页十几分钟,
+    // 只等整轮结束才刷新会让用户以为没在跑
+    const throttledRefresh = (): void => {
+      const now = Date.now()
+      const wait = 4000 - (now - lastRefreshRef.current)
+      if (wait <= 0) {
+        lastRefreshRef.current = now
+        refreshRef.current()
+        return
+      }
+      if (pendingTimerRef.current === null) {
+        pendingTimerRef.current = setTimeout(() => {
+          pendingTimerRef.current = null
+          lastRefreshRef.current = Date.now()
+          refreshRef.current()
+        }, wait)
+      }
+    }
     const offEvent = window.atlas.wiki.onEvent((event: WikiEvent) => {
       if (event.projectRoot !== rootPath) return
-      if (event.type === 'finished') refreshRef.current()
+      if (event.source !== 'v2') return
+      if (event.type === 'finished') {
+        lastRefreshRef.current = Date.now()
+        refreshRef.current()
+      } else if (event.page.status !== 'running') {
+        throttledRefresh()
+      }
     })
     const offLanguage = onWikiLanguageChanged(() => refreshRef.current())
     return () => {
       offEvent()
       offLanguage()
+      if (pendingTimerRef.current !== null) clearTimeout(pendingTimerRef.current)
     }
   }, [rootPath])
 

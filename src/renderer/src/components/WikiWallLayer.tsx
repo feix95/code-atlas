@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WikiEvent, WikiWallCard } from '@shared/wikiTypes'
 import { layoutWikiWall } from '../wikiWallLayout'
+import { WikiWallDetail } from './WikiWallDetail'
 import type { WikiWallData } from '../useWikiWall'
 import { friendlyErr } from '../errText'
 
@@ -25,6 +26,14 @@ interface RunLine {
   status: string
 }
 
+const RUN_STATUS_LABEL: Record<string, string> = {
+  running: '生成中',
+  done: '已生成',
+  skipped: '未变化,已跳过',
+  failed: '失败',
+  cancelled: '已取消'
+}
+
 export function WikiWallLayer({
   rootPath,
   wall,
@@ -44,6 +53,7 @@ export function WikiWallLayer({
   const [lines, setLines] = useState<RunLine[]>([])
   const [finishText, setFinishText] = useState<string | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
+  const [starting, setStarting] = useState(false)
   const runningRef = useRef(false)
 
   // 挂载时补读一次运行快照:任务可能在本层打开前就已开跑
@@ -61,6 +71,7 @@ export function WikiWallLayer({
   useEffect(() => {
     const off = window.atlas.wiki.onEvent((event: WikiEvent) => {
       if (event.projectRoot !== rootPath) return
+      if (event.source !== 'v2') return
       if (event.type === 'progress') {
         if (!runningRef.current) {
           runningRef.current = true
@@ -92,20 +103,24 @@ export function WikiWallLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootPath])
 
-  const start = async (force: boolean): Promise<void> => {
+  const start = async (onlyPageId?: string, force = false): Promise<void> => {
     setRunError(null)
     setFinishText(null)
     setLines([])
+    setStarting(true)
     const outcome = await window.atlas.wiki
       .startV2({
         requestId: crypto.randomUUID(),
         projectRoot: rootPath,
         language: wall.language,
-        ...(force ? { force: true } : {})
+        ...(force ? { force: true } : {}),
+        ...(onlyPageId ? { pageIds: [onlyPageId] } : {})
       })
       .catch((err: unknown) => ({ ok: false as const, error: friendlyErr(err) }))
+    setStarting(false)
     if (!outcome.ok) {
       setRunError(outcome.error)
+      setProgressOpen(true)
       return
     }
     runningRef.current = true
@@ -141,10 +156,10 @@ export function WikiWallLayer({
           <button
             type="button"
             className="wiki-wall-btn is-primary"
-            disabled={wall.language === ''}
-            onClick={() => void start(false)}
+            disabled={wall.language === '' || starting}
+            onClick={() => void start()}
           >
-            生成全部
+            {starting ? '正在启动…' : '生成全部'}
           </button>
         )}
         <button
@@ -173,7 +188,9 @@ export function WikiWallLayer({
             {lines.map((line) => (
               <li key={line.pageId}>
                 <span>{line.name}</span>
-                <span className="wiki-wall-line-status">{line.status}</span>
+                <span className="wiki-wall-line-status">
+                  {RUN_STATUS_LABEL[line.status] ?? line.status}
+                </span>
               </li>
             ))}
           </ul>
@@ -239,68 +256,15 @@ export function WikiWallLayer({
         </div>
       </div>
       {selected && (
-        <aside className="wiki-wall-detail">
-          <button
-            type="button"
-            className="wiki-wall-detail-close"
-            onClick={() => setSelectedId(null)}
-          >
-            ×
-          </button>
-          <p className="wiki-wall-detail-kind">
-            {KIND_LABEL[selected.kind]} · {STATUS_LABEL[selected.status]}
-          </p>
-          <h3>{selected.title}</h3>
-          {selected.topicPath.length > 0 && (
-            <p className="wiki-wall-detail-topic">{selected.topicPath.join(' / ')}</p>
-          )}
-          {selected.summary !== '' && <p>{selected.summary}</p>}
-          {selected.excerpt !== '' && (
-            <p className="wiki-wall-detail-excerpt">{selected.excerpt}</p>
-          )}
-          {selected.keyFiles.length > 0 && (
-            <>
-              <p className="wiki-wall-detail-label">关键文件</p>
-              <ul>
-                {selected.keyFiles.map((file) => (
-                  <li key={file}>{file}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          <div className="wiki-wall-detail-actions">
-            {selected.file !== '' && (
-              <>
-                <button
-                  type="button"
-                  className="wiki-wall-btn is-primary"
-                  onClick={() =>
-                    void window.atlas.wiki.openDoc(rootPath, wall.language, selected.file)
-                  }
-                >
-                  打开文档
-                </button>
-                <button
-                  type="button"
-                  className="wiki-wall-btn"
-                  onClick={() =>
-                    void window.atlas.wiki.revealDoc(rootPath, wall.language, selected.file)
-                  }
-                >
-                  在文件夹中定位
-                </button>
-              </>
-            )}
-            {selected.kind === 'leaf' && !running && (
-              <button type="button" className="wiki-wall-btn" onClick={() => void start(false)}>
-                {selected.status === 'planned' ? '生成这一页' : '重新生成'}
-              </button>
-            )}
-          </div>
-          {selected.kind === 'leaf' && selected.status !== 'planned' && (
-            <p className="wiki-wall-detail-note">重新生成会跳过没变过的页,只补需要更新的部分</p>
-          )}
-        </aside>
+        <WikiWallDetail
+          card={selected}
+          rootPath={rootPath}
+          language={wall.language}
+          running={running}
+          starting={starting}
+          onClose={() => setSelectedId(null)}
+          onGenerate={(pageId, force) => void start(pageId, force)}
+        />
       )}
     </div>
   )

@@ -22,6 +22,7 @@ import { runWikiJobV2 } from '../wiki/wikiJobV2.ts'
 import { assembleWikiPlanInput } from '../wiki/wikiPlanInput.ts'
 import { buildWikiPlan } from '../wiki/wikiPlan.ts'
 import { resolveProjectDir } from '../wiki/wikiProjectDir.ts'
+import { isWikiJobActive } from './wikiRun.ts'
 
 /** 证据层整文件读取上限:超出按读不到处理,证据层自有降级路径 */
 const EVIDENCE_READ_BYTES = 8 * 1024 * 1024
@@ -101,10 +102,15 @@ export function registerWikiRunV2Ipc(): void {
       wikiPlanSourceDeps(req.projectRoot)
     )
     const plan = buildWikiPlan(planInput)
-    const total = plan.pages.filter((page) => page.kind === 'leaf').length
+    const onlySet = req.pageIds ? new Set(req.pageIds) : null
+    const total = plan.pages.filter(
+      (page) => page.kind === 'leaf' && (onlySet === null || onlySet.has(page.id))
+    ).length
     if (total === 0) return { ok: false, error: '这个项目里还没有可生成的内容' }
+    if (activeJob !== null || isWikiJobActive()) {
+      return { ok: false, error: '已有生成任务在进行,先等它完成或取消后再开始' }
+    }
 
-    activeJob?.controller.abort()
     const controller = new AbortController()
     const job: ActiveJobV2 = {
       senderId: event.sender.id,
@@ -137,6 +143,7 @@ export function registerWikiRunV2Ipc(): void {
         contextSize: chat.ctx,
         planInput,
         ...(req.force ? { force: true } : {}),
+        ...(onlySet ? { onlyPageIds: onlySet } : {}),
         signal: controller.signal
       },
       {
@@ -160,6 +167,7 @@ export function registerWikiRunV2Ipc(): void {
         emit: (jobEvent) =>
           send({
             type: 'progress',
+            source: 'v2',
             projectRoot: jobEvent.projectRoot,
             language: jobEvent.language,
             total: jobEvent.total,
@@ -173,6 +181,7 @@ export function registerWikiRunV2Ipc(): void {
         if (activeJob === job) activeJob = null
         send({
           type: 'finished',
+          source: 'v2',
           projectRoot: req.projectRoot,
           language: req.language,
           status: summary.status,
@@ -188,6 +197,7 @@ export function registerWikiRunV2Ipc(): void {
         if (activeJob === job) activeJob = null
         send({
           type: 'finished',
+          source: 'v2',
           projectRoot: req.projectRoot,
           language: req.language,
           status: 'failed',

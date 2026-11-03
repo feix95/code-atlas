@@ -245,15 +245,7 @@ export function GraphCanvas(props: GraphViewProps & { result: ScanResult }): Rea
         onExpandAll={expansion.expandAll}
         onCollapseAll={expansion.collapseAll}
         onFit={viewport.fit}
-        wiki={
-          <GraphWikiEntry
-            result={result}
-            graph={current}
-            onOpenWiki={props.onOpenWiki}
-            wallVisible={graphWall.visible}
-            onToggleWall={graphWall.toggle}
-          />
-        }
+        wiki={<GraphWikiEntry wallVisible={graphWall.visible} onToggleWall={graphWall.toggle} />}
         search={<GraphSearch search={search} inputRef={searchInputRef} onLocate={locateHit} />}
       />
       <GraphNotices

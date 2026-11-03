@@ -114,7 +114,7 @@ export function GraphWikiSection({
       {damaged && <p className="graph-panel-note">Wiki 记录损坏,暂时读不到说明</p>}
       {note !== undefined && <p className="graph-panel-note">{note}</p>}
       {!damaged && status === 'none' && groupName !== null && (
-        <p className="graph-panel-note">这个散件组还没生成说明,可在工具条生成 Wiki</p>
+        <p className="graph-panel-note">这个散件组还没生成说明,可在卡片墙里生成</p>
       )}
       {!damaged && page !== null && status !== 'none' && (
         <>

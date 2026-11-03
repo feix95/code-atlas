@@ -62,6 +62,8 @@ export interface WikiJobV2Options {
   planInput: WikiPlanInput
   force?: boolean
   signal?: AbortSignal
+  /** 只生成这些叶子页(卡片墙单页生成);不传为全部叶子页 */
+  onlyPageIds?: ReadonlySet<string>
 }
 
 function errorText(err: unknown): string {
@@ -178,7 +180,9 @@ export async function runWikiJobV2(
   const ledger = await WikiNoteLedger.load(ledgerDir)
 
   const leafPages = plan.pages.filter((p) => p.kind === 'leaf')
-  const total = leafPages.length
+  const only = options.onlyPageIds
+  const targets = only ? leafPages.filter((p) => only.has(p.id)) : leafPages
+  const total = targets.length
   const emit = (page: WikiPageProgressV2): void => {
     if (page.status !== 'running') processed += 1
     deps.emit?.({
@@ -191,7 +195,7 @@ export async function runWikiJobV2(
   }
 
   try {
-    for (const page of leafPages) {
+    for (const page of targets) {
       const record = languageState.pages[page.id]!
       const progress = { pageId: page.id, kind: page.kind, name: record.name }
       if (!active()) {

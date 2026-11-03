@@ -6,6 +6,7 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runWikiJobV2 } from '../src/wiki/wikiJobV2.ts'
+import { buildWikiPlan } from '../src/wiki/wikiPlan.ts'
 import type { WikiPlanFileInput, WikiPlanInput } from '../src/wiki/wikiPlanTypes.ts'
 import type { WikiCompleter } from '../src/wiki/wikiReadTypes.ts'
 import {
@@ -186,6 +187,20 @@ try {
   const run2 = await runWikiJobV2(options, deps)
   assert.equal(run2.skipped, 1, '第二轮成员未变应全部跳过')
   assert.equal(run2.done, 0)
+
+  // 单页生成:only 名单外的页一律不碰,名单内的页强制重写
+  const leafId = buildWikiPlan(options.planInput).pages.find((p) => p.kind === 'leaf')!.id
+  const runOnlyMiss = await runWikiJobV2(
+    { ...options, force: true, onlyPageIds: new Set(['w:missing']) },
+    deps
+  )
+  assert.equal(runOnlyMiss.processed, 0, 'only 名单为空时不应处理任何页')
+  assert.equal(runOnlyMiss.done, 0)
+  const runOnlyHit = await runWikiJobV2(
+    { ...options, force: true, onlyPageIds: new Set([leafId]) },
+    deps
+  )
+  assert.equal(runOnlyHit.done, 1, 'only 命中时应只生成选中的那一页')
 
   console.log('✅ Wiki 第二版生成任务自测全部通过')
 } finally {

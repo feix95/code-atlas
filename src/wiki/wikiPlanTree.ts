@@ -119,13 +119,16 @@ export function assembleTopics(
     if (!topic) {
       topic = {
         id: `t:${shortHash(dir || '.')}`,
-        // 末段是 src 这类通用名时取上一段作显示名,免得与上层同名主题撞名(src/renderer/src 显示 renderer)
+        // 末段是 src 这类通用名时取上一段作显示名,免得与上层同名主题撞名(src/renderer/src 显示 renderer);
+        // 功能主题的目录键带 feature: 前缀,只作内部归组,显示名去掉前缀
         title:
           dir === ''
             ? input.projectName
-            : dir.split('/').pop() === 'src' && dir.split('/').length >= 2
-              ? dir.split('/')[dir.split('/').length - 2]!
-              : dir.split('/').pop()!,
+            : dir.startsWith('feature:')
+              ? dir.slice('feature:'.length)
+              : dir.split('/').pop() === 'src' && dir.split('/').length >= 2
+                ? dir.split('/')[dir.split('/').length - 2]!
+                : dir.split('/').pop()!,
         dir,
         overviewPageId: null,
         pageIds: [],

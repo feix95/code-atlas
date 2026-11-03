@@ -18,6 +18,7 @@ import { ensureWikiRootMarker, isInsideRoot, resolveWikiLocation } from '../wiki
 import { loadWikiSettings } from '../wiki/wikiSettings.ts'
 import { runWikiJob, wikiOutputTokens } from '../wiki/wikiJob.ts'
 import { resolveProjectDir } from '../wiki/wikiProjectDir.ts'
+import { isWikiJobV2Active } from './wikiRunV2.ts'
 
 /** 摘录只读开头,40 行 / 2000 字的上限在任务层再掐;32KB 足够覆盖 */
 const EXCERPT_READ_BYTES = 32 * 1024
@@ -102,7 +103,9 @@ export function registerWikiRunIpc(): void {
     const pages = only === null ? req.pages : req.pages.filter((page) => only.has(page.pageId))
     if (pages.length === 0) return { ok: false, error: '这些页已经不在当前项目里了' }
 
-    activeJob?.controller.abort()
+    if (activeJob !== null || isWikiJobV2Active()) {
+      return { ok: false, error: '已有生成任务在进行,先等它完成或取消后再开始' }
+    }
     const controller = new AbortController()
     const job: ActiveJob = {
       senderId: event.sender.id,

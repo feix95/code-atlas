@@ -118,7 +118,7 @@ export interface WikiJobEvent {
 }
 
 /** 主进程推给界面的整轮事件:逐页进度 + 收场汇总 */
-export type WikiEvent =
+export type WikiEvent = (
   | ({ type: 'progress' } & WikiJobEvent)
   | {
       type: 'finished'
@@ -131,6 +131,10 @@ export type WikiEvent =
       cancelled: number
       error?: string
     }
+) & {
+  /** 事件来源管线:第二版任务带 v2,旧版不带;卡片墙只听第二版 */
+  source?: 'v2'
+}
 
 /** 进度页晚于生成开跑时补读的运行快照;任务结束或没有任务时 active=false */
 export type WikiRunStatus =
@@ -175,7 +179,9 @@ export interface WikiWallCard {
   file: string
   keyFiles: string[]
   memberCount: number
-  /** 所属主题链(根主题在前);根主题页为空数组 */
+  /** 全部成员文件路径:供图谱侧按文件反查所属页 */
+  members: string[]
+  /** 所属主题链(第一层主题在前,不含项目名根主题);根主题页为空数组 */
   topicPath: string[]
 }
 
@@ -198,6 +204,8 @@ export interface WikiStartV2Request {
   language: string
   /** 忽略笔记与页面缓存强制重写 */
   force?: boolean
+  /** 只生成这些页(卡片墙单页生成);缺省为全部叶子页 */
+  pageIds?: string[]
 }
 
 /** 进度页读到的单篇现状:记账状态 + 文件是否还在 */
