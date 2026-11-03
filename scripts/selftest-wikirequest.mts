@@ -11,7 +11,8 @@ import {
   parseWikiStartV2
 } from '../src/main/wikiRequest.ts'
 import { resolveWikiDocPath } from '../src/main/wikiDocPath.ts'
-import { createWikiState, resolveProjectDir, writeWikiState } from '../src/wiki/wikiStore.ts'
+import { createWikiState, writeWikiState } from '../src/wiki/wikiStore.ts'
+import { resolveProjectDir } from '../src/wiki/wikiProjectDir.ts'
 
 function basePage(): Record<string, unknown> {
   return {
@@ -142,11 +143,25 @@ async function checkDocPath(base: string): Promise<void> {
   )
   assert.ok('path' in ok, '登记形状的文档能打开')
 
+  // 第二版嵌套路径:主题目录下的页面同样能打开,且目录解析认第二版记账
+  const v2doc = join(projectDir, '中文（简体）', 'src', 'aiDefaults.md')
+  await fs.mkdir(dirname(v2doc), { recursive: true })
+  await fs.writeFile(v2doc, '# V2')
+  const okV2 = await resolveWikiDocPath(
+    { projectRoot: project, language: 'zh-CN', file: 'src/aiDefaults.md' },
+    wiki
+  )
+  assert.ok('path' in okV2, '第二版嵌套路径能打开')
+
   const reject = async (payload: unknown, reason: string): Promise<void> => {
     const result = await resolveWikiDocPath(payload, wiki)
     assert.ok('error' in result, reason)
   }
   await reject({ projectRoot: project, language: 'zh-CN', file: '../x.md' }, '带 .. 的路径拒绝')
+  await reject(
+    { projectRoot: project, language: 'zh-CN', file: 'src/../../x.md' },
+    '第二版路径带 .. 拒绝'
+  )
   await reject({ projectRoot: project, language: 'zh-CN', file: '模块/../a.md' }, '目录内绕路拒绝')
   await reject(
     { projectRoot: project, language: 'zh-CN', file: join(wiki, 'demo', '模块', 'a.md') },

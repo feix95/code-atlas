@@ -152,6 +152,16 @@ try {
     assert.ok(isSafePageFileV2(file), `超长分配仍应安全:${file}`)
   }
 
+  // 八、目录解析认第二版记账:写出 schema 2 后仍解析回原目录,不另开带后缀的新目录
+  const { resolveProjectDir } = await import('../src/wiki/wikiProjectDir.ts')
+  const wikiRoot = join(root, 'wikiroot')
+  await fs.mkdir(wikiRoot, { recursive: true })
+  const resolved1 = await resolveProjectDir(wikiRoot, '/repo/demo')
+  const v2State = createWikiStateV2('/repo/demo', resolved1)
+  await writeWikiStateV2(resolved1, v2State)
+  const resolved2 = await resolveProjectDir(wikiRoot, '/repo/demo')
+  assert.equal(resolved2, resolved1, '第二版记账下目录解析应回到原目录')
+
   console.log('✅ Wiki 记账第二版自测全部通过')
 } finally {
   await fs.rm(root, { recursive: true, force: true })

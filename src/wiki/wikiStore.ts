@@ -82,31 +82,13 @@ function foldCase(path: string): string {
   return process.platform === 'win32' ? path.toLowerCase() : path
 }
 
-function isSamePath(a: string, b: string): boolean {
+export function isSamePath(a: string, b: string): boolean {
   return foldCase(a) === foldCase(b)
 }
 
-async function isEmptyDir(dir: string): Promise<boolean> {
+export async function isEmptyDir(dir: string): Promise<boolean> {
   const entries = await fs.readdir(dir).catch(() => null)
   return entries !== null && entries.length === 0
-}
-
-/** 项目目录:不重名用项目名;重名且记账属于别的项目时加短编号 */
-export async function resolveProjectDir(wikiRoot: string, projectRoot: string): Promise<string> {
-  const base = sanitizeFileName(basename(projectRoot)) || 'project'
-  const short = `${base}-${shortProjectCode(projectRoot)}`
-  const names = [base, short]
-  for (let i = 2; i <= 20; i++) names.push(`${short}-${i}`)
-  for (const name of names) {
-    const dir = join(wikiRoot, name)
-    const stat = await fs.stat(dir).catch(() => null)
-    if (stat === null) return dir
-    if (!stat.isDirectory()) continue
-    const state = await readWikiState(dir)
-    if (state.status === 'ok' && isSamePath(state.state.projectRoot, projectRoot)) return dir
-    if (state.status === 'missing' && (await isEmptyDir(dir))) return dir
-  }
-  return join(wikiRoot, `${short}-${Date.now().toString(36)}`)
 }
 
 export function languageDirLabel(code: string): string {

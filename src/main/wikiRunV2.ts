@@ -21,7 +21,7 @@ import { wikiOutputTokens } from '../wiki/wikiJob.ts'
 import { runWikiJobV2 } from '../wiki/wikiJobV2.ts'
 import { assembleWikiPlanInput } from '../wiki/wikiPlanInput.ts'
 import { buildWikiPlan } from '../wiki/wikiPlan.ts'
-import { resolveProjectDir } from '../wiki/wikiStore.ts'
+import { resolveProjectDir } from '../wiki/wikiProjectDir.ts'
 
 /** 证据层整文件读取上限:超出按读不到处理,证据层自有降级路径 */
 const EVIDENCE_READ_BYTES = 8 * 1024 * 1024

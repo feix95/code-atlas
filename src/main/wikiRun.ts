@@ -17,7 +17,7 @@ import { parseWikiStart } from './wikiRequest.ts'
 import { ensureWikiRootMarker, isInsideRoot, resolveWikiLocation } from '../wiki/wikiLocation.ts'
 import { loadWikiSettings } from '../wiki/wikiSettings.ts'
 import { runWikiJob, wikiOutputTokens } from '../wiki/wikiJob.ts'
-import { resolveProjectDir } from '../wiki/wikiStore.ts'
+import { resolveProjectDir } from '../wiki/wikiProjectDir.ts'
 
 /** 摘录只读开头,40 行 / 2000 字的上限在任务层再掐;32KB 足够覆盖 */
 const EXCERPT_READ_BYTES = 32 * 1024
