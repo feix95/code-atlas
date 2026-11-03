@@ -1,6 +1,7 @@
 // AI Wiki 的主进程入口:设置与位置、项目快照、清理与打开文档。
 // 渲染层递来的一切路径都当外部输入:项目内路径走 joinRoot,文档路径只认记账登记的相对路径。
 import { promises as fs } from 'node:fs'
+import { basename } from 'node:path'
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { CH } from '../shared/ipcChannels.ts'
 import { translateLang } from '../shared/translateLangs.ts'
@@ -15,7 +16,12 @@ import type {
 import { getFactFileCount, getFileFact } from '../depgraph/factCache.ts'
 import { pickPathDialog } from './atlasWindow.ts'
 import { userDataDir } from './paths.ts'
-import { parseProjectRoot, parseWikiPanelRequest } from './wikiRequest.ts'
+import { parseProjectRoot, parseWikiPanelRequest, parseWikiWallRequest } from './wikiRequest.ts'
+import { wikiPlanSourceDeps } from './wikiPlanSource.ts'
+import { assembleWikiPlanInput } from '../wiki/wikiPlanInput.ts'
+import { buildWikiPlan } from '../wiki/wikiPlan.ts'
+import { buildWikiWall } from '../wiki/wikiWall.ts'
+import type { WikiWallResult } from '../shared/wikiTypes.ts'
 import { resolveWikiDocPath } from './wikiDocPath.ts'
 import { isWikiJobActive } from './wikiRun.ts'
 import { isWikiJobV2Active } from './wikiRunV2.ts'
@@ -173,6 +179,32 @@ async function panelState(raw: unknown): Promise<WikiPanelStateResult> {
   return { ok: true, language, damaged: false, pages: result }
 }
 
+/**
+ * 卡片墙快照:规划按当前代码现算(零模型成本,骨架永远新鲜),
+ * 状态与名称摘要并第二版记账;记账损坏时只报损坏,不硬拼骨架。
+ */
+async function wallState(raw: unknown): Promise<WikiWallResult> {
+  const parsed = parseWikiWallRequest(raw)
+  if (!parsed.ok) return parsed
+  const { projectRoot, language } = parsed.request
+  if (translateLang(language) === null) return { ok: false, error: '这个语种还没登记' }
+  const location = wikiRoot()
+  if (location === null) return { ok: true, damaged: false, cards: [], links: [] }
+  const projectDir = await resolveProjectDir(location, projectRoot)
+  const read = await readWikiStateAny(projectDir)
+  if (read.status === 'damaged') return { ok: true, damaged: true, cards: [], links: [] }
+  const planInput = await assembleWikiPlanInput(
+    projectRoot,
+    basename(projectRoot),
+    wikiPlanSourceDeps(projectRoot)
+  )
+  const plan = buildWikiPlan(planInput)
+  const languageState =
+    read.status === 'ok' && read.version === 2 ? read.state.languages[language] : undefined
+  const wall = buildWikiWall(plan, planInput.edges, languageState)
+  return { ok: true, damaged: false, cards: wall.cards, links: wall.links }
+}
+
 /** 打开文档只认语种目录下记账形状的相对路径;realpath 必须仍在 Wiki 根内 */
 function docPath(raw: unknown): Promise<{ path: string } | { error: string }> {
   return resolveWikiDocPath(raw, wikiRoot())
@@ -270,4 +302,5 @@ export function registerWikiIpc(): void {
   registerFiles()
   ipcMain.handle(CH.wikiProjectState, (_event, raw: unknown) => projectState(raw))
   ipcMain.handle(CH.wikiPanelState, (_event, raw: unknown) => panelState(raw))
+  ipcMain.handle(CH.wikiWallState, (_event, raw: unknown) => wallState(raw))
 }

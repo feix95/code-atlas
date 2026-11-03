@@ -14,7 +14,8 @@ import type {
   WikiSettings,
   WikiStartRequest,
   WikiStartResult,
-  WikiStartV2Request
+  WikiStartV2Request,
+  WikiWallResult
 } from '../shared/wikiTypes.ts'
 
 export const wikiBridge = {
@@ -28,6 +29,8 @@ export const wikiBridge = {
     ipcRenderer.invoke(CH.wikiProjectState, projectRoot),
   panelState: (request: WikiPanelRequest): Promise<WikiPanelStateResult> =>
     ipcRenderer.invoke(CH.wikiPanelState, request),
+  wallState: (projectRoot: string, language: string): Promise<WikiWallResult> =>
+    ipcRenderer.invoke(CH.wikiWallState, { projectRoot, language }),
   start: (request: WikiStartRequest): Promise<WikiStartResult> =>
     ipcRenderer.invoke(CH.wikiStart, request),
   runStatus: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatus),

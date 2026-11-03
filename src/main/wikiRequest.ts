@@ -189,6 +189,19 @@ export function parseWikiStart(raw: unknown): WikiStartParse {
   }
 }
 
+export type WikiWallParse =
+  { ok: true; request: { projectRoot: string; language: string } } | { ok: false; error: string }
+
+/** 卡片墙取数请求:只有项目与语种,卡片与连线由主进程按当前代码现算 */
+export function parseWikiWallRequest(raw: unknown): WikiWallParse {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, error: '请求不完整' }
+  const record = raw as Record<string, unknown>
+  const projectRoot = parseProjectRoot(record.projectRoot)
+  const language = text(record.language, 20)
+  if (projectRoot === null || language === null) return { ok: false, error: '请求不完整' }
+  return { ok: true, request: { projectRoot, language } }
+}
+
 export type WikiStartV2Parse =
   { ok: true; request: WikiStartV2Request } | { ok: false; error: string }
 

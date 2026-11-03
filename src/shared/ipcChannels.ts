@@ -96,6 +96,7 @@ export const CH = {
   wikiStart: 'atlas:wiki-start',
   wikiRunStatus: 'atlas:wiki-run-status',
   wikiCancel: 'atlas:wiki-cancel',
+  wikiWallState: 'atlas:wiki-wall-state',
   wikiStartV2: 'atlas:wiki-start-v2',
   wikiRunStatusV2: 'atlas:wiki-run-status-v2',
   wikiCancelV2: 'atlas:wiki-cancel-v2',

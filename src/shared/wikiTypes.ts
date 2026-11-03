@@ -163,6 +163,34 @@ export type WikiStartResult =
   | { ok: true; total: number; provider: string; model: string; projectDir: string }
   | { ok: false; error: string }
 
+/** 卡片墙一卡:主题页在画布上的呈现数据,记账有 AI 名称与摘要时优先 */
+export interface WikiWallCard {
+  pageId: string
+  kind: 'leaf' | 'overview' | 'root'
+  title: string
+  status: 'planned' | 'done' | 'stale' | 'failed'
+  summary: string
+  excerpt: string
+  /** 相对语种目录的文档路径;未生成时为空串 */
+  file: string
+  keyFiles: string[]
+  memberCount: number
+  /** 所属主题链(根主题在前);根主题页为空数组 */
+  topicPath: string[]
+}
+
+/** 卡片墙一线:contains 为主题内从属,reference 为跨页引用(权重为聚合引用条数) */
+export interface WikiWallLink {
+  from: string
+  to: string
+  kind: 'contains' | 'reference'
+  weight: number
+}
+
+export type WikiWallResult =
+  | { ok: true; damaged: boolean; cards: WikiWallCard[]; links: WikiWallLink[] }
+  | { ok: false; error: string }
+
 /** 第二版开始生成:页面规划由主进程按项目装配,渲染层只递项目与语种 */
 export interface WikiStartV2Request {
   requestId: string
