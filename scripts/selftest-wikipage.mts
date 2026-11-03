@@ -698,6 +698,176 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
   assert.equal(etaResult.stats.symbolsCovered, 3, '漏记的非导出符号 etaB 应被补记补上')
   assert.deepEqual(etaResult.stats.coverageGaps, [], '补记后不应有缺口')
 
+  // 十三、符号之间只有空行时,段文本必须与原文逐行对齐,子段要切到正确的代码行
+  const thetaLines = [
+    "import { x } from './x.ts'",
+    '',
+    'export function thetaA(): number {',
+    '  return 1',
+    '}',
+    '',
+    '',
+    'export function thetaB(): number {',
+    '  return 2',
+    '}',
+    '',
+    'export function thetaC(): number {',
+    '  return 3',
+    '}'
+  ]
+  const thetaRanges = [
+    { name: 'thetaA', kind: 'function' as const, startLine: 3, endLine: 5 },
+    { name: 'thetaB', kind: 'function' as const, startLine: 8, endLine: 10 },
+    { name: 'thetaC', kind: 'function' as const, startLine: 12, endLine: 14 }
+  ]
+  const thetaStructure = {
+    languageId: 'typescript',
+    imports: ['./x.ts'],
+    exports: ['thetaA', 'thetaB', 'thetaC'],
+    functions: ['thetaA', 'thetaB', 'thetaC'],
+    classes: [],
+    interfaces: [],
+    reactComponents: [],
+    symbolRanges: thetaRanges
+  }
+  const thetaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/theta/theta.ts', {
+        exports: ['thetaA', 'thetaB', 'thetaC'],
+        functions: ['thetaA', 'thetaB', 'thetaC']
+      })
+    ],
+    edges: []
+  })
+  const thetaPage = thetaPlan.pages.find((p) => p.kind === 'leaf')!
+  const thetaEvidence = await buildPageEvidence(
+    { page: thetaPage, topicTitle: null, plan: thetaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: () => ({ sha256: 'h', structure: thetaStructure }),
+      readFile: async () => thetaLines.join('\n')
+    }
+  )
+  const thetaFile = thetaEvidence.files[0]!
+  assert.equal(thetaFile.segments.length, 1, 'theta 应合并为一段')
+  assert.equal(
+    thetaFile.segments[0]!.text,
+    thetaLines.join('\n'),
+    '段文本必须等于原文整段切片,空行间隙不许丢'
+  )
+  let thetaBCode = ''
+  const thetaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      const only = /\(主体符号 (\w+)\)/.exec(user)
+      if (!only) return 'garbage,不是 JSON'
+      if (only[1] === 'thetaB') thetaBCode = user.split('代码:\n')[1] ?? ''
+      return JSON.stringify({
+        symbols: [
+          { name: only[1], role: `${only[1]} 的作用`, deps: [], sideEffects: '无', crossRefs: [] }
+        ],
+        summary: `本段讲 ${only[1]}`
+      })
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const thetaResult = await runWikiPage(
+    { page: thetaPage, topicTitle: null, plan: thetaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: () => ({ sha256: 'h', structure: thetaStructure }),
+      readFile: async () => thetaLines.join('\n'),
+      complete: thetaCompleter,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.equal(thetaResult.stats.symbolsCovered, 3, 'theta 三个符号应全覆盖')
+  assert.ok(
+    thetaBCode.startsWith('8: export function thetaB(): number {'),
+    'thetaB 子段首行必须是它自己的声明行(带正确行号)'
+  )
+  assert.ok(!thetaBCode.includes('return 1'), 'thetaB 子段不应混进 thetaA 的代码')
+
+  // 十四、子段笔记写错符号:能解析也不算成功,不入缓存,复跑必须重试
+  const iotaLines: string[] = ["import { x } from './x.ts'", '']
+  const mkIota = (name: string): void => {
+    iotaLines.push(`export function ${name}(): number {`)
+    for (let i = 0; i < 18; i++) iotaLines.push(`  // ${name} 内部第 ${i} 行`)
+    iotaLines.push('}')
+    iotaLines.push('')
+  }
+  mkIota('iotaA')
+  mkIota('iotaB')
+  const iotaRanges = [
+    { name: 'iotaA', kind: 'function' as const, startLine: 3, endLine: 22 },
+    { name: 'iotaB', kind: 'function' as const, startLine: 24, endLine: 43 }
+  ]
+  const iotaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/iota/iota.ts', {
+        exports: ['iotaA', 'iotaB'],
+        functions: ['iotaA', 'iotaB']
+      })
+    ],
+    edges: []
+  })
+  const iotaPage = iotaPlan.pages.find((p) => p.kind === 'leaf')!
+  const iotaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      const range = /第 (\d+)-(\d+) 行/.exec(user)
+      const from = range ? Number(range[1]) : 1
+      const to = range ? Number(range[2]) : 9999
+      if (to - from > 30) return 'garbage,不是 JSON'
+      // 不管问哪个符号,都只回 iotaB 的笔记:iotaA 的子段属于写错符号
+      return JSON.stringify({
+        symbols: [
+          { name: 'iotaB', role: 'iotaB 的作用', deps: [], sideEffects: '无', crossRefs: [] }
+        ],
+        summary: '本段讲 iotaB'
+      })
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const iotaDeps = {
+    factOf: () => ({
+      sha256: 'i',
+      structure: {
+        languageId: 'typescript',
+        imports: ['./x.ts'],
+        exports: ['iotaA', 'iotaB'],
+        functions: ['iotaA', 'iotaB'],
+        classes: [],
+        interfaces: [],
+        reactComponents: [],
+        symbolRanges: iotaRanges
+      }
+    }),
+    readFile: async () => iotaLines.join('\n'),
+    complete: iotaCompleter,
+    modelId: 'fake-model',
+    ledger: new WikiNoteLedger(),
+    now: () => new Date('2026-11-03T00:00:00Z')
+  }
+  const iotaRun1 = await runWikiPage(
+    { page: iotaPage, topicTitle: null, plan: iotaPlan, edges: [], contextSize: 8192 },
+    iotaDeps
+  )
+  assert.equal(iotaRun1.stats.symbolsCovered, 1, '写错符号的笔记不应让 iotaA 算覆盖')
+  assert.ok(
+    iotaRun1.stats.coverageGaps.some((g) => g.includes('iotaA')),
+    'iotaA 应如实留在缺口里'
+  )
+  assert.ok(
+    iotaRun1.noteRawFailures.some((f) => f.reason.includes('未包含目标符号')),
+    '写错符号应以「未包含目标符号」留档'
+  )
+  const iotaRun2 = await runWikiPage(
+    { page: iotaPage, topicTitle: null, plan: iotaPlan, edges: [], contextSize: 8192 },
+    iotaDeps
+  )
+  assert.ok(iotaRun2.stats.noteCalls >= 1, '写错符号的子段不应入缓存,复跑必须重试')
+
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }
 

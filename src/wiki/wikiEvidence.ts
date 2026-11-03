@@ -74,7 +74,12 @@ function blocksOf(lines: string[], ranges: SymbolRange[]): Block[] {
 /** 单段符号数上限:笔记输出要逐符号成条,符号太密时输出被截断或尾部符号被漏记(真机实测教训) */
 const MAX_SYMBOLS_PER_SEGMENT = 8
 
-/** 把块合并成段:单段不超字节上限且符号数不超上限;单个符号块本身超限时按行再切 */
+/**
+ * 把块合并成段:单段不超字节上限且符号数不超上限;单个符号块本身超限时按行再切。
+ * 段文本恒等于原文件按起止行号的整段切片:符号之间只有空行的间隙必须保留,
+ * 否则段内行号与原文错位,按行号切出的子段会读到错误的代码(真机实测教训)。
+ * 块与块之间隔着真实代码(切片档筛掉的内容)时先收段,保证不变量不被跨档破坏。
+ */
 function mergeBlocks(
   path: string,
   lines: string[],
@@ -85,24 +90,28 @@ function mergeBlocks(
   let current: Block[] = []
   let currentBytes = 0
   let currentSymbols = 0
+  let currentEnd = 0
   const blockText = (block: Block): string =>
     lines.slice(block.startLine - 1, block.endLine).join('\n')
   const flush = (): void => {
     if (current.length === 0) return
-    const text = current.map(blockText).join('\n')
+    const startLine = Math.min(...current.map((b) => b.startLine))
+    const endLine = Math.max(...current.map((b) => b.endLine))
+    const text = lines.slice(startLine - 1, endLine).join('\n')
     segments.push({
       id: `${path}#${segments.length}`,
       path,
       kind: current.length === 1 ? current[0]!.kind : 'body',
       symbolName: current.length === 1 ? current[0]!.symbolName : null,
-      startLine: current[0]!.startLine,
-      endLine: current[current.length - 1]!.endLine,
+      startLine,
+      endLine,
       text,
       estTokens: estTokens(text)
     })
     current = []
     currentBytes = 0
     currentSymbols = 0
+    currentEnd = 0
   }
   for (const block of blocks) {
     const bytes = Buffer.byteLength(blockText(block), 'utf8')
@@ -133,6 +142,14 @@ function mergeBlocks(
       }
       continue
     }
+    // 与已收块之间隔着真实代码(被筛掉的内容)时先收段:段文本是整段切片,不能把筛掉的代码带进来
+    if (
+      current.length > 0 &&
+      block.startLine > currentEnd + 1 &&
+      lines.slice(currentEnd, block.startLine - 1).some((line) => line.trim() !== '')
+    ) {
+      flush()
+    }
     const isSymbol = block.symbolName !== null ? 1 : 0
     if (currentBytes + bytes > capBytes || currentSymbols + isSymbol > MAX_SYMBOLS_PER_SEGMENT) {
       flush()
@@ -140,6 +157,7 @@ function mergeBlocks(
     current.push(block)
     currentBytes += bytes
     currentSymbols += isSymbol
+    currentEnd = Math.max(currentEnd, block.endLine)
   }
   flush()
   return segments

@@ -159,22 +159,29 @@ export async function generateSegmentNotes(
       cacheHits++
       return cachedSub
     }
+    // 子段成功多一道判定:笔记里必须真有目标符号的条目。
+    // 只看能不能解析,会把「读错代码写出的笔记」当成功存进缓存(真机实测教训)
+    const hitsTarget = (note: WikiSegmentNote): boolean =>
+      note.symbolNotes.some((s) => s.name === range.name && s.degraded !== true)
     retries++
     const first = await attempt(sub, { hint: '只输出 JSON 对象本身,不要输出任何解释文字。' })
-    if (first.note !== null) {
+    if (first.note !== null && hitsTarget(first.note)) {
       deps.ledger.set(subKey, first.note)
       return first.note
     }
+    const firstReason = first.note !== null ? '笔记未包含目标符号' : (first.failure ?? '笔记失败')
     retries++
     const second = await attempt(sub, {
       hint: '只输出 JSON 对象本身,不要输出任何解释文字。',
       boost: 1.5
     })
-    if (second.note !== null) {
+    if (second.note !== null && hitsTarget(second.note)) {
       deps.ledger.set(subKey, second.note)
       return second.note
     }
-    recordFailure(sub.id, second.failure ?? first.failure, second.raw || first.raw)
+    const secondReason =
+      second.note !== null ? '笔记未包含目标符号' : (second.failure ?? firstReason)
+    recordFailure(sub.id, secondReason, second.raw || first.raw)
     return degradedNote(sub, kindOf)
   }
 
@@ -193,6 +200,12 @@ export async function generateSegmentNotes(
       deps.ledger.set(key, first.note)
       return first.note
     }
+    // 首试失败也留一份原始输出:靠拆分兜住时,不留就看不到首试为什么失败
+    rawFailures.push({
+      segmentId: segment.id,
+      reason: `${first.failure ?? '笔记失败'}(整段首试)`,
+      raw: first.raw.slice(0, 4000)
+    })
     // 升级重试:多符号段拆成单符号子段逐个记(整段反复失败时,小步通常能过),
     // 子段各自缓存、各自成败,合并结果不整段入缓存,免得占位条目混进去冒充读过;
     // 单符号段带格式提示并加五成输出额再试一次。仍失败才降级,原因记入统计。
