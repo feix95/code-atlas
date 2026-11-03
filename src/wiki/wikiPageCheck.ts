@@ -22,9 +22,13 @@ export function checkWhitelist(
   for (const match of text.matchAll(/`([^`]{1,120})`/g)) {
     const span = match[1]!.trim()
     if (span.includes('/') || /\.(ts|tsx|js|jsx|json|md|css|py|go|rs)$/.test(span)) {
-      // 只写文件名的按文件名定位;写全路径的必须能在规划内找到
+      // 只写文件名的按文件名定位;写全路径的必须能在规划内找到;
+      // 写目录的,只要是某个成员或规划文件的所在目录前缀,也算定位成功
+      const dirPrefix = `${span.replace(/\/?$/, '')}/`
       const located = span.includes('/')
-        ? memberPaths.has(span) || planPaths.has(span)
+        ? memberPaths.has(span) ||
+          planPaths.has(span) ||
+          [...memberPaths, ...planPaths].some((p) => p.startsWith(dirPrefix))
         : basenames.has(span)
       if (!located) violations.push(span)
     } else if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(span) && /[A-Z]/.test(span)) {

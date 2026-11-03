@@ -353,6 +353,195 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     assert.equal((line.match(/`/g) ?? []).length % 2, 0, `行内代码应配平:${line}`)
   }
 
+  // 八、整段反复失败时按符号拆分升级:长段返回废文本,单符号段合规,最终覆盖应全
+  const deltaLines: string[] = ["import { x } from './x.ts'", '']
+  const mkFn = (name: string): void => {
+    deltaLines.push(`export function ${name}(): number {`)
+    for (let i = 0; i < 18; i++) deltaLines.push(`  // ${name} 内部第 ${i} 行`)
+    deltaLines.push('}')
+    deltaLines.push('')
+  }
+  mkFn('deltaA')
+  mkFn('deltaB')
+  const DELTA = deltaLines.join('\n')
+  const deltaRanges = [
+    { name: 'deltaA', kind: 'function' as const, startLine: 3, endLine: 22 },
+    { name: 'deltaB', kind: 'function' as const, startLine: 24, endLine: 43 }
+  ]
+  const deltaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/delta/delta.ts', {
+        exports: ['deltaA', 'deltaB'],
+        functions: ['deltaA', 'deltaB']
+      })
+    ],
+    edges: []
+  })
+  const deltaPage = deltaPlan.pages.find((p) => p.kind === 'leaf')!
+  const deltaBase = makeCompleter().complete
+  const deltaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      const range = /第 (\d+)-(\d+) 行/.exec(user)
+      const from = range ? Number(range[1]) : 1
+      const to = range ? Number(range[2]) : 9999
+      if (to - from > 30) return '这不是 JSON,是一段废话'
+      const names = deltaRanges
+        .filter((r) => r.startLine >= from && r.endLine <= to)
+        .map((r) => r.name)
+      return JSON.stringify({
+        symbols: names.map((name) => ({
+          name,
+          role: `${name} 的作用`,
+          deps: [],
+          sideEffects: '无',
+          crossRefs: []
+        })),
+        summary: `本段讲 ${names.join(' 与 ')}`
+      })
+    }
+    if (user.includes('本节标题') && user.includes('职责与定位')) {
+      return '## 职责与定位\n本页由 `deltaA` 与 `deltaB` 构成。'
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const deltaResult = await runWikiPage(
+    { page: deltaPage, topicTitle: null, plan: deltaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: (p) =>
+        p === 'src/delta/delta.ts'
+          ? {
+              sha256: 'd',
+              structure: {
+                languageId: 'typescript',
+                imports: ['./x.ts'],
+                exports: ['deltaA', 'deltaB'],
+                functions: ['deltaA', 'deltaB'],
+                classes: [],
+                interfaces: [],
+                reactComponents: [],
+                symbolRanges: deltaRanges
+              }
+            }
+          : null,
+      readFile: async (p) => (p === 'src/delta/delta.ts' ? DELTA : null),
+      complete: deltaCompleter,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.equal(deltaResult.stats.symbolsCovered, 2, '拆分升级后两符号应全覆盖')
+  assert.equal(deltaResult.stats.degradedNotes, 0, '拆分升级成功时不应有降级笔记')
+  assert.ok(deltaResult.stats.retries >= 2, '拆分升级应计入重试')
+  assert.equal(
+    (deltaResult.markdown.match(/## 职责与定位/g) ?? []).length,
+    1,
+    '正文里重复的节标题应被剥掉'
+  )
+
+  // 九、嵌套符号折叠进父符号计覆盖:只记父符号也算全覆盖
+  const epsContent = Array.from({ length: 30 }, (_, i) => `// eps 第 ${i + 1} 行`).join('\n')
+  const epsRanges = [
+    { name: 'outerFn', kind: 'function' as const, startLine: 1, endLine: 30 },
+    { name: 'innerFn', kind: 'function' as const, startLine: 10, endLine: 15 }
+  ]
+  const epsPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/eps/eps.ts', { exports: ['outerFn'], functions: ['outerFn', 'innerFn'] })
+    ],
+    edges: []
+  })
+  const epsPage = epsPlan.pages.find((p) => p.kind === 'leaf')!
+  const epsCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      return JSON.stringify({
+        symbols: [
+          {
+            name: 'outerFn',
+            role: '外层函数,内部含 innerFn',
+            deps: [],
+            sideEffects: '无',
+            crossRefs: []
+          }
+        ],
+        summary: '本段讲 outerFn'
+      })
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const epsResult = await runWikiPage(
+    { page: epsPage, topicTitle: null, plan: epsPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: () => ({
+        sha256: 'e',
+        structure: {
+          languageId: 'typescript',
+          imports: [],
+          exports: ['outerFn'],
+          functions: ['outerFn', 'innerFn'],
+          classes: [],
+          interfaces: [],
+          reactComponents: [],
+          symbolRanges: epsRanges
+        }
+      }),
+      readFile: async () => epsContent,
+      complete: epsCompleter,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.equal(epsResult.stats.symbolsTotal, 1, '嵌套符号不应单独计入覆盖总数')
+  assert.deepEqual(epsResult.stats.coverageGaps, [], '父符号已记时嵌套符号不算缺口')
+
+  // 十、白名单对目录放行:成员所在目录可提及,不存在的目录仍拦
+  const { checkWhitelist } = await import('../src/wiki/wikiPageCheck.ts')
+  const miniEvidence = {
+    pageId: 'p',
+    pageTitle: 't',
+    topicTitle: null,
+    files: [
+      {
+        path: 'src/ai/wikiPrompt.ts',
+        role: 'primary' as const,
+        tier: 'full' as const,
+        contentHash: 'x',
+        sizeBytes: 1,
+        languageId: 'typescript',
+        structure: null,
+        symbolRanges: [],
+        segments: [],
+        dataFacts: null,
+        evidenceNote: null
+      }
+    ],
+    internalEdges: [],
+    externalNames: [],
+    budget: {
+      contextSize: 8192,
+      segmentTokenCap: 5000,
+      filesTotal: 1,
+      filesReadable: 1,
+      segmentsTotal: 0,
+      estNoteCalls: 0,
+      estInputTokens: 0,
+      decisions: []
+    }
+  }
+  assert.deepEqual(
+    checkWhitelist('代码位于 `src/ai/` 目录下。', miniEvidence, new Set(['src/ai/wikiPrompt.ts'])),
+    [],
+    '成员所在目录应放行'
+  )
+  assert.ok(
+    checkWhitelist('代码位于 `src/zz/` 目录下。', miniEvidence, new Set(['src/ai/wikiPrompt.ts']))
+      .length > 0,
+    '不存在的目录仍应拦下'
+  )
+
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }
 

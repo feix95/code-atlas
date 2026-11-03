@@ -1,16 +1,15 @@
 // 解读层:逐段生成结构化阅读笔记(B3),按账本缓存(B4),程序做覆盖校验(B5)。
 // 段与段之间不靠模型自由文本传话:上下文由程序拼装,固定带文件结构前缀,
 // 并按符号名重合从既有笔记里挑跨段注意一并携带。
-import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
 import {
   noteCacheKey,
   type WikiCompleter,
   type WikiPageEvidence,
   type WikiSegment,
-  type WikiSegmentNote,
-  type WikiSymbolNote
+  type WikiSegmentNote
 } from './wikiReadTypes.ts'
+import { degradedNote, parseNote, WikiNoteLedger } from './wikiLedger.ts'
+export { WikiNoteLedger } from './wikiLedger.ts'
 
 const NOTE_SYSTEM = [
   '你是代码阅读员。只依据给定的代码段做阅读笔记,不推测代码里没有的内容,不使用代码里不存在的标识符。',
@@ -18,45 +17,6 @@ const NOTE_SYSTEM = [
   '只输出一个 JSON 对象,不要输出任何其他文字。格式:',
   '{"symbols":[{"name":"符号名","role":"一句话作用","deps":["依赖的符号或模块名"],"sideEffects":"副作用,没有写 无","crossRefs":["需要跨段注意的点,没有留空数组"]}],"summary":"本段一句话摘要"}'
 ].join('\n')
-
-export class WikiNoteLedger {
-  private entries = new Map<string, WikiSegmentNote>()
-
-  get(key: string): WikiSegmentNote | undefined {
-    return this.entries.get(key)
-  }
-
-  set(key: string, note: WikiSegmentNote): void {
-    this.entries.set(key, note)
-  }
-
-  get size(): number {
-    return this.entries.size
-  }
-
-  static async load(dir: string): Promise<WikiNoteLedger> {
-    const ledger = new WikiNoteLedger()
-    try {
-      const raw = await fs.readFile(join(dir, 'wiki-note-ledger.json'), 'utf8')
-      const parsed = JSON.parse(raw) as { entries?: Record<string, WikiSegmentNote> }
-      for (const [key, note] of Object.entries(parsed.entries ?? {})) ledger.entries.set(key, note)
-    } catch {
-      // 没有账本文件就从空账本开始
-    }
-    return ledger
-  }
-
-  async save(dir: string): Promise<void> {
-    await fs.mkdir(dir, { recursive: true })
-    const entries: Record<string, WikiSegmentNote> = {}
-    for (const [key, note] of this.entries) entries[key] = note
-    await fs.writeFile(
-      join(dir, 'wiki-note-ledger.json'),
-      JSON.stringify({ version: 1, entries }, null, 2),
-      'utf8'
-    )
-  }
-}
 
 function structurePrefix(evidence: WikiPageEvidence, segment: WikiSegment): string {
   const path = segment.path
@@ -97,68 +57,6 @@ function relatedNotes(segment: WikiSegment, prior: WikiSegmentNote[]): string {
   return picked.length > 0 ? `\n相关既有笔记:\n${picked.join('\n')}` : ''
 }
 
-function parseNote(
-  raw: string,
-  segment: WikiSegment,
-  validNames: Set<string>
-): WikiSegmentNote | null {
-  const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  try {
-    const parsed = JSON.parse(raw.slice(start, end + 1)) as {
-      symbols?: unknown
-      summary?: unknown
-    }
-    if (!Array.isArray(parsed.symbols)) return null
-    const symbolNotes: WikiSymbolNote[] = []
-    for (const item of parsed.symbols) {
-      const entry = item as Record<string, unknown>
-      const name = typeof entry.name === 'string' ? entry.name : ''
-      if (name === '' || !validNames.has(name)) continue
-      symbolNotes.push({
-        name,
-        role: typeof entry.role === 'string' ? entry.role : '',
-        deps: Array.isArray(entry.deps)
-          ? entry.deps.filter((d): d is string => typeof d === 'string')
-          : [],
-        sideEffects: typeof entry.sideEffects === 'string' ? entry.sideEffects : '',
-        crossRefs: Array.isArray(entry.crossRefs)
-          ? entry.crossRefs.filter((c): c is string => typeof c === 'string')
-          : []
-      })
-    }
-    return {
-      segmentId: segment.id,
-      path: segment.path,
-      symbolNotes,
-      segmentSummary: typeof parsed.summary === 'string' ? parsed.summary : '',
-      degraded: false
-    }
-  } catch {
-    return null
-  }
-}
-
-/** 模型失败时的兜底笔记:只按事实层登记符号,不冒充读过 */
-function degradedNote(segment: WikiSegment, kindOf: Map<string, string>): WikiSegmentNote {
-  const names = new Set<string>()
-  if (segment.symbolName !== null) names.add(segment.symbolName)
-  return {
-    segmentId: segment.id,
-    path: segment.path,
-    symbolNotes: [...names].map((name) => ({
-      name,
-      role: `${kindOf.get(name) ?? '符号'} ${name}(程序按结构登记,模型笔记缺失)`,
-      deps: [],
-      sideEffects: '未确认',
-      crossRefs: []
-    })),
-    segmentSummary: names.size > 0 ? `包含符号 ${[...names].join(', ')}` : '导入与声明段',
-    degraded: true
-  }
-}
-
 export interface WikiNotesResult {
   notes: WikiSegmentNote[]
   calls: number
@@ -166,6 +64,8 @@ export interface WikiNotesResult {
   degraded: number
   /** 账本命中、没有调用模型的段数(复跑成本观察用) */
   cacheHits: number
+  /** 笔记失败的段与原因(段 id:调用失败 / 无法解析),供复测定位 */
+  failures: string[]
   symbolsTotal: number
   symbolsCovered: number
   coverageGaps: string[]
@@ -179,19 +79,24 @@ export async function generateSegmentNotes(
   let calls = 0
   let retries = 0
   let cacheHits = 0
+  const failures: string[] = []
   const fileOf = new Map(evidence.files.map((f) => [f.path, f]))
 
-  const runSegment = async (segment: WikiSegment, isRetry: boolean): Promise<WikiSegmentNote> => {
-    const file = fileOf.get(segment.path)!
-    const cached = deps.ledger.get(
-      noteCacheKey(segment.path, file.contentHash ?? '', segment.id, deps.modelId)
+  const symbolsInside = (
+    file: (typeof evidence.files)[number],
+    segment: WikiSegment
+  ): typeof file.symbolRanges =>
+    file.symbolRanges.filter(
+      (r) => r.startLine >= segment.startLine && r.endLine <= segment.endLine
     )
-    if (cached && !isRetry) {
-      cacheHits++
-      return cached
-    }
+
+  /** 一次笔记尝试:成功返回笔记,失败返回 null 加失败原因(调用失败还是解析失败) */
+  const attempt = async (
+    segment: WikiSegment,
+    opts: { hint?: string; boost?: number }
+  ): Promise<{ note: WikiSegmentNote | null; failure: string | null }> => {
+    const file = fileOf.get(segment.path)!
     calls++
-    if (isRetry) retries++
     const numbered = segment.text
       .split('\n')
       .map((line, i) => `${segment.startLine + i}: ${line}`)
@@ -201,32 +106,93 @@ export async function generateSegmentNotes(
       `本段:${segment.path} 第 ${segment.startLine}-${segment.endLine} 行${segment.symbolName ? `(主体符号 ${segment.symbolName})` : ''}`,
       relatedNotes(segment, notes),
       '代码:',
-      numbered
+      numbered,
+      opts.hint ?? ''
     ].join('\n')
     const validNames = new Set(file.symbolRanges.map((r) => r.name))
     // 输出额按段内符号数给:逐符号成条,符号多的段给少了会被截断成废 JSON
-    const symbolsInSegment = Math.max(
-      1,
-      file.symbolRanges.filter(
-        (r) => r.startLine >= segment.startLine && r.endLine <= segment.endLine
-      ).length
-    )
-    const maxTokens = Math.min(2600, 500 + 120 * symbolsInSegment)
-    let note: WikiSegmentNote | null = null
+    const count = Math.max(1, symbolsInside(file, segment).length)
+    const maxTokens = Math.min(3000, Math.round((500 + 120 * count) * (opts.boost ?? 1)))
+    let raw: string
     try {
-      note = parseNote(await deps.complete(NOTE_SYSTEM, user, maxTokens), segment, validNames)
+      raw = await deps.complete(NOTE_SYSTEM, user, maxTokens)
     } catch {
-      // 调用失败保持 null,下面走降级笔记
+      return { note: null, failure: '模型调用失败' }
     }
-    if (note === null) {
-      const kindOf = new Map(file.symbolRanges.map((r) => [r.name, r.kind]))
-      return degradedNote(segment, kindOf)
+    const parsed = parseNote(raw, segment, validNames)
+    return parsed !== null
+      ? { note: parsed, failure: null }
+      : { note: null, failure: '输出无法解析为结构化笔记' }
+  }
+
+  const runSegment = async (segment: WikiSegment, isRetry: boolean): Promise<WikiSegmentNote> => {
+    const file = fileOf.get(segment.path)!
+    const key = noteCacheKey(segment.path, file.contentHash ?? '', segment.id, deps.modelId)
+    const cached = deps.ledger.get(key)
+    if (cached && !isRetry) {
+      cacheHits++
+      return cached
     }
-    deps.ledger.set(
-      noteCacheKey(segment.path, file.contentHash ?? '', segment.id, deps.modelId),
-      note
-    )
-    return note
+    if (isRetry) retries++
+    const kindOf = new Map(file.symbolRanges.map((r) => [r.name, r.kind]))
+    const first = await attempt(segment, {})
+    if (first.note !== null) {
+      deps.ledger.set(key, first.note)
+      return first.note
+    }
+    // 升级重试:多符号段拆成单符号子段逐个记(整段反复失败时,小步通常能过);
+    // 单符号段带格式提示并加五成输出额再试一次。仍失败才降级,原因记入统计。
+    const inside = symbolsInside(file, segment)
+    if (inside.length >= 2) {
+      const lines = segment.text.split('\n')
+      const subs: WikiSegmentNote[] = []
+      for (const range of inside) {
+        retries++
+        const sub: WikiSegment = {
+          id: `${segment.id}:${range.name}`,
+          path: segment.path,
+          kind: 'symbol',
+          symbolName: range.name,
+          startLine: range.startLine,
+          endLine: range.endLine,
+          text: lines
+            .slice(range.startLine - segment.startLine, range.endLine - segment.startLine + 1)
+            .join('\n'),
+          estTokens: 0
+        }
+        const subAttempt = await attempt(sub, {
+          hint: '只输出 JSON 对象本身,不要输出任何解释文字。'
+        })
+        if (subAttempt.note === null) {
+          failures.push(`${sub.id}:${subAttempt.failure ?? '笔记失败'}`)
+        }
+        subs.push(subAttempt.note ?? degradedNote(sub, kindOf))
+      }
+      const merged: WikiSegmentNote = {
+        segmentId: segment.id,
+        path: segment.path,
+        symbolNotes: subs.flatMap((s) => s.symbolNotes),
+        segmentSummary: subs
+          .map((s) => s.segmentSummary)
+          .filter((s) => s !== '')
+          .join('；'),
+        degraded: subs.every((s) => s.degraded)
+      }
+      if (!merged.degraded) deps.ledger.set(key, merged)
+      if (merged.degraded) failures.push(`${segment.id}:${first.failure ?? '笔记失败'}`)
+      return merged
+    }
+    retries++
+    const second = await attempt(segment, {
+      hint: '只输出 JSON 对象本身,不要输出任何解释文字。',
+      boost: 1.5
+    })
+    if (second.note !== null) {
+      deps.ledger.set(key, second.note)
+      return second.note
+    }
+    failures.push(`${segment.id}:${second.failure ?? first.failure ?? '笔记失败'}`)
+    return degradedNote(segment, kindOf)
   }
 
   for (const file of evidence.files) {
@@ -250,7 +216,18 @@ export async function generateSegmentNotes(
   const coverageGaps: string[] = []
   for (const file of evidence.files) {
     if (file.tier !== 'full' && file.tier !== 'slice') continue
-    const required = [...new Set(file.symbolRanges.map((r) => r.name))]
+    // 嵌套在其他符号内部的函数折叠进父符号,不单独计覆盖(父符号的笔记应一并讲它)
+    const topLevel = file.symbolRanges.filter(
+      (r) =>
+        !file.symbolRanges.some(
+          (o) =>
+            o !== r &&
+            o.startLine <= r.startLine &&
+            o.endLine >= r.endLine &&
+            (o.startLine < r.startLine || o.endLine > r.endLine)
+        )
+    )
+    const required = [...new Set(topLevel.map((r) => r.name))]
     symbolsTotal += required.length
     let covered = coveredOf(file.path)
     const important = required.filter((name) => (file.structure?.exports ?? []).includes(name))
@@ -279,6 +256,7 @@ export async function generateSegmentNotes(
     retries,
     degraded: notes.filter((n) => n.degraded).length,
     cacheHits,
+    failures: [...new Set(failures)],
     symbolsTotal,
     symbolsCovered,
     coverageGaps

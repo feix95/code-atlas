@@ -4,9 +4,10 @@
 import { byCodeUnit } from '../modules/pathOrder.ts'
 import type { WikiCompleter, WikiPageEvidence, WikiSegmentNote } from './wikiReadTypes.ts'
 import { balanceInlineCode, checkWhitelist, mermaidOf } from './wikiPageCheck.ts'
+import { fillDuties } from './wikiDuties.ts'
 
 const SECTION_SYSTEM =
-  '你是技术文档作者,面向不看代码的读者写中文文档。只依据给定证据写作,不使用证据里不存在的文件、函数、类或常量名;引用标识符时用反引号包住。行文具体、克制,不写空话套话,不复述证据原文。'
+  '你是技术文档作者,面向不看代码的读者写中文文档。只依据给定证据写作,不使用证据里不存在的文件、函数、类或常量名;引用标识符时用反引号包住。行文具体、克制,不写空话套话,不复述证据原文。称呼页面用"本页",不要把页面称作"节"。不要在正文里重复输出节标题。'
 
 export interface WikiGenResult {
   markdown: string
@@ -29,75 +30,6 @@ function firstSentence(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim()
   const match = /^[^。.!?]+[。.!?]?/.exec(flat)
   return (match ? match[0] : flat).slice(0, 120)
-}
-
-function dutyFallback(path: string, evidence: WikiPageEvidence, notes: WikiSegmentNote[]): string {
-  const file = evidence.files.find((f) => f.path === path)
-  if (!file) return '本页成员文件'
-  if (file.dataFacts && file.dataFacts.length > 0) return file.dataFacts[0]!
-  const names = [...new Set(file.symbolRanges.map((r) => r.name))].slice(0, 4)
-  void notes
-  return names.length > 0 ? `包含 ${names.join('、')} 等符号` : '本页成员文件'
-}
-
-/** 一次调用填完全页文件的一句话职责(C5:按文件加页面类型缓存的口径,原型先整页一批) */
-async function fillDuties(
-  evidence: WikiPageEvidence,
-  notes: WikiSegmentNote[],
-  complete: WikiCompleter,
-  stats: { calls: number }
-): Promise<Map<string, string>> {
-  const duties = new Map<string, string>()
-  const readable = evidence.files.filter((f) => f.tier !== 'list')
-  if (readable.length === 0) return duties
-  const lines = readable.map((file) => {
-    // 全段摘要都要进:只取开头一段会把多段文件的职责写成首段的样子(真机实测教训)
-    const summary = notes
-      .filter((n) => n.path === file.path)
-      .map((n) => n.segmentSummary.slice(0, 70))
-      .join('；')
-      .slice(0, 800)
-    const exportRoles = notes
-      .filter((n) => n.path === file.path)
-      .flatMap((n) => n.symbolNotes)
-      .filter((s) => (file.structure?.exports ?? []).includes(s.name))
-      .map((s) => `${s.name}:${s.role}`)
-      .join('；')
-      .slice(0, 300)
-    const facts = file.dataFacts ? file.dataFacts.join(';') : ''
-    return `- ${file.path}(角色 ${file.role}):${[summary, exportRoles, facts].filter((s) => s !== '').join(' | ') || '无笔记'}`
-  })
-  const user = [
-    `页面「${evidence.pageTitle}」的文件清单与阅读摘要:`,
-    ...lines,
-    '为每个文件写一句话职责(不超过 40 字,说清它干什么,不复述文件名)。只输出 JSON:{"duties":[{"path":"文件路径","duty":"一句话职责"}]}'
-  ].join('\n')
-  stats.calls++
-  try {
-    const raw = await complete(
-      '你是文档作者。只依据给定摘要写作,不使用摘要里不存在的标识符。只输出 JSON,不要输出其他文字。',
-      user,
-      1200
-    )
-    const start = raw.indexOf('{')
-    const end = raw.lastIndexOf('}')
-    if (start >= 0 && end > start) {
-      const parsed = JSON.parse(raw.slice(start, end + 1)) as {
-        duties?: { path?: unknown; duty?: unknown }[]
-      }
-      for (const item of parsed.duties ?? []) {
-        if (typeof item.path === 'string' && typeof item.duty === 'string') {
-          duties.set(item.path, item.duty)
-        }
-      }
-    }
-  } catch {
-    // 填句失败不阻塞:全部走程序兜底
-  }
-  for (const file of readable) {
-    if (!duties.has(file.path)) duties.set(file.path, dutyFallback(file.path, evidence, notes))
-  }
-  return duties
 }
 
 async function runSection(
@@ -147,11 +79,22 @@ async function runSection(
   }
   return {
     title,
-    text: balanceInlineCode(text),
+    text: balanceInlineCode(stripOwnHeading(text, title)),
     sources,
     ok: text !== '' && violations.length === 0,
     violations
   }
+}
+
+/** 模型偶尔在正文开头重复输出节标题:首个非空行若是与节名相同的标题行,剥掉 */
+function stripOwnHeading(text: string, title: string): string {
+  const lines = text.split('\n')
+  const firstIndex = lines.findIndex((line) => line.trim() !== '')
+  if (firstIndex < 0) return text
+  const heading = lines[firstIndex]!.trim().replace(/^#+\s*/, '')
+  if (heading !== title) return text
+  lines.splice(firstIndex, 1)
+  return lines.join('\n').trim()
 }
 
 export async function generateWikiPageMarkdown(
@@ -210,7 +153,7 @@ export async function generateWikiPageMarkdown(
     evidence.internalEdges.map((e) => `${e.from} -> ${e.to}`).join('\n') || '页内无直接引用边'
   const secB = await runSection(
     '结构与协作',
-    '说明页内文件如何分工协作、引用关系说明了什么结构。用 1 到 3 段写清,图由程序附在本节末尾,你只写文字。',
+    '说明页内文件如何分工协作、引用关系说明了什么结构。谁调用谁、谁依赖谁,只能依据下面给出的引用边陈述;没有引用边的两个文件,不要断言它们之间存在调用或依赖关系。用 1 到 3 段写清,图由程序附在本节末尾,你只写文字。',
     `${noteLines(() => true)}\n引用边:\n${edgeText}`,
     '页内引用关系与各文件笔记',
     ctx,
@@ -232,6 +175,10 @@ export async function generateWikiPageMarkdown(
   summaries.push(firstSentence(secC.text))
 
   // 人话摘要(C2):全部分节完成后,按三个固定问题生成;同样过白名单,不过关宁可不用
+  const primaryDuties = evidence.files
+    .filter((f) => f.role === 'primary')
+    .map((f) => `${f.path}:${duties.get(f.path) ?? ''}`)
+    .join('；')
   const askIntro = async (extra: string): Promise<string> => {
     stats.calls++
     return (
@@ -240,7 +187,8 @@ export async function generateWikiPageMarkdown(
         [
           `主题:「${evidence.pageTitle}」`,
           `各节摘要:${summaries.filter((s) => s !== '').join(' ')}`,
-          '用一段话依次回答三个问题:这个部分解决什么问题、谁会用到它、没有它会怎样。不超过 200 字。',
+          `主角文件职责:${primaryDuties}`,
+          '用一段话依次回答三个问题:这个部分解决什么问题、谁会用到它、没有它会怎样。不超过 200 字。必须点名至少一个主角文件的核心导出符号(用反引号包住),说清它具体负责什么,不许只写"供用户使用""影响体验"这类空话。',
           extra
         ].join('\n'),
         700

@@ -49,6 +49,7 @@ export async function runWikiPage(
 
   const failures: string[] = [
     ...evidence.budget.decisions,
+    ...notesResult.failures.map((failure) => `笔记失败:${failure}`),
     ...notesResult.coverageGaps.map((gap) => `覆盖缺口:${gap}`),
     ...generated.checkDetails.map((detail) => `节校验未过:${detail}`)
   ]
