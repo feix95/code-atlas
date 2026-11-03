@@ -21,7 +21,8 @@ import { isWikiJobActive } from './wikiRun.ts'
 import { ensureWikiRootMarker, resolveWikiLocation } from '../wiki/wikiLocation.ts'
 import { loadWikiSettings, saveWikiSettings } from '../wiki/wikiSettings.ts'
 import { cleanupWiki, scanWikiRoot } from '../wiki/wikiCleanup.ts'
-import { pageFileExists, readWikiState, resolveProjectDir } from '../wiki/wikiStore.ts'
+import { pageFileExists, resolveProjectDir } from '../wiki/wikiStore.ts'
+import { pageFilePathV2, readWikiStateAny } from '../wiki/wikiStoreV2.ts'
 import { wikiPageInputHash } from '../wiki/wikiPageFacts.ts'
 import { panelPageOf } from '../wiki/wikiPanel.ts'
 
@@ -44,34 +45,93 @@ async function projectState(raw: unknown): Promise<WikiProjectStateResult> {
   const location = wikiRoot()
   if (location === null) return { ok: false, error: '还没选 Wiki 存放位置' }
   const projectDir = await resolveProjectDir(location, projectRoot)
-  const read = await readWikiState(projectDir)
+  const read = await readWikiStateAny(projectDir)
   if (read.status === 'damaged') {
     return { ok: true, projectDir, damaged: true, languages: [] }
   }
   if (read.status === 'missing') {
     return { ok: true, projectDir, damaged: false, languages: [] }
   }
+  if (read.version === 1) {
+    const languages = await Promise.all(
+      Object.values(read.state.languages).map(async (language) => ({
+        code: language.code,
+        label: language.label,
+        pages: await Promise.all(
+          Object.values(language.pages).map(async (record) => {
+            const exists = await pageFileExists(projectDir, language.code, record)
+            return {
+              pageId: record.pageId,
+              kind: record.kind,
+              name: record.name,
+              status: record.status === 'done' && !exists ? ('missing' as const) : record.status,
+              file: record.file,
+              generatedAt: record.generatedAt,
+              model: record.model,
+              truncated: record.truncated === true,
+              exists
+            }
+          })
+        )
+      }))
+    )
+    return { ok: true, projectDir, damaged: false, languages }
+  }
   const languages = await Promise.all(
-    Object.values(read.state.languages).map(async (language) => ({
-      code: language.code,
-      label: language.label,
-      pages: await Promise.all(
+    Object.values(read.state.languages).map(async (language) => {
+      type SummaryPage = {
+        pageId: string
+        kind: 'module' | 'group'
+        name: string
+        status: 'done' | 'stale' | 'missing' | 'failed' | 'cancelled'
+        file: string
+        generatedAt: string
+        model: string
+        truncated: boolean
+        exists: boolean
+      }
+      const pages: SummaryPage[] = await Promise.all(
         Object.values(language.pages).map(async (record) => {
-          const exists = await pageFileExists(projectDir, language.code, record)
+          const exists = await fs.access(pageFilePathV2(projectDir, language.code, record)).then(
+            () => true,
+            () => false
+          )
           return {
             pageId: record.pageId,
-            kind: record.kind,
+            // 页面类型暂借模块一类展示,进度页口径切换随生成入口切换一并处理;待生成页先按缺失呈现
+            kind: 'module' as const,
             name: record.name,
-            status: record.status === 'done' && !exists ? ('missing' as const) : record.status,
+            status:
+              record.status === 'done' && !exists
+                ? ('missing' as const)
+                : record.status === 'planned'
+                  ? ('missing' as const)
+                  : record.status,
             file: record.file,
             generatedAt: record.generatedAt,
             model: record.model,
-            truncated: record.truncated === true,
+            truncated: false,
             exists
           }
         })
       )
-    }))
+      // legacy 旧页并入同一份清单,保持可达;新页在前,旧页在后
+      for (const record of Object.values(language.legacy)) {
+        const exists = await pageFileExists(projectDir, language.code, record)
+        pages.push({
+          pageId: record.pageId,
+          kind: record.kind,
+          name: record.name,
+          status: record.status === 'done' && !exists ? ('missing' as const) : record.status,
+          file: record.file,
+          generatedAt: record.generatedAt,
+          model: record.model,
+          truncated: record.truncated === true,
+          exists
+        })
+      }
+      return { code: language.code, label: language.label, pages }
+    })
   )
   return { ok: true, projectDir, damaged: false, languages }
 }
@@ -88,18 +148,24 @@ async function panelState(raw: unknown): Promise<WikiPanelStateResult> {
   const location = wikiRoot()
   if (location === null) return { ok: true, language, damaged: false, pages: [] }
   const projectDir = await resolveProjectDir(location, projectRoot)
-  const read = await readWikiState(projectDir)
+  const read = await readWikiStateAny(projectDir)
   if (read.status === 'damaged') return { ok: true, language, damaged: true, pages: [] }
-  const languageState = read.status === 'ok' ? read.state.languages[language] : undefined
   const factReady = getFactFileCount(projectRoot) > 0
   const result = await Promise.all(
     pages.map(async (source) => {
-      const record = languageState?.pages[source.pageId]
+      // 第二版记账里,图谱页的记录在 legacy 区(同一套页面标识);新页与图谱页不是同一套标识,不在这里混查
+      const record =
+        read.status === 'ok'
+          ? read.version === 2
+            ? read.state.languages[language]?.legacy[source.pageId]
+            : read.state.languages[language]?.pages[source.pageId]
+          : undefined
       if (!record) return panelPageOf({ source, record, exists: false, currentHash: null })
       const exists = await pageFileExists(projectDir, language, record)
-      const currentHash = factReady
-        ? wikiPageInputHash(source, language, (relPath) => getFileFact(projectRoot, relPath))
-        : null
+      const currentHash =
+        factReady && read.status === 'ok' && read.version === 1
+          ? wikiPageInputHash(source, language, (relPath) => getFileFact(projectRoot, relPath))
+          : null
       return panelPageOf({ source, record, exists, currentHash })
     })
   )
