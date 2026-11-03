@@ -390,6 +390,45 @@ function main(): void {
     '小分片成员并进同功能最大分片'
   )
 
+  // 十四、主题显示名:末段为 src 的目录取上一段,免与上层 src 主题重名
+  const plan14 = buildWikiPlan(
+    input(
+      [file('x/renderer/src/app.ts'), file('x/renderer/src/view.ts'), file('x/other.ts')],
+      [['x/renderer/src/app.ts', 'x/renderer/src/view.ts']]
+    )
+  )
+  const topicTitles: string[] = []
+  const collectTitles = (topics: typeof plan14.topics): void => {
+    for (const topic of topics) {
+      topicTitles.push(`${topic.dir}=${topic.title}`)
+      collectTitles(topic.children)
+    }
+  }
+  collectTitles(plan14.topics)
+  assert.ok(
+    topicTitles.includes('x/renderer/src=renderer'),
+    `src 结尾的主题显示上一段名,实际 ${topicTitles.join(' / ')}`
+  )
+
+  // 十五、构建类薄页归入根主题页「构建与部署」,不自成叶子页
+  const plan15 = buildWikiPlan(
+    input(
+      [
+        file('build/installer.nsh', { languageId: '', sizeBytes: 600 }),
+        file('src/a.ts'),
+        file('src/b.ts')
+      ],
+      [],
+      { manifestPath: 'package.json', manifestScripts: ['build'] }
+    )
+  )
+  assert.ok(!leafPages(plan15).some((p) => p.anchorDir === 'build'), 'build 薄页不自成叶子页')
+  const buildRoot15 = plan15.pages.find((p) => p.title === '构建与部署')
+  assert.ok(
+    buildRoot15?.members.some((m) => m.path === 'build/installer.nsh'),
+    'installer.nsh 归入构建与部署成员'
+  )
+
   console.log('✅ Wiki 主题树切分自测全部通过')
   console.log(
     `   细切 ${leafPages(plan1).length} 页 · 跨目录 ${crossPages.length} 页 · 根主题 [${rootTitles.join(', ')}]`

@@ -15,7 +15,7 @@ import {
   type WikiPlanPage
 } from './wikiPlanTypes.ts'
 import { buildDraftGroups, nameTokens, tokensOf, type DraftGroup } from './wikiPlanGroups.ts'
-import { assembleTopics, buildRootPages, shortHash } from './wikiPlanTree.ts'
+import { assembleTopics, BUILD_CONFIG_PATTERN, buildRootPages, shortHash } from './wikiPlanTree.ts'
 
 export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   const files = [...input.files].sort((a, b) => byCodeUnit(a.relPath, b.relPath))
@@ -222,6 +222,18 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
         .map((p) => ({ page: p, shared: commonPrefixSegs(p.anchorDir, page.anchorDir) }))
         .filter((c) => c.shared >= 1)
         .sort((a, b) => b.shared - a.shared || primaryCount(b.page) - primaryCount(a.page))[0]?.page
+    }
+    if (!target) {
+      // 再兜底:构建类薄页(build 目录、安装脚本、构建配置)归入根主题页「构建与部署」,不自成叶子页
+      const buildRoot = pages.find((p) => p.kind === 'root' && p.title === '构建与部署')
+      const primaries = page.members.filter((m) => m.role === 'primary').map((m) => m.path)
+      const allBuildish =
+        primaries.length > 0 &&
+        primaries.every(
+          (path) =>
+            dirOf(path) === 'build' || BUILD_CONFIG_PATTERN.test(path) || /installer/i.test(path)
+        )
+      if (buildRoot && allBuildish) target = buildRoot
     }
     if (!target) continue
     for (const member of page.members) {

@@ -15,7 +15,7 @@ export function shortHash(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 10)
 }
 
-const BUILD_CONFIG_PATTERN =
+export const BUILD_CONFIG_PATTERN =
   /(^|\/)(electron-builder[^/]*|vite\.config\.[^/]+|webpack[^/]*|rollup\.config\.[^/]+|Dockerfile|Makefile)$/
 
 /** 进程间通道定义文件:只认通道定义本身(如 ipcChannels.ts),不认各通道的处理器文件 */
@@ -119,7 +119,13 @@ export function assembleTopics(
     if (!topic) {
       topic = {
         id: `t:${shortHash(dir || '.')}`,
-        title: dir === '' ? input.projectName : dir.split('/').pop()!,
+        // 末段是 src 这类通用名时取上一段作显示名,免得与上层同名主题撞名(src/renderer/src 显示 renderer)
+        title:
+          dir === ''
+            ? input.projectName
+            : dir.split('/').pop() === 'src' && dir.split('/').length >= 2
+              ? dir.split('/')[dir.split('/').length - 2]!
+              : dir.split('/').pop()!,
         dir,
         overviewPageId: null,
         pageIds: [],
