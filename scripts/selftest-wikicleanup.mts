@@ -16,6 +16,9 @@ import {
   type WikiPageRecord
 } from '../src/wiki/wikiStore.ts'
 import { WIKI_MARKER_FILE } from '../src/shared/wikiTypes.ts'
+import { buildWikiPlan } from '../src/wiki/wikiPlan.ts'
+import { writeWikiPlanFile } from '../src/wiki/wikiPlanStore.ts'
+import { createWikiStateV2, writeWikiStateV2 } from '../src/wiki/wikiStoreV2.ts'
 
 const LANG = 'zh-CN'
 const LANG_DIR = '简体中文'
@@ -185,6 +188,85 @@ async function checkRefusals(base: string): Promise<void> {
   assert.equal(missing.ok, false, '根目录不存在时报告清楚')
 }
 
+async function checkMixedV2(base: string): Promise<void> {
+  // 第二版项目:新页 + legacy 旧页 + 规划文件 + 账本区一起清,用户文件保留
+  const root = join(base, 'mixed')
+  await seedRoot(root)
+  const dir = join(root, 'proj2')
+  const state = createWikiStateV2(dir, dir)
+  state.planRef = { path: '.codeatlas/plan.json', version: 1 }
+  state.languages[LANG] = {
+    code: LANG,
+    label: LANG_DIR,
+    origin: 'generated',
+    pages: {
+      'p:leaf': {
+        pageId: 'p:leaf',
+        kind: 'leaf',
+        file: '引擎/安装.md',
+        name: '安装',
+        nameSource: 'program',
+        status: 'done',
+        model: 'fake',
+        generatedAt: '2026-11-04T00:00:00.000Z',
+        members: [],
+        budgetNotes: []
+      }
+    },
+    legacy: {
+      'm:old': {
+        pageId: 'm:old',
+        kind: 'module',
+        file: '模块/旧页.md',
+        inputHash: 'x',
+        promptVersion: 4,
+        model: 'fake',
+        generatedAt: '2026-11-03T00:00:00.000Z',
+        status: 'done',
+        name: '旧页'
+      }
+    }
+  }
+  await fs.mkdir(join(languageDir(dir, LANG), '引擎'), { recursive: true })
+  await fs.mkdir(join(languageDir(dir, LANG), '模块'), { recursive: true })
+  await fs.writeFile(join(languageDir(dir, LANG), '引擎', '安装.md'), '# 安装')
+  await fs.writeFile(join(languageDir(dir, LANG), '模块', '旧页.md'), '# 旧页')
+  await fs.writeFile(join(languageDir(dir, LANG), WIKI_README), '# 索引')
+  const userFile = join(languageDir(dir, LANG), '引擎', '用户笔记.md')
+  await fs.writeFile(userFile, '用户自己的文件,不能删')
+  await writeWikiPlanFile(
+    dir,
+    buildWikiPlan({
+      projectName: 'proj2',
+      files: [],
+      edges: [],
+      rootDocs: [],
+      manifestPath: null,
+      manifestScripts: []
+    })
+  )
+  await fs.mkdir(join(dir, '.codeatlas', 'ledger'), { recursive: true })
+  await fs.writeFile(join(dir, '.codeatlas', 'ledger', 'note-ledger.json'), '{}')
+  await writeWikiStateV2(dir, state)
+
+  const scan = await scanWikiRoot(root)
+  assert.equal(scan.damaged.length, 0, '第二版记账不应被扫描判成损坏')
+  assert.equal(scan.pages, 2, '扫描应计入新页与 legacy 旧页')
+
+  const outcome = await cleanupWiki({ root, isGenerating: false })
+  assert.equal(outcome.ok, true, '第二版项目应可清理')
+  assert.equal(await exists(join(languageDir(dir, LANG), '引擎', '安装.md')), false, '新页应删除')
+  assert.equal(
+    await exists(join(languageDir(dir, LANG), '模块', '旧页.md')),
+    false,
+    'legacy 旧页应删除'
+  )
+  assert.equal(await exists(join(dir, '.codeatlas', 'plan.json')), false, '规划文件应删除')
+  assert.equal(await exists(join(dir, '.codeatlas', 'ledger')), false, '账本区应删除')
+  assert.equal(await exists(join(dir, '.codeatlas', 'state.json')), false, '记账应删除')
+  assert.equal(await exists(userFile), true, '用户文件必须保留')
+}
+
 async function main(): Promise<void> {
   const base = join(tmpdir(), `codeatlas-wikicleanup-${Date.now()}`)
   await fs.mkdir(base, { recursive: true })
@@ -194,6 +276,7 @@ async function main(): Promise<void> {
     await checkProjectScope(base)
     await checkDamaged(base)
     await checkRefusals(base)
+    await checkMixedV2(base)
     console.log('✅ Wiki 清理自测全部通过')
     console.log('   只删记账文档与索引 · 用户文件保留 · 空根连标记一起收 · 单项目不动别家')
     console.log('   记账损坏整次拒绝 · 生成中拒绝 · 越界项目拒绝 · 扫描篇数与占用')

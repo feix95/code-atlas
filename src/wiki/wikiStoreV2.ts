@@ -2,13 +2,14 @@
 // 读取端双版本并存:第一版记账原样可读,首次新管线生成时才升版写入;
 // 旧页文件不搬动,新页按主题树路径写入,两套路径安全校验互不放宽。
 import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import {
   WIKI_STATE_DIR,
   WIKI_STATE_FILE,
   cleanString,
   cleanStringList,
   isObject,
+  languageDir,
   languageDirLabel,
   sanitizeWikiStateV1,
   writeFileAtomic,
@@ -98,6 +99,37 @@ export function wikiLedgerDirPath(projectDir: string): string {
 
 export function noteLedgerFilePath(projectDir: string): string {
   return join(wikiLedgerDirPath(projectDir), WIKI_NOTE_LEDGER_FILE)
+}
+
+export function pageFilePathV2(
+  projectDir: string,
+  languageCode: string,
+  record: Pick<WikiPageRecordV2, 'file'>
+): string {
+  return join(languageDir(projectDir, languageCode), record.file)
+}
+
+/** 删除记账里的一页新页文件;只动校验通过的嵌套路径,变空的父目录逐层收掉 */
+export async function removePageFileV2(
+  projectDir: string,
+  languageCode: string,
+  file: string
+): Promise<void> {
+  if (!isSafePageFileV2(file)) return
+  const root = languageDir(projectDir, languageCode)
+  const target = join(root, file)
+  const rel = relative(root, target)
+  if (rel.startsWith('..')) return
+  await fs.rm(target, { force: true })
+  let dir = dirname(target)
+  while (dir !== root && dir.startsWith(root)) {
+    const removed = await fs
+      .rmdir(dir)
+      .then(() => true)
+      .catch(() => false)
+    if (!removed) break
+    dir = dirname(dir)
+  }
 }
 
 export function createWikiStateV2(projectRoot: string, projectDir: string): WikiStateV2 {

@@ -12,13 +12,19 @@ import { isInsideRoot } from './wikiLocation.ts'
 import {
   languageDir,
   pageFilePath,
-  readWikiState,
   removePageFile,
   WIKI_README,
   WIKI_STATE_DIR,
   WIKI_STATE_FILE,
   type WikiState
 } from './wikiStore.ts'
+import { wikiPlanFilePath } from './wikiPlanStore.ts'
+import {
+  pageFilePathV2,
+  readWikiStateAny,
+  removePageFileV2,
+  type WikiStateV2
+} from './wikiStoreV2.ts'
 
 export interface WikiCleanupOptions {
   /** 已校验过的 Wiki 根 */
@@ -28,7 +34,9 @@ export interface WikiCleanupOptions {
   isGenerating: boolean
 }
 
-type CleanupPlan = { dir: string; state: WikiState }
+/** 清理计划按记账版本二选一:第一版走旧口径,第二版走新旧并集口径 */
+type CleanupPlan =
+  { dir: string; version: 1; state: WikiState } | { dir: string; version: 2; state: WikiStateV2 }
 
 const fail = (reason: string, damaged: string[] = []): WikiCleanupOutcome => ({
   ok: false,
@@ -59,15 +67,37 @@ export async function scanWikiRoot(root: string): Promise<WikiRootScan> {
     damaged: []
   }
   for (const dir of await listProjectDirs(root)) {
-    const read = await readWikiState(dir)
+    const read = await readWikiStateAny(dir)
     if (read.status === 'damaged') {
       scan.damaged.push(dir)
       continue
     }
     if (read.status === 'missing') continue
     scan.projects += 1
+    if (read.version === 1) {
+      for (const language of Object.values(read.state.languages)) {
+        for (const record of Object.values(language.pages)) {
+          scan.pages += 1
+          const stat = await statSafe(pageFilePath(dir, language.code, record))
+          if (stat?.isFile()) {
+            scan.files += 1
+            scan.bytes += stat.size
+          }
+        }
+      }
+      continue
+    }
     for (const language of Object.values(read.state.languages)) {
       for (const record of Object.values(language.pages)) {
+        scan.pages += 1
+        const stat = await statSafe(pageFilePathV2(dir, language.code, record))
+        if (stat?.isFile()) {
+          scan.files += 1
+          scan.bytes += stat.size
+        }
+      }
+      // 第二版的 legacy 旧页也在登记内,一并统计
+      for (const record of Object.values(language.legacy)) {
         scan.pages += 1
         const stat = await statSafe(pageFilePath(dir, language.code, record))
         if (stat?.isFile()) {
@@ -103,20 +133,57 @@ async function removeIndexPage(
   return { files: 1, bytes: stat.size }
 }
 
+async function removeGeneratedFileV2(
+  projectDir: string,
+  languageCode: string,
+  file: string
+): Promise<{ files: number; bytes: number }> {
+  const stat = await statSafe(pageFilePathV2(projectDir, languageCode, { file }))
+  if (!stat?.isFile()) return { files: 0, bytes: 0 }
+  await removePageFileV2(projectDir, languageCode, file)
+  return { files: 1, bytes: stat.size }
+}
+
 async function cleanLedgerProject(plan: CleanupPlan): Promise<{ files: number; bytes: number }> {
   let files = 0
   let bytes = 0
-  for (const language of Object.values(plan.state.languages)) {
-    for (const record of Object.values(language.pages)) {
-      const removed = await removeGeneratedFile(plan.dir, language.code, record.file)
-      files += removed.files
-      bytes += removed.bytes
+  if (plan.version === 1) {
+    for (const language of Object.values(plan.state.languages)) {
+      for (const record of Object.values(language.pages)) {
+        const removed = await removeGeneratedFile(plan.dir, language.code, record.file)
+        files += removed.files
+        bytes += removed.bytes
+      }
+      const index = await removeIndexPage(plan.dir, language.code)
+      files += index.files
+      bytes += index.bytes
+      // 生成目录只按语种标签建;空目录收掉,用户另建的目录不动
+      await fs.rmdir(languageDir(plan.dir, language.code)).catch(() => undefined)
     }
-    const index = await removeIndexPage(plan.dir, language.code)
-    files += index.files
-    bytes += index.bytes
-    // 生成目录只按语种标签建;空目录收掉,用户另建的目录不动
-    await fs.rmdir(languageDir(plan.dir, language.code)).catch(() => undefined)
+  } else {
+    // 第二版:删除集合是新页与 legacy 旧页的并集,再加规划文件与账本区
+    for (const language of Object.values(plan.state.languages)) {
+      for (const record of Object.values(language.pages)) {
+        const removed = await removeGeneratedFileV2(plan.dir, language.code, record.file)
+        files += removed.files
+        bytes += removed.bytes
+      }
+      for (const record of Object.values(language.legacy)) {
+        const removed = await removeGeneratedFile(plan.dir, language.code, record.file)
+        files += removed.files
+        bytes += removed.bytes
+      }
+      const index = await removeIndexPage(plan.dir, language.code)
+      files += index.files
+      bytes += index.bytes
+      await fs.rmdir(languageDir(plan.dir, language.code)).catch(() => undefined)
+    }
+    if (plan.state.planRef !== null) {
+      await fs.rm(wikiPlanFilePath(plan.dir), { force: true })
+    }
+    if (plan.state.ledgerDir === `${WIKI_STATE_DIR}/ledger`) {
+      await fs.rm(join(plan.dir, plan.state.ledgerDir), { recursive: true, force: true })
+    }
   }
   await fs.rm(join(plan.dir, WIKI_STATE_DIR, WIKI_STATE_FILE), { force: true })
   await fs.rmdir(join(plan.dir, WIKI_STATE_DIR)).catch(() => undefined)
@@ -142,16 +209,27 @@ async function planCleanup(
     if (target === resolve(options.root) || !isInsideRoot(target, options.root)) {
       return fail('只清理 Wiki 根目录里的项目文件夹')
     }
-    const read = await readWikiState(target)
+    const read = await readWikiStateAny(target)
     if (read.status === 'damaged') return fail('记录损坏,无法判断哪些文件是本应用生成的', [target])
-    return read.status === 'ok' ? [{ dir: target, state: read.state }] : []
+    if (read.status !== 'ok') return []
+    return [
+      read.version === 1
+        ? { dir: target, version: 1 as const, state: read.state }
+        : { dir: target, version: 2 as const, state: read.state }
+    ]
   }
   const plans: CleanupPlan[] = []
   const damaged: string[] = []
   for (const dir of await listProjectDirs(options.root)) {
-    const read = await readWikiState(dir)
+    const read = await readWikiStateAny(dir)
     if (read.status === 'damaged') damaged.push(dir)
-    else if (read.status === 'ok') plans.push({ dir, state: read.state })
+    else if (read.status === 'ok') {
+      plans.push(
+        read.version === 1
+          ? { dir, version: 1 as const, state: read.state }
+          : { dir, version: 2 as const, state: read.state }
+      )
+    }
   }
   return damaged.length > 0 ? fail('记录损坏,无法判断哪些文件是本应用生成的', damaged) : plans
 }
