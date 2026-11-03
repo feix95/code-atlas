@@ -429,6 +429,24 @@ function main(): void {
     'installer.nsh 归入构建与部署成员'
   )
 
+  // 十六、运行日志是产物不是源码:归资产类,永远不做主角
+  const plan16 = buildWikiPlan(
+    input(
+      [
+        file('vendor/tool.ts'),
+        file('vendor/engine-repro.log', { languageId: '', sizeBytes: 9000 }),
+        file('src/a.ts')
+      ],
+      []
+    )
+  )
+  assert.ok(
+    !plan16.pages.some((p) =>
+      p.members.some((m) => m.path.endsWith('.log') && m.role === 'primary')
+    ),
+    '日志文件不应成为任何页面的主角'
+  )
+
   console.log('✅ Wiki 主题树切分自测全部通过')
   console.log(
     `   细切 ${leafPages(plan1).length} 页 · 跨目录 ${crossPages.length} 页 · 根主题 [${rootTitles.join(', ')}]`

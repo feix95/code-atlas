@@ -222,6 +222,137 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
   assert.ok(fallen.stats.coverageGaps.length > 0, '降级不算真覆盖,缺口应记录')
   assert.ok(fallen.markdown.includes('# '), '模型全挂时页面骨架仍应产出')
 
+  // 五、段内符号数上限:12 个符号的文件必须切成至少 2 段,每段符号不超过 10
+  const gammaLines: string[] = []
+  const gammaRanges: { name: string; kind: 'function'; startLine: number; endLine: number }[] = []
+  for (let i = 1; i <= 12; i++) {
+    gammaLines.push(`export function g${i}(): number { return ${i} }`)
+    gammaLines.push('')
+    gammaRanges.push({
+      name: `g${i}`,
+      kind: 'function',
+      startLine: gammaLines.length - 1,
+      endLine: gammaLines.length - 1
+    })
+  }
+  const GAMMA = gammaLines.join('\n')
+  const gammaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      ...planInput.files,
+      planFile('src/gamma/gamma.ts', {
+        exports: gammaRanges.map((r) => r.name),
+        functions: gammaRanges.map((r) => r.name)
+      })
+    ]
+  })
+  const gammaPage = gammaPlan.pages.find(
+    (p) => p.kind === 'leaf' && p.members.some((m) => m.path === 'src/gamma/gamma.ts')
+  )!
+  assert.ok(gammaPage, 'gamma 应自成一页')
+  const gammaEvidence = await buildPageEvidence(
+    { page: gammaPage, topicTitle: null, plan: gammaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: (p) =>
+        p === 'src/gamma/gamma.ts'
+          ? {
+              sha256: 'g',
+              structure: {
+                languageId: 'typescript',
+                imports: [],
+                exports: gammaRanges.map((r) => r.name),
+                functions: gammaRanges.map((r) => r.name),
+                classes: [],
+                interfaces: [],
+                reactComponents: [],
+                symbolRanges: gammaRanges
+              }
+            }
+          : (FACTS.get(p) ?? null),
+      readFile: async (p) => (p === 'src/gamma/gamma.ts' ? GAMMA : (CONTENTS.get(p) ?? null))
+    }
+  )
+  const gammaFile = gammaEvidence.files.find((f) => f.path === 'src/gamma/gamma.ts')!
+  assert.ok(
+    gammaFile.segments.length >= 2,
+    `12 符号应切成至少 2 段,实际 ${gammaFile.segments.length}`
+  )
+  for (const seg of gammaFile.segments) {
+    const inside = gammaRanges.filter(
+      (r) => r.startLine >= seg.startLine && r.endLine <= seg.endLine
+    ).length
+    assert.ok(inside <= 10, `单段符号数应不超过 10,实际 ${inside}`)
+  }
+
+  // 六、职责填句的证据必须包含后段摘要:捕获职责调用的提示词,断言含第 12 个符号名
+  let dutiesPrompt = ''
+  const spyBase = makeCompleter().complete
+  const spy: WikiCompleter = async (system, user) => {
+    if (user.includes('一句话职责')) dutiesPrompt = user
+    return spyBase(system, user)
+  }
+  await runWikiPage(
+    { page: gammaPage, topicTitle: null, plan: gammaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: (p) =>
+        p === 'src/gamma/gamma.ts'
+          ? {
+              sha256: 'g',
+              structure: {
+                languageId: 'typescript',
+                imports: [],
+                exports: gammaRanges.map((r) => r.name),
+                functions: gammaRanges.map((r) => r.name),
+                classes: [],
+                interfaces: [],
+                reactComponents: [],
+                symbolRanges: gammaRanges
+              }
+            }
+          : (FACTS.get(p) ?? null),
+      readFile: async (p) => (p === 'src/gamma/gamma.ts' ? GAMMA : (CONTENTS.get(p) ?? null)),
+      complete: spy,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.ok(dutiesPrompt.includes('g12'), '职责证据应包含最后一段的符号,不只首段')
+
+  // 七、总述违规走兜底、行内代码配平
+  const introBase = makeCompleter().complete
+  const badIntro: WikiCompleter = async (system, user) => {
+    if (system.includes('产品说明')) {
+      return '这里由 `GhostThing` 统筹一切,解决所有问题,谁都会用到它。'
+    }
+    if (user.includes('本节标题') && user.includes('结构与协作')) {
+      return '引用 `alpha.ts 还引用了 `beta.ts`，结构清楚。'
+    }
+    return introBase(system, user)
+  }
+  const cleaned = await runWikiPage(
+    { page, topicTitle: null, plan, edges: planInput.edges, contextSize: 8192 },
+    {
+      factOf: (p: string) => FACTS.get(p) ?? null,
+      readFile: async (p: string) => CONTENTS.get(p) ?? null,
+      complete: badIntro,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  const introLine = cleaned.markdown.split('\n')[2] ?? ''
+  assert.ok(!introLine.includes('GhostThing'), '违规总述应被兜底替换')
+  let inFence = false
+  for (const line of cleaned.markdown.split('\n')) {
+    if (line.trimStart().startsWith('```')) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    assert.equal((line.match(/`/g) ?? []).length % 2, 0, `行内代码应配平:${line}`)
+  }
+
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }
 

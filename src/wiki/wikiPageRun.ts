@@ -42,14 +42,15 @@ export async function runWikiPage(
   const generated = await generateWikiPageMarkdown(evidence, notesResult.notes, {
     complete: deps.complete,
     planPaths,
-    generatedAt: (deps.now ? deps.now() : new Date()).toISOString()
+    generatedAt: (deps.now ? deps.now() : new Date()).toISOString(),
+    coverageGaps: notesResult.coverageGaps
   })
   const sectionsMs = performance.now() - sectionsStart
 
   const failures: string[] = [
     ...evidence.budget.decisions,
     ...notesResult.coverageGaps.map((gap) => `覆盖缺口:${gap}`),
-    ...generated.checkFailedSections.map((title) => `节校验未过:${title}`)
+    ...generated.checkDetails.map((detail) => `节校验未过:${detail}`)
   ]
   return {
     markdown: generated.markdown,
@@ -68,6 +69,7 @@ export async function runWikiPage(
       coverageGaps: notesResult.coverageGaps,
       checkFailedSections: generated.checkFailedSections,
       degradedNotes: notesResult.degraded,
+      cacheHits: notesResult.cacheHits,
       failures
     }
   }

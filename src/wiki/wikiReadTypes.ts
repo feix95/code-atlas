@@ -120,6 +120,8 @@ export interface WikiPageRunStats {
   checkFailedSections: string[]
   /** 降级笔记的段数(模型失败兜底) */
   degradedNotes: number
+  /** 账本命中的段数(没有调用模型) */
+  cacheHits: number
   failures: string[]
 }
 

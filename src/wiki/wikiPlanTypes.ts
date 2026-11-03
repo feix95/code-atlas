@@ -72,7 +72,9 @@ const ASSET_EXTS = new Set([
   '.wav',
   '.mp4',
   '.webm',
-  '.pdf'
+  '.pdf',
+  // 运行日志是产物不是源码:只挂靠不做主角,免得进正文与图
+  '.log'
 ])
 /** 自测判定与 P2 切分共用 MODULE_TEST_FILE_PATTERNS,这里只补它没覆盖的旅程与夹具文件 */
 const EXTRA_TEST_PATTERNS: readonly RegExp[] = [/(^|\/)journey-[^/]+$/, /(^|\/)[^/]*fixture[^/]*$/]

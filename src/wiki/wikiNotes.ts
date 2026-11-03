@@ -14,6 +14,7 @@ import {
 
 const NOTE_SYSTEM = [
   '你是代码阅读员。只依据给定的代码段做阅读笔记,不推测代码里没有的内容,不使用代码里不存在的标识符。',
+  '段内每个符号都要有一条记录,一条都不能漏。role 不超过 30 字,deps 最多 3 个,crossRefs 最多 2 条,写紧凑些。',
   '只输出一个 JSON 对象,不要输出任何其他文字。格式:',
   '{"symbols":[{"name":"符号名","role":"一句话作用","deps":["依赖的符号或模块名"],"sideEffects":"副作用,没有写 无","crossRefs":["需要跨段注意的点,没有留空数组"]}],"summary":"本段一句话摘要"}'
 ].join('\n')
@@ -57,12 +58,21 @@ export class WikiNoteLedger {
   }
 }
 
-function structurePrefix(evidence: WikiPageEvidence, path: string): string {
+function structurePrefix(evidence: WikiPageEvidence, segment: WikiSegment): string {
+  const path = segment.path
   const file = evidence.files.find((f) => f.path === path)
   if (!file || file.structure === null) return `文件:${path}`
-  const symbols = file.symbolRanges
-    .map((r) => `${r.name}(${r.kind} ${r.startLine}-${r.endLine})`)
-    .join('、')
+  let ranges = file.symbolRanges
+  if (ranges.length > 15) {
+    // 符号多的文件只带本段附近符号:整表每段重复携带,预填充成本太高
+    const hit = ranges
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.endLine >= segment.startLine && r.startLine <= segment.endLine)
+    const from = Math.max(0, (hit[0]?.i ?? 0) - 2)
+    const to = Math.min(ranges.length - 1, (hit[hit.length - 1]?.i ?? 0) + 2)
+    ranges = ranges.slice(from, to + 1)
+  }
+  const symbols = ranges.map((r) => `${r.name}(${r.kind} ${r.startLine}-${r.endLine})`).join('、')
   return [
     `文件:${path}(${file.languageId || '未知语言'})`,
     `导出:${file.structure.exports.join(', ') || '无'}`,
@@ -154,6 +164,8 @@ export interface WikiNotesResult {
   calls: number
   retries: number
   degraded: number
+  /** 账本命中、没有调用模型的段数(复跑成本观察用) */
+  cacheHits: number
   symbolsTotal: number
   symbolsCovered: number
   coverageGaps: string[]
@@ -166,6 +178,7 @@ export async function generateSegmentNotes(
   const notes: WikiSegmentNote[] = []
   let calls = 0
   let retries = 0
+  let cacheHits = 0
   const fileOf = new Map(evidence.files.map((f) => [f.path, f]))
 
   const runSegment = async (segment: WikiSegment, isRetry: boolean): Promise<WikiSegmentNote> => {
@@ -173,7 +186,10 @@ export async function generateSegmentNotes(
     const cached = deps.ledger.get(
       noteCacheKey(segment.path, file.contentHash ?? '', segment.id, deps.modelId)
     )
-    if (cached && !isRetry) return cached
+    if (cached && !isRetry) {
+      cacheHits++
+      return cached
+    }
     calls++
     if (isRetry) retries++
     const numbered = segment.text
@@ -181,16 +197,24 @@ export async function generateSegmentNotes(
       .map((line, i) => `${segment.startLine + i}: ${line}`)
       .join('\n')
     const user = [
-      structurePrefix(evidence, segment.path),
+      structurePrefix(evidence, segment),
       `本段:${segment.path} 第 ${segment.startLine}-${segment.endLine} 行${segment.symbolName ? `(主体符号 ${segment.symbolName})` : ''}`,
       relatedNotes(segment, notes),
       '代码:',
       numbered
     ].join('\n')
     const validNames = new Set(file.symbolRanges.map((r) => r.name))
+    // 输出额按段内符号数给:逐符号成条,符号多的段给少了会被截断成废 JSON
+    const symbolsInSegment = Math.max(
+      1,
+      file.symbolRanges.filter(
+        (r) => r.startLine >= segment.startLine && r.endLine <= segment.endLine
+      ).length
+    )
+    const maxTokens = Math.min(2600, 500 + 120 * symbolsInSegment)
     let note: WikiSegmentNote | null = null
     try {
-      note = parseNote(await deps.complete(NOTE_SYSTEM, user, 1100), segment, validNames)
+      note = parseNote(await deps.complete(NOTE_SYSTEM, user, maxTokens), segment, validNames)
     } catch {
       // 调用失败保持 null,下面走降级笔记
     }
@@ -254,6 +278,7 @@ export async function generateSegmentNotes(
     calls,
     retries,
     degraded: notes.filter((n) => n.degraded).length,
+    cacheHits,
     symbolsTotal,
     symbolsCovered,
     coverageGaps

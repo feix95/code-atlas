@@ -71,7 +71,10 @@ function blocksOf(lines: string[], ranges: SymbolRange[]): Block[] {
   return blocks
 }
 
-/** 把块合并成段:单段不超字节上限;单个符号块本身超限时按行再切 */
+/** 单段符号数上限:笔记输出要逐符号成条,符号太密时输出被截断、整段笔记作废(真机实测教训) */
+const MAX_SYMBOLS_PER_SEGMENT = 10
+
+/** 把块合并成段:单段不超字节上限且符号数不超上限;单个符号块本身超限时按行再切 */
 function mergeBlocks(
   path: string,
   lines: string[],
@@ -81,6 +84,7 @@ function mergeBlocks(
   const segments: WikiSegment[] = []
   let current: Block[] = []
   let currentBytes = 0
+  let currentSymbols = 0
   const blockText = (block: Block): string =>
     lines.slice(block.startLine - 1, block.endLine).join('\n')
   const flush = (): void => {
@@ -98,6 +102,7 @@ function mergeBlocks(
     })
     current = []
     currentBytes = 0
+    currentSymbols = 0
   }
   for (const block of blocks) {
     const bytes = Buffer.byteLength(blockText(block), 'utf8')
@@ -128,9 +133,13 @@ function mergeBlocks(
       }
       continue
     }
-    if (currentBytes + bytes > capBytes) flush()
+    const isSymbol = block.symbolName !== null ? 1 : 0
+    if (currentBytes + bytes > capBytes || currentSymbols + isSymbol > MAX_SYMBOLS_PER_SEGMENT) {
+      flush()
+    }
     current.push(block)
     currentBytes += bytes
+    currentSymbols += isSymbol
   }
   flush()
   return segments
