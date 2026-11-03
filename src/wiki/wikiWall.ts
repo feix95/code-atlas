@@ -9,7 +9,8 @@ function topicPaths(plan: WikiPlan): Map<string, string[]> {
   const paths = new Map<string, string[]>()
   const walk = (topic: WikiPlanTopic, chain: string[]): void => {
     const here = [...chain, topic.title]
-    if (topic.overviewPageId !== null) paths.set(topic.overviewPageId, chain)
+    // 总览页就是本主题的门面,主题链含本主题;叶子页同理
+    if (topic.overviewPageId !== null) paths.set(topic.overviewPageId, here)
     for (const pageId of topic.pageIds) paths.set(pageId, here)
     for (const child of topic.children) walk(child, here)
   }
