@@ -311,6 +311,8 @@ function sanitizeState(raw: unknown): WikiState | null {
   }
 }
 
+export { sanitizeState as sanitizeWikiStateV1, isObject, cleanString, cleanStringList }
+
 export async function readWikiState(projectDir: string): Promise<ReadStateResult> {
   const raw = await fs
     .readFile(stateFilePath(projectDir), 'utf8')
