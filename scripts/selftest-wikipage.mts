@@ -281,7 +281,7 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     const inside = gammaRanges.filter(
       (r) => r.startLine >= seg.startLine && r.endLine <= seg.endLine
     ).length
-    assert.ok(inside <= 10, `单段符号数应不超过 10,实际 ${inside}`)
+    assert.ok(inside <= 8, `单段符号数应不超过 8,实际 ${inside}`)
   }
 
   // 六、职责填句的证据必须包含后段摘要:捕获职责调用的提示词,断言含第 12 个符号名
@@ -343,6 +343,8 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
   )
   const introLine = cleaned.markdown.split('\n')[2] ?? ''
   assert.ok(!introLine.includes('GhostThing'), '违规总述应被兜底替换')
+  assert.equal(cleaned.stats.introSource, 'fallback', '违规总述应记录为兜底来源')
+  assert.ok(introLine.includes('alphaRun'), '兜底总述应挑点名核心导出符号的句子')
   let inFence = false
   for (const line of cleaned.markdown.split('\n')) {
     if (line.trimStart().startsWith('```')) {
@@ -541,6 +543,160 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
       .length > 0,
     '不存在的目录仍应拦下'
   )
+
+  // 十一、拆分部分失败:失败符号不算覆盖、不入缓存,复跑必须重试它
+  const zetaLines: string[] = ["import { x } from './x.ts'", '']
+  const mkZeta = (name: string): void => {
+    zetaLines.push(`export function ${name}(): number {`)
+    for (let i = 0; i < 18; i++) zetaLines.push(`  // ${name} 内部第 ${i} 行`)
+    zetaLines.push('}')
+    zetaLines.push('')
+  }
+  mkZeta('zetaA')
+  mkZeta('zetaB')
+  const zetaRanges = [
+    { name: 'zetaA', kind: 'function' as const, startLine: 3, endLine: 22 },
+    { name: 'zetaB', kind: 'function' as const, startLine: 24, endLine: 43 }
+  ]
+  const zetaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/zeta/zeta.ts', {
+        exports: ['zetaA', 'zetaB'],
+        functions: ['zetaA', 'zetaB']
+      })
+    ],
+    edges: []
+  })
+  const zetaPage = zetaPlan.pages.find((p) => p.kind === 'leaf')!
+  const zetaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      if (user.includes('主体符号 zetaB')) return 'garbage,不是 JSON'
+      const range = /第 (\d+)-(\d+) 行/.exec(user)
+      const from = range ? Number(range[1]) : 1
+      const to = range ? Number(range[2]) : 9999
+      if (to - from > 30) return 'garbage,不是 JSON'
+      const names = zetaRanges
+        .filter((r) => r.startLine >= from && r.endLine <= to)
+        .map((r) => r.name)
+      return JSON.stringify({
+        symbols: names.map((name) => ({
+          name,
+          role: `${name} 的作用`,
+          deps: [],
+          sideEffects: '无',
+          crossRefs: []
+        })),
+        summary: `本段讲 ${names.join(' 与 ')}`
+      })
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const zetaDeps = {
+    factOf: () => ({
+      sha256: 'z',
+      structure: {
+        languageId: 'typescript',
+        imports: ['./x.ts'],
+        exports: ['zetaA', 'zetaB'],
+        functions: ['zetaA', 'zetaB'],
+        classes: [],
+        interfaces: [],
+        reactComponents: [],
+        symbolRanges: zetaRanges
+      }
+    }),
+    readFile: async () => zetaLines.join('\n'),
+    complete: zetaCompleter,
+    modelId: 'fake-model',
+    ledger: new WikiNoteLedger(),
+    now: () => new Date('2026-11-03T00:00:00Z')
+  }
+  const zetaRun1 = await runWikiPage(
+    { page: zetaPage, topicTitle: null, plan: zetaPlan, edges: [], contextSize: 8192 },
+    zetaDeps
+  )
+  assert.equal(zetaRun1.stats.symbolsCovered, 1, '失败符号 zetaB 不应算覆盖')
+  assert.ok(
+    zetaRun1.stats.coverageGaps.some((g) => g.includes('zetaB')),
+    'zetaB 应如实出现在覆盖缺口里'
+  )
+  assert.ok(zetaRun1.noteRawFailures.length >= 1, '失败原始输出应留档')
+  const zetaRun2 = await runWikiPage(
+    { page: zetaPage, topicTitle: null, plan: zetaPlan, edges: [], contextSize: 8192 },
+    zetaDeps
+  )
+  assert.ok(zetaRun2.stats.noteCalls >= 1, '部分失败的段不应被缓存,复跑必须重试失败符号')
+  assert.ok(
+    zetaRun2.stats.coverageGaps.some((g) => g.includes('zetaB')),
+    '复跑后 zetaB 仍应如实在缺口里'
+  )
+
+  // 十二、非导出符号缺口也补记:整段笔记漏记 etaB 时,单符号补记应把它补上
+  const etaLines: string[] = ["import { x } from './x.ts'", '']
+  const etaRanges: { name: string; kind: 'function'; startLine: number; endLine: number }[] = []
+  for (const name of ['etaA', 'etaB', 'etaC']) {
+    const start = etaLines.length + 1
+    etaLines.push(`export function ${name}(): number {`)
+    for (let i = 0; i < 6; i++) etaLines.push(`  // ${name} 内部`)
+    etaLines.push('}')
+    etaLines.push('')
+    etaRanges.push({ name, kind: 'function', startLine: start, endLine: start + 7 })
+  }
+  const etaPlan = buildWikiPlan({
+    ...planInput,
+    files: [
+      planFile('src/eta/eta.ts', {
+        exports: ['etaA'],
+        functions: ['etaA', 'etaB', 'etaC']
+      })
+    ],
+    edges: []
+  })
+  const etaPage = etaPlan.pages.find((p) => p.kind === 'leaf')!
+  const etaCompleter: WikiCompleter = async (system, user, maxTokens) => {
+    if (system.includes('代码阅读员')) {
+      const only = /\(主体符号 (\w+)\)/.exec(user)
+      const names = only ? [only[1]!] : ['etaA', 'etaC']
+      return JSON.stringify({
+        symbols: names.map((name) => ({
+          name,
+          role: `${name} 的作用`,
+          deps: [],
+          sideEffects: '无',
+          crossRefs: []
+        })),
+        summary: `本段讲 ${names.join(' 与 ')}`
+      })
+    }
+    return deltaBase(system, user, maxTokens)
+  }
+  const etaResult = await runWikiPage(
+    { page: etaPage, topicTitle: null, plan: etaPlan, edges: [], contextSize: 8192 },
+    {
+      factOf: () => ({
+        sha256: 't',
+        structure: {
+          languageId: 'typescript',
+          imports: ['./x.ts'],
+          exports: ['etaA'],
+          functions: ['etaA', 'etaB', 'etaC'],
+          classes: [],
+          interfaces: [],
+          reactComponents: [],
+          symbolRanges: etaRanges
+        }
+      }),
+      readFile: async () => etaLines.join('\n'),
+      complete: etaCompleter,
+      modelId: 'fake-model',
+      ledger: new WikiNoteLedger(),
+      now: () => new Date('2026-11-03T00:00:00Z')
+    }
+  )
+  assert.equal(etaResult.stats.symbolsTotal, 3, 'eta 页应有 3 个顶层符号')
+  assert.equal(etaResult.stats.symbolsCovered, 3, '漏记的非导出符号 etaB 应被补记补上')
+  assert.deepEqual(etaResult.stats.coverageGaps, [], '补记后不应有缺口')
 
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }

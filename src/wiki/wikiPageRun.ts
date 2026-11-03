@@ -57,6 +57,7 @@ export async function runWikiPage(
     markdown: generated.markdown,
     evidence,
     notes: notesResult.notes,
+    noteRawFailures: notesResult.rawFailures,
     stats: {
       evidenceMs: Math.round(evidenceMs),
       notesMs: Math.round(notesMs),
@@ -71,6 +72,7 @@ export async function runWikiPage(
       checkFailedSections: generated.checkFailedSections,
       degradedNotes: notesResult.degraded,
       cacheHits: notesResult.cacheHits,
+      introSource: generated.introSource,
       failures
     }
   }

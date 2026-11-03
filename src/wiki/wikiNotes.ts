@@ -66,6 +66,8 @@ export interface WikiNotesResult {
   cacheHits: number
   /** 笔记失败的段与原因(段 id:调用失败 / 无法解析),供复测定位 */
   failures: string[]
+  /** 失败段的原始输出摘录,供定性解析坏在哪一段 */
+  rawFailures: { segmentId: string; reason: string; raw: string }[]
   symbolsTotal: number
   symbolsCovered: number
   coverageGaps: string[]
@@ -80,6 +82,7 @@ export async function generateSegmentNotes(
   let retries = 0
   let cacheHits = 0
   const failures: string[] = []
+  const rawFailures: { segmentId: string; reason: string; raw: string }[] = []
   const fileOf = new Map(evidence.files.map((f) => [f.path, f]))
 
   const symbolsInside = (
@@ -90,11 +93,11 @@ export async function generateSegmentNotes(
       (r) => r.startLine >= segment.startLine && r.endLine <= segment.endLine
     )
 
-  /** 一次笔记尝试:成功返回笔记,失败返回 null 加失败原因(调用失败还是解析失败) */
+  /** 一次笔记尝试:成功返回笔记,失败返回 null 加失败原因与原始输出(调用失败还是解析失败) */
   const attempt = async (
     segment: WikiSegment,
     opts: { hint?: string; boost?: number }
-  ): Promise<{ note: WikiSegmentNote | null; failure: string | null }> => {
+  ): Promise<{ note: WikiSegmentNote | null; failure: string | null; raw: string }> => {
     const file = fileOf.get(segment.path)!
     calls++
     const numbered = segment.text
@@ -117,12 +120,62 @@ export async function generateSegmentNotes(
     try {
       raw = await deps.complete(NOTE_SYSTEM, user, maxTokens)
     } catch {
-      return { note: null, failure: '模型调用失败' }
+      return { note: null, failure: '模型调用失败', raw: '' }
     }
     const parsed = parseNote(raw, segment, validNames)
     return parsed !== null
-      ? { note: parsed, failure: null }
-      : { note: null, failure: '输出无法解析为结构化笔记' }
+      ? { note: parsed, failure: null, raw }
+      : { note: null, failure: '输出无法解析为结构化笔记', raw }
+  }
+
+  const recordFailure = (segmentId: string, failure: string | null, raw: string): void => {
+    failures.push(`${segmentId}:${failure ?? '笔记失败'}`)
+    rawFailures.push({ segmentId, reason: failure ?? '笔记失败', raw: raw.slice(0, 4000) })
+  }
+
+  /** 单符号子段:先查子段缓存,失败带提示加额再试一次;成功按子段键入缓存,失败返回占位 */
+  const runSubSegment = async (
+    parent: WikiSegment,
+    range: (typeof evidence.files)[number]['symbolRanges'][number]
+  ): Promise<WikiSegmentNote> => {
+    const file = fileOf.get(parent.path)!
+    const kindOf = new Map(file.symbolRanges.map((r) => [r.name, r.kind]))
+    const lines = parent.text.split('\n')
+    const sub: WikiSegment = {
+      id: `${parent.id}:${range.name}`,
+      path: parent.path,
+      kind: 'symbol',
+      symbolName: range.name,
+      startLine: range.startLine,
+      endLine: range.endLine,
+      text: lines
+        .slice(range.startLine - parent.startLine, range.endLine - parent.startLine + 1)
+        .join('\n'),
+      estTokens: 0
+    }
+    const subKey = noteCacheKey(sub.path, file.contentHash ?? '', sub.id, deps.modelId)
+    const cachedSub = deps.ledger.get(subKey)
+    if (cachedSub) {
+      cacheHits++
+      return cachedSub
+    }
+    retries++
+    const first = await attempt(sub, { hint: '只输出 JSON 对象本身,不要输出任何解释文字。' })
+    if (first.note !== null) {
+      deps.ledger.set(subKey, first.note)
+      return first.note
+    }
+    retries++
+    const second = await attempt(sub, {
+      hint: '只输出 JSON 对象本身,不要输出任何解释文字。',
+      boost: 1.5
+    })
+    if (second.note !== null) {
+      deps.ledger.set(subKey, second.note)
+      return second.note
+    }
+    recordFailure(sub.id, second.failure ?? first.failure, second.raw || first.raw)
+    return degradedNote(sub, kindOf)
   }
 
   const runSegment = async (segment: WikiSegment, isRetry: boolean): Promise<WikiSegmentNote> => {
@@ -140,35 +193,16 @@ export async function generateSegmentNotes(
       deps.ledger.set(key, first.note)
       return first.note
     }
-    // 升级重试:多符号段拆成单符号子段逐个记(整段反复失败时,小步通常能过);
+    // 升级重试:多符号段拆成单符号子段逐个记(整段反复失败时,小步通常能过),
+    // 子段各自缓存、各自成败,合并结果不整段入缓存,免得占位条目混进去冒充读过;
     // 单符号段带格式提示并加五成输出额再试一次。仍失败才降级,原因记入统计。
     const inside = symbolsInside(file, segment)
     if (inside.length >= 2) {
-      const lines = segment.text.split('\n')
       const subs: WikiSegmentNote[] = []
       for (const range of inside) {
-        retries++
-        const sub: WikiSegment = {
-          id: `${segment.id}:${range.name}`,
-          path: segment.path,
-          kind: 'symbol',
-          symbolName: range.name,
-          startLine: range.startLine,
-          endLine: range.endLine,
-          text: lines
-            .slice(range.startLine - segment.startLine, range.endLine - segment.startLine + 1)
-            .join('\n'),
-          estTokens: 0
-        }
-        const subAttempt = await attempt(sub, {
-          hint: '只输出 JSON 对象本身,不要输出任何解释文字。'
-        })
-        if (subAttempt.note === null) {
-          failures.push(`${sub.id}:${subAttempt.failure ?? '笔记失败'}`)
-        }
-        subs.push(subAttempt.note ?? degradedNote(sub, kindOf))
+        subs.push(await runSubSegment(segment, range))
       }
-      const merged: WikiSegmentNote = {
+      return {
         segmentId: segment.id,
         path: segment.path,
         symbolNotes: subs.flatMap((s) => s.symbolNotes),
@@ -178,9 +212,6 @@ export async function generateSegmentNotes(
           .join('；'),
         degraded: subs.every((s) => s.degraded)
       }
-      if (!merged.degraded) deps.ledger.set(key, merged)
-      if (merged.degraded) failures.push(`${segment.id}:${first.failure ?? '笔记失败'}`)
-      return merged
     }
     retries++
     const second = await attempt(segment, {
@@ -191,7 +222,7 @@ export async function generateSegmentNotes(
       deps.ledger.set(key, second.note)
       return second.note
     }
-    failures.push(`${segment.id}:${second.failure ?? first.failure ?? '笔记失败'}`)
+    recordFailure(segment.id, second.failure ?? first.failure, second.raw || first.raw)
     return degradedNote(segment, kindOf)
   }
 
@@ -202,17 +233,21 @@ export async function generateSegmentNotes(
     }
   }
 
-  // 覆盖校验(B5):重要符号(导出符号)未入笔记的,对其所在段补跑一次
+  // 覆盖校验(B5):按符号条目判断,程序占位条目不算覆盖;
+  // 缺口符号(不分导出与否)逐个用单符号子段补记,单页补记设上限,不整段重跑
   const coveredOf = (path: string): Set<string> => {
     const covered = new Set<string>()
     for (const note of notes) {
-      if (note.path !== path || note.degraded) continue
-      for (const symbol of note.symbolNotes) covered.add(symbol.name)
+      if (note.path !== path) continue
+      for (const symbol of note.symbolNotes) {
+        if (symbol.degraded !== true) covered.add(symbol.name)
+      }
     }
     return covered
   }
   let symbolsTotal = 0
   let symbolsCovered = 0
+  let repairsLeft = 8
   const coverageGaps: string[] = []
   for (const file of evidence.files) {
     if (file.tier !== 'full' && file.tier !== 'slice') continue
@@ -230,19 +265,20 @@ export async function generateSegmentNotes(
     const required = [...new Set(topLevel.map((r) => r.name))]
     symbolsTotal += required.length
     let covered = coveredOf(file.path)
-    const important = required.filter((name) => (file.structure?.exports ?? []).includes(name))
-    const missingImportant = important.filter((name) => !covered.has(name))
-    if (missingImportant.length > 0) {
-      for (const segment of file.segments) {
-        const segmentSymbols = file.symbolRanges
-          .filter((r) => r.startLine >= segment.startLine && r.endLine <= segment.endLine)
-          .map((r) => r.name)
-        if (!segmentSymbols.some((name) => missingImportant.includes(name))) continue
-        const index = notes.findIndex((n) => n.segmentId === segment.id)
-        const fresh = await runSegment(segment, true)
-        if (index >= 0) notes[index] = fresh
+    const missing = required.filter((name) => !covered.has(name))
+    for (const name of missing) {
+      if (repairsLeft <= 0) break
+      const range = topLevel.find((r) => r.name === name)
+      const parent = file.segments.find(
+        (s) => range !== undefined && range.startLine >= s.startLine && range.endLine <= s.endLine
+      )
+      if (range === undefined || parent === undefined) continue
+      repairsLeft--
+      const repaired = await runSubSegment(parent, range)
+      if (!repaired.degraded) {
+        notes.push(repaired)
+        covered = coveredOf(file.path)
       }
-      covered = coveredOf(file.path)
     }
     for (const name of required) {
       if (covered.has(name)) symbolsCovered++
@@ -257,6 +293,7 @@ export async function generateSegmentNotes(
     degraded: notes.filter((n) => n.degraded).length,
     cacheHits,
     failures: [...new Set(failures)],
+    rawFailures,
     symbolsTotal,
     symbolsCovered,
     coverageGaps

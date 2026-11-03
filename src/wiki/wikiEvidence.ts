@@ -71,8 +71,8 @@ function blocksOf(lines: string[], ranges: SymbolRange[]): Block[] {
   return blocks
 }
 
-/** 单段符号数上限:笔记输出要逐符号成条,符号太密时输出被截断、整段笔记作废(真机实测教训) */
-const MAX_SYMBOLS_PER_SEGMENT = 10
+/** 单段符号数上限:笔记输出要逐符号成条,符号太密时输出被截断或尾部符号被漏记(真机实测教训) */
+const MAX_SYMBOLS_PER_SEGMENT = 8
 
 /** 把块合并成段:单段不超字节上限且符号数不超上限;单个符号块本身超限时按行再切 */
 function mergeBlocks(

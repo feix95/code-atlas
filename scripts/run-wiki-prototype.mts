@@ -167,6 +167,14 @@ const result = await runWikiPage(
 await ledger.save(outDir)
 await fs.mkdir(outDir, { recursive: true })
 await fs.writeFile(join(outDir, 'page.md'), result.markdown, 'utf8')
+if (result.noteRawFailures.length > 0) {
+  await fs.writeFile(
+    join(outDir, 'note-failures.json'),
+    JSON.stringify(result.noteRawFailures, null, 2),
+    'utf8'
+  )
+  console.log(`笔记失败原始输出已留档:${join(outDir, 'note-failures.json')}`)
+}
 await fs.writeFile(
   join(outDir, 'result.json'),
   JSON.stringify(

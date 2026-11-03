@@ -16,6 +16,29 @@ export interface WikiGenResult {
   checkFailedSections: string[]
   /** 校验未过的具体违规名,逐节记录,便于复测定位(节名:违规名) */
   checkDetails: string[]
+  /** 开头总述来源:模型生成且过校验为 model,走了程序兜底为 fallback */
+  introSource: 'model' | 'fallback'
+}
+
+/** 兜底总述:从各节正文里挑第一句点名了主角核心导出符号的句子,挑不到才退回首节摘要 */
+function pickIntroFallback(
+  sections: SectionOutcome[],
+  evidence: WikiPageEvidence,
+  summaries: string[]
+): string {
+  const coreNames = new Set(
+    evidence.files.filter((f) => f.role === 'primary').flatMap((f) => f.structure?.exports ?? [])
+  )
+  for (const section of sections) {
+    for (const sentence of section.text.split(/(?<=[。.!?])\s*/)) {
+      const trimmed = sentence.trim()
+      if (trimmed === '') continue
+      for (const match of trimmed.matchAll(/`([^`]+)`/g)) {
+        if (coreNames.has(match[1]!)) return trimmed.slice(0, 200)
+      }
+    }
+  }
+  return summaries.find((s) => s !== '') ?? '本页内容见下文各节。'
 }
 
 interface SectionOutcome {
@@ -199,7 +222,7 @@ export async function generateWikiPageMarkdown(
   try {
     intro = await askIntro('')
   } catch {
-    // 生成失败保持空,下面用首节摘要兜底
+    // 生成失败保持空,下面走程序兜底
   }
   if (intro !== '' && checkWhitelist(intro, evidence, deps.planPaths).length > 0) {
     try {
@@ -209,7 +232,8 @@ export async function generateWikiPageMarkdown(
       intro = ''
     }
   }
-  if (intro === '') intro = summaries.find((s) => s !== '') ?? '本页内容见下文各节。'
+  const introSource: 'model' | 'fallback' = intro !== '' ? 'model' : 'fallback'
+  if (intro === '') intro = pickIntroFallback(sections, evidence, summaries)
   intro = balanceInlineCode(intro)
 
   for (const section of sections) {
@@ -270,6 +294,7 @@ export async function generateWikiPageMarkdown(
     sectionCalls: stats.calls,
     retries: stats.retries,
     checkFailedSections,
-    checkDetails
+    checkDetails,
+    introSource
   }
 }

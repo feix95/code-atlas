@@ -77,6 +77,15 @@ export interface WikiSymbolNote {
   deps: string[]
   sideEffects: string
   crossRefs: string[]
+  /** 程序占位登记(模型笔记缺失)时为 true:不算覆盖,也不许随整段笔记入缓存冒充读过 */
+  degraded?: boolean
+}
+
+/** 笔记失败时留下的原始输出摘录,供定性失败原因(解析坏在哪) */
+export interface WikiNoteRawFailure {
+  segmentId: string
+  reason: string
+  raw: string
 }
 
 /** 一段代码的解读层笔记(B3);degraded 表示模型失败后由程序按事实层兜底,不是模型产出 */
@@ -122,6 +131,8 @@ export interface WikiPageRunStats {
   degradedNotes: number
   /** 账本命中的段数(没有调用模型) */
   cacheHits: number
+  /** 开头总述的来源:模型生成且过校验,还是走了程序兜底 */
+  introSource: 'model' | 'fallback'
   failures: string[]
 }
 
@@ -129,5 +140,7 @@ export interface WikiPageRunResult {
   markdown: string
   evidence: WikiPageEvidence
   notes: WikiSegmentNote[]
+  /** 笔记失败段的原始输出摘录,由实测脚本落盘定性 */
+  noteRawFailures: WikiNoteRawFailure[]
   stats: WikiPageRunStats
 }

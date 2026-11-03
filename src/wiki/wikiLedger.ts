@@ -98,7 +98,8 @@ export function degradedNote(segment: WikiSegment, kindOf: Map<string, string>):
       role: `${kindOf.get(name) ?? '符号'} ${name}(程序按结构登记,模型笔记缺失)`,
       deps: [],
       sideEffects: '未确认',
-      crossRefs: []
+      crossRefs: [],
+      degraded: true
     })),
     segmentSummary: names.size > 0 ? `包含符号 ${[...names].join(', ')}` : '导入与声明段',
     degraded: true
