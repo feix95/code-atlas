@@ -807,6 +807,23 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     '调用 `alphaRun` 完成',
     '正常片段不应被改动'
   )
+  // 带已知名称时,粘连片段应把真名重新包上反引号,而不是整段拆成纯文字
+  assert.equal(
+    balanceInlineCode(
+      '`src/shared/engineCatalog.ts前者提供校验和解压能力`',
+      new Set(['src/shared/engineCatalog.ts'])
+    ),
+    '`src/shared/engineCatalog.ts`前者提供校验和解压能力',
+    '已知路径开头的粘连应还原路径的反引号'
+  )
+  assert.equal(
+    balanceInlineCode(
+      '引用了 `src/ai/engineInstaller.tssrc/shared/engineCatalog.ts 以及其他模块`',
+      new Set(['src/ai/engineInstaller.ts', 'src/shared/engineCatalog.ts'])
+    ),
+    '引用了 `src/ai/engineInstaller.ts`、`src/shared/engineCatalog.ts` 以及其他模块',
+    '两个已知路径直接相连时应各包反引号并补顿号'
+  )
 
   // 十四、子段笔记写错符号:能解析也不算成功,不入缓存,复跑必须重试
   const iotaLines: string[] = ["import { x } from './x.ts'", '']
@@ -942,7 +959,10 @@ function makeCompleter(): { complete: WikiCompleter; state: { badOnce: boolean }
     }
   )
   assert.deepEqual(kappaResult.stats.checkFailedSections, [], '反引号粘连经修复后不应判节校验失败')
-  assert.ok(kappaResult.markdown.includes('kappa.ts不仅导出核心函数'), '修复后正文文字应保留')
+  assert.ok(
+    kappaResult.markdown.includes('`src/kappa/kappa.ts`不仅导出核心函数'),
+    '修复后路径应重新包上反引号,正文留在外面'
+  )
 
   console.log('✅ Wiki 单页全链路原型自测全部通过')
 }

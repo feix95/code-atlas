@@ -3,7 +3,7 @@
 // 人话摘要在全部分节完成后按三个固定问题生成(C2)。
 import { byCodeUnit } from '../modules/pathOrder.ts'
 import type { WikiCompleter, WikiPageEvidence, WikiSegmentNote } from './wikiReadTypes.ts'
-import { balanceInlineCode, checkWhitelist, mermaidOf } from './wikiPageCheck.ts'
+import { balanceInlineCode, checkWhitelist, knownNamesOf, mermaidOf } from './wikiPageCheck.ts'
 import { fillDuties } from './wikiDuties.ts'
 
 const SECTION_SYSTEM =
@@ -84,7 +84,8 @@ async function runSection(
     // 调用失败保持空稿,下面按未通过处理
   }
   // 先修行内代码再校验:漏写右反引号会把真实路径与中文粘成假名称,误判整节不合格
-  text = balanceInlineCode(text)
+  const knownNames = knownNamesOf(ctx.evidence, ctx.planPaths)
+  text = balanceInlineCode(text, knownNames)
   let violations =
     text === '' ? ['模型未返回内容'] : checkWhitelist(text, ctx.evidence, ctx.planPaths)
   if (violations.length > 0) {
@@ -93,7 +94,8 @@ async function runSection(
       const retry = balanceInlineCode(
         await ask(
           `上一稿不合格:出现了证据里不存在的名称(${violations.join('、')})。重写本节,只使用证据中真实存在的名称。`
-        )
+        ),
+        knownNames
       )
       const retryViolations = checkWhitelist(retry, ctx.evidence, ctx.planPaths)
       if (retry.trim() !== '' && retryViolations.length < violations.length) {
@@ -106,7 +108,7 @@ async function runSection(
   }
   return {
     title,
-    text: balanceInlineCode(stripOwnHeading(text, title)),
+    text: balanceInlineCode(stripOwnHeading(text, title), knownNames),
     sources,
     ok: text !== '' && violations.length === 0,
     violations
@@ -238,7 +240,7 @@ export async function generateWikiPageMarkdown(
   }
   const introSource: 'model' | 'fallback' = intro !== '' ? 'model' : 'fallback'
   if (intro === '') intro = pickIntroFallback(sections, evidence, summaries)
-  intro = balanceInlineCode(intro)
+  intro = balanceInlineCode(intro, knownNamesOf(evidence, deps.planPaths))
 
   for (const section of sections) {
     if (!section.ok) {

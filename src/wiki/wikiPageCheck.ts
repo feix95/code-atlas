@@ -43,12 +43,52 @@ function isCodeSpan(content: string): boolean {
   return content !== '' && !/\s/.test(content) && !/[^\x20-\x7E]/.test(content)
 }
 
+/** 粘连修复时认得出真名的集合:成员与规划文件的全路径与文件名,加证据内全部符号名 */
+export function knownNamesOf(evidence: WikiPageEvidence, planPaths: Set<string>): Set<string> {
+  const names = new Set<string>()
+  for (const p of [...evidence.files.map((f) => f.path), ...planPaths]) {
+    names.add(p)
+    names.add(p.split('/').pop() ?? p)
+  }
+  for (const file of evidence.files) {
+    for (const range of file.symbolRanges) names.add(range.name)
+    for (const name of file.structure?.exports ?? []) names.add(name)
+    for (const name of file.structure?.functions ?? []) names.add(name)
+    for (const name of file.structure?.classes ?? []) names.add(name)
+    for (const name of file.structure?.interfaces ?? []) names.add(name)
+  }
+  return names
+}
+
+/**
+ * 从粘连内容里抢救真名:以已知名称开头就把名称重新包上反引号,余下留作正文;
+ * 两个已知名称直接相连时中间补顿号。抢救不出任何名称返回 null。
+ */
+function rescueGlued(content: string, sortedNames: string[]): string | null {
+  let out = ''
+  let rest = content
+  let prevWasName = false
+  while (rest !== '') {
+    const hit = sortedNames.find((name) => rest.startsWith(name))
+    if (hit === undefined) break
+    out += `${prevWasName ? '、' : ''}\`${hit}\``
+    rest = rest.slice(hit.length)
+    prevWasName = true
+  }
+  return prevWasName ? out + rest : null
+}
+
 /**
  * 行内代码修复:模型偶尔漏写右反引号,使路径与后面的中文粘成一整段假代码。
- * 逐行处理:内容粘连的片段拆掉它的反引号(文字保留);行尾未闭合的片段,
- * 内容像代码就补上右反引号,像正文就拆掉左反引号。不动代码围栏行。
+ * 逐行处理:内容粘连的片段先按已知名称抢救真名,抢救不出才拆掉反引号(文字保留);
+ * 行尾未闭合的片段,内容像代码就补上右反引号,像正文就抢救或拆掉左反引号。
+ * 不动代码围栏行。
  */
-export function balanceInlineCode(text: string): string {
+export function balanceInlineCode(text: string, knownNames?: Set<string>): string {
+  const sortedNames =
+    knownNames === undefined
+      ? null
+      : [...knownNames].filter((n) => n !== '').sort((a, b) => b.length - a.length)
   let inFence = false
   return text
     .split('\n')
@@ -60,23 +100,38 @@ export function balanceInlineCode(text: string): string {
       if (inFence || !line.includes('`')) return line
       const ticks: number[] = []
       for (let i = 0; i < line.length; i++) if (line[i] === '`') ticks.push(i)
-      const drop = new Set<number>()
-      let appendClose = false
+      let out = ''
+      let cursor = 0
+      let changed = false
       for (let k = 0; k + 1 < ticks.length; k += 2) {
-        const content = line.slice(ticks[k]! + 1, ticks[k + 1]!)
-        if (!isCodeSpan(content)) {
-          drop.add(ticks[k]!)
-          drop.add(ticks[k + 1]!)
+        const open = ticks[k]!
+        const close = ticks[k + 1]!
+        const content = line.slice(open + 1, close)
+        out += line.slice(cursor, open)
+        if (isCodeSpan(content)) {
+          out += line.slice(open, close + 1)
+        } else {
+          const rescued = sortedNames !== null ? rescueGlued(content, sortedNames) : null
+          out += rescued ?? content
+          changed = true
         }
+        cursor = close + 1
       }
       if (ticks.length % 2 === 1) {
         const last = ticks[ticks.length - 1]!
-        if (isCodeSpan(line.slice(last + 1))) appendClose = true
-        else drop.add(last)
+        const trailing = line.slice(last + 1)
+        out += line.slice(cursor, last)
+        if (isCodeSpan(trailing)) {
+          out += `\`${trailing}\``
+        } else {
+          const rescued = sortedNames !== null ? rescueGlued(trailing, sortedNames) : null
+          out += rescued ?? trailing
+        }
+        changed = true
+        cursor = line.length
       }
-      if (drop.size === 0 && !appendClose) return line
-      const kept = [...line].filter((_, i) => !drop.has(i)).join('')
-      return appendClose ? `${kept}\`` : kept
+      out += line.slice(cursor)
+      return changed ? out : line
     })
     .join('\n')
 }
