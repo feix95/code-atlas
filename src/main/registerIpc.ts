@@ -9,6 +9,7 @@ import { registerTranslateIpc } from './ipcTranslate.ts'
 import { registerDocxIpc } from './ipcDocx.ts'
 import { registerWikiIpc } from './ipcWiki.ts'
 import { registerWikiRunIpc } from './wikiRun.ts'
+import { registerWikiRunV2Ipc } from './wikiRunV2.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -22,4 +23,5 @@ export function registerIpc(): void {
   registerDocxIpc()
   registerWikiIpc()
   registerWikiRunIpc()
+  registerWikiRunV2Ipc()
 }

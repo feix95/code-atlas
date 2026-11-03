@@ -98,7 +98,8 @@ export type WikiPageRunStatus = 'queued' | 'running' | 'done' | 'skipped' | 'fai
 
 export interface WikiPageProgress {
   pageId: string
-  kind: 'module' | 'group'
+  /** 第一版为 module/group;第二版为 leaf/overview/root,界面分档显示 */
+  kind: 'module' | 'group' | 'leaf' | 'overview' | 'root'
   name: string
   status: WikiPageRunStatus
   /** 相对语种目录的 MD 路径;done/skipped 时有 */
@@ -161,6 +162,15 @@ export interface WikiStartRequest {
 export type WikiStartResult =
   | { ok: true; total: number; provider: string; model: string; projectDir: string }
   | { ok: false; error: string }
+
+/** 第二版开始生成:页面规划由主进程按项目装配,渲染层只递项目与语种 */
+export interface WikiStartV2Request {
+  requestId: string
+  projectRoot: string
+  language: string
+  /** 忽略笔记与页面缓存强制重写 */
+  force?: boolean
+}
 
 /** 进度页读到的单篇现状:记账状态 + 文件是否还在 */
 export interface WikiPageSummary {

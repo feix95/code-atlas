@@ -13,7 +13,8 @@ import type {
   WikiRunStatus,
   WikiSettings,
   WikiStartRequest,
-  WikiStartResult
+  WikiStartResult,
+  WikiStartV2Request
 } from '../shared/wikiTypes.ts'
 
 export const wikiBridge = {
@@ -31,6 +32,10 @@ export const wikiBridge = {
     ipcRenderer.invoke(CH.wikiStart, request),
   runStatus: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatus),
   cancel: (): Promise<void> => ipcRenderer.invoke(CH.wikiCancel),
+  startV2: (request: WikiStartV2Request): Promise<WikiStartResult> =>
+    ipcRenderer.invoke(CH.wikiStartV2, request),
+  runStatusV2: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatusV2),
+  cancelV2: (): Promise<void> => ipcRenderer.invoke(CH.wikiCancelV2),
   cleanupAll: (): Promise<WikiCleanupOutcome> => ipcRenderer.invoke(CH.wikiCleanupAll),
   cleanupProject: (projectRoot: string): Promise<WikiCleanupOutcome> =>
     ipcRenderer.invoke(CH.wikiCleanupProject, projectRoot),

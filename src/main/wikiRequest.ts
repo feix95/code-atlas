@@ -7,7 +7,8 @@ import type {
   WikiPageFileSource,
   WikiPageSource,
   WikiPanelRequest,
-  WikiStartRequest
+  WikiStartRequest,
+  WikiStartV2Request
 } from '../shared/wikiTypes.ts'
 
 const MAX_PAGES = 2000
@@ -184,6 +185,30 @@ export function parseWikiStart(raw: unknown): WikiStartParse {
       ...(only ? { only } : {}),
       ...(record.force === true ? { force: true } : {}),
       knownTags: knownTags(record.knownTags)
+    }
+  }
+}
+
+export type WikiStartV2Parse =
+  { ok: true; request: WikiStartV2Request } | { ok: false; error: string }
+
+/** 第二版开始请求:只有项目、语种与强制标记,页面规划由主进程装配 */
+export function parseWikiStartV2(raw: unknown): WikiStartV2Parse {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, error: '生成请求不完整' }
+  const record = raw as Record<string, unknown>
+  const requestId = text(record.requestId, 100)
+  const language = text(record.language, 20)
+  const projectRoot = parseProjectRoot(record.projectRoot)
+  if (requestId === null || language === null || projectRoot === null) {
+    return { ok: false, error: '生成请求不完整' }
+  }
+  return {
+    ok: true,
+    request: {
+      requestId,
+      projectRoot,
+      language,
+      ...(record.force === true ? { force: true } : {})
     }
   }
 }

@@ -95,7 +95,7 @@ export type WikiRowStatus =
 
 export interface WikiProgressRow {
   pageId: string
-  kind: 'module' | 'group'
+  kind: WikiPageProgress['kind']
   /** 记账里有 AI 名称就用它,否则回退程序名 */
   name: string
   status: WikiRowStatus

@@ -18,6 +18,7 @@ import { userDataDir } from './paths.ts'
 import { parseProjectRoot, parseWikiPanelRequest } from './wikiRequest.ts'
 import { resolveWikiDocPath } from './wikiDocPath.ts'
 import { isWikiJobActive } from './wikiRun.ts'
+import { isWikiJobV2Active } from './wikiRunV2.ts'
 import { ensureWikiRootMarker, resolveWikiLocation } from '../wiki/wikiLocation.ts'
 import { loadWikiSettings, saveWikiSettings } from '../wiki/wikiSettings.ts'
 import { cleanupWiki, scanWikiRoot } from '../wiki/wikiCleanup.ts'
@@ -218,7 +219,7 @@ function registerCleanup(): void {
     if (location === null) {
       return { ok: false, reason: '还没选 Wiki 存放位置', damaged: [] }
     }
-    return cleanupWiki({ root: location, isGenerating: isWikiJobActive() })
+    return cleanupWiki({ root: location, isGenerating: isWikiJobActive() || isWikiJobV2Active() })
   })
   ipcMain.handle(
     CH.wikiCleanupProject,
@@ -235,7 +236,7 @@ function registerCleanup(): void {
       return cleanupWiki({
         root: location,
         projectDir,
-        isGenerating: isWikiJobActive()
+        isGenerating: isWikiJobActive() || isWikiJobV2Active()
       })
     }
   )

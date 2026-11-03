@@ -96,6 +96,9 @@ export const CH = {
   wikiStart: 'atlas:wiki-start',
   wikiRunStatus: 'atlas:wiki-run-status',
   wikiCancel: 'atlas:wiki-cancel',
+  wikiStartV2: 'atlas:wiki-start-v2',
+  wikiRunStatusV2: 'atlas:wiki-run-status-v2',
+  wikiCancelV2: 'atlas:wiki-cancel-v2',
   wikiCleanupAll: 'atlas:wiki-cleanup-all',
   wikiCleanupProject: 'atlas:wiki-cleanup-project',
   /** 主进程 → 渲染层推送:逐页进度与收场汇总 */

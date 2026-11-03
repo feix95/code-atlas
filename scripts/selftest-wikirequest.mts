@@ -4,7 +4,12 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import assert from 'node:assert/strict'
-import { parseProjectRoot, parseWikiPanelRequest, parseWikiStart } from '../src/main/wikiRequest.ts'
+import {
+  parseProjectRoot,
+  parseWikiPanelRequest,
+  parseWikiStart,
+  parseWikiStartV2
+} from '../src/main/wikiRequest.ts'
 import { resolveWikiDocPath } from '../src/main/wikiDocPath.ts'
 import { createWikiState, resolveProjectDir, writeWikiState } from '../src/wiki/wikiStore.ts'
 
@@ -163,6 +168,22 @@ async function main(): Promise<void> {
   try {
     checkParse(base)
     checkPanelRequest(base)
+    const v2 = parseWikiStartV2({ requestId: 'r1', projectRoot: base, language: 'zh-CN' })
+    if (!v2.ok) throw new Error('第二版开始请求应通过')
+    if (v2.request.force !== undefined) throw new Error('未传强制时不应有 force')
+    const v2Force = parseWikiStartV2({
+      requestId: 'r1',
+      projectRoot: base,
+      language: 'zh-CN',
+      force: true
+    })
+    if (!v2Force.ok || v2Force.request.force !== true) throw new Error('强制标记应透传')
+    if (parseWikiStartV2({ requestId: 'r1', projectRoot: 'relative/path', language: 'zh-CN' }).ok) {
+      throw new Error('相对项目根应拒绝')
+    }
+    if (parseWikiStartV2({ requestId: 'r1', projectRoot: base }).ok) {
+      throw new Error('缺语种应拒绝')
+    }
     await checkDocPath(base)
     console.log('✅ Wiki 请求边界自测全部通过')
     console.log('   页面路径只收项目内相对路径 · 绝对路径与 .. 丢弃 · 重复页去重')
