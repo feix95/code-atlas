@@ -162,6 +162,27 @@ export function assembleTopics(
     return topic
   }
   const collapsedRoots = rootTopics.map(collapseTopic)
+  // 最深层收尾:目录已到第 4 段、又只有一页的主题不再单独占层,页并入父主题
+  const foldDeep = (topic: WikiPlanTopic, parent: WikiPlanTopic | null): WikiPlanTopic | null => {
+    topic.children = topic.children
+      .map((child) => foldDeep(child, topic))
+      .filter((child): child is WikiPlanTopic => child !== null)
+    const segs =
+      topic.dir === '' || topic.dir.startsWith('feature:') ? 0 : topic.dir.split('/').length
+    if (
+      parent &&
+      segs >= PLAN_TREE_MAX_DEPTH &&
+      topic.children.length === 0 &&
+      topic.pageIds.length <= 1
+    ) {
+      parent.pageIds.push(...topic.pageIds)
+      return null
+    }
+    return topic
+  }
+  const foldedRoots = collapsedRoots
+    .map((topic) => foldDeep(topic, null))
+    .filter((topic): topic is WikiPlanTopic => topic !== null)
   const pageById = new Map(leafPages.map((p) => [p.id, p]))
   const overviewPages: WikiPlanPage[] = []
   for (const topic of [...topicByDir.values()].sort((a, b) => byCodeUnit(a.dir, b.dir))) {
@@ -189,5 +210,5 @@ export function assembleTopics(
     topic.overviewPageId = overview.id
     overviewPages.push(overview)
   }
-  return { topics: collapsedRoots.sort((a, b) => byCodeUnit(a.dir, b.dir)), overviewPages }
+  return { topics: foldedRoots.sort((a, b) => byCodeUnit(a.dir, b.dir)), overviewPages }
 }

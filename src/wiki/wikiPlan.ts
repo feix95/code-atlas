@@ -3,6 +3,7 @@
 // 文件归属唯一,P2 模块只作参考不直接当页面。只切分不写字,切分结果单独评审后才进生成阶段。
 import { byCodeUnit, dirOf } from '../modules/pathOrder.ts'
 import {
+  PLAN_FEATURE_SHARD_TOKEN_MAX,
   PLAN_PAGE_EVIDENCE_TOKEN_CAP,
   PLAN_TINY_PAGE_MAX_PRIMARY,
   PLAN_TINY_PAGE_TOKEN_MAX,
@@ -189,30 +190,39 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   // 第五步:根主题页入列
   pages.push(...rootPages)
 
-  // 第五步半:薄页合并。主角很少又没多少内容的叶子页不单独成页,成员降为配角并进同级大页
+  // 第五步半:薄页合并。主角很少又没多少内容的叶子页不单独成页,成员降为配角并进最亲近的大页。
+  // 亲近的判定:功能分片优先并进同功能的最大分片;普通页按锚点目录的公共前缀段数选亲戚,
+  // 一段都不共的说明没有亲戚,宁可保留薄页也不乱塞(乱塞曾把安装脚本塞进公共类型页)。
   const pageTokens = (page: WikiPlanPage): number =>
     page.members
       .filter((m) => m.role !== 'attached')
       .reduce((sum, m) => sum + (byPath.get(m.path) ? tokensOf(byPath.get(m.path)!) : 0), 0)
+  const primaryCount = (page: WikiPlanPage): number =>
+    page.members.filter((m) => m.role === 'primary').length
+  const commonPrefixSegs = (a: string, b: string): number => {
+    const as = a === '' ? [] : a.split('/')
+    const bs = b === '' ? [] : b.split('/')
+    let n = 0
+    while (n < as.length && n < bs.length && as[n] === bs[n]) n++
+    return n
+  }
   const leafNow = pages.filter((p) => p.kind === 'leaf')
   for (const page of leafNow) {
-    if (featurePageIds.has(page.id)) continue
-    const primaries = page.members.filter((m) => m.role === 'primary')
-    if (
-      primaries.length > PLAN_TINY_PAGE_MAX_PRIMARY ||
-      pageTokens(page) >= PLAN_TINY_PAGE_TOKEN_MAX
-    )
-      continue
-    const siblings = pages.filter(
-      (p) =>
-        p.kind === 'leaf' &&
-        p !== page &&
-        (dirOf(p.anchorDir) === dirOf(page.anchorDir) ||
-          p.anchorDir.startsWith(dirOf(page.anchorDir)))
-    )
-    const target = (
-      siblings.length > 0 ? siblings : pages.filter((p) => p.kind === 'leaf' && p !== page)
-    ).sort((a, b) => b.members.length - a.members.length)[0]
+    const isFeatureShard = featurePageIds.has(page.id)
+    const tinyLimit = isFeatureShard ? PLAN_FEATURE_SHARD_TOKEN_MAX : PLAN_TINY_PAGE_TOKEN_MAX
+    if (primaryCount(page) > PLAN_TINY_PAGE_MAX_PRIMARY || pageTokens(page) >= tinyLimit) continue
+    let target: WikiPlanPage | undefined
+    if (isFeatureShard && page.topicDir) {
+      target = pages
+        .filter((p) => p.kind === 'leaf' && p !== page && p.topicDir === page.topicDir)
+        .sort((a, b) => primaryCount(b) - primaryCount(a))[0]
+    } else {
+      target = pages
+        .filter((p) => p.kind === 'leaf' && p !== page)
+        .map((p) => ({ page: p, shared: commonPrefixSegs(p.anchorDir, page.anchorDir) }))
+        .filter((c) => c.shared >= 1)
+        .sort((a, b) => b.shared - a.shared || primaryCount(b.page) - primaryCount(a.page))[0]?.page
+    }
     if (!target) continue
     for (const member of page.members) {
       if (target.members.some((m) => m.path === member.path)) continue

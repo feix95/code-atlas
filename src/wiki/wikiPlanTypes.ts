@@ -27,8 +27,8 @@ export const PLAN_CROSS_DIR_MAX_FILES = 12
 /** 叶子页主角文件数上限:超过就对该页再切一轮社区(硬线,区别于参考分布的文件数) */
 export const PLAN_LEAF_MAX_PRIMARY = 16
 
-/** 叶子页证据量再切目标:超过它先尝试拆页,拆不动才留给 oversized 标记 */
-export const PLAN_SPLIT_TOKEN_TARGET = 45_000
+/** 叶子页证据量再切目标:约合 8K 上下文下 5 个读取分段;超过先尝试拆页,拆不动才留给 oversized 标记 */
+export const PLAN_SPLIT_TOKEN_TARGET = 30_000
 
 /** 功能名成页的候选规模上限:同名标记词横跨多目录的文件超过它就不再像一个功能 */
 export const PLAN_FEATURE_MAX_FILES = 40
@@ -42,6 +42,9 @@ export const PLAN_FEATURE_MIN_COHESION = 0.2
 /** 薄页合并线:主角不多于 2 个且证据量低于它的叶子页,并进上级,不单独成页 */
 export const PLAN_TINY_PAGE_MAX_PRIMARY = 2
 export const PLAN_TINY_PAGE_TOKEN_MAX = 400
+
+/** 功能分片的小片合并线:同功能分片里证据量低于它的, 并进同功能的最大分片 */
+export const PLAN_FEATURE_SHARD_TOKEN_MAX = 2500
 
 /** 主题树最深层级(与需求 A2 的「最多约 4 层」一致) */
 export const PLAN_TREE_MAX_DEPTH = 4

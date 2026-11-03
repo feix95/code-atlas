@@ -241,12 +241,12 @@ function main(): void {
       []
     )
   )
-  assert.ok(!leafPages(plan8).some((p) => p.anchorDir === 'web'), 'web 薄页被合并,不单独成页')
+  // 薄页找不到有公共目录前缀的亲戚时保留自成一页,不乱塞给不相干的大页
   assert.ok(
-    leafPages(plan8).some((p) =>
-      p.members.some((m) => m.path === 'web/index.html' && m.role === 'supporting')
+    leafPages(plan8).some(
+      (p) => p.anchorDir === 'web' && primariesOf(p).includes('web/index.html')
     ),
-    'index.html 降为配角并进大页'
+    '无亲戚的薄页保留自成一页'
   )
 
   // 九、自测按名归属:名字对上被测文件时,压过引用计数
@@ -319,6 +319,76 @@ function main(): void {
   walkTopics(plan11.topics)
   assert.ok(!topicDirs.includes('a/b'), '空中间层 a/b 被折叠')
   assert.ok(topicDirs.includes('a/b/c'), '叶子主题保留')
+
+  // 十二、薄页合并挑亲戚:有公共目录前缀的并进亲戚页,一段都不共的保留自成一页
+  const plan12 = buildWikiPlan(
+    input(
+      [
+        file('build/installer.nsh', { languageId: '', sizeBytes: 600 }),
+        file('src/renderer/index.html', { languageId: '', sizeBytes: 300 }),
+        file('src/renderer/src/app.ts', { sizeBytes: 9000 }),
+        file('src/renderer/src/main.ts', { sizeBytes: 9000 }),
+        file('src/renderer/src/view.ts', { sizeBytes: 9000 }),
+        file('src/other/core.ts', { sizeBytes: 9000 }),
+        file('src/other/util.ts', { sizeBytes: 9000 })
+      ],
+      []
+    )
+  )
+  assert.ok(
+    leafPages(plan12).some((p) => primariesOf(p).includes('build/installer.nsh')),
+    '与所有页都无公共前缀的薄页保留自成一页,不乱塞'
+  )
+  const rendererHost = leafPages(plan12).find((p) =>
+    primariesOf(p).includes('src/renderer/src/app.ts')
+  )
+  assert.ok(
+    rendererHost?.members.some(
+      (m) => m.path === 'src/renderer/index.html' && m.role === 'supporting'
+    ),
+    'index.html 并进同前缀的渲染页'
+  )
+
+  // 十三、功能分片的小片并进同功能最大分片
+  const featureFiles: ReturnType<typeof file>[] = []
+  const featureEdges: [string, string][] = []
+  const shardA = [
+    'wikiAlpha',
+    'wikiBeta',
+    'wikiGamma',
+    'wikiDelta',
+    'wikiEpsilon',
+    'wikiZeta',
+    'wikiEta',
+    'wikiTheta',
+    'wikiIota',
+    'wikiKappa',
+    'wikiLambda',
+    'wikiMu',
+    'wikiNu'
+  ]
+  const shardB = ['wikiXi', 'wikiPi', 'wikiRho']
+  for (const name of shardA) featureFiles.push(file(`src/core/${name}.ts`))
+  for (const name of shardB) featureFiles.push(file(`src/ui/${name}.ts`))
+  featureFiles.push(file('src/preload/wikiBridge.ts', { sizeBytes: 600 }))
+  for (let i = 0; i + 1 < shardA.length; i++)
+    featureEdges.push([`src/core/${shardA[i]}.ts`, `src/core/${shardA[i + 1]}.ts`])
+  for (let i = 0; i + 1 < shardB.length; i++)
+    featureEdges.push([`src/ui/${shardB[i]}.ts`, `src/ui/${shardB[i + 1]}.ts`])
+  featureEdges.push(['src/ui/wikiXi.ts', 'src/core/wikiAlpha.ts'])
+  featureEdges.push(['src/preload/wikiBridge.ts', 'src/core/wikiAlpha.ts'])
+  const plan13 = buildWikiPlan(input(featureFiles, featureEdges))
+  assert.ok(
+    !leafPages(plan13).some((p) => primariesOf(p).includes('src/preload/wikiBridge.ts')),
+    '功能小分片不单独成页'
+  )
+  const bigShard = leafPages(plan13).find((p) => primariesOf(p).includes('src/core/wikiAlpha.ts'))
+  assert.ok(
+    bigShard?.members.some(
+      (m) => m.path === 'src/preload/wikiBridge.ts' && m.role === 'supporting'
+    ),
+    '小分片成员并进同功能最大分片'
+  )
 
   console.log('✅ Wiki 主题树切分自测全部通过')
   console.log(
