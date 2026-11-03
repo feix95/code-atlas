@@ -19,7 +19,7 @@ import {
 import { isSafePageFileV2 } from './wikiPlanStore.ts'
 
 export const WIKI_LEDGER_DIR = 'ledger'
-export const WIKI_NOTE_LEDGER_FILE = 'note-ledger.json'
+export const WIKI_NOTE_LEDGER_FILE = 'wiki-note-ledger.json'
 
 export type WikiPageKindV2 = 'leaf' | 'overview' | 'root'
 export type WikiPageStatusV2 = 'done' | 'stale' | 'missing' | 'failed' | 'cancelled' | 'planned'

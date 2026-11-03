@@ -6,12 +6,17 @@ import { WikiGenerateDialog } from './WikiGenerateDialog'
 export function GraphWikiEntry({
   result,
   graph,
-  onOpenWiki
+  onOpenWiki,
+  wallVisible,
+  onToggleWall
 }: {
   result: ScanResult
   /** 关系分析还没到货时不能生成:清单靠它切模块 */
   graph: DepGraphResult | null
   onOpenWiki: () => void
+  /** 卡片墙当前是否盖在画布上;传入时多一个结构图/卡片墙切换钮 */
+  wallVisible?: boolean
+  onToggleWall?: () => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
 
@@ -28,6 +33,11 @@ export function GraphWikiEntry({
       <button type="button" className="graph-tool-text" onClick={onOpenWiki}>
         Wiki 进度
       </button>
+      {onToggleWall && (
+        <button type="button" className="graph-tool-text" onClick={onToggleWall}>
+          {wallVisible ? '结构图' : '卡片墙'}
+        </button>
+      )}
       {open && graph !== null && (
         <WikiGenerateDialog
           result={result}

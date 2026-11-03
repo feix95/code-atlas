@@ -1,0 +1,276 @@
+/* Wiki 卡片墙:图谱画布内的语义图层 —— 顶部条、进度下拉、主题分区与卡片、右侧详情面板。
+   颜色与间距走 token;引用线借证据板的红线,强弱三档以粗细与透明度区分。 */
+
+.wiki-wall {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas-tint);
+}
+
+.wiki-wall-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.wiki-wall-title {
+  color: var(--text-strong);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-semi);
+}
+
+.wiki-wall-count {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  color: var(--text-strong);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.wiki-wall-btn.is-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.wiki-wall-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wiki-wall-progress {
+  flex: none;
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--font-sm);
+  color: var(--text-strong);
+}
+
+.wiki-wall-progress ul {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wiki-wall-progress li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 2px 0;
+}
+
+.wiki-wall-line-status {
+  color: var(--muted);
+}
+
+.wiki-wall-error {
+  padding: var(--space-2) var(--space-4);
+  color: var(--bad, #b3261e);
+  font-size: var(--font-sm);
+}
+
+.wiki-wall-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.wiki-wall-board {
+  position: relative;
+  margin: 0 auto;
+}
+
+.wiki-wall-region {
+  position: absolute;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--canvas-tint) 92%, var(--line));
+}
+
+.wiki-wall-region-title {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-semi);
+}
+
+.wiki-wall-lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.wiki-wall-line.is-contains {
+  stroke: var(--muted-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+}
+
+.wiki-wall-line.is-reference.is-strong {
+  stroke: #c0392b;
+  stroke-width: 2.5;
+  opacity: 0.9;
+}
+
+.wiki-wall-line.is-reference.is-medium {
+  stroke: #c0392b;
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.wiki-wall-line.is-reference.is-faint {
+  stroke: #c0392b;
+  stroke-width: 1;
+  opacity: 0.25;
+}
+
+.wiki-wall-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-tint);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.wiki-wall-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.wiki-wall-card.is-planned {
+  border-style: dashed;
+  background: transparent;
+}
+
+.wiki-wall-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wiki-wall-card-kind {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-chip {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.wiki-wall-chip.is-done {
+  color: var(--ok, #1e7d32);
+}
+
+.wiki-wall-chip.is-failed {
+  color: var(--bad, #b3261e);
+}
+
+.wiki-wall-chip.is-stale {
+  color: var(--warn, #b26a00);
+}
+
+.wiki-wall-card-title {
+  font-size: var(--font-sm);
+  font-weight: var(--font-w-semi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-wall-card-body {
+  flex: 1;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  overflow: hidden;
+}
+
+.wiki-wall-card-foot {
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-detail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  padding: var(--space-4);
+  border-left: 1px solid var(--line);
+  background: var(--canvas-tint);
+  overflow: auto;
+  z-index: 5;
+}
+
+.wiki-wall-detail-close {
+  float: right;
+  border: none;
+  background: none;
+  font-size: var(--font-lg);
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.wiki-wall-detail-kind,
+.wiki-wall-detail-topic {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-detail-excerpt {
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
+.wiki-wall-detail-label {
+  margin-top: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-semi);
+}
+
+.wiki-wall-detail ul {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-4);
+  font-size: var(--font-sm);
+}
+
+.wiki-wall-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.wiki-wall-detail-note {
+  color: var(--muted);
+  font-size: var(--font-xs);
+  margin-top: var(--space-2);
+}

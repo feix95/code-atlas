@@ -68,15 +68,13 @@ for (const relPath of allPaths.sort()) {
     outCount: node?.outCount ?? 0
   })
 }
-let manifestScripts: string[] = []
-try {
-  const pkg = JSON.parse(await fs.readFile(join(projectRoot, 'package.json'), 'utf8')) as {
-    scripts?: Record<string, string>
-  }
-  manifestScripts = Object.keys(pkg.scripts ?? {})
-} catch {
-  manifestScripts = []
-}
+const manifestScripts: string[] = await fs
+  .readFile(join(projectRoot, 'package.json'), 'utf8')
+  .then((raw) => {
+    const pkg = JSON.parse(raw) as { scripts?: Record<string, string> }
+    return Object.keys(pkg.scripts ?? {})
+  })
+  .catch(() => [] as string[])
 const plan = buildWikiPlan({
   projectName: basename(projectRoot),
   files,
@@ -111,7 +109,7 @@ console.log(`待测页:${page.title}(${page.members.length} 个成员,主题 ${t
 
 const config = await loadAiConfig(userDataDir)
 let contextSize = config.contextSize ?? 8192
-let target: ReturnType<typeof resolveAiTarget> | null = null
+let target: ReturnType<typeof resolveAiTarget>
 if (config.provider === 'builtin') {
   const ready = await ensureBuiltinServer(
     config.builtin,
