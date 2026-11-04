@@ -29,11 +29,6 @@ function subscribe(cb: () => void): () => void {
   return () => listeners.delete(cb)
 }
 
-/** 摆放存档按「项目 × 层」分开:每一层各记各的手摆位置 */
-export function wallPositionsKey(root: string, scope: string): string {
-  return `${root}\n${scope}`
-}
-
 export function useWallPositions(root: string): WallPositions {
   return useSyncExternalStore(subscribe, () => prefs[root] ?? EMPTY)
 }

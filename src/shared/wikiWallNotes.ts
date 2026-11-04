@@ -35,8 +35,6 @@ interface WallStickerBase {
   y: number
   z: number
   attach: WallAttach | null
-  /** 贴在线索桌哪一层;全景层不记 */
-  layer?: string
 }
 
 export interface WallNote extends WallStickerBase {
@@ -63,7 +61,6 @@ export interface WallNotesFile {
 }
 
 const COORD_MAX = 50_000
-const LAYER_MAX = 1000
 const OFFSET_MAX = 20_000
 
 function num(raw: unknown, min: number, max: number, fallback: number): number {
@@ -96,8 +93,7 @@ function cleanSticker(raw: unknown): WallSticker | null {
     x: num(r.x, 0, COORD_MAX, 0),
     y: num(r.y, 0, COORD_MAX, 0),
     z: num(r.z, 0, 1_000_000, 0),
-    attach: cleanAttach(r.attach),
-    ...(typeof r.layer === 'string' ? wallStickerLayer(r.layer.slice(0, LAYER_MAX)) : {})
+    attach: cleanAttach(r.attach)
   }
   if (r.kind === 'note') {
     const color = WALL_NOTE_COLORS.find((c) => c === r.color) ?? 'yellow'
@@ -249,11 +245,6 @@ export function nextStickerZ(stickers: readonly WallSticker[]): number {
 }
 
 /** 按叠放次序排好,渲染顺序即上下关系 */
-/** 新便签的层字段:全景层省掉,老存档读进来也就是全景 */
-export function wallStickerLayer(layer: string): { layer?: string } {
-  return layer === '' ? {} : { layer }
-}
-
 export function sortWallStickers(stickers: readonly WallSticker[]): WallSticker[] {
   return [...stickers].sort((a, b) => a.z - b.z)
 }

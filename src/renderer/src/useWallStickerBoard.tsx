@@ -11,7 +11,6 @@ import {
   nextStickerZ,
   placeWallSticker,
   sortWallStickers,
-  wallStickerLayer,
   type WallSticker
 } from '@shared/wikiWallNotes'
 import type { WallPlacedCard } from './wikiWallLayout'
@@ -50,14 +49,11 @@ function isTyping(target: EventTarget | null): boolean {
 
 export function useWallStickerBoard({
   rootPath,
-  layer,
   cards,
   view,
   hostRef
 }: {
   rootPath: string
-  /** 当前所在的层:便签贴在哪层就只在哪层出现 */
-  layer: string
   cards: readonly WallPlacedCard[]
   view: WallView
   hostRef: React.RefObject<HTMLDivElement | null>
@@ -121,17 +117,7 @@ export function useWallStickerBoard({
     const y = Math.max(0, at.y - WALL_NOTE_H / 2)
     update((prev) => [
       ...prev,
-      {
-        id,
-        kind: 'note',
-        color: 'yellow',
-        text: '',
-        x,
-        y,
-        z: nextStickerZ(prev),
-        attach: null,
-        ...wallStickerLayer(layer)
-      }
+      { id, kind: 'note', color: 'yellow', text: '', x, y, z: nextStickerZ(prev), attach: null }
     ])
     setFocus({ id, editing: true })
   }
@@ -171,8 +157,7 @@ export function useWallStickerBoard({
               x,
               y,
               z: nextStickerZ(prev),
-              attach: null,
-              ...wallStickerLayer(layer)
+              attach: null
             }
           ])
           setFocus({ id, editing: false })
@@ -181,7 +166,7 @@ export function useWallStickerBoard({
         }
       }
     },
-    [rootPath, layer, update, setError]
+    [rootPath, update, setError]
   )
 
   // 拖文件进桌面:落在松手的位置;粘贴:落在视野中间。没读到存档前不收,免得盖掉旧存档
@@ -226,9 +211,9 @@ export function useWallStickerBoard({
     return () => document.removeEventListener('pointerdown', down, true)
   }, [focus])
 
-  const stickerLayer = (
+  const layer = (
     <>
-      {sortWallStickers(state.stickers.filter((s) => (s.layer ?? '') === layer)).map((sticker) => {
+      {sortWallStickers(state.stickers).map((sticker) => {
         const draft = drag.draft?.id === sticker.id ? drag.draft : null
         const placed = placeWallSticker(sticker, byId)
         const rect = draft === null ? placed : { ...placed, x: draft.x, y: draft.y }
@@ -291,5 +276,5 @@ export function useWallStickerBoard({
     </div>
   )
 
-  return { layer: stickerLayer, tools }
+  return { layer, tools }
 }

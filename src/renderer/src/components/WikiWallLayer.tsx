@@ -1,19 +1,12 @@
 // 卡片墙图层(线索桌):图谱画布内由文件夹结构变形而来的语义视图,不开新页签。
 // 这里管顶部条(生成、进度下拉、整理桌面、桌面与列表切换)和右侧详情面板;
 // 桌面本身(摆卡、线绳、拖动、平移缩放)在 WikiWallBoard,列表视图在 WikiWallList。
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { WikiEvent } from '@shared/wikiTypes'
 import { WikiWallDetail } from './WikiWallDetail'
 import { WikiWallBoard } from './WikiWallBoard'
 import { WikiWallList } from './WikiWallList'
-import { WikiWallCrumbs } from './WikiWallCrumbs'
-import { setWallPositions, useWallPositions, wallPositionsKey } from '../wikiWallBoardStore'
-import {
-  buildWallScopes,
-  resolveWallScope,
-  wallScopeTrail,
-  WALL_TOP_SCOPE
-} from '../wikiWallScopes'
+import { setWallPositions, useWallPositions } from '../wikiWallBoardStore'
 import type { WallPositions } from '../wikiWallPositions'
 import type { WikiWallData } from '../useWikiWall'
 import { friendlyErr } from '../errText'
@@ -45,27 +38,14 @@ export function WikiWallLayer({
   focus?: { pageId: string; n: number } | null
 }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const tree = useMemo(() => buildWallScopes(wall.cards, wall.links), [wall.cards, wall.links])
-  // 当前所在层,连同它属于哪个项目一起记:切项目回到全景
-  const [at, setAt] = useState({ root: rootPath, key: WALL_TOP_SCOPE })
-  const [motion, setMotion] = useState<'in' | 'out' | null>(null)
-  const scopeKey = resolveWallScope(tree, at.root === rootPath ? at.key : WALL_TOP_SCOPE)
-  const trail = wallScopeTrail(tree, scopeKey)
-  const go = (key: string, dir: 'in' | 'out'): void => {
-    setAt({ root: rootPath, key })
-    setMotion(dir)
-  }
-  // 外部跳卡:渲染期对齐已应用的序号,新序号到来时直接选中并飞到卡所在的层(不用 effect 同步状态)
+  // 外部跳卡:渲染期对齐已应用的序号,新序号到来时直接选中(不用 effect 同步状态)
   const [appliedFocusN, setAppliedFocusN] = useState(0)
   if (focus && focus.n !== appliedFocusN) {
     setAppliedFocusN(focus.n)
     setSelectedId(focus.pageId)
-    setAt({ root: rootPath, key: tree.scopeOfCard.get(focus.pageId) ?? WALL_TOP_SCOPE })
-    setMotion(null)
   }
   const [mode, setMode] = useState<'board' | 'list'>('board')
-  const posKey = wallPositionsKey(rootPath, scopeKey)
-  const positions = useWallPositions(posKey)
+  const positions = useWallPositions(rootPath)
   const [undo, setUndo] = useState<WallPositions | null>(null)
   const arranged = Object.keys(positions).length > 0
   const selected = wall.cards.find((card) => card.pageId === selectedId) ?? null
@@ -162,9 +142,6 @@ export function WikiWallLayer({
     <div className="wiki-wall" role="region" aria-label="Wiki 卡片墙">
       <div className="wiki-wall-bar">
         <span className="wiki-wall-title">Wiki 线索桌</span>
-        {mode === 'board' && trail.length > 1 && (
-          <WikiWallCrumbs trail={trail} onGo={(key) => go(key, 'out')} />
-        )}
         <span className="wiki-wall-count">
           {wall.loading
             ? '正在摆卡…'
@@ -201,7 +178,7 @@ export function WikiWallLayer({
             type="button"
             className="wiki-wall-btn"
             onClick={() => {
-              setWallPositions(posKey, undo)
+              setWallPositions(rootPath, undo)
               setUndo(null)
             }}
           >
@@ -215,7 +192,7 @@ export function WikiWallLayer({
             title="把手动拖过的卡放回自动摆放的位置"
             onClick={() => {
               setUndo(positions)
-              setWallPositions(posKey, {})
+              setWallPositions(rootPath, {})
             }}
           >
             整理桌面
@@ -264,24 +241,11 @@ export function WikiWallLayer({
           rootPath={rootPath}
           cards={wall.cards}
           links={wall.links}
-          tree={tree}
-          scopeKey={scopeKey}
-          motion={motion}
           ready={!wall.loading}
           selectedId={selectedId}
           onSelect={(pageId) => {
             setSelectedId(pageId)
             setUndo(null)
-          }}
-          onEnter={(key) => {
-            setUndo(null)
-            go(key, 'in')
-          }}
-          onUp={() => {
-            const up = trail[trail.length - 2]
-            if (up === undefined) return
-            setUndo(null)
-            go(up.key, 'out')
           }}
         />
       ) : (
