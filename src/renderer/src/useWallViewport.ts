@@ -7,6 +7,22 @@ import {
   zoomAt,
   type WallView
 } from './wikiWallViewport'
+import { trackWallPointer } from './wallPointer'
+
+/** 板面上实际有东西的范围;往左往上拖出去的卡会让 x、y 变成负数 */
+export interface WallBounds {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** 把「板面从 0 开始」算出的视角挪到实际范围的左上角 */
+const shiftView = (v: WallView, b: WallBounds): WallView => ({
+  ...v,
+  x: v.x - b.x * v.z,
+  y: v.y - b.y * v.z
+})
 
 export interface WallViewport {
   view: WallView
@@ -18,8 +34,7 @@ export interface WallViewport {
 
 export function useWallViewport(
   scrollRef: RefObject<HTMLDivElement | null>,
-  boardW: number,
-  boardH: number,
+  bounds: WallBounds,
   ready: boolean
 ): WallViewport {
   const [view, setView] = useState<WallView>({ x: 0, y: 0, z: 1 })
@@ -35,8 +50,8 @@ export function useWallViewport(
     const el = scrollRef.current
     if (!ready || placedRef.current || el === null) return
     placedRef.current = true
-    setView(initialWallView(boardW, boardH, el.clientWidth, el.clientHeight))
-  }, [ready, boardW, boardH, scrollRef])
+    setView(shiftView(initialWallView(bounds.w, bounds.h, el.clientWidth, el.clientHeight), bounds))
+  }, [ready, bounds, scrollRef])
 
   // 滚轮缩放要拦住默认滚动,React 的 onWheel 是被动监听拦不住,只能手挂
   useEffect(() => {
@@ -64,8 +79,10 @@ export function useWallViewport(
 
   const fit = useCallback(() => {
     const el = scrollRef.current
-    if (el !== null) setView(fitWallView(boardW, boardH, el.clientWidth, el.clientHeight))
-  }, [scrollRef, boardW, boardH])
+    if (el !== null) {
+      setView(shiftView(fitWallView(bounds.w, bounds.h, el.clientWidth, el.clientHeight), bounds))
+    }
+  }, [scrollRef, bounds])
 
   const onPanStart = useCallback(
     (event: React.PointerEvent<HTMLElement>, onBlankClick: () => void) => {
@@ -75,7 +92,6 @@ export function useWallViewport(
       const startY = event.clientY
       const origin = viewRef.current
       let moved = false
-      target.setPointerCapture(event.pointerId)
       const move = (e: PointerEvent): void => {
         const dx = e.clientX - startX
         const dy = e.clientY - startY
@@ -85,15 +101,10 @@ export function useWallViewport(
         setView({ ...origin, x: origin.x + dx, y: origin.y + dy })
       }
       const up = (): void => {
-        target.removeEventListener('pointermove', move)
-        target.removeEventListener('pointerup', up)
-        target.removeEventListener('pointercancel', up)
         target.classList.remove('is-panning')
         if (!moved) onBlankClick()
       }
-      target.addEventListener('pointermove', move)
-      target.addEventListener('pointerup', up)
-      target.addEventListener('pointercancel', up)
+      trackWallPointer(target, event.pointerId, move, up)
     },
     []
   )

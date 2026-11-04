@@ -56,7 +56,7 @@ function note(id: string, x: number, y: number, extra: Partial<WallNote> = {}): 
   const b = clean[1] as WallNote
   assert.equal(b.color, 'yellow', '不认识的颜色回落黄色')
   assert.equal(b.text.length, 500, '便签字数截到上限')
-  assert.deepEqual([b.x, b.y], [0, 50_000], '坐标夹到范围内')
+  assert.deepEqual([b.x, b.y], [-5, 50_000], '坐标夹到范围内,负数照收(能贴到左上方)')
   const d = clean[2]
   assert.ok(d.kind === 'photo' && d.size === 'm' && d.ratio === 4, '图片大小与比例夹到合法值')
   assert.deepEqual(clean[3].attach, { pageId: 'p', dx: 20000, dy: 0 }, '贴卡偏移夹到范围内')

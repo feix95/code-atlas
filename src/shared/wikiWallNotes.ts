@@ -90,8 +90,8 @@ function cleanSticker(raw: unknown): WallSticker | null {
   if (typeof r.id !== 'string' || !/^[\w-]{1,64}$/.test(r.id)) return null
   const base = {
     id: r.id,
-    x: num(r.x, 0, COORD_MAX, 0),
-    y: num(r.y, 0, COORD_MAX, 0),
+    x: num(r.x, -COORD_MAX, COORD_MAX, 0),
+    y: num(r.y, -COORD_MAX, COORD_MAX, 0),
     z: num(r.z, 0, 1_000_000, 0),
     attach: cleanAttach(r.attach)
   }
@@ -155,8 +155,8 @@ export function placeWallSticker(
   const host = sticker.attach === null ? undefined : cards.get(sticker.attach.pageId)
   if (sticker.attach !== null && host !== undefined) {
     return {
-      x: Math.max(0, host.x + sticker.attach.dx),
-      y: Math.max(0, host.y + sticker.attach.dy),
+      x: host.x + sticker.attach.dx,
+      y: host.y + sticker.attach.dy,
       ...size,
       attachedTo: sticker.attach.pageId
     }

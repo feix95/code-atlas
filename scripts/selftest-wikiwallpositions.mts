@@ -39,16 +39,21 @@ const cards = [card('a', 'leaf', ['src']), card('b', 'leaf', ['src']), card('c',
 const links: WikiWallLink[] = [{ from: 'a', to: 'b', kind: 'reference', weight: 3 }]
 const base = layoutWikiWall(cards, links)
 
-// 清洗:非数字、无穷、负数、超大坐标与空 id 都挡住
+// 清洗:非数字、无穷与空 id 挡住;负数照收(卡能拖到左上方),超大坐标夹到上下限
 const clean = sanitizeWallPositions({
   a: { x: 10.4, y: 20.6, z: 2 },
   b: { x: 'x', y: 1 },
   c: { x: -5, y: 1e9 },
+  f: { x: -1e9, y: -7 },
   d: { x: Infinity, y: 0 },
   '': { x: 1, y: 1 },
   e: null
 })
-assert.deepEqual(clean, { a: { x: 10, y: 21, z: 2 }, c: { x: 0, y: 50000, z: 0 } })
+assert.deepEqual(clean, {
+  a: { x: 10, y: 21, z: 2 },
+  c: { x: -5, y: 50000, z: 0 },
+  f: { x: -50000, y: -7, z: 0 }
+})
 assert.deepEqual(sanitizeWallPositions([1, 2]), {})
 assert.deepEqual(sanitizeWallBoardPrefs({ '/p': { a: { x: 1, y: 2 } }, '/q': {}, '': {} }), {
   '/p': { a: { x: 1, y: 2, z: 0 } }

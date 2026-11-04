@@ -84,8 +84,8 @@ export function useWallStickerBoard({
       const box = hostRef.current?.getBoundingClientRect()
       if (box === undefined) return { x: 0, y: 0 }
       return {
-        x: Math.max(0, Math.round((clientX - box.left - view.x) / view.z)),
-        y: Math.max(0, Math.round((clientY - box.top - view.y) / view.z))
+        x: Math.round((clientX - box.left - view.x) / view.z),
+        y: Math.round((clientY - box.top - view.y) / view.z)
       }
     },
     [hostRef, view]
@@ -113,8 +113,8 @@ export function useWallStickerBoard({
   const addNote = (): void => {
     const at = center()
     const id = crypto.randomUUID()
-    const x = Math.max(0, at.x - WALL_NOTE_W / 2)
-    const y = Math.max(0, at.y - WALL_NOTE_H / 2)
+    const x = at.x - WALL_NOTE_W / 2
+    const y = at.y - WALL_NOTE_H / 2
     update((prev) => [
       ...prev,
       { id, kind: 'note', color: 'yellow', text: '', x, y, z: nextStickerZ(prev), attach: null }
@@ -142,8 +142,8 @@ export function useWallStickerBoard({
             continue
           }
           const id = crypto.randomUUID()
-          const x = Math.max(0, at.x - WALL_PHOTO_WIDTH.m / 2 + offset)
-          const y = Math.max(0, at.y - 80 + offset)
+          const x = at.x - WALL_PHOTO_WIDTH.m / 2 + offset
+          const y = at.y - 80 + offset
           offset += 24
           update((prev) => [
             ...prev,

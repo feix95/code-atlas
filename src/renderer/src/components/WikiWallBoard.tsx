@@ -2,11 +2,11 @@
 // 手动拖过的卡位置按项目记在本机,没拖过的卡继续跟自动布局走;缩小到一定程度只留标题。
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { WikiWallCard, WikiWallLink } from '@shared/wikiTypes'
-import { layoutWikiWall, wallNeighbors, type WallPlacedCard } from '../wikiWallLayout'
+import { layoutWikiWall, wallNeighbors, WALL_PAD, type WallPlacedCard } from '../wikiWallLayout'
 import { applyWallPositions, nextWallZ } from '../wikiWallPositions'
 import { setWallPositions, useWallPositions } from '../wikiWallBoardStore'
 import { WALL_FAR_ZOOM, WALL_ZOOM_MAX, WALL_ZOOM_MIN } from '../wikiWallViewport'
-import { useWallViewport } from '../useWallViewport'
+import { useWallViewport, type WallBounds } from '../useWallViewport'
 import { useWallCardDrag } from '../useWallCardDrag'
 import { useWallStickerBoard } from '../useWallStickerBoard'
 import { WikiWallCardView } from './WikiWallCardView'
@@ -31,7 +31,23 @@ export function WikiWallBoard({
   const base = useMemo(() => layoutWikiWall(cards, links), [cards, links])
   const positions = useWallPositions(rootPath)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const viewport = useWallViewport(scrollRef, base.width, base.height, ready && cards.length > 0)
+  // 「看全部」要框住拖到任何方向的卡:自动布局的范围加上手动拖过的位置
+  const bounds = useMemo<WallBounds>(() => {
+    let minX = 0
+    let minY = 0
+    let maxX = base.width
+    let maxY = base.height
+    for (const card of base.cards) {
+      const pos = positions[card.card.pageId]
+      if (pos === undefined) continue
+      minX = Math.min(minX, pos.x - WALL_PAD)
+      minY = Math.min(minY, pos.y - WALL_PAD)
+      maxX = Math.max(maxX, pos.x + card.w + WALL_PAD)
+      maxY = Math.max(maxY, pos.y + card.h + WALL_PAD)
+    }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+  }, [base, positions])
+  const viewport = useWallViewport(scrollRef, bounds, ready && cards.length > 0)
   const { view } = viewport
   // 点阵间距跟着缩放走,缩得很小时隔一个点取一个,免得满屏密点发花
   const dot = 24 * view.z * (view.z < 0.5 ? 2 : 1)
@@ -62,7 +78,7 @@ export function WikiWallBoard({
     [links, focusId]
   )
   const nudge = (placed: WallPlacedCard, dx: number, dy: number): void =>
-    commit(placed.card.pageId, Math.max(0, placed.x + dx), Math.max(0, placed.y + dy))
+    commit(placed.card.pageId, placed.x + dx, placed.y + dy)
 
   return (
     <div

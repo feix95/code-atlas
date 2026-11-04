@@ -2,6 +2,7 @@
 // 拖过的那一下不再当点击,免得拖完顺手打开详情。卡片和用户便签共用这一套,只认 id 与起点。
 import { useCallback, useRef, useState } from 'react'
 import { WALL_DRAG_THRESHOLD } from './wikiWallViewport'
+import { trackWallPointer } from './wallPointer'
 
 export interface WallDraft {
   id: string
@@ -39,30 +40,24 @@ export function useWallCardDrag(
       const startX = event.clientX
       const startY = event.clientY
       let last: WallDraft | null = null
-      target.setPointerCapture(event.pointerId)
       const move = (e: PointerEvent): void => {
         const dx = e.clientX - startX
         const dy = e.clientY - startY
         if (last === null && Math.hypot(dx, dy) < WALL_DRAG_THRESHOLD) return
         last = {
           id: item.id,
-          x: Math.max(0, Math.round(item.x + dx / zoom)),
-          y: Math.max(0, Math.round(item.y + dy / zoom))
+          x: Math.round(item.x + dx / zoom),
+          y: Math.round(item.y + dy / zoom)
         }
         setDraft(last)
       }
       const up = (): void => {
-        target.removeEventListener('pointermove', move)
-        target.removeEventListener('pointerup', up)
-        target.removeEventListener('pointercancel', up)
         if (last === null) return
         justDragged.current = true
         onCommit(item.id, last.x, last.y)
         setDraft(null)
       }
-      target.addEventListener('pointermove', move)
-      target.addEventListener('pointerup', up)
-      target.addEventListener('pointercancel', up)
+      trackWallPointer(target, event.pointerId, move, up)
     },
     [zoom, onCommit]
   )

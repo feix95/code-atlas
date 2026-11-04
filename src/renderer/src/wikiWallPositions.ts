@@ -35,7 +35,7 @@ function cleanPos(raw: unknown): WallPos | null {
   ) {
     return null
   }
-  const clamp = (n: number): number => Math.round(Math.min(COORD_MAX, Math.max(0, n)))
+  const clamp = (n: number): number => Math.round(Math.min(COORD_MAX, Math.max(-COORD_MAX, n)))
   return {
     x: clamp(x),
     y: clamp(y),
