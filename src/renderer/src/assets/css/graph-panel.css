@@ -75,7 +75,8 @@
 .graph-panel-drag:focus-visible,
 .graph-panel-ctrl:focus-visible,
 .graph-panel-resize:focus-visible,
-.graph-panel-btn:focus-visible {
+.graph-panel-btn:focus-visible,
+.graph-file-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring) color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
@@ -321,33 +322,4 @@
   color: var(--muted);
   font-size: var(--font-xs);
   word-break: break-all;
-}
-
-.graph-file-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* 只读行:色块、文件名与上面的标题、小节的左缘对齐;数字贴正文右缘 */
-.graph-file {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
-  color: var(--text);
-}
-
-.graph-file-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.graph-file-note {
-  flex-shrink: 0;
-  color: var(--muted-2);
-  font-size: var(--font-xs);
 }

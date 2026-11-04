@@ -73,11 +73,7 @@ export function GraphWikiCardSection({
       )}
       <div className="graph-wiki-actions">
         {card.file !== '' && (
-          <button
-            type="button"
-            className="graph-panel-btn graph-wiki-open"
-            onClick={() => onOpenDoc(card.file)}
-          >
+          <button type="button" className="graph-panel-btn" onClick={() => onOpenDoc(card.file)}>
             打开说明文档
           </button>
         )}
@@ -122,7 +118,7 @@ export function GraphWikiFolderSection({
           <li key={card.pageId}>
             <button
               type="button"
-              className="graph-wiki-folder-row"
+              className="graph-file graph-file-btn"
               onClick={() => onShowCard(card.pageId)}
             >
               <span className="graph-file-name">{card.title}</span>
@@ -134,7 +130,7 @@ export function GraphWikiFolderSection({
         ))}
       </ul>
       {coverage.length > 6 && (
-        <p className="graph-panel-note">其余 {coverage.length - 6} 张卡在卡片墙里看</p>
+        <p className="graph-panel-more">其余 {coverage.length - 6} 张卡在卡片墙里看</p>
       )}
     </section>
   )

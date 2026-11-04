@@ -1,0 +1,57 @@
+/* 详情面板的清单行:只读行、可点的行与清单末尾的「其余 N 项」。
+   从 graph-panel.css 拆出守单文件行数闸;文件夹内容、模块构成、Wiki 说明的清单都用这一套,左右缘一致 */
+
+.graph-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 只读行:色块、文件名与上面的标题、小节的左缘对齐;数字贴正文右缘 */
+.graph-file {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  color: var(--text);
+}
+
+.graph-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-file-note {
+  flex-shrink: 0;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}
+
+/* 可点的行:与只读行同一套排版,文字左右缘不动;悬停底色向两侧各外扩一档留白,
+   落在正文左右垫里,不把文字挤进去 */
+.graph-file-btn {
+  width: calc(100% + 2 * var(--space-2));
+  margin-inline: calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-file-btn:hover {
+  background: var(--hover);
+}
+
+/* 清单末尾的「其余 N 项」:行距同清单行,字号色档同行尾计数,左缘贴正文 */
+.graph-panel-more {
+  margin: 0;
+  padding: var(--space-1) 0;
+  color: var(--muted-2);
+  font-size: var(--font-xs);
+}

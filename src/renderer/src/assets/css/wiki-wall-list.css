@@ -28,7 +28,10 @@
   font-weight: normal;
 }
 
+/* 一组一张网格,每行用 subgrid 共用列宽:标题、摘要、类型数与状态各自竖着对齐成列 */
 .wiki-wall-list-group ul {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(0, 3fr) auto auto;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -38,13 +41,20 @@
   overflow: hidden;
 }
 
+.wiki-wall-list-group li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
 .wiki-wall-list-group li + li {
   border-top: 1px solid var(--board-paper-edge);
 }
 
 .wiki-wall-list-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1.2fr) minmax(0, 3fr) auto auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -81,13 +91,15 @@
 }
 
 .wiki-wall-list-meta {
+  justify-self: end;
   color: var(--board-ink-3);
   font-size: var(--font-sm);
   white-space: nowrap;
 }
 
 .wiki-wall-list-status {
-  padding: 1px 8px;
+  justify-self: end;
+  padding: 1px var(--space-2);
   border-radius: var(--radius-pill);
   font-size: var(--font-sm);
   white-space: nowrap;

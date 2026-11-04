@@ -62,7 +62,7 @@ function FolderContentsSection({ node, tree }: FolderBodyProps): React.JSX.Eleme
           </li>
         ))}
       </ul>
-      {hidden > 0 && <p className="graph-panel-note">其余 {hidden} 项未列出</p>}
+      {hidden > 0 && <p className="graph-panel-more">其余 {hidden} 项未列出</p>}
     </section>
   )
 }
