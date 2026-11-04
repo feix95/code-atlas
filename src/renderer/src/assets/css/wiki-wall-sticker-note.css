@@ -1,0 +1,103 @@
+/* 线索桌用户便签的纸面样式:五种颜色、背胶条、翘角折痕、文字与输入框。颜色与影子的变量在 wiki-wall-sticker.css 里定义。 */
+/* ---- 便签 ---- */
+/* 像真的便利贴:顶上一条背胶色更深,纸面上亮下暗,右下角翘起来带一点折痕和更深的影子 */
+.wiki-wall-sticker.is-note {
+  padding: 24px 14px 10px;
+  border-radius: 2px 2px 34px 2px / 2px 2px 7px 2px;
+  background-image: linear-gradient(175deg, rgba(255, 255, 255, 0.22), transparent 45%);
+  box-shadow: var(--board-shadow), var(--sticker-curl-shadow);
+}
+
+.wiki-wall-sticker.is-note::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 16px;
+  background: var(--sticker-glue);
+  pointer-events: none;
+}
+
+.wiki-wall-sticker.is-note::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 20px;
+  border-bottom-right-radius: inherit;
+  background: linear-gradient(
+    140deg,
+    transparent 48%,
+    var(--sticker-fold) 52%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  pointer-events: none;
+}
+
+.wiki-wall-sticker.is-note.is-selected,
+.wiki-wall-sticker.is-note:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--sticker-focus),
+    var(--board-shadow),
+    var(--sticker-curl-shadow);
+}
+
+.wiki-wall-sticker.is-note.is-dragging {
+  box-shadow: var(--board-shadow-lift), var(--sticker-curl-shadow);
+}
+
+.wiki-wall-sticker.is-yellow {
+  background: var(--sticker-yellow);
+}
+.wiki-wall-sticker.is-pink {
+  background: var(--sticker-pink);
+}
+.wiki-wall-sticker.is-blue {
+  background: var(--sticker-blue);
+}
+.wiki-wall-sticker.is-green {
+  background: var(--sticker-green);
+}
+.wiki-wall-sticker.is-orange {
+  background: var(--sticker-orange);
+}
+
+.wiki-wall-note-text {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wiki-wall-note-text.is-empty,
+.wiki-wall-photo-caption.is-empty {
+  color: var(--sticker-ink-2);
+}
+
+.wiki-wall-note-input {
+  flex: 1;
+  min-height: 84px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  cursor: text;
+}
+
+.wiki-wall-sticker-meta {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--sticker-ink-2);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,271 @@
+/* 线索桌上用户自己贴的便签与图片:冰箱贴式彩色便签、拍立得式照片、选中时的小工具条与左上角新增按钮。
+   便签纸色亮暗各一套;暗色下压一点亮度,免得在深色桌面上刺眼。 */
+.wiki-wall {
+  --sticker-yellow: #fde68a;
+  --sticker-pink: #fbcfe8;
+  --sticker-blue: #bfdbfe;
+  --sticker-green: #bbf7d0;
+  --sticker-orange: #fed7aa;
+  --sticker-ink: #3a3222;
+  --sticker-ink-2: rgba(58, 50, 34, 0.55);
+  --sticker-photo: #fffdf8;
+  --sticker-tape: rgba(246, 222, 120, 0.78);
+  --sticker-glue: rgba(0, 0, 0, 0.05);
+  --sticker-fold: rgba(0, 0, 0, 0.1);
+  --sticker-curl-shadow: 4px 12px 14px -8px rgba(60, 40, 20, 0.45);
+  --sticker-focus: #3b7bd6;
+}
+
+:root[data-theme='dark'] .wiki-wall {
+  --sticker-yellow: #e9cf6a;
+  --sticker-pink: #e7aecd;
+  --sticker-blue: #a4c3ee;
+  --sticker-green: #9fdcb3;
+  --sticker-orange: #eebb88;
+  --sticker-photo: #ece6da;
+  --sticker-tape: rgba(226, 196, 96, 0.55);
+  --sticker-glue: rgba(0, 0, 0, 0.07);
+  --sticker-fold: rgba(0, 0, 0, 0.16);
+  --sticker-curl-shadow: 4px 14px 16px -8px rgba(0, 0, 0, 0.75);
+  --sticker-focus: #6ea4f0;
+}
+
+.wiki-wall-sticker {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  color: var(--sticker-ink);
+  box-shadow: var(--board-shadow);
+  transform-origin: 50% 0;
+  transform: rotate(var(--tilt));
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+}
+
+.wiki-wall-sticker.is-selected,
+.wiki-wall-sticker:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--sticker-focus),
+    var(--board-shadow);
+}
+
+.wiki-wall-sticker.is-dragging {
+  z-index: 7;
+  box-shadow: var(--board-shadow-lift);
+  transform: rotate(calc(var(--tilt) * 0.4)) scale(1.03);
+  transition: box-shadow 0.2s ease;
+  cursor: grabbing;
+}
+
+/* ---- 照片 ---- */
+.wiki-wall-sticker.is-photo {
+  padding: 8px 8px 6px;
+  border-radius: 2px;
+  background: var(--sticker-photo);
+}
+
+/* 照片顶上斜压一条半透明黄胶带,两头剪得毛一点;角度跟着照片反着歪,像随手撕了一截贴上 */
+.wiki-wall-sticker.is-photo::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -11px;
+  width: max(56px, 38%);
+  height: 22px;
+  background: var(--sticker-tape);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transform: translateX(-50%) rotate(calc(var(--tilt) * -2));
+  clip-path: polygon(
+    0 8%,
+    4% 0,
+    96% 4%,
+    100% 0,
+    98% 50%,
+    100% 92%,
+    95% 100%,
+    3% 96%,
+    0 100%,
+    2% 50%
+  );
+  pointer-events: none;
+}
+
+.wiki-wall-photo-img,
+.wiki-wall-photo-missing {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.wiki-wall-photo-missing {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--sticker-ink) 8%, transparent);
+  color: var(--sticker-ink-2);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-photo-caption,
+.wiki-wall-photo-input {
+  height: 20px;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: var(--font-xs);
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wiki-wall-photo-input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-bottom: 1px dashed var(--sticker-ink-2);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  outline: none;
+}
+
+/* ---- 选中时的小工具条:不跟便签一起歪 ---- */
+.wiki-wall-sticker-bar {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-md);
+  background: var(--board-chrome);
+  box-shadow: var(--board-shadow);
+  transform: rotate(calc(var(--tilt) * -1));
+  transform-origin: left bottom;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.wiki-wall-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.wiki-wall-swatch.is-yellow {
+  background: var(--sticker-yellow);
+}
+.wiki-wall-swatch.is-pink {
+  background: var(--sticker-pink);
+}
+.wiki-wall-swatch.is-blue {
+  background: var(--sticker-blue);
+}
+.wiki-wall-swatch.is-green {
+  background: var(--sticker-green);
+}
+.wiki-wall-swatch.is-orange {
+  background: var(--sticker-orange);
+}
+
+.wiki-wall-swatch.is-on {
+  box-shadow:
+    0 0 0 2px var(--board-chrome),
+    0 0 0 4px var(--sticker-focus);
+}
+
+.wiki-wall-size,
+.wiki-wall-sticker-del {
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--board-ink);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.wiki-wall-size.is-on {
+  background: color-mix(in srgb, var(--sticker-focus) 18%, transparent);
+}
+
+.wiki-wall-size:hover,
+.wiki-wall-sticker-del:hover {
+  background: color-mix(in srgb, var(--board-ink) 8%, transparent);
+}
+
+.wiki-wall-sticker-del {
+  margin-left: 2px;
+  color: var(--board-stamp-bad);
+}
+
+/* ---- 左上角新增按钮 ---- */
+.wiki-wall-sticker-tools {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+
+.wiki-wall-sticker-tools > button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-md);
+  background: var(--board-chrome);
+  box-shadow: var(--board-shadow);
+  color: var(--board-ink);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.wiki-wall-sticker-tools > button:hover:not(:disabled) {
+  background: var(--board-paper);
+}
+
+.wiki-wall-sticker-tools > button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.wiki-wall-sticker-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius-md);
+  background: var(--board-chrome);
+  box-shadow: var(--board-shadow);
+  color: var(--board-stamp-bad);
+  font-size: var(--font-xs);
+}
+
+.wiki-wall-sticker-error button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wiki-wall-sticker,
+  .wiki-wall-sticker.is-dragging {
+    transition: none;
+  }
+}

@@ -1,0 +1,133 @@
+/* 便签/图片底部的关联行:编辑时已关联的前面有个小叉,没关联的给「＋ 关联卡片」和搜索小列表。 */
+.wiki-wall-sticker-meta.is-linked {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wiki-wall-link-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 编辑时才出现的取消关联:一个没有底色的细线小叉,悬停时颜色加深 */
+.wiki-wall-link-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  position: relative;
+  /* 汉字的视觉中心比行框中心略低,往下挪 1px 才和文字看着齐 */
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--sticker-ink-2);
+  cursor: pointer;
+}
+
+.wiki-wall-link-x svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.wiki-wall-link-x:hover,
+.wiki-wall-link-x:focus-visible {
+  color: var(--sticker-ink);
+  outline: none;
+}
+
+.wiki-wall-link {
+  position: relative;
+  margin-top: 6px;
+}
+
+.wiki-wall-link-add {
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sticker-ink-2);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.wiki-wall-link-add:hover,
+.wiki-wall-link-add[aria-expanded='true'] {
+  color: var(--sticker-ink);
+}
+
+.wiki-wall-link-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-md);
+  background: var(--board-chrome);
+  color: var(--board-ink);
+  box-shadow: var(--board-shadow-lift);
+  transform: rotate(calc(var(--tilt) * -1));
+  transform-origin: left top;
+  cursor: default;
+}
+
+.wiki-wall-link-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-sm);
+  background: var(--board-paper);
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-xs);
+  outline: none;
+}
+
+.wiki-wall-link-search:focus {
+  border-color: var(--sticker-focus);
+}
+
+.wiki-wall-link-list {
+  max-height: 180px;
+  margin: 6px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.wiki-wall-link-list button {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  overflow: hidden;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-xs);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.wiki-wall-link-list button:hover,
+.wiki-wall-link-list button:focus-visible {
+  background: color-mix(in srgb, var(--sticker-focus) 16%, transparent);
+}
+
+.wiki-wall-link-empty {
+  padding: 4px 6px;
+  color: var(--board-ink-2, inherit);
+  font-size: var(--font-xs);
+  opacity: 0.7;
+}

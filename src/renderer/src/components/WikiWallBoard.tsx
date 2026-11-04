@@ -8,6 +8,7 @@ import { setWallPositions, useWallPositions } from '../wikiWallBoardStore'
 import { WALL_FAR_ZOOM, WALL_ZOOM_MAX, WALL_ZOOM_MIN } from '../wikiWallViewport'
 import { useWallViewport } from '../useWallViewport'
 import { useWallCardDrag } from '../useWallCardDrag'
+import { useWallStickerBoard } from '../useWallStickerBoard'
 import { WikiWallCardView } from './WikiWallCardView'
 
 const ZOOM_STEP = 1.25
@@ -48,12 +49,14 @@ export function WikiWallBoard({
     const merged =
       draft === null
         ? positions
-        : { ...positions, [draft.pageId]: { x: draft.x, y: draft.y, z: nextWallZ(positions) } }
+        : { ...positions, [draft.id]: { x: draft.x, y: draft.y, z: nextWallZ(positions) } }
     return applyWallPositions(base, merged, links)
   }, [base, positions, links, drag])
+  // 用户便签与图片:画在桌面里,贴在卡上的跟着卡走;整理桌面不动它们
+  const stickers = useWallStickerBoard({ rootPath, cards: layout.cards, view, hostRef: scrollRef })
 
   const [hoverId, setHoverId] = useState<string | null>(null)
-  const focusId = drag.draft?.pageId ?? hoverId ?? selectedId
+  const focusId = drag.draft?.id ?? hoverId ?? selectedId
   const near = useMemo(
     () => (focusId === null ? null : wallNeighbors(links, focusId)),
     [links, focusId]
@@ -117,16 +120,18 @@ export function WikiWallBoard({
             placed={placed}
             selected={selectedId === placed.card.pageId}
             dim={near !== null && !near.has(placed.card.pageId)}
-            dragging={drag.draft?.pageId === placed.card.pageId}
+            dragging={drag.draft?.id === placed.card.pageId}
             onSelect={(pageId) => {
               if (!drag.consumeClick()) onSelect(pageId)
             }}
             onHover={(pageId, on) => setHoverId((id) => (on ? pageId : id === pageId ? null : id))}
-            onDragStart={drag.start}
+            onDragStart={(event, p) => drag.start(event, { id: p.card.pageId, x: p.x, y: p.y })}
             onNudge={nudge}
           />
         ))}
+        {stickers.layer}
       </div>
+      {stickers.tools}
       <div
         className="wiki-wall-zoom"
         role="group"

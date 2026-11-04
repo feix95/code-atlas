@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
 import { isEmptyDir, isSamePath, sanitizeFileName, shortProjectCode } from './wikiStore.ts'
 import { readWikiStateAny } from './wikiStoreV2.ts'
+import { isWallOwner } from './wikiWallNotesStore.ts'
 
 export async function resolveProjectDir(wikiRoot: string, projectRoot: string): Promise<string> {
   const base = sanitizeFileName(basename(projectRoot)) || 'project'
@@ -19,6 +20,8 @@ export async function resolveProjectDir(wikiRoot: string, projectRoot: string): 
     const state = await readWikiStateAny(dir)
     if (state.status === 'ok' && isSamePath(state.state.projectRoot, projectRoot)) return dir
     if (state.status === 'missing' && (await isEmptyDir(dir))) return dir
+    // 还没生成过 Wiki、只先贴了线索桌便签的目录,靠便签存档里的项目路径认回来
+    if (state.status === 'missing' && (await isWallOwner(dir, projectRoot))) return dir
   }
   return join(wikiRoot, `${short}-${Date.now().toString(36)}`)
 }

@@ -8,6 +8,7 @@ import { registerEngineIpc } from './ipcEngine.ts'
 import { registerTranslateIpc } from './ipcTranslate.ts'
 import { registerDocxIpc } from './ipcDocx.ts'
 import { registerWikiIpc } from './ipcWiki.ts'
+import { registerWikiWallIpc } from './ipcWikiWall.ts'
 import { registerWikiRunIpc } from './wikiRun.ts'
 import { registerWikiRunV2Ipc } from './wikiRunV2.ts'
 
@@ -22,6 +23,7 @@ export function registerIpc(): void {
   registerTranslateIpc()
   registerDocxIpc()
   registerWikiIpc()
+  registerWikiWallIpc()
   registerWikiRunIpc()
   registerWikiRunV2Ipc()
 }

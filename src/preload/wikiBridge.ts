@@ -17,6 +17,13 @@ import type {
   WikiStartV2Request,
   WikiWallResult
 } from '../shared/wikiTypes.ts'
+import type {
+  WallImageReadResult,
+  WallImageSaveResult,
+  WallSticker,
+  WallStickersLoadResult,
+  WallStickersSaveResult
+} from '../shared/wikiWallNotes.ts'
 
 export const wikiBridge = {
   settingsGet: (): Promise<WikiSettings> => ipcRenderer.invoke(CH.wikiSettingsGet),
@@ -31,6 +38,18 @@ export const wikiBridge = {
     ipcRenderer.invoke(CH.wikiPanelState, request),
   wallState: (projectRoot: string, language: string): Promise<WikiWallResult> =>
     ipcRenderer.invoke(CH.wikiWallState, { projectRoot, language }),
+  /** 线索桌上用户贴的便签与图片,跟着 Wiki 存在项目目录下 */
+  wallStickersLoad: (projectRoot: string): Promise<WallStickersLoadResult> =>
+    ipcRenderer.invoke(CH.wikiWallStickersLoad, projectRoot),
+  wallStickersSave: (
+    projectRoot: string,
+    stickers: WallSticker[]
+  ): Promise<WallStickersSaveResult> =>
+    ipcRenderer.invoke(CH.wikiWallStickersSave, projectRoot, stickers),
+  wallImageSave: (projectRoot: string, bytes: Uint8Array): Promise<WallImageSaveResult> =>
+    ipcRenderer.invoke(CH.wikiWallImageSave, projectRoot, bytes),
+  wallImageRead: (projectRoot: string, file: string): Promise<WallImageReadResult> =>
+    ipcRenderer.invoke(CH.wikiWallImageRead, projectRoot, file),
   start: (request: WikiStartRequest): Promise<WikiStartResult> =>
     ipcRenderer.invoke(CH.wikiStart, request),
   runStatus: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatus),

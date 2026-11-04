@@ -51,6 +51,9 @@
 @import './css/wiki-progress.css';
 @import './css/wiki-wall.css';
 @import './css/wiki-wall-board.css';
+@import './css/wiki-wall-sticker.css';
+@import './css/wiki-wall-sticker-note.css';
+@import './css/wiki-wall-sticker-link.css';
 @import './css/wiki-wall-card.css';
 @import './css/wiki-wall-list.css';
 @import './css/wiki-dialog.css';
