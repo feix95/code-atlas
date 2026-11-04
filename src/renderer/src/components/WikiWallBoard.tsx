@@ -15,6 +15,8 @@ import { WALL_FAR_ZOOM, WALL_ZOOM_MAX, WALL_ZOOM_MIN } from '../wikiWallViewport
 import { useWallViewport, type WallBounds } from '../useWallViewport'
 import { useWallCardDrag } from '../useWallCardDrag'
 import { useWallStickerBoard } from '../useWallStickerBoard'
+import { useWallCull } from '../useWallCull'
+import { wallRectsTouch } from '../wikiWallCull'
 import { WikiWallCardView } from './WikiWallCardView'
 import { WikiWallLines } from './WikiWallLines'
 
@@ -77,12 +79,15 @@ export function WikiWallBoard({
         : { ...positions, [draft.id]: { x: draft.x, y: draft.y, z: nextWallZ(positions) } }
     return applyWallPositions(base, merged, links)
   }, [base, positions, links, drag])
+  // 近景只挂视口四周一屏内的卡、便签与线(null = 全挂);拖动中、选中、焦点的卡始终挂着
+  const cull = useWallCull(scrollRef, view, far)
   // 用户便签与图片:画在桌面里,贴在卡上的跟着卡走;整理桌面不动它们
   const stickers = useWallStickerBoard({
     rootPath,
     cards: layout.cards,
     view,
     far,
+    cull,
     hostRef: scrollRef
   })
 
@@ -100,6 +105,16 @@ export function WikiWallBoard({
   const near = useMemo(
     () => (focusId === null ? null : wallNeighbors(links, focusId)),
     [links, focusId]
+  )
+  const shownCards = useMemo(
+    () =>
+      cull === null
+        ? layout.cards
+        : layout.cards.filter((placed) => {
+            const id = placed.card.pageId
+            return id === focusId || id === selectedId || wallRectsTouch(placed, cull)
+          }),
+    [cull, layout.cards, focusId, selectedId]
   )
   const nudge = (placed: WallPlacedCard, dx: number, dy: number): void =>
     commit(placed.card.pageId, placed.x + dx, placed.y + dy)
@@ -122,7 +137,14 @@ export function WikiWallBoard({
           transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`
         }}
       >
-        <WikiWallLines layout={layout} links={links} far={far} zoom={view.z} focusId={focusId} />
+        <WikiWallLines
+          layout={layout}
+          links={links}
+          far={far}
+          zoom={view.z}
+          focusId={focusId}
+          cull={cull}
+        />
         {layout.regions.map((region) => (
           <span
             key={region.title || 'no-topic'}
@@ -137,7 +159,7 @@ export function WikiWallBoard({
             <small>{region.count} 张</small>
           </span>
         ))}
-        {layout.cards.map((placed) => (
+        {shownCards.map((placed) => (
           <WikiWallCardView
             key={placed.card.pageId}
             placed={placed}

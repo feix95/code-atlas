@@ -19,6 +19,7 @@ import { useWallCardDrag } from './useWallCardDrag'
 import { useWallStickers } from './useWallStickers'
 import { WikiWallStickerView } from './components/WikiWallStickerView'
 import { friendlyErr } from './errText'
+import { wallRectsTouch, type WallRect } from './wikiWallCull'
 
 interface Focus {
   id: string
@@ -52,6 +53,7 @@ export function useWallStickerBoard({
   cards,
   view,
   far,
+  cull,
   hostRef
 }: {
   rootPath: string
@@ -59,6 +61,8 @@ export function useWallStickerBoard({
   view: WallView
   /** 远景:图片不解码,画成色块 */
   far: boolean
+  /** 近景的视口裁剪范围:范围外的便签与图片不挂(选中、拖动中的照挂);null = 全挂 */
+  cull: WallRect | null
   hostRef: React.RefObject<HTMLDivElement | null>
 }): { layer: React.JSX.Element; tools: React.JSX.Element } {
   const state = useWallStickers(rootPath)
@@ -220,6 +224,13 @@ export function useWallStickerBoard({
         const draft = drag.draft?.id === sticker.id ? drag.draft : null
         const placed = placeWallSticker(sticker, byId)
         const rect = draft === null ? placed : { ...placed, x: draft.x, y: draft.y }
+        if (
+          cull !== null &&
+          draft === null &&
+          focus?.id !== sticker.id &&
+          !wallRectsTouch(rect, cull)
+        )
+          return null
         // 拖动途中照旧显示原来的关联,松手那一刻才重新判定
         const host = placed.attachedTo === null ? undefined : byId.get(placed.attachedTo)
         return (

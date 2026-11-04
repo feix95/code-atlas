@@ -4,19 +4,23 @@ import { useMemo } from 'react'
 import type { WikiWallLink } from '@shared/wikiTypes'
 import type { WikiWallLayout } from '../wikiWallLayout'
 import { WALL_ISLAND_LINE_PX, wallIslandLinks } from '../wikiWallIslandLinks'
+import { wallLineTouches, type WallRect } from '../wikiWallCull'
 
 export function WikiWallLines({
   layout,
   links,
   far,
   zoom,
-  focusId
+  focusId,
+  cull
 }: {
   layout: WikiWallLayout
   links: WikiWallLink[]
   far: boolean
   zoom: number
   focusId: string | null
+  /** 近景的视口裁剪范围:碰不到的线不画(点亮的照画);null = 全画 */
+  cull: WallRect | null
 }): React.JSX.Element {
   const islandLinks = useMemo(
     () => (far ? wallIslandLinks(layout.cards, links) : []),
@@ -38,6 +42,7 @@ export function WikiWallLines({
         : layout.links.map((placed, index) => {
             const hot =
               focusId !== null && (placed.link.from === focusId || placed.link.to === focusId)
+            if (cull !== null && !hot && !wallLineTouches(placed, cull)) return null
             return (
               <path
                 key={index}
