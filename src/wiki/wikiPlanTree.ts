@@ -2,6 +2,7 @@
 // 根主题不写死清单:有依据才提名(依据写进页面 basis);主题树按目录前缀建,超深折叠到第 4 层。
 import { createHash } from 'node:crypto'
 import { byCodeUnit, dirOf } from '../modules/pathOrder.ts'
+import { IPC_DEFINITION_PATTERN } from './wikiPlanHubs.ts'
 import {
   PLAN_TREE_MAX_DEPTH,
   type WikiMemberRole,
@@ -18,8 +19,16 @@ export function shortHash(text: string): string {
 export const BUILD_CONFIG_PATTERN =
   /(^|\/)(electron-builder[^/]*|vite\.config\.[^/]+|webpack[^/]*|rollup\.config\.[^/]+|Dockerfile|Makefile)$/
 
-/** 进程间通道定义文件:只认通道定义本身(如 ipcChannels.ts),不认各通道的处理器文件 */
-const IPC_DEFINITION_PATTERN = /(^|\/)[^/]*channels?\.ts$/i
+/** 功能主题的公共上级:各功能主题(feature:xxx)都挂在它下面,像目录一样成一章 */
+export const FEATURE_ROOT_DIR = 'feature:'
+export const FEATURE_ROOT_TITLE = '核心功能'
+
+/** 主题的上级目录键:功能主题归到「核心功能」下,其余按目录前缀 */
+function parentDirOf(dir: string): string {
+  if (dir === FEATURE_ROOT_DIR) return ''
+  if (dir.startsWith(FEATURE_ROOT_DIR)) return FEATURE_ROOT_DIR
+  return dirOf(dir)
+}
 
 /** 根主题页提名:项目概述常设,其余有信号才提名,不硬凑 */
 export function buildRootPages(
@@ -124,11 +133,13 @@ export function assembleTopics(
         title:
           dir === ''
             ? input.projectName
-            : dir.startsWith('feature:')
-              ? dir.slice('feature:'.length)
-              : dir.split('/').pop() === 'src' && dir.split('/').length >= 2
-                ? dir.split('/')[dir.split('/').length - 2]!
-                : dir.split('/').pop()!,
+            : dir === FEATURE_ROOT_DIR
+              ? FEATURE_ROOT_TITLE
+              : dir.startsWith('feature:')
+                ? dir.slice('feature:'.length)
+                : dir.split('/').pop() === 'src' && dir.split('/').length >= 2
+                  ? dir.split('/')[dir.split('/').length - 2]!
+                  : dir.split('/').pop()!,
         dir,
         overviewPageId: null,
         pageIds: [],
@@ -147,11 +158,11 @@ export function assembleTopics(
     const topic = topicOf(dir)
     topic.pageIds.push(page.id)
     page.topicId = topic.id
-    let parent = dirOf(dir)
+    let parent = parentDirOf(dir)
     while (true) {
       topicOf(parent)
       if (parent === '') break
-      parent = dirOf(parent)
+      parent = parentDirOf(parent)
     }
   }
   const rootTopics: WikiPlanTopic[] = []
@@ -160,7 +171,7 @@ export function assembleTopics(
       rootTopics.push(topic)
       continue
     }
-    topicByDir.get(dirOf(topic.dir))!.children.push(topic)
+    topicByDir.get(parentDirOf(topic.dir))!.children.push(topic)
   }
   // 链式折叠:自己没有页、只有一个子主题的中间层不占一层(如 src/renderer 只有 src 一个子目录)
   const collapseTopic = (topic: WikiPlanTopic): WikiPlanTopic => {

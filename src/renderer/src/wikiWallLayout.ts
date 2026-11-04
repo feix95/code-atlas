@@ -3,10 +3,12 @@
 // 位置只由卡片标识、主题链与连线决定:同一份数据每次摆出来都一样。连线从图钉到图钉,画成自然下垂的线绳。
 // 摆岛的算法在 wikiWallIslands.ts;这里负责卡片尺寸、角度、叠放次序、区名胶带与连线。
 import type { WikiWallCard, WikiWallLink } from '../../shared/wikiTypes'
+import { wallGroupTitles } from './wikiWallGroups.ts'
 import { layoutIslands, type IslandEdge } from './wikiWallIslands.ts'
 import { wallSeed } from './wikiWallSettle.ts'
 
 export { wallSeed }
+export { WALL_ROOT_REGION, wallGroupTitles } from './wikiWallGroups.ts'
 
 /** 主题页卡按包含文件数分大、中、小三档,桌面上自然有高低差 */
 export const WALL_LEAF_W = 214
@@ -25,10 +27,6 @@ export const WALL_PAD = 56
 const TAPE_H = 44
 /** 最大倾角(度) */
 const TILT = 3
-/** 根主题区的固定名字;根主题卡没有主题链 */
-export const WALL_ROOT_REGION = '总览'
-/** 成团取主题链的前几段 */
-export const WALL_GROUP_DEPTH = 2
 
 export interface WallPlacedCard {
   card: WikiWallCard
@@ -125,12 +123,6 @@ function sagPath(
   return { cx, cy, d: `M${r(x1)} ${r(y1)} Q${r(cx)} ${r(cy)} ${r(x2)} ${r(y2)}` }
 }
 
-/** 卡片所在团的名字:根主题归「总览」,其余取主题链前两段;列表视图按它分组,与桌面成团一致 */
-export function wallGroupTitle(card: WikiWallCard): string {
-  if (card.kind === 'root') return WALL_ROOT_REGION
-  return card.topicPath.slice(0, WALL_GROUP_DEPTH).join(' / ') || '未归类'
-}
-
 /** 按卡片当前位置把连线挂到图钉上;两端有一端不在板上的线丢掉 */
 export function placeWallLinks(
   placed: ReadonlyMap<string, WallPlacedCard>,
@@ -162,10 +154,12 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
     ...cards.filter((card) => card.kind !== 'root')
   ]
   const sizes = ordered.map(sizeOf)
+  const groupOf = wallGroupTitles(ordered)
+  const groupTitle = (card: WikiWallCard): string => groupOf.get(card.pageId)!
   const { centers, islands } = layoutIslands(
     ordered.map((card, i) => ({
       id: card.pageId,
-      group: wallGroupTitle(card),
+      group: groupTitle(card),
       head: card.kind !== 'leaf',
       w: sizes[i].w,
       h: sizes[i].h
@@ -198,7 +192,7 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
   const regions: WallRegion[] = []
   const groupCount = new Map<string, number>()
   for (const card of ordered)
-    groupCount.set(wallGroupTitle(card), (groupCount.get(wallGroupTitle(card)) ?? 0) + 1)
+    groupCount.set(groupTitle(card), (groupCount.get(groupTitle(card)) ?? 0) + 1)
   for (const island of islands) {
     if (!island.tape) continue
     const members = island.members.map((i) => placed.get(ordered[i].pageId)!)

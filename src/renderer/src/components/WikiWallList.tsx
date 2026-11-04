@@ -1,7 +1,7 @@
 // 线索桌的列表视图:卡多了桌面看不过来时,按团分组一行一张,点一行同样打开右侧详情。
 import { useMemo } from 'react'
 import type { WikiWallCard } from '@shared/wikiTypes'
-import { wallGroupTitle } from '../wikiWallLayout'
+import { wallGroupTitles } from '../wikiWallGroups'
 import { WALL_KIND_LABEL, WALL_STATUS_LABEL, wallCardBody } from '../wikiWallLabels'
 
 export function WikiWallList({
@@ -15,8 +15,9 @@ export function WikiWallList({
 }): React.JSX.Element {
   const groups = useMemo(() => {
     const map = new Map<string, WikiWallCard[]>()
+    const titles = wallGroupTitles(cards)
     for (const card of cards) {
-      const title = wallGroupTitle(card)
+      const title = titles.get(card.pageId)!
       const list = map.get(title)
       if (list === undefined) map.set(title, [card])
       else list.push(card)

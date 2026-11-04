@@ -9,6 +9,7 @@ import {
   WALL_ROOT_REGION,
   type WallPlacedCard
 } from '../src/renderer/src/wikiWallLayout.ts'
+import { WALL_CHAPTER_SPLIT_FROM, wallGroupTitles } from '../src/renderer/src/wikiWallGroups.ts'
 import { WALL_ASPECT } from '../src/renderer/src/wikiWallIslands.ts'
 import type { WikiWallCard, WikiWallLink } from '../src/shared/wikiTypes.ts'
 
@@ -57,12 +58,12 @@ function checkStacking(cards: WallPlacedCard[], label: string): number {
   return tucked
 }
 
-// 一个中等项目:根主题两张、src 一个大团(带枢纽 hub)、ui 一个小团、零散几团
+// 一个中等项目:根主题两张、src 一章超过拆岛门槛(带枢纽 hub)、其下 ui 一节拆成自己的岛、零散几团
 const cards: WikiWallCard[] = [
   card('root-1', 'root', []),
   card('root-2', 'root', [], 1),
   card('ov-src', 'overview', ['src'], 11),
-  ...Array.from({ length: 10 }, (_, i) =>
+  ...Array.from({ length: 12 }, (_, i) =>
     card(`src-${i}`, 'leaf', ['src'], i === 0 ? 32 : i % 3 === 0 ? 2 : 4)
   ),
   card('ov-ui', 'overview', ['src', 'ui'], 4),
@@ -104,11 +105,11 @@ assert.deepEqual(
   layout.regions.map((region) => [region.title, region.count]),
   [
     [WALL_ROOT_REGION, 2],
-    ['src', 11],
+    ['src', 13],
     ['src / ui', 6],
     ['lib', 2]
   ],
-  '每个主题一条区名胶带,张数含卫星岛'
+  '每章一条区名胶带,大章拆出的节另贴一条,张数含卫星岛'
 )
 
 // 横屏比例:不再朝一个方向无限延伸
@@ -207,7 +208,7 @@ assert.equal(
   '从属线恒弱档'
 )
 
-// 成团取主题链前两段:更深的并进第二层
+// 分岛口径:小章整章一座岛,更深的节都并进章里
 const deep = layoutWikiWall(
   [
     card('d-1', 'leaf', ['src']),
@@ -218,10 +219,32 @@ const deep = layoutWikiWall(
 )
 assert.deepEqual(
   deep.regions.map((region) => [region.title, region.count]),
-  [
-    ['src', 1],
-    ['src / ui', 2]
-  ]
+  [['src', 3]],
+  '没超过拆岛门槛的章不拆'
+)
+
+// 大章拆岛:超过门槛按第二段拆节;太小的节留在章岛;拆节同样只看前两段
+const bigChapter: WikiWallCard[] = [
+  card('c-ov', 'overview', ['核心功能']),
+  ...Array.from({ length: 9 }, (_, i) => card(`c-wiki-${i}`, 'leaf', ['核心功能', 'wiki'])),
+  ...Array.from({ length: 8 }, (_, i) =>
+    card(`c-graph-${i}`, 'leaf', ['核心功能', 'graph', ...(i === 0 ? ['view'] : [])])
+  ),
+  card('c-tiny-0', 'leaf', ['核心功能', 'tiny']),
+  card('c-tiny-1', 'leaf', ['核心功能', 'tiny'])
+]
+const titles = wallGroupTitles([card('r', 'root', []), card('u', 'leaf', []), ...bigChapter])
+assert.equal(titles.get('r'), WALL_ROOT_REGION, '根主题归总览')
+assert.equal(titles.get('u'), '未归类', '没有主题链的卡归未归类')
+assert.equal(titles.get('c-ov'), '核心功能', '章的总览卡留在章岛')
+assert.equal(titles.get('c-wiki-3'), '核心功能 / wiki')
+assert.equal(titles.get('c-graph-0'), '核心功能 / graph', '更深的卡并进第二段的节')
+assert.equal(titles.get('c-tiny-1'), '核心功能', '不足门槛的小节留在章岛')
+assert.ok(bigChapter.length > WALL_CHAPTER_SPLIT_FROM, '测试数据确实超过门槛')
+const small = wallGroupTitles(bigChapter.slice(0, WALL_CHAPTER_SPLIT_FROM))
+assert.ok(
+  [...small.values()].every((title) => title === '核心功能'),
+  '刚好到门槛不拆,整章一座岛'
 )
 assert.deepEqual(layoutWikiWall([], []).cards, [], '空墙不报错')
 

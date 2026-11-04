@@ -167,6 +167,12 @@ export type WikiStartResult =
   | { ok: true; total: number; provider: string; model: string; projectDir: string }
   | { ok: false; error: string }
 
+/**
+ * 规划器版本:切分口径变化时加一,旧规划整体过期;线索桌手摆位置也按它作废重排。
+ * 放在共享层,主进程规划与渲染层摆放存档读同一个数。
+ */
+export const WIKI_PLAN_VERSION = 2
+
 /** 卡片墙一卡:主题页在画布上的呈现数据,记账有 AI 名称与摘要时优先 */
 export interface WikiWallCard {
   pageId: string

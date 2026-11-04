@@ -14,7 +14,9 @@ import {
   type WikiPlanInput,
   type WikiPlanPage
 } from './wikiPlanTypes.ts'
-import { buildDraftGroups, nameTokens, tokensOf, type DraftGroup } from './wikiPlanGroups.ts'
+import { buildDraftGroups, tokensOf, type DraftGroup } from './wikiPlanGroups.ts'
+import { nameTokens } from './wikiPlanFeatures.ts'
+import { findPlanHubs } from './wikiPlanHubs.ts'
 import { assembleTopics, BUILD_CONFIG_PATTERN, buildRootPages, shortHash } from './wikiPlanTree.ts'
 
 export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
@@ -28,11 +30,14 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
     relPath.split('/').some((seg) => seg.startsWith('.'))
   const codeFiles = files.filter((f) => kinds.get(f.relPath) === 'code' && !isHidden(f.relPath))
 
-  const finalGroups = buildDraftGroups(input, byPath, inDegree, codeFiles)
+  // 公共文件先认出来:分组时请出聚类,挂靠与引用线都不再把它们当亲戚
+  const hubs = findPlanHubs(codeFiles)
+  const finalGroups = buildDraftGroups(input.edges, byPath, inDegree, codeFiles, hubs)
 
   // 第三步:每组定锚点、程序名与稳定标识,生成叶子页
   const pages: WikiPlanPage[] = []
   const featurePageIds = new Set<string>()
+  const hubPageIds = new Set<string>()
   const ownerOf = new Map<string, WikiPlanPage>()
   // 同一目录有多页时,页名改用各自锚点文件名,避免一排同名页
   const anchorDirOfGroup = (group: DraftGroup): string => {
@@ -93,6 +98,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
     }
     pages.push(page)
     if (group.feature) featurePageIds.add(page.id)
+    if (group.hub) hubPageIds.add(page.id)
     for (const member of members) ownerOf.set(member.path, page)
   }
 
@@ -112,7 +118,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
           : edge.to === from
             ? edge.from
             : null
-      if (other === null) continue
+      if (other === null || hubs.has(other)) continue
       const owner = ownerOf.get(other)
       if (owner) counts.set(owner, (counts.get(owner) ?? 0) + 1)
     }
@@ -208,6 +214,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   }
   const leafNow = pages.filter((p) => p.kind === 'leaf')
   for (const page of leafNow) {
+    if (hubPageIds.has(page.id)) continue // 公共文件页再薄也自成一页
     const isFeatureShard = featurePageIds.has(page.id)
     const tinyLimit = isFeatureShard ? PLAN_FEATURE_SHARD_TOKEN_MAX : PLAN_TINY_PAGE_TOKEN_MAX
     if (primaryCount(page) > PLAN_TINY_PAGE_MAX_PRIMARY || pageTokens(page) >= tinyLimit) continue
@@ -218,7 +225,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
         .sort((a, b) => primaryCount(b) - primaryCount(a))[0]
     } else {
       target = pages
-        .filter((p) => p.kind === 'leaf' && p !== page)
+        .filter((p) => p.kind === 'leaf' && p !== page && !hubPageIds.has(p.id))
         .map((p) => ({ page: p, shared: commonPrefixSegs(p.anchorDir, page.anchorDir) }))
         .filter((c) => c.shared >= 1)
         .sort((a, b) => b.shared - a.shared || primaryCount(b.page) - primaryCount(a.page))[0]?.page
@@ -270,6 +277,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
     topics: rootTopics.sort((a, b) => byCodeUnit(a.dir, b.dir)),
     rootPageIds: rootPages.map((p) => p.id),
     pages,
+    hubs: [...hubs].sort(byCodeUnit),
     unassigned: unassigned.sort((a, b) => byCodeUnit(a.path, b.path)),
     stats: {
       files: files.length,

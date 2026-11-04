@@ -1,10 +1,11 @@
-// 自测:线索桌手动摆放与视口。存档清洗挡住坏值、手摆位置盖到自动布局上并重挂线绳、
+// 自测:线索桌手动摆放与视口。存档清洗挡住坏值、规划器版本变了旧摆放作废、手摆位置盖到自动布局上并重挂线绳、
 // 叠放次序决定渲染顺序、板面随远处的卡撑大;缩放以鼠标点为中心、上下限、看全部与初始视角。
 import assert from 'node:assert/strict'
-import { layoutWikiWall, wallGroupTitle } from '../src/renderer/src/wikiWallLayout.ts'
+import { layoutWikiWall } from '../src/renderer/src/wikiWallLayout.ts'
 import {
   applyWallPositions,
   nextWallZ,
+  readWallBoardEnvelope,
   sanitizeWallBoardPrefs,
   sanitizeWallPositions
 } from '../src/renderer/src/wikiWallPositions.ts'
@@ -17,7 +18,7 @@ import {
   initialWallView,
   zoomAt
 } from '../src/renderer/src/wikiWallViewport.ts'
-import type { WikiWallCard, WikiWallLink } from '../src/shared/wikiTypes.ts'
+import { WIKI_PLAN_VERSION, type WikiWallCard, type WikiWallLink } from '../src/shared/wikiTypes.ts'
 
 function card(pageId: string, kind: WikiWallCard['kind'], topicPath: string[]): WikiWallCard {
   return {
@@ -88,10 +89,28 @@ assert.equal(ghost.cards.length, 3)
 assert.equal(nextWallZ({}), 1)
 assert.equal(nextWallZ({ a: { x: 0, y: 0, z: 7 }, b: { x: 0, y: 0, z: 3 } }), 8)
 
-// 列表分组与桌面成团同名
-assert.equal(wallGroupTitle(card('r', 'root', [])), '总览')
-assert.equal(wallGroupTitle(card('x', 'leaf', ['src', 'ui', 'deep'])), 'src / ui')
-assert.equal(wallGroupTitle(card('y', 'leaf', [])), '未归类')
+// 存档外壳:规划器版本对得上才认;旧格式(没有外壳)与版本不同都清空,回到自动摆放
+const stored = { '/p': { a: { x: 1, y: 2, z: 3 } } }
+assert.deepEqual(
+  readWallBoardEnvelope({ planVersion: WIKI_PLAN_VERSION, projects: stored }, WIKI_PLAN_VERSION),
+  stored,
+  '同版本存档照用'
+)
+assert.deepEqual(
+  readWallBoardEnvelope(
+    { planVersion: WIKI_PLAN_VERSION - 1, projects: stored },
+    WIKI_PLAN_VERSION
+  ),
+  {},
+  '规划器版本变了,旧摆放作废'
+)
+assert.deepEqual(readWallBoardEnvelope(stored, WIKI_PLAN_VERSION), {}, '旧格式存档作废')
+assert.deepEqual(readWallBoardEnvelope(null, WIKI_PLAN_VERSION), {})
+assert.deepEqual(
+  readWallBoardEnvelope({ planVersion: WIKI_PLAN_VERSION, projects: 'bad' }, WIKI_PLAN_VERSION),
+  {},
+  '外壳对、内容坏同样清洗'
+)
 
 // 缩放:鼠标点下的板面坐标不动;上下限
 const view = { x: 100, y: 50, z: 1 }

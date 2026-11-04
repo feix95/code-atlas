@@ -65,6 +65,20 @@ export function sanitizeWallBoardPrefs(raw: unknown): WallBoardPrefs {
   return out
 }
 
+/** 存档外壳:记下摆放时的规划器版本。切分口径一变,旧位置对不上新卡,整份作废重排 */
+export interface WallBoardEnvelope {
+  planVersion: number
+  projects: WallBoardPrefs
+}
+
+/** 读存档:版本对得上才认;旧格式(没有外壳)或版本不同一律清空,回到自动摆放 */
+export function readWallBoardEnvelope(raw: unknown, planVersion: number): WallBoardPrefs {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const { planVersion: stored, projects } = raw as Record<string, unknown>
+  if (stored !== planVersion) return {}
+  return sanitizeWallBoardPrefs(projects)
+}
+
 /** 下一张被拖动的卡该用的叠放次序 */
 export function nextWallZ(positions: WallPositions): number {
   let top = 0

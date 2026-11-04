@@ -3,8 +3,7 @@
 import { MODULE_TEST_FILE_PATTERNS } from '../modules/moduleConfig.ts'
 import type { DepEdge } from '../shared/types.ts'
 
-/** 规划器版本:切分口径变化时加一,旧规划据此整体过期 */
-export const WIKI_PLAN_VERSION = 1
+export { WIKI_PLAN_VERSION } from '../shared/wikiTypes.ts'
 
 /** 叶子页文件数的参考上限(参考分布,不是硬指标;主指标是证据量,见下) */
 export const PLAN_LEAF_SOFT_MAX_FILES = 8
@@ -45,6 +44,10 @@ export const PLAN_TINY_PAGE_TOKEN_MAX = 400
 
 /** 功能分片的小片合并线:同功能分片里证据量低于它的, 并进同功能的最大分片 */
 export const PLAN_FEATURE_SHARD_TOKEN_MAX = 2500
+
+/** 公共文件(hub)门槛:入度不低于它、且超过有入度文件数的这一比例,才算被到处引用的公共文件 */
+export const PLAN_HUB_MIN_IN_DEGREE = 10
+export const PLAN_HUB_SHARE = 0.05
 
 /** 主题树最深层级(与需求 A2 的「最多约 4 层」一致) */
 export const PLAN_TREE_MAX_DEPTH = 4
@@ -124,6 +127,20 @@ export interface WikiPlanInput {
   manifestScripts: string[]
 }
 
+/** 分组阶段的中间产物:一组将成为一张叶子页 */
+export interface DraftGroup {
+  primary: string[]
+  supporting: string[]
+  basis: string[]
+  crossDir: boolean
+  /** 功能名成页的标记词;有值表示整组属于同一功能 */
+  feature?: string
+  /** 功能主题键(如 feature:wiki):同功能拆出的多页靠它归到同一主题下 */
+  topicKey?: string
+  /** 公共文件页:不再切、不吸收孤立文件 */
+  hub?: boolean
+}
+
 export type WikiPlanPageKind = 'leaf' | 'overview' | 'root'
 export type WikiMemberRole = 'primary' | 'supporting' | 'attached'
 
@@ -175,6 +192,8 @@ export interface WikiPlan {
   /** 根主题页 id(项目概述、快速开始等),按提名顺序 */
   rootPageIds: string[]
   pages: WikiPlanPage[]
+  /** 公共文件(被到处引用的类型表、通道表等):不参与聚类,线索桌不画指向它们的引用线 */
+  hubs: string[]
   /** 没归进任何页的文件与原因(资源文件等),不静默消失 */
   unassigned: { path: string; reason: string }[]
   stats: {

@@ -46,15 +46,23 @@ function containsLinks(plan: WikiPlan): WikiWallLink[] {
   return links
 }
 
+/**
+ * 引用线:文件间引用聚合到页级。文件的归属只认叶子页的主角与配角——
+ * 总览页、根主题页也列着成员,但那是引用不是归属,让它们参与会抢走文件、把引用线全拉到总览上。
+ * 指向公共文件(规划里的 hubs)的引用不画:人人都引它,画出来只是一把扫帚,看不出谁跟谁亲。
+ */
 function referenceLinks(plan: WikiPlan, edges: DepEdge[]): WikiWallLink[] {
   const pageOf = new Map<string, string>()
   for (const page of plan.pages) {
+    if (page.kind !== 'leaf') continue
     for (const member of page.members) {
       if (member.role !== 'attached') pageOf.set(member.path, page.id)
     }
   }
+  const hubs = new Set(plan.hubs)
   const weights = new Map<string, number>()
   for (const edge of edges) {
+    if (hubs.has(edge.from) || hubs.has(edge.to)) continue
     const from = pageOf.get(edge.from)
     const to = pageOf.get(edge.to)
     if (from === undefined || to === undefined || from === to) continue

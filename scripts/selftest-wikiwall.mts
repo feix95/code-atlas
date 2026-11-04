@@ -1,4 +1,4 @@
-// 自测:卡片墙装配。从属线、引用聚合权重、记账名称与状态合并、主题链。
+// 自测:卡片墙装配。从属线、引用聚合权重(归属只认叶子页、公共文件不画线)、记账名称与状态合并、主题链。
 import assert from 'node:assert/strict'
 import { buildWikiWall } from '../src/wiki/wikiWall.ts'
 import {
@@ -155,5 +155,43 @@ assert.equal(refs.length, 1, '同页自引用不画线')
 assert.equal(refs[0].weight, 2, '两条文件引用聚合成权重 2')
 assert.equal(refs[0].from, 'leaf-a')
 assert.equal(refs[0].to, 'leaf-b')
+
+// 归属只认叶子页:总览页、根主题页列着成员(引用而非归属),不能把文件抢走、把引用线拉到自己身上;
+// 指向公共文件(hubs)的引用不画
+const withHub: WikiPlan = {
+  ...plan,
+  hubs: ['src/types.ts'],
+  pages: plan.pages.map((page) =>
+    page.kind === 'overview' || page.kind === 'root'
+      ? {
+          ...page,
+          members: [
+            { path: 'src/a.ts', role: 'supporting' as const },
+            { path: 'src/b.ts', role: 'supporting' as const }
+          ]
+        }
+      : page.id === 'leaf-b'
+        ? {
+            ...page,
+            members: [...page.members, { path: 'src/types.ts', role: 'primary' as const }]
+          }
+        : page
+  )
+}
+const hubRefs = buildWikiWall(
+  withHub,
+  [
+    { from: 'src/a.ts', to: 'src/b.ts' },
+    { from: 'src/aHelper.ts', to: 'src/b.ts' },
+    { from: 'src/a.ts', to: 'src/types.ts' },
+    { from: 'src/aHelper.ts', to: 'src/types.ts' }
+  ],
+  language
+).links.filter((link) => link.kind === 'reference')
+assert.deepEqual(
+  hubRefs.map((link) => [link.from, link.to, link.weight]),
+  [['leaf-a', 'leaf-b', 2]],
+  '总览与根主题页不抢归属,指向公共文件的引用不画'
+)
 
 console.log('selftest-wikiwall ok')
