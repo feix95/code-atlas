@@ -1,22 +1,28 @@
-// 卡片墙布局:纯函数,把卡片摆成「线索桌」——按主题成团、团内错落网格,每张卡带种子决定的小角度与抖动。
-// 位置只由卡片标识与主题链决定:同一份数据每次摆出来都一样,不受力、不弹跳;
-// 抖动幅度小于卡间距的一半,保证卡片互不压盖。连线从图钉到图钉,画成自然下垂的线绳。
+// 卡片墙布局:纯函数,把卡片摆成「线索桌」——按主题结成一座座小岛,横屏比例一屏看全,
+// 岛与岛高低错落、线绳相连,岛上的卡大多留缝、少数轻轻叠压,每张卡带种子决定的小角度。
+// 位置只由卡片标识、主题链与连线决定:同一份数据每次摆出来都一样。连线从图钉到图钉,画成自然下垂的线绳。
+// 摆岛的算法在 wikiWallIslands.ts;这里负责卡片尺寸、角度、叠放次序、区名胶带与连线。
 import type { WikiWallCard, WikiWallLink } from '../../shared/wikiTypes'
+import { layoutIslands, type IslandEdge } from './wikiWallIslands.ts'
+import { wallSeed } from './wikiWallSettle.ts'
 
+export { wallSeed }
+
+/** 主题页卡按包含文件数分大、中、小三档,桌面上自然有高低差 */
 export const WALL_LEAF_W = 214
-export const WALL_LEAF_H = 150
+export const WALL_LEAF_H = 146
+const LEAF_BIG = { w: 244, h: 160 }
+const LEAF_SMALL = { w: 190, h: 124 }
+/** 文件数到这个数就用大卡,不超过 LEAF_SMALL_MAX 用小卡 */
+const LEAF_BIG_FROM = 8
+const LEAF_SMALL_MAX = 2
 export const WALL_HEAD_W = 268
 export const WALL_HEAD_H = 172
 export const WALL_ROOT_W = 246
 export const WALL_ROOT_H = 162
-const GAP_X = 34
-const GAP_Y = 44
-const REGION_GAP = 76
 export const WALL_PAD = 56
-/** 区名胶带占的高度:胶带贴在团块左上角,卡片从它下方开始摆 */
+/** 区名胶带高度:板面顶部要给最上面一座岛的胶带留位置 */
 const TAPE_H = 44
-/** 抖动上限(像素):必须小于 GAP 的一半,卡片才不会互相压住 */
-const JITTER = 10
 /** 最大倾角(度) */
 const TILT = 3
 /** 根主题区的固定名字;根主题卡没有主题链 */
@@ -45,6 +51,9 @@ export interface WallRegion {
   y: number
   w: number
   h: number
+  /** 区名胶带的位置:贴在岛上最靠上那张卡的左上方 */
+  tapeX: number
+  tapeY: number
   /** 区名胶带的倾角(度) */
   tilt: number
 }
@@ -81,61 +90,25 @@ export function wallTierOf(link: WikiWallLink): WallLineTier {
   return 'faint'
 }
 
-/** 稳定的 0 到 1 伪随机数:同一字符串永远得到同一个值(FNV-1a) */
-export function wallSeed(text: string): number {
-  let hash = 2166136261
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i)
-    hash = Math.imul(hash, 16777619)
-  }
-  return ((hash >>> 0) % 100000) / 100000
-}
-
 function sizeOf(card: WikiWallCard): { w: number; h: number } {
   if (card.kind === 'root') return { w: WALL_ROOT_W, h: WALL_ROOT_H }
   if (card.kind === 'overview') return { w: WALL_HEAD_W, h: WALL_HEAD_H }
+  if (card.memberCount >= LEAF_BIG_FROM) return LEAF_BIG
+  if (card.memberCount <= LEAF_SMALL_MAX) return LEAF_SMALL
   return { w: WALL_LEAF_W, h: WALL_LEAF_H }
 }
 
-interface Block {
-  title: string
-  heads: WikiWallCard[]
-  leaves: WikiWallCard[]
-  cols: number
-  w: number
-  h: number
-}
-
-/** 团内叶子列数:让团块大致横长,单张卡的小团不会被拉成一长条 */
-function columnsFor(leafCount: number): number {
-  if (leafCount <= 1) return 1
-  return Math.max(2, Math.min(6, Math.ceil(Math.sqrt(leafCount * 1.6))))
-}
-
-function measureBlock(title: string, members: WikiWallCard[]): Block {
-  const heads = members.filter((card) => card.kind !== 'leaf')
-  const leaves = members.filter((card) => card.kind === 'leaf')
-  const cols = columnsFor(leaves.length)
-  const rows = Math.ceil(leaves.length / cols)
-  let headsW = 0
-  let headsH = 0
-  for (const head of heads) {
-    const size = sizeOf(head)
-    headsW += (headsW > 0 ? GAP_X : 0) + size.w
-    headsH = Math.max(headsH, size.h)
+/** 连线换成摆岛用的亲密度:跨页引用按条数,主题内从属只算半条,免得目录卡把整团拽成一坨 */
+function edgesOf(cards: WikiWallCard[], links: WikiWallLink[]): IslandEdge[] {
+  const index = new Map(cards.map((card, i) => [card.pageId, i]))
+  const out: IslandEdge[] = []
+  for (const link of links) {
+    const a = index.get(link.from)
+    const b = index.get(link.to)
+    if (a === undefined || b === undefined || a === b) continue
+    out.push({ a, b, weight: link.kind === 'contains' ? 0.5 : link.weight })
   }
-  // 奇数行右错半个间距,网格看着不那么规整
-  const leavesW =
-    leaves.length > 0 ? cols * WALL_LEAF_W + (cols - 1) * GAP_X + (rows > 1 ? GAP_X : 0) : 0
-  const leavesH = rows > 0 ? rows * WALL_LEAF_H + (rows - 1) * GAP_Y : 0
-  return {
-    title,
-    heads,
-    leaves,
-    cols,
-    w: Math.max(headsW, leavesW, 160),
-    h: TAPE_H + headsH + (headsH > 0 && leavesH > 0 ? GAP_Y : 0) + leavesH
-  }
+  return out
 }
 
 function sagPath(
@@ -183,100 +156,71 @@ export function placeWallLinks(
 }
 
 export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): WikiWallLayout {
-  // 分团:根主题单独一团放最前,其余按主题链分组,保持卡片出现顺序
-  const order: string[] = []
-  const groups = new Map<string, WikiWallCard[]>()
-  const push = (key: string, card: WikiWallCard): void => {
-    if (!groups.has(key)) {
-      groups.set(key, [])
-      order.push(key)
-    }
-    groups.get(key)!.push(card)
-  }
-  const roots = cards.filter((card) => card.kind === 'root')
-  for (const card of roots) push(`\u0000${WALL_ROOT_REGION}`, card)
-  // 按主题链前两段成团:只按第一段会把整个 src 堆成一大团,按最深一段又会碎成很多单卡小团
-  for (const card of cards) {
-    if (card.kind === 'root') continue
-    push(card.topicPath.slice(0, WALL_GROUP_DEPTH).join(' / '), card)
-  }
-  const blocks = order.map((key) =>
-    measureBlock(key.startsWith('\u0000') ? key.slice(1) : key, groups.get(key)!)
+  // 根主题排最前,其余保持卡片出现顺序:分岛与区名胶带都按这个顺序来
+  const ordered = [
+    ...cards.filter((card) => card.kind === 'root'),
+    ...cards.filter((card) => card.kind !== 'root')
+  ]
+  const sizes = ordered.map(sizeOf)
+  const { centers, islands } = layoutIslands(
+    ordered.map((card, i) => ({
+      id: card.pageId,
+      group: wallGroupTitle(card),
+      head: card.kind !== 'leaf',
+      w: sizes[i].w,
+      h: sizes[i].h
+    })),
+    edgesOf(ordered, links)
   )
-
-  // 货架式排团:目标宽度取总面积的横长比,放不下就换行;团的先后保持主题顺序
-  const area = blocks.reduce(
-    (sum, block) => sum + (block.w + REGION_GAP) * (block.h + REGION_GAP),
-    0
-  )
-  const widest = blocks.reduce((max, block) => Math.max(max, block.w), 0)
-  const targetW = Math.max(widest, Math.sqrt(area * 1.7))
-
+  let minX = Infinity
+  let minY = Infinity
+  centers.forEach((c, i) => {
+    minX = Math.min(minX, c.x - sizes[i].w / 2)
+    minY = Math.min(minY, c.y - sizes[i].h / 2)
+  })
   const placed = new Map<string, WallPlacedCard>()
-  const regions: WallRegion[] = []
-  let shelfX = WALL_PAD
-  let shelfY = WALL_PAD
-  let shelfH = 0
-  let boardW = 0
-
-  const place = (card: WikiWallCard, baseX: number, baseY: number): void => {
-    const { w, h } = sizeOf(card)
-    const id = card.pageId
-    const x = Math.round(baseX + (wallSeed(`${id}:x`) * 2 - 1) * JITTER)
-    const y = Math.round(baseY + (wallSeed(`${id}:y`) * 2 - 1) * JITTER)
+  let width = 0
+  let height = 0
+  ordered.forEach((card, i) => {
+    const { w, h } = sizes[i]
+    const x = Math.round(centers[i].x - w / 2 - minX + WALL_PAD)
+    const y = Math.round(centers[i].y - h / 2 - minY + WALL_PAD + TAPE_H)
     const tilt =
-      Math.round((wallSeed(`${id}:r`) * 2 - 1) * TILT * (card.kind === 'leaf' ? 1 : 0.6) * 100) /
-      100
-    placed.set(id, { card, x, y, w, h, tilt, pinX: x + w / 2, pinY: y + 4 })
-  }
+      Math.round(
+        (wallSeed(`${card.pageId}:r`) * 2 - 1) * TILT * (card.kind === 'leaf' ? 1 : 0.6) * 100
+      ) / 100
+    placed.set(card.pageId, { card, x, y, w, h, tilt, pinX: x + w / 2, pinY: y + 4 })
+    width = Math.max(width, x + w + WALL_PAD)
+    height = Math.max(height, y + h + WALL_PAD)
+  })
 
-  for (const block of blocks) {
-    if (shelfX > WALL_PAD && shelfX + block.w > WALL_PAD + targetW) {
-      shelfX = WALL_PAD
-      shelfY += shelfH + REGION_GAP
-      shelfH = 0
-    }
-    const bx = shelfX
-    const by = shelfY
-    let cursorY = by + TAPE_H
-    let headX = bx
-    let headsH = 0
-    for (const head of block.heads) {
-      const size = sizeOf(head)
-      place(head, headX, cursorY)
-      headX += size.w + GAP_X
-      headsH = Math.max(headsH, size.h)
-    }
-    if (headsH > 0 && block.leaves.length > 0) cursorY += headsH + GAP_Y
-    block.leaves.forEach((card, index) => {
-      const col = index % block.cols
-      const row = Math.floor(index / block.cols)
-      const stagger = row % 2 === 1 ? GAP_X : 0
-      place(card, bx + stagger + col * (WALL_LEAF_W + GAP_X), cursorY + row * (WALL_LEAF_H + GAP_Y))
-    })
+  // 区名胶带贴在每座主岛最靠上那张卡的左上方;卫星岛不另贴
+  const regions: WallRegion[] = []
+  const groupCount = new Map<string, number>()
+  for (const card of ordered)
+    groupCount.set(wallGroupTitle(card), (groupCount.get(wallGroupTitle(card)) ?? 0) + 1)
+  for (const island of islands) {
+    if (!island.tape) continue
+    const members = island.members.map((i) => placed.get(ordered[i].pageId)!)
+    const x = Math.min(...members.map((m) => m.x))
+    const y = Math.min(...members.map((m) => m.y))
+    const top = members.reduce((a, b) => (b.y < a.y ? b : a))
     regions.push({
-      title: block.title,
-      count: block.heads.length + block.leaves.length,
-      x: bx,
-      y: by,
-      w: block.w,
-      h: block.h,
-      tilt: Math.round((wallSeed(`region:${block.title}`) * 2 - 1) * 2.5 * 100) / 100
+      title: island.group,
+      count: groupCount.get(island.group) ?? members.length,
+      x,
+      y,
+      tapeX: top.x - 8,
+      tapeY: top.y - TAPE_H + 6,
+      w: Math.max(...members.map((m) => m.x + m.w)) - x,
+      h: Math.max(...members.map((m) => m.y + m.h)) - y,
+      tilt: Math.round((wallSeed(`region:${island.group}`) * 2 - 1) * 2.5 * 100) / 100
     })
-    shelfX = bx + block.w + REGION_GAP
-    shelfH = Math.max(shelfH, block.h)
-    boardW = Math.max(boardW, bx + block.w)
   }
 
-  const linksPlaced = placeWallLinks(placed, links)
-  const bottom = blocks.length > 0 ? shelfY + shelfH : WALL_PAD
-  return {
-    cards: [...placed.values()],
-    regions,
-    links: linksPlaced,
-    width: Math.round(boardW + WALL_PAD + JITTER),
-    height: Math.round(bottom + WALL_PAD + 120)
-  }
+  // 叠放次序:越靠右下越在上面,叠压时只压住别人的右下边角,标题与图钉总露在外面
+  const stacked = [...placed.values()].sort((a, b) => a.y + a.x * 0.5 - (b.y + b.x * 0.5))
+  return { cards: stacked, regions, links: placeWallLinks(placed, links), width, height }
 }
 
 /** 与某张卡直接相连的卡(含自身):悬停或选中时只把这些卡与它们之间的线点亮 */

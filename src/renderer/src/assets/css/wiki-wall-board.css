@@ -94,10 +94,10 @@
   stroke-width: 1.4;
 }
 
-/* 区名:一条手撕的纸胶带贴在团块左上角 */
+/* 区名:一条手撕的纸胶带贴在小岛最上面那张卡的左上方,压在卡片之上(悬停抬起的卡也不挡它) */
 .wiki-wall-tape {
   position: absolute;
-  z-index: 1;
+  z-index: 4;
   padding: 5px 16px;
   background: var(--board-tape);
   color: var(--board-tape-ink);

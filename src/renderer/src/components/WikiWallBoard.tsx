@@ -101,7 +101,11 @@ export function WikiWallBoard({
           <span
             key={region.title || 'no-topic'}
             className="wiki-wall-tape"
-            style={{ left: region.x - 6, top: region.y, transform: `rotate(${region.tilt}deg)` }}
+            style={{
+              left: region.tapeX,
+              top: region.tapeY,
+              transform: `rotate(${region.tilt}deg)`
+            }}
           >
             {region.title || '未归类'}
             <small>{region.count} 张</small>
