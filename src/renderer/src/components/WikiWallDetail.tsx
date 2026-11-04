@@ -43,8 +43,12 @@ export function WikiWallDetail({
       {card.topicPath.length > 0 && (
         <p className="wiki-wall-detail-topic">{card.topicPath.join(' / ')}</p>
       )}
-      {card.summary !== '' && <p>{card.summary}</p>}
-      {card.excerpt !== '' && <p className="wiki-wall-detail-excerpt">{card.excerpt}</p>}
+      {/* 摘要是导读的截短版,两段都有时只放完整的导读,免得同一段话出现两遍 */}
+      {card.excerpt !== '' ? (
+        <p className="wiki-wall-detail-excerpt">{card.excerpt}</p>
+      ) : (
+        card.summary !== '' && <p className="wiki-wall-detail-excerpt">{card.summary}</p>
+      )}
       {card.keyFiles.length > 0 && (
         <>
           <p className="wiki-wall-detail-label">关键文件</p>

@@ -1,0 +1,117 @@
+/* Wiki 线索桌·桌面:点阵纸底板、纸面颗粒、线绳层与区名胶带。颜色取 wiki-wall.css 里的 --board-* 变量。 */
+
+.wiki-wall-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  /* 点阵纸跟着板面一起滚,四角压一点暗角 */
+  background:
+    radial-gradient(circle, var(--board-dot) 1.15px, transparent 1.6px) 0 0 / 24px 24px,
+    var(--board-bg);
+  background-attachment: local;
+}
+
+.wiki-wall-board {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* 纸面颗粒:很淡的噪点,让底板不是一块死色 */
+.wiki-wall-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--board-noise-opacity);
+  mix-blend-mode: var(--board-noise-blend);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 .4  0 0 0 0 .32  0 0 0 0 .22  0 0 0 .12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+.wiki-wall-lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.wiki-wall-line {
+  fill: none;
+  stroke-linecap: round;
+  transition:
+    opacity 0.18s ease,
+    stroke-width 0.18s ease;
+}
+
+/* 从属线:铅笔虚线,只交代「这张属于那一组」 */
+.wiki-wall-line.is-contains {
+  stroke: var(--board-thread);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+  opacity: 0.8;
+}
+
+.wiki-wall-line.is-reference {
+  stroke: var(--board-string);
+}
+
+.wiki-wall-line.is-reference.is-strong {
+  stroke-width: 2.2;
+  opacity: 0.75;
+}
+
+.wiki-wall-line.is-reference.is-medium {
+  stroke-width: 1.5;
+  opacity: 0.45;
+}
+
+.wiki-wall-line.is-reference.is-faint {
+  stroke-width: 1;
+  opacity: 0.22;
+}
+
+/* 有焦点时:其余线退到很淡,相关的线加粗点亮 */
+.wiki-wall-board.has-focus .wiki-wall-line {
+  opacity: 0.08;
+}
+
+.wiki-wall-board.has-focus .wiki-wall-line.is-hot {
+  opacity: 0.95;
+  stroke-width: 2.4;
+  filter: drop-shadow(1px 2px 1.2px rgba(0, 0, 0, 0.3));
+}
+
+.wiki-wall-board.has-focus .wiki-wall-line.is-contains.is-hot {
+  stroke-width: 1.4;
+}
+
+/* 区名:一条手撕的纸胶带贴在团块左上角 */
+.wiki-wall-tape {
+  position: absolute;
+  z-index: 1;
+  padding: 5px 16px;
+  background: var(--board-tape);
+  color: var(--board-tape-ink);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-bold);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  clip-path: polygon(2% 0, 98% 6%, 100% 50%, 97% 100%, 3% 94%, 0 50%);
+  pointer-events: none;
+}
+
+.wiki-wall-tape small {
+  margin-left: 6px;
+  font-size: var(--font-xs);
+  font-weight: var(--font-w-regular);
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wiki-wall-line {
+    transition: none;
+  }
+}

@@ -1,0 +1,224 @@
+/* Wiki 线索桌·卡片:纸条、索引卡、档案夹三种卡面,图钉、印章与过期胶带。颜色取 wiki-wall.css 里的 --board-* 变量。 */
+
+.wiki-wall-card {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 14px 32px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: 2px;
+  background: var(--board-paper);
+  color: var(--board-ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--board-shadow);
+  transform-origin: 50% 0;
+  transform: rotate(var(--tilt, 0deg));
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.wiki-wall-card:hover,
+.wiki-wall-card:focus-visible,
+.wiki-wall-card.is-selected {
+  z-index: 3;
+  box-shadow: var(--board-shadow-lift);
+  transform: rotate(calc(var(--tilt, 0deg) * 0.4)) translateY(-5px) scale(1.03);
+}
+
+.wiki-wall-card:focus-visible,
+.wiki-wall-card.is-selected {
+  outline: 2px solid color-mix(in srgb, var(--board-string) 70%, transparent);
+  outline-offset: 3px;
+}
+
+.wiki-wall-card.is-dim {
+  opacity: 0.45;
+}
+
+/* 图钉:红色圆头钉在顶边中点,线绳就挂在这里 */
+.wiki-wall-pin {
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 255, 255, 0.55) 0 18%,
+    var(--board-pin) 40%,
+    var(--board-pin-dark) 100%
+  );
+  box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.35);
+}
+
+.wiki-wall-card.is-overview .wiki-wall-pin {
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 255, 255, 0.6) 0 18%,
+    var(--board-pin-head) 40%,
+    var(--board-pin-head-dark) 100%
+  );
+}
+
+.wiki-wall-card-kind {
+  color: var(--board-ink-2);
+  font-size: var(--font-xs);
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-wall-card-title {
+  margin-top: 2px;
+  font-size: var(--font-ml);
+  font-weight: var(--font-w-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-wall-card-body {
+  color: var(--board-ink-2);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wiki-wall-card-foot {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--board-ink-3);
+  font-size: var(--font-xs);
+}
+
+/* 主题页:没生成的是半透明虚线纸条,生成过的才是实心纸 */
+.wiki-wall-card.is-leaf.is-planned {
+  background: color-mix(in srgb, var(--board-paper) 55%, transparent);
+  border: 1.5px dashed var(--board-ink-3);
+  box-shadow: none;
+}
+
+.wiki-wall-card.is-leaf.is-planned .wiki-wall-card-title {
+  color: var(--board-ink-2);
+}
+
+.wiki-wall-card.is-leaf.is-planned .wiki-wall-card-body {
+  color: var(--board-ink-3);
+}
+
+/* 目录概览:带横线的索引卡,顶边一道红线 */
+.wiki-wall-card.is-overview {
+  padding-top: 22px;
+  border-top: 3px solid var(--board-index-top);
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(transparent 0 23px, var(--board-index-rule) 23px 24px) 0 52px / 100%
+      calc(100% - 52px) no-repeat,
+    var(--board-paper);
+}
+
+.wiki-wall-card.is-overview .wiki-wall-card-title {
+  font-size: 1.375rem;
+}
+
+/* 根主题:牛皮纸档案夹,左上角带一截夹签 */
+.wiki-wall-card.is-root {
+  padding-top: 26px;
+  border: none;
+  border-radius: 4px 10px 6px 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 40%), var(--board-folder);
+}
+
+.wiki-wall-card.is-root::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -16px;
+  width: 96px;
+  height: 18px;
+  border-radius: 8px 14px 0 0;
+  background: var(--board-folder-tab);
+}
+
+.wiki-wall-card.is-root .wiki-wall-card-kind,
+.wiki-wall-card.is-root .wiki-wall-card-foot,
+.wiki-wall-card.is-root .wiki-wall-card-body {
+  color: color-mix(in srgb, var(--board-ink) 62%, transparent);
+}
+
+.wiki-wall-card.is-root .wiki-wall-card-title {
+  font-size: 1.3rem;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+}
+
+/* 印章:双线框、斜着盖、边缘有点不均匀的油墨感 */
+.wiki-wall-stamp {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 9px;
+  border: 2.5px double currentColor;
+  border-radius: 5px;
+  font-size: var(--font-md);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  opacity: 0.78;
+  transform: rotate(-13deg);
+  pointer-events: none;
+  mask-image: radial-gradient(circle at 30% 40%, #000 55%, rgba(0, 0, 0, 0.55) 75%, #000 90%);
+}
+
+.wiki-wall-stamp.is-done {
+  color: var(--board-stamp-ok);
+}
+
+.wiki-wall-stamp.is-failed {
+  color: var(--board-stamp-bad);
+}
+
+/* 过期:右上角斜贴一条黄胶带 */
+.wiki-wall-stale-tape {
+  position: absolute;
+  right: -24px;
+  top: 12px;
+  width: 124px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--board-stale-tape);
+  color: var(--board-stale-ink);
+  font-size: var(--font-xxs);
+  font-weight: var(--font-w-bold);
+  letter-spacing: 0.1em;
+  transform: rotate(36deg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.wiki-wall-card.is-root .wiki-wall-stale-tape,
+.wiki-wall-card.is-overview .wiki-wall-stale-tape {
+  right: -18px;
+  top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wiki-wall-card {
+    transition: none;
+  }
+}

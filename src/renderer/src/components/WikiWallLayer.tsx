@@ -1,24 +1,13 @@
-// 卡片墙图层:图谱画布内由文件夹结构变形而来的语义视图,不开新页签。
-// 顶部条管生成与进度(下拉展开),板面按主题分区摆卡,点卡在右侧出详情面板。
+// 卡片墙图层(线索桌):图谱画布内由文件夹结构变形而来的语义视图,不开新页签。
+// 顶部条管生成与进度(下拉展开);板面是点阵纸桌面,卡片按主题成团、带小角度钉着,
+// 线绳从图钉垂到图钉、画在卡片下面;悬停或选中一张卡只点亮它的线,点卡在右侧出详情面板。
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { WikiEvent, WikiWallCard } from '@shared/wikiTypes'
-import { layoutWikiWall } from '../wikiWallLayout'
+import type { WikiEvent } from '@shared/wikiTypes'
+import { layoutWikiWall, wallNeighbors } from '../wikiWallLayout'
 import { WikiWallDetail } from './WikiWallDetail'
+import { WikiWallCardView } from './WikiWallCardView'
 import type { WikiWallData } from '../useWikiWall'
 import { friendlyErr } from '../errText'
-
-const KIND_LABEL: Record<WikiWallCard['kind'], string> = {
-  root: '根主题',
-  overview: '总览',
-  leaf: '主题页'
-}
-
-const STATUS_LABEL: Record<WikiWallCard['status'], string> = {
-  planned: '待生成',
-  done: '已生成',
-  stale: '已过期',
-  failed: '生成失败'
-}
 
 interface RunLine {
   pageId: string
@@ -45,6 +34,12 @@ export function WikiWallLayer({
 }): React.JSX.Element {
   const layout = useMemo(() => layoutWikiWall(wall.cards, wall.links), [wall.cards, wall.links])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const focusId = hoverId ?? selectedId
+  const near = useMemo(
+    () => (focusId === null ? null : wallNeighbors(wall.links, focusId)),
+    [wall.links, focusId]
+  )
   const selected = wall.cards.find((card) => card.pageId === selectedId) ?? null
   const [running, setRunning] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
@@ -138,7 +133,7 @@ export function WikiWallLayer({
   return (
     <div className="wiki-wall" role="region" aria-label="Wiki 卡片墙">
       <div className="wiki-wall-bar">
-        <span className="wiki-wall-title">Wiki 卡片墙</span>
+        <span className="wiki-wall-title">Wiki 线索桌</span>
         <span className="wiki-wall-count">
           {wall.loading
             ? '正在摆卡…'
@@ -201,58 +196,55 @@ export function WikiWallLayer({
         <p className="wiki-wall-error">这个项目的 Wiki 记账已损坏,先在设置里清理后重新生成</p>
       )}
       <div className="wiki-wall-scroll">
-        <div className="wiki-wall-board" style={{ width: layout.width, height: layout.height }}>
-          {layout.regions.map((region) => (
-            <div
-              key={region.title || 'root-band'}
-              className="wiki-wall-region"
-              style={{ left: region.x, top: region.y, width: region.w, height: region.h }}
-            >
-              <span className="wiki-wall-region-title">{region.title}</span>
-            </div>
-          ))}
-          <svg className="wiki-wall-lines" width={layout.width} height={layout.height}>
-            {layout.links.map((placed, index) => (
-              <line
-                key={index}
-                x1={placed.x1}
-                y1={placed.y1}
-                x2={placed.x2}
-                y2={placed.y2}
-                className={`wiki-wall-line is-${placed.link.kind} is-${placed.tier}`}
-              />
-            ))}
+        <div
+          className={`wiki-wall-board${near !== null ? ' has-focus' : ''}`}
+          style={{ width: layout.width, height: layout.height }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSelectedId(null)
+          }}
+        >
+          <svg
+            className="wiki-wall-lines"
+            width={layout.width}
+            height={layout.height}
+            aria-hidden="true"
+          >
+            {layout.links.map((placed, index) => {
+              const hot =
+                focusId !== null && (placed.link.from === focusId || placed.link.to === focusId)
+              return (
+                <path
+                  key={index}
+                  d={placed.d}
+                  className={`wiki-wall-line is-${placed.link.kind} is-${placed.tier}${
+                    hot ? ' is-hot' : ''
+                  }`}
+                />
+              )
+            })}
           </svg>
-          {layout.cards.map((placed) => {
-            const card = placed.card
-            return (
-              <button
-                key={card.pageId}
-                type="button"
-                className={`wiki-wall-card is-${card.kind} is-${card.status}${
-                  selectedId === card.pageId ? ' is-selected' : ''
-                }`}
-                style={{ left: placed.x, top: placed.y, width: placed.w, height: placed.h }}
-                onClick={() => setSelectedId(card.pageId)}
-              >
-                <span className="wiki-wall-card-head">
-                  <span className="wiki-wall-card-kind">{KIND_LABEL[card.kind]}</span>
-                  <span className={`wiki-wall-chip is-${card.status}`}>
-                    {STATUS_LABEL[card.status]}
-                  </span>
-                </span>
-                <span className="wiki-wall-card-title">{card.title}</span>
-                <span className="wiki-wall-card-body">
-                  {card.summary !== ''
-                    ? card.summary
-                    : card.keyFiles.length > 0
-                      ? card.keyFiles.slice(0, 3).join(' · ')
-                      : '还没有内容'}
-                </span>
-                <span className="wiki-wall-card-foot">{card.memberCount} 个文件</span>
-              </button>
-            )
-          })}
+          {layout.regions.map((region) => (
+            <span
+              key={region.title || 'no-topic'}
+              className="wiki-wall-tape"
+              style={{ left: region.x - 6, top: region.y, transform: `rotate(${region.tilt}deg)` }}
+            >
+              {region.title || '未归类'}
+              <small>{region.count} 张</small>
+            </span>
+          ))}
+          {layout.cards.map((placed) => (
+            <WikiWallCardView
+              key={placed.card.pageId}
+              placed={placed}
+              selected={selectedId === placed.card.pageId}
+              dim={near !== null && !near.has(placed.card.pageId)}
+              onSelect={setSelectedId}
+              onHover={(pageId, on) =>
+                setHoverId((id) => (on ? pageId : id === pageId ? null : id))
+              }
+            />
+          ))}
         </div>
       </div>
       {selected && (
