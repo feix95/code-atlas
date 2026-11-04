@@ -2,7 +2,13 @@
 // 手动拖过的卡位置按项目记在本机,没拖过的卡继续跟自动布局走;缩小到一定程度只留标题。
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { WikiWallCard, WikiWallLink } from '@shared/wikiTypes'
-import { layoutWikiWall, wallNeighbors, WALL_PAD, type WallPlacedCard } from '../wikiWallLayout'
+import {
+  layoutWikiWall,
+  wallFocusId,
+  wallNeighbors,
+  WALL_PAD,
+  type WallPlacedCard
+} from '../wikiWallLayout'
 import { applyWallPositions, nextWallZ } from '../wikiWallPositions'
 import { setWallPositions, useWallPositions } from '../wikiWallBoardStore'
 import { WALL_FAR_ZOOM, WALL_ZOOM_MAX, WALL_ZOOM_MIN } from '../wikiWallViewport'
@@ -80,8 +86,17 @@ export function WikiWallBoard({
     hostRef: scrollRef
   })
 
+  // 悬停只在近景生效:远景不记进入(鼠标扫过不触发重画),只认离开 —— 清掉缩远前残留的那张,
+  // 值没变时 React 自己跳过重画
   const [hoverId, setHoverId] = useState<string | null>(null)
-  const focusId = drag.draft?.id ?? hoverId ?? selectedId
+  const onHover = useCallback(
+    (pageId: string, on: boolean): void => {
+      if (far && on) return
+      setHoverId((id) => (on ? pageId : id === pageId ? null : id))
+    },
+    [far]
+  )
+  const focusId = wallFocusId({ far, draggingId: drag.draft?.id ?? null, hoverId, selectedId })
   const near = useMemo(
     () => (focusId === null ? null : wallNeighbors(links, focusId)),
     [links, focusId]
@@ -132,7 +147,7 @@ export function WikiWallBoard({
             onSelect={(pageId) => {
               if (!drag.consumeClick()) onSelect(pageId)
             }}
-            onHover={(pageId, on) => setHoverId((id) => (on ? pageId : id === pageId ? null : id))}
+            onHover={onHover}
             onDragStart={(event, p) => drag.start(event, { id: p.card.pageId, x: p.x, y: p.y })}
             onNudge={nudge}
           />

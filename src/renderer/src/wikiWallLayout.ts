@@ -217,6 +217,19 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
   return { cards: stacked, regions, links: placeWallLinks(placed, links), width, height }
 }
 
+/**
+ * 当前焦点卡:拖动中的 > 悬停的 > 选中的。远景(只留标题)不认悬停 —— 鼠标扫过一屏小卡时
+ * 不该一会儿点亮一会儿变灰;拖动与选中是点出来的,远近都照旧
+ */
+export function wallFocusId(focus: {
+  far: boolean
+  draggingId: string | null
+  hoverId: string | null
+  selectedId: string | null
+}): string | null {
+  return focus.draggingId ?? (focus.far ? null : focus.hoverId) ?? focus.selectedId
+}
+
 /** 与某张卡直接相连的卡(含自身):悬停或选中时只把这些卡与它们之间的线点亮 */
 export function wallNeighbors(links: WikiWallLink[], pageId: string): Set<string> {
   const near = new Set<string>([pageId])

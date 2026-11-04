@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import {
   layoutWikiWall,
+  wallFocusId,
   wallNeighbors,
   wallSeed,
   wallTierOf,
@@ -249,5 +250,18 @@ assert.ok(
 assert.deepEqual(layoutWikiWall([], []).cards, [], '空墙不报错')
 
 assert.deepEqual([...wallNeighbors(links, 'lib-0')].sort(), ['ghost', 'lib-0', 'src-5'])
+
+// 焦点:拖动 > 悬停 > 选中;远景不认悬停,拖动与选中照旧
+const focus = (
+  far: boolean,
+  draggingId: string | null,
+  hoverId: string | null,
+  selectedId: string | null
+) => wallFocusId({ far, draggingId, hoverId, selectedId })
+assert.equal(focus(false, null, 'h', 's'), 'h', '近景悬停优先于选中')
+assert.equal(focus(false, 'd', 'h', 's'), 'd', '拖动优先')
+assert.equal(focus(true, null, 'h', null), null, '远景悬停不点亮')
+assert.equal(focus(true, null, 'h', 's'), 's', '远景只认选中')
+assert.equal(focus(true, 'd', 'h', 's'), 'd', '远景拖动照旧')
 
 console.log('selftest-wikiwalllayout ok')

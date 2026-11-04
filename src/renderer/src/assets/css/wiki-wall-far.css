@@ -41,6 +41,12 @@
   transition: none;
 }
 
+/* 远景不做任何悬停反馈:悬停不把卡提到最上层(选中、拖动的照旧) */
+.wiki-wall-scroll.is-far
+  .wiki-wall-card:hover:not(.is-selected):not(.is-dragging):not(:focus-visible) {
+  z-index: 2; /* 与 wiki-wall-card.css 的常态层级一致 */
+}
+
 /* 半透明与花纹底换成等效的实色,免得每张卡单独混色 */
 .wiki-wall-scroll.is-far .wiki-wall-card.is-leaf.is-planned {
   background: color-mix(in srgb, var(--board-paper) 55%, var(--board-bg));
@@ -96,7 +102,7 @@
   background: color-mix(in srgb, var(--sticker-ink) 22%, var(--sticker-photo));
 }
 
-/* 岛间聚合线:同一种红,粗细由组件按引用条数写在行内(已换算成屏幕像素) */
+/* 岛间聚合线:同一种红,统一粗细由组件写在行内(已换算成屏幕像素) */
 .wiki-wall-island-line {
   fill: none;
   stroke: var(--board-string);

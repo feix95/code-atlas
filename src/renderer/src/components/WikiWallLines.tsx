@@ -1,9 +1,9 @@
 // 线索桌的线绳层:近景画卡与卡的从属线、引用线(焦点相关的点亮);
-// 远景只画岛与岛之间的聚合线,粗细按引用条数、换算成屏幕像素,缩多远都一样粗。
+// 远景只画岛与岛之间的聚合线:一律同一粗细、换算成屏幕像素,缩多远都一样粗;条数在悬停提示里。
 import { useMemo } from 'react'
 import type { WikiWallLink } from '@shared/wikiTypes'
 import type { WikiWallLayout } from '../wikiWallLayout'
-import { wallIslandLinks } from '../wikiWallIslandLinks'
+import { WALL_ISLAND_LINE_PX, wallIslandLinks } from '../wikiWallIslandLinks'
 
 export function WikiWallLines({
   layout,
@@ -30,7 +30,7 @@ export function WikiWallLines({
               key={`${line.from}\n${line.to}`}
               d={line.d}
               className="wiki-wall-island-line"
-              style={{ strokeWidth: line.width / zoom }}
+              style={{ strokeWidth: WALL_ISLAND_LINE_PX / zoom }}
             >
               <title>{`${line.from} ↔ ${line.to}:${line.count} 条引用`}</title>
             </path>
