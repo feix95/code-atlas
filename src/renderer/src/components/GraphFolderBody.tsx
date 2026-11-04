@@ -7,7 +7,10 @@ import { folderContents } from '../graph/folderContents'
 import type { GraphPanelSectionId } from '../graph/graphPanelSections'
 import { folderComposition } from '../graph/moduleDetails'
 import type { ModuleNames } from '../graph/moduleNames'
+import { cardsForFiles, descendantFilesOf } from '../graph/wikiCardOwner'
+import type { WikiWallCard } from '@shared/wikiTypes'
 import { ModuleChip } from './GraphModuleSection'
+import { GraphWikiFolderSection } from './GraphWikiCardSection'
 
 export interface FolderBodyProps {
   node: LevelNode
@@ -16,9 +19,23 @@ export interface FolderBodyProps {
   colorOf: (moduleId: string) => string
   /** 当前语种的模块显示名 */
   moduleNames?: ModuleNames
+  /** 卡片墙的卡:Wiki 区按后代文件聚合覆盖 */
+  wallCards: readonly WikiWallCard[]
+  onShowWallCard: (pageId: string) => void
   hidden: ReadonlySet<GraphPanelSectionId>
   /** 「显示项」拖出来的区块顺序 */
   order: readonly GraphPanelSectionId[]
+}
+
+function FolderWikiSection({
+  node,
+  tree,
+  wallCards,
+  onShowWallCard
+}: FolderBodyProps): React.JSX.Element | null {
+  const coverage = cardsForFiles(wallCards, descendantFilesOf(tree, node.id))
+  if (coverage.length === 0) return null
+  return <GraphWikiFolderSection coverage={coverage} onShowCard={onShowWallCard} />
 }
 
 function FolderContentsSection({ node, tree }: FolderBodyProps): React.JSX.Element {
@@ -82,6 +99,7 @@ export function FolderBody(props: FolderBodyProps): React.JSX.Element {
     <>
       {order.map((id) => {
         if (hidden.has(id)) return null
+        if (id === 'wiki') return <FolderWikiSection key={id} {...props} />
         if (id === 'contents') return <FolderContentsSection key={id} {...props} />
         if (id === 'composition') return <FolderCompositionSection key={id} {...props} />
         return null

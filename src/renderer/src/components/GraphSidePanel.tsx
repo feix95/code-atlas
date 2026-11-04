@@ -17,6 +17,8 @@ import {
   type GraphPanelSectionOrders
 } from '../graph/graphPanelSections'
 import { wikiOwnerOf } from '../graph/wikiOwner'
+import { cardOwnerOf, cardsForFiles, descendantFilesOf } from '../graph/wikiCardOwner'
+import type { WikiWallCard } from '@shared/wikiTypes'
 import { FolderBody } from './GraphFolderBody'
 import { GraphFileBody } from './GraphFileBody'
 import type { ModuleNames } from '../graph/moduleNames'
@@ -42,6 +44,16 @@ export interface GraphSidePanelProps {
   moduleNames: ModuleNames
   /** 当前语种的 Wiki 快照;还没读到为 null */
   wiki: WikiPanelData | null
+  /** 卡片墙的卡:侧栏 Wiki 区按文件反查所属卡 */
+  wallCards: readonly WikiWallCard[]
+  /** 在卡片墙里看这张卡:画布变形并选中 */
+  onShowWallCard: (pageId: string) => void
+  /** 打开卡片墙(旧版提示的去处) */
+  onShowWall: () => void
+  /** 打开卡的说明文档 */
+  onOpenWallDoc: (file: string) => void
+  /** 单页生成这张卡;返回错误文案,成功为 null */
+  onGenerateCard: (pageId: string) => Promise<string | null>
   /** 项目根:标签颜色按项目分开存 */
   rootPath: string
   /** 点 Wiki 标签 = 以该标签搜索 */
@@ -71,6 +83,11 @@ function panelViewOf(props: GraphSidePanelProps, orders: GraphPanelSectionOrders
   if (kind === null) return { sections: [], available: new Set(), orders }
   const owner =
     kind === 'file' ? wikiOwnerOf(props.wiki, props.node.id) : { page: null, groupName: null }
+  const cardOwner = kind === 'file' ? cardOwnerOf(props.wallCards, props.node.id) : null
+  const folderHasCards =
+    kind === 'folder'
+      ? cardsForFiles(props.wallCards, descendantFilesOf(props.tree, props.node.id)).length > 0
+      : false
   // 菜单始终列全这一类的区块,没内容的置灰;正文只认能拿到的那几块
   return {
     sections: orderGraphPanelSections(kind, orders),
@@ -78,7 +95,9 @@ function panelViewOf(props: GraphSidePanelProps, orders: GraphPanelSectionOrders
       ...props,
       wikiPage: owner.page,
       wikiGroup: owner.groupName,
-      wikiDamaged: props.wiki?.damaged ?? false
+      wikiDamaged: props.wiki?.damaged ?? false,
+      wikiCard: cardOwner !== null,
+      wikiFolderCards: folderHasCards
     }),
     orders
   }

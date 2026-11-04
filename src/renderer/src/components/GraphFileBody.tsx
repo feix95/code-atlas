@@ -7,8 +7,11 @@ import { moduleDetails, type ModuleDetails } from '../graph/moduleDetails'
 import type { ModuleNames } from '../graph/moduleNames'
 import type { GraphPanelSectionId } from '../graph/graphPanelSections'
 import { wikiOwnerOf } from '../graph/wikiOwner'
+import { cardOwnerOf } from '../graph/wikiCardOwner'
 import type { WikiPanelData } from '../useWikiPanel'
+import type { WikiWallCard } from '@shared/wikiTypes'
 import { GraphWikiSection } from './GraphWikiSection'
+import { GraphWikiCardSection, GraphWikiLegacyNote } from './GraphWikiCardSection'
 import {
   ModuleChip,
   ModuleFilesSection,
@@ -25,6 +28,12 @@ export interface GraphFileBodyProps {
   colorOf: (moduleId: string) => string
   moduleNames: ModuleNames
   wiki: WikiPanelData | null
+  /** 卡片墙的卡:Wiki 区优先按卡展示 */
+  wallCards: readonly WikiWallCard[]
+  onShowWallCard: (pageId: string) => void
+  onShowWall: () => void
+  onOpenWallDoc: (file: string) => void
+  onGenerateCard: (pageId: string) => Promise<string | null>
   /** 项目根:标签颜色按项目分开存 */
   rootPath: string
   /** 点标签 = 以该标签搜索 */
@@ -76,17 +85,44 @@ function fileSection(
   }
 }
 
-/** Wiki 区块:有记账、散件组归属或损坏提示才出,避免模块文件还没生成时摆一行空标题 */
+/** Wiki 区块:卡认领走第二版展示;旧版有记录给旧版提示;其余沿用旧区块(损坏与散件组未生成) */
 function wikiSection(props: GraphFileBodyProps): React.ReactNode {
-  const owner = wikiOwnerOf(props.wiki, props.node.id)
   const damaged = props.wiki?.damaged ?? false
+  if (damaged) {
+    return (
+      <GraphWikiSection
+        page={null}
+        groupName={null}
+        damaged
+        revealDoc={noopReveal}
+        rootPath={props.rootPath}
+        onSearchTag={props.onSearchTag}
+      />
+    )
+  }
+  const cardOwner = cardOwnerOf(props.wallCards, props.node.id)
+  if (cardOwner !== null) {
+    return (
+      <GraphWikiCardSection
+        owner={cardOwner}
+        onOpenDoc={props.onOpenWallDoc}
+        onShowCard={props.onShowWallCard}
+        onGenerate={props.onGenerateCard}
+      />
+    )
+  }
+  const owner = wikiOwnerOf(props.wiki, props.node.id)
   const hasPage = owner.page !== null && owner.page.status !== 'none'
-  if (!damaged && !hasPage && owner.groupName === null) return null
+  const hasLegacyRecords = (props.wiki?.pages.size ?? 0) > 0
+  if (hasLegacyRecords && (hasPage || owner.groupName !== null)) {
+    return <GraphWikiLegacyNote onShowWall={props.onShowWall} />
+  }
+  if (!hasPage && owner.groupName === null) return null
   return (
     <GraphWikiSection
       page={owner.page}
       groupName={owner.groupName}
-      damaged={damaged}
+      damaged={false}
       revealDoc={props.wiki?.revealDoc ?? noopReveal}
       rootPath={props.rootPath}
       onSearchTag={props.onSearchTag}

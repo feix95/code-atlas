@@ -38,8 +38,9 @@ const FILE_SECTIONS: readonly GraphPanelSectionDef[] = [
   { id: 'styles', label: '附挂样式', group: '模块' }
 ]
 
-// 文件夹只有一档分组:菜单不画小标题,直接平铺两项
+// 文件夹只有一档分组:菜单不画小标题,直接平铺
 const FOLDER_SECTIONS: readonly GraphPanelSectionDef[] = [
+  { id: 'wiki', label: 'Wiki 说明', group: '说明' },
   { id: 'contents', label: '文件夹内容', group: '构成' },
   { id: 'composition', label: '模块构成', group: '构成' }
 ]

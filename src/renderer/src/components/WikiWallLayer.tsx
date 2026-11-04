@@ -28,13 +28,22 @@ const RUN_STATUS_LABEL: Record<string, string> = {
 export function WikiWallLayer({
   rootPath,
   wall,
-  onClose
+  onClose,
+  focus
 }: {
   rootPath: string
   wall: WikiWallData
   onClose: () => void
+  /** 外部要求选中某张卡(侧栏、搜索跳卡):n 递增保证同一张卡重复点也生效 */
+  focus?: { pageId: string; n: number } | null
 }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 外部跳卡:渲染期对齐已应用的序号,新序号到来时直接选中(不用 effect 同步状态)
+  const [appliedFocusN, setAppliedFocusN] = useState(0)
+  if (focus && focus.n !== appliedFocusN) {
+    setAppliedFocusN(focus.n)
+    setSelectedId(focus.pageId)
+  }
   const [mode, setMode] = useState<'board' | 'list'>('board')
   const positions = useWallPositions(rootPath)
   const [undo, setUndo] = useState<WallPositions | null>(null)

@@ -1,6 +1,6 @@
 // 图谱搜索的纯逻辑:规范化查询词,按「标签 → 名称 → 简介 → 路径」的优先级给页排序。
 // 只查当前语种的 Wiki 与程序名,不读 Markdown 正文,也不发请求。
-import type { WikiPageSource, WikiPanelPage } from '@shared/wikiTypes'
+import type { WikiPageSource, WikiPanelPage, WikiWallCard } from '@shared/wikiTypes'
 
 /** 虚词:去掉后为空等于没搜(如「UI 相关」按 UI 查) */
 export const SEARCH_FILLER_WORDS = ['相关', '有关', '部分', '模块', '的'] as const
@@ -12,13 +12,15 @@ export type SearchMatch = 'tag' | 'name' | 'summary' | 'path'
 
 export interface WikiSearchHit {
   pageId: string
-  kind: 'module' | 'group'
+  kind: 'module' | 'group' | 'leaf' | 'overview' | 'root'
   name: string
   match: SearchMatch
   /** 命中的原文:标签、名称、简介或路径 */
   matched: string
   /** 页成员(含附挂文件),按路径去重 */
   files: string[]
+  /** 卡片墙的卡:定位时跳到墙上选中这张卡,而不是定位成员文件 */
+  card?: boolean
 }
 
 /** 交给画布的高亮集合:命中页的成员文件与模块 id */
@@ -111,6 +113,39 @@ export function searchWikiPages(
       match: match.match,
       matched: match.matched,
       files: pageFiles(entry.source)
+    })
+  }
+  return hits.sort(
+    (a, b) =>
+      MATCH_RANK[a.match] - MATCH_RANK[b.match] ||
+      b.files.length - a.files.length ||
+      a.name.localeCompare(b.name)
+  )
+}
+
+/** 卡片墙搜索:名称 → 简介 → 成员路径,口径与旧页搜索一致,命中标 card 走跳卡定位 */
+export function searchWikiCards(query: string, cards: readonly WikiWallCard[]): WikiSearchHit[] {
+  if (query === '') return []
+  const hits: WikiSearchHit[] = []
+  for (const card of cards) {
+    let match: Pick<WikiSearchHit, 'match' | 'matched'> | null = null
+    if (normalizeSearchText(card.title).includes(query)) {
+      match = { match: 'name', matched: card.title }
+    } else if (card.summary !== '' && normalizeSearchText(card.summary).includes(query)) {
+      match = { match: 'summary', matched: card.summary }
+    } else {
+      const file = card.members.find((path) => normalizeSearchText(path).includes(query))
+      if (file !== undefined) match = { match: 'path', matched: file }
+    }
+    if (match === null) continue
+    hits.push({
+      pageId: card.pageId,
+      kind: card.kind,
+      name: card.title,
+      match: match.match,
+      matched: match.matched,
+      files: [...card.members],
+      card: true
     })
   }
   return hits.sort(

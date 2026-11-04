@@ -116,8 +116,17 @@ export function GraphSearch({ search, inputRef, onLocate }: GraphSearchProps): R
               >
                 <span className="graph-search-hit-main">{hit.name}</span>
                 <span className="graph-search-hit-note">
-                  {MATCH_LABEL[hit.match]} · {hit.kind === 'module' ? '模块' : '散件组'} ·{' '}
-                  {hit.files.length} 个文件
+                  {MATCH_LABEL[hit.match]} ·{' '}
+                  {hit.kind === 'module'
+                    ? '模块'
+                    : hit.kind === 'group'
+                      ? '散件组'
+                      : hit.kind === 'overview'
+                        ? '总览'
+                        : hit.kind === 'root'
+                          ? '根主题'
+                          : '主题页'}{' '}
+                  · {hit.files.length} 个文件
                 </span>
                 {hit.match !== 'name' && (
                   <span className="graph-search-hit-why">{hit.matched}</span>

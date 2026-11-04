@@ -18,6 +18,10 @@ export interface GraphPanelSources {
   wikiGroup?: string | null
   /** 记账损坏:给一行提示,不摆空内容 */
   wikiDamaged?: boolean
+  /** 文件被卡片墙的卡认领(第二版归属) */
+  wikiCard?: boolean
+  /** 文件夹下有卡覆盖(第二版归属聚合非空) */
+  wikiFolderCards?: boolean
 }
 
 function moduleOf(map: ModuleMap | null, file: string): ModuleInfo | null {
@@ -44,8 +48,10 @@ export function availableGraphPanelSections(
   const ids = new Set<GraphPanelSectionId>()
   const kind = graphPanelKindOf(node)
   if (kind === 'file') {
-    // 有生成的说明、散件至少能说出所属组,或记账损坏需要提示,才摆这一块
-    if (wikiDamaged || (wikiPage && wikiPage.status !== 'none') || wikiGroup) ids.add('wiki')
+    // 有卡认领、有生成的说明、散件至少能说出所属组,或记账损坏需要提示,才摆这一块
+    if (wikiDamaged || sources.wikiCard || (wikiPage && wikiPage.status !== 'none') || wikiGroup) {
+      ids.add('wiki')
+    }
     if (depNodes.has(node.id)) ids.add('refs')
     const m = moduleOf(modules, node.id)
     if (m) {
@@ -59,6 +65,7 @@ export function availableGraphPanelSections(
     return ids
   }
   if (kind === 'folder') {
+    if (sources.wikiFolderCards) ids.add('wiki')
     if (tree.has(node.id)) ids.add('contents')
     if (modules && hasDescendantFiles(modules, node.id)) ids.add('composition')
   }

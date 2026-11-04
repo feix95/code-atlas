@@ -214,8 +214,8 @@ function checkSections(): void {
   )
   assert.deepEqual(
     graphPanelSections('folder').map((s) => s.id),
-    ['contents', 'composition'],
-    '文件夹:内容清单 + 模块构成'
+    ['wiki', 'contents', 'composition'],
+    '文件夹:Wiki 说明 + 内容清单 + 模块构成'
   )
 
   assert.equal(parseHiddenSections(null).size, 0, '没记过 = 全显示')
@@ -246,7 +246,7 @@ function checkSectionOrder(): void {
     ['wiki', 'refs', 'dependsOn', 'usedBy', 'module', 'files', 'tests', 'styles'],
     '没记过 = 默认顺序'
   )
-  assert.deepEqual(defaults.folder, ['contents', 'composition'], '文件夹默认顺序')
+  assert.deepEqual(defaults.folder, ['wiki', 'contents', 'composition'], '文件夹默认顺序')
 
   const dirty = parseSectionOrders({
     file: ['files', 'refs', 'files', 'nope', 'contents'],
@@ -257,7 +257,7 @@ function checkSectionOrder(): void {
     ['files', 'refs', 'wiki', 'dependsOn', 'usedBy', 'module', 'tests', 'styles'],
     '认得的去重保留,异类与未知 id 丢掉,缺的按默认补在末尾'
   )
-  assert.deepEqual(dirty.folder, ['contents', 'composition'], '坏档回默认')
+  assert.deepEqual(dirty.folder, ['wiki', 'contents', 'composition'], '坏档回默认')
 
   assert.deepEqual(
     mergeVisibleOrder(
@@ -275,10 +275,10 @@ function checkSectionOrder(): void {
   })
   assert.deepEqual(
     ordered.map((s) => s.id),
-    ['composition', 'contents'],
-    '按记下的顺序出菜单'
+    ['wiki', 'composition', 'contents'],
+    '按记下的顺序出菜单,没记过的区块按既有口径排到最前'
   )
-  assert.equal(ordered[0]?.label, '模块构成', '顺序换了,标签跟着走')
+  assert.equal(ordered[1]?.label, '模块构成', '顺序换了,标签跟着走')
 
   const fileOrder = ['tests', ...defaults.file.filter((id) => id !== 'tests')]
   assert.equal(

@@ -7,6 +7,7 @@ export interface GraphWall {
   visible: boolean
   toggle: () => void
   close: () => void
+  open: () => void
 }
 
 export function useGraphWall(rootPath: string): GraphWall {
@@ -18,6 +19,7 @@ export function useGraphWall(rootPath: string): GraphWall {
     wall,
     visible,
     toggle: () => setOverride(!visible),
-    close: () => setOverride(false)
+    close: () => setOverride(false),
+    open: () => setOverride(true)
   }
 }

@@ -6,10 +6,12 @@ import {
   SEARCH_RESULTS_MAX,
   focusOfHits,
   normalizeSearchText,
+  searchWikiCards,
   searchWikiPages,
   type SearchFocus,
   type WikiSearchHit
 } from './wikiSearch'
+import type { WikiWallCard } from '@shared/wikiTypes'
 import type { WikiPanelData } from '../useWikiPanel'
 
 export interface GraphSearchState {
@@ -36,30 +38,36 @@ export interface GraphSearchState {
 
 export function useGraphSearch(
   wiki: WikiPanelData | null,
-  inputRef: RefObject<HTMLInputElement | null>
+  inputRef: RefObject<HTMLInputElement | null>,
+  cards?: readonly WikiWallCard[]
 ): GraphSearchState {
   const [query, setQueryState] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const term = normalizeSearchText(query)
+  const hasCards = cards !== undefined && cards.length > 0
 
   const hits = useMemo(() => {
-    if (term === '' || wiki === null) return []
+    if (term === '') return []
+    // 卡片墙数据在手时只认第二版页面;还没读到墙时才回退旧页搜索
+    if (hasCards) return searchWikiCards(term, cards).slice(0, SEARCH_RESULTS_MAX)
+    if (wiki === null) return []
     const entries = wiki.sources.map((source) => ({
       source,
       page: wiki.pages.get(source.pageId) ?? null
     }))
     return searchWikiPages(term, entries).slice(0, SEARCH_RESULTS_MAX)
-  }, [term, wiki])
+  }, [term, wiki, cards, hasCards])
 
   const activeIndex = hits.length === 0 ? 0 : Math.min(active, hits.length - 1)
   const focus = useMemo(() => (hits.length > 0 ? focusOfHits(hits) : null), [hits])
 
   const hasWiki = useMemo(() => {
+    if (hasCards) return cards.some((card) => card.status === 'done' || card.status === 'stale')
     if (wiki === null) return false
     for (const page of wiki.pages.values()) if (page.status !== 'none') return true
     return false
-  }, [wiki])
+  }, [wiki, cards, hasCards])
 
   const setQuery = useCallback((value: string) => {
     setQueryState(value)

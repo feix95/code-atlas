@@ -35,6 +35,7 @@ import { GraphNotices } from './GraphNotices'
 import { GraphWikiEntry } from './GraphWikiEntry'
 import { WikiWallLayer } from './WikiWallLayer'
 import { useGraphWall } from '../useGraphWall'
+import { useWallPanelActions } from '../graph/useWallPanelActions'
 import type { GraphViewProps } from './GraphView'
 
 const NO_EDGES: DepEdge[] = []
@@ -88,7 +89,8 @@ export function GraphCanvas(props: GraphViewProps & { result: ScanResult }): Rea
     () => moduleNamesOf(moduleMap?.modules ?? [], (id) => wiki?.pages.get(id)?.name ?? null),
     [moduleMap, wiki]
   )
-  const search = useGraphSearch(wiki, searchInputRef)
+  const search = useGraphSearch(wiki, searchInputRef, graphWall.wall.cards)
+  const wallActions = useWallPanelActions(result.rootPath, graphWall.wall.language, graphWall.open)
   // 引用关系(连线与模块)还没到时先不布局:等数据齐了一次排好,首帧即最终布局,不会到货后再重排一遍
   const isAwaitingGraph = current === null && graphNote === null
   const layout = useForceLayout(isAwaitingGraph ? null : level, render.requestDraw, clusters)
@@ -246,7 +248,16 @@ export function GraphCanvas(props: GraphViewProps & { result: ScanResult }): Rea
         onCollapseAll={expansion.collapseAll}
         onFit={viewport.fit}
         wiki={<GraphWikiEntry wallVisible={graphWall.visible} onToggleWall={graphWall.toggle} />}
-        search={<GraphSearch search={search} inputRef={searchInputRef} onLocate={locateHit} />}
+        search={
+          <GraphSearch
+            search={search}
+            inputRef={searchInputRef}
+            onLocate={(hit) => {
+              if (hit.card === true) wallActions.showCard(hit.pageId)
+              else locateHit(hit)
+            }}
+          />
+        }
       />
       <GraphNotices
         graphNote={graphNote}
@@ -272,6 +283,11 @@ export function GraphCanvas(props: GraphViewProps & { result: ScanResult }): Rea
           colorOf={(id) => moduleSwatchCss(overlay.colorOf.get(id), overrides.get(id))}
           moduleNames={moduleNames}
           wiki={wiki}
+          wallCards={graphWall.wall.cards}
+          onShowWallCard={wallActions.showCard}
+          onShowWall={graphWall.open}
+          onOpenWallDoc={wallActions.openDoc}
+          onGenerateCard={wallActions.generateCard}
           rootPath={result.rootPath}
           onSearchTag={search.searchTag}
           viewRef={viewRef}
@@ -283,7 +299,12 @@ export function GraphCanvas(props: GraphViewProps & { result: ScanResult }): Rea
       {picker.element}
       <p className="graph-foot">{footText(current, modulesOn)}</p>
       {graphWall.visible && (
-        <WikiWallLayer rootPath={result.rootPath} wall={graphWall.wall} onClose={graphWall.close} />
+        <WikiWallLayer
+          rootPath={result.rootPath}
+          wall={graphWall.wall}
+          onClose={graphWall.close}
+          focus={wallActions.focus}
+        />
       )}
     </div>
   )
