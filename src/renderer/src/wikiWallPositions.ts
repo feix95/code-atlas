@@ -21,7 +21,8 @@ export type WallBoardPrefs = Readonly<Record<string, WallPositions>>
 
 /** 坐标上限:防止坏存档把卡扔到几百万像素外,板面撑爆 */
 const COORD_MAX = 50_000
-const MAX_PROJECTS = 200
+/** 按项目 × 层存,一个项目会占好几格 */
+const MAX_PROJECTS = 2000
 const MAX_CARDS = 3000
 
 function cleanPos(raw: unknown): WallPos | null {
