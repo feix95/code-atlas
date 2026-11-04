@@ -1,4 +1,4 @@
-/* Wiki 线索桌·桌面:点阵纸底板、纸面颗粒、线绳层与区名胶带,外加平移缩放、拖卡与远景只留标题。
+/* Wiki 线索桌·桌面:点阵纸底板、纸面颗粒、线绳层与区名胶带,外加平移缩放与拖卡;远景(只留标题)的画法在 wiki-wall-far.css。
    颜色取 wiki-wall.css 里的 --board-* 变量。点阵的位置与间距由组件按视口实时写在行内样式上。 */
 
 .wiki-wall-scroll {
@@ -124,33 +124,6 @@
   transition: none;
   box-shadow: var(--board-shadow-lift);
   transform: rotate(0deg) translateY(-6px) scale(1.04);
-}
-
-/* 远景:缩到很小时只留标题,字号放大到缩放后依旧看得清 */
-.wiki-wall-scroll.is-far .wiki-wall-card-kind,
-.wiki-wall-scroll.is-far .wiki-wall-card-body,
-.wiki-wall-scroll.is-far .wiki-wall-card-foot,
-.wiki-wall-scroll.is-far .wiki-wall-stamp,
-.wiki-wall-scroll.is-far .wiki-wall-stale-tape {
-  display: none;
-}
-
-.wiki-wall-scroll.is-far .wiki-wall-card {
-  justify-content: center;
-  padding-bottom: 16px;
-}
-
-.wiki-wall-scroll.is-far .wiki-wall-card-title {
-  display: -webkit-box;
-  font-size: 26px;
-  line-height: 1.25;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.wiki-wall-scroll.is-far .wiki-wall-tape {
-  font-size: 26px;
 }
 
 /* 右下角的缩放按钮:浮在桌面上,不跟着板面缩 */

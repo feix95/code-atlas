@@ -51,11 +51,14 @@ export function useWallStickerBoard({
   rootPath,
   cards,
   view,
+  far,
   hostRef
 }: {
   rootPath: string
   cards: readonly WallPlacedCard[]
   view: WallView
+  /** 远景:图片不解码,画成色块 */
+  far: boolean
   hostRef: React.RefObject<HTMLDivElement | null>
 }): { layer: React.JSX.Element; tools: React.JSX.Element } {
   const state = useWallStickers(rootPath)
@@ -223,6 +226,7 @@ export function useWallStickerBoard({
           <WikiWallStickerView
             key={sticker.id}
             rootPath={rootPath}
+            far={far}
             sticker={sticker}
             rect={rect}
             hostTitle={host?.title ?? null}

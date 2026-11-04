@@ -32,6 +32,8 @@ function tiltOf(id: string): number {
 
 export interface WallStickerViewProps {
   rootPath: string
+  /** 远景:图片不挂 <img>(不解码),只画一块底色 */
+  far: boolean
   sticker: WallSticker
   rect: WallRect
   hostTitle: string | null
@@ -172,14 +174,16 @@ function NoteBody({ sticker, editing, onEdit, onChange }: WallStickerViewProps):
 }
 
 function PhotoBody(props: WallStickerViewProps): React.JSX.Element {
-  const { sticker, editing, onEdit, onChange, rootPath, rect } = props
+  const { sticker, editing, onEdit, onChange, rootPath, rect, far } = props
   const file = sticker.kind === 'photo' ? sticker.file : ''
   const url = useWallImage(rootPath, file)
   if (sticker.kind !== 'photo') return <></>
   const imgH = rect.h - 34
   return (
     <>
-      {url === null ? (
+      {far ? (
+        <div className="wiki-wall-photo-block" style={{ height: imgH }} />
+      ) : url === null ? (
         <div className="wiki-wall-photo-missing" style={{ height: imgH }}>
           图片读不出来
         </div>

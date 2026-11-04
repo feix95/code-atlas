@@ -109,7 +109,7 @@ function edgesOf(cards: WikiWallCard[], links: WikiWallLink[]): IslandEdge[] {
   return out
 }
 
-function sagPath(
+export function sagPath(
   x1: number,
   y1: number,
   x2: number,

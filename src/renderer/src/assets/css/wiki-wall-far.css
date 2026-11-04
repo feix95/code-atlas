@@ -1,0 +1,105 @@
+/* Wiki 线索桌·远景(缩到只留标题,阈值见 wikiWallViewport.ts 的 WALL_FAR_ZOOM):
+   卡与便签画成平块——不歪、不带影子、不叠半透明与滤镜、不做过渡,图片不挂 <img>;
+   线绳改画岛与岛之间的聚合线(WikiWallLines)。位置不动,切换远近不跳。
+   目的是少合成层、少画东西:缩远时一屏几百张卡,每张的影子与旋转都要单独栅格化。 */
+
+/* 远景:缩到很小时只留标题,字号放大到缩放后依旧看得清 */
+.wiki-wall-scroll.is-far .wiki-wall-card-kind,
+.wiki-wall-scroll.is-far .wiki-wall-card-body,
+.wiki-wall-scroll.is-far .wiki-wall-card-foot,
+.wiki-wall-scroll.is-far .wiki-wall-stamp,
+.wiki-wall-scroll.is-far .wiki-wall-stale-tape {
+  display: none;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card {
+  justify-content: center;
+  padding-bottom: 16px;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card-title {
+  display: -webkit-box;
+  font-size: 26px;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-tape {
+  font-size: 26px;
+}
+
+/* 平块:去掉旋转、影子、过渡与悬停抬起;拖动中同样不抬 */
+.wiki-wall-scroll.is-far .wiki-wall-card,
+.wiki-wall-scroll.is-far .wiki-wall-card:hover,
+.wiki-wall-scroll.is-far .wiki-wall-card:focus-visible,
+.wiki-wall-scroll.is-far .wiki-wall-card.is-selected,
+.wiki-wall-scroll.is-far .wiki-wall-card.is-dragging {
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+
+/* 半透明与花纹底换成等效的实色,免得每张卡单独混色 */
+.wiki-wall-scroll.is-far .wiki-wall-card.is-leaf.is-planned {
+  background: color-mix(in srgb, var(--board-paper) 55%, var(--board-bg));
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card.is-overview {
+  background: var(--board-paper);
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card.is-root {
+  background: var(--board-folder);
+}
+
+/* 焦点淡出不用透明度,改字色变淡 */
+.wiki-wall-scroll.is-far .wiki-wall-card.is-dim {
+  opacity: 1;
+  color: var(--board-ink-3);
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-pin,
+.wiki-wall-scroll.is-far .wiki-wall-card.is-root::before {
+  display: none;
+}
+
+/* 纸面颗粒用了混色模式,整块板面都要多算一遍;远景看不出颗粒,直接不画 */
+.wiki-wall-scroll.is-far .wiki-wall-board::before {
+  display: none;
+}
+
+/* 便签与图片:同样画成平块,文字留位置不画,图片只剩一块底色 */
+.wiki-wall-scroll.is-far .wiki-wall-sticker,
+.wiki-wall-scroll.is-far .wiki-wall-sticker.is-selected,
+.wiki-wall-scroll.is-far .wiki-wall-sticker.is-dragging {
+  box-shadow: none;
+  transform: none;
+  transition: none;
+  background-image: none;
+  border-radius: 2px;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-sticker::before,
+.wiki-wall-scroll.is-far .wiki-wall-sticker::after,
+.wiki-wall-scroll.is-far .wiki-wall-sticker-bar {
+  display: none;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-sticker > :not(.wiki-wall-photo-block) {
+  visibility: hidden;
+}
+
+.wiki-wall-photo-block {
+  width: 100%;
+  background: color-mix(in srgb, var(--sticker-ink) 22%, var(--sticker-photo));
+}
+
+/* 岛间聚合线:同一种红,粗细由组件按引用条数写在行内(已换算成屏幕像素) */
+.wiki-wall-island-line {
+  fill: none;
+  stroke: var(--board-string);
+  stroke-linecap: round;
+  opacity: 0.55;
+}

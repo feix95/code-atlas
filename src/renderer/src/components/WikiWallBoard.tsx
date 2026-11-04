@@ -10,6 +10,7 @@ import { useWallViewport, type WallBounds } from '../useWallViewport'
 import { useWallCardDrag } from '../useWallCardDrag'
 import { useWallStickerBoard } from '../useWallStickerBoard'
 import { WikiWallCardView } from './WikiWallCardView'
+import { WikiWallLines } from './WikiWallLines'
 
 const ZOOM_STEP = 1.25
 
@@ -49,6 +50,8 @@ export function WikiWallBoard({
   }, [base, positions])
   const viewport = useWallViewport(scrollRef, bounds, ready && cards.length > 0)
   const { view } = viewport
+  // 远景(缩到只留标题):线按岛聚合、卡与便签画成平块,少合成层、少画东西
+  const far = view.z < WALL_FAR_ZOOM
   // 点阵间距跟着缩放走,缩得很小时隔一个点取一个,免得满屏密点发花
   const dot = 24 * view.z * (view.z < 0.5 ? 2 : 1)
 
@@ -69,7 +72,13 @@ export function WikiWallBoard({
     return applyWallPositions(base, merged, links)
   }, [base, positions, links, drag])
   // 用户便签与图片:画在桌面里,贴在卡上的跟着卡走;整理桌面不动它们
-  const stickers = useWallStickerBoard({ rootPath, cards: layout.cards, view, hostRef: scrollRef })
+  const stickers = useWallStickerBoard({
+    rootPath,
+    cards: layout.cards,
+    view,
+    far,
+    hostRef: scrollRef
+  })
 
   const [hoverId, setHoverId] = useState<string | null>(null)
   const focusId = drag.draft?.id ?? hoverId ?? selectedId
@@ -83,7 +92,7 @@ export function WikiWallBoard({
   return (
     <div
       ref={scrollRef}
-      className={`wiki-wall-scroll${view.z < WALL_FAR_ZOOM ? ' is-far' : ''}`}
+      className={`wiki-wall-scroll${far ? ' is-far' : ''}`}
       style={{
         backgroundPosition: `${view.x}px ${view.y}px, 0 0`,
         backgroundSize: `${dot}px ${dot}px, auto`
@@ -98,24 +107,7 @@ export function WikiWallBoard({
           transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`
         }}
       >
-        <svg
-          className="wiki-wall-lines"
-          width={layout.width}
-          height={layout.height}
-          aria-hidden="true"
-        >
-          {layout.links.map((placed, index) => {
-            const hot =
-              focusId !== null && (placed.link.from === focusId || placed.link.to === focusId)
-            return (
-              <path
-                key={index}
-                d={placed.d}
-                className={`wiki-wall-line is-${placed.link.kind} is-${placed.tier}${hot ? ' is-hot' : ''}`}
-              />
-            )
-          })}
-        </svg>
+        <WikiWallLines layout={layout} links={links} far={far} zoom={view.z} focusId={focusId} />
         {layout.regions.map((region) => (
           <span
             key={region.title || 'no-topic'}
