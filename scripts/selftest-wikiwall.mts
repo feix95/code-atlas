@@ -1,6 +1,11 @@
 // 自测:卡片墙装配。从属线、引用聚合权重、记账名称与状态合并、主题链。
 import assert from 'node:assert/strict'
 import { buildWikiWall } from '../src/wiki/wikiWall.ts'
+import {
+  parentChildInputs,
+  parentChildrenOf,
+  parentFingerprint
+} from '../src/wiki/wikiParentTree.ts'
 import type { WikiPlan } from '../src/wiki/wikiPlanTypes.ts'
 import type { WikiLanguageStateV2 } from '../src/wiki/wikiStoreV2.ts'
 
@@ -103,6 +108,37 @@ const wall = buildWikiWall(
   ],
   language
 )
+
+// 父页过期看下属指纹:指纹对得上是已生成,下属摘要一变立刻标过期
+const childrenOf = parentChildrenOf(plan)
+const fingerprintNow = parentFingerprint(parentChildInputs(plan, language, childrenOf.get('ov-1')!))
+language.pages['ov-1'] = {
+  pageId: 'ov-1',
+  kind: 'overview',
+  file: 'src/ov.md',
+  name: 'src 总览',
+  nameSource: 'program',
+  status: 'done',
+  model: 'm',
+  generatedAt: '2026-01-01',
+  members: [],
+  budgetNotes: [],
+  inputHash: fingerprintNow
+}
+const wallFresh = buildWikiWall(plan, [], language)
+assert.equal(
+  wallFresh.cards.find((card) => card.pageId === 'ov-1')!.status,
+  'done',
+  '指纹一致时父页为已生成'
+)
+language.pages['leaf-a']!.summary = '改过的摘要'
+const wallStale = buildWikiWall(plan, [], language)
+assert.equal(
+  wallStale.cards.find((card) => card.pageId === 'ov-1')!.status,
+  'stale',
+  '下属摘要变化后父页应标过期'
+)
+language.pages['leaf-a']!.summary = '甲页摘要'
 
 const cardA = wall.cards.find((card) => card.pageId === 'leaf-a')!
 assert.equal(cardA.title, '甲页', '记账 AI 名称优先')

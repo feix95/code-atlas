@@ -4,6 +4,7 @@ import type { DepEdge } from '../shared/types.ts'
 import type { WikiWallCard, WikiWallLink } from '../shared/wikiTypes.ts'
 import type { WikiPlan, WikiPlanTopic } from './wikiPlanTypes.ts'
 import type { WikiLanguageStateV2 } from './wikiStoreV2.ts'
+import { parentChildInputs, parentChildrenOf, parentFingerprint } from './wikiParentTree.ts'
 
 function topicPaths(plan: WikiPlan): Map<string, string[]> {
   const paths = new Map<string, string[]>()
@@ -72,14 +73,20 @@ export function buildWikiWall(
   language: WikiLanguageStateV2 | undefined
 ): { cards: WikiWallCard[]; links: WikiWallLink[] } {
   const paths = topicPaths(plan)
+  const childrenOf = parentChildrenOf(plan)
   const cards: WikiWallCard[] = plan.pages.map((page) => {
     const record = language?.pages[page.id]
-    const status =
+    let status: WikiWallCard['status'] =
       record === undefined
         ? 'planned'
         : record.status === 'done' || record.status === 'stale' || record.status === 'failed'
           ? record.status
           : 'planned'
+    // 父页的过期看下属指纹:下属摘要变了,父页就算还没重跑也先标过期
+    if (status === 'done' && page.kind !== 'leaf' && record !== undefined) {
+      const children = parentChildInputs(plan, language, childrenOf.get(page.id) ?? [])
+      if (record.inputHash !== parentFingerprint(children)) status = 'stale'
+    }
     return {
       pageId: page.id,
       kind: page.kind,

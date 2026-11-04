@@ -50,6 +50,8 @@ export interface WikiPageRecordV2 {
   tags?: string[]
   keyFiles?: string[]
   excerpt?: string
+  /** 父页的内容指纹:由下属页面的名称与摘要算出,变了即视为过期 */
+  inputHash?: string
 }
 
 export interface WikiLanguageStateV2 {
@@ -199,10 +201,12 @@ function sanitizePageV2(raw: unknown, pageId: string): WikiPageRecordV2 | null {
   const tags = cleanStringList(raw.tags, 5, 24)
   const keyFiles = cleanStringList(raw.keyFiles, 5, 1024)
   const excerpt = cleanString(raw.excerpt, 400)
+  const inputHash = cleanString(raw.inputHash, 64)
   if (summary !== null) record.summary = summary
   if (tags !== null) record.tags = tags
   if (keyFiles !== null) record.keyFiles = keyFiles
   if (excerpt !== null) record.excerpt = excerpt
+  if (inputHash !== null) record.inputHash = inputHash
   return record
 }
 

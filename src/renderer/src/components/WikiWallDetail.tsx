@@ -78,7 +78,7 @@ export function WikiWallDetail({
             </button>
           </>
         )}
-        {card.kind === 'leaf' && !running && (
+        {!running && (
           <button
             type="button"
             className="wiki-wall-btn"
@@ -89,9 +89,11 @@ export function WikiWallDetail({
           </button>
         )}
       </div>
-      {card.kind === 'leaf' && (
-        <p className="wiki-wall-detail-note">只生成这一页;生成全部时,内容没变过的页会自动跳过</p>
-      )}
+      <p className="wiki-wall-detail-note">
+        {card.kind === 'leaf'
+          ? '只生成这一页;生成全部时,内容没变过的页会自动跳过'
+          : '只生成这一页,内容汇总自下属页面的现有说明;下属说明变了它会自动标过期'}
+      </p>
     </aside>
   )
 }

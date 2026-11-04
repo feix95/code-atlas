@@ -9,6 +9,9 @@ import { buildWikiPlan } from './wikiPlan.ts'
 import type { WikiPlanInput, WikiPlanPage } from './wikiPlanTypes.ts'
 import type { WikiCompleter } from './wikiReadTypes.ts'
 import { runWikiPage } from './wikiPageRun.ts'
+import { runParentPages } from './wikiParentGen.ts'
+import { registerPlanPages } from './wikiJobRegister.ts'
+import { parentOrderOf, topicTitleOf } from './wikiParentTree.ts'
 import { allocatePlanFiles, writeWikiPlanFile } from './wikiPlanStore.ts'
 import { languageDirLabel, pageFileExists, removePageFile, writeFileAtomic } from './wikiStore.ts'
 import {
@@ -62,7 +65,7 @@ export interface WikiJobV2Options {
   planInput: WikiPlanInput
   force?: boolean
   signal?: AbortSignal
-  /** 只生成这些叶子页(卡片墙单页生成);不传为全部叶子页 */
+  /** 只生成这些页(卡片墙单页生成,叶子与父页都可);不传为全部页 */
   onlyPageIds?: ReadonlySet<string>
 }
 
@@ -90,19 +93,6 @@ function sameMembers(
   if (snapshot.length !== current.length) return false
   const byPath = new Map(current.map((m) => [m.path, m.contentHash]))
   return snapshot.every((member) => byPath.get(member.path) === member.contentHash)
-}
-
-function topicTitleOf(plan: ReturnType<typeof buildWikiPlan>, page: WikiPlanPage): string | null {
-  if (page.topicId === null) return null
-  const walk = (topics: typeof plan.topics): string | null => {
-    for (const topic of topics) {
-      if (topic.id === page.topicId) return topic.title
-      const found = walk(topic.children)
-      if (found !== null) return found
-    }
-    return null
-  }
-  return walk(plan.topics)
 }
 
 export async function runWikiJobV2(
@@ -149,30 +139,7 @@ export async function runWikiJobV2(
   languageState.label = label
   state.languages[options.language] = languageState
 
-  // 规划登记:每页先有 planned 记录,部分完成时目录与进度都能如实表达;
-  // 旧分配路径先记下来,页面重新生成时写新删旧
-  const previousFiles = new Map<string, string>()
-  for (const page of plan.pages) {
-    const existing = languageState.pages[page.id]
-    const file = files.get(page.id)!
-    if (existing) {
-      previousFiles.set(page.id, existing.file)
-      existing.file = file
-      continue
-    }
-    languageState.pages[page.id] = {
-      pageId: page.id,
-      kind: page.kind,
-      file,
-      name: page.title,
-      nameSource: 'program',
-      status: 'planned',
-      model: '',
-      generatedAt: '',
-      members: page.members.map((m) => ({ path: m.path, role: m.role, contentHash: null })),
-      budgetNotes: []
-    }
-  }
+  const previousFiles = registerPlanPages(plan, files, languageState)
   await writeWikiPlanFile(options.projectDir, plan)
   await writeWikiStateV2(options.projectDir, state)
 
@@ -182,7 +149,13 @@ export async function runWikiJobV2(
   const leafPages = plan.pages.filter((p) => p.kind === 'leaf')
   const only = options.onlyPageIds
   const targets = only ? leafPages.filter((p) => only.has(p.id)) : leafPages
-  const total = targets.length
+  // 父页在叶子之后按层生成:越深的总览越先,根主题页最后
+  const orderOf = parentOrderOf(plan)
+  const parentPages = plan.pages
+    .filter((p) => p.kind !== 'leaf')
+    .sort((a, b) => (orderOf.get(b.id) ?? 0) - (orderOf.get(a.id) ?? 0))
+  const parentTargets = only ? parentPages.filter((p) => only.has(p.id)) : parentPages
+  const total = targets.length + parentTargets.length
   const emit = (page: WikiPageProgressV2): void => {
     if (page.status !== 'running') processed += 1
     deps.emit?.({
@@ -222,7 +195,7 @@ export async function runWikiJobV2(
         const result = await runWikiPage(
           {
             page,
-            topicTitle: topicTitleOf(plan, page),
+            topicTitle: topicTitleOf(plan, page.topicId),
             plan,
             edges: options.planInput.edges,
             contextSize: options.contextSize
@@ -301,6 +274,26 @@ export async function runWikiJobV2(
   } catch (err) {
     return summary('failed', errorText(err))
   }
+
+  // 叶子跑完接着汇总父页:输入用刚落盘的下属记录,指纹对不上才重写
+  const parentOutcome = await runParentPages(
+    { plan, pages: parentTargets, languageState, files, previousFiles },
+    {
+      projectDir: options.projectDir,
+      language: options.language,
+      model: options.model,
+      ...(options.force ? { force: true } : {}),
+      complete: deps.complete,
+      now: () => deps.now?.() ?? new Date().toISOString(),
+      isActive: active,
+      emit: (page) => emit(page),
+      persist: () => writeWikiStateV2(options.projectDir, state)
+    }
+  )
+  done += parentOutcome.done
+  skipped += parentOutcome.skipped
+  failed += parentOutcome.failed
+  if (parentOutcome.cancelled) return summary('cancelled')
 
   // 全量完成才清退 legacy:部分完成时旧页继续可读,不提前删
   const allDone = leafPages.every((p) => languageState.pages[p.id]?.status === 'done')

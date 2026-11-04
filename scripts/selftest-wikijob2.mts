@@ -143,10 +143,12 @@ try {
   await fs.mkdir(join(languageDir(projectDir, LANG), '模块'), { recursive: true })
   await fs.writeFile(legacyFile, '# 旧页')
 
-  // 第一轮:两页叶子全部生成
+  // 第一轮:叶子生成后接着汇总父页(本夹具为 src 主题总览一页)
+  const plan1 = buildWikiPlan(planInput)
+  const parentCount1 = plan1.pages.filter((p) => p.kind !== 'leaf').length
   const run1 = await runWikiJobV2(options, deps)
   assert.equal(run1.status, 'done')
-  assert.equal(run1.done, 1, '第一轮应生成一页叶子(两文件按规划同页)')
+  assert.equal(run1.done, 1 + parentCount1, '第一轮应生成一页叶子(两文件按规划同页)与全部父页')
   assert.equal(run1.failed, 0)
 
   const stateRaw = JSON.parse(
@@ -163,7 +165,7 @@ try {
   assert.ok(stateRaw.planRef !== null, '规划应已登记')
   const lang = stateRaw.languages[LANG]!
   const leafRecords = Object.values(lang.pages).filter((p) => p.status === 'done')
-  assert.equal(leafRecords.length, 1, '叶子页记账应为 done')
+  assert.equal(leafRecords.length, 1 + parentCount1, '叶子与父页记账应为 done')
   assert.equal(Object.keys(lang.legacy).length, 0, '全量完成后 legacy 应清退')
   assert.equal(
     await fs.access(legacyFile).then(
@@ -181,11 +183,11 @@ try {
     assert.ok(markdown.includes('#'), '生成页应有标题')
   }
   const index = await fs.readFile(join(languageDir(projectDir, LANG), 'README.md'), 'utf8')
-  assert.ok(index.includes('待生成'), '目录页应把未生成的总览或根页标为待生成')
+  assert.ok(!index.includes('待生成'), '全量生成后目录页不应再有待生成页')
 
   // 第二轮:成员未变,两页都应跳过
   const run2 = await runWikiJobV2(options, deps)
-  assert.equal(run2.skipped, 1, '第二轮成员未变应全部跳过')
+  assert.equal(run2.skipped, 1 + parentCount1, '第二轮成员未变应全部跳过')
   assert.equal(run2.done, 0)
 
   // 单页生成:only 名单外的页一律不碰,名单内的页强制重写
@@ -201,6 +203,94 @@ try {
     deps
   )
   assert.equal(runOnlyHit.done, 1, 'only 命中时应只生成选中的那一页')
+
+  // 场景二:父页汇总。两块顶层目录各成一叶,根主题带一张总览页
+  const projectDir2 = join(root, 'wiki-proj2')
+  await fs.mkdir(projectDir2, { recursive: true })
+  const contents2 = new Map<string, string>([
+    ['alpha/alpha.ts', contents.get('src/alpha/alpha.ts')!],
+    ['beta/beta.ts', contents.get('src/beta/beta.ts')!]
+  ])
+  const deps2 = {
+    ...deps,
+    factOf: (path: string) => {
+      const content = contents2.get(path)
+      if (content === undefined) return null
+      const ranges = rangesOf(path)
+      return {
+        sha256: createHash('sha256').update(content, 'utf8').digest('hex'),
+        structure: {
+          languageId: 'typescript',
+          imports: [],
+          exports: ranges.map((r) => r.name),
+          functions: ranges.map((r) => r.name),
+          classes: [],
+          interfaces: [],
+          reactComponents: [],
+          symbolRanges: ranges
+        }
+      }
+    },
+    readFile: async (path: string) => contents2.get(path) ?? null,
+    complete: (async (system: string, user: string, maxTokens: number) => {
+      if (system.includes('总览作者')) {
+        return '这一页汇总下属页面的职责与分工,方便读者先看整体再看细节。'
+      }
+      return deps.complete(system, user, maxTokens)
+    }) as WikiCompleter
+  }
+  const planInput2: WikiPlanInput = {
+    projectName: 'demo',
+    files: [planFile('alpha/alpha.ts', 'alphaRun'), planFile('beta/beta.ts', 'betaRun')],
+    edges: [],
+    rootDocs: [],
+    manifestPath: null,
+    manifestScripts: []
+  }
+  const options2 = { ...options, projectDir: projectDir2, planInput: planInput2 }
+  const plan2 = buildWikiPlan(planInput2)
+  const leafCount2 = plan2.pages.filter((p) => p.kind === 'leaf').length
+  const overview2 = plan2.pages.find((p) => p.kind === 'overview')
+  assert.ok(overview2, '两块顶层主题应规划出总览页')
+  const parentCount2 = plan2.pages.filter((p) => p.kind !== 'leaf').length
+
+  const runB1 = await runWikiJobV2(options2, deps2)
+  assert.equal(runB1.failed, 0)
+  assert.equal(runB1.done, leafCount2 + parentCount2, '叶子与父页应一轮全生成')
+  const state2 = JSON.parse(
+    await fs.readFile(join(projectDir2, '.codeatlas', 'state.json'), 'utf8')
+  ) as {
+    languages: Record<
+      string,
+      { pages: Record<string, { status: string; file: string; inputHash?: string }> }
+    >
+  }
+  const overviewRecord = state2.languages[LANG]!.pages[overview2.id]!
+  assert.equal(overviewRecord.status, 'done', '总览页记账应为 done')
+  assert.ok(overviewRecord.inputHash, '总览页应留下内容指纹')
+  const overviewMarkdown = await fs.readFile(
+    join(languageDir(projectDir2, LANG), overviewRecord.file),
+    'utf8'
+  )
+  assert.ok(overviewMarkdown.includes('## 下属页面'), '总览页应有下属页面表')
+  assert.ok(overviewMarkdown.includes('汇总下属页面'), '总览页应有模型写的总览段')
+
+  const runB2 = await runWikiJobV2(options2, deps2)
+  assert.equal(runB2.skipped, leafCount2 + parentCount2, '第二轮叶子与父页都应跳过')
+  assert.equal(runB2.done, 0)
+
+  // 指纹对不上时只有父页重写,叶子仍跳过
+  const tampered = JSON.parse(
+    await fs.readFile(join(projectDir2, '.codeatlas', 'state.json'), 'utf8')
+  ) as typeof state2
+  tampered.languages[LANG]!.pages[overview2.id]!.inputHash = 'tampered'
+  await fs.writeFile(
+    join(projectDir2, '.codeatlas', 'state.json'),
+    JSON.stringify(tampered, null, 2)
+  )
+  const runB3 = await runWikiJobV2(options2, deps2)
+  assert.equal(runB3.done, 1, '指纹变化时应只重写父页')
+  assert.equal(runB3.skipped, leafCount2 + parentCount2 - 1, '指纹变化时其余叶子与父页应继续跳过')
 
   console.log('✅ Wiki 第二版生成任务自测全部通过')
 } finally {

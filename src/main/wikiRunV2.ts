@@ -103,9 +103,10 @@ export function registerWikiRunV2Ipc(): void {
     )
     const plan = buildWikiPlan(planInput)
     const onlySet = req.pageIds ? new Set(req.pageIds) : null
-    const total = plan.pages.filter(
-      (page) => page.kind === 'leaf' && (onlySet === null || onlySet.has(page.id))
-    ).length
+    const total =
+      onlySet === null
+        ? plan.pages.length
+        : plan.pages.filter((page) => onlySet.has(page.id)).length
     if (total === 0) return { ok: false, error: '这个项目里还没有可生成的内容' }
     if (activeJob !== null || isWikiJobActive()) {
       return { ok: false, error: '已有生成任务在进行,先等它完成或取消后再开始' }
