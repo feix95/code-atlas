@@ -25,8 +25,8 @@ import { useWorkspaceSearch } from './useWorkspaceSearch'
 import { useZoomKeys } from './useZoomKeys'
 
 function App(): React.JSX.Element {
-  const revived = useRendererRevival()
   const { toast, showToast } = useToast()
+  useRendererRevival(showToast)
   // 窗口层面的临时提示(渲染层无响应这类)统一走 toast
   useEffect(() => window.atlas.onWindowNotice(showToast), [showToast])
   // 扫描票据:开图/探目录/算图谱共用一套代际账,换项目一律作废上一代
@@ -223,7 +223,6 @@ function App(): React.JSX.Element {
 
   return (
     <AppLayout
-      revived={revived}
       sidebarCollapsed={sidebarCollapsed}
       sidebarWidth={sidebarWidth}
       uiScale={uiScale}

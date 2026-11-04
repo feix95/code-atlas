@@ -2,6 +2,10 @@
    Toast 与 .tip-bubble 同款黑底白字,落 .app 内(透明窗合成器裁根层 fixed 件);
    区域本身不吃鼠标。入场只淡入上浮,reduced-motion 下直接出现 */
 
+/* 落点:整窗(.app)的竖中线上、贴近窗底。离底一档 --space-7(2rem):
+   图谱底部那行说明字(.graph-foot,离底 --space-2、小号字)约占到离底 1.6rem,
+   提示框底边压在它上方一点,不挡字;别的页签底部没有常驻文字,同样留这点空。
+   画面复活提示、渲染层无响应提示与各处轻提示都走这一个出口 */
 .toast-region {
   position: absolute;
   left: 50%;

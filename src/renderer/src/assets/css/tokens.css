@@ -103,7 +103,6 @@
   --z-popover: 30;
   --z-dropdown: 40;
   --z-dialog: 50;
-  --z-revive: 90;
   --z-menu: 95;
   --z-tip: 100;
   /* 阴影/焦点环配方:focus-ring 只管几何(粗细),色环颜色由各家 color-mix 自己调  */

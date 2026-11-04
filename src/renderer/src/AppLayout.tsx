@@ -1,7 +1,6 @@
 // 应用外壳:顶栏 + rail + 侧栏 + 正文 + 全局浮层 + 独立子窗。只摆画,不碰业务。
 import type { ComponentProps, ReactNode } from 'react'
 import { ROOT_FONT_BASE_PX } from '@shared/uiScale'
-import type { RendererRevivedKind } from '@shared/types'
 import { AiSetupContext } from './aiSetupContext'
 import { AppTopBar } from './components/AppTopBar'
 import { AuxWindows } from './components/AuxWindows'
@@ -45,7 +44,6 @@ export interface TabControlProps {
 }
 
 export function AppLayout(props: {
-  revived: RendererRevivedKind | null
   sidebarCollapsed: boolean
   sidebarWidth: number
   uiScale: number
@@ -71,7 +69,6 @@ export function AppLayout(props: {
   closeAuxWindow: ComponentProps<typeof AuxWindows>['onRequestClose']
 }) {
   const {
-    revived,
     sidebarCollapsed,
     sidebarWidth,
     uiScale,
@@ -151,11 +148,6 @@ export function AppLayout(props: {
           } as React.CSSProperties
         }
       >
-        {revived && (
-          <div className="revive-note" role="status">
-            {revived === 'page' ? '画面已恢复，页面内容仍在' : '画面已恢复，聊天记录未保留'}
-          </div>
-        )}
         <AppTopBar
           {...topBar}
           tabs={
