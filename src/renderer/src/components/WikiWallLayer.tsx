@@ -1,11 +1,13 @@
 // 卡片墙图层(线索桌):图谱画布内由文件夹结构变形而来的语义视图,不开新页签。
-// 顶部条管生成与进度(下拉展开);板面是点阵纸桌面,卡片按主题成团、带小角度钉着,
-// 线绳从图钉垂到图钉、画在卡片下面;悬停或选中一张卡只点亮它的线,点卡在右侧出详情面板。
-import { useEffect, useMemo, useRef, useState } from 'react'
+// 这里管顶部条(生成、进度下拉、整理桌面、桌面与列表切换)和右侧详情面板;
+// 桌面本身(摆卡、线绳、拖动、平移缩放)在 WikiWallBoard,列表视图在 WikiWallList。
+import { useEffect, useRef, useState } from 'react'
 import type { WikiEvent } from '@shared/wikiTypes'
-import { layoutWikiWall, wallNeighbors } from '../wikiWallLayout'
 import { WikiWallDetail } from './WikiWallDetail'
-import { WikiWallCardView } from './WikiWallCardView'
+import { WikiWallBoard } from './WikiWallBoard'
+import { WikiWallList } from './WikiWallList'
+import { setWallPositions, useWallPositions } from '../wikiWallBoardStore'
+import type { WallPositions } from '../wikiWallPositions'
 import type { WikiWallData } from '../useWikiWall'
 import { friendlyErr } from '../errText'
 
@@ -32,14 +34,11 @@ export function WikiWallLayer({
   wall: WikiWallData
   onClose: () => void
 }): React.JSX.Element {
-  const layout = useMemo(() => layoutWikiWall(wall.cards, wall.links), [wall.cards, wall.links])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [hoverId, setHoverId] = useState<string | null>(null)
-  const focusId = hoverId ?? selectedId
-  const near = useMemo(
-    () => (focusId === null ? null : wallNeighbors(wall.links, focusId)),
-    [wall.links, focusId]
-  )
+  const [mode, setMode] = useState<'board' | 'list'>('board')
+  const positions = useWallPositions(rootPath)
+  const [undo, setUndo] = useState<WallPositions | null>(null)
+  const arranged = Object.keys(positions).length > 0
   const selected = wall.cards.find((card) => card.pageId === selectedId) ?? null
   const [running, setRunning] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
@@ -165,6 +164,39 @@ export function WikiWallLayer({
         >
           进度{running ? ` ${processed}/${total}` : ''}
         </button>
+        {undo !== null && !arranged ? (
+          <button
+            type="button"
+            className="wiki-wall-btn"
+            onClick={() => {
+              setWallPositions(rootPath, undo)
+              setUndo(null)
+            }}
+          >
+            撤销整理
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="wiki-wall-btn"
+            disabled={!arranged || mode !== 'board'}
+            title="把手动拖过的卡放回自动摆放的位置"
+            onClick={() => {
+              setUndo(positions)
+              setWallPositions(rootPath, {})
+            }}
+          >
+            整理桌面
+          </button>
+        )}
+        <button
+          type="button"
+          className="wiki-wall-btn"
+          aria-pressed={mode === 'list'}
+          onClick={() => setMode((value) => (value === 'board' ? 'list' : 'board'))}
+        >
+          {mode === 'board' ? '列表' : '桌面'}
+        </button>
         <button type="button" className="wiki-wall-btn" onClick={onClose}>
           变回结构图
         </button>
@@ -195,58 +227,21 @@ export function WikiWallLayer({
       {wall.damaged && (
         <p className="wiki-wall-error">这个项目的 Wiki 记账已损坏,先在设置里清理后重新生成</p>
       )}
-      <div className="wiki-wall-scroll">
-        <div
-          className={`wiki-wall-board${near !== null ? ' has-focus' : ''}`}
-          style={{ width: layout.width, height: layout.height }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setSelectedId(null)
+      {mode === 'board' ? (
+        <WikiWallBoard
+          rootPath={rootPath}
+          cards={wall.cards}
+          links={wall.links}
+          ready={!wall.loading}
+          selectedId={selectedId}
+          onSelect={(pageId) => {
+            setSelectedId(pageId)
+            setUndo(null)
           }}
-        >
-          <svg
-            className="wiki-wall-lines"
-            width={layout.width}
-            height={layout.height}
-            aria-hidden="true"
-          >
-            {layout.links.map((placed, index) => {
-              const hot =
-                focusId !== null && (placed.link.from === focusId || placed.link.to === focusId)
-              return (
-                <path
-                  key={index}
-                  d={placed.d}
-                  className={`wiki-wall-line is-${placed.link.kind} is-${placed.tier}${
-                    hot ? ' is-hot' : ''
-                  }`}
-                />
-              )
-            })}
-          </svg>
-          {layout.regions.map((region) => (
-            <span
-              key={region.title || 'no-topic'}
-              className="wiki-wall-tape"
-              style={{ left: region.x - 6, top: region.y, transform: `rotate(${region.tilt}deg)` }}
-            >
-              {region.title || '未归类'}
-              <small>{region.count} 张</small>
-            </span>
-          ))}
-          {layout.cards.map((placed) => (
-            <WikiWallCardView
-              key={placed.card.pageId}
-              placed={placed}
-              selected={selectedId === placed.card.pageId}
-              dim={near !== null && !near.has(placed.card.pageId)}
-              onSelect={setSelectedId}
-              onHover={(pageId, on) =>
-                setHoverId((id) => (on ? pageId : id === pageId ? null : id))
-              }
-            />
-          ))}
-        </div>
-      </div>
+        />
+      ) : (
+        <WikiWallList cards={wall.cards} selectedId={selectedId} onSelect={setSelectedId} />
+      )}
       {selected && (
         <WikiWallDetail
           card={selected}

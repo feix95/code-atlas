@@ -1,0 +1,111 @@
+/* Wiki 线索桌·列表视图:按团分组,一行一张卡;纸色沿用 --board-* 变量,和桌面是同一张纸。 */
+
+.wiki-wall-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5);
+  background: var(--board-bg);
+  color: var(--board-ink);
+}
+
+.wiki-wall-list-group + .wiki-wall-list-group {
+  margin-top: var(--space-4);
+}
+
+.wiki-wall-list-group h3 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-md);
+  font-weight: var(--font-w-bold);
+}
+
+.wiki-wall-list-group h3 small {
+  color: var(--board-ink-3);
+  font-size: var(--font-sm);
+  font-weight: normal;
+}
+
+.wiki-wall-list-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-md);
+  background: var(--board-paper);
+  overflow: hidden;
+}
+
+.wiki-wall-list-group li + li {
+  border-top: 1px solid var(--board-paper-edge);
+}
+
+.wiki-wall-list-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(0, 3fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wiki-wall-list-row:hover,
+.wiki-wall-list-row:focus-visible {
+  background: color-mix(in srgb, var(--board-ink) 5%, transparent);
+}
+
+.wiki-wall-list-row.is-selected {
+  background: color-mix(in srgb, var(--board-string) 12%, transparent);
+}
+
+.wiki-wall-list-title {
+  overflow: hidden;
+  font-weight: var(--font-w-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-wall-list-body {
+  overflow: hidden;
+  color: var(--board-ink-2);
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-wall-list-meta {
+  color: var(--board-ink-3);
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.wiki-wall-list-status {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sm);
+  white-space: nowrap;
+  color: var(--board-ink-2);
+  background: color-mix(in srgb, var(--board-ink) 8%, transparent);
+}
+
+.wiki-wall-list-status.is-done {
+  color: var(--board-stamp-ok);
+  background: color-mix(in srgb, var(--board-stamp-ok) 14%, transparent);
+}
+
+.wiki-wall-list-status.is-failed {
+  color: var(--board-stamp-bad);
+  background: color-mix(in srgb, var(--board-stamp-bad) 14%, transparent);
+}
+
+.wiki-wall-list-status.is-stale {
+  color: var(--board-stale-ink);
+  background: var(--board-stale-tape);
+}

@@ -1,21 +1,28 @@
-/* Wiki 线索桌·桌面:点阵纸底板、纸面颗粒、线绳层与区名胶带。颜色取 wiki-wall.css 里的 --board-* 变量。 */
+/* Wiki 线索桌·桌面:点阵纸底板、纸面颗粒、线绳层与区名胶带,外加平移缩放、拖卡与远景只留标题。
+   颜色取 wiki-wall.css 里的 --board-* 变量。点阵的位置与间距由组件按视口实时写在行内样式上。 */
 
 .wiki-wall-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   position: relative;
-  /* 点阵纸跟着板面一起滚,四角压一点暗角 */
-  background:
-    radial-gradient(circle, var(--board-dot) 1.15px, transparent 1.6px) 0 0 / 24px 24px,
-    var(--board-bg);
-  background-attachment: local;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  /* 点阵纸跟着视口平移缩放:位置与间距在行内样式里 */
+  background-image: radial-gradient(circle, var(--board-dot) 1.15px, transparent 1.6px);
+  background-color: var(--board-bg);
+}
+
+.wiki-wall-scroll.is-panning {
+  cursor: grabbing;
 }
 
 .wiki-wall-board {
-  position: relative;
-  min-width: 100%;
-  min-height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
 }
 
 /* 纸面颗粒:很淡的噪点,让底板不是一块死色 */
@@ -108,6 +115,80 @@
   font-weight: var(--font-w-regular);
   letter-spacing: 0;
   opacity: 0.75;
+}
+
+/* 拖起来的卡:摆正、抬高、阴影拉长,跟手不带过渡 */
+.wiki-wall-card.is-dragging {
+  z-index: 5;
+  cursor: grabbing;
+  transition: none;
+  box-shadow: var(--board-shadow-lift);
+  transform: rotate(0deg) translateY(-6px) scale(1.04);
+}
+
+/* 远景:缩到很小时只留标题,字号放大到缩放后依旧看得清 */
+.wiki-wall-scroll.is-far .wiki-wall-card-kind,
+.wiki-wall-scroll.is-far .wiki-wall-card-body,
+.wiki-wall-scroll.is-far .wiki-wall-card-foot,
+.wiki-wall-scroll.is-far .wiki-wall-stamp,
+.wiki-wall-scroll.is-far .wiki-wall-stale-tape {
+  display: none;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card {
+  justify-content: center;
+  padding-bottom: 16px;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-card-title {
+  display: -webkit-box;
+  font-size: 26px;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.wiki-wall-scroll.is-far .wiki-wall-tape {
+  font-size: 26px;
+}
+
+/* 右下角的缩放按钮:浮在桌面上,不跟着板面缩 */
+.wiki-wall-zoom {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--board-paper-edge);
+  border-radius: var(--radius-md);
+  background: var(--board-chrome);
+  box-shadow: var(--board-shadow);
+  cursor: default;
+}
+
+.wiki-wall-zoom button {
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--board-ink);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.wiki-wall-zoom button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--board-ink) 8%, transparent);
+}
+
+.wiki-wall-zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {

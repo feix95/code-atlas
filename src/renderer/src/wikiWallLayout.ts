@@ -12,7 +12,7 @@ export const WALL_ROOT_H = 162
 const GAP_X = 34
 const GAP_Y = 44
 const REGION_GAP = 76
-const PAD = 56
+export const WALL_PAD = 56
 /** 区名胶带占的高度:胶带贴在团块左上角,卡片从它下方开始摆 */
 const TAPE_H = 44
 /** 抖动上限(像素):必须小于 GAP 的一半,卡片才不会互相压住 */
@@ -152,6 +152,36 @@ function sagPath(
   return { cx, cy, d: `M${r(x1)} ${r(y1)} Q${r(cx)} ${r(cy)} ${r(x2)} ${r(y2)}` }
 }
 
+/** 卡片所在团的名字:根主题归「总览」,其余取主题链前两段;列表视图按它分组,与桌面成团一致 */
+export function wallGroupTitle(card: WikiWallCard): string {
+  if (card.kind === 'root') return WALL_ROOT_REGION
+  return card.topicPath.slice(0, WALL_GROUP_DEPTH).join(' / ') || '未归类'
+}
+
+/** 按卡片当前位置把连线挂到图钉上;两端有一端不在板上的线丢掉 */
+export function placeWallLinks(
+  placed: ReadonlyMap<string, WallPlacedCard>,
+  links: WikiWallLink[]
+): WallPlacedLink[] {
+  const out: WallPlacedLink[] = []
+  for (const link of links) {
+    const from = placed.get(link.from)
+    const to = placed.get(link.to)
+    if (from === undefined || to === undefined || from === to) continue
+    const curve = sagPath(from.pinX, from.pinY, to.pinX, to.pinY)
+    out.push({
+      link,
+      x1: from.pinX,
+      y1: from.pinY,
+      x2: to.pinX,
+      y2: to.pinY,
+      ...curve,
+      tier: wallTierOf(link)
+    })
+  }
+  return out
+}
+
 export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): WikiWallLayout {
   // 分团:根主题单独一团放最前,其余按主题链分组,保持卡片出现顺序
   const order: string[] = []
@@ -184,8 +214,8 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
 
   const placed = new Map<string, WallPlacedCard>()
   const regions: WallRegion[] = []
-  let shelfX = PAD
-  let shelfY = PAD
+  let shelfX = WALL_PAD
+  let shelfY = WALL_PAD
   let shelfH = 0
   let boardW = 0
 
@@ -201,8 +231,8 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
   }
 
   for (const block of blocks) {
-    if (shelfX > PAD && shelfX + block.w > PAD + targetW) {
-      shelfX = PAD
+    if (shelfX > WALL_PAD && shelfX + block.w > WALL_PAD + targetW) {
+      shelfX = WALL_PAD
       shelfY += shelfH + REGION_GAP
       shelfH = 0
     }
@@ -238,29 +268,14 @@ export function layoutWikiWall(cards: WikiWallCard[], links: WikiWallLink[]): Wi
     boardW = Math.max(boardW, bx + block.w)
   }
 
-  const linksPlaced: WallPlacedLink[] = []
-  for (const link of links) {
-    const from = placed.get(link.from)
-    const to = placed.get(link.to)
-    if (from === undefined || to === undefined || from === to) continue
-    const curve = sagPath(from.pinX, from.pinY, to.pinX, to.pinY)
-    linksPlaced.push({
-      link,
-      x1: from.pinX,
-      y1: from.pinY,
-      x2: to.pinX,
-      y2: to.pinY,
-      ...curve,
-      tier: wallTierOf(link)
-    })
-  }
-  const bottom = blocks.length > 0 ? shelfY + shelfH : PAD
+  const linksPlaced = placeWallLinks(placed, links)
+  const bottom = blocks.length > 0 ? shelfY + shelfH : WALL_PAD
   return {
     cards: [...placed.values()],
     regions,
     links: linksPlaced,
-    width: Math.round(boardW + PAD + JITTER),
-    height: Math.round(bottom + PAD + 120)
+    width: Math.round(boardW + WALL_PAD + JITTER),
+    height: Math.round(bottom + WALL_PAD + 120)
   }
 }
 
