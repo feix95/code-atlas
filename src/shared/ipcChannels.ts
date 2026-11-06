@@ -102,6 +102,8 @@ export const CH = {
   wikiWallImageSave: 'atlas:wiki-wall-image-save',
   wikiWallImageRead: 'atlas:wiki-wall-image-read',
   wikiStartV2: 'atlas:wiki-start-v2',
+  /** 只规划主题目录,不写正文 */
+  wikiPlanCatalog: 'atlas:wiki-plan-catalog',
   wikiRunStatusV2: 'atlas:wiki-run-status-v2',
   wikiCancelV2: 'atlas:wiki-cancel-v2',
   wikiCleanupAll: 'atlas:wiki-cleanup-all',

@@ -171,7 +171,7 @@ export type WikiStartResult =
  * 规划器版本:切分口径变化时加一,旧规划整体过期;线索桌手摆位置也按它作废重排。
  * 放在共享层,主进程规划与渲染层摆放存档读同一个数。
  */
-export const WIKI_PLAN_VERSION = 2
+export const WIKI_PLAN_VERSION = 3
 
 /** 卡片墙一卡:主题页在画布上的呈现数据,记账有 AI 名称与摘要时优先 */
 export interface WikiWallCard {
@@ -213,6 +213,26 @@ export interface WikiStartV2Request {
   /** 只生成这些页(卡片墙单页生成);缺省为全部叶子页 */
   pageIds?: string[]
 }
+
+/** 只规划主题目录,不写正文。force 才忽略已有缓存重新请模型 */
+export interface WikiPlanCatalogRequest {
+  requestId: string
+  projectRoot: string
+  language: string
+  force?: boolean
+}
+
+export type WikiPlanCatalogResult =
+  | {
+      ok: true
+      leaves: number
+      overviews: number
+      chapters: string[]
+      /** 这次没有请模型(用了缓存或确定性兜底) */
+      cached: boolean
+      modelCalls: number
+    }
+  | { ok: false; error: string }
 
 /** 进度页读到的单篇现状:记账状态 + 文件是否还在 */
 export interface WikiPageSummary {

@@ -11,6 +11,7 @@ import { registerWikiIpc } from './ipcWiki.ts'
 import { registerWikiWallIpc } from './ipcWikiWall.ts'
 import { registerWikiRunIpc } from './wikiRun.ts'
 import { registerWikiRunV2Ipc } from './wikiRunV2.ts'
+import { registerWikiCatalogIpc } from './wikiThemeRun.ts'
 
 export function registerIpc(): void {
   registerShellIpc()
@@ -26,4 +27,5 @@ export function registerIpc(): void {
   registerWikiWallIpc()
   registerWikiRunIpc()
   registerWikiRunV2Ipc()
+  registerWikiCatalogIpc()
 }

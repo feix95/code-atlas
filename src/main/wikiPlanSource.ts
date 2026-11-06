@@ -46,6 +46,12 @@ export function wikiPlanSourceDeps(rootPath: string): WikiPlanInputDeps {
         reactComponents: structure.reactComponents
       }
     },
+    readText: async (root, relPath) => {
+      if (!/\.(tsx?|jsx?|mjs|cjs|mts)$/.test(relPath)) return null
+      const buf = await fs.readFile(join(root, relPath)).catch(() => null)
+      if (buf === null || buf.byteLength > 120_000 || buf.includes(0)) return null
+      return buf.toString('utf8')
+    },
     readManifest: async (root) => {
       try {
         const pkg = JSON.parse(await fs.readFile(join(root, 'package.json'), 'utf8')) as {

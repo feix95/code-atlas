@@ -272,7 +272,10 @@ export async function generateWikiPageMarkdown(
   out.push('| --- | --- | --- |')
   for (const file of [...evidence.files].sort((a, b) => byCodeUnit(a.path, b.path))) {
     const duty =
-      duties.get(file.path) ?? (file.role === 'attached' ? '附属文件,未单独阅读' : '本页成员文件')
+      duties.get(file.path) ??
+      (file.role === 'attached' || file.role === 'reference'
+        ? '引用或附属,未单独阅读'
+        : '本页成员文件')
     out.push(`| ${file.path} | ${file.role} | ${duty.replace(/\|/g, ' ')} |`)
   }
   out.push('')

@@ -23,7 +23,7 @@ export async function explainWithMessagesCore(
   onDelta?: (text: string, stats?: AiStreamStats, reasoning?: string) => void,
   signal?: AbortSignal,
   maxTokens = 500,
-  opts?: { allowThinking?: boolean }
+  opts?: { allowThinking?: boolean; temperature?: number; responseFormat?: Record<string, unknown> }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
   let watchdog: ReturnType<typeof setTimeout> | undefined
@@ -38,7 +38,7 @@ export async function explainWithMessagesCore(
       {
         model: config.model,
         messages,
-        temperature: CHAT_TEMPERATURE,
+        temperature: opts?.temperature ?? CHAT_TEMPERATURE,
         // 反重复采样:复读机防线的引擎侧闸门,只对内置引擎发 ——
         // 外接服务不认这些字段,不塞,行为一分不变
         ...(config.timings ? AI_ANTI_REPEAT_PARAMS : {}),
@@ -54,7 +54,9 @@ export async function explainWithMessagesCore(
         // 外接服务不认识这些字段,不塞,行为一分不变
         ...(config.timings
           ? { timings_per_token: true, stream_options: { include_usage: true } }
-          : {})
+          : {}),
+        // 目录规划要 JSON;只有调用方显式要时才塞,普通讲解不带这个字段
+        ...(opts?.responseFormat ? { response_format: opts.responseFormat } : {})
       },
       { signal }
     )

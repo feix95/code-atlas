@@ -194,4 +194,30 @@ assert.deepEqual(
   '总览与根主题页不抢归属,指向公共文件的引用不画'
 )
 
+// reference 只是出处:即使写在叶子页上,也不参加归属,不因此多画一条线
+const cited = buildWikiWall(
+  {
+    ...plan,
+    hubs: [],
+    pages: plan.pages.map((page) =>
+      page.id === 'leaf-a'
+        ? {
+            ...page,
+            members: [...page.members, { path: 'src/onlyRef.ts', role: 'reference' as const }]
+          }
+        : page
+    )
+  },
+  [
+    { from: 'src/onlyRef.ts', to: 'src/b.ts' },
+    { from: 'src/a.ts', to: 'src/b.ts' }
+  ],
+  language
+).links.filter((link) => link.kind === 'reference')
+assert.deepEqual(
+  cited.map((link) => [link.from, link.to, link.weight]),
+  [['leaf-a', 'leaf-b', 1]],
+  'reference 成员不产生连线,主角之间的引用仍在'
+)
+
 console.log('selftest-wikiwall ok')

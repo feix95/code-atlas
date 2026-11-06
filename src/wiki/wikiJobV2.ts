@@ -6,6 +6,7 @@ import type { WikiEvidenceDeps } from './wikiEvidence.ts'
 import type { WikiJobSummary } from './wikiJob.ts'
 import { WikiNoteLedger } from './wikiLedger.ts'
 import { buildWikiPlan } from './wikiPlan.ts'
+import type { WikiCatalog } from './wikiCatalogStore.ts'
 import type { WikiPlanInput, WikiPlanPage } from './wikiPlanTypes.ts'
 import type { WikiCompleter } from './wikiReadTypes.ts'
 import { runWikiPage } from './wikiPageRun.ts'
@@ -63,6 +64,8 @@ export interface WikiJobV2Options {
   modelId: string
   contextSize: number
   planInput: WikiPlanInput
+  /** 主题目录缓存;没有就按确定性兜底组装,任务本身不调模型 */
+  catalog?: WikiCatalog | null
   force?: boolean
   signal?: AbortSignal
   /** 只生成这些页(卡片墙单页生成,叶子与父页都可);不传为全部页 */
@@ -81,7 +84,10 @@ function currentMemberHashes(
   return page.members.map((member) => ({
     path: member.path,
     role: member.role,
-    contentHash: member.role === 'attached' ? null : (deps.factOf(member.path)?.sha256 ?? null)
+    contentHash:
+      member.role === 'attached' || member.role === 'reference'
+        ? null
+        : (deps.factOf(member.path)?.sha256 ?? null)
   }))
 }
 
@@ -125,7 +131,7 @@ export async function runWikiJobV2(
     return summary('failed', 'Wiki 记账属于别的项目')
   }
 
-  const plan = buildWikiPlan(options.planInput)
+  const plan = buildWikiPlan(options.planInput, options.catalog ?? null)
   const files = allocatePlanFiles(plan)
   state.planRef = { path: '.codeatlas/plan.json', version: plan.version }
   const label = languageDirLabel(options.language)

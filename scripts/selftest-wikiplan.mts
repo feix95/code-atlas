@@ -307,7 +307,7 @@ function main(): void {
     '构建与部署不含 tsconfig 文件'
   )
 
-  // 十一、主题链折叠:中间空层不占一层
+  // 十一、主题树按章,不再按目录前缀;深层文件仍挂在章下
   const plan11 = buildWikiPlan(input([file('a/b/c/deep.ts'), file('a/x.ts'), file('a/y.ts')], []))
   const topicDirs: string[] = []
   const walkTopics = (topics: typeof plan11.topics): void => {
@@ -317,8 +317,11 @@ function main(): void {
     }
   }
   walkTopics(plan11.topics)
-  assert.ok(!topicDirs.includes('a/b'), '空中间层 a/b 被折叠')
-  assert.ok(topicDirs.includes('a/b/c'), '叶子主题保留')
+  assert.ok(!topicDirs.includes('a/b/c'), `主题键不再是目录 ${topicDirs.join(',')}`)
+  assert.ok(
+    plan11.topics.some((topic) => topic.title === '核心功能'),
+    '代码页归进核心功能,而不是 a/b/c'
+  )
 
   // 十二、薄页合并挑亲戚:有公共目录前缀的并进亲戚页,一段都不共的保留自成一页
   const plan12 = buildWikiPlan(
@@ -390,7 +393,7 @@ function main(): void {
     '小分片成员并进同功能最大分片'
   )
 
-  // 十四、主题显示名:末段为 src 的目录取上一段,免与上层 src 主题重名
+  // 十四、岛名不再是 src 结尾的目录;叶子标题也不停留在通词 src
   const plan14 = buildWikiPlan(
     input(
       [file('x/renderer/src/app.ts'), file('x/renderer/src/view.ts'), file('x/other.ts')],
@@ -406,9 +409,13 @@ function main(): void {
   }
   collectTitles(plan14.topics)
   assert.ok(
-    topicTitles.includes('x/renderer/src=renderer'),
-    `src 结尾的主题显示上一段名,实际 ${topicTitles.join(' / ')}`
+    !topicTitles.some((line) => line.startsWith('x/renderer')),
+    `主题不再按目录,实际 ${topicTitles.join(' / ')}`
   )
+  const appPage = leafPages(plan14).find((page) =>
+    primariesOf(page).includes('x/renderer/src/app.ts')
+  )
+  assert.ok(appPage && appPage.title !== 'src', `叶子标题不应是目录通词 src,实际 ${appPage?.title}`)
 
   // 十五、构建类薄页归入根主题页「构建与部署」,不自成叶子页
   const plan15 = buildWikiPlan(

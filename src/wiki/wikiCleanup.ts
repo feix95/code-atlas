@@ -18,6 +18,7 @@ import {
   WIKI_STATE_FILE,
   type WikiState
 } from './wikiStore.ts'
+import { wikiCatalogFilePath } from './wikiCatalogStore.ts'
 import { wikiPlanFilePath } from './wikiPlanStore.ts'
 import {
   pageFilePathV2,
@@ -181,6 +182,7 @@ async function cleanLedgerProject(plan: CleanupPlan): Promise<{ files: number; b
     if (plan.state.planRef !== null) {
       await fs.rm(wikiPlanFilePath(plan.dir), { force: true })
     }
+    await fs.rm(wikiCatalogFilePath(plan.dir), { force: true })
     if (plan.state.ledgerDir === `${WIKI_STATE_DIR}/ledger`) {
       await fs.rm(join(plan.dir, plan.state.ledgerDir), { recursive: true, force: true })
     }

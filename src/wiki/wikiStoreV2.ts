@@ -28,7 +28,7 @@ export type WikiLanguageOrigin = 'generated' | 'translated'
 
 export interface WikiMemberSnapshot {
   path: string
-  role: 'primary' | 'supporting' | 'attached'
+  role: 'primary' | 'supporting' | 'attached' | 'reference'
   /** 生成时的成员内容哈希;事实层未取得时为 null */
   contentHash: string | null
 }
@@ -89,7 +89,7 @@ const PAGE_STATUSES_V2 = new Set<WikiPageStatusV2>([
   'cancelled',
   'planned'
 ])
-const MEMBER_ROLES = new Set(['primary', 'supporting', 'attached'])
+const MEMBER_ROLES = new Set(['primary', 'supporting', 'attached', 'reference'])
 
 function stateFilePath(projectDir: string): string {
   return join(projectDir, WIKI_STATE_DIR, WIKI_STATE_FILE)

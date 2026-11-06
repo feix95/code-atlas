@@ -106,6 +106,31 @@ export function WikiWallLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootPath])
 
+  const planCatalog = async (force = false): Promise<void> => {
+    setRunError(null)
+    setFinishText(null)
+    setStarting(true)
+    const outcome = await window.atlas.wiki
+      .planCatalog({
+        requestId: crypto.randomUUID(),
+        projectRoot: rootPath,
+        language: wall.language,
+        ...(force ? { force: true } : {})
+      })
+      .catch((err: unknown) => ({ ok: false as const, error: friendlyErr(err) }))
+    setStarting(false)
+    if (!outcome.ok) {
+      setRunError(outcome.error)
+      return
+    }
+    setFinishText(
+      outcome.modelCalls > 0
+        ? `目录规划完成: ${outcome.chapters.length} 章,模型调用 ${outcome.modelCalls} 次`
+        : `目录已就绪: ${outcome.chapters.length} 章${outcome.cached ? '(沿用上次规划)' : '(未调用模型)'}`
+    )
+    wall.refresh()
+  }
+
   const start = async (onlyPageId?: string, force = false): Promise<void> => {
     setRunError(null)
     setFinishText(null)
@@ -163,6 +188,16 @@ export function WikiWallLayer({
             onClick={() => void start()}
           >
             {starting ? '正在启动…' : '生成全部'}
+          </button>
+        )}
+        {!running && (
+          <button
+            type="button"
+            className="wiki-wall-btn"
+            disabled={wall.language === '' || starting}
+            onClick={() => void planCatalog(false)}
+          >
+            只规划目录
           </button>
         )}
         <button

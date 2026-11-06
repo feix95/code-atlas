@@ -239,7 +239,7 @@ export async function buildPageEvidence(
       dataFacts: null,
       evidenceNote: null
     }
-    if (member.role === 'attached') {
+    if (member.role === 'attached' || member.role === 'reference') {
       files.push(base)
       continue
     }

@@ -1,6 +1,7 @@
 // 规划输入装配:把依赖图、事实缓存结构与文件清单拼成主题树规划的输入。
 // 依赖图构建会顺带刷新事实缓存,保证随后证据层读到的事实与本次规划同源。
 import type { DepEdge } from '../shared/types.ts'
+import { collectChannelUses } from './wikiPlanChannels.ts'
 import type { WikiPlanFileInput, WikiPlanInput } from './wikiPlanTypes.ts'
 
 export interface WikiPlanGraphNode {
@@ -27,6 +28,8 @@ export interface WikiPlanInputDeps {
   structureOf: (relPath: string) => WikiPlanStructure | null
   /** 清单文件与其中登记的脚本名;无清单时为 null */
   readManifest: (rootPath: string) => Promise<{ path: string; scripts: string[] } | null>
+  /** 读源码抽通道成员;不提供就跳过跨进程契约边 */
+  readText?: (rootPath: string, relPath: string) => Promise<string | null>
 }
 
 export async function assembleWikiPlanInput(
@@ -54,12 +57,16 @@ export async function assembleWikiPlanInput(
     })
   }
   const manifest = await deps.readManifest(rootPath)
+  const channelUses = deps.readText
+    ? await collectChannelUses(files, graph.edges, (relPath) => deps.readText!(rootPath, relPath))
+    : undefined
   return {
     projectName,
     files,
     edges: graph.edges,
     rootDocs: allPaths.filter((path) => !path.includes('/') && /\.md$/i.test(path)),
     manifestPath: manifest?.path ?? null,
-    manifestScripts: manifest?.scripts ?? []
+    manifestScripts: manifest?.scripts ?? [],
+    ...(channelUses ? { channelUses } : {})
   }
 }

@@ -49,15 +49,6 @@ function roleIn(result: WikiPlan, path: string): string | undefined {
   return pageOf(result, path)?.members.find((m) => m.path === path)?.role
 }
 
-function topicByDir(topics: WikiPlanTopic[], dir: string): WikiPlanTopic | undefined {
-  for (const topic of topics) {
-    if (topic.dir === dir) return topic
-    const found = topicByDir(topic.children, dir)
-    if (found) return found
-  }
-  return undefined
-}
-
 function main(): void {
   // 一、公共文件:被十几个目录引用的类型表与通道定义文件请出聚类,按目录单独成页
   const users = Array.from({ length: 12 }, (_, i) => `src/m${i}/user${i}.ts`)
@@ -70,15 +61,32 @@ function main(): void {
     ]
   )
   assert.deepEqual(hubPlan.hubs, ['src/shared/ipcChannels.ts', 'src/shared/types.ts'])
-  const hubPage = pageOf(hubPlan, 'src/shared/types.ts')!
-  assert.deepEqual(
-    hubPage.members.map((m) => m.path),
-    ['src/shared/ipcChannels.ts', 'src/shared/types.ts'],
-    '同目录的公共文件同页,不夹带非公共文件'
+  const typePage = hubPlan.pages.find((page) =>
+    page.members.some(
+      (member) => member.path === 'src/shared/types.ts' && member.role === 'primary'
+    )
+  )!
+  assert.equal(typePage.title, '共享类型', '类型公共文件归共享类型页')
+  assert.ok(typePage.basis[0]!.startsWith('骨架'), '依据写明是骨架页')
+  assert.ok(
+    !typePage.members.some((member) => member.path === 'src/shared/format.ts'),
+    '普通文件不进公共类型页'
   )
-  assert.ok(hubPage.basis[0]!.startsWith('公共文件'), '依据写明是公共文件页')
-  assert.notEqual(pageOf(hubPlan, 'src/shared/format.ts'), hubPage, '普通文件不进公共文件页')
-  assert.equal(hubPlan.version, 2, '切分口径变了,规划器版本加一')
+  const channelOwner = hubPlan.pages.find((page) =>
+    page.members.some(
+      (member) => member.path === 'src/shared/ipcChannels.ts' && member.role === 'primary'
+    )
+  )
+  assert.ok(channelOwner, '通道定义文件有唯一主角归属')
+  assert.notEqual(channelOwner, typePage, '通道定义与类型表分开归属')
+  assert.ok(
+    users.every(
+      (path) =>
+        !typePage.members.some((member) => member.path === path && member.role === 'primary')
+    ),
+    '引用方不进公共类型页当主角'
+  )
+  assert.equal(hubPlan.version, 3, '主题树口径变了,规划器版本再加一')
 
   // 二、孤立单文件:大目录里与本目录无引用的文件不再一律塞进最大一组;
   // 跟别处有引用的按票数就近当配角,一条引用都没有的自成一页
@@ -139,31 +147,25 @@ function main(): void {
       ['src/a/menuOne.ts', 'src/b/menuTwo.ts']
     ]
   )
-  const featureRoot = topicByDir(featurePlan.topics, 'feature:')
+  const featureRoot = featurePlan.topics.find((topic) => topic.title === '核心功能')
   assert.ok(featureRoot, '有「核心功能」一章')
-  assert.equal(featureRoot.title, '核心功能')
-  assert.deepEqual(
-    featureRoot.children.map((t) => t.dir),
-    ['feature:export', 'feature:search'],
-    '各功能主题挂在核心功能下,不再散在根下'
-  )
   assert.ok(
-    featurePlan.topics.every((root) =>
-      root.children.every((t) => t.dir === 'feature:' || !t.dir.startsWith('feature:'))
-    ),
-    '根下没有游离的功能主题'
+    featurePlan.topics.every((topic) => !topic.title.includes('/') && !topic.dir.startsWith('src')),
+    '根上不再是 src 目录岛'
   )
+  const under = (topic: WikiPlanTopic, pageId: string): boolean =>
+    topic.pageIds.includes(pageId) || topic.children.some((child) => under(child, pageId))
+  const exportPage = pageOf(featurePlan, 'src/main/exportJob.ts')!
   const searchPage = pageOf(featurePlan, 'src/main/searchIndex.ts')!
-  assert.equal(searchPage.topicDir, 'feature:search')
+  assert.ok(under(featureRoot, exportPage.id), '导出功能挂在核心功能下')
+  assert.ok(under(featureRoot, searchPage.id), '搜索功能挂在核心功能下')
+  assert.notEqual(exportPage.id, searchPage.id, '两个功能仍是两页')
   assert.ok(
-    pageOf(featurePlan, 'src/tools/searchLegacy.ts')?.topicDir !== 'feature:search',
-    '同名但没引用连上的文件不算进功能'
+    !exportPage.members.some((member) => member.path === 'src/tools/searchLegacy.ts'),
+    '同名但没引用连上的文件不算进功能页'
   )
-  assert.equal(
-    topicByDir(featurePlan.topics, 'feature:menu'),
-    undefined,
-    '连成一团不足三个不成功能'
-  )
+  const menuPage = pageOf(featurePlan, 'src/a/menuOne.ts')!
+  assert.ok(!menuPage.basis.some((line) => line.includes('功能名')), '连成一团不足三个不成功能页')
 }
 
 main()

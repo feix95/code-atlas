@@ -49,8 +49,11 @@ export const PLAN_FEATURE_SHARD_TOKEN_MAX = 2500
 export const PLAN_HUB_MIN_IN_DEGREE = 10
 export const PLAN_HUB_SHARE = 0.05
 
-/** 主题树最深层级(与需求 A2 的「最多约 4 层」一致) */
+/** 旧目录树兜底的最深层级(与需求 A2 的「最多约 4 层」一致) */
 export const PLAN_TREE_MAX_DEPTH = 4
+
+/** 主题树最深层级(含章):与 Qoder 一样最多 5 层 */
+export const PLAN_THEME_MAX_DEPTH = 5
 
 /** 文件在规划里的分类:决定它当主体、挂靠还是不进页面 */
 export type WikiPlanFileKind = 'code' | 'test' | 'style' | 'doc' | 'data' | 'asset'
@@ -125,6 +128,18 @@ export interface WikiPlanInput {
   manifestPath: string | null
   /** 清单文件里登记的脚本名;用来提名快速开始等根主题 */
   manifestScripts: string[]
+  /**
+   * 跨进程契约:某个文件用到了公共文件导出的成员(通道常量这类)。
+   * 没扫描过就缺省,主题亲和只靠引用边和文件名。
+   */
+  channelUses?: WikiChannelUse[]
+}
+
+/** 一个文件用到了某个公共文件的一个导出成员 */
+export interface WikiChannelUse {
+  file: string
+  hub: string
+  member: string
 }
 
 /** 分组阶段的中间产物:一组将成为一张叶子页 */
@@ -142,7 +157,13 @@ export interface DraftGroup {
 }
 
 export type WikiPlanPageKind = 'leaf' | 'overview' | 'root'
-export type WikiMemberRole = 'primary' | 'supporting' | 'attached'
+/** reference 只挂出处:不占证据预算,不参与连线归属,也不算文件的主人 */
+export type WikiMemberRole = 'primary' | 'supporting' | 'attached' | 'reference'
+
+/** 主角和配角才算这页的证据;附属与引用都不算 */
+export function memberOwnsEvidence(role: WikiMemberRole): boolean {
+  return role === 'primary' || role === 'supporting'
+}
 
 export interface WikiPlanMember {
   path: string
@@ -170,14 +191,22 @@ export interface WikiPlanPage {
   oversized: boolean
   /** 切分依据(信号留痕),供切分评审与排障 */
   basis: string[]
+  /** 模型给这页的写作指令;没有就不写,避免空字段进规划 */
+  writingPrompt?: string
 }
+
+export type WikiTopicKind = 'skeleton' | 'theme' | 'section'
 
 export interface WikiPlanTopic {
   id: string
-  /** 程序名(目录名) */
+  /** 程序名;主题树里是章名或主题名,旧目录树兜底仍是目录名 */
   title: string
-  /** 主题对应的目录;根层为 '' */
+  /** 主题键;主题树用章/主题 slug,旧目录树兜底仍是目录 */
   dir: string
+  /** 骨架章、功能主题或二级子章;旧目录树兜底不填 */
+  kind?: WikiTopicKind
+  /** 稳定短名,给目录缓存和路径用;旧目录树兜底不填 */
+  slug?: string
   /** 本主题的总览页 id;子项不足 2 个时没有总览页,为 null */
   overviewPageId: string | null
   /** 直接挂在本主题下的叶子页 id */

@@ -138,7 +138,7 @@ export function balanceInlineCode(text: string, knownNames?: Set<string>): strin
 
 /** C4 程序依赖图:节点为非附属成员,边为页内引用,边数上限 20 保可读 */
 export function mermaidOf(evidence: WikiPageEvidence): string {
-  const nodes = evidence.files.filter((f) => f.role !== 'attached')
+  const nodes = evidence.files.filter((f) => f.role !== 'attached' && f.role !== 'reference')
   const idOf = new Map(nodes.map((f, i) => [f.path, `f${i}`]))
   const lines = ['```mermaid', 'flowchart LR']
   for (const file of nodes) {

@@ -19,6 +19,7 @@ import { userDataDir } from './paths.ts'
 import { parseProjectRoot, parseWikiPanelRequest, parseWikiWallRequest } from './wikiRequest.ts'
 import { wikiPlanSourceDeps } from './wikiPlanSource.ts'
 import { assembleWikiPlanInput } from '../wiki/wikiPlanInput.ts'
+import { readWikiCatalog } from '../wiki/wikiCatalogStore.ts'
 import { buildWikiPlan } from '../wiki/wikiPlan.ts'
 import { buildWikiWall } from '../wiki/wikiWall.ts'
 import type { WikiWallResult } from '../shared/wikiTypes.ts'
@@ -199,7 +200,8 @@ async function wallState(raw: unknown): Promise<WikiWallResult> {
     basename(projectRoot),
     wikiPlanSourceDeps(projectRoot)
   )
-  const plan = buildWikiPlan(planInput)
+  const catalog = await readWikiCatalog(projectDir)
+  const plan = buildWikiPlan(planInput, catalog)
   const languageState =
     read.status === 'ok' && read.version === 2 ? read.state.languages[language] : undefined
   const wall = buildWikiWall(plan, planInput.edges, languageState)

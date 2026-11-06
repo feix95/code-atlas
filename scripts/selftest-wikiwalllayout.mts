@@ -264,4 +264,18 @@ assert.equal(focus(true, null, 'h', null), null, '远景悬停不点亮')
 assert.equal(focus(true, null, 'h', 's'), 's', '远景只认选中')
 assert.equal(focus(true, 'd', 'h', 's'), 'd', '远景拖动照旧')
 
+// 按章成岛:人话章名就是岛名;章太大时按第二节拆,胶带写成「章 / 节」
+const chapterCards = [
+  card('arch', 'overview', ['架构设计']),
+  card('arch-1', 'leaf', ['架构设计', '进程与入口']),
+  ...Array.from({ length: 20 }, (_, i) => card(`feat-${i}`, 'leaf', ['核心功能', '对话'])),
+  card('root-x', 'root', [])
+]
+const chapterTitles = wallGroupTitles(chapterCards)
+assert.equal(chapterTitles.get('arch'), '架构设计', '章本身的总览留在章岛')
+assert.equal(chapterTitles.get('arch-1'), '架构设计', '小节不够张数时不单拆')
+assert.equal(chapterTitles.get('feat-0'), '核心功能 / 对话', '大章按节拆岛')
+assert.equal(chapterTitles.get('root-x'), WALL_ROOT_REGION, '根文仍归总览')
+assert.ok(![...chapterTitles.values()].some((title) => title.startsWith('src')), '岛名不是目录前缀')
+
 console.log('selftest-wikiwalllayout ok')

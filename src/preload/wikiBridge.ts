@@ -14,6 +14,8 @@ import type {
   WikiSettings,
   WikiStartRequest,
   WikiStartResult,
+  WikiPlanCatalogRequest,
+  WikiPlanCatalogResult,
   WikiStartV2Request,
   WikiWallResult
 } from '../shared/wikiTypes.ts'
@@ -56,6 +58,8 @@ export const wikiBridge = {
   cancel: (): Promise<void> => ipcRenderer.invoke(CH.wikiCancel),
   startV2: (request: WikiStartV2Request): Promise<WikiStartResult> =>
     ipcRenderer.invoke(CH.wikiStartV2, request),
+  planCatalog: (request: WikiPlanCatalogRequest): Promise<WikiPlanCatalogResult> =>
+    ipcRenderer.invoke(CH.wikiPlanCatalog, request),
   runStatusV2: (): Promise<WikiRunStatus> => ipcRenderer.invoke(CH.wikiRunStatusV2),
   cancelV2: (): Promise<void> => ipcRenderer.invoke(CH.wikiCancelV2),
   cleanupAll: (): Promise<WikiCleanupOutcome> => ipcRenderer.invoke(CH.wikiCleanupAll),

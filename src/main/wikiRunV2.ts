@@ -21,6 +21,8 @@ import { wikiOutputTokens } from '../wiki/wikiJob.ts'
 import { runWikiJobV2 } from '../wiki/wikiJobV2.ts'
 import { assembleWikiPlanInput } from '../wiki/wikiPlanInput.ts'
 import { buildWikiPlan } from '../wiki/wikiPlan.ts'
+import { ensureWikiCatalog } from '../wiki/wikiThemeModel.ts'
+import { catalogCompleter } from './wikiThemeRun.ts'
 import { resolveProjectDir } from '../wiki/wikiProjectDir.ts'
 import { isWikiJobActive } from './wikiRun.ts'
 
@@ -101,7 +103,30 @@ export function registerWikiRunV2Ipc(): void {
       basename(req.projectRoot),
       wikiPlanSourceDeps(req.projectRoot)
     )
-    const plan = buildWikiPlan(planInput)
+    const catalog = await ensureWikiCatalog({
+      projectDir,
+      input: planInput,
+      model: chat.target.model,
+      complete: catalogCompleter(chat.target),
+      onProgress: (done, total) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send(CH.wikiEvent, {
+          type: 'progress',
+          source: 'v2',
+          projectRoot: req.projectRoot,
+          language: req.language,
+          total,
+          processed: done,
+          page: {
+            pageId: 'wiki-catalog',
+            kind: 'overview',
+            name: `规划目录 ${done}/${total}`,
+            status: 'running'
+          }
+        })
+      }
+    }).catch(() => null)
+    const plan = buildWikiPlan(planInput, catalog)
     const onlySet = req.pageIds ? new Set(req.pageIds) : null
     const total =
       onlySet === null
@@ -143,6 +168,7 @@ export function registerWikiRunV2Ipc(): void {
         modelId: model,
         contextSize: chat.ctx,
         planInput,
+        catalog,
         ...(req.force ? { force: true } : {}),
         ...(onlySet ? { onlyPageIds: onlySet } : {}),
         signal: controller.signal

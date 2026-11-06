@@ -3,12 +3,10 @@
 // 文件归属唯一,P2 模块只作参考不直接当页面。只切分不写字,切分结果单独评审后才进生成阶段。
 import { byCodeUnit, dirOf } from '../modules/pathOrder.ts'
 import {
-  PLAN_FEATURE_SHARD_TOKEN_MAX,
   PLAN_PAGE_EVIDENCE_TOKEN_CAP,
-  PLAN_TINY_PAGE_MAX_PRIMARY,
-  PLAN_TINY_PAGE_TOKEN_MAX,
   WIKI_PLAN_VERSION,
   classifyPlanFile,
+  memberOwnsEvidence,
   type WikiMemberRole,
   type WikiPlan,
   type WikiPlanInput,
@@ -17,9 +15,13 @@ import {
 import { buildDraftGroups, tokensOf, type DraftGroup } from './wikiPlanGroups.ts'
 import { nameTokens } from './wikiPlanFeatures.ts'
 import { findPlanHubs } from './wikiPlanHubs.ts'
-import { assembleTopics, BUILD_CONFIG_PATTERN, buildRootPages, shortHash } from './wikiPlanTree.ts'
+import { assembleTopics, shortHash } from './wikiPlanTree.ts'
+import { mergeTinyPages } from './wikiPlanMerge.ts'
+import { buildSkeleton } from './wikiSkeleton.ts'
+import { assembleThemeTopics } from './wikiThemeTree.ts'
+import type { WikiCatalog } from './wikiCatalogStore.ts'
 
-export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
+export function buildWikiPlan(input: WikiPlanInput, catalog: WikiCatalog | null = null): WikiPlan {
   const files = [...input.files].sort((a, b) => byCodeUnit(a.relPath, b.relPath))
   const byPath = new Map(files.map((f) => [f.relPath, f]))
   const inDegree = new Map(files.map((f) => [f.relPath, f.inCount]))
@@ -37,7 +39,6 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   // 第三步:每组定锚点、程序名与稳定标识,生成叶子页
   const pages: WikiPlanPage[] = []
   const featurePageIds = new Set<string>()
-  const hubPageIds = new Set<string>()
   const ownerOf = new Map<string, WikiPlanPage>()
   // 同一目录有多页时,页名改用各自锚点文件名,避免一排同名页
   const anchorDirOfGroup = (group: DraftGroup): string => {
@@ -46,17 +47,25 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
     )[0]!
     return dirOf(anchorPath)
   }
+  const atomPaths = new Set<string>()
+  for (const group of finalGroups) {
+    if (group.hub) continue
+    for (const path of group.primary) atomPaths.add(path)
+  }
   const groupsPerDir = new Map<string, number>()
   for (const group of finalGroups) {
+    if (group.hub) continue
     const dir = anchorDirOfGroup(group)
     groupsPerDir.set(dir, (groupsPerDir.get(dir) ?? 0) + 1)
   }
   const groupsPerTopicKey = new Map<string, number>()
   for (const group of finalGroups) {
+    if (group.hub) continue
     if (group.topicKey)
       groupsPerTopicKey.set(group.topicKey, (groupsPerTopicKey.get(group.topicKey) ?? 0) + 1)
   }
   for (const group of finalGroups) {
+    if (group.hub) continue
     const members = [
       ...group.primary.map((path) => ({ path, role: 'primary' as WikiMemberRole })),
       ...group.supporting.map((path) => ({ path, role: 'supporting' as WikiMemberRole }))
@@ -98,7 +107,6 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
     }
     pages.push(page)
     if (group.feature) featurePageIds.add(page.id)
-    if (group.hub) hubPageIds.add(page.id)
     for (const member of members) ownerOf.set(member.path, page)
   }
 
@@ -129,8 +137,9 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   const testPaths = new Set(
     files.filter((f) => kinds.get(f.relPath) === 'test').map((f) => f.relPath)
   )
-  const rootPages = buildRootPages(input, files, testPaths)
-  const rootMemberPaths = new Set(rootPages.flatMap((p) => p.members.map((m) => m.path)))
+  const skeleton = buildSkeleton(input, files, testPaths, hubs, atomPaths)
+  const rootPages = skeleton.roots
+  const rootMemberPaths = skeleton.owned
 
   // 第四步:自测、样式、文档与数据文件按角色挂靠(不占页面主体)
   // 根主题成员不再重复挂靠;自测例外:测试策略页只是引用它,它的正职仍是挂到被测页当附属
@@ -196,77 +205,43 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   // 第五步:根主题页入列
   pages.push(...rootPages)
 
-  // 第五步半:薄页合并。主角很少又没多少内容的叶子页不单独成页,成员降为配角并进最亲近的大页。
-  // 亲近的判定:功能分片优先并进同功能的最大分片;普通页按锚点目录的公共前缀段数选亲戚,
-  // 一段都不共的说明没有亲戚,宁可保留薄页也不乱塞(乱塞曾把安装脚本塞进公共类型页)。
-  const pageTokens = (page: WikiPlanPage): number =>
-    page.members
-      .filter((m) => m.role !== 'attached')
-      .reduce((sum, m) => sum + (byPath.get(m.path) ? tokensOf(byPath.get(m.path)!) : 0), 0)
-  const primaryCount = (page: WikiPlanPage): number =>
-    page.members.filter((m) => m.role === 'primary').length
-  const commonPrefixSegs = (a: string, b: string): number => {
-    const as = a === '' ? [] : a.split('/')
-    const bs = b === '' ? [] : b.split('/')
-    let n = 0
-    while (n < as.length && n < bs.length && as[n] === bs[n]) n++
-    return n
+  // 薄页先并,再把骨架章自己的叶子(公共类型、测试索引)放进来,最后按主题成树
+  mergeTinyPages(pages, byPath, featurePageIds, new Set())
+  pages.push(...skeleton.leaves)
+  const atoms = pages.filter((page) => page.kind === 'leaf' && !skeleton.leaves.includes(page))
+  let rootTopics: WikiPlan['topics']
+  let overviewPages: WikiPlanPage[]
+  try {
+    const assembled = assembleThemeTopics(
+      input,
+      atoms,
+      skeleton.chapters,
+      skeleton.leaves,
+      input.edges,
+      hubs,
+      catalog
+    )
+    rootTopics = assembled.topics
+    overviewPages = assembled.overviewPages
+  } catch {
+    // 主题组装整体失败时退回旧的目录树,至少还能摆出卡片
+    const fallback = assembleTopics(
+      input,
+      pages.filter((page) => page.kind === 'leaf')
+    )
+    rootTopics = fallback.topics
+    overviewPages = fallback.overviewPages
   }
-  const leafNow = pages.filter((p) => p.kind === 'leaf')
-  for (const page of leafNow) {
-    if (hubPageIds.has(page.id)) continue // 公共文件页再薄也自成一页
-    const isFeatureShard = featurePageIds.has(page.id)
-    const tinyLimit = isFeatureShard ? PLAN_FEATURE_SHARD_TOKEN_MAX : PLAN_TINY_PAGE_TOKEN_MAX
-    if (primaryCount(page) > PLAN_TINY_PAGE_MAX_PRIMARY || pageTokens(page) >= tinyLimit) continue
-    let target: WikiPlanPage | undefined
-    if (isFeatureShard && page.topicDir) {
-      target = pages
-        .filter((p) => p.kind === 'leaf' && p !== page && p.topicDir === page.topicDir)
-        .sort((a, b) => primaryCount(b) - primaryCount(a))[0]
-    } else {
-      target = pages
-        .filter((p) => p.kind === 'leaf' && p !== page && !hubPageIds.has(p.id))
-        .map((p) => ({ page: p, shared: commonPrefixSegs(p.anchorDir, page.anchorDir) }))
-        .filter((c) => c.shared >= 1)
-        .sort((a, b) => b.shared - a.shared || primaryCount(b.page) - primaryCount(a.page))[0]?.page
-    }
-    if (!target) {
-      // 再兜底:构建类薄页(build 目录、安装脚本、构建配置)归入根主题页「构建与部署」,不自成叶子页
-      const buildRoot = pages.find((p) => p.kind === 'root' && p.title === '构建与部署')
-      const primaries = page.members.filter((m) => m.role === 'primary').map((m) => m.path)
-      const allBuildish =
-        primaries.length > 0 &&
-        primaries.every(
-          (path) =>
-            dirOf(path) === 'build' || BUILD_CONFIG_PATTERN.test(path) || /installer/i.test(path)
-        )
-      if (buildRoot && allBuildish) target = buildRoot
-    }
-    if (!target) continue
-    for (const member of page.members) {
-      if (target.members.some((m) => m.path === member.path)) continue
-      target.members.push({
-        path: member.path,
-        role: member.role === 'attached' ? 'attached' : 'supporting'
-      })
-    }
-    page.members = []
-    pages.splice(pages.indexOf(page), 1)
-  }
-
-  // 第六步:按目录前缀建主题树(超深折叠到第 4 层),子项够多的主题生成总览页
-  const leafPages = pages.filter((p) => p.kind === 'leaf')
-  const { topics: rootTopics, overviewPages } = assembleTopics(input, leafPages)
   pages.push(...overviewPages)
+  const leafPages = pages.filter((page) => page.kind === 'leaf')
 
-  // 第七步:统一算证据量与超限标记
   for (const page of pages) {
     page.members.sort((a, b) => byCodeUnit(a.path, b.path))
     page.evidenceTokens = page.members
-      .filter((m) => m.role !== 'attached')
-      .reduce((sum, m) => {
-        const member = byPath.get(m.path)
-        return sum + (member ? tokensOf(member) : 0)
+      .filter((member) => memberOwnsEvidence(member.role))
+      .reduce((sum, member) => {
+        const file = byPath.get(member.path)
+        return sum + (file ? tokensOf(file) : 0)
       }, 0)
     page.oversized = page.kind === 'leaf' && page.evidenceTokens > PLAN_PAGE_EVIDENCE_TOKEN_CAP
   }
@@ -274,7 +249,7 @@ export function buildWikiPlan(input: WikiPlanInput): WikiPlan {
   return {
     version: WIKI_PLAN_VERSION,
     projectName: input.projectName,
-    topics: rootTopics.sort((a, b) => byCodeUnit(a.dir, b.dir)),
+    topics: rootTopics,
     rootPageIds: rootPages.map((p) => p.id),
     pages,
     hubs: [...hubs].sort(byCodeUnit),

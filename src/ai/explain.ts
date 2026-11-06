@@ -38,6 +38,8 @@ export async function explainWithMessages(
   opts?: {
     allowThinking?: boolean
     /** 复读机重答前的收尾令:聊天场景发 reset 把已吐的字收回;不传就静默重答 */ onRestart?: () => void
+    temperature?: number
+    responseFormat?: Record<string, unknown>
   }
 ): Promise<AiExplainResult> {
   const startedAt = Date.now()
